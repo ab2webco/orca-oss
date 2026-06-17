@@ -1030,14 +1030,32 @@
 .mobile-emulator-tab-intro-callout--menu::before {
   content: '';
   position: absolute;
-  top: -5px;
-  left: 0.75rem;
-  width: 10px;
-  height: 10px;
-  transform: rotate(45deg);
-  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  background: color-mix(in srgb, var(--card) 80%, var(--background));
+  top: -7px;
+  left: 0.8125rem;
+  border-style: solid;
+  border-width: 0 7px 7px;
+  /* Why: use foreground + border to create a subtle shadow that adapts to theme */
+  border-color: transparent transparent color-mix(in srgb, var(--foreground) 10%, var(--border))
+    transparent;
+}
+
+.mobile-emulator-tab-intro-callout--menu::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 0.8125rem;
+  border-style: solid;
+  border-width: 0 6px 6px;
+  border-color: transparent transparent var(--muted) transparent;
+}
+
+.dark .mobile-emulator-tab-intro-callout--menu::before {
+  /* Why: use foreground + border to create a subtle shadow that adapts to theme */
+  border-bottom-color: color-mix(in srgb, var(--foreground) 12%, var(--border));
+}
+
+.dark .mobile-emulator-tab-intro-callout--menu::after {
+  border-bottom-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
 
 /* Why: anchor the optional setup card over the emulator without blurring the
