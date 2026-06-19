@@ -582,6 +582,18 @@
             "de50bef680": "macOS 正在阻止 Orca 通知"
           }
         }
+      },
+      "agentRateLimitAutoSwitchRunner": {
+        "07ff1f8806": "Auto-switch is disabled.",
+        "7e5d87791a": "Auto-switch is not available for SSH terminals because account auth lives on the remote host.",
+        "d823b157d5": "No managed {{value0}} account with available quota was found.",
+        "79751c2c2d": "Could not build a resume command for the limited agent session.",
+        "13668a6034": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "9553d26436": "The terminal did not accept the resume command after switching accounts.",
+        "13ccffb514": "The resumed agent did not take over the terminal in time.",
+        "65d1f14b75": "The resumed agent did not accept the continue command.",
+        "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
       }
     },
     "hooks": {
@@ -4852,7 +4864,12 @@
           "remoteScopeAccounts": "正在显示由 {{value0}} 管理的账户。请在该服务器上添加或重新验证账户。",
           "remoteScopeAuthContext": "每个账户在 {{value0}} 上保留自己的登录上下文。",
           "remoteEmptyClaudeAccounts": "{{value0}} 上没有受管理的 Claude 账户。它使用其系统默认的 Claude 登录；请在该服务器上添加账户。",
-          "remoteEmptyCodexAccounts": "{{value0}} 上没有受管理的 Codex 账户。它使用其系统默认的 Codex 登录；请在该服务器上添加账户。"
+          "remoteEmptyCodexAccounts": "{{value0}} 上没有受管理的 Codex 账户。它使用其系统默认的 Codex 登录；请在该服务器上添加账户。",
+          "b28bb41f63": "Auto-switch Limited Agents",
+          "7d2634bfa1": "When a live Claude or Codex session hits an account limit, Orca can switch to another managed account and resume the same session.",
+          "5d6a7e20ef": "Exits the limited Claude or Codex agent, selects a managed account with available quota, resumes the provider session, then sends continue.",
+          "0f9197cfde": "Enabled",
+          "a103114594": "Enable"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",
@@ -6996,7 +7013,9 @@
             "d2c6a0e8f1": "grok",
             "c1b5f9d7e0": "xai",
             "b0a4e8c6d9": "OAuth",
-            "a9f3d7b5c8": "登录"
+            "a9f3d7b5c8": "登录",
+            "0b0fd87891": "Auto-switch Limited Agents",
+            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit."
           }
         },
         "advanced": {
@@ -12961,6 +12980,16 @@
         "searchLabels": "筛选标签…",
         "searchAssignee": "筛选负责人…",
         "back": "返回"
+      },
+      "terminalPane": {
+        "TerminalPane": {
+          "3200325804": "Switching managed accounts and resuming the same session.",
+          "34f715e07e": "{{value0}} account limit detected.",
+          "e0e6981a0e": "{{value0}} session resumed.",
+          "f8d8f16aca": "Switched to {{value0}} and sent continue.",
+          "816627b20e": "{{value0}} auto-switch skipped.",
+          "8bb13ef78d": "{{value0}} auto-switch failed."
+        }
       }
     },
     "i18n": {

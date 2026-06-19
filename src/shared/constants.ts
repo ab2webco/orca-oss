@@ -315,6 +315,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     activeCodexManagedAccountIdsByRuntime: { host: null, wsl: {} },
     claudeManagedAccounts: [],
     activeClaudeManagedAccountId: null,
+    autoSwitchRateLimitedAccounts: false,
     terminalScopeHistoryByWorktree: true,
     terminalHiddenViewParking: true,
     terminalMainSideEffectAuthority: true,

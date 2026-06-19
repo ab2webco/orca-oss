@@ -582,6 +582,18 @@
             "de50bef680": "macOS가 Orca 알림을 차단하고 있습니다"
           }
         }
+      },
+      "agentRateLimitAutoSwitchRunner": {
+        "07ff1f8806": "Auto-switch is disabled.",
+        "7e5d87791a": "Auto-switch is not available for SSH terminals because account auth lives on the remote host.",
+        "d823b157d5": "No managed {{value0}} account with available quota was found.",
+        "79751c2c2d": "Could not build a resume command for the limited agent session.",
+        "13668a6034": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "9553d26436": "The terminal did not accept the resume command after switching accounts.",
+        "13ccffb514": "The resumed agent did not take over the terminal in time.",
+        "65d1f14b75": "The resumed agent did not accept the continue command.",
+        "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
       }
     },
     "hooks": {
@@ -4852,7 +4864,12 @@
           "remoteScopeAccounts": "{{value0}}에서 관리하는 계정을 표시하고 있습니다. 계정 추가나 재인증은 해당 서버에서 진행하세요.",
           "remoteScopeAuthContext": "각 계정은 {{value0}}에 자체 로그인 컨텍스트를 유지합니다.",
           "remoteEmptyClaudeAccounts": "{{value0}}에 관리되는 Claude 계정이 없습니다. 해당 서버의 시스템 기본 Claude 로그인을 사용하며, 계정 추가는 그 서버에서 진행하세요.",
-          "remoteEmptyCodexAccounts": "{{value0}}에 관리되는 Codex 계정이 없습니다. 해당 서버의 시스템 기본 Codex 로그인을 사용하며, 계정 추가는 그 서버에서 진행하세요."
+          "remoteEmptyCodexAccounts": "{{value0}}에 관리되는 Codex 계정이 없습니다. 해당 서버의 시스템 기본 Codex 로그인을 사용하며, 계정 추가는 그 서버에서 진행하세요.",
+          "b28bb41f63": "Auto-switch Limited Agents",
+          "7d2634bfa1": "When a live Claude or Codex session hits an account limit, Orca can switch to another managed account and resume the same session.",
+          "5d6a7e20ef": "Exits the limited Claude or Codex agent, selects a managed account with available quota, resumes the provider session, then sends continue.",
+          "0f9197cfde": "Enabled",
+          "a103114594": "Enable"
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",
@@ -6996,7 +7013,9 @@
             "d2c6a0e8f1": "grok",
             "c1b5f9d7e0": "xai",
             "b0a4e8c6d9": "OAuth",
-            "a9f3d7b5c8": "로그인"
+            "a9f3d7b5c8": "로그인",
+            "0b0fd87891": "Auto-switch Limited Agents",
+            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit."
           }
         },
         "advanced": {
@@ -12961,6 +12980,16 @@
         "searchLabels": "레이블 필터…",
         "searchAssignee": "담당자 필터…",
         "back": "뒤로"
+      },
+      "terminalPane": {
+        "TerminalPane": {
+          "3200325804": "Switching managed accounts and resuming the same session.",
+          "34f715e07e": "{{value0}} account limit detected.",
+          "e0e6981a0e": "{{value0}} session resumed.",
+          "f8d8f16aca": "Switched to {{value0}} and sent continue.",
+          "816627b20e": "{{value0}} auto-switch skipped.",
+          "8bb13ef78d": "{{value0}} auto-switch failed."
+        }
       }
     },
     "i18n": {
