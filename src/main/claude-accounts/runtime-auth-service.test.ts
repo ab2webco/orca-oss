@@ -3657,6 +3657,138 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  it('injects a worktree-pinned WSL account instead of the global WSL selection', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const globalAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'global-account',
+      createClaudeCredentialsJson('global@example.com', 'global-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('pinned-account', pinnedAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/pinned/auth'
+        }),
+        createClaudeAccount('global-account', globalAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/global/auth'
+        })
+      ],
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: { Ubuntu: 'global-account' } }
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu',
+      overrideAccountId: 'pinned-account'
+    })
+
+    expect(preparation).toMatchObject({
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu',
+      wslLinuxConfigDir: '/home/alice/.local/share/orca/claude-accounts/pinned/auth',
+      provenance: 'managed:pinned-account:wsl:injected:Ubuntu',
+      stripAuthEnv: true
+    })
+    // The override bypasses materialization entirely: the global WSL selection
+    // (still pointing at global-account) must be left untouched.
+    expect(store.updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the global WSL selection and warns when the pinned account WSL distro does not match the launch', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-debian-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const ubuntuAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'ubuntu-account',
+      createClaudeCredentialsJson('ubuntu@example.com', 'ubuntu-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('pinned-debian-account', pinnedAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Debian',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/pinned-debian/auth'
+        }),
+        createClaudeAccount('ubuntu-account', ubuntuAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/ubuntu/auth'
+        })
+      ],
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: { Ubuntu: 'ubuntu-account' } }
+    })
+    const store = createStore(settings)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu',
+      overrideAccountId: 'pinned-debian-account'
+    })
+
+    expect(preparation).toMatchObject({
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu',
+      wslLinuxConfigDir: '/home/alice/.local/share/orca/claude-accounts/ubuntu/auth',
+      provenance: 'managed:ubuntu-account:wsl:Ubuntu'
+    })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('pinned-debian-account'))
+    warn.mockRestore()
+  })
+
+  it('falls back to global host selection and warns when a WSL-pinned account is used for a host launch', async () => {
+    const wslAccountPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'wsl-account',
+      createClaudeCredentialsJson('wsl@example.com', 'wsl-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('wsl-account', wslAccountPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/wsl-account/auth'
+        })
+      ],
+      activeClaudeManagedAccountId: null
+    })
+    const store = createStore(settings)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'wsl-account'
+    })
+
+    expect(preparation).toMatchObject({
+      runtime: 'host',
+      provenance: 'system',
+      stripAuthEnv: false
+    })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('wsl-account'))
+    warn.mockRestore()
+  })
+
   it('does not clobber fresh Claude credentials after clearLastWrittenCredentialsJson', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     const originalCredentials = createClaudeCredentialsJson('user@example.com', 'original')

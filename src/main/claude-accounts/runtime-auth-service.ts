@@ -30,6 +30,7 @@ import {
   writeManagedClaudeKeychainCredentials
 } from './keychain'
 import {
+  getClaudeWslSelectionKey,
   getSelectedClaudeAccountIdForTarget,
   normalizeClaudeAccountSelectionTarget,
   normalizeClaudeRuntimeSelection,
@@ -182,10 +183,13 @@ export class ClaudeRuntimeAuthService {
   private async doSyncForCurrentSelection(target?: ClaudeAccountSelectionTarget): Promise<void> {
     const settings = this.store.getSettings()
     const effectiveTarget = this.resolveWslDefaultTarget(target)
-    // Injected (per-worktree pinned) host accounts bypass materialization: the
-    // launch injects a per-terminal CLAUDE_CONFIG_DIR instead of mutating shared
-    // ~/.claude or the global switch-block. Mirrors the WSL early-return below.
-    if (this.resolveInjectedHostAccount(effectiveTarget, settings)) {
+    // Injected (per-worktree pinned) accounts bypass materialization: the
+    // launch injects a per-terminal CLAUDE_CONFIG_DIR (host) or Linux
+    // CLAUDE_CONFIG_DIR (WSL) instead of mutating shared ~/.claude or the
+    // global switch-block/selection. Mirrors the WSL early-return below.
+    // warnOnMismatch: true makes this the single point per sync cycle that
+    // logs a runtime-incompatible override before falling back to global.
+    if (this.resolveInjectedAccount(effectiveTarget, settings, { warnOnMismatch: true })) {
       return
     }
     const normalizedTarget = normalizeClaudeAccountSelectionTarget(effectiveTarget)
@@ -652,19 +656,32 @@ export class ClaudeRuntimeAuthService {
     const normalizedTarget = this.resolveWslDefaultTarget(
       target ?? this.getDefaultAccountSelectionTarget(settings)
     )
-    // Per-worktree pinned host account: inject the account's own config dir
-    // (WSL-shaped) instead of materializing it into shared ~/.claude, so multiple
-    // worktrees can run different accounts concurrently. Mirrors the WSL path.
-    const injectedHostAccount = this.resolveInjectedHostAccount(normalizedTarget, settings)
-    if (injectedHostAccount) {
+    // Per-worktree pinned account: inject the account's own config dir instead
+    // of materializing it into shared ~/.claude (host) or using the global WSL
+    // selection, so multiple worktrees can run different accounts concurrently.
+    // A host override injects its managedAuthPath; a WSL override injects its
+    // wslLinuxAuthPath, mirroring the global-selection WSL branch below.
+    const injectedAccount = this.resolveInjectedAccount(normalizedTarget, settings)
+    if (injectedAccount?.managedAuthRuntime === 'wsl' && injectedAccount.wslLinuxAuthPath) {
       return {
-        configDir: injectedHostAccount.managedAuthPath,
+        configDir: injectedAccount.managedAuthPath,
+        runtime: 'wsl',
+        wslDistro: injectedAccount.wslDistro ?? null,
+        wslLinuxConfigDir: injectedAccount.wslLinuxAuthPath,
+        envPatch: { CLAUDE_CONFIG_DIR: injectedAccount.wslLinuxAuthPath },
+        stripAuthEnv: true,
+        provenance: `managed:${injectedAccount.id}:wsl:injected:${injectedAccount.wslDistro ?? ''}`
+      }
+    }
+    if (injectedAccount && injectedAccount.managedAuthRuntime !== 'wsl') {
+      return {
+        configDir: injectedAccount.managedAuthPath,
         runtime: 'host',
         wslDistro: null,
         wslLinuxConfigDir: null,
-        envPatch: { CLAUDE_CONFIG_DIR: injectedHostAccount.managedAuthPath },
+        envPatch: { CLAUDE_CONFIG_DIR: injectedAccount.managedAuthPath },
         stripAuthEnv: true,
-        provenance: `managed:${injectedHostAccount.id}:injected`
+        provenance: `managed:${injectedAccount.id}:injected`
       }
     }
     const activeAccountId = getSelectedClaudeAccountIdForTarget(settings, normalizedTarget)
@@ -741,28 +758,52 @@ export class ClaudeRuntimeAuthService {
     return accounts.find((account) => account.id === activeAccountId) ?? null
   }
 
-  // Resolves a per-worktree pinned host account into the account to inject, or
-  // null to fall back to the global selection. Only valid, Orca-owned host
-  // accounts qualify — a missing/foreign/WSL override is ignored so unassigned
-  // (and misconfigured) worktrees keep today's global behavior.
-  private resolveInjectedHostAccount(
+  // Resolves a per-worktree pinned account into the account to inject, or null
+  // to fall back to the global selection. A host worktree only honors a host
+  // override; a WSL worktree only honors a WSL override whose distro matches
+  // the launch (or the default distro when the target has none). On a runtime/
+  // distro mismatch, warns once (when requested) and falls back to global. A
+  // missing/foreign/unowned override is ignored silently, so unassigned (and
+  // misconfigured) worktrees keep today's global behavior.
+  private resolveInjectedAccount(
     target: ClaudeAccountSelectionTarget | undefined,
-    settings = this.store.getSettings()
+    settings = this.store.getSettings(),
+    options: { warnOnMismatch?: boolean } = {}
   ): ClaudeManagedAccount | null {
     const overrideAccountId = target?.overrideAccountId
     if (!overrideAccountId) {
       return null
     }
     const account = this.getActiveAccount(settings.claudeManagedAccounts, overrideAccountId)
-    if (
-      account &&
-      account.managedAuthRuntime !== 'wsl' &&
-      account.managedAuthPath &&
-      this.getOwnedManagedAuthPath(account)
-    ) {
-      return account
+    if (!account) {
+      return null
     }
-    return null
+    const normalizedTarget = normalizeClaudeAccountSelectionTarget(target)
+    const accountIsWsl = account.managedAuthRuntime === 'wsl'
+    const runtimeMismatch =
+      (normalizedTarget.runtime === 'host' && accountIsWsl) ||
+      (normalizedTarget.runtime === 'wsl' &&
+        (!accountIsWsl ||
+          getClaudeWslSelectionKey(account.wslDistro) !==
+            getClaudeWslSelectionKey(normalizedTarget.wslDistro)))
+    if (runtimeMismatch) {
+      if (options.warnOnMismatch) {
+        console.warn(
+          `[claude-runtime-auth] Worktree-pinned Claude account ${account.id} runtime (${
+            accountIsWsl ? `wsl:${account.wslDistro ?? 'default'}` : 'host'
+          }) does not match the launch runtime (${
+            normalizedTarget.runtime === 'wsl'
+              ? `wsl:${normalizedTarget.wslDistro ?? 'default'}`
+              : 'host'
+          }); falling back to global account selection`
+        )
+      }
+      return null
+    }
+    if (!accountIsWsl) {
+      return account.managedAuthPath && this.getOwnedManagedAuthPath(account) ? account : null
+    }
+    return account.wslLinuxAuthPath && this.getOwnedManagedAuthPath(account) ? account : null
   }
 
   // macOS only: Claude Code 2.1+ reads Keychain credentials from a config-dir-
@@ -787,8 +828,10 @@ export class ClaudeRuntimeAuthService {
     const normalizedTarget = this.resolveWslDefaultTarget(
       target ?? this.getDefaultAccountSelectionTarget()
     )
-    const account = this.resolveInjectedHostAccount(normalizedTarget)
-    if (!account) {
+    const account = this.resolveInjectedAccount(normalizedTarget)
+    // WSL accounts are isolated by their own Linux CLAUDE_CONFIG_DIR and need
+    // no Keychain seed (see WSL comment on doSyncForCurrentSelection above).
+    if (!account || account.managedAuthRuntime === 'wsl') {
       return
     }
     try {
