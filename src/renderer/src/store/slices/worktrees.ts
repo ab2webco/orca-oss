@@ -2940,6 +2940,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     options
   ) => {
     const automationProvenanceRequest = options?.automationProvenanceRequest
+    const claudeAccountId = options?.claudeAccountId
     const retryableConflictPatterns = [
       /already exists locally/i,
       /already exists on a remote/i,
@@ -2993,6 +2994,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(manualOrder !== undefined ? { manualOrder } : {}),
             ...(parentWorkspace ? { parentWorkspace } : {}),
             ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
+            ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
             ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
             ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
             ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),
@@ -3038,6 +3040,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(manualOrder !== undefined ? { manualOrder } : {}),
                     ...(parentWorkspace ? { parentWorkspace } : {}),
                     ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
+                    ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
                     ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
                     ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
                     ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),

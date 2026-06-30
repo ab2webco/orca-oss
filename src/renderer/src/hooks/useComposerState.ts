@@ -383,7 +383,9 @@ export type UseComposerStateResult = {
   promptTextareaRef: React.RefObject<HTMLTextAreaElement | null>
   nameInputRef: React.RefObject<HTMLInputElement | null>
   submit: () => Promise<void>
-  submitQuick: (agent: TuiAgent | null) => Promise<void>
+  /** `claudeAccountId` pins the new worktree to a managed Claude account.
+   *  Omitted/null = inherit the global host selection. */
+  submitQuick: (agent: TuiAgent | null, claudeAccountId?: string | null) => Promise<void>
   /** Invoked by the Enter handler to re-check whether submission should fire. */
   createDisabled: boolean
 }
@@ -3835,8 +3837,11 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   }, [])
 
   const submitQuick = useCallback(
-    async (requestedAgent: TuiAgent | null): Promise<void> => {
+    async (requestedAgent: TuiAgent | null, claudeAccountId?: string | null): Promise<void> => {
       if (isProjectGroupTarget) {
+        // Why: folder workspaces don't yet resolve a single worktree runtime
+        // to pin an account to, so a per-worktree Claude account choice (if
+        // any) is intentionally dropped here rather than silently mis-applied.
         await submitFolderTarget(requestedAgent)
         return
       }
@@ -4161,6 +4166,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           ...(resolvedInitialWorkspaceStatus
             ? { workspaceStatus: resolvedInitialWorkspaceStatus }
             : {}),
+          ...(claudeAccountId ? { claudeAccountId } : {}),
           ...(smartGitHubResolution.kind === 'none' && linkedGitLabMR != null
             ? { linkedGitLabMR }
             : {}),

@@ -68,6 +68,9 @@ export type WorktreeCreationRequest = {
   linkedLinearIssueOrganizationUrlKey?: string | null
   branchNameOverride?: string
   workspaceStatus?: WorkspaceStatus
+  /** Claude managed account to pin this worktree to at creation. Omitted/null
+   *  = inherit the global host selection. */
+  claudeAccountId?: string | null
   linkedGitLabMR?: number
   linkedGitLabIssue?: number
   linkedBitbucketPR?: number | null
