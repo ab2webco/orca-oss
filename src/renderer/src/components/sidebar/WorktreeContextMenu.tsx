@@ -26,6 +26,7 @@ import {
   Kanban,
   Trash2,
   Unlink,
+  UserCog,
   Workflow,
   FolderInput,
   FolderPlus,
@@ -35,7 +36,11 @@ import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { useAllWorktrees, useRepoById, useRepoMap, useWorktreeMap } from '@/store/selectors'
 import { cn } from '@/lib/utils'
-import type { Repo, Worktree } from '../../../../shared/types'
+import {
+  filterClaudeAccountsByRuntime,
+  INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE
+} from '@/lib/claude-account-runtime-filter'
+import type { ClaudeManagedAccountSummary, Repo, Worktree } from '../../../../shared/types'
 import { runWorktreeBatchDelete, runWorktreeDelete } from './delete-worktree-flow'
 import { runSleepWorktrees } from './sleep-worktree-flow'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -284,6 +289,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const repo = useRepoById(worktree.repoId)
   const deleteState = useAppStore((s) => s.deleteStateByWorktreeId[worktree.id])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 })
   const [contextWorktrees, setContextWorktrees] = useState<readonly Worktree[]>(
     effectiveSelectedWorktrees
@@ -359,6 +365,28 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       ? status
       : ''
   }, [activeContextWorktrees, workspaceStatuses])
+  // Why: per-worktree account pinning is filtered by runtime (host vs WSL),
+  // keyed off the on-disk path — same signal the backend uses (a worktree's
+  // path itself reveals whether it lives on a WSL filesystem). Multi-select
+  // uses the first item's path as the representative runtime; an account
+  // mismatched to any other selected item's runtime is simply ignored at
+  // launch (falls back to global), same as a foreign/invalid assignment.
+  const filteredClaudeAccounts = useMemo(
+    () => filterClaudeAccountsByRuntime(claudeAccounts, activeContextWorktrees[0]?.path),
+    [activeContextWorktrees, claudeAccounts]
+  )
+  const contextClaudeAccountId = useMemo(() => {
+    const [first, ...rest] = activeContextWorktrees
+    if (!first) {
+      return ''
+    }
+    const accountId = first.claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE
+    return rest.every(
+      (item) => (item.claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE) === accountId
+    )
+      ? accountId
+      : ''
+  }, [activeContextWorktrees])
   const batchDeleteWorktrees = useMemo(
     () =>
       activeContextWorktrees.filter((item) => {
@@ -424,6 +452,25 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     []
   )
 
+  // Why: fetch managed Claude accounts only while the menu is open, mirroring
+  // selectMenuScopedMap's gating philosophy above — with potentially many
+  // sidebar rows mounted, an unconditional fetch-on-mount would fire one IPC
+  // call per row instead of once per actual open.
+  useEffect(() => {
+    if (!menuOpen) {
+      return
+    }
+    let cancelled = false
+    void window.api.claudeAccounts.list().then((result) => {
+      if (!cancelled) {
+        setClaudeAccounts(result.accounts)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [menuOpen])
+
   const handleCopyPath = useCallback(() => {
     window.api.ui.writeClipboardText(worktree.path)
   }, [worktree.path])
@@ -485,6 +532,20 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       )
     },
     [activeContextWorktrees, setMenuOpenState, updateWorktreeMeta, workspaceStatuses]
+  )
+
+  const handleAssignClaudeAccount = useCallback(
+    (accountId: string | null) => {
+      setMenuOpenState(false)
+      void Promise.all(
+        activeContextWorktrees.map((item) =>
+          (item.claudeAccountId ?? null) === accountId
+            ? Promise.resolve()
+            : updateWorktreeMeta(item.id, { claudeAccountId: accountId })
+        )
+      )
+    },
+    [activeContextWorktrees, setMenuOpenState, updateWorktreeMeta]
   )
 
   const handleRename = useCallback(() => {
@@ -731,6 +792,44 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          {filteredClaudeAccounts.length > 0 ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={deletingContext}>
+                <UserCog className="size-3.5" />
+                {isMultiContext
+                  ? translate(
+                      'auto.components.sidebar.WorktreeContextMenu.assignAccountsTo',
+                      'Assign Accounts To'
+                    )
+                  : translate(
+                      'auto.components.sidebar.WorktreeContextMenu.assignAccount',
+                      'Assign Account'
+                    )}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-48">
+                <DropdownMenuRadioGroup value={contextClaudeAccountId}>
+                  <DropdownMenuRadioItem
+                    value={INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}
+                    onSelect={() => handleAssignClaudeAccount(null)}
+                  >
+                    {translate(
+                      'auto.components.sidebar.WorktreeContextMenu.inheritGlobalAccount',
+                      'Inherit global'
+                    )}
+                  </DropdownMenuRadioItem>
+                  {filteredClaudeAccounts.map((account) => (
+                    <DropdownMenuRadioItem
+                      key={account.id}
+                      value={account.id}
+                      onSelect={() => handleAssignClaudeAccount(account.id)}
+                    >
+                      <span className="max-w-48 truncate">{account.email}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
           <DropdownMenuSeparator />
           {!isMultiContext && (
             <>
