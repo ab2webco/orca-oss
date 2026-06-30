@@ -1108,9 +1108,14 @@ export default function NewWorkspaceComposerCard({
           </div>
           {claudeAccounts.length > 0 ? (
             <div className="min-w-0 flex-1 space-y-1">
-              <label className="block text-xs font-medium text-muted-foreground">
-                {translate('auto.components.NewWorkspaceComposerCard.claudeAccount', 'Account')}
-              </label>
+              {/* Why: match the Agent column's header height (its row carries a
+                  size-5 settings button), so both fields' inputs share a
+                  baseline instead of the Account input sitting ~4px higher. */}
+              <div className="flex h-5 items-center">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {translate('auto.components.NewWorkspaceComposerCard.claudeAccount', 'Account')}
+                </label>
+              </div>
               <Select
                 value={claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}
                 onValueChange={(value) =>
