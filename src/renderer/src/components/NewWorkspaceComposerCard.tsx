@@ -1100,6 +1100,10 @@ export default function NewWorkspaceComposerCard({
               onSetDefault={handleSetDefaultAgent}
               triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
               onTriggerEnter={createDisabled ? undefined : onCreate}
+              // Why: when the Account selector shares this row, each column is
+              // ~50% width (< the combobox's default 260px min), so allow a
+              // narrow trigger to prevent the Agent field overflowing into it.
+              allowNarrowTrigger={claudeAccounts.length > 0}
             />
           </div>
           {claudeAccounts.length > 0 ? (
