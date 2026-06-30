@@ -1215,7 +1215,9 @@
         "noRunTargets": "No hay destinos de ejecución listos para este proyecto.",
         "perWorkspaceEnvHint": "Provisiona un entorno bajo demanda a partir de una receta",
         "branchName": "Nombre de rama",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "claudeAccount": "Account",
+        "claudeAccountInheritGlobal": "Inherit global"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Crear worktree",
@@ -4205,7 +4207,10 @@
           "setParentWorkspace": "Establecer worktree padre...",
           "workspaceSection": "Espacio de trabajo",
           "primaryDeleteDisabled": "El worktree principal no se puede eliminar. Quita el proyecto en su lugar.",
-          "deleteWorktree": "Eliminar worktree"
+          "deleteWorktree": "Eliminar worktree",
+          "assignAccountsTo": "Assign Accounts To",
+          "assignAccount": "Assign Account",
+          "inheritGlobalAccount": "Inherit global"
         },
         "WorktreeList": {
           "d880ea0744": "Crea un grupo y mueve este proyecto a él.",

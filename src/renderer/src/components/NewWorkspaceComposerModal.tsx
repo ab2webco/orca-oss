@@ -18,6 +18,7 @@ import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import type {
+  ClaudeManagedAccountSummary,
   TuiAgent,
   WorkspaceCreateTelemetrySource,
   WorkspaceStatus
@@ -26,6 +27,7 @@ import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/folder-workspace-composer-helpers'
+import { filterClaudeAccountsByRuntime } from '@/lib/claude-account-runtime-filter'
 
 type ComposerModalData = {
   prefilledName?: string
@@ -176,14 +178,63 @@ function QuickTabBody({
   const handleQuickAgentChange = useCallback((agent: TuiAgent | null) => {
     setQuickAgentOverride(agent)
   }, [])
-
-  const handleCreate = useCallback(async (): Promise<void> => {
-    await submitQuick(quickAgent)
-  }, [quickAgent, submitQuick])
   const selectedProjectOption = cardProps.projectOptions.find(
     (option) => option.id === cardProps.selectedProjectId
   )
   const isFolderWorkspaceTarget = selectedProjectOption?.kind === 'project-group'
+
+  // Why: managed Claude accounts are fetched once per modal open (the modal
+  // fully unmounts on close), mirroring the `claudeAccounts:list` fetch other
+  // account surfaces (e.g. StatusBar) perform on open rather than caching.
+  const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
+  useEffect(() => {
+    let cancelled = false
+    void window.api.claudeAccounts.list().then((result) => {
+      if (!cancelled) {
+        setClaudeAccounts(result.accounts)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const [claudeAccountId, setClaudeAccountId] = useState<string | null>(null)
+  // Why: per-worktree account pinning only takes effect for local git-worktree
+  // launches (pty.ts skips SSH-remote spawns, and folder workspaces route
+  // through a separate submit path that does not forward this field yet) — so
+  // the picker is hidden, not merely irrelevant, for those targets. Filtering
+  // also drops accounts whose runtime (host vs WSL) doesn't match the target
+  // repo's on-disk path, mirroring the backend's own runtime compatibility
+  // check.
+  const filteredClaudeAccounts = useMemo(
+    () =>
+      isFolderWorkspaceTarget || cardProps.selectedRepoIsRemote
+        ? []
+        : filterClaudeAccountsByRuntime(claudeAccounts, cardProps.selectedRepoPath),
+    [
+      cardProps.selectedRepoIsRemote,
+      cardProps.selectedRepoPath,
+      claudeAccounts,
+      isFolderWorkspaceTarget
+    ]
+  )
+  if (
+    claudeAccountId &&
+    !filteredClaudeAccounts.some((account) => account.id === claudeAccountId)
+  ) {
+    // Why: a repo/target switch (or account removal) can invalidate a
+    // previously selected account; repair during render so the Select never
+    // shows a value that isn't in its own option list. Mirrors the
+    // quickAgentOverride repair above.
+    setClaudeAccountId(null)
+  }
+  const handleClaudeAccountIdChange = useCallback((accountId: string | null) => {
+    setClaudeAccountId(accountId)
+  }, [])
+
+  const handleCreate = useCallback(async (): Promise<void> => {
+    await submitQuick(quickAgent, claudeAccountId)
+  }, [claudeAccountId, quickAgent, submitQuick])
   const primaryActionLabel = isFolderWorkspaceTarget
     ? getFolderWorkspacePrimaryActionLabel()
     : cardProps.selectedRepoIsGit
@@ -267,6 +318,9 @@ function QuickTabBody({
         nameInputRef={nameInputRef}
         quickAgent={quickAgent}
         onQuickAgentChange={handleQuickAgentChange}
+        claudeAccounts={filteredClaudeAccounts}
+        claudeAccountId={claudeAccountId}
+        onClaudeAccountIdChange={handleClaudeAccountIdChange}
         {...cardProps}
         primaryActionLabel={primaryActionLabel}
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}

@@ -21,6 +21,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { SettingsSwitch } from '@/components/settings/SettingsFormControls'
 import type RepoCombobox from '@/components/repo/RepoCombobox'
@@ -38,7 +45,9 @@ import {
 import { getScreenSubmitModifierLabel } from '@/lib/screen-submit-shortcut'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { filterEnabledTuiAgents } from '../../../shared/tui-agent-selection'
+import { INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE } from '@/lib/claude-account-runtime-filter'
 import type {
+  ClaudeManagedAccountSummary,
   GitHubWorkItem,
   GitLabWorkItem,
   LinearIssue,
@@ -78,6 +87,11 @@ type NewWorkspaceComposerCardProps = {
   nameInputRef?: React.RefObject<HTMLInputElement | null>
   quickAgent: TuiAgent | null
   onQuickAgentChange: (agent: TuiAgent | null) => void
+  /** Managed Claude accounts compatible with the target worktree's runtime
+   *  (host vs WSL) — pre-filtered by the caller. Empty hides the selector. */
+  claudeAccounts: ClaudeManagedAccountSummary[]
+  claudeAccountId: string | null
+  onClaudeAccountIdChange: (accountId: string | null) => void
   eligibleRepos: RepoOption[]
   repoId: string
   projectOptions?: NewWorkspaceProjectOption[]
@@ -543,6 +557,9 @@ export default function NewWorkspaceComposerCard({
   nameInputRef,
   quickAgent,
   onQuickAgentChange,
+  claudeAccounts,
+  claudeAccountId,
+  onClaudeAccountIdChange,
   eligibleRepos,
   repoId,
   projectOptions = EMPTY_PROJECT_OPTIONS,
@@ -1037,49 +1054,86 @@ export default function NewWorkspaceComposerCard({
           </div>
         </div>
 
-        <div className="space-y-1" data-contextual-tour-target="workspace-creation-agent">
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs font-medium text-muted-foreground">
-              {translate('auto.components.NewWorkspaceComposerCard.01d1e8f601', 'Agent')}
-            </label>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={onOpenAgentSettings}
-                  // Why: keep Tab flow Name → Agent combobox. This settings
-                  // shortcut is a detour; making it tabbable forces a keystroke
-                  // on every workspace creation.
-                  tabIndex={-1}
-                  className="size-5 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
-                  aria-label={translate(
-                    'auto.components.NewWorkspaceComposerCard.ab63f25397',
-                    'Open agent settings'
+        <div className="flex gap-2">
+          <div
+            className="min-w-0 flex-1 space-y-1"
+            data-contextual-tour-target="workspace-creation-agent"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-medium text-muted-foreground">
+                {translate('auto.components.NewWorkspaceComposerCard.01d1e8f601', 'Agent')}
+              </label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onOpenAgentSettings}
+                    // Why: keep Tab flow Name → Agent combobox. This settings
+                    // shortcut is a detour; making it tabbable forces a keystroke
+                    // on every workspace creation.
+                    tabIndex={-1}
+                    className="size-5 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+                    aria-label={translate(
+                      'auto.components.NewWorkspaceComposerCard.ab63f25397',
+                      'Open agent settings'
+                    )}
+                  >
+                    <Settings2 className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  {translate(
+                    'auto.components.NewWorkspaceComposerCard.ba64270bdb',
+                    'Configure agents'
                   )}
-                >
-                  <Settings2 className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={6}>
-                {translate(
-                  'auto.components.NewWorkspaceComposerCard.ba64270bdb',
-                  'Configure agents'
-                )}
-              </TooltipContent>
-            </Tooltip>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <AgentCombobox
+              agents={visibleQuickAgents}
+              value={quickAgent}
+              onValueChange={onQuickAgentChange}
+              onOpenManageAgents={onOpenAgentSettings}
+              defaultAgent={defaultTuiAgent}
+              onSetDefault={handleSetDefaultAgent}
+              triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
+              onTriggerEnter={createDisabled ? undefined : onCreate}
+            />
           </div>
-          <AgentCombobox
-            agents={visibleQuickAgents}
-            value={quickAgent}
-            onValueChange={onQuickAgentChange}
-            onOpenManageAgents={onOpenAgentSettings}
-            defaultAgent={defaultTuiAgent}
-            onSetDefault={handleSetDefaultAgent}
-            triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
-            onTriggerEnter={createDisabled ? undefined : onCreate}
-          />
+          {claudeAccounts.length > 0 ? (
+            <div className="min-w-0 flex-1 space-y-1">
+              <label className="block text-xs font-medium text-muted-foreground">
+                {translate('auto.components.NewWorkspaceComposerCard.claudeAccount', 'Account')}
+              </label>
+              <Select
+                value={claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}
+                onValueChange={(value) =>
+                  onClaudeAccountIdChange(
+                    value === INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE ? null : value
+                  )
+                }
+              >
+                <SelectTrigger className="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}>
+                    {translate(
+                      'auto.components.NewWorkspaceComposerCard.claudeAccountInheritGlobal',
+                      'Inherit global'
+                    )}
+                  </SelectItem>
+                  {claudeAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
         </div>
 
         {/* Why: Advanced is a disclosure header, so keep it visually grouped

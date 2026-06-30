@@ -1215,7 +1215,9 @@
         "noRunTargets": "此项目还没有可用的运行目标。",
         "perWorkspaceEnvHint": "通过环境模板按需创建环境",
         "branchName": "分支名称",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "claudeAccount": "Account",
+        "claudeAccountInheritGlobal": "Inherit global"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建工作树",
@@ -4186,7 +4188,10 @@
           "setParentWorkspace": "设置父工作树...",
           "workspaceSection": "工作区",
           "primaryDeleteDisabled": "主工作树不能删除。请改为移除项目。",
-          "deleteWorktree": "删除工作树"
+          "deleteWorktree": "删除工作树",
+          "assignAccountsTo": "Assign Accounts To",
+          "assignAccount": "Assign Account",
+          "inheritGlobalAccount": "Inherit global"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",

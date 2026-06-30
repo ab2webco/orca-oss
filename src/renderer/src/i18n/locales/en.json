@@ -1215,7 +1215,9 @@
         "noRunTargets": "No run targets are ready for this project.",
         "perWorkspaceEnvHint": "Provision an on-demand environment from a recipe",
         "branchName": "Branch name",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "claudeAccount": "Account",
+        "claudeAccountInheritGlobal": "Inherit global"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
@@ -4228,7 +4230,10 @@
           "setParentWorkspace": "Set Parent Worktree...",
           "workspaceSection": "Workspace",
           "primaryDeleteDisabled": "Primary worktree — can't be deleted. Remove the project instead.",
-          "deleteWorktree": "Delete Worktree"
+          "deleteWorktree": "Delete Worktree",
+          "assignAccountsTo": "Assign Accounts To",
+          "assignAccount": "Assign Account",
+          "inheritGlobalAccount": "Inherit global"
         },
         "WorktreeList": {
           "7a8b9c0d1e": "Update required",
