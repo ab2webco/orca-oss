@@ -629,6 +629,21 @@ function getCodexSelectionTargetForPty(
   return { runtime: 'host' }
 }
 
+// Resolves the per-worktree Claude account binding (if any) fresh at spawn time
+// and layers it onto the runtime selection target as an override. Unassigned
+// worktrees return the base target unchanged, preserving global selection.
+function getClaudeSelectionTargetForPty(
+  base: CodexAccountSelectionTarget,
+  store: Store | undefined,
+  worktreeId: string | undefined
+): ClaudeAccountSelectionTarget {
+  const overrideAccountId =
+    store && typeof worktreeId === 'string'
+      ? (store.getWorktreeMeta(worktreeId)?.claudeAccountId ?? undefined)
+      : undefined
+  return overrideAccountId ? { ...base, overrideAccountId } : base
+}
+
 function getCompatibleSelectedCodexHomePath(
   target: CodexAccountSelectionTarget,
   selectedCodexHomePath: string | null
@@ -2946,8 +2961,13 @@ export function registerPtyHandlers(
         cwd,
         terminalRuntimeOptions.terminalWindowsWslDistro ?? null
       )
+      const claudeSelectionTarget = getClaudeSelectionTargetForPty(
+        codexSelectionTarget,
+        store,
+        args.worktreeId
+      )
       const claudeAuth =
-        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(codexSelectionTarget) : null
+        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
       if (isClaudeLaunch && isClaudeAuthSwitchInProgress()) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
@@ -3672,8 +3692,13 @@ export function registerPtyHandlers(
         cwd,
         terminalRuntimeOptions.terminalWindowsWslDistro ?? null
       )
+      const claudeSelectionTarget = getClaudeSelectionTargetForPty(
+        initialSelectionTarget,
+        store,
+        args.worktreeId
+      )
       const claudeAuth =
-        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(initialSelectionTarget) : null
+        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
       spawnTiming.mark('auth')
       if (isClaudeLaunch && isClaudeAuthSwitchInProgress()) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')

@@ -181,6 +181,12 @@ export class ClaudeRuntimeAuthService {
   private async doSyncForCurrentSelection(target?: ClaudeAccountSelectionTarget): Promise<void> {
     const settings = this.store.getSettings()
     const effectiveTarget = this.resolveWslDefaultTarget(target)
+    // Injected (per-worktree pinned) host accounts bypass materialization: the
+    // launch injects a per-terminal CLAUDE_CONFIG_DIR instead of mutating shared
+    // ~/.claude or the global switch-block. Mirrors the WSL early-return below.
+    if (this.resolveInjectedHostAccount(effectiveTarget, settings)) {
+      return
+    }
     const normalizedTarget = normalizeClaudeAccountSelectionTarget(effectiveTarget)
     const activeAccountId = getSelectedClaudeAccountIdForTarget(settings, normalizedTarget)
     const activeAccount = this.getActiveAccount(settings.claudeManagedAccounts, activeAccountId)
@@ -645,6 +651,21 @@ export class ClaudeRuntimeAuthService {
     const normalizedTarget = this.resolveWslDefaultTarget(
       target ?? this.getDefaultAccountSelectionTarget(settings)
     )
+    // Per-worktree pinned host account: inject the account's own config dir
+    // (WSL-shaped) instead of materializing it into shared ~/.claude, so multiple
+    // worktrees can run different accounts concurrently. Mirrors the WSL path.
+    const injectedHostAccount = this.resolveInjectedHostAccount(normalizedTarget, settings)
+    if (injectedHostAccount) {
+      return {
+        configDir: injectedHostAccount.managedAuthPath,
+        runtime: 'host',
+        wslDistro: null,
+        wslLinuxConfigDir: null,
+        envPatch: { CLAUDE_CONFIG_DIR: injectedHostAccount.managedAuthPath },
+        stripAuthEnv: true,
+        provenance: `managed:${injectedHostAccount.id}:injected`
+      }
+    }
     const activeAccountId = getSelectedClaudeAccountIdForTarget(settings, normalizedTarget)
     const activeAccount = this.getActiveAccount(settings.claudeManagedAccounts, activeAccountId)
     if (
@@ -717,6 +738,30 @@ export class ClaudeRuntimeAuthService {
       return null
     }
     return accounts.find((account) => account.id === activeAccountId) ?? null
+  }
+
+  // Resolves a per-worktree pinned host account into the account to inject, or
+  // null to fall back to the global selection. Only valid, Orca-owned host
+  // accounts qualify — a missing/foreign/WSL override is ignored so unassigned
+  // (and misconfigured) worktrees keep today's global behavior.
+  private resolveInjectedHostAccount(
+    target: ClaudeAccountSelectionTarget | undefined,
+    settings = this.store.getSettings()
+  ): ClaudeManagedAccount | null {
+    const overrideAccountId = target?.overrideAccountId
+    if (!overrideAccountId) {
+      return null
+    }
+    const account = this.getActiveAccount(settings.claudeManagedAccounts, overrideAccountId)
+    if (
+      account &&
+      account.managedAuthRuntime !== 'wsl' &&
+      account.managedAuthPath &&
+      this.getOwnedManagedAuthPath(account)
+    ) {
+      return account
+    }
+    return null
   }
 
   private getDefaultAccountSelectionTarget(
