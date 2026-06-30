@@ -3706,6 +3706,44 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(store.updateSettings).not.toHaveBeenCalled()
   })
 
+  it('hasInjectedAccountOverride reports whether a target resolves to a valid pinned account', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)],
+      activeClaudeManagedAccountId: null
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    // A target whose overrideAccountId resolves to a valid owned host account
+    // is reported as injected — this is the synchronous check the PTY spawn
+    // gate uses to exempt the launch from the global switch-block.
+    expect(
+      service.hasInjectedAccountOverride({
+        runtime: 'host',
+        overrideAccountId: 'pinned-host-account'
+      })
+    ).toBe(true)
+
+    // No override at all: falls back to global selection, not injected.
+    expect(service.hasInjectedAccountOverride({ runtime: 'host' })).toBe(false)
+
+    // Override pointing at an account that does not exist: falls back to
+    // global selection, not injected.
+    expect(
+      service.hasInjectedAccountOverride({
+        runtime: 'host',
+        overrideAccountId: 'no-such-account'
+      })
+    ).toBe(false)
+  })
+
   it('falls back to the global WSL selection and warns when the pinned account WSL distro does not match the launch', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,

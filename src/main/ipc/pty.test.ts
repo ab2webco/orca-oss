@@ -209,7 +209,12 @@ import {
   isHiddenRendererPty
 } from './pty-hidden-delivery-gate'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { hasLiveClaudePtys, markClaudePtySpawned } from '../claude-accounts/live-pty-gate'
+import {
+  beginClaudeAuthSwitch,
+  endClaudeAuthSwitch,
+  hasLiveClaudePtys,
+  markClaudePtySpawned
+} from '../claude-accounts/live-pty-gate'
 import * as livePtyGate from '../claude-accounts/live-pty-gate'
 import {
   encodePowerShellCommand,
@@ -440,6 +445,11 @@ describe('registerPtyHandlers', () => {
       unregisterSshPtyProvider(leakedConnectionId)
     }
     setLocalPtyProvider(new LocalPtyProvider())
+    // Why: the global switch-block tests below leave this set if they throw
+    // before reaching their own cleanup; reset it unconditionally so a
+    // failure can't leak isClaudeAuthSwitchInProgress() === true into
+    // unrelated later tests in this file.
+    endClaudeAuthSwitch()
     if (savedProcessPlatform) {
       Object.defineProperty(process, 'platform', savedProcessPlatform)
     }
@@ -843,6 +853,80 @@ describe('registerPtyHandlers', () => {
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })
 
       expect(hasLiveClaudePtys()).toBe(false)
+    })
+
+    it('does not block an injected (per-worktree-pinned) Claude launch while a global account switch is in progress', async () => {
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude-injected',
+        envPatch: { CLAUDE_CONFIG_DIR: '/tmp/claude-injected' },
+        stripAuthEnv: true,
+        provenance: 'managed:account-injected:injected'
+      }))
+      const isInjectedClaudeAccountTarget = vi.fn(() => true)
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        undefined,
+        undefined,
+        isInjectedClaudeAccountTarget
+      )
+
+      beginClaudeAuthSwitch()
+      try {
+        const spawnResult = (await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'claude',
+          worktreeId: 'wt-injected'
+        })) as { id: string }
+
+        expect(spawnResult.id).toBeDefined()
+        expect(isInjectedClaudeAccountTarget).toHaveBeenCalled()
+        expect(prepareClaudeAuth).toHaveBeenCalledTimes(1)
+
+        await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      } finally {
+        endClaudeAuthSwitch()
+      }
+    })
+
+    it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude',
+        envPatch: {},
+        stripAuthEnv: false,
+        provenance: 'managed:account-1'
+      }))
+      // Why: no per-worktree override resolves for this launch, so it must
+      // still go through the global shared-runtime switch-block.
+      const isInjectedClaudeAccountTarget = vi.fn(() => false)
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        undefined,
+        undefined,
+        isInjectedClaudeAccountTarget
+      )
+
+      beginClaudeAuthSwitch()
+      try {
+        await expect(
+          handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            command: 'claude'
+          })
+        ).rejects.toThrow('A Claude account switch is in progress. Try again after it finishes.')
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+      } finally {
+        endClaudeAuthSwitch()
+      }
     })
 
     it('clears Claude live-PTY tracking from shared provider teardown', () => {

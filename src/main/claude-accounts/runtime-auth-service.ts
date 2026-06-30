@@ -161,6 +161,21 @@ export class ClaudeRuntimeAuthService {
     return this.pathResolver.getRuntimePaths().configDir
   }
 
+  // Synchronous, side-effect-free check for whether a launch target resolves
+  // to a valid per-worktree-pinned (injected) account — i.e. whether the
+  // upcoming prepareForClaudeLaunch() call will inject that account's own
+  // config dir instead of touching the shared global selection/materialized
+  // ~/.claude. Reuses the exact resolveInjectedAccount() resolution that
+  // getPreparation()/doSyncForCurrentSelection() use, so callers (the PTY
+  // spawn gate) can decide whether the global Claude-account-switch block
+  // applies to a launch before paying for the async prepare/keychain work.
+  hasInjectedAccountOverride(target?: ClaudeAccountSelectionTarget): boolean {
+    const effectiveTarget = this.resolveWslDefaultTarget(
+      target ?? this.getDefaultAccountSelectionTarget()
+    )
+    return this.resolveInjectedAccount(effectiveTarget, this.store.getSettings()) !== null
+  }
+
   private initializeLastSyncedState(): void {
     const settings = this.store.getSettings()
     this.lastSyncedAccountId = getSelectedClaudeAccountIdForTarget(settings, { runtime: 'host' })

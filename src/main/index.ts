@@ -970,7 +970,8 @@ function openMainWindow(): BrowserWindow {
       isRecoveryReloadInFlight,
       onBeforeUpdateQuit: () =>
         preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
-    }
+    },
+    (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
   )
   rateLimits.attach(window)
   // Why: quota probes can spawn CLIs and hit network. The attached show/focus
@@ -2060,7 +2061,8 @@ app.whenReady().then(async () => {
       prepareCodexRuntimeHomeForLaunch,
       () => store!.getSettings(),
       (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target),
-      store
+      store,
+      (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
     )
     // Why: headless servers have no renderer to mount <webview> browser panes.
     // Back them with main-process offscreen WebContents instead, so this host can
