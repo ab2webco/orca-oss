@@ -119,6 +119,7 @@ export class ClaudeRuntimeAuthService {
   ): Promise<ClaudeRuntimeAuthPreparation> {
     const effectiveTarget = target ?? this.getDefaultAccountSelectionTarget()
     await this.syncForCurrentSelection(effectiveTarget)
+    await this.seedInjectedHostAccountKeychain(effectiveTarget)
     return this.getPreparation(effectiveTarget)
   }
 
@@ -762,6 +763,46 @@ export class ClaudeRuntimeAuthService {
       return account
     }
     return null
+  }
+
+  // macOS only: Claude Code 2.1+ reads Keychain credentials from a config-dir-
+  // scoped service (`Claude Code-credentials-<sha256(configDir)[:8]>`), not
+  // the legacy unscoped service. An injected per-worktree host account points
+  // CLAUDE_CONFIG_DIR at its own managedAuthPath, so before launch we seed
+  // ONLY that scoped service from the account's managed credentials — never
+  // the legacy unscoped service, which is the shared global-selection
+  // singleton and would race across worktrees pinned to different accounts.
+  // Runs once per prepareForClaudeLaunch() call (one seed per PTY spawn).
+  // Best-effort: unlike the global switch-block's writeRuntimeCredentials,
+  // this scoped service has no prior state to protect, so a write failure
+  // just falls back to Claude's own login prompt for that one terminal
+  // instead of blocking the launch. No-op on Linux/Windows, where keychain
+  // ops are already no-ops and the file in the managed dir is authoritative.
+  private async seedInjectedHostAccountKeychain(
+    target?: ClaudeAccountSelectionTarget
+  ): Promise<void> {
+    if (process.platform !== 'darwin') {
+      return
+    }
+    const normalizedTarget = this.resolveWslDefaultTarget(
+      target ?? this.getDefaultAccountSelectionTarget()
+    )
+    const account = this.resolveInjectedHostAccount(normalizedTarget)
+    if (!account) {
+      return
+    }
+    try {
+      const credentialsJson = await this.readManagedCredentials(account)
+      if (!credentialsJson || !this.isValidCredentialsJsonObject(credentialsJson)) {
+        return
+      }
+      await writeActiveClaudeKeychainCredentials(credentialsJson, account.managedAuthPath)
+    } catch (error) {
+      console.warn(
+        '[claude-runtime-auth] Failed to seed scoped Keychain credentials for injected account:',
+        error
+      )
+    }
   }
 
   private getDefaultAccountSelectionTarget(
