@@ -189,11 +189,17 @@ function QuickTabBody({
   const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
   useEffect(() => {
     let cancelled = false
-    void window.api.claudeAccounts.list().then((result) => {
-      if (!cancelled) {
-        setClaudeAccounts(result.accounts)
-      }
-    })
+    void window.api.claudeAccounts
+      .list()
+      .then((result) => {
+        if (!cancelled) {
+          setClaudeAccounts(result.accounts)
+        }
+      })
+      .catch(() => {
+        // Non-fatal: leave the account list empty (picker hides itself); the
+        // rejection is swallowed so it doesn't surface as an unhandled promise.
+      })
     return () => {
       cancelled = true
     }

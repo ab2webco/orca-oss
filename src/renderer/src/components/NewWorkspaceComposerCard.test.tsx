@@ -198,6 +198,11 @@ function changeInputValue(input: HTMLInputElement, value: string): void {
   })
 }
 
+const claudeAccounts = [
+  { id: 'acct-alice', email: 'alice@example.com' },
+  { id: 'acct-bob', email: 'bob@example.com' }
+] as never
+
 let current: { container: HTMLDivElement; root: Root } | null = null
 
 describe('NewWorkspaceComposerCard folder task source mode', () => {
@@ -525,5 +530,91 @@ describe('NewWorkspaceComposerCard folder task source mode', () => {
 
     expect(hostChanges).toEqual(['setup-builder'])
     expect(recipeChanges).toEqual([null])
+  })
+})
+
+describe('NewWorkspaceComposerCard Claude account selector', () => {
+  afterEach(() => {
+    act(() => current?.root.unmount())
+    current?.container.remove()
+    current = null
+  })
+
+  const accountLabel = (): HTMLLabelElement | undefined =>
+    [...(current?.container.querySelectorAll('label') ?? [])].find(
+      (label) => label.textContent === 'Account'
+    ) as HTMLLabelElement | undefined
+
+  const accountTrigger = (): HTMLElement | null | undefined =>
+    accountLabel()?.closest('.space-y-1')?.querySelector<HTMLElement>('button[role="combobox"]')
+
+  it('hides the Account selector when no managed accounts exist', () => {
+    current = renderCard({ claudeAccounts: [] })
+    expect(accountLabel()).toBeUndefined()
+    expect(accountTrigger()).toBeFalsy()
+  })
+
+  it('renders the selector and reflects the pinned account, defaulting to Inherit global', () => {
+    current = renderCard({ claudeAccounts, claudeAccountId: null })
+    expect(accountLabel()).toBeTruthy()
+    expect(accountTrigger()?.textContent).toContain('Inherit global')
+
+    act(() => current?.root.unmount())
+    current?.container.remove()
+
+    current = renderCard({ claudeAccounts, claudeAccountId: 'acct-bob' })
+    expect(accountTrigger()?.textContent).toContain('bob@example.com')
+  })
+
+  it('emits the account id when an account is chosen and null for Inherit global', () => {
+    // Radix Select relies on pointer-capture + scrollIntoView, which happy-dom
+    // does not implement; polyfill them so the listbox opens under test.
+    const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>
+    proto.hasPointerCapture = () => false
+    proto.setPointerCapture = () => {}
+    proto.releasePointerCapture = () => {}
+    proto.scrollIntoView = () => {}
+
+    const openAndPick = (optionText: string): void => {
+      const trigger = accountTrigger()
+      expect(trigger).toBeTruthy()
+      act(() => {
+        trigger?.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+        trigger?.dispatchEvent(new window.MouseEvent('pointerup', { bubbles: true, button: 0 }))
+        trigger?.click()
+      })
+      const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (item) => item.textContent === optionText
+      )
+      expect(option, `option "${optionText}" should be present`).toBeTruthy()
+      act(() => {
+        option?.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+        option?.dispatchEvent(new window.MouseEvent('pointerup', { bubbles: true, button: 0 }))
+        option?.click()
+      })
+    }
+
+    const changes: (string | null)[] = []
+    current = renderCard({
+      claudeAccounts,
+      claudeAccountId: null,
+      onClaudeAccountIdChange: (next) => changes.push(next)
+    })
+
+    openAndPick('alice@example.com')
+    expect(changes).toEqual(['acct-alice'])
+
+    act(() => current?.root.unmount())
+    current?.container.remove()
+
+    const inheritChanges: (string | null)[] = []
+    current = renderCard({
+      claudeAccounts,
+      claudeAccountId: 'acct-alice',
+      onClaudeAccountIdChange: (next) => inheritChanges.push(next)
+    })
+
+    openAndPick('Inherit global')
+    expect(inheritChanges).toEqual([null])
   })
 })

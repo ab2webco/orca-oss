@@ -109,6 +109,14 @@ export class ClaudeRuntimeAuthService {
   private lastWrittenOauthAccount: unknown = null
   private skipNextReadBackForAccountId: string | null = null
   private managedRefreshDeferredByLivePtyAccountId: string | null = null
+  // Windows-only: caches the resolved canonical WSL auth path for owned WSL-
+  // pinned accounts, keyed by `${account.id}:${managedAuthPath}`. getOwnedManaged
+  // AuthPath() shells out to `wsl.exe` synchronously to validate ownership, and
+  // hasInjectedAccountOverride() runs it on the PTY spawn hot path — so without
+  // this cache every launch would block the main process on a WSL subprocess.
+  // Only successful (non-null) resolutions are cached; failures re-attempt so a
+  // transiently-unavailable distro isn't sticky.
+  private readonly ownedWslAuthPathCache = new Map<string, string>()
 
   constructor(private readonly store: Store) {
     this.initializeLastSyncedState()
@@ -1271,6 +1279,11 @@ export class ClaudeRuntimeAuthService {
         return null
       }
       if (process.platform === 'win32') {
+        const cacheKey = `${account.id}:${account.managedAuthPath}`
+        const cached = this.ownedWslAuthPathCache.get(cacheKey)
+        if (cached !== undefined) {
+          return cached
+        }
         try {
           const canonicalLinuxPath = execFileSync(
             'wsl.exe',
@@ -1295,7 +1308,13 @@ export class ClaudeRuntimeAuthService {
             ],
             { encoding: 'utf-8', timeout: 5000 }
           ).trim()
-          return canonicalLinuxPath ? toWindowsWslPath(canonicalLinuxPath, wslInfo.distro) : null
+          const resolved = canonicalLinuxPath
+            ? toWindowsWslPath(canonicalLinuxPath, wslInfo.distro)
+            : null
+          if (resolved) {
+            this.ownedWslAuthPathCache.set(cacheKey, resolved)
+          }
+          return resolved
         } catch {
           return null
         }
