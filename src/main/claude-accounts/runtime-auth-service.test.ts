@@ -3897,7 +3897,11 @@ describe('ClaudeRuntimeAuthService', () => {
       // own config dir.
       expect(write).not.toHaveBeenCalledWith(expect.anything(), managedAuthPath)
     } finally {
-      readStrict.mockImplementation(originalReadImpl!)
+      if (originalReadImpl) {
+        readStrict.mockImplementation(originalReadImpl)
+      } else {
+        readStrict.mockReset()
+      }
     }
   })
 
