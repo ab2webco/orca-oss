@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import NewWorkspaceComposerCard from './NewWorkspaceComposerCard'
 import type { NewWorkspaceProjectOption } from '@/lib/new-workspace-project-options'
+import type { ClaudeManagedAccountSummary } from '../../../shared/types'
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
@@ -201,7 +202,7 @@ function changeInputValue(input: HTMLInputElement, value: string): void {
 const claudeAccounts = [
   { id: 'acct-alice', email: 'alice@example.com' },
   { id: 'acct-bob', email: 'bob@example.com' }
-] as never
+] as unknown as ClaudeManagedAccountSummary[]
 
 let current: { container: HTMLDivElement; root: Root } | null = null
 
@@ -570,6 +571,12 @@ describe('NewWorkspaceComposerCard Claude account selector', () => {
     // Radix Select relies on pointer-capture + scrollIntoView, which happy-dom
     // does not implement; polyfill them so the listbox opens under test.
     const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>
+    const originalProto = {
+      hasPointerCapture: proto.hasPointerCapture,
+      setPointerCapture: proto.setPointerCapture,
+      releasePointerCapture: proto.releasePointerCapture,
+      scrollIntoView: proto.scrollIntoView
+    }
     proto.hasPointerCapture = () => false
     proto.setPointerCapture = () => {}
     proto.releasePointerCapture = () => {}
@@ -594,27 +601,31 @@ describe('NewWorkspaceComposerCard Claude account selector', () => {
       })
     }
 
-    const changes: (string | null)[] = []
-    current = renderCard({
-      claudeAccounts,
-      claudeAccountId: null,
-      onClaudeAccountIdChange: (next) => changes.push(next)
-    })
+    try {
+      const changes: (string | null)[] = []
+      current = renderCard({
+        claudeAccounts,
+        claudeAccountId: null,
+        onClaudeAccountIdChange: (next) => changes.push(next)
+      })
 
-    openAndPick('alice@example.com')
-    expect(changes).toEqual(['acct-alice'])
+      openAndPick('alice@example.com')
+      expect(changes).toEqual(['acct-alice'])
 
-    act(() => current?.root.unmount())
-    current?.container.remove()
+      act(() => current?.root.unmount())
+      current?.container.remove()
 
-    const inheritChanges: (string | null)[] = []
-    current = renderCard({
-      claudeAccounts,
-      claudeAccountId: 'acct-alice',
-      onClaudeAccountIdChange: (next) => inheritChanges.push(next)
-    })
+      const inheritChanges: (string | null)[] = []
+      current = renderCard({
+        claudeAccounts,
+        claudeAccountId: 'acct-alice',
+        onClaudeAccountIdChange: (next) => inheritChanges.push(next)
+      })
 
-    openAndPick('Inherit global')
-    expect(inheritChanges).toEqual([null])
+      openAndPick('Inherit global')
+      expect(inheritChanges).toEqual([null])
+    } finally {
+      Object.assign(proto, originalProto)
+    }
   })
 })

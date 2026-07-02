@@ -803,12 +803,21 @@ export class ClaudeRuntimeAuthService {
     }
     const normalizedTarget = normalizeClaudeAccountSelectionTarget(target)
     const accountIsWsl = account.managedAuthRuntime === 'wsl'
+    // Callers resolve a distro-less WSL target to the concrete default distro
+    // (resolveWslDefaultTarget), so an account stored as the default WSL account
+    // (wslDistro: null -> '__default__') must still match a launch whose distro
+    // resolved to that same concrete default. Canonicalize '__default__' to the
+    // concrete default on both sides before comparing. getDefaultWslDistro() is
+    // process-lifetime cached (and a no-op off Windows), so this adds no cost.
+    const defaultWslKey = getClaudeWslSelectionKey(getDefaultWslDistro())
+    const canonicalizeWslKey = (key: string): string =>
+      key === '__default__' ? defaultWslKey : key
+    const wslDistroMatches =
+      canonicalizeWslKey(getClaudeWslSelectionKey(account.wslDistro)) ===
+      canonicalizeWslKey(getClaudeWslSelectionKey(normalizedTarget.wslDistro))
     const runtimeMismatch =
       (normalizedTarget.runtime === 'host' && accountIsWsl) ||
-      (normalizedTarget.runtime === 'wsl' &&
-        (!accountIsWsl ||
-          getClaudeWslSelectionKey(account.wslDistro) !==
-            getClaudeWslSelectionKey(normalizedTarget.wslDistro)))
+      (normalizedTarget.runtime === 'wsl' && (!accountIsWsl || !wslDistroMatches))
     if (runtimeMismatch) {
       if (options.warnOnMismatch) {
         console.warn(
@@ -837,11 +846,12 @@ export class ClaudeRuntimeAuthService {
   // the legacy unscoped service, which is the shared global-selection
   // singleton and would race across worktrees pinned to different accounts.
   // Runs once per prepareForClaudeLaunch() call (one seed per PTY spawn).
-  // Best-effort: unlike the global switch-block's writeRuntimeCredentials,
-  // this scoped service has no prior state to protect, so a write failure
-  // just falls back to Claude's own login prompt for that one terminal
-  // instead of blocking the launch. No-op on Linux/Windows, where keychain
-  // ops are already no-ops and the file in the managed dir is authoritative.
+  // Seeds only on first launch: if the scoped service already holds valid
+  // creds, Claude owns them (possibly rotated) and we leave them untouched.
+  // Best-effort: a write failure just falls back to Claude's own login prompt
+  // for that one terminal instead of blocking the launch. No-op on
+  // Linux/Windows, where keychain ops are already no-ops and the file in the
+  // managed dir is authoritative.
   private async seedInjectedHostAccountKeychain(
     target?: ClaudeAccountSelectionTarget
   ): Promise<void> {
@@ -858,6 +868,24 @@ export class ClaudeRuntimeAuthService {
       return
     }
     try {
+      // Only bootstrap the scoped service on first launch. The seed source is
+      // the managed keychain (keyed by account.id), but once Claude runs with
+      // CLAUDE_CONFIG_DIR=managedAuthPath it owns the scoped service (keyed by
+      // sha256(managedAuthPath)) and may rotate/refresh the tokens there.
+      // Injected accounts are CLI-owned (no read-back), so the managed copy is
+      // never updated to match — re-seeding it would clobber a fresher refresh
+      // token and break auth. The scoped service for this per-account config
+      // dir only ever holds this account's creds, so if valid creds already
+      // exist there, leave Claude's copy in place.
+      const existingScopedCredentials = await this.readActiveClaudeKeychainCredentialsBestEffort(
+        account.managedAuthPath
+      )
+      if (
+        existingScopedCredentials &&
+        this.isValidCredentialsJsonObject(existingScopedCredentials)
+      ) {
+        return
+      }
       const credentialsJson = await this.readManagedCredentials(account)
       if (!credentialsJson || !this.isValidCredentialsJsonObject(credentialsJson)) {
         return
@@ -889,7 +917,10 @@ export class ClaudeRuntimeAuthService {
       return target ?? { runtime: 'host' }
     }
     const defaultDistro = getDefaultWslDistro()
-    return defaultDistro ? { runtime: 'wsl', wslDistro: defaultDistro } : target
+    // Preserve other target fields (notably overrideAccountId) when filling in
+    // the concrete default distro — otherwise a distro-less WSL launch would
+    // drop its per-worktree account pin and fall back to global selection.
+    return defaultDistro ? { ...target, runtime: 'wsl', wslDistro: defaultDistro } : target
   }
 
   private async findManagedAccountForRuntimeCredentials(

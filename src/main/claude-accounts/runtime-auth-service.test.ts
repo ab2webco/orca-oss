@@ -3792,6 +3792,115 @@ describe('ClaudeRuntimeAuthService', () => {
     warn.mockRestore()
   })
 
+  it('injects a default-WSL pinned account (wslDistro: null) when the launch resolves to the default distro', async () => {
+    // Regression: resolveWslDefaultTarget turns a distro-less WSL launch into
+    // the concrete default distro, so a default-WSL account stored with
+    // wslDistro: null must still match (both canonicalize to the default)
+    // instead of silently falling back to the global WSL selection.
+    vi.doMock('../wsl', async () => {
+      const actual = (await vi.importActual('../wsl')) as Record<string, unknown>
+      return { ...actual, getDefaultWslDistro: () => 'Ubuntu' }
+    })
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'default-wsl-account',
+      createClaudeCredentialsJson('default@example.com', 'default-token')
+    )
+    const globalAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'global-account',
+      createClaudeCredentialsJson('global@example.com', 'global-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('default-wsl-account', pinnedAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: null,
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/default-wsl/auth'
+        }),
+        createClaudeAccount('global-account', globalAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/global/auth'
+        })
+      ],
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: { Ubuntu: 'global-account' } }
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'wsl',
+      wslDistro: null,
+      overrideAccountId: 'default-wsl-account'
+    })
+
+    expect(preparation).toMatchObject({
+      runtime: 'wsl',
+      wslDistro: null,
+      wslLinuxConfigDir: '/home/alice/.local/share/orca/claude-accounts/default-wsl/auth',
+      provenance: 'managed:default-wsl-account:wsl:injected:',
+      stripAuthEnv: true
+    })
+    // The pin resolved: the global WSL selection is left untouched...
+    expect(store.updateSettings).not.toHaveBeenCalled()
+    // ...and the PTY spawn gate sees it as injected.
+    expect(
+      service.hasInjectedAccountOverride({
+        runtime: 'wsl',
+        wslDistro: null,
+        overrideAccountId: 'default-wsl-account'
+      })
+    ).toBe(true)
+  })
+
+  it('does not re-seed the scoped Keychain when Claude already owns valid creds for an injected host account (macOS)', async () => {
+    // Regression: injected host launches seed the config-dir-scoped Keychain
+    // from the managed copy. Once Claude owns that scoped service it may hold a
+    // rotated refresh token (injected accounts are CLI-owned, no read-back);
+    // re-seeding the static managed copy would clobber it. If valid creds
+    // already exist in the scoped service, leave them.
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host',
+      createClaudeCredentialsJson('pinned@example.com', 'managed-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host', managedAuthPath)],
+      activeClaudeManagedAccountId: null
+    })
+    const store = createStore(settings)
+
+    const keychain = await import('./keychain')
+    const readStrict = vi.mocked(keychain.readActiveClaudeKeychainCredentialsStrict)
+    const originalReadImpl = readStrict.getMockImplementation()
+    const rotated = createClaudeCredentialsJson('pinned@example.com', 'rotated-token')
+    // Claude's scoped service for this account's own config dir already holds
+    // rotated creds.
+    readStrict.mockImplementation(async (configDir?: string) =>
+      configDir === managedAuthPath
+        ? rotated
+        : originalReadImpl
+          ? originalReadImpl(configDir)
+          : null
+    )
+    const write = vi.mocked(keychain.writeActiveClaudeKeychainCredentials)
+
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+      await service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'pinned-host' })
+
+      // The rotated scoped creds must survive: no re-seed write to the account's
+      // own config dir.
+      expect(write).not.toHaveBeenCalledWith(expect.anything(), managedAuthPath)
+    } finally {
+      readStrict.mockImplementation(originalReadImpl!)
+    }
+  })
+
   it('falls back to global host selection and warns when a WSL-pinned account is used for a host launch', async () => {
     const wslAccountPath = createManagedClaudeAuth(
       testState.userDataDir,
