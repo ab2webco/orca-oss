@@ -238,10 +238,6 @@ Conecte ao app desktop para monitorar e conduzir seus agentes pelo celular.
 
 - **Discord:** Entre na comunidade no **[Discord](https://discord.gg/fzjDKHxv8Q)**.
 - **Twitter / X:** Siga **[@orca_build](https://x.com/orca_build)** para atualizações e anúncios.
-- **WeChat:** Escaneie o QR code para entrar na comunidade.
-
-  <img src="../assets/wechat-qr.png" alt="QR code do WeChat para a comunidade Orca" width="160" />
-
 - **Feedback e ideias:** Lançamos rápido. Sentiu falta de algo? [Peça um novo recurso](https://github.com/stablyai/orca/issues).
 - **Privacidade:** Veja a [documentação de privacidade e telemetria](https://www.onorca.dev/docs/telemetry) para saber quais dados anônimos de uso o Orca coleta e como desativar.
 - **Mostre apoio:** Dê uma [estrela](https://github.com/stablyai/orca) neste repositório para acompanhar nossos lançamentos diários.
