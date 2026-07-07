@@ -5894,7 +5894,8 @@ describe('registerPtyHandlers', () => {
       upsertSshRemotePtyLease: vi.fn(),
       persistPtyBinding: vi.fn(),
       removeSshRemotePtyLease: vi.fn(),
-      markSshRemotePtyLease: vi.fn()
+      markSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn()
     }
     let controller: RuntimeSpawnController | null = null
     const runtime = {
