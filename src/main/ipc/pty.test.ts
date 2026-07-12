@@ -1067,6 +1067,67 @@ describe('registerPtyHandlers', () => {
       }
     )
 
+    it('keeps a runtime-controller shared reattach shared after repinning', async () => {
+      const runtime = {
+        setPtyController: vi.fn(),
+        registerPty: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn(),
+        preAllocateHandleForPty: vi.fn()
+      }
+      markClaudePtySpawned('runtime-shared-session', 'account-a')
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude-shared',
+        envPatch: {},
+        stripAuthEnv: false,
+        sharedAccountId: 'account-b',
+        provenance: 'managed:account-b'
+      }))
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'newly-pinned-account' }))
+      }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+      const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+        spawn(args: {
+          cols: number
+          rows: number
+          command: string
+          worktreeId: string
+          sessionId: string
+        }): Promise<{ id: string }>
+      }
+
+      try {
+        await controller.spawn({
+          cols: 80,
+          rows: 24,
+          command: 'claude',
+          worktreeId: 'wt-shared',
+          sessionId: 'runtime-shared-session'
+        })
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: null })
+        )
+        expect(livePtyGate.getLiveSharedClaudePtyAccountId('runtime-shared-session')).toBe(
+          'account-a'
+        )
+      } finally {
+        livePtyGate.markClaudePtyExited('runtime-shared-session')
+      }
+    })
+
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',
@@ -1123,6 +1184,56 @@ describe('registerPtyHandlers', () => {
       expect(hasLiveClaudePtys()).toBe(true)
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })
       expect(hasLiveClaudePtys()).toBe(false)
+    })
+
+    it('never prepares host Claude auth for a pinned SSH worktree launch', async () => {
+      const prepareClaudeAuth = vi.fn()
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'host-account' })),
+        upsertSshRemotePtyLease: vi.fn()
+      }
+      registerSshPtyProvider('ssh-1', {
+        spawn: vi.fn(async () => ({ id: 'ssh-claude-session' })),
+        write: vi.fn(),
+        resize: vi.fn(),
+        shutdown: vi.fn(),
+        sendSignal: vi.fn(),
+        getCwd: vi.fn(),
+        getInitialCwd: vi.fn(),
+        clearBuffer: vi.fn(),
+        acknowledgeDataEvent: vi.fn(),
+        hasChildProcesses: vi.fn(),
+        getForegroundProcess: vi.fn(),
+        serialize: vi.fn(),
+        revive: vi.fn(),
+        onData: vi.fn(() => () => {}),
+        onReplay: vi.fn(() => () => {}),
+        onExit: vi.fn(() => () => {}),
+        listProcesses: vi.fn(async () => []),
+        attach: vi.fn(),
+        getDefaultShell: vi.fn(),
+        getProfiles: vi.fn()
+      } as never)
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        () => true
+      )
+
+      await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        connectionId: 'ssh-1',
+        worktreeId: 'ssh-worktree'
+      })
+
+      expect(prepareClaudeAuth).not.toHaveBeenCalled()
     })
 
     it('clears Claude live-PTY tracking from shared provider teardown', () => {

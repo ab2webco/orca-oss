@@ -66,7 +66,8 @@ import type {
   TerminalTab,
   WorkspaceSessionPatch,
   WorkspaceSessionState,
-  ClaudeLivePtyAccountBinding
+  ClaudeLivePtyAccountBinding,
+  ClaudeLiveSharedPtyAccountBinding
 } from '../shared/types'
 import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
@@ -2250,6 +2251,36 @@ function normalizeClaudeLivePtyAccountBindings(value: unknown): ClaudeLivePtyAcc
   return bindings.toReversed()
 }
 
+function normalizeClaudeLiveSharedPtyAccountBindings(
+  value: unknown
+): ClaudeLiveSharedPtyAccountBinding[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const bindings: ClaudeLiveSharedPtyAccountBinding[] = []
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const candidate = value[index] as Partial<ClaudeLiveSharedPtyAccountBinding> | null
+    if (
+      !candidate ||
+      typeof candidate.sessionId !== 'string' ||
+      candidate.sessionId.length === 0 ||
+      candidate.sessionId.length > 512 ||
+      (candidate.accountId !== null &&
+        (typeof candidate.accountId !== 'string' ||
+          candidate.accountId.length === 0 ||
+          candidate.accountId.length > 512)) ||
+      bindings.some((entry) => entry.sessionId === candidate.sessionId)
+    ) {
+      continue
+    }
+    bindings.push({ sessionId: candidate.sessionId, accountId: candidate.accountId ?? null })
+    if (bindings.length >= MAX_CLAUDE_LIVE_PTY_SESSION_IDS) {
+      break
+    }
+  }
+  return bindings.toReversed()
+}
+
 function normalizeMigrationUnsupportedPtyEntries(value: unknown): MigrationUnsupportedPtyEntry[] {
   if (!Array.isArray(value)) {
     return []
@@ -3454,6 +3485,9 @@ export class Store {
             .map(normalizeSshRemotePtyLease)
             .filter((lease): lease is SshRemotePtyLease => lease !== null),
           claudeLivePtySessionIds: normalizeClaudeLivePtySessionIds(parsed.claudeLivePtySessionIds),
+          claudeLiveSharedPtyAccountBindings: normalizeClaudeLiveSharedPtyAccountBindings(
+            parsed.claudeLiveSharedPtyAccountBindings
+          ),
           claudeLivePtyAccountBindings: normalizeClaudeLivePtyAccountBindings(
             parsed.claudeLivePtyAccountBindings
           ),
@@ -6003,6 +6037,7 @@ export class Store {
     ptyId: string
     startupCwd?: string
     claudeAccountId?: string
+    claudeSharedAccountId?: string | null
   }): boolean {
     const session = this.state.workspaceSession
     if (!session) {
@@ -6010,6 +6045,8 @@ export class Store {
     }
     const sessionBeforeBinding = cloneWorkspaceSessionState(session)
     const claudeBindingsBefore = this.state.claudeLivePtyAccountBindings ?? []
+    const sharedClaudeIdsBefore = this.state.claudeLivePtySessionIds ?? []
+    const sharedClaudeBindingsBefore = this.state.claudeLiveSharedPtyAccountBindings ?? []
     const tabs = session.tabsByWorktree?.[args.worktreeId]
     const tab = tabs?.find((t) => t.id === args.tabId)
     if (tab) {
@@ -6053,6 +6090,25 @@ export class Store {
         { sessionId: args.ptyId, accountId: args.claudeAccountId! }
       ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
     }
+    const shouldPersistSharedClaudeBinding =
+      Object.hasOwn(args, 'claudeSharedAccountId') &&
+      (args.claudeSharedAccountId === null ||
+        (typeof args.claudeSharedAccountId === 'string' &&
+          args.claudeSharedAccountId.length > 0 &&
+          args.claudeSharedAccountId.length <= 512)) &&
+      args.ptyId.length > 0 &&
+      args.ptyId.length <= 512
+    if (shouldPersistSharedClaudeBinding) {
+      this.state.claudeLivePtySessionIds = (
+        sharedClaudeIdsBefore.includes(args.ptyId)
+          ? sharedClaudeIdsBefore
+          : [...sharedClaudeIdsBefore, args.ptyId]
+      ).slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
+      this.state.claudeLiveSharedPtyAccountBindings = [
+        ...sharedClaudeBindingsBefore.filter((entry) => entry.sessionId !== args.ptyId),
+        { sessionId: args.ptyId, accountId: args.claudeSharedAccountId ?? null }
+      ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
+    }
     if (!isTerminalLeafId(args.leafId)) {
       // Why: legacy renderer-local pane ids may arrive from older callers; keep
       // them out of durable leaf-keyed layout state after the UUID migration.
@@ -6061,12 +6117,14 @@ export class Store {
       } catch (err) {
         this.state.workspaceSession = sessionBeforeBinding
         this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
+        this.state.claudeLivePtySessionIds = sharedClaudeIdsBefore
+        this.state.claudeLiveSharedPtyAccountBindings = sharedClaudeBindingsBefore
         // Why: flushOrThrow canceled the prior debounce; unrelated pending
         // state still needs a retry after this binding transaction rolls back.
         this.scheduleSave()
         throw err
       }
-      return shouldPersistClaudeBinding
+      return shouldPersistClaudeBinding || shouldPersistSharedClaudeBinding
     }
     const layout = session.terminalLayoutsByTabId?.[args.tabId]
     if (layout) {
@@ -6117,10 +6175,12 @@ export class Store {
     } catch (err) {
       this.state.workspaceSession = sessionBeforeBinding
       this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
+      this.state.claudeLivePtySessionIds = sharedClaudeIdsBefore
+      this.state.claudeLiveSharedPtyAccountBindings = sharedClaudeBindingsBefore
       this.scheduleSave()
       throw err
     }
-    return shouldPersistClaudeBinding
+    return shouldPersistClaudeBinding || shouldPersistSharedClaudeBinding
   }
 
   // ── SSH Targets ────────────────────────────────────────────────────
@@ -6171,6 +6231,10 @@ export class Store {
     return [...(this.state.claudeLivePtySessionIds ?? [])]
   }
 
+  getClaudeLiveSharedPtyAccountBindings(): ClaudeLiveSharedPtyAccountBinding[] {
+    return (this.state.claudeLiveSharedPtyAccountBindings ?? []).map((binding) => ({ ...binding }))
+  }
+
   commitClaudeAccountState(
     settingsUpdates: Partial<GlobalSettings>,
     worktreeAccountIds: Readonly<Record<string, string | null>>
@@ -6193,20 +6257,39 @@ export class Store {
     }
   }
 
-  addClaudeLivePtySessionId(sessionId: string): void {
+  addClaudeLivePtySessionId(sessionId: string, accountId: string | null = null): void {
     if (sessionId.length === 0 || sessionId.length > 512) {
       return
     }
     const ids = this.state.claudeLivePtySessionIds ?? []
-    if (ids.includes(sessionId)) {
+    const currentBindings = this.state.claudeLiveSharedPtyAccountBindings ?? []
+    const existingBinding = currentBindings.find((binding) => binding.sessionId === sessionId)
+    if (
+      ids.includes(sessionId) &&
+      existingBinding &&
+      (existingBinding.accountId === accountId || accountId === null)
+    ) {
       return
     }
     // Why: drop the oldest entry at the cap — stale ids are pruned against the
     // daemon at startup anyway, so recency is the only thing worth keeping.
-    this.state.claudeLivePtySessionIds = [...ids, sessionId].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
-    // Why: flush synchronously — a force-quit right after a Claude spawn must
-    // still seed the live-PTY gate on the next launch.
-    this.flush()
+    this.state.claudeLivePtySessionIds = [...ids.filter((id) => id !== sessionId), sessionId].slice(
+      -MAX_CLAUDE_LIVE_PTY_SESSION_IDS
+    )
+    this.state.claudeLiveSharedPtyAccountBindings = [
+      ...currentBindings.filter((binding) => binding.sessionId !== sessionId),
+      { sessionId, accountId }
+    ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
+    try {
+      // Why: a force-quit right after spawn must retain both shared mode and
+      // account identity before another launch can fork its refresh chain.
+      this.flushOrThrow()
+    } catch (error) {
+      this.state.claudeLivePtySessionIds = ids
+      this.state.claudeLiveSharedPtyAccountBindings = currentBindings
+      this.scheduleSave()
+      throw error
+    }
   }
 
   removeClaudeLivePtySessionId(sessionId: string): void {
@@ -6215,6 +6298,9 @@ export class Store {
       return
     }
     this.state.claudeLivePtySessionIds = ids.filter((id) => id !== sessionId)
+    this.state.claudeLiveSharedPtyAccountBindings = (
+      this.state.claudeLiveSharedPtyAccountBindings ?? []
+    ).filter((binding) => binding.sessionId !== sessionId)
     this.scheduleSave()
   }
 

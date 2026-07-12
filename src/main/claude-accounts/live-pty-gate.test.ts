@@ -7,6 +7,8 @@ import {
   endClaudeAuthSwitch,
   endManagedClaudeAccountMutation,
   getLiveInjectedClaudePtyAccountId,
+  getLiveSharedClaudePtyAccountId,
+  hasLiveSharedClaudePtysForAccount,
   hasLiveInjectedClaudePtysForAccount,
   hasLiveClaudePtys,
   isClaudeAuthSwitchInProgress,
@@ -89,6 +91,27 @@ describe('Claude live PTY gate', () => {
     expect(hasLiveClaudePtys()).toBe(true)
   })
 
+  it('preserves shared launch-account ownership across restart seeding', () => {
+    seedLiveClaudePtysFromPersistence(
+      ['seeded-pty-1'],
+      [{ sessionId: 'seeded-pty-1', accountId: 'account-a' }]
+    )
+
+    expect(getLiveSharedClaudePtyAccountId('seeded-pty-1')).toBe('account-a')
+    expect(hasLiveSharedClaudePtysForAccount('account-a')).toBe(true)
+    expect(hasLiveSharedClaudePtysForAccount('account-b')).toBe(false)
+    expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
+      'already in use by a global terminal'
+    )
+  })
+
+  it('treats legacy shared sessions with unknown accounts conservatively', () => {
+    seedLiveClaudePtysFromPersistence(['seeded-pty-1'])
+
+    expect(hasLiveSharedClaudePtysForAccount('account-a')).toBe(true)
+    expect(hasLiveSharedClaudePtysForAccount('account-b')).toBe(true)
+  })
+
   it('persists spawns and exits when persistence is attached', () => {
     const addClaudeLivePtySessionId = vi.fn()
     const removeClaudeLivePtySessionId = vi.fn()
@@ -98,7 +121,7 @@ describe('Claude live PTY gate', () => {
     })
 
     markClaudePtySpawned('live-claude-pty')
-    expect(addClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty')
+    expect(addClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty', null)
 
     markClaudePtyExited('live-claude-pty')
     expect(removeClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty')
@@ -181,6 +204,22 @@ describe('Claude live PTY gate', () => {
     expect(hasLiveInjectedClaudePtysForAccount('account-a')).toBe(false)
   })
 
+  it('rolls back shared ownership when durable account persistence fails', () => {
+    const reservationId = reserveSharedClaudeAccountLaunch('account-a')
+    attachClaudeLivePtyPersistence({
+      addClaudeLivePtySessionId: vi.fn(() => {
+        throw new Error('disk full')
+      }),
+      removeClaudeLivePtySessionId: vi.fn()
+    })
+
+    expect(() => markClaudePtySpawned('live-claude-pty', 'account-a', reservationId)).toThrow(
+      'disk full'
+    )
+    expect(hasLiveClaudePtys()).toBe(false)
+    expect(hasLiveSharedClaudePtysForAccount('account-a')).toBe(false)
+  })
+
   it('never overwrites a surviving PTY binding with a later worktree pin', () => {
     markInjectedClaudePtySpawned('injected-pty', 'account-a')
 
@@ -209,7 +248,7 @@ describe('Claude live PTY gate', () => {
       expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow('in use')
       expect(() => beginClaudeAuthSwitch()).toThrow('global Claude terminal is starting')
 
-      markClaudePtySpawned('live-claude-pty', reservationId)
+      markClaudePtySpawned('live-claude-pty', 'account-a', reservationId)
       beginClaudeAuthSwitch()
       expect(isClaudeAuthSwitchInProgress()).toBe(true)
     } finally {

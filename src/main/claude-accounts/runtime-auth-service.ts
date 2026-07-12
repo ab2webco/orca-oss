@@ -27,6 +27,7 @@ import { buildEncodedWslBashCommand } from '../wsl-bash-command'
 import {
   hasLiveClaudePtys,
   hasLiveInjectedClaudePtysForAccount,
+  hasLiveSharedClaudePtysForAccount,
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch,
   reserveInjectedClaudeAccountLaunch,
@@ -67,6 +68,7 @@ export type ClaudeRuntimeAuthPreparation = {
   injectedAccountId?: string
   injectedAccountReservationId?: string
   sharedAccountReservationId?: string
+  sharedAccountId?: string | null
   provenance: string
 }
 
@@ -154,11 +156,7 @@ export class ClaudeRuntimeAuthService {
     )
     const settings = this.store.getSettings()
     const injectedCandidate = this.resolveInjectedAccountCandidate(effectiveTarget, settings)
-    if (
-      injectedCandidate &&
-      getSelectedClaudeAccountIdForTarget(settings, effectiveTarget) === injectedCandidate.id &&
-      hasLiveClaudePtys()
-    ) {
+    if (injectedCandidate && hasLiveSharedClaudePtysForAccount(injectedCandidate.id)) {
       // Why: the shared CLI already owns this account's refresh chain. Starting
       // an isolated pinned copy before it exits would fork the one-use token.
       throw new Error(
@@ -201,7 +199,8 @@ export class ClaudeRuntimeAuthService {
       await this.syncForCurrentSelection(effectiveTarget)
       return {
         ...this.getPreparation(effectiveTarget),
-        sharedAccountReservationId: sharedReservationId
+        sharedAccountReservationId: sharedReservationId,
+        sharedAccountId: getSelectedClaudeAccountIdForTarget(settings, effectiveTarget)
       }
     } catch (error) {
       releaseSharedClaudeAccountLaunch(sharedReservationId)

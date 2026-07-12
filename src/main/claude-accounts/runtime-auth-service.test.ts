@@ -4011,6 +4011,39 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  it('rejects pinned account A after the global selection switches from live A to B', async () => {
+    const accountAPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-a',
+      createClaudeCredentialsJson('a@example.com', 'token-a')
+    )
+    const accountBPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-b',
+      createClaudeCredentialsJson('b@example.com', 'token-b')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-a', accountAPath),
+        createClaudeAccount('account-b', accountBPath)
+      ],
+      activeClaudeManagedAccountId: 'account-b'
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    markClaudePtySpawned('global-a-pty', 'account-a')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      await expect(
+        service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-a' })
+      ).rejects.toThrow('running global Claude terminal')
+    } finally {
+      markClaudePtyExited('global-a-pty')
+    }
+  })
+
   it('refuses to materialize shared auth while the same injected account is live', async () => {
     const managedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,

@@ -2346,6 +2346,11 @@ export type ClaudeLivePtyAccountBinding = {
   accountId: string
 }
 
+export type ClaudeLiveSharedPtyAccountBinding = {
+  sessionId: string
+  accountId: string | null
+}
+
 export type ClaudeRateLimitAccountsState = {
   accounts: ClaudeManagedAccountSummary[]
   activeAccountId: string | null
@@ -3616,6 +3621,9 @@ export type PersistedState = {
    *  live-PTY gate on startup so an early OAuth refresh cannot rotate the
    *  single-use refresh token out from under a still-running daemon CLI. */
   claudeLivePtySessionIds?: string[]
+  /** Launch-account ownership for shared Claude daemon sessions. A null
+   * account is a conservative legacy/system-default identity. */
+  claudeLiveSharedPtyAccountBindings?: ClaudeLiveSharedPtyAccountBinding[]
   /** Account ownership for live injected Claude daemon sessions. This keeps
    *  account-specific auth immutable across app restarts until the CLI exits. */
   claudeLivePtyAccountBindings?: ClaudeLivePtyAccountBinding[]

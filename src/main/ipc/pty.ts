@@ -71,6 +71,7 @@ import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-se
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
 import {
   getLiveInjectedClaudePtyAccountId,
+  getLiveSharedClaudePtyAccountId,
   isLiveSharedClaudePty,
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
@@ -2997,6 +2998,13 @@ export function registerPtyHandlers(
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)
         : null
+      const isExistingSharedClaudeSession = Boolean(
+        args.sessionId && isLiveSharedClaudePty(args.sessionId)
+      )
+      const existingSharedAccountId =
+        args.sessionId && isExistingSharedClaudeSession
+          ? getLiveSharedClaudePtyAccountId(args.sessionId)
+          : null
       if (existingInjectedAccountId) {
         // Why: reattach must retain the account that the surviving CLI started
         // with even if the worktree was repinned while the app was away.
@@ -3004,7 +3012,7 @@ export function registerPtyHandlers(
           ...claudeSelectionTarget,
           overrideAccountId: existingInjectedAccountId
         }
-      } else if (args.sessionId && isLiveSharedClaudePty(args.sessionId)) {
+      } else if (isExistingSharedClaudeSession) {
         // Why: a surviving shared CLI keeps its original auth mode even if its
         // worktree was assigned an isolated account while Orca was reloading.
         claudeSelectionTarget = { ...claudeSelectionTarget, overrideAccountId: null }
@@ -3274,10 +3282,10 @@ export function registerPtyHandlers(
         if (effectiveSessionAppId !== undefined && effectiveSessionAppId !== result.id) {
           ptySizes.delete(effectiveSessionAppId)
         }
-        let didPersistInjectedClaudeBinding = false
+        let didPersistClaudeBinding = false
         if (hostSessionBinding) {
           try {
-            didPersistInjectedClaudeBinding = hostSessionBinding.store.persistPtyBinding({
+            didPersistClaudeBinding = hostSessionBinding.store.persistPtyBinding({
               worktreeId: hostSessionBinding.worktreeId,
               tabId: hostSessionBinding.tabId,
               leafId: hostSessionBinding.leafId,
@@ -3285,6 +3293,13 @@ export function registerPtyHandlers(
               ...(cwd ? { startupCwd: cwd } : {}),
               ...(claudeAuth?.injectedAccountId
                 ? { claudeAccountId: claudeAuth.injectedAccountId }
+                : {}),
+              ...(isClaudeLaunch && !didPrepareInjectedClaudeAuth
+                ? {
+                    claudeSharedAccountId: isExistingSharedClaudeSession
+                      ? existingSharedAccountId
+                      : (claudeAuth?.sharedAccountId ?? null)
+                  }
                 : {})
             })
           } catch (err) {
@@ -3328,14 +3343,36 @@ export function registerPtyHandlers(
         // Why: the global live-PTY gate protects shared ~/.claude only; an
         // injected PTY owns its account-specific config dir instead.
         if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {
-          markClaudePtySpawned(result.id, claudeAuth?.sharedAccountReservationId)
+          try {
+            markClaudePtySpawned(
+              result.id,
+              isExistingSharedClaudeSession
+                ? existingSharedAccountId
+                : (claudeAuth?.sharedAccountId ?? null),
+              isExistingSharedClaudeSession ? undefined : claudeAuth?.sharedAccountReservationId,
+              { persistenceAlreadyRecorded: didPersistClaudeBinding }
+            )
+          } catch (error) {
+            if (!result.isReattach) {
+              try {
+                await provider.shutdown(result.id, { immediate: true })
+              } catch (shutdownError) {
+                console.warn(
+                  '[pty] failed to stop Claude after auth binding failure:',
+                  shutdownError
+                )
+              }
+              clearProviderPtyState(result.id)
+            }
+            throw error
+          }
         } else if (isClaudeLaunch && claudeAuth?.injectedAccountId) {
           try {
             markInjectedClaudePtySpawned(
               result.id,
               claudeAuth.injectedAccountId,
               claudeAuth.injectedAccountReservationId,
-              { persistenceAlreadyRecorded: didPersistInjectedClaudeBinding }
+              { persistenceAlreadyRecorded: didPersistClaudeBinding }
             )
           } catch (error) {
             // Why: a fresh daemon PTY can outlive Orca. If its ownership did
@@ -3787,12 +3824,19 @@ export function registerPtyHandlers(
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)
         : null
+      const isExistingSharedClaudeSession = Boolean(
+        args.sessionId && isLiveSharedClaudePty(args.sessionId)
+      )
+      const existingSharedAccountId =
+        args.sessionId && isExistingSharedClaudeSession
+          ? getLiveSharedClaudePtyAccountId(args.sessionId)
+          : null
       if (existingInjectedAccountId) {
         claudeSelectionTarget = {
           ...claudeSelectionTarget,
           overrideAccountId: existingInjectedAccountId
         }
-      } else if (args.sessionId && isLiveSharedClaudePty(args.sessionId)) {
+      } else if (isExistingSharedClaudeSession) {
         claudeSelectionTarget = { ...claudeSelectionTarget, overrideAccountId: null }
       }
       // Why: see the matching comment in runtime.setPtyController's spawn
@@ -4307,7 +4351,7 @@ export function registerPtyHandlers(
         // other field; patch the load-bearing (tab.ptyId, ptyIdsByLeafId)
         // binding synchronously so a force-quit in the ~450 ms debounce window
         // cannot orphan either daemon history or a remote relay PTY lease.
-        let didPersistInjectedClaudeBinding = false
+        let didPersistClaudeBinding = false
         if (
           (isDaemonHostSpawn || args.connectionId) &&
           store &&
@@ -4316,7 +4360,7 @@ export function registerPtyHandlers(
           validatedLeafId !== null
         ) {
           try {
-            didPersistInjectedClaudeBinding = store.persistPtyBinding({
+            didPersistClaudeBinding = store.persistPtyBinding({
               worktreeId: args.worktreeId,
               tabId: args.tabId,
               leafId: validatedLeafId,
@@ -4324,6 +4368,13 @@ export function registerPtyHandlers(
               ...(cwd ? { startupCwd: cwd } : {}),
               ...(claudeAuth?.injectedAccountId
                 ? { claudeAccountId: claudeAuth.injectedAccountId }
+                : {}),
+              ...(isClaudeLaunch && !didPrepareInjectedClaudeAuth
+                ? {
+                    claudeSharedAccountId: isExistingSharedClaudeSession
+                      ? existingSharedAccountId
+                      : (claudeAuth?.sharedAccountId ?? null)
+                  }
                 : {})
             })
           } catch (err) {
@@ -4432,14 +4483,36 @@ export function registerPtyHandlers(
           typeof args.command === 'string' ? args.command : null
         )
         if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {
-          markClaudePtySpawned(result.id, claudeAuth?.sharedAccountReservationId)
+          try {
+            markClaudePtySpawned(
+              result.id,
+              isExistingSharedClaudeSession
+                ? existingSharedAccountId
+                : (claudeAuth?.sharedAccountId ?? null),
+              isExistingSharedClaudeSession ? undefined : claudeAuth?.sharedAccountReservationId,
+              { persistenceAlreadyRecorded: didPersistClaudeBinding }
+            )
+          } catch (error) {
+            if (!result.isReattach) {
+              try {
+                await provider.shutdown(result.id, { immediate: true })
+              } catch (shutdownError) {
+                console.warn(
+                  '[pty] failed to stop Claude after auth binding failure:',
+                  shutdownError
+                )
+              }
+              clearProviderPtyState(result.id)
+            }
+            throw error
+          }
         } else if (isClaudeLaunch && claudeAuth?.injectedAccountId) {
           try {
             markInjectedClaudePtySpawned(
               result.id,
               claudeAuth.injectedAccountId,
               claudeAuth.injectedAccountReservationId,
-              { persistenceAlreadyRecorded: didPersistInjectedClaudeBinding }
+              { persistenceAlreadyRecorded: didPersistClaudeBinding }
             )
           } catch (error) {
             if (!result.isReattach) {

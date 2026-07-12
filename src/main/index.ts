@@ -1611,7 +1611,8 @@ app.whenReady().then(async () => {
   // out from under that process (it then shows "Not logged in" mid-session).
   attachClaudeLivePtyPersistence(store)
   const persistedClaudePtyIds = store.getClaudeLivePtySessionIds()
-  seedLiveClaudePtysFromPersistence(persistedClaudePtyIds)
+  const persistedSharedClaudePtys = store.getClaudeLiveSharedPtyAccountBindings()
+  seedLiveClaudePtysFromPersistence(persistedClaudePtyIds, persistedSharedClaudePtys)
   const persistedInjectedClaudePtys = store.getClaudeLivePtyAccountBindings()
   seedLiveInjectedClaudePtysFromPersistence(persistedInjectedClaudePtys)
   if (persistedClaudePtyIds.length > 0 || persistedInjectedClaudePtys.length > 0) {

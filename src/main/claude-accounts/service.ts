@@ -34,7 +34,8 @@ import {
   beginClaudeAuthSwitch,
   endManagedClaudeAccountMutation,
   endClaudeAuthSwitch,
-  hasLiveInjectedClaudePtysForAccount
+  hasLiveInjectedClaudePtysForAccount,
+  hasLiveSharedClaudePtysForAccount
 } from './live-pty-gate'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
@@ -458,11 +459,14 @@ export class ClaudeAccountService {
   }
 
   private assertAccountAuthIsIdle(accountId: string): void {
-    if (!hasLiveInjectedClaudePtysForAccount(accountId)) {
+    if (
+      !hasLiveInjectedClaudePtysForAccount(accountId) &&
+      !hasLiveSharedClaudePtysForAccount(accountId)
+    ) {
       return
     }
-    // Why: a live pinned CLI owns this account's refresh chain and scoped
-    // credentials; reauth, global selection, or removal would invalidate it.
+    // Why: any live CLI owns this account's refresh chain; reauth, selecting
+    // the same account again, or removal would invalidate that process.
     throw new Error(
       'This Claude account is in use by an assigned worktree. Close its Claude terminal before changing the account.'
     )

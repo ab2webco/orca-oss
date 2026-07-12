@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 const liveClaudePtyIds = new Set<string>()
+const liveSharedClaudePtyAccounts = new Map<string, string | null>()
 const liveInjectedClaudePtyAccounts = new Map<string, string>()
 const injectedClaudeLaunchReservations = new Map<string, string>()
 const sharedClaudeLaunchReservations = new Map<string, string | null>()
@@ -14,7 +15,7 @@ const seededUnconfirmedInjectedPtyIds = new Set<string>()
 let switchInProgress = false
 
 export type ClaudeLivePtyPersistence = {
-  addClaudeLivePtySessionId(sessionId: string): void
+  addClaudeLivePtySessionId(sessionId: string, accountId?: string | null): void
   removeClaudeLivePtySessionId(sessionId: string): void
   addClaudeLivePtyAccountBinding?(sessionId: string, accountId: string): void
   removeClaudeLivePtyAccountBinding?(sessionId: string): void
@@ -26,9 +27,18 @@ export function attachClaudeLivePtyPersistence(target: ClaudeLivePtyPersistence 
   persistence = target
 }
 
-export function seedLiveClaudePtysFromPersistence(sessionIds: readonly string[]): void {
+export function seedLiveClaudePtysFromPersistence(
+  sessionIds: readonly string[],
+  bindings: readonly { sessionId: string; accountId: string | null }[] = []
+): void {
+  const accountBySessionId = new Map(
+    bindings.map((binding) => [binding.sessionId, binding.accountId])
+  )
   for (const sessionId of sessionIds) {
     liveClaudePtyIds.add(sessionId)
+    // Why: pre-binding releases have unknown ownership; block them
+    // conservatively instead of assuming the current global account.
+    liveSharedClaudePtyAccounts.set(sessionId, accountBySessionId.get(sessionId) ?? null)
     seededUnconfirmedPtyIds.add(sessionId)
   }
 }
@@ -57,6 +67,7 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
   for (const sessionId of seededUnconfirmedPtyIds) {
     if (!alive.has(sessionId)) {
       liveClaudePtyIds.delete(sessionId)
+      liveSharedClaudePtyAccounts.delete(sessionId)
       persistence?.removeClaudeLivePtySessionId(sessionId)
     }
   }
@@ -70,14 +81,47 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
   seededUnconfirmedInjectedPtyIds.clear()
 }
 
-export function markClaudePtySpawned(ptyId: string, reservationId?: string): void {
-  if (reservationId && !sharedClaudeLaunchReservations.has(reservationId)) {
+export function markClaudePtySpawned(
+  ptyId: string,
+  accountId: string | null = null,
+  reservationId?: string,
+  options?: { persistenceAlreadyRecorded?: boolean }
+): void {
+  if (
+    reservationId &&
+    (!sharedClaudeLaunchReservations.has(reservationId) ||
+      sharedClaudeLaunchReservations.get(reservationId) !== accountId)
+  ) {
     throw new Error('The shared Claude account launch reservation is no longer valid.')
   }
+  const wasLive = liveClaudePtyIds.has(ptyId)
+  const wasSeededUnconfirmed = seededUnconfirmedPtyIds.has(ptyId)
+  const hadExistingAccount = liveSharedClaudePtyAccounts.has(ptyId)
+  const existingAccountId = liveSharedClaudePtyAccounts.get(ptyId) ?? null
+  const bindingAccountId = hadExistingAccount ? existingAccountId : accountId
   try {
     liveClaudePtyIds.add(ptyId)
+    liveSharedClaudePtyAccounts.set(ptyId, bindingAccountId)
     seededUnconfirmedPtyIds.delete(ptyId)
-    persistence?.addClaudeLivePtySessionId(ptyId)
+    try {
+      if (!options?.persistenceAlreadyRecorded) {
+        persistence?.addClaudeLivePtySessionId(ptyId, bindingAccountId)
+      }
+    } catch (error) {
+      liveClaudePtyIds.delete(ptyId)
+      if (wasLive) {
+        liveClaudePtyIds.add(ptyId)
+      }
+      if (wasSeededUnconfirmed) {
+        seededUnconfirmedPtyIds.add(ptyId)
+      }
+      if (hadExistingAccount) {
+        liveSharedClaudePtyAccounts.set(ptyId, existingAccountId)
+      } else {
+        liveSharedClaudePtyAccounts.delete(ptyId)
+      }
+      throw error
+    }
   } finally {
     releaseSharedClaudeAccountLaunch(reservationId)
   }
@@ -121,6 +165,7 @@ export function markInjectedClaudePtySpawned(
 
 export function markClaudePtyExited(ptyId: string): void {
   liveClaudePtyIds.delete(ptyId)
+  liveSharedClaudePtyAccounts.delete(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtySessionId(ptyId)
   liveInjectedClaudePtyAccounts.delete(ptyId)
@@ -134,6 +179,16 @@ export function hasLiveClaudePtys(): boolean {
 
 export function isLiveSharedClaudePty(ptyId: string): boolean {
   return liveClaudePtyIds.has(ptyId)
+}
+
+export function getLiveSharedClaudePtyAccountId(ptyId: string): string | null {
+  return liveSharedClaudePtyAccounts.get(ptyId) ?? null
+}
+
+export function hasLiveSharedClaudePtysForAccount(accountId: string): boolean {
+  return [...liveSharedClaudePtyAccounts.values()].some(
+    (liveAccountId) => liveAccountId === null || liveAccountId === accountId
+  )
 }
 
 export function hasLiveInjectedClaudePtysForAccount(accountId: string): boolean {
@@ -153,6 +208,11 @@ export function reserveInjectedClaudeAccountLaunch(accountId: string): string {
   }
   if ([...sharedClaudeLaunchReservations.values()].includes(accountId)) {
     throw new Error('This Claude account is being launched globally. Try again when it finishes.')
+  }
+  if (hasLiveSharedClaudePtysForAccount(accountId)) {
+    throw new Error(
+      'This Claude account is already in use by a global terminal. Close it before launching the assigned account.'
+    )
   }
   const reservationId = randomUUID()
   injectedClaudeLaunchReservations.set(reservationId, accountId)

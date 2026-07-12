@@ -9096,7 +9096,7 @@ describe('Store', () => {
     it('persists added ids across reloads and removes them durably', async () => {
       const store = await createStore()
 
-      store.addClaudeLivePtySessionId('claude-session-1')
+      store.addClaudeLivePtySessionId('claude-session-1', 'account-a')
       store.addClaudeLivePtySessionId('claude-session-2')
       store.addClaudeLivePtySessionId('claude-session-1')
 
@@ -9107,23 +9107,40 @@ describe('Store', () => {
         'claude-session-1',
         'claude-session-2'
       ])
+      expect(reloaded.getClaudeLiveSharedPtyAccountBindings()).toEqual([
+        { sessionId: 'claude-session-1', accountId: 'account-a' },
+        { sessionId: 'claude-session-2', accountId: null }
+      ])
 
       reloaded.removeClaudeLivePtySessionId('claude-session-1')
       reloaded.flush()
 
       const reloadedAgain = await createStore()
       expect(reloadedAgain.getClaudeLivePtySessionIds()).toEqual(['claude-session-2'])
+      expect(reloadedAgain.getClaudeLiveSharedPtyAccountBindings()).toEqual([
+        { sessionId: 'claude-session-2', accountId: null }
+      ])
     })
 
     it('drops malformed persisted entries on load', async () => {
       writeDataFile({
         schemaVersion: 1,
-        claudeLivePtySessionIds: ['valid-id', '', 42, null, 'valid-id', 'x'.repeat(513)]
+        claudeLivePtySessionIds: ['valid-id', '', 42, null, 'valid-id', 'x'.repeat(513)],
+        claudeLiveSharedPtyAccountBindings: [
+          { sessionId: 'valid-id', accountId: 'account-a' },
+          { sessionId: '', accountId: 'bad' },
+          { sessionId: 'unknown-id', accountId: null },
+          { sessionId: 'bad-account', accountId: '' }
+        ]
       })
 
       const store = await createStore()
 
       expect(store.getClaudeLivePtySessionIds()).toEqual(['valid-id'])
+      expect(store.getClaudeLiveSharedPtyAccountBindings()).toEqual([
+        { sessionId: 'valid-id', accountId: 'account-a' },
+        { sessionId: 'unknown-id', accountId: null }
+      ])
     })
 
     it('keeps the newest ids when an oversized persisted list is loaded', async () => {
@@ -9150,6 +9167,25 @@ describe('Store', () => {
       expect(ids).toHaveLength(200)
       expect(ids[0]).toBe('claude-session-5')
       expect(ids[199]).toBe('claude-session-204')
+    })
+
+    it('fails closed and rearms unrelated state after a shared-ownership write failure', async () => {
+      const store = await createStore()
+      store.updateSettings({ terminalFontSize: 19 })
+      chmodSync(testState.dir, 0o500)
+      try {
+        expect(() => store.addClaudeLivePtySessionId('claude-session-1', 'account-a')).toThrow()
+        expect(store.getClaudeLivePtySessionIds()).toEqual([])
+        expect(store.getClaudeLiveSharedPtyAccountBindings()).toEqual([])
+        expect(
+          (store as unknown as { writeTimer: ReturnType<typeof setTimeout> | null }).writeTimer
+        ).not.toBeNull()
+      } finally {
+        chmodSync(testState.dir, 0o700)
+      }
+
+      store.flush()
+      expect((await createStore()).getSettings().terminalFontSize).toBe(19)
     })
   })
 
@@ -9223,6 +9259,27 @@ describe('Store', () => {
       ])
     })
 
+    it('coalesces workspace and shared-account ownership into one durable flush', async () => {
+      const store = await createStore()
+      const flush = vi.spyOn(store as unknown as { flushOrThrow(): void }, 'flushOrThrow')
+
+      expect(
+        store.persistPtyBinding({
+          worktreeId: 'repo-1::/tmp/worktree',
+          tabId: 'tab-1',
+          leafId: TEST_LEAF_1,
+          ptyId: 'claude-session-1',
+          claudeSharedAccountId: 'account-a'
+        })
+      ).toBe(true)
+      store.addClaudeLivePtySessionId('claude-session-1', 'account-a')
+
+      expect(flush).toHaveBeenCalledTimes(1)
+      expect(store.getClaudeLiveSharedPtyAccountBindings()).toEqual([
+        { sessionId: 'claude-session-1', accountId: 'account-a' }
+      ])
+    })
+
     it.each([
       ['UUID leaf', TEST_LEAF_1],
       ['legacy leaf', 'legacy-pane-id']
@@ -9239,7 +9296,8 @@ describe('Store', () => {
               tabId: 'tab-1',
               leafId,
               ptyId: 'claude-session-1',
-              claudeAccountId: 'account-a'
+              claudeAccountId: 'account-a',
+              claudeSharedAccountId: 'account-a'
             })
           ).toThrow()
           expect(
@@ -9253,6 +9311,7 @@ describe('Store', () => {
         const reloaded = await createStore()
         expect(reloaded.getSettings().terminalFontSize).toBe(19)
         expect(reloaded.getClaudeLivePtyAccountBindings()).toEqual([])
+        expect(reloaded.getClaudeLiveSharedPtyAccountBindings()).toEqual([])
       }
     )
 

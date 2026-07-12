@@ -859,7 +859,7 @@ describe('ClaudeAccountService credential capture', () => {
       identity: { email: 'new@example.com', organizationUuid: null, organizationName: null }
     }))
 
-    markClaudePtySpawned('live-claude-pty')
+    markClaudePtySpawned('live-claude-pty', 'host-account')
     try {
       await service.addAccount({ runtime: 'host' })
     } finally {
@@ -944,7 +944,7 @@ describe('ClaudeAccountService credential capture', () => {
       runtimeAuth as never
     )
 
-    markClaudePtySpawned('live-claude-pty')
+    markClaudePtySpawned('live-claude-pty', 'account-1')
     try {
       await service.selectAccount('account-2')
     } finally {
