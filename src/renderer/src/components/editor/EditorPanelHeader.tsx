@@ -15,6 +15,8 @@ import { EditorPanelMarkdownActionsMenu } from './EditorPanelMarkdownActionsMenu
 import { translate } from '@/i18n/i18n'
 import { EditorPanelHeaderPath } from './EditorPanelHeaderPath'
 import { useDiffNavigation } from './diff-navigation-context'
+import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
+import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 
 type EditorPanelHeaderProps = {
   activeFile: OpenFile
@@ -94,6 +96,8 @@ export function EditorPanelHeader({
     [activeFile.relativePath, diffComments]
   )
   const { changeCount, goToPreviousDiff, goToNextDiff } = useDiffNavigation()
+  const previousChangeShortcut = useShortcutKeyDetails('editor.previousChange')
+  const nextChangeShortcut = useShortcutKeyDetails('editor.nextChange')
 
   return (
     <div className="editor-header">
@@ -224,6 +228,13 @@ export function EditorPanelHeader({
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={4}>
               {translate('auto.components.editor.EditorPanelHeader.2076ecfc9c', 'Previous change')}
+              {previousChangeShortcut.keys.length > 0 && (
+                <ShortcutKeyCombo
+                  keys={previousChangeShortcut.keys}
+                  doubleTap={previousChangeShortcut.doubleTap}
+                  className="ml-1.5"
+                />
+              )}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -247,6 +258,13 @@ export function EditorPanelHeader({
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={4}>
               {translate('auto.components.editor.EditorPanelHeader.631dab0df3', 'Next change')}
+              {nextChangeShortcut.keys.length > 0 && (
+                <ShortcutKeyCombo
+                  keys={nextChangeShortcut.keys}
+                  doubleTap={nextChangeShortcut.doubleTap}
+                  className="ml-1.5"
+                />
+              )}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
