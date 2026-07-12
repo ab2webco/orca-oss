@@ -777,6 +777,28 @@ describe('registerWorktreeHandlers', () => {
     expect(runtimeStub.notifyWorktreesChangedForRemoteClients).toHaveBeenCalledWith('repo-1')
   })
 
+  it('validates and persists local metadata batches through one handler call', () => {
+    store.getSettings.mockReturnValue({
+      claudeManagedAccounts: [{ id: 'account-a' }]
+    })
+    store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
+
+    const result = handlers['worktrees:updateMetaBatch'](null, {
+      updates: [
+        { worktreeId: 'repo-1::/workspace/a', updates: { claudeAccountId: 'account-a' } },
+        { worktreeId: 'repo-1::/workspace/b', updates: { claudeAccountId: 'account-a' } }
+      ]
+    })
+
+    expect(store.setWorktreeMeta).toHaveBeenCalledTimes(2)
+    expect(result).toHaveLength(2)
+    expect(() =>
+      handlers['worktrees:updateMetaBatch'](null, {
+        updates: [{ worktreeId: 'repo-1::/workspace/c', updates: { claudeAccountId: 'removed' } }]
+      })
+    ).toThrow('no longer exists')
+  })
+
   it('does not trust renderer-authored automation provenance during local create', async () => {
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
     listWorktreesMock.mockResolvedValue([

@@ -120,7 +120,10 @@ import {
   normalizeCodexRuntimeSelection,
   type CodexAccountSelectionTarget
 } from './codex-accounts/runtime-selection'
-import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
+import {
+  getSelectedClaudeAccountIdForTarget,
+  normalizeClaudeRuntimeSelection
+} from './claude-accounts/runtime-selection'
 import { codexHookService } from './codex/hook-service'
 import { getDefaultWslDistro } from './wsl'
 import { ClaudeAccountService } from './claude-accounts/service'
@@ -1686,6 +1689,9 @@ app.whenReady().then(async () => {
   rateLimits.setClaudeFetchTarget(getInitialClaudeRateLimitTarget(store.getSettings()))
   rateLimits.setClaudeAuthPreparationResolver((target) =>
     claudeRuntimeAuth!.prepareForRateLimitFetch(target)
+  )
+  rateLimits.setClaudeAccountIdResolver((target) =>
+    getSelectedClaudeAccountIdForTarget(store!.getSettings(), target)
   )
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store!.getSettings()

@@ -1,0 +1,26 @@
+import type { Store } from '../persistence'
+
+export function isManagedClaudeAccountId(store: Store, accountId: string): boolean {
+  return store.getSettings().claudeManagedAccounts.some((account) => account.id === accountId)
+}
+
+export function normalizeClaudeAccountPinForCreate(
+  store: Store,
+  accountId: string | null | undefined
+): string | null | undefined {
+  if (typeof accountId !== 'string' || isManagedClaudeAccountId(store, accountId)) {
+    return accountId
+  }
+  // Why: a slow worktree create may finish after its selected account was
+  // removed; inherit global auth instead of durably resurrecting a dead pin.
+  return null
+}
+
+export function assertValidClaudeAccountPin(
+  store: Store,
+  accountId: string | null | undefined
+): void {
+  if (typeof accountId === 'string' && !isManagedClaudeAccountId(store, accountId)) {
+    throw new Error('That Claude account no longer exists.')
+  }
+}

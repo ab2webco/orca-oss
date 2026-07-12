@@ -4,6 +4,10 @@ import { ipcMain } from 'electron'
 import { readFile, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
+import {
+  assertValidClaudeAccountPin,
+  normalizeClaudeAccountPinForCreate
+} from '../claude-accounts/worktree-account-pin'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { readBranchRenameFailureOutputForDisplay } from '../agent-hooks/branch-rename-failure-output'
 import {
@@ -909,6 +913,7 @@ function createFolderWorkspace(
   const now = Date.now()
   const instanceId = randomUUID()
   const worktreeId = getFolderWorkspaceInstanceId(repo, instanceId)
+  const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
   const meta = store.setWorktreeMeta(worktreeId, {
     instanceId,
     ...(store.getProjectHostSetups
@@ -932,7 +937,7 @@ function createFolderWorkspace(
       : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
+    ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
     ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.linkedBitbucketPR !== undefined ? { linkedBitbucketPR: args.linkedBitbucketPR } : {}),
@@ -986,6 +991,7 @@ export function registerWorktreeHandlers(
   ipcMain.removeHandler('worktrees:forgetLocal')
   ipcMain.removeHandler('worktrees:forceDeletePreservedBranch')
   ipcMain.removeHandler('worktrees:updateMeta')
+  ipcMain.removeHandler('worktrees:updateMetaBatch')
   ipcMain.removeHandler('worktrees:listLineage')
   ipcMain.removeHandler('worktrees:updateLineage')
   ipcMain.removeHandler('worktrees:persistSortOrder')
@@ -2032,6 +2038,7 @@ export function registerWorktreeHandlers(
   ipcMain.handle(
     'worktrees:updateMeta',
     (_event, args: { worktreeId: string; updates: Partial<WorktreeMeta> }) => {
+      assertValidClaudeAccountPin(store, args.updates.claudeAccountId)
       const updates =
         args.updates.displayName !== undefined
           ? {
@@ -2056,6 +2063,34 @@ export function registerWorktreeHandlers(
         runtime.notifyWorktreesChangedForRemoteClients(getRepoIdFromWorktreeId(args.worktreeId))
       }
       return meta
+    }
+  )
+
+  ipcMain.handle(
+    'worktrees:updateMetaBatch',
+    (_event, args: { updates: { worktreeId: string; updates: Partial<WorktreeMeta> }[] }) => {
+      for (const entry of args.updates) {
+        assertValidClaudeAccountPin(store, entry.updates.claudeAccountId)
+      }
+      const renamedRepoIds = new Set<string>()
+      const result = args.updates.map((entry) => {
+        const updates =
+          entry.updates.displayName !== undefined
+            ? {
+                ...entry.updates,
+                pendingFirstAgentMessageRename: false,
+                firstAgentMessageRenameError: null
+              }
+            : entry.updates
+        if (entry.updates.displayName !== undefined) {
+          renamedRepoIds.add(getRepoIdFromWorktreeId(entry.worktreeId))
+        }
+        return store.setWorktreeMeta(entry.worktreeId, stripOrcaProvenanceMetaUpdates(updates))
+      })
+      for (const repoId of renamedRepoIds) {
+        runtime.notifyWorktreesChangedForRemoteClients(repoId)
+      }
+      return result
     }
   )
 

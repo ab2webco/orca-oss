@@ -280,6 +280,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const defaultSelectedWorktrees = useMemo(() => [worktree], [worktree])
   const effectiveSelectedWorktrees = selectedWorktrees ?? defaultSelectedWorktrees
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
+  const updateWorktreesMeta = useAppStore((s) => s.updateWorktreesMeta)
   const setWorktreesPinnedAndReveal = useAppStore((s) => s.setWorktreesPinnedAndReveal)
   const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const openModal = useAppStore((s) => s.openModal)
@@ -568,15 +569,14 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleAssignClaudeAccount = useCallback(
     (accountId: string | null) => {
       setMenuOpenState(false)
-      void Promise.all(
-        activeContextWorktrees.map((item) =>
-          (item.claudeAccountId ?? null) === accountId
-            ? Promise.resolve()
-            : updateWorktreeMeta(item.id, { claudeAccountId: accountId })
-        )
+      const updates = new Map(
+        activeContextWorktrees
+          .filter((item) => (item.claudeAccountId ?? null) !== accountId)
+          .map((item) => [item.id, { claudeAccountId: accountId }])
       )
+      void updateWorktreesMeta(updates)
     },
-    [activeContextWorktrees, setMenuOpenState, updateWorktreeMeta]
+    [activeContextWorktrees, setMenuOpenState, updateWorktreesMeta]
   )
 
   const handleRename = useCallback(() => {

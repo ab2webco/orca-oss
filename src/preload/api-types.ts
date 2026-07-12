@@ -1165,6 +1165,9 @@ export type PreloadApi = {
       expectedHead: string
     }) => Promise<ForceDeleteWorktreeBranchResult>
     updateMeta: (args: { worktreeId: string; updates: Partial<WorktreeMeta> }) => Promise<Worktree>
+    updateMetaBatch: (args: {
+      updates: { worktreeId: string; updates: Partial<WorktreeMeta> }[]
+    }) => Promise<Worktree[]>
     listLineage: () => Promise<{
       lineage: Record<string, WorktreeLineage>
       workspaceLineage?: Record<string, WorkspaceLineage>
@@ -2073,10 +2076,7 @@ export type PreloadApi = {
      *  IPC — call sparingly. */
     getSync: () => GlobalSettings | null
     set: (args: Partial<GlobalSettings>) => Promise<GlobalSettings>
-    updatePRBotAuthorOverride: (args: {
-      author: string
-      isBot: boolean
-    }) => Promise<GlobalSettings>
+    updatePRBotAuthorOverride: (args: { author: string; isBot: boolean }) => Promise<GlobalSettings>
     listFonts: () => Promise<string[]>
     previewGhosttyImport: () => Promise<GhosttyImportPreview>
     previewWarpThemeImport: (source: WarpThemeImportSource) => Promise<WarpThemeImportPreview>

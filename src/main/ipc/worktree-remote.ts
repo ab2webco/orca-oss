@@ -12,6 +12,7 @@ import { posix, win32 } from 'node:path'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
+import { normalizeClaudeAccountPinForCreate } from '../claude-accounts/worktree-account-pin'
 import type {
   AutomationWorkspaceProvenance,
   CreateWorktreeArgs,
@@ -1839,6 +1840,7 @@ export async function createRemoteWorktree(
       preparedPushTarget
     )
   }
+  const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
   const metaUpdates: Partial<WorktreeMeta> = {
     // Why: path-derived worktree IDs can be reused after external deletion.
     // Fresh creations must rotate instance identity so stale lineage cannot
@@ -1896,7 +1898,7 @@ export async function createRemoteWorktree(
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {})
+    ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {
     const meta = store.setWorktreeMeta(worktreeId, metaUpdates)
@@ -2464,6 +2466,7 @@ export async function createLocalWorktree(
   // Why: PR/MR-created worktrees can start from a head ref/SHA while Source
   // Control must compare against the review target branch.
   const metadataBaseRef = args.compareBaseRef ?? remoteTrackingBase?.ref ?? baseBranch
+  const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
   const metaUpdates: Partial<WorktreeMeta> = {
     // Why: path-derived worktree IDs can be reused after external deletion.
     // Fresh creations must rotate instance identity so stale lineage cannot
@@ -2520,7 +2523,7 @@ export async function createLocalWorktree(
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {})
+    ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {
     const meta = store.setWorktreeMeta(worktreeId, metaUpdates)

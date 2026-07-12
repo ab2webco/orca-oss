@@ -269,8 +269,28 @@ describe('Claude live PTY gate', () => {
     const reservationId = reserveSharedClaudeAccountLaunch(null)
     try {
       expect(() => beginClaudeAuthSwitch()).toThrow('global Claude terminal is starting')
+      expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
+        'being launched globally'
+      )
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow('in use')
     } finally {
       releaseSharedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('prevents unknown shared preparation from racing account-specific ownership', () => {
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-a')
+    try {
+      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow('assigned worktree')
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
+
+    beginManagedClaudeAccountMutation('account-a')
+    try {
+      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow('being changed')
+    } finally {
+      endManagedClaudeAccountMutation('account-a')
     }
   })
 })

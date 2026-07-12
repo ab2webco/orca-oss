@@ -4017,8 +4017,34 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           }
     })
 
-    await Promise.all(
-      Array.from(updatesByWorktreeId, async ([worktreeId, updates]) => {
+    const localUpdates: { worktreeId: string; updates: Partial<WorktreeMeta> }[] = []
+    const remoteUpdates: [string, Partial<WorktreeMeta>][] = []
+    for (const [worktreeId, updates] of updatesByWorktreeId) {
+      const settings = settingsForWorktreeOwner(get(), worktreeId)
+      if (getActiveRuntimeTarget(settings).kind === 'local') {
+        localUpdates.push({ worktreeId, updates })
+      } else {
+        remoteUpdates.push([worktreeId, updates])
+      }
+    }
+
+    const refreshAfterFailure = (worktreeIds: readonly string[], err: unknown): void => {
+      console.error('Failed to update worktree meta:', err)
+      for (const repoId of new Set(worktreeIds.map(getRepoIdFromWorktreeId))) {
+        void get().fetchWorktrees(repoId)
+      }
+    }
+
+    await Promise.all([
+      localUpdates.length > 0
+        ? window.api.worktrees.updateMetaBatch({ updates: localUpdates }).catch((err) =>
+            refreshAfterFailure(
+              localUpdates.map((entry) => entry.worktreeId),
+              err
+            )
+          )
+        : Promise.resolve(),
+      ...remoteUpdates.map(async ([worktreeId, updates]) => {
         try {
           await persistWorktreeMeta(
             settingsForWorktreeOwner(get(), worktreeId),
@@ -4030,11 +4056,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
             return
           }
-          console.error('Failed to update worktree meta:', err)
-          void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
+          refreshAfterFailure([worktreeId], err)
         }
       })
-    )
+    ])
   },
 
   setWorktreesPinnedAndReveal: (worktreeIds, isPinned) => {

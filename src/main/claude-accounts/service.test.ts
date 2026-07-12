@@ -483,11 +483,13 @@ describe('ClaudeAccountService credential capture', () => {
       ],
       activeClaudeManagedAccountId: 'account-1'
     }
-    const worktreeMeta = { 'wt-1': { claudeAccountId: 'account-1' as string | null } }
+    const worktreeMeta: Record<string, { claudeAccountId: string | null }> = {
+      'wt-1': { claudeAccountId: 'account-1' }
+    }
     const store = {
       getSettings: vi.fn(() => settings),
       getAllWorktreeMeta: vi.fn(() => worktreeMeta),
-      setWorktreeMeta: vi.fn((worktreeId: 'wt-1', updates: { claudeAccountId: null }) => {
+      setWorktreeMeta: vi.fn((worktreeId: string, updates: { claudeAccountId: null }) => {
         worktreeMeta[worktreeId] = { ...worktreeMeta[worktreeId], ...updates }
       }),
       updateSettings: vi.fn((updates: Partial<typeof settings>) => {
@@ -501,13 +503,15 @@ describe('ClaudeAccountService credential capture', () => {
         ) => {
           settings = { ...settings, ...updates }
           for (const [worktreeId, claudeAccountId] of Object.entries(assignments)) {
-            worktreeMeta[worktreeId as 'wt-1'] = { claudeAccountId }
+            worktreeMeta[worktreeId] = { claudeAccountId }
           }
         }
       )
     }
     const runtimeAuth = {
-      syncForCurrentSelection: vi.fn(async () => {}),
+      syncForCurrentSelection: vi.fn(async () => {
+        worktreeMeta['wt-created-during-sync'] = { claudeAccountId: 'account-1' }
+      }),
       forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {})
     }
     const rateLimits = {
@@ -532,6 +536,7 @@ describe('ClaudeAccountService credential capture', () => {
       activeClaudeManagedAccountId: null
     })
     expect(worktreeMeta['wt-1'].claudeAccountId).toBeNull()
+    expect(worktreeMeta['wt-created-during-sync'].claudeAccountId).toBeNull()
     expect(deleteActiveClaudeKeychainCredentialsStrict).toHaveBeenCalledWith(
       expect.stringContaining(join('claude-accounts', 'account-1', 'auth'))
     )

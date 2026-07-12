@@ -15,6 +15,10 @@ import { fetchGrokRateLimits } from './grok-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchOpenCodeGoRateLimits } from './opencode-go-usage-fetcher'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
+import {
+  releaseInjectedClaudeAccountLaunch,
+  reserveInjectedClaudeAccountLaunch
+} from '../claude-accounts/live-pty-gate'
 
 vi.mock('./claude-fetcher', () => ({
   fetchClaudeRateLimits: vi.fn(),
@@ -1105,6 +1109,45 @@ describe('RateLimitService', () => {
         signal: expect.any(AbortSignal)
       })
     )
+  })
+
+  it('does not mutate inactive account credentials while an injected launch owns them', async () => {
+    const service = new RateLimitService()
+    const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+    service.setInactiveClaudeAccountsResolver(() => [account])
+    const reservationId = reserveInjectedClaudeAccountLaunch(account.id)
+
+    try {
+      await service.fetchInactiveClaudeAccountsOnOpen()
+      expect(fetchManagedAccountUsage).not.toHaveBeenCalled()
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('owns an active managed account across preparation and quota fetch', async () => {
+    const service = new RateLimitService()
+    const fetch = deferred<ProviderRateLimits>()
+    service.setClaudeAccountIdResolver(() => 'account-1')
+    service.setClaudeAuthPreparationResolver(async () => ({
+      configDir: '/tmp/account-1/auth',
+      runtime: 'host',
+      wslDistro: null,
+      wslLinuxConfigDir: null,
+      envPatch: {},
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }))
+    vi.mocked(fetchClaudeRateLimits).mockReturnValueOnce(fetch.promise)
+
+    const refresh = service.refreshClaudeForTarget()
+    await flushMicrotasks()
+    expect(() => reserveInjectedClaudeAccountLaunch('account-1')).toThrow('being changed')
+
+    fetch.resolve(okProvider('claude', 33, Date.now()))
+    await refresh
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-1')
+    releaseInjectedClaudeAccountLaunch(reservationId)
   })
 
   it('does not start overlapping inactive Codex preview fetches', async () => {

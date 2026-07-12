@@ -75,6 +75,7 @@ const mockApi = {
     resolvePrBase: vi.fn(),
     resolveMrBase: vi.fn(),
     updateMeta: vi.fn().mockResolvedValue(undefined),
+    updateMetaBatch: vi.fn().mockResolvedValue([]),
     updateLineage: vi.fn().mockResolvedValue(null)
   },
   pty: {
@@ -5442,7 +5443,13 @@ describe('worktree remote runtime mutations', () => {
     ])
     expect(store.getState().sortEpoch).toBe(8)
     expect(subscriber).toHaveBeenCalledTimes(1)
-    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledTimes(2)
+    expect(mockApi.worktrees.updateMetaBatch).toHaveBeenCalledTimes(1)
+    expect(mockApi.worktrees.updateMetaBatch).toHaveBeenCalledWith({
+      updates: [
+        { worktreeId: first.id, updates: { workspaceStatus: 'in-review' } },
+        { worktreeId: second.id, updates: { workspaceStatus: 'completed' } }
+      ]
+    })
   })
 })
 

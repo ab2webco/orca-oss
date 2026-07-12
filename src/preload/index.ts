@@ -702,6 +702,8 @@ const api = {
 
     updateMeta: (args) => ipcRenderer.invoke('worktrees:updateMeta', args),
 
+    updateMetaBatch: (args) => ipcRenderer.invoke('worktrees:updateMetaBatch', args),
+
     listLineage: () => ipcRenderer.invoke('worktrees:listLineage'),
 
     updateLineage: (args) => ipcRenderer.invoke('worktrees:updateLineage', args),

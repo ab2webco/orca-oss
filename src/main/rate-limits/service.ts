@@ -13,6 +13,7 @@ import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetche
 import type { InactiveClaudeAccountInfo } from './claude-fetcher'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
+import { runManagedClaudeAccountMutation } from '../claude-accounts/live-pty-gate'
 import type { NetworkProxySettings } from '../../shared/network-proxy'
 import {
   normalizeClaudeAccountSelectionTarget,
@@ -41,6 +42,7 @@ type CodexHomePathResolver = (target?: CodexAccountSelectionTarget) => string | 
 type ClaudeAuthPreparationResolver = (
   target?: ClaudeAccountSelectionTarget
 ) => Promise<ClaudeRuntimeAuthPreparation>
+type ClaudeAccountIdResolver = (target?: ClaudeAccountSelectionTarget) => string | null
 
 type OpenCodeGoRateLimitConfig = {
   sessionCookie: string
@@ -173,6 +175,7 @@ export class RateLimitService {
     wslDistro: null
   }
   private claudeAuthPreparationResolver: ClaudeAuthPreparationResolver | null = null
+  private claudeAccountIdResolver: ClaudeAccountIdResolver | null = null
   private claudeFetchTarget: NormalizedClaudeAccountSelectionTarget = {
     runtime: 'host',
     wslDistro: null
@@ -212,6 +215,10 @@ export class RateLimitService {
 
   setClaudeAuthPreparationResolver(resolver: ClaudeAuthPreparationResolver): void {
     this.claudeAuthPreparationResolver = resolver
+  }
+
+  setClaudeAccountIdResolver(resolver: ClaudeAccountIdResolver): void {
+    this.claudeAccountIdResolver = resolver
   }
 
   setClaudeFetchTarget(target?: ClaudeAccountSelectionTarget): void {
@@ -481,11 +488,13 @@ export class RateLimitService {
           continue
         }
         try {
-          const fresh = await fetchManagedAccountUsage(account, {
-            allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-            networkProxySettings: this.networkProxySettingsResolver?.(),
-            signal
-          })
+          const fresh = await this.withClaudeAccountOperation(account.id, () =>
+            fetchManagedAccountUsage(account, {
+              allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+              networkProxySettings: this.networkProxySettingsResolver?.(),
+              signal
+            })
+          )
           if (
             signal.aborted ||
             fetchGeneration !== this.inactiveClaudeAccountsGeneration ||
@@ -1267,17 +1276,55 @@ export class RateLimitService {
     return { ...current, status: 'fetching' }
   }
 
+  private withClaudeAccountOperation<T>(
+    accountId: string | null,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    if (!accountId) {
+      return operation()
+    }
+    return runManagedClaudeAccountMutation(accountId, operation)
+  }
+
+  private fetchClaudeWithOwnership(
+    target: ClaudeAccountSelectionTarget | undefined,
+    signal: AbortSignal
+  ): Promise<{
+    limits: ProviderRateLimits
+    provenance: string
+    latestProvenance: string
+  }> {
+    const accountId = this.claudeAccountIdResolver?.(target) ?? null
+    return this.withClaudeAccountOperation(accountId, async () => {
+      const authPreparation = this.claudeAuthPreparationResolver
+        ? await this.claudeAuthPreparationResolver(target)
+        : undefined
+      const provenance = authPreparation?.provenance ?? 'system'
+      const limits = await fetchClaudeRateLimits({
+        authPreparation,
+        allowPtyFallback: this.shouldAllowClaudePtyFallback(authPreparation),
+        allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+        networkProxySettings: this.networkProxySettingsResolver?.(),
+        signal
+      })
+      const latestAuthPreparation = this.claudeAuthPreparationResolver
+        ? await this.claudeAuthPreparationResolver(target)
+        : undefined
+      return {
+        limits,
+        provenance,
+        latestProvenance: latestAuthPreparation?.provenance ?? 'system'
+      }
+    })
+  }
+
   private async runFetchAllCycle(signal: AbortSignal): Promise<void> {
     if (signal.aborted) {
       return
     }
     const claudeTarget = this.claudeFetchTarget
-    const claudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
-    if (signal.aborted) {
-      return
-    }
-    const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const claudeGeneration = this.claudeFetchGeneration
+    const claudeFetchPromise = this.fetchClaudeWithOwnership(claudeTarget, signal)
     const codexTarget = this.codexFetchTarget
     const codexHomePath = this.codexHomePathResolver?.(codexTarget) ?? null
     const codexProvenance = this.getCodexProvenance(codexTarget, codexHomePath)
@@ -1346,13 +1393,7 @@ export class RateLimitService {
 
     const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
       await Promise.allSettled([
-        fetchClaudeRateLimits({
-          authPreparation: claudeAuthPreparation,
-          allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-          allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-          networkProxySettings: this.networkProxySettingsResolver?.(),
-          signal
-        }),
+        claudeFetchPromise,
         missingWslCodexHome ??
           fetchCodexRateLimits({
             codexHomePath,
@@ -1377,7 +1418,7 @@ export class RateLimitService {
 
     const claude =
       claudeResult.status === 'fulfilled'
-        ? claudeResult.value
+        ? claudeResult.value.limits
         : ({
             provider: 'claude',
             session: null,
@@ -1466,11 +1507,10 @@ export class RateLimitService {
           } satisfies ProviderRateLimits)
 
     const latestCodexHomePath = this.codexHomePathResolver?.(codexTarget) ?? null
-    const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
-    if (signal.aborted) {
-      return
-    }
-    const latestClaudeProvenance = latestClaudeAuthPreparation?.provenance ?? 'system'
+    const claudeProvenance =
+      claudeResult.status === 'fulfilled' ? claudeResult.value.provenance : null
+    const latestClaudeProvenance =
+      claudeResult.status === 'fulfilled' ? claudeResult.value.latestProvenance : null
     const latestCodexProvenance = this.getCodexProvenance(codexTarget, latestCodexHomePath)
     const shouldApplyCodex =
       codexGeneration === this.codexFetchGeneration && codexProvenance === latestCodexProvenance
@@ -1586,11 +1626,6 @@ export class RateLimitService {
       return
     }
     const claudeTarget = this.claudeFetchTarget
-    const claudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
-    if (signal.aborted) {
-      return
-    }
-    const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const claudeGeneration = this.claudeFetchGeneration
     const previousState = this.state
 
@@ -1599,41 +1634,32 @@ export class RateLimitService {
       claude: this.withFetchingStatus(previousState.claude, 'claude')
     })
 
-    const claude = await fetchClaudeRateLimits({
-      authPreparation: claudeAuthPreparation,
-      allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-      allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-      networkProxySettings: this.networkProxySettingsResolver?.(),
-      signal
-    }).catch(
-      (err): ProviderRateLimits => ({
+    const result = await this.fetchClaudeWithOwnership(claudeTarget, signal).catch((err) => ({
+      limits: {
         provider: 'claude',
         session: null,
         weekly: null,
         updatedAt: Date.now(),
         error: err instanceof Error ? err.message : 'Unknown error',
         status: 'error'
-      })
-    )
+      } satisfies ProviderRateLimits,
+      provenance: null,
+      latestProvenance: null
+    }))
 
     if (signal.aborted) {
       return
     }
 
-    const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
-    if (signal.aborted) {
-      return
-    }
-    const latestClaudeProvenance = latestClaudeAuthPreparation?.provenance ?? 'system'
     const shouldApplyClaude =
       claudeGeneration === this.claudeFetchGeneration &&
-      claudeProvenance === latestClaudeProvenance &&
+      result.provenance === result.latestProvenance &&
       this.isSameClaudeTarget(claudeTarget, this.claudeFetchTarget)
 
     this.updateState({
       ...this.state,
       claude: shouldApplyClaude
-        ? this.applyStalePolicy(claude, previousState.claude)
+        ? this.applyStalePolicy(result.limits, previousState.claude)
         : this.state.claude
     })
   }

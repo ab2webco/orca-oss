@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 const liveClaudePtyIds = new Set<string>()
 const liveSharedClaudePtyAccounts = new Map<string, string | null>()
@@ -6,6 +7,7 @@ const liveInjectedClaudePtyAccounts = new Map<string, string>()
 const injectedClaudeLaunchReservations = new Map<string, string>()
 const sharedClaudeLaunchReservations = new Map<string, string | null>()
 const managedClaudeAccountMutations = new Set<string>()
+const managedClaudeAccountMutationContext = new AsyncLocalStorage<ReadonlySet<string>>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
 // cannot rotate the single-use refresh token out from under a Claude CLI that
@@ -206,7 +208,11 @@ export function reserveInjectedClaudeAccountLaunch(accountId: string): string {
   if (managedClaudeAccountMutations.has(accountId)) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
-  if ([...sharedClaudeLaunchReservations.values()].includes(accountId)) {
+  if (
+    [...sharedClaudeLaunchReservations.values()].some(
+      (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId
+    )
+  ) {
     throw new Error('This Claude account is being launched globally. Try again when it finishes.')
   }
   if (hasLiveSharedClaudePtysForAccount(accountId)) {
@@ -223,10 +229,18 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
   if (switchInProgress) {
     throw new Error('A Claude account switch is in progress. Try again after it finishes.')
   }
-  if (accountId && managedClaudeAccountMutations.has(accountId)) {
+  if (
+    accountId === null
+      ? managedClaudeAccountMutations.size > 0
+      : managedClaudeAccountMutations.has(accountId)
+  ) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
-  if (accountId && hasLiveInjectedClaudePtysForAccount(accountId)) {
+  if (
+    accountId === null
+      ? liveInjectedClaudePtyAccounts.size > 0 || injectedClaudeLaunchReservations.size > 0
+      : hasLiveInjectedClaudePtysForAccount(accountId)
+  ) {
     throw new Error(
       'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
     )
@@ -239,7 +253,10 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
 export function beginManagedClaudeAccountMutation(accountId: string): void {
   if (
     hasLiveInjectedClaudePtysForAccount(accountId) ||
-    [...sharedClaudeLaunchReservations.values()].includes(accountId)
+    hasLiveSharedClaudePtysForAccount(accountId) ||
+    [...sharedClaudeLaunchReservations.values()].some(
+      (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId
+    )
   ) {
     throw new Error(
       'This Claude account is in use by an assigned worktree. Close its Claude terminal before changing the account.'
@@ -253,6 +270,25 @@ export function beginManagedClaudeAccountMutation(accountId: string): void {
 
 export function endManagedClaudeAccountMutation(accountId: string): void {
   managedClaudeAccountMutations.delete(accountId)
+}
+
+export async function runManagedClaudeAccountMutation<T>(
+  accountId: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const inherited = managedClaudeAccountMutationContext.getStore()
+  if (inherited?.has(accountId)) {
+    return operation()
+  }
+  beginManagedClaudeAccountMutation(accountId)
+  try {
+    return await managedClaudeAccountMutationContext.run(
+      new Set([...(inherited ?? []), accountId]),
+      operation
+    )
+  } finally {
+    endManagedClaudeAccountMutation(accountId)
+  }
 }
 
 export function releaseInjectedClaudeAccountLaunch(reservationId: string | undefined): void {

@@ -30,12 +30,11 @@ import {
   writeManagedClaudeKeychainCredentials
 } from './keychain'
 import {
-  beginManagedClaudeAccountMutation,
   beginClaudeAuthSwitch,
-  endManagedClaudeAccountMutation,
   endClaudeAuthSwitch,
   hasLiveInjectedClaudePtysForAccount,
-  hasLiveSharedClaudePtysForAccount
+  hasLiveSharedClaudePtysForAccount,
+  runManagedClaudeAccountMutation
 } from './live-pty-gate'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
@@ -155,12 +154,7 @@ export class ClaudeAccountService {
     accountId: string,
     operation: () => Promise<T>
   ): Promise<T> {
-    beginManagedClaudeAccountMutation(accountId)
-    try {
-      return await operation()
-    } finally {
-      endManagedClaudeAccountMutation(accountId)
-    }
+    return runManagedClaudeAccountMutation(accountId, operation)
   }
 
   private async doAddAccount(
@@ -307,11 +301,7 @@ export class ClaudeAccountService {
       accountId,
       account.managedAuthPath
     )
-    const pinnedWorktreeIds = Object.entries(this.store.getAllWorktreeMeta())
-      .filter(([, meta]) => meta.claudeAccountId === accountId)
-      .map(([worktreeId]) => worktreeId)
-    const clearedPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, null]))
-    const restoredPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, accountId]))
+    let restoredPins: Record<string, string | null> = {}
     let removalCommitted = false
     let credentialRemovalStarted = false
 
@@ -330,6 +320,13 @@ export class ClaudeAccountService {
       } else {
         await this.syncRuntimeAuthWithLivePtyGate(getClaudeSelectionTargetForAccount(account))
       }
+      // Why: worktree creation can finish while account removal awaits auth sync.
+      // Snapshot pins at the durable commit boundary so none can escape cleanup.
+      const pinnedWorktreeIds = Object.entries(this.store.getAllWorktreeMeta())
+        .filter(([, meta]) => meta.claudeAccountId === accountId)
+        .map(([worktreeId]) => worktreeId)
+      const clearedPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, null]))
+      restoredPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, accountId]))
       this.commitClaudeAccountState(
         {
           claudeManagedAccounts: nextAccounts,
