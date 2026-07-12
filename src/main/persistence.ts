@@ -6061,6 +6061,9 @@ export class Store {
       } catch (err) {
         this.state.workspaceSession = sessionBeforeBinding
         this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
+        // Why: flushOrThrow canceled the prior debounce; unrelated pending
+        // state still needs a retry after this binding transaction rolls back.
+        this.scheduleSave()
         throw err
       }
       return shouldPersistClaudeBinding
@@ -6114,6 +6117,7 @@ export class Store {
     } catch (err) {
       this.state.workspaceSession = sessionBeforeBinding
       this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
+      this.scheduleSave()
       throw err
     }
     return shouldPersistClaudeBinding

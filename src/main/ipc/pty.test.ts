@@ -1011,6 +1011,62 @@ describe('registerPtyHandlers', () => {
       livePtyGate.markClaudePtyExited('surviving-session')
     })
 
+    it.each(['live gate', 'restart seed'] as const)(
+      'keeps a shared reattach shared after repinning via the %s',
+      async (ownershipSource) => {
+        if (ownershipSource === 'restart seed') {
+          livePtyGate.seedLiveClaudePtysFromPersistence(['surviving-shared-session'])
+        } else {
+          markClaudePtySpawned('surviving-shared-session')
+        }
+        const prepareClaudeAuth = vi.fn(async () => ({
+          configDir: '/tmp/claude-shared',
+          envPatch: {},
+          stripAuthEnv: false,
+          provenance: 'managed:global-account'
+        }))
+        const store = {
+          getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'newly-pinned-account' }))
+        }
+        const isInjectedClaudeAccountTarget = vi.fn(
+          (target?: { overrideAccountId?: string | null }) => Boolean(target?.overrideAccountId)
+        )
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          store as never,
+          undefined,
+          isInjectedClaudeAccountTarget
+        )
+
+        try {
+          const spawnResult = (await handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            command: 'claude',
+            worktreeId: 'wt-shared',
+            sessionId: 'surviving-shared-session'
+          })) as { id: string }
+
+          expect(prepareClaudeAuth).toHaveBeenCalledWith(
+            expect.objectContaining({ overrideAccountId: null })
+          )
+          expect(isInjectedClaudeAccountTarget).toHaveBeenCalledWith(
+            expect.objectContaining({ overrideAccountId: null })
+          )
+          expect(
+            livePtyGate.getLiveInjectedClaudePtyAccountId('surviving-shared-session')
+          ).toBeNull()
+          await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+        } finally {
+          livePtyGate.markClaudePtyExited('surviving-shared-session')
+        }
+      }
+    )
+
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',

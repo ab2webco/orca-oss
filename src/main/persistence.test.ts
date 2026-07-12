@@ -9223,6 +9223,39 @@ describe('Store', () => {
       ])
     })
 
+    it.each([
+      ['UUID leaf', TEST_LEAF_1],
+      ['legacy leaf', 'legacy-pane-id']
+    ])(
+      'rearms unrelated pending state after a transient coalesced %s failure',
+      async (_, leafId) => {
+        const store = await createStore()
+        store.updateSettings({ terminalFontSize: 19 })
+        chmodSync(testState.dir, 0o500)
+        try {
+          expect(() =>
+            store.persistPtyBinding({
+              worktreeId: 'repo-1::/tmp/worktree',
+              tabId: 'tab-1',
+              leafId,
+              ptyId: 'claude-session-1',
+              claudeAccountId: 'account-a'
+            })
+          ).toThrow()
+          expect(
+            (store as unknown as { writeTimer: ReturnType<typeof setTimeout> | null }).writeTimer
+          ).not.toBeNull()
+        } finally {
+          chmodSync(testState.dir, 0o700)
+        }
+
+        store.flush()
+        const reloaded = await createStore()
+        expect(reloaded.getSettings().terminalFontSize).toBe(19)
+        expect(reloaded.getClaudeLivePtyAccountBindings()).toEqual([])
+      }
+    )
+
     it('rearms unrelated pending state after a transient binding write failure', async () => {
       const store = await createStore()
       store.updateSettings({ terminalFontSize: 19 })

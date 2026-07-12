@@ -71,6 +71,7 @@ import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-se
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
 import {
   getLiveInjectedClaudePtyAccountId,
+  isLiveSharedClaudePty,
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
   markClaudePtySpawned,
@@ -3003,6 +3004,10 @@ export function registerPtyHandlers(
           ...claudeSelectionTarget,
           overrideAccountId: existingInjectedAccountId
         }
+      } else if (args.sessionId && isLiveSharedClaudePty(args.sessionId)) {
+        // Why: a surviving shared CLI keeps its original auth mode even if its
+        // worktree was assigned an isolated account while Orca was reloading.
+        claudeSelectionTarget = { ...claudeSelectionTarget, overrideAccountId: null }
       }
       // Why: a per-worktree-pinned (injected) Claude account launches against
       // its own CLAUDE_CONFIG_DIR and never touches the shared ~/.claude
@@ -3787,6 +3792,8 @@ export function registerPtyHandlers(
           ...claudeSelectionTarget,
           overrideAccountId: existingInjectedAccountId
         }
+      } else if (args.sessionId && isLiveSharedClaudePty(args.sessionId)) {
+        claudeSelectionTarget = { ...claudeSelectionTarget, overrideAccountId: null }
       }
       // Why: see the matching comment in runtime.setPtyController's spawn
       // above — an injected (per-worktree-pinned) launch bypasses the shared

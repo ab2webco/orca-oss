@@ -132,6 +132,10 @@ export function hasLiveClaudePtys(): boolean {
   return liveClaudePtyIds.size > 0
 }
 
+export function isLiveSharedClaudePty(ptyId: string): boolean {
+  return liveClaudePtyIds.has(ptyId)
+}
+
 export function hasLiveInjectedClaudePtysForAccount(accountId: string): boolean {
   return (
     [...liveInjectedClaudePtyAccounts.values()].includes(accountId) ||
