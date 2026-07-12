@@ -860,16 +860,23 @@ describe('registerPtyHandlers', () => {
         configDir: '/tmp/claude-injected',
         envPatch: { CLAUDE_CONFIG_DIR: '/tmp/claude-injected' },
         stripAuthEnv: true,
+        injectedAccountId: 'account-injected',
         provenance: 'managed:account-injected:injected'
       }))
-      const isInjectedClaudeAccountTarget = vi.fn(() => true)
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-injected' }))
+      }
+      const isInjectedClaudeAccountTarget = vi.fn(
+        (target?: { overrideAccountId?: string | null }) =>
+          target?.overrideAccountId === 'account-injected'
+      )
       registerPtyHandlers(
         mainWindow as never,
         undefined,
         undefined,
         undefined,
         prepareClaudeAuth,
-        undefined,
+        store as never,
         undefined,
         isInjectedClaudeAccountTarget
       )
@@ -884,13 +891,124 @@ describe('registerPtyHandlers', () => {
         })) as { id: string }
 
         expect(spawnResult.id).toBeDefined()
-        expect(isInjectedClaudeAccountTarget).toHaveBeenCalled()
+        expect(isInjectedClaudeAccountTarget).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-injected' })
+        )
         expect(prepareClaudeAuth).toHaveBeenCalledTimes(1)
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-injected' })
+        )
+        expect(hasLiveClaudePtys()).toBe(false)
+        expect(livePtyGate.hasLiveInjectedClaudePtysForAccount('account-injected')).toBe(true)
 
         await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+        expect(livePtyGate.hasLiveInjectedClaudePtysForAccount('account-injected')).toBe(false)
       } finally {
         endClaudeAuthSwitch()
       }
+    })
+
+    it('releases injected account ownership when renderer provider spawn fails', async () => {
+      const reservationId = livePtyGate.reserveInjectedClaudeAccountLaunch('account-injected')
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude-injected',
+        envPatch: { CLAUDE_CONFIG_DIR: '/tmp/claude-injected' },
+        stripAuthEnv: true,
+        injectedAccountId: 'account-injected',
+        injectedAccountReservationId: reservationId,
+        provenance: 'managed:account-injected:injected'
+      }))
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-injected' }))
+      }
+      spawnMock.mockImplementation(() => {
+        throw new Error('provider spawn failed')
+      })
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        () => true
+      )
+
+      await expect(
+        handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'claude',
+          worktreeId: 'wt-injected'
+        })
+      ).rejects.toThrow()
+
+      expect(livePtyGate.hasLiveInjectedClaudePtysForAccount('account-injected')).toBe(false)
+    })
+
+    it('releases shared launch ownership when renderer provider spawn fails', async () => {
+      const reservationId = livePtyGate.reserveSharedClaudeAccountLaunch('account-global')
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude',
+        envPatch: {},
+        stripAuthEnv: false,
+        sharedAccountReservationId: reservationId,
+        provenance: 'managed:account-global'
+      }))
+      spawnMock.mockImplementation(() => {
+        throw new Error('provider spawn failed')
+      })
+      registerPtyHandlers(mainWindow as never, undefined, undefined, undefined, prepareClaudeAuth)
+
+      await expect(
+        handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'claude'
+        })
+      ).rejects.toThrow()
+
+      beginClaudeAuthSwitch()
+      expect(livePtyGate.isClaudeAuthSwitchInProgress()).toBe(true)
+      endClaudeAuthSwitch()
+    })
+
+    it('reattaches with the PTY account even after the worktree is repinned', async () => {
+      livePtyGate.markInjectedClaudePtySpawned('surviving-session', 'account-a')
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/account-a',
+        envPatch: { CLAUDE_CONFIG_DIR: '/tmp/account-a' },
+        stripAuthEnv: true,
+        injectedAccountId: 'account-a',
+        provenance: 'managed:account-a:injected'
+      }))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-b' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        () => true
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        worktreeId: 'wt-injected',
+        sessionId: 'surviving-session'
+      })) as { id: string }
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-a' })
+      )
+      expect(livePtyGate.getLiveInjectedClaudePtyAccountId('surviving-session')).toBe('account-a')
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      livePtyGate.markClaudePtyExited('surviving-session')
     })
 
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
@@ -927,6 +1045,28 @@ describe('registerPtyHandlers', () => {
       } finally {
         endClaudeAuthSwitch()
       }
+    })
+
+    it('does not treat a global WSL account whose distro is named injected as injected auth', async () => {
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude-wsl',
+        runtime: 'wsl' as const,
+        wslDistro: 'injected',
+        envPatch: {},
+        stripAuthEnv: true,
+        provenance: 'managed:account-1:wsl:injected'
+      }))
+      registerPtyHandlers(mainWindow as never, undefined, undefined, undefined, prepareClaudeAuth)
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude'
+      })) as { id: string }
+
+      expect(hasLiveClaudePtys()).toBe(true)
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      expect(hasLiveClaudePtys()).toBe(false)
     })
 
     it('clears Claude live-PTY tracking from shared provider teardown', () => {

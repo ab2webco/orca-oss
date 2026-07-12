@@ -1216,8 +1216,8 @@
         "perWorkspaceEnvHint": "レシピからオンデマンド環境をプロビジョニングする",
         "branchName": "ブランチ名",
         "branchNamePlaceholder": "feature/my-branch",
-        "claudeAccount": "Account",
-        "claudeAccountInheritGlobal": "Inherit global"
+        "claudeAccount": "アカウント",
+        "claudeAccountInheritGlobal": "グローバル設定を継承"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "ワークツリーを作成する",
@@ -4189,9 +4189,9 @@
           "workspaceSection": "ワークスペース",
           "primaryDeleteDisabled": "プライマリワークツリーは削除できません。代わりにプロジェクトを削除してください。",
           "deleteWorktree": "ワークツリーを削除",
-          "assignAccountsTo": "Assign Accounts To",
-          "assignAccount": "Assign Account",
-          "inheritGlobalAccount": "Inherit global"
+          "assignAccountsTo": "アカウントを割り当て",
+          "assignAccount": "アカウントを割り当て",
+          "inheritGlobalAccount": "グローバル設定を継承"
         },
         "WorktreeList": {
           "d880ea0744": "グループを作成し、このプロジェクトをそのグループに移動します。",

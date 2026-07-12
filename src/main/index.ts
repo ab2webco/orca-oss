@@ -127,7 +127,8 @@ import { ClaudeAccountService } from './claude-accounts/service'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import {
   attachClaudeLivePtyPersistence,
-  seedLiveClaudePtysFromPersistence
+  seedLiveClaudePtysFromPersistence,
+  seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer } from './agent-hooks/server'
@@ -956,7 +957,7 @@ function openMainWindow(): BrowserWindow {
     store,
     runtime,
     prepareCodexRuntimeHomeForLaunch,
-    (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target),
+    (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true }),
     {
       awaitLocalPtyStartup: () => localPtyStartupReady,
       onBeforeRendererReload: ({ ignoreCache, webContentsId }) => {
@@ -1611,9 +1612,11 @@ app.whenReady().then(async () => {
   attachClaudeLivePtyPersistence(store)
   const persistedClaudePtyIds = store.getClaudeLivePtySessionIds()
   seedLiveClaudePtysFromPersistence(persistedClaudePtyIds)
-  if (persistedClaudePtyIds.length > 0) {
+  const persistedInjectedClaudePtys = store.getClaudeLivePtyAccountBindings()
+  seedLiveInjectedClaudePtysFromPersistence(persistedInjectedClaudePtys)
+  if (persistedClaudePtyIds.length > 0 || persistedInjectedClaudePtys.length > 0) {
     console.log(
-      `[claude-live-pty] Seeded ${persistedClaudePtyIds.length} persisted Claude session id(s) into the refresh gate`
+      `[claude-live-pty] Seeded ${persistedClaudePtyIds.length} shared and ${persistedInjectedClaudePtys.length} injected Claude session id(s) into the refresh gate`
     )
   }
   selfHealRuntimeEnvironmentFocus({ store, userDataPath: app.getPath('userData') })
@@ -2060,7 +2063,7 @@ app.whenReady().then(async () => {
       runtime,
       prepareCodexRuntimeHomeForLaunch,
       () => store!.getSettings(),
-      (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target),
+      (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true }),
       store,
       (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
     )

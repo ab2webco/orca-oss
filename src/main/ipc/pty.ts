@@ -70,9 +70,13 @@ import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-au
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
 import {
+  getLiveInjectedClaudePtyAccountId,
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
-  markClaudePtySpawned
+  markClaudePtySpawned,
+  markInjectedClaudePtySpawned,
+  releaseInjectedClaudeAccountLaunch,
+  releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
 import {
   applyTerminalAttributionEnv,
@@ -621,6 +625,23 @@ type PrepareClaudeAuth = (
 // paying for the async prepare/keychain work, so the global switch-block
 // check below can exempt it without weakening the global-selection path.
 type IsInjectedClaudeAccountTarget = (target?: ClaudeAccountSelectionTarget) => boolean
+
+function isInjectedClaudePreparation(preparation: ClaudeRuntimeAuthPreparation | null): boolean {
+  return Boolean(preparation?.injectedAccountId)
+}
+
+function createClaudeAccountReservationScope(
+  preparation: ClaudeRuntimeAuthPreparation | null
+): Disposable {
+  return {
+    // Why: account ownership spans validation, dedupe, provider spawn, and all
+    // post-spawn helpers; every exit path must release whichever mode prepared.
+    [Symbol.dispose]: () => {
+      releaseInjectedClaudeAccountLaunch(preparation?.injectedAccountReservationId)
+      releaseSharedClaudeAccountLaunch(preparation?.sharedAccountReservationId)
+    }
+  }
+}
 
 function getCodexSelectionTargetForPty(
   shellPath: string | undefined,
@@ -2967,11 +2988,22 @@ export function registerPtyHandlers(
         cwd,
         terminalRuntimeOptions.terminalWindowsWslDistro ?? null
       )
-      const claudeSelectionTarget = getClaudeSelectionTargetForPty(
+      let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         codexSelectionTarget,
         store,
         args.worktreeId
       )
+      const existingInjectedAccountId = args.sessionId
+        ? getLiveInjectedClaudePtyAccountId(args.sessionId)
+        : null
+      if (existingInjectedAccountId) {
+        // Why: reattach must retain the account that the surviving CLI started
+        // with even if the worktree was repinned while the app was away.
+        claudeSelectionTarget = {
+          ...claudeSelectionTarget,
+          overrideAccountId: existingInjectedAccountId
+        }
+      }
       // Why: a per-worktree-pinned (injected) Claude account launches against
       // its own CLAUDE_CONFIG_DIR and never touches the shared ~/.claude
       // runtime that the global switch-block protects (live-pty-gate.ts) —
@@ -2989,7 +3021,9 @@ export function registerPtyHandlers(
       }
       const claudeAuth =
         isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
-      if (isClaudeLaunch && !isInjectedClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+      using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
+      const didPrepareInjectedClaudeAuth = isInjectedClaudePreparation(claudeAuth)
+      if (isClaudeLaunch && !didPrepareInjectedClaudeAuth && isClaudeAuthSwitchInProgress()) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
       if (claudeAuth?.stripAuthEnv && hasClaudeAuthEnvConflict(args.env)) {
@@ -3235,14 +3269,18 @@ export function registerPtyHandlers(
         if (effectiveSessionAppId !== undefined && effectiveSessionAppId !== result.id) {
           ptySizes.delete(effectiveSessionAppId)
         }
+        let didPersistInjectedClaudeBinding = false
         if (hostSessionBinding) {
           try {
-            hostSessionBinding.store.persistPtyBinding({
+            didPersistInjectedClaudeBinding = hostSessionBinding.store.persistPtyBinding({
               worktreeId: hostSessionBinding.worktreeId,
               tabId: hostSessionBinding.tabId,
               leafId: hostSessionBinding.leafId,
               ptyId: result.id,
-              ...(cwd ? { startupCwd: cwd } : {})
+              ...(cwd ? { startupCwd: cwd } : {}),
+              ...(claudeAuth?.injectedAccountId
+                ? { claudeAccountId: claudeAuth.injectedAccountId }
+                : {})
             })
           } catch (err) {
             console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
@@ -3282,8 +3320,34 @@ export function registerPtyHandlers(
         // command (renderer startupCommand parity); banner detection covers
         // PTYs spawned without one.
         runtime?.noteTerminalSpawnCommand?.(result.id, args.command ?? null)
-        if (isClaudeLaunch) {
-          markClaudePtySpawned(result.id)
+        // Why: the global live-PTY gate protects shared ~/.claude only; an
+        // injected PTY owns its account-specific config dir instead.
+        if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {
+          markClaudePtySpawned(result.id, claudeAuth?.sharedAccountReservationId)
+        } else if (isClaudeLaunch && claudeAuth?.injectedAccountId) {
+          try {
+            markInjectedClaudePtySpawned(
+              result.id,
+              claudeAuth.injectedAccountId,
+              claudeAuth.injectedAccountReservationId,
+              { persistenceAlreadyRecorded: didPersistInjectedClaudeBinding }
+            )
+          } catch (error) {
+            // Why: a fresh daemon PTY can outlive Orca. If its ownership did
+            // not reach disk, stop it before returning the durability failure.
+            if (!result.isReattach) {
+              try {
+                await provider.shutdown(result.id, { immediate: true })
+              } catch (shutdownError) {
+                console.warn(
+                  '[pty] failed to stop Claude after auth binding failure:',
+                  shutdownError
+                )
+              }
+              clearProviderPtyState(result.id)
+            }
+            throw error
+          }
         }
         if (args.telemetry) {
           const agentKindParse = agentKindSchema.safeParse(args.telemetry.agent_kind)
@@ -3710,11 +3774,20 @@ export function registerPtyHandlers(
         cwd,
         terminalRuntimeOptions.terminalWindowsWslDistro ?? null
       )
-      const claudeSelectionTarget = getClaudeSelectionTargetForPty(
+      let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         initialSelectionTarget,
         store,
         args.worktreeId
       )
+      const existingInjectedAccountId = args.sessionId
+        ? getLiveInjectedClaudePtyAccountId(args.sessionId)
+        : null
+      if (existingInjectedAccountId) {
+        claudeSelectionTarget = {
+          ...claudeSelectionTarget,
+          overrideAccountId: existingInjectedAccountId
+        }
+      }
       // Why: see the matching comment in runtime.setPtyController's spawn
       // above — an injected (per-worktree-pinned) launch bypasses the shared
       // ~/.claude runtime entirely, so it is exempt from the global
@@ -3727,8 +3800,10 @@ export function registerPtyHandlers(
       }
       const claudeAuth =
         isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
+      using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
       spawnTiming.mark('auth')
-      if (isClaudeLaunch && !isInjectedClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+      const didPrepareInjectedClaudeAuth = isInjectedClaudePreparation(claudeAuth)
+      if (isClaudeLaunch && !didPrepareInjectedClaudeAuth && isClaudeAuthSwitchInProgress()) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
       if (claudeAuth?.stripAuthEnv && hasClaudeAuthEnvConflict(args.env)) {
@@ -4225,6 +4300,7 @@ export function registerPtyHandlers(
         // other field; patch the load-bearing (tab.ptyId, ptyIdsByLeafId)
         // binding synchronously so a force-quit in the ~450 ms debounce window
         // cannot orphan either daemon history or a remote relay PTY lease.
+        let didPersistInjectedClaudeBinding = false
         if (
           (isDaemonHostSpawn || args.connectionId) &&
           store &&
@@ -4233,12 +4309,15 @@ export function registerPtyHandlers(
           validatedLeafId !== null
         ) {
           try {
-            store.persistPtyBinding({
+            didPersistInjectedClaudeBinding = store.persistPtyBinding({
               worktreeId: args.worktreeId,
               tabId: args.tabId,
               leafId: validatedLeafId,
               ptyId: result.id,
-              ...(cwd ? { startupCwd: cwd } : {})
+              ...(cwd ? { startupCwd: cwd } : {}),
+              ...(claudeAuth?.injectedAccountId
+                ? { claudeAccountId: claudeAuth.injectedAccountId }
+                : {})
             })
           } catch (err) {
             console.error('[pty] failed to persist PTY binding after spawn:', err)
@@ -4345,8 +4424,30 @@ export function registerPtyHandlers(
           result.id,
           typeof args.command === 'string' ? args.command : null
         )
-        if (isClaudeLaunch) {
-          markClaudePtySpawned(result.id)
+        if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {
+          markClaudePtySpawned(result.id, claudeAuth?.sharedAccountReservationId)
+        } else if (isClaudeLaunch && claudeAuth?.injectedAccountId) {
+          try {
+            markInjectedClaudePtySpawned(
+              result.id,
+              claudeAuth.injectedAccountId,
+              claudeAuth.injectedAccountReservationId,
+              { persistenceAlreadyRecorded: didPersistInjectedClaudeBinding }
+            )
+          } catch (error) {
+            if (!result.isReattach) {
+              try {
+                await provider.shutdown(result.id, { immediate: true })
+              } catch (shutdownError) {
+                console.warn(
+                  '[pty] failed to stop Claude after auth binding failure:',
+                  shutdownError
+                )
+              }
+              clearProviderPtyState(result.id)
+            }
+            throw error
+          }
         }
         // Why: renderer sets ORCA_PANE_KEY in `args.env` for every pane-owned
         // spawn (see pty-connection.ts). Recording the mapping here lets

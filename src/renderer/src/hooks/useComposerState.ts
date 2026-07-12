@@ -76,6 +76,7 @@ import {
   resolveQuickCreateLinkedWorkItemPrompt
 } from '@/lib/linked-work-item-context'
 import { getLocalRepoProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
+import type { ClaudeAccountLaunchRuntime } from '@/lib/claude-account-runtime-filter'
 import {
   buildLinearIssueLinkedWorkItem,
   isLinearLinkedWorkItem
@@ -243,6 +244,7 @@ export type UseComposerStateOptions = {
 export type ComposerCardProps = {
   eligibleRepos: ReturnType<typeof useAppStore.getState>['repos']
   repoId: string
+  selectedRepoClaudeAccountRuntime?: ClaudeAccountLaunchRuntime
   projectOptions: NewWorkspaceProjectOption[]
   selectedProjectId: string | null
   selectedRepoIsGit: boolean
@@ -760,26 +762,30 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     null
   )
   const [ephemeralVmRecipeError, setEphemeralVmRecipeError] = useState<string | null>(null)
+  const selectedRepoProjectRuntime = useMemo(
+    () =>
+      !selectedRepo || selectedRepo.connectionId
+        ? undefined
+        : getLocalRepoProjectExecutionRuntimeContext(
+            {
+              activeRepoId,
+              activeWorktreeId: null,
+              projects,
+              repos,
+              settings,
+              worktreesByRepo
+            },
+            selectedRepo.id,
+            CLIENT_PLATFORM
+          ),
+    [activeRepoId, projects, repos, selectedRepo, settings, worktreesByRepo]
+  )
   const selectedRepoAgentLaunchPlatform = useMemo(() => {
     if (!selectedRepo) {
       return CLIENT_PLATFORM
     }
-    const projectRuntime = selectedRepo.connectionId
-      ? undefined
-      : getLocalRepoProjectExecutionRuntimeContext(
-          {
-            activeRepoId,
-            activeWorktreeId: null,
-            projects,
-            repos,
-            settings,
-            worktreesByRepo
-          },
-          selectedRepo.id,
-          CLIENT_PLATFORM
-        )
-    return getAgentLaunchPlatformForRepo(selectedRepo, projectRuntime)
-  }, [activeRepoId, projects, repos, selectedRepo, settings, worktreesByRepo])
+    return getAgentLaunchPlatformForRepo(selectedRepo, selectedRepoProjectRuntime)
+  }, [selectedRepo, selectedRepoProjectRuntime])
   // Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
   // `orca-ide` rename must not be applied to remote launch commands.
   const selectedRepoIsRemote = selectedRepo ? repoIsRemote(selectedRepo) : false
@@ -4283,6 +4289,14 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const cardProps: ComposerCardProps = {
     eligibleRepos: isProjectGroupTarget ? folderSourceRepos : eligibleRepos,
     repoId,
+    selectedRepoClaudeAccountRuntime:
+      selectedRepoProjectRuntime?.status === 'repair-required'
+        ? { kind: 'unavailable' }
+        : selectedRepoProjectRuntime?.runtime.kind === 'wsl'
+          ? { kind: 'wsl', distro: selectedRepoProjectRuntime.runtime.distro }
+          : selectedRepoProjectRuntime
+            ? { kind: 'host' }
+            : undefined,
     projectOptions,
     selectedProjectId,
     selectedRepoIsGit: isProjectGroupTarget ? true : selectedRepoIsGit,

@@ -1216,8 +1216,8 @@
         "perWorkspaceEnvHint": "通过环境模板按需创建环境",
         "branchName": "分支名称",
         "branchNamePlaceholder": "feature/my-branch",
-        "claudeAccount": "Account",
-        "claudeAccountInheritGlobal": "Inherit global"
+        "claudeAccount": "账户",
+        "claudeAccountInheritGlobal": "继承全局设置"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建工作树",
@@ -4189,9 +4189,9 @@
           "workspaceSection": "工作区",
           "primaryDeleteDisabled": "主工作树不能删除。请改为移除项目。",
           "deleteWorktree": "删除工作树",
-          "assignAccountsTo": "Assign Accounts To",
-          "assignAccount": "Assign Account",
-          "inheritGlobalAccount": "Inherit global"
+          "assignAccountsTo": "分配账户",
+          "assignAccount": "分配账户",
+          "inheritGlobalAccount": "继承全局设置"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",

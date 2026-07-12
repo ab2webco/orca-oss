@@ -2341,6 +2341,11 @@ export type ClaudeManagedAccountSummary = {
   lastAuthenticatedAt: number
 }
 
+export type ClaudeLivePtyAccountBinding = {
+  sessionId: string
+  accountId: string
+}
+
 export type ClaudeRateLimitAccountsState = {
   accounts: ClaudeManagedAccountSummary[]
   activeAccountId: string | null
@@ -3611,6 +3616,9 @@ export type PersistedState = {
    *  live-PTY gate on startup so an early OAuth refresh cannot rotate the
    *  single-use refresh token out from under a still-running daemon CLI. */
   claudeLivePtySessionIds?: string[]
+  /** Account ownership for live injected Claude daemon sessions. This keeps
+   *  account-specific auth immutable across app restarts until the CLI exits. */
+  claudeLivePtyAccountBindings?: ClaudeLivePtyAccountBinding[]
   migrationUnsupportedPtyEntries: MigrationUnsupportedPtyEntry[]
   legacyPaneKeyAliasEntries: LegacyPaneKeyAliasEntry[]
   automations: Automation[]

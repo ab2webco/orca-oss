@@ -553,7 +553,9 @@ describe('useComposerState host-context boundaries', () => {
   it('plans new workspace agent startup from the selected repo runtime', () => {
     expect(HOOK_SOURCE).toContain('const selectedRepoAgentLaunchPlatform = useMemo')
     expect(HOOK_SOURCE).toContain('getLocalRepoProjectExecutionRuntimeContext')
-    expect(HOOK_SOURCE).toContain('getAgentLaunchPlatformForRepo(selectedRepo, projectRuntime)')
+    expect(HOOK_SOURCE).toContain(
+      'getAgentLaunchPlatformForRepo(selectedRepo, selectedRepoProjectRuntime)'
+    )
 
     const fullSubmit = sourceBetween(
       HOOK_SOURCE,

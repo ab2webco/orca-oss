@@ -27,7 +27,10 @@ import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/folder-workspace-composer-helpers'
-import { filterClaudeAccountsByRuntime } from '@/lib/claude-account-runtime-filter'
+import {
+  filterClaudeAccountsByRuntime,
+  isLocalClaudeAccountRepoTarget
+} from '@/lib/claude-account-runtime-filter'
 
 type ComposerModalData = {
   prefilledName?: string
@@ -182,6 +185,8 @@ function QuickTabBody({
     (option) => option.id === cardProps.selectedProjectId
   )
   const isFolderWorkspaceTarget = selectedProjectOption?.kind === 'project-group'
+  const selectedRepo = cardProps.eligibleRepos.find((repo) => repo.id === cardProps.repoId)
+  const isLocalRepoTarget = isLocalClaudeAccountRepoTarget(selectedRepo)
 
   // Why: managed Claude accounts are fetched once per modal open (the modal
   // fully unmounts on close), mirroring the `claudeAccounts:list` fetch other
@@ -214,14 +219,20 @@ function QuickTabBody({
   // check.
   const filteredClaudeAccounts = useMemo(
     () =>
-      isFolderWorkspaceTarget || cardProps.selectedRepoIsRemote
+      isFolderWorkspaceTarget || cardProps.selectedRepoIsRemote || !isLocalRepoTarget
         ? []
-        : filterClaudeAccountsByRuntime(claudeAccounts, cardProps.selectedRepoPath),
+        : filterClaudeAccountsByRuntime(
+            claudeAccounts,
+            cardProps.selectedRepoPath,
+            cardProps.selectedRepoClaudeAccountRuntime
+          ),
     [
       cardProps.selectedRepoIsRemote,
       cardProps.selectedRepoPath,
+      cardProps.selectedRepoClaudeAccountRuntime,
       claudeAccounts,
-      isFolderWorkspaceTarget
+      isFolderWorkspaceTarget,
+      isLocalRepoTarget
     ]
   )
   if (

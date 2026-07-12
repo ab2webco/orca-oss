@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { getDefaultSettings } from '../../shared/constants'
 import type { ClaudeManagedAccount, GlobalSettings } from '../../shared/types'
 import { isOauthTokenExpiring, refreshClaudeOauthCredentials } from './oauth-refresh'
+import type { ClaudeAccountSelectionTarget } from './runtime-selection'
 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
 const hostPlatform = process.platform
@@ -3495,8 +3496,10 @@ describe('ClaudeRuntimeAuthService', () => {
   it('uses account WSL runtime for untargeted Claude preparation instead of stale terminal WSL settings', async () => {
     setPlatform('win32')
     vi.doMock('../wsl', () => ({
+      getCachedWslDistros: () => ['Ubuntu'],
       getDefaultWslDistro: () => 'Ubuntu',
       getWslHome: () => null,
+      listWslDistrosAsync: async () => ['Ubuntu'],
       toWindowsWslPath: (value: string) => value
     }))
     const ubuntuAuthPath = createManagedClaudeAuth(
@@ -3540,8 +3543,10 @@ describe('ClaudeRuntimeAuthService', () => {
   it('keeps untargeted Claude preparation on host when account runtime is host', async () => {
     setPlatform('win32')
     vi.doMock('../wsl', () => ({
+      getCachedWslDistros: () => ['Ubuntu'],
       getDefaultWslDistro: () => 'Ubuntu',
       getWslHome: () => null,
+      listWslDistrosAsync: async () => ['Ubuntu'],
       toWindowsWslPath: (value: string) => value
     }))
     const settings = createSettings({
@@ -3600,8 +3605,10 @@ describe('ClaudeRuntimeAuthService', () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
     vi.doMock('../wsl', () => ({
+      getCachedWslDistros: () => ['Ubuntu'],
       getDefaultWslDistro: () => 'Ubuntu',
       getWslHome: () => join(testState.userDataDir, 'wsl-home'),
+      listWslDistrosAsync: async () => ['Ubuntu'],
       toWindowsWslPath: (value: string) => value
     }))
     const ubuntuAuthPath = createManagedClaudeAuth(
@@ -3742,9 +3749,336 @@ describe('ClaudeRuntimeAuthService', () => {
         overrideAccountId: 'no-such-account'
       })
     ).toBe(false)
+
+    store.updateSettings({ activeClaudeManagedAccountId: 'pinned-host-account' })
+    expect(
+      service.hasInjectedAccountOverride({
+        runtime: 'host',
+        overrideAccountId: 'pinned-host-account'
+      })
+    ).toBe(true)
   })
 
-  it('falls back to the global WSL selection and warns when the pinned account WSL distro does not match the launch', async () => {
+  it('probes WSL ownership asynchronously once and reuses the cached result', async () => {
+    setPlatform('win32')
+    const linuxAuthPath = '/home/alice/.local/share/orca/claude-accounts/pinned-wsl/auth'
+    const canonicalLinuxAuthPath =
+      '/home/alice/.local/share/orca/claude-accounts/pinned-wsl-canonical/auth'
+    const managedAuthPath =
+      '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\claude-accounts\\pinned-wsl\\auth'
+    let finishProbe = (_error: Error | null, _stdout: string, _stderr: string): void => {
+      throw new Error('WSL ownership probe did not start')
+    }
+    const execFile = vi.fn(
+      (
+        _file: string,
+        _args: string[],
+        _options: unknown,
+        callback: (error: Error | null, stdout: string, stderr: string) => void
+      ) => {
+        finishProbe = callback
+        return { kill: vi.fn() }
+      }
+    )
+    vi.doMock('node:child_process', () => ({ execFile }))
+    vi.doMock('../wsl', async () => {
+      const actual = (await vi.importActual('../wsl')) as Record<string, unknown>
+      return {
+        ...actual,
+        getCachedWslDistros: () => ['Ubuntu'],
+        getDefaultWslDistro: () => 'Ubuntu',
+        listWslDistrosAsync: async () => ['Ubuntu'],
+        toWindowsWslPath: (linuxPath: string, distro: string) =>
+          `\\\\wsl.localhost\\${distro}${linuxPath.replace(/\//g, '\\')}`
+      }
+    })
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('pinned-wsl', managedAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: linuxAuthPath
+        })
+      ],
+      activeClaudeManagedAccountId: null
+    })
+    const store = createStore(settings)
+    const target = {
+      runtime: 'wsl' as const,
+      wslDistro: 'Ubuntu',
+      overrideAccountId: 'pinned-wsl'
+    }
+
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      expect(service.hasInjectedAccountOverride(target)).toBe(true)
+      expect(execFile).not.toHaveBeenCalled()
+
+      const first = service.prepareForClaudeLaunch(target)
+      const second = service.prepareForClaudeLaunch(target)
+      await Promise.resolve()
+      expect(execFile).toHaveBeenCalledTimes(1)
+      // The production execFile has a custom promisifier returning { stdout,
+      // stderr }; this lightweight mock must provide that same resolved shape.
+      finishProbe(
+        null,
+        { stdout: `${canonicalLinuxAuthPath}\n`, stderr: '' } as unknown as string,
+        ''
+      )
+
+      const preparations = await Promise.all([first, second])
+      expect(preparations[0].envPatch).toEqual({ CLAUDE_CONFIG_DIR: canonicalLinuxAuthPath })
+      expect((await service.prepareForClaudeLaunch(target)).envPatch).toEqual({
+        CLAUDE_CONFIG_DIR: canonicalLinuxAuthPath
+      })
+      expect(execFile).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.doUnmock('node:child_process')
+    }
+  })
+
+  it('deduplicates simultaneous cold default-WSL distro lookups', async () => {
+    setPlatform('win32')
+    let resolveDistros: (distros: string[]) => void = () => {
+      throw new Error('WSL distro lookup did not start')
+    }
+    const listWslDistrosAsync = vi.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveDistros = resolve
+        })
+    )
+    vi.doMock('../wsl', async () => {
+      const actual = (await vi.importActual('../wsl')) as Record<string, unknown>
+      return { ...actual, listWslDistrosAsync }
+    })
+    const store = createStore(createSettings())
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const resolveTarget = (
+      service as unknown as {
+        resolveWslDefaultTargetForLaunch(target: {
+          runtime: 'wsl'
+          wslDistro: null
+        }): Promise<ClaudeAccountSelectionTarget>
+      }
+    ).resolveWslDefaultTargetForLaunch.bind(service)
+
+    const first = resolveTarget({ runtime: 'wsl', wslDistro: null })
+    const second = resolveTarget({ runtime: 'wsl', wslDistro: null })
+    await Promise.resolve()
+
+    expect(listWslDistrosAsync).toHaveBeenCalledTimes(1)
+    resolveDistros(['Ubuntu'])
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { runtime: 'wsl', wslDistro: 'Ubuntu' },
+      { runtime: 'wsl', wslDistro: 'Ubuntu' }
+    ])
+  })
+
+  it('prepares an injected account without entering the shared auth mutation queue', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    const sync = vi.spyOn(service, 'syncForCurrentSelection')
+
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    })
+
+    expect(sync).not.toHaveBeenCalled()
+    expect(preparation).toMatchObject({
+      configDir: pinnedAuthPath,
+      envPatch: { CLAUDE_CONFIG_DIR: pinnedAuthPath },
+      provenance: 'managed:pinned-host-account:injected'
+    })
+  })
+
+  it('keeps an explicit pin isolated when it matches the global account', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', pinnedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    await service.syncForCurrentSelection()
+
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'account-1'
+    })
+
+    expect(preparation).toMatchObject({
+      configDir: pinnedAuthPath,
+      envPatch: { CLAUDE_CONFIG_DIR: pinnedAuthPath },
+      injectedAccountId: 'account-1',
+      provenance: 'managed:account-1:injected'
+    })
+  })
+
+  it('fails closed when a same-as-global explicit pin cannot be resolved', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    vi.spyOn(
+      service as unknown as {
+        resolveInjectedAccount(): Promise<ClaudeManagedAccount | null>
+      },
+      'resolveInjectedAccount'
+    ).mockResolvedValue(null)
+
+    await expect(
+      service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-1' })
+    ).rejects.toThrow('assigned to this worktree is unavailable')
+  })
+
+  it('reserves a global account through PTY spawn preparation', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const { releaseSharedClaudeAccountLaunch, reserveInjectedClaudeAccountLaunch } =
+      await import('./live-pty-gate')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    const preparation = await service.prepareForClaudeLaunch(undefined, {
+      reservePtyAccount: true
+    })
+    try {
+      expect(preparation.sharedAccountReservationId).toEqual(expect.any(String))
+      expect(() => reserveInjectedClaudeAccountLaunch('account-1')).toThrow(
+        'being launched globally'
+      )
+    } finally {
+      releaseSharedClaudeAccountLaunch(preparation.sharedAccountReservationId)
+    }
+  })
+
+  it('rejects a same-account pin while the shared global CLI still owns its token', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', pinnedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    markClaudePtySpawned('global-pty')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+      await expect(
+        service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-1' })
+      ).rejects.toThrow('running global Claude terminal')
+    } finally {
+      markClaudePtyExited('global-pty')
+    }
+  })
+
+  it('refuses to materialize shared auth while the same injected account is live', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markInjectedClaudePtySpawned } = await import('./live-pty-gate')
+    markInjectedClaudePtySpawned('injected-pty', 'account-1')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      await expect(service.syncForCurrentSelection()).rejects.toThrow('assigned worktree')
+    } finally {
+      markClaudePtyExited('injected-pty')
+    }
+  })
+
+  it('switches global accounts without reading back over a live pinned predecessor', async () => {
+    const accountAPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-a',
+      createClaudeCredentialsJson('a@example.com', 'token-a')
+    )
+    const accountBPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-b',
+      createClaudeCredentialsJson('b@example.com', 'token-b')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-a', accountAPath),
+        createClaudeAccount('account-b', accountBPath)
+      ],
+      activeClaudeManagedAccountId: 'account-a'
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    await service.syncForCurrentSelection()
+    const readBack = vi.spyOn(
+      service as unknown as {
+        readBackRefreshedTokens(...args: unknown[]): Promise<unknown>
+      },
+      'readBackRefreshedTokens'
+    )
+    const { markClaudePtyExited, markInjectedClaudePtySpawned } = await import('./live-pty-gate')
+    markInjectedClaudePtySpawned('injected-a', 'account-a')
+    try {
+      store.updateSettings({
+        activeClaudeManagedAccountId: 'account-b',
+        activeClaudeManagedAccountIdsByRuntime: { host: 'account-b', wsl: {} }
+      })
+
+      await service.syncForCurrentSelection()
+
+      expect(readBack).not.toHaveBeenCalled()
+    } finally {
+      markClaudePtyExited('injected-a')
+    }
+  })
+
+  it('fails closed when the pinned account WSL distro does not match the launch', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,
       'pinned-debian-account',
@@ -3772,24 +4106,15 @@ describe('ClaudeRuntimeAuthService', () => {
       activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: { Ubuntu: 'ubuntu-account' } }
     })
     const store = createStore(settings)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
     const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
     const service = new ClaudeRuntimeAuthService(store as never)
-    const preparation = await service.prepareForClaudeLaunch({
-      runtime: 'wsl',
-      wslDistro: 'Ubuntu',
-      overrideAccountId: 'pinned-debian-account'
-    })
-
-    expect(preparation).toMatchObject({
-      runtime: 'wsl',
-      wslDistro: 'Ubuntu',
-      wslLinuxConfigDir: '/home/alice/.local/share/orca/claude-accounts/ubuntu/auth',
-      provenance: 'managed:ubuntu-account:wsl:Ubuntu'
-    })
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('pinned-debian-account'))
-    warn.mockRestore()
+    await expect(
+      service.prepareForClaudeLaunch({
+        runtime: 'wsl',
+        wslDistro: 'Ubuntu',
+        overrideAccountId: 'pinned-debian-account'
+      })
+    ).rejects.toThrow('assigned to this worktree is unavailable')
   })
 
   it('injects a default-WSL pinned account (wslDistro: null) when the launch resolves to the default distro', async () => {
@@ -3799,7 +4124,12 @@ describe('ClaudeRuntimeAuthService', () => {
     // instead of silently falling back to the global WSL selection.
     vi.doMock('../wsl', async () => {
       const actual = (await vi.importActual('../wsl')) as Record<string, unknown>
-      return { ...actual, getDefaultWslDistro: () => 'Ubuntu' }
+      return {
+        ...actual,
+        getCachedWslDistros: () => ['Ubuntu'],
+        getDefaultWslDistro: () => 'Ubuntu',
+        listWslDistrosAsync: async () => ['Ubuntu']
+      }
     })
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,
@@ -3862,11 +4192,8 @@ describe('ClaudeRuntimeAuthService', () => {
     // rotated refresh token (injected accounts are CLI-owned, no read-back);
     // re-seeding the static managed copy would clobber it. If valid creds
     // already exist in the scoped service, leave them.
-    const managedAuthPath = createManagedClaudeAuth(
-      testState.userDataDir,
-      'pinned-host',
-      createClaudeCredentialsJson('pinned@example.com', 'managed-token')
-    )
+    const managed = createClaudeCredentialsJson('pinned@example.com', 'managed-token', null, 1_000)
+    const managedAuthPath = createManagedClaudeAuth(testState.userDataDir, 'pinned-host', managed)
     const settings = createSettings({
       claudeManagedAccounts: [createClaudeAccount('pinned-host', managedAuthPath)],
       activeClaudeManagedAccountId: null
@@ -3876,7 +4203,7 @@ describe('ClaudeRuntimeAuthService', () => {
     const keychain = await import('./keychain')
     const readStrict = vi.mocked(keychain.readActiveClaudeKeychainCredentialsStrict)
     const originalReadImpl = readStrict.getMockImplementation()
-    const rotated = createClaudeCredentialsJson('pinned@example.com', 'rotated-token')
+    const rotated = createClaudeCredentialsJson('pinned@example.com', 'rotated-token', null, 2_000)
     // Claude's scoped service for this account's own config dir already holds
     // rotated creds.
     readStrict.mockImplementation(async (configDir?: string) =>
@@ -3896,6 +4223,7 @@ describe('ClaudeRuntimeAuthService', () => {
       // The rotated scoped creds must survive: no re-seed write to the account's
       // own config dir.
       expect(write).not.toHaveBeenCalledWith(expect.anything(), managedAuthPath)
+      expect(testState.managedKeychainCredentials.get('pinned-host')).toBe(rotated)
     } finally {
       if (originalReadImpl) {
         readStrict.mockImplementation(originalReadImpl)
@@ -3905,7 +4233,42 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
-  it('falls back to global host selection and warns when a WSL-pinned account is used for a host launch', async () => {
+  it('adopts fresher injected scoped credentials before using the account globally (macOS)', async () => {
+    const managed = createClaudeCredentialsJson('user@example.com', 'managed-token', null, 1_000)
+    const rotated = createClaudeCredentialsJson('user@example.com', 'rotated-token', null, 2_000)
+    const managedAuthPath = createManagedClaudeAuth(testState.userDataDir, 'account-1', managed)
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const keychain = await import('./keychain')
+    const readStrict = vi.mocked(keychain.readActiveClaudeKeychainCredentialsStrict)
+    const originalReadImpl = readStrict.getMockImplementation()
+    readStrict.mockImplementation(async (configDir?: string) =>
+      configDir === managedAuthPath
+        ? rotated
+        : originalReadImpl
+          ? originalReadImpl(configDir)
+          : null
+    )
+
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+      await service.syncForCurrentSelection({ runtime: 'host' })
+
+      expect(testState.managedKeychainCredentials.get('account-1')).toBe(rotated)
+    } finally {
+      if (originalReadImpl) {
+        readStrict.mockImplementation(originalReadImpl)
+      } else {
+        readStrict.mockReset()
+      }
+    }
+  })
+
+  it('fails closed when a WSL-pinned account is used for a host launch', async () => {
     const wslAccountPath = createManagedClaudeAuth(
       testState.userDataDir,
       'wsl-account',
@@ -3922,22 +4285,28 @@ describe('ClaudeRuntimeAuthService', () => {
       activeClaudeManagedAccountId: null
     })
     const store = createStore(settings)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
     const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
     const service = new ClaudeRuntimeAuthService(store as never)
-    const preparation = await service.prepareForClaudeLaunch({
-      runtime: 'host',
-      overrideAccountId: 'wsl-account'
-    })
+    await expect(
+      service.prepareForClaudeLaunch({
+        runtime: 'host',
+        overrideAccountId: 'wsl-account'
+      })
+    ).rejects.toThrow('assigned to this worktree is unavailable')
+  })
 
-    expect(preparation).toMatchObject({
-      runtime: 'host',
-      provenance: 'system',
-      stripAuthEnv: false
-    })
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('wsl-account'))
-    warn.mockRestore()
+  it('fails closed when the pinned account no longer exists', async () => {
+    const settings = createSettings({ claudeManagedAccounts: [] })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    await expect(
+      service.prepareForClaudeLaunch({
+        runtime: 'host',
+        overrideAccountId: 'deleted-account'
+      })
+    ).rejects.toThrow('assigned to this worktree is unavailable')
   })
 
   it('does not clobber fresh Claude credentials after clearLastWrittenCredentialsJson', async () => {
@@ -4036,6 +4405,68 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(refreshClaudeOauthCredentials).toHaveBeenCalledWith(account1Stale)
     expect(readManagedCredentialsForTest('account-1', managedAuthPath1)).toBe(account1Refreshed)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(account1Refreshed)
+  })
+
+  it('repairs an existing injected scoped Keychain copy after global refresh', async () => {
+    const account1Stale = createClaudeCredentialsJson('one@example.com', 'one-stale', null, 1_000)
+    const account1Refreshed = createClaudeCredentialsJson(
+      'one@example.com',
+      'one-refreshed',
+      null,
+      9_999_999_999_999
+    )
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      account1Stale
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-1', managedAuthPath, { email: 'one@example.com' })
+      ],
+      activeClaudeManagedAccountId: null
+    })
+    const store = createStore(settings)
+    const keychain = await import('./keychain')
+    const readStrict = vi.mocked(keychain.readActiveClaudeKeychainCredentialsStrict)
+    const writeScoped = vi.mocked(keychain.writeActiveClaudeKeychainCredentials)
+    const originalReadImpl = readStrict.getMockImplementation()
+    const originalWriteImpl = writeScoped.getMockImplementation()
+    let injectedScopedCredentials = account1Stale
+    readStrict.mockImplementation(async (configDir?: string) =>
+      configDir === managedAuthPath
+        ? injectedScopedCredentials
+        : originalReadImpl
+          ? originalReadImpl(configDir)
+          : null
+    )
+    writeScoped.mockImplementation(async (contents: string, configDir?: string) => {
+      if (configDir === managedAuthPath) {
+        injectedScopedCredentials = contents
+        return
+      }
+      await originalWriteImpl?.(contents, configDir)
+    })
+
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+      await service.syncForCurrentSelection()
+      vi.mocked(isOauthTokenExpiring).mockReturnValueOnce(true)
+      vi.mocked(refreshClaudeOauthCredentials).mockResolvedValueOnce(account1Refreshed)
+      store.updateSettings({ activeClaudeManagedAccountId: 'account-1' })
+
+      await service.syncForCurrentSelection()
+
+      expect(injectedScopedCredentials).toBe(account1Refreshed)
+    } finally {
+      if (originalReadImpl) {
+        readStrict.mockImplementation(originalReadImpl)
+      }
+      if (originalWriteImpl) {
+        writeScoped.mockImplementation(originalWriteImpl)
+      }
+    }
   })
 
   it('refreshes the active account with an expired token when no Claude PTY is live', async () => {

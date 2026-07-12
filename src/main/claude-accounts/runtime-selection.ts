@@ -7,12 +7,9 @@ import type {
 export type ClaudeAccountSelectionTarget = {
   runtime?: 'host' | 'wsl'
   wslDistro?: string | null
-  /** Per-worktree pinned account id. When set and it resolves to a valid owned
-   *  account whose runtime (host vs WSL, including distro) matches this target,
-   *  the launch injects that account's CLAUDE_CONFIG_DIR (host) or
-   *  wslLinuxAuthPath (WSL) instead of using the global selection. Ignored when
-   *  null/invalid/runtime-mismatched (falls back to global, warning on
-   *  mismatch), so unassigned worktrees keep today's behavior. */
+  /** Per-worktree pinned account id. Valid runtime-compatible pins inject the
+   *  account's own config dir; invalid or mismatched pins fail closed at launch.
+   *  Null/undefined preserves the global selection. */
   overrideAccountId?: string | null
 }
 
