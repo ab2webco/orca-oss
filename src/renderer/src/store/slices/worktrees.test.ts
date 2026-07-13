@@ -5525,8 +5525,8 @@ describe('worktree remote runtime mutations', () => {
 
     await store.getState().updateWorktreesMeta(
       new Map([
-        [first.id, { claudeAccountId: null }],
-        [second.id, { claudeAccountId: 'account-a' }]
+        [first.id, { workspaceStatus: 'in-review' }],
+        [second.id, { workspaceStatus: 'completed' }]
       ])
     )
 
@@ -5536,9 +5536,40 @@ describe('worktree remote runtime mutations', () => {
       'worktree.set'
     ])
     expect(runtimeEnvironmentCall.mock.calls.slice(1).map(([request]) => request.params)).toEqual([
-      { worktree: `id:${first.id}`, claudeAccountId: null },
-      { worktree: `id:${second.id}`, claudeAccountId: 'account-a' }
+      { worktree: `id:${first.id}`, workspaceStatus: 'in-review' },
+      { worktree: `id:${second.id}`, workspaceStatus: 'completed' }
     ])
+  })
+
+  it('does not send Claude account pins through a legacy runtime schema', async () => {
+    const store = createTestStore()
+    const worktree = makeWorktree({
+      id: 'repo1::/remote/wt-1',
+      repoId: 'repo1',
+      hostId: 'runtime:env-1'
+    })
+    const fetchWorktrees = vi.fn().mockResolvedValue(undefined)
+    runtimeEnvironmentCall.mockRejectedValue(
+      new RuntimeRpcCallError({
+        id: 'batch-failure',
+        ok: false,
+        error: { code: 'method_not_found', message: 'Unknown method' },
+        _meta: { runtimeId: 'runtime-1' }
+      })
+    )
+    store.setState({
+      worktreesByRepo: { repo1: [worktree] },
+      fetchWorktrees
+    } as Partial<AppState>)
+
+    await store
+      .getState()
+      .updateWorktreesMeta(new Map([[worktree.id, { claudeAccountId: 'account-a' }]]))
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
+    expect(fetchWorktrees).toHaveBeenCalledWith('repo1', {
+      executionHostId: 'runtime:env-1'
+    })
   })
 
   it('refreshes each repo once when a runtime metadata batch fails', async () => {

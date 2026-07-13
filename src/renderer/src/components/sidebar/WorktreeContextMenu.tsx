@@ -56,6 +56,7 @@ import { WorktreeParentPickerPopover } from './WorktreeParentPickerPopover'
 import { getEligibleWorktreeParents } from './worktree-parent-candidates'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import {
   folderWorkspaceKey,
   parseWorkspaceKey,
@@ -89,6 +90,20 @@ const EMPTY_BROWSER_TABS_BY_WORKTREE: AppState['browserTabsByWorktree'] = {}
 const EMPTY_DELETE_STATE_BY_WORKTREE_ID: AppState['deleteStateByWorktreeId'] = {}
 const EMPTY_WORKTREE_LINEAGE_BY_ID: AppState['worktreeLineageById'] = {}
 const EMPTY_WORKSPACE_LINEAGE_BY_CHILD_KEY: AppState['workspaceLineageByChildKey'] = {}
+
+export function canAssignClaudeAccountsToWorktrees(
+  worktrees: readonly Worktree[],
+  repoMap: ReadonlyMap<string, Repo>,
+  isPairedWebClient: boolean
+): boolean {
+  return (
+    !isPairedWebClient &&
+    worktrees.length > 0 &&
+    worktrees.every((worktree) =>
+      isLocalClaudeAccountWorktreeTarget(worktree, repoMap.get(worktree.repoId))
+    )
+  )
+}
 
 // Why: the gating decision for the menu-only store subscriptions. When the menu is
 // closed we MUST return the same `empty` reference every render so Zustand's Object.is
@@ -368,12 +383,11 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       ? status
       : ''
   }, [activeContextWorktrees, workspaceStatuses])
-  const canAssignClaudeAccount =
-    activeContextWorktrees.length > 0 &&
-    activeContextWorktrees.every((item) => {
-      const itemRepo = repoMap.get(item.repoId)
-      return isLocalClaudeAccountWorktreeTarget(item, itemRepo)
-    })
+  const canAssignClaudeAccount = canAssignClaudeAccountsToWorktrees(
+    activeContextWorktrees,
+    repoMap,
+    isWebClientLocation()
+  )
   // Why: one batch action must be valid for every selected worktree; using an
   // intersection prevents a host/WSL mixed selection from silently falling back.
   const filteredClaudeAccounts = useMemo(

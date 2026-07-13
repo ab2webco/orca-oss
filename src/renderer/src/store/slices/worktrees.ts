@@ -71,6 +71,10 @@ import {
   parseWorkspaceKey,
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
+import {
+  hasClaudeAccountPinUpdate,
+  runLegacyWorktreeMetaUpdates
+} from '@/runtime/runtime-worktree-meta-fallback'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
 import {
   classifyWorktreeForceDeleteReason,
@@ -4071,12 +4075,15 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             if (!isRuntimeMethodNotFoundError(error)) {
               throw error
             }
+            if (runtimeUpdates.some(hasClaudeAccountPinUpdate)) {
+              // Why: pre-account runtimes accept worktree.set but discard the
+              // unknown pin field, which would turn optimistic UI into unsafe auth.
+              throw error
+            }
             // Why: compatible older SSH/runtime hosts predate setBatch; preserve
             // their established per-row worktree.set behavior during upgrades.
-            await Promise.all(
-              runtimeUpdates.map((runtimeUpdate) =>
-                callRuntimeRpc(target, 'worktree.set', runtimeUpdate, { timeoutMs: 15_000 })
-              )
+            await runLegacyWorktreeMetaUpdates(runtimeUpdates, (runtimeUpdate) =>
+              callRuntimeRpc(target, 'worktree.set', runtimeUpdate, { timeoutMs: 15_000 })
             )
           }
         } catch (err) {

@@ -67,6 +67,10 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import { toRuntimeWorktreeSelector } from '../runtime/runtime-worktree-selector'
+import {
+  hasClaudeAccountPinUpdate,
+  runLegacyWorktreeMetaUpdates
+} from '../runtime/runtime-worktree-meta-fallback'
 import { normalizeDisabledTuiAgents } from '../../../shared/tui-agent-selection'
 import {
   normalizeTuiAgentArgsRecord,
@@ -1462,10 +1466,13 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
       if (response.error.code !== 'method_not_found') {
         throw new Error(response.error.message)
       }
+      if (runtimeUpdates.some(hasClaudeAccountPinUpdate)) {
+        throw new Error('Assigning Claude accounts requires a newer Orca host.')
+      }
       // Why: paired clients can outpace their host during rolling upgrades;
       // older hosts still support the pre-batch per-worktree method.
-      await Promise.all(
-        runtimeUpdates.map((runtimeUpdate) => callRuntimeResult('worktree.set', runtimeUpdate))
+      await runLegacyWorktreeMetaUpdates(runtimeUpdates, (runtimeUpdate) =>
+        callRuntimeResult('worktree.set', runtimeUpdate)
       )
     },
     listLineage: async () =>

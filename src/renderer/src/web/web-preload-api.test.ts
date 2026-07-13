@@ -2201,8 +2201,8 @@ describe('web worktree preload API', () => {
 
     await globals.window.api.worktrees.updateMetaBatch({
       updates: [
-        { worktreeId: 'repo-1::/workspace/one', updates: { claudeAccountId: null } },
-        { worktreeId: 'repo-1::/workspace/two', updates: { claudeAccountId: 'account-a' } }
+        { worktreeId: 'repo-1::/workspace/one', updates: { workspaceStatus: 'in-review' } },
+        { worktreeId: 'repo-1::/workspace/two', updates: { workspaceStatus: 'completed' } }
       ]
     })
 
@@ -2211,20 +2211,55 @@ describe('web worktree preload API', () => {
         method: 'worktree.setBatch',
         params: {
           updates: [
-            { worktree: 'id:repo-1::/workspace/one', claudeAccountId: null },
-            { worktree: 'id:repo-1::/workspace/two', claudeAccountId: 'account-a' }
+            { worktree: 'id:repo-1::/workspace/one', workspaceStatus: 'in-review' },
+            { worktree: 'id:repo-1::/workspace/two', workspaceStatus: 'completed' }
           ]
         }
       },
       {
         method: 'worktree.set',
-        params: { worktree: 'id:repo-1::/workspace/one', claudeAccountId: null }
+        params: { worktree: 'id:repo-1::/workspace/one', workspaceStatus: 'in-review' }
       },
       {
         method: 'worktree.set',
-        params: { worktree: 'id:repo-1::/workspace/two', claudeAccountId: 'account-a' }
+        params: { worktree: 'id:repo-1::/workspace/two', workspaceStatus: 'completed' }
       }
     ])
+  })
+
+  it('rejects Claude account pins when the paired runtime predates setBatch', async () => {
+    const runtimeCalls: string[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push(method)
+          return Promise.resolve({
+            id: 'batch-failure',
+            ok: false,
+            error: { code: 'method_not_found', message: 'Unknown method' },
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await expect(
+      globals.window.api.worktrees.updateMetaBatch({
+        updates: [
+          {
+            worktreeId: 'repo-1::/workspace/one',
+            updates: { claudeAccountId: 'account-a' }
+          }
+        ]
+      })
+    ).rejects.toThrow('requires a newer Orca host')
+    expect(runtimeCalls).toEqual(['worktree.setBatch'])
   })
 })
 
