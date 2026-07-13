@@ -5391,7 +5391,9 @@
           "bf16ef0af2": "关闭",
           "3f6892f307": "开启",
           "b82f86d7d2": "Rich Markdown Spellcheck",
-          "5195f0b9ef": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。"
+          "5195f0b9ef": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
+          "7ddd66fede": "编辑器自动换行",
+          "9b18de6eea": "在文件编辑器中自动换行长行，而无需水平滚动。"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "本地主机，127.0.0.1，*.internal",
@@ -7669,7 +7671,9 @@
             "defaultProjectRuntime": "默认项目运行时",
             "defaultProjectRuntimeDescription": "选择本地 Windows 项目继承的运行时。",
             "d2d2d929c0": "Rich Markdown Spellcheck",
-            "4497e2e2bb": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。"
+            "4497e2e2bb": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
+            "e61157e926": "编辑器自动换行",
+            "005be5c699": "在文件编辑器中自动换行长行，而无需水平滚动。"
           }
         },
         "git": {
@@ -10644,6 +10648,17 @@
           "trigger-label": "要公布的网络地址",
           "custom-option": "{{address}}（自定义）",
           "add-custom": "添加自定义地址…"
+        },
+        "WindowsFirewallNotice": {
+          "repair-success": "Windows Firewall now allows Orca Mobile on private networks",
+          "repair-failed": "Could not add the Windows Firewall rule",
+          "public-title": "Windows marks this network as public",
+          "missing-title": "Allow phone connections through Windows Firewall",
+          "public-description": "Change this trusted Wi-Fi network to Private before allowing Orca Mobile connections.",
+          "missing-description": "Windows may block the pairing server. Add a rule for this Orca app and TCP port {{port}} on Private networks.",
+          "open-settings": "Open network settings",
+          "waiting": "Waiting for Windows…",
+          "allow": "Allow phone connections"
         }
       },
       "gitlab": {
@@ -11441,7 +11456,9 @@
           "c98ce191da": "此差异没有可打开的修改端文件",
           "9b80bbe1de": "打开文件选项卡",
           "f0fd4174b5": "打开文件选项卡以使用丰富的 Markdown 编辑",
-          "a10d9b8337": "打开文件"
+          "a10d9b8337": "打开文件",
+          "2076ecfc9c": "上一个更改",
+          "631dab0df3": "下一个更改"
         },
         "EditorPanelMarkdownActionsMenu": {
           "3e0ce48c24": "导出为 PDF",

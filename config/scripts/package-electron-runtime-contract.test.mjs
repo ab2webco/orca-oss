@@ -91,6 +91,37 @@ describe('Electron runtime package contract', () => {
     )
   })
 
+  it('blocks Linux and macOS release packaging on watcher process fault recovery', () => {
+    const releaseWorkflow = parse(
+      readFileSync(join(projectDir, '.github/workflows/release-cut.yml'), 'utf8')
+    )
+    const macWorkflow = parse(
+      readFileSync(join(projectDir, '.github/workflows/release-mac-build.yml'), 'utf8')
+    )
+    const assertFaultGate = (steps, publishStepName, expectedCondition) => {
+      const names = steps.map((step) => step.name)
+      const gate = steps.find((step) => step.name === 'Gate runtime file-watcher process isolation')
+
+      expect(gate.if).toBe(expectedCondition)
+      expect(gate['continue-on-error']).toBeUndefined()
+      expect(gate.run).toContain('node config/scripts/runtime-file-watcher-fault-harness.mjs')
+      expect(gate.run).toContain('ELECTRON_RUN_AS_NODE=1 pnpm exec electron')
+      expect(names.indexOf('Build app')).toBeLessThan(names.indexOf(gate.name))
+      expect(names.indexOf(gate.name)).toBeLessThan(names.indexOf(publishStepName))
+    }
+
+    assertFaultGate(
+      releaseWorkflow.jobs.build.steps,
+      'Publish release artifacts (Linux)',
+      "runner.os == 'Linux'"
+    )
+    assertFaultGate(
+      macWorkflow.jobs['build-mac'].steps,
+      'Publish release artifacts (macOS)',
+      undefined
+    )
+  })
+
   it('pins the Windows release builder to the VS 2022 runner image', () => {
     const releaseWorkflow = parse(
       readFileSync(join(projectDir, '.github/workflows/release-cut.yml'), 'utf8')
