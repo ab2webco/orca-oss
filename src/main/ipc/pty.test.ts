@@ -1379,6 +1379,51 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('coalesces staggered Claude exits into one scheduled inventory retry', async () => {
+      vi.useFakeTimers()
+      const provider = installObservableDaemonTestProvider()
+      const sessionIds = Array.from({ length: 200 }, (_, index) => `staggered-claude-${index}`)
+      provider.listProcesses.mockResolvedValue(
+        sessionIds.map((id) => ({ id, cwd: '', title: 'surviving owner' }))
+      )
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      const baselineTimerCount = vi.getTimerCount()
+
+      try {
+        livePtyGate.markInjectedClaudePtySpawned(sessionIds[0], 'account-a')
+        provider.emitExit(sessionIds[0], 0)
+        await vi.advanceTimersByTimeAsync(50)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(2)
+
+        for (const sessionId of sessionIds.slice(1)) {
+          livePtyGate.markInjectedClaudePtySpawned(sessionId, 'account-a')
+          provider.emitExit(sessionId, 0)
+        }
+
+        expect(provider.listProcesses).toHaveBeenCalledTimes(2)
+        expect(vi.getTimerCount()).toBe(baselineTimerCount + 1)
+
+        for (const sessionId of sessionIds) {
+          livePtyGate.markClaudePtyExited(sessionId)
+        }
+        provider.listProcesses.mockResolvedValue([])
+        await vi.advanceTimersByTimeAsync(250)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(3)
+        expect(vi.getTimerCount()).toBe(baselineTimerCount)
+      } finally {
+        for (const sessionId of sessionIds) {
+          livePtyGate.markClaudePtyExited(sessionId)
+        }
+        vi.useRealTimers()
+      }
+    })
+
     it('rechecks an ordinary exit across multiple late inventory settle windows', async () => {
       const provider = installObservableDaemonTestProvider()
       const liveInventory = [

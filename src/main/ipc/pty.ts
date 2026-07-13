@@ -2621,15 +2621,38 @@ export function registerPtyHandlers(
     }
   >()
   let verifyPendingClaudeProviderExits: (() => void) | null = null
+  let claudeExitRetryTimer: NodeJS.Timeout | null = null
+  let claudeExitRetryDueAt = 0
   let providerListenerGeneration = 0
   const bindProviderListeners = (): void => {
     localDataUnsub?.()
     localExitUnsub?.()
     localBackgroundStreamUnsub?.()
+    if (claudeExitRetryTimer) {
+      clearTimeout(claudeExitRetryTimer)
+      claudeExitRetryTimer = null
+      claudeExitRetryDueAt = 0
+    }
     providerListenerGeneration += 1
     const bindingGeneration = providerListenerGeneration
     const boundProvider = localProvider
     let claudeExitVerificationInFlight = false
+    const scheduleClaudeExitRetry = (delayMs: number): void => {
+      const dueAt = Date.now() + delayMs
+      if (claudeExitRetryTimer && dueAt >= claudeExitRetryDueAt) {
+        return
+      }
+      if (claudeExitRetryTimer) {
+        clearTimeout(claudeExitRetryTimer)
+      }
+      claudeExitRetryDueAt = dueAt
+      claudeExitRetryTimer = setTimeout(() => {
+        claudeExitRetryTimer = null
+        claudeExitRetryDueAt = 0
+        void verifyClaudeProviderExits()
+      }, delayMs)
+      claudeExitRetryTimer.unref?.()
+    }
 
     // Keep-tail thinning facts from the daemon, in byte order with onData.
     // The marker flips scan authority for the four transient-fact scanners;
@@ -2793,7 +2816,7 @@ export function registerPtyHandlers(
       }
       sendPtyExitToRenderer(payload)
     }
-    const verifyClaudeProviderExits = async (): Promise<void> => {
+    async function verifyClaudeProviderExits(): Promise<void> {
       if (claudeExitVerificationInFlight || pendingClaudeProviderExits.size === 0) {
         return
       }
@@ -2863,18 +2886,28 @@ export function registerPtyHandlers(
         // unverifiable exits) pending for the replacement provider to prove.
       } finally {
         claudeExitVerificationInFlight = false
-        if (liveExitRetryDelayMs !== null && bindingGeneration === providerListenerGeneration) {
-          await delay(liveExitRetryDelayMs)
-        }
         if (bindingGeneration !== providerListenerGeneration) {
           verifyPendingClaudeProviderExits?.()
-        } else if (
-          liveExitRetryDelayMs !== null ||
-          [...pendingClaudeProviderExits].some(
-            ([ptyId, pendingExit]) => exitsAtStart.get(ptyId) !== pendingExit
-          )
-        ) {
-          void verifyClaudeProviderExits()
+        } else {
+          if (liveExitRetryDelayMs !== null) {
+            scheduleClaudeExitRetry(liveExitRetryDelayMs)
+          }
+          if (
+            [...pendingClaudeProviderExits].some(
+              ([ptyId, pendingExit]) => exitsAtStart.get(ptyId) !== pendingExit
+            )
+          ) {
+            void verifyClaudeProviderExits()
+          } else if (
+            ![...pendingClaudeProviderExits.values()].some(
+              (pendingExit) => pendingExit.payload.code !== -1
+            ) &&
+            claudeExitRetryTimer
+          ) {
+            clearTimeout(claudeExitRetryTimer)
+            claudeExitRetryTimer = null
+            claudeExitRetryDueAt = 0
+          }
         }
       }
     }
@@ -2885,12 +2918,18 @@ export function registerPtyHandlers(
       if (!isLocalProvider && hasClaudeCredentialOwner) {
         const ownershipEpoch = getLiveClaudePtyOwnershipEpoch(payload.id)
         if (ownershipEpoch !== null) {
+          const existingPendingExit = pendingClaudeProviderExits.get(payload.id)
           pendingClaudeProviderExits.set(payload.id, {
             payload,
             ownershipEpoch,
-            liveSettleRetryCount: 0
+            liveSettleRetryCount:
+              existingPendingExit?.ownershipEpoch === ownershipEpoch
+                ? existingPendingExit.liveSettleRetryCount
+                : 0
           })
-          void verifyClaudeProviderExits()
+          if (existingPendingExit || claudeExitRetryTimer === null) {
+            void verifyClaudeProviderExits()
+          }
         }
         return
       }
