@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import * as ownershipEpoch from './live-pty-ownership-epoch'
 
 const liveClaudePtyIds = new Set<string>()
 const liveSharedClaudePtyAccounts = new Map<string, string | null>()
@@ -41,6 +42,7 @@ export function seedLiveClaudePtysFromPersistence(
     // Why: pre-binding releases have unknown ownership; block them
     // conservatively instead of assuming the current global account.
     liveSharedClaudePtyAccounts.set(sessionId, accountBySessionId.get(sessionId) ?? null)
+    ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
     seededUnconfirmedPtyIds.add(sessionId)
   }
 }
@@ -50,6 +52,7 @@ export function seedLiveInjectedClaudePtysFromPersistence(
 ): void {
   for (const { sessionId, accountId } of bindings) {
     liveInjectedClaudePtyAccounts.set(sessionId, accountId)
+    ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
     seededUnconfirmedInjectedPtyIds.add(sessionId)
   }
 }
@@ -70,12 +73,14 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
     if (!alive.has(sessionId)) {
       liveClaudePtyIds.delete(sessionId)
       liveSharedClaudePtyAccounts.delete(sessionId)
+      ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtySessionId(sessionId)
     }
   }
   for (const sessionId of seededUnconfirmedInjectedPtyIds) {
     if (!alive.has(sessionId)) {
       liveInjectedClaudePtyAccounts.delete(sessionId)
+      ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtyAccountBinding?.(sessionId)
     }
   }
@@ -100,6 +105,7 @@ export function markClaudePtySpawned(
   const wasSeededUnconfirmed = seededUnconfirmedPtyIds.has(ptyId)
   const hadExistingAccount = liveSharedClaudePtyAccounts.has(ptyId)
   const existingAccountId = liveSharedClaudePtyAccounts.get(ptyId) ?? null
+  const existingOwnershipEpoch = ownershipEpoch.getLiveClaudePtyOwnershipEpoch(ptyId)
   const bindingAccountId = hadExistingAccount ? existingAccountId : accountId
   try {
     liveClaudePtyIds.add(ptyId)
@@ -109,6 +115,7 @@ export function markClaudePtySpawned(
       if (!options?.persistenceAlreadyRecorded) {
         persistence?.addClaudeLivePtySessionId(ptyId, bindingAccountId)
       }
+      ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
     } catch (error) {
       liveClaudePtyIds.delete(ptyId)
       if (wasLive) {
@@ -122,6 +129,7 @@ export function markClaudePtySpawned(
       } else {
         liveSharedClaudePtyAccounts.delete(ptyId)
       }
+      ownershipEpoch.restoreLiveClaudePtyOwnershipEpoch(ptyId, existingOwnershipEpoch)
       throw error
     }
   } finally {
@@ -136,6 +144,7 @@ export function markInjectedClaudePtySpawned(
   options?: { persistenceAlreadyRecorded?: boolean }
 ): void {
   const existingAccountId = liveInjectedClaudePtyAccounts.get(ptyId)
+  const existingOwnershipEpoch = ownershipEpoch.getLiveClaudePtyOwnershipEpoch(ptyId)
   const reservedAccountId = reservationId
     ? injectedClaudeLaunchReservations.get(reservationId)
     : undefined
@@ -152,12 +161,14 @@ export function markInjectedClaudePtySpawned(
       if (!options?.persistenceAlreadyRecorded) {
         persistence?.addClaudeLivePtyAccountBinding?.(ptyId, accountId)
       }
+      ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
     } catch (error) {
       if (existingAccountId) {
         liveInjectedClaudePtyAccounts.set(ptyId, existingAccountId)
       } else {
         liveInjectedClaudePtyAccounts.delete(ptyId)
       }
+      ownershipEpoch.restoreLiveClaudePtyOwnershipEpoch(ptyId, existingOwnershipEpoch)
       throw error
     }
   } finally {
@@ -171,6 +182,7 @@ export function markClaudePtyExited(ptyId: string): void {
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtySessionId(ptyId)
   liveInjectedClaudePtyAccounts.delete(ptyId)
+  ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
   seededUnconfirmedInjectedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtyAccountBinding?.(ptyId)
 }

@@ -81,6 +81,7 @@ import {
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import { getLiveClaudePtyOwnershipEpoch } from '../claude-accounts/live-pty-ownership-epoch'
 import {
   applyTerminalAttributionEnv,
   resolveAttributionShellFamily
@@ -2610,9 +2611,11 @@ export function registerPtyHandlers(
   // adapter after replaceDaemonProvider runs. Both the startup registration
   // and the post-restart rebind go through the same code path — no risk of
   // drift between the two entry points.
-  const pendingClaudeProviderExits = new Map<string, { id: string; code: number }>()
-  const claudeExitVerificationGenerations = new Map<string, number>()
-  let verifyPendingClaudeProviderExit: ((ptyId: string) => void) | null = null
+  const pendingClaudeProviderExits = new Map<
+    string,
+    { payload: { id: string; code: number }; ownershipEpoch: number }
+  >()
+  let verifyPendingClaudeProviderExits: (() => void) | null = null
   let providerListenerGeneration = 0
   const bindProviderListeners = (): void => {
     localDataUnsub?.()
@@ -2621,6 +2624,7 @@ export function registerPtyHandlers(
     providerListenerGeneration += 1
     const bindingGeneration = providerListenerGeneration
     const boundProvider = localProvider
+    let claudeExitVerificationInFlight = false
 
     // Keep-tail thinning facts from the daemon, in byte order with onData.
     // The marker flips scan authority for the four transient-fact scanners;
@@ -2784,20 +2788,17 @@ export function registerPtyHandlers(
       }
       sendPtyExitToRenderer(payload)
     }
-    const verifyClaudeProviderExit = async (ptyId: string): Promise<void> => {
-      if (claudeExitVerificationGenerations.get(ptyId) === bindingGeneration) {
+    const verifyClaudeProviderExits = async (): Promise<void> => {
+      if (claudeExitVerificationInFlight || pendingClaudeProviderExits.size === 0) {
         return
       }
-      claudeExitVerificationGenerations.set(ptyId, bindingGeneration)
-      const payload = pendingClaudeProviderExits.get(ptyId)
+      claudeExitVerificationInFlight = true
+      const exitsAtStart = new Map(pendingClaudeProviderExits)
       try {
-        if (!payload) {
-          return
-        }
-        let hasSurvivingOwner: boolean | null = null
-        for (let attempt = 0; attempt < 3 && hasSurvivingOwner === null; attempt += 1) {
+        let livePtyIds: Set<string> | null = null
+        for (let attempt = 0; attempt < 3 && livePtyIds === null; attempt += 1) {
           try {
-            hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+            livePtyIds = new Set((await boundProvider.listProcesses()).map((session) => session.id))
           } catch (error) {
             console.warn('[pty] Failed to verify Claude PTY exit ownership', error)
             if (attempt < 2) {
@@ -2805,57 +2806,66 @@ export function registerPtyHandlers(
             }
           }
         }
-        if (hasSurvivingOwner === true) {
+        if (livePtyIds && [...exitsAtStart.keys()].some((ptyId) => livePtyIds?.has(ptyId))) {
           // Why: some providers publish exit before their inventory drops the
-          // session; confirm once after settling before treating it as a duplicate.
+          // session; one shared snapshot confirms all pending owners after settling.
           await delay(50)
           try {
-            hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+            livePtyIds = new Set((await boundProvider.listProcesses()).map((session) => session.id))
           } catch (error) {
             console.warn('[pty] Failed to confirm surviving Claude PTY owner', error)
-            hasSurvivingOwner = null
+            livePtyIds = null
           }
         }
         if (bindingGeneration !== providerListenerGeneration) {
           return
         }
-        if (hasSurvivingOwner === false) {
-          const finalPayload = pendingClaudeProviderExits.get(ptyId) ?? payload
-          pendingClaudeProviderExits.delete(ptyId)
-          finishProviderExit(finalPayload)
-          return
-        }
-        const currentPayload = pendingClaudeProviderExits.get(ptyId) ?? payload
-        if (currentPayload.code !== -1 && hasSurvivingOwner === true) {
-          pendingClaudeProviderExits.delete(ptyId)
+        for (const [ptyId, pendingExit] of exitsAtStart) {
+          if (pendingClaudeProviderExits.get(ptyId) !== pendingExit) {
+            continue
+          }
+          if (getLiveClaudePtyOwnershipEpoch(ptyId) !== pendingExit.ownershipEpoch) {
+            pendingClaudeProviderExits.delete(ptyId)
+            continue
+          }
+          const hasSurvivingOwner = livePtyIds?.has(ptyId)
+          if (hasSurvivingOwner === false) {
+            pendingClaudeProviderExits.delete(ptyId)
+            finishProviderExit(pendingExit.payload)
+          } else if (hasSurvivingOwner === true && pendingExit.payload.code !== -1) {
+            pendingClaudeProviderExits.delete(ptyId)
+          }
         }
         // Why: restart exits happen before provider teardown. Keep them (and
         // unverifiable exits) pending for the replacement provider to prove.
       } finally {
-        if (claudeExitVerificationGenerations.get(ptyId) === bindingGeneration) {
-          claudeExitVerificationGenerations.delete(ptyId)
-        }
+        claudeExitVerificationInFlight = false
         if (bindingGeneration !== providerListenerGeneration) {
-          verifyPendingClaudeProviderExit?.(ptyId)
-        } else if (pendingClaudeProviderExits.get(ptyId) !== payload) {
-          void verifyClaudeProviderExit(ptyId)
+          verifyPendingClaudeProviderExits?.()
+        } else if (
+          [...pendingClaudeProviderExits].some(
+            ([ptyId, pendingExit]) => exitsAtStart.get(ptyId) !== pendingExit
+          )
+        ) {
+          void verifyClaudeProviderExits()
         }
       }
     }
-    verifyPendingClaudeProviderExit = (ptyId) => void verifyClaudeProviderExit(ptyId)
+    verifyPendingClaudeProviderExits = () => void verifyClaudeProviderExits()
     localExitUnsub = boundProvider.onExit((payload) => {
       const hasClaudeCredentialOwner =
         isLiveSharedClaudePty(payload.id) || getLiveInjectedClaudePtyAccountId(payload.id) !== null
       if (!isLocalProvider && hasClaudeCredentialOwner) {
-        pendingClaudeProviderExits.set(payload.id, payload)
-        void verifyClaudeProviderExit(payload.id)
+        const ownershipEpoch = getLiveClaudePtyOwnershipEpoch(payload.id)
+        if (ownershipEpoch !== null) {
+          pendingClaudeProviderExits.set(payload.id, { payload, ownershipEpoch })
+          void verifyClaudeProviderExits()
+        }
         return
       }
       finishProviderExit(payload)
     })
-    for (const ptyId of pendingClaudeProviderExits.keys()) {
-      void verifyClaudeProviderExit(ptyId)
-    }
+    void verifyClaudeProviderExits()
   }
 
   bindProviderListeners()

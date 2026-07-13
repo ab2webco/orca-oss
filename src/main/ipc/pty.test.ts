@@ -1310,6 +1310,75 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('does not apply an old exit proof after same-ID Claude ownership is renewed', async () => {
+      let resolveOldInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
+      const oldInventory = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
+        resolveOldInventory = resolve
+      })
+      const provider = installObservableDaemonTestProvider()
+      provider.listProcesses.mockReturnValueOnce(oldInventory)
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      livePtyGate.markInjectedClaudePtySpawned('renewed-claude-session', 'account-a')
+
+      try {
+        provider.emitExit('renewed-claude-session', 0)
+        await vi.waitFor(() => expect(provider.listProcesses).toHaveBeenCalledOnce())
+        livePtyGate.markInjectedClaudePtySpawned('renewed-claude-session', 'account-a')
+        resolveOldInventory([])
+        await Promise.resolve()
+
+        expect(runtime.onPtyExit).not.toHaveBeenCalled()
+        expect(livePtyGate.getLiveInjectedClaudePtyAccountId('renewed-claude-session')).toBe(
+          'account-a'
+        )
+      } finally {
+        livePtyGate.markClaudePtyExited('renewed-claude-session')
+      }
+    })
+
+    it('batches pending Claude exit inventory when the provider is rebound', async () => {
+      let resolveOldInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
+      const oldInventory = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
+        resolveOldInventory = resolve
+      })
+      const oldProvider = installObservableDaemonTestProvider()
+      oldProvider.listProcesses.mockReturnValueOnce(oldInventory)
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      const sessionIds = Array.from({ length: 50 }, (_, index) => `batched-claude-${index}`)
+
+      try {
+        for (const sessionId of sessionIds) {
+          livePtyGate.markInjectedClaudePtySpawned(sessionId, 'account-a')
+          oldProvider.emitExit(sessionId, -1)
+        }
+        await vi.waitFor(() => expect(oldProvider.listProcesses).toHaveBeenCalledOnce())
+
+        const newProvider = installObservableDaemonTestProvider()
+        newProvider.listProcesses.mockResolvedValue([])
+        rebindLocalProviderListeners()
+        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledTimes(sessionIds.length))
+
+        expect(newProvider.listProcesses).toHaveBeenCalledOnce()
+        resolveOldInventory([])
+      } finally {
+        for (const sessionId of sessionIds) {
+          livePtyGate.markClaudePtyExited(sessionId)
+        }
+      }
+    })
+
     it('rechecks a restart exit against the replacement provider before cleanup', async () => {
       const oldProvider = installObservableDaemonTestProvider()
       oldProvider.listProcesses.mockResolvedValue([
