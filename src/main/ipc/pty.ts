@@ -1297,6 +1297,30 @@ type PendingClaudeProviderExit = {
 const pendingClaudeProviderExits = new Map<string, PendingClaudeProviderExit>()
 let providerListenerGeneration = 0
 let cancelProviderExitReconciliation: (() => void) | null = null
+let claudeProviderInventoryRequest: {
+  provider: IPtyProvider
+  promise: Promise<Set<string>>
+} | null = null
+
+function listClaudeProviderPtyIds(provider: IPtyProvider): Promise<Set<string>> {
+  if (claudeProviderInventoryRequest?.provider === provider) {
+    return claudeProviderInventoryRequest.promise
+  }
+  const entry = {
+    provider,
+    promise: Promise.resolve(new Set<string>())
+  }
+  entry.promise = provider
+    .listProcesses()
+    .then((sessions) => new Set(sessions.map((session) => session.id)))
+    .finally(() => {
+      if (claudeProviderInventoryRequest === entry) {
+        claudeProviderInventoryRequest = null
+      }
+    })
+  claudeProviderInventoryRequest = entry
+  return entry.promise
+}
 
 export function rebindLocalProviderListeners(): void {
   rebindProviderListeners?.()
@@ -2848,10 +2872,16 @@ export function registerPtyHandlers(
       try {
         let livePtyIds: Set<string> | null = null
         for (let attempt = 0; attempt < 3 && livePtyIds === null; attempt += 1) {
+          if (providerExitReconciliationCancelled) {
+            return
+          }
           try {
-            livePtyIds = new Set((await boundProvider.listProcesses()).map((session) => session.id))
+            livePtyIds = await listClaudeProviderPtyIds(boundProvider)
           } catch (error) {
             console.warn('[pty] Failed to verify Claude PTY exit ownership', error)
+            if (providerExitReconciliationCancelled) {
+              return
+            }
             if (attempt < 2) {
               await delay(100)
             }
@@ -2867,8 +2897,11 @@ export function registerPtyHandlers(
           // Why: some providers publish exit before their inventory drops the
           // session; one shared snapshot confirms all pending owners after settling.
           await delay(50)
+          if (providerExitReconciliationCancelled) {
+            return
+          }
           try {
-            livePtyIds = new Set((await boundProvider.listProcesses()).map((session) => session.id))
+            livePtyIds = await listClaudeProviderPtyIds(boundProvider)
           } catch (error) {
             console.warn('[pty] Failed to confirm surviving Claude PTY owner', error)
             livePtyIds = null

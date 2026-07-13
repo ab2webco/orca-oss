@@ -1616,6 +1616,51 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('coalesces hanging Claude inventory across repeated window registrations', async () => {
+      let resolveInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
+      const inventoryPending = new Promise<{ id: string; cwd: string; title: string }[]>(
+        (resolve) => {
+          resolveInventory = resolve
+        }
+      )
+      const provider = installObservableDaemonTestProvider()
+      provider.listProcesses.mockReturnValue(inventoryPending)
+      const oldRuntimes = Array.from({ length: 3 }, () => ({
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }))
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, oldRuntimes[0] as never)
+      livePtyGate.markInjectedClaudePtySpawned('hanging-window-session', 'account-a')
+
+      try {
+        provider.emitExit('hanging-window-session', 0)
+        await vi.waitFor(() => expect(provider.listProcesses).toHaveBeenCalledOnce())
+
+        for (const runtime of oldRuntimes.slice(1)) {
+          handlers.clear()
+          registerPtyHandlers(mainWindow as never, runtime as never)
+          await Promise.resolve()
+        }
+        const latestRuntime = {
+          setPtyController: vi.fn(),
+          onPtyExit: vi.fn(),
+          onPtyData: vi.fn()
+        }
+        handlers.clear()
+        registerPtyHandlers(mainWindow as never, latestRuntime as never)
+        await Promise.resolve()
+
+        expect(provider.listProcesses).toHaveBeenCalledOnce()
+        resolveInventory([])
+        await vi.waitFor(() => expect(latestRuntime.onPtyExit).toHaveBeenCalledOnce())
+        expect(oldRuntimes.every((runtime) => runtime.onPtyExit.mock.calls.length === 0)).toBe(true)
+      } finally {
+        livePtyGate.markClaudePtyExited('hanging-window-session')
+      }
+    })
+
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',
