@@ -335,6 +335,7 @@ export class DaemonServer {
         const p = request.payload
         const result = await this.host.createOrAttach({
           sessionId: p.sessionId,
+          requireReattach: p.requireReattach === true,
           cols: p.cols,
           rows: p.rows,
           cwd: p.cwd,

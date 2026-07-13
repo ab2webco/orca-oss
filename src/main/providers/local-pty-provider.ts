@@ -22,6 +22,7 @@ import {
   logHistoryInjection
 } from '../terminal-history'
 import type { IPtyProvider, PtyProcessInfo, PtySpawnOptions, PtySpawnResult } from './types'
+import { requiredPtyReattachUnavailableMessage } from './pty-reattach-contract'
 import {
   ensureNodePtySpawnHelperExecutable,
   validateWorkingDirectory,
@@ -339,6 +340,9 @@ export class LocalPtyProvider implements IPtyProvider {
         }
         return { id: reattachId, pid: existing.pid, isReattach: true }
       }
+    }
+    if (args.requireReattach) {
+      throw new Error(requiredPtyReattachUnavailableMessage(args.sessionId ?? ''))
     }
     const id = allocatePtyId(reattachId ?? undefined)
 

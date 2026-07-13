@@ -7,6 +7,7 @@ import { buildStartupCommandSubmission } from '../../shared/startup-command-subm
 import type { SessionInfo, TakePendingOutputResult, TerminalSnapshot } from './types'
 import { SessionNotFoundError } from './types'
 import type { CreateOrAttachOptions, CreateOrAttachResult } from './terminal-host-create-contract'
+import { requiredPtyReattachUnavailableMessage } from '../providers/pty-reattach-contract'
 
 export type { CreateOrAttachOptions, CreateOrAttachResult } from './terminal-host-create-contract'
 
@@ -79,6 +80,16 @@ export class TerminalHost {
         ...(existing.historySeeded !== undefined ? { historySeeded: existing.historySeeded } : {}),
         attachToken: token
       }
+    }
+
+    if (opts.requireReattach) {
+      // Why: a replacement process would inherit current launch state, not the
+      // preserved ownership of the dead process named by this session id.
+      if (existing) {
+        existing.dispose()
+        this.sessions.delete(opts.sessionId)
+      }
+      throw new Error(requiredPtyReattachUnavailableMessage(opts.sessionId))
     }
 
     // Clean up dead session if present

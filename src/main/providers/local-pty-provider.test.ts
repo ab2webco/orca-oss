@@ -195,6 +195,19 @@ describe('LocalPtyProvider', () => {
       expect(spawnMock).not.toHaveBeenCalled()
     })
 
+    it('does not replace a caller-required reattach after the session is gone', async () => {
+      await expect(
+        provider.spawn({
+          cols: 80,
+          rows: 24,
+          sessionId: 'missing-shared-session',
+          requireReattach: true
+        })
+      ).rejects.toThrow('is no longer available to reattach')
+
+      expect(spawnMock).not.toHaveBeenCalled()
+    })
+
     it('does not reattach numeric caller session ids that can collide after restart', async () => {
       const first = await provider.spawn({ cols: 80, rows: 24 })
       spawnMock.mockClear()

@@ -4,6 +4,7 @@ import type { ShellReadyState, TerminalSnapshot } from './types'
 
 export type CreateOrAttachOptions = {
   sessionId: string
+  requireReattach?: boolean
   cols: number
   rows: number
   cwd?: string

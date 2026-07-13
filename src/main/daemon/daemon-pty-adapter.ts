@@ -175,6 +175,12 @@ export class DaemonPtyAdapter implements IPtyProvider {
   private async doSpawn(opts: PtySpawnOptions): Promise<PtySpawnResult> {
     const sessionId = opts.sessionId ?? mintPtySessionId(opts.worktreeId)
 
+    if (opts.requireReattach && this.protocolVersion < 22) {
+      // Why: older daemons ignore the attach-only wire flag and may create a
+      // replacement process under credentials that do not own this session.
+      throw new Error('The preserved PTY session cannot be safely reattached after this update')
+    }
+
     if (this.killedSessionTombstones.has(sessionId)) {
       throw new TerminalKilledError(sessionId)
     }
@@ -202,7 +208,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
     // full detect.
     let restoreInfo: ColdRestoreInfo | null = null
     let restoreSkippedForLiveSession = false
-    if (this.historyReader?.hasRestorableHistory(sessionId)) {
+    if (!opts.requireReattach && this.historyReader?.hasRestorableHistory(sessionId)) {
       if ((await this.getAppliedSize(sessionId)) !== null) {
         restoreSkippedForLiveSession = true
       } else {
@@ -230,6 +236,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
     const createOrAttach = (historySeed: string | null) =>
       this.client.request<CreateOrAttachResult>('createOrAttach', {
         sessionId,
+        ...(opts.requireReattach ? { requireReattach: true } : {}),
         cols: effectiveCols,
         rows: effectiveRows,
         cwd: effectiveCwd,

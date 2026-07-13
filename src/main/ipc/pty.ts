@@ -55,6 +55,7 @@ import { detectPiAgentKindFromCommand, type PiAgentKind } from '../../shared/pi-
 import { isPwshAvailable } from '../pwsh'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import { REQUIRED_PTY_REATTACH_UNAVAILABLE } from '../providers/pty-reattach-contract'
 import type { StartupCommandDelivery } from '../../shared/codex-startup-delivery'
 import {
   SSH_SESSION_EXPIRED_ERROR,
@@ -3178,6 +3179,9 @@ export function registerPtyHandlers(
         spawnOptions.sessionId = sessionId
         ptySizes.set(effectiveSessionAppId ?? sessionId, { cols: args.cols, rows: args.rows })
       }
+      if (isExistingSharedClaudeSession) {
+        spawnOptions.requireReattach = true
+      }
       const materializedPaneKey = hostSessionBinding
         ? makePaneKey(hostSessionBinding.tabId, hostSessionBinding.leafId)
         : null
@@ -3247,6 +3251,16 @@ export function registerPtyHandlers(
             if (!isIdentityMismatch) {
               store?.markSshRemotePtyLease(args.connectionId, effectiveSessionRelayId, 'expired')
             }
+          }
+          if (
+            isExistingSharedClaudeSession &&
+            args.sessionId &&
+            (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
+              rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
+          ) {
+            // Why: the provider atomically proved the preserved process is gone;
+            // retaining its binding would block safe account mutations forever.
+            markClaudePtyExited(args.sessionId)
           }
           if (isMintedSessionId && sessionId !== undefined) {
             clearProviderPtyState(sessionId)
@@ -4162,6 +4176,9 @@ export function registerPtyHandlers(
       if (effectiveSessionId !== undefined) {
         spawnOptions.sessionId = effectiveSessionId
       }
+      if (isExistingSharedClaudeSession) {
+        spawnOptions.requireReattach = true
+      }
       // Why: on Windows, fall back to the persisted default-shell setting
       // when the renderer didn't send a per-tab override. Without this, the
       // daemon path ignores the user's "Default Shell" preference entirely —
@@ -4270,6 +4287,16 @@ export function registerPtyHandlers(
             if (!isIdentityMismatch) {
               store?.markSshRemotePtyLease(args.connectionId, effectiveSessionRelayId, 'expired')
             }
+          }
+          if (
+            isExistingSharedClaudeSession &&
+            args.sessionId &&
+            (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
+              rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
+          ) {
+            // Why: the provider atomically proved the preserved process is gone;
+            // retaining its binding would block safe account mutations forever.
+            markClaudePtyExited(args.sessionId)
           }
           // Why: if buildPtyHostEnv materialized provider state for this minted
           // id but provider.spawn failed, that state would otherwise leak.

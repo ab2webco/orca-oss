@@ -78,6 +78,9 @@ export type PtySpawnOptions = {
    *  daemon hosts also pass minted IDs for fresh sessions that need stable
    *  per-PTY state before provider.spawn returns. */
   sessionId?: string
+  /** Fail instead of creating a replacement process when sessionId is gone.
+   *  Why: preserved auth ownership is only valid for the original live process. */
+  requireReattach?: boolean
   /** True when the caller minted this daemon session for a fresh terminal.
    *  Existing-session attach paths must stay false so recovery checks do not
    *  replace the daemon out from under a still-live PTY. */

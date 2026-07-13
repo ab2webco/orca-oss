@@ -1014,6 +1014,12 @@ describe('registerPtyHandlers', () => {
     it.each(['live gate', 'restart seed'] as const)(
       'keeps a shared reattach shared after repinning via the %s',
       async (ownershipSource) => {
+        await getLocalPtyProvider().spawn({
+          cols: 80,
+          rows: 24,
+          sessionId: 'surviving-shared-session'
+        })
+        spawnMock.mockClear()
         if (ownershipSource === 'restart seed') {
           livePtyGate.seedLiveClaudePtysFromPersistence(['surviving-shared-session'])
         } else {
@@ -1065,6 +1071,7 @@ describe('registerPtyHandlers', () => {
           expect(
             livePtyGate.getLiveInjectedClaudePtyAccountId('surviving-shared-session')
           ).toBeNull()
+          expect(spawnMock).not.toHaveBeenCalled()
           await handlers.get('pty:kill')!(null, { id: spawnResult.id })
         } finally {
           livePtyGate.markClaudePtyExited('surviving-shared-session')
@@ -1083,6 +1090,12 @@ describe('registerPtyHandlers', () => {
         onPtyData: vi.fn(),
         preAllocateHandleForPty: vi.fn()
       }
+      await getLocalPtyProvider().spawn({
+        cols: 80,
+        rows: 24,
+        sessionId: 'runtime-shared-session'
+      })
+      spawnMock.mockClear()
       markClaudePtySpawned('runtime-shared-session', 'account-a')
       livePtyGate.markInjectedClaudePtySpawned('runtime-injected-account-b', 'account-b')
       const prepareClaudeAuth = vi.fn(async () => {
@@ -1132,9 +1145,80 @@ describe('registerPtyHandlers', () => {
         expect(livePtyGate.getLiveSharedClaudePtyAccountId('runtime-shared-session')).toBe(
           'account-a'
         )
+        expect(spawnMock).not.toHaveBeenCalled()
       } finally {
         livePtyGate.markClaudePtyExited('runtime-shared-session')
         livePtyGate.markClaudePtyExited('runtime-injected-account-b')
+      }
+    })
+
+    it('clears stale shared ownership when runtime-controller attach-only fails', async () => {
+      const runtime = {
+        setPtyController: vi.fn(),
+        registerPty: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn(),
+        preAllocateHandleForPty: vi.fn()
+      }
+      markClaudePtySpawned('runtime-stale-shared-session', 'account-a')
+      const prepareClaudeAuth = vi.fn()
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth
+      )
+      const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+        spawn(args: {
+          cols: number
+          rows: number
+          command: string
+          sessionId: string
+        }): Promise<{ id: string }>
+      }
+      spawnMock.mockClear()
+
+      try {
+        await expect(
+          controller.spawn({
+            cols: 80,
+            rows: 24,
+            command: 'claude',
+            sessionId: 'runtime-stale-shared-session'
+          })
+        ).rejects.toThrow('is no longer available to reattach')
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+        expect(spawnMock).not.toHaveBeenCalled()
+        expect(livePtyGate.isLiveSharedClaudePty('runtime-stale-shared-session')).toBe(false)
+      } finally {
+        livePtyGate.markClaudePtyExited('runtime-stale-shared-session')
+      }
+    })
+
+    it('does not replace a stale shared session under the currently materialized account', async () => {
+      markClaudePtySpawned('stale-shared-session', 'account-a')
+      const prepareClaudeAuth = vi.fn()
+      registerPtyHandlers(mainWindow as never, undefined, undefined, undefined, prepareClaudeAuth)
+      spawnMock.mockClear()
+      classifyErrorMock.mockReturnValue({ error_class: 'unknown' })
+
+      try {
+        await expect(
+          handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            command: 'claude',
+            sessionId: 'stale-shared-session'
+          })
+        ).rejects.toThrow('is no longer available to reattach')
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+        expect(spawnMock).not.toHaveBeenCalled()
+        expect(livePtyGate.isLiveSharedClaudePty('stale-shared-session')).toBe(false)
+      } finally {
+        livePtyGate.markClaudePtyExited('stale-shared-session')
       }
     })
 

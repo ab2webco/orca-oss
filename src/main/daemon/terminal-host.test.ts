@@ -95,6 +95,7 @@ describe('TerminalHost', () => {
 
       const result = await host.createOrAttach({
         sessionId: 'session-1',
+        requireReattach: true,
         cols: 80,
         rows: 24,
         streamClient: { onData: vi.fn(), onExit: vi.fn() }
@@ -103,6 +104,20 @@ describe('TerminalHost', () => {
       expect(result.isNew).toBe(false)
       // Should not spawn a second subprocess
       expect(spawnFn).toHaveBeenCalledOnce()
+    })
+
+    it('rejects a required reattach without spawning a replacement subprocess', async () => {
+      await expect(
+        host.createOrAttach({
+          sessionId: 'missing-shared-session',
+          requireReattach: true,
+          cols: 80,
+          rows: 24,
+          streamClient: { onData: vi.fn(), onExit: vi.fn() }
+        })
+      ).rejects.toThrow('missing-shared-session')
+
+      expect(spawnFn).not.toHaveBeenCalled()
     })
 
     it('returns snapshot when attaching to existing session', async () => {
