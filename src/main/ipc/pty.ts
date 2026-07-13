@@ -2610,10 +2610,16 @@ export function registerPtyHandlers(
   // adapter after replaceDaemonProvider runs. Both the startup registration
   // and the post-restart rebind go through the same code path — no risk of
   // drift between the two entry points.
+  const pendingClaudeProviderExits = new Map<string, { id: string; code: number }>()
+  const claudeExitVerificationGenerations = new Map<string, number>()
+  let verifyPendingClaudeProviderExit: ((ptyId: string) => void) | null = null
+  let providerListenerGeneration = 0
   const bindProviderListeners = (): void => {
     localDataUnsub?.()
     localExitUnsub?.()
     localBackgroundStreamUnsub?.()
+    providerListenerGeneration += 1
+    const bindingGeneration = providerListenerGeneration
     const boundProvider = localProvider
 
     // Keep-tail thinning facts from the daemon, in byte order with onData.
@@ -2766,8 +2772,6 @@ export function registerPtyHandlers(
         schedulePendingDataFlush(PTY_BATCH_INTERVAL_MS)
       }
     })
-    const pendingClaudeProviderExits = new Map<string, { id: string; code: number }>()
-    const claudeExitVerifications = new Set<string>()
     const finishProviderExit = (payload: { id: string; code: number }): void => {
       if (consumeSyntheticKillExit(payload.id)) {
         return
@@ -2781,54 +2785,64 @@ export function registerPtyHandlers(
       sendPtyExitToRenderer(payload)
     }
     const verifyClaudeProviderExit = async (ptyId: string): Promise<void> => {
-      if (claudeExitVerifications.has(ptyId)) {
+      if (claudeExitVerificationGenerations.get(ptyId) === bindingGeneration) {
         return
       }
-      claudeExitVerifications.add(ptyId)
+      claudeExitVerificationGenerations.set(ptyId, bindingGeneration)
+      const payload = pendingClaudeProviderExits.get(ptyId)
       try {
-        do {
-          const payload = pendingClaudeProviderExits.get(ptyId)
+        if (!payload) {
+          return
+        }
+        let hasSurvivingOwner: boolean | null = null
+        for (let attempt = 0; attempt < 3 && hasSurvivingOwner === null; attempt += 1) {
+          try {
+            hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+          } catch (error) {
+            console.warn('[pty] Failed to verify Claude PTY exit ownership', error)
+            if (attempt < 2) {
+              await delay(100)
+            }
+          }
+        }
+        if (hasSurvivingOwner === true) {
+          // Why: some providers publish exit before their inventory drops the
+          // session; confirm once after settling before treating it as a duplicate.
+          await delay(50)
+          try {
+            hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+          } catch (error) {
+            console.warn('[pty] Failed to confirm surviving Claude PTY owner', error)
+            hasSurvivingOwner = null
+          }
+        }
+        if (bindingGeneration !== providerListenerGeneration) {
+          return
+        }
+        if (hasSurvivingOwner === false) {
+          const finalPayload = pendingClaudeProviderExits.get(ptyId) ?? payload
           pendingClaudeProviderExits.delete(ptyId)
-          if (!payload) {
-            return
-          }
-          let hasSurvivingOwner: boolean | null = null
-          for (let attempt = 0; attempt < 3 && hasSurvivingOwner === null; attempt += 1) {
-            try {
-              hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
-            } catch (error) {
-              console.warn('[pty] Failed to verify Claude PTY exit ownership', error)
-              if (attempt < 2) {
-                await delay(100)
-              }
-            }
-          }
-          if (hasSurvivingOwner === true) {
-            // Why: some providers publish exit before their inventory drops the
-            // session; confirm once after settling before treating it as a duplicate.
-            await delay(50)
-            try {
-              hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
-            } catch (error) {
-              console.warn('[pty] Failed to confirm surviving Claude PTY owner', error)
-              hasSurvivingOwner = null
-            }
-          }
-          if (hasSurvivingOwner === false) {
-            pendingClaudeProviderExits.delete(ptyId)
-            finishProviderExit(payload)
-            return
-          }
-          // Why: live or unverifiable duplicate ownership must retain the
-          // credential guard; a later physical-owner exit will retry proof.
-        } while (pendingClaudeProviderExits.has(ptyId))
+          finishProviderExit(finalPayload)
+          return
+        }
+        const currentPayload = pendingClaudeProviderExits.get(ptyId) ?? payload
+        if (currentPayload.code !== -1 && hasSurvivingOwner === true) {
+          pendingClaudeProviderExits.delete(ptyId)
+        }
+        // Why: restart exits happen before provider teardown. Keep them (and
+        // unverifiable exits) pending for the replacement provider to prove.
       } finally {
-        claudeExitVerifications.delete(ptyId)
-        if (pendingClaudeProviderExits.has(ptyId)) {
+        if (claudeExitVerificationGenerations.get(ptyId) === bindingGeneration) {
+          claudeExitVerificationGenerations.delete(ptyId)
+        }
+        if (bindingGeneration !== providerListenerGeneration) {
+          verifyPendingClaudeProviderExit?.(ptyId)
+        } else if (pendingClaudeProviderExits.get(ptyId) !== payload) {
           void verifyClaudeProviderExit(ptyId)
         }
       }
     }
+    verifyPendingClaudeProviderExit = (ptyId) => void verifyClaudeProviderExit(ptyId)
     localExitUnsub = boundProvider.onExit((payload) => {
       const hasClaudeCredentialOwner =
         isLiveSharedClaudePty(payload.id) || getLiveInjectedClaudePtyAccountId(payload.id) !== null
@@ -2839,6 +2853,9 @@ export function registerPtyHandlers(
       }
       finishProviderExit(payload)
     })
+    for (const ptyId of pendingClaudeProviderExits.keys()) {
+      void verifyClaudeProviderExit(ptyId)
+    }
   }
 
   bindProviderListeners()

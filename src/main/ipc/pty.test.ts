@@ -1274,6 +1274,77 @@ describe('registerPtyHandlers', () => {
       }
     )
 
+    it('does not apply an old provider exit proof to a reused session after rebind', async () => {
+      let resolveOldInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
+      const oldInventory = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
+        resolveOldInventory = resolve
+      })
+      const oldProvider = installObservableDaemonTestProvider()
+      oldProvider.listProcesses.mockReturnValueOnce(oldInventory)
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      markClaudePtySpawned('reused-claude-session', 'account-a')
+
+      try {
+        oldProvider.emitExit('reused-claude-session', 0)
+        await vi.waitFor(() => expect(oldProvider.listProcesses).toHaveBeenCalledOnce())
+
+        const newProvider = installObservableDaemonTestProvider()
+        newProvider.listProcesses.mockResolvedValue([
+          { id: 'reused-claude-session', cwd: '', title: 'new owner' }
+        ])
+        rebindLocalProviderListeners()
+        await vi.waitFor(() => expect(newProvider.listProcesses).toHaveBeenCalledTimes(2))
+        resolveOldInventory([])
+        await Promise.resolve()
+
+        expect(runtime.onPtyExit).not.toHaveBeenCalled()
+        expect(livePtyGate.isLiveSharedClaudePty('reused-claude-session')).toBe(true)
+      } finally {
+        livePtyGate.markClaudePtyExited('reused-claude-session')
+      }
+    })
+
+    it('rechecks a restart exit against the replacement provider before cleanup', async () => {
+      const oldProvider = installObservableDaemonTestProvider()
+      oldProvider.listProcesses.mockResolvedValue([
+        { id: 'restarted-claude-session', cwd: '', title: 'old owner' }
+      ])
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      markClaudePtySpawned('restarted-claude-session', 'account-a')
+
+      try {
+        oldProvider.emitExit('restarted-claude-session', -1)
+        await vi.waitFor(() => expect(oldProvider.listProcesses).toHaveBeenCalledTimes(2))
+
+        const newProvider = installObservableDaemonTestProvider()
+        newProvider.listProcesses.mockResolvedValue([])
+        rebindLocalProviderListeners()
+
+        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
+        expect(runtime.onPtyExit).toHaveBeenCalledWith('restarted-claude-session', -1)
+        expect(livePtyGate.isLiveSharedClaudePty('restarted-claude-session')).toBe(false)
+        expect(
+          mainWindow.webContents.send.mock.calls.filter(
+            (call) => call[0] === 'pty:exit' && call[1]?.id === 'restarted-claude-session'
+          )
+        ).toHaveLength(1)
+      } finally {
+        livePtyGate.markClaudePtyExited('restarted-claude-session')
+      }
+    })
+
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',
