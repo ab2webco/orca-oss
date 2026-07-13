@@ -1543,6 +1543,79 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('retries a current-generation restart exit after inventory errors recover', async () => {
+      const provider = installObservableDaemonTestProvider()
+      provider.listProcesses
+        .mockRejectedValueOnce(new Error('inventory unavailable 1'))
+        .mockRejectedValueOnce(new Error('inventory unavailable 2'))
+        .mockRejectedValueOnce(new Error('inventory unavailable 3'))
+        .mockResolvedValue([])
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      markClaudePtySpawned('restart-inventory-error-session', 'account-a')
+
+      try {
+        provider.emitExit('restart-inventory-error-session', -1)
+
+        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 800 })
+        expect(provider.listProcesses).toHaveBeenCalledTimes(4)
+        expect(livePtyGate.isLiveSharedClaudePty('restart-inventory-error-session')).toBe(false)
+      } finally {
+        livePtyGate.markClaudePtyExited('restart-inventory-error-session')
+      }
+    })
+
+    it('transfers scheduled Claude exit reconciliation to a new window registration', async () => {
+      vi.useFakeTimers()
+      const provider = installObservableDaemonTestProvider()
+      provider.listProcesses.mockResolvedValue([
+        { id: 'window-reconcile-session', cwd: '', title: 'surviving owner' }
+      ])
+      const oldRuntime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, oldRuntime as never)
+      livePtyGate.markInjectedClaudePtySpawned('window-reconcile-session', 'account-a')
+
+      try {
+        provider.emitExit('window-reconcile-session', 0)
+        await vi.advanceTimersByTimeAsync(50)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(2)
+
+        const newRuntime = {
+          setPtyController: vi.fn(),
+          onPtyExit: vi.fn(),
+          onPtyData: vi.fn()
+        }
+        handlers.clear()
+        registerPtyHandlers(mainWindow as never, newRuntime as never)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(3)
+
+        await vi.advanceTimersByTimeAsync(250)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(3)
+        await vi.advanceTimersByTimeAsync(250)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(4)
+
+        provider.listProcesses.mockResolvedValue([])
+        await vi.advanceTimersByTimeAsync(1_000)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(5)
+        expect(oldRuntime.onPtyExit).not.toHaveBeenCalled()
+        expect(newRuntime.onPtyExit).toHaveBeenCalledOnce()
+      } finally {
+        livePtyGate.markClaudePtyExited('window-reconcile-session')
+        vi.useRealTimers()
+      }
+    })
+
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',

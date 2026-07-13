@@ -1288,6 +1288,15 @@ let rendererDidStartLoadingHandler: (() => void) | null = null
 // module scope so the restart flow (src/main/daemon/daemon-init.ts) can
 // trigger a rebind without re-running the full registerPtyHandlers setup.
 let rebindProviderListeners: (() => void) | null = null
+type PendingClaudeProviderExit = {
+  payload: { id: string; code: number }
+  ownershipEpoch: number
+  exitProviderGeneration: number
+  liveSettleRetryCount: number
+}
+const pendingClaudeProviderExits = new Map<string, PendingClaudeProviderExit>()
+let providerListenerGeneration = 0
+let cancelProviderExitReconciliation: (() => void) | null = null
 
 export function rebindLocalProviderListeners(): void {
   rebindProviderListeners?.()
@@ -2612,19 +2621,24 @@ export function registerPtyHandlers(
   // adapter after replaceDaemonProvider runs. Both the startup registration
   // and the post-restart rebind go through the same code path — no risk of
   // drift between the two entry points.
-  const pendingClaudeProviderExits = new Map<
-    string,
-    {
-      payload: { id: string; code: number }
-      ownershipEpoch: number
-      exitProviderGeneration: number
-      liveSettleRetryCount: number
+  cancelProviderExitReconciliation?.()
+  for (const [ptyId, pendingExit] of pendingClaudeProviderExits) {
+    if (getLiveClaudePtyOwnershipEpoch(ptyId) !== pendingExit.ownershipEpoch) {
+      pendingClaudeProviderExits.delete(ptyId)
     }
-  >()
+  }
   let verifyPendingClaudeProviderExits: (() => void) | null = null
   let claudeExitRetryTimer: NodeJS.Timeout | null = null
   let claudeExitRetryDueAt = 0
-  let providerListenerGeneration = 0
+  let providerExitReconciliationCancelled = false
+  cancelProviderExitReconciliation = () => {
+    providerExitReconciliationCancelled = true
+    if (claudeExitRetryTimer) {
+      clearTimeout(claudeExitRetryTimer)
+      claudeExitRetryTimer = null
+      claudeExitRetryDueAt = 0
+    }
+  }
   const bindProviderListeners = (): void => {
     localDataUnsub?.()
     localExitUnsub?.()
@@ -2639,6 +2653,9 @@ export function registerPtyHandlers(
     const boundProvider = localProvider
     let claudeExitVerificationInFlight = false
     const scheduleClaudeExitRetry = (delayMs: number): void => {
+      if (providerExitReconciliationCancelled) {
+        return
+      }
       const dueAt = Date.now() + delayMs
       if (claudeExitRetryTimer && dueAt >= claudeExitRetryDueAt) {
         return
@@ -2818,7 +2835,11 @@ export function registerPtyHandlers(
       sendPtyExitToRenderer(payload)
     }
     async function verifyClaudeProviderExits(): Promise<void> {
-      if (claudeExitVerificationInFlight || pendingClaudeProviderExits.size === 0) {
+      if (
+        providerExitReconciliationCancelled ||
+        claudeExitVerificationInFlight ||
+        pendingClaudeProviderExits.size === 0
+      ) {
         return
       }
       claudeExitVerificationInFlight = true
@@ -2853,7 +2874,10 @@ export function registerPtyHandlers(
             livePtyIds = null
           }
         }
-        if (bindingGeneration !== providerListenerGeneration) {
+        if (
+          providerExitReconciliationCancelled ||
+          bindingGeneration !== providerListenerGeneration
+        ) {
           return
         }
         for (const [ptyId, pendingExit] of exitsAtStart) {
@@ -2869,6 +2893,7 @@ export function registerPtyHandlers(
             pendingClaudeProviderExits.delete(ptyId)
             finishProviderExit(pendingExit.payload)
           } else if (
+            livePtyIds === null ||
             pendingExit.payload.code !== -1 ||
             pendingExit.exitProviderGeneration !== bindingGeneration
           ) {
@@ -2890,7 +2915,9 @@ export function registerPtyHandlers(
         // unverifiable exits) pending for the replacement provider to prove.
       } finally {
         claudeExitVerificationInFlight = false
-        if (bindingGeneration !== providerListenerGeneration) {
+        if (providerExitReconciliationCancelled) {
+          // A newer window registration owns the shared pending map and timer.
+        } else if (bindingGeneration !== providerListenerGeneration) {
           verifyPendingClaudeProviderExits?.()
         } else {
           if (liveExitRetryDelayMs !== null) {
@@ -2903,6 +2930,7 @@ export function registerPtyHandlers(
           ) {
             void verifyClaudeProviderExits()
           } else if (
+            liveExitRetryDelayMs === null &&
             ![...pendingClaudeProviderExits.values()].some(
               (pendingExit) =>
                 pendingExit.payload.code !== -1 ||
