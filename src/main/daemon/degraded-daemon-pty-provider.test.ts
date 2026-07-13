@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DegradedDaemonPtyProvider } from './degraded-daemon-pty-provider'
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import { requiredPtyReattachUnavailableMessage } from '../providers/pty-reattach-contract'
 
 type ProviderMock = IPtyProvider & {
   emitData: (id: string, data: string, sequenceChars?: number) => void
@@ -138,6 +139,54 @@ describe('DegradedDaemonPtyProvider', () => {
     expect(fallback.spawn).toHaveBeenCalledWith({ cols: 80, rows: 24 })
     expect(current.write).toHaveBeenCalledWith('daemon-session', 'old\n')
     expect(fallback.write).toHaveBeenCalledWith(fresh.id, 'new\n')
+  })
+
+  it('searches fallback and every daemon for an unmapped required reattach', async () => {
+    const current = createDaemonAdapter('daemon')
+    const legacy = createDaemonAdapter('legacy', ['legacy-session'])
+    const fallback = createProvider('fallback')
+    vi.mocked(fallback.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    vi.mocked(current.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    vi.mocked(legacy.listProcesses).mockRejectedValueOnce(new Error('transient discovery failure'))
+    const provider = new DegradedDaemonPtyProvider({ current, legacy: [legacy], fallback })
+    await provider.discoverDaemonSessions()
+
+    await expect(
+      provider.spawn({
+        sessionId: 'legacy-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).resolves.toEqual({ id: 'legacy-session' })
+    expect(legacy.spawn).toHaveBeenCalledOnce()
+  })
+
+  it('does not treat one provider not-found as global proof after discovery fails', async () => {
+    const current = createDaemonAdapter('daemon')
+    const legacy = createDaemonAdapter('legacy', ['legacy-session'])
+    const fallback = createProvider('fallback')
+    vi.mocked(fallback.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    vi.mocked(current.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    vi.mocked(legacy.spawn).mockRejectedValue(new Error('legacy ownership is ambiguous'))
+    const provider = new DegradedDaemonPtyProvider({ current, legacy: [legacy], fallback })
+
+    await expect(
+      provider.spawn({
+        sessionId: 'legacy-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).rejects.toThrow('legacy ownership is ambiguous')
   })
 
   it('routes a previously daemon-backed id to fallback after daemon exit removes the mapping', async () => {

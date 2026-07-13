@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DaemonPtyRouter } from './daemon-pty-router'
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
 import type { PtyBackgroundStreamEvent, PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import { requiredPtyReattachUnavailableMessage } from '../providers/pty-reattach-contract'
 
 type AdapterMock = DaemonPtyAdapter & {
   emitData: (id: string, data: string, sequenceChars?: number) => void
@@ -154,6 +155,69 @@ describe('DaemonPtyRouter', () => {
     expect(current.spawn).toHaveBeenCalledWith({ cols: 80, rows: 24 })
     expect(legacy.write).toHaveBeenCalledWith('legacy-session', 'old\n')
     expect(current.write).toHaveBeenCalledWith(fresh.id, 'new\n')
+  })
+
+  it('searches every daemon for an unmapped required reattach after discovery fails', async () => {
+    const current = createAdapter('current')
+    const legacy = createAdapter('legacy', ['legacy-session'])
+    vi.mocked(legacy.listProcesses).mockRejectedValueOnce(new Error('transient discovery failure'))
+    vi.mocked(current.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+    await router.discoverLegacySessions()
+
+    await expect(
+      router.spawn({
+        sessionId: 'legacy-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).resolves.toEqual({ id: 'legacy-session' })
+    expect(current.spawn).toHaveBeenCalledOnce()
+    expect(legacy.spawn).toHaveBeenCalledOnce()
+  })
+
+  it('retains ambiguous ownership when an unmapped daemon cannot prove absence', async () => {
+    const current = createAdapter('current')
+    const legacy = createAdapter('legacy', ['legacy-session'])
+    vi.mocked(current.spawn).mockRejectedValue(
+      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
+    )
+    vi.mocked(legacy.spawn).mockRejectedValue(new Error('legacy ownership is ambiguous'))
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+
+    await expect(
+      router.spawn({
+        sessionId: 'legacy-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).rejects.toThrow('legacy ownership is ambiguous')
+  })
+
+  it('reports unavailable only after every daemon proves the session absent', async () => {
+    const current = createAdapter('current')
+    const legacy = createAdapter('legacy')
+    for (const adapter of [current, legacy]) {
+      vi.mocked(adapter.spawn).mockRejectedValue(
+        new Error(requiredPtyReattachUnavailableMessage('missing-session'))
+      )
+    }
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+
+    await expect(
+      router.spawn({
+        sessionId: 'missing-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).rejects.toThrow('PTY_REQUIRED_REATTACH_UNAVAILABLE')
+    expect(current.spawn).toHaveBeenCalledOnce()
+    expect(legacy.spawn).toHaveBeenCalledOnce()
   })
 
   it('routes background hints and authoritative snapshots to the session owner', async () => {
