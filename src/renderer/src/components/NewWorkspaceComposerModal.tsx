@@ -18,7 +18,6 @@ import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import type {
-  ClaudeManagedAccountSummary,
   TuiAgent,
   WorkspaceCreateTelemetrySource,
   WorkspaceStatus
@@ -31,6 +30,8 @@ import {
   canOfferClaudeAccountPinForRepoTarget,
   filterClaudeAccountsByRuntime
 } from '@/lib/claude-account-runtime-filter'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { useComposerClaudeAccounts } from '@/hooks/use-composer-claude-accounts'
 
 type ComposerModalData = {
   prefilledName?: string
@@ -189,33 +190,10 @@ function QuickTabBody({
   const canOfferClaudeAccountPin = canOfferClaudeAccountPinForRepoTarget({
     repo: selectedRepo,
     isFolderWorkspaceTarget,
-    selectedRepoIsRemote: cardProps.selectedRepoIsRemote
+    selectedRepoIsRemote: cardProps.selectedRepoIsRemote,
+    isPairedWebClient: isWebClientLocation()
   })
-
-  const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
-  useEffect(() => {
-    if (!canOfferClaudeAccountPin) {
-      setClaudeAccounts([])
-      return
-    }
-    let cancelled = false
-    // Why: account discovery refreshes provider state, so only pay for it when
-    // the selected target can actually display and persist the account picker.
-    void window.api.claudeAccounts
-      .list()
-      .then((result) => {
-        if (!cancelled) {
-          setClaudeAccounts(result.accounts)
-        }
-      })
-      .catch(() => {
-        // Non-fatal: leave the account list empty (picker hides itself); the
-        // rejection is swallowed so it doesn't surface as an unhandled promise.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [canOfferClaudeAccountPin])
+  const claudeAccounts = useComposerClaudeAccounts(canOfferClaudeAccountPin)
   const [claudeAccountId, setClaudeAccountId] = useState<string | null>(null)
   // Why: per-worktree account pinning only takes effect for local git-worktree
   // launches (pty.ts skips SSH-remote spawns, and folder workspaces route

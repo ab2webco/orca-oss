@@ -72,21 +72,32 @@ describe('Claude account binding target ownership', () => {
       canOfferClaudeAccountPinForRepoTarget({
         repo: localRepo,
         isFolderWorkspaceTarget: false,
-        selectedRepoIsRemote: false
+        selectedRepoIsRemote: false,
+        isPairedWebClient: false
       })
     ).toBe(true)
     expect(
       canOfferClaudeAccountPinForRepoTarget({
         repo: runtimeRepo,
         isFolderWorkspaceTarget: false,
-        selectedRepoIsRemote: false
+        selectedRepoIsRemote: false,
+        isPairedWebClient: false
       })
     ).toBe(false)
     expect(
       canOfferClaudeAccountPinForRepoTarget({
         repo: localRepo,
         isFolderWorkspaceTarget: true,
-        selectedRepoIsRemote: false
+        selectedRepoIsRemote: false,
+        isPairedWebClient: false
+      })
+    ).toBe(false)
+    expect(
+      canOfferClaudeAccountPinForRepoTarget({
+        repo: localRepo,
+        isFolderWorkspaceTarget: false,
+        selectedRepoIsRemote: false,
+        isPairedWebClient: true
       })
     ).toBe(false)
   })

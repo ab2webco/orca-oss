@@ -49,6 +49,7 @@ import {
   setSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
+import { getRepoIdFromWorktreeId } from '../../shared/worktree-id'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const STATUS_TIMEOUT_MS = 20_000
@@ -97,7 +98,8 @@ export class ClaudeAccountService {
   constructor(
     private readonly store: Store,
     private readonly rateLimits: RateLimitService,
-    private readonly runtimeAuth: ClaudeRuntimeAuthService
+    private readonly runtimeAuth: ClaudeRuntimeAuthService,
+    private readonly onWorktreeAccountPinsChanged?: (repoId: string) => void
   ) {}
 
   listAccounts(): ClaudeRateLimitAccountsState {
@@ -304,6 +306,7 @@ export class ClaudeAccountService {
     let restoredPins: Record<string, string | null> = {}
     let removalCommitted = false
     let credentialRemovalStarted = false
+    let affectedRepoIds: string[] = []
 
     try {
       if (
@@ -325,6 +328,7 @@ export class ClaudeAccountService {
       const pinnedWorktreeIds = Object.entries(this.store.getAllWorktreeMeta())
         .filter(([, meta]) => meta.claudeAccountId === accountId)
         .map(([worktreeId]) => worktreeId)
+      affectedRepoIds = [...new Set(pinnedWorktreeIds.map(getRepoIdFromWorktreeId))]
       const clearedPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, null]))
       restoredPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, accountId]))
       this.commitClaudeAccountState(
@@ -348,6 +352,15 @@ export class ClaudeAccountService {
       )
       credentialRemovalStarted = true
       await this.safeRemoveManagedAuth(accountId, account.managedAuthPath, { strict: true })
+      for (const repoId of affectedRepoIds) {
+        try {
+          this.onWorktreeAccountPinsChanged?.(repoId)
+        } catch (error) {
+          // Why: renderer invalidation is best-effort after the durable removal;
+          // an event delivery failure must not resurrect deleted credentials.
+          console.warn('[claude-accounts] Failed to notify cleared worktree pins:', error)
+        }
+      }
       return this.getSnapshot()
     } catch (error) {
       if (credentialRemovalStarted) {

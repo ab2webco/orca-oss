@@ -484,7 +484,7 @@ describe('ClaudeAccountService credential capture', () => {
       activeClaudeManagedAccountId: 'account-1'
     }
     const worktreeMeta: Record<string, { claudeAccountId: string | null }> = {
-      'wt-1': { claudeAccountId: 'account-1' }
+      'repo-1::wt-1': { claudeAccountId: 'account-1' }
     }
     const store = {
       getSettings: vi.fn(() => settings),
@@ -510,7 +510,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const runtimeAuth = {
       syncForCurrentSelection: vi.fn(async () => {
-        worktreeMeta['wt-created-during-sync'] = { claudeAccountId: 'account-1' }
+        worktreeMeta['repo-1::wt-created-during-sync'] = { claudeAccountId: 'account-1' }
       }),
       forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {})
     }
@@ -519,10 +519,12 @@ describe('ClaudeAccountService credential capture', () => {
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
     const { ClaudeAccountService } = await import('./service')
+    const onWorktreeAccountPinsChanged = vi.fn()
     const service = new ClaudeAccountService(
       store as never,
       rateLimits as never,
-      runtimeAuth as never
+      runtimeAuth as never,
+      onWorktreeAccountPinsChanged
     )
 
     await service.removeAccount('account-1')
@@ -535,8 +537,10 @@ describe('ClaudeAccountService credential capture', () => {
       claudeManagedAccounts: [],
       activeClaudeManagedAccountId: null
     })
-    expect(worktreeMeta['wt-1'].claudeAccountId).toBeNull()
-    expect(worktreeMeta['wt-created-during-sync'].claudeAccountId).toBeNull()
+    expect(worktreeMeta['repo-1::wt-1'].claudeAccountId).toBeNull()
+    expect(worktreeMeta['repo-1::wt-created-during-sync'].claudeAccountId).toBeNull()
+    expect(onWorktreeAccountPinsChanged).toHaveBeenCalledTimes(1)
+    expect(onWorktreeAccountPinsChanged).toHaveBeenCalledWith('repo-1')
     expect(deleteActiveClaudeKeychainCredentialsStrict).toHaveBeenCalledWith(
       expect.stringContaining(join('claude-accounts', 'account-1', 'auth'))
     )
@@ -602,10 +606,12 @@ describe('ClaudeAccountService credential capture', () => {
       })
     }
     const { ClaudeAccountService } = await import('./service')
+    const onWorktreeAccountPinsChanged = vi.fn()
     const service = new ClaudeAccountService(
       store as never,
       rateLimits as never,
-      runtimeAuth as never
+      runtimeAuth as never,
+      onWorktreeAccountPinsChanged
     )
 
     await expect(service.removeAccount('account-1')).rejects.toThrow('refresh failed')
@@ -616,6 +622,7 @@ describe('ClaudeAccountService credential capture', () => {
     expect(worktreeMeta['wt-1'].claudeAccountId).toBe('account-1')
     expect(readFileSync(join(managedAuthPath, '.credentials.json'), 'utf-8')).toBe('{"old":true}\n')
     expect(runtimeAuth.forceMaterializeCurrentSelectionForRollback).toHaveBeenCalled()
+    expect(onWorktreeAccountPinsChanged).not.toHaveBeenCalled()
   })
 
   it('does not delete managed files when scoped Keychain cleanup fails', async () => {

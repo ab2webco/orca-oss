@@ -127,6 +127,7 @@ import {
 import { codexHookService } from './codex/hook-service'
 import { getDefaultWslDistro } from './wsl'
 import { ClaudeAccountService } from './claude-accounts/service'
+import { notifyWorktreesChanged } from './ipc/worktree-remote'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import {
   attachClaudeLivePtyPersistence,
@@ -1681,7 +1682,6 @@ app.whenReady().then(async () => {
   codexRuntimeHome = new CodexRuntimeHomeService(store)
   codexAccounts = new CodexAccountService(store, rateLimits, codexRuntimeHome)
   claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
-  claudeAccounts = new ClaudeAccountService(store, rateLimits, claudeRuntimeAuth)
   rateLimits.setCodexHomePathResolver((target) =>
     codexRuntimeHome!.prepareForRateLimitFetch(target)
   )
@@ -1782,6 +1782,12 @@ app.whenReady().then(async () => {
       isAgentStatusHooksEnabled(store?.getSettings()) ? agentHookServer.buildPtyEnv() : {}
   })
   runtime = runtimeService
+  claudeAccounts = new ClaudeAccountService(store, rateLimits, claudeRuntimeAuth, (repoId) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      notifyWorktreesChanged(mainWindow, repoId)
+    }
+    runtimeService.notifyWorktreesChangedForRemoteClients(repoId)
+  })
   automations = new AutomationService(store, {
     claudeUsage,
     codexUsage,

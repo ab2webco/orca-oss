@@ -25,8 +25,10 @@ export function canOfferClaudeAccountPinForRepoTarget(args: {
   repo: ClaudeAccountTargetRepo | null | undefined
   isFolderWorkspaceTarget: boolean
   selectedRepoIsRemote: boolean
+  isPairedWebClient: boolean
 }): boolean {
   return (
+    !args.isPairedWebClient &&
     !args.isFolderWorkspaceTarget &&
     !args.selectedRepoIsRemote &&
     isLocalClaudeAccountRepoTarget(args.repo)
