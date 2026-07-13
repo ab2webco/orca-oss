@@ -4053,17 +4053,32 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         : Promise.resolve(),
       ...Array.from(remoteUpdatesByEnvironment, async ([environmentId, entries]) => {
         try {
-          await callRuntimeRpc(
-            { kind: 'environment', environmentId },
-            'worktree.setBatch',
-            {
-              updates: entries.map(({ worktreeId, updates }) => ({
-                worktree: toRuntimeWorktreeSelector(worktreeId),
-                ...encodePushTargetClearForRuntimeRpc(updates)
-              }))
-            },
-            { timeoutMs: 15_000 }
-          )
+          const target = { kind: 'environment' as const, environmentId }
+          const runtimeUpdates = entries.map(({ worktreeId, updates }) => ({
+            worktree: toRuntimeWorktreeSelector(worktreeId),
+            ...encodePushTargetClearForRuntimeRpc(updates)
+          }))
+          try {
+            await callRuntimeRpc(
+              target,
+              'worktree.setBatch',
+              { updates: runtimeUpdates },
+              {
+                timeoutMs: 15_000
+              }
+            )
+          } catch (error) {
+            if (!isRuntimeMethodNotFoundError(error)) {
+              throw error
+            }
+            // Why: compatible older SSH/runtime hosts predate setBatch; preserve
+            // their established per-row worktree.set behavior during upgrades.
+            await Promise.all(
+              runtimeUpdates.map((runtimeUpdate) =>
+                callRuntimeRpc(target, 'worktree.set', runtimeUpdate, { timeoutMs: 15_000 })
+              )
+            )
+          }
         } catch (err) {
           if (isRuntimeSelectorNotFoundError(err)) {
             for (const repoId of new Set(

@@ -16388,9 +16388,11 @@ export class OrcaRuntimeService {
       worktreeSelector,
       updates
     )
+    let nextLineage: WorktreeLineage | null | undefined
+    let nextWorkspaceLineage: WorkspaceLineage | null | undefined
     if (lineage?.noParent === true) {
-      this.store.removeWorktreeLineage?.(worktree.id)
-      this.store.removeWorkspaceLineage?.(worktreeWorkspaceKey(worktree.id))
+      nextLineage = null
+      nextWorkspaceLineage = null
     } else if (lineage?.parentWorktree) {
       const parent = await this.resolveWorktreeSelector(lineage.parentWorktree)
 
@@ -16408,7 +16410,7 @@ export class OrcaRuntimeService {
         )
       }
       const createdAt = Date.now()
-      this.store.setWorktreeLineage(worktree.id, {
+      nextLineage = {
         worktreeId: worktree.id,
         worktreeInstanceId: worktree.instanceId,
         parentWorktreeId: parent.id,
@@ -16416,8 +16418,8 @@ export class OrcaRuntimeService {
         origin: 'manual',
         capture: { source: 'manual-action', confidence: 'explicit' },
         createdAt
-      })
-      this.store.setWorkspaceLineage?.({
+      }
+      nextWorkspaceLineage = {
         childWorkspaceKey: worktreeWorkspaceKey(worktree.id),
         childInstanceId: worktree.instanceId,
         parentWorkspaceKey: worktreeWorkspaceKey(parent.id),
@@ -16425,11 +16427,21 @@ export class OrcaRuntimeService {
         origin: 'manual',
         capture: { source: 'manual-action', confidence: 'explicit' },
         createdAt
-      })
+      }
     }
     // Why: lineage resolution can outlive account removal; revalidate after
-    // every await and immediately before the synchronous metadata write.
+    // every await and before any synchronous lineage or metadata write.
     this.assertCurrentManagedClaudeAccountPins([persistedMetaUpdates])
+    if (nextLineage === null) {
+      this.store.removeWorktreeLineage?.(worktree.id)
+    } else if (nextLineage) {
+      this.store.setWorktreeLineage?.(worktree.id, nextLineage)
+    }
+    if (nextWorkspaceLineage === null) {
+      this.store.removeWorkspaceLineage?.(worktreeWorkspaceKey(worktree.id))
+    } else if (nextWorkspaceLineage) {
+      this.store.setWorkspaceLineage?.(nextWorkspaceLineage)
+    }
     this.store.setWorktreeMeta(worktree.id, stripOrcaProvenanceMetaUpdates(persistedMetaUpdates))
     // Why: unlike renderer-initiated optimistic updates, CLI callers need an
     // explicit push so the editor refreshes metadata changed outside the UI.

@@ -19,7 +19,10 @@ import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
-import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import {
+  clearRuntimeCompatibilityCacheForTests,
+  RuntimeRpcCallError
+} from '../../runtime/runtime-rpc-client'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import {
   beginHugeRepoWarningProbe,
@@ -5488,6 +5491,54 @@ describe('worktree remote runtime mutations', () => {
       },
       timeoutMs: 15_000
     })
+  })
+
+  it('falls back to per-row metadata updates for an older runtime host', async () => {
+    const store = createTestStore()
+    const first = makeWorktree({
+      id: 'repo1::/remote/wt-1',
+      repoId: 'repo1',
+      hostId: 'runtime:env-1'
+    })
+    const second = makeWorktree({
+      id: 'repo1::/remote/wt-2',
+      repoId: 'repo1',
+      hostId: 'runtime:env-1'
+    })
+    runtimeEnvironmentCall.mockImplementation(({ method }) => {
+      if (method === 'worktree.setBatch') {
+        throw new RuntimeRpcCallError({
+          id: 'batch-failure',
+          ok: false,
+          error: { code: 'method_not_found', message: 'Unknown method' },
+          _meta: { runtimeId: 'runtime-1' }
+        })
+      }
+      return Promise.resolve({
+        id: `result-${method}`,
+        ok: true,
+        result: { worktree: {} },
+        _meta: { runtimeId: 'runtime-1' }
+      })
+    })
+    store.setState({ worktreesByRepo: { repo1: [first, second] } } as Partial<AppState>)
+
+    await store.getState().updateWorktreesMeta(
+      new Map([
+        [first.id, { claudeAccountId: null }],
+        [second.id, { claudeAccountId: 'account-a' }]
+      ])
+    )
+
+    expect(runtimeEnvironmentCall.mock.calls.map(([request]) => request.method)).toEqual([
+      'worktree.setBatch',
+      'worktree.set',
+      'worktree.set'
+    ])
+    expect(runtimeEnvironmentCall.mock.calls.slice(1).map(([request]) => request.params)).toEqual([
+      { worktree: `id:${first.id}`, claudeAccountId: null },
+      { worktree: `id:${second.id}`, claudeAccountId: 'account-a' }
+    ])
   })
 
   it('refreshes each repo once when a runtime metadata batch fails', async () => {

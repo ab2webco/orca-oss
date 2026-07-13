@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ClaudeManagedAccountSummary } from '../../../shared/types'
 import {
+  canOfferClaudeAccountPinForRepoTarget,
   filterClaudeAccountsByRuntime,
   filterClaudeAccountsByWorktreeRuntimes,
   isLocalClaudeAccountRepoTarget,
@@ -64,6 +65,30 @@ describe('Claude account binding target ownership', () => {
   it('uses repo execution-host ownership instead of global runtime focus', () => {
     expect(isLocalClaudeAccountRepoTarget(localRepo)).toBe(true)
     expect(isLocalClaudeAccountRepoTarget(runtimeRepo)).toBe(false)
+  })
+
+  it('loads account discovery only for local repo targets that can show the picker', () => {
+    expect(
+      canOfferClaudeAccountPinForRepoTarget({
+        repo: localRepo,
+        isFolderWorkspaceTarget: false,
+        selectedRepoIsRemote: false
+      })
+    ).toBe(true)
+    expect(
+      canOfferClaudeAccountPinForRepoTarget({
+        repo: runtimeRepo,
+        isFolderWorkspaceTarget: false,
+        selectedRepoIsRemote: false
+      })
+    ).toBe(false)
+    expect(
+      canOfferClaudeAccountPinForRepoTarget({
+        repo: localRepo,
+        isFolderWorkspaceTarget: true,
+        selectedRepoIsRemote: false
+      })
+    ).toBe(false)
   })
 
   it('allows raw local worktree ids but rejects runtime-owned and folder workspaces', () => {

@@ -1446,15 +1446,27 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
       ).worktree
     },
     updateMetaBatch: async ({ updates }) => {
-      await callRuntimeResult<{ updated: number }>('worktree.setBatch', {
-        updates: updates.map(({ worktreeId, updates: worktreeUpdates }) => ({
-          worktree: toRuntimeWorktreeSelector(worktreeId),
-          ...(Object.prototype.hasOwnProperty.call(worktreeUpdates, 'pushTarget') &&
-          worktreeUpdates.pushTarget === undefined
-            ? { ...worktreeUpdates, pushTarget: null }
-            : worktreeUpdates)
-        }))
+      const runtimeUpdates = updates.map(({ worktreeId, updates: worktreeUpdates }) => ({
+        worktree: toRuntimeWorktreeSelector(worktreeId),
+        ...(Object.prototype.hasOwnProperty.call(worktreeUpdates, 'pushTarget') &&
+        worktreeUpdates.pushTarget === undefined
+          ? { ...worktreeUpdates, pushTarget: null }
+          : worktreeUpdates)
+      }))
+      const response = await callRuntimeEnvelope<{ updated: number }>('worktree.setBatch', {
+        updates: runtimeUpdates
       })
+      if (response.ok) {
+        return
+      }
+      if (response.error.code !== 'method_not_found') {
+        throw new Error(response.error.message)
+      }
+      // Why: paired clients can outpace their host during rolling upgrades;
+      // older hosts still support the pre-batch per-worktree method.
+      await Promise.all(
+        runtimeUpdates.map((runtimeUpdate) => callRuntimeResult('worktree.set', runtimeUpdate))
+      )
     },
     listLineage: async () =>
       await callRuntimeResult<{

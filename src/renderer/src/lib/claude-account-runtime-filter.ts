@@ -21,6 +21,18 @@ export function isLocalClaudeAccountRepoTarget(
   return Boolean(repo && getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID)
 }
 
+export function canOfferClaudeAccountPinForRepoTarget(args: {
+  repo: ClaudeAccountTargetRepo | null | undefined
+  isFolderWorkspaceTarget: boolean
+  selectedRepoIsRemote: boolean
+}): boolean {
+  return (
+    !args.isFolderWorkspaceTarget &&
+    !args.selectedRepoIsRemote &&
+    isLocalClaudeAccountRepoTarget(args.repo)
+  )
+}
+
 export function isLocalClaudeAccountWorktreeTarget(
   worktree: Pick<Worktree, 'id' | 'hostId'>,
   repo: ClaudeAccountTargetRepo | null | undefined

@@ -2167,6 +2167,65 @@ describe('web worktree preload API', () => {
       }
     ])
   })
+
+  it('falls back to worktree.set when the paired runtime predates setBatch', async () => {
+    const runtimeCalls: { method: string; params: unknown }[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push({ method, params })
+          if (method === 'worktree.setBatch') {
+            return Promise.resolve({
+              id: 'batch-failure',
+              ok: false,
+              error: { code: 'method_not_found', message: 'Unknown method' },
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+          return Promise.resolve({
+            id: `call-${runtimeCalls.length}`,
+            ok: true,
+            result: { worktree: {} },
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await globals.window.api.worktrees.updateMetaBatch({
+      updates: [
+        { worktreeId: 'repo-1::/workspace/one', updates: { claudeAccountId: null } },
+        { worktreeId: 'repo-1::/workspace/two', updates: { claudeAccountId: 'account-a' } }
+      ]
+    })
+
+    expect(runtimeCalls).toEqual([
+      {
+        method: 'worktree.setBatch',
+        params: {
+          updates: [
+            { worktree: 'id:repo-1::/workspace/one', claudeAccountId: null },
+            { worktree: 'id:repo-1::/workspace/two', claudeAccountId: 'account-a' }
+          ]
+        }
+      },
+      {
+        method: 'worktree.set',
+        params: { worktree: 'id:repo-1::/workspace/one', claudeAccountId: null }
+      },
+      {
+        method: 'worktree.set',
+        params: { worktree: 'id:repo-1::/workspace/two', claudeAccountId: 'account-a' }
+      }
+    ])
+  })
 })
 
 describe('web file preload API', () => {

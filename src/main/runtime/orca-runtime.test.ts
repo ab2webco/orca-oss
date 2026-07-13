@@ -23190,6 +23190,70 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('does not persist lineage when its account pin is removed during parent resolution', async () => {
+    const parentPath = '/tmp/worktree-parent'
+    const childPath = '/tmp/worktree-child'
+    const parentId = `${TEST_REPO_ID}::${parentPath}`
+    const childId = `${TEST_REPO_ID}::${childPath}`
+    const metaById: Record<string, WorktreeMeta> = {
+      [parentId]: makeWorktreeMeta({ instanceId: 'parent-instance' }),
+      [childId]: makeWorktreeMeta({ instanceId: 'child-instance' })
+    }
+    const setWorktreeLineage = vi.fn()
+    const setWorkspaceLineage = vi.fn()
+    const setWorktreeMeta = vi.fn()
+    const runtimeStore = {
+      ...store,
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta,
+      getWorktreeLineage: () => undefined,
+      setWorktreeLineage,
+      setWorkspaceLineage
+    }
+    vi.mocked(listWorktrees).mockResolvedValue([
+      {
+        path: parentPath,
+        head: 'abc',
+        branch: 'feature/parent',
+        isBare: false,
+        isMainWorktree: false
+      },
+      {
+        path: childPath,
+        head: 'def',
+        branch: 'feature/child',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    const child = await runtime['resolveWorktreeSelector'](`id:${childId}`)
+    const parent = await runtime['resolveWorktreeSelector'](`id:${parentId}`)
+    const parentResolution = deferred<typeof parent>()
+    const resolveWorktreeSelector = vi.fn((selector: string) =>
+      selector === `id:${parentId}` ? parentResolution.promise : Promise.resolve(child)
+    )
+    runtime['resolveWorktreeSelector'] = resolveWorktreeSelector
+    const listAccounts = vi
+      .fn()
+      .mockReturnValueOnce({ accounts: [{ id: 'account-a' }] })
+      .mockReturnValue({ accounts: [] })
+    runtime.setAccountServices({ claudeAccounts: { listAccounts } } as never)
+
+    const update = runtime.updateManagedWorktreeMeta(`id:${childId}`, {
+      claudeAccountId: 'account-a',
+      lineage: { parentWorktree: `id:${parentId}` }
+    })
+    await vi.waitFor(() => expect(resolveWorktreeSelector).toHaveBeenCalledTimes(2))
+    parentResolution.resolve(parent)
+
+    await expect(update).rejects.toThrow('no longer exists')
+    expect(setWorktreeLineage).not.toHaveBeenCalled()
+    expect(setWorkspaceLineage).not.toHaveBeenCalled()
+    expect(setWorktreeMeta).not.toHaveBeenCalled()
+  })
+
   it('clears workspace lineage when manually removing a parent', async () => {
     const childPath = '/tmp/worktree-child'
     const childId = `${TEST_REPO_ID}::${childPath}`

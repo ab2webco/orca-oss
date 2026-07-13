@@ -28,8 +28,8 @@ import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/folder-workspace-composer-helpers'
 import {
-  filterClaudeAccountsByRuntime,
-  isLocalClaudeAccountRepoTarget
+  canOfferClaudeAccountPinForRepoTarget,
+  filterClaudeAccountsByRuntime
 } from '@/lib/claude-account-runtime-filter'
 
 type ComposerModalData = {
@@ -186,14 +186,21 @@ function QuickTabBody({
   )
   const isFolderWorkspaceTarget = selectedProjectOption?.kind === 'project-group'
   const selectedRepo = cardProps.eligibleRepos.find((repo) => repo.id === cardProps.repoId)
-  const isLocalRepoTarget = isLocalClaudeAccountRepoTarget(selectedRepo)
+  const canOfferClaudeAccountPin = canOfferClaudeAccountPinForRepoTarget({
+    repo: selectedRepo,
+    isFolderWorkspaceTarget,
+    selectedRepoIsRemote: cardProps.selectedRepoIsRemote
+  })
 
-  // Why: managed Claude accounts are fetched once per modal open (the modal
-  // fully unmounts on close), mirroring the `claudeAccounts:list` fetch other
-  // account surfaces (e.g. StatusBar) perform on open rather than caching.
   const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
   useEffect(() => {
+    if (!canOfferClaudeAccountPin) {
+      setClaudeAccounts([])
+      return
+    }
     let cancelled = false
+    // Why: account discovery refreshes provider state, so only pay for it when
+    // the selected target can actually display and persist the account picker.
     void window.api.claudeAccounts
       .list()
       .then((result) => {
@@ -208,7 +215,7 @@ function QuickTabBody({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [canOfferClaudeAccountPin])
   const [claudeAccountId, setClaudeAccountId] = useState<string | null>(null)
   // Why: per-worktree account pinning only takes effect for local git-worktree
   // launches (pty.ts skips SSH-remote spawns, and folder workspaces route
@@ -219,7 +226,7 @@ function QuickTabBody({
   // check.
   const filteredClaudeAccounts = useMemo(
     () =>
-      isFolderWorkspaceTarget || cardProps.selectedRepoIsRemote || !isLocalRepoTarget
+      !canOfferClaudeAccountPin
         ? []
         : filterClaudeAccountsByRuntime(
             claudeAccounts,
@@ -227,12 +234,10 @@ function QuickTabBody({
             cardProps.selectedRepoClaudeAccountRuntime
           ),
     [
-      cardProps.selectedRepoIsRemote,
       cardProps.selectedRepoPath,
       cardProps.selectedRepoClaudeAccountRuntime,
       claudeAccounts,
-      isFolderWorkspaceTarget,
-      isLocalRepoTarget
+      canOfferClaudeAccountPin
     ]
   )
   if (
