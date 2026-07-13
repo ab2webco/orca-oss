@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { DaemonPtyRouter } from './daemon-pty-router'
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
 import type { PtyBackgroundStreamEvent, PtySpawnOptions, PtySpawnResult } from '../providers/types'
-import { requiredPtyReattachUnavailableMessage } from '../providers/pty-reattach-contract'
 
 type AdapterMock = DaemonPtyAdapter & {
   emitData: (id: string, data: string, sequenceChars?: number) => void
@@ -161,9 +160,6 @@ describe('DaemonPtyRouter', () => {
     const current = createAdapter('current')
     const legacy = createAdapter('legacy', ['legacy-session'])
     vi.mocked(legacy.listProcesses).mockRejectedValueOnce(new Error('transient discovery failure'))
-    vi.mocked(current.spawn).mockRejectedValue(
-      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
-    )
     const router = new DaemonPtyRouter({ current, legacy: [legacy] })
     await router.discoverLegacySessions()
 
@@ -175,16 +171,13 @@ describe('DaemonPtyRouter', () => {
         rows: 24
       })
     ).resolves.toEqual({ id: 'legacy-session' })
-    expect(current.spawn).toHaveBeenCalledOnce()
+    expect(current.spawn).not.toHaveBeenCalled()
     expect(legacy.spawn).toHaveBeenCalledOnce()
   })
 
   it('retains ambiguous ownership when an unmapped daemon cannot prove absence', async () => {
     const current = createAdapter('current')
     const legacy = createAdapter('legacy', ['legacy-session'])
-    vi.mocked(current.spawn).mockRejectedValue(
-      new Error(requiredPtyReattachUnavailableMessage('legacy-session'))
-    )
     vi.mocked(legacy.spawn).mockRejectedValue(new Error('legacy ownership is ambiguous'))
     const router = new DaemonPtyRouter({ current, legacy: [legacy] })
 
@@ -201,11 +194,6 @@ describe('DaemonPtyRouter', () => {
   it('reports unavailable only after every daemon proves the session absent', async () => {
     const current = createAdapter('current')
     const legacy = createAdapter('legacy')
-    for (const adapter of [current, legacy]) {
-      vi.mocked(adapter.spawn).mockRejectedValue(
-        new Error(requiredPtyReattachUnavailableMessage('missing-session'))
-      )
-    }
     const router = new DaemonPtyRouter({ current, legacy: [legacy] })
 
     await expect(
@@ -216,8 +204,49 @@ describe('DaemonPtyRouter', () => {
         rows: 24
       })
     ).rejects.toThrow('PTY_REQUIRED_REATTACH_UNAVAILABLE')
-    expect(current.spawn).toHaveBeenCalledOnce()
-    expect(legacy.spawn).toHaveBeenCalledOnce()
+    expect(current.spawn).not.toHaveBeenCalled()
+    expect(legacy.spawn).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])(
+    'fails closed for %s mapped duplicate live owners',
+    async (discoverFirst) => {
+      const current = createAdapter('current', ['duplicate-session'])
+      const legacy = createAdapter('legacy', ['duplicate-session'])
+      const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+      if (discoverFirst) {
+        await router.discoverLegacySessions()
+      }
+
+      await expect(
+        router.spawn({
+          sessionId: 'duplicate-session',
+          requireReattach: true,
+          cols: 80,
+          rows: 24
+        })
+      ).rejects.toThrow('PTY_REQUIRED_REATTACH_OWNER_AMBIGUOUS')
+      expect(current.spawn).not.toHaveBeenCalled()
+      expect(legacy.spawn).not.toHaveBeenCalled()
+    }
+  )
+
+  it('retains ownership when a provider inventory fails transiently', async () => {
+    const current = createAdapter('current')
+    const legacy = createAdapter('legacy', ['legacy-session'])
+    vi.mocked(current.listProcesses).mockRejectedValue(new Error('transient inventory failure'))
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+
+    await expect(
+      router.spawn({
+        sessionId: 'legacy-session',
+        requireReattach: true,
+        cols: 80,
+        rows: 24
+      })
+    ).rejects.toThrow('transient inventory failure')
+    expect(current.spawn).not.toHaveBeenCalled()
+    expect(legacy.spawn).not.toHaveBeenCalled()
   })
 
   it('routes background hints and authoritative snapshots to the session owner', async () => {
