@@ -533,9 +533,10 @@ test.describe('Terminal Shortcuts', () => {
     await expect.poll(() => getKittyKeyboardFlags(orcaPage)).toBe(1)
     await pressAndExpectWrite(orcaPage, electronApp, 'Shift+Enter', '\x1b[13;2u')
 
-    // The shell is only standing in for a KKP-aware TUI and does not consume
-    // the CSI-u input above, so cancel that synthetic line before its reset.
-    await execInTerminal(orcaPage, ptyId, "\x03printf '\\033[<u'")
+    // The shell is only standing in for a KKP-aware TUI and does not consume the
+    // CSI-u input above. Send an idempotent "set flags to 0" reset rather than a
+    // stack pop so it doesn't race the shell line editor still holding that input.
+    await execInTerminal(orcaPage, ptyId, "\x03printf '\\033[=0u'")
     await expect.poll(() => getKittyKeyboardFlags(orcaPage)).toBe(0)
     await pressAndExpectWrite(orcaPage, electronApp, 'Shift+Enter', '\x1b\r')
   })
