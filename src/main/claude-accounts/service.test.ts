@@ -714,6 +714,83 @@ describe('ClaudeAccountService credential capture', () => {
     releaseInjectedClaudeAccountLaunch(reservationId)
   })
 
+  it('excludes pinned launches for the outgoing account throughout selection sync', async () => {
+    let settings = {
+      claudeManagedAccounts: [
+        {
+          id: 'account-1',
+          email: 'one@example.com',
+          managedAuthPath: '/tmp/account-1/auth',
+          managedAuthRuntime: 'host' as const,
+          wslDistro: null,
+          wslLinuxAuthPath: null,
+          authMethod: 'subscription-oauth' as const,
+          organizationUuid: null,
+          organizationName: null,
+          createdAt: 1,
+          updatedAt: 1,
+          lastAuthenticatedAt: 1
+        },
+        {
+          id: 'account-2',
+          email: 'two@example.com',
+          managedAuthPath: '/tmp/account-2/auth',
+          managedAuthRuntime: 'host' as const,
+          wslDistro: null,
+          wslLinuxAuthPath: null,
+          authMethod: 'subscription-oauth' as const,
+          organizationUuid: null,
+          organizationName: null,
+          createdAt: 2,
+          updatedAt: 2,
+          lastAuthenticatedAt: 2
+        }
+      ],
+      activeClaudeManagedAccountId: 'account-1',
+      activeClaudeManagedAccountIdsByRuntime: { host: 'account-1', wsl: {} }
+    }
+    const store = {
+      getSettings: vi.fn(() => settings),
+      updateSettings: vi.fn((updates: Partial<typeof settings>) => {
+        settings = { ...settings, ...updates }
+        return settings
+      })
+    }
+    let noteSyncStarted!: () => void
+    const syncStarted = new Promise<void>((resolve) => {
+      noteSyncStarted = resolve
+    })
+    let finishSync!: () => void
+    const syncPending = new Promise<void>((resolve) => {
+      finishSync = resolve
+    })
+    const runtimeAuth = {
+      syncForCurrentSelection: vi.fn(() => {
+        noteSyncStarted()
+        return syncPending
+      }),
+      forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {})
+    }
+    const rateLimits = {
+      refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
+    }
+    const { ClaudeAccountService } = await import('./service')
+    const { reserveInjectedClaudeAccountLaunch } = await import('./live-pty-gate')
+    const service = new ClaudeAccountService(
+      store as never,
+      rateLimits as never,
+      runtimeAuth as never
+    )
+
+    const selection = service.selectAccount('account-2')
+    await syncStarted
+
+    expect(() => reserveInjectedClaudeAccountLaunch('account-1')).toThrow('being changed')
+
+    finishSync()
+    await selection
+  })
+
   it('surfaces the concrete distro for a legacy default-WSL account summary', async () => {
     const { ClaudeAccountService } = await import('./service')
     const service = new ClaudeAccountService({} as never, {} as never, {} as never)

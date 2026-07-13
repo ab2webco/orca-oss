@@ -175,6 +175,7 @@ type FreshLocalFallbackProvider = IPtyProvider & {
 }
 const sshProviders = new Map<string, IPtyProvider>()
 const SYNTHETIC_KILL_EXIT_DUPLICATE_WINDOW_MS = 30_000
+const CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS = 250
 // Why: producer flow control changes terminal physics — a flooding shell now
 // blocks on write instead of buffering in main. Kill switch: flip this one
 // line to disable pause/resume entirely without untangling the wiring.
@@ -2613,7 +2614,11 @@ export function registerPtyHandlers(
   // drift between the two entry points.
   const pendingClaudeProviderExits = new Map<
     string,
-    { payload: { id: string; code: number }; ownershipEpoch: number }
+    {
+      payload: { id: string; code: number }
+      ownershipEpoch: number
+      liveSettleRetryCount: number
+    }
   >()
   let verifyPendingClaudeProviderExits: (() => void) | null = null
   let providerListenerGeneration = 0
@@ -2794,6 +2799,7 @@ export function registerPtyHandlers(
       }
       claudeExitVerificationInFlight = true
       const exitsAtStart = new Map(pendingClaudeProviderExits)
+      let shouldRetryLiveExits = false
       try {
         let livePtyIds: Set<string> | null = null
         for (let attempt = 0; attempt < 3 && livePtyIds === null; attempt += 1) {
@@ -2833,16 +2839,25 @@ export function registerPtyHandlers(
             pendingClaudeProviderExits.delete(ptyId)
             finishProviderExit(pendingExit.payload)
           } else if (hasSurvivingOwner === true && pendingExit.payload.code !== -1) {
-            pendingClaudeProviderExits.delete(ptyId)
+            if (pendingExit.liveSettleRetryCount === 0) {
+              pendingExit.liveSettleRetryCount += 1
+              shouldRetryLiveExits = true
+            } else {
+              pendingClaudeProviderExits.delete(ptyId)
+            }
           }
         }
         // Why: restart exits happen before provider teardown. Keep them (and
         // unverifiable exits) pending for the replacement provider to prove.
       } finally {
         claudeExitVerificationInFlight = false
+        if (shouldRetryLiveExits && bindingGeneration === providerListenerGeneration) {
+          await delay(CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS)
+        }
         if (bindingGeneration !== providerListenerGeneration) {
           verifyPendingClaudeProviderExits?.()
         } else if (
+          shouldRetryLiveExits ||
           [...pendingClaudeProviderExits].some(
             ([ptyId, pendingExit]) => exitsAtStart.get(ptyId) !== pendingExit
           )
@@ -2858,7 +2873,11 @@ export function registerPtyHandlers(
       if (!isLocalProvider && hasClaudeCredentialOwner) {
         const ownershipEpoch = getLiveClaudePtyOwnershipEpoch(payload.id)
         if (ownershipEpoch !== null) {
-          pendingClaudeProviderExits.set(payload.id, { payload, ownershipEpoch })
+          pendingClaudeProviderExits.set(payload.id, {
+            payload,
+            ownershipEpoch,
+            liveSettleRetryCount: 0
+          })
           void verifyClaudeProviderExits()
         }
         return

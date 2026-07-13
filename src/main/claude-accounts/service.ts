@@ -415,21 +415,32 @@ export class ClaudeAccountService {
     const previousSettings = this.store.getSettings()
     const selection = normalizeClaudeRuntimeSelection(previousSettings)
     const outgoingAccountId = getSelectedClaudeAccountIdForTarget(previousSettings, effectiveTarget)
-    const nextSelection = setSelectedClaudeAccountIdForTarget(selection, accountId, effectiveTarget)
-    this.store.updateSettings({
-      activeClaudeManagedAccountId:
-        effectiveTarget?.runtime === 'wsl' ? nextSelection.host : accountId,
-      activeClaudeManagedAccountIdsByRuntime: nextSelection
-    })
-    try {
-      await this.syncRuntimeAuthWithLivePtyGate(effectiveTarget)
-      await this.rateLimits.refreshForClaudeAccountChange(outgoingAccountId, effectiveTarget)
-      return this.getSnapshot()
-    } catch (error) {
-      this.restoreClaudeSettings(previousSettings)
-      await this.runtimeAuth.forceMaterializeCurrentSelectionForRollback()
-      throw error
+    const applySelection = async (): Promise<ClaudeRateLimitAccountsState> => {
+      const nextSelection = setSelectedClaudeAccountIdForTarget(
+        selection,
+        accountId,
+        effectiveTarget
+      )
+      this.store.updateSettings({
+        activeClaudeManagedAccountId:
+          effectiveTarget?.runtime === 'wsl' ? nextSelection.host : accountId,
+        activeClaudeManagedAccountIdsByRuntime: nextSelection
+      })
+      try {
+        await this.syncRuntimeAuthWithLivePtyGate(effectiveTarget)
+        await this.rateLimits.refreshForClaudeAccountChange(outgoingAccountId, effectiveTarget)
+        return this.getSnapshot()
+      } catch (error) {
+        this.restoreClaudeSettings(previousSettings)
+        await this.runtimeAuth.forceMaterializeCurrentSelectionForRollback()
+        throw error
+      }
     }
+    // Why: runtime sync can read back and rewrite the account being switched
+    // away from, so pinned launches must exclude that account for the full switch.
+    return outgoingAccountId
+      ? runManagedClaudeAccountMutation(outgoingAccountId, applySelection, true)
+      : applySelection()
   }
 
   private getSnapshot(): ClaudeRateLimitAccountsState {

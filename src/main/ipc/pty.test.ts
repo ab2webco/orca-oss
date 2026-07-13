@@ -1331,7 +1331,7 @@ describe('registerPtyHandlers', () => {
         await vi.waitFor(() => expect(provider.listProcesses).toHaveBeenCalledOnce())
         livePtyGate.markInjectedClaudePtySpawned('renewed-claude-session', 'account-a')
         resolveOldInventory([])
-        await Promise.resolve()
+        await new Promise((resolve) => setTimeout(resolve, 25))
 
         expect(runtime.onPtyExit).not.toHaveBeenCalled()
         expect(livePtyGate.getLiveInjectedClaudePtyAccountId('renewed-claude-session')).toBe(
@@ -1376,6 +1376,37 @@ describe('registerPtyHandlers', () => {
         for (const sessionId of sessionIds) {
           livePtyGate.markClaudePtyExited(sessionId)
         }
+      }
+    })
+
+    it('rechecks an ordinary exit after the provider inventory settles late', async () => {
+      const provider = installObservableDaemonTestProvider()
+      const liveInventory = [
+        { id: 'late-settling-claude-session', cwd: '', title: 'exiting owner' }
+      ]
+      provider.listProcesses
+        .mockResolvedValueOnce(liveInventory)
+        .mockResolvedValueOnce(liveInventory)
+        .mockResolvedValue([])
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      livePtyGate.markInjectedClaudePtySpawned('late-settling-claude-session', 'account-a')
+
+      try {
+        provider.emitExit('late-settling-claude-session', 0)
+
+        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
+        expect(provider.listProcesses).toHaveBeenCalledTimes(3)
+        expect(
+          livePtyGate.getLiveInjectedClaudePtyAccountId('late-settling-claude-session')
+        ).toBeNull()
+      } finally {
+        livePtyGate.markClaudePtyExited('late-settling-claude-session')
       }
     })
 

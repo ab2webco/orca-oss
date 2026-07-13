@@ -102,7 +102,6 @@ export function markClaudePtySpawned(
     throw new Error('The shared Claude account launch reservation is no longer valid.')
   }
   const wasLive = liveClaudePtyIds.has(ptyId)
-  const wasSeededUnconfirmed = seededUnconfirmedPtyIds.has(ptyId)
   const hadExistingAccount = liveSharedClaudePtyAccounts.has(ptyId)
   const existingAccountId = liveSharedClaudePtyAccounts.get(ptyId) ?? null
   const existingOwnershipEpoch = ownershipEpoch.getLiveClaudePtyOwnershipEpoch(ptyId)
@@ -110,19 +109,16 @@ export function markClaudePtySpawned(
   try {
     liveClaudePtyIds.add(ptyId)
     liveSharedClaudePtyAccounts.set(ptyId, bindingAccountId)
-    seededUnconfirmedPtyIds.delete(ptyId)
     try {
       if (!options?.persistenceAlreadyRecorded) {
         persistence?.addClaudeLivePtySessionId(ptyId, bindingAccountId)
       }
+      seededUnconfirmedPtyIds.delete(ptyId)
       ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
     } catch (error) {
       liveClaudePtyIds.delete(ptyId)
       if (wasLive) {
         liveClaudePtyIds.add(ptyId)
-      }
-      if (wasSeededUnconfirmed) {
-        seededUnconfirmedPtyIds.add(ptyId)
       }
       if (hadExistingAccount) {
         liveSharedClaudePtyAccounts.set(ptyId, existingAccountId)
@@ -156,11 +152,11 @@ export function markInjectedClaudePtySpawned(
   }
   try {
     liveInjectedClaudePtyAccounts.set(ptyId, accountId)
-    seededUnconfirmedInjectedPtyIds.delete(ptyId)
     try {
       if (!options?.persistenceAlreadyRecorded) {
         persistence?.addClaudeLivePtyAccountBinding?.(ptyId, accountId)
       }
+      seededUnconfirmedInjectedPtyIds.delete(ptyId)
       ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
     } catch (error) {
       if (existingAccountId) {
@@ -262,10 +258,13 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
   return reservationId
 }
 
-export function beginManagedClaudeAccountMutation(accountId: string): void {
+export function beginManagedClaudeAccountMutation(
+  accountId: string,
+  allowLiveSharedPtys = false
+): void {
   if (
     hasLiveInjectedClaudePtysForAccount(accountId) ||
-    hasLiveSharedClaudePtysForAccount(accountId) ||
+    (!allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId)) ||
     [...sharedClaudeLaunchReservations.values()].some(
       (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId
     )
@@ -286,13 +285,14 @@ export function endManagedClaudeAccountMutation(accountId: string): void {
 
 export async function runManagedClaudeAccountMutation<T>(
   accountId: string,
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
+  allowLiveSharedPtys = false
 ): Promise<T> {
   const inherited = managedClaudeAccountMutationContext.getStore()
   if (inherited?.has(accountId)) {
     return operation()
   }
-  beginManagedClaudeAccountMutation(accountId)
+  beginManagedClaudeAccountMutation(accountId, allowLiveSharedPtys)
   try {
     return await managedClaudeAccountMutationContext.run(
       new Set([...(inherited ?? []), accountId]),
