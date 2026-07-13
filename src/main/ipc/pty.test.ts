@@ -599,6 +599,7 @@ describe('registerPtyHandlers', () => {
       | ((payload: { id: string; kind: 'dataGap'; droppedChars: number }) => void)
       | null = null
     const getBufferSnapshot = vi.fn()
+    const listProcesses = vi.fn(async () => [] as { id: string; cwd: string; title: string }[])
     setLocalPtyProvider({
       spawn,
       write,
@@ -633,7 +634,7 @@ describe('registerPtyHandlers', () => {
         exitHandler = handler
         return () => {}
       }),
-      listProcesses: vi.fn(async () => []),
+      listProcesses,
       attach: vi.fn(),
       getDefaultShell: vi.fn(),
       getProfiles: vi.fn()
@@ -644,6 +645,7 @@ describe('registerPtyHandlers', () => {
       pauseProducer,
       resumeProducer,
       getBufferSnapshot,
+      listProcesses,
       emitData: (id: string, data: string) => dataHandler?.({ id, data }),
       emitExit: (id: string, code = 0) => exitHandler?.({ id, code }),
       emitDataGap: (id: string, droppedChars: number) =>
@@ -1221,6 +1223,55 @@ describe('registerPtyHandlers', () => {
         livePtyGate.markClaudePtyExited('stale-shared-session')
       }
     })
+
+    it.each(['shared', 'injected'] as const)(
+      'retains %s account ownership until every duplicate provider owner exits',
+      async (ownershipMode) => {
+        const provider = installObservableDaemonTestProvider()
+        const runtime = {
+          setPtyController: vi.fn(),
+          onPtyExit: vi.fn(),
+          onPtyData: vi.fn()
+        }
+        handlers.clear()
+        registerPtyHandlers(mainWindow as never, runtime as never)
+        if (ownershipMode === 'shared') {
+          markClaudePtySpawned('duplicate-claude-session', 'account-a')
+        } else {
+          livePtyGate.markInjectedClaudePtySpawned('duplicate-claude-session', 'account-a')
+        }
+        provider.listProcesses.mockResolvedValue([
+          { id: 'duplicate-claude-session', cwd: '', title: 'surviving owner' }
+        ])
+        if (ownershipMode === 'shared') {
+          provider.listProcesses.mockRejectedValueOnce(new Error('transient inventory failure'))
+        }
+
+        try {
+          provider.emitExit('duplicate-claude-session', 0)
+          await new Promise((resolve) => setTimeout(resolve, ownershipMode === 'shared' ? 175 : 75))
+
+          expect(runtime.onPtyExit).not.toHaveBeenCalled()
+          expect(
+            ownershipMode === 'shared'
+              ? livePtyGate.isLiveSharedClaudePty('duplicate-claude-session')
+              : livePtyGate.getLiveInjectedClaudePtyAccountId('duplicate-claude-session') !== null
+          ).toBe(true)
+
+          provider.listProcesses.mockResolvedValue([])
+          provider.emitExit('duplicate-claude-session', 0)
+          await new Promise((resolve) => setTimeout(resolve, 25))
+
+          expect(runtime.onPtyExit).toHaveBeenCalledOnce()
+          expect(livePtyGate.isLiveSharedClaudePty('duplicate-claude-session')).toBe(false)
+          expect(
+            livePtyGate.getLiveInjectedClaudePtyAccountId('duplicate-claude-session')
+          ).toBeNull()
+        } finally {
+          livePtyGate.markClaudePtyExited('duplicate-claude-session')
+        }
+      }
+    )
 
     it('still blocks a non-injected (global-selection) Claude launch while a global account switch is in progress', async () => {
       const prepareClaudeAuth = vi.fn(async () => ({

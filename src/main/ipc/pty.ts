@@ -2614,6 +2614,7 @@ export function registerPtyHandlers(
     localDataUnsub?.()
     localExitUnsub?.()
     localBackgroundStreamUnsub?.()
+    const boundProvider = localProvider
 
     // Keep-tail thinning facts from the daemon, in byte order with onData.
     // The marker flips scan authority for the four transient-fact scanners;
@@ -2621,7 +2622,7 @@ export function registerPtyHandlers(
     // restore from the model snapshot (same seq-guard path as hidden drops)
     // in case any view — eager buffer included — was receiving bytes.
     localBackgroundStreamUnsub =
-      localProvider.onBackgroundStreamEvent?.((payload) => {
+      boundProvider.onBackgroundStreamEvent?.((payload) => {
         if (payload.kind === 'backgroundMarker') {
           runtime?.setPtyTransientFactDelegation(
             payload.id,
@@ -2649,9 +2650,9 @@ export function registerPtyHandlers(
     // empty and agent-detection from raw data never fires. Runtime tails also
     // power mobile read/stream, so they must be notified regardless of window
     // state.
-    const isLocalProvider = localProvider instanceof LocalPtyProvider
+    const isLocalProvider = boundProvider instanceof LocalPtyProvider
 
-    localDataUnsub = localProvider.onData((payload) => {
+    localDataUnsub = boundProvider.onData((payload) => {
       const outputSeq = isLocalProvider
         ? runtime?.getPtyOutputSequence(payload.id)
         : runtime?.onPtyData(
@@ -2765,7 +2766,9 @@ export function registerPtyHandlers(
         schedulePendingDataFlush(PTY_BATCH_INTERVAL_MS)
       }
     })
-    localExitUnsub = localProvider.onExit((payload) => {
+    const pendingClaudeProviderExits = new Map<string, { id: string; code: number }>()
+    const claudeExitVerifications = new Set<string>()
+    const finishProviderExit = (payload: { id: string; code: number }): void => {
       if (consumeSyntheticKillExit(payload.id)) {
         return
       }
@@ -2776,6 +2779,64 @@ export function registerPtyHandlers(
         runtime?.onPtyExit(payload.id, payload.code)
       }
       sendPtyExitToRenderer(payload)
+    }
+    const verifyClaudeProviderExit = async (ptyId: string): Promise<void> => {
+      if (claudeExitVerifications.has(ptyId)) {
+        return
+      }
+      claudeExitVerifications.add(ptyId)
+      try {
+        do {
+          const payload = pendingClaudeProviderExits.get(ptyId)
+          pendingClaudeProviderExits.delete(ptyId)
+          if (!payload) {
+            return
+          }
+          let hasSurvivingOwner: boolean | null = null
+          for (let attempt = 0; attempt < 3 && hasSurvivingOwner === null; attempt += 1) {
+            try {
+              hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+            } catch (error) {
+              console.warn('[pty] Failed to verify Claude PTY exit ownership', error)
+              if (attempt < 2) {
+                await delay(100)
+              }
+            }
+          }
+          if (hasSurvivingOwner === true) {
+            // Why: some providers publish exit before their inventory drops the
+            // session; confirm once after settling before treating it as a duplicate.
+            await delay(50)
+            try {
+              hasSurvivingOwner = await isProviderPtyLive(boundProvider, ptyId)
+            } catch (error) {
+              console.warn('[pty] Failed to confirm surviving Claude PTY owner', error)
+              hasSurvivingOwner = null
+            }
+          }
+          if (hasSurvivingOwner === false) {
+            finishProviderExit(payload)
+            return
+          }
+          // Why: live or unverifiable duplicate ownership must retain the
+          // credential guard; a later physical-owner exit will retry proof.
+        } while (pendingClaudeProviderExits.has(ptyId))
+      } finally {
+        claudeExitVerifications.delete(ptyId)
+        if (pendingClaudeProviderExits.has(ptyId)) {
+          void verifyClaudeProviderExit(ptyId)
+        }
+      }
+    }
+    localExitUnsub = boundProvider.onExit((payload) => {
+      const hasClaudeCredentialOwner =
+        isLiveSharedClaudePty(payload.id) || getLiveInjectedClaudePtyAccountId(payload.id) !== null
+      if (!isLocalProvider && hasClaudeCredentialOwner) {
+        pendingClaudeProviderExits.set(payload.id, payload)
+        void verifyClaudeProviderExit(payload.id)
+        return
+      }
+      finishProviderExit(payload)
     })
   }
 
