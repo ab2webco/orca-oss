@@ -1260,6 +1260,7 @@ describe('registerPtyHandlers', () => {
 
           provider.listProcesses.mockResolvedValue([])
           provider.emitExit('duplicate-claude-session', 0)
+          provider.emitExit('duplicate-claude-session', 0)
           await new Promise((resolve) => setTimeout(resolve, 25))
 
           expect(runtime.onPtyExit).toHaveBeenCalledOnce()

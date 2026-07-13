@@ -2815,6 +2815,7 @@ export function registerPtyHandlers(
             }
           }
           if (hasSurvivingOwner === false) {
+            pendingClaudeProviderExits.delete(ptyId)
             finishProviderExit(payload)
             return
           }
