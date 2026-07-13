@@ -175,7 +175,7 @@ type FreshLocalFallbackProvider = IPtyProvider & {
 }
 const sshProviders = new Map<string, IPtyProvider>()
 const SYNTHETIC_KILL_EXIT_DUPLICATE_WINDOW_MS = 30_000
-const CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS = 250
+const CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS = [250, 500, 1_000, 5_000, 30_000] as const
 // Why: producer flow control changes terminal physics — a flooding shell now
 // blocks on write instead of buffering in main. Kill switch: flip this one
 // line to disable pause/resume entirely without untangling the wiring.
@@ -2799,7 +2799,7 @@ export function registerPtyHandlers(
       }
       claudeExitVerificationInFlight = true
       const exitsAtStart = new Map(pendingClaudeProviderExits)
-      let shouldRetryLiveExits = false
+      let liveExitRetryDelayMs: number | null = null
       try {
         let livePtyIds: Set<string> | null = null
         for (let attempt = 0; attempt < 3 && livePtyIds === null; attempt += 1) {
@@ -2812,7 +2812,13 @@ export function registerPtyHandlers(
             }
           }
         }
-        if (livePtyIds && [...exitsAtStart.keys()].some((ptyId) => livePtyIds?.has(ptyId))) {
+        if (
+          livePtyIds &&
+          [...exitsAtStart].some(
+            ([ptyId, pendingExit]) =>
+              pendingExit.liveSettleRetryCount === 0 && livePtyIds?.has(ptyId)
+          )
+        ) {
           // Why: some providers publish exit before their inventory drops the
           // session; one shared snapshot confirms all pending owners after settling.
           await delay(50)
@@ -2838,26 +2844,32 @@ export function registerPtyHandlers(
           if (hasSurvivingOwner === false) {
             pendingClaudeProviderExits.delete(ptyId)
             finishProviderExit(pendingExit.payload)
-          } else if (hasSurvivingOwner === true && pendingExit.payload.code !== -1) {
-            if (pendingExit.liveSettleRetryCount === 0) {
-              pendingExit.liveSettleRetryCount += 1
-              shouldRetryLiveExits = true
-            } else {
-              pendingClaudeProviderExits.delete(ptyId)
-            }
+          } else if (pendingExit.payload.code !== -1) {
+            // Why: provider inventory can lag an authoritative exit for an
+            // unbounded time; one batched backoff avoids stranding the guard.
+            const retryIndex = Math.min(
+              pendingExit.liveSettleRetryCount,
+              CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS.length - 1
+            )
+            const retryDelayMs = CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS[retryIndex]
+            pendingExit.liveSettleRetryCount = Math.min(
+              pendingExit.liveSettleRetryCount + 1,
+              CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS.length
+            )
+            liveExitRetryDelayMs = Math.min(liveExitRetryDelayMs ?? retryDelayMs, retryDelayMs)
           }
         }
         // Why: restart exits happen before provider teardown. Keep them (and
         // unverifiable exits) pending for the replacement provider to prove.
       } finally {
         claudeExitVerificationInFlight = false
-        if (shouldRetryLiveExits && bindingGeneration === providerListenerGeneration) {
-          await delay(CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS)
+        if (liveExitRetryDelayMs !== null && bindingGeneration === providerListenerGeneration) {
+          await delay(liveExitRetryDelayMs)
         }
         if (bindingGeneration !== providerListenerGeneration) {
           verifyPendingClaudeProviderExits?.()
         } else if (
-          shouldRetryLiveExits ||
+          liveExitRetryDelayMs !== null ||
           [...pendingClaudeProviderExits].some(
             ([ptyId, pendingExit]) => exitsAtStart.get(ptyId) !== pendingExit
           )

@@ -1379,12 +1379,14 @@ describe('registerPtyHandlers', () => {
       }
     })
 
-    it('rechecks an ordinary exit after the provider inventory settles late', async () => {
+    it('rechecks an ordinary exit across multiple late inventory settle windows', async () => {
       const provider = installObservableDaemonTestProvider()
       const liveInventory = [
         { id: 'late-settling-claude-session', cwd: '', title: 'exiting owner' }
       ]
       provider.listProcesses
+        .mockResolvedValueOnce(liveInventory)
+        .mockResolvedValueOnce(liveInventory)
         .mockResolvedValueOnce(liveInventory)
         .mockResolvedValueOnce(liveInventory)
         .mockResolvedValue([])
@@ -1400,8 +1402,8 @@ describe('registerPtyHandlers', () => {
       try {
         provider.emitExit('late-settling-claude-session', 0)
 
-        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
-        expect(provider.listProcesses).toHaveBeenCalledTimes(3)
+        await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 2_500 })
+        expect(provider.listProcesses).toHaveBeenCalledTimes(5)
         expect(
           livePtyGate.getLiveInjectedClaudePtyAccountId('late-settling-claude-session')
         ).toBeNull()
