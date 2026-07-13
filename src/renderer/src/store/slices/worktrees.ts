@@ -60,6 +60,7 @@ import {
   getSettingsFocusedExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
+  toRuntimeExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
@@ -2306,7 +2307,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   fetchWorktrees: async (repoId, options) => {
     try {
       const ownerState = get()
-      const hostId = repoHostId(ownerState, repoId)
+      const hostId = options?.executionHostId ?? repoHostId(ownerState, repoId)
       const ownerWasMissingAtStart = !ownerState.repos.some((repo) => repo.id === repoId)
       const setup = getProjectHostSetupForRepoHost(ownerState, repoId, hostId)
       const settings = settingsForRepoOwner(ownerState, repoId, hostId)
@@ -4068,14 +4069,20 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             for (const repoId of new Set(
               entries.map(({ worktreeId }) => getRepoIdFromWorktreeId(worktreeId))
             )) {
-              void get().fetchWorktrees(repoId)
+              void get().fetchWorktrees(repoId, {
+                executionHostId: toRuntimeExecutionHostId(environmentId)
+              })
             }
             return
           }
-          refreshAfterFailure(
-            entries.map(({ worktreeId }) => worktreeId),
-            err
-          )
+          console.error('Failed to update worktree meta:', err)
+          for (const repoId of new Set(
+            entries.map(({ worktreeId }) => getRepoIdFromWorktreeId(worktreeId))
+          )) {
+            void get().fetchWorktrees(repoId, {
+              executionHostId: toRuntimeExecutionHostId(environmentId)
+            })
+          }
         }
       })
     ])

@@ -2769,9 +2769,10 @@ describe('OrcaRuntimeService', () => {
       name: 'folder-session',
       createdWithAgent: 'codex'
     })
+    const listClaudeAccounts = vi.fn(() => ({ accounts: [{ id: 'account-a' }] }))
     runtime.setAccountServices({
       claudeAccounts: {
-        listAccounts: () => ({ accounts: [{ id: 'account-a' }] })
+        listAccounts: listClaudeAccounts
       }
     } as never)
 
@@ -2791,15 +2792,18 @@ describe('OrcaRuntimeService', () => {
       comment: 'batch-note',
       claudeAccountId: 'account-a'
     })
+    listClaudeAccounts
+      .mockReturnValueOnce({ accounts: [{ id: 'account-a' }] })
+      .mockReturnValue({ accounts: [] })
     await expect(
       runtime.updateManagedWorktreesMeta([
         {
           worktreeSelector: `id:${result.worktree.id}`,
-          updates: { comment: 'must-not-persist' }
+          updates: { comment: 'must-not-persist', claudeAccountId: 'account-a' }
         },
         {
           worktreeSelector: `id:${rootWorktreeId}`,
-          updates: { claudeAccountId: 'removed' }
+          updates: { workspaceStatus: 'completed' }
         }
       ])
     ).rejects.toThrow('no longer exists')

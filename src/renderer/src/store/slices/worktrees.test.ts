@@ -5515,7 +5515,45 @@ describe('worktree remote runtime mutations', () => {
 
     expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
     expect(fetchWorktrees).toHaveBeenCalledTimes(1)
-    expect(fetchWorktrees).toHaveBeenCalledWith('repo1')
+    expect(fetchWorktrees).toHaveBeenCalledWith('repo1', {
+      executionHostId: 'runtime:env-1'
+    })
+  })
+
+  it('repairs failed batches against each owning runtime environment', async () => {
+    const store = createTestStore()
+    const first = makeWorktree({
+      id: 'repo1::/remote/env-1',
+      repoId: 'repo1',
+      hostId: 'runtime:env-1'
+    })
+    const second = makeWorktree({
+      id: 'repo1::/remote/env-2',
+      repoId: 'repo1',
+      hostId: 'runtime:env-2'
+    })
+    const fetchWorktrees = vi.fn().mockResolvedValue(undefined)
+    runtimeEnvironmentCall.mockRejectedValue(new Error('offline'))
+    store.setState({
+      worktreesByRepo: { repo1: [first, second] },
+      fetchWorktrees
+    } as Partial<AppState>)
+
+    await store.getState().updateWorktreesMeta(
+      new Map([
+        [first.id, { claudeAccountId: null }],
+        [second.id, { claudeAccountId: null }]
+      ])
+    )
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(2)
+    expect(fetchWorktrees).toHaveBeenCalledTimes(2)
+    expect(fetchWorktrees).toHaveBeenCalledWith('repo1', {
+      executionHostId: 'runtime:env-1'
+    })
+    expect(fetchWorktrees).toHaveBeenCalledWith('repo1', {
+      executionHostId: 'runtime:env-2'
+    })
   })
 })
 

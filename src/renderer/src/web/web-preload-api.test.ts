@@ -2002,6 +2002,7 @@ describe('web worktree preload API', () => {
       compareBaseRef: 'refs/remotes/origin/main',
       setupDecision: 'inherit',
       createdWithAgent: 'codex',
+      claudeAccountId: 'account-a',
       startup: {
         command: "codex 'summarize repo'",
         env: { ORCA_AGENT_MODE: 'direct' },
@@ -2036,6 +2037,7 @@ describe('web worktree preload API', () => {
           baseBranch: TEST_COMMIT_OID,
           compareBaseRef: 'refs/remotes/origin/main',
           createdWithAgent: 'codex',
+          claudeAccountId: 'account-a',
           startupCommand: "codex 'summarize repo'",
           startupEnv: { ORCA_AGENT_MODE: 'direct' },
           startupLaunchConfig: {
@@ -2068,6 +2070,39 @@ describe('web worktree preload API', () => {
         }
       }
     ])
+  })
+
+  it('lists Claude accounts from the paired runtime', async () => {
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          expect(method).toBe('accounts.list')
+          return Promise.resolve({
+            id: 'accounts-list',
+            ok: true,
+            result: {
+              claude: {
+                accounts: [{ id: 'account-a', email: 'a@example.com' }],
+                activeAccountId: null,
+                activeAccountIdsByRuntime: { host: null, wsl: {} }
+              }
+            },
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await expect(globals.window.api.claudeAccounts.list()).resolves.toMatchObject({
+      accounts: [{ id: 'account-a', email: 'a@example.com' }]
+    })
   })
 
   it('encodes explicit push target clears for runtime worktree updates', async () => {

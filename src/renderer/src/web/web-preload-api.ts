@@ -34,6 +34,7 @@ import type {
   WorkspaceSessionPatch,
   WorkspaceSessionState
 } from '../../../shared/types'
+import type { ClaudeRateLimitAccountsState } from '../../../shared/types'
 import type { SkillDiscoveryResult } from '../../../shared/skills'
 import type { SshConnectionState, SshTarget } from '../../../shared/ssh-types'
 import {
@@ -716,7 +717,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     minimaxCredentials: createMiniMaxCredentialsApi(),
     grokAccounts: createGrokAccountsApi(),
     codexAccounts: createAccountsApi(),
-    claudeAccounts: createAccountsApi(),
+    claudeAccounts: createClaudeAccountsApi(),
     cli: createCliApi(),
     agentHooks: createAgentHooksApi(),
     developerPermissions: createDeveloperPermissionsApi(),
@@ -1382,6 +1383,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
           : {}),
         parentWorkspace: args.parentWorkspace,
         workspaceStatus: args.workspaceStatus,
+        claudeAccountId: args.claudeAccountId,
         manualOrder: args.manualOrder,
         automationProvenanceRequest: args.automationProvenanceRequest
       })
@@ -2683,6 +2685,14 @@ function createAccountsApi(): never {
     reauthenticate: () => Promise.resolve(empty),
     remove: () => Promise.resolve(empty),
     select: () => Promise.resolve(empty)
+  } as never
+}
+
+function createClaudeAccountsApi(): never {
+  return {
+    ...(createAccountsApi() as NonNullable<Partial<PreloadApi>['claudeAccounts']>),
+    list: async () =>
+      (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude
   } as never
 }
 

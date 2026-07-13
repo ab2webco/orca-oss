@@ -14550,6 +14550,7 @@ export class OrcaRuntimeService {
     displayName?: string
     telemetrySource?: WorkspaceCreateTelemetrySource
     workspaceStatus?: string
+    claudeAccountId?: string | null
     manualOrder?: number
     sparseCheckout?: { directories: string[]; presetId?: string }
     pushTarget?: GitPushTarget
@@ -14571,6 +14572,7 @@ export class OrcaRuntimeService {
     }
 
     const repo = await this.resolveRepoSelector(args.repoSelector)
+    this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: args.claudeAccountId }])
     const createSettings = this.store.getSettings()
     const requestedAgent = args.startupAgent ?? args.createdWithAgent
     const requestedAgentEnabled =
@@ -14608,6 +14610,7 @@ export class OrcaRuntimeService {
       const settings = createSettings
       const instanceId = randomUUID()
       const worktreeId = getRuntimeFolderWorkspaceInstanceId(repo, instanceId)
+      const claudeAccountId = this.normalizeManagedClaudeAccountPinForCreate(args.claudeAccountId)
       const meta = this.store.setWorktreeMeta(worktreeId, {
         instanceId,
         ...getProjectHostSetupWorktreeMeta(this.store.getProjectHostSetups?.() ?? [], repo),
@@ -14646,7 +14649,8 @@ export class OrcaRuntimeService {
         ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
         ...(args.comment !== undefined ? { comment: args.comment } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
-        ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
+        ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
+        ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
       })
       const worktree = mergeRuntimeFolderWorkspace(repo, worktreeId, meta)
       this.invalidateResolvedWorktreeCache()
@@ -15172,6 +15176,7 @@ export class OrcaRuntimeService {
       : shouldSetDisplayName(effectiveRequestedName, branchName, effectiveSanitizedName)
         ? { displayName: effectiveRequestedName }
         : {}
+    const claudeAccountId = this.normalizeManagedClaudeAccountPinForCreate(args.claudeAccountId)
     const meta = this.store.setWorktreeMeta(worktreeId, {
       // Why: worktree IDs are path-derived. If a path is deleted outside Orca
       // and later recreated, creation must mint a fresh instance identity so
@@ -15227,7 +15232,8 @@ export class OrcaRuntimeService {
       ...(args.automationProvenance ? { automationProvenance: args.automationProvenance } : {}),
       ...(args.comment !== undefined ? { comment: args.comment } : {}),
       ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
-      ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
+      ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
+      ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
     })
     const worktree = mergeWorktree(repo.id, created, meta)
     const {
@@ -15540,6 +15546,7 @@ export class OrcaRuntimeService {
       comment?: string
       displayName?: string
       workspaceStatus?: string
+      claudeAccountId?: string | null
       manualOrder?: number
       sparseCheckout?: { directories: string[]; presetId?: string }
       pushTarget?: GitPushTarget
@@ -15595,6 +15602,7 @@ export class OrcaRuntimeService {
         ...(args.linkedGiteaPR != null ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
         ...(args.pushTarget ? { pushTarget: args.pushTarget } : {}),
         ...(args.workspaceStatus ? { workspaceStatus: args.workspaceStatus as never } : {}),
+        ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
         ...(args.createdWithAgent ? { createdWithAgent: args.createdWithAgent } : {}),
         ...(args.pendingFirstAgentMessageRename === true
@@ -16303,14 +16311,7 @@ export class OrcaRuntimeService {
     }
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const { lineage, ...metaUpdates } = updates
-    if (
-      typeof metaUpdates.claudeAccountId === 'string' &&
-      !this.requireAccountServices()
-        .claudeAccounts.listAccounts()
-        .accounts.some((account) => account.id === metaUpdates.claudeAccountId)
-    ) {
-      throw new Error('That Claude account no longer exists.')
-    }
+    this.assertCurrentManagedClaudeAccountPins([metaUpdates])
     const shouldClearPushTarget =
       Object.prototype.hasOwnProperty.call(metaUpdates, 'pushTarget') &&
       metaUpdates.pushTarget === null
@@ -16332,6 +16333,42 @@ export class OrcaRuntimeService {
       persistedMetaUpdates.pushTarget = undefined
     }
     return { worktree, lineage, persistedMetaUpdates }
+  }
+
+  private assertCurrentManagedClaudeAccountPins(
+    updates: readonly { claudeAccountId?: string | null }[]
+  ): void {
+    const requestedIds = new Set(
+      updates
+        .map((entry) => entry.claudeAccountId)
+        .filter((accountId): accountId is string => typeof accountId === 'string')
+    )
+    if (requestedIds.size === 0) {
+      return
+    }
+    const currentIds = new Set(
+      this.requireAccountServices()
+        .claudeAccounts.listAccounts()
+        .accounts.map((account) => account.id)
+    )
+    for (const accountId of requestedIds) {
+      if (!currentIds.has(accountId)) {
+        throw new Error('That Claude account no longer exists.')
+      }
+    }
+  }
+
+  private normalizeManagedClaudeAccountPinForCreate(
+    accountId: string | null | undefined
+  ): string | null | undefined {
+    if (typeof accountId !== 'string') {
+      return accountId
+    }
+    return this.requireAccountServices()
+      .claudeAccounts.listAccounts()
+      .accounts.some((account) => account.id === accountId)
+      ? accountId
+      : null
   }
 
   async updateManagedWorktreeMeta(
@@ -16390,6 +16427,9 @@ export class OrcaRuntimeService {
         createdAt
       })
     }
+    // Why: lineage resolution can outlive account removal; revalidate after
+    // every await and immediately before the synchronous metadata write.
+    this.assertCurrentManagedClaudeAccountPins([persistedMetaUpdates])
     this.store.setWorktreeMeta(worktree.id, stripOrcaProvenanceMetaUpdates(persistedMetaUpdates))
     // Why: unlike renderer-initiated optimistic updates, CLI callers need an
     // explicit push so the editor refreshes metadata changed outside the UI.
@@ -16415,6 +16455,9 @@ export class OrcaRuntimeService {
       entries.map((entry) =>
         this.prepareManagedWorktreeMetaUpdate(entry.worktreeSelector, entry.updates)
       )
+    )
+    this.assertCurrentManagedClaudeAccountPins(
+      prepared.map(({ persistedMetaUpdates }) => persistedMetaUpdates)
     )
     for (const { worktree, persistedMetaUpdates } of prepared) {
       this.store.setWorktreeMeta(worktree.id, stripOrcaProvenanceMetaUpdates(persistedMetaUpdates))
