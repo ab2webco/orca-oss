@@ -2617,6 +2617,7 @@ export function registerPtyHandlers(
     {
       payload: { id: string; code: number }
       ownershipEpoch: number
+      exitProviderGeneration: number
       liveSettleRetryCount: number
     }
   >()
@@ -2867,7 +2868,10 @@ export function registerPtyHandlers(
           if (hasSurvivingOwner === false) {
             pendingClaudeProviderExits.delete(ptyId)
             finishProviderExit(pendingExit.payload)
-          } else if (pendingExit.payload.code !== -1) {
+          } else if (
+            pendingExit.payload.code !== -1 ||
+            pendingExit.exitProviderGeneration !== bindingGeneration
+          ) {
             // Why: provider inventory can lag an authoritative exit for an
             // unbounded time; one batched backoff avoids stranding the guard.
             const retryIndex = Math.min(
@@ -2900,7 +2904,9 @@ export function registerPtyHandlers(
             void verifyClaudeProviderExits()
           } else if (
             ![...pendingClaudeProviderExits.values()].some(
-              (pendingExit) => pendingExit.payload.code !== -1
+              (pendingExit) =>
+                pendingExit.payload.code !== -1 ||
+                pendingExit.exitProviderGeneration !== bindingGeneration
             ) &&
             claudeExitRetryTimer
           ) {
@@ -2922,12 +2928,13 @@ export function registerPtyHandlers(
           pendingClaudeProviderExits.set(payload.id, {
             payload,
             ownershipEpoch,
+            exitProviderGeneration: bindingGeneration,
             liveSettleRetryCount:
               existingPendingExit?.ownershipEpoch === ownershipEpoch
                 ? existingPendingExit.liveSettleRetryCount
                 : 0
           })
-          if (existingPendingExit || claudeExitRetryTimer === null) {
+          if (claudeExitRetryTimer === null) {
             void verifyClaudeProviderExits()
           }
         }

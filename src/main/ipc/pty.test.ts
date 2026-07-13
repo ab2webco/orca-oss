@@ -1261,9 +1261,8 @@ describe('registerPtyHandlers', () => {
           provider.listProcesses.mockResolvedValue([])
           provider.emitExit('duplicate-claude-session', 0)
           provider.emitExit('duplicate-claude-session', 0)
-          await new Promise((resolve) => setTimeout(resolve, 25))
+          await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
 
-          expect(runtime.onPtyExit).toHaveBeenCalledOnce()
           expect(livePtyGate.isLiveSharedClaudePty('duplicate-claude-session')).toBe(false)
           expect(
             livePtyGate.getLiveInjectedClaudePtyAccountId('duplicate-claude-session')
@@ -1424,6 +1423,50 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('keeps repeated same-ID exits on the shared steady-state retry cadence', async () => {
+      vi.useFakeTimers()
+      const provider = installObservableDaemonTestProvider()
+      provider.listProcesses.mockResolvedValue([
+        { id: 'repeated-claude-session', cwd: '', title: 'surviving owner' }
+      ])
+      const runtime = {
+        setPtyController: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      const baselineTimerCount = vi.getTimerCount()
+      livePtyGate.markInjectedClaudePtySpawned('repeated-claude-session', 'account-a')
+
+      try {
+        provider.emitExit('repeated-claude-session', 0)
+        await vi.advanceTimersByTimeAsync(50)
+        await vi.advanceTimersByTimeAsync(250)
+        await vi.advanceTimersByTimeAsync(500)
+        await vi.advanceTimersByTimeAsync(1_000)
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(6)
+
+        for (let index = 0; index < 29; index += 1) {
+          provider.emitExit('repeated-claude-session', 0)
+          await vi.advanceTimersByTimeAsync(1_000)
+        }
+
+        expect(provider.listProcesses).toHaveBeenCalledTimes(6)
+        expect(vi.getTimerCount()).toBe(baselineTimerCount + 1)
+
+        provider.listProcesses.mockResolvedValue([])
+        await vi.advanceTimersByTimeAsync(1_000)
+        expect(provider.listProcesses).toHaveBeenCalledTimes(7)
+        expect(runtime.onPtyExit).toHaveBeenCalledOnce()
+        expect(vi.getTimerCount()).toBe(baselineTimerCount)
+      } finally {
+        livePtyGate.markClaudePtyExited('repeated-claude-session')
+        vi.useRealTimers()
+      }
+    })
+
     it('rechecks an ordinary exit across multiple late inventory settle windows', async () => {
       const provider = installObservableDaemonTestProvider()
       const liveInventory = [
@@ -1476,10 +1519,18 @@ describe('registerPtyHandlers', () => {
         await vi.waitFor(() => expect(oldProvider.listProcesses).toHaveBeenCalledTimes(2))
 
         const newProvider = installObservableDaemonTestProvider()
-        newProvider.listProcesses.mockResolvedValue([])
+        newProvider.listProcesses
+          .mockResolvedValueOnce([
+            { id: 'restarted-claude-session', cwd: '', title: 'replacement inventory lag' }
+          ])
+          .mockResolvedValueOnce([
+            { id: 'restarted-claude-session', cwd: '', title: 'replacement inventory lag' }
+          ])
+          .mockResolvedValue([])
         rebindLocalProviderListeners()
 
         await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
+        expect(newProvider.listProcesses).toHaveBeenCalledTimes(3)
         expect(runtime.onPtyExit).toHaveBeenCalledWith('restarted-claude-session', -1)
         expect(livePtyGate.isLiveSharedClaudePty('restarted-claude-session')).toBe(false)
         expect(
