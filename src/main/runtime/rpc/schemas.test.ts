@@ -82,6 +82,12 @@ describe('RPC optional pipe schemas', () => {
       linkedLinearIssueWorkspaceId: null,
       linkedLinearIssueOrganizationUrlKey: 'stably'
     })
+    expectParses(methodParams(WORKTREE_METHODS, 'worktree.setBatch'), {
+      updates: [
+        { worktree: 'id:wt-1', claudeAccountId: 'account-a' },
+        { worktree: 'id:wt-2', claudeAccountId: null }
+      ]
+    })
     expectParses(methodParams(WORKTREE_METHODS, 'worktree.prefetchCreateBase'), { repo: 'repo-1' })
   })
 })

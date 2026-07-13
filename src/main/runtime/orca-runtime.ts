@@ -16288,7 +16288,7 @@ export class OrcaRuntimeService {
     return { base, behind: drift.behind, recentSubjects }
   }
 
-  async updateManagedWorktreeMeta(
+  private async prepareManagedWorktreeMetaUpdate(
     worktreeSelector: string,
     updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
       pushTarget?: GitPushTarget | null
@@ -16303,6 +16303,14 @@ export class OrcaRuntimeService {
     }
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const { lineage, ...metaUpdates } = updates
+    if (
+      typeof metaUpdates.claudeAccountId === 'string' &&
+      !this.requireAccountServices()
+        .claudeAccounts.listAccounts()
+        .accounts.some((account) => account.id === metaUpdates.claudeAccountId)
+    ) {
+      throw new Error('That Claude account no longer exists.')
+    }
     const shouldClearPushTarget =
       Object.prototype.hasOwnProperty.call(metaUpdates, 'pushTarget') &&
       metaUpdates.pushTarget === null
@@ -16323,6 +16331,26 @@ export class OrcaRuntimeService {
       // pushTarget:null is an explicit request to remove persisted target metadata.
       persistedMetaUpdates.pushTarget = undefined
     }
+    return { worktree, lineage, persistedMetaUpdates }
+  }
+
+  async updateManagedWorktreeMeta(
+    worktreeSelector: string,
+    updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
+      pushTarget?: GitPushTarget | null
+      lineage?: {
+        parentWorktree?: string
+        noParent?: boolean
+      }
+    }
+  ) {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    const { worktree, lineage, persistedMetaUpdates } = await this.prepareManagedWorktreeMetaUpdate(
+      worktreeSelector,
+      updates
+    )
     if (lineage?.noParent === true) {
       this.store.removeWorktreeLineage?.(worktree.id)
       this.store.removeWorkspaceLineage?.(worktreeWorkspaceKey(worktree.id))
@@ -16368,6 +16396,34 @@ export class OrcaRuntimeService {
     this.invalidateResolvedWorktreeCache()
     this.notifyWorktreesChanged(worktree.repoId)
     return await this.showManagedWorktree(`id:${worktree.id}`)
+  }
+
+  async updateManagedWorktreesMeta(
+    entries: {
+      worktreeSelector: string
+      updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
+        pushTarget?: GitPushTarget | null
+      }
+    }[]
+  ): Promise<{ updated: number }> {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    // Why: resolve selectors and validate every account before the first write;
+    // a bad row must not leave a multi-select update partially persisted.
+    const prepared = await Promise.all(
+      entries.map((entry) =>
+        this.prepareManagedWorktreeMetaUpdate(entry.worktreeSelector, entry.updates)
+      )
+    )
+    for (const { worktree, persistedMetaUpdates } of prepared) {
+      this.store.setWorktreeMeta(worktree.id, stripOrcaProvenanceMetaUpdates(persistedMetaUpdates))
+    }
+    this.invalidateResolvedWorktreeCache()
+    for (const repoId of new Set(prepared.map(({ worktree }) => worktree.repoId))) {
+      this.notifyWorktreesChanged(repoId)
+    }
+    return { updated: prepared.length }
   }
 
   persistManagedWorktreeSortOrder(orderedIds: string[]): { updated: number } {

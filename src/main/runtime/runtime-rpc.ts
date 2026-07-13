@@ -357,6 +357,7 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'worktree.resolvePrBase',
   'worktree.rm',
   'worktree.set',
+  'worktree.setBatch',
   'worktree.sleep'
 ])
 

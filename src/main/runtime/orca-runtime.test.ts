@@ -2769,6 +2769,41 @@ describe('OrcaRuntimeService', () => {
       name: 'folder-session',
       createdWithAgent: 'codex'
     })
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-a' }] })
+      }
+    } as never)
+
+    await expect(
+      runtime.updateManagedWorktreesMeta([
+        {
+          worktreeSelector: `id:${result.worktree.id}`,
+          updates: { comment: 'batch-note', claudeAccountId: 'account-a' }
+        },
+        {
+          worktreeSelector: `id:${rootWorktreeId}`,
+          updates: { workspaceStatus: 'in-review' }
+        }
+      ])
+    ).resolves.toEqual({ updated: 2 })
+    expect(metaById[result.worktree.id]).toMatchObject({
+      comment: 'batch-note',
+      claudeAccountId: 'account-a'
+    })
+    await expect(
+      runtime.updateManagedWorktreesMeta([
+        {
+          worktreeSelector: `id:${result.worktree.id}`,
+          updates: { comment: 'must-not-persist' }
+        },
+        {
+          worktreeSelector: `id:${rootWorktreeId}`,
+          updates: { claudeAccountId: 'removed' }
+        }
+      ])
+    ).rejects.toThrow('no longer exists')
+    expect(metaById[result.worktree.id]?.comment).toBe('batch-note')
 
     expect(addWorktreeMock).not.toHaveBeenCalled()
     expect(result.worktree).toEqual(

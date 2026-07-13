@@ -1,11 +1,15 @@
-import type { Store } from '../persistence'
+import type { GlobalSettings } from '../../shared/types'
 
-export function isManagedClaudeAccountId(store: Store, accountId: string): boolean {
+type ClaudeAccountPinStore = {
+  getSettings(): Pick<GlobalSettings, 'claudeManagedAccounts'>
+}
+
+export function isManagedClaudeAccountId(store: ClaudeAccountPinStore, accountId: string): boolean {
   return store.getSettings().claudeManagedAccounts.some((account) => account.id === accountId)
 }
 
 export function normalizeClaudeAccountPinForCreate(
-  store: Store,
+  store: ClaudeAccountPinStore,
   accountId: string | null | undefined
 ): string | null | undefined {
   if (typeof accountId !== 'string' || isManagedClaudeAccountId(store, accountId)) {
@@ -17,7 +21,7 @@ export function normalizeClaudeAccountPinForCreate(
 }
 
 export function assertValidClaudeAccountPin(
-  store: Store,
+  store: ClaudeAccountPinStore,
   accountId: string | null | undefined
 ): void {
   if (typeof accountId === 'string' && !isManagedClaudeAccountId(store, accountId)) {

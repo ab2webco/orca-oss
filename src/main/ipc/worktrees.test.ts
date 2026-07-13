@@ -783,7 +783,7 @@ describe('registerWorktreeHandlers', () => {
     })
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
 
-    const result = handlers['worktrees:updateMetaBatch'](null, {
+    handlers['worktrees:updateMetaBatch'](null, {
       updates: [
         { worktreeId: 'repo-1::/workspace/a', updates: { claudeAccountId: 'account-a' } },
         { worktreeId: 'repo-1::/workspace/b', updates: { claudeAccountId: 'account-a' } }
@@ -791,7 +791,6 @@ describe('registerWorktreeHandlers', () => {
     })
 
     expect(store.setWorktreeMeta).toHaveBeenCalledTimes(2)
-    expect(result).toHaveLength(2)
     expect(() =>
       handlers['worktrees:updateMetaBatch'](null, {
         updates: [{ worktreeId: 'repo-1::/workspace/c', updates: { claudeAccountId: 'removed' } }]

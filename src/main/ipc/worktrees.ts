@@ -2073,7 +2073,7 @@ export function registerWorktreeHandlers(
         assertValidClaudeAccountPin(store, entry.updates.claudeAccountId)
       }
       const renamedRepoIds = new Set<string>()
-      const result = args.updates.map((entry) => {
+      for (const entry of args.updates) {
         const updates =
           entry.updates.displayName !== undefined
             ? {
@@ -2085,12 +2085,11 @@ export function registerWorktreeHandlers(
         if (entry.updates.displayName !== undefined) {
           renamedRepoIds.add(getRepoIdFromWorktreeId(entry.worktreeId))
         }
-        return store.setWorktreeMeta(entry.worktreeId, stripOrcaProvenanceMetaUpdates(updates))
-      })
+        store.setWorktreeMeta(entry.worktreeId, stripOrcaProvenanceMetaUpdates(updates))
+      }
       for (const repoId of renamedRepoIds) {
         runtime.notifyWorktreesChangedForRemoteClients(repoId)
       }
-      return result
     }
   )
 

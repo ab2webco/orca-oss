@@ -1443,18 +1443,17 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         })
       ).worktree
     },
-    updateMetaBatch: async ({ updates }) =>
-      Promise.all(
-        updates.map(({ worktreeId, updates: worktreeUpdates }) =>
-          callRuntimeResult<{ worktree: Worktree }>('worktree.set', {
-            worktree: toRuntimeWorktreeSelector(worktreeId),
-            ...(Object.prototype.hasOwnProperty.call(worktreeUpdates, 'pushTarget') &&
-            worktreeUpdates.pushTarget === undefined
-              ? { ...worktreeUpdates, pushTarget: null }
-              : worktreeUpdates)
-          }).then((result) => result.worktree)
-        )
-      ),
+    updateMetaBatch: async ({ updates }) => {
+      await callRuntimeResult<{ updated: number }>('worktree.setBatch', {
+        updates: updates.map(({ worktreeId, updates: worktreeUpdates }) => ({
+          worktree: toRuntimeWorktreeSelector(worktreeId),
+          ...(Object.prototype.hasOwnProperty.call(worktreeUpdates, 'pushTarget') &&
+          worktreeUpdates.pushTarget === undefined
+            ? { ...worktreeUpdates, pushTarget: null }
+            : worktreeUpdates)
+        }))
+      })
+    },
     listLineage: async () =>
       await callRuntimeResult<{
         lineage: Record<string, WorktreeLineage>

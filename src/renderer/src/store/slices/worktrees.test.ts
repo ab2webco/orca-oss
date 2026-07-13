@@ -75,7 +75,7 @@ const mockApi = {
     resolvePrBase: vi.fn(),
     resolveMrBase: vi.fn(),
     updateMeta: vi.fn().mockResolvedValue(undefined),
-    updateMetaBatch: vi.fn().mockResolvedValue([]),
+    updateMetaBatch: vi.fn().mockResolvedValue(undefined),
     updateLineage: vi.fn().mockResolvedValue(null)
   },
   pty: {
@@ -5450,6 +5450,72 @@ describe('worktree remote runtime mutations', () => {
         { worktreeId: second.id, updates: { workspaceStatus: 'completed' } }
       ]
     })
+  })
+
+  it('sends 100 runtime-owned metadata updates in one host RPC', async () => {
+    const store = createTestStore()
+    const worktrees = Array.from({ length: 100 }, (_, index) =>
+      makeWorktree({
+        id: `repo1::/remote/wt-${index}`,
+        repoId: 'repo1',
+        path: `/remote/wt-${index}`,
+        hostId: 'runtime:env-1'
+      })
+    )
+    runtimeEnvironmentCall.mockResolvedValue({
+      id: 'batch-result',
+      ok: true,
+      result: { updated: 100 },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    store.setState({ worktreesByRepo: { repo1: worktrees } } as Partial<AppState>)
+
+    await store
+      .getState()
+      .updateWorktreesMeta(
+        new Map(worktrees.map((worktree) => [worktree.id, { claudeAccountId: 'account-a' }]))
+      )
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
+      selector: 'env-1',
+      method: 'worktree.setBatch',
+      params: {
+        updates: worktrees.map((worktree) => ({
+          worktree: `id:${worktree.id}`,
+          claudeAccountId: 'account-a'
+        }))
+      },
+      timeoutMs: 15_000
+    })
+  })
+
+  it('refreshes each repo once when a runtime metadata batch fails', async () => {
+    const store = createTestStore()
+    const worktrees = Array.from({ length: 100 }, (_, index) =>
+      makeWorktree({
+        id: `repo1::/remote/wt-${index}`,
+        repoId: 'repo1',
+        path: `/remote/wt-${index}`,
+        hostId: 'runtime:env-1'
+      })
+    )
+    const fetchWorktrees = vi.fn().mockResolvedValue(undefined)
+    runtimeEnvironmentCall.mockRejectedValue(new Error('offline'))
+    store.setState({
+      worktreesByRepo: { repo1: worktrees },
+      fetchWorktrees
+    } as Partial<AppState>)
+
+    await store
+      .getState()
+      .updateWorktreesMeta(
+        new Map(worktrees.map((worktree) => [worktree.id, { claudeAccountId: null }]))
+      )
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
+    expect(fetchWorktrees).toHaveBeenCalledTimes(1)
+    expect(fetchWorktrees).toHaveBeenCalledWith('repo1')
   })
 })
 

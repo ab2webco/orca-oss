@@ -174,7 +174,7 @@ export const WorktreePrefetchCreateBase = z.object({
   baseBranch: OptionalString
 })
 
-export const WorktreeSet = WorktreeSelector.extend({
+const WorktreeMetaSet = WorktreeSelector.extend({
   displayName: OptionalString,
   // Why: empty comments are meaningful metadata updates, so use the plain
   // string parser instead of OptionalString's empty-as-undefined behavior.
@@ -201,6 +201,7 @@ export const WorktreeSet = WorktreeSelector.extend({
   sparsePresetId: OptionalString,
   baseRef: OptionalString,
   workspaceStatus: OptionalString,
+  claudeAccountId: z.union([z.string().min(1).max(512), z.null()]).optional(),
   pushTarget: z
     .object({
       remoteName: z.string(),
@@ -210,7 +211,10 @@ export const WorktreeSet = WorktreeSelector.extend({
     .nullable()
     .optional(),
   diffComments: z.array(z.unknown()).optional(),
-  mobileDiffReview: z.unknown().optional(),
+  mobileDiffReview: z.unknown().optional()
+})
+
+export const WorktreeSet = WorktreeMetaSet.extend({
   parentWorktree: OptionalString,
   noParent: OptionalBoolean
 }).superRefine((params, ctx) => {
@@ -220,6 +224,10 @@ export const WorktreeSet = WorktreeSelector.extend({
       message: 'Choose either --parent-worktree or --no-parent, not both.'
     })
   }
+})
+
+export const WorktreeSetBatch = z.object({
+  updates: z.array(WorktreeMetaSet).min(1).max(500)
 })
 
 export const WorktreeRemove = WorktreeSelector.extend({

@@ -2099,6 +2099,18 @@ describe('web worktree preload API', () => {
       worktreeId: 'repo-1::/workspace/review',
       updates: { linkedPR: null, pushTarget: undefined }
     })
+    await globals.window.api.worktrees.updateMetaBatch({
+      updates: [
+        {
+          worktreeId: 'repo-1::/workspace/review',
+          updates: { claudeAccountId: null }
+        },
+        {
+          worktreeId: 'repo-1::/workspace/other',
+          updates: { claudeAccountId: 'account-a' }
+        }
+      ]
+    })
 
     expect(runtimeCalls).toEqual([
       {
@@ -2107,6 +2119,15 @@ describe('web worktree preload API', () => {
           worktree: 'id:repo-1::/workspace/review',
           linkedPR: null,
           pushTarget: null
+        }
+      },
+      {
+        method: 'worktree.setBatch',
+        params: {
+          updates: [
+            { worktree: 'id:repo-1::/workspace/review', claudeAccountId: null },
+            { worktree: 'id:repo-1::/workspace/other', claudeAccountId: 'account-a' }
+          ]
         }
       }
     ])

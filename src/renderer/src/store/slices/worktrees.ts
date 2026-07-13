@@ -4018,13 +4018,19 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     })
 
     const localUpdates: { worktreeId: string; updates: Partial<WorktreeMeta> }[] = []
-    const remoteUpdates: [string, Partial<WorktreeMeta>][] = []
+    const remoteUpdatesByEnvironment = new Map<
+      string,
+      { worktreeId: string; updates: Partial<WorktreeMeta> }[]
+    >()
     for (const [worktreeId, updates] of updatesByWorktreeId) {
       const settings = settingsForWorktreeOwner(get(), worktreeId)
-      if (getActiveRuntimeTarget(settings).kind === 'local') {
+      const target = getActiveRuntimeTarget(settings)
+      if (target.kind === 'local') {
         localUpdates.push({ worktreeId, updates })
       } else {
-        remoteUpdates.push([worktreeId, updates])
+        const entries = remoteUpdatesByEnvironment.get(target.environmentId) ?? []
+        entries.push({ worktreeId, updates })
+        remoteUpdatesByEnvironment.set(target.environmentId, entries)
       }
     }
 
@@ -4044,19 +4050,32 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             )
           )
         : Promise.resolve(),
-      ...remoteUpdates.map(async ([worktreeId, updates]) => {
+      ...Array.from(remoteUpdatesByEnvironment, async ([environmentId, entries]) => {
         try {
-          await persistWorktreeMeta(
-            settingsForWorktreeOwner(get(), worktreeId),
-            worktreeId,
-            updates
+          await callRuntimeRpc(
+            { kind: 'environment', environmentId },
+            'worktree.setBatch',
+            {
+              updates: entries.map(({ worktreeId, updates }) => ({
+                worktree: toRuntimeWorktreeSelector(worktreeId),
+                ...encodePushTargetClearForRuntimeRpc(updates)
+              }))
+            },
+            { timeoutMs: 15_000 }
           )
         } catch (err) {
           if (isRuntimeSelectorNotFoundError(err)) {
-            void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
+            for (const repoId of new Set(
+              entries.map(({ worktreeId }) => getRepoIdFromWorktreeId(worktreeId))
+            )) {
+              void get().fetchWorktrees(repoId)
+            }
             return
           }
-          refreshAfterFailure([worktreeId], err)
+          refreshAfterFailure(
+            entries.map(({ worktreeId }) => worktreeId),
+            err
+          )
         }
       })
     ])
