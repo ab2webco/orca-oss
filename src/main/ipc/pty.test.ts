@@ -1019,12 +1019,19 @@ describe('registerPtyHandlers', () => {
         } else {
           markClaudePtySpawned('surviving-shared-session')
         }
-        const prepareClaudeAuth = vi.fn(async () => ({
-          configDir: '/tmp/claude-shared',
-          envPatch: {},
-          stripAuthEnv: false,
-          provenance: 'managed:global-account'
-        }))
+        livePtyGate.markInjectedClaudePtySpawned('injected-account-b', 'account-b')
+        const prepareClaudeAuth = vi.fn(async () => {
+          const sharedAccountReservationId =
+            livePtyGate.reserveSharedClaudeAccountLaunch('account-b')
+          return {
+            configDir: '/tmp/claude-shared',
+            envPatch: {},
+            stripAuthEnv: false,
+            sharedAccountId: 'account-b',
+            sharedAccountReservationId,
+            provenance: 'managed:account-b'
+          }
+        })
         const store = {
           getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'newly-pinned-account' }))
         }
@@ -1051,9 +1058,7 @@ describe('registerPtyHandlers', () => {
             sessionId: 'surviving-shared-session'
           })) as { id: string }
 
-          expect(prepareClaudeAuth).toHaveBeenCalledWith(
-            expect.objectContaining({ overrideAccountId: null })
-          )
+          expect(prepareClaudeAuth).not.toHaveBeenCalled()
           expect(isInjectedClaudeAccountTarget).toHaveBeenCalledWith(
             expect.objectContaining({ overrideAccountId: null })
           )
@@ -1063,6 +1068,7 @@ describe('registerPtyHandlers', () => {
           await handlers.get('pty:kill')!(null, { id: spawnResult.id })
         } finally {
           livePtyGate.markClaudePtyExited('surviving-shared-session')
+          livePtyGate.markClaudePtyExited('injected-account-b')
         }
       }
     )
@@ -1078,13 +1084,18 @@ describe('registerPtyHandlers', () => {
         preAllocateHandleForPty: vi.fn()
       }
       markClaudePtySpawned('runtime-shared-session', 'account-a')
-      const prepareClaudeAuth = vi.fn(async () => ({
-        configDir: '/tmp/claude-shared',
-        envPatch: {},
-        stripAuthEnv: false,
-        sharedAccountId: 'account-b',
-        provenance: 'managed:account-b'
-      }))
+      livePtyGate.markInjectedClaudePtySpawned('runtime-injected-account-b', 'account-b')
+      const prepareClaudeAuth = vi.fn(async () => {
+        const sharedAccountReservationId = livePtyGate.reserveSharedClaudeAccountLaunch('account-b')
+        return {
+          configDir: '/tmp/claude-shared',
+          envPatch: {},
+          stripAuthEnv: false,
+          sharedAccountId: 'account-b',
+          sharedAccountReservationId,
+          provenance: 'managed:account-b'
+        }
+      })
       const store = {
         getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'newly-pinned-account' }))
       }
@@ -1117,14 +1128,13 @@ describe('registerPtyHandlers', () => {
           sessionId: 'runtime-shared-session'
         })
 
-        expect(prepareClaudeAuth).toHaveBeenCalledWith(
-          expect.objectContaining({ overrideAccountId: null })
-        )
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
         expect(livePtyGate.getLiveSharedClaudePtyAccountId('runtime-shared-session')).toBe(
           'account-a'
         )
       } finally {
         livePtyGate.markClaudePtyExited('runtime-shared-session')
+        livePtyGate.markClaudePtyExited('runtime-injected-account-b')
       }
     })
 

@@ -3029,14 +3029,28 @@ export function registerPtyHandlers(
       // read/write the shared runtime — keeps the existing block unchanged.
       const isInjectedClaudeLaunch =
         isClaudeLaunch && Boolean(isInjectedClaudeAccountTarget?.(claudeSelectionTarget))
-      if (isClaudeLaunch && !isInjectedClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+      if (
+        isClaudeLaunch &&
+        !isInjectedClaudeLaunch &&
+        !isExistingSharedClaudeSession &&
+        isClaudeAuthSwitchInProgress()
+      ) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
+      // Why: reattach does not launch a new CLI; preparing current shared auth
+      // can reserve a different account than the surviving process actually owns.
       const claudeAuth =
-        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
+        isClaudeLaunch && prepareClaudeAuth && !isExistingSharedClaudeSession
+          ? await prepareClaudeAuth(claudeSelectionTarget)
+          : null
       using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
       const didPrepareInjectedClaudeAuth = isInjectedClaudePreparation(claudeAuth)
-      if (isClaudeLaunch && !didPrepareInjectedClaudeAuth && isClaudeAuthSwitchInProgress()) {
+      if (
+        isClaudeLaunch &&
+        !didPrepareInjectedClaudeAuth &&
+        !isExistingSharedClaudeSession &&
+        isClaudeAuthSwitchInProgress()
+      ) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
       if (claudeAuth?.stripAuthEnv && hasClaudeAuthEnvConflict(args.env)) {
@@ -3846,15 +3860,29 @@ export function registerPtyHandlers(
       // existing block unchanged.
       const isInjectedClaudeLaunch =
         isClaudeLaunch && Boolean(isInjectedClaudeAccountTarget?.(claudeSelectionTarget))
-      if (isClaudeLaunch && !isInjectedClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+      if (
+        isClaudeLaunch &&
+        !isInjectedClaudeLaunch &&
+        !isExistingSharedClaudeSession &&
+        isClaudeAuthSwitchInProgress()
+      ) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
+      // Why: reattach does not launch a new CLI; preparing current shared auth
+      // can reserve a different account than the surviving process actually owns.
       const claudeAuth =
-        isClaudeLaunch && prepareClaudeAuth ? await prepareClaudeAuth(claudeSelectionTarget) : null
+        isClaudeLaunch && prepareClaudeAuth && !isExistingSharedClaudeSession
+          ? await prepareClaudeAuth(claudeSelectionTarget)
+          : null
       using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
       spawnTiming.mark('auth')
       const didPrepareInjectedClaudeAuth = isInjectedClaudePreparation(claudeAuth)
-      if (isClaudeLaunch && !didPrepareInjectedClaudeAuth && isClaudeAuthSwitchInProgress()) {
+      if (
+        isClaudeLaunch &&
+        !didPrepareInjectedClaudeAuth &&
+        !isExistingSharedClaudeSession &&
+        isClaudeAuthSwitchInProgress()
+      ) {
         throw new Error('A Claude account switch is in progress. Try again after it finishes.')
       }
       if (claudeAuth?.stripAuthEnv && hasClaudeAuthEnvConflict(args.env)) {
