@@ -2149,6 +2149,116 @@
       "demotionRule": "Cannot promote while restored daemon ids or routing operations can silently route to local fallback."
     },
     {
+      "id": "terminal-provider.startup-shutdown-authority",
+      "title": "Cold-start terminal shutdown targets the installed daemon provider",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "terminal-provider",
+      "layer": "main-provider-contract",
+      "surfaces": [
+        "daemon startup",
+        "renderer terminal close",
+        "runtime terminal stop",
+        "restored terminal teardown"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "local",
+        "daemon",
+        "ssh"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [
+        "local",
+        "daemon",
+        "ssh"
+      ],
+      "coverageNotes": "A real daemon server over a local socket proves a fresh adapter can kill a live session before any prior client operation. Main-process tests prove renderer IPC, runtime kill, and runtime exact-stop wait for the provider swap and issue zero shutdowns to the fallback provider, while SSH spawn and kill bypass the local barrier. The same shared logic runs on Linux and Windows; live platform runs remain gaps.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca/issues/7742",
+        "https://github.com/stablyai/orca/pull/7836"
+      ],
+      "invariant": "A local PTY shutdown requested during desktop cold start must resolve its provider only after daemon startup settles, and a fresh daemon adapter must connect before issuing the destructive request; a fallback provider must never falsely acknowledge shutdown while the restored daemon session remains live, and SSH shutdown must not wait on local startup.",
+      "oracle": "Hold the desktop provider-startup promise unresolved, request shutdown through renderer IPC and both runtime-controller entry points, install the daemon provider, and assert the fallback receives zero shutdowns while the daemon receives exactly the requested kill; prove the provider gate opens as soon as daemon authority settles even while optional hook startup remains unresolved, and prove an SSH spawn and kill complete without touching either local barrier. Separately, spawn a session through one adapter, kill it through a fresh unconnected adapter, and assert the daemon no longer lists it.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/ipc/pty.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/startup/first-window-startup-services.test.ts"
+      ],
+      "testFiles": [
+        "src/main/ipc/pty.test.ts",
+        "src/main/daemon/daemon-pty-adapter.test.ts",
+        "src/main/startup/first-window-startup-services.test.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/main/ipc/pty.test.ts",
+          "assertions": [
+            "renderer local kills issue zero fallback shutdowns before startup and target the installed daemon afterward",
+            "runtime fire-and-forget local kills issue zero fallback shutdowns before startup and target the installed daemon afterward",
+            "runtime exact local stops issue zero fallback shutdowns before startup and verify the installed daemon target stopped",
+            "SSH spawns and kills bypass the unresolved local startup barrier and target the SSH provider"
+          ]
+        },
+        {
+          "file": "src/main/daemon/daemon-pty-adapter.test.ts",
+          "assertions": [
+            "a fresh unconnected adapter kills a session hosted by the live daemon and the session disappears from daemon inventory",
+            "concurrent shutdowns through a fresh adapter perform exactly one control-plus-stream handshake and remove both daemon sessions"
+          ]
+        },
+        {
+          "file": "src/main/startup/first-window-startup-services.test.ts",
+          "assertions": [
+            "daemon provider authority opens before an unresolved optional hook startup while the broader local spawn gate remains closed",
+            "the provider authority gate shares the bounded 60-second fail-open when daemon startup hangs"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-07-17",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/ipc/pty.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/startup/first-window-startup-services.test.ts",
+          "result": "passed",
+          "durationSeconds": 3.27,
+          "summary": "3 files and 406 tests passed, including single and concurrent real-socket fresh-adapter shutdown, one control-plus-stream handshake for burst shutdown, three deferred local provider-selection teardown paths, hook-independent provider authority, and SSH barrier bypass."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 10,
+        "scope": "focused main-process provider and IPC contract tests"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "The focused deterministic gate passed locally once and needs CI soak history."
+      },
+      "redGreenEvidence": {
+        "status": "partial",
+        "evidence": "Removing the adapter connection reproduces DaemonProtocolError: Not connected, and removing the renderer startup barrier routes shutdown to the fallback. The new runtime-controller barrier assertions also fail against the prior provider-before-startup shape; saved CI red artifacts remain uncollected."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "The provider-authority barrier and connection guard add no polling, timers, subprocesses, session inventories, or provider fanout; runtime exact-stop's existing post-stop verification inventory is unchanged. Shutdown does not wait for optional hook startup once daemon authority settles. Each path awaits one bounded provider promise; DaemonClient.ensureConnected is an O(1) no-op when connected and deduplicates concurrent connection attempts when disconnected. Tests deterministically count zero fallback shutdowns, exactly one target shutdown per entry point, and exactly one control-plus-stream handshake for concurrent fresh-adapter shutdowns."
+      },
+      "promotionCriteria": [
+        "Run the focused gate for at least 100 consecutive passes or 14 days across required CI platforms.",
+        "Collect a Windows cold-start close or exact-stop run against a preserved daemon PTY.",
+        "Attach saved red/green artifacts for all three provider-selection entry points."
+      ],
+      "knownGaps": [
+        "No live Electron restart-to-close journey is included; provider and IPC contracts cover the race deterministically.",
+        "The bounded daemon-startup fail-open to LocalPtyProvider remains an accepted boot-over-persistence tradeoff tracked by issue #5232.",
+        "Daemon process death and the resulting Windows ConPTY PowerShell FailFast are separate from provider-selection shutdown authority."
+      ],
+      "demotionRule": "Keep experimental or demote if the gate flakes without a product or harness bug, if any local shutdown reaches fallback before startup settles, or if shutdown adds inventory scans or retry loops."
+    },
+    {
       "id": "terminal-provider.ssh-remote-reattach-contract",
       "title": "SSH and remote terminal restore never turn unknown liveness into destructive cleanup",
       "maturity": "experimental",

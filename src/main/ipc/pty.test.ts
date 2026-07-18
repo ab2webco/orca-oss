@@ -587,6 +587,7 @@ describe('registerPtyHandlers', () => {
     const write = vi.fn()
     const pauseProducer = vi.fn()
     const resumeProducer = vi.fn()
+    const shutdown = vi.fn()
     let dataHandler: ((payload: { id: string; data: string }) => void) | null = null
     let exitHandler: ((payload: { id: string; code: number }) => void) | null = null
     let backgroundStreamHandler:
@@ -600,7 +601,7 @@ describe('registerPtyHandlers', () => {
       pauseProducer,
       resumeProducer,
       kill: vi.fn(),
-      shutdown: vi.fn(),
+      shutdown,
       sendSignal: vi.fn(),
       getCwd: vi.fn(),
       getInitialCwd: vi.fn(),
@@ -637,6 +638,7 @@ describe('registerPtyHandlers', () => {
       write,
       pauseProducer,
       resumeProducer,
+      shutdown,
       getBufferSnapshot,
       emitData: (id: string, data: string) => dataHandler?.({ id, data }),
       emitExit: (id: string, code = 0) => exitHandler?.({ id, code }),
@@ -3595,6 +3597,115 @@ describe('registerPtyHandlers', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
+  // Why: cold-start teardown must select the daemon after startup; fallback
+  // shutdown can falsely succeed and orphan the restored daemon PTY (#7742).
+  it('waits for the desktop startup barrier before renderer local kills resolve the provider', async () => {
+    const barrier = makeDeferred()
+    const awaitLocalPtyStartup = vi.fn(() => new Promise<void>(() => {}))
+    const awaitLocalPtyProviderStartup = vi.fn(() => barrier.promise)
+    const fallbackShutdown = vi.spyOn(getLocalPtyProvider(), 'shutdown')
+    registerPtyHandlers(
+      mainWindow as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        awaitLocalPtyStartup,
+        awaitLocalPtyProviderStartup
+      }
+    )
+
+    const daemonSessionId = 'wt-1@@11111111-1111-1111-1111-111111111111'
+    const pendingKill = handlers.get('pty:kill')!(null, { id: daemonSessionId }) as Promise<void>
+
+    await Promise.resolve()
+    expect(awaitLocalPtyStartup).not.toHaveBeenCalled()
+    expect(awaitLocalPtyProviderStartup).toHaveBeenCalledTimes(1)
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+    const daemon = installObservableDaemonTestProvider()
+    barrier.resolve()
+    await pendingKill
+
+    expect(daemon.spawn).not.toHaveBeenCalled()
+    expect(daemon.shutdown).toHaveBeenCalledWith(
+      daemonSessionId,
+      expect.objectContaining({ immediate: true })
+    )
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+  })
+
+  it('waits for the desktop startup barrier before runtime local kills resolve the provider', async () => {
+    const barrier = makeDeferred()
+    const awaitLocalPtyProviderStartup = vi.fn(() => barrier.promise)
+    const fallbackShutdown = vi.spyOn(getLocalPtyProvider(), 'shutdown')
+    const runtime = { setPtyController: vi.fn(), onPtyExit: vi.fn() }
+    registerPtyHandlers(
+      mainWindow as never,
+      runtime as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        awaitLocalPtyProviderStartup
+      }
+    )
+    const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+      kill: (ptyId: string) => boolean
+    }
+
+    expect(controller.kill('daemon-session')).toBe(true)
+    await Promise.resolve()
+    expect(awaitLocalPtyProviderStartup).toHaveBeenCalledTimes(1)
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+
+    const daemon = installObservableDaemonTestProvider()
+    barrier.resolve()
+    await vi.waitFor(() => expect(daemon.shutdown).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledTimes(1))
+
+    expect(daemon.shutdown).toHaveBeenCalledWith('daemon-session', { immediate: false })
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+  })
+
+  it('waits for the desktop startup barrier before runtime exact stops resolve the provider', async () => {
+    const barrier = makeDeferred()
+    const awaitLocalPtyProviderStartup = vi.fn(() => barrier.promise)
+    const fallbackShutdown = vi.spyOn(getLocalPtyProvider(), 'shutdown')
+    const runtime = { setPtyController: vi.fn(), onPtyExit: vi.fn() }
+    registerPtyHandlers(
+      mainWindow as never,
+      runtime as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        awaitLocalPtyProviderStartup
+      }
+    )
+    const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+      stopAndWait: (ptyId: string) => Promise<boolean>
+    }
+
+    const pendingStop = controller.stopAndWait('daemon-session')
+    await Promise.resolve()
+    expect(awaitLocalPtyProviderStartup).toHaveBeenCalledTimes(1)
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+
+    const daemon = installObservableDaemonTestProvider()
+    barrier.resolve()
+    await expect(pendingStop).resolves.toBe(true)
+
+    expect(daemon.shutdown).toHaveBeenCalledWith('daemon-session', {
+      immediate: true,
+      keepHistory: false
+    })
+    expect(fallbackShutdown).not.toHaveBeenCalled()
+  })
+
   it('rebinds local data and exit listeners after a late daemon provider install', async () => {
     vi.useFakeTimers()
     const barrier = makeDeferred()
@@ -3750,15 +3861,16 @@ describe('registerPtyHandlers', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('does not wait on the desktop startup barrier for SSH spawns', async () => {
+  it('does not wait on the desktop startup barrier for SSH spawns or kills', async () => {
     const barrier = makeDeferred()
     const awaitLocalPtyStartup = vi.fn(() => barrier.promise)
     const sshSpawn = vi.fn(async () => ({ id: 'remote-pty' }))
+    const sshShutdown = vi.fn()
     registerSshPtyProvider('ssh-1', {
       spawn: sshSpawn,
       write: vi.fn(),
       resize: vi.fn(),
-      shutdown: vi.fn(),
+      shutdown: sshShutdown,
       sendSignal: vi.fn(),
       getCwd: vi.fn(),
       getInitialCwd: vi.fn(),
@@ -3794,9 +3906,14 @@ describe('registerPtyHandlers', () => {
         env: {}
       })
     ).resolves.toEqual(expect.objectContaining({ id: 'remote-pty' }))
+    await handlers.get('pty:kill')!(null, { id: 'remote-pty' })
 
     expect(awaitLocalPtyStartup).not.toHaveBeenCalled()
     expect(sshSpawn).toHaveBeenCalledTimes(1)
+    expect(sshShutdown).toHaveBeenCalledWith('remote-pty', {
+      immediate: true,
+      keepHistory: false
+    })
   })
 
   it('lists sessions from both local and SSH providers', async () => {

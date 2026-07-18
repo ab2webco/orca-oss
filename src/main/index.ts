@@ -268,6 +268,7 @@ const gpuCrashFallbackTracker = new GpuCrashFallbackTracker({
 })
 let gpuFallbackActiveThisLaunch = false
 let localPtyStartupReady: Promise<void> = Promise.resolve()
+let localPtyProviderStartupReady: Promise<void> = Promise.resolve()
 const AGENT_STATE_CRASH_BREADCRUMB_MIN_INTERVAL_MS = 30_000
 const isServeMode = process.argv.includes('--serve')
 const desktopActivationGate = createServeDesktopActivationGate({
@@ -743,6 +744,7 @@ function startTerminalRuntimeStartupServices(): Promise<void> {
   })
   firstWindowStartupServicesReady = startupServices.firstWindowReady
   localPtyStartupReady = startupServices.localPtyReady
+  localPtyProviderStartupReady = startupServices.localPtyProviderReady
   void firstWindowStartupServicesReady.then(() => {
     logStartupMilestone('first-window-startup-services-ready')
   })
@@ -1073,6 +1075,7 @@ function openMainWindow(): BrowserWindow {
     (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target),
     {
       awaitLocalPtyStartup: () => localPtyStartupReady,
+      awaitLocalPtyProviderStartup: () => localPtyProviderStartupReady,
       onBeforeRendererReload: ({ ignoreCache, webContentsId }) => {
         if (window.webContents.id === webContentsId) {
           markExpectedRendererReload(webContentsId)
