@@ -190,6 +190,7 @@ import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../shared/setup-agent-sequencing'
 import {
+  isClaudeLaunchCommand,
   registerPtyHandlers,
   registerSshPtyProvider,
   clearProviderPtyState,
@@ -12341,5 +12342,26 @@ describe('registerPtyHandlers', () => {
         vi.useRealTimers()
       }
     })
+  })
+})
+
+describe('isClaudeLaunchCommand', () => {
+  it('detects direct claude launches', () => {
+    expect(isClaudeLaunchCommand('claude')).toBe(true)
+    expect(isClaudeLaunchCommand('claude --teammate-mode auto')).toBe(true)
+    expect(isClaudeLaunchCommand('/usr/local/bin/claude --resume abc')).toBe(true)
+  })
+
+  it('detects the Orca Agent Teams wrapper so per-worktree account pins apply', () => {
+    expect(isClaudeLaunchCommand('orca claude-teams')).toBe(true)
+    expect(isClaudeLaunchCommand('orca-dev claude-teams --foo')).toBe(true)
+    expect(isClaudeLaunchCommand('orca-ide claude-teams')).toBe(true)
+  })
+
+  it('does not match unrelated commands', () => {
+    expect(isClaudeLaunchCommand('openclaude')).toBe(false)
+    expect(isClaudeLaunchCommand('vim claude-teams.md')).toBe(false)
+    expect(isClaudeLaunchCommand('echo hello')).toBe(false)
+    expect(isClaudeLaunchCommand(undefined)).toBe(false)
   })
 })

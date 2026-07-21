@@ -1075,11 +1075,14 @@ export function buildPtyHostEnv(
   return baseEnv
 }
 
-function isClaudeLaunchCommand(command: string | undefined): boolean {
+export function isClaudeLaunchCommand(command: string | undefined): boolean {
   if (!command) {
     return false
   }
-  return /(^|[\s;&|('"`])(?:[^\s;&|('"`]*[\\/])?claude(?:\.cmd|\.exe)?($|[\s;&|)'"`])/i.test(
+  // Why: `claude-teams` covers the Orca Agent Teams wrapper (`orca claude-teams`),
+  // whose child claude inherits the PTY env — without it, per-worktree account
+  // pins are silently bypassed for Agent Teams launches.
+  return /(^|[\s;&|('"`])(?:[^\s;&|('"`]*[\\/])?claude(?:-teams)?(?:\.cmd|\.exe)?($|[\s;&|)'"`])/i.test(
     command
   )
 }
