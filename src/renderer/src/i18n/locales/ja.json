@@ -4205,7 +4205,9 @@
           "deleteWorktree": "ワークツリーを削除",
           "assignAccountsTo": "アカウントを割り当て",
           "assignAccount": "アカウントを割り当て",
-          "inheritGlobalAccount": "グローバル設定を継承"
+          "inheritGlobalAccount": "グローバル設定を継承",
+          "claudeAccountSection": "Claude",
+          "codexAccountSection": "Codex"
         },
         "WorktreeList": {
           "d880ea0744": "グループを作成し、このプロジェクトをそのグループに移動します。",

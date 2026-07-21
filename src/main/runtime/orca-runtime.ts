@@ -16295,6 +16295,7 @@ export class OrcaRuntimeService {
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const { lineage, ...metaUpdates } = updates
     this.assertCurrentManagedClaudeAccountPins([metaUpdates])
+    this.assertCurrentManagedCodexAccountPins([metaUpdates])
     const shouldClearPushTarget =
       Object.prototype.hasOwnProperty.call(metaUpdates, 'pushTarget') &&
       metaUpdates.pushTarget === null
@@ -16337,6 +16338,29 @@ export class OrcaRuntimeService {
     for (const accountId of requestedIds) {
       if (!currentIds.has(accountId)) {
         throw new Error('That Claude account no longer exists.')
+      }
+    }
+  }
+
+  private assertCurrentManagedCodexAccountPins(
+    updates: readonly { codexAccountId?: string | null }[]
+  ): void {
+    const requestedIds = new Set(
+      updates
+        .map((entry) => entry.codexAccountId)
+        .filter((accountId): accountId is string => typeof accountId === 'string')
+    )
+    if (requestedIds.size === 0) {
+      return
+    }
+    const currentIds = new Set(
+      this.requireAccountServices()
+        .codexAccounts.listAccounts()
+        .accounts.map((account) => account.id)
+    )
+    for (const accountId of requestedIds) {
+      if (!currentIds.has(accountId)) {
+        throw new Error('That Codex account no longer exists.')
       }
     }
   }
@@ -16415,6 +16439,7 @@ export class OrcaRuntimeService {
     // Why: lineage resolution can outlive account removal; revalidate after
     // every await and before any synchronous lineage or metadata write.
     this.assertCurrentManagedClaudeAccountPins([persistedMetaUpdates])
+    this.assertCurrentManagedCodexAccountPins([persistedMetaUpdates])
     if (nextLineage === null) {
       this.store.removeWorktreeLineage?.(worktree.id)
     } else if (nextLineage) {
@@ -16452,6 +16477,9 @@ export class OrcaRuntimeService {
       )
     )
     this.assertCurrentManagedClaudeAccountPins(
+      prepared.map(({ persistedMetaUpdates }) => persistedMetaUpdates)
+    )
+    this.assertCurrentManagedCodexAccountPins(
       prepared.map(({ persistedMetaUpdates }) => persistedMetaUpdates)
     )
     for (const { worktree, persistedMetaUpdates } of prepared) {

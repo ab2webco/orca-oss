@@ -9424,6 +9424,44 @@ describe('Store', () => {
     })
   })
 
+  describe('worktree Codex account pins', () => {
+    it('round-trips codexAccountId through save and reload like claudeAccountId', async () => {
+      const store = await createStore()
+      store.setWorktreeMeta('worktree-a', { codexAccountId: 'codex-account-a' })
+      store.flush()
+
+      const reloaded = await createStore()
+      expect(reloaded.getWorktreeMeta('worktree-a')?.codexAccountId).toBe('codex-account-a')
+
+      reloaded.setWorktreeMeta('worktree-a', { codexAccountId: null })
+      reloaded.flush()
+      const cleared = await createStore()
+      expect(cleared.getWorktreeMeta('worktree-a')?.codexAccountId).toBeNull()
+    })
+  })
+
+  describe('worktree Codex account pin persistence', () => {
+    it('round-trips codexAccountId through worktree meta like claudeAccountId', async () => {
+      const store = await createStore()
+      store.setWorktreeMeta('worktree-a', { codexAccountId: 'codex-account-a' })
+      store.flush()
+
+      const reloaded = await createStore()
+      expect(reloaded.getWorktreeMeta('worktree-a')?.codexAccountId).toBe('codex-account-a')
+    })
+
+    it('round-trips an explicit null pin (inherit global)', async () => {
+      const store = await createStore()
+      store.setWorktreeMeta('worktree-a', { codexAccountId: 'codex-account-a' })
+      store.flush()
+      store.setWorktreeMeta('worktree-a', { codexAccountId: null })
+      store.flush()
+
+      const reloaded = await createStore()
+      expect(reloaded.getWorktreeMeta('worktree-a')?.codexAccountId).toBeNull()
+    })
+  })
+
   // ── Rolling backups (issue #1158) ──────────────────────────────────
 
   describe('rolling backups', () => {

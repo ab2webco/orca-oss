@@ -4,6 +4,16 @@ export function hasClaudeAccountPinUpdate(update: Readonly<Record<string, unknow
   return Object.prototype.hasOwnProperty.call(update, 'claudeAccountId')
 }
 
+export function hasCodexAccountPinUpdate(update: Readonly<Record<string, unknown>>): boolean {
+  return Object.prototype.hasOwnProperty.call(update, 'codexAccountId')
+}
+
+/** Why: pre-account runtimes accept worktree.set but discard unknown pin
+ *  fields, which would turn optimistic UI into unsafe auth for either provider. */
+export function hasProviderAccountPinUpdate(update: Readonly<Record<string, unknown>>): boolean {
+  return hasClaudeAccountPinUpdate(update) || hasCodexAccountPinUpdate(update)
+}
+
 export async function runLegacyWorktreeMetaUpdates<T>(
   updates: readonly T[],
   updateOne: (update: T) => Promise<unknown>

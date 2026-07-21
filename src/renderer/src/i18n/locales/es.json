@@ -4224,7 +4224,9 @@
           "deleteWorktree": "Eliminar worktree",
           "assignAccountsTo": "Asignar cuentas a",
           "assignAccount": "Asignar cuenta",
-          "inheritGlobalAccount": "Heredar configuración global"
+          "inheritGlobalAccount": "Heredar configuración global",
+          "claudeAccountSection": "Claude",
+          "codexAccountSection": "Codex"
         },
         "WorktreeList": {
           "d880ea0744": "Crea un grupo y mueve este proyecto a él.",

@@ -118,7 +118,7 @@ import { CodexAccountService } from './codex-accounts/service'
 import { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
 import {
   normalizeCodexRuntimeSelection,
-  type CodexAccountSelectionTarget
+  type CodexAccountLaunchTarget
 } from './codex-accounts/runtime-selection'
 import {
   getSelectedClaudeAccountIdForTarget,
@@ -699,7 +699,7 @@ async function startServeAgentHookServer(): Promise<void> {
   }
 }
 
-function prepareCodexRuntimeHomeForLaunch(target?: CodexAccountSelectionTarget): string | null {
+function prepareCodexRuntimeHomeForLaunch(target?: CodexAccountLaunchTarget): string | null {
   const runtimeHomePath = codexRuntimeHome!.prepareForCodexLaunch(target)
   const hookTarget =
     target?.runtime === 'wsl'

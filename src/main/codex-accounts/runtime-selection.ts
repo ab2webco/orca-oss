@@ -9,6 +9,13 @@ export type CodexAccountSelectionTarget = {
   wslDistro?: string | null
 }
 
+/** Selection target plus an optional per-worktree pinned account override.
+ *  Launch preparation must honor the override or fail closed — never silently
+ *  fall back to the global selection. */
+export type CodexAccountLaunchTarget = CodexAccountSelectionTarget & {
+  overrideAccountId?: string
+}
+
 export type NormalizedCodexAccountSelectionTarget = {
   runtime: 'host' | 'wsl'
   wslDistro: string | null

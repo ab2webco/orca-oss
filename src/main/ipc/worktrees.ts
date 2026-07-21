@@ -8,6 +8,7 @@ import {
   assertValidClaudeAccountPin,
   normalizeClaudeAccountPinForCreate
 } from '../claude-accounts/worktree-account-pin'
+import { assertValidCodexAccountPin } from '../codex-accounts/worktree-account-pin'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { readBranchRenameFailureOutputForDisplay } from '../agent-hooks/branch-rename-failure-output'
 import {
@@ -836,6 +837,7 @@ function mergeFolderWorkspace(repo: Repo, worktreeId: string, meta: WorktreeMeta
     ...(meta.priorWorktreeIds !== undefined ? { priorWorktreeIds: meta.priorWorktreeIds } : {}),
     workspaceStatus: meta.workspaceStatus ?? DEFAULT_WORKSPACE_STATUS_ID,
     ...(meta.claudeAccountId !== undefined ? { claudeAccountId: meta.claudeAccountId } : {}),
+    ...(meta.codexAccountId !== undefined ? { codexAccountId: meta.codexAccountId } : {}),
     diffComments: meta.diffComments,
     mobileDiffReview: meta.mobileDiffReview
   }
@@ -2039,6 +2041,7 @@ export function registerWorktreeHandlers(
     'worktrees:updateMeta',
     (_event, args: { worktreeId: string; updates: Partial<WorktreeMeta> }) => {
       assertValidClaudeAccountPin(store, args.updates.claudeAccountId)
+      assertValidCodexAccountPin(store, args.updates.codexAccountId)
       const updates =
         args.updates.displayName !== undefined
           ? {
@@ -2071,6 +2074,7 @@ export function registerWorktreeHandlers(
     (_event, args: { updates: { worktreeId: string; updates: Partial<WorktreeMeta> }[] }) => {
       for (const entry of args.updates) {
         assertValidClaudeAccountPin(store, entry.updates.claudeAccountId)
+        assertValidCodexAccountPin(store, entry.updates.codexAccountId)
       }
       const renamedRepoIds = new Set<string>()
       for (const entry of args.updates) {

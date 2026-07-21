@@ -512,6 +512,10 @@ export type Worktree = {
    *  PTY spawn into a per-terminal CLAUDE_CONFIG_DIR. null/undefined = inherit
    *  the global host selection (today's behavior). */
   claudeAccountId?: string | null
+  /** Codex managed account this worktree is pinned to, resolved fresh at each
+   *  Codex PTY spawn into a per-terminal CODEX_HOME. null/undefined = inherit
+   *  the global runtime selection (today's behavior). */
+  codexAccountId?: string | null
   diffComments?: DiffComment[]
   mobileDiffReview?: MobileDiffReviewState
   automationProvenance?: AutomationWorkspaceProvenance
@@ -619,6 +623,8 @@ export type WorktreeMeta = {
   workspaceStatus?: WorkspaceStatus
   /** See {@link Worktree.claudeAccountId}. Persisted to orca-data.json. */
   claudeAccountId?: string | null
+  /** See {@link Worktree.codexAccountId}. Persisted to orca-data.json. */
+  codexAccountId?: string | null
   diffComments?: DiffComment[]
   /** Path-derived worktree ids this worktree had before its folder was renamed
    *  on disk (the id embeds the path). Lets the daemon's session GC and registry

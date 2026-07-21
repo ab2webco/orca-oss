@@ -146,7 +146,10 @@ import {
 import { setTerminalViewAttributes } from '../runtime/terminal-view-attribute-store'
 import { validateTerminalViewAttributes } from '../../shared/terminal-view-attributes'
 import type { PtyModelRestoreReason } from '../../shared/pty-model-restore-marker'
-import type { CodexAccountSelectionTarget } from '../codex-accounts/runtime-selection'
+import type {
+  CodexAccountLaunchTarget,
+  CodexAccountSelectionTarget
+} from '../codex-accounts/runtime-selection'
 import { isHostCodexHomeForWsl, isWslCodexHomeForHost } from '../pty/codex-home-wsl-env'
 import { buildConfiguredProxyEnv, type NetworkProxySettings } from '../../shared/network-proxy'
 import { resolveSetupAgentSequenceLaunchCommand } from '../../shared/setup-agent-sequencing'
@@ -621,7 +624,7 @@ function shouldSkipCodexHomeEnvForWindowsShell(
 }
 
 const CODEX_HOME_ENV_KEYS = ['CODEX_HOME', 'ORCA_CODEX_HOME'] as const
-type GetSelectedCodexHomePath = (target?: CodexAccountSelectionTarget) => string | null
+type GetSelectedCodexHomePath = (target?: CodexAccountLaunchTarget) => string | null
 type PrepareClaudeAuth = (
   target?: ClaudeAccountSelectionTarget
 ) => Promise<ClaudeRuntimeAuthPreparation>
@@ -658,6 +661,27 @@ function getCodexSelectionTargetForPty(
     return { runtime: 'wsl', wslDistro: wslPath?.distro ?? wslDistro ?? null }
   }
   return { runtime: 'host' }
+}
+
+// Resolves the per-worktree Codex account binding (if any) fresh at spawn time
+// for Codex launch commands and layers it onto the runtime selection target as
+// an override the codex account service must honor or fail closed. Non-Codex
+// spawns and unassigned worktrees return the base target unchanged, preserving
+// the global selection's CODEX_HOME behavior byte-for-byte.
+function getCodexLaunchTargetForPty(
+  base: CodexAccountSelectionTarget,
+  store: Store | undefined,
+  worktreeId: string | undefined,
+  command: string | undefined
+): CodexAccountLaunchTarget {
+  if (!isCodexLaunchCommand(command)) {
+    return base
+  }
+  const overrideAccountId =
+    store && typeof worktreeId === 'string'
+      ? (store.getWorktreeMeta(worktreeId)?.codexAccountId ?? undefined)
+      : undefined
+  return overrideAccountId ? { ...base, overrideAccountId } : base
 }
 
 // Resolves the per-worktree Claude account binding (if any) fresh at spawn time
@@ -1085,6 +1109,15 @@ export function isClaudeLaunchCommand(command: string | undefined): boolean {
   return /(^|[\s;&|('"`])(?:[^\s;&|('"`]*[\\/])?claude(?:-teams)?(?:\.cmd|\.exe)?($|[\s;&|)'"`])/i.test(
     command
   )
+}
+
+export function isCodexLaunchCommand(command: string | undefined): boolean {
+  if (!command) {
+    return false
+  }
+  // Why: mirrors isClaudeLaunchCommand's shape (path prefixes, Windows
+  // extensions, shell separators); Codex has no Orca wrapper command today.
+  return /(^|[\s;&|('"`])(?:[^\s;&|('"`]*[\\/])?codex(?:\.cmd|\.exe)?($|[\s;&|)'"`])/i.test(command)
 }
 
 function routesFreshSpawnsToLocalProvider(
@@ -1619,7 +1652,9 @@ export function registerPtyHandlers(
             : { runtime: 'host' }
         const selectedCodexHomePath = getCompatibleSelectedCodexHomePath(
           codexSelectionTarget,
-          getSelectedCodexHomePath?.(codexSelectionTarget) ?? null
+          getSelectedCodexHomePath?.(
+            getCodexLaunchTargetForPty(codexSelectionTarget, store, ctx?.worktreeId, ctx?.command)
+          ) ?? null
         )
         const env = buildPtyHostEnv(id, baseEnv, {
           isPackaged: app.isPackaged,
@@ -3340,7 +3375,9 @@ export function registerPtyHandlers(
       const selectedCodexHomePath = isDaemonHostSpawn
         ? getCompatibleSelectedCodexHomePath(
             codexSelectionTarget,
-            getSelectedCodexHomePath?.(codexSelectionTarget) ?? null
+            getSelectedCodexHomePath?.(
+              getCodexLaunchTargetForPty(codexSelectionTarget, store, args.worktreeId, args.command)
+            ) ?? null
           )
         : null
       const skipCodexHomeEnv =
@@ -4297,7 +4334,9 @@ export function registerPtyHandlers(
       const selectedCodexHomePath = isDaemonHostSpawn
         ? getCompatibleSelectedCodexHomePath(
             codexSelectionTarget,
-            getSelectedCodexHomePath?.(codexSelectionTarget) ?? null
+            getSelectedCodexHomePath?.(
+              getCodexLaunchTargetForPty(codexSelectionTarget, store, args.worktreeId, args.command)
+            ) ?? null
           )
         : null
       const skipCodexHomeEnv =

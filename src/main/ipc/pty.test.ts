@@ -191,6 +191,7 @@ import { makePaneKey } from '../../shared/stable-pane-id'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../shared/setup-agent-sequencing'
 import {
   isClaudeLaunchCommand,
+  isCodexLaunchCommand,
   registerPtyHandlers,
   registerSshPtyProvider,
   clearProviderPtyState,
@@ -12363,5 +12364,39 @@ describe('isClaudeLaunchCommand', () => {
     expect(isClaudeLaunchCommand('vim claude-teams.md')).toBe(false)
     expect(isClaudeLaunchCommand('echo hello')).toBe(false)
     expect(isClaudeLaunchCommand(undefined)).toBe(false)
+  })
+})
+
+describe('isCodexLaunchCommand', () => {
+  it('detects direct codex launches', () => {
+    expect(isCodexLaunchCommand('codex')).toBe(true)
+    expect(isCodexLaunchCommand('codex resume --last')).toBe(true)
+    expect(isCodexLaunchCommand('/usr/local/bin/codex --model gpt-5-codex')).toBe(true)
+    expect(isCodexLaunchCommand('codex.exe')).toBe(true)
+    expect(isCodexLaunchCommand('C:\\tools\\codex.cmd')).toBe(true)
+  })
+
+  it('does not match unrelated commands', () => {
+    expect(isCodexLaunchCommand('opencodex')).toBe(false)
+    expect(isCodexLaunchCommand('vim codex.md')).toBe(false)
+    expect(isCodexLaunchCommand('echo hello')).toBe(false)
+    expect(isCodexLaunchCommand(undefined)).toBe(false)
+  })
+})
+
+describe('isCodexLaunchCommand', () => {
+  it('detects direct codex launches', () => {
+    expect(isCodexLaunchCommand('codex')).toBe(true)
+    expect(isCodexLaunchCommand('codex resume --last')).toBe(true)
+    expect(isCodexLaunchCommand('/usr/local/bin/codex --model gpt-5-codex')).toBe(true)
+    expect(isCodexLaunchCommand('codex.exe')).toBe(true)
+    expect(isCodexLaunchCommand('C:\\tools\\codex.cmd --help')).toBe(true)
+  })
+
+  it('does not match unrelated commands', () => {
+    expect(isCodexLaunchCommand('opencodex')).toBe(false)
+    expect(isCodexLaunchCommand('vim codex.md')).toBe(false)
+    expect(isCodexLaunchCommand('echo hello')).toBe(false)
+    expect(isCodexLaunchCommand(undefined)).toBe(false)
   })
 })

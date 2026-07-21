@@ -39,10 +39,21 @@ import { cn } from '@/lib/utils'
 import {
   filterClaudeAccountsByWorktreeRuntimes,
   INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE,
-  isLocalClaudeAccountWorktreeTarget
+  isLocalClaudeAccountWorktreeTarget,
+  type ClaudeAccountLaunchRuntime
 } from '@/lib/claude-account-runtime-filter'
+import {
+  filterCodexAccountsByWorktreeRuntimes,
+  INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE,
+  isLocalCodexAccountWorktreeTarget
+} from '@/lib/codex-account-runtime-filter'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
-import type { ClaudeManagedAccountSummary, Repo, Worktree } from '../../../../shared/types'
+import type {
+  ClaudeManagedAccountSummary,
+  CodexManagedAccountSummary,
+  Repo,
+  Worktree
+} from '../../../../shared/types'
 import { runWorktreeBatchDelete, runWorktreeDelete } from './delete-worktree-flow'
 import { runSleepWorktrees } from './sleep-worktree-flow'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -101,6 +112,20 @@ export function canAssignClaudeAccountsToWorktrees(
     worktrees.length > 0 &&
     worktrees.every((worktree) =>
       isLocalClaudeAccountWorktreeTarget(worktree, repoMap.get(worktree.repoId))
+    )
+  )
+}
+
+export function canAssignCodexAccountsToWorktrees(
+  worktrees: readonly Worktree[],
+  repoMap: ReadonlyMap<string, Repo>,
+  isPairedWebClient: boolean
+): boolean {
+  return (
+    !isPairedWebClient &&
+    worktrees.length > 0 &&
+    worktrees.every((worktree) =>
+      isLocalCodexAccountWorktreeTarget(worktree, repoMap.get(worktree.repoId))
     )
   )
 }
@@ -308,6 +333,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const deleteState = useAppStore((s) => s.deleteStateByWorktreeId[worktree.id])
   const [menuOpen, setMenuOpen] = useState(false)
   const [claudeAccounts, setClaudeAccounts] = useState<ClaudeManagedAccountSummary[]>([])
+  const [codexAccounts, setCodexAccounts] = useState<CodexManagedAccountSummary[]>([])
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 })
   const [contextWorktrees, setContextWorktrees] = useState<readonly Worktree[]>(
     effectiveSelectedWorktrees
@@ -388,14 +414,16 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     repoMap,
     isWebClientLocation()
   )
-  // Why: one batch action must be valid for every selected worktree; using an
-  // intersection prevents a host/WSL mixed selection from silently falling back.
-  const filteredClaudeAccounts = useMemo(
+  const canAssignCodexAccount = canAssignCodexAccountsToWorktrees(
+    activeContextWorktrees,
+    repoMap,
+    isWebClientLocation()
+  )
+  const accountRuntimeTargets = useMemo(
     () =>
-      menuOpen && canAssignClaudeAccount
-        ? filterClaudeAccountsByWorktreeRuntimes(
-            claudeAccounts,
-            activeContextWorktrees.map((item) => {
+      menuOpen
+        ? activeContextWorktrees.map(
+            (item): { path: string; launchRuntime?: ClaudeAccountLaunchRuntime } => {
               const projectRuntime = getLocalProjectExecutionRuntimeContext(
                 useAppStore.getState(),
                 item.id
@@ -411,10 +439,26 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                         ? ({ kind: 'host' } as const)
                         : undefined
               }
-            })
+            }
           )
         : [],
-    [activeContextWorktrees, canAssignClaudeAccount, claudeAccounts, menuOpen]
+    [activeContextWorktrees, menuOpen]
+  )
+  // Why: one batch action must be valid for every selected worktree; using an
+  // intersection prevents a host/WSL mixed selection from silently falling back.
+  const filteredClaudeAccounts = useMemo(
+    () =>
+      menuOpen && canAssignClaudeAccount
+        ? filterClaudeAccountsByWorktreeRuntimes(claudeAccounts, accountRuntimeTargets)
+        : [],
+    [accountRuntimeTargets, canAssignClaudeAccount, claudeAccounts, menuOpen]
+  )
+  const filteredCodexAccounts = useMemo(
+    () =>
+      menuOpen && canAssignCodexAccount
+        ? filterCodexAccountsByWorktreeRuntimes(codexAccounts, accountRuntimeTargets)
+        : [],
+    [accountRuntimeTargets, canAssignCodexAccount, codexAccounts, menuOpen]
   )
   const contextClaudeAccountId = useMemo(() => {
     const [first, ...rest] = activeContextWorktrees
@@ -424,6 +468,18 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     const accountId = first.claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE
     return rest.every(
       (item) => (item.claudeAccountId ?? INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE) === accountId
+    )
+      ? accountId
+      : ''
+  }, [activeContextWorktrees])
+  const contextCodexAccountId = useMemo(() => {
+    const [first, ...rest] = activeContextWorktrees
+    if (!first) {
+      return ''
+    }
+    const accountId = first.codexAccountId ?? INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE
+    return rest.every(
+      (item) => (item.codexAccountId ?? INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE) === accountId
     )
       ? accountId
       : ''
@@ -493,7 +549,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     []
   )
 
-  // Why: fetch managed Claude accounts only while the menu is open, mirroring
+  // Why: fetch managed provider accounts only while the menu is open, mirroring
   // selectMenuScopedMap's gating philosophy above — with potentially many
   // sidebar rows mounted, an unconditional fetch-on-mount would fire one IPC
   // call per row instead of once per actual open.
@@ -516,6 +572,26 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       cancelled = true
     }
   }, [canAssignClaudeAccount, menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen || !canAssignCodexAccount) {
+      return
+    }
+    let cancelled = false
+    void window.api.codexAccounts
+      .list()
+      .then((result) => {
+        if (!cancelled) {
+          setCodexAccounts(result.accounts)
+        }
+      })
+      .catch(() => {
+        // Non-fatal: the account action stays hidden when the list is unavailable.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canAssignCodexAccount, menuOpen])
 
   const handleCopyPath = useCallback(() => {
     window.api.ui.writeClipboardText(worktree.path)
@@ -587,6 +663,19 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
         activeContextWorktrees
           .filter((item) => (item.claudeAccountId ?? null) !== accountId)
           .map((item) => [item.id, { claudeAccountId: accountId }])
+      )
+      void updateWorktreesMeta(updates)
+    },
+    [activeContextWorktrees, setMenuOpenState, updateWorktreesMeta]
+  )
+
+  const handleAssignCodexAccount = useCallback(
+    (accountId: string | null) => {
+      setMenuOpenState(false)
+      const updates = new Map(
+        activeContextWorktrees
+          .filter((item) => (item.codexAccountId ?? null) !== accountId)
+          .map((item) => [item.id, { codexAccountId: accountId }])
       )
       void updateWorktreesMeta(updates)
     },
@@ -837,46 +926,102 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
-          {canAssignClaudeAccount &&
-          (filteredClaudeAccounts.length > 0 ||
-            activeContextWorktrees.some((item) => item.claudeAccountId)) ? (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={deletingContext}>
-                <UserCog className="size-3.5" />
-                {isMultiContext
-                  ? translate(
-                      'auto.components.sidebar.WorktreeContextMenu.assignAccountsTo',
-                      'Assign Accounts To'
-                    )
-                  : translate(
-                      'auto.components.sidebar.WorktreeContextMenu.assignAccount',
-                      'Assign Account'
-                    )}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48">
-                <DropdownMenuRadioGroup value={contextClaudeAccountId}>
-                  <DropdownMenuRadioItem
-                    value={INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}
-                    onSelect={() => handleAssignClaudeAccount(null)}
-                  >
-                    {translate(
-                      'auto.components.sidebar.WorktreeContextMenu.inheritGlobalAccount',
-                      'Inherit global'
-                    )}
-                  </DropdownMenuRadioItem>
-                  {filteredClaudeAccounts.map((account) => (
-                    <DropdownMenuRadioItem
-                      key={account.id}
-                      value={account.id}
-                      onSelect={() => handleAssignClaudeAccount(account.id)}
-                    >
-                      <span className="max-w-48 truncate">{account.email}</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ) : null}
+          {(() => {
+            // Why: only surface a provider section when it has managed accounts
+            // (or an existing pin that must stay reachable for unassignment).
+            const showClaudeAccountSection =
+              canAssignClaudeAccount &&
+              (filteredClaudeAccounts.length > 0 ||
+                activeContextWorktrees.some((item) => item.claudeAccountId))
+            const showCodexAccountSection =
+              canAssignCodexAccount &&
+              (filteredCodexAccounts.length > 0 ||
+                activeContextWorktrees.some((item) => item.codexAccountId))
+            if (!showClaudeAccountSection && !showCodexAccountSection) {
+              return null
+            }
+            return (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={deletingContext}>
+                  <UserCog className="size-3.5" />
+                  {isMultiContext
+                    ? translate(
+                        'auto.components.sidebar.WorktreeContextMenu.assignAccountsTo',
+                        'Assign Accounts To'
+                      )
+                    : translate(
+                        'auto.components.sidebar.WorktreeContextMenu.assignAccount',
+                        'Assign Account'
+                      )}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-48">
+                  {showClaudeAccountSection ? (
+                    <>
+                      <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                        {translate(
+                          'auto.components.sidebar.WorktreeContextMenu.claudeAccountSection',
+                          'Claude'
+                        )}
+                      </DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={contextClaudeAccountId}>
+                        <DropdownMenuRadioItem
+                          value={INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE}
+                          onSelect={() => handleAssignClaudeAccount(null)}
+                        >
+                          {translate(
+                            'auto.components.sidebar.WorktreeContextMenu.inheritGlobalAccount',
+                            'Inherit global'
+                          )}
+                        </DropdownMenuRadioItem>
+                        {filteredClaudeAccounts.map((account) => (
+                          <DropdownMenuRadioItem
+                            key={account.id}
+                            value={account.id}
+                            onSelect={() => handleAssignClaudeAccount(account.id)}
+                          >
+                            <span className="max-w-48 truncate">{account.email}</span>
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </>
+                  ) : null}
+                  {showClaudeAccountSection && showCodexAccountSection ? (
+                    <DropdownMenuSeparator />
+                  ) : null}
+                  {showCodexAccountSection ? (
+                    <>
+                      <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                        {translate(
+                          'auto.components.sidebar.WorktreeContextMenu.codexAccountSection',
+                          'Codex'
+                        )}
+                      </DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={contextCodexAccountId}>
+                        <DropdownMenuRadioItem
+                          value={INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE}
+                          onSelect={() => handleAssignCodexAccount(null)}
+                        >
+                          {translate(
+                            'auto.components.sidebar.WorktreeContextMenu.inheritGlobalAccount',
+                            'Inherit global'
+                          )}
+                        </DropdownMenuRadioItem>
+                        {filteredCodexAccounts.map((account) => (
+                          <DropdownMenuRadioItem
+                            key={account.id}
+                            value={account.id}
+                            onSelect={() => handleAssignCodexAccount(account.id)}
+                          >
+                            <span className="max-w-48 truncate">{account.email}</span>
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </>
+                  ) : null}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )
+          })()}
           <DropdownMenuSeparator />
           {!isMultiContext && (
             <>

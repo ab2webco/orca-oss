@@ -187,6 +187,7 @@ export const WORKTREE_METHODS: RpcMethod[] = [
         baseRef: params.baseRef,
         workspaceStatus: params.workspaceStatus,
         claudeAccountId: params.claudeAccountId,
+        codexAccountId: params.codexAccountId,
         pushTarget: params.pushTarget,
         diffComments: params.diffComments,
         mobileDiffReview: params.mobileDiffReview,

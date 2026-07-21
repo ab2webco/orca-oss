@@ -4205,7 +4205,9 @@
           "deleteWorktree": "删除工作树",
           "assignAccountsTo": "分配账户",
           "assignAccount": "分配账户",
-          "inheritGlobalAccount": "继承全局设置"
+          "inheritGlobalAccount": "继承全局设置",
+          "claudeAccountSection": "Claude",
+          "codexAccountSection": "Codex"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",

@@ -4247,7 +4247,9 @@
           "deleteWorktree": "Delete Worktree",
           "assignAccountsTo": "Assign Accounts To",
           "assignAccount": "Assign Account",
-          "inheritGlobalAccount": "Inherit global"
+          "inheritGlobalAccount": "Inherit global",
+          "claudeAccountSection": "Claude",
+          "codexAccountSection": "Codex"
         },
         "WorktreeList": {
           "7a8b9c0d1e": "Update required",

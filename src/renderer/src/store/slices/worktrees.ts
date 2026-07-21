@@ -72,7 +72,7 @@ import {
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
 import {
-  hasClaudeAccountPinUpdate,
+  hasProviderAccountPinUpdate,
   runLegacyWorktreeMetaUpdates
 } from '@/runtime/runtime-worktree-meta-fallback'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
@@ -4089,7 +4089,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             if (!isRuntimeMethodNotFoundError(error)) {
               throw error
             }
-            if (runtimeUpdates.some(hasClaudeAccountPinUpdate)) {
+            if (runtimeUpdates.some(hasProviderAccountPinUpdate)) {
               // Why: pre-account runtimes accept worktree.set but discard the
               // unknown pin field, which would turn optimistic UI into unsafe auth.
               throw error

@@ -293,7 +293,15 @@ export type LocalPtyProviderOptions = {
   buildSpawnEnv?: (
     id: string,
     baseEnv: Record<string, string>,
-    ctx?: { command?: string; shellPath?: string; isWsl?: boolean; wslDistro?: string | null }
+    ctx?: {
+      command?: string
+      shellPath?: string
+      isWsl?: boolean
+      wslDistro?: string | null
+      /** Why: per-worktree Codex account pins are resolved fresh at spawn time
+       *  inside the env hook, which otherwise has no worktree identity. */
+      worktreeId?: string
+    }
   ) => Record<string, string>
   /** Whether worktree-scoped shell history is enabled. When true (or absent)
    *  and a worktreeId is provided, HISTFILE is scoped per-worktree. */
@@ -524,7 +532,8 @@ export class LocalPtyProvider implements IPtyProvider {
           command: args.command,
           shellPath,
           isWsl: isWslShell,
-          wslDistro: launchWslDistro
+          wslDistro: launchWslDistro,
+          worktreeId: args.worktreeId
         })
       : spawnEnv
     // Why: app-level env hooks can reintroduce vars that special launch modes

@@ -991,6 +991,74 @@ describe('CodexRuntimeHomeService', () => {
     expect(existsSync(getRuntimeCodexHomePath())).toBe(true)
   })
 
+  it('returns the pinned account managed home instead of the shared runtime home', async () => {
+    const managedHomePath = createManagedAuth(
+      testState.userDataDir,
+      'account-pin',
+      createCodexAuthJson('pin@example.com', 'acct-pin', 'pin')
+    )
+    const store = createStore(
+      createSettings({
+        codexManagedAccounts: [
+          {
+            id: 'account-pin',
+            email: 'pin@example.com',
+            managedHomePath,
+            providerAccountId: 'acct-pin',
+            workspaceLabel: null,
+            workspaceAccountId: 'acct-pin',
+            createdAt: 1,
+            updatedAt: 1,
+            lastAuthenticatedAt: 1
+          }
+        ]
+      })
+    )
+    const { CodexRuntimeHomeService } = await import('./runtime-home-service')
+    const service = new CodexRuntimeHomeService(store as never)
+
+    expect(
+      service.prepareForCodexLaunch({ runtime: 'host', overrideAccountId: 'account-pin' })
+    ).toBe(managedHomePath)
+  })
+
+  it('fails closed for dangling or runtime-incompatible worktree pins', async () => {
+    const managedHomePath = createManagedAuth(
+      testState.userDataDir,
+      'account-wsl-pin',
+      createCodexAuthJson('wsl@example.com', 'acct-wsl', 'wsl')
+    )
+    const store = createStore(
+      createSettings({
+        codexManagedAccounts: [
+          {
+            id: 'account-wsl-pin',
+            email: 'wsl@example.com',
+            managedHomePath,
+            managedHomeRuntime: 'wsl',
+            wslDistro: 'Ubuntu',
+            providerAccountId: 'acct-wsl',
+            workspaceLabel: null,
+            workspaceAccountId: 'acct-wsl',
+            createdAt: 1,
+            updatedAt: 1,
+            lastAuthenticatedAt: 1
+          }
+        ]
+      })
+    )
+    const { CodexRuntimeHomeService } = await import('./runtime-home-service')
+    const { WORKTREE_CODEX_ACCOUNT_UNAVAILABLE_MESSAGE } = await import('./worktree-account-pin')
+    const service = new CodexRuntimeHomeService(store as never)
+
+    expect(() =>
+      service.prepareForCodexLaunch({ runtime: 'host', overrideAccountId: 'removed-account' })
+    ).toThrow(WORKTREE_CODEX_ACCOUNT_UNAVAILABLE_MESSAGE)
+    expect(() =>
+      service.prepareForCodexLaunch({ runtime: 'host', overrideAccountId: 'account-wsl-pin' })
+    ).toThrow(WORKTREE_CODEX_ACCOUNT_UNAVAILABLE_MESSAGE)
+  })
+
   it('uses the same host CODEX_HOME after switching managed Codex accounts', async () => {
     const runtimeAuthPath = getRuntimeCodexAuthPath()
     const account1Auth = createCodexAuthJson('one@example.com', 'acct-1', 'one')

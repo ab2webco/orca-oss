@@ -57,8 +57,13 @@ import {
   getSelectedCodexAccountIdForTarget,
   normalizeCodexRuntimeSelection,
   setSelectedCodexAccountIdForTarget,
+  type CodexAccountLaunchTarget,
   type CodexAccountSelectionTarget
 } from './runtime-selection'
+import {
+  resolveWorktreeCodexAccountPin,
+  WORKTREE_CODEX_ACCOUNT_UNAVAILABLE_MESSAGE
+} from './worktree-account-pin'
 import { getDefaultWslDistro, getWslHome } from '../wsl'
 
 type CodexAuthIdentity = {
@@ -138,7 +143,14 @@ export class CodexRuntimeHomeService {
    * Historical session bridging is requested in the background so launch setup
    * returns as soon as the active runtime home is ready.
    */
-  prepareForCodexLaunch(target?: CodexAccountSelectionTarget): string | null {
+  prepareForCodexLaunch(target?: CodexAccountLaunchTarget): string | null {
+    const pinnedCodexHomePath = this.resolvePinnedCodexHomeForLaunch(target)
+    if (pinnedCodexHomePath) {
+      // Why: a per-worktree-pinned launch runs against the account's own
+      // managed home and never touches the shared runtime home that global
+      // selection sync/bridging maintain — mirror Claude's injected launches.
+      return pinnedCodexHomePath
+    }
     if (target?.runtime === 'wsl') {
       const wslTarget = this.resolveWslDefaultTarget(target)
       const syncedRuntimeHomePath = this.syncWslRuntimeForCurrentSelection(wslTarget)
@@ -157,6 +169,26 @@ export class CodexRuntimeHomeService {
       resolveHostCodexSessionSourceHome(this.store.getSettings())
     )
     return this.getRuntimeHomePath()
+  }
+
+  // Resolves a per-worktree Codex account pin into that account's managed home,
+  // or null when the launch carries no pin. An unavailable or runtime-
+  // incompatible pin fails closed: silently substituting the global account
+  // could cross billing/org boundaries.
+  private resolvePinnedCodexHomeForLaunch(target?: CodexAccountLaunchTarget): string | null {
+    if (!target?.overrideAccountId) {
+      return null
+    }
+    const effectiveTarget = target.runtime === 'wsl' ? this.resolveWslDefaultTarget(target) : target
+    const resolution = resolveWorktreeCodexAccountPin({
+      pinnedAccountId: target.overrideAccountId,
+      accounts: this.store.getSettings().codexManagedAccounts,
+      target: effectiveTarget
+    })
+    if (resolution.status === 'pinned') {
+      return resolution.codexHomePath
+    }
+    throw new Error(WORKTREE_CODEX_ACCOUNT_UNAVAILABLE_MESSAGE)
   }
 
   private startWslSessionBridgeForLaunch(
