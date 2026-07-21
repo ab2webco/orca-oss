@@ -41,6 +41,7 @@ import { toast } from 'sonner'
 import {
   getAccountsClaudeSearchEntries,
   getAccountsAutoSwitchSearchEntries,
+  getAccountsWorktreeUsageSearchEntries,
   getAccountsCodexSearchEntries,
   getAccountsGeminiSearchEntries,
   getAccountsLocationSearchEntries,
@@ -768,6 +769,58 @@ export function AccountsPane({
               >
                 <RefreshCw className="size-3" />
                 {settings.autoSwitchRateLimitedAccounts
+                  ? translate('auto.components.settings.AccountsPane.0f9197cfde', 'Enabled')
+                  : translate('auto.components.settings.AccountsPane.a103114594', 'Enable')}
+              </Button>
+            }
+          />
+        </SearchableSetting>
+      </section>
+    ) : null,
+    matchesSettingsSearch(searchQuery, getAccountsWorktreeUsageSearchEntries()) ? (
+      <section
+        key="worktree-account-usage"
+        id="accounts-worktree-usage"
+        className="space-y-3 scroll-mt-6"
+      >
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.AccountsPane.worktreeUsageTitle',
+            'Worktree Account Usage'
+          )}
+          description={translate(
+            'auto.components.settings.AccountsPane.worktreeUsageDescription',
+            'Show usage for the Claude account pinned to the focused worktree instead of the global active account.'
+          )}
+          keywords={getAccountsWorktreeUsageSearchEntries().flatMap((entry) => [
+            entry.title,
+            entry.description ?? '',
+            ...(entry.keywords ?? [])
+          ])}
+        >
+          <SettingsRow
+            label={translate(
+              'auto.components.settings.AccountsPane.worktreeUsageTitle',
+              'Worktree Account Usage'
+            )}
+            alignTop
+            description={translate(
+              'auto.components.settings.AccountsPane.worktreeUsageRowDescription',
+              'When the focused worktree is pinned to a managed Claude account, the status bar usage meters show that account, labeled with its email. Disable to always show the global account.'
+            )}
+            control={
+              <Button
+                variant={settings.showWorktreeAccountUsage !== false ? 'default' : 'outline'}
+                size="sm"
+                onClick={() =>
+                  updateSettings({
+                    showWorktreeAccountUsage: settings.showWorktreeAccountUsage === false
+                  })
+                }
+                className="w-24 gap-1.5"
+              >
+                <ClaudeIcon size={12} />
+                {settings.showWorktreeAccountUsage !== false
                   ? translate('auto.components.settings.AccountsPane.0f9197cfde', 'Enabled')
                   : translate('auto.components.settings.AccountsPane.a103114594', 'Enable')}
               </Button>

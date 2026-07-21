@@ -3069,7 +3069,9 @@
             "antigravityUsage": "Antigravity Usage",
             "antigravityUsageDetails": "Open Antigravity usage details",
             "grokUsageAria": "Open Grok usage details",
-            "grokUsageMenu": "Grok Usage"
+            "grokUsageMenu": "Grok Usage",
+            "worktreeAccountLabel": "Worktree account",
+            "worktreeAccountUsageNote": "Usage shown for the account pinned to the focused worktree."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "Connect an account",
@@ -4884,7 +4886,10 @@
           "7d2634bfa1": "When a live Claude or Codex session hits an account limit, Orca can switch to another managed account and resume the same session.",
           "5d6a7e20ef": "Exits the limited Claude or Codex agent, selects a managed account with available quota, resumes the provider session, then sends continue.",
           "0f9197cfde": "Enabled",
-          "a103114594": "Enable"
+          "a103114594": "Enable",
+          "worktreeUsageTitle": "Worktree Account Usage",
+          "worktreeUsageDescription": "Show usage for the Claude account pinned to the focused worktree instead of the global active account.",
+          "worktreeUsageRowDescription": "When the focused worktree is pinned to a managed Claude account, the status bar usage meters show that account, labeled with its email. Disable to always show the global account."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -7067,7 +7072,12 @@
             "b0a4e8c6d9": "oauth",
             "a9f3d7b5c8": "login",
             "0b0fd87891": "Auto-switch Limited Agents",
-            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit."
+            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit.",
+            "worktreeUsageTitle": "Worktree Account Usage",
+            "worktreeUsageDescription": "Show the pinned Claude account usage in the status bar when the focused worktree is bound to a managed account.",
+            "worktreeKeyword": "worktree",
+            "usageKeyword": "usage",
+            "pinKeyword": "pin"
           }
         },
         "advanced": {

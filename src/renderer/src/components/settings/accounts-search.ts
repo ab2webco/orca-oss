@@ -48,6 +48,34 @@ export const getAccountsAutoSwitchSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsWorktreeUsageSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate(
+      'auto.components.settings.accounts.search.worktreeUsageTitle',
+      'Worktree Account Usage'
+    ),
+    description: translate(
+      'auto.components.settings.accounts.search.worktreeUsageDescription',
+      'Show the pinned Claude account usage in the status bar when the focused worktree is bound to a managed account.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.accounts.search.06662af91e', 'account'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.e14049e1a8', 'claude'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.c759741d77', 'quota'),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.86edc96bc9',
+        'status bar'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.worktreeKeyword',
+        'worktree'
+      ),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.usageKeyword', 'usage'),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.pinKeyword', 'pin')
+    ]
+  }
+])
+
 export const getAccountsClaudeSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.75682e1b62', 'Claude Accounts'),
@@ -241,6 +269,7 @@ export const getAccountsGrokSearchEntries = createLocalizedCatalog(() => [
 export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsSearchEntry[] => [
   ...getAccountsLocationSearchEntries(),
   ...getAccountsAutoSwitchSearchEntries(),
+  ...getAccountsWorktreeUsageSearchEntries(),
   ...getAccountsClaudeSearchEntries(),
   ...getAccountsCodexSearchEntries(),
   ...getAccountsGeminiSearchEntries(),

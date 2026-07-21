@@ -316,6 +316,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     claudeManagedAccounts: [],
     activeClaudeManagedAccountId: null,
     autoSwitchRateLimitedAccounts: false,
+    showWorktreeAccountUsage: true,
     terminalScopeHistoryByWorktree: true,
     terminalHiddenViewParking: true,
     terminalMainSideEffectAuthority: true,

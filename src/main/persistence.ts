@@ -5285,6 +5285,10 @@ export class Store {
       sanitizedUpdates.autoSwitchRateLimitedAccounts =
         updates.autoSwitchRateLimitedAccounts === true
     }
+    if ('showWorktreeAccountUsage' in updates) {
+      // Why: default-on setting — coerce non-bool payloads back to the default.
+      sanitizedUpdates.showWorktreeAccountUsage = updates.showWorktreeAccountUsage !== false
+    }
     if ('disabledTuiAgents' in updates) {
       sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
     }

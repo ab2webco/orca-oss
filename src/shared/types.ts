@@ -2763,6 +2763,10 @@ export type GlobalSettings = {
    *  switches to another managed account with available quota, resumes the
    *  same provider session, then sends "continue". */
   autoSwitchRateLimitedAccounts?: boolean
+  /** When true (default), the Claude usage meters show the pinned managed
+   *  account's usage while the focused worktree carries a claudeAccountId pin.
+   *  false always shows the globally active account. */
+  showWorktreeAccountUsage?: boolean
   /** When true, each worktree gets its own shell history file so ArrowUp
    *  does not surface commands from other worktrees. Defaults to true.
    *  Disable to revert to shared global shell history. */

@@ -60,6 +60,10 @@ import { AgentIcon } from '@/lib/agent-catalog'
 import { formatWindowLabel } from '@/lib/window-label-formatter'
 import { markLiveCodexSessionsForRestart } from '@/lib/codex-session-restart'
 import { UpdateStatusSegment } from './UpdateStatusSegment'
+import {
+  createPendingClaudeLimits,
+  resolveClaudeUsageAccountScope
+} from './claude-usage-account-scope'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
 import { StatusBarUsageEmptyCta } from './StatusBarUsageEmptyCta'
@@ -709,7 +713,37 @@ function ClaudeSwitcherMenu({
     }
     return `${settings.activeRuntimeEnvironmentId?.trim() || 'local'}:${settings.activeClaudeManagedAccountId ?? 'system'}:${JSON.stringify(settings.activeClaudeManagedAccountIdsByRuntime ?? null)}:${settings.claudeManagedAccounts.map((account) => `${account.id}:${account.updatedAt}`).join('|')}`
   })
+  const focusedWorktreeClaudeAccountId = useAppStore((s) =>
+    s.activeWorktreeId
+      ? (s.getKnownWorktreeById(s.activeWorktreeId)?.claudeAccountId ?? null)
+      : null
+  )
   const accountState = resolveClaudeStatusAccountState(settings, accounts)
+  const usageScope = resolveClaudeUsageAccountScope({
+    showWorktreeAccountUsage: settings?.showWorktreeAccountUsage,
+    focusedWorktreeClaudeAccountId,
+    activeClaudeAccountId: getClaudeStatusActiveId(
+      accountState,
+      toCodexStatusRuntimeTarget(claudeTarget)
+    ),
+    accounts: accountState.accounts,
+    activeAccountLimits: claude,
+    inactiveAccountUsage: inactiveClaudeAccounts
+  })
+  const displayedClaude =
+    usageScope.limits ??
+    (usageScope.kind === 'worktree' ? createPendingClaudeLimits(usageScope.isFetching) : claude)
+  const pinnedInactiveAccountId =
+    usageScope.kind === 'worktree' && usageScope.limits === null ? usageScope.accountId : null
+
+  useEffect(() => {
+    // Why: pinned-worktree meters reuse the switcher's inactive-usage cache;
+    // main debounces this fetch, so worktree focus changes stay cheap.
+    // Remote-owned accounts have no local inactive-usage cache to fill.
+    if (pinnedInactiveAccountId && !hasActiveRuntimeEnvironment) {
+      void fetchInactiveClaudeAccountUsage()
+    }
+  }, [pinnedInactiveAccountId, hasActiveRuntimeEnvironment, fetchInactiveClaudeAccountUsage])
 
   useEffect(() => {
     mountedRef.current = true
@@ -829,23 +863,51 @@ function ClaudeSwitcherMenu({
 
   return (
     <ProviderDetailsMenu
-      provider={claude}
+      provider={displayedClaude}
       compact={compact}
       iconOnly={iconOnly}
       ariaLabel={translate(
         'auto.components.status.bar.StatusBar.3dd7ddfae1',
         'Open Claude details and account switcher'
       )}
+      triggerExtra={
+        usageScope.kind === 'worktree' ? (
+          <span className="ml-1 max-w-[110px] truncate text-[10px] text-muted-foreground">
+            {usageScope.email}
+          </span>
+        ) : undefined
+      }
       topContent={
-        <AccountRuntimeToggle
-          groups={switchGroups}
-          value={selectedGroup?.key ?? selectedRuntimeKey}
-          onChange={(group) => void handleSelectRuntime(group)}
-          ariaLabel={translate(
-            'auto.components.status.bar.StatusBar.11e2354daf',
-            'Claude usage runtime'
-          )}
-        />
+        <>
+          {usageScope.kind === 'worktree' ? (
+            <div className="px-2 pt-2">
+              <div className="rounded-md border border-border/60 bg-accent/5 px-2 py-1.5">
+                <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                  {translate(
+                    'auto.components.status.bar.StatusBar.worktreeAccountLabel',
+                    'Worktree account'
+                  )}
+                </div>
+                <div className="truncate text-[11px] text-foreground">{usageScope.email}</div>
+                <div className="text-[10px] leading-4 text-muted-foreground">
+                  {translate(
+                    'auto.components.status.bar.StatusBar.worktreeAccountUsageNote',
+                    'Usage shown for the account pinned to the focused worktree.'
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <AccountRuntimeToggle
+            groups={switchGroups}
+            value={selectedGroup?.key ?? selectedRuntimeKey}
+            onChange={(group) => void handleSelectRuntime(group)}
+            ariaLabel={translate(
+              'auto.components.status.bar.StatusBar.11e2354daf',
+              'Claude usage runtime'
+            )}
+          />
+        </>
       }
       open={open}
       onOpenChange={handleOpenChange}
@@ -1742,6 +1804,7 @@ export function ProviderDetailsMenu({
   compact,
   iconOnly,
   ariaLabel,
+  triggerExtra,
   topContent,
   hidePanelResetCredits = false,
   open,
@@ -1752,6 +1815,8 @@ export function ProviderDetailsMenu({
   compact: boolean
   iconOnly: boolean
   ariaLabel: string
+  /** Compact annotation rendered after the usage segment in the trigger. */
+  triggerExtra?: React.ReactNode
   topContent?: React.ReactNode
   hidePanelResetCredits?: boolean
   open?: boolean
@@ -1804,7 +1869,10 @@ export function ProviderDetailsMenu({
               </span>
             </span>
           ) : (
-            <ProviderSegment p={provider} compact={compact} display={usagePercentageDisplay} />
+            <>
+              <ProviderSegment p={provider} compact={compact} display={usagePercentageDisplay} />
+              {triggerExtra}
+            </>
           )}
         </button>
       </DropdownMenuTrigger>

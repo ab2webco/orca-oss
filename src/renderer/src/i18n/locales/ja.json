@@ -3069,7 +3069,9 @@
             "antigravityUsage": "Antigravity の使用状況",
             "antigravityUsageDetails": "Antigravity の使用状況詳細を開く",
             "grokUsageAria": "Grok の使用状況詳細を開く",
-            "grokUsageMenu": "Grok の使用状況"
+            "grokUsageMenu": "Grok の使用状況",
+            "worktreeAccountLabel": "ワークツリーのアカウント",
+            "worktreeAccountUsageNote": "フォーカス中のワークツリーに固定されたアカウントの使用量を表示しています。"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "アカウントを接続する",
@@ -4869,7 +4871,10 @@
           "7d2634bfa1": "When a live Claude or Codex session hits an account limit, Orca can switch to another managed account and resume the same session.",
           "5d6a7e20ef": "Exits the limited Claude or Codex agent, selects a managed account with available quota, resumes the provider session, then sends continue.",
           "0f9197cfde": "Enabled",
-          "a103114594": "Enable"
+          "a103114594": "Enable",
+          "worktreeUsageTitle": "ワークツリーのアカウント使用量",
+          "worktreeUsageDescription": "グローバルなアクティブアカウントの代わりに、フォーカス中のワークツリーに固定された Claude アカウントの使用量を表示します。",
+          "worktreeUsageRowDescription": "フォーカス中のワークツリーが管理された Claude アカウントに固定されている場合、ステータスバーの使用量メーターはそのアカウントをメールアドレス付きで表示します。無効にすると常にグローバルアカウントを表示します。"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",
@@ -7052,7 +7057,12 @@
             "b0a4e8c6d9": "認証",
             "a9f3d7b5c8": "ログイン",
             "0b0fd87891": "Auto-switch Limited Agents",
-            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit."
+            "3d76b94f10": "Resume Claude and Codex sessions on another managed account when the active account hits a limit.",
+            "worktreeUsageTitle": "ワークツリーのアカウント使用量",
+            "worktreeUsageDescription": "フォーカス中のワークツリーが管理アカウントに固定されている場合、固定された Claude アカウントの使用量をステータスバーに表示します。",
+            "worktreeKeyword": "ワークツリー",
+            "usageKeyword": "使用量",
+            "pinKeyword": "固定"
           }
         },
         "advanced": {

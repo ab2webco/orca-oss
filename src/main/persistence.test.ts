@@ -649,6 +649,32 @@ describe('Store', () => {
     expect(store.getSettings().minimizeToTrayOnClose).toBe(false)
   })
 
+  it('defaults showWorktreeAccountUsage to true when unset', async () => {
+    const store = await createStore()
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(true)
+  })
+
+  it('persists showWorktreeAccountUsage false/true round-trip', async () => {
+    const store = await createStore()
+    store.updateSettings({ showWorktreeAccountUsage: false })
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(false)
+    store.flush()
+    expect((readDataFile() as PersistedState).settings.showWorktreeAccountUsage).toBe(false)
+    store.updateSettings({ showWorktreeAccountUsage: true })
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(true)
+  })
+
+  it('coerces non-boolean showWorktreeAccountUsage payloads to the default-on boolean', async () => {
+    const store = await createStore()
+    // Why: default-on setting — only an explicit false may disable it.
+    store.updateSettings({ showWorktreeAccountUsage: 'false' as unknown as boolean })
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(true)
+    store.updateSettings({ showWorktreeAccountUsage: 0 as unknown as boolean })
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(true)
+    store.updateSettings({ showWorktreeAccountUsage: false })
+    expect(store.getSettings().showWorktreeAccountUsage).toBe(false)
+  })
+
   it('defaults trayMinimizeNoticeShown to false and persists it strictly', async () => {
     const store = await createStore()
     expect(store.getUI().trayMinimizeNoticeShown).toBe(false)
