@@ -4887,7 +4887,7 @@
           "dbb9626ed1": "Cancel",
           "854ebbcc45": "Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.",
           "63843e37e2": "Remove Claude Account?",
-          "99c8f9e498": "Orca will delete the managed Codex home for this saved account. If it is currently active, Orca falls back to the system default Codex login.",
+          "380a7736cc": "Removing this account permanently deletes its managed Codex home, including all Codex session history and MCP logins stored inside. This cannot be undone. If the account is currently active, Orca falls back to the system default Codex login.",
           "0d47394635": "Remove Codex Account?",
           "ae3b21eb6c": "opencode.ai/workspace/wrk_…/go",
           "51c9104e13": "Find this in the URL after logging into opencode.ai (e.g.",

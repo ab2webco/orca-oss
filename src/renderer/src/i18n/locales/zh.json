@@ -4849,7 +4849,7 @@
           "dbb9626ed1": "取消",
           "854ebbcc45": "Orca 将删除此已保存账户的托管 Claude 身份验证。如果当前处于活动状态，Orca 将回退到系统默认的 Claude 登录名。",
           "63843e37e2": "删除 Claude 账户？",
-          "99c8f9e498": "Orca 将删除此已保存账户的托管 Codex 主目录。如果当前处于活动状态，Orca 将回退到系统默认的 Codex 登录。",
+          "380a7736cc": "移除此账户会永久删除其托管的 Codex 主目录，包括其中存储的所有 Codex 会话历史记录和 MCP 登录信息。此操作无法撤销。如果该账户当前处于活动状态，Orca 将回退到系统默认的 Codex 登录。",
           "0d47394635": "删除 Codex 账户？",
           "ae3b21eb6c": "opencode.ai/workspace/wrk_…/go",
           "51c9104e13": "登录 opencode.ai 后在 URL 中找到此内容（例如",
