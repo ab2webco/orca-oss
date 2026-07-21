@@ -29,7 +29,10 @@ const ACCOUNT_LIMIT_PATTERNS = [
   /\btoo\s+many\s+requests\b/i,
   /\b(?:http|status|error)\s*429\b/i,
   /\b(?:you(?:'ve|\s+have)|we(?:'ve|\s+have))\s+(?:reached|hit)\s+(?:your|the)?[\s\S]{0,80}\b(?:rate|usage|quota)\s+limit\b/i,
-  /\b(?:daily|weekly|monthly|5-hour|five-hour)\s+(?:limit|quota)\s+(?:exceeded|reached|hit)\b/i
+  /\b(?:daily|weekly|monthly|5-hour|five-hour)\s+(?:limit|quota)\s+(?:exceeded|reached|hit)\b/i,
+  // Why: Claude Code org spend caps say "hit your org's monthly spend limit" / "run /usage-credits", which no rate/usage/quota pattern matches; anchor to a limit-hit verb so domain talk about credit/billing limits can't trigger a switch.
+  /\b(?:you(?:'ve|\s+have)|we(?:'ve|\s+have))\s+(?:hit|reached|exceeded)\b[\s\S]{0,60}?\b(?:spend(?:ing)?|billing|credit)\s+limit\b/i,
+  /\brun\s+\/usage-credits\b[\s\S]{0,80}?\b(?:admin|higher\s+limit)\b/i
 ] as const
 
 const AUTO_SWITCH_RATE_LIMIT_AGENTS = new Set<string>(['claude', 'codex'])
