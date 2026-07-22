@@ -1,0 +1,231 @@
+name: Lab Release
+
+# Why: one-click Orca Lab release from the fork. Computes the next
+# `<upstream-base>.lab.N` version (a bare -lab.N would sort BELOW -rc.N in
+# semver and the updater would never offer it), builds unsigned macOS (x64 +
+# arm64) and Linux x64 artifacts, and lets electron-builder publish them with
+# the auto-update manifests (latest-mac.yml / latest-linux.yml) attached —
+# the two things the hand-rolled lab.1 release got wrong.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Explicit version override (e.g. 1.4.151-rc.2.lab.1). Empty = auto-increment .lab.N.
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: Build both platforms without tagging or publishing
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lab-release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    # Why: gate to the fork so this workflow no-ops if the file ever reaches
+    # upstream or another fork (mirrors release-cut.yml's canonical-repo guard).
+    if: github.repository == 'ab2webco/orca-oss'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      title: ${{ steps.next.outputs.title }}
+      build_ref: ${{ steps.push.outputs.build_ref }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next lab version
+        id: next
+        run: |
+          current="$(node -p "require('./package.json').version")"
+          override="${{ inputs.version }}"
+          if [[ -n "$override" ]]; then
+            next="$override"
+          elif [[ "$current" =~ ^(.+)\.lab\.([0-9]+)$ ]]; then
+            next="${BASH_REMATCH[1]}.lab.$(( BASH_REMATCH[2] + 1 ))"
+          else
+            next="${current}.lab.1"
+          fi
+          # Why: a reused or regressing version silently breaks auto-update for
+          # installed labs, so refuse same-version and already-tagged cuts.
+          if [[ "$next" == "$current" ]]; then
+            echo "Version $next equals current $current" >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "Tag v$next already exists" >&2
+            exit 1
+          fi
+          # Human title: 1.4.150-rc.0.lab.3 -> Orca Lab v1.4.150-lab.3
+          base="${next%%-*}"
+          lab_n="${next##*.lab.}"
+          echo "version=$next" >>"$GITHUB_OUTPUT"
+          echo "tag=v$next" >>"$GITHUB_OUTPUT"
+          echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"
+          echo "Next lab version: $next"
+
+      - name: Bump, commit, tag and push
+        id: push
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "Dry run — skipping bump/tag; building from main tip."
+            echo "build_ref=main" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          next="${{ steps.next.outputs.version }}"
+          tag="${{ steps.next.outputs.tag }}"
+          node -e "
+            const fs = require('fs')
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+            pkg.version = '$next'
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+          "
+          git add package.json
+          git commit -m "chore(release): bump version to $next"
+          git tag "$tag"
+          git push origin HEAD:main "$tag"
+          echo "build_ref=$tag" >>"$GITHUB_OUTPUT"
+
+  mac:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Build macOS native helpers
+        run: pnpm build:computer-macos && pnpm build:notification-status-macos
+
+      - name: Package and publish macOS artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Why: --publish always uploads dmg/zip/blockmaps AND latest-mac.yml to
+        # the tag's release; dry runs package with --publish never instead.
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$publish"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Package and publish Linux artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb --publish "$publish"
+
+  finalize:
+    needs: [version, mac, linux]
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set title, notes and Latest marker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          title="${{ needs.version.outputs.title }}"
+          prev_tag="$(git tag --list 'v*lab*' --sort=-creatordate | grep -v "^${tag}$" | head -n 1)"
+          {
+            echo "# ${title}"
+            echo
+            echo "Build del laboratorio de Ab2Web basado en Orca (upstream stablyai/orca) más las funcionalidades propias del lab. Se distingue por el distintivo \"by Ab2Web\" en la barra de título."
+            echo
+            echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
+            echo
+            if [[ -n "$prev_tag" ]]; then
+              echo "## Cambios desde ${prev_tag}"
+              echo
+              git log --no-merges --pretty='- %s' "${prev_tag}..${tag}" | head -50
+              echo
+            fi
+            echo "## Instalación en macOS (build sin firmar)"
+            echo '```bash'
+            echo 'xattr -dr com.apple.quarantine "/Applications/Orca.app"'
+            echo '```'
+            echo
+            echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
+          } > /tmp/notes.md
+          gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
+          echo "Release $tag published as Latest."
