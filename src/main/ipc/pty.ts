@@ -775,7 +775,10 @@ export type PrepareCodexSessionResume = (args: {
   workspacePath?: string
 }) => Promise<{ codexHomePath: string | null } | null>
 type PrepareClaudeAuth = (
-  target?: ClaudeAccountSelectionTarget
+  target?: ClaudeAccountSelectionTarget,
+  // Why: reattach to a live injected PTY must tell the auth service the CLI
+  // already owns this account, so the shared-PTY fork gate does not misfire.
+  options?: { reattachLiveInjectedPtyId?: string }
 ) => Promise<ClaudeRuntimeAuthPreparation>
 // Why: synchronous companion to PrepareClaudeAuth — lets the spawn gate know
 // whether a launch is a per-worktree-pinned (injected) account *before*
@@ -3319,7 +3322,12 @@ export function registerPtyHandlers(
       // can reserve a different account than the surviving process actually owns.
       const claudeAuth =
         isClaudeLaunch && prepareClaudeAuth && !isExistingSharedClaudeSession
-          ? await prepareClaudeAuth(claudeSelectionTarget)
+          ? await prepareClaudeAuth(
+              claudeSelectionTarget,
+              existingInjectedAccountId && args.sessionId
+                ? { reattachLiveInjectedPtyId: args.sessionId }
+                : undefined
+            )
           : null
       using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
       const didPrepareInjectedClaudeAuth = isInjectedClaudePreparation(claudeAuth)
@@ -4496,7 +4504,12 @@ export function registerPtyHandlers(
       // can reserve a different account than the surviving process actually owns.
       const claudeAuth =
         isClaudeLaunch && prepareClaudeAuth && !isExistingSharedClaudeSession
-          ? await prepareClaudeAuth(claudeSelectionTarget)
+          ? await prepareClaudeAuth(
+              claudeSelectionTarget,
+              existingInjectedAccountId && args.sessionId
+                ? { reattachLiveInjectedPtyId: args.sessionId }
+                : undefined
+            )
           : null
       using _claudeAccountReservation = createClaudeAccountReservationScope(claudeAuth)
       spawnTiming.mark('auth')

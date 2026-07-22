@@ -1691,7 +1691,8 @@ describe('registerPtyHandlers', () => {
         )
         expect(prepareClaudeAuth).toHaveBeenCalledTimes(1)
         expect(prepareClaudeAuth).toHaveBeenCalledWith(
-          expect.objectContaining({ overrideAccountId: 'account-injected' })
+          expect.objectContaining({ overrideAccountId: 'account-injected' }),
+          undefined
         )
         expect(hasLiveClaudePtys()).toBe(false)
         expect(livePtyGate.hasLiveInjectedClaudePtysForAccount('account-injected')).toBe(true)
@@ -1800,7 +1801,10 @@ describe('registerPtyHandlers', () => {
       })) as { id: string }
 
       expect(prepareClaudeAuth).toHaveBeenCalledWith(
-        expect.objectContaining({ overrideAccountId: 'account-a' })
+        expect.objectContaining({ overrideAccountId: 'account-a' }),
+        // Why: the reattach must announce the surviving PTY so the auth service
+        // can exempt it from the shared-PTY fork gate.
+        { reattachLiveInjectedPtyId: 'surviving-session' }
       )
       expect(livePtyGate.getLiveInjectedClaudePtyAccountId('surviving-session')).toBe('account-a')
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })

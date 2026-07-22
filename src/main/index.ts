@@ -1152,7 +1152,8 @@ function openMainWindow(): BrowserWindow {
     store,
     runtime,
     prepareCodexRuntimeHomeForLaunch,
-    (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true }),
+    (target, opts) =>
+      claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true, ...opts }),
     {
       prepareCodexSessionResume: prepareCodexSessionResumeForLaunch,
       awaitLocalPtyStartup: () => localPtyStartupReady,
@@ -2323,7 +2324,8 @@ app.whenReady().then(async () => {
       runtime,
       prepareCodexRuntimeHomeForLaunch,
       () => store!.getSettings(),
-      (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true }),
+      (target, opts) =>
+        claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true, ...opts }),
       store,
       (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target),
       prepareCodexSessionResumeForLaunch

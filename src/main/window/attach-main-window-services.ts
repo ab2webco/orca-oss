@@ -73,7 +73,8 @@ export function attachMainWindowServices(
   runtime: OrcaRuntimeService,
   getSelectedCodexHomePath?: GetSelectedCodexHomePath,
   prepareClaudeAuth?: (
-    target?: ClaudeAccountSelectionTarget
+    target?: ClaudeAccountSelectionTarget,
+    options?: { reattachLiveInjectedPtyId?: string }
   ) => Promise<ClaudeRuntimeAuthPreparation>,
   options?: {
     prepareCodexSessionResume?: PrepareCodexSessionResume

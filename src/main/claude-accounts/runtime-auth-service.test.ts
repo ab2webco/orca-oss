@@ -4195,6 +4195,54 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  it('allows reattaching to a live injected OAuth PTY despite a live global terminal', async () => {
+    // Reattach cannot fork the refresh chain: the pinned CLI process already
+    // owns it. Only the reattach path is exempt — fresh launches still block.
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', pinnedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned, markInjectedClaudePtySpawned } =
+      await import('./live-pty-gate')
+    // The exact stuck state from the field: a null-bound global terminal plus
+    // the pinned session's own live CLI.
+    markClaudePtySpawned('global-pty')
+    markInjectedClaudePtySpawned('injected-session', 'account-1')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      const preparation = await service.prepareForClaudeLaunch(
+        { runtime: 'host', overrideAccountId: 'account-1' },
+        { reservePtyAccount: true, reattachLiveInjectedPtyId: 'injected-session' }
+      )
+      expect(preparation).toMatchObject({
+        injectedAccountId: 'account-1',
+        provenance: 'managed:account-1:injected'
+      })
+
+      // A DIFFERENT session id (or none) is a fresh launch and must still block.
+      await expect(
+        service.prepareForClaudeLaunch(
+          { runtime: 'host', overrideAccountId: 'account-1' },
+          { reattachLiveInjectedPtyId: 'some-other-session' }
+        )
+      ).rejects.toThrow('running global Claude terminal')
+      await expect(
+        service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-1' })
+      ).rejects.toThrow('running global Claude terminal')
+    } finally {
+      markClaudePtyExited('global-pty')
+      markClaudePtyExited('injected-session')
+    }
+  })
+
   it('rejects pinned account A after the global selection switches from live A to B', async () => {
     const accountAPath = createManagedClaudeAuth(
       testState.userDataDir,

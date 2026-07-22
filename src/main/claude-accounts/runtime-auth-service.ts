@@ -24,6 +24,7 @@ import {
 } from '../wsl'
 import { buildEncodedWslBashCommand } from '../wsl-bash-command'
 import {
+  getLiveInjectedClaudePtyAccountId,
   hasLiveClaudePtys,
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount,
@@ -145,19 +146,28 @@ export class ClaudeRuntimeAuthService {
 
   async prepareForClaudeLaunch(
     target?: ClaudeAccountSelectionTarget,
-    options?: { reservePtyAccount?: boolean }
+    options?: { reservePtyAccount?: boolean; reattachLiveInjectedPtyId?: string }
   ): Promise<ClaudeRuntimeAuthPreparation> {
     const effectiveTarget = await this.resolveWslDefaultTargetForLaunch(
       target ?? this.getDefaultAccountSelectionTarget()
     )
     const settings = this.store.getSettings()
     const injectedCandidate = this.resolveInjectedAccountCandidate(effectiveTarget, settings)
+    // Why: reattaching to a PTY whose live CLI already runs this exact injected
+    // account cannot fork its refresh chain — that process has owned it all along.
+    const isLiveInjectedReattach = Boolean(
+      injectedCandidate &&
+      options?.reattachLiveInjectedPtyId &&
+      getLiveInjectedClaudePtyAccountId(options.reattachLiveInjectedPtyId) === injectedCandidate.id
+    )
     // Why: custom-endpoint accounts have no single-use OAuth refresh chain (they
     // read a static token from their own universe's settings.json), so a live
     // shared terminal on the same account is not a fork hazard — and the failover
     // target is always custom-endpoint, so exempting it keeps failover launchable.
     const injectedCandidateForksOauth =
-      Boolean(injectedCandidate) && injectedCandidate?.authMethod !== 'custom-endpoint'
+      Boolean(injectedCandidate) &&
+      injectedCandidate?.authMethod !== 'custom-endpoint' &&
+      !isLiveInjectedReattach
     if (
       injectedCandidate &&
       injectedCandidateForksOauth &&
