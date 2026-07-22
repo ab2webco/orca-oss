@@ -179,6 +179,54 @@ describe('selectAutoSwitchAccount', () => {
     expect(result).toBeNull()
   })
 
+  it('never selects a custom-endpoint Claude account, even with usable usage data', () => {
+    const result = selectAutoSwitchAccount({
+      agent: 'claude',
+      target: { runtime: 'host', wslDistro: null },
+      accounts: {
+        claude: {
+          accounts: [
+            {
+              id: 'active',
+              email: 'active@example.com',
+              managedAuthRuntime: 'host',
+              authMethod: 'subscription-oauth',
+              createdAt: 1,
+              updatedAt: 1,
+              lastAuthenticatedAt: 1
+            },
+            {
+              id: 'endpoint',
+              email: 'z.ai · GLM',
+              managedAuthRuntime: 'host',
+              authMethod: 'custom-endpoint',
+              endpointLabel: 'z.ai · GLM',
+              createdAt: 1,
+              updatedAt: 1,
+              lastAuthenticatedAt: 1
+            }
+          ],
+          activeAccountId: 'active',
+          activeAccountIdsByRuntime: { host: 'active', wsl: {} }
+        },
+        codex: emptyCodex,
+        rateLimits: rateLimitState({
+          // Why: even if a usage entry leaks in for the endpoint account, it must stay ineligible.
+          inactiveClaudeAccounts: [
+            {
+              accountId: 'endpoint',
+              rateLimits: limits('claude', 5),
+              updatedAt: 1,
+              isFetching: false
+            }
+          ]
+        })
+      }
+    })
+
+    expect(result).toBeNull()
+  })
+
   it('keeps WSL account selection scoped to the same distro', () => {
     const result = selectAutoSwitchAccount({
       agent: 'codex',

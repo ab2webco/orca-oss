@@ -42,7 +42,7 @@ function getResumeLaunchPlatform(worktreeId: string): NodeJS.Platform {
   return CLIENT_PLATFORM
 }
 
-function appendTabToWorktreeOrder(worktreeId: string, tabId: string): void {
+export function appendTabToWorktreeOrder(worktreeId: string, tabId: string): void {
   const state = useAppStore.getState()
   const termIds = (state.tabsByWorktree[worktreeId] ?? []).map((tab) => tab.id)
   const editorIds = state.openFiles

@@ -603,7 +603,8 @@
         "13ccffb514": "The resumed agent did not take over the terminal in time.",
         "65d1f14b75": "The resumed agent did not accept the continue command.",
         "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
-        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}",
+        "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。"
       },
       "linear": {
         "usage": {
@@ -625,6 +626,12 @@
             "triageFollowupsPrompt": "Use {{value0}} to triage the linked Linear issue — set priority and estimate — and create a parented follow-up ticket for the deferred cleanup."
           }
         }
+      },
+      "agentRateLimitFailover": {
+        "resumePlanFailed": "无法为故障转移会话构建恢复命令。",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "无法将故障转移账户分配给此工作树：{{value0}}",
+        "launchPlanFailed": "无法为故障转移会话构建启动命令。"
       }
     },
     "hooks": {
@@ -5018,7 +5025,10 @@
           "customEndpointSubmit": "添加端点",
           "customEndpointTitle": "添加自定义端点账户",
           "customEndpointToken": "API 令牌",
-          "endpointBadge": "端点"
+          "endpointBadge": "端点",
+          "failoverRowTitle": "最后手段故障转移",
+          "failoverRowDescription": "当所有 Anthropic 账户都没有额度时，将工作树固定到此自定义端点账户并在那里继续会话。",
+          "failoverNone": "无"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",
@@ -7182,7 +7192,8 @@
             "pinKeyword": "固定",
             "claudeEndpointKeyword": "端点",
             "claudeGlmKeyword": "glm",
-            "claudeZaiKeyword": "z.ai"
+            "claudeZaiKeyword": "z.ai",
+            "failoverKeyword": "故障转移"
           }
         },
         "advanced": {
@@ -13466,7 +13477,11 @@
           "e0e6981a0e": "{{value0}} session resumed.",
           "f8d8f16aca": "Switched to {{value0}} and sent continue.",
           "816627b20e": "{{value0}} auto-switch skipped.",
-          "8bb13ef78d": "{{value0}} auto-switch failed."
+          "8bb13ef78d": "{{value0}} auto-switch failed.",
+          "failoverTitle": "Anthropic 账户已无剩余额度 — 正在使用 {{value0}} 继续。",
+          "failoverResumed": "工作树已固定到端点账户；会话已在新标签页中恢复并发送了 continue。",
+          "failoverLaunched": "会话已在新标签页中恢复，但 continue 未能送达 — 请手动发送。",
+          "failoverFresh": "无法复制先前的会话记录，端点会话将在新标签页中重新开始。"
         }
       },
       "browser-pane": {

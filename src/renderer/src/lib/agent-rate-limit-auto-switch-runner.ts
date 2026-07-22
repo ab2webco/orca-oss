@@ -1,35 +1,47 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
+import type { ClaudeLivePtyAccountInfo } from '../../../shared/types'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
 import { useAppStore } from '@/store'
 import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
-import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
-import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { translate } from '@/i18n/i18n'
 import { buildAgentResumeStartupPlan } from './tui-agent-startup'
+import { selectAutoSwitchAccount } from './agent-rate-limit-auto-switch'
 import {
-  selectAutoSwitchAccount,
-  type AutoSwitchAccountCandidate,
-  type AutoSwitchAccountsSnapshot
-} from './agent-rate-limit-auto-switch'
+  loadAccountsSnapshot,
+  selectAccount,
+  type AccountsSnapshotResult
+} from './agent-rate-limit-account-snapshot'
 import {
   stopForegroundAgent,
   waitForAgentReadyInput,
   waitForResumedAgent
 } from './agent-rate-limit-terminal-control'
 import { resolveAgentRateLimitResumePlatform } from './agent-rate-limit-resume-platform'
+import {
+  resolveClaudeSessionBackingAccount,
+  runLastResortFailoverIfConfigured,
+  type AgentRateLimitFailoverMode
+} from './agent-rate-limit-failover'
 
 export type AgentRateLimitAutoSwitchResult =
-  | { ok: true; agent: AutoSwitchRateLimitAgent; accountLabel: string }
+  | {
+      ok: true
+      agent: AutoSwitchRateLimitAgent
+      accountLabel: string
+      /** Present when the session continued on the last-resort custom-endpoint account. */
+      failover?: AgentRateLimitFailoverMode
+    }
   | {
       ok: false
       reason:
         | 'disabled'
         | 'ssh'
         | 'no-account'
+        | 'custom-endpoint-session'
         | 'stop-failed'
         | 'resume-failed'
         | 'continue-failed'
@@ -37,9 +49,11 @@ export type AgentRateLimitAutoSwitchResult =
       message: string
     }
 
-type AccountsSnapshotResult = {
-  accounts: AutoSwitchAccountsSnapshot
-  target: RuntimeClientTarget
+type AutoSwitchFailureReason = Extract<AgentRateLimitAutoSwitchResult, { ok: false }>['reason']
+
+/** Shapes a failure result; keeps the runner's many exit points scannable. */
+function failure(reason: AutoSwitchFailureReason, message: string): AgentRateLimitAutoSwitchResult {
+  return { ok: false, reason, message }
 }
 
 /** Formats unknown async failures for toast-safe structured runner results. */
@@ -47,96 +61,83 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Refreshes local inactive-account quota data before selecting an auto-switch target. */
-async function loadLocalAccountsSnapshot(agent: AutoSwitchRateLimitAgent): Promise<{
-  accounts: AutoSwitchAccountsSnapshot
-  target: RuntimeClientTarget
-}> {
-  const fetchInactive =
-    agent === 'claude'
-      ? window.api.rateLimits.fetchInactiveClaudeAccounts
-      : window.api.rateLimits.fetchInactiveCodexAccounts
-  await fetchInactive()
-  const [claude, codex, rateLimits] = await Promise.all([
-    window.api.claudeAccounts.list(),
-    window.api.codexAccounts.list(),
-    window.api.rateLimits.get()
-  ])
-  useAppStore.getState().setRateLimitsFromPush(rateLimits)
-  return { accounts: { claude, codex, rateLimits }, target: { kind: 'local' } }
-}
-
-/** Loads managed-account and quota state from the PTY-owning runtime. */
-async function loadAccountsSnapshot(args: {
-  agent: AutoSwitchRateLimitAgent
+/** Maps the no-quota last-resort failover outcome onto the runner result, or null when not configured. */
+async function tryLastResortFailover(args: {
+  worktreeId: string
   ptyId: string
-}): Promise<AccountsSnapshotResult> {
-  const environmentId = getRemoteRuntimePtyEnvironmentId(args.ptyId)
-  if (!environmentId) {
-    return loadLocalAccountsSnapshot(args.agent)
-  }
-  const target = { kind: 'environment', environmentId } as const
-  const accounts = await callRuntimeRpc<AutoSwitchAccountsSnapshot>(
-    target,
-    'accounts.list',
-    undefined,
-    { timeoutMs: 30_000 }
-  )
-  return { accounts, target }
-}
-
-/** Selects the chosen managed account in the same runtime where the PTY is running. */
-async function selectAccount(args: {
   agent: AutoSwitchRateLimitAgent
-  runtimeTarget: RuntimeClientTarget
-  candidate: AutoSwitchAccountCandidate
-}): Promise<void> {
-  if (args.runtimeTarget.kind === 'environment') {
-    await callRuntimeRpc(
-      args.runtimeTarget,
-      args.agent === 'claude' ? 'accounts.selectClaude' : 'accounts.selectCodex',
-      { accountId: args.candidate.accountId },
-      { timeoutMs: 30_000 }
-    )
-    return
+  providerSession: AgentProviderSessionMetadata
+  snapshot: AccountsSnapshotResult
+  livePtyAccount: ClaudeLivePtyAccountInfo | null
+}): Promise<AgentRateLimitAutoSwitchResult | null> {
+  // Why: last-resort failover uses the per-worktree pin, which only exists for
+  // local worktrees; remote runtimes keep the plain no-account outcome.
+  if (args.agent !== 'claude' || args.snapshot.target.kind !== 'local') {
+    return null
   }
-
-  const selection = {
-    accountId: args.candidate.accountId,
-    runtime: args.candidate.target.runtime,
-    wslDistro: args.candidate.target.wslDistro
+  const failoverResult = await runLastResortFailoverIfConfigured({
+    worktreeId: args.worktreeId,
+    ptyId: args.ptyId,
+    providerSession: args.providerSession,
+    accounts: args.snapshot.accounts.claude.accounts,
+    livePtyAccount: args.livePtyAccount,
+    settings: useAppStore.getState().settings
+  })
+  if (!failoverResult) {
+    return null
   }
-  const selectManagedAccount =
-    args.agent === 'claude' ? window.api.claudeAccounts.select : window.api.codexAccounts.select
-  await selectManagedAccount(selection)
-  await useAppStore.getState().fetchSettings()
+  if (failoverResult.ok) {
+    return {
+      ok: true,
+      agent: args.agent,
+      accountLabel: failoverResult.accountLabel,
+      failover: failoverResult.failover
+    }
+  }
+  return failure(
+    failoverResult.reason === 'pin-failed' ? 'switch-failed' : failoverResult.reason,
+    failoverResult.message
+  )
 }
 
 /** Runs the stop/switch/resume/continue flow for a detected account-limit event. */
 export async function runAgentRateLimitAutoSwitch(args: {
   ptyId: string
+  worktreeId: string
   agent: AutoSwitchRateLimitAgent
   providerSession: AgentProviderSessionMetadata
   connectionId: string | null
 }): Promise<AgentRateLimitAutoSwitchResult> {
   const settings = useAppStore.getState().settings
   if (settings?.autoSwitchRateLimitedAccounts !== true) {
-    return {
-      ok: false,
-      reason: 'disabled',
-      message: translate(
-        'auto.lib.agentRateLimitAutoSwitchRunner.07ff1f8806',
-        'Auto-switch is disabled.'
-      )
-    }
+    return failure(
+      'disabled',
+      translate('auto.lib.agentRateLimitAutoSwitchRunner.07ff1f8806', 'Auto-switch is disabled.')
+    )
   }
   if (args.connectionId) {
-    return {
-      ok: false,
-      reason: 'ssh',
-      message: translate(
+    return failure(
+      'ssh',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.7e5d87791a',
         'Auto-switch is not available for SSH terminals because account auth lives on the remote host.'
+      )
+    )
+  }
+
+  // Why: a custom-endpoint (gateway) session can emit Anthropic-shaped limit
+  // errors, but its universe has no quota to switch; never Ctrl+C it.
+  let livePtyAccount: ClaudeLivePtyAccountInfo | null = null
+  if (args.agent === 'claude') {
+    const backing = await resolveClaudeSessionBackingAccount(args.ptyId)
+    livePtyAccount = backing.info
+    if (backing.isCustomEndpoint) {
+      return failure(
+        'custom-endpoint-session',
+        translate(
+          'auto.lib.agentRateLimitAutoSwitchRunner.customEndpointSession',
+          'This session runs on a custom endpoint account; its errors are not Anthropic account limits.'
+        )
       )
     }
   }
@@ -145,15 +146,14 @@ export async function runAgentRateLimitAutoSwitch(args: {
   try {
     snapshot = await loadAccountsSnapshot({ agent: args.agent, ptyId: args.ptyId })
   } catch (error) {
-    return {
-      ok: false,
-      reason: 'switch-failed',
-      message: translate(
+    return failure(
+      'switch-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.65e8e278a4',
         'Could not inspect managed accounts: {{value0}}',
         { value0: errorMessage(error) }
       )
-    }
+    )
   }
   const providerTarget =
     args.agent === 'claude'
@@ -166,15 +166,25 @@ export async function runAgentRateLimitAutoSwitch(args: {
       snapshot.target.kind === 'environment' ? { runtime: 'host', wslDistro: null } : providerTarget
   })
   if (!candidate) {
-    return {
-      ok: false,
-      reason: 'no-account',
-      message: translate(
+    const failoverOutcome = await tryLastResortFailover({
+      worktreeId: args.worktreeId,
+      ptyId: args.ptyId,
+      agent: args.agent,
+      providerSession: args.providerSession,
+      snapshot,
+      livePtyAccount
+    })
+    if (failoverOutcome) {
+      return failoverOutcome
+    }
+    return failure(
+      'no-account',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.d823b157d5',
         'No managed {{value0}} account with available quota was found.',
         { value0: args.agent === 'claude' ? 'Claude' : 'Codex' }
       )
-    }
+    )
   }
 
   let platform: NodeJS.Platform
@@ -184,15 +194,14 @@ export async function runAgentRateLimitAutoSwitch(args: {
       accountTarget: candidate.target
     })
   } catch (error) {
-    return {
-      ok: false,
-      reason: 'resume-failed',
-      message: translate(
+    return failure(
+      'resume-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.a939f58b30',
         'Could not resolve the resume platform: {{value0}}',
         { value0: errorMessage(error) }
       )
-    }
+    )
   }
   const localSettings = snapshot.target.kind === 'local' ? settings : null
   const resumePlan = buildAgentResumeStartupPlan({
@@ -204,14 +213,13 @@ export async function runAgentRateLimitAutoSwitch(args: {
     platform
   })
   if (!resumePlan) {
-    return {
-      ok: false,
-      reason: 'resume-failed',
-      message: translate(
+    return failure(
+      'resume-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.79751c2c2d',
         'Could not build a resume command for the limited agent session.'
       )
-    }
+    )
   }
 
   const stopped = await stopForegroundAgent({
@@ -221,14 +229,13 @@ export async function runAgentRateLimitAutoSwitch(args: {
     expectedProcess: resumePlan.expectedProcess
   })
   if (!stopped) {
-    return {
-      ok: false,
-      reason: 'stop-failed',
-      message: translate(
+    return failure(
+      'stop-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.13668a6034',
         'The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.'
       )
-    }
+    )
   }
 
   try {
@@ -238,11 +245,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
       candidate
     })
   } catch (error) {
-    return {
-      ok: false,
-      reason: 'switch-failed',
-      message: error instanceof Error ? error.message : String(error)
-    }
+    return failure('switch-failed', errorMessage(error))
   }
 
   const launched = await sendRuntimePtyInputVerified(
@@ -251,14 +254,13 @@ export async function runAgentRateLimitAutoSwitch(args: {
     `${resumePlan.launchCommand}\r`
   )
   if (!launched) {
-    return {
-      ok: false,
-      reason: 'resume-failed',
-      message: translate(
+    return failure(
+      'resume-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.9553d26436',
         'The terminal did not accept the resume command after switching accounts.'
       )
-    }
+    )
   }
 
   const resumed = await waitForResumedAgent({
@@ -268,14 +270,13 @@ export async function runAgentRateLimitAutoSwitch(args: {
     expectedProcess: resumePlan.expectedProcess
   })
   if (!resumed) {
-    return {
-      ok: false,
-      reason: 'resume-failed',
-      message: translate(
+    return failure(
+      'resume-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.13ccffb514',
         'The resumed agent did not take over the terminal in time.'
       )
-    }
+    )
   }
 
   await waitForAgentReadyInput()
@@ -285,14 +286,13 @@ export async function runAgentRateLimitAutoSwitch(args: {
     'continue\r'
   )
   if (!continued) {
-    return {
-      ok: false,
-      reason: 'continue-failed',
-      message: translate(
+    return failure(
+      'continue-failed',
+      translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.65d1f14b75',
         'The resumed agent did not accept the continue command.'
       )
-    }
+    )
   }
 
   return { ok: true, agent: args.agent, accountLabel: candidate.label }

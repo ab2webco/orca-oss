@@ -619,7 +619,8 @@
         "13ccffb514": "The resumed agent did not take over the terminal in time.",
         "65d1f14b75": "The resumed agent did not accept the continue command.",
         "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
-        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}",
+        "customEndpointSession": "This session runs on a custom endpoint account; its errors are not Anthropic account limits."
       },
       "blocked": {
         "notification": {
@@ -648,6 +649,12 @@
             "triageFollowupsPrompt": "Use {{value0}} to triage the linked Linear issue — set priority and estimate — and create a parented follow-up ticket for the deferred cleanup."
           }
         }
+      },
+      "agentRateLimitFailover": {
+        "resumePlanFailed": "Could not build a resume command for the failover session.",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "Could not assign the failover account to this worktree: {{value0}}",
+        "launchPlanFailed": "Could not build a launch command for the failover session."
       }
     },
     "hooks": {
@@ -5056,7 +5063,10 @@
           "customEndpointSubmit": "Add Endpoint",
           "customEndpointTitle": "Add Custom Endpoint Account",
           "customEndpointToken": "API token",
-          "endpointBadge": "Endpoint"
+          "endpointBadge": "Endpoint",
+          "failoverRowTitle": "Last-Resort Failover",
+          "failoverRowDescription": "When no Anthropic account has quota left, pin the worktree to this custom endpoint account and continue the session there.",
+          "failoverNone": "None"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -7257,7 +7267,8 @@
             "pinKeyword": "pin",
             "claudeEndpointKeyword": "endpoint",
             "claudeGlmKeyword": "glm",
-            "claudeZaiKeyword": "z.ai"
+            "claudeZaiKeyword": "z.ai",
+            "failoverKeyword": "failover"
           }
         },
         "advanced": {
@@ -13489,7 +13500,11 @@
           "e0e6981a0e": "{{value0}} session resumed.",
           "f8d8f16aca": "Switched to {{value0}} and sent continue.",
           "816627b20e": "{{value0}} auto-switch skipped.",
-          "8bb13ef78d": "{{value0}} auto-switch failed."
+          "8bb13ef78d": "{{value0}} auto-switch failed.",
+          "failoverTitle": "No Anthropic account has quota left — continuing on {{value0}}.",
+          "failoverResumed": "The worktree is now pinned to the endpoint account; the session resumed in a new tab and continue was sent.",
+          "failoverLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "failoverFresh": "The previous transcript could not be copied, so the endpoint session starts fresh in a new tab."
         }
       },
       "browser-pane": {

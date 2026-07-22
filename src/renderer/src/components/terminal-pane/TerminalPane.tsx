@@ -1003,12 +1003,40 @@ export default function TerminalPane({
 
       void runAgentRateLimitAutoSwitch({
         ptyId: event.ptyId,
+        worktreeId,
         agent: event.agent,
         providerSession: event.providerSession,
         connectionId: getConnectionId(worktreeId) ?? null
       })
         .then((result) => {
           if (result.ok) {
+            if (result.failover) {
+              toast.info(
+                translate(
+                  'auto.components.terminalPane.TerminalPane.failoverTitle',
+                  'No Anthropic account has quota left — continuing on {{value0}}.',
+                  { value0: result.accountLabel }
+                ),
+                {
+                  description:
+                    result.failover === 'resumed'
+                      ? translate(
+                          'auto.components.terminalPane.TerminalPane.failoverResumed',
+                          'The worktree is now pinned to the endpoint account; the session resumed in a new tab and continue was sent.'
+                        )
+                      : result.failover === 'launched'
+                        ? translate(
+                            'auto.components.terminalPane.TerminalPane.failoverLaunched',
+                            'The session resumed in a new tab, but continue was not delivered — send it manually.'
+                          )
+                        : translate(
+                            'auto.components.terminalPane.TerminalPane.failoverFresh',
+                            'The previous transcript could not be copied, so the endpoint session starts fresh in a new tab.'
+                          )
+                }
+              )
+              return
+            }
             toast.success(
               translate(
                 'auto.components.terminalPane.TerminalPane.e0e6981a0e',
@@ -1029,7 +1057,11 @@ export default function TerminalPane({
             return
           }
           const toastFn =
-            result.reason === 'no-account' || result.reason === 'ssh' ? toast.info : toast.error
+            result.reason === 'no-account' ||
+            result.reason === 'ssh' ||
+            result.reason === 'custom-endpoint-session'
+              ? toast.info
+              : toast.error
           toastFn(
             translate(
               'auto.components.terminalPane.TerminalPane.816627b20e',

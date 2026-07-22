@@ -2924,7 +2924,11 @@ function createClaudeAccountsApi(): never {
       (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude,
     // Why: custom endpoints are managed on the account-owning desktop/server, not from the web client.
     addCustomEndpoint: () =>
-      Promise.reject(new Error('Add custom endpoint accounts from the Orca desktop app.'))
+      Promise.reject(new Error('Add custom endpoint accounts from the Orca desktop app.')),
+    // Why: the live-pty gate and account universes live on the desktop host, so web clients see no binding.
+    getLivePtyAccount: () => Promise.resolve(null),
+    copySessionForFailover: () =>
+      Promise.reject(new Error('Rate-limit failover runs on the Orca desktop app.'))
   } as never
 }
 

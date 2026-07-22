@@ -491,7 +491,8 @@ describe('registerCoreHandlers', () => {
       getPtyIdForPaneKey: expect.any(Function)
     })
     expect(registerPetHandlersMock).toHaveBeenCalled()
-    expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts)
+    // Why: claude-account handlers now read managed-account settings for the failover session copy.
+    expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts, store)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits)

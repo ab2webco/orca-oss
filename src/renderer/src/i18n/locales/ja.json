@@ -603,7 +603,8 @@
         "13ccffb514": "The resumed agent did not take over the terminal in time.",
         "65d1f14b75": "The resumed agent did not accept the continue command.",
         "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
-        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}",
+        "customEndpointSession": "このセッションはカスタムエンドポイントアカウントで実行されています。そのエラーは Anthropic アカウントの制限ではありません。"
       },
       "linear": {
         "usage": {
@@ -625,6 +626,12 @@
             "triageFollowupsPrompt": "Use {{value0}} to triage the linked Linear issue — set priority and estimate — and create a parented follow-up ticket for the deferred cleanup."
           }
         }
+      },
+      "agentRateLimitFailover": {
+        "resumePlanFailed": "フェイルオーバーセッションの再開コマンドを作成できませんでした。",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "このワークツリーにフェイルオーバーアカウントを割り当てられませんでした: {{value0}}",
+        "launchPlanFailed": "フェイルオーバーセッションの起動コマンドを作成できませんでした。"
       }
     },
     "hooks": {
@@ -5018,7 +5025,10 @@
           "customEndpointSubmit": "エンドポイントを追加",
           "customEndpointTitle": "カスタムエンドポイントアカウントを追加",
           "customEndpointToken": "API トークン",
-          "endpointBadge": "エンドポイント"
+          "endpointBadge": "エンドポイント",
+          "failoverRowTitle": "最終手段のフェイルオーバー",
+          "failoverRowDescription": "どの Anthropic アカウントにもクォータが残っていない場合、ワークツリーをこのカスタムエンドポイントアカウントに固定してセッションを続行します。",
+          "failoverNone": "なし"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",
@@ -7219,7 +7229,8 @@
             "pinKeyword": "固定",
             "claudeEndpointKeyword": "エンドポイント",
             "claudeGlmKeyword": "glm",
-            "claudeZaiKeyword": "z.ai"
+            "claudeZaiKeyword": "z.ai",
+            "failoverKeyword": "フェイルオーバー"
           }
         },
         "advanced": {
@@ -13466,7 +13477,11 @@
           "e0e6981a0e": "{{value0}} session resumed.",
           "f8d8f16aca": "Switched to {{value0}} and sent continue.",
           "816627b20e": "{{value0}} auto-switch skipped.",
-          "8bb13ef78d": "{{value0}} auto-switch failed."
+          "8bb13ef78d": "{{value0}} auto-switch failed.",
+          "failoverTitle": "Anthropic アカウントに残りクォータがありません — {{value0}} で続行します。",
+          "failoverResumed": "ワークツリーはエンドポイントアカウントに固定されました。セッションは新しいタブで再開され、continue を送信しました。",
+          "failoverLaunched": "セッションは新しいタブで再開されましたが、continue を送信できませんでした — 手動で送信してください。",
+          "failoverFresh": "以前のトランスクリプトをコピーできなかったため、エンドポイントのセッションは新しいタブで最初から開始されます。"
         }
       },
       "browser-pane": {

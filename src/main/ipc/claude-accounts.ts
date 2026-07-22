@@ -5,8 +5,38 @@ import type {
   ClaudeCustomEndpointAccountInput
 } from '../claude-accounts/service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
+import type { ClaudeLivePtyAccountInfo, GlobalSettings } from '../../shared/types'
+import {
+  getLiveInjectedClaudePtyAccountId,
+  getLiveSharedClaudePtyAccountId,
+  isLiveSharedClaudePty
+} from '../claude-accounts/live-pty-gate'
+import {
+  copyClaudeSessionForFailover,
+  type CopyClaudeSessionForFailoverArgs
+} from '../claude-accounts/session-failover'
+import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
 
-export function registerClaudeAccountHandlers(claudeAccounts: ClaudeAccountService): void {
+type ClaudeAccountSettingsStore = {
+  getSettings(): Pick<GlobalSettings, 'claudeManagedAccounts'>
+}
+
+/** Resolves the managed account backing a live Claude PTY from main's live-pty gate. */
+export function getClaudeLivePtyAccountInfo(ptyId: string): ClaudeLivePtyAccountInfo | null {
+  const injectedAccountId = getLiveInjectedClaudePtyAccountId(ptyId)
+  if (injectedAccountId) {
+    return { accountId: injectedAccountId, injected: true }
+  }
+  if (isLiveSharedClaudePty(ptyId)) {
+    return { accountId: getLiveSharedClaudePtyAccountId(ptyId), injected: false }
+  }
+  return null
+}
+
+export function registerClaudeAccountHandlers(
+  claudeAccounts: ClaudeAccountService,
+  store: ClaudeAccountSettingsStore
+): void {
   ipcMain.handle('claudeAccounts:list', () => claudeAccounts.listAccounts())
   ipcMain.handle('claudeAccounts:add', (_event, args?: ClaudeAccountAddTarget) =>
     claudeAccounts.addAccount(args)
@@ -31,5 +61,16 @@ export function registerClaudeAccountHandlers(claudeAccounts: ClaudeAccountServi
       }
       return claudeAccounts.selectAccountForTarget(args.accountId, args)
     }
+  )
+  ipcMain.handle('claudeAccounts:getLivePtyAccount', (_event, args: { ptyId: string }) =>
+    typeof args?.ptyId === 'string' ? getClaudeLivePtyAccountInfo(args.ptyId) : null
+  )
+  ipcMain.handle(
+    'claudeAccounts:copySessionForFailover',
+    (_event, args: CopyClaudeSessionForFailoverArgs) =>
+      copyClaudeSessionForFailover(args, {
+        getAccounts: () => store.getSettings().claudeManagedAccounts,
+        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+      })
   )
 }

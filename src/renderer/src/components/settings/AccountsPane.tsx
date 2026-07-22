@@ -93,6 +93,8 @@ export { getAccountsPaneSearchEntries }
 
 const EMPTY_WSL_DISTROS: string[] = []
 const MINIMAX_CONSOLE_URL = 'https://platform.minimax.io/console/usage'
+// Why: Radix Select items cannot carry an empty-string value, so "off" needs a sentinel.
+const FAILOVER_ACCOUNT_NONE_VALUE = '__none__'
 
 function formatMiniMaxRelativeRefresh(updatedAt: number, now: number): string {
   const diffMs = Math.max(0, now - updatedAt)
@@ -419,6 +421,10 @@ export function AccountsPane({
   }
   const visibleClaudeAccounts = claudeAccounts.accounts.filter((account) =>
     providerAccountMatchesView(account, accountRuntime, accountVisibilityOptions)
+  )
+  // Why: the failover picker offers only custom-endpoint accounts — OAuth accounts already participate in auto-switch.
+  const customEndpointClaudeAccounts = claudeAccounts.accounts.filter(
+    (account) => account.authMethod === 'custom-endpoint'
   )
   const visibleCodexAccounts = codexAccounts.accounts.filter((account) =>
     providerAccountMatchesView(account, accountRuntime, accountVisibilityOptions)
@@ -852,6 +858,50 @@ export function AccountsPane({
               </Button>
             }
           />
+          {customEndpointClaudeAccounts.length > 0 ? (
+            <SettingsRow
+              label={translate(
+                'auto.components.settings.AccountsPane.failoverRowTitle',
+                'Last-Resort Failover'
+              )}
+              alignTop
+              description={translate(
+                'auto.components.settings.AccountsPane.failoverRowDescription',
+                'When no Anthropic account has quota left, pin the worktree to this custom endpoint account and continue the session there.'
+              )}
+              control={
+                <Select
+                  value={
+                    customEndpointClaudeAccounts.some(
+                      (account) => account.id === settings.rateLimitFailoverAccountId
+                    )
+                      ? (settings.rateLimitFailoverAccountId as string)
+                      : FAILOVER_ACCOUNT_NONE_VALUE
+                  }
+                  onValueChange={(value) =>
+                    updateSettings({
+                      rateLimitFailoverAccountId:
+                        value === FAILOVER_ACCOUNT_NONE_VALUE ? null : value
+                    })
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FAILOVER_ACCOUNT_NONE_VALUE}>
+                      {translate('auto.components.settings.AccountsPane.failoverNone', 'None')}
+                    </SelectItem>
+                    {customEndpointClaudeAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.endpointLabel?.trim() || account.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              }
+            />
+          ) : null}
         </SearchableSetting>
       </section>
     ) : null,

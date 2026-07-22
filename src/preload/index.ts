@@ -1915,7 +1915,15 @@ const api = {
       accountId: string | null
       runtime?: 'host' | 'wsl'
       wslDistro?: string | null
-    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:select', args)
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:select', args),
+    getLivePtyAccount: (args: { ptyId: string }): Promise<unknown> =>
+      ipcRenderer.invoke('claudeAccounts:getLivePtyAccount', args),
+    copySessionForFailover: (args: {
+      sessionId: string
+      cwd: string
+      targetAccountId: string
+      sourceAccountId?: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:copySessionForFailover', args)
   },
 
   cli: {

@@ -2456,6 +2456,28 @@ export type ClaudeLivePtyAccountBinding = {
   accountId: string
 }
 
+/** Managed account backing a live Claude PTY, from main's live-pty gate.
+ *  injected = per-worktree pinned universe; shared = global ~/.claude auth. */
+export type ClaudeLivePtyAccountInfo = {
+  accountId: string | null
+  injected: boolean
+}
+
+export type ClaudeSessionFailoverCopyFailureReason =
+  | 'invalid-session-id'
+  | 'target-account-not-found'
+  | 'source-account-not-found'
+  | 'target-dir-unresolved'
+  | 'source-dir-unresolved'
+  | 'source-not-found'
+  | 'copy-failed'
+
+/** Outcome of copying a provider session transcript into a custom-endpoint
+ *  account universe for last-resort rate-limit failover. */
+export type ClaudeSessionFailoverCopyResult =
+  | { ok: true; sessionId: string; copiedFileCount: number }
+  | { ok: false; reason: ClaudeSessionFailoverCopyFailureReason }
+
 export type ClaudeLiveSharedPtyAccountBinding = {
   sessionId: string
   accountId: string | null
@@ -2819,6 +2841,9 @@ export type GlobalSettings = {
    *  switches to another managed account with available quota, resumes the
    *  same provider session, then sends "continue". */
   autoSwitchRateLimitedAccounts?: boolean
+  /** Custom-endpoint Claude account used as a last-resort per-worktree pin when
+   *  auto-switch finds no Anthropic account with quota. null = off. */
+  rateLimitFailoverAccountId?: string | null
   /** When true (default), the Claude usage meters show the pinned managed
    *  account's usage while the focused worktree carries a claudeAccountId pin.
    *  false always shows the globally active account. */

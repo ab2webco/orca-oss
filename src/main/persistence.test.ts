@@ -742,6 +742,44 @@ describe('Store', () => {
     expect(store.getSettings().minimizeToTrayOnClose).toBe(false)
   })
 
+  it('defaults rateLimitFailoverAccountId to null when unset', async () => {
+    const store = await createStore()
+    expect(store.getSettings().rateLimitFailoverAccountId).toBeNull()
+  })
+
+  it('persists rateLimitFailoverAccountId round-trip and clears it with null', async () => {
+    const store = await createStore()
+    store.updateSettings({ rateLimitFailoverAccountId: 'endpoint-account-id' })
+    expect(store.getSettings().rateLimitFailoverAccountId).toBe('endpoint-account-id')
+    store.flush()
+    expect((readDataFile() as PersistedState).settings.rateLimitFailoverAccountId).toBe(
+      'endpoint-account-id'
+    )
+    store.updateSettings({ rateLimitFailoverAccountId: null })
+    expect(store.getSettings().rateLimitFailoverAccountId).toBeNull()
+  })
+
+  it('sanitizes non-string and empty rateLimitFailoverAccountId updates to null', async () => {
+    const store = await createStore()
+    store.updateSettings({ rateLimitFailoverAccountId: 42 as unknown as string })
+    expect(store.getSettings().rateLimitFailoverAccountId).toBeNull()
+    store.updateSettings({ rateLimitFailoverAccountId: '   ' })
+    expect(store.getSettings().rateLimitFailoverAccountId).toBeNull()
+  })
+
+  it('coerces a loaded non-string rateLimitFailoverAccountId to null', async () => {
+    writeDataFile({
+      ...getDefaultPersistedState(testState.dir),
+      settings: {
+        rateLimitFailoverAccountId: { nested: true } as unknown as string
+      }
+    })
+
+    const store = await createStore()
+
+    expect(store.getSettings().rateLimitFailoverAccountId).toBeNull()
+  })
+
   it('persists native chat session options with per-model isolation', async () => {
     const store = await createStore()
     store.updateSettings({

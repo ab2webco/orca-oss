@@ -2125,6 +2125,15 @@ function normalizeClaudeLivePtySessionIds(value: unknown): string[] {
   return ids.toReversed()
 }
 
+// Why: cross-IPC/hand-edited payloads; only a non-empty account-id string may persist, anything else means "failover off".
+function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 && trimmed.length <= 512 ? trimmed : null
+}
+
 function normalizeClaudeLivePtyAccountBindings(value: unknown): ClaudeLivePtyAccountBinding[] {
   if (!Array.isArray(value)) {
     return []
@@ -3123,6 +3132,9 @@ export class Store {
             appIcon: normalizeAppIconId(parsed.settings?.appIcon),
             // Why: persisted settings may be hand-edited or from older builds; keep tray-minimize false unless stored value is true.
             minimizeToTrayOnClose: parsed.settings?.minimizeToTrayOnClose === true,
+            rateLimitFailoverAccountId: normalizeRateLimitFailoverAccountId(
+              parsed.settings?.rateLimitFailoverAccountId
+            ),
             // Why: missing means default-on; round-trips unchanged on non-mac since darwin consumers gate the effect.
             showMenuBarIcon: parsed.settings?.showMenuBarIcon !== false,
             uiLanguage: normalizeUiLanguage(parsed.settings?.uiLanguage),
@@ -5126,6 +5138,11 @@ export class Store {
     if ('autoSwitchRateLimitedAccounts' in updates) {
       sanitizedUpdates.autoSwitchRateLimitedAccounts =
         updates.autoSwitchRateLimitedAccounts === true
+    }
+    if ('rateLimitFailoverAccountId' in updates) {
+      sanitizedUpdates.rateLimitFailoverAccountId = normalizeRateLimitFailoverAccountId(
+        updates.rateLimitFailoverAccountId
+      )
     }
     if ('showWorktreeAccountUsage' in updates) {
       // Why: default-on setting — coerce non-bool payloads back to the default.

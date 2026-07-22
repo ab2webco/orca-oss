@@ -603,7 +603,8 @@
         "13ccffb514": "The resumed agent did not take over the terminal in time.",
         "65d1f14b75": "The resumed agent did not accept the continue command.",
         "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
-        "a939f58b30": "Could not resolve the resume platform: {{value0}}"
+        "a939f58b30": "Could not resolve the resume platform: {{value0}}",
+        "customEndpointSession": "이 세션은 사용자 지정 엔드포인트 계정에서 실행됩니다. 해당 오류는 Anthropic 계정 한도가 아닙니다."
       },
       "linear": {
         "usage": {
@@ -625,6 +626,12 @@
             "triageFollowupsPrompt": "Use {{value0}} to triage the linked Linear issue — set priority and estimate — and create a parented follow-up ticket for the deferred cleanup."
           }
         }
+      },
+      "agentRateLimitFailover": {
+        "resumePlanFailed": "페일오버 세션의 재개 명령을 만들 수 없습니다.",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "이 워크트리에 페일오버 계정을 할당할 수 없습니다: {{value0}}",
+        "launchPlanFailed": "페일오버 세션의 실행 명령을 만들 수 없습니다."
       }
     },
     "hooks": {
@@ -5018,7 +5025,10 @@
           "customEndpointSubmit": "엔드포인트 추가",
           "customEndpointTitle": "사용자 지정 엔드포인트 계정 추가",
           "customEndpointToken": "API 토큰",
-          "endpointBadge": "엔드포인트"
+          "endpointBadge": "엔드포인트",
+          "failoverRowTitle": "최후 수단 페일오버",
+          "failoverRowDescription": "Anthropic 계정에 할당량이 없으면 워크트리를 이 사용자 지정 엔드포인트 계정에 고정하고 세션을 계속합니다.",
+          "failoverNone": "없음"
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",
@@ -7182,7 +7192,8 @@
             "pinKeyword": "고정",
             "claudeEndpointKeyword": "엔드포인트",
             "claudeGlmKeyword": "glm",
-            "claudeZaiKeyword": "z.ai"
+            "claudeZaiKeyword": "z.ai",
+            "failoverKeyword": "페일오버"
           }
         },
         "advanced": {
@@ -13466,7 +13477,11 @@
           "e0e6981a0e": "{{value0}} session resumed.",
           "f8d8f16aca": "Switched to {{value0}} and sent continue.",
           "816627b20e": "{{value0}} auto-switch skipped.",
-          "8bb13ef78d": "{{value0}} auto-switch failed."
+          "8bb13ef78d": "{{value0}} auto-switch failed.",
+          "failoverTitle": "Anthropic 계정에 남은 할당량이 없습니다 — {{value0}}(으)로 계속합니다.",
+          "failoverResumed": "워크트리가 엔드포인트 계정에 고정되었습니다. 세션이 새 탭에서 재개되었고 continue를 보냈습니다.",
+          "failoverLaunched": "세션이 새 탭에서 재개되었지만 continue를 전달하지 못했습니다 — 직접 보내 주세요.",
+          "failoverFresh": "이전 대화 기록을 복사할 수 없어 엔드포인트 세션이 새 탭에서 새로 시작됩니다."
         }
       },
       "browser-pane": {

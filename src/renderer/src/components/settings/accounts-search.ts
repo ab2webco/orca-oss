@@ -43,7 +43,15 @@ export const getAccountsAutoSwitchSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.e14049e1a8', 'claude'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.70d1b8def5', 'codex'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.4de7da808a', 'continue'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.0df8d33e19', 'resume')
+      ...translateSearchKeyword('auto.components.settings.accounts.search.0df8d33e19', 'resume'),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.failoverKeyword',
+        'failover'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.claudeEndpointKeyword',
+        'endpoint'
+      )
     ]
   }
 ])

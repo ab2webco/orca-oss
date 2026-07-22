@@ -86,7 +86,9 @@ import type {
   BrowserSessionProfileScope,
   BrowserSessionProfileSource,
   BrowserViewportOverride,
+  ClaudeLivePtyAccountInfo,
   ClaudeRateLimitAccountsState,
+  ClaudeSessionFailoverCopyResult,
   ClassifiedError,
   CodexRateLimitAccountsState,
   CreateWorktreeArgs,
@@ -2192,6 +2194,13 @@ export type PreloadApi = {
       runtime?: 'host' | 'wsl'
       wslDistro?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
+    getLivePtyAccount: (args: { ptyId: string }) => Promise<ClaudeLivePtyAccountInfo | null>
+    copySessionForFailover: (args: {
+      sessionId: string
+      cwd: string
+      targetAccountId: string
+      sourceAccountId?: string | null
+    }) => Promise<ClaudeSessionFailoverCopyResult>
   }
   cli: {
     getInstallStatus: () => Promise<CliInstallStatus>

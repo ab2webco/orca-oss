@@ -136,6 +136,9 @@ export function selectAutoSwitchAccount(args: {
 
   const candidates = providerAccounts.accounts
     .filter((account) => account.id !== activeAccountId)
+    // Why: custom-endpoint accounts carry no Anthropic quota and must never become
+    // a global switch target; they are reachable only via last-resort failover pins.
+    .filter((account) => !('authMethod' in account) || account.authMethod !== 'custom-endpoint')
     .filter((account) => accountMatchesTarget(args.agent, account, args.target))
     .map((account) => {
       const usedPercent = usageByAccountId.get(account.id)
