@@ -31,6 +31,15 @@ export type CopyClaudeSessionForFailBackArgs = {
   targetAccountId: string | null
 }
 
+export type CopyClaudeSessionForAccountSwitchArgs = {
+  sessionId: string
+  cwd: string
+  /** Managed OAuth (non-endpoint) account receiving the transcript. */
+  targetAccountId: string
+  /** Managed account whose universe hosted the session; null/undefined = shared ~/.claude. */
+  sourceAccountId?: string | null
+}
+
 export type ClaudeSessionFailoverDeps = {
   getAccounts(): readonly ClaudeManagedAccount[]
   /** Shared Claude config dir (~/.claude or CLAUDE_CONFIG_DIR) used when the source session is unpinned. */
@@ -242,6 +251,60 @@ export function copyClaudeSessionForFailBack(
     cwd: args.cwd,
     sessionId
   })
+}
+
+/**
+ * Copies a Claude session transcript (plus same-session-id sidecars) between two
+ * managed OAuth universes — or from shared ~/.claude into a pinned account — so
+ * switching a pinned worktree to another Claude account keeps `claude --resume`
+ * working there. This is the managed→managed sibling of the endpoint failover
+ * copy: the target here must be an OAuth account (endpoint switches own their own
+ * guarded path via copyClaudeSessionForFailover).
+ */
+export function copyClaudeSessionForAccountSwitch(
+  args: CopyClaudeSessionForAccountSwitchArgs,
+  deps: ClaudeSessionFailoverDeps
+): ClaudeSessionFailoverCopyResult {
+  const sessionId = args.sessionId.trim()
+  if (!SESSION_ID_PATTERN.test(sessionId) || sessionId.includes('..')) {
+    return { ok: false, reason: 'invalid-session-id' }
+  }
+
+  const accounts = deps.getAccounts()
+  const targetAccount = accounts.find((account) => account.id === args.targetAccountId)
+  // Why: transcripts belong in an OAuth account's own vault; a custom-endpoint target is the failover path, not this one.
+  if (!targetAccount || targetAccount.authMethod === 'custom-endpoint') {
+    return { ok: false, reason: 'target-account-not-found' }
+  }
+  if (targetAccount.managedAuthRuntime === 'wsl') {
+    return { ok: false, reason: 'target-dir-unresolved' }
+  }
+  const targetRoot = resolveOwnedClaudeManagedAuthPath(
+    targetAccount.id,
+    targetAccount.managedAuthPath
+  )
+  if (!targetRoot) {
+    return { ok: false, reason: 'target-dir-unresolved' }
+  }
+
+  let sourceRoot: string
+  if (typeof args.sourceAccountId === 'string' && args.sourceAccountId.length > 0) {
+    const resolved = resolveManagedSourceRoot(
+      accounts.find((account) => account.id === args.sourceAccountId)
+    )
+    if (!resolved.ok) {
+      return { ok: false, reason: resolved.reason }
+    }
+    sourceRoot = resolved.root
+  } else {
+    const shared = resolveRealRoot(deps.getSharedConfigDir())
+    if (!shared) {
+      return { ok: false, reason: 'source-dir-unresolved' }
+    }
+    sourceRoot = shared
+  }
+
+  return copySessionFilesBetweenRoots({ sourceRoot, targetRoot, cwd: args.cwd, sessionId })
 }
 
 function copySessionFilesBetweenRoots(args: {

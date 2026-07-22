@@ -22,6 +22,14 @@ vi.mock('@/i18n/i18n', () => ({
       fallback
     )
 }))
+
+// Why: isolate the header's gating logic from the switch button's Radix menu +
+// account fetch, which are covered by their own units.
+vi.mock('./TerminalClaudeAccountSwitchButton', () => ({
+  TerminalClaudeAccountSwitchButton: () => (
+    <button type="button" aria-label="Switch Account & Continue" />
+  )
+}))
 const mounted: { container: HTMLDivElement; root: Root }[] = []
 
 function makePane(id: number): ManagedPane {
@@ -49,6 +57,8 @@ function renderOverlay({
   onRenameSubmit = vi.fn(),
   canContinueAgentSessionInNewSession = false,
   onContinueAgentSessionInNewSession = vi.fn(),
+  canSwitchClaudeAccount = false,
+  onSwitchClaudeAccount = vi.fn(),
   renameValue = '',
   renamingPaneId = null
 }: {
@@ -61,6 +71,8 @@ function renderOverlay({
   onRenameSubmit?: ReturnType<typeof vi.fn>
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: ReturnType<typeof vi.fn>
+  canSwitchClaudeAccount?: boolean
+  onSwitchClaudeAccount?: ReturnType<typeof vi.fn>
   renameValue?: string
   renamingPaneId?: number | null
 }): {
@@ -102,6 +114,8 @@ function renderOverlay({
         onContinueAgentSessionInNewSession={
           onContinueAgentSessionInNewSession as (pane: ManagedPane) => void
         }
+        canSwitchClaudeAccount={canSwitchClaudeAccount}
+        onSwitchClaudeAccount={onSwitchClaudeAccount as (pane: ManagedPane) => void}
         onSplitPane={vi.fn()}
         onBeginPaneDrag={vi.fn()}
         onActivatePaneTitleInteraction={vi.fn()}
@@ -175,6 +189,24 @@ describe('TerminalPaneHeaderOverlay', () => {
 
     expect(onClosePane).toHaveBeenCalledWith(1)
     expect(onRemoveTitle).not.toHaveBeenCalled()
+  })
+
+  it('renders the switch-account action on the active pane when it hosts a Claude session', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: 'server', 2: '' },
+      canSwitchClaudeAccount: true
+    })
+
+    expect(container.querySelector('button[aria-label="Switch Account & Continue"]')).not.toBeNull()
+  })
+
+  it('omits the switch-account action when the pane is not a Claude session', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: 'server', 2: '' },
+      canSwitchClaudeAccount: false
+    })
+
+    expect(container.querySelector('button[aria-label="Switch Account & Continue"]')).toBeNull()
   })
 
   it('omits the split control when the header affordance is hidden', () => {

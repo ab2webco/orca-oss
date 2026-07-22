@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ClaudeManagedAccount } from '../../shared/types'
 import {
+  copyClaudeSessionForAccountSwitch,
   copyClaudeSessionForFailBack,
   copyClaudeSessionForFailover,
   encodeClaudeProjectDirName
@@ -358,5 +359,104 @@ describe('copyClaudeSessionForFailBack', () => {
     )
 
     expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
+  })
+})
+
+describe('copyClaudeSessionForAccountSwitch', () => {
+  beforeEach(() => {
+    testRoot = mkdtempSync(join(tmpdir(), 'orca-session-switch-'))
+  })
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true })
+  })
+
+  it('copies the transcript from one pinned OAuth vault into another', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    createManagedUniverse(target.id)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(sourceAuthPath, encoded)
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      { getAccounts: () => [source, target], getSharedConfigDir: () => '/nonexistent' }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+    const copied = join(
+      testRoot,
+      'claude-accounts',
+      target.id,
+      'auth',
+      'projects',
+      encoded,
+      `${SESSION_ID}.jsonl`
+    )
+    expect(readFileSync(copied, 'utf-8')).toBe('{"type":"summary"}\n')
+    if (process.platform !== 'win32') {
+      expect(statSync(copied).mode & 0o777).toBe(0o600)
+    }
+  })
+
+  it('copies from the shared config dir when the source was the global selection', () => {
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    createManagedUniverse(target.id)
+    const sharedDir = createSharedConfigDir()
+    writeSessionFiles(sharedDir, encodeClaudeProjectDirName(CWD))
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
+      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+  })
+
+  it('rejects a custom-endpoint target — endpoint switches use the failover path', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'endpoint-account', authMethod: 'custom-endpoint' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    createManagedUniverse(target.id)
+    writeSessionFiles(sourceAuthPath, encodeClaudeProjectDirName(CWD))
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      { getAccounts: () => [source, target], getSharedConfigDir: () => '/nonexistent' }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'target-account-not-found' })
+  })
+
+  it('rejects session ids with traversal shapes', () => {
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    createManagedUniverse(target.id)
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: 'a/../b', cwd: CWD, targetAccountId: target.id },
+      { getAccounts: () => [target], getSharedConfigDir: () => createSharedConfigDir() }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
+  })
+
+  it('does not follow a symlinked transcript out of the source root', () => {
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    createManagedUniverse(target.id)
+    const sharedDir = createSharedConfigDir()
+    const encoded = encodeClaudeProjectDirName(CWD)
+    const projectDir = join(sharedDir, 'projects', encoded)
+    mkdirSync(projectDir, { recursive: true })
+    const outsideFile = join(testRoot, 'secret.txt')
+    writeFileSync(outsideFile, 'secret', 'utf-8')
+    symlinkSync(outsideFile, join(projectDir, `${SESSION_ID}.jsonl`))
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
+      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'source-not-found' })
   })
 })

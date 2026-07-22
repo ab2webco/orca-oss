@@ -639,6 +639,13 @@
         "pinFailed": "无法在此工作树上恢复原始账户：{{value0}}",
         "launchPlanFailed": "无法为恢复的会话构建启动命令。",
         "resumePlanFailed": "无法为恢复的会话构建恢复命令。"
+      },
+      "agentRateLimitAccountSwitch": {
+        "invalidTarget": "That account runs on a custom endpoint; use the failover path instead of a managed account switch.",
+        "resumePlanFailed": "Could not build a resume command for the switched session.",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
+        "launchPlanFailed": "Could not build a launch command for the switched session."
       }
     },
     "hooks": {
@@ -13521,7 +13528,11 @@
           "failoverTitle": "Anthropic 账户已无剩余额度 — 正在使用 {{value0}} 继续。",
           "failoverResumed": "工作树已固定到端点账户；会话已在新标签页中恢复并发送了 continue。",
           "failoverLaunched": "会话已在新标签页中恢复，但 continue 未能送达 — 请手动发送。",
-          "failoverFresh": "无法复制先前的会话记录，端点会话将在新标签页中重新开始。"
+          "failoverFresh": "无法复制先前的会话记录，端点会话将在新标签页中重新开始。",
+          "relaunchTitle": "Switched to {{value0}} and relaunched this worktree.",
+          "relaunchResumed": "The session resumed in a new tab and continue was sent.",
+          "relaunchLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "relaunchFresh": "The previous transcript could not be copied, so the session starts fresh in a new tab."
         },
         "useAgentRateLimitFailBack": {
           "failed": "回切失败。",
@@ -13533,6 +13544,23 @@
           "doneResumed": "会话已在新标签页中恢复，并已发送 continue。",
           "doneLaunched": "会话已在新标签页中恢复，但 continue 未送达 — 请手动发送。",
           "doneFresh": "无法复制回会话记录，会话将在新标签页中重新开始。"
+        },
+        "TerminalClaudeAccountSwitchMenu": {
+          "trigger": "Switch Account & Continue",
+          "claudeSection": "Claude accounts",
+          "endpointSection": "Last resort"
+        },
+        "useManualClaudeAccountSwitch": {
+          "doneTitle": "Switched this terminal to {{value0}}.",
+          "doneResumed": "The session resumed in a new tab and continue was sent.",
+          "doneLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "doneFresh": "The transcript could not be copied, so the session starts fresh in a new tab.",
+          "noSession": "No resumable Claude session was found in this terminal.",
+          "startTitle": "Switching this terminal to {{value0}}…",
+          "failed": "Account switch failed."
+        },
+        "ClaudeAccountSwitchList": {
+          "empty": "No accounts available"
         }
       },
       "browser-pane": {

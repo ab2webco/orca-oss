@@ -174,6 +174,10 @@ import { runAgentRateLimitAutoSwitch } from '@/lib/agent-rate-limit-auto-switch-
 import { translate } from '@/i18n/i18n'
 import { canContinueAgentSessionInNewSession } from './terminal-agent-session-continuation'
 import {
+  useManualClaudeAccountSwitch,
+  type ManualClaudeAccountSwitchContext
+} from './use-manual-claude-account-switch'
+import {
   updateTerminalRemoteRuntimeRecoveryUiState,
   type VisiblePtyRecoveryState
 } from './terminal-remote-runtime-recovery-ui-state'
@@ -1057,6 +1061,33 @@ export default function TerminalPane({
                         : translate(
                             'auto.components.terminalPane.TerminalPane.failoverFresh',
                             'The previous transcript could not be copied, so the endpoint session starts fresh in a new tab.'
+                          )
+                }
+              )
+              return
+            }
+            if (result.relaunch) {
+              toast.success(
+                translate(
+                  'auto.components.terminalPane.TerminalPane.relaunchTitle',
+                  'Switched to {{value0}} and relaunched this worktree.',
+                  { value0: result.accountLabel }
+                ),
+                {
+                  description:
+                    result.relaunch === 'resumed'
+                      ? translate(
+                          'auto.components.terminalPane.TerminalPane.relaunchResumed',
+                          'The session resumed in a new tab and continue was sent.'
+                        )
+                      : result.relaunch === 'launched'
+                        ? translate(
+                            'auto.components.terminalPane.TerminalPane.relaunchLaunched',
+                            'The session resumed in a new tab, but continue was not delivered — send it manually.'
+                          )
+                        : translate(
+                            'auto.components.terminalPane.TerminalPane.relaunchFresh',
+                            'The previous transcript could not be copied, so the session starts fresh in a new tab.'
                           )
                 }
               )
@@ -3004,6 +3035,37 @@ export default function TerminalPane({
   const contextMenuCanContinueInNewSession = canContinueAgentSessionInNewSession(
     resolveAgentForLeaf(contextMenuLeafId)
   )
+  const contextMenuIsClaudeSession = resolveAgentForLeaf(contextMenuLeafId) === 'claude'
+  const activePaneIsClaudeSession = resolveAgentForLeaf(activePane?.leafId ?? null) === 'claude'
+  // Why: every surface acts on a specific pane — resolve that pane's live Claude
+  // session (ptyId + provider session) when the action fires, mirroring how
+  // continue/fork resolve their pane lazily on click.
+  const resolvePaneClaudeContext = useCallback(
+    (pane: ManagedPane | null): ManualClaudeAccountSwitchContext | null => {
+      if (!pane) {
+        return null
+      }
+      const entry = useAppStore.getState().agentStatusByPaneKey[makePaneKey(tabId, pane.leafId)]
+      if (entry?.agentType !== 'claude') {
+        return null
+      }
+      const providerSession = normalizeAgentProviderSession(entry.providerSession)
+      const ptyId = paneTransportsRef.current.get(pane.id)?.getPtyId()
+      if (!providerSession || !ptyId) {
+        return null
+      }
+      return { ptyId, providerSession }
+    },
+    [tabId]
+  )
+  const findManagedPaneById = useCallback(
+    (paneId: number | null): ManagedPane | null =>
+      paneId === null
+        ? null
+        : (managerRef.current?.getPanes().find((candidate) => candidate.id === paneId) ?? null),
+    []
+  )
+  const { switchToAccount: switchClaudeAccount } = useManualClaudeAccountSwitch({ worktreeId })
   // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
   const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
   const contextMenuCanToggleChat = canToggleChatForLeaf(contextMenuLeafId)
@@ -3123,6 +3185,9 @@ export default function TerminalPane({
                     ),
                   onForkAgentSession: () =>
                     void contextMenu.runForPane(chatPane.id, contextMenu.onForkAgentSession),
+                  canSwitchClaudeAccount: resolveAgentForLeaf(chatPane.leafId) === 'claude',
+                  onSwitchClaudeAccount: (account) =>
+                    switchClaudeAccount(resolvePaneClaudeContext(chatPane), account),
                   onSetTitle: () => contextMenu.runForPane(chatPane.id, contextMenu.onSetTitle),
                   onCopyTerminalId: () =>
                     void contextMenu.runForPane(chatPane.id, contextMenu.onCopyTerminalId),
@@ -3159,6 +3224,13 @@ export default function TerminalPane({
         canContinueAgentSessionInNewSession={contextMenuCanContinueInNewSession}
         onContinueAgentSessionInNewSession={contextMenu.onContinueAgentSessionInNewSession}
         onForkAgentSession={() => void contextMenu.onForkAgentSession()}
+        canSwitchClaudeAccount={contextMenuIsClaudeSession}
+        onSwitchClaudeAccount={(account) =>
+          switchClaudeAccount(
+            resolvePaneClaudeContext(findManagedPaneById(contextMenu.menuPaneId)),
+            account
+          )
+        }
         canToggleNativeChat={contextMenuCanToggleChat}
         isNativeChatView={contextMenuIsChatView}
         onToggleNativeChat={handleContextMenuToggleNativeChat}
@@ -3233,6 +3305,10 @@ export default function TerminalPane({
         canContinueAgentSessionInNewSession={activePaneCanContinueInNewSession}
         onContinueAgentSessionInNewSession={(pane) =>
           contextMenu.runForPane(pane.id, contextMenu.onContinueAgentSessionInNewSession)
+        }
+        canSwitchClaudeAccount={activePaneIsClaudeSession}
+        onSwitchClaudeAccount={(pane, account) =>
+          switchClaudeAccount(resolvePaneClaudeContext(pane), account)
         }
         onSplitPane={splitTerminalPaneFromHeader}
         onBeginPaneDrag={beginPaneDragFromHeader}

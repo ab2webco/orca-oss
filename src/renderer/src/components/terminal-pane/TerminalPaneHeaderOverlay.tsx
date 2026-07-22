@@ -14,6 +14,8 @@ import { WORKSPACE_FILE_PATH_MIME, WORKSPACE_FILE_PATHS_MIME } from '@/lib/works
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import type { PtyTransport } from './pty-transport'
 import { handleInternalTerminalFileDrop } from './terminal-drop-handler'
+import { TerminalClaudeAccountSwitchButton } from './TerminalClaudeAccountSwitchButton'
+import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
 
 export type PaneTitleOverlayRect = {
   left: number
@@ -52,6 +54,9 @@ type TerminalPaneHeaderOverlayProps = {
   onToggleNativeChat?: () => void
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: (pane: ManagedPane) => void
+  /** True when the active pane hosts a Claude session that can be re-pinned to another account. */
+  canSwitchClaudeAccount?: boolean
+  onSwitchClaudeAccount?: (pane: ManagedPane, account: ClaudeManagedAccountSummary) => void
   onSplitPane: (pane: ManagedPane, direction: 'vertical' | 'horizontal') => void
   onBeginPaneDrag: (paneId: number, handle: HTMLElement, event: PointerEvent) => void
   onActivatePaneTitleInteraction: (paneId: number) => void
@@ -90,6 +95,8 @@ export default function TerminalPaneHeaderOverlay({
   onToggleNativeChat,
   canContinueAgentSessionInNewSession,
   onContinueAgentSessionInNewSession,
+  canSwitchClaudeAccount,
+  onSwitchClaudeAccount,
   onSplitPane,
   onBeginPaneDrag,
   onActivatePaneTitleInteraction,
@@ -271,6 +278,11 @@ export default function TerminalPaneHeaderOverlay({
                         )}
                       </TooltipContent>
                     </Tooltip>
+                  ) : null}
+                  {canSwitchClaudeAccount && isActivePane ? (
+                    <TerminalClaudeAccountSwitchButton
+                      onSwitch={(account) => onSwitchClaudeAccount?.(pane, account)}
+                    />
                   ) : null}
                   {canToggleNativeChat && isActivePane ? (
                     <Tooltip>

@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
 import { isMacPlatform, nativeChatToggleShortcutLabel } from './native-chat-shortcut'
+import { TerminalClaudeAccountSwitchMenu } from '../terminal-pane/TerminalClaudeAccountSwitchMenu'
+import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
 
 type NativeChatContextMenuState = {
   open: boolean
@@ -56,6 +58,8 @@ export type NativeChatContextMenuActions = {
   canContinueAgentSessionInNewSession: boolean
   onContinueAgentSessionInNewSession: () => void
   onForkAgentSession: () => void
+  canSwitchClaudeAccount: boolean
+  onSwitchClaudeAccount: (account: ClaudeManagedAccountSummary) => void
   onSetTitle: () => void
   onCopyTerminalId: () => void
   onCopyPaneId: () => void
@@ -75,6 +79,8 @@ export const emptyNativeChatContextMenuActions: Omit<NativeChatContextMenuAction
   canContinueAgentSessionInNewSession: false,
   onContinueAgentSessionInNewSession: () => {},
   onForkAgentSession: () => {},
+  canSwitchClaudeAccount: false,
+  onSwitchClaudeAccount: () => {},
   onSetTitle: () => {},
   onCopyTerminalId: () => {},
   onCopyPaneId: () => {},
@@ -191,6 +197,12 @@ export function useNativeChatContextMenu({
               'Fork Agent Session…'
             )}
           </DropdownMenuItem>
+          {actions.canSwitchClaudeAccount ? (
+            <TerminalClaudeAccountSwitchMenu
+              enabled={state.open}
+              onSwitch={actions.onSwitchClaudeAccount}
+            />
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={actions.onSplitRight}>
             <PanelRightClose />

@@ -42,12 +42,12 @@ export function useAgentRateLimitFailBack(args: {
         return
       }
       const worktree = state.getKnownWorktreeById(worktreeId)
-      const endpointAccountId = worktree?.claudeAccountId
+      const currentAccountId = worktree?.claudeAccountId
       // Cheap local gate before any IPC: only failover-marked worktrees whose
       // reset moment has passed proceed to the account lookup.
       if (
         !worktree?.claudeFailoverOriginAccountId ||
-        !endpointAccountId ||
+        !currentAccountId ||
         (typeof worktree.claudeFailoverResetsAt === 'number' &&
           Date.now() < worktree.claudeFailoverResetsAt)
       ) {
@@ -59,6 +59,12 @@ export function useAgentRateLimitFailBack(args: {
         if (!accountsState) {
           return
         }
+        // Why: the copy-back path differs by universe — endpoint failovers restore
+        // via copySessionForFailBack, managed→managed switches via the symmetric
+        // account-switch copy.
+        const currentAccountIsCustomEndpoint =
+          accountsState.accounts.find((account) => account.id === currentAccountId)?.authMethod ===
+          'custom-endpoint'
         const readiness = evaluateFailBackReadiness({
           worktree,
           accounts: accountsState.accounts,
@@ -87,7 +93,8 @@ export function useAgentRateLimitFailBack(args: {
             worktreeId,
             ptyId: context.ptyId,
             providerSession: context.providerSession,
-            endpointAccountId,
+            currentAccountId,
+            currentAccountIsCustomEndpoint,
             originAccountId: readiness.originAccountId,
             originLabel: readiness.originLabel,
             settings: useAppStore.getState().settings
@@ -124,7 +131,7 @@ export function useAgentRateLimitFailBack(args: {
           {
             description: translate(
               'auto.components.terminalPane.useAgentRateLimitFailBack.notifyDescription',
-              'This worktree is still on the failover endpoint. Switch back and resume the session?'
+              'This worktree is still on the failover account. Switch back and resume the session?'
             ),
             duration: 60_000,
             action: {

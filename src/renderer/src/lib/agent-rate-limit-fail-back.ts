@@ -118,17 +118,20 @@ export function evaluateFailBackReadiness(args: {
 }
 
 /**
- * Returns a failed-over worktree to its origin account: stop the endpoint CLI,
- * copy the transcript back into the origin universe, restore the pre-failover
- * pin, and relaunch in a NEW tab (same mechanics as the forward failover — a
- * live PTY can never swap its CLAUDE_CONFIG_DIR in place).
+ * Returns a failed-over worktree to its origin account: stop the current
+ * failover CLI, copy the transcript back into the origin universe, restore the
+ * pre-failover pin, and relaunch in a NEW tab (same mechanics as the forward
+ * failover — a live PTY can never swap its CLAUDE_CONFIG_DIR in place). Handles
+ * both endpoint failovers and managed→managed (OAuth) account switches.
  */
 export async function runRateLimitFailBack(args: {
   worktreeId: string
   ptyId: string
   providerSession: AgentProviderSessionMetadata
-  /** Endpoint account the worktree is currently pinned to. */
-  endpointAccountId: string
+  /** Account the worktree is currently pinned to (endpoint or managed OAuth failover target). */
+  currentAccountId: string
+  /** Whether the current account is a custom-endpoint universe — selects the copy-back path. */
+  currentAccountIsCustomEndpoint: boolean
   /** Origin to restore: managed account id, or null for the global selection. */
   originAccountId: string | null
   originLabel: string
@@ -177,12 +180,26 @@ export async function runRateLimitFailBack(args: {
   let copyResult: ClaudeSessionFailoverCopyResult = { ok: false, reason: 'copy-failed' }
   if (worktreePath) {
     try {
-      copyResult = await window.api.claudeAccounts.copySessionForFailBack({
-        sessionId: args.providerSession.id,
-        cwd: worktreePath,
-        sourceAccountId: args.endpointAccountId,
-        targetAccountId: args.originAccountId
-      })
+      if (args.currentAccountIsCustomEndpoint) {
+        copyResult = await window.api.claudeAccounts.copySessionForFailBack({
+          sessionId: args.providerSession.id,
+          cwd: worktreePath,
+          sourceAccountId: args.currentAccountId,
+          targetAccountId: args.originAccountId
+        })
+      } else if (args.originAccountId) {
+        // Managed→managed fail-back: copy back into the origin OAuth vault (the
+        // account-switch copy is symmetric, so it serves the return trip too).
+        copyResult = await window.api.claudeAccounts.copySessionForAccountSwitch({
+          sessionId: args.providerSession.id,
+          cwd: worktreePath,
+          targetAccountId: args.originAccountId,
+          sourceAccountId: args.currentAccountId
+        })
+      }
+      // Why: a managed→managed failover always pins a real origin account, so a
+      // null origin on the OAuth path is unreachable — leave the copy failed and
+      // fall through to a fresh relaunch rather than guess a target.
     } catch {
       copyResult = { ok: false, reason: 'copy-failed' }
     }

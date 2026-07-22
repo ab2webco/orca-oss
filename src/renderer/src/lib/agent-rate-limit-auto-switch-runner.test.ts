@@ -21,6 +21,7 @@ const appendTabToWorktreeOrder = vi.fn<(...args: unknown[]) => void>()
 
 type StoreStub = {
   settings: Record<string, unknown>
+  rateLimits: RateLimitState
   setRateLimitsFromPush: ReturnType<typeof vi.fn>
   fetchSettings: ReturnType<typeof vi.fn>
   getKnownWorktreeById: ReturnType<typeof vi.fn>
@@ -33,6 +34,7 @@ type StoreStub = {
 
 const store: StoreStub = {
   settings: {},
+  rateLimits: rateLimitState(),
   setRateLimitsFromPush: vi.fn(),
   fetchSettings: vi.fn(async () => {}),
   getKnownWorktreeById: vi.fn(() => ({ id: 'wt-1', path: '/Users/dev/demo' })),
@@ -157,7 +159,14 @@ const api = {
         sessionId: PROVIDER_SESSION.id,
         copiedFileCount: 1
       })
-    )
+    ),
+    copySessionForAccountSwitch: vi.fn<
+      (...args: unknown[]) => Promise<ClaudeSessionFailoverCopyResult>
+    >(async () => ({
+      ok: true,
+      sessionId: PROVIDER_SESSION.id,
+      copiedFileCount: 1
+    }))
   },
   codexAccounts: {
     list: vi.fn(async () => emptyCodexState),
@@ -188,12 +197,18 @@ beforeEach(() => {
     agentCmdOverrides: {},
     activeRuntimeEnvironmentId: null
   }
+  store.rateLimits = rateLimitState()
   store.getKnownWorktreeById.mockReturnValue({ id: 'wt-1', path: '/Users/dev/demo' })
   store.createTab.mockReturnValue({ id: 'tab-new' })
   // Why: clearAllMocks keeps per-test rejected implementations; restore the happy default explicitly.
   store.updateWorktreeMeta.mockImplementation(async () => {})
   api.claudeAccounts.getLivePtyAccount.mockResolvedValue(null)
   api.claudeAccounts.copySessionForFailover.mockResolvedValue({
+    ok: true,
+    sessionId: PROVIDER_SESSION.id,
+    copiedFileCount: 1
+  })
+  api.claudeAccounts.copySessionForAccountSwitch.mockResolvedValue({
     ok: true,
     sessionId: PROVIDER_SESSION.id,
     copiedFileCount: 1
@@ -262,6 +277,9 @@ describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
     // Why: quota exhaustion handling must never leak into the happy switch path.
     expect(store.updateWorktreeMeta).not.toHaveBeenCalled()
     expect(store.createTab).not.toHaveBeenCalled()
+    // Why: a non-injected (global-selection) session keeps the same-PTY resume,
+    // never the pinned copy + relaunch.
+    expect(api.claudeAccounts.copySessionForAccountSwitch).not.toHaveBeenCalled()
   })
 
   it('keeps the plain no-account outcome when no failover account is configured', async () => {
@@ -275,6 +293,69 @@ describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
     expect(stopForegroundAgent).not.toHaveBeenCalled()
     expect(store.updateWorktreeMeta).not.toHaveBeenCalled()
     expect(api.claudeAccounts.copySessionForFailover).not.toHaveBeenCalled()
+  })
+})
+
+describe('runAgentRateLimitAutoSwitch — pinned managed session routing', () => {
+  beforeEach(() => {
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
+    )
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+  })
+
+  it('relaunches an injected (pinned) session on the target OAuth account in a new tab', async () => {
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: true
+    })
+
+    const result = await runClaudeAutoSwitch()
+
+    expect(result).toEqual({
+      ok: true,
+      agent: 'claude',
+      accountLabel: 'spare-1@example.com',
+      relaunch: 'resumed'
+    })
+    expect(api.claudeAccounts.copySessionForAccountSwitch).toHaveBeenCalledWith({
+      sessionId: PROVIDER_SESSION.id,
+      cwd: '/Users/dev/demo',
+      targetAccountId: 'spare-1',
+      sourceAccountId: 'active-1'
+    })
+    expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
+      'wt-1',
+      expect.objectContaining({ claudeAccountId: 'spare-1' })
+    )
+    expect(store.createTab).toHaveBeenCalledWith('wt-1', undefined, undefined, {
+      launchAgent: 'claude'
+    })
+    // Why: the pinned relaunch must stay off the gated global selection and the same-PTY resume.
+    expect(api.claudeAccounts.select).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
+  })
+
+  it('keeps the same-PTY flow for a non-injected (global-selection) session', async () => {
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: false
+    })
+
+    const result = await runClaudeAutoSwitch()
+
+    expect(result).toEqual({ ok: true, agent: 'claude', accountLabel: 'spare-1@example.com' })
+    expect(api.claudeAccounts.select).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'spare-1' })
+    )
+    expect(api.claudeAccounts.copySessionForAccountSwitch).not.toHaveBeenCalled()
+    expect(store.createTab).not.toHaveBeenCalled()
   })
 })
 
@@ -302,9 +383,10 @@ describe('runAgentRateLimitAutoSwitch — last-resort failover', () => {
       targetAccountId: ENDPOINT_ACCOUNT.id,
       sourceAccountId: null
     })
-    expect(store.updateWorktreeMeta).toHaveBeenCalledWith('wt-1', {
-      claudeAccountId: ENDPOINT_ACCOUNT.id
-    })
+    expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
+      'wt-1',
+      expect.objectContaining({ claudeAccountId: ENDPOINT_ACCOUNT.id })
+    )
     expect(store.createTab).toHaveBeenCalledWith('wt-1', undefined, undefined, {
       launchAgent: 'claude'
     })
@@ -354,9 +436,10 @@ describe('runAgentRateLimitAutoSwitch — last-resort failover', () => {
       accountLabel: 'z.ai · GLM',
       failover: 'fresh'
     })
-    expect(store.updateWorktreeMeta).toHaveBeenCalledWith('wt-1', {
-      claudeAccountId: ENDPOINT_ACCOUNT.id
-    })
+    expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
+      'wt-1',
+      expect.objectContaining({ claudeAccountId: ENDPOINT_ACCOUNT.id })
+    )
     const startup = store.queueTabStartupCommand.mock.calls[0][1] as {
       command: string
       resumeProviderSession?: unknown

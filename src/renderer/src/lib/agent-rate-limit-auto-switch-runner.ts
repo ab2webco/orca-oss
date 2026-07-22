@@ -21,84 +21,16 @@ import {
   waitForResumedAgent
 } from './agent-rate-limit-terminal-control'
 import { resolveAgentRateLimitResumePlatform } from './agent-rate-limit-resume-platform'
+import { resolveClaudeSessionBackingAccount } from './agent-rate-limit-failover'
 import {
-  resolveClaudeSessionBackingAccount,
-  runLastResortFailoverIfConfigured,
-  type AgentRateLimitFailoverMode
-} from './agent-rate-limit-failover'
+  errorMessage,
+  failure,
+  tryLastResortFailover,
+  tryPinnedManagedSwitch,
+  type AgentRateLimitAutoSwitchResult
+} from './agent-rate-limit-auto-switch-routing'
 
-export type AgentRateLimitAutoSwitchResult =
-  | {
-      ok: true
-      agent: AutoSwitchRateLimitAgent
-      accountLabel: string
-      /** Present when the session continued on the last-resort custom-endpoint account. */
-      failover?: AgentRateLimitFailoverMode
-    }
-  | {
-      ok: false
-      reason:
-        | 'disabled'
-        | 'ssh'
-        | 'no-account'
-        | 'custom-endpoint-session'
-        | 'stop-failed'
-        | 'resume-failed'
-        | 'continue-failed'
-        | 'switch-failed'
-      message: string
-    }
-
-type AutoSwitchFailureReason = Extract<AgentRateLimitAutoSwitchResult, { ok: false }>['reason']
-
-/** Shapes a failure result; keeps the runner's many exit points scannable. */
-function failure(reason: AutoSwitchFailureReason, message: string): AgentRateLimitAutoSwitchResult {
-  return { ok: false, reason, message }
-}
-
-/** Formats unknown async failures for toast-safe structured runner results. */
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-/** Maps the no-quota last-resort failover outcome onto the runner result, or null when not configured. */
-async function tryLastResortFailover(args: {
-  worktreeId: string
-  ptyId: string
-  agent: AutoSwitchRateLimitAgent
-  providerSession: AgentProviderSessionMetadata
-  snapshot: AccountsSnapshotResult
-  livePtyAccount: ClaudeLivePtyAccountInfo | null
-}): Promise<AgentRateLimitAutoSwitchResult | null> {
-  // Why: last-resort failover uses the per-worktree pin, which only exists for
-  // local worktrees; remote runtimes keep the plain no-account outcome.
-  if (args.agent !== 'claude' || args.snapshot.target.kind !== 'local') {
-    return null
-  }
-  const failoverResult = await runLastResortFailoverIfConfigured({
-    worktreeId: args.worktreeId,
-    ptyId: args.ptyId,
-    providerSession: args.providerSession,
-    accounts: args.snapshot.accounts.claude.accounts,
-    livePtyAccount: args.livePtyAccount,
-    settings: useAppStore.getState().settings
-  })
-  if (!failoverResult) {
-    return null
-  }
-  if (failoverResult.ok) {
-    return {
-      ok: true,
-      agent: args.agent,
-      accountLabel: failoverResult.accountLabel,
-      failover: failoverResult.failover
-    }
-  }
-  return failure(
-    failoverResult.reason === 'pin-failed' ? 'switch-failed' : failoverResult.reason,
-    failoverResult.message
-  )
-}
+export type { AgentRateLimitAutoSwitchResult } from './agent-rate-limit-auto-switch-routing'
 
 /** Runs the stop/switch/resume/continue flow for a detected account-limit event. */
 export async function runAgentRateLimitAutoSwitch(args: {
@@ -185,6 +117,19 @@ export async function runAgentRateLimitAutoSwitch(args: {
         { value0: args.agent === 'claude' ? 'Claude' : 'Codex' }
       )
     )
+  }
+
+  const pinnedSwitch = await tryPinnedManagedSwitch({
+    worktreeId: args.worktreeId,
+    ptyId: args.ptyId,
+    agent: args.agent,
+    providerSession: args.providerSession,
+    snapshot,
+    candidate,
+    livePtyAccount
+  })
+  if (pinnedSwitch) {
+    return pinnedSwitch
   }
 
   let platform: NodeJS.Platform

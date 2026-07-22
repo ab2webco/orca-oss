@@ -639,6 +639,13 @@
         "pinFailed": "このworktreeで元のアカウントを復元できませんでした: {{value0}}",
         "launchPlanFailed": "復元したセッションの起動コマンドを作成できませんでした。",
         "resumePlanFailed": "復元したセッションの再開コマンドを作成できませんでした。"
+      },
+      "agentRateLimitAccountSwitch": {
+        "invalidTarget": "That account runs on a custom endpoint; use the failover path instead of a managed account switch.",
+        "resumePlanFailed": "Could not build a resume command for the switched session.",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
+        "launchPlanFailed": "Could not build a launch command for the switched session."
       }
     },
     "hooks": {
@@ -13521,7 +13528,11 @@
           "failoverTitle": "Anthropic アカウントに残りクォータがありません — {{value0}} で続行します。",
           "failoverResumed": "ワークツリーはエンドポイントアカウントに固定されました。セッションは新しいタブで再開され、continue を送信しました。",
           "failoverLaunched": "セッションは新しいタブで再開されましたが、continue を送信できませんでした — 手動で送信してください。",
-          "failoverFresh": "以前のトランスクリプトをコピーできなかったため、エンドポイントのセッションは新しいタブで最初から開始されます。"
+          "failoverFresh": "以前のトランスクリプトをコピーできなかったため、エンドポイントのセッションは新しいタブで最初から開始されます。",
+          "relaunchTitle": "Switched to {{value0}} and relaunched this worktree.",
+          "relaunchResumed": "The session resumed in a new tab and continue was sent.",
+          "relaunchLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "relaunchFresh": "The previous transcript could not be copied, so the session starts fresh in a new tab."
         },
         "useAgentRateLimitFailBack": {
           "failed": "フェイルバックに失敗しました。",
@@ -13533,6 +13544,23 @@
           "doneResumed": "セッションは新しいタブで再開され、continue が送信されました。",
           "doneLaunched": "セッションは新しいタブで再開されましたが、continue は送信されませんでした — 手動で送信してください。",
           "doneFresh": "トランスクリプトをコピーして戻せなかったため、セッションは新しいタブで最初から開始します。"
+        },
+        "TerminalClaudeAccountSwitchMenu": {
+          "trigger": "Switch Account & Continue",
+          "claudeSection": "Claude accounts",
+          "endpointSection": "Last resort"
+        },
+        "useManualClaudeAccountSwitch": {
+          "doneTitle": "Switched this terminal to {{value0}}.",
+          "doneResumed": "The session resumed in a new tab and continue was sent.",
+          "doneLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "doneFresh": "The transcript could not be copied, so the session starts fresh in a new tab.",
+          "noSession": "No resumable Claude session was found in this terminal.",
+          "startTitle": "Switching this terminal to {{value0}}…",
+          "failed": "Account switch failed."
+        },
+        "ClaudeAccountSwitchList": {
+          "empty": "No accounts available"
         }
       },
       "browser-pane": {

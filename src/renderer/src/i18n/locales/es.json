@@ -639,6 +639,13 @@
         "pinFailed": "No se pudo restaurar la cuenta original en este worktree: {{value0}}",
         "launchPlanFailed": "No se pudo construir un comando de lanzamiento para la sesión restaurada.",
         "resumePlanFailed": "No se pudo construir un comando de reanudación para la sesión restaurada."
+      },
+      "agentRateLimitAccountSwitch": {
+        "invalidTarget": "That account runs on a custom endpoint; use the failover path instead of a managed account switch.",
+        "resumePlanFailed": "Could not build a resume command for the switched session.",
+        "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
+        "launchPlanFailed": "Could not build a launch command for the switched session."
       }
     },
     "hooks": {
@@ -13521,7 +13528,11 @@
           "failoverTitle": "Sin cupo en cuentas Anthropic — continuando con {{value0}}.",
           "failoverResumed": "El worktree quedó anclado a la cuenta del endpoint; la sesión se reanudó en una pestaña nueva y se envió continue.",
           "failoverLaunched": "La sesión se reanudó en una pestaña nueva, pero no se pudo entregar continue — envíalo manualmente.",
-          "failoverFresh": "No se pudo copiar la transcripción anterior, así que la sesión del endpoint comienza desde cero en una pestaña nueva."
+          "failoverFresh": "No se pudo copiar la transcripción anterior, así que la sesión del endpoint comienza desde cero en una pestaña nueva.",
+          "relaunchTitle": "Switched to {{value0}} and relaunched this worktree.",
+          "relaunchResumed": "The session resumed in a new tab and continue was sent.",
+          "relaunchLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "relaunchFresh": "The previous transcript could not be copied, so the session starts fresh in a new tab."
         },
         "useAgentRateLimitFailBack": {
           "failed": "El fail-back falló.",
@@ -13533,6 +13544,23 @@
           "doneResumed": "La sesión se reanudó en una pestaña nueva y se envió continue.",
           "doneLaunched": "La sesión se reanudó en una pestaña nueva, pero continue no se entregó — envíalo manualmente.",
           "doneFresh": "No se pudo copiar la transcripción de vuelta, así que la sesión inicia desde cero en una pestaña nueva."
+        },
+        "TerminalClaudeAccountSwitchMenu": {
+          "trigger": "Switch Account & Continue",
+          "claudeSection": "Claude accounts",
+          "endpointSection": "Last resort"
+        },
+        "useManualClaudeAccountSwitch": {
+          "doneTitle": "Switched this terminal to {{value0}}.",
+          "doneResumed": "The session resumed in a new tab and continue was sent.",
+          "doneLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "doneFresh": "The transcript could not be copied, so the session starts fresh in a new tab.",
+          "noSession": "No resumable Claude session was found in this terminal.",
+          "startTitle": "Switching this terminal to {{value0}}…",
+          "failed": "Account switch failed."
+        },
+        "ClaudeAccountSwitchList": {
+          "empty": "No accounts available"
         }
       },
       "browser-pane": {
