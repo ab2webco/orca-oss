@@ -632,6 +632,13 @@
         "stopFailed": "制限に達したエージェントが Ctrl+C 後も終了しなかったため、Orca はターミナルに手を加えませんでした。",
         "pinFailed": "このワークツリーにフェイルオーバーアカウントを割り当てられませんでした: {{value0}}",
         "launchPlanFailed": "フェイルオーバーセッションの起動コマンドを作成できませんでした。"
+      },
+      "agentRateLimitFailBack": {
+        "globalSelectionLabel": "グローバルアカウント選択",
+        "stopFailed": "エンドポイントのエージェントが Ctrl+C 後も終了しなかったため、Orca はターミナルに手を加えませんでした。",
+        "pinFailed": "このworktreeで元のアカウントを復元できませんでした: {{value0}}",
+        "launchPlanFailed": "復元したセッションの起動コマンドを作成できませんでした。",
+        "resumePlanFailed": "復元したセッションの再開コマンドを作成できませんでした。"
       }
     },
     "hooks": {
@@ -5056,7 +5063,12 @@
           "endpointBadge": "エンドポイント",
           "failoverRowTitle": "最終手段のフェイルオーバー",
           "failoverRowDescription": "どの Anthropic アカウントにもクォータが残っていない場合、ワークツリーをこのカスタムエンドポイントアカウントに固定してセッションを続行します。",
-          "failoverNone": "なし"
+          "failoverNone": "なし",
+          "failBackRowTitle": "回復時のフェイルバック",
+          "failBackRowDescription": "元のアカウントのクォータが回復したら、フェイルオーバーしたworktreeを戻します: ワンクリック操作で通知、自動で切り戻し、またはエンドポイントのピンをそのまま維持。",
+          "failBackNotify": "通知",
+          "failBackAuto": "自動",
+          "failBackOff": "オフ"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",
@@ -13510,6 +13522,17 @@
           "failoverResumed": "ワークツリーはエンドポイントアカウントに固定されました。セッションは新しいタブで再開され、continue を送信しました。",
           "failoverLaunched": "セッションは新しいタブで再開されましたが、continue を送信できませんでした — 手動で送信してください。",
           "failoverFresh": "以前のトランスクリプトをコピーできなかったため、エンドポイントのセッションは新しいタブで最初から開始されます。"
+        },
+        "useAgentRateLimitFailBack": {
+          "failed": "フェイルバックに失敗しました。",
+          "autoTitle": "{{value0}} のクォータが回復しました — このworktreeを元に戻しています。",
+          "notifyTitle": "{{value0}} のクォータが回復しました。",
+          "notifyDescription": "このworktreeはまだフェイルオーバー先のエンドポイントを使用しています。元に戻してセッションを再開しますか？",
+          "notifyAction": "元に戻す",
+          "doneTitle": "{{value0}} に戻りました。",
+          "doneResumed": "セッションは新しいタブで再開され、continue が送信されました。",
+          "doneLaunched": "セッションは新しいタブで再開されましたが、continue は送信されませんでした — 手動で送信してください。",
+          "doneFresh": "トランスクリプトをコピーして戻せなかったため、セッションは新しいタブで最初から開始します。"
         }
       },
       "browser-pane": {

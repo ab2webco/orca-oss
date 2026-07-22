@@ -65,7 +65,8 @@ import type {
   WorkspaceSessionPatch,
   WorkspaceSessionState,
   ClaudeLivePtyAccountBinding,
-  ClaudeLiveSharedPtyAccountBinding
+  ClaudeLiveSharedPtyAccountBinding,
+  RateLimitFailBackMode
 } from '../shared/types'
 import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
@@ -2139,6 +2140,11 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
   return trimmed.length > 0 && trimmed.length <= 512 ? trimmed : null
 }
 
+// Why: unknown strings from hand-edited payloads fall back to the safe default.
+function normalizeRateLimitFailBackMode(value: unknown): RateLimitFailBackMode {
+  return value === 'off' || value === 'auto' ? value : 'notify'
+}
+
 function normalizeClaudeLivePtyAccountBindings(value: unknown): ClaudeLivePtyAccountBinding[] {
   if (!Array.isArray(value)) {
     return []
@@ -3164,6 +3170,9 @@ export class Store {
             minimizeToTrayOnClose: parsed.settings?.minimizeToTrayOnClose === true,
             rateLimitFailoverAccountId: normalizeRateLimitFailoverAccountId(
               parsed.settings?.rateLimitFailoverAccountId
+            ),
+            rateLimitFailBackMode: normalizeRateLimitFailBackMode(
+              parsed.settings?.rateLimitFailBackMode
             ),
             // Why: missing means default-on; round-trips unchanged on non-mac since darwin consumers gate the effect.
             showMenuBarIcon: parsed.settings?.showMenuBarIcon !== false,
@@ -5212,6 +5221,11 @@ export class Store {
     if ('rateLimitFailoverAccountId' in updates) {
       sanitizedUpdates.rateLimitFailoverAccountId = normalizeRateLimitFailoverAccountId(
         updates.rateLimitFailoverAccountId
+      )
+    }
+    if ('rateLimitFailBackMode' in updates) {
+      sanitizedUpdates.rateLimitFailBackMode = normalizeRateLimitFailBackMode(
+        updates.rateLimitFailBackMode
       )
     }
     if ('showWorktreeAccountUsage' in updates) {

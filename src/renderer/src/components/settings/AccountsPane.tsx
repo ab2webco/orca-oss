@@ -8,7 +8,8 @@ import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState,
   CodexSystemDefaultIdentity,
-  GlobalSettings
+  GlobalSettings,
+  RateLimitFailBackMode
 } from '../../../../shared/types'
 import { resolveLocalAccountRuntimeTarget } from '../../../../shared/local-account-runtime'
 import { getRendererAppPlatform } from '../../lib/renderer-app-platform'
@@ -908,6 +909,44 @@ export function AccountsPane({
                         {account.endpointLabel?.trim() || account.email}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              }
+            />
+          ) : null}
+          {customEndpointClaudeAccounts.length > 0 && settings.rateLimitFailoverAccountId ? (
+            <SettingsRow
+              label={translate(
+                'auto.components.settings.AccountsPane.failBackRowTitle',
+                'Fail-Back on Recovery'
+              )}
+              alignTop
+              description={translate(
+                'auto.components.settings.AccountsPane.failBackRowDescription',
+                'When the original account recovers quota, return the failed-over worktree to it: notify with a one-click action, switch back automatically, or leave the endpoint pin as is.'
+              )}
+              control={
+                <Select
+                  value={settings.rateLimitFailBackMode ?? 'notify'}
+                  onValueChange={(value) =>
+                    updateSettings({
+                      rateLimitFailBackMode: value as RateLimitFailBackMode
+                    })
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="notify">
+                      {translate('auto.components.settings.AccountsPane.failBackNotify', 'Notify')}
+                    </SelectItem>
+                    <SelectItem value="auto">
+                      {translate('auto.components.settings.AccountsPane.failBackAuto', 'Automatic')}
+                    </SelectItem>
+                    <SelectItem value="off">
+                      {translate('auto.components.settings.AccountsPane.failBackOff', 'Off')}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               }

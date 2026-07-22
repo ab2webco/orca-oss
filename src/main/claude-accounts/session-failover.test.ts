@@ -11,7 +11,11 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ClaudeManagedAccount } from '../../shared/types'
-import { copyClaudeSessionForFailover, encodeClaudeProjectDirName } from './session-failover'
+import {
+  copyClaudeSessionForFailBack,
+  copyClaudeSessionForFailover,
+  encodeClaudeProjectDirName
+} from './session-failover'
 
 let testRoot = ''
 
@@ -240,5 +244,119 @@ describe('copyClaudeSessionForFailover', () => {
     )
 
     expect(result).toEqual({ ok: false, reason: 'source-dir-unresolved' })
+  })
+})
+
+describe('copyClaudeSessionForFailBack', () => {
+  beforeEach(() => {
+    testRoot = mkdtempSync(join(tmpdir(), 'orca-session-failback-'))
+  })
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true })
+  })
+
+  it('copies the transcript back from the endpoint universe into an OAuth origin account', () => {
+    const endpoint = makeAccount({ id: 'endpoint-account' })
+    const endpointAuthPath = createManagedUniverse(endpoint.id)
+    const origin = makeAccount({ id: 'origin-account', authMethod: 'subscription-oauth' })
+    createManagedUniverse(origin.id)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(endpointAuthPath, encoded)
+
+    const result = copyClaudeSessionForFailBack(
+      { sessionId: SESSION_ID, cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: origin.id },
+      { getAccounts: () => [endpoint, origin], getSharedConfigDir: () => createSharedConfigDir() }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+    const restored = join(
+      testRoot,
+      'claude-accounts',
+      origin.id,
+      'auth',
+      'projects',
+      encoded,
+      `${SESSION_ID}.jsonl`
+    )
+    expect(readFileSync(restored, 'utf-8')).toBe('{"type":"summary"}\n')
+    if (process.platform !== 'win32') {
+      expect(statSync(restored).mode & 0o777).toBe(0o600)
+    }
+  })
+
+  it('copies back into the shared config dir when the origin was the global selection', () => {
+    const endpoint = makeAccount({ id: 'endpoint-account' })
+    const endpointAuthPath = createManagedUniverse(endpoint.id)
+    const sharedDir = createSharedConfigDir()
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(endpointAuthPath, encoded)
+
+    const result = copyClaudeSessionForFailBack(
+      { sessionId: SESSION_ID, cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: null },
+      { getAccounts: () => [endpoint], getSharedConfigDir: () => sharedDir }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+    expect(readFileSync(join(sharedDir, 'projects', encoded, `${SESSION_ID}.jsonl`), 'utf-8')).toBe(
+      '{"type":"summary"}\n'
+    )
+  })
+
+  it('rejects a source that is not a custom-endpoint account', () => {
+    const oauthSource = makeAccount({ id: 'oauth-source', authMethod: 'subscription-oauth' })
+    const origin = makeAccount({ id: 'origin-account', authMethod: 'subscription-oauth' })
+    createManagedUniverse(oauthSource.id)
+    createManagedUniverse(origin.id)
+
+    const result = copyClaudeSessionForFailBack(
+      {
+        sessionId: SESSION_ID,
+        cwd: CWD,
+        sourceAccountId: oauthSource.id,
+        targetAccountId: origin.id
+      },
+      {
+        getAccounts: () => [oauthSource, origin],
+        getSharedConfigDir: () => createSharedConfigDir()
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'source-account-not-found' })
+  })
+
+  it('rejects a custom-endpoint target — fail-back never copies sideways', () => {
+    const endpoint = makeAccount({ id: 'endpoint-account' })
+    const otherEndpoint = makeAccount({ id: 'other-endpoint' })
+    const endpointAuthPath = createManagedUniverse(endpoint.id)
+    createManagedUniverse(otherEndpoint.id)
+    writeSessionFiles(endpointAuthPath, encodeClaudeProjectDirName(CWD))
+
+    const result = copyClaudeSessionForFailBack(
+      {
+        sessionId: SESSION_ID,
+        cwd: CWD,
+        sourceAccountId: endpoint.id,
+        targetAccountId: otherEndpoint.id
+      },
+      {
+        getAccounts: () => [endpoint, otherEndpoint],
+        getSharedConfigDir: () => createSharedConfigDir()
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'target-account-not-found' })
+  })
+
+  it('rejects session ids with traversal shapes', () => {
+    const endpoint = makeAccount({ id: 'endpoint-account' })
+    createManagedUniverse(endpoint.id)
+
+    const result = copyClaudeSessionForFailBack(
+      { sessionId: '../escape', cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: null },
+      { getAccounts: () => [endpoint], getSharedConfigDir: () => createSharedConfigDir() }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
   })
 })

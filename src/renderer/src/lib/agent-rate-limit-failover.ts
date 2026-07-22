@@ -1,9 +1,11 @@
-import type {
-  ClaudeLivePtyAccountInfo,
-  ClaudeManagedAccountSummary,
-  ClaudeSessionFailoverCopyResult,
-  GlobalSettings
+import {
+  CLAUDE_FAILOVER_ORIGIN_SHARED,
+  type ClaudeLivePtyAccountInfo,
+  type ClaudeManagedAccountSummary,
+  type ClaudeSessionFailoverCopyResult,
+  type GlobalSettings
 } from '../../../shared/types'
+import { resolveFailoverOriginResetsAt } from '@/lib/agent-rate-limit-fail-back'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
 import {
   resolveTuiAgentLaunchArgs,
@@ -176,9 +178,16 @@ export async function runRateLimitFailoverRelaunch(args: {
 
   try {
     // Why: the per-worktree pin is the honest mechanism — the worktree visibly runs on the endpoint until the user changes it.
-    await useAppStore
-      .getState()
-      .updateWorktreeMeta(args.worktreeId, { claudeAccountId: args.failoverAccount.id })
+    // The origin + reset marker let the fail-back watcher offer the return trip once quota recovers.
+    await useAppStore.getState().updateWorktreeMeta(args.worktreeId, {
+      claudeAccountId: args.failoverAccount.id,
+      claudeFailoverOriginAccountId: args.sourceAccountId ?? CLAUDE_FAILOVER_ORIGIN_SHARED,
+      claudeFailoverResetsAt: resolveFailoverOriginResetsAt({
+        rateLimits: useAppStore.getState().rateLimits,
+        sourceAccountId: args.sourceAccountId,
+        now: Date.now()
+      })
+    })
   } catch (error) {
     return {
       ok: false,

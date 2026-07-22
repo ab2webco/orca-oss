@@ -655,6 +655,13 @@
         "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
         "pinFailed": "Could not assign the failover account to this worktree: {{value0}}",
         "launchPlanFailed": "Could not build a launch command for the failover session."
+      },
+      "agentRateLimitFailBack": {
+        "globalSelectionLabel": "the global account selection",
+        "stopFailed": "The endpoint agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
+        "pinFailed": "Could not restore the original account on this worktree: {{value0}}",
+        "launchPlanFailed": "Could not build a launch command for the restored session.",
+        "resumePlanFailed": "Could not build a resume command for the restored session."
       }
     },
     "hooks": {
@@ -5094,7 +5101,12 @@
           "endpointBadge": "Endpoint",
           "failoverRowTitle": "Last-Resort Failover",
           "failoverRowDescription": "When no Anthropic account has quota left, pin the worktree to this custom endpoint account and continue the session there.",
-          "failoverNone": "None"
+          "failoverNone": "None",
+          "failBackRowTitle": "Fail-Back on Recovery",
+          "failBackRowDescription": "When the original account recovers quota, return the failed-over worktree to it: notify with a one-click action, switch back automatically, or leave the endpoint pin as is.",
+          "failBackNotify": "Notify",
+          "failBackAuto": "Automatic",
+          "failBackOff": "Off"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -13533,6 +13545,17 @@
           "failoverResumed": "The worktree is now pinned to the endpoint account; the session resumed in a new tab and continue was sent.",
           "failoverLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
           "failoverFresh": "The previous transcript could not be copied, so the endpoint session starts fresh in a new tab."
+        },
+        "useAgentRateLimitFailBack": {
+          "failed": "Fail-back failed.",
+          "autoTitle": "{{value0}} has quota again — returning this worktree to it.",
+          "notifyTitle": "{{value0}} has quota again.",
+          "notifyDescription": "This worktree is still on the failover endpoint. Switch back and resume the session?",
+          "notifyAction": "Switch back",
+          "doneTitle": "Back on {{value0}}.",
+          "doneResumed": "The session resumed in a new tab and continue was sent.",
+          "doneLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
+          "doneFresh": "The transcript could not be copied back, so the session starts fresh in a new tab."
         }
       },
       "browser-pane": {

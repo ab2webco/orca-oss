@@ -632,6 +632,13 @@
         "stopFailed": "受限代理在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
         "pinFailed": "无法将故障转移账户分配给此工作树：{{value0}}",
         "launchPlanFailed": "无法为故障转移会话构建启动命令。"
+      },
+      "agentRateLimitFailBack": {
+        "globalSelectionLabel": "全局账户选择",
+        "stopFailed": "端点代理在 Ctrl+C 后未退出，Orca 未改动该终端。",
+        "pinFailed": "无法在此工作树上恢复原始账户：{{value0}}",
+        "launchPlanFailed": "无法为恢复的会话构建启动命令。",
+        "resumePlanFailed": "无法为恢复的会话构建恢复命令。"
       }
     },
     "hooks": {
@@ -5056,7 +5063,12 @@
           "endpointBadge": "端点",
           "failoverRowTitle": "最后手段故障转移",
           "failoverRowDescription": "当所有 Anthropic 账户都没有额度时，将工作树固定到此自定义端点账户并在那里继续会话。",
-          "failoverNone": "无"
+          "failoverNone": "无",
+          "failBackRowTitle": "恢复后回切",
+          "failBackRowDescription": "当原始账户配额恢复时，将故障转移的工作树切回：一键操作通知、自动切回，或保持端点固定不变。",
+          "failBackNotify": "通知",
+          "failBackAuto": "自动",
+          "failBackOff": "关闭"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",
@@ -13510,6 +13522,17 @@
           "failoverResumed": "工作树已固定到端点账户；会话已在新标签页中恢复并发送了 continue。",
           "failoverLaunched": "会话已在新标签页中恢复，但 continue 未能送达 — 请手动发送。",
           "failoverFresh": "无法复制先前的会话记录，端点会话将在新标签页中重新开始。"
+        },
+        "useAgentRateLimitFailBack": {
+          "failed": "回切失败。",
+          "autoTitle": "{{value0}} 的配额已恢复 — 正在将此工作树切回。",
+          "notifyTitle": "{{value0}} 的配额已恢复。",
+          "notifyDescription": "此工作树仍在故障转移端点上。要切回并恢复会话吗？",
+          "notifyAction": "切回",
+          "doneTitle": "已切回 {{value0}}。",
+          "doneResumed": "会话已在新标签页中恢复，并已发送 continue。",
+          "doneLaunched": "会话已在新标签页中恢复，但 continue 未送达 — 请手动发送。",
+          "doneFresh": "无法复制回会话记录，会话将在新标签页中重新开始。"
         }
       },
       "browser-pane": {

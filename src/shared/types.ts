@@ -531,6 +531,13 @@ export type Worktree = {
    *  PTY spawn into a per-terminal CLAUDE_CONFIG_DIR. null/undefined = inherit
    *  the global host selection (today's behavior). */
   claudeAccountId?: string | null
+  /** Set while claudeAccountId is a last-resort failover pin: the account the
+   *  worktree used before failover, or CLAUDE_FAILOVER_ORIGIN_SHARED when it
+   *  followed the global selection. null/undefined = not a failover pin. */
+  claudeFailoverOriginAccountId?: string | null
+  /** Unix ms when the limited origin account's tightest window resets; the
+   *  fail-back watcher offers/performs the return once this passes. */
+  claudeFailoverResetsAt?: number | null
   /** Codex managed account this worktree is pinned to, resolved fresh at each
    *  Codex PTY spawn into a per-terminal CODEX_HOME. null/undefined = inherit
    *  the global runtime selection (today's behavior). */
@@ -539,6 +546,12 @@ export type Worktree = {
   mobileDiffReview?: MobileDiffReviewState
   automationProvenance?: AutomationWorkspaceProvenance
 } & GitWorktreeInfo
+
+/** Sentinel for claudeFailoverOriginAccountId: origin was the shared/global selection. */
+export const CLAUDE_FAILOVER_ORIGIN_SHARED = '__shared__'
+
+/** Behavior when a failed-over worktree's origin account recovers quota. */
+export type RateLimitFailBackMode = 'off' | 'notify' | 'auto'
 
 export type AutomationWorkspaceProvenance = {
   kind: 'created-by-automation'
@@ -642,6 +655,10 @@ export type WorktreeMeta = {
   workspaceStatus?: WorkspaceStatus
   /** See {@link Worktree.claudeAccountId}. Persisted to orca-data.json. */
   claudeAccountId?: string | null
+  /** See {@link Worktree.claudeFailoverOriginAccountId}. Persisted to orca-data.json. */
+  claudeFailoverOriginAccountId?: string | null
+  /** See {@link Worktree.claudeFailoverResetsAt}. Persisted to orca-data.json. */
+  claudeFailoverResetsAt?: number | null
   /** See {@link Worktree.codexAccountId}. Persisted to orca-data.json. */
   codexAccountId?: string | null
   diffComments?: DiffComment[]
@@ -2860,6 +2877,10 @@ export type GlobalSettings = {
   /** Custom-endpoint Claude account used as a last-resort per-worktree pin when
    *  auto-switch finds no Anthropic account with quota. null = off. */
   rateLimitFailoverAccountId?: string | null
+  /** What to do when a failed-over worktree's origin account recovers quota:
+   *  'notify' (default) offers a toast action, 'auto' fails back immediately,
+   *  'off' leaves the endpoint pin until the user changes it. */
+  rateLimitFailBackMode?: RateLimitFailBackMode
   /** When true (default), the Claude usage meters show the pinned managed
    *  account's usage while the focused worktree carries a claudeAccountId pin.
    *  false always shows the globally active account. */

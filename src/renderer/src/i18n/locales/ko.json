@@ -632,6 +632,13 @@
         "stopFailed": "제한된 에이전트가 Ctrl+C 후에도 종료되지 않아 Orca는 터미널을 그대로 두었습니다.",
         "pinFailed": "이 워크트리에 페일오버 계정을 할당할 수 없습니다: {{value0}}",
         "launchPlanFailed": "페일오버 세션의 실행 명령을 만들 수 없습니다."
+      },
+      "agentRateLimitFailBack": {
+        "globalSelectionLabel": "전역 계정 선택",
+        "stopFailed": "엔드포인트 에이전트가 Ctrl+C 후에도 종료되지 않아 Orca가 터미널을 그대로 두었습니다.",
+        "pinFailed": "이 워크트리에서 원래 계정을 복원하지 못했습니다: {{value0}}",
+        "launchPlanFailed": "복원된 세션의 실행 명령을 만들지 못했습니다.",
+        "resumePlanFailed": "복원된 세션의 재개 명령을 만들지 못했습니다."
       }
     },
     "hooks": {
@@ -5056,7 +5063,12 @@
           "endpointBadge": "엔드포인트",
           "failoverRowTitle": "최후 수단 페일오버",
           "failoverRowDescription": "Anthropic 계정에 할당량이 없으면 워크트리를 이 사용자 지정 엔드포인트 계정에 고정하고 세션을 계속합니다.",
-          "failoverNone": "없음"
+          "failoverNone": "없음",
+          "failBackRowTitle": "회복 시 페일백",
+          "failBackRowDescription": "원래 계정의 쿼터가 회복되면 페일오버된 워크트리를 되돌립니다: 원클릭 동작으로 알림, 자동 전환 또는 엔드포인트 고정 유지.",
+          "failBackNotify": "알림",
+          "failBackAuto": "자동",
+          "failBackOff": "끄기"
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",
@@ -13510,6 +13522,17 @@
           "failoverResumed": "워크트리가 엔드포인트 계정에 고정되었습니다. 세션이 새 탭에서 재개되었고 continue를 보냈습니다.",
           "failoverLaunched": "세션이 새 탭에서 재개되었지만 continue를 전달하지 못했습니다 — 직접 보내 주세요.",
           "failoverFresh": "이전 대화 기록을 복사할 수 없어 엔드포인트 세션이 새 탭에서 새로 시작됩니다."
+        },
+        "useAgentRateLimitFailBack": {
+          "failed": "페일백에 실패했습니다.",
+          "autoTitle": "{{value0}}의 쿼터가 회복되었습니다 — 이 워크트리를 되돌리는 중입니다.",
+          "notifyTitle": "{{value0}}의 쿼터가 회복되었습니다.",
+          "notifyDescription": "이 워크트리는 아직 페일오버 엔드포인트를 사용 중입니다. 다시 전환하고 세션을 재개할까요?",
+          "notifyAction": "되돌리기",
+          "doneTitle": "{{value0}}(으)로 돌아왔습니다.",
+          "doneResumed": "세션이 새 탭에서 재개되었고 continue가 전송되었습니다.",
+          "doneLaunched": "세션이 새 탭에서 재개되었지만 continue가 전달되지 않았습니다 — 수동으로 보내주세요.",
+          "doneFresh": "대화 기록을 다시 복사하지 못해 세션이 새 탭에서 처음부터 시작됩니다."
         }
       },
       "browser-pane": {

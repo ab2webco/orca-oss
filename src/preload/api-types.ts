@@ -2207,6 +2207,12 @@ export type PreloadApi = {
       targetAccountId: string
       sourceAccountId?: string | null
     }) => Promise<ClaudeSessionFailoverCopyResult>
+    copySessionForFailBack: (args: {
+      sessionId: string
+      cwd: string
+      sourceAccountId: string
+      targetAccountId: string | null
+    }) => Promise<ClaudeSessionFailoverCopyResult>
   }
   cli: {
     getInstallStatus: () => Promise<CliInstallStatus>

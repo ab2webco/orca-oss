@@ -844,6 +844,12 @@ function mergeFolderWorkspace(repo: Repo, worktreeId: string, meta: WorktreeMeta
     ...(meta.priorWorktreeIds !== undefined ? { priorWorktreeIds: meta.priorWorktreeIds } : {}),
     workspaceStatus: meta.workspaceStatus ?? DEFAULT_WORKSPACE_STATUS_ID,
     ...(meta.claudeAccountId !== undefined ? { claudeAccountId: meta.claudeAccountId } : {}),
+    ...(meta.claudeFailoverOriginAccountId !== undefined
+      ? { claudeFailoverOriginAccountId: meta.claudeFailoverOriginAccountId }
+      : {}),
+    ...(meta.claudeFailoverResetsAt !== undefined
+      ? { claudeFailoverResetsAt: meta.claudeFailoverResetsAt }
+      : {}),
     ...(meta.codexAccountId !== undefined ? { codexAccountId: meta.codexAccountId } : {}),
     diffComments: meta.diffComments,
     mobileDiffReview: meta.mobileDiffReview

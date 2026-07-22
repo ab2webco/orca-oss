@@ -1929,7 +1929,13 @@ const api = {
       cwd: string
       targetAccountId: string
       sourceAccountId?: string | null
-    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:copySessionForFailover', args)
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:copySessionForFailover', args),
+    copySessionForFailBack: (args: {
+      sessionId: string
+      cwd: string
+      sourceAccountId: string
+      targetAccountId: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:copySessionForFailBack', args)
   },
 
   cli: {

@@ -162,7 +162,14 @@ import { TerminalSshReconnectOverlay } from './TerminalSshReconnectOverlay'
 import { TerminalRemoteRuntimeReconnectBanner } from './TerminalRemoteRuntimeReconnectBanner'
 import { selectTerminalTabAgentTypesByLeaf } from './terminal-tab-agent-type-index'
 import type { AutoSwitchRateLimitAgent } from '../../../../shared/agent-rate-limit-detection'
-import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
+import {
+  normalizeAgentProviderSession,
+  type AgentProviderSessionMetadata
+} from '../../../../shared/agent-session-resume'
+import {
+  useAgentRateLimitFailBack,
+  type LiveClaudePaneContext
+} from './use-agent-rate-limit-fail-back'
 import { runAgentRateLimitAutoSwitch } from '@/lib/agent-rate-limit-auto-switch-runner'
 import { translate } from '@/i18n/i18n'
 import { canContinueAgentSessionInNewSession } from './terminal-agent-session-continuation'
@@ -366,6 +373,24 @@ export default function TerminalPane({
   }, [sshReconnectEnvironmentId])
 
   useVisibleTerminalTabClaim({ isVisible, tabId })
+
+  // Why: the fail-back watcher needs the live endpoint pane's PTY + provider
+  // session — the same context the forward failover used from this tab.
+  const getLiveClaudePaneContext = useCallback((): LiveClaudePaneContext | null => {
+    for (const pane of managerRef.current?.getPanes() ?? []) {
+      const entry = useAppStore.getState().agentStatusByPaneKey[makePaneKey(tabId, pane.leafId)]
+      if (entry?.agentType !== 'claude') {
+        continue
+      }
+      const providerSession = normalizeAgentProviderSession(entry.providerSession)
+      const ptyId = paneTransportsRef.current.get(pane.id)?.getPtyId()
+      if (providerSession && ptyId) {
+        return { ptyId, providerSession }
+      }
+    }
+    return null
+  }, [tabId])
+  useAgentRateLimitFailBack({ worktreeId, getLiveClaudePaneContext })
 
   const [expandedPaneId, setExpandedPaneId] = useState<number | null>(null)
   // Why: React state (not the imperative managerRef) so the render re-runs on split/close; managerRef alone doesn't trigger React deps.

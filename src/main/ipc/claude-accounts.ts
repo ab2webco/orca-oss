@@ -12,7 +12,9 @@ import {
   isLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import {
+  copyClaudeSessionForFailBack,
   copyClaudeSessionForFailover,
+  type CopyClaudeSessionForFailBackArgs,
   type CopyClaudeSessionForFailoverArgs
 } from '../claude-accounts/session-failover'
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
@@ -69,6 +71,14 @@ export function registerClaudeAccountHandlers(
     'claudeAccounts:copySessionForFailover',
     (_event, args: CopyClaudeSessionForFailoverArgs) =>
       copyClaudeSessionForFailover(args, {
+        getAccounts: () => store.getSettings().claudeManagedAccounts,
+        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+      })
+  )
+  ipcMain.handle(
+    'claudeAccounts:copySessionForFailBack',
+    (_event, args: CopyClaudeSessionForFailBackArgs) =>
+      copyClaudeSessionForFailBack(args, {
         getAccounts: () => store.getSettings().claudeManagedAccounts,
         getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
       })

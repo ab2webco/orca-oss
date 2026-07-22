@@ -22,6 +22,15 @@ export type CopyClaudeSessionForFailoverArgs = {
   sourceAccountId?: string | null
 }
 
+export type CopyClaudeSessionForFailBackArgs = {
+  sessionId: string
+  cwd: string
+  /** Custom-endpoint account whose universe hosts the failed-over session. */
+  sourceAccountId: string
+  /** Origin account to return the transcript to; null = shared ~/.claude. */
+  targetAccountId: string | null
+}
+
 export type ClaudeSessionFailoverDeps = {
   getAccounts(): readonly ClaudeManagedAccount[]
   /** Shared Claude config dir (~/.claude or CLAUDE_CONFIG_DIR) used when the source session is unpinned. */
@@ -171,22 +180,91 @@ export function copyClaudeSessionForFailover(
     sourceRoot = shared
   }
 
-  const sourceProject = findSourceProjectDir(sourceRoot, args.cwd, sessionId)
+  return copySessionFilesBetweenRoots({ sourceRoot, targetRoot, cwd: args.cwd, sessionId })
+}
+
+/**
+ * Copies a failed-over session transcript back OUT of a custom-endpoint
+ * universe into the origin account's universe (or shared ~/.claude) once the
+ * origin recovers quota, so `claude --resume` finds it at home again.
+ */
+export function copyClaudeSessionForFailBack(
+  args: CopyClaudeSessionForFailBackArgs,
+  deps: ClaudeSessionFailoverDeps
+): ClaudeSessionFailoverCopyResult {
+  const sessionId = args.sessionId.trim()
+  if (!SESSION_ID_PATTERN.test(sessionId) || sessionId.includes('..')) {
+    return { ok: false, reason: 'invalid-session-id' }
+  }
+
+  const accounts = deps.getAccounts()
+  const sourceAccount = accounts.find((account) => account.id === args.sourceAccountId)
+  // Why: only custom-endpoint universes may be a fail-back source — the mirror
+  // of the forward guard, so this path can never shuttle OAuth-universe state.
+  if (!sourceAccount || sourceAccount.authMethod !== 'custom-endpoint') {
+    return { ok: false, reason: 'source-account-not-found' }
+  }
+  const resolvedSource = resolveManagedSourceRoot(sourceAccount)
+  if (!resolvedSource.ok) {
+    return { ok: false, reason: resolvedSource.reason }
+  }
+
+  let targetRoot: string
+  if (typeof args.targetAccountId === 'string' && args.targetAccountId.length > 0) {
+    const targetAccount = accounts.find((account) => account.id === args.targetAccountId)
+    // Why: fail-back returns to a real origin; an endpoint target would be a
+    // sideways copy this flow was never meant to perform.
+    if (!targetAccount || targetAccount.authMethod === 'custom-endpoint') {
+      return { ok: false, reason: 'target-account-not-found' }
+    }
+    if (targetAccount.managedAuthRuntime === 'wsl') {
+      return { ok: false, reason: 'target-dir-unresolved' }
+    }
+    const resolved = resolveOwnedClaudeManagedAuthPath(
+      targetAccount.id,
+      targetAccount.managedAuthPath
+    )
+    if (!resolved) {
+      return { ok: false, reason: 'target-dir-unresolved' }
+    }
+    targetRoot = resolved
+  } else {
+    const shared = resolveRealRoot(deps.getSharedConfigDir())
+    if (!shared) {
+      return { ok: false, reason: 'target-dir-unresolved' }
+    }
+    targetRoot = shared
+  }
+
+  return copySessionFilesBetweenRoots({
+    sourceRoot: resolvedSource.root,
+    targetRoot,
+    cwd: args.cwd,
+    sessionId
+  })
+}
+
+function copySessionFilesBetweenRoots(args: {
+  sourceRoot: string
+  targetRoot: string
+  cwd: string
+  sessionId: string
+}): ClaudeSessionFailoverCopyResult {
+  const sourceProject = findSourceProjectDir(args.sourceRoot, args.cwd, args.sessionId)
   if (!sourceProject) {
     return { ok: false, reason: 'source-not-found' }
   }
-
   try {
-    const targetProjectDir = join(targetRoot, 'projects', sourceProject.dirName)
+    const targetProjectDir = join(args.targetRoot, 'projects', sourceProject.dirName)
     mkdirSync(targetProjectDir, { recursive: true })
     let copiedFileCount = 0
     for (const entry of readdirSync(sourceProject.dirPath)) {
-      if (!entry.startsWith(sessionId)) {
+      if (!entry.startsWith(args.sessionId)) {
         continue
       }
       const sourceFile = join(sourceProject.dirPath, entry)
-      // Why: never follow symlinks — a planted link could exfiltrate arbitrary files into the endpoint universe.
-      if (!isRealFile(sourceFile) || !isInsideRoot(sourceRoot, sourceFile)) {
+      // Why: never follow symlinks — a planted link could exfiltrate arbitrary files across universes.
+      if (!isRealFile(sourceFile) || !isInsideRoot(args.sourceRoot, sourceFile)) {
         continue
       }
       const targetFile = join(targetProjectDir, entry)
@@ -197,7 +275,7 @@ export function copyClaudeSessionForFailover(
     if (copiedFileCount === 0) {
       return { ok: false, reason: 'source-not-found' }
     }
-    return { ok: true, sessionId, copiedFileCount }
+    return { ok: true, sessionId: args.sessionId, copiedFileCount }
   } catch {
     return { ok: false, reason: 'copy-failed' }
   }

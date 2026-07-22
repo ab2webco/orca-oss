@@ -294,6 +294,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     activeClaudeManagedAccountId: null,
     autoSwitchRateLimitedAccounts: false,
     rateLimitFailoverAccountId: null,
+    rateLimitFailBackMode: 'notify',
     showWorktreeAccountUsage: true,
     terminalScopeHistoryByWorktree: true,
     terminalHiddenViewParking: true,
