@@ -212,7 +212,13 @@ export function getLiveInjectedClaudePtyAccountId(ptyId: string): string | null 
   return liveInjectedClaudePtyAccounts.get(ptyId) ?? null
 }
 
-export function reserveInjectedClaudeAccountLaunch(accountId: string): string {
+export function reserveInjectedClaudeAccountLaunch(
+  accountId: string,
+  // Why: custom-endpoint accounts authenticate with a static token in their own
+  // universe's settings.json — there is no single-use OAuth refresh chain a live
+  // shared terminal could fork, so those launches opt out of the shared-PTY gate.
+  options: { allowLiveSharedPtys?: boolean } = {}
+): string {
   if (managedClaudeAccountMutations.has(accountId)) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
@@ -223,7 +229,7 @@ export function reserveInjectedClaudeAccountLaunch(accountId: string): string {
   ) {
     throw new Error('This Claude account is being launched globally. Try again when it finishes.')
   }
-  if (hasLiveSharedClaudePtysForAccount(accountId)) {
+  if (!options.allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId)) {
     throw new Error(
       'This Claude account is already in use by a global terminal. Close it before launching the assigned account.'
     )

@@ -4127,6 +4127,74 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  it('launches a pinned custom-endpoint account even while a global terminal is live', async () => {
+    // A custom-endpoint account reads a static token from its own settings.json,
+    // so a live shared terminal has no single-use OAuth chain to fork — the
+    // failover target (always custom-endpoint) must stay launchable and reattachable.
+    const managedAuthPath = join(
+      testState.userDataDir,
+      'claude-accounts',
+      'endpoint-account',
+      'auth'
+    )
+    mkdirSync(managedAuthPath, { recursive: true })
+    writeFileSync(join(managedAuthPath, '.orca-managed-claude-auth'), 'endpoint-account\n', 'utf-8')
+    writeFileSync(
+      join(managedAuthPath, 'settings.json'),
+      `${JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic' } })}\n`,
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('endpoint-account', managedAuthPath, {
+          email: 'z.ai · GLM',
+          authMethod: 'custom-endpoint',
+          endpointLabel: 'z.ai · GLM',
+          endpointBaseUrl: 'https://api.z.ai/api/anthropic',
+          endpointModel: 'glm-5.1'
+        })
+      ]
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned, reserveInjectedClaudeAccountLaunch } =
+      await import('./live-pty-gate')
+    // A global terminal with an unknown (null) account binding — the exact state
+    // that used to block every pinned launch.
+    markClaudePtySpawned('global-pty')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      const preparation = await service.prepareForClaudeLaunch(
+        { runtime: 'host', overrideAccountId: 'endpoint-account' },
+        { reservePtyAccount: true }
+      )
+
+      expect(preparation).toMatchObject({
+        injectedAccountId: 'endpoint-account',
+        provenance: 'managed:endpoint-account:injected'
+      })
+      // The reservation must have succeeded despite the live global terminal.
+      expect(preparation.injectedAccountReservationId).toEqual(expect.any(String))
+    } finally {
+      markClaudePtyExited('global-pty')
+    }
+
+    // Sanity: without the exemption, the low-level gate still blocks a normal
+    // (OAuth) reservation while that global terminal is live.
+    markClaudePtySpawned('global-pty-2')
+    try {
+      expect(() => reserveInjectedClaudeAccountLaunch('some-oauth-account')).toThrow(
+        'already in use by a global terminal'
+      )
+      expect(() =>
+        reserveInjectedClaudeAccountLaunch('endpoint-account', { allowLiveSharedPtys: true })
+      ).not.toThrow()
+    } finally {
+      markClaudePtyExited('global-pty-2')
+    }
+  })
+
   it('rejects pinned account A after the global selection switches from live A to B', async () => {
     const accountAPath = createManagedClaudeAuth(
       testState.userDataDir,

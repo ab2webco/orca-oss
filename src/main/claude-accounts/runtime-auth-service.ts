@@ -152,7 +152,17 @@ export class ClaudeRuntimeAuthService {
     )
     const settings = this.store.getSettings()
     const injectedCandidate = this.resolveInjectedAccountCandidate(effectiveTarget, settings)
-    if (injectedCandidate && hasLiveSharedClaudePtysForAccount(injectedCandidate.id)) {
+    // Why: custom-endpoint accounts have no single-use OAuth refresh chain (they
+    // read a static token from their own universe's settings.json), so a live
+    // shared terminal on the same account is not a fork hazard — and the failover
+    // target is always custom-endpoint, so exempting it keeps failover launchable.
+    const injectedCandidateForksOauth =
+      Boolean(injectedCandidate) && injectedCandidate?.authMethod !== 'custom-endpoint'
+    if (
+      injectedCandidate &&
+      injectedCandidateForksOauth &&
+      hasLiveSharedClaudePtysForAccount(injectedCandidate.id)
+    ) {
       // Why: the shared CLI already owns this account's refresh chain. Starting
       // an isolated pinned copy before it exits would fork the one-use token.
       throw new Error(
@@ -161,7 +171,9 @@ export class ClaudeRuntimeAuthService {
     }
     const reservationId =
       injectedCandidate && options?.reservePtyAccount
-        ? reserveInjectedClaudeAccountLaunch(injectedCandidate.id)
+        ? reserveInjectedClaudeAccountLaunch(injectedCandidate.id, {
+            allowLiveSharedPtys: !injectedCandidateForksOauth
+          })
         : undefined
     const sharedReservationId =
       !injectedCandidate && !effectiveTarget?.overrideAccountId && options?.reservePtyAccount
