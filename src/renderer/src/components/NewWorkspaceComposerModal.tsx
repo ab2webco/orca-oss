@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
+import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import NewWorkspaceComposerCard from '@/components/NewWorkspaceComposerCard'
 import AgentSettingsDialog from '@/components/agent/AgentSettingsDialog'
+import type { AddRepoDialogHostedController } from '@/components/sidebar/use-add-repo-hosted-controller'
 import { useComposerState } from '@/hooks/useComposerState'
 import {
   pickQuickWorkspaceAgent,
@@ -32,6 +34,12 @@ import {
 } from '@/lib/claude-account-runtime-filter'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { useComposerClaudeAccounts } from '@/hooks/use-composer-claude-accounts'
+
+// Why: match App-level AddRepoDialog loading — the add flow is off the hot
+// path for the composer, so keep its clone/SSH machinery out of the entry render.
+const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/AddRepoDialog'), {
+  reloadKey: 'composer-add-repo'
+})
 
 type ComposerModalData = {
   prefilledName?: string
@@ -126,7 +134,8 @@ function QuickTabBody({
     onComposerNodeChange,
     nameInputRef,
     submitQuick,
-    createDisabled
+    createDisabled,
+    selectAddedProjectRepo
   } = useComposerState({
     initialName: modalData.prefilledName ?? '',
     // Why: the modal is quick-create only now, so prompt-prefill state is
@@ -182,6 +191,45 @@ function QuickTabBody({
   const handleQuickAgentChange = useCallback((agent: TuiAgent | null) => {
     setQuickAgentOverride(agent)
   }, [])
+
+  // Why: Add Project layers over the composer as a nested dialog instead of
+  // replacing it in the activeModal slot — closing the composer mid-flow (and
+  // losing the typed name/prompt) was the old, abrupt behavior. Once opened it
+  // stays mounted so cancel/complete plays the close animation and the
+  // dialog's close effects can abort in-flight clone/scan work. (Folder/non-git
+  // outcomes still navigate away and tear the whole modal down.)
+  const [addProjectOpen, setAddProjectOpen] = useState(false)
+  const [addProjectMounted, setAddProjectMounted] = useState(false)
+  const handleOpenAddProject = useCallback((): void => {
+    setAddProjectMounted(true)
+    setAddProjectOpen(true)
+  }, [])
+  const handleProjectAdded = useCallback(
+    (repoId: string): void => {
+      selectAddedProjectRepo(repoId)
+    },
+    [selectAddedProjectRepo]
+  )
+  const handleAddProjectCloseAutoFocus = useCallback(
+    (event: Event): void => {
+      // Why: after adding a project the next step is naming the worktree.
+      // Radix would try to restore focus to the (unmounted) combobox row that
+      // opened the dialog; send it to the name field instead — the same place
+      // picking a project from the combobox lands.
+      event.preventDefault()
+      nameInputRef?.current?.focus()
+    },
+    [nameInputRef]
+  )
+  const addProjectController = useMemo<AddRepoDialogHostedController>(
+    () => ({
+      open: addProjectOpen,
+      onOpenChange: setAddProjectOpen,
+      onProjectAdded: handleProjectAdded,
+      onCloseAutoFocus: handleAddProjectCloseAutoFocus
+    }),
+    [addProjectOpen, handleAddProjectCloseAutoFocus, handleProjectAdded]
+  )
   const selectedProjectOption = cardProps.projectOptions.find(
     (option) => option.id === cardProps.selectedProjectId
   )
@@ -242,8 +290,12 @@ function QuickTabBody({
       : translate('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
 
   // Cmd/Ctrl+Enter submits, Esc first blurs the focused input (like the full page).
+  const nestedDialogOpen = agentSettingsOpen || addProjectOpen
   useEffect(() => {
-    if (!active) {
+    if (!active || nestedDialogOpen) {
+      // Why: while a nested dialog (Add Project / Agents) is layered on top,
+      // this capture-phase handler must not steal its Escape (which should
+      // close only the nested dialog) or fire composer submit underneath it.
       return
     }
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -287,7 +339,7 @@ function QuickTabBody({
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [active, composerRef, createDisabled, handleCreate, onClose])
+  }, [active, composerRef, createDisabled, handleCreate, nestedDialogOpen, onClose])
 
   return (
     <>
@@ -325,8 +377,14 @@ function QuickTabBody({
         primaryActionLabel={primaryActionLabel}
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}
         onCreate={() => void handleCreate()}
+        onAddProjectOverride={handleOpenAddProject}
       />
       <AgentSettingsDialog open={agentSettingsOpen} onOpenChange={setAgentSettingsOpen} />
+      {addProjectMounted ? (
+        <Suspense fallback={null}>
+          <HostedAddRepoDialog hosted={addProjectController} />
+        </Suspense>
+      ) : null}
     </>
   )
 }

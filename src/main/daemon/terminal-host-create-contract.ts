@@ -1,6 +1,7 @@
 import type { StartupCommandDelivery } from '../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../shared/types'
 import type { ShellReadyState, TerminalSnapshot } from './types'
+import type { PtyStartupIngressIntent } from '../../shared/pty-startup-ingress'
 
 export type CreateOrAttachOptions = {
   sessionId: string
@@ -20,7 +21,11 @@ export type CreateOrAttachOptions = {
   shellReadySupported?: boolean
   shellReadyTimeoutMs?: number
   historySeed?: string
-  streamClient: { onData: (data: string) => void; onExit: (code: number) => void }
+  startupIngress?: PtyStartupIngressIntent
+  streamClient: {
+    onData: (data: string, rawLength?: number, transformed?: boolean, seq?: number) => void
+    onExit: (code: number) => void
+  }
 }
 
 export type CreateOrAttachResult = {
@@ -30,5 +35,6 @@ export type CreateOrAttachResult = {
   shellState: ShellReadyState
   historySeeded?: boolean
   launchAgent?: TuiAgent
+  wslDistro: string | null
   attachToken: symbol
 }

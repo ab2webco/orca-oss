@@ -13,11 +13,19 @@ export class WatcherProcessFailure extends Error {
   constructor(
     message: string,
     readonly scope: WatcherProcessFailureScope,
-    readonly code: WatcherProcessFailureCode
+    readonly code: WatcherProcessFailureCode,
+    readonly physicalExit?: Promise<void>
   ) {
     super(message)
     this.name = 'WatcherProcessFailure'
   }
+}
+
+export function watcherHostFailure(
+  message: string,
+  code: WatcherProcessFailureCode
+): WatcherProcessFailure {
+  return new WatcherProcessFailure(message, 'supervisor', code)
 }
 
 export function isWatcherProcessFailure(error: unknown): error is WatcherProcessFailure {

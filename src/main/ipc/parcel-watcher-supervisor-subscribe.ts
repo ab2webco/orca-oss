@@ -1,9 +1,13 @@
 import type { ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { getWatcherProcessEntryPath } from './parcel-watcher-entry-path'
+import { sendToWatcherChild } from './parcel-watcher-child-messaging'
 import { createHostWatcherSubscription } from './parcel-watcher-host-subscriptions'
+import type { PendingWatcherUnsubscribe } from './parcel-watcher-host-subscriptions'
 import { subscribeWithInProcessWatcher } from './parcel-watcher-in-process-fallback'
-import { installPendingSubscribeControls } from './parcel-watcher-pending-subscribe'
+import {
+  installPendingSubscribeControls,
+  resetPendingSubscribeAttempt
+} from './parcel-watcher-pending-subscribe'
 import { WatcherProcessFailure } from './parcel-watcher-process-failure'
 import type {
   HostToWatcherMessage,
@@ -22,12 +26,16 @@ type WatcherSupervisorSubscribeOptions = {
   opts: WatcherProcessSubscribeOptions
   hooks: WatcherProcessHooks
   shutdownRequested: boolean
+  entryPath: string
+  useInProcessVitestFallback: boolean
   allocateId: () => number
   records: Map<number, WatcherProcessSubscriptionRecord>
-  pendingUnsubscribes: Map<number, () => void>
+  pendingUnsubscribes: Map<number, PendingWatcherUnsubscribe>
   ensureWatcherProcess: (entryPath: string) => ChildProcess | null
   getChild: () => ChildProcess | null
-  killWatcherChildIfIdle: () => void
+  getTerminationPromise: () => Promise<void> | null
+  killWatcherChildIfIdle: () => Promise<void>
+  terminateUnavailableChild: (child: ChildProcess | null) => Promise<void>
   sendSubscribe: (child: ChildProcess, record: WatcherProcessSubscriptionRecord) => void
   sendToChild: (child: ChildProcess, message: HostToWatcherMessage) => void
   cancelPendingSubscribe: (
@@ -36,18 +44,36 @@ type WatcherSupervisorSubscribeOptions = {
   ) => void
 }
 
+export function sendWatcherSubscribe(
+  child: ChildProcess,
+  record: WatcherProcessSubscriptionRecord
+): void {
+  resetPendingSubscribeAttempt(record)
+  sendToWatcherChild(child, {
+    op: 'subscribe',
+    id: record.id,
+    dir: record.dir,
+    opts: record.opts,
+    delivery: record.hooks.delivery
+  })
+}
+
 export function subscribeThroughWatcherSupervisor({
   dir,
   callback,
   opts,
   hooks,
   shutdownRequested,
+  entryPath,
+  useInProcessVitestFallback,
   allocateId,
   records,
   pendingUnsubscribes,
   ensureWatcherProcess,
   getChild,
+  getTerminationPromise,
   killWatcherChildIfIdle,
+  terminateUnavailableChild,
   sendSubscribe,
   sendToChild,
   cancelPendingSubscribe
@@ -72,10 +98,9 @@ export function subscribeThroughWatcherSupervisor({
   }
   // Why: under Vitest we cannot fork a real watcher child, so exercise the
   // subscription path in-process (against mocked @parcel/watcher) instead.
-  if (process.env.VITEST) {
+  if (process.env.VITEST && useInProcessVitestFallback) {
     return subscribeWithInProcessWatcher(dir, callback, opts, hooks)
   }
-  const entryPath = getWatcherProcessEntryPath()
   if (!existsSync(entryPath)) {
     return Promise.reject(
       new WatcherProcessFailure(
@@ -115,7 +140,9 @@ export function subscribeThroughWatcherSupervisor({
             records,
             pendingUnsubscribes,
             getChild,
+            getTerminationPromise,
             killWatcherChildIfIdle,
+            terminateUnavailableChild,
             sendToChild
           })
         ),

@@ -37,6 +37,8 @@ vi.mock('../store', () => ({
 
 vi.mock('./web-session-tabs-sync', () => ({
   applyFreshWebSessionTabsSnapshot: mocks.applyFreshWebSessionTabsSnapshot,
+  applyWebSessionTabsStorePatch: (buildPatch: (state: unknown) => unknown) =>
+    mocks.setState(buildPatch),
   resolveHostSessionTabIdForWebSessionTab: mocks.resolveHostSessionTabIdForWebSessionTab
 }))
 
@@ -78,7 +80,7 @@ describe('activateWebRuntimeSessionWorktree', () => {
     vi.clearAllMocks()
   })
 
-  it('can ask the host to activate session surfaces without notifying desktop clients', async () => {
+  it('activates caller-owned session surfaces without steering host or clients', async () => {
     const runtimeCall = vi.fn().mockResolvedValueOnce({
       id: 'activate',
       ok: true,
@@ -95,8 +97,7 @@ describe('activateWebRuntimeSessionWorktree', () => {
 
     await expect(
       activateWebRuntimeSessionWorktree({
-        worktreeId: WORKTREE_ID,
-        notifyDesktop: false
+        worktreeId: WORKTREE_ID
       })
     ).resolves.toBe(true)
 
@@ -105,7 +106,8 @@ describe('activateWebRuntimeSessionWorktree', () => {
       method: 'worktree.activate',
       params: {
         worktree: `id:${WORKTREE_ID}`,
-        notifyClients: false
+        notifyClients: false,
+        navigation: 'caller'
       },
       timeoutMs: 15_000
     })
@@ -482,12 +484,14 @@ describe('createWebRuntimeSessionTerminal', () => {
         command: "codex 'linked issue context'",
         cwd: '/repo/packages/app',
         env: { CODEX_PROFILE: 'captured' },
+        envToDelete: ['CODEX_HOME', 'ORCA_CODEX_HOME'],
         startupCommandDelivery: 'shell-ready',
         launchConfig: {
           agentArgs: '--model gpt-5',
           agentEnv: { CODEX_PROFILE: 'captured' }
         },
         launchAgent: 'codex',
+        viewMode: 'chat',
         activate: true
       })
     ).resolves.toBe(true)
@@ -502,13 +506,17 @@ describe('createWebRuntimeSessionTerminal', () => {
         command: "codex 'linked issue context'",
         cwd: '/repo/packages/app',
         env: { CODEX_PROFILE: 'captured' },
+        envToDelete: ['CODEX_HOME', 'ORCA_CODEX_HOME'],
         startupCommandDelivery: 'shell-ready',
         launchConfig: {
           agentArgs: '--model gpt-5',
           agentEnv: { CODEX_PROFILE: 'captured' }
         },
         launchAgent: 'codex',
-        activate: true
+        viewMode: 'chat',
+        activate: false,
+        select: true,
+        navigation: 'caller'
       },
       timeoutMs: 15_000
     })
@@ -847,7 +855,9 @@ describe('web runtime session tab actions', () => {
       method: 'session.tabs.activate',
       params: {
         worktree: `id:${WORKTREE_ID}`,
-        tabId: 'host-browser-unified'
+        tabId: 'host-browser-unified',
+        notifyClients: false,
+        navigation: 'caller'
       },
       timeoutMs: 15_000
     })
