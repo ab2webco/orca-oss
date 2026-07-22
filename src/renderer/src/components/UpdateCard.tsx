@@ -26,10 +26,13 @@ import { translate } from '@/i18n/i18n'
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function releaseUrlForVersion(version: string | null): string {
-  // Why: fall back to the plain releases listing (not /releases/latest) — /latest also breaks when GitHub's API is degraded.
+  // Why: the lab publishes releases to the ab2webco fork (matching the updater
+  // feed in electron-builder.config.cjs), so the manual-download fallback must
+  // point there — not upstream stablyai, where these lab tags do not exist.
+  // Why the plain listing fallback: /releases/latest also breaks when GitHub's API is degraded.
   return version
-    ? `https://github.com/stablyai/orca/releases/tag/v${version}`
-    : 'https://github.com/stablyai/orca/releases'
+    ? `https://github.com/ab2webco/orca-oss/releases/tag/v${version}`
+    : 'https://github.com/ab2webco/orca-oss/releases'
 }
 
 function isAnimatedGif(url: string | undefined): boolean {
