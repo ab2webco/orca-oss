@@ -2050,7 +2050,9 @@ describe('ClaudeAccountService credential capture', () => {
       identity: { email: ' HOST@example.com ', organizationUuid: null, organizationName: null }
     }))
 
-    await expect(service.addAccount({ runtime: 'host' })).rejects.toThrow('already managed')
+    await expect(service.addAccount({ runtime: 'host' })).rejects.toThrow(
+      'This Claude account is already added.'
+    )
 
     expect(settings.claudeManagedAccounts).toHaveLength(1)
     expect(settings.activeClaudeManagedAccountId).toBe('host-account')

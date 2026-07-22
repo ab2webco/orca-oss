@@ -541,6 +541,25 @@ describe('registerPtyHandlers', () => {
     }
   }
 
+  // Why: LocalPtyProvider.shutdown awaits physical exit; kill must emit onExit or pty:kill times out (upstream 1.4.150 contract).
+  function installExitOnKillSpawnMock(): void {
+    spawnMock.mockImplementation(() => {
+      let exitCb: ((info: { exitCode: number }) => void) | undefined
+      return {
+        onData: vi.fn(() => makeDisposable()),
+        onExit: vi.fn((cb: (info: { exitCode: number }) => void) => {
+          exitCb = cb
+          return makeDisposable()
+        }),
+        write: vi.fn(),
+        resize: vi.fn(),
+        kill: vi.fn(() => exitCb?.({ exitCode: -1 })),
+        process: 'zsh',
+        pid: 12345
+      }
+    })
+  }
+
   function getPtyWriteListener(): (event: unknown, args: { id: string; data: string }) => void {
     const writeCall = onMock.mock.calls.find((call: unknown[]) => call[0] === 'pty:write')
     if (!writeCall) {
@@ -872,6 +891,7 @@ describe('registerPtyHandlers', () => {
     })
 
     it('does not block an injected (per-worktree-pinned) Claude launch while a global account switch is in progress', async () => {
+      installExitOnKillSpawnMock()
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude-injected',
         envPatch: { CLAUDE_CONFIG_DIR: '/tmp/claude-injected' },
@@ -991,6 +1011,7 @@ describe('registerPtyHandlers', () => {
     })
 
     it('reattaches with the PTY account even after the worktree is repinned', async () => {
+      installExitOnKillSpawnMock()
       livePtyGate.markInjectedClaudePtySpawned('surviving-session', 'account-a')
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/account-a',
@@ -1030,6 +1051,7 @@ describe('registerPtyHandlers', () => {
     it.each(['live gate', 'restart seed'] as const)(
       'keeps a shared reattach shared after repinning via the %s',
       async (ownershipSource) => {
+        installExitOnKillSpawnMock()
         await getLocalPtyProvider().spawn({
           cols: 80,
           rows: 24,
@@ -1712,6 +1734,7 @@ describe('registerPtyHandlers', () => {
     })
 
     it('does not treat a global WSL account whose distro is named injected as injected auth', async () => {
+      installExitOnKillSpawnMock()
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude-wsl',
         runtime: 'wsl' as const,

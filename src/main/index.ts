@@ -134,7 +134,8 @@ import { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
 import { markCodexProjectTrusted } from './agent-trust-presets'
 import {
   normalizeCodexRuntimeSelection,
-  type CodexAccountLaunchTarget
+  type CodexAccountLaunchTarget,
+  type CodexAccountSelectionTarget
 } from './codex-accounts/runtime-selection'
 import {
   getSelectedClaudeAccountIdForTarget,
