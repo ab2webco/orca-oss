@@ -259,6 +259,7 @@ let runtimeRpc: OrcaRuntimeRpcServer | null = null
 const serveReadinessPublisher = new ServeReadinessPublisher()
 let desktopRelayService: DesktopRelayService | null = null
 let desktopRelayStatus: RelayBrokerStatus = 'offline'
+let pendingUnpairedDeviceAuthFailure = false
 // Why: gates whether headless serve installs the offscreen browser backend (and advertises browser pane support).
 let headlessBrowserDisplayAvailable = false
 
@@ -2306,7 +2307,29 @@ app.whenReady().then(async () => {
       : {}),
     webClientRoot: getBundledWebClientRoot()
   })
-  registerMobileHandlers(runtimeRpc, { getRelayStatus: () => desktopRelayStatus })
+  registerMobileHandlers(runtimeRpc, {
+    getRelayStatus: () => desktopRelayStatus,
+    consumePendingUnpairedDeviceAuthFailure: (webContentsId) => {
+      if (
+        !mainWindow ||
+        mainWindow.isDestroyed() ||
+        mainWindow.webContents.id !== webContentsId ||
+        !pendingUnpairedDeviceAuthFailure
+      ) {
+        return false
+      }
+      pendingUnpairedDeviceAuthFailure = false
+      return true
+    }
+  })
+  // Why: repeated direct auth failures otherwise look like a client that never connects; point users to re-pairing.
+  runtimeRpc.setOnUnpairedDeviceAuthFailure(() => {
+    // Why: runtime startup races renderer mount; retain the one-shot until the listener consumes it.
+    pendingUnpairedDeviceAuthFailure = true
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mobile:unpairedDeviceAuthFailure')
+    }
+  })
 
   startTerminalRuntimeStartupServices()
   app.on('activate', requestDesktopActivation)
