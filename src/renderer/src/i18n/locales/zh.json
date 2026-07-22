@@ -132,7 +132,8 @@
       "fe21e8f6f5": "返回 ({{value0}})",
       "064bd07810": "返回",
       "ce37cf5279": "切换侧边栏 ({{value0}})",
-      "e4b9e7dff7": "切换侧边栏"
+      "e4b9e7dff7": "切换侧边栏",
+      "byAb2WebBadge": "by Ab2Web"
     },
     "web": {
       "WebConnect": {
@@ -3123,7 +3124,8 @@
             "grokUsageAria": "打开 Grok 使用详情",
             "grokUsageMenu": "Grok 使用量",
             "worktreeAccountLabel": "工作树账户",
-            "worktreeAccountUsageNote": "正在显示固定到当前聚焦工作树的账户用量。"
+            "worktreeAccountUsageNote": "正在显示固定到当前聚焦工作树的账户用量。",
+            "worktreeEndpointAccountUsageNote": "自定义端点账户 — 无法追踪用量。"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "连接账户",
@@ -5005,7 +5007,18 @@
           "worktreeUsageDescription": "显示固定到聚焦工作树的 Claude 账户用量，而不是全局活动账户。",
           "worktreeUsageRowDescription": "当聚焦的工作树固定到托管的 Claude 账户时，状态栏用量指示条会显示该账户并标注其邮箱。关闭后始终显示全局账户。",
           "codexSystemDefaultCustomProvider": "自定义提供商 — 不跟踪使用情况。",
-          "codexSystemDefaultNeedsSignIn": "未找到 {{value0}} 的 Codex 登录信息。"
+          "codexSystemDefaultNeedsSignIn": "未找到 {{value0}} 的 Codex 登录信息。",
+          "addCustomEndpoint": "添加自定义端点",
+          "customEndpointBaseUrl": "基础 URL",
+          "customEndpointBaseUrlPlaceholder": "https://api.z.ai/api/anthropic",
+          "customEndpointDescription": "将兼容 Anthropic 的端点（如 z.ai GLM）添加为受管理的 Claude 账户。令牌仅保存在本设备上，并在工作树分配到该账户时使用。",
+          "customEndpointLabel": "标签",
+          "customEndpointModel": "模型",
+          "customEndpointModelPlaceholder": "glm-5.1",
+          "customEndpointSubmit": "添加端点",
+          "customEndpointTitle": "添加自定义端点账户",
+          "customEndpointToken": "API 令牌",
+          "endpointBadge": "端点"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",
@@ -7166,7 +7179,10 @@
             "worktreeUsageDescription": "当聚焦的工作树绑定到托管账户时，在状态栏显示固定的 Claude 账户用量。",
             "worktreeKeyword": "工作树",
             "usageKeyword": "用量",
-            "pinKeyword": "固定"
+            "pinKeyword": "固定",
+            "claudeEndpointKeyword": "端点",
+            "claudeGlmKeyword": "glm",
+            "claudeZaiKeyword": "z.ai"
           }
         },
         "advanced": {
@@ -10376,7 +10392,8 @@
             "worktreeUnavailable": "工作树不再可用。",
             "openSupportedWorkspace": "在恢复会话之前，请先打开一个工作区。",
             "localSessionSshWorkspaceUnsupported": "此会话的历史记录存储在本机上，因此无法在 SSH 工作区中恢复。请改为打开一个本地工作区。",
-            "sessionHostMismatchUnsupported": "此会话属于其他主机。请打开同一主机上的工作区以恢复它。"
+            "sessionHostMismatchUnsupported": "此会话属于其他主机。请打开同一主机上的工作区以恢复它。",
+            "resumePrepareFailed": "无法准备恢复此会话。"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "正在扫描会话",

@@ -1977,15 +1977,19 @@ app.whenReady().then(async () => {
         ...Object.values(normalizeClaudeRuntimeSelection(settings).wsl)
       ].filter(Boolean)
     )
-    return settings.claudeManagedAccounts
-      .filter((account) => !activeIds.has(account.id))
-      .map((account) => ({
-        id: account.id,
-        managedAuthPath: account.managedAuthPath,
-        managedAuthRuntime: account.managedAuthRuntime,
-        wslDistro: account.wslDistro,
-        wslLinuxAuthPath: account.wslLinuxAuthPath
-      }))
+    return (
+      settings.claudeManagedAccounts
+        // Why: custom-endpoint accounts have no Anthropic usage API; enumerating
+        // them would leave switcher rows fetching forever.
+        .filter((account) => !activeIds.has(account.id) && account.authMethod !== 'custom-endpoint')
+        .map((account) => ({
+          id: account.id,
+          managedAuthPath: account.managedAuthPath,
+          managedAuthRuntime: account.managedAuthRuntime,
+          wslDistro: account.wslDistro,
+          wslLinuxAuthPath: account.wslLinuxAuthPath
+        }))
+    )
   })
   rateLimits.setInactiveCodexAccountsResolver(() => {
     const settings = store!.getSettings()

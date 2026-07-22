@@ -1,11 +1,20 @@
 import { ipcMain } from 'electron'
-import type { ClaudeAccountAddTarget, ClaudeAccountService } from '../claude-accounts/service'
+import type {
+  ClaudeAccountAddTarget,
+  ClaudeAccountService,
+  ClaudeCustomEndpointAccountInput
+} from '../claude-accounts/service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 
 export function registerClaudeAccountHandlers(claudeAccounts: ClaudeAccountService): void {
   ipcMain.handle('claudeAccounts:list', () => claudeAccounts.listAccounts())
   ipcMain.handle('claudeAccounts:add', (_event, args?: ClaudeAccountAddTarget) =>
     claudeAccounts.addAccount(args)
+  )
+  ipcMain.handle(
+    'claudeAccounts:addCustomEndpoint',
+    (_event, args: ClaudeCustomEndpointAccountInput) =>
+      claudeAccounts.addCustomEndpointAccount(args)
   )
   ipcMain.handle('claudeAccounts:cancelPendingLogin', () => claudeAccounts.cancelPendingLogin())
   ipcMain.handle('claudeAccounts:reauthenticate', (_event, args: { accountId: string }) =>

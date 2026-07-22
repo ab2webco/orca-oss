@@ -68,6 +68,7 @@ import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
 import { markLiveCodexSessionsForRestart } from '@/lib/codex-session-restart'
 import { UpdateStatusSegment } from './UpdateStatusSegment'
 import {
+  createCustomEndpointClaudeLimits,
   createPendingClaudeLimits,
   resolveClaudeUsageAccountScope
 } from './claude-usage-account-scope'
@@ -440,10 +441,13 @@ function getClaudeStatusAccountsForTarget(
   state: ClaudeRateLimitAccountsState,
   target: CodexStatusRuntimeTarget
 ): ClaudeStatusAccount[] {
+  // Why: custom-endpoint accounts are per-worktree only; global switching would
+  // materialize shared ~/.claude auth they don't have.
+  const selectable = state.accounts.filter((account) => account.authMethod !== 'custom-endpoint')
   if (target.runtime === 'host') {
-    return state.accounts.filter((account) => account.managedAuthRuntime !== 'wsl')
+    return selectable.filter((account) => account.managedAuthRuntime !== 'wsl')
   }
-  return state.accounts.filter(
+  return selectable.filter(
     (account) =>
       account.managedAuthRuntime === 'wsl' &&
       getCodexStatusWslKey(account.wslDistro) === getCodexStatusWslKey(target.wslDistro)
@@ -755,8 +759,12 @@ export function ClaudeSwitcherMenu({
     inactiveAccountUsage: inactiveClaudeAccounts
   })
   const displayedClaude =
-    usageScope.limits ??
-    (usageScope.kind === 'worktree' ? createPendingClaudeLimits(usageScope.isFetching) : claude)
+    usageScope.kind === 'worktree-custom-endpoint'
+      ? createCustomEndpointClaudeLimits()
+      : (usageScope.limits ??
+        (usageScope.kind === 'worktree'
+          ? createPendingClaudeLimits(usageScope.isFetching)
+          : claude))
   const pinnedInactiveAccountId =
     usageScope.kind === 'worktree' && usageScope.limits === null ? usageScope.accountId : null
 
@@ -893,7 +901,7 @@ export function ClaudeSwitcherMenu({
         'Open Claude details and account switcher'
       )}
       triggerExtra={
-        usageScope.kind === 'worktree' ? (
+        usageScope.kind === 'worktree' || usageScope.kind === 'worktree-custom-endpoint' ? (
           <span className="ml-1 max-w-[110px] truncate text-[10px] text-muted-foreground">
             {usageScope.email}
           </span>
@@ -901,7 +909,7 @@ export function ClaudeSwitcherMenu({
       }
       topContent={
         <>
-          {usageScope.kind === 'worktree' ? (
+          {usageScope.kind === 'worktree' || usageScope.kind === 'worktree-custom-endpoint' ? (
             <div className="px-2 pt-2">
               <div className="rounded-md border border-border/60 bg-accent/5 px-2 py-1.5">
                 <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
@@ -912,10 +920,15 @@ export function ClaudeSwitcherMenu({
                 </div>
                 <div className="truncate text-[11px] text-foreground">{usageScope.email}</div>
                 <div className="text-[10px] leading-4 text-muted-foreground">
-                  {translate(
-                    'auto.components.status.bar.StatusBar.worktreeAccountUsageNote',
-                    'Usage shown for the account pinned to the focused worktree.'
-                  )}
+                  {usageScope.kind === 'worktree-custom-endpoint'
+                    ? translate(
+                        'auto.components.status.bar.StatusBar.worktreeEndpointAccountUsageNote',
+                        'Custom endpoint account — usage tracking is not available.'
+                      )
+                    : translate(
+                        'auto.components.status.bar.StatusBar.worktreeAccountUsageNote',
+                        'Usage shown for the account pinned to the focused worktree.'
+                      )}
                 </div>
               </div>
             </div>

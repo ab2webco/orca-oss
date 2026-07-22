@@ -132,7 +132,8 @@
       "fe21e8f6f5": "戻る ({{value0}})",
       "064bd07810": "戻る",
       "ce37cf5279": "サイドバーの切り替え ({{value0}})",
-      "e4b9e7dff7": "サイドバーの切り替え"
+      "e4b9e7dff7": "サイドバーの切り替え",
+      "byAb2WebBadge": "by Ab2Web"
     },
     "web": {
       "WebConnect": {
@@ -3123,7 +3124,8 @@
             "grokUsageAria": "Grok の使用状況詳細を開く",
             "grokUsageMenu": "Grok の使用状況",
             "worktreeAccountLabel": "ワークツリーのアカウント",
-            "worktreeAccountUsageNote": "フォーカス中のワークツリーに固定されたアカウントの使用量を表示しています。"
+            "worktreeAccountUsageNote": "フォーカス中のワークツリーに固定されたアカウントの使用量を表示しています。",
+            "worktreeEndpointAccountUsageNote": "カスタムエンドポイントアカウント — 使用量トラッキングは利用できません。"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "アカウントを接続する",
@@ -5005,7 +5007,18 @@
           "worktreeUsageDescription": "グローバルなアクティブアカウントの代わりに、フォーカス中のワークツリーに固定された Claude アカウントの使用量を表示します。",
           "worktreeUsageRowDescription": "フォーカス中のワークツリーが管理された Claude アカウントに固定されている場合、ステータスバーの使用量メーターはそのアカウントをメールアドレス付きで表示します。無効にすると常にグローバルアカウントを表示します。",
           "codexSystemDefaultCustomProvider": "カスタムプロバイダー — 使用量は追跡されません。",
-          "codexSystemDefaultNeedsSignIn": "{{value0}} の Codex サインインが見つかりません。"
+          "codexSystemDefaultNeedsSignIn": "{{value0}} の Codex サインインが見つかりません。",
+          "addCustomEndpoint": "カスタムエンドポイントを追加",
+          "customEndpointBaseUrl": "ベース URL",
+          "customEndpointBaseUrlPlaceholder": "https://api.z.ai/api/anthropic",
+          "customEndpointDescription": "Anthropic 互換のエンドポイント（z.ai GLM など）を管理対象の Claude アカウントとして接続します。トークンはこのデバイスにのみ保存され、ワークツリーがこのアカウントに割り当てられたときに使用されます。",
+          "customEndpointLabel": "ラベル",
+          "customEndpointModel": "モデル",
+          "customEndpointModelPlaceholder": "glm-5.1",
+          "customEndpointSubmit": "エンドポイントを追加",
+          "customEndpointTitle": "カスタムエンドポイントアカウントを追加",
+          "customEndpointToken": "API トークン",
+          "endpointBadge": "エンドポイント"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",
@@ -7203,7 +7216,10 @@
             "worktreeUsageDescription": "フォーカス中のワークツリーが管理アカウントに固定されている場合、固定された Claude アカウントの使用量をステータスバーに表示します。",
             "worktreeKeyword": "ワークツリー",
             "usageKeyword": "使用量",
-            "pinKeyword": "固定"
+            "pinKeyword": "固定",
+            "claudeEndpointKeyword": "エンドポイント",
+            "claudeGlmKeyword": "glm",
+            "claudeZaiKeyword": "z.ai"
           }
         },
         "advanced": {
@@ -10376,7 +10392,8 @@
             "worktreeUnavailable": "ワークツリーは利用できなくなりました。",
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "localSessionSshWorkspaceUnsupported": "このセッションの履歴はこのマシンに保存されているため、SSH ワークスペースでは再開できません。代わりにローカルワークスペースを開いてください。",
-            "sessionHostMismatchUnsupported": "このセッションは別のホストに属しています。再開するには同じホスト上のワークスペースを開いてください。"
+            "sessionHostMismatchUnsupported": "このセッションは別のホストに属しています。再開するには同じホスト上のワークスペースを開いてください。",
+            "resumePrepareFailed": "このセッションを再開する準備ができませんでした。"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Scanning sessions",

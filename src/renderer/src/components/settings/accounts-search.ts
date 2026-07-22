@@ -93,7 +93,16 @@ export const getAccountsClaudeSearchEntries = createLocalizedCatalog(() => [
         'status bar'
       ),
       ...translateSearchKeyword('auto.components.settings.accounts.search.c759741d77', 'quota'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.f2d666a886', 'optional')
+      ...translateSearchKeyword('auto.components.settings.accounts.search.f2d666a886', 'optional'),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.claudeEndpointKeyword',
+        'endpoint'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.accounts.search.claudeZaiKeyword',
+        'z.ai'
+      ),
+      ...translateSearchKeyword('auto.components.settings.accounts.search.claudeGlmKeyword', 'glm')
     ]
   }
 ])

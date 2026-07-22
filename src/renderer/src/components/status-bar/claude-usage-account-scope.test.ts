@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { InactiveAccountUsage, ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import {
+  createCustomEndpointClaudeLimits,
   createPendingClaudeLimits,
   resolveClaudeUsageAccountScope,
   type ClaudeUsageAccountScopeInput
@@ -162,6 +163,53 @@ describe('resolveClaudeUsageAccountScope', () => {
       })
     )
     expect(scope).toEqual({ kind: 'global', limits: activeLimits })
+  })
+
+  it('returns the custom-endpoint variant for a pinned custom-endpoint account', () => {
+    const scope = resolveClaudeUsageAccountScope(
+      input({
+        focusedWorktreeClaudeAccountId: 'acct-endpoint',
+        accounts: [
+          ...ACCOUNTS,
+          { id: 'acct-endpoint', email: 'z.ai · GLM', authMethod: 'custom-endpoint' }
+        ],
+        // A stray cache entry must not turn the scope back into a fetching worktree.
+        inactiveAccountUsage: [
+          inactiveUsage('acct-endpoint', { rateLimits: null, isFetching: true })
+        ]
+      })
+    )
+    expect(scope).toEqual({
+      kind: 'worktree-custom-endpoint',
+      accountId: 'acct-endpoint',
+      email: 'z.ai · GLM'
+    })
+  })
+
+  it('keeps the worktree scope for oauth accounts that declare an authMethod', () => {
+    const scope = resolveClaudeUsageAccountScope(
+      input({
+        focusedWorktreeClaudeAccountId: 'acct-pinned',
+        accounts: [
+          { id: 'acct-active', email: 'active@example.com', authMethod: 'subscription-oauth' },
+          { id: 'acct-pinned', email: 'pinned@example.com', authMethod: 'subscription-oauth' }
+        ]
+      })
+    )
+    expect(scope.kind).toBe('worktree')
+  })
+})
+
+describe('createCustomEndpointClaudeLimits', () => {
+  it('creates a terminal no-usage placeholder that never renders the pending pulse', () => {
+    expect(createCustomEndpointClaudeLimits()).toEqual({
+      provider: 'claude',
+      session: null,
+      weekly: null,
+      updatedAt: 0,
+      error: null,
+      status: 'unavailable'
+    })
   })
 })
 

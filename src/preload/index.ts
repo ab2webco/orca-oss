@@ -1899,6 +1899,12 @@ const api = {
     list: (): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:list'),
     add: (args?: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:add', args),
+    addCustomEndpoint: (args: {
+      label: string
+      baseUrl: string
+      token: string
+      model?: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:addCustomEndpoint', args),
     cancelPendingLogin: (): Promise<boolean> =>
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>

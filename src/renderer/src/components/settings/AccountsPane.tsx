@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import {
   AlertTriangle,
   ExternalLink,
+  Globe,
   HelpCircle,
   Loader2,
   Lock,
@@ -233,6 +234,17 @@ function getClaudeAccountRuntimeLabel(
   return hostLabel
 }
 
+function getEndpointHostLabel(endpointBaseUrl: string | null | undefined): string {
+  if (!endpointBaseUrl) {
+    return ''
+  }
+  try {
+    return new URL(endpointBaseUrl).host
+  } catch {
+    return endpointBaseUrl
+  }
+}
+
 function getCodexAccountErrorDescription(error: unknown): string {
   const message = String((error as Error)?.message ?? error)
     .replace(/^Error occurred in handler for 'codexAccounts:[^']+':\s*/i, '')
@@ -379,8 +391,18 @@ export function AccountsPane({
   const [claudeAccounts, setClaudeAccounts] =
     useState<ClaudeRateLimitAccountsState>(emptyClaudeAccountsState)
   const [claudeAction, setClaudeAction] = useState<
-    'idle' | 'adding' | `reauth:${string}` | `remove:${string}` | `select:${string | 'system'}`
+    | 'idle'
+    | 'adding'
+    | 'adding-endpoint'
+    | `reauth:${string}`
+    | `remove:${string}`
+    | `select:${string | 'system'}`
   >('idle')
+  const [addEndpointOpen, setAddEndpointOpen] = useState(false)
+  const [endpointLabelDraft, setEndpointLabelDraft] = useState('z.ai · GLM')
+  const [endpointBaseUrlDraft, setEndpointBaseUrlDraft] = useState('https://api.z.ai/api/anthropic')
+  const [endpointTokenDraft, setEndpointTokenDraft] = useState('')
+  const [endpointModelDraft, setEndpointModelDraft] = useState('glm-5.1')
   // Why: capture the account's runtime slot when the dialog opens; the roster
   // can change underneath an open dialog and lose the slot to diff for restarts.
   const [removeCodexTarget, setRemoveCodexTarget] = useState<{
@@ -761,6 +783,29 @@ export function AccountsPane({
     }
   }
 
+  const canSubmitCustomEndpoint =
+    endpointLabelDraft.trim() !== '' &&
+    endpointBaseUrlDraft.trim() !== '' &&
+    endpointTokenDraft.trim() !== ''
+
+  const submitAddCustomEndpoint = async (): Promise<void> => {
+    if (!canSubmitCustomEndpoint) {
+      return
+    }
+    await runClaudeAccountAction('adding-endpoint', async () => {
+      const next = await window.api.claudeAccounts.addCustomEndpoint({
+        label: endpointLabelDraft.trim(),
+        baseUrl: endpointBaseUrlDraft.trim(),
+        token: endpointTokenDraft.trim(),
+        model: endpointModelDraft.trim() || null
+      })
+      // Why: close only on success so a validation error keeps the draft editable.
+      setAddEndpointOpen(false)
+      setEndpointTokenDraft('')
+      return next
+    })
+  }
+
   const visibleSections = [
     matchesSettingsSearch(searchQuery, getAccountsAutoSwitchSearchEntries()) ? (
       <section key="auto-switch-limits" id="accounts-auto-switch" className="space-y-3 scroll-mt-6">
@@ -941,6 +986,27 @@ export function AccountsPane({
                 )}
                 {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
               </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setAddEndpointOpen(true)}
+                disabled={
+                  // Why: the endpoint account is created on the account owner;
+                  // a remote server manages its own provider accounts.
+                  isRemoteAccountScope || claudeAction !== 'idle'
+                }
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                {claudeAction === 'adding-endpoint' ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Globe className="size-3" />
+                )}
+                {translate(
+                  'auto.components.settings.AccountsPane.addCustomEndpoint',
+                  'Add custom endpoint'
+                )}
+              </Button>
               {claudeAction === 'adding' ? (
                 <Button
                   variant="ghost"
@@ -1016,12 +1082,15 @@ export function AccountsPane({
               </div>
             ) : (
               visibleClaudeAccounts.map((account) => {
-                const isActive = providerAccountIsActiveInView(
-                  account,
-                  claudeAccounts,
-                  accountRuntime,
-                  accountVisibilityOptions
-                )
+                const isCustomEndpoint = account.authMethod === 'custom-endpoint'
+                const isActive =
+                  !isCustomEndpoint &&
+                  providerAccountIsActiveInView(
+                    account,
+                    claudeAccounts,
+                    accountRuntime,
+                    accountVisibilityOptions
+                  )
                 const isReauthing = claudeAction === `reauth:${account.id}`
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
 
@@ -1038,6 +1107,10 @@ export function AccountsPane({
                       <button
                         type="button"
                         onClick={() => {
+                          // Why: custom-endpoint accounts are per-worktree only; global selection would fail in main.
+                          if (isCustomEndpoint) {
+                            return
+                          }
                           const accountRuntimeView = getProviderAccountRuntime(account)
                           void runClaudeAccountAction(
                             `select:${account.id}`,
@@ -1049,17 +1122,29 @@ export function AccountsPane({
                             accountRuntimeView
                           )
                         }}
-                        disabled={isBusy}
+                        disabled={isBusy || isCustomEndpoint}
                         className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-sm font-medium">{account.email}</span>
-                          <Badge
-                            variant="outline"
-                            className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/70"
-                          >
-                            {getClaudeAccountRuntimeLabel(account, accountRuntime.label)}
-                          </Badge>
+                          {isCustomEndpoint ? (
+                            <Badge
+                              variant="outline"
+                              className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/70"
+                            >
+                              {translate(
+                                'auto.components.settings.AccountsPane.endpointBadge',
+                                'Endpoint'
+                              )}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/70"
+                            >
+                              {getClaudeAccountRuntimeLabel(account, accountRuntime.label)}
+                            </Badge>
+                          )}
                           {isActive ? (
                             <Badge
                               variant="outline"
@@ -1073,39 +1158,43 @@ export function AccountsPane({
                           ) : null}
                         </div>
                         <span className="truncate text-[11px] text-muted-foreground">
-                          {account.organizationName
-                            ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
-                            : formatAccountTimestamp(account.lastAuthenticatedAt)}
+                          {isCustomEndpoint
+                            ? getEndpointHostLabel(account.endpointBaseUrl)
+                            : account.organizationName
+                              ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
+                              : formatAccountTimestamp(account.lastAuthenticatedAt)}
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void runClaudeAccountAction(
-                              `reauth:${account.id}`,
-                              () =>
-                                window.api.claudeAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
-                              getProviderAccountRuntime(account)
-                            )
-                          }}
-                          disabled={isRemoteAccountScope || isBusy}
-                          className="h-6 px-2 text-muted-foreground hover:text-foreground"
-                        >
-                          {isReauthing ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : (
-                            <RefreshCw className="size-3" />
-                          )}
-                          {translate(
-                            'auto.components.settings.AccountsPane.8a0f870153',
-                            'Re-authenticate'
-                          )}
-                        </Button>
+                        {isCustomEndpoint ? null : (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void runClaudeAccountAction(
+                                `reauth:${account.id}`,
+                                () =>
+                                  window.api.claudeAccounts.reauthenticate({
+                                    accountId: account.id
+                                  }),
+                                getProviderAccountRuntime(account)
+                              )
+                            }}
+                            disabled={isRemoteAccountScope || isBusy}
+                            className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                          >
+                            {isReauthing ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="size-3" />
+                            )}
+                            {translate(
+                              'auto.components.settings.AccountsPane.8a0f870153',
+                              'Re-authenticate'
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="xs"
@@ -2043,6 +2132,122 @@ export function AccountsPane({
               }}
             >
               {translate('auto.components.settings.AccountsPane.c2d2751587', 'Remove Account')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={addEndpointOpen}
+        onOpenChange={(open) => {
+          if (!open && claudeAction !== 'adding-endpoint') {
+            setAddEndpointOpen(false)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {translate(
+                'auto.components.settings.AccountsPane.customEndpointTitle',
+                'Add Custom Endpoint Account'
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {translate(
+                'auto.components.settings.AccountsPane.customEndpointDescription',
+                'Connect an Anthropic-compatible endpoint (like z.ai GLM) as a managed Claude account. The token is stored only on this device and used when a worktree is assigned to this account.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="claude-endpoint-label">
+                {translate('auto.components.settings.AccountsPane.customEndpointLabel', 'Label')}
+              </Label>
+              <Input
+                id="claude-endpoint-label"
+                type="text"
+                value={endpointLabelDraft}
+                onChange={(e) => setEndpointLabelDraft(e.target.value)}
+                spellCheck={false}
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claude-endpoint-base-url">
+                {translate(
+                  'auto.components.settings.AccountsPane.customEndpointBaseUrl',
+                  'Base URL'
+                )}
+              </Label>
+              <Input
+                id="claude-endpoint-base-url"
+                type="text"
+                value={endpointBaseUrlDraft}
+                onChange={(e) => setEndpointBaseUrlDraft(e.target.value)}
+                placeholder={translate(
+                  'auto.components.settings.AccountsPane.customEndpointBaseUrlPlaceholder',
+                  'https://api.z.ai/api/anthropic'
+                )}
+                spellCheck={false}
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claude-endpoint-token">
+                {translate(
+                  'auto.components.settings.AccountsPane.customEndpointToken',
+                  'API token'
+                )}
+              </Label>
+              <Input
+                id="claude-endpoint-token"
+                type="password"
+                value={endpointTokenDraft}
+                onChange={(e) => setEndpointTokenDraft(e.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claude-endpoint-model">
+                {translate('auto.components.settings.AccountsPane.customEndpointModel', 'Model')}
+              </Label>
+              <Input
+                id="claude-endpoint-model"
+                type="text"
+                value={endpointModelDraft}
+                onChange={(e) => setEndpointModelDraft(e.target.value)}
+                placeholder={translate(
+                  'auto.components.settings.AccountsPane.customEndpointModelPlaceholder',
+                  'glm-5.1'
+                )}
+                spellCheck={false}
+                className="text-xs"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddEndpointOpen(false)}
+              disabled={claudeAction === 'adding-endpoint'}
+            >
+              {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
+            </Button>
+            <Button
+              onClick={() => void submitAddCustomEndpoint()}
+              disabled={!canSubmitCustomEndpoint || claudeAction !== 'idle'}
+              className="gap-1.5"
+            >
+              {claudeAction === 'adding-endpoint' ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : null}
+              {translate(
+                'auto.components.settings.AccountsPane.customEndpointSubmit',
+                'Add Endpoint'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

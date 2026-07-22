@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -2056,5 +2057,280 @@ describe('ClaudeAccountService credential capture', () => {
 
     expect(settings.claudeManagedAccounts).toHaveLength(1)
     expect(settings.activeClaudeManagedAccountId).toBe('host-account')
+  })
+})
+
+describe('ClaudeAccountService custom endpoint accounts', () => {
+  let tempDir: string | null = null
+
+  beforeEach(() => {
+    setPlatform('linux')
+    tempDir = '/tmp/orca-claude-service-test'
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  afterEach(() => {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  type CustomEndpointTestSettings = {
+    claudeManagedAccounts: ClaudeManagedAccount[]
+    activeClaudeManagedAccountId: string | null
+    activeClaudeManagedAccountIdsByRuntime?: {
+      host: string | null
+      wsl: Record<string, string | null>
+    }
+  }
+
+  function createCustomEndpointHarness(initialSettings?: Partial<CustomEndpointTestSettings>): {
+    settings: () => CustomEndpointTestSettings
+    store: Record<string, unknown>
+    runtimeAuth: { syncForCurrentSelection: ReturnType<typeof vi.fn> }
+    rateLimits: {
+      evictInactiveClaudeCache: ReturnType<typeof vi.fn>
+      refreshForClaudeAccountChange: ReturnType<typeof vi.fn>
+    }
+    worktreeMeta: Record<string, { claudeAccountId: string | null }>
+  } {
+    let settings: CustomEndpointTestSettings = {
+      claudeManagedAccounts: [],
+      activeClaudeManagedAccountId: null,
+      ...initialSettings
+    }
+    const worktreeMeta: Record<string, { claudeAccountId: string | null }> = {}
+    const store = {
+      getSettings: vi.fn(() => settings),
+      getAllWorktreeMeta: vi.fn(() => worktreeMeta),
+      updateSettings: vi.fn((updates: Partial<CustomEndpointTestSettings>) => {
+        settings = { ...settings, ...updates }
+        return settings
+      }),
+      commitClaudeAccountState: vi.fn(
+        (
+          updates: Partial<CustomEndpointTestSettings>,
+          assignments: Readonly<Record<string, string | null>>
+        ) => {
+          settings = { ...settings, ...updates }
+          for (const [worktreeId, claudeAccountId] of Object.entries(assignments)) {
+            worktreeMeta[worktreeId] = { claudeAccountId }
+          }
+        }
+      )
+    }
+    const runtimeAuth = {
+      clearLastWrittenCredentialsJson: vi.fn(),
+      syncForCurrentSelection: vi.fn(async () => {}),
+      forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {})
+    }
+    const rateLimits = {
+      evictInactiveClaudeCache: vi.fn(),
+      refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
+    }
+    return { settings: () => settings, store, runtimeAuth, rateLimits, worktreeMeta }
+  }
+
+  async function createService(harness: ReturnType<typeof createCustomEndpointHarness>) {
+    const { ClaudeAccountService } = await import('./service')
+    return new ClaudeAccountService(
+      harness.store as never,
+      harness.rateLimits as never,
+      harness.runtimeAuth as never
+    )
+  }
+
+  it('adds a custom endpoint account with a 0600 settings.json and no persisted token', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    const state = await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'super-secret-token',
+      model: null
+    })
+
+    const settings = harness.settings()
+    expect(settings.claudeManagedAccounts).toHaveLength(1)
+    const account = settings.claudeManagedAccounts[0]
+    expect(account).toMatchObject({
+      email: 'z.ai · GLM',
+      managedAuthRuntime: 'host',
+      authMethod: 'custom-endpoint',
+      endpointLabel: 'z.ai · GLM',
+      endpointBaseUrl: 'https://api.z.ai/api/anthropic',
+      endpointModel: 'glm-5.1',
+      organizationUuid: null,
+      organizationName: null
+    })
+    // Global selection stays untouched: endpoint accounts are per-worktree only.
+    expect(settings.activeClaudeManagedAccountId).toBeNull()
+
+    const settingsJsonPath = join(account.managedAuthPath, 'settings.json')
+    expect(existsSync(settingsJsonPath)).toBe(true)
+    expect(JSON.parse(readFileSync(settingsJsonPath, 'utf-8'))).toEqual({
+      env: {
+        ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+        ANTHROPIC_AUTH_TOKEN: 'super-secret-token',
+        ANTHROPIC_MODEL: 'glm-5.1',
+        API_TIMEOUT_MS: '3000000'
+      }
+    })
+    expect(statSync(settingsJsonPath).mode & 0o777).toBe(0o600)
+    // The token must never leave the managed dir: not in settings, not in the IPC snapshot.
+    expect(JSON.stringify(settings)).not.toContain('super-secret-token')
+    expect(JSON.stringify(state)).not.toContain('super-secret-token')
+    expect(state.accounts[0]).toMatchObject({
+      email: 'z.ai · GLM',
+      authMethod: 'custom-endpoint',
+      endpointBaseUrl: 'https://api.z.ai/api/anthropic',
+      endpointModel: 'glm-5.1'
+    })
+  })
+
+  it('keeps an explicit model and trims input fields', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    await service.addCustomEndpointAccount({
+      label: '  GLM Lab  ',
+      baseUrl: ' https://api.z.ai/api/anthropic ',
+      token: ' tok ',
+      model: ' glm-4.7 '
+    })
+
+    const account = harness.settings().claudeManagedAccounts[0]
+    expect(account.email).toBe('GLM Lab')
+    expect(account.endpointModel).toBe('glm-4.7')
+    const parsed = JSON.parse(
+      readFileSync(join(account.managedAuthPath, 'settings.json'), 'utf-8')
+    ) as { env: Record<string, string> }
+    expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toBe('tok')
+    expect(parsed.env.ANTHROPIC_MODEL).toBe('glm-4.7')
+  })
+
+  it('rejects duplicate labels among custom endpoint accounts case-insensitively', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok-1'
+    })
+
+    await expect(
+      service.addCustomEndpointAccount({
+        label: 'Z.AI · glm',
+        baseUrl: 'https://api.z.ai/api/anthropic',
+        token: 'tok-2'
+      })
+    ).rejects.toThrow('A custom endpoint account with this label already exists.')
+
+    expect(harness.settings().claudeManagedAccounts).toHaveLength(1)
+    // Validation precedes dir creation, so no orphaned auth dir is left behind.
+    expect(readdirSync(join(tempDir!, 'claude-accounts'))).toHaveLength(1)
+  })
+
+  it('rejects invalid or non-http(s) base URLs and empty label/token', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    await expect(
+      service.addCustomEndpointAccount({ label: 'x', baseUrl: 'not-a-url', token: 't' })
+    ).rejects.toThrow('The endpoint base URL must be a valid http(s) URL.')
+    await expect(
+      service.addCustomEndpointAccount({ label: 'x', baseUrl: 'ftp://api.z.ai', token: 't' })
+    ).rejects.toThrow('The endpoint base URL must be a valid http(s) URL.')
+    await expect(
+      service.addCustomEndpointAccount({ label: '  ', baseUrl: 'https://api.z.ai', token: 't' })
+    ).rejects.toThrow('Enter a label for the custom endpoint account.')
+    await expect(
+      service.addCustomEndpointAccount({ label: 'x', baseUrl: 'https://api.z.ai', token: '  ' })
+    ).rejects.toThrow('Enter the endpoint API token.')
+
+    expect(harness.settings().claudeManagedAccounts).toHaveLength(0)
+  })
+
+  it('does not treat a custom endpoint label as an OAuth duplicate identity', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    await service.addCustomEndpointAccount({
+      label: 'person@example.com',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    })
+    ;(
+      service as unknown as {
+        runClaudeLoginAndCapture(): Promise<{
+          credentialsJson: string
+          oauthAccount: unknown
+          identity: { email: string; organizationUuid: null; organizationName: null }
+        }>
+      }
+    ).runClaudeLoginAndCapture = vi.fn(async () => ({
+      credentialsJson: '{"new":true}\n',
+      oauthAccount: { newOauth: true },
+      identity: { email: 'person@example.com', organizationUuid: null, organizationName: null }
+    }))
+
+    await service.addAccount({ runtime: 'host' })
+
+    expect(harness.settings().claudeManagedAccounts).toHaveLength(2)
+  })
+
+  it('rejects OAuth re-authentication for custom endpoint accounts', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    })
+    const accountId = harness.settings().claudeManagedAccounts[0].id
+
+    await expect(service.reauthenticateAccount(accountId)).rejects.toThrow(
+      'Custom endpoint accounts have no OAuth re-authentication; edit or re-add the endpoint instead.'
+    )
+  })
+
+  it('rejects selecting a custom endpoint account globally', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    })
+    const accountId = harness.settings().claudeManagedAccounts[0].id
+
+    await expect(service.selectAccount(accountId)).rejects.toThrow(
+      'Custom endpoint accounts can only be assigned per worktree.'
+    )
+    await expect(service.selectAccountForTarget(accountId, { runtime: 'host' })).rejects.toThrow(
+      'Custom endpoint accounts can only be assigned per worktree.'
+    )
+    expect(harness.settings().activeClaudeManagedAccountId).toBeNull()
+  })
+
+  it('removes a custom endpoint account and its managed dir', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    })
+    const account = harness.settings().claudeManagedAccounts[0]
+    expect(existsSync(account.managedAuthPath)).toBe(true)
+
+    const state = await service.removeAccount(account.id)
+
+    expect(harness.settings().claudeManagedAccounts).toHaveLength(0)
+    expect(state.accounts).toHaveLength(0)
+    expect(existsSync(account.managedAuthPath)).toBe(false)
   })
 })

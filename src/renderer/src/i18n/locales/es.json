@@ -132,7 +132,8 @@
       "fe21e8f6f5": "Volver ({{value0}})",
       "064bd07810": "Volver",
       "ce37cf5279": "Alternar barra lateral ({{value0}})",
-      "e4b9e7dff7": "Alternar barra lateral"
+      "e4b9e7dff7": "Alternar barra lateral",
+      "byAb2WebBadge": "by Ab2Web"
     },
     "web": {
       "WebConnect": {
@@ -3123,7 +3124,8 @@
             "grokUsageAria": "Abrir detalles de uso de Grok",
             "grokUsageMenu": "Uso de Grok",
             "worktreeAccountLabel": "Cuenta del worktree",
-            "worktreeAccountUsageNote": "Se muestra el uso de la cuenta fijada al worktree enfocado."
+            "worktreeAccountUsageNote": "Se muestra el uso de la cuenta fijada al worktree enfocado.",
+            "worktreeEndpointAccountUsageNote": "Cuenta de endpoint personalizado — el seguimiento de uso no está disponible."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "Conectar una cuenta",
@@ -5020,7 +5022,18 @@
           "worktreeUsageDescription": "Muestra el uso de la cuenta de Claude fijada al worktree enfocado en lugar de la cuenta global activa.",
           "worktreeUsageRowDescription": "Cuando el worktree enfocado está fijado a una cuenta administrada de Claude, los medidores de uso de la barra de estado muestran esa cuenta, etiquetada con su correo. Desactiva esta opción para mostrar siempre la cuenta global.",
           "codexSystemDefaultCustomProvider": "Proveedor personalizado — no se registra el uso.",
-          "codexSystemDefaultNeedsSignIn": "No se encontró ningún inicio de sesión de Codex para {{value0}}."
+          "codexSystemDefaultNeedsSignIn": "No se encontró ningún inicio de sesión de Codex para {{value0}}.",
+          "addCustomEndpoint": "Agregar endpoint personalizado",
+          "customEndpointBaseUrl": "URL base",
+          "customEndpointBaseUrlPlaceholder": "https://api.z.ai/api/anthropic",
+          "customEndpointDescription": "Conecta un endpoint compatible con Anthropic (como z.ai GLM) como una cuenta administrada de Claude. El token se guarda solo en este dispositivo y se usa cuando un worktree se asigna a esta cuenta.",
+          "customEndpointLabel": "Etiqueta",
+          "customEndpointModel": "Modelo",
+          "customEndpointModelPlaceholder": "glm-5.1",
+          "customEndpointSubmit": "Agregar endpoint",
+          "customEndpointTitle": "Agregar cuenta de endpoint personalizado",
+          "customEndpointToken": "Token de API",
+          "endpointBadge": "Endpoint"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",
@@ -7181,7 +7194,10 @@
             "worktreeUsageDescription": "Muestra el uso de la cuenta de Claude fijada en la barra de estado cuando el worktree enfocado está vinculado a una cuenta administrada.",
             "worktreeKeyword": "worktree",
             "usageKeyword": "uso",
-            "pinKeyword": "fijar"
+            "pinKeyword": "fijar",
+            "claudeEndpointKeyword": "endpoint",
+            "claudeGlmKeyword": "glm",
+            "claudeZaiKeyword": "z.ai"
           }
         },
         "advanced": {
@@ -10376,7 +10392,8 @@
             "worktreeUnavailable": "El worktree ya no está disponible.",
             "openSupportedWorkspace": "Abre un workspace antes de reanudar una sesión.",
             "localSessionSshWorkspaceUnsupported": "El historial de esta sesión solo existe en este equipo. Para reanudarla, abre un workspace local. Los workspaces SSH no tienen acceso a ese historial.",
-            "sessionHostMismatchUnsupported": "Esta sesión pertenece a un host diferente. Abre un espacio de trabajo en el mismo host para reanudarla."
+            "sessionHostMismatchUnsupported": "Esta sesión pertenece a un host diferente. Abre un espacio de trabajo en el mismo host para reanudarla.",
+            "resumePrepareFailed": "No se pudo preparar esta sesión para reanudarla."
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Buscando sesiones",

@@ -936,6 +936,14 @@
   flex: 0 0 auto;
 }
 
+.titlebar-app-name-sub {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--muted-foreground);
+  transform: translateY(0.5px);
+}
+
 .titlebar-icon-button {
   -webkit-app-region: no-drag;
   background: none;

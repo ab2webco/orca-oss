@@ -965,6 +965,11 @@ export class ClaudeRuntimeAuthService {
     if (process.platform !== 'darwin') {
       return
     }
+    // Why: custom-endpoint accounts have no Anthropic credentials; the CLI reads
+    // the token from the managed dir's settings.json env instead.
+    if (account.authMethod === 'custom-endpoint') {
+      return
+    }
     // WSL accounts are isolated by their own Linux CLAUDE_CONFIG_DIR and need
     // no Keychain seed (see WSL comment on doSyncForCurrentSelection above).
     if (account.managedAuthRuntime === 'wsl') {

@@ -81,6 +81,17 @@ export type ClaudeAccountAddTarget = {
   wslDistro?: string | null
 }
 
+export type ClaudeCustomEndpointAccountInput = {
+  label: string
+  baseUrl: string
+  token: string
+  model?: string | null
+}
+
+const DEFAULT_CUSTOM_ENDPOINT_MODEL = 'glm-5.1'
+// Why: the claude CLI stalls for minutes on slow GLM responses with the default timeout.
+const CUSTOM_ENDPOINT_API_TIMEOUT_MS = '3000000'
+
 type ManagedClaudeAuthLocation = {
   managedAuthPath: string
   managedAuthRuntime: 'host' | 'wsl'
@@ -110,6 +121,12 @@ export class ClaudeAccountService {
 
   async addAccount(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState> {
     return this.serializeMutation(() => this.doAddAccount(target))
+  }
+
+  async addCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(() => this.doAddCustomEndpointAccount(input))
   }
 
   async reauthenticateAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
@@ -177,12 +194,19 @@ export class ClaudeAccountService {
       // Why: duplicate rows confuse account selection and rate-limit tracking;
       // the per-row Re-authenticate action already refreshes credentials.
       if (
-        findDuplicateClaudeAccount(previousSettings.claudeManagedAccounts, {
-          email: captured.identity.email,
-          organizationUuid: captured.identity.organizationUuid,
-          managedAuthRuntime: managedAuth.managedAuthRuntime,
-          wslDistro: managedAuth.wslDistro
-        })
+        // Why: a custom-endpoint label is a free-form string, not an OAuth
+        // identity; it must never block adding the real account of that email.
+        findDuplicateClaudeAccount(
+          previousSettings.claudeManagedAccounts.filter(
+            (account) => account.authMethod !== 'custom-endpoint'
+          ),
+          {
+            email: captured.identity.email,
+            organizationUuid: captured.identity.organizationUuid,
+            managedAuthRuntime: managedAuth.managedAuthRuntime,
+            wslDistro: managedAuth.wslDistro
+          }
+        )
       ) {
         duplicateIdentityFound = true
         throw new Error('This Claude account is already added.')
@@ -226,9 +250,106 @@ export class ClaudeAccountService {
     }
   }
 
+  private async doAddCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const label = input.label.trim()
+    if (!label) {
+      throw new Error('Enter a label for the custom endpoint account.')
+    }
+    const baseUrl = input.baseUrl.trim()
+    if (!this.isHttpUrl(baseUrl)) {
+      throw new Error('The endpoint base URL must be a valid http(s) URL.')
+    }
+    const token = input.token.trim()
+    if (!token) {
+      throw new Error('Enter the endpoint API token.')
+    }
+    const model = this.normalizeField(input.model) ?? DEFAULT_CUSTOM_ENDPOINT_MODEL
+    const previousSettings = this.store.getSettings()
+    // Why: the label is the account's display identity; two identical labels
+    // would be indistinguishable in the switcher and the Assign Account menu.
+    if (
+      previousSettings.claudeManagedAccounts.some(
+        (account) =>
+          account.authMethod === 'custom-endpoint' &&
+          account.email.trim().toLowerCase() === label.toLowerCase()
+      )
+    ) {
+      throw new Error('A custom endpoint account with this label already exists.')
+    }
+
+    const accountId = randomUUID()
+    const managedAuth = this.createManagedAuthDir(accountId)
+    try {
+      // Why: the claude CLI reads this env at startup from CLAUDE_CONFIG_DIR;
+      // the token lives only here (mode 600), never in Orca settings.
+      writeClaudeManagedAuthFile(
+        managedAuth.managedAuthPath,
+        'settings.json',
+        `${JSON.stringify(
+          {
+            env: {
+              ANTHROPIC_BASE_URL: baseUrl,
+              ANTHROPIC_AUTH_TOKEN: token,
+              ANTHROPIC_MODEL: model,
+              API_TIMEOUT_MS: CUSTOM_ENDPOINT_API_TIMEOUT_MS
+            }
+          },
+          null,
+          2
+        )}\n`
+      )
+
+      const now = Date.now()
+      const account: ClaudeManagedAccount = {
+        id: accountId,
+        email: label,
+        managedAuthPath: managedAuth.managedAuthPath,
+        managedAuthRuntime: managedAuth.managedAuthRuntime,
+        wslDistro: managedAuth.wslDistro,
+        wslLinuxAuthPath: managedAuth.wslLinuxAuthPath,
+        authMethod: 'custom-endpoint',
+        organizationUuid: null,
+        organizationName: null,
+        endpointLabel: label,
+        endpointBaseUrl: baseUrl,
+        endpointModel: model,
+        createdAt: now,
+        updatedAt: now,
+        lastAuthenticatedAt: now
+      }
+      const selection = normalizeClaudeRuntimeSelection(previousSettings)
+      this.store.updateSettings({
+        claudeManagedAccounts: [...previousSettings.claudeManagedAccounts, account],
+        activeClaudeManagedAccountId: selection.host,
+        activeClaudeManagedAccountIdsByRuntime: selection
+      })
+      return this.getSnapshot()
+    } catch (error) {
+      this.restoreClaudeSettings(previousSettings)
+      await this.safeRemoveManagedAuth(accountId, managedAuth.managedAuthPath)
+      throw error
+    }
+  }
+
+  private isHttpUrl(candidate: string): boolean {
+    try {
+      const parsed = new URL(candidate)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
   private async doReauthenticateAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
     this.assertAccountAuthIsIdle(accountId)
     const account = this.requireAccount(accountId)
+    if (account.authMethod === 'custom-endpoint') {
+      throw new Error(
+        'Custom endpoint accounts have no OAuth re-authentication; edit or re-add the endpoint instead.'
+      )
+    }
     const managedAuthPath = this.assertManagedAuthPath(account.managedAuthPath, accountId)
     const previousSettings = this.store.getSettings()
     const previousManagedAuth = await this.readManagedAuthSnapshot(accountId, managedAuthPath)
@@ -443,6 +564,12 @@ export class ClaudeAccountService {
     if (accountId !== null) {
       this.assertAccountAuthIsIdle(accountId)
       const account = this.requireAccount(accountId)
+      // Why: the shared ~/.claude materialization is credential-based; endpoint
+      // accounts carry no Anthropic credentials and only work via per-worktree
+      // CLAUDE_CONFIG_DIR injection.
+      if (account.authMethod === 'custom-endpoint') {
+        throw new Error('Custom endpoint accounts can only be assigned per worktree.')
+      }
       const accountTarget = getClaudeSelectionTargetForAccount(account)
       const requestedTarget = normalizeClaudeAccountSelectionTarget(target ?? accountTarget)
       const normalizedAccountTarget = normalizeClaudeAccountSelectionTarget(accountTarget)
@@ -506,6 +633,9 @@ export class ClaudeAccountService {
       authMethod: account.authMethod ?? 'unknown',
       organizationUuid: account.organizationUuid ?? null,
       organizationName: account.organizationName ?? null,
+      endpointLabel: account.endpointLabel ?? null,
+      endpointBaseUrl: account.endpointBaseUrl ?? null,
+      endpointModel: account.endpointModel ?? null,
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
       lastAuthenticatedAt: account.lastAuthenticatedAt

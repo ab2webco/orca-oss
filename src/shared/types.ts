@@ -2413,6 +2413,8 @@ export type CodexManagedAccountRuntimeSelection = {
   wsl: Record<string, string | null>
 }
 
+export type ClaudeManagedAccountAuthMethod = 'subscription-oauth' | 'custom-endpoint' | 'unknown'
+
 export type ClaudeManagedAccount = {
   id: string
   email: string
@@ -2420,9 +2422,14 @@ export type ClaudeManagedAccount = {
   managedAuthRuntime?: 'host' | 'wsl'
   wslDistro?: string | null
   wslLinuxAuthPath?: string | null
-  authMethod: 'subscription-oauth' | 'unknown'
+  authMethod: ClaudeManagedAccountAuthMethod
   organizationUuid?: string | null
   organizationName?: string | null
+  /** Display metadata for custom-endpoint accounts. The endpoint token is NEVER
+   *  stored here — it lives only in the managed dir's settings.json (mode 600). */
+  endpointLabel?: string | null
+  endpointBaseUrl?: string | null
+  endpointModel?: string | null
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number
@@ -2433,9 +2440,12 @@ export type ClaudeManagedAccountSummary = {
   email: string
   managedAuthRuntime?: 'host' | 'wsl'
   wslDistro?: string | null
-  authMethod: 'subscription-oauth' | 'unknown'
+  authMethod: ClaudeManagedAccountAuthMethod
   organizationUuid?: string | null
   organizationName?: string | null
+  endpointLabel?: string | null
+  endpointBaseUrl?: string | null
+  endpointModel?: string | null
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number

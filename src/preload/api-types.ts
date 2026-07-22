@@ -2178,6 +2178,12 @@ export type PreloadApi = {
       runtime?: 'host' | 'wsl'
       wslDistro?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
+    addCustomEndpoint: (args: {
+      label: string
+      baseUrl: string
+      token: string
+      model?: string | null
+    }) => Promise<ClaudeRateLimitAccountsState>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     remove: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>

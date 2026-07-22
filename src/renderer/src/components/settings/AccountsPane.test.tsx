@@ -135,4 +135,27 @@ describe('AccountsPane', () => {
       markup.slice(markup.lastIndexOf('<button', addAccountIndex), addAccountIndex)
     ).not.toContain('disabled=""')
   })
+
+  it('offers the Claude custom endpoint action locally', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    const endpointIndex = markup.indexOf('Add custom endpoint')
+    expect(endpointIndex).toBeGreaterThan(0)
+    expect(markup.slice(markup.lastIndexOf('<button', endpointIndex), endpointIndex)).not.toContain(
+      'disabled=""'
+    )
+  })
+
+  it('disables the Claude custom endpoint action under a remote account scope', () => {
+    const markup = renderPane({
+      ...getDefaultSettings('/tmp'),
+      activeRuntimeEnvironmentId: 'env-1'
+    })
+
+    const endpointIndex = markup.indexOf('Add custom endpoint')
+    expect(endpointIndex).toBeGreaterThan(0)
+    expect(markup.slice(markup.lastIndexOf('<button', endpointIndex), endpointIndex)).toContain(
+      'disabled=""'
+    )
+  })
 })

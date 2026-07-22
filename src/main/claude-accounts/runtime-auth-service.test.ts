@@ -3971,6 +3971,56 @@ describe('ClaudeRuntimeAuthService', () => {
     })
   })
 
+  it('injects a pinned custom-endpoint account without seeding the scoped Keychain (macOS)', async () => {
+    // Custom-endpoint accounts have no Anthropic credentials: only a marker and
+    // a settings.json whose env carries the endpoint token for the CLI.
+    const managedAuthPath = join(
+      testState.userDataDir,
+      'claude-accounts',
+      'endpoint-account',
+      'auth'
+    )
+    mkdirSync(managedAuthPath, { recursive: true })
+    writeFileSync(join(managedAuthPath, '.orca-managed-claude-auth'), 'endpoint-account\n', 'utf-8')
+    writeFileSync(
+      join(managedAuthPath, 'settings.json'),
+      `${JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic' } })}\n`,
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('endpoint-account', managedAuthPath, {
+          email: 'z.ai · GLM',
+          authMethod: 'custom-endpoint',
+          endpointLabel: 'z.ai · GLM',
+          endpointBaseUrl: 'https://api.z.ai/api/anthropic',
+          endpointModel: 'glm-5.1'
+        })
+      ]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const { writeActiveClaudeKeychainCredentials, writeManagedClaudeKeychainCredentials } =
+      await import('./keychain')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    const preparation = await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'endpoint-account'
+    })
+
+    expect(preparation).toMatchObject({
+      configDir: managedAuthPath,
+      envPatch: { CLAUDE_CONFIG_DIR: managedAuthPath },
+      stripAuthEnv: true,
+      injectedAccountId: 'endpoint-account',
+      provenance: 'managed:endpoint-account:injected'
+    })
+    // The seed path is credential-based and must be skipped for endpoint accounts.
+    expect(writeActiveClaudeKeychainCredentials).not.toHaveBeenCalled()
+    expect(writeManagedClaudeKeychainCredentials).not.toHaveBeenCalled()
+  })
+
   it('keeps an explicit pin isolated when it matches the global account', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,

@@ -3,6 +3,8 @@ import type { InactiveAccountUsage, ProviderRateLimits } from '../../../../share
 export type ClaudeUsageAccountRef = {
   id: string
   email: string
+  /** Optional so plain {id, email} rosters keep working; undefined means OAuth-like. */
+  authMethod?: 'subscription-oauth' | 'custom-endpoint' | 'unknown'
 }
 
 export type ClaudeUsageAccountScopeInput = {
@@ -30,6 +32,12 @@ export type ClaudeUsageAccountScope =
       limits: ProviderRateLimits | null
       isFetching: boolean
     }
+  | {
+      /** Pinned custom-endpoint account: no Anthropic usage API, never fetches. */
+      kind: 'worktree-custom-endpoint'
+      accountId: string
+      email: string
+    }
 
 /**
  * Decides whose usage the Claude meters display: the globally active account,
@@ -47,6 +55,11 @@ export function resolveClaudeUsageAccountScope(
   if (!pinnedAccount) {
     // Why: a dangling pin (account removed) must not blank the global meters.
     return { kind: 'global', limits: input.activeAccountLimits }
+  }
+  if (pinnedAccount.authMethod === 'custom-endpoint') {
+    // Why: no usage API exists for the endpoint; a worktree scope with null
+    // limits would leave the meters on the pending pulse forever.
+    return { kind: 'worktree-custom-endpoint', accountId: pinnedId, email: pinnedAccount.email }
   }
   if (pinnedId === input.activeClaudeAccountId) {
     // Why: the pin matches the active account, so the live snapshot is the
@@ -79,5 +92,18 @@ export function createPendingClaudeLimits(isFetching: boolean): ProviderRateLimi
     updatedAt: 0,
     error: null,
     status: isFetching ? 'fetching' : 'idle'
+  }
+}
+
+/** Terminal placeholder for pinned custom-endpoint accounts: renders the
+ *  no-usage dash instead of the pending pulse. */
+export function createCustomEndpointClaudeLimits(): ProviderRateLimits {
+  return {
+    provider: 'claude',
+    session: null,
+    weekly: null,
+    updatedAt: 0,
+    error: null,
+    status: 'unavailable'
   }
 }

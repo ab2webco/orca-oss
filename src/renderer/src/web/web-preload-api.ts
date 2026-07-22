@@ -2921,7 +2921,10 @@ function createClaudeAccountsApi(): never {
   return {
     ...(createAccountsApi() as NonNullable<Partial<PreloadApi>['claudeAccounts']>),
     list: async () =>
-      (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude
+      (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude,
+    // Why: custom endpoints are managed on the account-owning desktop/server, not from the web client.
+    addCustomEndpoint: () =>
+      Promise.reject(new Error('Add custom endpoint accounts from the Orca desktop app.'))
   } as never
 }
 

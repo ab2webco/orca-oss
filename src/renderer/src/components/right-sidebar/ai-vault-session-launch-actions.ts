@@ -77,7 +77,12 @@ export function useAiVaultSessionLaunchActions({
         )
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : 'Could not prepare this session for resume.'
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.right.sidebar.AiVaultPanel.resumePrepareFailed',
+                'Could not prepare this session for resume.'
+              )
         )
       }
     },
@@ -147,7 +152,12 @@ export function useAiVaultSessionLaunchActions({
         })
         .catch((error: unknown) => {
           toast.error(
-            error instanceof Error ? error.message : 'Could not prepare this session for resume.'
+            error instanceof Error
+              ? error.message
+              : translate(
+                  'auto.components.right.sidebar.AiVaultPanel.resumePrepareFailed',
+                  'Could not prepare this session for resume.'
+                )
           )
         })
     },
