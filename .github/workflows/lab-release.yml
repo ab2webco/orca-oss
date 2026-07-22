@@ -108,6 +108,16 @@ jobs:
     needs: version
     runs-on: macos-latest
     timeout-minutes: 90
+    # Why: real releases sign + notarize with the ANTAKARANA Developer ID (repo
+    # secrets); dry runs resolve these to empty so they stay unsigned and fast.
+    # ORCA_MAC_RELEASE=1 flips hardenedRuntime + notarize on in the builder config.
+    env:
+      ORCA_MAC_RELEASE: ${{ !inputs.dry_run && '1' || '' }}
+      CSC_LINK: ${{ !inputs.dry_run && secrets.CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ !inputs.dry_run && secrets.CSC_KEY_PASSWORD || '' }}
+      APPLE_ID: ${{ !inputs.dry_run && secrets.APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ !inputs.dry_run && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ !inputs.dry_run && secrets.APPLE_TEAM_ID || '' }}
     steps:
       - name: Checkout build ref
         uses: actions/checkout@v6
