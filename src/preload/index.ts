@@ -1919,6 +1919,10 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:remove', args),
     resyncGlobalConfig: (): Promise<number> =>
       ipcRenderer.invoke('claudeAccounts:resyncGlobalConfig'),
+    syncGlobalConfigForAccount: (args: { accountId: string }): Promise<void> =>
+      ipcRenderer.invoke('claudeAccounts:syncGlobalConfigForAccount', args),
+    clearGlobalConfigForAccount: (args: { accountId: string }): Promise<void> =>
+      ipcRenderer.invoke('claudeAccounts:clearGlobalConfigForAccount', args),
     select: (args: {
       accountId: string | null
       runtime?: 'host' | 'wsl'

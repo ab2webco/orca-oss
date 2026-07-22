@@ -61,6 +61,16 @@ export function registerClaudeAccountHandlers(
     claudeAccounts.resyncGlobalConfigIntoManagedVaults()
   )
   ipcMain.handle(
+    'claudeAccounts:syncGlobalConfigForAccount',
+    (_event, args: { accountId: string }) =>
+      claudeAccounts.syncGlobalConfigForAccount(args.accountId)
+  )
+  ipcMain.handle(
+    'claudeAccounts:clearGlobalConfigForAccount',
+    (_event, args: { accountId: string }) =>
+      claudeAccounts.clearGlobalConfigForAccount(args.accountId)
+  )
+  ipcMain.handle(
     'claudeAccounts:select',
     (_event, args: { accountId: string | null } & ClaudeAccountSelectionTarget) => {
       if (!args.runtime) {

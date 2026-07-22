@@ -3,39 +3,60 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  clearMcpServersFromVaultConfig,
+  collectGlobalMcpServers,
   ensureVaultSkillsSymlink,
   mergeMcpServersIntoVaultConfig,
-  readGlobalMcpServers
+  removeVaultSkillsSymlink
 } from './global-config-inheritance'
 
 function makeHome(): string {
   return mkdtempSync(join(tmpdir(), 'orca-global-config-'))
 }
 
-describe('readGlobalMcpServers', () => {
-  it('returns the mcpServers map when present', () => {
+function writeGlobalConfig(home: string, mcpServers: Record<string, unknown>): void {
+  writeFileSync(join(home, '.claude.json'), JSON.stringify({ mcpServers, other: 1 }))
+}
+
+describe('collectGlobalMcpServers', () => {
+  it('returns the user-scope mcpServers from ~/.claude.json', () => {
     const home = makeHome()
+    writeGlobalConfig(home, { lune: { command: 'lune' }, plane: { command: 'plane' } })
+    expect(collectGlobalMcpServers(home)).toEqual({
+      lune: { command: 'lune' },
+      plane: { command: 'plane' }
+    })
+  })
+
+  it('also merges settings.json mcpServers and standalone ~/.claude/mcp/*.json (plugin MCPs)', () => {
+    const home = makeHome()
+    writeGlobalConfig(home, { lune: { command: 'lune' } })
+    mkdirSync(join(home, '.claude', 'mcp'), { recursive: true })
     writeFileSync(
-      join(home, '.claude.json'),
-      JSON.stringify({ mcpServers: { context7: { command: 'npx', args: ['ctx'] } }, other: 1 })
+      join(home, '.claude', 'settings.json'),
+      JSON.stringify({ mcpServers: { context7: { command: 'npx' } } })
     )
-    expect(readGlobalMcpServers(home)).toEqual({ context7: { command: 'npx', args: ['ctx'] } })
+    writeFileSync(
+      join(home, '.claude', 'mcp', 'engram.json'),
+      JSON.stringify({ command: '/opt/homebrew/bin/engram', args: ['mcp', '--tools=agent'] })
+    )
+    expect(collectGlobalMcpServers(home)).toEqual({
+      lune: { command: 'lune' },
+      context7: { command: 'npx' },
+      engram: { command: '/opt/homebrew/bin/engram', args: ['mcp', '--tools=agent'] }
+    })
   })
 
-  it('returns null when the file is missing', () => {
-    expect(readGlobalMcpServers(makeHome())).toBeNull()
-  })
-
-  it('returns null when mcpServers is absent or empty', () => {
+  it('ignores ~/.claude/mcp files without a command', () => {
     const home = makeHome()
-    writeFileSync(join(home, '.claude.json'), JSON.stringify({ mcpServers: {} }))
-    expect(readGlobalMcpServers(home)).toBeNull()
+    mkdirSync(join(home, '.claude', 'mcp'), { recursive: true })
+    writeFileSync(join(home, '.claude', 'mcp', 'broken.json'), JSON.stringify({ args: [] }))
+    writeFileSync(join(home, '.claude', 'mcp', 'notjson.json'), '{ nope')
+    expect(collectGlobalMcpServers(home)).toBeNull()
   })
 
-  it('returns null on malformed JSON', () => {
-    const home = makeHome()
-    writeFileSync(join(home, '.claude.json'), '{ not json')
-    expect(readGlobalMcpServers(home)).toBeNull()
+  it('returns null when there are no servers anywhere', () => {
+    expect(collectGlobalMcpServers(makeHome())).toBeNull()
   })
 })
 
@@ -74,6 +95,43 @@ describe('mergeMcpServersIntoVaultConfig', () => {
 
   it('returns null when the vault config is unparseable (never clobbers)', () => {
     expect(mergeMcpServersIntoVaultConfig('{ broken', global)).toBeNull()
+  })
+})
+
+describe('clearMcpServersFromVaultConfig', () => {
+  it('removes mcpServers but keeps other CLI-managed keys', () => {
+    const existing = JSON.stringify({
+      mcpServers: { engram: { command: 'x' } },
+      oauthAccount: { id: 'y' }
+    })
+    const parsed = JSON.parse(clearMcpServersFromVaultConfig(existing) as string)
+    expect(parsed.mcpServers).toBeUndefined()
+    expect(parsed.oauthAccount).toEqual({ id: 'y' })
+  })
+
+  it('returns null when there is nothing to remove', () => {
+    expect(clearMcpServersFromVaultConfig(null)).toBeNull()
+    expect(clearMcpServersFromVaultConfig(JSON.stringify({ oauthAccount: {} }))).toBeNull()
+    expect(clearMcpServersFromVaultConfig('{ broken')).toBeNull()
+  })
+})
+
+describe('removeVaultSkillsSymlink', () => {
+  it('unlinks our skills symlink', () => {
+    const home = makeHome()
+    mkdirSync(join(home, '.claude', 'skills'), { recursive: true })
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(vault, { recursive: true })
+    ensureVaultSkillsSymlink(vault, home)
+    expect(removeVaultSkillsSymlink(vault)).toBe(true)
+    expect(existsSync(join(vault, 'skills'))).toBe(false)
+  })
+
+  it('leaves a real directory alone and returns false', () => {
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(join(vault, 'skills'), { recursive: true })
+    expect(removeVaultSkillsSymlink(vault)).toBe(false)
+    expect(lstatSync(join(vault, 'skills')).isDirectory()).toBe(true)
   })
 })
 

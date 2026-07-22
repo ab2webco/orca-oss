@@ -5120,7 +5120,13 @@
           "resyncGlobalConfigDone": "Synced global MCP servers and skills into {{value0}} account(s).",
           "resyncGlobalConfigFailed": "Failed to sync global config into accounts.",
           "resyncGlobalConfigHint": "Copy your global MCP servers and skills into existing accounts",
-          "resyncGlobalConfig": "Sync global config"
+          "resyncGlobalConfig": "Sync global config",
+          "syncAccountConfigDone": "Synced global MCP servers and skills into this account.",
+          "clearAccountConfigDone": "Cleared inherited config from this account. Add its own from scratch.",
+          "clearAccountConfigFailed": "Failed to clear config from this account.",
+          "accountConfigMenu": "Account config options",
+          "syncAccountConfig": "Sync global config",
+          "clearAccountConfig": "Clear config (start fresh)"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",

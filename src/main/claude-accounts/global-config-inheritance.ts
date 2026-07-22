@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, existsSync, symlinkSync } from 'node:fs'
+import { lstatSync, readFileSync, existsSync, readdirSync, symlinkSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Managed accounts run the Claude CLI against an isolated CLAUDE_CONFIG_DIR vault,
@@ -17,21 +17,62 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Reads the user's global `mcpServers` map from ~/.claude.json; null when absent/unreadable/empty. */
-export function readGlobalMcpServers(homeDir: string): Record<string, unknown> | null {
-  const globalConfigPath = join(homeDir, '.claude.json')
+/** Reads the `mcpServers` map from a Claude JSON file (.claude.json / settings.json); {} when absent/unreadable. */
+function readMcpServersFromFile(filePath: string): Record<string, unknown> {
   try {
-    if (!existsSync(globalConfigPath)) {
-      return null
+    if (!existsSync(filePath)) {
+      return {}
     }
-    const parsed: unknown = JSON.parse(readFileSync(globalConfigPath, 'utf-8'))
-    if (!isPlainObject(parsed) || !isPlainObject(parsed.mcpServers)) {
-      return null
-    }
-    return Object.keys(parsed.mcpServers).length > 0 ? parsed.mcpServers : null
+    const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf-8'))
+    return isPlainObject(parsed) && isPlainObject(parsed.mcpServers) ? parsed.mcpServers : {}
   } catch {
-    return null
+    return {}
   }
+}
+
+/**
+ * Reads standalone `<home>/.claude/mcp/<name>.json` server definitions. This is
+ * where plugin-provided MCP servers (e.g. Engram) land as plain `{command,args}`
+ * configs, so registering them as ordinary mcpServers avoids replicating the
+ * whole plugin machinery into the isolated vault.
+ */
+function readMcpDirServers(homeDir: string): Record<string, unknown> {
+  const dir = join(homeDir, '.claude', 'mcp')
+  const servers: Record<string, unknown> = {}
+  try {
+    for (const entry of readdirSync(dir)) {
+      if (!entry.endsWith('.json')) {
+        continue
+      }
+      try {
+        const parsed: unknown = JSON.parse(readFileSync(join(dir, entry), 'utf-8'))
+        if (isPlainObject(parsed) && typeof parsed.command === 'string') {
+          servers[entry.slice(0, -'.json'.length)] = parsed
+        }
+      } catch {
+        // Skip an unreadable/malformed server file without failing the rest.
+      }
+    }
+  } catch {
+    // No ~/.claude/mcp directory — nothing to contribute.
+  }
+  return servers
+}
+
+/**
+ * Collects the user's global MCP servers from every place Claude Code stores them:
+ * user-scope `~/.claude.json`, `~/.claude/settings.json`, and the standalone
+ * `~/.claude/mcp/*.json` files where plugin-provided servers (Engram, context7)
+ * live. Reads the running machine's own home so each dev inherits their own
+ * tooling. Returns a merged name→config map, or null when there are none.
+ */
+export function collectGlobalMcpServers(homeDir: string): Record<string, unknown> | null {
+  const merged: Record<string, unknown> = {
+    ...readMcpServersFromFile(join(homeDir, '.claude.json')),
+    ...readMcpServersFromFile(join(homeDir, '.claude', 'settings.json')),
+    ...readMcpDirServers(homeDir)
+  }
+  return Object.keys(merged).length > 0 ? merged : null
 }
 
 /**
@@ -79,6 +120,45 @@ export function mergeMcpServersIntoVaultConfig(
  * existing entry the CLI may have created. Uses a junction on Windows so no
  * elevated privilege is required for the directory link.
  */
+/**
+ * Removes the `mcpServers` key from a vault's .claude.json so the account starts
+ * clean (the user can then add their own from scratch). Preserves every other
+ * CLI-managed key (oauthAccount, projects, history). Returns the serialized JSON
+ * to write, or null when there was nothing to remove.
+ */
+export function clearMcpServersFromVaultConfig(existingVaultJson: string | null): string | null {
+  if (!existingVaultJson) {
+    return null
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(existingVaultJson)
+  } catch {
+    // Unparseable vault config — never clobber unknown content.
+    return null
+  }
+  if (!isPlainObject(parsed) || !('mcpServers' in parsed)) {
+    return null
+  }
+  const next: VaultInheritableConfig = { ...parsed }
+  delete next.mcpServers
+  return `${JSON.stringify(next, null, 2)}\n`
+}
+
+/** Removes `<vault>/skills` only when it is our symlink; leaves a real directory alone. Returns true if unlinked. */
+export function removeVaultSkillsSymlink(vaultAuthPath: string): boolean {
+  const linkPath = join(vaultAuthPath, 'skills')
+  try {
+    if (!lstatSync(linkPath).isSymbolicLink()) {
+      return false
+    }
+    unlinkSync(linkPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function ensureVaultSkillsSymlink(
   vaultAuthPath: string,
   homeDir: string

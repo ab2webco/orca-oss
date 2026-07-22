@@ -2196,6 +2196,8 @@ export type PreloadApi = {
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     remove: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     resyncGlobalConfig: () => Promise<number>
+    syncGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
+    clearGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
     select: (args: {
       accountId: string | null
       runtime?: 'host' | 'wsl'

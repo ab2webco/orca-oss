@@ -24,18 +24,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import {
   AlertTriangle,
   ChevronDown,
+  Eraser,
   ExternalLink,
   Globe,
   HelpCircle,
   Loader2,
   Lock,
   LockOpen,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   ShieldCheck,
   Trash2,
   X
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '../ui/dropdown-menu'
 import { useAppStore } from '../../store'
 import {
   ClaudeIcon,
@@ -822,6 +830,52 @@ export function AccountsPane({
     }
   }
 
+  const runSyncGlobalConfigForAccount = async (accountId: string): Promise<void> => {
+    setClaudeAction('resyncing')
+    try {
+      await window.api.claudeAccounts.syncGlobalConfigForAccount({ accountId })
+      toast.success(
+        translate(
+          'auto.components.settings.AccountsPane.syncAccountConfigDone',
+          'Synced global MCP servers and skills into this account.'
+        )
+      )
+    } catch (error) {
+      toast.error(
+        translate(
+          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
+          'Failed to sync global config into accounts.'
+        ),
+        { description: getClaudeAccountErrorDescription(error) }
+      )
+    } finally {
+      setClaudeAction('idle')
+    }
+  }
+
+  const runClearGlobalConfigForAccount = async (accountId: string): Promise<void> => {
+    setClaudeAction('resyncing')
+    try {
+      await window.api.claudeAccounts.clearGlobalConfigForAccount({ accountId })
+      toast.success(
+        translate(
+          'auto.components.settings.AccountsPane.clearAccountConfigDone',
+          'Cleared inherited config from this account. Add its own from scratch.'
+        )
+      )
+    } catch (error) {
+      toast.error(
+        translate(
+          'auto.components.settings.AccountsPane.clearAccountConfigFailed',
+          'Failed to clear config from this account.'
+        ),
+        { description: getClaudeAccountErrorDescription(error) }
+      )
+    } finally {
+      setClaudeAction('idle')
+    }
+  }
+
   const canSubmitCustomEndpoint =
     endpointLabelDraft.trim() !== '' &&
     endpointBaseUrlDraft.trim() !== '' &&
@@ -1360,6 +1414,45 @@ export function AccountsPane({
                           <Trash2 className="size-3" />
                           {translate('auto.components.settings.AccountsPane.db209ee572', 'Remove')}
                         </Button>
+                        {isCustomEndpoint ? null : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={isBusy}
+                                onClick={(event) => event.stopPropagation()}
+                                className="h-6 px-1.5 text-muted-foreground hover:text-foreground"
+                                aria-label={translate(
+                                  'auto.components.settings.AccountsPane.accountConfigMenu',
+                                  'Account config options'
+                                )}
+                              >
+                                <MoreHorizontal className="size-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onSelect={() => void runSyncGlobalConfigForAccount(account.id)}
+                              >
+                                <RefreshCw className="size-3" />
+                                {translate(
+                                  'auto.components.settings.AccountsPane.syncAccountConfig',
+                                  'Sync global config'
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => void runClearGlobalConfigForAccount(account.id)}
+                              >
+                                <Eraser className="size-3" />
+                                {translate(
+                                  'auto.components.settings.AccountsPane.clearAccountConfig',
+                                  'Clear config (start fresh)'
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   </div>

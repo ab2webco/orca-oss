@@ -22,9 +22,11 @@ import {
   writeClaudeManagedAuthFile
 } from './managed-auth-path'
 import {
+  clearMcpServersFromVaultConfig,
+  collectGlobalMcpServers,
   ensureVaultSkillsSymlink,
   mergeMcpServersIntoVaultConfig,
-  readGlobalMcpServers
+  removeVaultSkillsSymlink
 } from './global-config-inheritance'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -1291,7 +1293,7 @@ export class ClaudeAccountService {
         return
       }
       const home = homedir()
-      const globalMcpServers = readGlobalMcpServers(home)
+      const globalMcpServers = collectGlobalMcpServers(home)
       if (globalMcpServers) {
         const existing = readClaudeManagedAuthFile(owned, '.claude.json')
         const merged = mergeMcpServersIntoVaultConfig(existing, globalMcpServers)
@@ -1322,6 +1324,42 @@ export class ClaudeAccountService {
       processed += 1
     }
     return processed
+  }
+
+  /** Re-seeds global MCP servers + skills into a single account's vault. */
+  syncGlobalConfigForAccount(accountId: string): void {
+    const account = this.requireAccount(accountId)
+    this.seedGlobalConfigIntoVault(
+      accountId,
+      account.managedAuthPath,
+      account.managedAuthRuntime ?? 'host'
+    )
+  }
+
+  /**
+   * Clears the inherited global config (MCP servers + skills link) from one
+   * account's vault so the user can configure that account from scratch.
+   * Best-effort and ownership-checked; never touches CLI-managed identity keys.
+   */
+  clearGlobalConfigForAccount(accountId: string): void {
+    const account = this.requireAccount(accountId)
+    if ((account.managedAuthRuntime ?? 'host') !== 'host') {
+      return
+    }
+    try {
+      const owned = resolveOwnedClaudeManagedAuthPath(accountId, account.managedAuthPath)
+      if (!owned) {
+        return
+      }
+      const existing = readClaudeManagedAuthFile(owned, '.claude.json')
+      const cleared = clearMcpServersFromVaultConfig(existing)
+      if (cleared !== null) {
+        writeClaudeManagedAuthFile(owned, '.claude.json', cleared)
+      }
+      removeVaultSkillsSymlink(owned)
+    } catch (error) {
+      console.warn('[claude-accounts] Failed to clear global config from vault:', error)
+    }
   }
 
   private async runClaudeCommand(
