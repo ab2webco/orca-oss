@@ -8,6 +8,7 @@ import type { ClaudeManagedAccount } from '../../shared/types'
 import type { Store } from '../persistence'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import type { ClaudeEnvPatch } from './environment'
+import { claudeHookService } from '../claude/hook-service'
 import {
   readClaudeManagedAuthFile,
   resolveOwnedClaudeManagedAuthPath,
@@ -197,6 +198,7 @@ export class ClaudeRuntimeAuthService {
         // Why: reserve before async ownership/Keychain work so a concurrent
         // global switch cannot fork this account before the PTY becomes live.
         await this.seedInjectedHostAccountKeychain(injectedAccount)
+        this.ensureInjectedHostInstrumentation(injectedAccount)
         return this.getInjectedPreparation(injectedAccount, reservationId)
       }
       releaseInjectedClaudeAccountLaunch(reservationId)
@@ -1035,6 +1037,36 @@ export class ClaudeRuntimeAuthService {
     } catch (error) {
       console.warn(
         '[claude-runtime-auth] Failed to seed scoped Keychain credentials for injected account:',
+        error
+      )
+    }
+  }
+
+  // Why: a pinned worktree launches Claude with CLAUDE_CONFIG_DIR set to this account's
+  // isolated vault, so the shared ~/.claude hook + statusLine never run — Orca then never
+  // learns the session id (account switch / failover / fail-back all break) and usage never
+  // posts (Usage panel stalls). Merge the same managed instrumentation into the vault's
+  // settings.json, preserving every existing key (theme, skipDangerousModePermissionPrompt,
+  // and a custom-endpoint vault's env token). Host-only: WSL vaults use the hook relay.
+  private ensureInjectedHostInstrumentation(account: ClaudeManagedAccount): void {
+    if (account.managedAuthRuntime === 'wsl') {
+      return
+    }
+    try {
+      const currentSettingsJson = readClaudeManagedAuthFile(
+        account.managedAuthPath,
+        'settings.json'
+      )
+      const mergedSettingsJson =
+        claudeHookService.ensureInjectedVaultInstrumentation(currentSettingsJson)
+      if (mergedSettingsJson !== null) {
+        writeClaudeManagedAuthFile(account.managedAuthPath, 'settings.json', mergedSettingsJson)
+      }
+    } catch (error) {
+      // Best-effort: a vault write failure only leaves that one pinned session without live
+      // status/usage; it must never block the launch.
+      console.warn(
+        '[claude-runtime-auth] Failed to ensure injected vault hook instrumentation:',
         error
       )
     }

@@ -519,3 +519,96 @@ describe('OpenClaudeHookService-compatible install', () => {
     expect(fs.files.get('/home/dev/.orca/agent-hooks/openclaude-hook.sh')).toContain('/hook/claude')
   })
 })
+
+// Why: a worktree pinned to a managed account launches with CLAUDE_CONFIG_DIR set to an
+// isolated vault, so the shared ~/.claude instrumentation never applies. This entry point
+// derives the SAME hook + statusLine (from the shared installer) for the vault's settings.json.
+describe('ClaudeHookService.ensureInjectedVaultInstrumentation', () => {
+  it('merges managed hooks + statusLine while preserving existing vault keys', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-vault-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      const merged = new ClaudeHookService().ensureInjectedVaultInstrumentation(
+        JSON.stringify({
+          skipDangerousModePermissionPrompt: true,
+          theme: 'dark',
+          env: { ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic', ANTHROPIC_AUTH_TOKEN: 't' }
+        })
+      )
+      expect(merged).not.toBeNull()
+      const parsed = JSON.parse(merged!) as {
+        skipDangerousModePermissionPrompt?: boolean
+        theme?: string
+        env?: Record<string, string>
+        hooks?: Record<string, { hooks: { command: string }[] }[]>
+        statusLine?: { type: string; command: string }
+      }
+      // Existing keys — including a custom-endpoint env token — must survive untouched.
+      expect(parsed.skipDangerousModePermissionPrompt).toBe(true)
+      expect(parsed.theme).toBe('dark')
+      expect(parsed.env).toEqual({
+        ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+        ANTHROPIC_AUTH_TOKEN: 't'
+      })
+      expect(isClaudeManagedCommand(parsed.hooks!.Stop[0].hooks[0].command)).toBe(true)
+      expect(parsed.statusLine?.command).toContain('claude-statusline')
+      // The shared scripts the vault points at are written under ~/.orca.
+      expect(existsSync(join(tmpHome, '.orca', 'agent-hooks', CLAUDE_SCRIPT_FILE_NAME))).toBe(true)
+      expect(existsSync(join(tmpHome, '.orca', 'agent-hooks', STATUSLINE_SCRIPT_FILE_NAME))).toBe(
+        true
+      )
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('treats an absent (null) vault settings.json as an empty config to seed', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-vault-empty-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      const merged = new ClaudeHookService().ensureInjectedVaultInstrumentation(null)
+      expect(merged).not.toBeNull()
+      const parsed = JSON.parse(merged!) as {
+        hooks: Record<string, { hooks: { command: string }[] }[]>
+        statusLine: { command: string }
+      }
+      expect(isClaudeManagedCommand(parsed.hooks.Stop[0].hooks[0].command)).toBe(true)
+      expect(parsed.statusLine.command).toContain('claude-statusline')
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('returns null when the merge changes nothing (idempotent, no needless write)', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-vault-idem-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      const service = new ClaudeHookService()
+      const merged = service.ensureInjectedVaultInstrumentation('{}')
+      expect(merged).not.toBeNull()
+      expect(service.ensureInjectedVaultInstrumentation(merged)).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('never clobbers unparseable or non-object vault content', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-vault-bad-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      const service = new ClaudeHookService()
+      expect(service.ensureInjectedVaultInstrumentation('{ not json')).toBeNull()
+      expect(service.ensureInjectedVaultInstrumentation('"a string"')).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+})

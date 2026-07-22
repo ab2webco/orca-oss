@@ -4021,6 +4021,139 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(writeManagedClaudeKeychainCredentials).not.toHaveBeenCalled()
   })
 
+  it('merges the managed hook + statusline into a pinned host vault on launch prep', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    // Vault starts with only Orca-owned isolation keys — no hooks, no statusLine.
+    writeFileSync(
+      join(pinnedAuthPath, 'settings.json'),
+      `${JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: 'dark' })}\n`,
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    })
+
+    const vaultSettings = JSON.parse(
+      readFileSync(join(pinnedAuthPath, 'settings.json'), 'utf-8')
+    ) as {
+      skipDangerousModePermissionPrompt?: boolean
+      theme?: string
+      hooks?: Record<string, { hooks: { command: string }[] }[]>
+      statusLine?: { type: string; command: string }
+    }
+    // Existing isolation keys preserved.
+    expect(vaultSettings.skipDangerousModePermissionPrompt).toBe(true)
+    expect(vaultSettings.theme).toBe('dark')
+    // Managed hook present on every load-bearing event → Orca learns the session id.
+    for (const event of ['UserPromptSubmit', 'Stop', 'PreToolUse']) {
+      expect(vaultSettings.hooks?.[event]?.[0]?.hooks?.[0]?.command ?? '').toContain(
+        'agent-hooks/claude-hook'
+      )
+    }
+    // Managed statusline present → pinned usage posts.
+    expect(vaultSettings.statusLine?.type).toBe('command')
+    expect(vaultSettings.statusLine?.command).toContain('claude-statusline')
+  })
+
+  it('instruments a pinned custom-endpoint vault while preserving its env token', async () => {
+    const managedAuthPath = join(
+      testState.userDataDir,
+      'claude-accounts',
+      'endpoint-account',
+      'auth'
+    )
+    mkdirSync(managedAuthPath, { recursive: true })
+    writeFileSync(join(managedAuthPath, '.orca-managed-claude-auth'), 'endpoint-account\n', 'utf-8')
+    writeFileSync(
+      join(managedAuthPath, 'settings.json'),
+      `${JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+          ANTHROPIC_AUTH_TOKEN: 'secret-endpoint-token'
+        }
+      })}\n`,
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('endpoint-account', managedAuthPath, {
+          email: 'z.ai · GLM',
+          authMethod: 'custom-endpoint',
+          endpointLabel: 'z.ai · GLM',
+          endpointBaseUrl: 'https://api.z.ai/api/anthropic',
+          endpointModel: 'glm-5.1'
+        })
+      ]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'endpoint-account'
+    })
+
+    const vaultSettings = JSON.parse(
+      readFileSync(join(managedAuthPath, 'settings.json'), 'utf-8')
+    ) as {
+      env?: Record<string, string>
+      hooks?: Record<string, { hooks: { command: string }[] }[]>
+      statusLine?: { command: string }
+    }
+    // The endpoint token env must never be clobbered by the merge.
+    expect(vaultSettings.env).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+      ANTHROPIC_AUTH_TOKEN: 'secret-endpoint-token'
+    })
+    expect(vaultSettings.hooks?.Stop?.[0]?.hooks?.[0]?.command ?? '').toContain(
+      'agent-hooks/claude-hook'
+    )
+    expect(vaultSettings.statusLine?.command).toContain('claude-statusline')
+  })
+
+  it('does not rewrite a pinned vault whose instrumentation is already current', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    const target: ClaudeAccountSelectionTarget = {
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    }
+    await service.prepareForClaudeLaunch(target)
+    const vaultSettingsPath = join(pinnedAuthPath, 'settings.json')
+    const firstContent = readFileSync(vaultSettingsPath, 'utf-8')
+    const firstMtimeMs = statSync(vaultSettingsPath).mtimeMs
+
+    // A second prep (e.g. reattach) must be a no-op: identical content, no rewrite.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await service.prepareForClaudeLaunch(target)
+
+    expect(readFileSync(vaultSettingsPath, 'utf-8')).toBe(firstContent)
+    expect(statSync(vaultSettingsPath).mtimeMs).toBe(firstMtimeMs)
+  })
+
   it('keeps an explicit pin isolated when it matches the global account', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,
