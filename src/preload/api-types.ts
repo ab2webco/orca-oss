@@ -2185,6 +2185,10 @@ export type PreloadApi = {
       baseUrl: string
       token: string
       model?: string | null
+      opusModel?: string | null
+      sonnetModel?: string | null
+      haikuModel?: string | null
+      subagentModel?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>

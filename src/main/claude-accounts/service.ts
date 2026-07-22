@@ -86,6 +86,10 @@ export type ClaudeCustomEndpointAccountInput = {
   baseUrl: string
   token: string
   model?: string | null
+  opusModel?: string | null
+  sonnetModel?: string | null
+  haikuModel?: string | null
+  subagentModel?: string | null
 }
 
 const DEFAULT_CUSTOM_ENDPOINT_MODEL = 'glm-5.1'
@@ -265,7 +269,13 @@ export class ClaudeAccountService {
     if (!token) {
       throw new Error('Enter the endpoint API token.')
     }
-    const model = this.normalizeField(input.model) ?? DEFAULT_CUSTOM_ENDPOINT_MODEL
+    const model = this.normalizeModelName(input.model) ?? DEFAULT_CUSTOM_ENDPOINT_MODEL
+    // Why: Claude Code resolves /model opus|sonnet|haiku, background tasks (haiku),
+    // and subagents from these env vars, so mapping them enables in-session switching.
+    const opusModel = this.normalizeModelName(input.opusModel)
+    const sonnetModel = this.normalizeModelName(input.sonnetModel)
+    const haikuModel = this.normalizeModelName(input.haikuModel)
+    const subagentModel = this.normalizeModelName(input.subagentModel)
     const previousSettings = this.store.getSettings()
     // Why: the label is the account's display identity; two identical labels
     // would be indistinguishable in the switcher and the Assign Account menu.
@@ -293,6 +303,10 @@ export class ClaudeAccountService {
               ANTHROPIC_BASE_URL: baseUrl,
               ANTHROPIC_AUTH_TOKEN: token,
               ANTHROPIC_MODEL: model,
+              ...(opusModel !== null && { ANTHROPIC_DEFAULT_OPUS_MODEL: opusModel }),
+              ...(sonnetModel !== null && { ANTHROPIC_DEFAULT_SONNET_MODEL: sonnetModel }),
+              ...(haikuModel !== null && { ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuModel }),
+              ...(subagentModel !== null && { CLAUDE_CODE_SUBAGENT_MODEL: subagentModel }),
               API_TIMEOUT_MS: CUSTOM_ENDPOINT_API_TIMEOUT_MS
             }
           },
@@ -1375,5 +1389,20 @@ export class ClaudeAccountService {
     }
     const trimmed = value.trim()
     return trimmed === '' ? null : trimmed
+  }
+
+  // Why: model names land verbatim in the universe settings.json env; embedded
+  // whitespace or control characters silently break the CLI's model resolution.
+  private normalizeModelName(value: string | null | undefined): string | null {
+    const normalized = this.normalizeField(value)
+    if (normalized === null) {
+      return null
+    }
+    if (normalized.length > 256 || /[\s\p{Cc}]/u.test(normalized)) {
+      throw new Error(
+        'Model names must be 256 characters or fewer with no whitespace or control characters.'
+      )
+    }
+    return normalized
   }
 }

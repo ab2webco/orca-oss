@@ -2213,6 +2213,124 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     expect(parsed.env.ANTHROPIC_MODEL).toBe('glm-4.7')
   })
 
+  it('writes tier mapping env vars only for provided fields and keeps 0600', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok',
+      model: 'glm-5.1',
+      opusModel: ' glm-5.2 ',
+      sonnetModel: 'glm-5.1',
+      haikuModel: '   ',
+      subagentModel: undefined
+    })
+
+    const account = harness.settings().claudeManagedAccounts[0]
+    const settingsJsonPath = join(account.managedAuthPath, 'settings.json')
+    expect(JSON.parse(readFileSync(settingsJsonPath, 'utf-8'))).toEqual({
+      env: {
+        ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+        ANTHROPIC_AUTH_TOKEN: 'tok',
+        ANTHROPIC_MODEL: 'glm-5.1',
+        ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.2',
+        ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-5.1',
+        API_TIMEOUT_MS: '3000000'
+      }
+    })
+    expect(statSync(settingsJsonPath).mode & 0o777).toBe(0o600)
+  })
+
+  it('writes the full tier mapping including the subagent model', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok',
+      opusModel: 'glm-5.2',
+      sonnetModel: 'glm-5.1',
+      haikuModel: 'glm-4.5-air',
+      subagentModel: 'glm-5.1'
+    })
+
+    const account = harness.settings().claudeManagedAccounts[0]
+    const parsed = JSON.parse(
+      readFileSync(join(account.managedAuthPath, 'settings.json'), 'utf-8')
+    ) as { env: Record<string, string> }
+    expect(parsed.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('glm-5.2')
+    expect(parsed.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('glm-5.1')
+    expect(parsed.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('glm-4.5-air')
+    expect(parsed.env.CLAUDE_CODE_SUBAGENT_MODEL).toBe('glm-5.1')
+    // Tier mapping never leaks the token out of the managed dir.
+    expect(JSON.stringify(harness.settings())).not.toContain('tok')
+  })
+
+  it('omits every tier env var when no tier field is provided', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    })
+
+    const account = harness.settings().claudeManagedAccounts[0]
+    expect(
+      JSON.parse(readFileSync(join(account.managedAuthPath, 'settings.json'), 'utf-8'))
+    ).toEqual({
+      env: {
+        ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+        ANTHROPIC_AUTH_TOKEN: 'tok',
+        ANTHROPIC_MODEL: 'glm-5.1',
+        API_TIMEOUT_MS: '3000000'
+      }
+    })
+  })
+
+  it('rejects tier model values with control characters or over the length cap', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    const base = {
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok'
+    }
+
+    await expect(
+      service.addCustomEndpointAccount({ ...base, opusModel: 'glm\n5.2' })
+    ).rejects.toThrow(
+      'Model names must be 256 characters or fewer with no whitespace or control characters.'
+    )
+    await expect(
+      service.addCustomEndpointAccount({ ...base, sonnetModel: 'x'.repeat(257) })
+    ).rejects.toThrow(
+      'Model names must be 256 characters or fewer with no whitespace or control characters.'
+    )
+    await expect(
+      service.addCustomEndpointAccount({ ...base, haikuModel: 'glm 5' })
+    ).rejects.toThrow(
+      'Model names must be 256 characters or fewer with no whitespace or control characters.'
+    )
+    await expect(
+      service.addCustomEndpointAccount({ ...base, subagentModel: '\tglm\t5' })
+    ).rejects.toThrow(
+      'Model names must be 256 characters or fewer with no whitespace or control characters.'
+    )
+    await expect(service.addCustomEndpointAccount({ ...base, model: 'glm\r5' })).rejects.toThrow(
+      'Model names must be 256 characters or fewer with no whitespace or control characters.'
+    )
+
+    expect(harness.settings().claudeManagedAccounts).toHaveLength(0)
+    // Validation precedes dir creation, so no auth dir is ever materialized.
+    const accountsDir = join(tempDir!, 'claude-accounts')
+    expect(existsSync(accountsDir) ? readdirSync(accountsDir) : []).toHaveLength(0)
+  })
+
   it('rejects duplicate labels among custom endpoint accounts case-insensitively', async () => {
     const harness = createCustomEndpointHarness()
     const service = await createService(harness)

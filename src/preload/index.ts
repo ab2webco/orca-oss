@@ -1904,6 +1904,10 @@ const api = {
       baseUrl: string
       token: string
       model?: string | null
+      opusModel?: string | null
+      sonnetModel?: string | null
+      haikuModel?: string | null
+      subagentModel?: string | null
     }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:addCustomEndpoint', args),
     cancelPendingLogin: (): Promise<boolean> =>
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),

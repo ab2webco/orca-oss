@@ -14,6 +14,7 @@ import { resolveLocalAccountRuntimeTarget } from '../../../../shared/local-accou
 import { getRendererAppPlatform } from '../../lib/renderer-app-platform'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
@@ -21,6 +22,7 @@ import { Separator } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import {
   AlertTriangle,
+  ChevronDown,
   ExternalLink,
   Globe,
   HelpCircle,
@@ -405,6 +407,11 @@ export function AccountsPane({
   const [endpointBaseUrlDraft, setEndpointBaseUrlDraft] = useState('https://api.z.ai/api/anthropic')
   const [endpointTokenDraft, setEndpointTokenDraft] = useState('')
   const [endpointModelDraft, setEndpointModelDraft] = useState('glm-5.1')
+  const [endpointTierMappingOpen, setEndpointTierMappingOpen] = useState(false)
+  const [endpointOpusModelDraft, setEndpointOpusModelDraft] = useState('')
+  const [endpointSonnetModelDraft, setEndpointSonnetModelDraft] = useState('')
+  const [endpointHaikuModelDraft, setEndpointHaikuModelDraft] = useState('')
+  const [endpointSubagentModelDraft, setEndpointSubagentModelDraft] = useState('')
   // Why: capture the account's runtime slot when the dialog opens; the roster
   // can change underneath an open dialog and lose the slot to diff for restarts.
   const [removeCodexTarget, setRemoveCodexTarget] = useState<{
@@ -803,7 +810,11 @@ export function AccountsPane({
         label: endpointLabelDraft.trim(),
         baseUrl: endpointBaseUrlDraft.trim(),
         token: endpointTokenDraft.trim(),
-        model: endpointModelDraft.trim() || null
+        model: endpointModelDraft.trim() || null,
+        opusModel: endpointOpusModelDraft.trim() || null,
+        sonnetModel: endpointSonnetModelDraft.trim() || null,
+        haikuModel: endpointHaikuModelDraft.trim() || null,
+        subagentModel: endpointSubagentModelDraft.trim() || null
       })
       // Why: close only on success so a validation error keeps the draft editable.
       setAddEndpointOpen(false)
@@ -2277,6 +2288,122 @@ export function AccountsPane({
                 className="text-xs"
               />
             </div>
+            <Collapsible
+              open={endpointTierMappingOpen}
+              onOpenChange={setEndpointTierMappingOpen}
+              className="border-t border-border/50 pt-2"
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2 h-auto w-[calc(100%+0.5rem)] justify-between gap-3 px-2 py-1.5 text-left"
+                >
+                  <span className="min-w-0 space-y-0.5">
+                    <span className="block text-xs font-medium text-foreground">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointTierMappingTitle',
+                        'Advanced: model tier mapping'
+                      )}
+                    </span>
+                    <span className="block whitespace-normal text-[11px] font-normal text-muted-foreground">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointTierMappingDescription',
+                        'Mapped tiers can be switched in-session with /model opus|sonnet|haiku; Haiku also runs background tasks.'
+                      )}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`size-4 shrink-0 transition-transform ${endpointTierMappingOpen ? 'rotate-180' : ''}`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="collapsible-height-content">
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="claude-endpoint-opus-model">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointOpusModel',
+                        'Opus →'
+                      )}
+                    </Label>
+                    <Input
+                      id="claude-endpoint-opus-model"
+                      type="text"
+                      value={endpointOpusModelDraft}
+                      onChange={(e) => setEndpointOpusModelDraft(e.target.value)}
+                      placeholder={translate(
+                        'auto.components.settings.AccountsPane.customEndpointOpusModelPlaceholder',
+                        'glm-5.2'
+                      )}
+                      spellCheck={false}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="claude-endpoint-sonnet-model">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointSonnetModel',
+                        'Sonnet →'
+                      )}
+                    </Label>
+                    <Input
+                      id="claude-endpoint-sonnet-model"
+                      type="text"
+                      value={endpointSonnetModelDraft}
+                      onChange={(e) => setEndpointSonnetModelDraft(e.target.value)}
+                      placeholder={translate(
+                        'auto.components.settings.AccountsPane.customEndpointSonnetModelPlaceholder',
+                        'glm-5.1'
+                      )}
+                      spellCheck={false}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="claude-endpoint-haiku-model">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointHaikuModel',
+                        'Haiku →'
+                      )}
+                    </Label>
+                    <Input
+                      id="claude-endpoint-haiku-model"
+                      type="text"
+                      value={endpointHaikuModelDraft}
+                      onChange={(e) => setEndpointHaikuModelDraft(e.target.value)}
+                      placeholder={translate(
+                        'auto.components.settings.AccountsPane.customEndpointHaikuModelPlaceholder',
+                        'glm-4.5-air'
+                      )}
+                      spellCheck={false}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="claude-endpoint-subagent-model">
+                      {translate(
+                        'auto.components.settings.AccountsPane.customEndpointSubagentModel',
+                        'Subagents →'
+                      )}
+                    </Label>
+                    <Input
+                      id="claude-endpoint-subagent-model"
+                      type="text"
+                      value={endpointSubagentModelDraft}
+                      onChange={(e) => setEndpointSubagentModelDraft(e.target.value)}
+                      placeholder={translate(
+                        'auto.components.settings.AccountsPane.customEndpointSubagentModelPlaceholder',
+                        'glm-5.1'
+                      )}
+                      spellCheck={false}
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
           <DialogFooter>
             <Button
