@@ -343,6 +343,23 @@ describe('buildAgentDraftLaunchPlan', () => {
       launchConfig: emptyLaunchConfig('openclaude')
     })
   })
+
+  it('uses claude native prefill for claude-zai draft launches', () => {
+    expect(
+      buildAgentDraftLaunchPlan({
+        agent: 'claude-zai',
+        draft: 'review this',
+        cmdOverrides: {},
+        platform: 'linux'
+      })
+    ).toEqual({
+      agent: 'claude-zai',
+      launchCommand: "claude-zai --prefill 'review this'",
+      // Why: the wrapper execs the real claude binary.
+      expectedProcess: 'claude',
+      launchConfig: emptyLaunchConfig('claude-zai')
+    })
+  })
 })
 
 describe('isShellProcess', () => {

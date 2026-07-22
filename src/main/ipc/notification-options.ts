@@ -7,6 +7,7 @@ const NOTIFICATION_BODY_PREVIEW_MAX_LENGTH = 180
 const AGENT_TYPE_LABELS: Readonly<Record<string, string>> = {
   claude: 'Claude',
   openclaude: 'OpenClaude',
+  'claude-zai': 'Claude GLM (z.ai)',
   codex: 'Codex',
   gemini: 'Gemini',
   antigravity: 'Antigravity',

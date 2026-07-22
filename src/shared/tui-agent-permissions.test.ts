@@ -50,6 +50,17 @@ describe('tui agent permissions', () => {
     ).toBe('mixed')
   })
 
+  it('resolves a claude-zai yolo launch with the claude skip-permissions flag', () => {
+    expect(YOLO_TUI_AGENT_ARGS['claude-zai']).toBe('--dangerously-skip-permissions')
+    expect(
+      resolveTuiAgentPermissionMode({
+        agent: 'claude-zai',
+        agentArgs: YOLO_TUI_AGENT_ARGS['claude-zai'],
+        agentEnv: {}
+      })
+    ).toBe('yolo')
+  })
+
   it('resolves one Codex yolo launch as yolo', () => {
     expect(
       resolveTuiAgentPermissionMode({

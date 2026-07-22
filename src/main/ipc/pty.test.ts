@@ -12365,6 +12365,14 @@ describe('isClaudeLaunchCommand', () => {
     expect(isClaudeLaunchCommand('echo hello')).toBe(false)
     expect(isClaudeLaunchCommand(undefined)).toBe(false)
   })
+
+  it('does not match the claude-zai wrapper so its isolated CLAUDE_CONFIG_DIR survives', () => {
+    // Why: the z.ai wrapper manages its own config dir; per-worktree Claude
+    // account pin injection must never apply to it.
+    expect(isClaudeLaunchCommand('claude-zai')).toBe(false)
+    expect(isClaudeLaunchCommand('claude-zai --resume x')).toBe(false)
+    expect(isClaudeLaunchCommand('/Users/me/.local/bin/claude-zai')).toBe(false)
+  })
 })
 
 describe('isCodexLaunchCommand', () => {

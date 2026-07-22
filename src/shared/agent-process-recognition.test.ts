@@ -25,6 +25,23 @@ describe('agent process recognition', () => {
     expect(isExpectedAgentProcess('/usr/local/bin/openclaude', 'claude')).toBe(false)
   })
 
+  it('recognizes the claude-zai wrapper launch without stealing claude ownership', () => {
+    expect(recognizeAgentProcess('/Users/dev/.local/bin/claude-zai')).toEqual({
+      agent: 'claude-zai',
+      processName: 'claude-zai'
+    })
+    expect(recognizeAgentProcessFromCommandLine('claude-zai --resume abc123')).toEqual({
+      agent: 'claude-zai',
+      processName: 'claude-zai'
+    })
+    // Why: the wrapper execs the real claude binary, so the bare `claude`
+    // foreground process must keep mapping to the canonical claude agent.
+    expect(recognizeAgentProcess('claude')).toEqual({ agent: 'claude', processName: 'claude' })
+    expect(isRecognizedAgentType('claude-zai')).toBe(true)
+    // Why: claude-zai one-shot invocations are claude print-mode subprocesses.
+    expect(recognizeAgentProcessFromCommandLine('claude-zai -p "summarize"')).toBeNull()
+  })
+
   it('recognizes the Droid foreground process on Windows', () => {
     expect(recognizeAgentProcess(String.raw`C:\Users\dev\AppData\Roaming\npm\droid.cmd`)).toEqual({
       agent: 'droid',

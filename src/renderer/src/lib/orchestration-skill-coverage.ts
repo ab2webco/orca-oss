@@ -53,6 +53,9 @@ const ORCHESTRATION_SKILL_LOCATION_IDS_BY_AGENT: Partial<
 > = {
   claude: ['claude-home', 'agents-home'],
   openclaude: ['claude-home', 'agents-home'],
+  // Why: claude-zai's isolated CLAUDE_CONFIG_DIR bypasses ~/.claude skills, so
+  // only the agent-agnostic ~/.agents location counts as coverage.
+  'claude-zai': ['agents-home'],
   codex: ['codex-home', 'codex-plugin-cache', 'agents-home']
 }
 

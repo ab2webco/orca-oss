@@ -81,6 +81,8 @@ const CODEX_COMMANDS: readonly SlashCommandSuggestion[] = [
 const COMMANDS_BY_AGENT: Partial<Record<AgentType, readonly SlashCommandSuggestion[]>> = {
   claude: CLAUDE_COMMANDS,
   openclaude: CLAUDE_COMMANDS,
+  // Why: claude-zai wraps the real claude CLI, so its slash surface is Claude's.
+  'claude-zai': CLAUDE_COMMANDS,
   codex: CODEX_COMMANDS
 }
 

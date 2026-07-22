@@ -209,6 +209,9 @@ export const getGeneralAgentSearchEntries = createLocalizedCatalog(() => [
         'auto.components.settings.general.search.5baf51c4d9',
         'open claude'
       ),
+      ...translateSearchKeyword('auto.components.settings.general.search.6e918a5bcc', 'claude glm'),
+      ...translateSearchKeyword('auto.components.settings.general.search.4880297fec', 'z.ai'),
+      ...translateSearchKeyword('auto.components.settings.general.search.71bf3d35f5', 'glm'),
       ...translateSearchKeyword('auto.components.settings.general.search.27d9b996ba', 'codex'),
       ...translateSearchKeyword('auto.components.settings.general.search.882c4896fd', 'opencode'),
       ...translateSearchKeyword('auto.components.settings.general.search.9b0bc30160', 'pi'),

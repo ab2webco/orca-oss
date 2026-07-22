@@ -28,6 +28,15 @@ describe('AgentCombobox', () => {
     expect(markup).not.toContain('<svg')
   })
 
+  it('reuses the Claude brand mark for claude-zai', () => {
+    const markup = renderToStaticMarkup(<AgentIcon agent="claude-zai" />)
+
+    // Why: the wrapper runs the real claude CLI, so it keeps the Claude glyph.
+    expect(markup).toContain('<svg')
+    expect(markup).toContain('#D97757')
+    expect(markup).not.toContain('<img')
+  })
+
   it('uses the official OpenCode SVG mark instead of a remote favicon', () => {
     const markup = renderToStaticMarkup(<AgentIcon agent="opencode" />)
 

@@ -526,6 +526,37 @@ describe('tui agent startup plans', () => {
     })
   })
 
+  it('launches the claude-zai wrapper while expecting the real claude process', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude-zai',
+      prompt: 'fix it',
+      cmdOverrides: {},
+      platform: 'linux'
+    })
+
+    expect(plan).toEqual({
+      agent: 'claude-zai',
+      launchCommand: "claude-zai 'fix it'",
+      // Why: the wrapper execs the real claude binary, so readiness/foreground
+      // checks must watch for `claude`, not the wrapper name.
+      expectedProcess: 'claude',
+      followupPrompt: null,
+      launchConfig: { agentCommand: 'claude-zai', agentArgs: '', agentEnv: {} }
+    })
+  })
+
+  it('resumes claude-zai sessions through the wrapper so its config dir survives', () => {
+    const plan = buildAgentResumeStartupPlan({
+      agent: 'claude-zai',
+      providerSession: { key: 'session_id', id: 's1' },
+      cmdOverrides: {},
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe("claude-zai '--resume' 's1'")
+    expect(plan?.expectedProcess).toBe('claude')
+  })
+
   it('launches Mistral Vibe through the installed vibe executable', () => {
     const plan = buildAgentStartupPlan({
       agent: 'mistral-vibe',

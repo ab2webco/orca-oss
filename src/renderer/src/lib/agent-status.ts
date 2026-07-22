@@ -108,6 +108,7 @@ export function getWorkingAgentsPerWorktree({
 const WELL_KNOWN_LABELS: Record<string, string> = {
   claude: 'Claude',
   openclaude: 'OpenClaude',
+  'claude-zai': 'Claude GLM (z.ai)',
   codex: 'Codex',
   gemini: 'Gemini',
   antigravity: 'Antigravity',
@@ -153,6 +154,7 @@ const ICONABLE_AGENT_TYPES: Record<TuiAgent, true> = {
   claude: true,
   'claude-agent-teams': true,
   openclaude: true,
+  'claude-zai': true,
   codex: true,
   autohand: true,
   opencode: true,

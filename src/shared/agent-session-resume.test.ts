@@ -29,8 +29,13 @@ describe('agent session resume metadata', () => {
     expect(extractAgentProviderSession(source, payload)).toEqual(expected)
   })
 
+  it('treats the claude-zai wrapper as a resumable TUI agent', () => {
+    expect(isResumableTuiAgent('claude-zai')).toBe(true)
+  })
+
   it.each([
     ['claude', { key: 'session_id', id: 's1' }, ['claude', '--resume', 's1']],
+    ['claude-zai', { key: 'session_id', id: 's1' }, ['claude-zai', '--resume', 's1']],
     ['codex', { key: 'session_id', id: 's1' }, ['codex', 'resume', 's1']],
     ['gemini', { key: 'session_id', id: 's1' }, ['gemini', '--resume', 's1']],
     ['antigravity', { key: 'conversation_id', id: 's1' }, ['agy', '--conversation', 's1']],

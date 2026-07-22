@@ -3,7 +3,8 @@ import { isClaudeHeadlessOneShotCommand } from './claude-headless-command'
 import type { TuiAgent } from './types'
 
 export function isHeadlessOneShotAgentCommand(agent: TuiAgent, tokens: readonly string[]): boolean {
-  if (agent === 'claude') {
+  // Why: claude-zai wraps the real claude CLI, so its one-shot flags are Claude's.
+  if (agent === 'claude' || agent === 'claude-zai') {
     return isClaudeHeadlessOneShotCommand(tokens)
   }
   return agent === 'ante' && isAnteHeadlessOneShotCommand(tokens)

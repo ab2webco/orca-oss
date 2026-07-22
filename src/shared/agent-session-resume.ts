@@ -4,6 +4,9 @@ import type { TuiAgent } from './types'
 
 export const RESUMABLE_TUI_AGENTS = [
   'claude',
+  // Why: claude-zai wraps the real claude CLI, so `--resume <id>` works and the
+  // wrapper keeps its own CLAUDE_CONFIG_DIR when relaunching.
+  'claude-zai',
   'codex',
   'gemini',
   'antigravity',
@@ -200,6 +203,8 @@ export function getAgentResumeArgv(
   switch (agent) {
     case 'claude':
       return providerSession.key === 'session_id' ? ['claude', '--resume', id] : null
+    case 'claude-zai':
+      return providerSession.key === 'session_id' ? ['claude-zai', '--resume', id] : null
     case 'codex':
       return providerSession.key === 'session_id' ? ['codex', 'resume', id] : null
     case 'gemini':

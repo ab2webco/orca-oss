@@ -9,6 +9,7 @@ describe('terminal quick command agent options', () => {
 
     expect(ids.slice(0, 3)).toEqual(['claude', 'codex', 'gemini'])
     expect(ids.indexOf('openclaude')).toBeGreaterThan(ids.indexOf('command-code'))
+    expect(ids.indexOf('claude-zai')).toBeGreaterThan(ids.indexOf('openclaude'))
   })
 
   it('keeps unsupported prompt-command agents below supported agents', () => {

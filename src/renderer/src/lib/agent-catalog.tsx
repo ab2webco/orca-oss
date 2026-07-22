@@ -65,6 +65,12 @@ export const getAgentCatalog = createLocalizedCatalog((): AgentCatalogEntry[] =>
     homepageUrl: 'https://openclaude.gitlawb.com/'
   },
   {
+    id: 'claude-zai',
+    label: translate('auto.lib.agent.catalog.e585da3bda', 'Claude GLM (z.ai)'),
+    cmd: 'claude-zai',
+    homepageUrl: 'https://docs.z.ai/devpack/tool/claude'
+  },
+  {
     id: 'codex',
     label: translate('auto.lib.agent.catalog.760bc6883d', 'Codex'),
     cmd: 'codex',
@@ -312,7 +318,9 @@ export function AgentIcon({
   if (!agent) {
     return <AgentLetterIcon letter="?" size={size} />
   }
-  if (agent === 'claude' || agent === 'claude-agent-teams') {
+  // Why: claude-zai is the real claude CLI (z.ai backend); ClaudeIcon has a
+  // fixed brand fill, so it is reused as-is rather than inventing a new hue.
+  if (agent === 'claude' || agent === 'claude-agent-teams' || agent === 'claude-zai') {
     return <ClaudeIcon size={size} />
   }
   if (agent === 'codex') {

@@ -107,6 +107,17 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     promptInjectionMode: 'argv',
     draftPromptFlag: '--prefill'
   },
+  // Why: user-installed wrapper that execs the real `claude` binary against an
+  // isolated CLAUDE_CONFIG_DIR (z.ai/GLM backend), so prompt/prefill semantics
+  // follow the `claude` entry and the foreground process is `claude`. Must stay
+  // below `claude` so canonical `claude` process ownership is registered first.
+  'claude-zai': {
+    detectCmd: 'claude-zai',
+    launchCmd: 'claude-zai',
+    expectedProcess: 'claude',
+    promptInjectionMode: 'argv',
+    draftPromptFlag: '--prefill'
+  },
   codex: {
     detectCmd: 'codex',
     launchCmd: 'codex',
