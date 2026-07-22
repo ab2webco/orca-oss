@@ -8,6 +8,9 @@ import {
 
 const AGENT_STOP_ATTEMPTS = 3
 const AGENT_STOP_WAIT_MS = 1400
+// Why: Claude's "Press Ctrl+C again to exit" window is short; a second Ctrl+C
+// must land inside it or it reads as a fresh first-press and never exits.
+const AGENT_STOP_DOUBLE_INTERRUPT_MS = 120
 const AGENT_RESUME_WAIT_MS = 6000
 const AGENT_READY_INPUT_DELAY_MS = 800
 
@@ -52,8 +55,17 @@ export async function stopForegroundAgent(args: {
   }
 
   for (let attempt = 0; attempt < AGENT_STOP_ATTEMPTS; attempt += 1) {
-    const sent = await sendRuntimePtyInputVerified(args.settings, args.ptyId, '\x03')
-    if (!sent) {
+    // Why: send a rapid Ctrl+C pair — the first interrupts any in-flight
+    // response (returning Claude to the prompt), the second lands inside the
+    // "press again to exit" window and quits. A single Ctrl+C per attempt, with
+    // the settle wait between attempts, never exits a busy or idle session.
+    const first = await sendRuntimePtyInputVerified(args.settings, args.ptyId, '\x03')
+    if (!first) {
+      return false
+    }
+    await wait(AGENT_STOP_DOUBLE_INTERRUPT_MS)
+    const second = await sendRuntimePtyInputVerified(args.settings, args.ptyId, '\x03')
+    if (!second) {
       return false
     }
     await wait(AGENT_STOP_WAIT_MS)
