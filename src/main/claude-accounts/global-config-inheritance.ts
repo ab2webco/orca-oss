@@ -114,13 +114,6 @@ export function mergeMcpServersIntoVaultConfig(
 }
 
 /**
- * Points <vault>/skills at the user's global ~/.claude/skills via a symlink so a
- * pinned account inherits global skills live (edits to the global folder show up
- * immediately). Skips when there are no global skills, and never clobbers an
- * existing entry the CLI may have created. Uses a junction on Windows so no
- * elevated privilege is required for the directory link.
- */
-/**
  * Removes the `mcpServers` key from a vault's .claude.json so the account starts
  * clean (the user can then add their own from scratch). Preserves every other
  * CLI-managed key (oauthAccount, projects, history). Returns the serialized JSON
@@ -159,6 +152,13 @@ export function removeVaultSkillsSymlink(vaultAuthPath: string): boolean {
   }
 }
 
+/**
+ * Points <vault>/skills at the user's global ~/.claude/skills via a symlink so a
+ * pinned account inherits global skills live (edits to the global folder show up
+ * immediately). Skips when there are no global skills, and never clobbers an
+ * existing entry the CLI may have created. Uses a junction on Windows so no
+ * elevated privilege is required for the directory link.
+ */
 export function ensureVaultSkillsSymlink(
   vaultAuthPath: string,
   homeDir: string
