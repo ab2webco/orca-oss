@@ -2451,4 +2451,74 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     expect(state.accounts).toHaveLength(0)
     expect(existsSync(account.managedAuthPath)).toBe(false)
   })
+
+  it('rejects reauthentication when the browser session returns a different identity', async () => {
+    setPlatform('linux')
+    tempDir = '/tmp/orca-claude-service-test'
+    rmSync(tempDir, { recursive: true, force: true })
+    const managedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(managedAuthPath, { recursive: true })
+    writeFileSync(join(managedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    writeFileSync(join(managedAuthPath, '.credentials.json'), '{"old":true}\n', 'utf-8')
+    writeFileSync(join(managedAuthPath, 'oauth-account.json'), '{"oldOauth":true}\n', 'utf-8')
+    let settings = {
+      claudeManagedAccounts: [
+        {
+          id: 'account-1',
+          email: 'old@example.com',
+          managedAuthPath,
+          authMethod: 'subscription-oauth',
+          organizationUuid: null,
+          organizationName: null,
+          createdAt: 1,
+          updatedAt: 1,
+          lastAuthenticatedAt: 1
+        }
+      ],
+      activeClaudeManagedAccountId: 'account-1'
+    }
+    const store = {
+      getSettings: vi.fn(() => settings),
+      updateSettings: vi.fn((updates: Partial<typeof settings>) => {
+        settings = { ...settings, ...updates }
+        return settings
+      })
+    }
+    const runtimeAuth = {
+      clearLastWrittenCredentialsJson: vi.fn(),
+      forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {}),
+      syncForCurrentSelection: vi.fn(async () => {})
+    }
+    const rateLimits = {
+      evictInactiveClaudeCache: vi.fn(),
+      refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
+    }
+    const { ClaudeAccountService } = await import('./service')
+    const service = new ClaudeAccountService(
+      store as never,
+      rateLimits as never,
+      runtimeAuth as never
+    )
+    ;(
+      service as unknown as {
+        runClaudeLoginAndCapture(): Promise<{
+          credentialsJson: string
+          oauthAccount: unknown
+          identity: { email: string; organizationUuid: null; organizationName: null }
+        }>
+      }
+    ).runClaudeLoginAndCapture = vi.fn(async () => ({
+      credentialsJson: '{"new":true}\n',
+      oauthAccount: { newOauth: true },
+      identity: { email: 'intruder@example.com', organizationUuid: null, organizationName: null }
+    }))
+
+    await expect(service.reauthenticateAccount('account-1')).rejects.toThrow('intruder@example.com')
+
+    expect(store.getSettings().claudeManagedAccounts[0].email).toBe('old@example.com')
+    expect(readFileSync(join(managedAuthPath, '.credentials.json'), 'utf-8')).toBe('{"old":true}\n')
+    expect(readFileSync(join(managedAuthPath, 'oauth-account.json'), 'utf-8')).toBe(
+      '{"oldOauth":true}\n'
+    )
+  })
 })
