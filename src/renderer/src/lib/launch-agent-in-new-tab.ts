@@ -205,18 +205,14 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
       environmentId: runtimeEnvironmentId,
       groupId,
       cwd: initialCwd,
-      hasPrompt,
       startupPlan,
-      ...(pasteDraftAfterLaunch !== null
-        ? {
-            promptAfterReady: {
-              content: pasteDraftAfterLaunch,
-              submit: submitPastedPrompt,
-              forcePaste: promptDelivery === 'submit-after-ready'
-            }
-          }
-        : {}),
-      // Why: send the client's resolved terminal choice explicitly, else a paired host applies its own default.
+      prompt: trimmedPrompt,
+      promptDelivery,
+      pastePromptAfterReady: pasteDraftAfterLaunch,
+      submitPastedPrompt,
+      agentArgs,
+      // Why: omission means terminal locally, but would let a paired host apply
+      // its own default; send the client's resolved terminal choice explicitly.
       viewMode: initialViewModeProps.viewMode ?? 'terminal',
       onPromptDelivered
     })
@@ -247,6 +243,8 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     ...(startupPlan.env ? { env: startupPlan.env } : {}),
     launchConfig: startupPlan.launchConfig,
     launchAgent: agent,
+    ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
+    ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
     ...(startupPlan.startupCommandDelivery
       ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
       : {}),

@@ -1269,7 +1269,17 @@
         "branchName": "ブランチ名",
         "branchNamePlaceholder": "feature/my-branch",
         "claudeAccount": "アカウント",
-        "claudeAccountInheritGlobal": "グローバル設定を継承"
+        "claudeAccountInheritGlobal": "グローバル設定を継承",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
+        "connectingHost": "Connecting…",
+        "connectHost": "Connect",
+        "addHost": "Add host",
+        "addHostHint": "Register another machine or Orca server",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteOrcaServer": "Add Remote Orca Server",
+        "addRemoteOrcaServerHint": "Pair another Orca runtime",
+        "hostConnectionFailed": "Connection failed"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "ワークツリーを作成する",
@@ -4515,7 +4525,14 @@
           "worktree": {
             "flow": {
               "c460fecc4a": "一部のワークスペースのスリープに失敗しました",
-              "8bc3fc0671": "ワークスペースのスリープに失敗しました"
+              "8bc3fc0671": "ワークスペースのスリープに失敗しました",
+              "legacy": {
+                "unverified": "The older host runtime could not confirm terminal shutdown. The workspace was kept open; update the host and try again."
+              },
+              "host": {
+                "unverified": "The host could not confirm terminal shutdown. The workspace was kept open; check the connection and try again."
+              },
+              "retry": "The workspace was kept open. Try again; if the problem continues, check the host connection."
             }
           }
         },
@@ -4824,7 +4841,8 @@
           "sshImportFailed": "SSH 構成のインポートに失敗しました。",
           "importing": "インポート中...",
           "importSshConfig": "~/.ssh/config をインポートします",
-          "sshPersistenceDefault": "このホスト上のリモートターミナルは、終了するかリレーをリセットするまで動作し続けます。"
+          "sshPersistenceDefault": "このホスト上のリモートターミナルは、終了するかリレーをリセットするまで動作し続けます。",
+          "advanced": "Advanced"
         },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "再接続に失敗しました",
@@ -10414,7 +10432,7 @@
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "localSessionSshWorkspaceUnsupported": "このセッションの履歴はこのマシンに保存されているため、SSH ワークスペースでは再開できません。代わりにローカルワークスペースを開いてください。",
             "sessionHostMismatchUnsupported": "このセッションは別のホストに属しています。再開するには同じホスト上のワークスペースを開いてください。",
-            "resumePrepareFailed": "このセッションを再開する準備ができませんでした。"
+            "prepareSessionResumeFailed": "このセッションを再開する準備ができませんでした。"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Scanning sessions",
@@ -13538,6 +13556,11 @@
           "a2c6d9e0f7": "MR",
           "91b5c8d7e6": "GitLab"
         }
+      }
+    },
+    "runtime": {
+      "webRuntimeSession": {
+        "remoteHostDisconnected": "The workspace is not connected to a remote Orca host."
       }
     }
   },

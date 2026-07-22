@@ -41,6 +41,7 @@ import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-cl
 import { resolveConsent } from './telemetry/consent'
 import { triggerStartupNotificationRegistration } from './ipc/notifications'
 import { OrcaRuntimeService } from './runtime/orca-runtime'
+import { loadAgentSessionClaimSigner } from './runtime/agent-session-claim-identity'
 import { OrcaRuntimeRpcServer } from './runtime/runtime-rpc'
 import { resolveAdvertisedPairingEndpoint } from './runtime/pairing-endpoint'
 import { ServeReadinessPublisher } from './server/serve-readiness'
@@ -2003,6 +2004,10 @@ app.whenReady().then(async () => {
       .map((account) => ({ id: account.id, managedHomePath: account.managedHomePath }))
   })
   const runtimeService = new OrcaRuntimeService(store, stats, {
+    agentSessionClaimSigner: loadAgentSessionClaimSigner(
+      getProfileUserDataPath(),
+      getProfileUserDataPath()
+    ),
     // Why: resolve the PTY provider lazily — a daemon swap happens later, so an eager reference would freeze the pre-daemon provider (design §4.3).
     getLocalProvider: () => getLocalPtyProvider(),
     // Why: SSH relay providers register after construction and may reconnect, so destructive cleanup must resolve the current generation.

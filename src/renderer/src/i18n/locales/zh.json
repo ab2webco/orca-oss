@@ -1269,7 +1269,17 @@
         "branchName": "分支名称",
         "branchNamePlaceholder": "feature/my-branch",
         "claudeAccount": "账户",
-        "claudeAccountInheritGlobal": "继承全局设置"
+        "claudeAccountInheritGlobal": "继承全局设置",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
+        "connectingHost": "Connecting…",
+        "connectHost": "Connect",
+        "addHost": "Add host",
+        "addHostHint": "Register another machine or Orca server",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteOrcaServer": "Add Remote Orca Server",
+        "addRemoteOrcaServerHint": "Pair another Orca runtime",
+        "hostConnectionFailed": "Connection failed"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建工作树",
@@ -4515,7 +4525,14 @@
           "worktree": {
             "flow": {
               "c460fecc4a": "无法睡眠某些工作区",
-              "8bc3fc0671": "无法睡眠工作区"
+              "8bc3fc0671": "无法睡眠工作区",
+              "legacy": {
+                "unverified": "The older host runtime could not confirm terminal shutdown. The workspace was kept open; update the host and try again."
+              },
+              "host": {
+                "unverified": "The host could not confirm terminal shutdown. The workspace was kept open; check the connection and try again."
+              },
+              "retry": "The workspace was kept open. Try again; if the problem continues, check the host connection."
             }
           }
         },
@@ -4824,7 +4841,8 @@
           "sshImportFailed": "导入 SSH 配置失败。",
           "importing": "正在导入...",
           "importSshConfig": "导入 ~/.ssh/config",
-          "sshPersistenceDefault": "此主机上的远程终端会保持运行，直到你结束它们或重置中继。"
+          "sshPersistenceDefault": "此主机上的远程终端会保持运行，直到你结束它们或重置中继。",
+          "advanced": "Advanced"
         },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "重新连接失败",
@@ -10414,7 +10432,7 @@
             "openSupportedWorkspace": "在恢复会话之前，请先打开一个工作区。",
             "localSessionSshWorkspaceUnsupported": "此会话的历史记录存储在本机上，因此无法在 SSH 工作区中恢复。请改为打开一个本地工作区。",
             "sessionHostMismatchUnsupported": "此会话属于其他主机。请打开同一主机上的工作区以恢复它。",
-            "resumePrepareFailed": "无法准备恢复此会话。"
+            "prepareSessionResumeFailed": "无法准备恢复此会话。"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "正在扫描会话",
@@ -13538,6 +13556,11 @@
           "a2c6d9e0f7": "合并请求",
           "91b5c8d7e6": "GitLab"
         }
+      }
+    },
+    "runtime": {
+      "webRuntimeSession": {
+        "remoteHostDisconnected": "The workspace is not connected to a remote Orca host."
       }
     }
   },

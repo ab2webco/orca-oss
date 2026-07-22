@@ -28,8 +28,8 @@ export const ActivateTab = WorktreeTabSelector.extend({
 })
 
 export const CloseTab = ActivateTab.extend({
-  // Why: optional so legacy clients still validate; policy conservatively
-  // attributes only authenticated mobile callers as user intent.
+  // Why: optional preserves authenticated legacy user closes; lifecycle intent
+  // uses the additive evidence-bearing method instead.
   reason: z.literal('user').optional()
 })
 

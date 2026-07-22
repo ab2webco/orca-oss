@@ -1292,7 +1292,17 @@
         "branchName": "Branch name",
         "branchNamePlaceholder": "feature/my-branch",
         "claudeAccount": "Account",
-        "claudeAccountInheritGlobal": "Inherit global"
+        "claudeAccountInheritGlobal": "Inherit global",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
+        "connectingHost": "Connecting…",
+        "connectHost": "Connect",
+        "addHost": "Add host",
+        "addHostHint": "Register another machine or Orca server",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteOrcaServer": "Add Remote Orca Server",
+        "addRemoteOrcaServerHint": "Pair another Orca runtime",
+        "hostConnectionFailed": "Connection failed"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
@@ -4580,7 +4590,14 @@
           "worktree": {
             "flow": {
               "c460fecc4a": "Failed to sleep some workspaces",
-              "8bc3fc0671": "Failed to sleep workspace"
+              "8bc3fc0671": "Failed to sleep workspace",
+              "legacy": {
+                "unverified": "The older host runtime could not confirm terminal shutdown. The workspace was kept open; update the host and try again."
+              },
+              "host": {
+                "unverified": "The host could not confirm terminal shutdown. The workspace was kept open; check the connection and try again."
+              },
+              "retry": "The workspace was kept open. Try again; if the problem continues, check the host connection."
             }
           }
         },
@@ -4847,7 +4864,8 @@
           "sshImportSynced": "Synced {{value0}} host{{value1}}.",
           "sshImportFailed": "Failed to import SSH config.",
           "importing": "Importing...",
-          "importSshConfig": "Import ~/.ssh/config"
+          "importSshConfig": "Import ~/.ssh/config",
+          "advanced": "Advanced"
         },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "Reconnection failed",
@@ -10437,7 +10455,7 @@
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "sessionHostMismatchUnsupported": "This session belongs to a different host. Open a workspace on the same host to resume it.",
             "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Open a local workspace instead.",
-            "resumePrepareFailed": "Could not prepare this session for resume."
+            "prepareSessionResumeFailed": "Could not prepare this session for resume."
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Scanning sessions",
@@ -13561,6 +13579,11 @@
           "a2c6d9e0f7": "Merge Request",
           "91b5c8d7e6": "GitLab"
         }
+      }
+    },
+    "runtime": {
+      "webRuntimeSession": {
+        "remoteHostDisconnected": "The workspace is not connected to a remote Orca host."
       }
     }
   },

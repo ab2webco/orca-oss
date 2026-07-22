@@ -920,7 +920,7 @@
       "providers": ["daemon", "runtime", "ssh", "wsl"],
       "coveredPlatforms": ["windows"],
       "coveredProviders": ["daemon", "runtime"],
-      "coverageNotes": "A native Windows v21/v22/v23/v24/v25 named-pipe harness calls the production desktop legacy-adapter scanner and covers warm reattach, current-to-next upgrade, parallel clients, repeated reconnects, client relaunch, exact process identity, bounded failed disposal, and PTY-root/descendant survival. Deterministic host/renderer tests cover old servers, missing liveness, stale publications, reused claims, split parents, missing intent, cross-profile isolation, remote runtime clients, SSH-provider routing, and WSL boundaries. Docker is unavailable and WSL is not installed on this runner, so live SSH/WSL remain gaps.",
+      "coverageNotes": "Recorded native Windows evidence covers the v21/v22/v23/v24/v25 named-pipe matrix. The current harness additionally includes the v26 agent-authority boundary while retaining v24 clean-disconnect and v25 startup-ingress coverage; that six-generation Windows rerun remains to be collected. Deterministic host/renderer tests cover old servers, missing liveness, stale publications, reused claims, split parents, authenticated legacy and unattributed intent, cross-profile isolation, remote runtime clients, SSH-provider routing, and WSL boundaries. Docker is unavailable and WSL is not installed on this runner, so live SSH/WSL remain gaps.",
       "motivatingLinks": [
         "https://github.com/stablyai/orca/issues/9749",
         "https://github.com/stablyai/orca/issues/8871",
@@ -928,7 +928,7 @@
         "https://github.com/stablyai/orca/issues/9229"
       ],
       "invariant": "Reconnect, replay, or lifecycle observations must never kill a live PTY. Destructive close requires explicit user intent; lifecycle close requires the exact observed publication, terminal, environment, and authoritative liveness, never signals a process, and leaves renderer-owned or partial-split retirement to its owner. Missing or incompatible evidence keeps and audits. Legacy daemon hello and warm reattachment remain non-destructive.",
-      "oracle": "Start five isolated native-Windows daemon generations on distinct versioned named pipes, let the production desktop scanner discover v21-v24 from a v25 client, attach live and stale-mirror canaries with exact root/descendant PID-start identities, reconnect and relaunch the production router path, issue repeated desktop and remote-profile lifecycle closes, and require every daemon, root, and descendant to remain alive with zero session-killed events. Unit contracts require unknown/stale/reused/cross-profile claims and live PTYs to refuse without kill or renderer-close calls, old servers to return method_not_found with no destructive fallback, explicit user close to remain destructive, and dead whole-headless state to retire without signalling its retained PTY id.",
+      "oracle": "Start six isolated native-Windows daemon generations on distinct versioned named pipes, let the production desktop scanner discover v21-v25 from a v26 client, attach live and stale-mirror canaries with exact root/descendant PID-start identities, reconnect and relaunch the production router path, issue repeated desktop and remote-profile lifecycle closes, and require every daemon, root, and descendant to remain alive with zero session-killed events. Unit contracts require unknown/stale/reused/cross-profile claims and live PTYs to refuse without kill or renderer-close calls, old servers to return method_not_found with no destructive fallback, authenticated legacy and explicit user closes to remain destructive, and dead whole-headless state to retire without signalling its retained PTY id.",
       "commands": [
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/session-tabs.test.ts src/main/runtime/rpc/methods/session-tabs-schemas.test.ts src/renderer/src/runtime/web-runtime-session.test.ts src/renderer/src/runtime/web-session-close-intent.test.ts src/renderer/src/runtime/web-session-tabs-sync.test.ts src/renderer/src/components/terminal/terminal-tab-actions.test.ts src/renderer/src/components/terminal/terminal-close-incarnation.test.ts src/renderer/src/components/terminal-pane/terminal-parked-tab-watchers.test.ts",
         "pnpm exec playwright test tests/e2e/daemon-generation-reconnect-safety.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1"
@@ -949,7 +949,7 @@
         {
           "file": "tests/e2e/daemon-generation-reconnect-safety.spec.ts",
           "assertions": [
-            "the production scanner discovers v21/v22/v23/v24 from v25 and every generation accepts repeated client hellos while every exact daemon, PTY-root, and descendant incarnation remains alive",
+            "the production scanner discovers v21/v22/v23/v24/v25 from v26 and every generation accepts repeated client hellos while every exact daemon, PTY-root, and descendant incarnation remains alive",
             "desktop and two remote profiles repeat lifecycle closes before and after client relaunch with zero session-killed events",
             "shutdown-dispose-failed drops named-pipe authority within the deadline and exact fixture cleanup leaves no process tree"
           ]
@@ -957,9 +957,9 @@
         {
           "file": "src/main/runtime/orca-runtime.test.ts",
           "assertions": [
-            "live, unknown, stale, missing-intent, and non-owner lifecycle closes invoke neither PTY kill nor renderer close",
+            "live, unknown, stale, missing-intent, non-owner, and inventory-proven but not yet pane-bound lifecycle closes invoke neither PTY kill nor renderer close",
             "dead whole-headless retirement removes stale state without signalling a retained PTY id",
-            "explicit user close remains destructive"
+            "explicit and authenticated legacy user closes remain destructive"
           ]
         },
         {
@@ -1376,6 +1376,165 @@
         "Current command does not run a real workspace activation loop repeatedly through Electron."
       ],
       "demotionRule": "Demote or quarantine if failures are non-actionable or if a duplicate resume escape occurs outside the modeled matrix."
+    },
+    {
+      "id": "agent-session.remote-host-authority",
+      "title": "Remote agent sessions have one host-authoritative PTY and durable surface lifecycle",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "agent-session",
+      "layer": "runtime-controller-provider-renderer-contract",
+      "surfaces": [
+        "remote agent launch and explicit resume",
+        "multi-client remote runtime sessions",
+        "daemon and relay reconnect",
+        "terminal exit retirement and restart restore",
+        "mixed-version fallback"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "local",
+        "daemon",
+        "ssh",
+        "wsl",
+        "remote-runtime"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [
+        "local",
+        "daemon",
+        "ssh",
+        "remote-runtime"
+      ],
+      "coverageNotes": "Deterministic macOS tests cover controller claims, daemon and SSH/relay operation replay, mixed-version selection, runtime ownership, exact provisional handoff, and durable terminal retirement. The real repro runs two independent clients against one headless remote Orca runtime over the encrypted pairing path and a real daemon-backed PTY. SSH coverage is contract/fault-injection coverage; WSL and live SSH hosts remain gaps.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca/issues/8878",
+        "https://github.com/stablyai/orca/issues/9352",
+        "https://github.com/stablyai/orca/pull/9687"
+      ],
+      "invariant": "For every claim-capable execution route, one provider-session identity has at most one live PTY owner and one canonical host surface across concurrent clients, retries, reconnects, and stale publications. A physical exit retires that exact incarnation durably so stale client state and host restart cannot recreate it. Mixed-version routes select the unchanged legacy request before any authority side effect or execution-owner-local filesystem access.",
+      "oracle": "Race independent clients and repeated operation IDs, then assert one physical spawn and one canonical PTY/surface; inject exit-before-reply, provider disconnect, conflicting claim scope, and old daemon/relay capabilities; assert safe adoption or explicit failure without a second spawn. After exact exit, assert terminal and tab listings omit the surface, a stale publication cannot restore it, restart cannot resurrect it, and an exact provisional handoff is consumed even when exit wins before the next snapshot.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/shared/claimed-agent-pty-owner.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/providers/ssh-pty-provider-agent-session-create-operation.test.ts src/main/runtime/orca-runtime-agent-session-operation.test.ts src/main/runtime/remote-agent-session-host-authority.integration.test.ts src/main/runtime/orca-runtime-terminal-retirement.test.ts src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.test.ts src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts src/renderer/src/runtime/web-runtime-session.test.ts src/renderer/src/runtime/web-session-tabs-sync.test.ts",
+        "pnpm test:repro:remote-agent-session"
+      ],
+      "testFiles": [
+        "src/shared/claimed-agent-pty-owner.test.ts",
+        "src/main/daemon/daemon-pty-adapter.test.ts",
+        "src/main/providers/ssh-pty-provider-agent-session-create-operation.test.ts",
+        "src/main/runtime/orca-runtime-agent-session-operation.test.ts",
+        "src/main/runtime/remote-agent-session-host-authority.integration.test.ts",
+        "src/main/runtime/orca-runtime-terminal-retirement.test.ts",
+        "src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.test.ts",
+        "src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts",
+        "src/renderer/src/runtime/web-runtime-session.test.ts",
+        "src/renderer/src/runtime/web-session-tabs-sync.test.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/shared/claimed-agent-pty-owner.test.ts",
+          "assertions": [
+            "concurrent exact claims spawn once and later callers adopt the canonical owner",
+            "same identity in another worktree conflicts and cannot be found as the current scope's owner",
+            "generation-guarded exit and authoritative reconciliation cannot retire a replacement owner"
+          ]
+        },
+        {
+          "file": "src/main/runtime/orca-runtime-agent-session-operation.test.ts",
+          "assertions": [
+            "old execution owners select exact legacy fallback before trust, spawn, or ledger mutation",
+            "nested SSH Pi resume selects legacy before reading the remote-only transcript path locally",
+            "fresh operation retries replay one result and retain a fence after an ambiguous physical commit"
+          ]
+        },
+        {
+          "file": "src/main/runtime/remote-agent-session-host-authority.integration.test.ts",
+          "assertions": [
+            "independent runtime clients converge on one canonical live agent-session owner",
+            "retries and concurrent requests cannot create a second physical PTY"
+          ]
+        },
+        {
+          "file": "src/main/runtime/orca-runtime-terminal-retirement.test.ts",
+          "assertions": [
+            "an exact PTY exit retires host membership and stale topology cannot recreate the surface",
+            "incarnation fencing prevents an old delayed exit from retiring a replacement PTY"
+          ]
+        },
+        {
+          "file": "src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts",
+          "assertions": [
+            "a causally post-operation inventory waits out an older request and concurrent confirmations share the fresh request"
+          ]
+        },
+        {
+          "file": "src/renderer/src/runtime/web-runtime-session.test.ts",
+          "assertions": [
+            "a causally post-create list confirms only the exact provisional tab and terminal-handle generation when another create is in flight"
+          ]
+        },
+        {
+          "file": "src/renderer/src/runtime/web-session-tabs-sync.test.ts",
+          "assertions": [
+            "only an exact structured-create handoff retires its provisional tab",
+            "an absent host tab retires its exact provisional handoff only after a causally post-create snapshot while unrelated tabs remain"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-07-21",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/claimed-agent-pty-owner.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/providers/ssh-pty-provider-agent-session-create-operation.test.ts src/main/runtime/orca-runtime-agent-session-operation.test.ts src/main/runtime/remote-agent-session-host-authority.integration.test.ts src/main/runtime/orca-runtime-terminal-retirement.test.ts src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.test.ts src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts src/renderer/src/runtime/web-runtime-session.test.ts src/renderer/src/runtime/web-session-tabs-sync.test.ts",
+          "result": "passed",
+          "durationSeconds": 7.67,
+          "summary": "Ten focused files and 325 tests passed after the final review fixes, covering claim scope, mixed-version Pi/SSH fallback ordering, operation replay, terminal retirement, causal inventory fencing, exact concurrent handoff confirmation, daemon-generation integration, transport behavior, and remote host integration."
+        },
+        {
+          "date": "2026-07-21",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm test:repro:remote-agent-session",
+          "result": "passed",
+          "durationSeconds": 48.47,
+          "summary": "The build-backed headless remote Orca harness passed over encrypted WebSocket pairing with two independent clients, proving one spawn, retry adoption, durable exit retirement, stale-publication rejection, and no restart resurrection."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 30,
+        "scope": "focused ownership, compatibility, lifecycle, and renderer handoff tests; build-backed repro tracked separately"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "New experimental gate with deterministic local coverage and no soak history yet."
+      },
+      "redGreenEvidence": {
+        "status": "partial",
+        "evidence": "The motivating remote-client duplicate-resume and exited-surface repros are encoded in deterministic lower-layer tests and the real remote harness; saved CI red/green artifacts are still needed."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "Agent-session reconciliation runs only at explicit claim admission, dedupes concurrent provider listing, and adds no polling or renderer output work. Create-operation ledgers are capped globally and per client, expire after 24 hours, and reject rather than evict live replay fences. Capability caches are bounded or connection-scoped, and exact handoffs are consumed by the next authoritative snapshot."
+      },
+      "promotionCriteria": [
+        "Run the focused gate and remote-server repro for at least 100 consecutive passes or 14 days across required CI platforms.",
+        "Attach saved red/green evidence for duplicate remote resume and exit-before-snapshot retirement.",
+        "Add live Linux/Windows and SSH/WSL provider evidence before claiming full platform/provider coverage."
+      ],
+      "knownGaps": [
+        "The real remote-server harness currently runs on macOS and uses a local daemon-backed execution owner; Linux and Windows runs remain uncollected.",
+        "SSH and relay failure ordering is deterministic contract coverage, not a live SSH-host journey; WSL has no provider-specific run.",
+        "Fresh-launch operation replay is memory-backed and intentionally does not survive runtime restart; a durable operation journal is a documented future extension.",
+        "Automatic sleep checkpoints, verified nested-SSH execution namespaces, and multi-process profile coordination remain outside v1."
+      ],
+      "demotionRule": "Keep experimental or demote if the focused gate flakes without a product or harness bug, if a retry can physically spawn twice, if a stale exit/publication can replace or resurrect a terminal, or if mixed-version fallback occurs after an authority side effect."
     },
     {
       "id": "terminal-geometry.visible-convergence",

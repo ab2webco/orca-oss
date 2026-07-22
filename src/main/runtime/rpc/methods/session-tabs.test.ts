@@ -136,6 +136,28 @@ describe('session tab RPC methods', () => {
     expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
   })
 
+  it('preserves reasonless explicit closes from authenticated legacy runtime clients', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      refuseUnattributedMobileSessionTabClose: vi.fn(),
+      closeMobileSessionTab: vi.fn().mockResolvedValue({ closed: true })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
+    const replies: string[] = []
+
+    await dispatcher.dispatchStreaming(
+      makeRequest('session.tabs.close', { worktree: 'id:wt-1', tabId: 'tab-1' }),
+      (response) => replies.push(response),
+      { clientKind: 'runtime', pairedDeviceId: 'legacy-runtime' }
+    )
+
+    expect(replies).toHaveLength(1)
+    expect(runtime.closeMobileSessionTab).toHaveBeenCalledWith('id:wt-1', 'tab-1', {
+      reason: 'user'
+    })
+    expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
+  })
+
   it.each(['pty-exit', 'cleanup'] as const)(
     'rejects %s on the legacy close endpoint before host adjudication',
     async (reason) => {
@@ -262,7 +284,7 @@ describe('session tab RPC methods', () => {
     })
   })
 
-  it('dispatches terminal creation with the requested tab group', async () => {
+  it('dispatches ordinary terminal creation with the requested tab group', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       createMobileSessionTerminal: vi.fn().mockResolvedValue({
@@ -321,7 +343,9 @@ describe('session tab RPC methods', () => {
       activate: true,
       select: undefined,
       clientNavigationId: undefined,
-      navigation: 'all'
+      navigation: 'all',
+      clientMutationId: undefined,
+      signal: undefined
     })
   })
 
@@ -357,7 +381,7 @@ describe('session tab RPC methods', () => {
     )
   })
 
-  it('dispatches terminal creation with a requested agent preset', async () => {
+  it('preserves legacy agent creation for mixed-version clients', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       createMobileSessionTerminal: vi.fn().mockResolvedValue({
@@ -390,13 +414,16 @@ describe('session tab RPC methods', () => {
       afterTabId: undefined,
       targetGroupId: undefined,
       command: undefined,
+      cwd: undefined,
       startupCommandDelivery: undefined,
       agent: 'codex',
       agentPrompt: 'Review this diff',
       activate: undefined,
       select: undefined,
       clientNavigationId: undefined,
-      navigation: 'all'
+      navigation: 'all',
+      clientMutationId: undefined,
+      signal: undefined
     })
   })
 

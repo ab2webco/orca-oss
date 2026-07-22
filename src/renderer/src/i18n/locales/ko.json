@@ -1269,7 +1269,17 @@
         "branchName": "브랜치 이름",
         "branchNamePlaceholder": "feature/my-branch",
         "claudeAccount": "계정",
-        "claudeAccountInheritGlobal": "전역 설정 상속"
+        "claudeAccountInheritGlobal": "전역 설정 상속",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
+        "connectingHost": "Connecting…",
+        "connectHost": "Connect",
+        "addHost": "Add host",
+        "addHostHint": "Register another machine or Orca server",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteOrcaServer": "Add Remote Orca Server",
+        "addRemoteOrcaServerHint": "Pair another Orca runtime",
+        "hostConnectionFailed": "Connection failed"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "작업 트리 만들기",
@@ -4515,7 +4525,14 @@
           "worktree": {
             "flow": {
               "c460fecc4a": "일부 워크스페이스를 절전 모드로 전환하지 못했습니다.",
-              "8bc3fc0671": "워크스페이스를 절전 모드로 전환하지 못했습니다."
+              "8bc3fc0671": "워크스페이스를 절전 모드로 전환하지 못했습니다.",
+              "legacy": {
+                "unverified": "The older host runtime could not confirm terminal shutdown. The workspace was kept open; update the host and try again."
+              },
+              "host": {
+                "unverified": "The host could not confirm terminal shutdown. The workspace was kept open; check the connection and try again."
+              },
+              "retry": "The workspace was kept open. Try again; if the problem continues, check the host connection."
             }
           }
         },
@@ -4824,7 +4841,8 @@
           "sshImportFailed": "SSH 구성을 가져오지 못했습니다.",
           "importing": "가져오는 중...",
           "importSshConfig": "~/.ssh/config 가져오기",
-          "sshPersistenceDefault": "이 호스트의 원격 터미널은 종료하거나 릴레이를 재설정할 때까지 계속 실행됩니다."
+          "sshPersistenceDefault": "이 호스트의 원격 터미널은 종료하거나 릴레이를 재설정할 때까지 계속 실행됩니다.",
+          "advanced": "Advanced"
         },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "재연결 실패",
@@ -10414,7 +10432,7 @@
             "openSupportedWorkspace": "세션을 재개하기 전에 워크스페이스를 여세요.",
             "localSessionSshWorkspaceUnsupported": "이 세션의 기록은 이 컴퓨터에 저장되어 있어 SSH 워크스페이스에서는 재개할 수 없습니다. 대신 로컬 워크스페이스를 여세요.",
             "sessionHostMismatchUnsupported": "이 세션은 다른 호스트에 속합니다. 재개하려면 같은 호스트의 워크스페이스를 여세요.",
-            "resumePrepareFailed": "이 세션을 재개할 준비를 하지 못했습니다."
+            "prepareSessionResumeFailed": "이 세션을 재개할 준비를 하지 못했습니다."
           },
           "AiVaultPanelControls": {
             "scanningSessions": "세션 스캔 중",
@@ -13538,6 +13556,11 @@
           "a2c6d9e0f7": "머지 리퀘스트",
           "91b5c8d7e6": "GitLab"
         }
+      }
+    },
+    "runtime": {
+      "webRuntimeSession": {
+        "remoteHostDisconnected": "The workspace is not connected to a remote Orca host."
       }
     }
   },

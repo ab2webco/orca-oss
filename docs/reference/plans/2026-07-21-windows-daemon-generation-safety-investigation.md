@@ -373,9 +373,10 @@ with the lifecycle request:
    `killPtys:false`; a renderer-owned parent or partial split remains with its
    authoritative owner. Thus a reusable tab ID or incomplete provider read
    cannot become destructive authority.
-6. Reasonless legacy-client closes on a new host are successful conservative
-   refusals with an authoritative replay. Older clients and servers therefore
-   degrade to a visible retained tab, not terminal loss.
+6. Reasonless closes from authenticated legacy mobile or runtime clients retain
+   their pre-change explicit-user meaning, so upgrading only the host does not
+   break close. Their old lifecycle/user ambiguity remains until the client
+   upgrades; unattributed in-process reasonless calls are refused and replayed.
 7. Renderer close intents are scoped by runtime environment and worktree, and
    terminal-incarnation evidence must match that exact runtime environment.
    Identical tab/worktree IDs in another profile cannot suppress or authorize
@@ -513,7 +514,7 @@ scenarios in 99.1 seconds; the practical Electron clean-relaunch check passed
 again in 24.0 seconds, and mixed-version retirement/live-session preservation
 passed 2/2 in 23.1 seconds.
 
-Latest focused verification includes 14/14 host adjudication tests, 948/949
+Latest focused verification includes 15/15 host adjudication tests, 948/949
 focused production/RPC/renderer tests, 133/133 daemon discovery/adoption/
 retirement/access-failure tests, all three typechecks, and 215
 remote-runtime, multi-client, remote-server, SSH-provider, WSL-context, remote
@@ -533,8 +534,8 @@ additional contract gaps:
 - a stale PTY-exit callback could borrow a replacement or sibling handle from
   tab-wide state; lifecycle evidence now comes only from the exact callback PTY;
 - the legacy close endpoint accepted lifecycle reasons without incarnation
-  evidence and refused old mobile close taps; it now accepts only explicit user
-  intent, with reasonless compatibility limited to authenticated mobile clients;
+  evidence; it now accepts only explicit user intent, with reasonless
+  compatibility retained for authenticated legacy mobile and runtime clients;
 - keep-on-unknown preserved the PTY but could leave its client mirror hidden;
   the host now republishes unchanged authority when inventory is unavailable.
 
@@ -543,7 +544,7 @@ the fixture protocol list collision-safe. The final native no-build run passed
 both scenarios in 98.8 seconds, the fresh-build run passed in 137.1 seconds,
 mixed-version retirement passed, and practical Electron restart/input passed
 two scenarios with one intentionally skipped wedge scenario. Current-main
-remote recovery (112 tests), focused close/reconnect suites, all 14 host
+remote recovery (112 tests), focused close/reconnect suites, all 15 host
 adjudication cases, all typechecks, reliability gates, max-lines, changed lint,
 formatting, and diff checks pass. The full lint command remains blocked only by
 pre-existing current-main switch-exhaustiveness and localization findings; no
@@ -600,7 +601,7 @@ source-text assertion that does not match CRLF on Windows.
 | Reconnect bursts, app quit/relaunch, simultaneous clients, repeated IDs, profile and remote-runtime boundaries                              | Three router rebuilds, a full reconnect-client process exit/relaunch, parallel direct clients, and six desktop/two-profile lifecycle attempts per persisted ID are native. Environment-scoped close-intent and remote-runtime transport suites supply deterministic profile-switch/remote-server boundary proof.                                                   | Proven (native transport plus deterministic profile/provider boundaries) |
 | `shutdown-dispose-failed` has a bounded non-authoritative state without conflating process death                                            | The native refusal fixture loses pipe authority within the deadline, rejects a late client, logs the failure, proves its daemon/root/descendant still live, then cleans only exact recorded fixture incarnations.                                                                                                                                                  | Proven                                                                   |
 | Smallest immediate fix preserves legacy adoption and separates broader retirement/descendant cleanup                                        | Additive `session.tabs.closeLifecycle`, host liveness/incarnation adjudication, no destructive fallback, and state-only dead-headless retirement leave hello/adoption, #9138/#9229 retirement, and #9704/#9752 descendant semantics unchanged.                                                                                                                     | Proven                                                                   |
-| Missing evidence keeps/audits; retirement is incarnation/profile safe; one owner has destructive authority                                  | Host tests cover unavailable inventory, stale publication/handle, live split siblings, renderer ownership, and reasonless clients. Renderer tests cover exact environment handles and cross-profile intent isolation. Lifecycle requests never signal a PTY or relay renderer teardown.                                                                            | Proven                                                                   |
+| Missing evidence keeps/audits; retirement is incarnation/profile safe; one owner has destructive authority                                  | Host tests cover unavailable inventory, stale publication/handle, live split siblings, renderer ownership, and authenticated legacy versus unattributed reasonless callers. Renderer tests cover exact environment handles and cross-profile intent isolation. Lifecycle requests never signal a PTY or relay renderer teardown.                                   | Proven                                                                   |
 | Windows identity, dead-parent/never-adopted, ACL/access failure, rapid reconnect, and multi-client behavior                                 | Native CIM `CreationDate` identity is exact; the five-generation run covers rapid reconnect and concurrent clients. The 133-test daemon group covers never-adopted retirement, admission fencing, overlapping clients, and EACCES/EPERM process-signal failures.                                                                                                   | Proven (native identity/reconnect; deterministic ACL failure)            |
 | No production PowerShell/CIM hot path, polling/listener/handle leak, or reconnect storm                                                     | Process enumeration exists only in fixture helpers; production adds no subprocess or timer. Refreshes coalesce by environment/worktree, listener ownership is unchanged, every fixture allocation has bounded cleanup, and 25-burst stress evidence is recorded above.                                                                                             | Proven                                                                   |
 | Cross-platform, SSH, WSL, remote-server, and multiple-client compatibility                                                                  | 215 deterministic tests cover remote runtime/server, shared control, SSH provider, WSL host context, and PTY transport. Platform-specific fixture behavior is runtime-gated.                                                                                                                                                                                       | Deterministic proof complete; live Linux SSH/WSL unavailable             |

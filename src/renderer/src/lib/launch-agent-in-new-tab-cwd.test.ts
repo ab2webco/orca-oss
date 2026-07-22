@@ -122,11 +122,10 @@ describe('launchAgentInNewTab initial cwd', () => {
       expect.objectContaining({
         worktreeId: 'wt-1',
         environmentId: 'web-runtime',
-        promptAfterReady: {
-          content: 'continue the unfinished task',
-          submit: true,
-          forcePaste: true
-        }
+        prompt: 'continue the unfinished task',
+        promptDelivery: 'submit-after-ready',
+        pastePromptAfterReady: 'continue the unfinished task',
+        submitPastedPrompt: true
       })
     )
     expect(store.createTab).not.toHaveBeenCalled()

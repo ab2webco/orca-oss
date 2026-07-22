@@ -12,6 +12,7 @@ import {
   createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive,
   moveWebRuntimeSessionTab,
+  refreshWebRuntimeSessionTabsSnapshot,
   setWebRuntimeTabProps,
   splitWebRuntimeTerminal
 } from './web-runtime-session'
@@ -20,6 +21,13 @@ import {
   recordWebSessionCloseIntent,
   resetWebSessionCloseIntentForTests
 } from './web-session-close-intent'
+import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
+import {
+  confirmWebAgentSessionHandoffAfterCreate,
+  isWebAgentSessionHandoffPostCreateSnapshotConfirmed,
+  recordWebAgentSessionHandoff,
+  resetWebAgentSessionHandoffsForTests
+} from './web-agent-session-handoff'
 
 const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
@@ -80,6 +88,78 @@ function makeSnapshot(): RuntimeMobileSessionTabsResult {
   }
 }
 
+describe('refreshWebRuntimeSessionTabsSnapshot', () => {
+  afterEach(() => {
+    resetWebAgentSessionHandoffsForTests()
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('confirms only the exact handoff after its post-create list completes', async () => {
+    const runtimeCall = vi.fn().mockResolvedValue({
+      id: 'list',
+      ok: true,
+      result: makeSnapshot()
+    })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+    mocks.applyFreshWebSessionTabsSnapshot.mockImplementation((state) => state)
+    recordWebAgentSessionHandoff({
+      environmentId: ENVIRONMENT_ID,
+      worktreeId: WORKTREE_ID,
+      provisionalTabId: 'provisional-a',
+      hostTabId: 'host-a',
+      hostTerminalHandle: 'term_host-a'
+    })
+    recordWebAgentSessionHandoff({
+      environmentId: ENVIRONMENT_ID,
+      worktreeId: WORKTREE_ID,
+      provisionalTabId: 'provisional-b',
+      hostTabId: 'host-b',
+      hostTerminalHandle: 'term_host-b'
+    })
+
+    await refreshWebRuntimeSessionTabsSnapshot(ENVIRONMENT_ID, WORKTREE_ID, {
+      acceptCurrentSnapshot: true,
+      confirmAgentSessionHandoff: {
+        provisionalTabId: 'provisional-a',
+        hostTabId: 'host-a',
+        hostTerminalHandle: 'term_host-a'
+      }
+    })
+
+    const confirmed = (provisionalTabId: string): boolean =>
+      isWebAgentSessionHandoffPostCreateSnapshotConfirmed({
+        environmentId: ENVIRONMENT_ID,
+        worktreeId: WORKTREE_ID,
+        provisionalTabId
+      })
+    expect(confirmed('provisional-a')).toBe(true)
+    expect(confirmed('provisional-b')).toBe(false)
+    expect(mocks.acceptReplayedWebSessionTabsSnapshot).toHaveBeenCalledWith(
+      ENVIRONMENT_ID,
+      WORKTREE_ID
+    )
+
+    recordWebAgentSessionHandoff({
+      environmentId: ENVIRONMENT_ID,
+      worktreeId: WORKTREE_ID,
+      provisionalTabId: 'provisional-a',
+      hostTabId: 'host-a',
+      hostTerminalHandle: 'term_host-a-replacement'
+    })
+    confirmWebAgentSessionHandoffAfterCreate({
+      environmentId: ENVIRONMENT_ID,
+      worktreeId: WORKTREE_ID,
+      provisionalTabId: 'provisional-a',
+      hostTabId: 'host-a',
+      hostTerminalHandle: 'term_host-a'
+    })
+    expect(confirmed('provisional-a')).toBe(false)
+  })
+})
+
 describe('activateWebRuntimeSessionWorktree', () => {
   beforeEach(() => {
     vi.stubGlobal('__ORCA_WEB_CLIENT__', true)
@@ -92,6 +172,7 @@ describe('activateWebRuntimeSessionWorktree', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    clearRuntimeCompatibilityCacheForTests()
     vi.clearAllMocks()
   })
 
@@ -162,6 +243,7 @@ describe('createWebRuntimeSessionBrowserTab', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    clearRuntimeCompatibilityCacheForTests()
     vi.clearAllMocks()
   })
 
@@ -441,14 +523,16 @@ describe('createWebRuntimeSessionTerminal', () => {
     })
     mocks.applyFreshWebSessionTabsSnapshot.mockReturnValue({ state: 'after' })
     mocks.resolveHostSessionTabIdForWebSessionTab.mockReturnValue(null)
+    mocks.deliverLaunchPromptToAgentTab.mockResolvedValue(true)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    clearRuntimeCompatibilityCacheForTests()
     vi.clearAllMocks()
   })
 
-  it('creates paired web terminals through session tabs so host activation is mirrored', async () => {
+  it('creates paired web agents through host authority so activation is mirrored', async () => {
     const snapshot = {
       ...makeSnapshot(),
       snapshotVersion: 2,
@@ -470,13 +554,36 @@ describe('createWebRuntimeSessionTerminal', () => {
     const runtimeCall = vi
       .fn()
       .mockResolvedValueOnce({
+        id: 'status',
+        ok: true,
+        result: {
+          runtimeId: 'runtime-1',
+          graphStatus: 'ready',
+          runtimeProtocolVersion: 3,
+          minCompatibleRuntimeClientVersion: 2,
+          capabilities: ['agent-session.host-authority.v1']
+        }
+      })
+      .mockResolvedValueOnce({
         id: 'create-terminal',
         ok: true,
         result: {
-          tab: snapshot.tabs[0],
-          publicationEpoch: snapshot.publicationEpoch,
-          snapshotVersion: snapshot.snapshotVersion
+          terminal: {
+            id: 'pty-2',
+            handle: 'term_2',
+            title: 'Terminal 2',
+            cwd: '/repo/packages/app',
+            worktreeId: WORKTREE_ID,
+            tabId: 'host-tab-2',
+            leafId: 'leaf-1'
+          },
+          disposition: 'created'
         }
+      })
+      .mockResolvedValueOnce({
+        id: 'move',
+        ok: true,
+        result: { moved: true }
       })
       .mockResolvedValueOnce({
         id: 'list',
@@ -495,7 +602,6 @@ describe('createWebRuntimeSessionTerminal', () => {
     await expect(
       createWebRuntimeSessionTerminal({
         worktreeId: WORKTREE_ID,
-        afterTabId: 'web-terminal-host-tab-1%3A%3Aleaf-1',
         targetGroupId: 'group-left',
         command: "codex 'linked issue context'",
         cwd: '/repo/packages/app',
@@ -507,36 +613,44 @@ describe('createWebRuntimeSessionTerminal', () => {
           agentEnv: { CODEX_PROFILE: 'captured' }
         },
         launchAgent: 'codex',
+        prompt: 'linked issue context',
+        promptDelivery: 'draft',
+        agentArgs: '--model gpt-5 --profile captured',
+        launchPreferences: { model: 'gpt-5', effort: 'high' },
         viewMode: 'chat',
         activate: true
       })
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ status: 'created' })
 
-    expect(runtimeCall).toHaveBeenNthCalledWith(1, {
+    expect(runtimeCall).toHaveBeenNthCalledWith(2, {
       selector: ENVIRONMENT_ID,
-      method: 'session.tabs.createTerminal',
+      method: 'terminal.createAgentSession',
       params: {
+        clientOperationId: expect.stringMatching(/^\d{13}-[0-9a-f]{32}$/),
         worktree: `id:${WORKTREE_ID}`,
-        afterTabId: 'host-tab-1::leaf-1',
-        targetGroupId: 'group-left',
-        command: "codex 'linked issue context'",
-        cwd: '/repo/packages/app',
-        env: { CODEX_PROFILE: 'captured' },
-        envToDelete: ['CODEX_HOME', 'ORCA_CODEX_HOME'],
-        startupCommandDelivery: 'shell-ready',
-        launchConfig: {
-          agentArgs: '--model gpt-5',
-          agentEnv: { CODEX_PROFILE: 'captured' }
-        },
-        launchAgent: 'codex',
+        agent: 'codex',
+        prompt: 'linked issue context',
+        promptDelivery: 'draft',
+        agentArgs: '--model gpt-5 --profile captured',
+        launchPreferences: { model: 'gpt-5', effort: 'high' },
+        startupCwd: '/repo/packages/app',
         viewMode: 'chat',
-        activate: false,
-        select: true,
-        navigation: 'caller'
+        presentation: 'focused'
       },
       timeoutMs: 15_000
     })
-    expect(runtimeCall).toHaveBeenNthCalledWith(2, {
+    expect(runtimeCall).toHaveBeenNthCalledWith(3, {
+      selector: ENVIRONMENT_ID,
+      method: 'session.tabs.move',
+      params: {
+        worktree: `id:${WORKTREE_ID}`,
+        tabId: 'host-tab-2',
+        targetGroupId: 'group-left',
+        kind: 'move-to-group'
+      },
+      timeoutMs: 15_000
+    })
+    expect(runtimeCall).toHaveBeenNthCalledWith(4, {
       selector: ENVIRONMENT_ID,
       method: 'session.tabs.list',
       params: {
@@ -549,6 +663,57 @@ describe('createWebRuntimeSessionTerminal', () => {
       snapshot,
       ENVIRONMENT_ID
     )
+  })
+
+  it('keeps exact legacy ordering when structured creation cannot express afterTabId', async () => {
+    const runtimeCall = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'legacy-create',
+        ok: true,
+        result: {
+          tab: { id: 'host-tab-2' },
+          publicationEpoch: 'epoch-1',
+          snapshotVersion: 2
+        }
+      })
+      .mockResolvedValueOnce({ id: 'list', ok: true, result: makeSnapshot() })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        afterTabId: 'web-terminal-host-tab-1%3A%3Aleaf-1',
+        targetGroupId: 'group-left',
+        agentSessionKind: 'fresh',
+        agent: 'codex',
+        activate: true
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    expect(runtimeCall).toHaveBeenNthCalledWith(1, {
+      selector: ENVIRONMENT_ID,
+      method: 'session.tabs.createTerminal',
+      params: {
+        worktree: `id:${WORKTREE_ID}`,
+        afterTabId: 'host-tab-1::leaf-1',
+        targetGroupId: 'group-left',
+        command: undefined,
+        cwd: undefined,
+        startupCommandDelivery: undefined,
+        agent: 'codex',
+        activate: false,
+        select: true,
+        navigation: 'caller'
+      },
+      timeoutMs: 15_000
+    })
+    expect(runtimeCall.mock.calls.map(([request]) => request.method)).toEqual([
+      'session.tabs.createTerminal',
+      'session.tabs.list'
+    ])
   })
 
   it('can create a terminal without selecting the target worktree', async () => {
@@ -600,39 +765,353 @@ describe('createWebRuntimeSessionTerminal', () => {
         activate: true,
         selectWorktree: false
       })
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ status: 'created' })
 
     expect(setStateResults).not.toContainEqual({ activeWorktreeId: WORKTREE_ID })
   })
 
-  it('waits for the paired Agent input before submitting a generated prompt', async () => {
-    const terminal = {
-      type: 'terminal' as const,
-      id: 'host-tab-2::leaf-1',
-      parentTabId: 'host-tab-2',
-      leafId: 'leaf-1',
-      title: 'Claude',
-      terminal: null,
-      status: 'pending-handle' as const,
-      isActive: true
-    }
-    const snapshot = {
-      ...makeSnapshot(),
-      snapshotVersion: 2,
-      tabs: [terminal]
-    }
-    const runtimeCall = vi
-      .fn()
-      .mockResolvedValueOnce({
-        id: 'create-terminal',
-        ok: true,
-        result: {
-          tab: terminal,
-          publicationEpoch: snapshot.publicationEpoch,
-          snapshotVersion: snapshot.snapshotVersion
+  it.each(['session.tabs.move', 'session.tabs.list'] as const)(
+    'treats %s failure after host creation as accepted so callers do not duplicate the agent',
+    async (failedMethod) => {
+      const runtimeCall = vi.fn(async (request: { method: string }) => {
+        if (request.method === 'status.get') {
+          return {
+            id: 'status',
+            ok: true,
+            result: {
+              runtimeId: 'runtime-1',
+              graphStatus: 'ready',
+              runtimeProtocolVersion: 3,
+              minCompatibleRuntimeClientVersion: 2,
+              capabilities: ['agent-session.host-authority.v1']
+            }
+          }
         }
+        if (request.method === 'terminal.createAgentSession') {
+          return {
+            id: 'create',
+            ok: true,
+            result: {
+              terminal: {
+                id: 'pty-created',
+                handle: 'term_created',
+                title: 'Codex',
+                cwd: '/repo',
+                worktreeId: WORKTREE_ID,
+                tabId: 'host-tab-created',
+                leafId: 'leaf-created'
+              },
+              disposition: 'created'
+            }
+          }
+        }
+        if (request.method === failedMethod) {
+          throw new Error(`${failedMethod} unavailable`)
+        }
+        return { id: 'ok', ok: true, result: makeSnapshot() }
       })
-      .mockResolvedValueOnce({ id: 'list', ok: true, result: snapshot })
+      vi.stubGlobal('window', {
+        api: { runtimeEnvironments: { call: runtimeCall } }
+      })
+
+      await expect(
+        createWebRuntimeSessionTerminal({
+          worktreeId: WORKTREE_ID,
+          targetGroupId: failedMethod === 'session.tabs.move' ? 'group-left' : undefined,
+          launchAgent: 'codex',
+          activate: true
+        })
+      ).resolves.toEqual({ status: 'created' })
+
+      expect(
+        runtimeCall.mock.calls.filter(
+          ([request]) => request.method === 'terminal.createAgentSession'
+        )
+      ).toHaveLength(1)
+    }
+  )
+
+  it('replays an ambiguous fresh-create failure with the same operation ID', async () => {
+    const operationIds: string[] = []
+    let createAttempts = 0
+    const runtimeCall = vi.fn(async (request: { method: string; params?: unknown }) => {
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'runtime-1',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: ['agent-session.host-authority.v1']
+          }
+        }
+      }
+      if (request.method === 'terminal.createAgentSession') {
+        operationIds.push((request.params as { clientOperationId: string }).clientOperationId)
+        createAttempts += 1
+        if (createAttempts === 1) {
+          throw new Error('connection closed before response')
+        }
+        return {
+          id: 'create',
+          ok: true,
+          result: {
+            terminal: {
+              handle: 'term_replayed',
+              worktreeId: WORKTREE_ID,
+              tabId: 'host-tab-replayed',
+              leafId: 'leaf-replayed'
+            },
+            disposition: 'replayed'
+          }
+        }
+      }
+      return { id: 'list', ok: true, result: makeSnapshot() }
+    })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        launchAgent: 'codex',
+        targetGroupId: 'group-left'
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    expect(operationIds).toHaveLength(2)
+    expect(operationIds[0]).toBe(operationIds[1])
+  })
+
+  it('preserves the legacy fresh-agent path when host authority is unavailable', async () => {
+    const runtimeCall = vi.fn(async (request: { method: string; params?: unknown }) => {
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'old-runtime',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: []
+          }
+        }
+      }
+      if (request.method === 'session.tabs.createTerminal') {
+        return {
+          id: 'legacy-create',
+          ok: true,
+          result: {
+            tab: { id: 'legacy-tab-1' },
+            publicationEpoch: 'epoch-1',
+            snapshotVersion: 1
+          }
+        }
+      }
+      return { id: 'list', ok: true, result: makeSnapshot() }
+    })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        launchAgent: 'codex',
+        targetGroupId: 'group-left'
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    expect(runtimeCall).toHaveBeenNthCalledWith(2, {
+      selector: ENVIRONMENT_ID,
+      method: 'session.tabs.createTerminal',
+      params: {
+        worktree: `id:${WORKTREE_ID}`,
+        afterTabId: undefined,
+        targetGroupId: 'group-left',
+        command: undefined,
+        cwd: undefined,
+        startupCommandDelivery: undefined,
+        launchAgent: 'codex',
+        activate: false,
+        select: true,
+        navigation: 'caller'
+      },
+      timeoutMs: 15_000
+    })
+    expect(runtimeCall.mock.calls.map(([request]) => request.method)).toEqual([
+      'status.get',
+      'session.tabs.createTerminal',
+      'session.tabs.list'
+    ])
+  })
+
+  it('preserves the opaque legacy resume payload on an old host', async () => {
+    const runtimeCall = vi.fn(async (request: { method: string }) => {
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'old-runtime',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: []
+          }
+        }
+      }
+      if (request.method === 'session.tabs.createTerminal') {
+        return {
+          id: 'legacy-create',
+          ok: true,
+          result: { tab: { id: 'legacy-tab-1' }, publicationEpoch: 'epoch-1', snapshotVersion: 1 }
+        }
+      }
+      return { id: 'list', ok: true, result: makeSnapshot() }
+    })
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: runtimeCall } }
+    })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'resume',
+        launchAgent: 'codex',
+        command: "codex resume 'session-1'",
+        env: { CODEX_PROFILE: 'captured' },
+        launchConfig: {
+          agentCommand: 'codex',
+          agentArgs: '',
+          agentEnv: { CODEX_PROFILE: 'captured' }
+        },
+        providerSession: { key: 'session_id', id: 'session-1' }
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    expect(runtimeCall).toHaveBeenNthCalledWith(2, {
+      selector: ENVIRONMENT_ID,
+      method: 'session.tabs.createTerminal',
+      params: {
+        worktree: `id:${WORKTREE_ID}`,
+        afterTabId: undefined,
+        targetGroupId: undefined,
+        command: "codex resume 'session-1'",
+        cwd: undefined,
+        env: { CODEX_PROFILE: 'captured' },
+        startupCommandDelivery: undefined,
+        launchConfig: {
+          agentCommand: 'codex',
+          agentArgs: '',
+          agentEnv: { CODEX_PROFILE: 'captured' }
+        },
+        launchAgent: 'codex',
+        activate: false,
+        select: true,
+        navigation: 'caller'
+      },
+      timeoutMs: 15_000
+    })
+  })
+
+  it('preserves the exact resume when a new host reports an old execution owner', async () => {
+    const methods: string[] = []
+    const runtimeCall = vi.fn(async (request: { method: string }) => {
+      methods.push(request.method)
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'new-runtime',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: ['agent-session.host-authority.v1']
+          }
+        }
+      }
+      if (request.method === 'terminal.ensureAgentSession') {
+        return {
+          id: 'ensure',
+          ok: false,
+          error: {
+            code: 'agent_session_legacy_required',
+            message: 'agent_session_legacy_required'
+          }
+        }
+      }
+      return {
+        id: 'legacy-create',
+        ok: true,
+        result: { tab: { id: 'legacy-tab-1' }, publicationEpoch: 'epoch-1', snapshotVersion: 1 }
+      }
+    })
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
+
+    await expect(
+      createWebRuntimeSessionTerminal({
+        worktreeId: WORKTREE_ID,
+        agentSessionKind: 'resume',
+        launchAgent: 'codex',
+        command: "codex resume 'session-1'",
+        env: { CODEX_PROFILE: 'captured' },
+        providerSession: { key: 'session_id', id: 'session-1' }
+      })
+    ).resolves.toEqual({ status: 'created' })
+
+    expect(methods).toEqual([
+      'status.get',
+      'terminal.ensureAgentSession',
+      'session.tabs.createTerminal',
+      'session.tabs.list'
+    ])
+    expect(runtimeCall.mock.calls[2]?.[0]).toMatchObject({
+      params: {
+        command: "codex resume 'session-1'",
+        env: { CODEX_PROFILE: 'captured' },
+        launchAgent: 'codex'
+      }
+    })
+  })
+
+  it('delivers generated continuation context after host-authoritative creation', async () => {
+    const runtimeCall = vi.fn(async (request: { method: string; params?: unknown }) => {
+      if (request.method === 'status.get') {
+        return {
+          id: 'status',
+          ok: true,
+          result: {
+            runtimeId: 'runtime-1',
+            graphStatus: 'ready',
+            runtimeProtocolVersion: 3,
+            minCompatibleRuntimeClientVersion: 2,
+            capabilities: ['agent-session.host-authority.v1']
+          }
+        }
+      }
+      if (request.method === 'terminal.createAgentSession') {
+        return {
+          id: 'create',
+          ok: true,
+          result: {
+            terminal: {
+              handle: 'term_created',
+              worktreeId: WORKTREE_ID,
+              tabId: 'host-tab-2',
+              leafId: 'leaf-1'
+            },
+            disposition: 'created'
+          }
+        }
+      }
+      return { id: 'list', ok: true, result: makeSnapshot() }
+    })
     vi.stubGlobal('window', {
       api: { runtimeEnvironments: { call: runtimeCall } }
     })
@@ -640,14 +1119,20 @@ describe('createWebRuntimeSessionTerminal', () => {
     await expect(
       createWebRuntimeAgentSessionTerminal({
         worktreeId: WORKTREE_ID,
+        agentSessionKind: 'fresh',
         agent: 'claude',
         command: 'claude',
         promptAfterReady: 'continue the unfinished task',
         submitPrompt: true,
         forcePromptPaste: true
       })
-    ).resolves.toEqual({ created: true, promptDelivered: true })
+    ).resolves.toEqual({ outcome: { status: 'created' }, promptDelivered: true })
 
+    const createRequest = runtimeCall.mock.calls.find(
+      ([request]) => request.method === 'terminal.createAgentSession'
+    )?.[0]
+    expect(createRequest).toMatchObject({ params: { agent: 'claude' } })
+    expect(createRequest?.params).not.toHaveProperty('prompt')
     expect(mocks.deliverLaunchPromptToAgentTab).toHaveBeenCalledWith({
       tabId: 'web-terminal-host-tab-2',
       content: 'continue the unfinished task',

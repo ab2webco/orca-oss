@@ -8,6 +8,7 @@ import type {
   PtySpawnResult
 } from '../providers/types'
 import { spawnRequiredPtyReattach } from '../providers/required-pty-reattach-routing'
+import type { PtyIncarnationId } from '../../shared/pty-incarnation'
 
 export class DaemonPtyRouter implements IPtyProvider {
   private current: DaemonPtyAdapter
@@ -21,7 +22,11 @@ export class DaemonPtyRouter implements IPtyProvider {
     transformed?: boolean
     seq?: number
   }) => void)[] = []
-  private exitListeners: ((payload: { id: string; code: number }) => void)[] = []
+  private exitListeners: ((payload: {
+    id: string
+    code: number
+    incarnationId?: PtyIncarnationId
+  }) => void)[] = []
 
   constructor(opts: { current: DaemonPtyAdapter; legacy: DaemonPtyAdapter[] }) {
     this.current = opts.current
@@ -64,13 +69,33 @@ export class DaemonPtyRouter implements IPtyProvider {
     }
     const target = adapter ?? this.current
     const result = await target.spawn(opts)
-    this.sessionAdapters.set(result.id, target)
+    // Why: the adapter filters intentional recovery exits and canonical-ID races before publishing proof.
+    if (!result.exitedBeforeSpawnReply) {
+      this.sessionAdapters.set(result.id, target)
+    }
     return result
   }
 
   supportsGitCredentialGuardHost(sessionId?: string): boolean {
     const adapter = sessionId ? this.adapterFor(sessionId) : this.current
     return adapter.supportsGitCredentialGuardHost()
+  }
+
+  supportsAgentSessionClaims(): boolean {
+    // Why: a legacy daemon may still own a resumable PTY, so authority requires every route.
+    return this.allAdapters().every((adapter) => adapter.supportsAgentSessionClaims())
+  }
+
+  providesAgentSessionOwnerListings(ptyId: string): boolean {
+    const adapter = this.sessionAdapters.get(ptyId)
+    // Why: an unmapped id may belong to any preserved daemon generation;
+    // only an established route can make an omitted owner authoritative.
+    return adapter?.providesAgentSessionOwnerListings(ptyId) === true
+  }
+
+  supportsAgentSessionCreateOperations(): boolean {
+    // Fresh sessions always route to the current daemon; legacy adapters only retain old IDs.
+    return this.current.supportsAgentSessionCreateOperations()
   }
 
   async attach(id: string): Promise<void> {
@@ -230,7 +255,9 @@ export class DaemonPtyRouter implements IPtyProvider {
     return () => {}
   }
 
-  onExit(callback: (payload: { id: string; code: number }) => void): () => void {
+  onExit(
+    callback: (payload: { id: string; code: number; incarnationId?: PtyIncarnationId }) => void
+  ): () => void {
     this.exitListeners.push(callback)
     return () => {
       const idx = this.exitListeners.indexOf(callback)

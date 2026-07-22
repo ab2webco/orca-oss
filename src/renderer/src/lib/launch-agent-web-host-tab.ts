@@ -1,13 +1,15 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import {
   createWebRuntimeAgentSessionTerminal,
   createWebRuntimeSessionTerminal,
   isWebTerminalSurfaceTabId
 } from '@/runtime/web-runtime-session'
+import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { Tab, TuiAgent } from '../../../shared/types'
+import type { AgentPromptDelivery } from '../../../shared/agent-session-host-authority'
 import { translate } from '@/i18n/i18n'
+import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
 
 function removeStaleLocalAgentTabsForWebHostLaunch(worktreeId: string): void {
   const state = useAppStore.getState()
@@ -34,13 +36,12 @@ export function launchAgentInWebHostTab(args: {
   environmentId: string | null
   groupId?: string
   cwd?: string | null
-  hasPrompt: boolean
   startupPlan: AgentStartupPlan
-  promptAfterReady?: {
-    content: string
-    submit: boolean
-    forcePaste: boolean
-  }
+  prompt: string
+  promptDelivery: 'auto-submit' | 'draft' | 'submit-after-ready'
+  pastePromptAfterReady: string | null
+  submitPastedPrompt: boolean
+  agentArgs?: string | null
   viewMode?: Tab['viewMode']
   onPromptDelivered?: () => void
 }): Promise<{ delivered: boolean; failureNotified: boolean }> {
@@ -50,12 +51,19 @@ export function launchAgentInWebHostTab(args: {
     environmentId,
     groupId,
     cwd,
-    hasPrompt,
     startupPlan,
-    promptAfterReady,
+    prompt,
+    promptDelivery,
+    pastePromptAfterReady,
+    submitPastedPrompt,
+    agentArgs,
     viewMode,
     onPromptDelivered
   } = args
+  const hasPrompt = prompt.length > 0
+  const launchPreferences = toAgentLaunchPreferences(startupPlan.sessionOptions)
+  const structuredPromptDelivery: AgentPromptDelivery =
+    promptDelivery === 'draft' ? 'draft' : 'auto-submit'
   removeStaleLocalAgentTabsForWebHostLaunch(worktreeId)
   const launch = {
     worktreeId,
@@ -64,41 +72,44 @@ export function launchAgentInWebHostTab(args: {
     activate: true,
     ...(cwd?.trim() ? { cwd } : {}),
     ...(viewMode ? { viewMode } : {}),
+    agentSessionKind: 'fresh',
     ...(hasPrompt
       ? {
+          launchAgent: agent,
           command: startupPlan.launchCommand,
           ...(startupPlan.env ? { env: startupPlan.env } : {}),
           launchConfig: startupPlan.launchConfig,
-          launchAgent: agent,
           ...(startupPlan.startupCommandDelivery
             ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
             : {})
         }
-      : { agent })
-  }
-  const creation = promptAfterReady
-    ? createWebRuntimeAgentSessionTerminal({
-        ...launch,
-        agent,
-        promptAfterReady: promptAfterReady.content,
-        submitPrompt: promptAfterReady.submit,
-        forcePromptPaste: promptAfterReady.forcePaste
-      })
-    : createWebRuntimeSessionTerminal(launch)
+      : { agent }),
+    ...(hasPrompt && pastePromptAfterReady === null ? { prompt } : {}),
+    ...(hasPrompt && pastePromptAfterReady === null
+      ? { promptDelivery: structuredPromptDelivery }
+      : {}),
+    ...(agentArgs !== undefined ? { agentArgs } : {}),
+    ...(launchPreferences ? { launchPreferences } : {})
+  } as const
 
-  return creation.then((result) => {
-    const created = typeof result === 'boolean' ? result : result.created
-    const promptDelivered = typeof result === 'boolean' ? result : result.promptDelivered
+  const handleCreation = ({
+    outcome,
+    promptDelivered
+  }: {
+    outcome: Awaited<ReturnType<typeof createWebRuntimeSessionTerminal>>
+    promptDelivered: boolean
+  }): { delivered: boolean; failureNotified: boolean } => {
     // Why: created means the host accepted the launch, not that a local tab
     // exists; keep pruning stale local rows until the snapshot mirrors.
     removeStaleLocalAgentTabsForWebHostLaunch(worktreeId)
-    if (!created) {
+    if (outcome.status === 'failed') {
       toast.error(
-        translate(
-          'auto.lib.launch.agent.in.new.tab.11cce5cc77',
-          'Could not launch {{value0}} in a new terminal.',
-          { value0: agent }
-        )
+        outcome.message ||
+          translate(
+            'auto.lib.launch.agent.in.new.tab.11cce5cc77',
+            'Could not launch {{value0}} in a new terminal.',
+            { value0: agent }
+          )
       )
       return { delivered: false, failureNotified: true }
     }
@@ -107,5 +118,18 @@ export function launchAgentInWebHostTab(args: {
       onPromptDelivered?.()
     }
     return { delivered: promptDelivered, failureNotified: false }
-  })
+  }
+
+  if (pastePromptAfterReady !== null) {
+    return createWebRuntimeAgentSessionTerminal({
+      ...launch,
+      agent,
+      promptAfterReady: pastePromptAfterReady,
+      submitPrompt: submitPastedPrompt,
+      forcePromptPaste: promptDelivery === 'submit-after-ready'
+    }).then(handleCreation)
+  }
+  return createWebRuntimeSessionTerminal(launch).then((outcome) =>
+    handleCreation({ outcome, promptDelivered: outcome.status === 'created' && hasPrompt })
+  )
 }

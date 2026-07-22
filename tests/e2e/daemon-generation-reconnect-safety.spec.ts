@@ -3,7 +3,11 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test, type TestInfo } from '@playwright/test'
 import { DaemonClient } from '../../src/main/daemon/client'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
+import {
+  CLEAN_DISCONNECT_PROTOCOL_VERSION,
+  PROTOCOL_VERSION,
+  PTY_STARTUP_INGRESS_PROTOCOL_VERSION
+} from '../../src/main/daemon/types'
 import {
   cleanupDaemonGenerationFixtures,
   createDaemonGenerationRuntime,
@@ -22,9 +26,15 @@ import {
   type RecordedProcessIdentity
 } from './helpers/daemon-generation-processes'
 
-const GENERATION_PROTOCOLS = [21, 22, 23] as const
 const ALL_GENERATION_PROTOCOLS = [
-  ...new Set([...GENERATION_PROTOCOLS, PROTOCOL_VERSION - 1, PROTOCOL_VERSION])
+  ...new Set([
+    21,
+    22,
+    23,
+    CLEAN_DISCONNECT_PROTOCOL_VERSION,
+    PTY_STARTUP_INGRESS_PROTOCOL_VERSION,
+    PROTOCOL_VERSION
+  ])
 ]
 const configuredReconnectBursts = Number.parseInt(
   process.env.ORCA_DAEMON_GENERATION_RECONNECT_BURSTS ?? '3',

@@ -1269,7 +1269,17 @@
         "branchName": "Nombre de rama",
         "branchNamePlaceholder": "feature/mi-rama",
         "claudeAccount": "Cuenta",
-        "claudeAccountInheritGlobal": "Heredar configuración global"
+        "claudeAccountInheritGlobal": "Heredar configuración global",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
+        "connectingHost": "Connecting…",
+        "connectHost": "Connect",
+        "addHost": "Add host",
+        "addHostHint": "Register another machine or Orca server",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteOrcaServer": "Add Remote Orca Server",
+        "addRemoteOrcaServerHint": "Pair another Orca runtime",
+        "hostConnectionFailed": "Connection failed"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Crear worktree",
@@ -4534,7 +4544,14 @@
           "worktree": {
             "flow": {
               "c460fecc4a": "No se pudieron poner en reposo algunos espacios de trabajo",
-              "8bc3fc0671": "No se pudo poner en reposo el espacio de trabajo"
+              "8bc3fc0671": "No se pudo poner en reposo el espacio de trabajo",
+              "legacy": {
+                "unverified": "The older host runtime could not confirm terminal shutdown. The workspace was kept open; update the host and try again."
+              },
+              "host": {
+                "unverified": "The host could not confirm terminal shutdown. The workspace was kept open; check the connection and try again."
+              },
+              "retry": "The workspace was kept open. Try again; if the problem continues, check the host connection."
             }
           }
         },
@@ -4824,7 +4841,8 @@
           "sshImportFailed": "No se pudo importar la configuración SSH.",
           "importing": "Importando...",
           "importSshConfig": "Importar ~/.ssh/config",
-          "sshPersistenceDefault": "Los terminales remotos en este host seguirán activos hasta que los cierres o restablezcas el relay."
+          "sshPersistenceDefault": "Los terminales remotos en este host seguirán activos hasta que los cierres o restablezcas el relay.",
+          "advanced": "Advanced"
         },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "Error de reconexión",
@@ -10414,7 +10432,7 @@
             "openSupportedWorkspace": "Abre un workspace antes de reanudar una sesión.",
             "localSessionSshWorkspaceUnsupported": "El historial de esta sesión solo existe en este equipo. Para reanudarla, abre un workspace local. Los workspaces SSH no tienen acceso a ese historial.",
             "sessionHostMismatchUnsupported": "Esta sesión pertenece a un host diferente. Abre un espacio de trabajo en el mismo host para reanudarla.",
-            "resumePrepareFailed": "No se pudo preparar esta sesión para reanudarla."
+            "prepareSessionResumeFailed": "No se pudo preparar esta sesión para reanudarla."
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Buscando sesiones",
@@ -13538,6 +13556,11 @@
           "a2c6d9e0f7": "Solicitud de fusión",
           "91b5c8d7e6": "GitLab"
         }
+      }
+    },
+    "runtime": {
+      "webRuntimeSession": {
+        "remoteHostDisconnected": "The workspace is not connected to a remote Orca host."
       }
     }
   },

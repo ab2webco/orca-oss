@@ -1148,6 +1148,22 @@ export type WorkspaceSessionState = {
   defaultTerminalTabsAppliedByWorktreeId?: Record<string, true>
   /** Provider-session resume records captured when workspaces sleep. */
   sleepingAgentSessionsByPaneKey?: Record<string, SleepingAgentSessionRecord>
+  /** Host-issued process incarnation for each durable terminal surface. */
+  terminalPtyIncarnationsByPaneKey?: Record<string, string>
+  /** Monotonic host authority watermark for terminal membership in each repo. */
+  terminalTopologyRevisionByRepoId?: Record<string, number>
+  /** Legacy per-surface fences migrated into terminalTopologyRevisionByRepoId on load. */
+  terminalSurfaceTombstonesByPaneKey?: Record<
+    string,
+    {
+      worktreeId: string
+      parentTabId: string
+      leafId: string
+      ptyId: string
+      incarnationId: string
+      retiredAt: number
+    }
+  >
 }
 
 export type WorkspaceSessionPatch = Partial<WorkspaceSessionState>

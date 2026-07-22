@@ -17,6 +17,7 @@
     "lint:switch-exhaustiveness": "oxlint --type-aware --config config/oxlint-switch-exhaustiveness.json src/main src/preload src/shared src/relay src/cli src/renderer/src config tests --quiet",
     "prepare": "husky",
     "test": "node config/scripts/ensure-native-runtime.mjs --runtime=node && vitest run --config config/vitest.config.ts",
+    "test:repro:remote-agent-session": "pnpm run build:cli && pnpm run build:electron-vite && node config/scripts/remote-agent-session-authority-repro.mjs",
     "check:styled-scrollbars": "node config/scripts/check-styled-scrollbars.mjs",
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
     "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",

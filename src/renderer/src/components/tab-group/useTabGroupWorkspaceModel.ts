@@ -616,15 +616,18 @@ export function useTabGroupWorkspaceModel({
       },
       newTerminalWithShell: (shellOverride: string) => {
         void (async () => {
-          if (
-            await createWebRuntimeSessionTerminal({
-              worktreeId,
-              environmentId: getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), worktreeId),
-              targetGroupId: groupId,
-              command: shellOverride,
-              activate: true
-            })
-          ) {
+          const environmentId = getRuntimeEnvironmentIdForWorktree(
+            useAppStore.getState(),
+            worktreeId
+          )
+          const outcome = await createWebRuntimeSessionTerminal({
+            worktreeId,
+            environmentId,
+            targetGroupId: groupId,
+            command: shellOverride,
+            activate: true
+          })
+          if (outcome.status === 'created' || isWebRuntimeSessionActive(environmentId)) {
             return
           }
           const terminal = createTab(worktreeId, groupId, shellOverride)

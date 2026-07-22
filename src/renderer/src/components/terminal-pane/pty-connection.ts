@@ -30,6 +30,7 @@ import type { PtyBufferSnapshot, PtyConnectResult } from './pty-transport'
 import type { PtyTransportRecoveryState } from './pty-transport-types'
 import { createIpcPtyTransport } from './pty-transport'
 import { createRemoteRuntimePtyTransport } from './remote-runtime-pty-transport'
+import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
 import { getConnectionId } from '@/lib/connection-context'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
@@ -43,6 +44,11 @@ import {
   type HasPty
 } from './terminal-dead-session-reconcile'
 import type { PtyConnectionDeps } from './pty-connection-types'
+import {
+  consumeCommittedPtyShutdownExit,
+  deferPtyShutdownExit,
+  isHostPtySleepPending
+} from './pty-shutdown-exit-deferral'
 import {
   cancelPendingSafeFitContinuations,
   safeFit,
@@ -2449,17 +2455,31 @@ export function connectPanePty(
       })
     return claimKey
   }
-  const onExit = (ptyId: string): void => {
+  const onExit = (ptyId: string, opts: { preserveRendererBinding?: boolean } = {}): void => {
     if (handledExitPtyId === ptyId) {
       return
     }
+    if (deps.isPtyShutdownPending(ptyId) || isHostPtySleepPending(ptyId, runtimeEnvironmentId)) {
+      // Why: the transport emits exit once; replay it only after a verified commit so rollback keeps renderer state retryable.
+      deferPtyShutdownExit(ptyId, (settlement) => {
+        if (settlement === 'committed') {
+          onExit(ptyId, { preserveRendererBinding: true })
+        }
+      })
+      return
+    }
+    const preserveRendererBinding =
+      opts.preserveRendererBinding === true ||
+      consumeCommittedPtyShutdownExit(ptyId, runtimeEnvironmentId)
     resetRendererOrderedSeqForPtyExit(ptyId)
     const currentPaneTransport = deps.paneTransportsRef.current.get(pane.id)
     if (currentPaneTransport && currentPaneTransport !== transport) {
       // Why: an old transport can deliver a late exit after this pane has
       // rebound to a replacement PTY; only clear ownership for the exited id.
       handledExitPtyId = ptyId
-      deps.clearTabPtyId(deps.tabId, ptyId)
+      if (!preserveRendererBinding) {
+        deps.clearTabPtyId(deps.tabId, ptyId)
+      }
       deps.consumeSuppressedPtyExit(ptyId)
       scheduleRuntimeGraphSync()
       return
@@ -2474,12 +2494,14 @@ export function connectPanePty(
     // Why: the negotiating application died with its PTY; any replacement
     // session starts with kitty keyboard flags at zero.
     kittyKeyboardModes.reset()
-    const isSuppressedExit = deps.consumeSuppressedPtyExit(ptyId)
+    const isSuppressedExit = deps.consumeSuppressedPtyExit(ptyId) || preserveRendererBinding
     if (!isSuppressedExit) {
       deps.clearExitedPanePtyLayoutBinding(pane.id, ptyId)
     }
     deps.clearRuntimePaneTitle(deps.tabId, pane.id)
-    deps.clearTabPtyId(deps.tabId, ptyId)
+    if (!preserveRendererBinding) {
+      deps.clearTabPtyId(deps.tabId, ptyId)
+    }
     // Why: if the PTY exits abruptly (Ctrl-D, crash, shell termination) without
     // first emitting a non-agent title, the cache timer would persist as stale
     // state. Clear it unconditionally on PTY exit.
@@ -3335,6 +3357,7 @@ export function connectPanePty(
   const terminalColorQueryReplies = terminalTheme
     ? { foreground: terminalTheme.foreground, background: terminalTheme.background }
     : undefined
+  const agentLaunchPreferences = toAgentLaunchPreferences(paneStartup?.sessionOptions)
   const transportOptions = {
     cwd: deps.cwd,
     // Why: only fresh local IPC spawns may recover from a saved startup cwd
@@ -3363,6 +3386,18 @@ export function connectPanePty(
     ...(paneStartup?.resumeProviderSession
       ? { resumeProviderSession: paneStartup.resumeProviderSession }
       : {}),
+    ...((paneStartup?.initialAgentStatus?.prompt ?? paneStartup?.draftPrompt)
+      ? { agentPrompt: paneStartup?.initialAgentStatus?.prompt ?? paneStartup?.draftPrompt }
+      : {}),
+    ...(paneStartup?.initialAgentStatus?.prompt
+      ? { agentPromptDelivery: 'auto-submit' as const }
+      : paneStartup?.draftPrompt
+        ? { agentPromptDelivery: 'draft' as const }
+        : {}),
+    ...(paneStartup?.agentArgsOverride !== undefined
+      ? { agentArgsOverride: paneStartup.agentArgsOverride }
+      : {}),
+    ...(agentLaunchPreferences ? { agentLaunchPreferences } : {}),
     ...(launchToken ? { launchToken } : {}),
     ...(paneStartup?.launchAgent ? { launchAgent: paneStartup.launchAgent } : {}),
     ...(paneStartup?.telemetry ? { telemetry: paneStartup.telemetry } : {}),

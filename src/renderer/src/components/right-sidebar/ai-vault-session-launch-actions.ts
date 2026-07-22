@@ -85,14 +85,7 @@ export function useAiVaultSessionLaunchActions({
           )
         )
       } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : translate(
-                'auto.components.right.sidebar.AiVaultPanel.resumePrepareFailed',
-                'Could not prepare this session for resume.'
-              )
-        )
+        notifyAiVaultSessionPreparationFailure(error)
       }
     },
     [buildResumeCommand]
@@ -128,16 +121,20 @@ export function useAiVaultSessionLaunchActions({
             ...buildResumeStartup(preparedSession, targetId.worktreeId)
           })
           if (launchResult.tabId === null) {
-            void launchResult.runtimeLaunch.then((created) => {
-              if (!created) {
+            void launchResult.runtimeLaunch.then((outcome) => {
+              if (outcome.status === 'failed') {
                 toast.error(
-                  translate(
-                    'auto.lib.launch.agent.in.new.tab.11cce5cc77',
-                    'Could not launch {{value0}} in a new terminal.',
-                    { value0: agentLabel(session.agent) }
-                  )
+                  outcome.message ||
+                    translate(
+                      'auto.lib.launch.agent.in.new.tab.11cce5cc77',
+                      'Could not launch {{value0}} in a new terminal.',
+                      { value0: agentLabel(session.agent) }
+                    )
                 )
                 return
+              }
+              if (useAppStore.getState().activeWorktreeId !== targetId.worktreeId) {
+                activateAiVaultResumeWorkspace(targetId.worktreeId)
               }
               showQueuedToast()
             })
@@ -148,16 +145,7 @@ export function useAiVaultSessionLaunchActions({
           }
           showQueuedToast()
         })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.components.right.sidebar.AiVaultPanel.resumePrepareFailed',
-                  'Could not prepare this session for resume.'
-                )
-          )
-        })
+        .catch(notifyAiVaultSessionPreparationFailure)
     },
     [activeWorktree?.id, activeWorktreeId, buildResumeStartup, targetState]
   )
@@ -213,6 +201,17 @@ export function useAiVaultSessionLaunchActions({
     continuationRequest,
     handleContinuationDialogOpenChange
   }
+}
+
+function notifyAiVaultSessionPreparationFailure(error: unknown): void {
+  toast.error(
+    error instanceof Error
+      ? error.message
+      : translate(
+          'auto.components.right.sidebar.AiVaultPanel.prepareSessionResumeFailed',
+          'Could not prepare this session for resume.'
+        )
+  )
 }
 
 function resolveAiVaultTargetWorkspacePath(

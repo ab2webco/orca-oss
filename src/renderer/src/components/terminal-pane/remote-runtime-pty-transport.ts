@@ -5,6 +5,10 @@ import {
   toRemoteRuntimeClientErrorLike
 } from '../../../../shared/remote-runtime-client-error-classification'
 import type {
+  RuntimeCreateAgentSessionResult,
+  RuntimeEnsureAgentSessionResult
+} from '../../../../shared/agent-session-host-authority'
+import type {
   RuntimeMobileSessionTerminalClientTab,
   RuntimeMobileSessionTabsResult,
   RuntimeStatus,
@@ -48,11 +52,28 @@ import {
   RemoteRuntimePtyRecoveryState
 } from './remote-runtime-pty-recovery-state'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import {
+  createAgentSessionCreateOperation,
+  withAgentSessionCreateOperationId
+} from '@/runtime/agent-session-create-operation'
 import { replaceFitOverridePtyId, setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { replaceDriverPtyId, setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
 import { listRemoteRuntimeSessionTabsDeduped } from '@/runtime/remote-runtime-session-tabs-inflight'
 import { subscribeAcceptedWebSessionTerminalHandle } from '@/runtime/web-session-terminal-handle-events'
+import { runRemoteAgentSessionLaunch } from '@/runtime/remote-agent-session-launch'
+import { useAppStore } from '@/store'
+import { recordWebAgentSessionHandoff } from '@/runtime/web-agent-session-handoff'
+import { refreshWebRuntimeSessionTabsSnapshot } from '@/runtime/web-runtime-session'
+import {
+  bufferPtyShutdownData,
+  bufferPtyShutdownReplayData,
+  drainRolledBackPtyShutdownData,
+  isPtyDataHandlerShutdownPending,
+  ptyDataHandlers,
+  ptyReplayHandlers,
+  ptyShutdownLifecycleHandlers
+} from './pty-shutdown-data-suspension'
 
 const REMOTE_TERMINAL_INPUT_FLUSH_MS = 8
 const REMOTE_TERMINAL_VIEWPORT_FLUSH_MS = 33
@@ -60,6 +81,11 @@ const HOST_SESSION_ATTACH_POLL_MS = 150
 const HOST_SESSION_REPLACEMENT_POLL_MAX_MS = 1_000
 const HOST_SESSION_ATTACH_TIMEOUT_MS = 15_000
 const TERMINAL_CREATE_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000, 8000, 15_000, 30_000] as const
+
+type RemoteAgentSessionLaunchResult =
+  | RuntimeEnsureAgentSessionResult
+  | RuntimeCreateAgentSessionResult
+  | { terminal: RuntimeTerminalCreate; disposition?: undefined }
 
 function isRemoteTerminalStaleMessage(message: string): boolean {
   return message.includes('terminal_handle_stale')
@@ -69,7 +95,8 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
   return (
     message.includes('terminal_exited') ||
     message.includes('terminal_gone') ||
-    message.includes('no_connected_pty')
+    message.includes('no_connected_pty') ||
+    message.toLocaleLowerCase('en-US').includes('explicitly killed')
   )
 }
 
@@ -88,6 +115,10 @@ export function createRemoteRuntimePtyTransport(
     launchToken,
     launchAgent,
     terminalColorQueryReplies,
+    agentPrompt,
+    agentPromptDelivery,
+    agentArgsOverride,
+    agentLaunchPreferences,
     worktreeId,
     tabId,
     leafId,
@@ -140,6 +171,8 @@ export function createRemoteRuntimePtyTransport(
   } | null = null
   // Why: after an unknown result, every later attempt must reconcile first so older runtimes cannot duplicate the PTY.
   let terminalCreateNeedsReconciliation = false
+  // Why: once a structured outcome is ambiguous, only its stable host operation may be replayed.
+  let agentSessionRequiresHostAuthorityReplay = false
   let terminalCreateUnknownOutcomeError: unknown = null
   let lastConnectOptions: Parameters<PtyTransport['connect']>[0] | null = null
   const viewportClaimReadyWaiters = new Set<(ready: boolean) => void>()
@@ -154,6 +187,9 @@ export function createRemoteRuntimePtyTransport(
   // Why: tab/leaf ids are shared by paired viewers; the instance suffix keeps one viewer's refresh off peer records.
   const clientId = `desktop:${tabId ?? 'tab'}:${leafId ?? 'leaf'}:${createBrowserUuid()}`
   const terminalCreateMutationId = createBrowserUuid()
+  // Why: reconnect retries must replay one host operation instead of creating
+  // another fresh agent when the first response was lost.
+  const agentCreateOperation = createAgentSessionCreateOperation()
   const outputProcessor = createPtyOutputProcessor({
     onTitleChange,
     onBell,
@@ -162,6 +198,45 @@ export function createRemoteRuntimePtyTransport(
     onAgentExited,
     onAgentStatus
   })
+  const shutdownDataHandler = (
+    data: string,
+    meta?: Parameters<typeof outputProcessor.processData>[3]
+  ): void => {
+    outputProcessor.processData(data, storedCallbacks, undefined, meta)
+  }
+  const shutdownReplayHandler = (data: string): void => {
+    outputProcessor.processData(data, storedCallbacks, {
+      replayingBufferedData: true,
+      suppressAttentionEvents: true
+    })
+  }
+  const shutdownLifecycle = {
+    pause: outputProcessor.pausePendingSideEffects,
+    rollback: outputProcessor.flushPendingSideEffects,
+    commit: outputProcessor.clearAccumulatedState
+  }
+  const registerShutdownHandlers = (ptyId: string): void => {
+    ptyDataHandlers.set(ptyId, shutdownDataHandler)
+    ptyReplayHandlers.set(ptyId, shutdownReplayHandler)
+    ptyShutdownLifecycleHandlers.set(ptyId, shutdownLifecycle)
+    if (!isPtyDataHandlerShutdownPending(ptyId)) {
+      drainRolledBackPtyShutdownData(ptyId)
+    }
+  }
+  const unregisterShutdownHandlers = (ptyId: string | null): void => {
+    if (!ptyId) {
+      return
+    }
+    if (ptyDataHandlers.get(ptyId) === shutdownDataHandler) {
+      ptyDataHandlers.delete(ptyId)
+    }
+    if (ptyReplayHandlers.get(ptyId) === shutdownReplayHandler) {
+      ptyReplayHandlers.delete(ptyId)
+    }
+    if (ptyShutdownLifecycleHandlers.get(ptyId) === shutdownLifecycle) {
+      ptyShutdownLifecycleHandlers.delete(ptyId)
+    }
+  }
 
   function getRecoveryState(): PtyTransportRecoveryState {
     const phase = destroyed
@@ -194,6 +269,25 @@ export function createRemoteRuntimePtyTransport(
     }
     lastRecoveryStateKey = key
     storedCallbacks.onRecoveryStateChange?.(state)
+  }
+
+  function hostSnapshotOwnsLaunch(
+    result: RemoteAgentSessionLaunchResult,
+    environmentId: string
+  ): boolean {
+    if (result.disposition !== undefined) {
+      // Why: every structured launch is host-owned; provisional teardown must
+      // never close its canonical terminal while snapshot reconciliation catches up.
+      return true
+    }
+    const scopedPtyId = toRemoteRuntimePtyId(result.terminal.handle, environmentId)
+    return (useAppStore.getState().tabsByWorktree[worktreeId ?? ''] ?? []).some(
+      (tab) =>
+        tab.ptyId === scopedPtyId ||
+        (result.terminal.tabId !== undefined &&
+          isWebTerminalSurfaceTabId(tab.id) &&
+          toHostSessionTabId(tab.id) === result.terminal.tabId)
+    )
   }
 
   function findReadyHostSessionHandle(
@@ -366,6 +460,7 @@ export function createRemoteRuntimePtyTransport(
 
     handle = hostHandle
     remotePtyId = toRemoteRuntimePtyId(hostHandle, currentRuntimeEnvironmentId)
+    registerShutdownHandlers(remotePtyId)
     connected = true
     desiredViewport = {
       cols: options.cols ?? 80,
@@ -442,14 +537,23 @@ export function createRemoteRuntimePtyTransport(
     return recovery.currentPhase === 'disconnected'
   }
 
-  async function createTerminalWithUnknownOutcomeRecovery(
-    params: Record<string, unknown>,
+  async function createWithUnknownOutcomeRecovery(
+    kind: 'terminal' | 'agent-session',
+    invoke: (
+      timeoutMs: number,
+      reconcileExisting: boolean
+    ) => Promise<RemoteAgentSessionLaunchResult>,
     environmentId: string,
     expectedLifecycleEpoch: number
-  ): Promise<{ terminal: RuntimeTerminalCreate } | null> {
+  ): Promise<RemoteAgentSessionLaunchResult | null> {
     let retryAttempt = 0
-    let idempotencySupported = false
-    let reconcileExisting = terminalCreateNeedsReconciliation
+    // Structured operations already carry their replay proof; ordinary terminal.create
+    // must prove v2 support before retrying an outcome the client cannot observe.
+    let idempotencySupported = kind === 'agent-session'
+    let reconcileExisting =
+      kind === 'agent-session'
+        ? agentSessionRequiresHostAuthorityReplay
+        : terminalCreateNeedsReconciliation
     let recoveryDeadlineAt: number | null = recovery.isActive
       ? Date.now() + REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS
       : null
@@ -525,22 +629,18 @@ export function createRemoteRuntimePtyTransport(
         break
       }
       try {
-        return await callRuntimeForEnvironment<{ terminal: RuntimeTerminalCreate }>(
-          environmentId,
-          'terminal.create',
-          {
-            ...params,
-            ...(reconcileExisting ? { reconcileExisting: true } : {})
-          },
-          Math.min(15_000, createRemainingMs ?? 15_000)
-        )
+        return await invoke(Math.min(15_000, createRemainingMs ?? 15_000), reconcileExisting)
       } catch (error) {
         lastError = error
         const clientError = toRemoteRuntimeClientErrorLike(error)
         if (!isRecoverableRemoteRuntimeConnectionError(clientError)) {
           throw error
         }
-        terminalCreateNeedsReconciliation = true
+        if (kind === 'agent-session') {
+          agentSessionRequiresHostAuthorityReplay = true
+        } else {
+          terminalCreateNeedsReconciliation = true
+        }
         terminalCreateUnknownOutcomeError ??= error
         reconcileExisting = true
         const startsRecovery = recoveryDeadlineAt === null
@@ -734,6 +834,7 @@ export function createRemoteRuntimePtyTransport(
     clearPublishedHandleWait()
     clearPendingViewportClaim()
     const stalePtyId = remotePtyId
+    unregisterShutdownHandlers(stalePtyId)
     handle = null
     remotePtyId = null
     closeMultiplexedStream()
@@ -746,8 +847,10 @@ export function createRemoteRuntimePtyTransport(
   function rebindRemoteTerminalHandle(nextHandle: string): void {
     clearPublishedHandleWait()
     const replacedPtyId = remotePtyId
+    unregisterShutdownHandlers(replacedPtyId)
     handle = nextHandle
     remotePtyId = toRemoteRuntimePtyId(nextHandle, currentRuntimeEnvironmentId)
+    registerShutdownHandlers(remotePtyId)
     attachmentReady = false
     // Why: host handle rotation preserves the pane generation; only the store identity changes, not spawn/exit semantics.
     if (replacedPtyId) {
@@ -986,12 +1089,18 @@ export function createRemoteRuntimePtyTransport(
       callbacks: {
         onData: (data, meta) => {
           if (isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, undefined, meta)
+            if (subscribedPtyId && bufferPtyShutdownData(subscribedPtyId, data, meta)) {
+              return
+            }
+            shutdownDataHandler(data, meta)
           }
         },
         onSnapshot: (data, meta) => {
           // Why: an empty snapshot can still carry a pending mid-escape tail that must replay so the next live chunk completes it.
           if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
+            if (subscribedPtyId && bufferPtyShutdownReplayData(subscribedPtyId, data)) {
+              return
+            }
             outputProcessor.processData(data, storedCallbacks, {
               replayingBufferedData: true,
               suppressAttentionEvents: true,
@@ -1019,6 +1128,7 @@ export function createRemoteRuntimePtyTransport(
             return
           }
           outputProcessor.clearAccumulatedState()
+          unregisterShutdownHandlers(subscribedPtyId)
           connected = false
           connecting = false
           handle = null
@@ -1145,33 +1255,101 @@ export function createRemoteRuntimePtyTransport(
         const resumeProviderSessionToSend = options.resumeProviderSession ?? resumeProviderSession
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
-        const created = await createTerminalWithUnknownOutcomeRecovery(
-          {
-            worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
-            clientMutationId: terminalCreateMutationId,
-            ...(commandToSend !== undefined ? { command: commandToSend } : {}),
-            ...(startupCommandDeliveryToSend !== undefined
-              ? { startupCommandDelivery: startupCommandDeliveryToSend }
-              : {}),
-            ...(envToSend !== undefined ? { env: envToSend } : {}),
-            ...(envToDeleteToSend !== undefined ? { envToDelete: envToDeleteToSend } : {}),
-            ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
-            ...(resumeProviderSessionToSend !== undefined
-              ? { resumeProviderSession: resumeProviderSessionToSend }
-              : {}),
-            ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
-            ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
-            ...(terminalColorQueryReplies ? { terminalColorQueryReplies } : {}),
-            tabId,
-            leafId,
-            focus: false,
-            // Why: transport backs an already-mounted pane; activation is local state, not permission for remote UI reveal.
-            presentation: 'background',
-            ...(activate === true ? { activate: true } : {})
-          },
-          createEnvironmentId,
-          connectLifecycleEpoch
-        )
+        const legacyCreateParams = {
+          worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+          clientMutationId: terminalCreateMutationId,
+          ...(commandToSend !== undefined ? { command: commandToSend } : {}),
+          ...(startupCommandDeliveryToSend !== undefined
+            ? { startupCommandDelivery: startupCommandDeliveryToSend }
+            : {}),
+          ...(envToSend !== undefined ? { env: envToSend } : {}),
+          ...(envToDeleteToSend !== undefined ? { envToDelete: envToDeleteToSend } : {}),
+          ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
+          ...(resumeProviderSessionToSend !== undefined
+            ? { resumeProviderSession: resumeProviderSessionToSend }
+            : {}),
+          ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
+          ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
+          ...(terminalColorQueryReplies ? { terminalColorQueryReplies } : {}),
+          tabId,
+          leafId,
+          focus: false,
+          // Why: transport backs an already-mounted pane; activation is local state, not permission for remote UI reveal.
+          presentation: 'background' as const,
+          ...(activate === true ? { activate: true } : {})
+        }
+        const legacyCreate = () =>
+          createWithUnknownOutcomeRecovery(
+            'terminal',
+            (timeoutMs, reconcileExisting) =>
+              callRuntimeForEnvironment<{ terminal: RuntimeTerminalCreate }>(
+                createEnvironmentId,
+                'terminal.create',
+                {
+                  ...legacyCreateParams,
+                  ...(reconcileExisting ? { reconcileExisting: true } : {})
+                },
+                timeoutMs
+              ),
+            createEnvironmentId,
+            connectLifecycleEpoch
+          )
+        const hostAuthorityCreate = () =>
+          createWithUnknownOutcomeRecovery(
+            'agent-session',
+            (timeoutMs) =>
+              resumeProviderSessionToSend
+                ? callRuntimeForEnvironment<RuntimeEnsureAgentSessionResult>(
+                    createEnvironmentId,
+                    'terminal.ensureAgentSession',
+                    {
+                      kind: 'explicit',
+                      worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+                      agent: launchAgentToSend!,
+                      providerSession: resumeProviderSessionToSend,
+                      ...(agentArgsOverride !== undefined ? { agentArgs: agentArgsOverride } : {}),
+                      ...(agentLaunchPreferences
+                        ? { launchPreferences: agentLaunchPreferences }
+                        : {}),
+                      placement: { tabId, leafId },
+                      presentation: 'background'
+                    },
+                    timeoutMs
+                  )
+                : callRuntimeForEnvironment<RuntimeCreateAgentSessionResult>(
+                    createEnvironmentId,
+                    'terminal.createAgentSession',
+                    withAgentSessionCreateOperationId(
+                      {
+                        worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+                        agent: launchAgentToSend!,
+                        ...(agentPrompt ? { prompt: agentPrompt } : {}),
+                        ...(agentPromptDelivery ? { promptDelivery: agentPromptDelivery } : {}),
+                        ...(agentArgsOverride !== undefined
+                          ? { agentArgs: agentArgsOverride }
+                          : {}),
+                        ...(agentLaunchPreferences
+                          ? { launchPreferences: agentLaunchPreferences }
+                          : {}),
+                        placement: { tabId, leafId },
+                        presentation: 'background'
+                      },
+                      agentCreateOperation.clientOperationId
+                    ),
+                    timeoutMs
+                  ),
+            createEnvironmentId,
+            connectLifecycleEpoch
+          )
+        const created = launchAgentToSend
+          ? agentSessionRequiresHostAuthorityReplay
+            ? await hostAuthorityCreate()
+            : await runRemoteAgentSessionLaunch<RemoteAgentSessionLaunchResult | null>({
+                environmentId: createEnvironmentId,
+                hostAuthority: hostAuthorityCreate,
+                legacy: legacyCreate
+              })
+          : await legacyCreate()
         if (!created) {
           if (!destroyed && lifecycleEpoch === connectLifecycleEpoch) {
             connecting = false
@@ -1179,18 +1357,39 @@ export function createRemoteRuntimePtyTransport(
           }
           return
         }
+        const createdTerminal = created.terminal
+        if (created.disposition !== undefined && tabId && createdTerminal.tabId) {
+          recordWebAgentSessionHandoff({
+            environmentId: createEnvironmentId,
+            worktreeId,
+            provisionalTabId: tabId,
+            hostTabId: createdTerminal.tabId,
+            hostTerminalHandle: createdTerminal.handle
+          })
+          // Snapshot parity must not delay attachment to a terminal the host already created.
+          void refreshWebRuntimeSessionTabsSnapshot(createEnvironmentId, worktreeId, {
+            acceptCurrentSnapshot: true,
+            confirmAgentSessionHandoff: {
+              provisionalTabId: tabId,
+              hostTabId: createdTerminal.tabId,
+              hostTerminalHandle: createdTerminal.handle
+            }
+          })
+        }
         if (destroyed || lifecycleEpoch !== connectLifecycleEpoch) {
           if (
-            created.terminal.handle !== handle ||
-            createEnvironmentId !== currentRuntimeEnvironmentId
+            !hostSnapshotOwnsLaunch(created, createEnvironmentId) &&
+            (createdTerminal.handle !== handle ||
+              createEnvironmentId !== currentRuntimeEnvironmentId)
           ) {
-            await closeRemoteTerminal(created.terminal.handle, createEnvironmentId)
+            await closeRemoteTerminal(createdTerminal.handle, createEnvironmentId)
           }
           return
         }
-        handle = created.terminal.handle
+        handle = createdTerminal.handle
 
         remotePtyId = toRemoteRuntimePtyId(handle, currentRuntimeEnvironmentId)
+        registerShutdownHandlers(remotePtyId)
         connected = true
         desiredViewport = {
           cols: options.cols ?? 80,
@@ -1218,8 +1417,13 @@ export function createRemoteRuntimePtyTransport(
         if (!destroyed && lifecycleEpoch === connectLifecycleEpoch) {
           connecting = false
           recovery.cancel()
-          storedCallbacks.onError?.(runtimeTerminalErrorMessage(error))
-          emitRecoveryState()
+          const message = runtimeTerminalErrorMessage(error)
+          if (isRemoteTerminalGoneMessage(message)) {
+            handleRemoteTerminalError(error)
+          } else {
+            emitRecoveryState()
+            storedCallbacks.onError?.(message)
+          }
         }
         return undefined
       }
@@ -1238,6 +1442,7 @@ export function createRemoteRuntimePtyTransport(
       currentRuntimeEnvironmentId =
         getRemoteRuntimePtyEnvironmentId(options.existingPtyId) ?? runtimeEnvironmentId
       const previousHandle = handle
+      const previousPtyId = remotePtyId
       const nextHandle = getRemoteRuntimeTerminalHandle(options.existingPtyId)
       if (previousHandle && previousHandle !== nextHandle) {
         // Why: debounced input is scoped by the current terminal handle at flush time.
@@ -1245,6 +1450,7 @@ export function createRemoteRuntimePtyTransport(
       }
       handle = nextHandle
       if (!handle) {
+        unregisterShutdownHandlers(previousPtyId)
         connected = false
         connecting = false
         remotePtyId = null
@@ -1254,7 +1460,9 @@ export function createRemoteRuntimePtyTransport(
         return
       }
       // Why: legacy restored ids omit their runtime owner; canonicalize at attach so stores and lifecycle guards never share raw aliases.
+      unregisterShutdownHandlers(previousPtyId)
       remotePtyId = toRemoteRuntimePtyId(handle, currentRuntimeEnvironmentId)
+      registerShutdownHandlers(remotePtyId)
       connected = true
       desiredViewport = {
         cols: options.cols ?? 80,
@@ -1288,6 +1496,7 @@ export function createRemoteRuntimePtyTransport(
       terminalEnded = true
       clearPendingViewportClaim()
       const id = remotePtyId
+      unregisterShutdownHandlers(id)
       closeMultiplexedStream()
       handle = null
       remotePtyId = null
@@ -1308,6 +1517,7 @@ export function createRemoteRuntimePtyTransport(
       inputBatcher.clear()
       viewportBatcher.flush()
       outputProcessor.clearAccumulatedState()
+      unregisterShutdownHandlers(remotePtyId)
       connected = false
       connecting = false
       clearPendingViewportClaim()
@@ -1414,7 +1624,7 @@ export function createRemoteRuntimePtyTransport(
         !terminalEnded &&
         !connected &&
         !handle &&
-        terminalCreateNeedsReconciliation &&
+        (terminalCreateNeedsReconciliation || agentSessionRequiresHostAuthorityReplay) &&
         lastConnectOptions &&
         recovery.currentPhase === 'disconnected'
       ) {
