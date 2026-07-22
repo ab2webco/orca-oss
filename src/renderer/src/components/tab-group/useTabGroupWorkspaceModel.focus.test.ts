@@ -296,7 +296,8 @@ describe('useTabGroupWorkspaceModel terminal activation focus', () => {
     expect(mocks.closeWebRuntimeSessionTab).toHaveBeenCalledWith({
       worktreeId: 'wt-1',
       tabId: 'terminal-2',
-      environmentId: 'env-1'
+      environmentId: 'env-1',
+      reason: 'user'
     })
   })
 

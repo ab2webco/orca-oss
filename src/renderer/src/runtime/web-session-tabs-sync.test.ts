@@ -11,6 +11,8 @@ import {
   resetWebSessionFocusIntentForTests
 } from './web-session-focus-intent'
 import {
+  clearWebSessionCloseIntent,
+  isWebSessionCloseIntentPending,
   recordWebSessionCloseIntent,
   resetWebSessionCloseIntentForTests
 } from './web-session-close-intent'
@@ -159,11 +161,12 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(shouldApplyWebSessionTabsSnapshot(snapshot, ENV)).toBe(false)
 
     acceptReplayedWebSessionTabsSnapshot(ENV, snapshot.worktree)
+    const older = makeSnapshot([], { snapshotVersion: 4, activeTabType: null })
+    expect(shouldApplyWebSessionTabsSnapshot(older, ENV)).toBe(false)
     expect(shouldApplyWebSessionTabsSnapshot(snapshot, ENV)).toBe(true)
 
     // The replay reset re-primes tracking: ordering protection resumes for
     // subsequent frames (an older same-epoch frame is still rejected).
-    const older = makeSnapshot([], { snapshotVersion: 4, activeTabType: null })
     expect(shouldApplyWebSessionTabsSnapshot(older, ENV)).toBe(false)
     const newer = makeSnapshot([], { snapshotVersion: 6, activeTabType: null })
     expect(shouldApplyWebSessionTabsSnapshot(newer, ENV)).toBe(true)
@@ -258,7 +261,7 @@ describe('applyWebSessionTabsSnapshot', () => {
       isActive: true
     }
     // Client closed host-tab-1; an in-flight pre-close snapshot still lists it.
-    recordWebSessionCloseIntent(WT, 'host-tab-1', NOW)
+    recordWebSessionCloseIntent(ENV, WT, 'host-tab-1', NOW)
     const stalePreClose = applyWebSessionTabsSnapshot(
       makeState(),
       makeSnapshot([surface]),
@@ -281,6 +284,56 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect((reopened.tabsByWorktree?.[WT] ?? []).map((tab) => tab.id)).toContain(
       toWebTerminalSurfaceTabId('host-tab-1')
     )
+  })
+
+  it('reapplies an unchanged host snapshot after a lifecycle close is refused', () => {
+    const surface = {
+      type: 'terminal' as const,
+      id: HOST_SURFACE_ID,
+      parentTabId: 'host-tab-1',
+      leafId: LEAF_ID,
+      title: 'Terminal',
+      status: 'ready' as const,
+      terminal: 'term_host',
+      isActive: true
+    }
+    const authoritative = makeSnapshot([surface], { snapshotVersion: 6 })
+
+    const initial = makeState()
+    recordWebSessionCloseIntent(ENV, WT, 'host-tab-1', NOW)
+    const hiddenPatch = applyFreshWebSessionTabsSnapshot(initial, authoritative, ENV, NOW)
+    const hidden = { ...initial, ...(hiddenPatch as Partial<WebSessionTabsSyncState>) }
+    expect((hidden.tabsByWorktree[WT] ?? []).map((tab) => tab.id)).not.toContain(
+      toWebTerminalSurfaceTabId('host-tab-1')
+    )
+
+    // The host vetoed lifecycle cleanup because the PTY is still live. Its
+    // unchanged snapshot must become usable immediately, without a new publish.
+    clearWebSessionCloseIntent(ENV, WT, 'host-tab-1')
+    acceptReplayedWebSessionTabsSnapshot(ENV, WT)
+    const restoredPatch = applyFreshWebSessionTabsSnapshot(hidden, authoritative, ENV, NOW + 1)
+    const restored = { ...hidden, ...(restoredPatch as Partial<WebSessionTabsSyncState>) }
+    expect((restored.tabsByWorktree[WT] ?? []).map((tab) => tab.id)).toContain(
+      toWebTerminalSurfaceTabId('host-tab-1')
+    )
+  })
+
+  it('does not let a replay reset clear another close intent from an older snapshot', () => {
+    const current = makeSnapshot([], { snapshotVersion: 6, activeTabType: null })
+    expect(shouldApplyWebSessionTabsSnapshot(current, ENV)).toBe(true)
+    recordWebSessionCloseIntent(ENV, WT, 'host-tab-2', NOW)
+
+    acceptReplayedWebSessionTabsSnapshot(ENV, WT)
+    const state = makeState()
+    const stalePatch = applyFreshWebSessionTabsSnapshot(
+      state,
+      makeSnapshot([], { snapshotVersion: 5, activeTabType: null }),
+      ENV,
+      NOW + 1
+    )
+
+    expect(stalePatch).toBe(state)
+    expect(isWebSessionCloseIntentPending(ENV, WT, 'host-tab-2', NOW + 1)).toBe(true)
   })
 
   it('keeps a client reorder until the host echoes it (no order snap-back)', () => {

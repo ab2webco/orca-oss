@@ -253,7 +253,8 @@ export function useTabGroupWorkspaceModel({
           void closeWebRuntimeSessionTab({
             worktreeId,
             tabId: item.id,
-            environmentId: runtimeEnvironmentId
+            environmentId: runtimeEnvironmentId,
+            reason: 'user'
           })
         }
         destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
@@ -311,7 +312,8 @@ export function useTabGroupWorkspaceModel({
             void closeWebRuntimeSessionTab({
               worktreeId,
               tabId: item.id,
-              environmentId: runtimeEnvironmentId
+              environmentId: runtimeEnvironmentId,
+              reason: 'user'
             })
           }
           destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)

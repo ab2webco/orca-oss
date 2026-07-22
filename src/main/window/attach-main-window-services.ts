@@ -30,7 +30,8 @@ import {
   getUpdateStatus,
   quitAndInstall,
   setupAutoUpdater,
-  dismissNudge
+  dismissNudge,
+  type UpdateInstallMode
 } from '../updater'
 import { scheduleHistoryGc } from '../terminal-history'
 import { hydrateLocalPtyRegistryAtBoot } from '../memory/hydrate-local-pty-registry'
@@ -82,6 +83,7 @@ export function attachMainWindowServices(
     // Why: lets the PTY orphan sweep skip the one crash-recovery reload (#5787).
     isRecoveryReloadInFlight?: (webContentsId: number) => boolean
     onBeforeUpdateQuit?: () => void | Promise<void>
+    updateInstallMode?: UpdateInstallMode
   },
   // Why: synchronous companion to prepareClaudeAuth — exempts per-worktree-
   // pinned (injected) Claude launches from the global account-switch block,
@@ -163,7 +165,8 @@ export function attachMainWindowServices(
       },
       setDismissedUpdateNudgeId: (id) => {
         store.updateUI({ dismissedUpdateNudgeId: id })
-      }
+      },
+      installMode: options?.updateInstallMode
     })
     logStartupMilestone('updater-setup-done')
   }

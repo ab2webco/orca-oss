@@ -52,6 +52,8 @@ import { resolveTerminalLayoutRoot } from './remote-terminal-layout-resolution'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 import { clearWebSessionFocusIntent, peekWebSessionFocusIntent } from './web-session-focus-intent'
 import {
+  clearWebSessionCloseIntentsForEnvironment,
+  clearWebSessionCloseIntentsForRuntimeWorktree,
   isWebSessionCloseIntentPending,
   reconcileWebSessionCloseIntents
 } from './web-session-close-intent'
@@ -86,6 +88,7 @@ type SnapshotFreshness = {
 }
 
 const latestSessionTabsSnapshotByWorktree = new Map<string, SnapshotFreshness>()
+const replayableSessionTabsSnapshotByWorktree = new Map<string, SnapshotFreshness>()
 const lastHostTerminalTabCountByWorktree = new Map<string, number>()
 const hostSessionTabIdByLocalKey = new Map<string, string>()
 
@@ -176,12 +179,27 @@ export function getLastKnownHostTerminalTabCount(
   )
 }
 
-// Why: a post-reconnect replay re-emits the snapshot with unchanged epoch/version; dropping the freshness entry lets the monotonic gate accept it instead of freezing the mirror (#7718).
+export function getLatestWebSessionTabsPublicationEpoch(
+  environmentId: string,
+  worktreeId: string
+): string | null {
+  return (
+    latestSessionTabsSnapshotByWorktree.get(sessionTabsFreshnessKey(environmentId, worktreeId))
+      ?.publicationEpoch ?? null
+  )
+}
+
+// Why: a replay may repeat the current epoch/version; permit only that exact
+// identity once so an older concurrent frame cannot bypass monotonic ordering.
 export function acceptReplayedWebSessionTabsSnapshot(
   environmentId: string,
   worktreeId: string
 ): void {
-  latestSessionTabsSnapshotByWorktree.delete(sessionTabsFreshnessKey(environmentId, worktreeId))
+  const key = sessionTabsFreshnessKey(environmentId, worktreeId)
+  const current = latestSessionTabsSnapshotByWorktree.get(key)
+  if (current) {
+    replayableSessionTabsSnapshotByWorktree.set(key, current)
+  }
 }
 
 export function shouldApplyWebSessionTabsSnapshot(
@@ -201,14 +219,25 @@ export function shouldApplyWebSessionTabsSnapshot(
   }
   rememberHostTerminalTabCount(environmentId, snapshot)
   const current = latestSessionTabsSnapshotByWorktree.get(key)
+  const replayable = replayableSessionTabsSnapshotByWorktree.get(key)
+  const isExactCurrentReplay = Boolean(
+    current &&
+    replayable &&
+    current.publicationEpoch === replayable.publicationEpoch &&
+    current.snapshotVersion === replayable.snapshotVersion &&
+    snapshot.publicationEpoch === replayable.publicationEpoch &&
+    snapshot.snapshotVersion === replayable.snapshotVersion
+  )
   // Why: snapshotVersion is monotonic only within one publicationEpoch (resets on host restart); reject as stale only within the same epoch, since a different epoch is a new generation and must apply.
   if (
     current &&
     current.publicationEpoch === snapshot.publicationEpoch &&
-    snapshot.snapshotVersion <= current.snapshotVersion
+    snapshot.snapshotVersion <= current.snapshotVersion &&
+    !isExactCurrentReplay
   ) {
     return false
   }
+  replayableSessionTabsSnapshotByWorktree.delete(key)
   latestSessionTabsSnapshotByWorktree.set(key, {
     publicationEpoch: snapshot.publicationEpoch,
     snapshotVersion: snapshot.snapshotVersion
@@ -283,6 +312,7 @@ export function shouldSyncAllRuntimeSessionTabs(args: {
 
 export function resetWebSessionTabsSnapshotFreshnessForTests(): void {
   latestSessionTabsSnapshotByWorktree.clear()
+  replayableSessionTabsSnapshotByWorktree.clear()
   lastHostTerminalTabCountByWorktree.clear()
   hostSessionTabIdByLocalKey.clear()
 }
@@ -300,9 +330,11 @@ export function _getWebSessionTabsTrackingCountsForTest(): {
 function clearWebSessionTabsTrackingForWorktree(environmentId: string, worktreeId: string): void {
   const key = sessionTabsFreshnessKey(environmentId, worktreeId)
   latestSessionTabsSnapshotByWorktree.delete(key)
+  replayableSessionTabsSnapshotByWorktree.delete(key)
   lastHostTerminalTabCountByWorktree.delete(key)
   clearWebRuntimeWakeTerminalRespawnForWorktree(worktreeId)
   clearWebSessionReorderIntentsForWorktree(worktreeId)
+  clearWebSessionCloseIntentsForRuntimeWorktree(environmentId, worktreeId)
   const keyPrefix = `${environmentId}:${worktreeId}:`
   for (const key of hostSessionTabIdByLocalKey.keys()) {
     if (key.startsWith(keyPrefix)) {
@@ -322,6 +354,11 @@ export function clearWebSessionTabsTrackingForEnvironment(environmentId: string)
       latestSessionTabsSnapshotByWorktree.delete(key)
     }
   }
+  for (const key of replayableSessionTabsSnapshotByWorktree.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      replayableSessionTabsSnapshotByWorktree.delete(key)
+    }
+  }
   for (const key of lastHostTerminalTabCountByWorktree.keys()) {
     if (key.startsWith(keyPrefix)) {
       lastHostTerminalTabCountByWorktree.delete(key)
@@ -333,6 +370,7 @@ export function clearWebSessionTabsTrackingForEnvironment(environmentId: string)
     }
   }
   clearAllWebRuntimeWakeTerminalRespawn()
+  clearWebSessionCloseIntentsForEnvironment(trimmedEnvironmentId)
 }
 
 function hostSessionTabMappingKey(args: {
@@ -1630,16 +1668,18 @@ export function applyWebSessionTabsSnapshot(
   const snapshotHostTabId = (tab: RuntimeMobileSessionTabsResult['tabs'][number]): string =>
     tab.type === 'terminal' ? tab.parentTabId : tab.id
   reconcileWebSessionCloseIntents(
+    environmentId,
     worktreeId,
     new Set(rawSnapshot.tabs.map((tab) => snapshotHostTabId(tab)))
   )
   const snapshot: RuntimeMobileSessionTabsResult = rawSnapshot.tabs.some((tab) =>
-    isWebSessionCloseIntentPending(worktreeId, snapshotHostTabId(tab), now)
+    isWebSessionCloseIntentPending(environmentId, worktreeId, snapshotHostTabId(tab), now)
   )
     ? {
         ...rawSnapshot,
         tabs: rawSnapshot.tabs.filter(
-          (tab) => !isWebSessionCloseIntentPending(worktreeId, snapshotHostTabId(tab), now)
+          (tab) =>
+            !isWebSessionCloseIntentPending(environmentId, worktreeId, snapshotHostTabId(tab), now)
         )
       }
     : rawSnapshot
