@@ -189,58 +189,8 @@ jobs:
           fi
           pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb --publish "$publish"
 
-  windows:
-    needs: version
-    runs-on: windows-latest
-    timeout-minutes: 90
-    steps:
-      - name: Checkout build ref
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.version.outputs.build_ref }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: package.json
-          cache: pnpm
-
-      - name: Install dependencies (with retry)
-        uses: nick-fields/retry@v4
-        with:
-          timeout_minutes: 15
-          max_attempts: 3
-          command: pnpm install --frozen-lockfile
-
-      # Why: packaging embeds native/windows-cli-launcher/.build/orca.exe,
-      # which build:native compiles with the inbox .NET Framework csc.exe.
-      - name: Build Windows native helpers
-        run: pnpm build:native
-
-      - name: Build desktop bundles
-        run: pnpm build:desktop
-
-      - name: Package and publish Windows artifacts
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Why: unsigned lab build — installable past SmartScreen, but Windows
-        # auto-update will NOT apply it (electron-updater's Authenticode check
-        # rejects unsigned installers and must never be disabled). Windows lab
-        # users update manually until the fork gets SignPath/Authenticode signing.
-        run: |
-          node config/scripts/ensure-native-runtime.mjs --runtime=electron
-          publish="always"
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            publish="never"
-          fi
-          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish "$publish"
-
   finalize:
-    needs: [version, mac, linux, windows]
+    needs: [version, mac, linux]
     if: inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
