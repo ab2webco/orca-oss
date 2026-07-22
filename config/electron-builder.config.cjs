@@ -390,10 +390,13 @@ module.exports = {
   // on Intel Macs. The beforeBuild hook performs Orca's targeted rebuild and
   // returns false so electron-builder does not rebuild optional cpu-features.
   npmRebuild: true,
+  // Why: this fork publishes its own `-lab.N` releases here; keep in sync with
+  // src/main/update-feed-target.ts (that TS module is the runtime feed source
+  // but cannot be imported from this CJS config).
   publish: {
     provider: 'github',
-    owner: 'stablyai',
-    repo: 'orca',
+    owner: 'ab2webco',
+    repo: 'orca-oss',
     releaseType: 'release'
   }
 }
