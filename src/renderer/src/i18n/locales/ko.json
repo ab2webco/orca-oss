@@ -5075,7 +5075,11 @@
           "failBackRowDescription": "원래 계정의 쿼터가 회복되면 페일오버된 워크트리를 되돌립니다: 원클릭 동작으로 알림, 자동 전환 또는 엔드포인트 고정 유지.",
           "failBackNotify": "알림",
           "failBackAuto": "자동",
-          "failBackOff": "끄기"
+          "failBackOff": "끄기",
+          "resyncGlobalConfigDone": "Synced global MCP servers and skills into {{value0}} account(s).",
+          "resyncGlobalConfigFailed": "Failed to sync global config into accounts.",
+          "resyncGlobalConfigHint": "Copy your global MCP servers and skills into existing accounts",
+          "resyncGlobalConfig": "Sync global config"
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",

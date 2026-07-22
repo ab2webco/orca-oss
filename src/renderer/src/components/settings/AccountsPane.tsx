@@ -399,6 +399,7 @@ export function AccountsPane({
     | 'idle'
     | 'adding'
     | 'adding-endpoint'
+    | 'resyncing'
     | `reauth:${string}`
     | `remove:${string}`
     | `select:${string | 'system'}`
@@ -797,6 +798,30 @@ export function AccountsPane({
     }
   }
 
+  const runResyncGlobalConfig = async (): Promise<void> => {
+    setClaudeAction('resyncing')
+    try {
+      const processed = await window.api.claudeAccounts.resyncGlobalConfig()
+      toast.success(
+        translate(
+          'auto.components.settings.AccountsPane.resyncGlobalConfigDone',
+          'Synced global MCP servers and skills into {{value0}} account(s).',
+          { value0: String(processed) }
+        )
+      )
+    } catch (error) {
+      toast.error(
+        translate(
+          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
+          'Failed to sync global config into accounts.'
+        ),
+        { description: getClaudeAccountErrorDescription(error) }
+      )
+    } finally {
+      setClaudeAction('idle')
+    }
+  }
+
   const canSubmitCustomEndpoint =
     endpointLabelDraft.trim() !== '' &&
     endpointBaseUrlDraft.trim() !== '' &&
@@ -1105,6 +1130,30 @@ export function AccountsPane({
                 {translate(
                   'auto.components.settings.AccountsPane.addCustomEndpoint',
                   'Add custom endpoint'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => void runResyncGlobalConfig()}
+                // Why: pinned accounts run in isolated vaults; this copies the
+                // user's global MCP servers + skills into every existing account
+                // so a newly added global tool reaches accounts created earlier.
+                disabled={isRemoteAccountScope || claudeAction !== 'idle'}
+                title={translate(
+                  'auto.components.settings.AccountsPane.resyncGlobalConfigHint',
+                  'Copy your global MCP servers and skills into existing accounts'
+                )}
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                {claudeAction === 'resyncing' ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                {translate(
+                  'auto.components.settings.AccountsPane.resyncGlobalConfig',
+                  'Sync global config'
                 )}
               </Button>
               {claudeAction === 'adding' ? (

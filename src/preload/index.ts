@@ -1917,6 +1917,8 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
     remove: (args: { accountId: string }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:remove', args),
+    resyncGlobalConfig: (): Promise<number> =>
+      ipcRenderer.invoke('claudeAccounts:resyncGlobalConfig'),
     select: (args: {
       accountId: string | null
       runtime?: 'host' | 'wsl'

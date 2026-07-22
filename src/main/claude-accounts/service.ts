@@ -3,7 +3,7 @@ for login, credential capture, Keychain storage, selection, and rate-limit refre
 import { randomUUID } from 'node:crypto'
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, relative, resolve, sep } from 'node:path'
 import type {
   ClaudeManagedAccount,
@@ -12,7 +12,8 @@ import type {
 } from '../../shared/types'
 import type { Store } from '../persistence'
 import type { RateLimitService } from '../rate-limits/service'
-import { resolveClaudeCommand } from '../codex-cli/command'
+import { resolveClaudeCommand, resolveCliCommandOrNull } from '../codex-cli/command'
+import { hydrateShellPath, mergePathSegments } from '../startup/hydrate-shell-path'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
 import {
   getClaudeManagedAccountsRoot,
@@ -20,6 +21,11 @@ import {
   resolveOwnedClaudeManagedAuthPath,
   writeClaudeManagedAuthFile
 } from './managed-auth-path'
+import {
+  ensureVaultSkillsSymlink,
+  mergeMcpServersIntoVaultConfig,
+  readGlobalMcpServers
+} from './global-config-inheritance'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
   deleteManagedClaudeKeychainCredentials,
@@ -216,6 +222,9 @@ export class ClaudeAccountService {
         throw new Error('This Claude account is already added.')
       }
       await this.writeManagedAuth(accountId, managedAuthPath, captured)
+      // Inherit the user's global MCP servers + skills into the new vault so a
+      // pinned account starts with the same tooling as the global config.
+      this.seedGlobalConfigIntoVault(accountId, managedAuthPath, managedAuth.managedAuthRuntime)
 
       const now = Date.now()
       const account: ClaudeManagedAccount = {
@@ -313,6 +322,13 @@ export class ClaudeAccountService {
           null,
           2
         )}\n`
+      )
+      // Inherit the user's global MCP servers + skills into the new vault so a
+      // pinned custom-endpoint account starts with the same tooling.
+      this.seedGlobalConfigIntoVault(
+        accountId,
+        managedAuth.managedAuthPath,
+        managedAuth.managedAuthRuntime
       )
 
       const now = Date.now()
@@ -629,13 +645,34 @@ export class ClaudeAccountService {
 
   private getSnapshot(): ClaudeRateLimitAccountsState {
     const settings = this.store.getSettings()
+    const selection = normalizeClaudeRuntimeSelection(settings)
     return {
       accounts: settings.claudeManagedAccounts
         .map((account) => this.toSummary(account))
         .sort((a, b) => b.updatedAt - a.updatedAt),
-      activeAccountId: normalizeClaudeRuntimeSelection(settings).host,
-      activeAccountIdsByRuntime: normalizeClaudeRuntimeSelection(settings)
+      activeAccountId: selection.host,
+      activeAccountIdsByRuntime: selection,
+      activeModel: this.resolveActiveModelLabel(settings.claudeManagedAccounts, selection.host)
     }
+  }
+
+  /** Model label for the active account: live session model for OAuth, fixed endpointModel for custom endpoints. */
+  private resolveActiveModelLabel(
+    accounts: ClaudeManagedAccount[],
+    activeAccountId: string | null
+  ): string | null {
+    if (!activeAccountId) {
+      return null
+    }
+    const account = accounts.find((entry) => entry.id === activeAccountId)
+    if (!account) {
+      return null
+    }
+    if (account.authMethod === 'custom-endpoint') {
+      return account.endpointModel ?? null
+    }
+    const configDir = account.wslLinuxAuthPath ?? account.managedAuthPath
+    return this.rateLimits.getActiveClaudeSessionModel(configDir)
   }
 
   private toSummary(account: ClaudeManagedAccount): ClaudeManagedAccountSummary {
@@ -1209,15 +1246,103 @@ export class ClaudeAccountService {
     await deleteManagedClaudeKeychainCredentials(accountId)
   }
 
-  private runClaudeCommand(
+  /**
+   * Resolves the `claude` binary for a host (non-WSL) spawn, first hydrating PATH
+   * from the user's login shell. GUI-launched Orca inherits launchd's minimal
+   * PATH, so a user whose `claude` lives outside the static fallback dirs (custom
+   * npm prefix, non-standard version manager) would otherwise hit `spawn claude
+   * ENOENT`. Returns null when the binary genuinely cannot be found so the caller
+   * can surface a clear error instead of an opaque ENOENT. On Windows resolution
+   * stays synchronous (no POSIX login shell) and shell:true does the final lookup.
+   */
+  private async resolveHostClaudeCommand(): Promise<string | null> {
+    if (process.platform === 'win32') {
+      return resolveClaudeCommand()
+    }
+    try {
+      const hydration = await hydrateShellPath()
+      if (hydration.ok) {
+        mergePathSegments(hydration.segments)
+      }
+    } catch {
+      // Hydration is best-effort; fall through to whatever PATH we already have.
+    }
+    return resolveCliCommandOrNull('claude')
+  }
+
+  /**
+   * Seeds the user's global Claude config (MCP servers + skills) into a managed
+   * account's isolated vault so a pinned account inherits the same MCP servers
+   * and skills configured globally. Host-only for now (WSL/relay vaults live on a
+   * different filesystem — a follow-up). Best-effort: never blocks account
+   * creation or launch, and only ever writes through the ownership-checked path.
+   */
+  seedGlobalConfigIntoVault(
+    accountId: string,
+    managedAuthPath: string,
+    runtime: 'host' | 'wsl'
+  ): void {
+    if (runtime !== 'host') {
+      return
+    }
+    try {
+      const owned = resolveOwnedClaudeManagedAuthPath(accountId, managedAuthPath)
+      if (!owned) {
+        return
+      }
+      const home = homedir()
+      const globalMcpServers = readGlobalMcpServers(home)
+      if (globalMcpServers) {
+        const existing = readClaudeManagedAuthFile(owned, '.claude.json')
+        const merged = mergeMcpServersIntoVaultConfig(existing, globalMcpServers)
+        if (merged !== null) {
+          writeClaudeManagedAuthFile(owned, '.claude.json', merged)
+        }
+      }
+      ensureVaultSkillsSymlink(owned, home)
+    } catch (error) {
+      console.warn('[claude-accounts] Failed to seed global config into vault:', error)
+    }
+  }
+
+  /**
+   * Re-seeds global MCP servers + skills into every host managed account's vault.
+   * Lets a user propagate a newly added global MCP/skill to accounts that already
+   * exist, without re-creating them. Returns how many host vaults were processed.
+   */
+  resyncGlobalConfigIntoManagedVaults(): number {
+    const accounts = this.store.getSettings().claudeManagedAccounts
+    let processed = 0
+    for (const account of accounts) {
+      const runtime = account.managedAuthRuntime ?? 'host'
+      if (runtime !== 'host') {
+        continue
+      }
+      this.seedGlobalConfigIntoVault(account.id, account.managedAuthPath, runtime)
+      processed += 1
+    }
+    return processed
+  }
+
+  private async runClaudeCommand(
     args: string[],
     configDir: { windowsPath: string; linuxPath: string | null; wslDistro: string | null },
     timeoutMs: number,
     options?: { allowFailure?: boolean; signal?: AbortSignal; keepStdinOpen?: boolean }
   ): Promise<string> {
+    const isWsl = Boolean(configDir.linuxPath && configDir.wslDistro)
+    let hostCommand: string | null = null
+    if (!isWsl) {
+      hostCommand = await this.resolveHostClaudeCommand()
+      if (hostCommand === null) {
+        throw new Error(
+          'Claude CLI not found. Install the Claude Code CLI or make sure `claude` is on your PATH, then try again.'
+        )
+      }
+    }
     return new Promise((resolvePromise, rejectPromise) => {
       const spawnConfig =
-        configDir.linuxPath && configDir.wslDistro
+        isWsl && configDir.linuxPath && configDir.wslDistro
           ? {
               command: 'wsl.exe',
               args: [
@@ -1232,7 +1357,7 @@ export class ClaudeAccountService {
               shell: false
             }
           : {
-              command: resolveClaudeCommand(),
+              command: hostCommand as string,
               args,
               env: {
                 ...process.env,

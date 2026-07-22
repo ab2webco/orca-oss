@@ -5113,7 +5113,11 @@
           "failBackRowDescription": "When the original account recovers quota, return the failed-over worktree to it: notify with a one-click action, switch back automatically, or leave the endpoint pin as is.",
           "failBackNotify": "Notify",
           "failBackAuto": "Automatic",
-          "failBackOff": "Off"
+          "failBackOff": "Off",
+          "resyncGlobalConfigDone": "Synced global MCP servers and skills into {{value0}} account(s).",
+          "resyncGlobalConfigFailed": "Failed to sync global config into accounts.",
+          "resyncGlobalConfigHint": "Copy your global MCP servers and skills into existing accounts",
+          "resyncGlobalConfig": "Sync global config"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",

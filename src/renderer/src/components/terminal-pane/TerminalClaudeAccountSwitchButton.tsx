@@ -23,7 +23,8 @@ export function TerminalClaudeAccountSwitchButton({
   onSwitch: (account: ClaudeManagedAccountSummary) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const { oauthAccounts, endpointAccounts } = useClaudeAccountSwitchTargets(open)
+  const { oauthAccounts, endpointAccounts, activeAccountId, activeModel } =
+    useClaudeAccountSwitchTargets(open)
   const label = translate(
     'auto.components.terminalPane.TerminalClaudeAccountSwitchMenu.trigger',
     'Switch Account & Continue'
@@ -61,6 +62,8 @@ export function TerminalClaudeAccountSwitchButton({
             setOpen(false)
             onSwitch(account)
           }}
+          activeAccountId={activeAccountId}
+          activeModel={activeModel}
         />
       </DropdownMenuContent>
     </DropdownMenu>

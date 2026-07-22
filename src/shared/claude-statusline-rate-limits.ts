@@ -22,6 +22,8 @@ export type ClaudeStatusLineRateLimits = {
   configDir: string | null
   fiveHour: ClaudeStatusLineWindow | null
   sevenDay: ClaudeStatusLineWindow | null
+  /** Active model label the session reported (e.g. "Opus 4.8"); null/absent when the CLI omitted it. */
+  model?: string | null
 }
 
 function finiteNumber(value: unknown): number | undefined {
@@ -84,5 +86,20 @@ export function parseClaudeStatusLineBody(body: unknown): ClaudeStatusLineRateLi
     return null
   }
   const configDir = typeof fields.configDir === 'string' ? fields.configDir.trim() : ''
-  return { configDir: configDir || null, fiveHour, sevenDay }
+  return { configDir: configDir || null, fiveHour, sevenDay, model: parseModelLabel(payload) }
+}
+
+/** Reads the active model label the CLI ships alongside rate_limits (`model.display_name`, else `model.id`). */
+function parseModelLabel(payload: object): string | null {
+  const model = (payload as { model?: unknown }).model
+  if (typeof model !== 'object' || model === null) {
+    return null
+  }
+  const raw = model as { display_name?: unknown; id?: unknown }
+  const displayName = typeof raw.display_name === 'string' ? raw.display_name.trim() : ''
+  if (displayName) {
+    return displayName
+  }
+  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  return id || null
 }

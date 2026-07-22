@@ -178,6 +178,18 @@ export function resolveCliCommand(
   return versionManagerCandidate ?? commandName
 }
 
+// Why: resolveCliCommand returns the bare command name as a last-resort fallback
+// when nothing runnable was found. Callers that spawn without a shell need to
+// tell "resolved to a real path" apart from that fallback so they can fail with
+// a clear "CLI not found" message instead of an opaque `spawn <cmd> ENOENT`.
+export function resolveCliCommandOrNull(
+  commandName: string,
+  options: ResolveCommandOptions = {}
+): string | null {
+  const resolved = resolveCliCommand(commandName, options)
+  return resolved === commandName ? null : resolved
+}
+
 export function resolveCliCommands(
   commandNames: readonly string[],
   options: ResolveCommandOptions = {}

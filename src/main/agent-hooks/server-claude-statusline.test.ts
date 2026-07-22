@@ -51,7 +51,8 @@ describe('AgentHookServer /statusline/claude', () => {
       {
         configDir: '/home/dev/managed',
         fiveHour: { used_percentage: 12.5, resets_at: 1738425600 },
-        sevenDay: { used_percentage: 40, resets_at: 1712059200 }
+        sevenDay: { used_percentage: 40, resets_at: 1712059200 },
+        model: null
       }
     ])
   })

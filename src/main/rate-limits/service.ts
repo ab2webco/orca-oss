@@ -194,6 +194,9 @@ export class RateLimitService {
   private claudeFetchGeneration = 0
   // Why: statusline ingest must attribute live windows to the selected account without re-running the side-effectful auth sync per post.
   private lastClaudeAuthSnapshot: { configDir: string | null; provenance: string } | null = null
+  // Active model the live statusline last reported, kept per config dir so the
+  // account switcher can show which model the running session is on.
+  private lastLiveClaudeModel: { configDir: string | null; model: string } | null = null
   private opencodeFetchGeneration = 0
   private minimaxFetchGeneration = 0
   private lastOpencodeConfigHash = ''
@@ -1363,6 +1366,11 @@ export class RateLimitService {
       })
       return
     }
+    // Capture the active model even when no usage window is fresh — the switcher
+    // shows it independently of the usage bar.
+    if (event.model) {
+      this.lastLiveClaudeModel = { configDir: snapshot.configDir, model: event.model }
+    }
     const freshSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
     const freshWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
     if (!freshSession && !freshWeekly) {
@@ -1402,6 +1410,15 @@ export class RateLimitService {
         }
       }
     })
+  }
+
+  /** Model label the live session last reported for `configDir`; null when none matches. */
+  getActiveClaudeSessionModel(configDir: string | null): string | null {
+    const captured = this.lastLiveClaudeModel
+    if (!captured) {
+      return null
+    }
+    return normalizeClaudeConfigDir(configDir) === captured.configDir ? captured.model : null
   }
 
   private trackActiveFailureStreak(

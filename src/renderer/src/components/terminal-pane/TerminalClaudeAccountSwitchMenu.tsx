@@ -21,7 +21,8 @@ type Props = {
  * a Claude agent session.
  */
 export function TerminalClaudeAccountSwitchMenu({ enabled, onSwitch }: Props): React.JSX.Element {
-  const { oauthAccounts, endpointAccounts } = useClaudeAccountSwitchTargets(enabled)
+  const { oauthAccounts, endpointAccounts, activeAccountId, activeModel } =
+    useClaudeAccountSwitchTargets(enabled)
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
@@ -36,6 +37,8 @@ export function TerminalClaudeAccountSwitchMenu({ enabled, onSwitch }: Props): R
           oauthAccounts={oauthAccounts}
           endpointAccounts={endpointAccounts}
           onSelect={onSwitch}
+          activeAccountId={activeAccountId}
+          activeModel={activeModel}
         />
       </DropdownMenuSubContent>
     </DropdownMenuSub>

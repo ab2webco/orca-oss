@@ -2195,6 +2195,7 @@ export type PreloadApi = {
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     remove: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
+    resyncGlobalConfig: () => Promise<number>
     select: (args: {
       accountId: string | null
       runtime?: 'host' | 'wsl'

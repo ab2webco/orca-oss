@@ -5075,7 +5075,11 @@
           "failBackRowDescription": "当原始账户配额恢复时，将故障转移的工作树切回：一键操作通知、自动切回，或保持端点固定不变。",
           "failBackNotify": "通知",
           "failBackAuto": "自动",
-          "failBackOff": "关闭"
+          "failBackOff": "关闭",
+          "resyncGlobalConfigDone": "Synced global MCP servers and skills into {{value0}} account(s).",
+          "resyncGlobalConfigFailed": "Failed to sync global config into accounts.",
+          "resyncGlobalConfigHint": "Copy your global MCP servers and skills into existing accounts",
+          "resyncGlobalConfig": "Sync global config"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",

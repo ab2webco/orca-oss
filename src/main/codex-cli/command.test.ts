@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   getVersionManagerBinPaths,
   resolveClaudeCommand,
+  resolveCliCommandOrNull,
   resolveCliCommands,
   resolveCodexCommand
 } from './command'
@@ -271,6 +272,32 @@ describe('resolveCliCommands', () => {
 
     expect([...resolved.keys()]).toEqual(['claude'])
     expect(resolved.get('claude')).toBe(pathClaude)
+  })
+})
+
+describe('resolveCliCommandOrNull', () => {
+  afterEach(() => {
+    delete process.env.PATH
+    delete process.env.Path
+  })
+
+  it('returns the resolved path when the command is found', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-cli-or-null-'))
+    const pathDir = join(root, 'bin')
+    const commandPath = join(pathDir, 'claude')
+    makeExecutable(commandPath)
+
+    expect(
+      resolveCliCommandOrNull('claude', { platform: 'darwin', pathEnv: pathDir, homePath: root })
+    ).toBe(commandPath)
+  })
+
+  it('returns null instead of the bare fallback when nothing is found', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-cli-or-null-'))
+
+    expect(
+      resolveCliCommandOrNull('claude', { platform: 'linux', pathEnv: '', homePath: root })
+    ).toBeNull()
   })
 })
 

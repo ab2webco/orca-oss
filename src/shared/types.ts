@@ -2520,6 +2520,8 @@ export type ClaudeRateLimitAccountsState = {
   accounts: ClaudeManagedAccountSummary[]
   activeAccountId: string | null
   activeAccountIdsByRuntime?: ClaudeManagedAccountRuntimeSelection
+  /** Live model label the active account's session last reported (e.g. "Opus 4.8"); null when unknown. */
+  activeModel?: string | null
 }
 
 export type ClaudeManagedAccountRuntimeSelection = {

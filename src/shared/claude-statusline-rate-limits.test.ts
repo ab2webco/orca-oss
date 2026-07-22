@@ -24,8 +24,32 @@ describe('parseClaudeStatusLineBody', () => {
     expect(parsed).toEqual({
       configDir: '/home/dev/.config/managed-claude',
       fiveHour: { used_percentage: 23.5, resets_at: 1738425600 },
-      sevenDay: { used_percentage: 41.2, resets_at: 1712059200 }
+      sevenDay: { used_percentage: 41.2, resets_at: 1712059200 },
+      model: null
     })
+  })
+
+  it('extracts the active model label, preferring display_name over id', () => {
+    const withDisplayName = parseClaudeStatusLineBody(
+      formBody({
+        model: { id: 'claude-opus-4-8', display_name: 'Opus 4.8' },
+        rate_limits: { five_hour: { used_percentage: 10 } }
+      })
+    )
+    expect(withDisplayName?.model).toBe('Opus 4.8')
+
+    const idOnly = parseClaudeStatusLineBody(
+      formBody({
+        model: { id: 'claude-sonnet-5' },
+        rate_limits: { five_hour: { used_percentage: 10 } }
+      })
+    )
+    expect(idOnly?.model).toBe('claude-sonnet-5')
+
+    const noModel = parseClaudeStatusLineBody(
+      formBody({ rate_limits: { five_hour: { used_percentage: 10 } } })
+    )
+    expect(noModel?.model).toBeNull()
   })
 
   it('treats a missing/empty configDir as a system-default session', () => {

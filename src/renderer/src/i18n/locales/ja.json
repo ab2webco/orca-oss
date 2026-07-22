@@ -5075,7 +5075,11 @@
           "failBackRowDescription": "元のアカウントのクォータが回復したら、フェイルオーバーしたworktreeを戻します: ワンクリック操作で通知、自動で切り戻し、またはエンドポイントのピンをそのまま維持。",
           "failBackNotify": "通知",
           "failBackAuto": "自動",
-          "failBackOff": "オフ"
+          "failBackOff": "オフ",
+          "resyncGlobalConfigDone": "Synced global MCP servers and skills into {{value0}} account(s).",
+          "resyncGlobalConfigFailed": "Failed to sync global config into accounts.",
+          "resyncGlobalConfigHint": "Copy your global MCP servers and skills into existing accounts",
+          "resyncGlobalConfig": "Sync global config"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",

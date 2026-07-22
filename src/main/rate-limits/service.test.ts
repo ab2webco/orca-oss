@@ -713,6 +713,27 @@ describe('RateLimitService', () => {
     }
   })
 
+  it('captures the active model from statusline posts and returns it only for the matching config dir', async () => {
+    vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 18))
+    mockFreshBackgroundProviderFetches()
+
+    const service = new RateLimitService()
+    // A fetch cycle sets the attribution snapshot (system-default => configDir null).
+    await service.refresh()
+    expect(service.getActiveClaudeSessionModel(null)).toBeNull()
+
+    service.ingestLiveClaudeRateLimits({
+      configDir: null,
+      fiveHour: { used_percentage: 20 },
+      sevenDay: null,
+      model: 'Opus 4.8'
+    })
+
+    expect(service.getActiveClaudeSessionModel(null)).toBe('Opus 4.8')
+    // A different account's config dir must not read the active model.
+    expect(service.getActiveClaudeSessionModel('/some/other/dir')).toBeNull()
+  })
+
   it('drops statusline posts before attribution is known or from a mismatched config dir', async () => {
     vi.useFakeTimers()
     try {
