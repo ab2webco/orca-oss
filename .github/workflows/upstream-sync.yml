@@ -1,0 +1,118 @@
+name: Sync from upstream (stablyai/orca)
+
+# Why: this fork tracks the official Orca repo. This workflow keeps a
+# `upstream-sync/main` branch pointed at upstream's newest main and opens (or
+# refreshes) a single PR so new upstream commits land through review. It NEVER
+# pushes to the fork's default branch and NEVER auto-resolves conflicts — the
+# 55-commit divergence means most syncs conflict (pty.ts, persistence.ts,
+# daemon/*, i18n locales), so a human resolves them in the PR.
+
+on:
+  schedule:
+    # Daily at 12:00 UTC. Adjust or remove if a different cadence is wanted.
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: Fork branch to open the sync PR against (default = repo default branch)
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Gate to the fork so the workflow no-ops if this file ever reaches upstream
+    # or another fork (mirrors the release-cut.yml canonical-repo guard).
+    if: github.repository == 'ab2webco/orca-oss'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve base branch
+        id: base
+        run: |
+          base="${{ inputs.base_branch }}"
+          if [[ -z "$base" ]]; then
+            base="${{ github.event.repository.default_branch }}"
+          fi
+          echo "branch=$base" >>"$GITHUB_OUTPUT"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/stablyai/orca.git 2>/dev/null \
+            || git remote set-url upstream https://github.com/stablyai/orca.git
+          git fetch upstream main --quiet
+
+      - name: Count new upstream commits
+        id: check
+        run: |
+          base="${{ steps.base.outputs.branch }}"
+          behind="$(git rev-list --count "origin/${base}..upstream/main")"
+          echo "behind=$behind" >>"$GITHUB_OUTPUT"
+          echo "Upstream is $behind commit(s) ahead of origin/${base}."
+
+      - name: Prepare sync branch
+        id: merge
+        if: steps.check.outputs.behind != '0'
+        run: |
+          base="${{ steps.base.outputs.branch }}"
+          sync_branch="upstream-sync/${base}"
+          # Start from the fork branch and try a real merge to detect conflicts.
+          git checkout -B "$sync_branch" "origin/${base}"
+          if git merge --no-edit --no-ff upstream/main; then
+            echo "conflicts=false" >>"$GITHUB_OUTPUT"
+            echo "Merge is clean — the PR can be merged directly."
+          else
+            # Leave no conflict markers behind: reset the branch to upstream's
+            # tip so the PR diff is meaningful and GitHub surfaces the conflicts
+            # when the reviewer merges. Conflict resolution happens in the PR.
+            git merge --abort
+            git reset --hard upstream/main
+            echo "conflicts=true" >>"$GITHUB_OUTPUT"
+            echo "Merge has conflicts — the reviewer must resolve them in the PR."
+          fi
+          git push -f origin "$sync_branch"
+          echo "branch=$sync_branch" >>"$GITHUB_OUTPUT"
+
+      - name: Open or update sync PR
+        if: steps.check.outputs.behind != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          base="${{ steps.base.outputs.branch }}"
+          head="${{ steps.merge.outputs.branch }}"
+          behind="${{ steps.check.outputs.behind }}"
+          conflicts="${{ steps.merge.outputs.conflicts }}"
+          if [[ "$conflicts" == "true" ]]; then
+            note="⚠️ **This sync has merge conflicts.** Resolve them locally (\`git merge upstream/main\`) or via the GitHub conflict editor before merging. Use a **merge commit** (not squash) to preserve upstream history."
+          else
+            note="✅ Clean merge. Use a **merge commit** (not squash) to preserve upstream history."
+          fi
+          body=$(printf '%s\n\n%s\n' "Automated sync of **${behind}** new commit(s) from \`stablyai/orca@main\` into \`${base}\`." "$note")
+          if gh pr view "$head" --json number >/dev/null 2>&1; then
+            gh pr edit "$head" --body "$body"
+            echo "Updated existing sync PR."
+          else
+            gh pr create \
+              --base "$base" \
+              --head "$head" \
+              --title "chore: sync ${behind} commit(s) from upstream stablyai/orca" \
+              --body "$body"
+          fi
