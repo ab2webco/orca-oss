@@ -119,6 +119,33 @@ export type ClaudeCustomEndpointAccountInput = {
   subagentModel?: string | null
 }
 
+// Edit variant: token is optional — a blank token keeps the stored one so the
+// user can change the URL/model without re-entering the secret.
+export type ClaudeCustomEndpointAccountUpdateInput = {
+  accountId: string
+  label: string
+  baseUrl: string
+  token?: string | null
+  model?: string | null
+  opusModel?: string | null
+  sonnetModel?: string | null
+  haikuModel?: string | null
+  subagentModel?: string | null
+}
+
+// Current endpoint config for pre-filling the edit dialog. The token is never
+// returned; hasToken tells the UI whether one is already stored.
+export type ClaudeCustomEndpointAccountConfig = {
+  label: string
+  baseUrl: string
+  model: string
+  opusModel: string | null
+  sonnetModel: string | null
+  haikuModel: string | null
+  subagentModel: string | null
+  hasToken: boolean
+}
+
 const DEFAULT_CUSTOM_ENDPOINT_MODEL = 'glm-5.1'
 // Why: the claude CLI stalls for minutes on slow GLM responses with the default timeout.
 const CUSTOM_ENDPOINT_API_TIMEOUT_MS = '3000000'
@@ -161,6 +188,38 @@ export class ClaudeAccountService {
     input: ClaudeCustomEndpointAccountInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.serializeMutation(() => this.doAddCustomEndpointAccount(input))
+  }
+
+  async updateCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountUpdateInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(() =>
+      this.withManagedAccountMutation(input.accountId, () =>
+        this.doUpdateCustomEndpointAccount(input)
+      )
+    )
+  }
+
+  /** Returns the current endpoint config (never the token) to pre-fill the edit dialog. */
+  getCustomEndpointAccountConfig(accountId: string): ClaudeCustomEndpointAccountConfig {
+    const account = this.requireAccount(accountId)
+    if (account.authMethod !== 'custom-endpoint') {
+      throw new Error('Only custom endpoint accounts have an editable endpoint config.')
+    }
+    const owned = resolveOwnedClaudeManagedAuthPath(accountId, account.managedAuthPath)
+    const env = owned ? this.readVaultEnv(owned) : {}
+    const str = (value: unknown): string | null =>
+      typeof value === 'string' && value.trim() !== '' ? value : null
+    return {
+      label: account.endpointLabel ?? account.email,
+      baseUrl: account.endpointBaseUrl ?? str(env.ANTHROPIC_BASE_URL) ?? '',
+      model: account.endpointModel ?? str(env.ANTHROPIC_MODEL) ?? '',
+      opusModel: str(env.ANTHROPIC_DEFAULT_OPUS_MODEL),
+      sonnetModel: str(env.ANTHROPIC_DEFAULT_SONNET_MODEL),
+      haikuModel: str(env.ANTHROPIC_DEFAULT_HAIKU_MODEL),
+      subagentModel: str(env.CLAUDE_CODE_SUBAGENT_MODEL),
+      hasToken: str(env.ANTHROPIC_AUTH_TOKEN) !== null
+    }
   }
 
   async reauthenticateAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
@@ -399,6 +458,133 @@ export class ClaudeAccountService {
       this.restoreClaudeSettings(previousSettings)
       await this.safeRemoveManagedAuth(accountId, managedAuth.managedAuthPath)
       throw error
+    }
+  }
+
+  private async doUpdateCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountUpdateInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const account = this.requireAccount(input.accountId)
+    if (account.authMethod !== 'custom-endpoint') {
+      throw new Error('Only custom endpoint accounts can be edited.')
+    }
+    if ((account.managedAuthRuntime ?? 'host') !== 'host') {
+      throw new Error('Editing custom endpoint accounts is only supported on this device.')
+    }
+    const label = input.label.trim()
+    if (!label) {
+      throw new Error('Enter a label for the custom endpoint account.')
+    }
+    const baseUrl = input.baseUrl.trim()
+    if (!this.isHttpUrl(baseUrl)) {
+      throw new Error('The endpoint base URL must be a valid http(s) URL.')
+    }
+    const model = this.normalizeModelName(input.model) ?? DEFAULT_CUSTOM_ENDPOINT_MODEL
+    const opusModel = this.normalizeModelName(input.opusModel)
+    const sonnetModel = this.normalizeModelName(input.sonnetModel)
+    const haikuModel = this.normalizeModelName(input.haikuModel)
+    const subagentModel = this.normalizeModelName(input.subagentModel)
+
+    const previousSettings = this.store.getSettings()
+    if (
+      previousSettings.claudeManagedAccounts.some(
+        (other) =>
+          other.id !== input.accountId &&
+          other.authMethod === 'custom-endpoint' &&
+          other.email.trim().toLowerCase() === label.toLowerCase()
+      )
+    ) {
+      throw new Error('A custom endpoint account with this label already exists.')
+    }
+
+    const owned = resolveOwnedClaudeManagedAuthPath(input.accountId, account.managedAuthPath)
+    if (!owned) {
+      throw new Error('Managed Claude auth storage is not owned by Orca.')
+    }
+
+    // Preserve any settings.json keys we did not author (e.g. seeded hooks) and
+    // any extra env; only the endpoint fields below are rewritten.
+    let existingSettings: Record<string, unknown> = {}
+    const existingRaw = readClaudeManagedAuthFile(owned, 'settings.json')
+    if (existingRaw) {
+      try {
+        const parsed: unknown = JSON.parse(existingRaw)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existingSettings = parsed as Record<string, unknown>
+        }
+      } catch {
+        // Unparseable — rebuild from scratch rather than fail the edit.
+      }
+    }
+    const existingEnv = this.readVaultEnv(owned)
+    const providedToken = (input.token ?? '').trim()
+    const existingToken =
+      typeof existingEnv.ANTHROPIC_AUTH_TOKEN === 'string' ? existingEnv.ANTHROPIC_AUTH_TOKEN : ''
+    const token = providedToken || existingToken
+    if (!token) {
+      throw new Error('Enter the endpoint API token.')
+    }
+
+    const nextEnv: Record<string, unknown> = {
+      ...existingEnv,
+      ANTHROPIC_BASE_URL: baseUrl,
+      ANTHROPIC_AUTH_TOKEN: token,
+      ANTHROPIC_MODEL: model,
+      API_TIMEOUT_MS: CUSTOM_ENDPOINT_API_TIMEOUT_MS
+    }
+    // A cleared tier field (null) removes the mapping so it falls back to the base model.
+    const applyTier = (key: string, value: string | null): void => {
+      if (value !== null) {
+        nextEnv[key] = value
+      } else {
+        delete nextEnv[key]
+      }
+    }
+    applyTier('ANTHROPIC_DEFAULT_OPUS_MODEL', opusModel)
+    applyTier('ANTHROPIC_DEFAULT_SONNET_MODEL', sonnetModel)
+    applyTier('ANTHROPIC_DEFAULT_HAIKU_MODEL', haikuModel)
+    applyTier('CLAUDE_CODE_SUBAGENT_MODEL', subagentModel)
+
+    writeClaudeManagedAuthFile(
+      owned,
+      'settings.json',
+      `${JSON.stringify({ ...existingSettings, env: nextEnv }, null, 2)}\n`
+    )
+
+    const now = Date.now()
+    const updatedAccounts = previousSettings.claudeManagedAccounts.map((other) =>
+      other.id === input.accountId
+        ? {
+            ...other,
+            email: label,
+            endpointLabel: label,
+            endpointBaseUrl: baseUrl,
+            endpointModel: model,
+            updatedAt: now
+          }
+        : other
+    )
+    this.store.updateSettings({ claudeManagedAccounts: updatedAccounts })
+    return this.getSnapshot()
+  }
+
+  /** Reads the `env` map from a vault settings.json; {} when absent/unparseable. */
+  private readVaultEnv(owned: string): Record<string, unknown> {
+    try {
+      const raw = readClaudeManagedAuthFile(owned, 'settings.json')
+      if (!raw) {
+        return {}
+      }
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const env = (parsed as Record<string, unknown>).env
+        if (env && typeof env === 'object' && !Array.isArray(env)) {
+          return env as Record<string, unknown>
+        }
+      }
+      return {}
+    } catch {
+      return {}
     }
   }
 

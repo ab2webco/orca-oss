@@ -2211,6 +2211,27 @@ export type PreloadApi = {
       haikuModel?: string | null
       subagentModel?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
+    updateCustomEndpoint: (args: {
+      accountId: string
+      label: string
+      baseUrl: string
+      token?: string | null
+      model?: string | null
+      opusModel?: string | null
+      sonnetModel?: string | null
+      haikuModel?: string | null
+      subagentModel?: string | null
+    }) => Promise<ClaudeRateLimitAccountsState>
+    getCustomEndpointConfig: (args: { accountId: string }) => Promise<{
+      label: string
+      baseUrl: string
+      model: string
+      opusModel: string | null
+      sonnetModel: string | null
+      haikuModel: string | null
+      subagentModel: string | null
+      hasToken: boolean
+    }>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     remove: (args: {

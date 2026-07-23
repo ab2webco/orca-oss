@@ -1929,6 +1929,29 @@ const api = {
       haikuModel?: string | null
       subagentModel?: string | null
     }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:addCustomEndpoint', args),
+    updateCustomEndpoint: (args: {
+      accountId: string
+      label: string
+      baseUrl: string
+      token?: string | null
+      model?: string | null
+      opusModel?: string | null
+      sonnetModel?: string | null
+      haikuModel?: string | null
+      subagentModel?: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:updateCustomEndpoint', args),
+    getCustomEndpointConfig: (args: {
+      accountId: string
+    }): Promise<{
+      label: string
+      baseUrl: string
+      model: string
+      opusModel: string | null
+      sonnetModel: string | null
+      haikuModel: string | null
+      subagentModel: string | null
+      hasToken: boolean
+    }> => ipcRenderer.invoke('claudeAccounts:getCustomEndpointConfig', args),
     cancelPendingLogin: (): Promise<boolean> =>
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>
