@@ -138,10 +138,14 @@ export function resolveWorktreeOperationRouteResult(
       }
     }
   }
+  // Why: once the catalog is hydrated with zero saved runtimes, no remote host
+  // remains, so the workspace is local — even if runtimes were removed earlier.
+  // Gating on removedRuntimeEnvironmentIds here permanently stranded local
+  // terminals after a user deleted every paired host ("Workspace identity is
+  // ambiguous across hosts"). The removed-ids set is history, not a live owner.
   const mayBeLegacyLocal =
-    (savedRuntimeIds === undefined ||
-      (state.runtimeEnvironmentCatalogHydrated === true && savedRuntimeIds.length === 0)) &&
-    (state.removedRuntimeEnvironmentIds?.size ?? 0) === 0
+    savedRuntimeIds === undefined ||
+    (state.runtimeEnvironmentCatalogHydrated === true && savedRuntimeIds.length === 0)
   return mayBeLegacyLocal
     ? { kind: 'resolved', route: { executionHostId: 'local', runtimeEnvironmentId: null } }
     : { kind: 'missing' }

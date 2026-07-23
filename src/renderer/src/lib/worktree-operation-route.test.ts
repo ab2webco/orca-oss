@@ -194,6 +194,24 @@ describe('resolveWorktreeOperationRouteResult', () => {
     })
   })
 
+  it('routes locally after every paired host was removed (stale removed-ids must not strand local terminals)', () => {
+    expect(
+      resolveWorktreeOperationRouteResult(
+        {
+          repos: [{ id: 'repo-1' } as never],
+          runtimeEnvironments: [],
+          runtimeEnvironmentCatalogHydrated: true,
+          removedRuntimeEnvironmentIds: new Set(['deleted-hub-a', 'deleted-hub-b']),
+          worktreesByRepo: { 'repo-1': [worktree(undefined)] }
+        },
+        WORKTREE_ID
+      )
+    ).toEqual({
+      kind: 'resolved',
+      route: { executionHostId: 'local', runtimeEnvironmentId: null }
+    })
+  })
+
   it('fails an unknown stale worktree closed instead of routing it through focus', () => {
     expect(
       resolveWorktreeOperationRouteResult(
