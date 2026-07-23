@@ -537,7 +537,7 @@ describe('registerCoreHandlers', () => {
     expect(registerNativeChatHandlersMock).toHaveBeenCalled()
     expect(registerCliHandlersMock).toHaveBeenCalled()
     expect(registerPreflightHandlersMock).toHaveBeenCalled()
-    expect(registerShellHandlersMock).toHaveBeenCalled()
+    expect(registerShellHandlersMock).toHaveBeenCalledWith(store)
     expect(registerClipboardHandlersMock).toHaveBeenCalledWith(store)
     expect(registerUpdaterHandlersMock).toHaveBeenCalled()
     expect(setTrustedBrowserRendererWebContentsIdMock).toHaveBeenCalledWith(null)
