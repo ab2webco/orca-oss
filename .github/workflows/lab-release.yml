@@ -40,6 +40,7 @@ jobs:
       tag: ${{ steps.next.outputs.tag }}
       title: ${{ steps.next.outputs.title }}
       build_ref: ${{ steps.push.outputs.build_ref }}
+      prev: ${{ steps.push.outputs.prev }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v6
@@ -98,7 +99,7 @@ jobs:
           fi
           next="${{ steps.next.outputs.version }}"
           tag="${{ steps.next.outputs.tag }}"
-          # Capture the version being superseded so the nudge only re-checks
+          # Capture the version being superseded so finalize's nudge only re-checks
           # installs at-or-below it (the just-released $next stays out of range).
           prev="$(node -p "require('./package.json').version")"
           node -e "
@@ -106,21 +107,13 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
             pkg.version = '$next'
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
-            // Why: our fork hosts its own update nudge (see src/main/update-feed-target.ts
-            // UPDATE_NUDGE_URL). A fresh id each release re-nudges older installs to
-            // check; maxVersion=prev keeps the newest build from nudging itself.
-            fs.mkdirSync('whats-new', { recursive: true })
-            fs.writeFileSync('whats-new/nudge.json', JSON.stringify({
-              id: 'orca-lab-$next',
-              minVersion: '1.0.0',
-              maxVersion: '$prev'
-            }, null, 2) + '\n')
           "
-          git add package.json whats-new/nudge.json
+          git add package.json
           git commit -m "chore(release): bump version to $next"
           git tag "$tag"
           git push origin HEAD:main "$tag"
           echo "build_ref=$tag" >>"$GITHUB_OUTPUT"
+          echo "prev=$prev" >>"$GITHUB_OUTPUT"
 
   mac:
     needs: version
@@ -307,3 +300,41 @@ jobs:
           } > /tmp/notes.md
           gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
           echo "Release $tag published as Latest."
+
+      - name: Publish update nudge
+        # Why: written here (after mac/linux/windows assets are confirmed published)
+        # instead of in the version job, so installs polling the nudge never see a
+        # release announced before its latest-*.yml/zip/dmg assets exist — that race
+        # made the auto-updater resolve 'not-available' and permanently dismiss the
+        # campaign. See src/main/update-feed-target.ts UPDATE_NUDGE_URL.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          tag="${{ needs.version.outputs.tag }}"
+          prev="${{ needs.version.outputs.prev }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node -e "
+            const fs = require('fs')
+            // Why: a fresh id each release re-nudges older installs to check;
+            // maxVersion=prev keeps the newest build from nudging itself.
+            fs.mkdirSync('whats-new', { recursive: true })
+            fs.writeFileSync('whats-new/nudge.json', JSON.stringify({
+              id: 'orca-lab-$version',
+              minVersion: '1.0.0',
+              maxVersion: '$prev'
+            }, null, 2) + '\n')
+          "
+          git add whats-new/nudge.json
+          git commit -m "chore(release): announce $tag via update nudge"
+          # Why: the version job already pushed the bump commit to main; retry
+          # once with a rebase in case main moved between checkout and push.
+          push_nudge() {
+            git push origin HEAD:main
+          }
+          if ! push_nudge; then
+            git fetch origin main
+            git rebase origin/main
+            push_nudge
+          fi
