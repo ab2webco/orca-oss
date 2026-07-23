@@ -2,7 +2,10 @@ const CLAUDE_SESSION_MARKER_ENV_KEYS = [
   'CLAUDECODE',
   'CLAUDE_CODE_CHILD_SESSION',
   'CLAUDE_CODE_SESSION_ID',
-  'CLAUDE_CODE_ENTRYPOINT'
+  'CLAUDE_CODE_ENTRYPOINT',
+  // Why: also stripped by the prior downstream #9961 fix; kept here so the
+  // spawn-site strip is the single source of truth and no marker regresses.
+  'CLAUDE_CODE_BRIDGE_SESSION_ID'
 ] as const
 
 /** Return a copy of an inherited environment without Claude Code session markers. */
