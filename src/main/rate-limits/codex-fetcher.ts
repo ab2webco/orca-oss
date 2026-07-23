@@ -476,11 +476,45 @@ function mapRpcWindow(
 
   return {
     usedPercent: Math.min(100, Math.max(0, raw.usedPercent)),
-    // Why: windowDurationMins reports remaining minutes, but the UI needs the fixed bucket duration for "5h"/"wk" labels.
-    windowMinutes: expectedWindowMinutes,
+    // Why (#9969): windowDurationMins is the window's fixed duration (e.g. 10080
+    // = weekly), NOT remaining minutes — trust it so the window is classified and
+    // labeled by its real length. Fall back to the caller's expected duration only
+    // when Codex omits it (e.g. the backend path, which passes it separately).
+    windowMinutes:
+      typeof raw.windowDurationMins === 'number' &&
+      Number.isFinite(raw.windowDurationMins) &&
+      raw.windowDurationMins > 0
+        ? raw.windowDurationMins
+        : expectedWindowMinutes,
     resetsAt,
     resetDescription
   }
+}
+
+// Codex does not guarantee which slot (primary/secondary) carries which window;
+// a plus plan can return only a weekly window in `primary`. Classify by real
+// duration instead of slot: a window shorter than a day is the rolling "session"
+// limit, anything a day or longer is the "weekly" limit. Prevents a weekly
+// window from being mislabeled as the 5h session with a multi-day reset (#9969).
+const SESSION_WINDOW_MAX_MINUTES = 1440
+
+function classifyCodexWindows(windows: (RateLimitWindow | null)[]): {
+  session: RateLimitWindow | null
+  weekly: RateLimitWindow | null
+} {
+  let session: RateLimitWindow | null = null
+  let weekly: RateLimitWindow | null = null
+  for (const window of windows) {
+    if (!window) {
+      continue
+    }
+    if (window.windowMinutes < SESSION_WINDOW_MAX_MINUTES) {
+      session ??= window
+    } else {
+      weekly ??= window
+    }
+  }
+  return { session, weekly }
 }
 
 function mapBackendUsageWindow(
@@ -528,10 +562,14 @@ async function fetchViaBackend(
   if (typeof payload.plan_type !== 'string') {
     return null
   }
+  const { session, weekly } = classifyCodexWindows([
+    mapBackendUsageWindow(payload.rate_limit?.primary_window, 300),
+    mapBackendUsageWindow(payload.rate_limit?.secondary_window, 10080)
+  ])
   return {
     provider: 'codex',
-    session: mapBackendUsageWindow(payload.rate_limit?.primary_window, 300),
-    weekly: mapBackendUsageWindow(payload.rate_limit?.secondary_window, 10080),
+    session,
+    weekly,
     // Surfaced for the status-bar Usage row (e.g. "Codex · Plus").
     planType: payload.plan_type,
     ...(payload.rate_limit_reset_credits !== undefined
@@ -701,8 +739,10 @@ async function fetchViaRpc(options?: FetchCodexRateLimitsOptions): Promise<Provi
 
             const wrapper = msg.result as RpcRateLimitsResponse | undefined
             const result = wrapper?.rateLimits
-            const session = mapRpcWindow(result?.primary, 300)
-            const weekly = mapRpcWindow(result?.secondary, 10080)
+            const { session, weekly } = classifyCodexWindows([
+              mapRpcWindow(result?.primary, 300),
+              mapRpcWindow(result?.secondary, 10080)
+            ])
             const rateLimitResetCredits = mapRpcRateLimitResetCredits(
               wrapper?.rateLimitResetCredits
             )
