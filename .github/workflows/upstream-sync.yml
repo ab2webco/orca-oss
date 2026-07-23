@@ -22,6 +22,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Why: the sync branch can include upstream changes under .github/workflows/
+  # (e.g. computer-e2e.yml); GitHub rejects the push without workflow write scope.
+  workflows: write
 
 concurrency:
   group: upstream-sync
