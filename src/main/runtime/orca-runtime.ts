@@ -3420,6 +3420,24 @@ export class OrcaRuntimeService {
     this.ptyController = controller
   }
 
+  /**
+   * Stop one local Claude PTY and resolve true only once its process teardown is
+   * confirmed. Claude account removal uses this to close terminals that still own
+   * an account's OAuth refresh chain before deleting its credentials.
+   */
+  async stopClaudePtyForAccountRemoval(ptyId: string, deadlineMs = 10_000): Promise<boolean> {
+    const controller = this.ptyController
+    if (!controller) {
+      return false
+    }
+    if (controller.stopAndWait) {
+      return controller.stopAndWait(ptyId, { deadlineMs: Date.now() + deadlineMs })
+    }
+    // Why: fallback runtimes without stopAndWait can only fire-and-forget kill;
+    // treat a returned true as confirmation the PTY was owned and stopped.
+    return Boolean(controller.kill(ptyId))
+  }
+
   setNotifier(notifier: RuntimeNotifier | null): void {
     this.notifier = notifier
     // Why: run the one-shot fork-upstream backfill once a renderer is attached,

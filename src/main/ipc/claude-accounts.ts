@@ -11,6 +11,7 @@ import {
   getLiveSharedClaudePtyAccountId,
   isLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
+import { getLiveClaudePtyIdsForAccount } from '../claude-accounts/close-live-claude-terminals'
 import {
   copyClaudeSessionForAccountSwitch,
   copyClaudeSessionForFailBack,
@@ -54,8 +55,17 @@ export function registerClaudeAccountHandlers(
   ipcMain.handle('claudeAccounts:reauthenticate', (_event, args: { accountId: string }) =>
     claudeAccounts.reauthenticateAccount(args.accountId)
   )
-  ipcMain.handle('claudeAccounts:remove', (_event, args: { accountId: string }) =>
-    claudeAccounts.removeAccount(args.accountId)
+  ipcMain.handle(
+    'claudeAccounts:remove',
+    (_event, args: { accountId: string; closeLiveTerminals?: boolean }) =>
+      claudeAccounts.removeAccount(args.accountId, {
+        closeLiveTerminals: args.closeLiveTerminals === true
+      })
+  )
+  ipcMain.handle(
+    'claudeAccounts:countLiveTerminalsForAccount',
+    (_event, args: { accountId: string }): number =>
+      typeof args?.accountId === 'string' ? getLiveClaudePtyIdsForAccount(args.accountId).length : 0
   )
   ipcMain.handle('claudeAccounts:resyncGlobalConfig', () =>
     claudeAccounts.resyncGlobalConfigIntoManagedVaults()

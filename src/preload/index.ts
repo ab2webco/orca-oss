@@ -1919,8 +1919,10 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
-    remove: (args: { accountId: string }): Promise<unknown> =>
+    remove: (args: { accountId: string; closeLiveTerminals?: boolean }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:remove', args),
+    countLiveTerminalsForAccount: (args: { accountId: string }): Promise<number> =>
+      ipcRenderer.invoke('claudeAccounts:countLiveTerminalsForAccount', args),
     resyncGlobalConfig: (): Promise<number> =>
       ipcRenderer.invoke('claudeAccounts:resyncGlobalConfig'),
     syncGlobalConfigForAccount: (args: { accountId: string }): Promise<void> =>

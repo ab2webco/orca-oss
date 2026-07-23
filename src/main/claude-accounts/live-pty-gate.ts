@@ -3,8 +3,9 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
 
 const liveClaudePtyIds = new Set<string>()
-const liveSharedClaudePtyAccounts = new Map<string, string | null>()
-const liveInjectedClaudePtyAccounts = new Map<string, string>()
+// Why: exported for sibling account-removal enumeration; only this module mutates them.
+export const liveSharedClaudePtyAccounts = new Map<string, string | null>()
+export const liveInjectedClaudePtyAccounts = new Map<string, string>()
 const injectedClaudeLaunchReservations = new Map<string, string>()
 const sharedClaudeLaunchReservations = new Map<string, string | null>()
 const managedClaudeAccountMutations = new Set<string>()

@@ -89,7 +89,9 @@ import {
 } from './provider-account-visibility'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
 import {
+  countLiveClaudeTerminalsForAccount,
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
   hasRemoteProviderAccountOwner,
@@ -217,16 +219,6 @@ function getCodexSystemDefaultSubtitle(
   )
 }
 
-function getClaudeAccountLabel(
-  state: ClaudeRateLimitAccountsState,
-  accountId: string | null | undefined
-): string {
-  if (accountId == null) {
-    return 'System default'
-  }
-  return state.accounts.find((account) => account.id === accountId)?.email ?? 'Claude account'
-}
-
 function getCodexAccountRuntimeLabel(
   account: CodexRateLimitAccountsState['accounts'][number],
   hostLabel = getHostRuntimeLabel()
@@ -245,17 +237,6 @@ function getClaudeAccountRuntimeLabel(
     return account.wslDistro ? `WSL ${account.wslDistro}` : 'WSL'
   }
   return hostLabel
-}
-
-function getEndpointHostLabel(endpointBaseUrl: string | null | undefined): string {
-  if (!endpointBaseUrl) {
-    return ''
-  }
-  try {
-    return new URL(endpointBaseUrl).host
-  } catch {
-    return endpointBaseUrl
-  }
 }
 
 function getCodexAccountErrorDescription(error: unknown): string {
@@ -432,6 +413,35 @@ export function AccountsPane({
     id: string
     runtime: ProviderAccountRuntimeView
   } | null>(null)
+  // Why: null = still counting; the dialog stays generic until the live-terminal
+  // count resolves so the destructive "Close & delete" path is never offered blind.
+  const [removeClaudeLiveTerminalCount, setRemoveClaudeLiveTerminalCount] = useState<number | null>(
+    null
+  )
+  useEffect(() => {
+    if (!removeClaudeTarget) {
+      setRemoveClaudeLiveTerminalCount(null)
+      return
+    }
+    let cancelled = false
+    setRemoveClaudeLiveTerminalCount(null)
+    void countLiveClaudeTerminalsForAccount(settings, removeClaudeTarget.id)
+      .then((count) => {
+        if (!cancelled) {
+          setRemoveClaudeLiveTerminalCount(count)
+        }
+      })
+      .catch(() => {
+        // Why: fall back to the plain-delete copy if counting fails rather than
+        // block removal entirely.
+        if (!cancelled) {
+          setRemoveClaudeLiveTerminalCount(0)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [removeClaudeTarget, settings])
   const accountVisibilityOptions = {
     remoteOwner: isRemoteAccountScope,
     ownerPlatform: accountOwnerPlatform
@@ -2354,26 +2364,47 @@ export function AccountsPane({
               )}
             </DialogDescription>
           </DialogHeader>
+          {(removeClaudeLiveTerminalCount ?? 0) > 0 ? (
+            <p className="text-sm text-destructive">
+              {removeClaudeLiveTerminalCount === 1
+                ? translate(
+                    'auto.components.settings.AccountsPane.claudeRemoveLiveOne',
+                    '1 live Claude terminal is using this account. It will be closed before the account is deleted.'
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.claudeRemoveLiveMany',
+                    '{{count}} live Claude terminals are using this account. They will be closed before the account is deleted.',
+                    { count: removeClaudeLiveTerminalCount ?? 0 }
+                  )}
+            </p>
+          ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRemoveClaudeTarget(null)}>
               {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
             </Button>
             <Button
               variant="destructive"
+              disabled={removeClaudeLiveTerminalCount === null}
               onClick={() => {
                 const target = removeClaudeTarget
                 if (!target) {
                   return
                 }
+                const closeLiveTerminals = (removeClaudeLiveTerminalCount ?? 0) > 0
                 setRemoveClaudeTarget(null)
                 void runClaudeAccountAction(
                   `remove:${target.id}`,
-                  () => removeClaudeProviderAccount(settings, target.id),
+                  () => removeClaudeProviderAccount(settings, target.id, { closeLiveTerminals }),
                   target.runtime
                 )
               }}
             >
-              {translate('auto.components.settings.AccountsPane.c2d2751587', 'Remove Account')}
+              {(removeClaudeLiveTerminalCount ?? 0) > 0
+                ? translate(
+                    'auto.components.settings.AccountsPane.claudeRemoveCloseAndDelete',
+                    'Close & delete'
+                  )
+                : translate('auto.components.settings.AccountsPane.c2d2751587', 'Remove Account')}
             </Button>
           </DialogFooter>
         </DialogContent>

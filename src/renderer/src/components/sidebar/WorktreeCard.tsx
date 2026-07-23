@@ -25,6 +25,7 @@ import { SshDisconnectedDialog } from './SshDisconnectedDialog'
 import { AutoRenameFailedDialog } from './AutoRenameFailedDialog'
 import { LinearAgentSkillSetupPrompt } from './LinearAgentSkillSetupPrompt'
 import WorktreeCardAgents from './WorktreeCardAgents'
+import { WorktreeCardClaudeAccountChip } from './WorktreeCardClaudeAccountChip'
 import { useWorktreeAgentRows } from './useWorktreeAgentRows'
 import { WorktreeCardStatusSlot } from './WorktreeCardStatusSlot'
 import { cn } from '@/lib/utils'
@@ -1523,6 +1524,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
                 </TooltipContent>
               </Tooltip>
             )}
+
+            <WorktreeCardClaudeAccountChip worktree={worktree} repo={repo} />
 
             {showTitleRowIndicators && titleRowIndicators}
           </div>

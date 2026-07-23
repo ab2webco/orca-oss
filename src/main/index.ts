@@ -2047,12 +2047,18 @@ app.whenReady().then(async () => {
       isAgentStatusHooksEnabled(store?.getSettings()) ? agentHookServer.buildPtyEnv() : {}
   })
   runtime = runtimeService
-  claudeAccounts = new ClaudeAccountService(store, rateLimits, claudeRuntimeAuth, (repoId) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      notifyWorktreesChanged(mainWindow, repoId)
-    }
-    runtimeService.notifyWorktreesChangedForRemoteClients(repoId)
-  })
+  claudeAccounts = new ClaudeAccountService(
+    store,
+    rateLimits,
+    claudeRuntimeAuth,
+    (repoId) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        notifyWorktreesChanged(mainWindow, repoId)
+      }
+      runtimeService.notifyWorktreesChangedForRemoteClients(repoId)
+    },
+    (ptyId) => runtimeService.stopClaudePtyForAccountRemoval(ptyId)
+  )
   browserManager.setBrowserGuestStateChangedListener((worktreeId) => {
     runtimeService.notifyMobileSessionTabsChanged(worktreeId)
   })

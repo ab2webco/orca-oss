@@ -2202,7 +2202,11 @@ export type PreloadApi = {
     }) => Promise<ClaudeRateLimitAccountsState>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
-    remove: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
+    remove: (args: {
+      accountId: string
+      closeLiveTerminals?: boolean
+    }) => Promise<ClaudeRateLimitAccountsState>
+    countLiveTerminalsForAccount: (args: { accountId: string }) => Promise<number>
     resyncGlobalConfig: () => Promise<number>
     syncGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
     clearGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>

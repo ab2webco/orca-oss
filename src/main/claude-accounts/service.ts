@@ -44,6 +44,10 @@ import {
   hasLiveSharedClaudePtysForAccount,
   runManagedClaudeAccountMutation
 } from './live-pty-gate'
+import {
+  closeLiveClaudeTerminalsForAccount,
+  type ClaudePtyTerminator
+} from './close-live-claude-terminals'
 import { findDuplicateClaudeAccount } from './claude-duplicate-account'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
@@ -123,7 +127,10 @@ export class ClaudeAccountService {
     private readonly store: Store,
     private readonly rateLimits: RateLimitService,
     private readonly runtimeAuth: ClaudeRuntimeAuthService,
-    private readonly onWorktreeAccountPinsChanged?: (repoId: string) => void
+    private readonly onWorktreeAccountPinsChanged?: (repoId: string) => void,
+    // Why: local-runtime hook to stop a live Claude PTY so removal can delete an
+    // account still owned by a terminal; absent on remote runtimes we do not own.
+    private readonly terminateLiveClaudePty?: ClaudePtyTerminator
   ) {}
 
   listAccounts(): ClaudeRateLimitAccountsState {
@@ -147,10 +154,25 @@ export class ClaudeAccountService {
     )
   }
 
-  async removeAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
-    return this.serializeMutation(() =>
-      this.withManagedAccountMutation(accountId, () => this.doRemoveAccount(accountId))
-    )
+  async removeAccount(
+    accountId: string,
+    options: { closeLiveTerminals?: boolean } = {}
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(async () => {
+      if (options.closeLiveTerminals) {
+        // Why: killing live terminals must happen before the managed-mutation lock,
+        // which itself refuses to open while the account has live PTYs.
+        await this.closeLiveClaudeTerminalsForAccount(accountId)
+      }
+      return this.withManagedAccountMutation(accountId, () => this.doRemoveAccount(accountId))
+    })
+  }
+
+  private async closeLiveClaudeTerminalsForAccount(accountId: string): Promise<void> {
+    if (!this.terminateLiveClaudePty) {
+      throw new Error('Closing live Claude terminals is not supported in this runtime.')
+    }
+    await closeLiveClaudeTerminalsForAccount(accountId, this.terminateLiveClaudePty)
   }
 
   async selectAccount(accountId: string | null): Promise<ClaudeRateLimitAccountsState> {

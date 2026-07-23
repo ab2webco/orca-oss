@@ -271,10 +271,13 @@ export async function selectCodexProviderAccount(
 
 export async function removeClaudeProviderAccount(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
-  accountId: string
+  accountId: string,
+  options: { closeLiveTerminals?: boolean } = {}
 ): Promise<ClaudeRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
+    // Why: the live-PTY gate and terminals are host-local, so close-and-delete is
+    // a no-op on remote runtimes; forward the plain removal unchanged.
     return callRuntimeRpc<ClaudeRateLimitAccountsState>(
       target,
       'accounts.removeClaude',
@@ -282,7 +285,22 @@ export async function removeClaudeProviderAccount(
       { timeoutMs: REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS }
     )
   }
-  return window.api.claudeAccounts.remove({ accountId })
+  return window.api.claudeAccounts.remove({
+    accountId,
+    closeLiveTerminals: options.closeLiveTerminals === true
+  })
+}
+
+/** Count local live Claude terminals bound to an account; remote runtimes own no host PTYs so report zero. */
+export async function countLiveClaudeTerminalsForAccount(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  accountId: string
+): Promise<number> {
+  const target = getActiveRuntimeTarget(settings)
+  if (target.kind === 'environment') {
+    return 0
+  }
+  return window.api.claudeAccounts.countLiveTerminalsForAccount({ accountId })
 }
 
 export async function removeCodexProviderAccount(
