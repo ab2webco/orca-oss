@@ -1387,6 +1387,8 @@
       "surfaces": [
         "remote agent launch and explicit resume",
         "multi-client remote runtime sessions",
+        "headed desktop remote-server pairing",
+        "headless remote-server parity",
         "daemon and relay reconnect",
         "terminal exit retirement and restart restore",
         "mixed-version fallback"
@@ -1412,7 +1414,7 @@
         "ssh",
         "remote-runtime"
       ],
-      "coverageNotes": "Deterministic macOS tests cover controller claims, daemon and SSH/relay operation replay, mixed-version selection, runtime ownership, exact provisional handoff, and durable terminal retirement. The real repro runs two independent clients against one headless remote Orca runtime over the encrypted pairing path and a real daemon-backed PTY. SSH coverage is contract/fault-injection coverage; WSL and live SSH hosts remain gaps.",
+      "coverageNotes": "Deterministic macOS tests cover controller claims, daemon and SSH/relay operation replay, mixed-version selection, runtime ownership, exact provisional handoff, durable terminal retirement, and two independent viewer mirrors. The secondary parity repro runs independent clients against one headless remote Orca runtime over encrypted pairing and a real daemon-backed PTY. A headed Orca desktop server paired to a separate client is the primary live user topology and remains uncollected for this issue. SSH coverage is provider/relay contract and fault-injection coverage only; it does not substitute for paired-server coverage. WSL and live SSH hosts remain gaps.",
       "motivatingLinks": [
         "https://github.com/stablyai/orca/issues/8878",
         "https://github.com/stablyai/orca/issues/9352",
@@ -1422,6 +1424,7 @@
       "oracle": "Race independent clients and repeated operation IDs, then assert one physical spawn and one canonical PTY/surface; inject exit-before-reply, provider disconnect, conflicting claim scope, and old daemon/relay capabilities; assert safe adoption or explicit failure without a second spawn. After exact exit, assert terminal and tab listings omit the surface, a stale publication cannot restore it, restart cannot resurrect it, and an exact provisional handoff is consumed even when exit wins before the next snapshot.",
       "commands": [
         "pnpm exec vitest run --config config/vitest.config.ts src/shared/claimed-agent-pty-owner.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/providers/ssh-pty-provider-agent-session-create-operation.test.ts src/main/runtime/orca-runtime-agent-session-operation.test.ts src/main/runtime/remote-agent-session-host-authority.integration.test.ts src/main/runtime/orca-runtime-terminal-retirement.test.ts src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.test.ts src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts src/renderer/src/runtime/web-runtime-session.test.ts src/renderer/src/runtime/web-session-tabs-sync.test.ts",
+        "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/remote-terminal-tab-retirement.unit.test.ts",
         "pnpm test:repro:remote-agent-session"
       ],
       "testFiles": [
@@ -1434,7 +1437,8 @@
         "src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.test.ts",
         "src/renderer/src/runtime/remote-runtime-session-tabs-inflight.test.ts",
         "src/renderer/src/runtime/web-runtime-session.test.ts",
-        "src/renderer/src/runtime/web-session-tabs-sync.test.ts"
+        "src/renderer/src/runtime/web-session-tabs-sync.test.ts",
+        "tests/e2e/remote-terminal-tab-retirement.unit.test.ts"
       ],
       "assertionRefs": [
         {
@@ -1485,6 +1489,14 @@
             "only an exact structured-create handoff retires its provisional tab",
             "an absent host tab retires its exact provisional handoff only after a causally post-create snapshot while unrelated tabs remain"
           ]
+        },
+        {
+          "file": "tests/e2e/remote-terminal-tab-retirement.unit.test.ts",
+          "assertions": [
+            "a durable host exit removes the terminal from two independent viewer mirrors instead of publishing a handle-less phantom",
+            "one exact exit produces one same-epoch higher-version host publication and one durable persistence flush",
+            "same-epoch stale publications cannot resurrect the retired surface after reconnect"
+          ]
         }
       ],
       "evidenceRuns": [
@@ -1504,7 +1516,34 @@
           "command": "pnpm test:repro:remote-agent-session",
           "result": "passed",
           "durationSeconds": 48.47,
-          "summary": "The build-backed headless remote Orca harness passed over encrypted WebSocket pairing with two independent clients, proving one spawn, retry adoption, durable exit retirement, stale-publication rejection, and no restart resurrection."
+          "summary": "The secondary build-backed headless parity harness passed over encrypted WebSocket pairing with independent clients, proving one spawn, retry adoption, durable exit retirement, stale-publication rejection, and no restart resurrection."
+        },
+        {
+          "date": "2026-07-22",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/remote-terminal-tab-retirement.unit.test.ts",
+          "result": "failed",
+          "durationSeconds": 3.11,
+          "summary": "The exact cross-boundary oracle failed on pre-#9687 commit 2a32c5c9a because the retired publication still contained the pinned persisted terminal surface."
+        },
+        {
+          "date": "2026-07-22",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/remote-terminal-tab-retirement.unit.test.ts",
+          "result": "failed",
+          "durationSeconds": 3.48,
+          "summary": "The exact strengthened oracle failed on PR #9053 head d3a1d3047 because its stale-headless pruning retained the pinned persisted terminal surface."
+        },
+        {
+          "date": "2026-07-22",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/remote-terminal-tab-retirement.unit.test.ts",
+          "result": "passed",
+          "durationSeconds": 3.18,
+          "summary": "The same strengthened oracle passed on main@4fce2de49."
         }
       ],
       "runtimeBudget": {
@@ -1517,7 +1556,7 @@
       },
       "redGreenEvidence": {
         "status": "partial",
-        "evidence": "The motivating remote-client duplicate-resume and exited-surface repros are encoded in deterministic lower-layer tests and the real remote harness; saved CI red/green artifacts are still needed."
+        "evidence": "The exact cross-boundary retirement oracle is red on pre-#9687 commit 2a32c5c9a and PR #9053 head d3a1d3047 because the pinned persisted surface remains in the host publication, and green on main@4fce2de49. Duplicate-resume red evidence remains encoded in lower-layer tests; saved CI artifacts are still needed."
       },
       "performanceBudget": {
         "required": true,
@@ -1526,11 +1565,13 @@
       "promotionCriteria": [
         "Run the focused gate and remote-server repro for at least 100 consecutive passes or 14 days across required CI platforms.",
         "Attach saved red/green evidence for duplicate remote resume and exit-before-snapshot retirement.",
-        "Add live Linux/Windows and SSH/WSL provider evidence before claiming full platform/provider coverage."
+        "Add the primary live journey with a headed Orca desktop server and a separate paired client; use a physical host when OS, ConPTY, update, sleep, firewall, or window lifecycle is causal.",
+        "Add live SSH/WSL provider evidence before claiming full provider coverage; Docker SSH proves only the SSH provider/relay path."
       ],
       "knownGaps": [
-        "The real remote-server harness currently runs on macOS and uses a local daemon-backed execution owner; Linux and Windows runs remain uncollected.",
-        "SSH and relay failure ordering is deterministic contract coverage, not a live SSH-host journey; WSL has no provider-specific run.",
+        "The primary live topology—a headed Orca desktop server with an isolated profile paired to a separate persistent client—has not been run for this issue. The causal boundary is host membership rather than OS/window/ConPTY/update/sleep behavior, so a physical headed host was not required for the current disposition.",
+        "The secondary headless parity harness runs on macOS with a local daemon-backed execution owner and independent short-lived encrypted RPC clients; two persistent viewer-store mirrors and reconnect ordering are joined deterministically in the cross-boundary unit test rather than mounted live.",
+        "SSH and relay failure ordering is deterministic provider-contract coverage, not a live SSH-host journey or paired-Orca-server proof; WSL has no provider-specific run.",
         "Fresh-launch operation replay is memory-backed and intentionally does not survive runtime restart; a durable operation journal is a documented future extension.",
         "Automatic sleep checkpoints, verified nested-SSH execution namespaces, and multi-process profile coordination remain outside v1."
       ],

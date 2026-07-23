@@ -3552,9 +3552,9 @@ export class OrcaRuntimeService {
   }
 
   private emitClientEvent(event: RuntimeClientEvent): void {
-    for (const listener of this.clientEventListeners) {
-      listener(event)
-    }
+    // Why: a throwing subscriber here once escaped acquireWorktreeTerminalSpawn after it took the
+    // per-worktree terminal mutation, leaking it and wedging that worktree's sleep until restart.
+    notifyRuntimeListeners(this.clientEventListeners, (listener) => listener(event), 'client-event')
   }
 
   private notifyWorktreesChanged(repoId: string): void {
@@ -7618,7 +7618,13 @@ export class OrcaRuntimeService {
         ...(cwdChanged && cwd !== null ? { cwd } : {})
       }
       for (const listener of listeners) {
-        listener(data, meta)
+        try {
+          listener(data, meta)
+        } catch (error) {
+          // Why: inlined rather than via notifyRuntimeListeners to avoid a per-chunk closure
+          // allocation on the terminal-output hot path; isolation semantics match the helper.
+          console.error('[runtime] pty-data listener threw', error)
+        }
       }
     }
     return outputSequence
@@ -8601,9 +8607,7 @@ export class OrcaRuntimeService {
     if (!listeners) {
       return
     }
-    for (const listener of listeners) {
-      listener({ mode, cols, rows })
-    }
+    notifyRuntimeListeners(listeners, (listener) => listener({ mode, cols, rows }), 'fit-override')
   }
 
   serializeTerminalBuffer(
@@ -9878,12 +9882,13 @@ export class OrcaRuntimeService {
 
   dispatchMobileNotification(event: MobileNotificationEvent): void {
     const seq = this.mobileNotificationReplay.record(event)
-    for (const listener of this.notificationListeners) {
-      // Why: surface the desktop-assigned seq to live listeners so they can
-      // watermark the last event delivered and feed it back to getMissedSince
-      // on reconnect (idempotent catch-up, no duplicate local pushes).
-      listener({ ...event, notificationSeq: seq })
-    }
+    // Why: surface the desktop-assigned seq to live listeners so they can watermark the last event
+    // delivered and feed it back to getMissedSince on reconnect (idempotent catch-up, no dupes).
+    notifyRuntimeListeners(
+      this.notificationListeners,
+      (listener) => listener({ ...event, notificationSeq: seq }),
+      'mobile-notification'
+    )
   }
 
   // Returns notifications dispatched after lastSeenSeq. Idempotent: the same
@@ -10809,9 +10814,7 @@ export class OrcaRuntimeService {
     this.notifier?.terminalDriverChanged(ptyId, next)
     const listeners = this.driverListeners.get(ptyId)
     if (listeners) {
-      for (const listener of listeners) {
-        listener(next)
-      }
+      notifyRuntimeListeners(listeners, (listener) => listener(next), 'pty-driver')
     }
   }
 
@@ -12384,9 +12387,7 @@ export class OrcaRuntimeService {
     if (!listeners) {
       return
     }
-    for (const listener of listeners) {
-      listener(event)
-    }
+    notifyRuntimeListeners(listeners, (listener) => listener(event), 'pty-resize')
   }
 
   // Why: Section 7.2 — the runtime detects agent exit directly and updates
@@ -29847,6 +29848,23 @@ async function waitForWorktreeTerminalMutation(
   } finally {
     if (timeout !== undefined) {
       clearTimeout(timeout)
+    }
+  }
+}
+
+// Why: listener fan-out is best-effort delivery. One subscriber throwing synchronously — e.g. a
+// paired-client relay whose stream is closed — must never abort the emitting operation or leak
+// state (a lock/mutation) the caller holds across the emit. Isolate every listener and log.
+function notifyRuntimeListeners<L>(
+  listeners: Iterable<L>,
+  deliver: (listener: L) => void,
+  context: string
+): void {
+  for (const listener of listeners) {
+    try {
+      deliver(listener)
+    } catch (error) {
+      console.error(`[runtime] ${context} listener threw`, error)
     }
   }
 }
