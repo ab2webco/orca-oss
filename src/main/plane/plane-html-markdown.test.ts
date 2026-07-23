@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest'
+import { markdownToPlaneHtml, planeHtmlToMarkdown } from './plane-html-markdown'
+
+describe('planeHtmlToMarkdown', () => {
+  it('returns empty string for null, undefined, empty, and non-string input', () => {
+    expect(planeHtmlToMarkdown(null as unknown as string)).toBe('')
+    expect(planeHtmlToMarkdown(undefined as unknown as string)).toBe('')
+    expect(planeHtmlToMarkdown('')).toBe('')
+    expect(planeHtmlToMarkdown(42 as unknown as string)).toBe('')
+    expect(planeHtmlToMarkdown({} as unknown as string)).toBe('')
+  })
+
+  it('converts a heading, paragraph with inline marks, list, blockquote, and code block', () => {
+    const html =
+      '<h1>Title</h1>' +
+      '<p>Some <strong>bold</strong> and <em>italic</em> text.</p>' +
+      '<ul><li>item one</li><li>item two</li></ul>' +
+      '<blockquote><p>a quote</p></blockquote>' +
+      '<pre><code>code here</code></pre>'
+
+    const md = planeHtmlToMarkdown(html)
+
+    expect(md).toContain('# Title')
+    expect(md).toContain('Some **bold** and *italic* text.')
+    expect(md).toContain('- item one')
+    expect(md).toContain('- item two')
+    expect(md).toContain('> a quote')
+    expect(md).toContain('```\ncode here\n```')
+  })
+
+  it('converts an ordered list and a link', () => {
+    const html =
+      '<ol><li>first</li><li>second</li></ol><p>See <a href="https://example.com">docs</a>.</p>'
+    const md = planeHtmlToMarkdown(html)
+
+    expect(md).toContain('1. first')
+    expect(md).toContain('2. second')
+    expect(md).toContain('[docs](https://example.com)')
+  })
+
+  it('decodes HTML entities', () => {
+    const html = '<p>Fish &amp; chips &lt;tag&gt; &quot;quoted&quot;</p>'
+    expect(planeHtmlToMarkdown(html)).toContain('Fish & chips <tag> "quoted"')
+  })
+
+  it('never imports the Jira ADF conversion module', async () => {
+    const source = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('./plane-html-markdown.ts', import.meta.url), 'utf-8')
+    )
+    expect(source).not.toMatch(/from\s+['"][^'"]*adf-markdown['"]/)
+  })
+})
+
+describe('markdownToPlaneHtml', () => {
+  it('returns empty string for null, undefined, empty, and non-string input', () => {
+    expect(markdownToPlaneHtml(null as unknown as string)).toBe('')
+    expect(markdownToPlaneHtml(undefined as unknown as string)).toBe('')
+    expect(markdownToPlaneHtml('')).toBe('')
+    expect(markdownToPlaneHtml(7 as unknown as string)).toBe('')
+  })
+
+  it('converts headings, bold/italic, and paragraphs to HTML', () => {
+    const html = markdownToPlaneHtml('# Title\n\nSome **bold** and *italic* text.')
+    expect(html).toContain('<h1>Title</h1>')
+    expect(html).toContain('<strong>bold</strong>')
+    expect(html).toContain('<em>italic</em>')
+  })
+
+  it('converts unordered and ordered lists', () => {
+    const html = markdownToPlaneHtml('- item one\n- item two')
+    expect(html).toBe('<ul><li>item one</li><li>item two</li></ul>')
+
+    const orderedHtml = markdownToPlaneHtml('1. first\n2. second')
+    expect(orderedHtml).toBe('<ol><li>first</li><li>second</li></ol>')
+  })
+
+  it('converts a code fence and a blockquote', () => {
+    expect(markdownToPlaneHtml('```\ncode here\n```')).toBe('<pre><code>code here</code></pre>')
+    expect(markdownToPlaneHtml('> a quote')).toBe('<blockquote><p>a quote</p></blockquote>')
+  })
+
+  it('escapes HTML-significant characters', () => {
+    const html = markdownToPlaneHtml('Fish & chips <tag>')
+    expect(html).toBe('<p>Fish &amp; chips &lt;tag&gt;</p>')
+  })
+})
+
+describe('planeHtmlToMarkdown <-> markdownToPlaneHtml round-trip', () => {
+  it('preserves structure across a multi-line document', () => {
+    const original =
+      '# Title\n\n' +
+      'Some **bold** and *italic* text.\n\n' +
+      '- item one\n- item two\n\n' +
+      '> a quote\n\n' +
+      '```\ncode here\n```'
+
+    const html = markdownToPlaneHtml(original)
+    const roundTripped = planeHtmlToMarkdown(html)
+
+    expect(roundTripped).toContain('# Title')
+    expect(roundTripped).toContain('Some **bold** and *italic* text.')
+    expect(roundTripped).toContain('- item one')
+    expect(roundTripped).toContain('- item two')
+    expect(roundTripped).toContain('> a quote')
+    expect(roundTripped).toContain('```\ncode here\n```')
+  })
+})
