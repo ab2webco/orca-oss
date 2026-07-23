@@ -58,8 +58,9 @@ export function getTaskSourceContextSummary(args: {
         hostAvailability: args.hostAvailability
       })
     case 'jira':
+    case 'plane':
       return getAccountBackedTaskSourceSummary(args.providerLabel, {
-        accountLabel: args.jiraSiteName,
+        accountLabel: args.provider === 'jira' ? args.jiraSiteName : null,
         accountHostId: args.accountHostId,
         hostLabelById: args.hostLabelById,
         hostAvailability: args.hostAvailability
@@ -198,6 +199,8 @@ function getProviderIdentityLabel(
       return identity.workspaceName ?? identity.workspaceId ?? null
     case 'jira':
       return identity.siteUrl ?? identity.siteId ?? null
+    case 'plane':
+      return identity.workspaceSlug ?? identity.workspaceId ?? null
   }
 }
 
@@ -218,10 +221,7 @@ function uniqueLabels(labels: readonly (string | null | undefined)[]): string[] 
 function getUnavailableHosts(
   hostAvailability: readonly TaskSourceHostAvailability[],
   hostLabelById?: HostLabelLookup
-): {
-  hostLabel: string
-  statusLabel: string
-}[] {
+): { hostLabel: string; statusLabel: string }[] {
   const seen = new Set<string>()
   const unavailableHosts: { hostLabel: string; statusLabel: string }[] = []
   for (const availability of hostAvailability) {

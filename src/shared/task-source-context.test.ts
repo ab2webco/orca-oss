@@ -145,6 +145,37 @@ describe('task source context', () => {
         }
       })
     ).toContain(encodeURIComponent('https://example.atlassian.net/OPS'))
+    expect(
+      getTaskSourceCacheScope({
+        ...base,
+        provider: 'plane',
+        providerIdentity: {
+          provider: 'plane',
+          workspaceSlug: 'acme',
+          projectId: 'project-1'
+        }
+      })
+    ).toContain(encodeURIComponent('acme/project-1'))
+  })
+
+  it('normalizes the plane provider and falls back to workspace id when no slug is set', () => {
+    expect(
+      normalizeTaskSourceContext({
+        provider: 'plane',
+        projectId: 'project-1',
+        providerIdentity: { provider: 'plane', workspaceId: 'workspace-1', projectId: 'proj-1' }
+      })?.provider
+    ).toBe('plane')
+
+    expect(
+      getTaskSourceCacheScope({
+        provider: 'plane',
+        projectId: 'project-1',
+        hostId: LOCAL_EXECUTION_HOST_ID,
+        repoId: 'repo-1',
+        providerIdentity: { provider: 'plane', workspaceId: 'workspace-1', projectId: 'proj-1' }
+      })
+    ).toContain(encodeURIComponent('workspace-1/proj-1'))
   })
 
   it('drops provider identities that do not match the source provider', () => {

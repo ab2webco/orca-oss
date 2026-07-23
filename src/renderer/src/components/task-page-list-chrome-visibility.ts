@@ -30,5 +30,8 @@ export function shouldHideTaskPageListChrome({
       return hasJiraDetail
     case 'linear':
       return hasLinearIssueDetail || hasLinearProjectContext || hasLinearViewContext
+    // Foundation-only: Plane has no list-chrome detail state yet (added with its TaskPage slice).
+    case 'plane':
+      return false
   }
 }

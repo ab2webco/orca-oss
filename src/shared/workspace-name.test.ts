@@ -80,6 +80,21 @@ describe('getLinkedWorkItemWorkspaceName', () => {
       seedName: 'proj-7-fix-flaky-import'
     })
   })
+
+  it('recognizes a Plane work item via planeIdentifier', () => {
+    expect(
+      getLinkedWorkItemWorkspaceName({
+        type: 'issue',
+        provider: 'plane',
+        number: 0,
+        title: 'PROJ-12 Fix flaky import',
+        planeIdentifier: 'PROJ-12'
+      })
+    ).toEqual({
+      displayName: 'PROJ-12 Fix flaky import',
+      seedName: 'proj-12-fix-flaky-import'
+    })
+  })
 })
 
 describe('getWorkspaceIntentName', () => {
