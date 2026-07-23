@@ -325,7 +325,7 @@ describe('fetchCodexRateLimits', () => {
     expect(ptySpawnMock).not.toHaveBeenCalled()
   })
 
-  it('normalizes Codex RPC remaining-minute windows to fixed display durations', async () => {
+  it('classifies Codex RPC windows by their real duration (session vs weekly)', async () => {
     const rpcChild = makeRpcChild()
     childSpawnMock.mockReturnValue(rpcChild)
     rpcChild.stdin.write.mockImplementation((line: string) => {
@@ -348,8 +348,8 @@ describe('fetchCodexRateLimits', () => {
                 id: msg.id,
                 result: {
                   rateLimits: {
-                    primary: { usedPercent: 0, windowDurationMins: 299 },
-                    secondary: { usedPercent: 0, windowDurationMins: 10079 }
+                    primary: { usedPercent: 0, windowDurationMins: 300 },
+                    secondary: { usedPercent: 0, windowDurationMins: 10080 }
                   }
                 }
               })}\n`
@@ -366,6 +366,59 @@ describe('fetchCodexRateLimits', () => {
 
     expect(result.session?.windowMinutes).toBe(300)
     expect(result.weekly?.windowMinutes).toBe(10080)
+  })
+
+  it('maps a weekly window delivered in the primary slot to weekly, not session (#9969)', async () => {
+    const rpcChild = makeRpcChild()
+    childSpawnMock.mockReturnValue(rpcChild)
+    // Why: a Codex plus plan returns only a weekly window, carried in `primary`
+    // with `secondary: null`. Slot-based mapping mislabeled this as the 5h
+    // session with a ~7-day reset; it must land in `weekly` and leave session null.
+    const weeklyResetsAt = 1785426094
+    rpcChild.stdin.write.mockImplementation((line: string) => {
+      const msg = JSON.parse(line) as { id?: number; method?: string }
+      if (msg.method === 'initialize') {
+        setTimeout(() => {
+          rpcChild.stdout.emit(
+            'data',
+            Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} })}\n`)
+          )
+        }, 0)
+      }
+      if (msg.method === 'account/rateLimits/read') {
+        setTimeout(() => {
+          rpcChild.stdout.emit(
+            'data',
+            Buffer.from(
+              `${JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                result: {
+                  rateLimits: {
+                    primary: {
+                      usedPercent: 12,
+                      windowDurationMins: 10080,
+                      resetsAt: weeklyResetsAt
+                    },
+                    secondary: null,
+                    planType: 'plus'
+                  }
+                }
+              })}\n`
+            )
+          )
+        }, 0)
+      }
+    })
+
+    const resultPromise = fetchCodexRateLimits()
+    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(1)
+    const result = await resultPromise
+
+    expect(result.session).toBeNull()
+    expect(result.weekly?.windowMinutes).toBe(10080)
+    expect(result.weekly?.resetsAt).toBe(weeklyResetsAt * 1000)
   })
 
   it('fills reset-credit count from the backend when the installed app-server omits it', async () => {
