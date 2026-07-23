@@ -14,7 +14,16 @@ vi.mock('electron', () => ({
   }
 }))
 
+// Why: keep the default (uninjected) service deterministic — never spawn a real
+// `claude --version` in unit tests. Pin a recent version so the full event set
+// is eligible; gating-specific tests inject their own `detectVersion`.
+vi.mock('./hook-event-versions', async (importActual) => {
+  const actual = await importActual<typeof HookEventVersionsModule>()
+  return { ...actual, detectClaudeCodeVersion: () => '2.1.218' }
+})
+
 import type { SFTPWrapper } from 'ssh2'
+import type * as HookEventVersionsModule from './hook-event-versions'
 import { createManagedCommandMatcher } from '../agent-hooks/installer-utils'
 import { ClaudeHookService } from './hook-service'
 import { OPENCLAUDE_HOOK_SETTINGS } from './hook-settings'
@@ -149,7 +158,8 @@ describe('ClaudeHookService.install', () => {
         })
       )
 
-      const status = new ClaudeHookService().install()
+      // Why: pin a recent version so StopFailure (minVersion 2.1.78) is eligible.
+      const status = new ClaudeHookService({ detectVersion: () => '2.1.218' }).install()
       expect(status.state).toBe('installed')
 
       const legacy = JSON.parse(readFileSync(legacyPath, 'utf-8'))
@@ -318,7 +328,9 @@ describe('ClaudeHookService.install', () => {
       vi.stubEnv('HOME', tmpHome)
       vi.stubEnv('USERPROFILE', tmpHome)
       try {
-        expect(new ClaudeHookService().install().state).toBe('installed')
+        expect(new ClaudeHookService({ detectVersion: () => '2.1.218' }).install().state).toBe(
+          'installed'
+        )
 
         const settings = JSON.parse(
           readFileSync(join(tmpHome, '.claude', 'settings.json'), 'utf-8')
@@ -362,6 +374,108 @@ describe('ClaudeHookService.install', () => {
   )
 })
 
+describe('ClaudeHookService version gating', () => {
+  const GATED_EVENTS = [
+    'StopFailure',
+    'SubagentStart',
+    'TeammateIdle',
+    'PostToolUseFailure',
+    'PermissionRequest'
+  ]
+  const BASE_EVENTS = ['UserPromptSubmit', 'Stop', 'SubagentStop', 'PreToolUse', 'PostToolUse']
+
+  const withTmpHome = (fn: (home: string) => void): void => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-gating-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      fn(tmpHome)
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  }
+
+  const readHooks = (home: string): Record<string, unknown> =>
+    JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf-8')).hooks
+
+  // Why: an older client that never received StopFailure et al. must not be told
+  // its install is degraded forever — getStatus() gates on the same version.
+  it('omits gated keys for an old client and does not report perpetual partial', () => {
+    withTmpHome((home) => {
+      const svc = new ClaudeHookService({ detectVersion: () => '2.0.44' })
+      const status = svc.install()
+      expect(status.state).toBe('installed')
+      const hooks = readHooks(home)
+      // 2.0.44 has the base set plus SubagentStart (2.0.43)...
+      for (const event of ['UserPromptSubmit', 'Stop', 'PreToolUse', 'SubagentStart']) {
+        expect(hooks[event]).toBeTruthy()
+      }
+      // ...but predates PermissionRequest (2.0.45), TeammateIdle (2.1.33) and StopFailure (2.1.78).
+      for (const event of [
+        'PermissionRequest',
+        'TeammateIdle',
+        'StopFailure',
+        'PostToolUseFailure'
+      ]) {
+        expect(hooks[event]).toBeUndefined()
+      }
+      // A fresh instance reading the same file still reports installed, not partial.
+      expect(new ClaudeHookService({ detectVersion: () => '2.0.44' }).getStatus().state).toBe(
+        'installed'
+      )
+    })
+  })
+
+  it('injects the full event set for a new client', () => {
+    withTmpHome((home) => {
+      const status = new ClaudeHookService({ detectVersion: () => '2.1.218' }).install()
+      expect(status.state).toBe('installed')
+      const hooks = readHooks(home)
+      for (const event of [...BASE_EVENTS, ...GATED_EVENTS]) {
+        expect(hooks[event]).toBeTruthy()
+      }
+    })
+  })
+
+  it('injects only the safe base set when the version is undetectable', () => {
+    withTmpHome((home) => {
+      const status = new ClaudeHookService({ detectVersion: () => null }).install()
+      expect(status.state).toBe('installed')
+      const hooks = readHooks(home)
+      for (const event of BASE_EVENTS) {
+        expect(hooks[event]).toBeTruthy()
+      }
+      for (const event of GATED_EVENTS) {
+        expect(hooks[event]).toBeUndefined()
+      }
+      expect(new ClaudeHookService({ detectVersion: () => null }).getStatus().state).toBe(
+        'installed'
+      )
+    })
+  })
+
+  // Why: OpenClaude forks Claude Code with its own versioning, so it stays
+  // ungated and keeps receiving StopFailure regardless of Claude Code floors.
+  it('keeps OpenClaude ungated (full set) even with an old detected version', () => {
+    withTmpHome((home) => {
+      const svc = new ClaudeHookService({
+        agent: 'openclaude',
+        displayName: 'OpenClaude',
+        settings: OPENCLAUDE_HOOK_SETTINGS,
+        detectVersion: () => '1.0.0'
+      })
+      expect(svc.install().state).toBe('installed')
+      const hooks = JSON.parse(
+        readFileSync(join(home, '.openclaude', 'settings.json'), 'utf-8')
+      ).hooks
+      for (const event of [...BASE_EVENTS, ...GATED_EVENTS]) {
+        expect(hooks[event]).toBeTruthy()
+      }
+    })
+  })
+})
+
 describe('ClaudeHookService.installRemote', () => {
   it('writes Claude settings + managed script under the remote $HOME', async () => {
     const svc = new ClaudeHookService()
@@ -372,27 +486,24 @@ describe('ClaudeHookService.installRemote', () => {
     const settings = fs.files.get('/home/dev/.claude/settings.json')
     expect(settings).toBeTruthy()
     const parsed = JSON.parse(settings!)
-    // Why: every load-bearing event must be present and point at the
-    // remote-shaped script path with the guarded launcher applied. Drift in
-    // any of these is a real bug — Claude
-    // Code rejects unknown shapes silently and the agent-hooks pipeline
-    // goes dark.
-    for (const event of [
-      'UserPromptSubmit',
-      'Stop',
-      'StopFailure',
-      'SubagentStart',
-      'SubagentStop',
-      'TeammateIdle',
-      'PreToolUse',
-      'PostToolUse',
-      'PostToolUseFailure',
-      'PermissionRequest'
-    ]) {
+    // Why: the remote box's Claude version is unknown and unprobed, so remote
+    // installs inject only the always-safe base events. A gated key would make
+    // an older remote client reject the entire settings.json.
+    for (const event of ['UserPromptSubmit', 'Stop', 'SubagentStop', 'PreToolUse', 'PostToolUse']) {
       expect(parsed.hooks[event]).toBeTruthy()
       const cmd = parsed.hooks[event][0].hooks[0].command as string
       expect(cmd).toContain('/home/dev/.orca/agent-hooks/claude-hook.sh')
       expect(cmd).toMatch(/^if \[ -f /)
+    }
+    // Gated events are omitted remotely — see the base-set rationale above.
+    for (const event of [
+      'StopFailure',
+      'SubagentStart',
+      'TeammateIdle',
+      'PostToolUseFailure',
+      'PermissionRequest'
+    ]) {
+      expect(parsed.hooks[event]).toBeUndefined()
     }
     // Managed script body
     const script = fs.files.get('/home/dev/.orca/agent-hooks/claude-hook.sh')

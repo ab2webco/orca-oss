@@ -23,7 +23,6 @@ import { getManagedStatusLineScript } from './statusline-script'
 import {
   applyManagedHooks,
   applyManagedStatusLine,
-  CLAUDE_EVENTS,
   CLAUDE_HOOK_SETTINGS,
   getManagedScriptFileName,
   getConfigPath,
@@ -38,19 +37,34 @@ import {
   getStatusLineSlotState,
   removeManagedHooks,
   removeManagedStatusLine,
-  type ClaudeCompatibleHookSettings
+  type ClaudeCompatibleHookSettings,
+  type ClaudeHookEventSpec
 } from './hook-settings'
+import {
+  detectClaudeCodeVersion,
+  resolveLocalEligibleEvents,
+  resolveRemoteEligibleEvents
+} from './hook-event-versions'
 
 type ClaudeHookServiceOptions = {
   agent: AgentHookInstallStatus['agent']
   displayName: string
   settings: ClaudeCompatibleHookSettings
+  // Why: gate injected event keys on the installed Claude Code version so an
+  // older client never sees a key it would reject. OpenClaude forks Claude Code
+  // with independent versioning, so the changelog floors don't apply — it stays
+  // ungated (defaults from `agent`).
+  versionGated: boolean
+  // Why: injectable so tests can drive the gating without spawning `claude`.
+  detectVersion: () => string | null
 }
 
 const DEFAULT_CLAUDE_HOOK_SERVICE_OPTIONS: ClaudeHookServiceOptions = {
   agent: 'claude',
   displayName: 'Claude',
-  settings: CLAUDE_HOOK_SETTINGS
+  settings: CLAUDE_HOOK_SETTINGS,
+  versionGated: true,
+  detectVersion: detectClaudeCodeVersion
 }
 
 function getManagedScript(
@@ -117,9 +131,24 @@ function getManagedScript(
 
 export class ClaudeHookService {
   private readonly options: ClaudeHookServiceOptions
+  private localEventsCache: readonly ClaudeHookEventSpec[] | null = null
 
-  constructor(options: ClaudeHookServiceOptions = DEFAULT_CLAUDE_HOOK_SERVICE_OPTIONS) {
-    this.options = options
+  constructor(options: Partial<ClaudeHookServiceOptions> = {}) {
+    this.options = {
+      ...DEFAULT_CLAUDE_HOOK_SERVICE_OPTIONS,
+      ...options,
+      // Why: OpenClaude versioning is independent of Claude Code; leave it
+      // ungated unless the caller opts in explicitly.
+      versionGated: options.versionGated ?? (options.agent ?? 'claude') !== 'openclaude'
+    }
+  }
+
+  // Why: memoize per instance so getStatus() polling doesn't re-spawn `claude`.
+  // install() and getStatus() share the list so an older client (which omits
+  // gated keys) can't report perpetual "partial".
+  private getLocalEligibleEvents(): readonly ClaudeHookEventSpec[] {
+    this.localEventsCache ??= resolveLocalEligibleEvents(this.options)
+    return this.localEventsCache
   }
 
   getStatus(): AgentHookInstallStatus {
@@ -140,7 +169,7 @@ export class ClaudeHookService {
     const command = getManagedCommand(scriptPath)
     const missing: string[] = []
     let presentCount = 0
-    for (const event of CLAUDE_EVENTS) {
+    for (const event of this.getLocalEligibleEvents()) {
       const definitions = Array.isArray(config.hooks?.[event.eventName])
         ? config.hooks![event.eventName]!
         : []
@@ -187,7 +216,8 @@ export class ClaudeHookService {
     let nextConfig = applyManagedHooks(
       config,
       command,
-      getManagedScriptFileName(this.options.settings)
+      getManagedScriptFileName(this.options.settings),
+      this.getLocalEligibleEvents()
     )
     writeManagedScript(
       scriptPath,
@@ -245,8 +275,16 @@ export class ClaudeHookService {
       }
 
       // Why: the POSIX wrapper is identical regardless of where the script lands; only the path differs.
+      // Why: the remote's Claude version is unknown and unprobed here, so inject
+      // only the always-safe base events — an older remote client would otherwise
+      // reject the entire settings.json on a gated key.
       const command = getRemoteManagedCommand(remoteScriptPath)
-      const nextConfig = applyManagedHooks(config, command, remoteScriptFileName)
+      const nextConfig = applyManagedHooks(
+        config,
+        command,
+        remoteScriptFileName,
+        resolveRemoteEligibleEvents(this.options.versionGated)
+      )
 
       // Why: write script before settings — a mid-install failure then leaves a harmless orphan script, not settings.json pointing at a missing one.
       // Why: SSH remotes use POSIX `.sh` paths even when Orca runs on Windows; never derive remote script syntax from the local OS.
