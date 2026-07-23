@@ -9,7 +9,7 @@ import {
 import type { GlobalSettings, ProjectProviderIdentity, Repo } from './types'
 import { githubRepoIdentityKey } from './github-repository-identity-key'
 
-export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira'
+export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira' | 'plane'
 
 export type GitHubTaskProviderIdentity = ProjectProviderIdentity & {
   provider: 'github'
@@ -38,11 +38,19 @@ export type JiraTaskProviderIdentity = {
   projectKey?: string | null
 }
 
+export type PlaneTaskProviderIdentity = {
+  provider: 'plane'
+  workspaceSlug?: string | null
+  workspaceId?: string | null
+  projectId?: string | null
+}
+
 export type TaskProviderIdentity =
   | GitHubTaskProviderIdentity
   | GitLabTaskProviderIdentity
   | LinearTaskProviderIdentity
   | JiraTaskProviderIdentity
+  | PlaneTaskProviderIdentity
 
 export type TaskSourceContext = {
   kind: 'task-source'
@@ -183,6 +191,7 @@ function normalizeTaskProvider(value: string): TaskProvider | null {
     case 'gitlab':
     case 'linear':
     case 'jira':
+    case 'plane':
       return value
     default:
       return null
@@ -217,6 +226,10 @@ function providerIdentityCachePart(identity: TaskProviderIdentity | null | undef
       return [identity.workspaceId, identity.teamId ?? identity.teamKey].filter(Boolean).join('/')
     case 'jira':
       return [identity.siteId ?? identity.siteUrl, identity.projectKey].filter(Boolean).join('/')
+    case 'plane':
+      return [identity.workspaceSlug ?? identity.workspaceId, identity.projectId]
+        .filter(Boolean)
+        .join('/')
   }
 }
 

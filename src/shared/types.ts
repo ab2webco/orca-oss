@@ -341,13 +341,14 @@ export type FolderWorkspace = {
 }
 
 export type FolderWorkspaceLinkedTask = {
-  provider: 'github' | 'gitlab' | 'linear' | 'jira'
+  provider: 'github' | 'gitlab' | 'linear' | 'jira' | 'plane'
   type: 'issue' | 'pr' | 'mr'
   number: number
   title: string
   url: string
   linearIdentifier?: string
   jiraIdentifier?: string
+  planeIdentifier?: string
   repoId?: string
 }
 
@@ -1990,6 +1991,26 @@ export type {
   JiraViewer
 } from './jira-types'
 
+export type {
+  PlaneComment,
+  PlaneConnectArgs,
+  PlaneConnectionStatus,
+  PlaneCreateWorkItemArgs,
+  PlaneCreateWorkItemResult,
+  PlaneLabel,
+  PlaneMutationResult,
+  PlaneProject,
+  PlaneState,
+  PlaneUser,
+  PlaneViewer,
+  PlaneWorkItem,
+  PlaneWorkItemFilter,
+  PlaneWorkItemPriority,
+  PlaneWorkItemUpdate,
+  PlaneWorkspace,
+  PlaneWorkspaceSelection
+} from './plane-types'
+
 /**
  * GitHub API rate-limit buckets surfaced in the TaskPage header so users can
  * see remaining budget before they hit the wall. `core` = REST (5000/hr),
@@ -2933,6 +2954,9 @@ export type GlobalSettings = {
   /** Persisted Linear team selection (tasks view). Same nullable-array pattern as
    *  defaultRepoSelection: null = sticky-all, string[] = frozen subset of team IDs. */
   defaultLinearTeamSelection: string[] | null
+  /** Persisted Plane workspace+board (project) selection (tasks view), mirroring
+   *  defaultLinearTeamSelection. null = no board selected yet. */
+  defaultPlaneSelection?: { workspaceSlug: string; projectId: string } | null
   /** Session cookie for OpenCode Go rate-limit fetching. Stored encrypted. */
   opencodeSessionCookie: string
   /** Optional OpenCode Go workspace ID override; when set, skips the workspaces lookup and fetches usage directly. */
@@ -3029,6 +3053,10 @@ export type GlobalSettings = {
       worktree from a Linear issue. Empty = built-in default. Placeholders:
       {{identifier}} (e.g. TEAM-1234) and {{url}}. */
   linearLaunchPromptTemplate?: string
+  /** Optional template for the first instruction injected when launching a
+      worktree from a Plane work item. Empty = built-in default. Placeholders:
+      {{identifier}} (e.g. PROJ-12) and {{url}}. */
+  planeLaunchPromptTemplate?: string
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */

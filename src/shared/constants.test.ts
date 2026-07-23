@@ -155,6 +155,13 @@ describe('getDefaultSettings linearLaunchPromptTemplate', () => {
   })
 })
 
+describe('getDefaultSettings plane defaults', () => {
+  it('defaults the Plane launch prompt template to an empty string and no board selection', () => {
+    expect(getDefaultSettings('/home/test').planeLaunchPromptTemplate).toBe('')
+    expect(getDefaultSettings('/home/test').defaultPlaneSelection).toBeNull()
+  })
+})
+
 describe('MiniMax defaults', () => {
   it('starts MiniMax with empty group id and the canonical default model', () => {
     const settings = getDefaultSettings('/tmp')

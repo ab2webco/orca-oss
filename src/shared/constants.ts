@@ -315,6 +315,8 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     defaultRepoSelection: null,
     defaultLinearTeamSelection: null,
     linearLaunchPromptTemplate: '',
+    defaultPlaneSelection: null,
+    planeLaunchPromptTemplate: '',
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',
     minimaxGroupId: '',

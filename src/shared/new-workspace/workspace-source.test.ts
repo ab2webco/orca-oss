@@ -56,6 +56,16 @@ describe('workspace source policy', () => {
     ).toBe(true)
     expect(
       shouldPreserveWorkspaceSourceOnRepoChange({
+        provider: 'plane',
+        type: 'issue',
+        number: 0,
+        title: 'PROJ-12 Workspace scoped',
+        url: 'https://plane.acme.test/acme/browse/PROJ-12',
+        planeIdentifier: 'PROJ-12'
+      })
+    ).toBe(true)
+    expect(
+      shouldPreserveWorkspaceSourceOnRepoChange({
         provider: 'github',
         type: 'issue',
         number: 1,
@@ -104,5 +114,31 @@ describe('workspace source policy', () => {
     expect(
       shouldApplyWorkspaceSourceAutoName({ currentName: 'my workspace', lastAutoName: 'old' })
     ).toBe(false)
+  })
+
+  it('recognizes a Plane work item by tag, never by URL', () => {
+    const planeItem = {
+      provider: 'plane' as const,
+      type: 'issue' as const,
+      number: 0,
+      title: 'PROJ-12 Ship board selector',
+      url: 'https://plane.acme.test/acme/browse/PROJ-12',
+      planeIdentifier: 'PROJ-12'
+    }
+    // Why: Plane self-hosts on arbitrary base URLs, so an untagged item with a
+    // Plane-shaped URL must NOT be inferred as 'plane' without an explicit tag.
+    expect(
+      getWorkspaceSourceProvider({
+        type: 'issue',
+        number: 5,
+        title: 'Untagged',
+        url: 'https://plane.acme.test/acme/work-items/PROJ-5'
+      })
+    ).toBe('github')
+    expect(getWorkspaceSourceProvider(planeItem)).toBe('plane')
+    expect(buildWorkspaceSourceSelection({ linkedWorkItem: planeItem })).toMatchObject({
+      kind: 'plane',
+      label: 'PROJ-12 Ship board selector'
+    })
   })
 })
