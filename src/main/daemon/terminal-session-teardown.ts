@@ -1,7 +1,7 @@
 import { killWithDescendantSweep } from '../pty-descendant-termination'
 import type { Session } from './session'
 
-type AgentTeardownOperation = {
+type SessionTeardownOperation = {
   promise: Promise<void>
   immediate: boolean
   rootSignalled: boolean
@@ -9,10 +9,10 @@ type AgentTeardownOperation = {
   session: Session
 }
 
-/** Owns agent teardown by session id until descendant capture and root
+/** Owns terminal teardown by session id until descendant capture and root
  * signalling finish, even when the root exits and its Session is reaped. */
 export class TerminalSessionTeardown {
-  private operations = new Map<string, AgentTeardownOperation>()
+  private operations = new Map<string, SessionTeardownOperation>()
 
   constructor(private sessions: ReadonlyMap<string, Session>) {}
 
@@ -33,22 +33,11 @@ export class TerminalSessionTeardown {
     return pending?.promise
   }
 
-  killSession(sessionId: string, session: Session, immediate: boolean): void | Promise<void> {
-    if (session.launchAgent) {
-      return this.killAgentSession(sessionId, session, immediate)
-    }
-    if (immediate) {
-      return session.forceKillAndWaitForExit()
-    } else {
-      session.kill()
-    }
+  killSession(sessionId: string, session: Session, immediate: boolean): Promise<void> {
+    return this.killOwnedSession(sessionId, session, immediate)
   }
 
-  private killAgentSession(
-    sessionId: string,
-    session: Session,
-    immediate: boolean
-  ): void | Promise<void> {
+  private killOwnedSession(sessionId: string, session: Session, immediate: boolean): Promise<void> {
     const pending = this.operations.get(sessionId)
     if (pending) {
       // Why: an immediate caller is a stronger teardown request and must not
@@ -63,13 +52,13 @@ export class TerminalSessionTeardown {
       if (immediate && session.isAlive && session.isTerminating) {
         return session.forceKillAndWaitForExit()
       }
-      return
+      return Promise.resolve()
     }
     if (!immediate) {
       session.scheduleForceDisposeFallback()
     }
 
-    const entry: AgentTeardownOperation = {
+    const entry: SessionTeardownOperation = {
       promise: Promise.resolve(),
       immediate,
       rootSignalled: false,
@@ -99,9 +88,14 @@ export class TerminalSessionTeardown {
         }
       )
     )
-    // Why: descendant capture completion only proves signals were requested;
-    // destructive callers must retain the native owner until OS-confirmed exit.
-    const operation = sweep.then(() => entry.rootCompletion)
+    // Why: sweep failure still must retain the native owner until OS-confirmed root exit.
+    const operation = sweep.then(
+      () => entry.rootCompletion,
+      async (error: unknown) => {
+        await entry.rootCompletion
+        throw error
+      }
+    )
     entry.promise = operation
     this.operations.set(sessionId, entry)
     const clearOperation = (): void => {

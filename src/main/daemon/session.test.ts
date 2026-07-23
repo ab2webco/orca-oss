@@ -93,6 +93,9 @@ describe('Session', () => {
     vi.useFakeTimers()
     subprocess = createMockSubprocess()
     killWithDescendantSweepMock.mockReset()
+    killWithDescendantSweepMock.mockImplementation((_pid: number, killRoot: () => void) =>
+      killRoot()
+    )
   })
 
   afterEach(() => {
@@ -541,14 +544,19 @@ describe('Session', () => {
       expect(session.isTerminating).toBe(true)
     })
 
-    it('non-agent kill stays synchronous and never routes through the descendant sweep', () => {
+    it('non-agent kill routes through the descendant sweep', () => {
       createSession()
       session.kill()
       expect(subprocess.killed).toBe(true)
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
+      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+        subprocess.pid,
+        expect.any(Function),
+        expect.objectContaining({ ownsRoot: expect.any(Function) })
+      )
     })
 
     it('agent kill routes through the descendant sweep with the subprocess as root', () => {
+      killWithDescendantSweepMock.mockReset()
       createSession({ launchAgent: 'claude' })
       session.kill()
       expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
@@ -564,6 +572,7 @@ describe('Session', () => {
     })
 
     it('agent kill root callback is a no-op after the session already exited', () => {
+      killWithDescendantSweepMock.mockReset()
       createSession({ launchAgent: 'claude' })
       session.kill()
       const killRoot = killWithDescendantSweepMock.mock.calls[0][1] as () => void
