@@ -66,8 +66,8 @@ describe('buildWorktreeClaudeAccountChipModel', () => {
       roster: roster({ activeAccountIdsByRuntime: { host: 'acct-pinned', wsl: {} } }),
       systemDefaultLabel: SYSTEM_DEFAULT
     })
-    expect(model.label).toBe('pinned@example.com')
-    expect(model.inherited).toBe(true)
+    expect(model?.label).toBe('pinned@example.com')
+    expect(model?.inherited).toBe(true)
   })
 
   it('shows the endpoint label for a pinned custom-endpoint account', () => {
@@ -108,8 +108,8 @@ describe('buildWorktreeClaudeAccountChipModel', () => {
       }),
       systemDefaultLabel: SYSTEM_DEFAULT
     })
-    expect(model.label).toBe('api.z.ai')
-    expect(model.isEndpoint).toBe(true)
+    expect(model?.label).toBe('api.z.ai')
+    expect(model?.isEndpoint).toBe(true)
   })
 
   it('falls back to the global account for a dangling pin (removed account)', () => {
@@ -143,8 +143,18 @@ describe('buildWorktreeClaudeAccountChipModel', () => {
       }),
       systemDefaultLabel: SYSTEM_DEFAULT
     })
-    expect(model.label).toBe('wsl@example.com')
-    expect(model.inherited).toBe(true)
+    expect(model?.label).toBe('wsl@example.com')
+    expect(model?.inherited).toBe(true)
+  })
+
+  it('returns null when the roster is not yet available', () => {
+    const model = buildWorktreeClaudeAccountChipModel({
+      pinnedAccountId: 'acct-active',
+      wslDistro: null,
+      roster: undefined,
+      systemDefaultLabel: SYSTEM_DEFAULT
+    })
+    expect(model).toBeNull()
   })
 })
 

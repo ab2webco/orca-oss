@@ -11,12 +11,12 @@ type ClaudeAccountRoster = Pick<
  *  status-bar host selection, and picks the WSL selection when the worktree
  *  path resolves to a distro. */
 export function getActiveClaudeAccountId(
-  roster: ClaudeAccountRoster,
+  roster: ClaudeAccountRoster | null | undefined,
   wslDistro: string | null
 ): string | null {
-  const selection = roster.activeAccountIdsByRuntime
+  const selection = roster?.activeAccountIdsByRuntime
   if (!wslDistro) {
-    return selection?.host ?? roster.activeAccountId ?? null
+    return selection?.host ?? roster?.activeAccountId ?? null
   }
   return selection?.wsl?.[wslDistro] ?? null
 }
@@ -37,9 +37,14 @@ export type WorktreeClaudeAccountChipModel = {
 export function buildWorktreeClaudeAccountChipModel(args: {
   pinnedAccountId: string | null | undefined
   wslDistro: string | null
-  roster: ClaudeAccountRoster
+  roster: ClaudeAccountRoster | null | undefined
   systemDefaultLabel: string
-}): WorktreeClaudeAccountChipModel {
+}): WorktreeClaudeAccountChipModel | null {
+  // Why: the roster slice may be unset (before the app-scoped subscription
+  // populates it, or in tests that don't mount it) — render no chip, never throw.
+  if (!args.roster) {
+    return null
+  }
   const activeAccountId = getActiveClaudeAccountId(args.roster, args.wslDistro)
   const resolution = resolveWorktreeClaudeAccount({
     pinnedAccountId: args.pinnedAccountId,

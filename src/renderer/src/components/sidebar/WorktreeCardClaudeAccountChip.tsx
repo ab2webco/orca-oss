@@ -40,6 +40,11 @@ export function WorktreeCardClaudeAccountChip({
     )
   })
 
+  // Why: no chip until the account roster is available (never render a wrong/empty value).
+  if (!model) {
+    return null
+  }
+
   const Icon = model.isEndpoint ? Globe : model.inherited ? AtSign : Pin
   const tooltip = model.isEndpoint
     ? translate(
