@@ -1,4 +1,8 @@
 import { execFile } from 'node:child_process'
+import {
+  terminateWindowsProcessTree,
+  type WindowsProcessTreeTerminator
+} from './windows-process-tree-termination'
 
 export const DESCENDANT_KILL_GRACE_MS = 2_000
 export const DESCENDANT_SNAPSHOT_TIMEOUT_MS = 1_000
@@ -192,6 +196,7 @@ type SnapshotDeps = {
   readTable?: ProcessTableReader
   platform?: NodeJS.Platform
   timeoutMs?: number
+  terminateWindowsTree?: WindowsProcessTreeTerminator
 }
 
 /**
@@ -221,7 +226,7 @@ export async function captureDescendantSnapshot(
 }
 
 /**
- * Standard agent-session kill sequencing: snapshot the descendant tree,
+ * Standard terminal-session kill sequencing: snapshot the descendant tree,
  * signal its members, then run the caller's root kill. Callers must not signal
  * the root before this runs — a dead root's descendants reparent to pid 1 and
  * become unfindable. Snapshot failure degrades to killRoot alone.
@@ -231,6 +236,17 @@ export async function killWithDescendantSweep(
   killRoot: () => void,
   deps: SnapshotDeps & TerminateDeps & { ownsRoot?: () => boolean } = {}
 ): Promise<void> {
+  const platform = deps.platform ?? process.platform
+  if (platform === 'win32') {
+    try {
+      if (deps.ownsRoot?.() ?? true) {
+        await (deps.terminateWindowsTree ?? terminateWindowsProcessTree)(rootPid)
+      }
+    } finally {
+      killRoot()
+    }
+    return
+  }
   const snapshot = await captureDescendantSnapshot(rootPid, deps)
   try {
     // Signal the captured descendants while their parent links still exist;

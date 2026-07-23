@@ -68,7 +68,7 @@ describe('TerminalHost', () => {
   }
 
   beforeEach(() => {
-    killWithDescendantSweepMock.mockReset()
+    killWithDescendantSweepMock.mockReset().mockImplementation((_pid, kill) => kill())
     spawnFn = vi.fn(() => {
       const sub = createMockSubprocess() as ReturnType<typeof createMockSubprocess> & {
         _onDataCb: ((data: string) => void) | null
@@ -429,7 +429,7 @@ describe('TerminalHost', () => {
 
       expect(lastSubprocess.kill).not.toHaveBeenCalled()
       expect(lastSubprocess.forceKill).toHaveBeenCalled()
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
+      expect(killWithDescendantSweepMock).toHaveBeenCalledOnce()
       expect(lastSubprocess.dispose).not.toHaveBeenCalled()
       expect(host.listSessions()).toHaveLength(1)
 
@@ -507,7 +507,7 @@ describe('TerminalHost', () => {
       expect(() => host.kill('missing')).toThrow('Session not found')
     })
 
-    it('agent immediate kill routes through the descendant sweep and defers the force-kill to it', async () => {
+    it('waits for physical exit before surfacing a descendant sweep failure', async () => {
       await host.createOrAttach({
         sessionId: 'agent-1',
         cols: 80,
@@ -516,27 +516,19 @@ describe('TerminalHost', () => {
         streamClient: { onData: vi.fn(), onExit: vi.fn() }
       })
       lastSubprocess.forceKill = vi.fn()
+      killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
+        killRoot()
+        throw new Error('taskkill failed')
+      })
 
       const killing = host.kill('agent-1', { immediate: true })
-
-      // Why order matters: force-killing first would let orphans reparent to
-      // pid 1 and escape the sweep's ppid walk entirely.
-      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
-        99999,
-        expect.any(Function),
-        expect.objectContaining({ ownsRoot: expect.any(Function) })
-      )
-      expect(lastSubprocess.forceKill).not.toHaveBeenCalled()
-      expect(host.isKilled('agent-1')).toBe(true)
-
-      const finish = killWithDescendantSweepMock.mock.calls[0][1] as () => void
-      finish()
-      expect(lastSubprocess.forceKill).toHaveBeenCalled()
-      expect(lastSubprocess.dispose).not.toHaveBeenCalled()
-
+      let settled = false
+      void killing.finally(() => (settled = true)).catch(() => {})
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      const settledBeforeExit = settled
       lastSubprocess._onExitCb?.(137)
-      await killing
-      expect(lastSubprocess.dispose).toHaveBeenCalled()
+      await expect(killing).rejects.toThrow('taskkill failed')
+      expect(settledBeforeExit).toBe(false)
     })
 
     it('rejects reattach while an agent immediate-kill snapshot is pending', async () => {
