@@ -37,6 +37,7 @@ import type { RecentlyClosedTabsSlice } from './slices/recently-closed-tabs'
 import type { OrcaProfilesSlice } from './slices/orca-profiles'
 import type { NewIssueDraftSlice } from './slices/new-issue-draft'
 import type { ClaudeAccountRosterSlice } from './slices/claude-account-roster'
+import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -76,4 +77,5 @@ export type AppState = RepoSlice &
   RecentlyClosedTabsSlice &
   OrcaProfilesSlice &
   NewIssueDraftSlice &
-  ClaudeAccountRosterSlice
+  ClaudeAccountRosterSlice &
+  RemoteServerUpdatesSlice
