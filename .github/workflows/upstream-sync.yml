@@ -22,9 +22,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # Why: the sync branch can include upstream changes under .github/workflows/
-  # (e.g. computer-e2e.yml); GitHub rejects the push without workflow write scope.
-  workflows: write
 
 concurrency:
   group: upstream-sync
@@ -90,6 +87,19 @@ jobs:
             git reset --hard upstream/main
             echo "conflicts=true" >>"$GITHUB_OUTPUT"
             echo "Merge has conflicts — the reviewer must resolve them in the PR."
+          fi
+          # Why: GITHUB_TOKEN cannot create/update files under .github/workflows/
+          # on push (GitHub rejects it: "refusing to allow ... without workflows
+          # permission" — and there is no such `permissions:` key). This fork also
+          # maintains its own CI (lab-release, this file, …), so restore the fork's
+          # workflow dir exactly — drop upstream-added workflow files and revert
+          # modified ones — so the sync push carries no workflow changes. Upstream
+          # workflow updates are reviewed/applied separately, not via this bot push.
+          rm -rf .github/workflows
+          git checkout "origin/${base}" -- .github/workflows
+          git add -A .github/workflows
+          if ! git diff --cached --quiet -- .github/workflows; then
+            git commit -m "chore(sync): retain fork .github/workflows (bot token cannot push workflow changes)"
           fi
           git push -f origin "$sync_branch"
           echo "branch=$sync_branch" >>"$GITHUB_OUTPUT"
