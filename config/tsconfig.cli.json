@@ -15,6 +15,7 @@
     "../src/main/agent-hooks/managed-agent-hook-controls.ts",
     "../src/main/amp/hook-service.ts",
     "../src/main/antigravity/hook-service.ts",
+    "../src/main/claude/hook-event-versions.ts",
     "../src/main/claude/hook-settings.ts",
     "../src/main/claude/hook-service.ts",
     "../src/main/claude/managed-hook-script.ts",
