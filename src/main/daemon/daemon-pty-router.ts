@@ -298,14 +298,10 @@ export class DaemonPtyRouter implements IPtyProvider {
       // those arrays into push can exceed JavaScript's argument limit.
       for (const id of result.alive) {
         alive.push(id)
-      }
-      for (const id of result.killed) {
-        killed.push(id)
-      }
-      for (const id of result.alive) {
         this.sessionAdapters.set(id, adapter)
       }
       for (const id of result.killed) {
+        killed.push(id)
         this.sessionAdapters.delete(id)
       }
     }
