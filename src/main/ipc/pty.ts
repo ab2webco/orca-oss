@@ -228,6 +228,17 @@ const AGENT_HOOK_RUNTIME_ENV_KEYS = [
   'ORCA_CLAUDE_AGENT_STATUS_SETTINGS'
 ] as const
 
+// Why: a pty host launched from inside a Claude Code session inherits Claude's
+// child-session stamps, and the wholesale process.env spread then marks every
+// spawned terminal as a nested Claude child — Claude silently disables
+// transcript persistence for those sessions, so real user sessions lose their
+// on-disk history without any visible error. Orca never sets these itself.
+const CLAUDE_CHILD_SESSION_STAMP_ENV_KEYS = [
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_BRIDGE_SESSION_ID'
+] as const
+
 export function getPtyIdForPaneKey(paneKey: string): string | undefined {
   return paneKeyPtyId.get(paneKey)
 }
@@ -977,6 +988,15 @@ function getInheritedAgentHookEnvKeysToDelete(
   const env = spawnEnv ?? {}
   // Why: providers merge process.env after cleanup; delete stale hook keys without dropping fresh coordinates buildPtyHostEnv set.
   return AGENT_HOOK_RUNTIME_ENV_KEYS.filter((key) => env[key] === undefined)
+}
+
+function getInheritedClaudeSessionStampEnvKeysToDelete(
+  spawnEnv: Record<string, string> | undefined
+): string[] {
+  const env = spawnEnv ?? {}
+  // Why: strip only values inherited from the pty host; a caller that explicitly
+  // provides a stamp (deliberately spawning a nested Claude child) keeps it.
+  return CLAUDE_CHILD_SESSION_STAMP_ENV_KEYS.filter((key) => env[key] === undefined)
 }
 
 // Why: a nested terminal can inherit prior OpenCode/Pi/OMP overlay env; restore the user's recorded source dir, else strip only Orca-owned values.
@@ -3497,8 +3517,14 @@ export function registerPtyHandlers(
         args.onPtySpawnCommitted?.()
       }
       spawnOptions.envToDelete = mergePtyEnvDeletions(
-        mergePtyEnvDeletions(authEnvToDelete, args.envToDelete ?? []),
-        isDaemonHostSpawn ? getInheritedAgentHookEnvKeysToDelete(env) : []
+        mergePtyEnvDeletions(
+          mergePtyEnvDeletions(authEnvToDelete, args.envToDelete ?? []),
+          isDaemonHostSpawn ? getInheritedAgentHookEnvKeysToDelete(env) : []
+        ),
+        // Why (#9961): unconditional — both the daemon and the relay host spread
+        // their own (possibly contaminated) process.env into every spawn, so the
+        // inherited Claude child-session stamps must always be stripped.
+        getInheritedClaudeSessionStampEnvKeysToDelete(env)
       )
       if (skipCodexHomeEnv) {
         spawnOptions.envToDelete = mergePtyEnvDeletions(
@@ -4773,12 +4799,18 @@ export function registerPtyHandlers(
         mergePtyEnvDeletions(
           mergePtyEnvDeletions(
             mergePtyEnvDeletions(
-              mergePtyEnvDeletions(envToDelete, args.envToDelete ?? []),
-              agentTeamsEnvToDelete ?? []
+              mergePtyEnvDeletions(
+                mergePtyEnvDeletions(envToDelete, args.envToDelete ?? []),
+                agentTeamsEnvToDelete ?? []
+              ),
+              isDaemonHostSpawn ? getInheritedAgentHookEnvKeysToDelete(spawnEnv) : []
             ),
-            isDaemonHostSpawn ? getInheritedAgentHookEnvKeysToDelete(spawnEnv) : []
+            skipCodexHomeEnv ? CODEX_HOME_ENV_KEYS : []
           ),
-          skipCodexHomeEnv ? CODEX_HOME_ENV_KEYS : []
+          // Why (#9961): Orca never sets the Claude child-session stamps itself,
+          // so on the host they are always inherited poison that silently
+          // disables the real session's transcript persistence — strip them.
+          getInheritedClaudeSessionStampEnvKeysToDelete(spawnEnv)
         ),
         // Why: the persistent daemon compares its own merged CODEX_HOME pair;
         // main cannot safely decide ownership for a process it may not parent.
