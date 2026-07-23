@@ -4,8 +4,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   clearMcpServersFromVaultConfig,
+  collectGlobalMcpServerEntries,
   collectGlobalMcpServers,
+  ensureSelectiveVaultSkills,
   ensureVaultSkillsSymlink,
+  listGlobalSkillNames,
   mergeMcpServersIntoVaultConfig,
   removeVaultSkillsSymlink
 } from './global-config-inheritance'
@@ -167,5 +170,103 @@ describe('ensureVaultSkillsSymlink', () => {
     mkdirSync(join(vault, 'skills'), { recursive: true })
     expect(ensureVaultSkillsSymlink(vault, home)).toBe('exists')
     expect(lstatSync(join(vault, 'skills')).isDirectory()).toBe(true)
+  })
+})
+
+function makeSkills(home: string, names: string[]): void {
+  for (const name of names) {
+    mkdirSync(join(home, '.claude', 'skills', name), { recursive: true })
+  }
+}
+
+describe('listGlobalSkillNames', () => {
+  it('lists global skill directory names sorted', () => {
+    const home = makeHome()
+    makeSkills(home, ['zebra', 'alpha'])
+    expect(listGlobalSkillNames(home)).toEqual(['alpha', 'zebra'])
+  })
+
+  it('returns [] when there is no global skills dir', () => {
+    expect(listGlobalSkillNames(makeHome())).toEqual([])
+  })
+})
+
+describe('collectGlobalMcpServerEntries', () => {
+  it('reports each server with its source, letting the later source win', () => {
+    const home = makeHome()
+    writeFileSync(
+      join(home, '.claude.json'),
+      JSON.stringify({ mcpServers: { shared: {}, only1: {} } })
+    )
+    mkdirSync(join(home, '.claude', 'mcp'), { recursive: true })
+    writeFileSync(
+      join(home, '.claude', 'settings.json'),
+      JSON.stringify({ mcpServers: { shared: {} } })
+    )
+    writeFileSync(
+      join(home, '.claude', 'mcp', 'engram.json'),
+      JSON.stringify({ command: 'engram' })
+    )
+    expect(collectGlobalMcpServerEntries(home)).toEqual([
+      { name: 'engram', source: 'plugin-dir' },
+      { name: 'only1', source: 'user-config' },
+      { name: 'shared', source: 'settings' }
+    ])
+  })
+})
+
+describe('ensureSelectiveVaultSkills', () => {
+  it('creates one live symlink per selected skill', () => {
+    const home = makeHome()
+    makeSkills(home, ['a', 'b', 'c'])
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(vault, { recursive: true })
+
+    ensureSelectiveVaultSkills(vault, home, ['a', 'c'])
+    const skillsDir = join(vault, 'skills')
+    expect(lstatSync(skillsDir).isDirectory()).toBe(true)
+    expect(lstatSync(join(skillsDir, 'a')).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(join(skillsDir, 'a'))).toBe(join(home, '.claude', 'skills', 'a'))
+    expect(existsSync(join(skillsDir, 'b'))).toBe(false)
+    expect(lstatSync(join(skillsDir, 'c')).isSymbolicLink()).toBe(true)
+  })
+
+  it('migrates a legacy whole-dir symlink and prunes deselected skills', () => {
+    const home = makeHome()
+    makeSkills(home, ['a', 'b'])
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(vault, { recursive: true })
+
+    ensureVaultSkillsSymlink(vault, home) // legacy whole-dir link
+    expect(lstatSync(join(vault, 'skills')).isSymbolicLink()).toBe(true)
+
+    ensureSelectiveVaultSkills(vault, home, ['a', 'b'])
+    ensureSelectiveVaultSkills(vault, home, ['a']) // now deselect b
+    const skillsDir = join(vault, 'skills')
+    expect(lstatSync(skillsDir).isDirectory()).toBe(true)
+    expect(existsSync(join(skillsDir, 'a'))).toBe(true)
+    expect(existsSync(join(skillsDir, 'b'))).toBe(false)
+  })
+
+  it('skips a selected skill that does not exist globally', () => {
+    const home = makeHome()
+    makeSkills(home, ['a'])
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(vault, { recursive: true })
+    ensureSelectiveVaultSkills(vault, home, ['a', 'ghost'])
+    expect(existsSync(join(vault, 'skills', 'a'))).toBe(true)
+    expect(existsSync(join(vault, 'skills', 'ghost'))).toBe(false)
+  })
+})
+
+describe('removeVaultSkillsSymlink (selective dir)', () => {
+  it('prunes per-skill symlinks and removes the emptied dir', () => {
+    const home = makeHome()
+    makeSkills(home, ['a', 'b'])
+    const vault = join(makeHome(), 'auth')
+    mkdirSync(vault, { recursive: true })
+    ensureSelectiveVaultSkills(vault, home, ['a', 'b'])
+    expect(removeVaultSkillsSymlink(vault)).toBe(true)
+    expect(existsSync(join(vault, 'skills'))).toBe(false)
   })
 })

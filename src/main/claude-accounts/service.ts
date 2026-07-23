@@ -23,11 +23,26 @@ import {
 } from './managed-auth-path'
 import {
   clearMcpServersFromVaultConfig,
+  collectGlobalMcpServerEntries,
   collectGlobalMcpServers,
+  ensureSelectiveVaultSkills,
   ensureVaultSkillsSymlink,
+  listGlobalSkillNames,
   mergeMcpServersIntoVaultConfig,
   removeVaultSkillsSymlink
 } from './global-config-inheritance'
+import {
+  collectGlobalHooks,
+  mergeHooksIntoSettingsObject,
+  mergeHooksIntoVaultSettings
+} from './plugin-hooks-inheritance'
+import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection,
+  PluginHookEntry
+} from '../../shared/global-config-sync'
+import { getConfigPath } from '../claude/hook-settings'
+import { writeHooksJson } from '../agent-hooks/installer-utils'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
   deleteManagedClaudeKeychainCredentials,
@@ -104,6 +119,33 @@ export type ClaudeCustomEndpointAccountInput = {
   subagentModel?: string | null
 }
 
+// Edit variant: token is optional — a blank token keeps the stored one so the
+// user can change the URL/model without re-entering the secret.
+export type ClaudeCustomEndpointAccountUpdateInput = {
+  accountId: string
+  label: string
+  baseUrl: string
+  token?: string | null
+  model?: string | null
+  opusModel?: string | null
+  sonnetModel?: string | null
+  haikuModel?: string | null
+  subagentModel?: string | null
+}
+
+// Current endpoint config for pre-filling the edit dialog. The token is never
+// returned; hasToken tells the UI whether one is already stored.
+export type ClaudeCustomEndpointAccountConfig = {
+  label: string
+  baseUrl: string
+  model: string
+  opusModel: string | null
+  sonnetModel: string | null
+  haikuModel: string | null
+  subagentModel: string | null
+  hasToken: boolean
+}
+
 const DEFAULT_CUSTOM_ENDPOINT_MODEL = 'glm-5.1'
 // Why: the claude CLI stalls for minutes on slow GLM responses with the default timeout.
 const CUSTOM_ENDPOINT_API_TIMEOUT_MS = '3000000'
@@ -146,6 +188,38 @@ export class ClaudeAccountService {
     input: ClaudeCustomEndpointAccountInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.serializeMutation(() => this.doAddCustomEndpointAccount(input))
+  }
+
+  async updateCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountUpdateInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(() =>
+      this.withManagedAccountMutation(input.accountId, () =>
+        this.doUpdateCustomEndpointAccount(input)
+      )
+    )
+  }
+
+  /** Returns the current endpoint config (never the token) to pre-fill the edit dialog. */
+  getCustomEndpointAccountConfig(accountId: string): ClaudeCustomEndpointAccountConfig {
+    const account = this.requireAccount(accountId)
+    if (account.authMethod !== 'custom-endpoint') {
+      throw new Error('Only custom endpoint accounts have an editable endpoint config.')
+    }
+    const owned = resolveOwnedClaudeManagedAuthPath(accountId, account.managedAuthPath)
+    const env = owned ? this.readVaultEnv(owned) : {}
+    const str = (value: unknown): string | null =>
+      typeof value === 'string' && value.trim() !== '' ? value : null
+    return {
+      label: account.endpointLabel ?? account.email,
+      baseUrl: account.endpointBaseUrl ?? str(env.ANTHROPIC_BASE_URL) ?? '',
+      model: account.endpointModel ?? str(env.ANTHROPIC_MODEL) ?? '',
+      opusModel: str(env.ANTHROPIC_DEFAULT_OPUS_MODEL),
+      sonnetModel: str(env.ANTHROPIC_DEFAULT_SONNET_MODEL),
+      haikuModel: str(env.ANTHROPIC_DEFAULT_HAIKU_MODEL),
+      subagentModel: str(env.CLAUDE_CODE_SUBAGENT_MODEL),
+      hasToken: str(env.ANTHROPIC_AUTH_TOKEN) !== null
+    }
   }
 
   async reauthenticateAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
@@ -384,6 +458,133 @@ export class ClaudeAccountService {
       this.restoreClaudeSettings(previousSettings)
       await this.safeRemoveManagedAuth(accountId, managedAuth.managedAuthPath)
       throw error
+    }
+  }
+
+  private async doUpdateCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountUpdateInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const account = this.requireAccount(input.accountId)
+    if (account.authMethod !== 'custom-endpoint') {
+      throw new Error('Only custom endpoint accounts can be edited.')
+    }
+    if ((account.managedAuthRuntime ?? 'host') !== 'host') {
+      throw new Error('Editing custom endpoint accounts is only supported on this device.')
+    }
+    const label = input.label.trim()
+    if (!label) {
+      throw new Error('Enter a label for the custom endpoint account.')
+    }
+    const baseUrl = input.baseUrl.trim()
+    if (!this.isHttpUrl(baseUrl)) {
+      throw new Error('The endpoint base URL must be a valid http(s) URL.')
+    }
+    const model = this.normalizeModelName(input.model) ?? DEFAULT_CUSTOM_ENDPOINT_MODEL
+    const opusModel = this.normalizeModelName(input.opusModel)
+    const sonnetModel = this.normalizeModelName(input.sonnetModel)
+    const haikuModel = this.normalizeModelName(input.haikuModel)
+    const subagentModel = this.normalizeModelName(input.subagentModel)
+
+    const previousSettings = this.store.getSettings()
+    if (
+      previousSettings.claudeManagedAccounts.some(
+        (other) =>
+          other.id !== input.accountId &&
+          other.authMethod === 'custom-endpoint' &&
+          other.email.trim().toLowerCase() === label.toLowerCase()
+      )
+    ) {
+      throw new Error('A custom endpoint account with this label already exists.')
+    }
+
+    const owned = resolveOwnedClaudeManagedAuthPath(input.accountId, account.managedAuthPath)
+    if (!owned) {
+      throw new Error('Managed Claude auth storage is not owned by Orca.')
+    }
+
+    // Preserve any settings.json keys we did not author (e.g. seeded hooks) and
+    // any extra env; only the endpoint fields below are rewritten.
+    let existingSettings: Record<string, unknown> = {}
+    const existingRaw = readClaudeManagedAuthFile(owned, 'settings.json')
+    if (existingRaw) {
+      try {
+        const parsed: unknown = JSON.parse(existingRaw)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existingSettings = parsed as Record<string, unknown>
+        }
+      } catch {
+        // Unparseable — rebuild from scratch rather than fail the edit.
+      }
+    }
+    const existingEnv = this.readVaultEnv(owned)
+    const providedToken = (input.token ?? '').trim()
+    const existingToken =
+      typeof existingEnv.ANTHROPIC_AUTH_TOKEN === 'string' ? existingEnv.ANTHROPIC_AUTH_TOKEN : ''
+    const token = providedToken || existingToken
+    if (!token) {
+      throw new Error('Enter the endpoint API token.')
+    }
+
+    const nextEnv: Record<string, unknown> = {
+      ...existingEnv,
+      ANTHROPIC_BASE_URL: baseUrl,
+      ANTHROPIC_AUTH_TOKEN: token,
+      ANTHROPIC_MODEL: model,
+      API_TIMEOUT_MS: CUSTOM_ENDPOINT_API_TIMEOUT_MS
+    }
+    // A cleared tier field (null) removes the mapping so it falls back to the base model.
+    const applyTier = (key: string, value: string | null): void => {
+      if (value !== null) {
+        nextEnv[key] = value
+      } else {
+        delete nextEnv[key]
+      }
+    }
+    applyTier('ANTHROPIC_DEFAULT_OPUS_MODEL', opusModel)
+    applyTier('ANTHROPIC_DEFAULT_SONNET_MODEL', sonnetModel)
+    applyTier('ANTHROPIC_DEFAULT_HAIKU_MODEL', haikuModel)
+    applyTier('CLAUDE_CODE_SUBAGENT_MODEL', subagentModel)
+
+    writeClaudeManagedAuthFile(
+      owned,
+      'settings.json',
+      `${JSON.stringify({ ...existingSettings, env: nextEnv }, null, 2)}\n`
+    )
+
+    const now = Date.now()
+    const updatedAccounts = previousSettings.claudeManagedAccounts.map((other) =>
+      other.id === input.accountId
+        ? {
+            ...other,
+            email: label,
+            endpointLabel: label,
+            endpointBaseUrl: baseUrl,
+            endpointModel: model,
+            updatedAt: now
+          }
+        : other
+    )
+    this.store.updateSettings({ claudeManagedAccounts: updatedAccounts })
+    return this.getSnapshot()
+  }
+
+  /** Reads the `env` map from a vault settings.json; {} when absent/unparseable. */
+  private readVaultEnv(owned: string): Record<string, unknown> {
+    try {
+      const raw = readClaudeManagedAuthFile(owned, 'settings.json')
+      if (!raw) {
+        return {}
+      }
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const env = (parsed as Record<string, unknown>).env
+        if (env && typeof env === 'object' && !Array.isArray(env)) {
+          return env as Record<string, unknown>
+        }
+      }
+      return {}
+    } catch {
+      return {}
     }
   }
 
@@ -1304,7 +1505,8 @@ export class ClaudeAccountService {
   seedGlobalConfigIntoVault(
     accountId: string,
     managedAuthPath: string,
-    runtime: 'host' | 'wsl'
+    runtime: 'host' | 'wsl',
+    selection?: GlobalConfigSyncSelection
   ): void {
     if (runtime !== 'host') {
       return
@@ -1315,26 +1517,67 @@ export class ClaudeAccountService {
         return
       }
       const home = homedir()
+
       const globalMcpServers = collectGlobalMcpServers(home)
-      if (globalMcpServers) {
+      const mcpToSeed =
+        globalMcpServers && selection
+          ? Object.fromEntries(
+              Object.entries(globalMcpServers).filter(([name]) =>
+                selection.mcpServerNames.includes(name)
+              )
+            )
+          : globalMcpServers
+      if (mcpToSeed && Object.keys(mcpToSeed).length > 0) {
         const existing = readClaudeManagedAuthFile(owned, '.claude.json')
-        const merged = mergeMcpServersIntoVaultConfig(existing, globalMcpServers)
+        const merged = mergeMcpServersIntoVaultConfig(existing, mcpToSeed)
         if (merged !== null) {
           writeClaudeManagedAuthFile(owned, '.claude.json', merged)
         }
       }
-      ensureVaultSkillsSymlink(owned, home)
+
+      // No selection = the account-creation path: inherit all skills live via a
+      // whole-dir symlink. With a selection, seed only the chosen skills.
+      if (selection) {
+        ensureSelectiveVaultSkills(owned, home, selection.skillNames)
+      } else {
+        ensureVaultSkillsSymlink(owned, home)
+      }
+
+      if (selection && selection.hookIds.length > 0) {
+        const hooks = collectGlobalHooks(home).filter((hook) => selection.hookIds.includes(hook.id))
+        const existingSettings = readClaudeManagedAuthFile(owned, 'settings.json')
+        const mergedSettings = mergeHooksIntoVaultSettings(existingSettings, hooks)
+        if (mergedSettings !== null) {
+          writeClaudeManagedAuthFile(owned, 'settings.json', mergedSettings)
+        }
+      }
     } catch (error) {
       console.warn('[claude-accounts] Failed to seed global config into vault:', error)
     }
   }
 
   /**
-   * Re-seeds global MCP servers + skills into every host managed account's vault.
-   * Lets a user propagate a newly added global MCP/skill to accounts that already
-   * exist, without re-creating them. Returns how many host vaults were processed.
+   * Builds the inventory shown in the pre-sync popup: the global MCP servers,
+   * skills, and plugin hooks that could be seeded into managed vaults. Host-only
+   * (the seed itself is host-only); reads the running machine's own home.
    */
-  resyncGlobalConfigIntoManagedVaults(): number {
+  buildGlobalConfigSyncInventory(): GlobalConfigSyncInventory {
+    const home = homedir()
+    return {
+      mcpServers: collectGlobalMcpServerEntries(home),
+      skills: listGlobalSkillNames(home),
+      hooks: collectGlobalHooks(home)
+    }
+  }
+
+  /**
+   * Re-seeds the selected global config into every host managed account's vault.
+   * Lets a user propagate a chosen set of global MCP servers, skills, and plugin
+   * hooks to accounts that already exist, without re-creating them. When no
+   * selection is given (legacy callers) everything is seeded. Returns how many
+   * host vaults were processed.
+   */
+  resyncGlobalConfigIntoManagedVaults(selection?: GlobalConfigSyncSelection): number {
     const accounts = this.store.getSettings().claudeManagedAccounts
     let processed = 0
     for (const account of accounts) {
@@ -1342,20 +1585,74 @@ export class ClaudeAccountService {
       if (runtime !== 'host') {
         continue
       }
-      this.seedGlobalConfigIntoVault(account.id, account.managedAuthPath, runtime)
+      this.seedGlobalConfigIntoVault(account.id, account.managedAuthPath, runtime, selection)
       processed += 1
+    }
+    if (selection?.writeGlobalHooks) {
+      this.writeSelectedHooksToGlobalSettings(selection)
     }
     return processed
   }
 
-  /** Re-seeds global MCP servers + skills into a single account's vault. */
-  syncGlobalConfigForAccount(accountId: string): void {
+  /** Re-seeds the selected global config into a single account's vault. */
+  syncGlobalConfigForAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
     const account = this.requireAccount(accountId)
     this.seedGlobalConfigIntoVault(
       accountId,
       account.managedAuthPath,
-      account.managedAuthRuntime ?? 'host'
+      account.managedAuthRuntime ?? 'host',
+      selection
     )
+    if (selection?.writeGlobalHooks) {
+      this.writeSelectedHooksToGlobalSettings(selection)
+    }
+  }
+
+  /**
+   * Writes the selected plugin hooks into the user's global ~/.claude/settings.json
+   * so non-pinned (shared ~/.claude) sessions get them too. Merges into the hooks
+   * key without disturbing existing (e.g. Orca status) hooks, using the hardened
+   * atomic writer with rolling backup since this is the user's real config.
+   */
+  private writeSelectedHooksToGlobalSettings(selection: GlobalConfigSyncSelection): void {
+    if (selection.hookIds.length === 0) {
+      return
+    }
+    try {
+      const home = homedir()
+      const hooks: PluginHookEntry[] = collectGlobalHooks(home).filter((hook) =>
+        selection.hookIds.includes(hook.id)
+      )
+      if (hooks.length === 0) {
+        return
+      }
+      const configPath = getConfigPath()
+      const base = this.readGlobalSettingsObject(configPath)
+      if (base === null) {
+        return
+      }
+      const { config, changed } = mergeHooksIntoSettingsObject(base, hooks)
+      if (changed) {
+        writeHooksJson(configPath, config, { preserveMode: true })
+      }
+    } catch (error) {
+      console.warn('[claude-accounts] Failed to write hooks into global settings:', error)
+    }
+  }
+
+  /** Parses ~/.claude/settings.json; {} when absent, null when unparseable (never clobber). */
+  private readGlobalSettingsObject(configPath: string): Record<string, unknown> | null {
+    try {
+      if (!existsSync(configPath)) {
+        return {}
+      }
+      const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null
+    } catch {
+      return null
+    }
   }
 
   /**

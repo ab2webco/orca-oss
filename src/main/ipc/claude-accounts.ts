@@ -2,9 +2,11 @@ import { ipcMain } from 'electron'
 import type {
   ClaudeAccountAddTarget,
   ClaudeAccountService,
-  ClaudeCustomEndpointAccountInput
+  ClaudeCustomEndpointAccountInput,
+  ClaudeCustomEndpointAccountUpdateInput
 } from '../claude-accounts/service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
+import type { GlobalConfigSyncSelection } from '../../shared/global-config-sync'
 import type { ClaudeLivePtyAccountInfo, GlobalSettings } from '../../shared/types'
 import {
   getLiveInjectedClaudePtyAccountId,
@@ -51,6 +53,14 @@ export function registerClaudeAccountHandlers(
     (_event, args: ClaudeCustomEndpointAccountInput) =>
       claudeAccounts.addCustomEndpointAccount(args)
   )
+  ipcMain.handle(
+    'claudeAccounts:updateCustomEndpoint',
+    (_event, args: ClaudeCustomEndpointAccountUpdateInput) =>
+      claudeAccounts.updateCustomEndpointAccount(args)
+  )
+  ipcMain.handle('claudeAccounts:getCustomEndpointConfig', (_event, args: { accountId: string }) =>
+    claudeAccounts.getCustomEndpointAccountConfig(args.accountId)
+  )
   ipcMain.handle('claudeAccounts:cancelPendingLogin', () => claudeAccounts.cancelPendingLogin())
   ipcMain.handle('claudeAccounts:reauthenticate', (_event, args: { accountId: string }) =>
     claudeAccounts.reauthenticateAccount(args.accountId)
@@ -67,13 +77,18 @@ export function registerClaudeAccountHandlers(
     (_event, args: { accountId: string }): number =>
       typeof args?.accountId === 'string' ? getLiveClaudePtyIdsForAccount(args.accountId).length : 0
   )
-  ipcMain.handle('claudeAccounts:resyncGlobalConfig', () =>
-    claudeAccounts.resyncGlobalConfigIntoManagedVaults()
+  ipcMain.handle('claudeAccounts:previewGlobalConfig', () =>
+    claudeAccounts.buildGlobalConfigSyncInventory()
+  )
+  ipcMain.handle(
+    'claudeAccounts:resyncGlobalConfig',
+    (_event, args?: { selection?: GlobalConfigSyncSelection }) =>
+      claudeAccounts.resyncGlobalConfigIntoManagedVaults(args?.selection)
   )
   ipcMain.handle(
     'claudeAccounts:syncGlobalConfigForAccount',
-    (_event, args: { accountId: string }) =>
-      claudeAccounts.syncGlobalConfigForAccount(args.accountId)
+    (_event, args: { accountId: string; selection?: GlobalConfigSyncSelection }) =>
+      claudeAccounts.syncGlobalConfigForAccount(args.accountId, args.selection)
   )
   ipcMain.handle(
     'claudeAccounts:clearGlobalConfigForAccount',

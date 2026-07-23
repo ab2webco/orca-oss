@@ -32,6 +32,7 @@ import {
   Lock,
   LockOpen,
   MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -66,6 +67,7 @@ import {
   getAccountsPaneSearchEntries
 } from './accounts-search'
 import { GrokAccountsSection } from './GrokAccountsSection'
+import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 import { matchesSettingsSearch } from './settings-search'
@@ -394,6 +396,8 @@ export function AccountsPane({
     | `select:${string | 'system'}`
   >('idle')
   const [addEndpointOpen, setAddEndpointOpen] = useState(false)
+  // null = the dialog is in add mode; an id = editing that endpoint account.
+  const [editEndpointAccountId, setEditEndpointAccountId] = useState<string | null>(null)
   const [endpointLabelDraft, setEndpointLabelDraft] = useState('z.ai · GLM')
   const [endpointBaseUrlDraft, setEndpointBaseUrlDraft] = useState('https://api.z.ai/api/anthropic')
   const [endpointTokenDraft, setEndpointTokenDraft] = useState('')
@@ -816,51 +820,15 @@ export function AccountsPane({
     }
   }
 
-  const runResyncGlobalConfig = async (): Promise<void> => {
-    setClaudeAction('resyncing')
-    try {
-      const processed = await window.api.claudeAccounts.resyncGlobalConfig()
-      toast.success(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigDone',
-          'Synced global MCP servers and skills into {{value0}} account(s).',
-          { value0: String(processed) }
-        )
-      )
-    } catch (error) {
-      toast.error(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
-          'Failed to sync global config into accounts.'
-        ),
-        { description: getClaudeAccountErrorDescription(error) }
-      )
-    } finally {
-      setClaudeAction('idle')
-    }
-  }
+  const [globalConfigSyncDialog, setGlobalConfigSyncDialog] = useState<{
+    open: boolean
+    accountId: string | null
+  }>({ open: false, accountId: null })
 
-  const runSyncGlobalConfigForAccount = async (accountId: string): Promise<void> => {
-    setClaudeAction('resyncing')
-    try {
-      await window.api.claudeAccounts.syncGlobalConfigForAccount({ accountId })
-      toast.success(
-        translate(
-          'auto.components.settings.AccountsPane.syncAccountConfigDone',
-          'Synced global MCP servers and skills into this account.'
-        )
-      )
-    } catch (error) {
-      toast.error(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
-          'Failed to sync global config into accounts.'
-        ),
-        { description: getClaudeAccountErrorDescription(error) }
-      )
-    } finally {
-      setClaudeAction('idle')
-    }
+  // Open the pre-sync popup so the user picks which MCP servers, skills, and
+  // plugin hooks to seed. accountId null targets every managed account.
+  const openGlobalConfigSyncDialog = (accountId: string | null): void => {
+    setGlobalConfigSyncDialog({ open: true, accountId })
   }
 
   const runClearGlobalConfigForAccount = async (accountId: string): Promise<void> => {
@@ -886,28 +854,87 @@ export function AccountsPane({
     }
   }
 
+  const isEditingEndpoint = editEndpointAccountId !== null
   const canSubmitCustomEndpoint =
     endpointLabelDraft.trim() !== '' &&
     endpointBaseUrlDraft.trim() !== '' &&
-    endpointTokenDraft.trim() !== ''
+    // Editing keeps the stored token when the field is left blank.
+    (isEditingEndpoint || endpointTokenDraft.trim() !== '')
+
+  const resetEndpointDrafts = (): void => {
+    setEndpointLabelDraft('z.ai · GLM')
+    setEndpointBaseUrlDraft('https://api.z.ai/api/anthropic')
+    setEndpointTokenDraft('')
+    setEndpointModelDraft('glm-5.1')
+    setEndpointOpusModelDraft('')
+    setEndpointSonnetModelDraft('')
+    setEndpointHaikuModelDraft('')
+    setEndpointSubagentModelDraft('')
+    setEndpointTierMappingOpen(false)
+  }
+
+  const openAddEndpointDialog = (): void => {
+    setEditEndpointAccountId(null)
+    resetEndpointDrafts()
+    setAddEndpointOpen(true)
+  }
+
+  const openEditEndpointDialog = async (accountId: string): Promise<void> => {
+    try {
+      const config = await window.api.claudeAccounts.getCustomEndpointConfig({ accountId })
+      setEndpointLabelDraft(config.label)
+      setEndpointBaseUrlDraft(config.baseUrl)
+      setEndpointTokenDraft('')
+      setEndpointModelDraft(config.model)
+      setEndpointOpusModelDraft(config.opusModel ?? '')
+      setEndpointSonnetModelDraft(config.sonnetModel ?? '')
+      setEndpointHaikuModelDraft(config.haikuModel ?? '')
+      setEndpointSubagentModelDraft(config.subagentModel ?? '')
+      setEndpointTierMappingOpen(
+        Boolean(config.opusModel || config.sonnetModel || config.haikuModel || config.subagentModel)
+      )
+      setEditEndpointAccountId(accountId)
+      setAddEndpointOpen(true)
+    } catch (error) {
+      toast.error(
+        translate(
+          'auto.components.settings.AccountsPane.editEndpointLoadFailed',
+          'Could not load the endpoint settings.'
+        ),
+        { description: getClaudeAccountErrorDescription(error) }
+      )
+    }
+  }
 
   const submitAddCustomEndpoint = async (): Promise<void> => {
     if (!canSubmitCustomEndpoint) {
       return
     }
+    const editingId = editEndpointAccountId
     await runClaudeAccountAction('adding-endpoint', async () => {
-      const next = await window.api.claudeAccounts.addCustomEndpoint({
+      const fields = {
         label: endpointLabelDraft.trim(),
         baseUrl: endpointBaseUrlDraft.trim(),
-        token: endpointTokenDraft.trim(),
         model: endpointModelDraft.trim() || null,
         opusModel: endpointOpusModelDraft.trim() || null,
         sonnetModel: endpointSonnetModelDraft.trim() || null,
         haikuModel: endpointHaikuModelDraft.trim() || null,
         subagentModel: endpointSubagentModelDraft.trim() || null
-      })
+      }
+      const next = editingId
+        ? await window.api.claudeAccounts.updateCustomEndpoint({
+            accountId: editingId,
+            // Blank token keeps the stored one.
+            token: endpointTokenDraft.trim() || null,
+            ...fields
+          })
+        : await window.api.claudeAccounts.addCustomEndpoint({
+            token: endpointTokenDraft.trim(),
+            ...fields
+          })
       // Why: close only on success so a validation error keeps the draft editable.
       setAddEndpointOpen(false)
+      setEditEndpointAccountId(null)
       setEndpointTokenDraft('')
       return next
     })
@@ -1178,7 +1205,7 @@ export function AccountsPane({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => setAddEndpointOpen(true)}
+                onClick={openAddEndpointDialog}
                 disabled={
                   // Why: the endpoint account is created on the account owner;
                   // a remote server manages its own provider accounts.
@@ -1199,22 +1226,18 @@ export function AccountsPane({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => void runResyncGlobalConfig()}
-                // Why: pinned accounts run in isolated vaults; this copies the
-                // user's global MCP servers + skills into every existing account
-                // so a newly added global tool reaches accounts created earlier.
+                onClick={() => openGlobalConfigSyncDialog(null)}
+                // Why: pinned accounts run in isolated vaults; this opens a popup
+                // to pick which global MCP servers, skills, and plugin hooks to
+                // copy into existing accounts so newer tools reach older accounts.
                 disabled={isRemoteAccountScope || claudeAction !== 'idle'}
                 title={translate(
                   'auto.components.settings.AccountsPane.resyncGlobalConfigHint',
-                  'Copy your global MCP servers and skills into existing accounts'
+                  'Choose global MCP servers, skills, and hooks to copy into existing accounts'
                 )}
                 className="gap-1.5 text-muted-foreground hover:text-foreground"
               >
-                {claudeAction === 'resyncing' ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-3" />
-                )}
+                <RefreshCw className="size-3" />
                 {translate(
                   'auto.components.settings.AccountsPane.resyncGlobalConfig',
                   'Sync global config'
@@ -1379,7 +1402,24 @@ export function AccountsPane({
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
-                        {isCustomEndpoint ? null : (
+                        {isCustomEndpoint ? (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void openEditEndpointDialog(account.id)
+                            }}
+                            disabled={isRemoteAccountScope || isBusy}
+                            className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="size-3" />
+                            {translate(
+                              'auto.components.settings.AccountsPane.editEndpoint',
+                              'Edit'
+                            )}
+                          </Button>
+                        ) : (
                           <Button
                             variant="ghost"
                             size="xs"
@@ -1424,45 +1464,46 @@ export function AccountsPane({
                           <Trash2 className="size-3" />
                           {translate('auto.components.settings.AccountsPane.db209ee572', 'Remove')}
                         </Button>
-                        {isCustomEndpoint ? null : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                disabled={isBusy}
-                                onClick={(event) => event.stopPropagation()}
-                                className="h-6 px-1.5 text-muted-foreground hover:text-foreground"
-                                aria-label={translate(
-                                  'auto.components.settings.AccountsPane.accountConfigMenu',
-                                  'Account config options'
-                                )}
-                              >
-                                <MoreHorizontal className="size-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onSelect={() => void runSyncGlobalConfigForAccount(account.id)}
-                              >
-                                <RefreshCw className="size-3" />
-                                {translate(
-                                  'auto.components.settings.AccountsPane.syncAccountConfig',
-                                  'Sync global config'
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => void runClearGlobalConfigForAccount(account.id)}
-                              >
-                                <Eraser className="size-3" />
-                                {translate(
-                                  'auto.components.settings.AccountsPane.clearAccountConfig',
-                                  'Clear config (start fresh)'
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        {/* Sync/Clear act on the account's own host vault, so
+                            they apply to custom-endpoint (z.ai) accounts too —
+                            only Re-authenticate above is OAuth-specific. */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              disabled={isBusy}
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-6 px-1.5 text-muted-foreground hover:text-foreground"
+                              aria-label={translate(
+                                'auto.components.settings.AccountsPane.accountConfigMenu',
+                                'Account config options'
+                              )}
+                            >
+                              <MoreHorizontal className="size-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={() => openGlobalConfigSyncDialog(account.id)}
+                            >
+                              <RefreshCw className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.syncAccountConfig',
+                                'Sync global config'
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => void runClearGlobalConfigForAccount(account.id)}
+                            >
+                              <Eraser className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.clearAccountConfig',
+                                'Clear config (start fresh)'
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
@@ -2414,22 +2455,33 @@ export function AccountsPane({
         onOpenChange={(open) => {
           if (!open && claudeAction !== 'adding-endpoint') {
             setAddEndpointOpen(false)
+            setEditEndpointAccountId(null)
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {translate(
-                'auto.components.settings.AccountsPane.customEndpointTitle',
-                'Add Custom Endpoint Account'
-              )}
+              {isEditingEndpoint
+                ? translate(
+                    'auto.components.settings.AccountsPane.editEndpointTitle',
+                    'Edit Custom Endpoint Account'
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.customEndpointTitle',
+                    'Add Custom Endpoint Account'
+                  )}
             </DialogTitle>
             <DialogDescription>
-              {translate(
-                'auto.components.settings.AccountsPane.customEndpointDescription',
-                'Connect an Anthropic-compatible endpoint (like z.ai GLM) as a managed Claude account. The token is stored only on this device and used when a worktree is assigned to this account.'
-              )}
+              {isEditingEndpoint
+                ? translate(
+                    'auto.components.settings.AccountsPane.editEndpointDescription',
+                    'Update this endpoint. Leave the API token blank to keep the one already stored on this device.'
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.customEndpointDescription',
+                    'Connect an Anthropic-compatible endpoint (like z.ai GLM) as a managed Claude account. The token is stored only on this device and used when a worktree is assigned to this account.'
+                  )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -2478,6 +2530,14 @@ export function AccountsPane({
                 type="password"
                 value={endpointTokenDraft}
                 onChange={(e) => setEndpointTokenDraft(e.target.value)}
+                placeholder={
+                  isEditingEndpoint
+                    ? translate(
+                        'auto.components.settings.AccountsPane.editEndpointTokenPlaceholder',
+                        'Leave blank to keep the current token'
+                      )
+                    : undefined
+                }
                 spellCheck={false}
                 autoComplete="off"
                 className="text-xs"
@@ -2620,7 +2680,10 @@ export function AccountsPane({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setAddEndpointOpen(false)}
+              onClick={() => {
+                setAddEndpointOpen(false)
+                setEditEndpointAccountId(null)
+              }}
               disabled={claudeAction === 'adding-endpoint'}
             >
               {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
@@ -2633,14 +2696,24 @@ export function AccountsPane({
               {claudeAction === 'adding-endpoint' ? (
                 <Loader2 className="size-3 animate-spin" />
               ) : null}
-              {translate(
-                'auto.components.settings.AccountsPane.customEndpointSubmit',
-                'Add Endpoint'
-              )}
+              {isEditingEndpoint
+                ? translate(
+                    'auto.components.settings.AccountsPane.editEndpointSubmit',
+                    'Save changes'
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.customEndpointSubmit',
+                    'Add Endpoint'
+                  )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <GlobalConfigSyncDialog
+        open={globalConfigSyncDialog.open}
+        accountId={globalConfigSyncDialog.accountId}
+        onOpenChange={(open) => setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))}
+      />
       {visibleSections.map((section, index) => (
         <div key={index} className="space-y-8">
           {index > 0 ? <Separator /> : null}

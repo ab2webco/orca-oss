@@ -1,5 +1,15 @@
-import { lstatSync, readFileSync, existsSync, readdirSync, symlinkSync, unlinkSync } from 'node:fs'
+import {
+  lstatSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmdirSync,
+  symlinkSync,
+  unlinkSync
+} from 'node:fs'
 import { join } from 'node:path'
+import type { GlobalConfigMcpEntry } from '../../shared/global-config-sync'
 
 // Managed accounts run the Claude CLI against an isolated CLAUDE_CONFIG_DIR vault,
 // so they never see the user's global ~/.claude.json MCP servers or ~/.claude/skills.
@@ -138,18 +148,52 @@ export function clearMcpServersFromVaultConfig(existingVaultJson: string | null)
   return `${JSON.stringify(next, null, 2)}\n`
 }
 
-/** Removes `<vault>/skills` only when it is our symlink; leaves a real directory alone. Returns true if unlinked. */
+/**
+ * Removes Orca's inherited skills from `<vault>/skills`: unlinks a whole-dir
+ * symlink, or prunes the per-skill symlinks from a selective real directory
+ * (removing the dir when it becomes empty). A real directory holding non-symlink
+ * content is left untouched. Returns true when anything was removed.
+ */
 export function removeVaultSkillsSymlink(vaultAuthPath: string): boolean {
   const linkPath = join(vaultAuthPath, 'skills')
+  let stat: ReturnType<typeof lstatSync>
   try {
-    if (!lstatSync(linkPath).isSymbolicLink()) {
-      return false
-    }
-    unlinkSync(linkPath)
-    return true
+    stat = lstatSync(linkPath)
   } catch {
     return false
   }
+  if (stat.isSymbolicLink()) {
+    try {
+      unlinkSync(linkPath)
+      return true
+    } catch {
+      return false
+    }
+  }
+  if (!stat.isDirectory()) {
+    return false
+  }
+  let removed = false
+  const entries = readdirSync(linkPath, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isSymbolicLink()) {
+      continue
+    }
+    try {
+      unlinkSync(join(linkPath, entry.name))
+      removed = true
+    } catch {
+      // best effort
+    }
+  }
+  if (removed && readdirSync(linkPath).length === 0) {
+    try {
+      rmdirSync(linkPath)
+    } catch {
+      // best effort
+    }
+  }
+  return removed
 }
 
 /**
@@ -180,5 +224,97 @@ export function ensureVaultSkillsSymlink(
     return 'linked'
   } catch {
     return 'skipped'
+  }
+}
+
+const SKILL_LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir'
+
+/** Lists the user's global skill directory names (for the pre-sync popup). */
+export function listGlobalSkillNames(homeDir: string): string[] {
+  const globalSkills = join(homeDir, '.claude', 'skills')
+  try {
+    return readdirSync(globalSkills, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Collects global MCP servers as name→source rows for the pre-sync popup. When a
+ * name appears in more than one source, the later source wins (matching the merge
+ * order in collectGlobalMcpServers: user config → settings → plugin dir).
+ */
+export function collectGlobalMcpServerEntries(homeDir: string): GlobalConfigMcpEntry[] {
+  const source = new Map<string, GlobalConfigMcpEntry['source']>()
+  for (const name of Object.keys(readMcpServersFromFile(join(homeDir, '.claude.json')))) {
+    source.set(name, 'user-config')
+  }
+  for (const name of Object.keys(
+    readMcpServersFromFile(join(homeDir, '.claude', 'settings.json'))
+  )) {
+    source.set(name, 'settings')
+  }
+  for (const name of Object.keys(readMcpDirServers(homeDir))) {
+    source.set(name, 'plugin-dir')
+  }
+  return [...source.entries()]
+    .map(([name, entrySource]) => ({ name, source: entrySource }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Seeds only the selected skills into <vault>/skills as per-skill symlinks. Unlike
+ * ensureVaultSkillsSymlink (a single whole-dir link), this makes <vault>/skills a
+ * real directory holding one live symlink per chosen skill, so the user can
+ * include/exclude skills. Migrates an existing whole-dir symlink, adds missing
+ * links, and prunes our per-skill links that are no longer selected — never
+ * touching real (non-symlink) content.
+ */
+export function ensureSelectiveVaultSkills(
+  vaultAuthPath: string,
+  homeDir: string,
+  skillNames: string[]
+): void {
+  const globalSkills = join(homeDir, '.claude', 'skills')
+  if (!existsSync(globalSkills)) {
+    return
+  }
+  const linkPath = join(vaultAuthPath, 'skills')
+  try {
+    if (lstatSync(linkPath).isSymbolicLink()) {
+      // Migrate the legacy whole-dir symlink to a real dir of per-skill links.
+      unlinkSync(linkPath)
+    }
+  } catch {
+    // Nothing at linkPath yet — mkdir below creates it.
+  }
+  mkdirSync(linkPath, { recursive: true })
+
+  const desired = new Set(skillNames.filter((name) => existsSync(join(globalSkills, name))))
+  for (const entry of readdirSync(linkPath, { withFileTypes: true })) {
+    if (entry.isSymbolicLink() && !desired.has(entry.name)) {
+      try {
+        unlinkSync(join(linkPath, entry.name))
+      } catch {
+        // best effort
+      }
+    }
+  }
+  for (const name of desired) {
+    const dest = join(linkPath, name)
+    try {
+      lstatSync(dest)
+      continue
+    } catch {
+      // Not present — create the link below.
+    }
+    try {
+      symlinkSync(join(globalSkills, name), dest, SKILL_LINK_TYPE)
+    } catch {
+      // best effort — skip a skill that can't be linked
+    }
   }
 }

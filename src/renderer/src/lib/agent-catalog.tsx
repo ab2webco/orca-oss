@@ -65,12 +65,11 @@ export const getAgentCatalog = createLocalizedCatalog((): AgentCatalogEntry[] =>
     iconUrl: openClaudeLogoUrl,
     homepageUrl: 'https://openclaude.gitlawb.com/'
   },
-  {
-    id: 'claude-zai',
-    label: translate('auto.lib.agent.catalog.e585da3bda', 'Claude GLM (z.ai)'),
-    cmd: 'claude-zai',
-    homepageUrl: 'https://docs.z.ai/devpack/tool/claude'
-  },
+  // Note: no 'claude-zai' launcher entry — GLM/z.ai runs through a managed
+  // custom-endpoint account (Settings → Accounts) that a worktree pins, so
+  // "Claude"/"Claude Agent Teams" launch it with the account's editable model +
+  // tier mapping instead of a standalone wrapper with a fixed model. Existing
+  // claude-zai sessions are still recognized/resumed elsewhere.
   {
     id: 'codex',
     label: translate('auto.lib.agent.catalog.760bc6883d', 'Codex'),

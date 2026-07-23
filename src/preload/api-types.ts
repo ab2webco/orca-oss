@@ -27,6 +27,10 @@ import type {
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection
+} from '../shared/global-config-sync'
+import type {
   WriteTerminalRenderDesyncEvidenceArgs,
   WriteTerminalRenderDesyncEvidenceResult
 } from '../shared/terminal-render-desync-evidence'
@@ -2207,6 +2211,27 @@ export type PreloadApi = {
       haikuModel?: string | null
       subagentModel?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
+    updateCustomEndpoint: (args: {
+      accountId: string
+      label: string
+      baseUrl: string
+      token?: string | null
+      model?: string | null
+      opusModel?: string | null
+      sonnetModel?: string | null
+      haikuModel?: string | null
+      subagentModel?: string | null
+    }) => Promise<ClaudeRateLimitAccountsState>
+    getCustomEndpointConfig: (args: { accountId: string }) => Promise<{
+      label: string
+      baseUrl: string
+      model: string
+      opusModel: string | null
+      sonnetModel: string | null
+      haikuModel: string | null
+      subagentModel: string | null
+      hasToken: boolean
+    }>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
     remove: (args: {
@@ -2214,8 +2239,12 @@ export type PreloadApi = {
       closeLiveTerminals?: boolean
     }) => Promise<ClaudeRateLimitAccountsState>
     countLiveTerminalsForAccount: (args: { accountId: string }) => Promise<number>
-    resyncGlobalConfig: () => Promise<number>
-    syncGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
+    previewGlobalConfig: () => Promise<GlobalConfigSyncInventory>
+    resyncGlobalConfig: (args?: { selection?: GlobalConfigSyncSelection }) => Promise<number>
+    syncGlobalConfigForAccount: (args: {
+      accountId: string
+      selection?: GlobalConfigSyncSelection
+    }) => Promise<void>
     clearGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
     select: (args: {
       accountId: string | null
