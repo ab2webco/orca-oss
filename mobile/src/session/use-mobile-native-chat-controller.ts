@@ -19,7 +19,10 @@ import { openMobileNativeChatFile } from './mobile-native-chat-open-file'
 import { useMobileNativeChatPermissionSend } from './mobile-native-chat-permission-send'
 import { sendMobileNativeChatMessageWithOutcome } from './mobile-native-chat-send'
 import { useMobileNativeChatAnswerSend } from './use-mobile-native-chat-answer-send'
-import { useMobileNativeChatDrafts } from './use-mobile-native-chat-drafts'
+import {
+  useMobileNativeChatDrafts,
+  type MobileNativeChatPendingMessage
+} from './use-mobile-native-chat-drafts'
 import { useMobileNativeChatFileSearch } from './use-mobile-native-chat-file-search'
 import { useMobileNativeChatSession } from './use-mobile-native-chat-session'
 import { useMobileNativeChatPrompts } from './use-mobile-native-chat-prompts'
@@ -38,7 +41,7 @@ export type MobileNativeChatController = {
   nativeChatAgent: string | null
   chatComposerText: string
   setChatComposerText: Dispatch<SetStateAction<string>>
-  chatPending: Array<{ id: string; text: string }>
+  chatPending: MobileNativeChatPendingMessage[]
   nativeChatSession: ReturnType<typeof useMobileNativeChatSession>
   nativeChatAgentWorking: boolean
   nativeChatStreamingText?: string
@@ -55,7 +58,7 @@ export type MobileNativeChatController = {
   handleNativeChatStop: () => void
   nativeChatFilePaths: string[]
   loadNativeChatFiles: (query: string) => void
-  handleNativeChatSend: (text: string) => Promise<boolean>
+  handleNativeChatSend: (text: string, images?: string[]) => Promise<boolean>
 }
 
 /** Owns mobile native-chat state and teardown outside the already dense session
@@ -222,7 +225,7 @@ export function useMobileNativeChatController(args: {
   })
 
   const handleNativeChatSend = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (text: string, images?: string[]): Promise<boolean> => {
       const handle = activeHandleRef.current
       const origin = captureSendOrigin(text)
       if (!client || !handle || !origin || !nativeChatInputLeaseReady) {
@@ -249,7 +252,9 @@ export function useMobileNativeChatController(args: {
         onSendError('Message not sent')
         return false
       }
-      acceptSend(origin, text)
+      // `images` are local preview URIs for the optimistic echo only — the actual
+      // image bytes already rode along as a bracketed paste before this text send.
+      acceptSend(origin, text, images)
       return true
     },
     [

@@ -53,7 +53,10 @@ describe('pickMobileImage', () => {
       createFile: file.createFile
     })
 
-    expect(result).toEqual({ base64: Buffer.from(bytes).toString('base64') })
+    expect(result).toEqual({
+      base64: Buffer.from(bytes).toString('base64'),
+      uri: 'file:///x.jpg'
+    })
     expect(launchLibrary).toHaveBeenCalledWith(
       expect.objectContaining({ base64: false, allowsMultipleSelection: false })
     )
@@ -91,7 +94,10 @@ describe('pickMobileImage', () => {
       createFile: file.createFile
     })
 
-    expect(result).toEqual({ base64: Buffer.from(bytes).toString('base64') })
+    expect(result).toEqual({
+      base64: Buffer.from(bytes).toString('base64'),
+      uri: 'file:///doc.png'
+    })
     expect(launchFiles).toHaveBeenCalledWith(
       expect.objectContaining({ copyToCacheDirectory: true })
     )
@@ -167,7 +173,10 @@ describe('pickMobileImage', () => {
       }),
       createFile: file.createFile
     })
-    expect(result).toEqual({ base64: Buffer.from([1, 2, 3, 4, 5]).toString('base64') })
+    expect(result).toEqual({
+      base64: Buffer.from([1, 2, 3, 4, 5]).toString('base64'),
+      uri: 'file:///chunked.png'
+    })
     expect(file.close).toHaveBeenCalledTimes(1)
   })
 })

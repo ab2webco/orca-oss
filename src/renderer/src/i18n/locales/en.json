@@ -5608,7 +5608,7 @@
           "dfbc12c8c8": "Hardware debugging and device tools that talk to USB devices.",
           "bf51e4a542": "USB Devices",
           "f903bf20b5": "Discovery and access for development servers on your network.",
-          "e7bb06007c": "Local Network",
+          "e7bb06007c": "LAN",
           "4a73f5217a": "Apple Events for scripts that control other local apps.",
           "e119f0d66b": "Automation",
           "7ca17b62c8": "Recommended when projects, worktrees, or symlinked files touch macOS-protected folders.",
@@ -6116,7 +6116,7 @@
           "668016be7a": "on your computer and phone.",
           "1dc87a7fbc": "Tailscale",
           "51d29927eb": "Install",
-          "9fc5d203ff": "Orca Mobile connects directly to this computer. To use it away from the same local network, put your computer and phone on the same private overlay network, then generate the QR code with that network address selected.",
+          "9fc5d203ff": "Orca Mobile connects directly to this computer. To use it away from the same LAN, put your computer and phone on the same private overlay network, then generate the QR code with that network address selected.",
           "39fad211d9": "Connect outside your Wi-Fi with a tailnet",
           "a9db5d771d": "Refresh network interfaces",
           "b2c384cfd6": "No interfaces found",
@@ -6147,7 +6147,7 @@
           "6436e56546": "QR Code for mobile pairing",
           "1b1b70279a": "No devices paired yet.",
           "1592afcc7a": "No devices paired yet. Scan the QR code with the Orca mobile app.",
-          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your local network. Regenerate to try again."
+          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale. Regenerate to try again."
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub Releases",
@@ -7791,14 +7791,14 @@
         "developer": {
           "permissions": {
             "search": {
-              "3363889768": "Local Network, USB, and Bluetooth",
+              "3363889768": "LAN, USB, and Bluetooth",
               "6c82846f66": "device",
               "11653d3f42": "mdns",
               "78a10b826f": "bonjour",
               "e3fbc48083": "bluetooth",
               "c4a4a02ea4": "usb",
-              "fa3239cd42": "local network",
-              "acad3d4743": "Allow device and local-network tools used from terminal sessions.",
+              "fa3239cd42": "lan",
+              "acad3d4743": "Allow device tools and LAN access used from terminal sessions.",
               "3e0131e45d": "icloud",
               "ce07159ff5": "desktop",
               "a0c19119fb": "downloads",
@@ -9424,10 +9424,10 @@
           "anywhereTitle": "Orca Relay",
           "anywhereDescription": "Phone can be on cellular or any Wi‑Fi. Sign-in required.",
           "signInRequired": "Sign in to use Orca Mobile Relay.",
-          "relayUnavailable": "Orca Relay isn’t available in this build. Use Local network.",
+          "relayUnavailable": "Orca Relay isn’t available in this build. Use LAN.",
           "signIn": "Sign in",
           "signInAgain": "Sign in again",
-          "localTitle": "Local network",
+          "localTitle": "LAN",
           "localDescription": "Phone must be on this Wi‑Fi or your Tailscale. No sign-in."
         },
         "MobilePairingSetupSection": {
@@ -11174,7 +11174,7 @@
             "preview": "Preview",
             "stable": "Stable"
           },
-          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your local network."
+          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale."
         },
         "MobilePage": {
           "e17393c6a3": "Phone preview",

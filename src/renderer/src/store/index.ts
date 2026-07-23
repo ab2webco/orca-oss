@@ -43,6 +43,10 @@ import { createClaudeAccountRosterSlice } from './slices/claude-account-roster'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
+import {
+  registerRendererMemoryProfileContributor,
+  summarizeStateCollectionSizes
+} from '@/lib/renderer-memory-profile'
 
 export const useAppStore = create<AppState>()((...a) => ({
   ...createRepoSlice(...a),
@@ -89,6 +93,12 @@ export const useAppStore = create<AppState>()((...a) => ({
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())
+
+// Why: names the fattest store slices in renderer_memory_highwater breadcrumbs
+// so OOM crash reports identify what grew without a local repro.
+registerRendererMemoryProfileContributor('store', () =>
+  summarizeStateCollectionSizes(useAppStore.getState(), 20)
+)
 
 export type { AppState } from './types'
 

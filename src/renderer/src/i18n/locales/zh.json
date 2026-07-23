@@ -5570,7 +5570,7 @@
           "dfbc12c8c8": "与 USB 设备通信的硬件调试和设备工具。",
           "bf51e4a542": "USB 设备",
           "f903bf20b5": "发现和访问网络上的开发服务器。",
-          "e7bb06007c": "本地网络",
+          "e7bb06007c": "局域网",
           "4a73f5217a": "用于控制其他本地应用程序的脚本的 Apple 事件。",
           "e119f0d66b": "自动化",
           "7ca17b62c8": "当项目、worktree 或符号链接文件会访问 macOS 受保护文件夹时推荐启用。",
@@ -6041,7 +6041,7 @@
           "668016be7a": "在您的计算机和手机上。",
           "1dc87a7fbc": "Tailscale",
           "51d29927eb": "安装",
-          "9fc5d203ff": "Orca 手机端 直接连接到此计算机。要在远离同一本地网络的地方使用它，请将您的计算机和手机置于同一私有覆盖网络上，然后使用所选的网络地址生成二维码。",
+          "9fc5d203ff": "Orca 手机端 直接连接到此计算机。要在远离同一局域网的地方使用它，请将您的计算机和手机置于同一私有覆盖网络上，然后使用所选的网络地址生成二维码。",
           "39fad211d9": "使用尾网连接 Wi-Fi 外部",
           "a9db5d771d": "刷新网络接口",
           "b2c384cfd6": "没有找到接口",
@@ -6072,7 +6072,7 @@
           "6436e56546": "用于手机配对的二维码",
           "1b1b70279a": "尚未配对任何设备。",
           "1592afcc7a": "尚未配对任何设备。使用 Orca 手机应用程序扫描二维码。",
-          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your local network. Regenerate to try again."
+          "relayDegradedNotice": "无法连接 Relay — 此二维码仅在局域网或 Tailscale 内可用。请重新生成后再试。"
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub 发布",
@@ -7716,14 +7716,14 @@
         "developer": {
           "permissions": {
             "search": {
-              "3363889768": "本地网络、USB 和蓝牙",
+              "3363889768": "局域网、USB 和蓝牙",
               "6c82846f66": "设备",
               "11653d3f42": "域名服务器",
               "78a10b826f": "你好",
               "e3fbc48083": "蓝牙",
               "c4a4a02ea4": "USB",
-              "fa3239cd42": "本地网络",
-              "acad3d4743": "允许从终端会话使用设备和本地网络工具。",
+              "fa3239cd42": "局域网",
+              "acad3d4743": "允许从终端会话使用设备工具和局域网访问。",
               "3e0131e45d": "云",
               "ce07159ff5": "桌面",
               "a0c19119fb": "下载",
@@ -9403,9 +9403,9 @@
           "anywhereTitle": "Orca Relay",
           "anywhereDescription": "手机可通过蜂窝网络或任意 Wi‑Fi 连接。需要登录。",
           "signInRequired": "请登录以使用 Orca Mobile Relay。",
-          "relayUnavailable": "此版本不支持 Orca Relay。请使用本地网络。",
+          "relayUnavailable": "此版本不支持 Orca Relay。请使用局域网。",
           "signInAgain": "重新登录",
-          "localTitle": "本地网络"
+          "localTitle": "局域网"
         },
         "MobilePairingSetupSection": {
           "title": "配对手机",
@@ -11151,7 +11151,7 @@
             "preview": "预览版",
             "stable": "稳定版"
           },
-          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your local network."
+          "relayDegradedNotice": "无法连接 Relay — 此二维码仅在局域网或 Tailscale 内可用。"
         },
         "MobilePage": {
           "e17393c6a3": "手机预览",
