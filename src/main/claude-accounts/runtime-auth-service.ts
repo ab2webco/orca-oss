@@ -1,11 +1,12 @@
 /* eslint-disable max-lines -- Why: keeps file/Keychain/snapshot/env-patch auth semantics together so PTY launch and quota-fetch paths can't drift. */
 import { execFile } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import type { ClaudeManagedAccount } from '../../shared/types'
 import type { Store } from '../persistence'
+import { readAgentStateFileSync, readAgentStateJsonFileSync } from '../agent-state-file-reader'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import type { ClaudeEnvPatch } from './environment'
 import { claudeHookService } from '../claude/hook-service'
@@ -53,6 +54,7 @@ import {
   setSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
+import { NodeFileReadTooLargeError } from '../../shared/node-bounded-file-reader'
 
 const execFileAsync = promisify(execFile)
 const OWNED_WSL_AUTH_PATH_SUCCESS_TTL_MS = 30_000
@@ -500,7 +502,7 @@ export class ClaudeRuntimeAuthService {
     if (this.lastSyncedAccountId === null) {
       const paths = this.pathResolver.getRuntimePaths()
       const runtimeCredentialsJson = existsSync(paths.credentialsPath)
-        ? readFileSync(paths.credentialsPath, 'utf-8')
+        ? readAgentStateFileSync(paths.credentialsPath)
         : null
       await this.captureSystemDefaultSnapshotForManagedEntry(
         runtimeCredentialsJson,
@@ -728,7 +730,7 @@ export class ClaudeRuntimeAuthService {
   ): Promise<ClaudeRuntimeCredentialCandidate[]> {
     const paths = this.pathResolver.getRuntimePaths()
     const fileCredentials = existsSync(paths.credentialsPath)
-      ? readFileSync(paths.credentialsPath, 'utf-8')
+      ? readAgentStateFileSync(paths.credentialsPath)
       : null
     const runtimeOauthAccount = this.readRuntimeOauthAccount()
     const candidates: ClaudeRuntimeCredentialCandidate[] = []
@@ -1714,7 +1716,7 @@ export class ClaudeRuntimeAuthService {
       options.credentialsJsonOverride !== undefined
         ? options.credentialsJsonOverride
         : existsSync(paths.credentialsPath)
-          ? readFileSync(paths.credentialsPath, 'utf-8')
+          ? readAgentStateFileSync(paths.credentialsPath)
           : null
     const keychainCredentialsJson = await this.readAggregateClaudeKeychainCredentialsBestEffort(
       paths.configDir
@@ -1845,7 +1847,7 @@ export class ClaudeRuntimeAuthService {
       return null
     }
     try {
-      const parsed = JSON.parse(readFileSync(snapshotPath, 'utf-8')) as unknown
+      const parsed = readAgentStateJsonFileSync(snapshotPath)
       if (this.isSystemDefaultSnapshot(parsed)) {
         return parsed
       }
@@ -1963,7 +1965,7 @@ export class ClaudeRuntimeAuthService {
 
   private readRuntimeCredentialsFile(): string | null {
     const credentialsPath = this.pathResolver.getRuntimePaths().credentialsPath
-    return existsSync(credentialsPath) ? readFileSync(credentialsPath, 'utf-8') : null
+    return existsSync(credentialsPath) ? readAgentStateFileSync(credentialsPath) : null
   }
 
   private runtimeCredentialsBelongToAccount(
@@ -2004,7 +2006,7 @@ export class ClaudeRuntimeAuthService {
     }
     const paths = this.pathResolver.getRuntimePaths()
     const currentCredentialsJson = existsSync(paths.credentialsPath)
-      ? readFileSync(paths.credentialsPath, 'utf-8')
+      ? readAgentStateFileSync(paths.credentialsPath)
       : null
     return currentCredentialsJson === previouslyWrittenCredentialsJson
   }
@@ -2013,7 +2015,7 @@ export class ClaudeRuntimeAuthService {
     const paths = this.pathResolver.getRuntimePaths()
     try {
       const currentCredentialsJson = existsSync(paths.credentialsPath)
-        ? readFileSync(paths.credentialsPath, 'utf-8')
+        ? readAgentStateFileSync(paths.credentialsPath)
         : null
       return (
         currentCredentialsJson !== null &&
@@ -2103,7 +2105,7 @@ export class ClaudeRuntimeAuthService {
       return null
     }
     try {
-      const parsed = JSON.parse(readFileSync(configPath, 'utf-8')) as unknown
+      const parsed = readAgentStateJsonFileSync(configPath)
       const record = this.asRecord(parsed)
       if (!record) {
         return RUNTIME_OAUTH_ACCOUNT_PARSE_ERROR
@@ -2313,8 +2315,11 @@ export class ClaudeRuntimeAuthService {
 
   private fileContentsEqual(targetPath: string, contents: string): boolean {
     try {
-      return existsSync(targetPath) && readFileSync(targetPath, 'utf-8') === contents
-    } catch {
+      return existsSync(targetPath) && readAgentStateFileSync(targetPath) === contents
+    } catch (error) {
+      if (error instanceof NodeFileReadTooLargeError) {
+        throw error
+      }
       return false
     }
   }
@@ -2335,7 +2340,7 @@ export class ClaudeRuntimeAuthService {
       return {}
     }
     try {
-      const parsed = JSON.parse(readFileSync(targetPath, 'utf-8')) as unknown
+      const parsed = readAgentStateJsonFileSync(targetPath)
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return parsed as Record<string, unknown>
       }

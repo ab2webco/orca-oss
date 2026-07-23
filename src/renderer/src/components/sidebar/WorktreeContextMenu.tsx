@@ -54,6 +54,7 @@ import type {
   Repo,
   Worktree
 } from '../../../../shared/types'
+import { mapSettledWithConcurrency } from '../../../../shared/map-with-concurrency'
 import { runWorktreeBatchDelete, runWorktreeDelete } from './delete-worktree-flow'
 import { runSleepWorktrees } from './sleep-worktree-flow'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -93,6 +94,16 @@ const WORKTREE_NATIVE_CONTEXT_MENU_ATTR = 'data-worktree-native-context-menu'
 const CONTEXT_MENU_CLICK_SUPPRESSION_MS = 500
 const DELETE_POSITION_RESTORE_MAX_FRAMES = 180
 const DELETE_POSITION_RESTORE_STABLE_FRAMES = 6
+const WORKTREE_META_MUTATION_CONCURRENCY = 8
+
+function rethrowFirstMutationFailure(results: readonly PromiseSettledResult<unknown>[]): void {
+  const failure = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  )
+  if (failure) {
+    throw failure.reason
+  }
+}
 
 // Why: stable empty sentinels let closed menu wrappers subscribe to a referentially
 // stable value instead of the high-churn maps that delete teardown replaces. The
@@ -673,13 +684,14 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleAssignWorkspaceStatus = useCallback(
     (status: string) => {
       setMenuOpenState(false)
-      void Promise.all(
-        activeContextWorktrees.map((item) =>
+      void mapSettledWithConcurrency(
+        activeContextWorktrees,
+        WORKTREE_META_MUTATION_CONCURRENCY,
+        (item) =>
           getWorkspaceStatus(item, workspaceStatuses) === status
             ? Promise.resolve()
             : updateWorktreeMeta(item.id, { workspaceStatus: status })
-        )
-      )
+      ).then(rethrowFirstMutationFailure)
     },
     [activeContextWorktrees, setMenuOpenState, updateWorktreeMeta, workspaceStatuses]
   )
@@ -819,9 +831,11 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   )
 
   const handleRemoveParentLink = useCallback(() => {
-    void Promise.all(
-      activeContextWorktrees.map((item) => updateWorktreeLineage(item.id, { noParent: true }))
-    )
+    void mapSettledWithConcurrency(
+      activeContextWorktrees,
+      WORKTREE_META_MUTATION_CONCURRENCY,
+      (item) => updateWorktreeLineage(item.id, { noParent: true })
+    ).then(rethrowFirstMutationFailure)
   }, [activeContextWorktrees, updateWorktreeLineage])
 
   const suppressOpeningPointerEvent = useCallback((event: React.SyntheticEvent) => {

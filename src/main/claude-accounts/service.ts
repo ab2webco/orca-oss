@@ -14,6 +14,7 @@ import type { Store } from '../persistence'
 import type { RateLimitService } from '../rate-limits/service'
 import { resolveClaudeCommand, resolveCliCommandOrNull } from '../codex-cli/command'
 import { hydrateShellPath, mergePathSegments } from '../startup/hydrate-shell-path'
+import { readAgentStateFileSync, readAgentStateJsonFileSync } from '../agent-state-file-reader'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
 import {
   getClaudeManagedAccountsRoot,
@@ -1155,7 +1156,7 @@ export class ClaudeAccountService {
       }
     }
     const credentialsPath = join(configDir, '.credentials.json')
-    return existsSync(credentialsPath) ? readFileSync(credentialsPath, 'utf-8') : null
+    return existsSync(credentialsPath) ? readAgentStateFileSync(credentialsPath) : null
   }
 
   private readOauthAccountFromConfigDir(configDir: string): unknown {
@@ -1164,7 +1165,7 @@ export class ClaudeAccountService {
         continue
       }
       try {
-        const parsed = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+        const parsed = readAgentStateJsonFileSync(configPath) as Record<string, unknown>
         if (parsed.oauthAccount) {
           return parsed.oauthAccount
         }

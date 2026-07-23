@@ -113,7 +113,9 @@ import {
 } from './web-runtime-environment'
 import { parseWebPairingInput } from './web-pairing'
 import { WebRuntimeClient } from './web-runtime-client'
+import { parseWebLocalStorageJson, stringifyWebLocalStorageJson } from './web-local-storage-json'
 import { RuntimeRpcCallQueuePool } from '../../../shared/runtime-rpc-call-queue'
+import { mapWithConcurrency } from '../../../shared/map-with-concurrency'
 import {
   assertClipboardTextWriteWithinLimitWithYield,
   assertClipboardTextWithinLimitWithYield,
@@ -128,6 +130,7 @@ import {
   assertClipboardImageDimensionsWithinLimit
 } from '../../../shared/clipboard-image'
 import { sanitizeWebRuntimeWorkspaceSession } from './web-workspace-session'
+import { WebPreloadRequestOwners } from './web-preload-request-owners'
 import {
   normalizeFeatureInteractions,
   type FeatureInteractionId,
@@ -150,12 +153,14 @@ const GITHUB_CACHE_STORAGE_KEY = 'orca.web.githubCache.v1'
 const KEYBINDINGS_STORAGE_KEY = 'orca.web.keybindings.v1'
 // Why: paired clients need parity for large dev sessions; the runtime default stays capped for lower-level RPC callers.
 const WEB_RUNTIME_WORKTREE_LIST_LIMIT = 10_000
+export const WEB_RUNTIME_REPO_DISCOVERY_CONCURRENCY = 8
 const MAX_CLIPBOARD_IMAGE_BASE64_CHARS = CLIPBOARD_IMAGE_MAX_BASE64_CHARS
 export const MAX_CLIPBOARD_IMAGE_SOURCE_BYTES = CLIPBOARD_IMAGE_MAX_SOURCE_BYTES
 export const MAX_CLIPBOARD_IMAGE_PIXELS = CLIPBOARD_IMAGE_MAX_PIXELS
 export const CLIPBOARD_IMAGE_UPLOAD_CHUNK_BASE64_CHARS = 512 * 1024
 export const CLIPBOARD_IMAGE_SINGLE_FRAME_FALLBACK_BASE64_CHARS = 256 * 1024
 const CLIPBOARD_IMAGE_SAVE_TIMEOUT_MS = 30_000
+export const WEB_PRELOAD_MAX_KEYBINDING_LISTENERS = 64
 
 let activeEnvironment: StoredWebRuntimeEnvironment | null = readStoredWebRuntimeEnvironment()
 let activeClient: WebRuntimeClient | null = null
@@ -479,9 +484,17 @@ export const GITLAB_WEB_RPC_METHODS = {
 } as const satisfies Record<WebGitLabRouteKey, WebGitLabRuntimeMethod>
 
 const WEB_KEYBINDING_PLATFORMS: readonly KeybindingPlatform[] = ['darwin', 'linux', 'win32']
-const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => void>()
+type WebKeybindingSubscription = {
+  target: Window
+  onStorage: (event: StorageEvent) => void
+}
+const webKeybindingSubscriptions = new Map<
+  (snapshot: KeybindingFileSnapshot) => void,
+  WebKeybindingSubscription
+>()
 
 export function installWebPreloadApi(): void {
+  disposeWebPreloadOwnedState()
   activeEnvironment = readStoredWebRuntimeEnvironment()
   const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
   webWindow.__ORCA_WEB_CLIENT__ = true
@@ -1106,7 +1119,7 @@ function writeWebKeybindingAction(
 }
 
 function notifyWebKeybindingListeners(snapshot: KeybindingFileSnapshot): void {
-  for (const listener of webKeybindingListeners) {
+  for (const listener of webKeybindingSubscriptions.keys()) {
     listener(snapshot)
   }
 }
@@ -1124,18 +1137,41 @@ function createWebKeybindingsApi(): WebKeybindingsApi {
     openFile: () => Promise.resolve(getWebKeybindingSnapshot()),
     revealFile: () => Promise.resolve(getWebKeybindingSnapshot()),
     onChanged: (callback) => {
-      webKeybindingListeners.add(callback)
+      const existing = webKeybindingSubscriptions.get(callback)
+      if (existing) {
+        return () => releaseWebKeybindingSubscription(callback, existing)
+      }
+      if (webKeybindingSubscriptions.size >= WEB_PRELOAD_MAX_KEYBINDING_LISTENERS) {
+        throw new Error('Web keybinding listener capacity reached; remove a listener and retry.')
+      }
+      const target = window
       const onStorage = (event: StorageEvent): void => {
         if (event.key === KEYBINDINGS_STORAGE_KEY) {
           callback(getWebKeybindingSnapshot())
         }
       }
-      window.addEventListener('storage', onStorage)
-      return () => {
-        webKeybindingListeners.delete(callback)
-        window.removeEventListener('storage', onStorage)
-      }
+      const subscription = { target, onStorage }
+      webKeybindingSubscriptions.set(callback, subscription)
+      target.addEventListener('storage', onStorage)
+      return () => releaseWebKeybindingSubscription(callback, subscription)
     }
+  }
+}
+
+function releaseWebKeybindingSubscription(
+  callback: (snapshot: KeybindingFileSnapshot) => void,
+  expected: WebKeybindingSubscription
+): void {
+  if (webKeybindingSubscriptions.get(callback) !== expected) {
+    return
+  }
+  webKeybindingSubscriptions.delete(callback)
+  expected.target.removeEventListener('storage', expected.onStorage)
+}
+
+function disposeWebKeybindingSubscriptions(): void {
+  for (const [callback, subscription] of webKeybindingSubscriptions) {
+    releaseWebKeybindingSubscription(callback, subscription)
   }
 }
 
@@ -1795,16 +1831,14 @@ function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
 }
 
 // Why: track the in-flight abortable status request per token so cancelStatus can abort it and close its remote context.
-const webGitStatusAbortControllers = new Map<string, AbortController>()
+const webGitStatusRequestOwners = new WebPreloadRequestOwners()
 
 async function callAbortableRuntimeStatus<TResult>(
   requestToken: string,
   params: unknown
 ): Promise<TResult> {
   const environment = requireActiveEnvironment()
-  webGitStatusAbortControllers.get(requestToken)?.abort()
-  const controller = new AbortController()
-  webGitStatusAbortControllers.set(requestToken, controller)
+  const controller = webGitStatusRequestOwners.replace(requestToken)
   try {
     const response = await callAbortableRuntimeEnvironment(
       environment.id,
@@ -1819,9 +1853,7 @@ async function callAbortableRuntimeStatus<TResult>(
     }
     return response.result as TResult
   } finally {
-    if (webGitStatusAbortControllers.get(requestToken) === controller) {
-      webGitStatusAbortControllers.delete(requestToken)
-    }
+    webGitStatusRequestOwners.release(requestToken, controller)
   }
 }
 
@@ -1848,7 +1880,7 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
       return callAbortableRuntimeStatus(requestToken, params)
     },
     cancelStatus: async ({ requestToken }) => {
-      webGitStatusAbortControllers.get(requestToken)?.abort()
+      webGitStatusRequestOwners.abort(requestToken)
     },
     submoduleStatus: async ({ worktreePath, submodulePath, area }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
@@ -3321,10 +3353,16 @@ function getClientForEnvironment(environment: StoredWebRuntimeEnvironment): WebR
 }
 
 function closeActiveRuntimeClients(): void {
+  webGitStatusRequestOwners.abortAll()
   activeClient?.close()
   activeClient = null
   activeClientEnvironmentId = null
   invalidateRuntimeWorktreeCaches()
+}
+
+function disposeWebPreloadOwnedState(): void {
+  disposeWebKeybindingSubscriptions()
+  closeActiveRuntimeClients()
 }
 
 function disconnectActiveRuntimeEnvironment(): void {
@@ -3377,8 +3415,8 @@ function updateEnvironmentFromResponse(
 function getStoredSettings(): GlobalSettings {
   activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   const defaults = getDefaultSettings('~')
-  const rawStoredSettings = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
-  const stored = readJson<Partial<GlobalSettings>>(SETTINGS_STORAGE_KEY, {})
+  const storedResult = readJsonWithMetadata<Partial<GlobalSettings>>(SETTINGS_STORAGE_KEY, {})
+  const stored = storedResult.value
   const migratedStored = {
     ...stored,
     ...normalizeAutoRenameBranchFromWorkDefaultOn(stored),
@@ -3387,7 +3425,7 @@ function getStoredSettings(): GlobalSettings {
     uiLanguage: normalizeUiLanguage(stored.uiLanguage)
   }
   if (
-    rawStoredSettings &&
+    storedResult.parsedPlainObject &&
     (stored.autoRenameBranchFromWork !== migratedStored.autoRenameBranchFromWork ||
       stored.autoRenameBranchFromWorkDefaultedOn !==
         migratedStored.autoRenameBranchFromWorkDefaultedOn ||
@@ -3397,14 +3435,7 @@ function getStoredSettings(): GlobalSettings {
       stored.terminalCustomThemes !== migratedStored.terminalCustomThemes ||
       stored.uiLanguage !== migratedStored.uiLanguage)
   ) {
-    try {
-      const parsed = JSON.parse(rawStoredSettings) as unknown
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        writeJson(SETTINGS_STORAGE_KEY, migratedStored)
-      }
-    } catch {
-      // Keep readJson's invalid-JSON fallback non-destructive.
-    }
+    writeJson(SETTINGS_STORAGE_KEY, migratedStored)
   }
   return mergeSettings(
     {
@@ -3771,10 +3802,10 @@ async function listAllRuntimeDetectedWorktrees(
 
   assertActiveEnvironment(expectedEnvironmentId)
   const repos = (await callResult<{ repos: Repo[] }>('repo.list')).repos
-  const detectedLists = await Promise.all(
-    repos.map((repo) =>
-      callRuntimeDetectedWorktrees(repo.id, expectedEnvironmentId, callResult, callEnvelope)
-    )
+  const detectedLists = await mapWithConcurrency(
+    repos,
+    WEB_RUNTIME_REPO_DISCOVERY_CONCURRENCY,
+    (repo) => callRuntimeDetectedWorktrees(repo.id, expectedEnvironmentId, callResult, callEnvelope)
   )
   const worktrees = detectedLists.flatMap((result) => result.worktrees)
   assertActiveEnvironment(expectedEnvironmentId)
@@ -3973,23 +4004,34 @@ function getBrowserPlatform(): NodeJS.Platform {
 }
 
 function readJson<T>(key: string, fallback: T): T {
+  return readJsonWithMetadata(key, fallback).value
+}
+
+function readJsonWithMetadata<T>(
+  key: string,
+  fallback: T
+): { value: T; parsedPlainObject: boolean } {
   const raw = window.localStorage.getItem(key)
   if (!raw) {
-    return cloneJson(fallback)
+    return { value: cloneJson(fallback), parsedPlainObject: false }
   }
   try {
-    return { ...cloneJson(fallback), ...JSON.parse(raw) } as T
+    const parsed = parseWebLocalStorageJson(raw)
+    return {
+      value: { ...cloneJson(fallback), ...(parsed as object) } as T,
+      parsedPlainObject: parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+    }
   } catch {
-    return cloneJson(fallback)
+    return { value: cloneJson(fallback), parsedPlainObject: false }
   }
 }
 
 function writeJson<T>(key: string, value: T): void {
-  window.localStorage.setItem(key, JSON.stringify(value))
+  window.localStorage.setItem(key, stringifyWebLocalStorageJson(value))
 }
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
+  return parseWebLocalStorageJson<T>(stringifyWebLocalStorageJson(value))
 }
 
 function withFallback<T extends object>(target: T, path: string[]): T {
