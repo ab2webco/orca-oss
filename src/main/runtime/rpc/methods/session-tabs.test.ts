@@ -114,6 +114,32 @@ describe('session tab RPC methods', () => {
     expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
   })
 
+  it('preserves explicit user closes from current runtime clients', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      refuseUnattributedMobileSessionTabClose: vi.fn(),
+      closeMobileSessionTab: vi.fn().mockResolvedValue({ closed: true })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
+    const replies: string[] = []
+
+    await dispatcher.dispatchStreaming(
+      makeRequest('session.tabs.close', {
+        worktree: 'id:wt-1',
+        tabId: 'tab-1',
+        reason: 'user'
+      }),
+      (response) => replies.push(response),
+      { clientKind: 'runtime', pairedDeviceId: 'current-runtime' }
+    )
+
+    expect(replies).toHaveLength(1)
+    expect(runtime.closeMobileSessionTab).toHaveBeenCalledWith('id:wt-1', 'tab-1', {
+      reason: 'user'
+    })
+    expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
+  })
+
   it('preserves reasonless explicit closes from authenticated legacy mobile clients', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
@@ -136,11 +162,16 @@ describe('session tab RPC methods', () => {
     expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
   })
 
-  it('preserves reasonless explicit closes from authenticated legacy runtime clients', async () => {
+  it('refuses ambiguous reasonless closes from authenticated legacy runtime clients', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
-      refuseUnattributedMobileSessionTabClose: vi.fn(),
-      closeMobileSessionTab: vi.fn().mockResolvedValue({ closed: true })
+      refuseUnattributedMobileSessionTabClose: vi.fn().mockResolvedValue({
+        closed: true,
+        refused: true,
+        refusalReason: 'missing-intent',
+        snapshotRepublished: true
+      }),
+      closeMobileSessionTab: vi.fn()
     } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
     const replies: string[] = []
@@ -152,10 +183,8 @@ describe('session tab RPC methods', () => {
     )
 
     expect(replies).toHaveLength(1)
-    expect(runtime.closeMobileSessionTab).toHaveBeenCalledWith('id:wt-1', 'tab-1', {
-      reason: 'user'
-    })
-    expect(runtime.refuseUnattributedMobileSessionTabClose).not.toHaveBeenCalled()
+    expect(runtime.refuseUnattributedMobileSessionTabClose).toHaveBeenCalledWith('id:wt-1', 'tab-1')
+    expect(runtime.closeMobileSessionTab).not.toHaveBeenCalled()
   })
 
   it.each(['pty-exit', 'cleanup'] as const)(
