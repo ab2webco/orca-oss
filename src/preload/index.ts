@@ -983,6 +983,10 @@ const api = {
     /** Return the PTY foreground process basename when available (e.g. "codex"). */
     getForegroundProcess: (id: string): Promise<string | null> =>
       ipcRenderer.invoke('pty:getForegroundProcess', { id }),
+    inspectProcess: (
+      id: string
+    ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }> =>
+      ipcRenderer.invoke('pty:inspectProcess', { id }),
     confirmForegroundProcess: (id: string): Promise<string | null> =>
       ipcRenderer.invoke('pty:confirmForegroundProcess', { id }),
 
@@ -1840,6 +1844,11 @@ const api = {
 
     set: (args: Record<string, unknown>): Promise<unknown> =>
       ipcRenderer.invoke('settings:set', args),
+
+    setActiveRuntimeEnvironmentPreference: (args: {
+      environmentId: string | null
+    }): Promise<unknown> =>
+      ipcRenderer.invoke('settings:set-active-runtime-environment-preference', args),
 
     updatePRBotAuthorOverride: (args: { author: string; isBot: boolean }): Promise<unknown> =>
       ipcRenderer.invoke('settings:update-pr-bot-author-override', args),

@@ -133,6 +133,7 @@ import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut
 import { resolveAgentStatusTerminalTitle } from '@/lib/agent-status-terminal-title'
 import { titleHasAgentName } from '../../../shared/agent-detection'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-pane-authority'
 import { translate } from '@/i18n/i18n'
 import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
@@ -1486,18 +1487,6 @@ export function useIpcEvents(): void {
           splitTelemetrySource
         }) => {
           try {
-            if (isRuntimeEnvironmentActive()) {
-              if (requestId) {
-                window.api.ui.replyTerminalCreate({
-                  requestId,
-                  error: translate(
-                    'auto.hooks.useIpcEvents.60428567b4',
-                    'Local terminal reveal is unavailable while a remote runtime is active'
-                  )
-                })
-              }
-              return
-            }
             const store = useAppStore.getState()
             const terminalPresentation = resolveTerminalPresentation({ presentation, activate })
             const shouldActivate = terminalPresentation === 'focused'
@@ -1710,23 +1699,34 @@ export function useIpcEvents(): void {
     unsubs.push(
       window.api.ui.onRequestTerminalCreate((data) => {
         try {
-          // Why: runtime-session requests are host-owned tabs materialized by this renderer, not ordinary local creates.
-          if (isRuntimeEnvironmentActive() && data.source !== 'runtime-session') {
-            window.api.ui.replyTerminalCreate({
-              requestId: data.requestId,
-              error: translate(
-                'auto.hooks.useIpcEvents.7a64b31991',
-                'Local terminal creation is unavailable while a remote runtime is active'
-              )
-            })
-            return
-          }
           const store = useAppStore.getState()
           const worktreeId = data.worktreeId ?? store.activeWorktreeId
           if (!worktreeId) {
             window.api.ui.replyTerminalCreate({
               requestId: data.requestId,
               error: translate('auto.hooks.useIpcEvents.f000b2ff76', 'No active worktree')
+            })
+            return
+          }
+          const worktreeRoute = resolveTerminalWorktreeRoute(store, worktreeId)
+          if (!worktreeRoute) {
+            window.api.ui.replyTerminalCreate({
+              requestId: data.requestId,
+              error: translate(
+                'auto.hooks.useIpcEvents.unresolvedTerminalWorktreeOwner',
+                'Terminal creation is unavailable because the worktree owner could not be resolved'
+              )
+            })
+            return
+          }
+          // Why: runtime-session requests are host-owned tabs materialized by this renderer, not ordinary local creates.
+          if (worktreeRoute.runtimeEnvironmentId && data.source !== 'runtime-session') {
+            window.api.ui.replyTerminalCreate({
+              requestId: data.requestId,
+              error: translate(
+                'auto.hooks.useIpcEvents.7a64b31991',
+                'Local terminal creation is unavailable while a remote runtime is active'
+              )
             })
             return
           }

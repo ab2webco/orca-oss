@@ -13,6 +13,7 @@ import {
   CornerDownLeft,
   FolderPlus,
   LoaderCircle,
+  Monitor,
   PlugZap,
   Plus,
   Settings2,
@@ -26,7 +27,7 @@ import {
   CommandList,
   CommandSeparator
 } from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -80,6 +81,7 @@ import type {
   ReadyProjectHostSetupOption
 } from '@/lib/project-host-setup-options'
 import type { WorkspaceCreateErrorDisplay } from '@/lib/workspace-create-error-format'
+import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
 import type { SshConnectionStatus } from '../../../shared/ssh-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
@@ -369,6 +371,12 @@ function HostPathTooltip({ path }: { path: string }): React.JSX.Element {
   )
 }
 
+// Why: the local machine isn't a server — give it a monitor glyph so it reads as "this computer".
+function HostRowIcon({ hostId }: { hostId: ExecutionHostId }): React.JSX.Element {
+  const Icon = hostId === LOCAL_EXECUTION_HOST_ID ? Monitor : Server
+  return <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+}
+
 function WorkspaceRunTargetCombobox({
   hostOptions,
   hostValue,
@@ -515,7 +523,7 @@ function WorkspaceRunTargetCombobox({
             </span>
           ) : selectedHost ? (
             <span className="inline-flex min-w-0 items-center gap-1.5">
-              <Server className="size-3.5 shrink-0 text-muted-foreground" />
+              <HostRowIcon hostId={selectedHost.hostId} />
               <span className="truncate">{selectedHost.label}</span>
             </span>
           ) : (
@@ -548,7 +556,7 @@ function WorkspaceRunTargetCombobox({
                 onSelect={() => handleHostSelect(option.id)}
                 onPointerEnter={closeSubmenus}
                 onFocus={closeSubmenus}
-                className="items-center gap-2 px-3 py-2"
+                className="items-center gap-2 px-3 py-1.5"
               >
                 <Check
                   className={cn(
@@ -556,7 +564,7 @@ function WorkspaceRunTargetCombobox({
                     !selectedRecipe && option.id === selectedHost?.id ? 'opacity-100' : 'opacity-0'
                   )}
                 />
-                <Server className="size-3.5 shrink-0 text-muted-foreground" />
+                <HostRowIcon hostId={option.hostId} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{option.label}</div>
                   <HostPathTooltip path={option.path} />
@@ -578,7 +586,7 @@ function WorkspaceRunTargetCombobox({
                     onSelect={() => {}}
                     onPointerEnter={closeSubmenus}
                     onFocus={closeSubmenus}
-                    className="items-center gap-2 px-3 py-2"
+                    className="items-center gap-2 px-3 py-1.5"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2 opacity-60">
                       <Check className="size-4 opacity-0" />
@@ -590,7 +598,7 @@ function WorkspaceRunTargetCombobox({
                       ) : option.attention ? (
                         <AlertTriangle className="size-3.5 shrink-0 text-muted-foreground" />
                       ) : (
-                        <Server className="size-3.5 shrink-0 text-muted-foreground" />
+                        <HostRowIcon hostId={option.hostId} />
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{option.label}</div>
@@ -640,10 +648,10 @@ function WorkspaceRunTargetCombobox({
                 ))}
               </>
             ) : null}
-            {/* Why: separate the host list from the environment/add-host actions below, mirroring
-                the divider above the not-connected group so the two action rows read as their own
-                section rather than trailing the hosts. */}
-            {readyHostOptions.length > 0 || needsSetupHostOptions.length > 0 ? (
+            {/* Why: separate the host list from the per-workspace-env row; the "Add host" action
+                is pinned below the list with its own border, so it needs no separator here. */}
+            {recipes.length > 0 &&
+            (readyHostOptions.length > 0 || needsSetupHostOptions.length > 0) ? (
               <CommandSeparator />
             ) : null}
             {recipes.length > 0 ? (
@@ -655,7 +663,7 @@ function WorkspaceRunTargetCombobox({
                     onSelect={openVmRecipesSubmenu}
                     onPointerEnter={openVmRecipesSubmenu}
                     onFocus={openVmRecipesSubmenu}
-                    className="items-center gap-2 px-3 py-2"
+                    className="items-center gap-2 px-3 py-1.5"
                   >
                     <Check
                       className={cn(
@@ -685,7 +693,7 @@ function WorkspaceRunTargetCombobox({
                           key={recipe.id}
                           value={`recipe:${recipe.id}`}
                           onSelect={() => handleRecipeSelect(recipe.id)}
-                          className="items-center gap-2 px-3 py-2"
+                          className="items-center gap-2 px-3 py-1.5"
                         >
                           <Check
                             className={cn(
@@ -712,31 +720,31 @@ function WorkspaceRunTargetCombobox({
                 </PopoverContent>
               </Popover>
             ) : null}
+          </CommandList>
+          {/* Why: pin "Add host" below the scrollable list — mirrors the Project combobox's
+              "Add a new project" footer so it keeps a compact single-row height and one clean
+              divider instead of a taller in-list row above the popover edge. */}
+          <div className="border-t border-border">
             <Popover open={hostActionsOpen} onOpenChange={setHostActionsOpen}>
-              <PopoverTrigger asChild>
-                <CommandItem
-                  value="add-host"
-                  onSelect={openHostActionsSubmenu}
+              {/* Why: an Anchor (not a Trigger) so click/hover/focus all just open the submenu —
+                  a Trigger's own toggle would fight the hover-open and close it on the same click. */}
+              <PopoverAnchor asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-run-target-add-host="true"
+                  onClick={openHostActionsSubmenu}
                   onPointerEnter={openHostActionsSubmenu}
                   onFocus={openHostActionsSubmenu}
-                  className="items-center gap-2 px-3 py-2"
+                  className="h-8 w-full justify-start gap-2 rounded-none px-3 text-xs font-normal"
                 >
-                  <Check className="size-4 opacity-0" />
                   <Plus className="size-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm">
-                      {translate('auto.components.NewWorkspaceComposerCard.addHost', 'Add host')}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {translate(
-                        'auto.components.NewWorkspaceComposerCard.addHostHint',
-                        'Register another machine or Orca server'
-                      )}
-                    </div>
-                  </div>
-                  <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                </CommandItem>
-              </PopoverTrigger>
+                  <span>
+                    {translate('auto.components.NewWorkspaceComposerCard.addHost', 'Add host')}
+                  </span>
+                  <ChevronRight className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
+                </Button>
+              </PopoverAnchor>
               <PopoverContent side="right" align="start" sideOffset={6} className="w-72 p-0">
                 {/* Why: pin an empty value so cmdk doesn't auto-highlight the first row on open —
                     matches the recipes submenu, which leaves nothing highlighted by default. */}
@@ -745,7 +753,7 @@ function WorkspaceRunTargetCombobox({
                     <CommandItem
                       value="add-ssh-host"
                       onSelect={handleAddSshHost}
-                      className="items-center gap-2 px-3 py-2"
+                      className="items-center gap-2 px-3 py-1.5"
                     >
                       <Server className="size-3.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
@@ -766,7 +774,7 @@ function WorkspaceRunTargetCombobox({
                     <CommandItem
                       value="add-remote-orca-server"
                       onSelect={handleAddRemoteServer}
-                      className="items-center gap-2 px-3 py-2"
+                      className="items-center gap-2 px-3 py-1.5"
                     >
                       <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
@@ -788,7 +796,7 @@ function WorkspaceRunTargetCombobox({
                 </Command>
               </PopoverContent>
             </Popover>
-          </CommandList>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

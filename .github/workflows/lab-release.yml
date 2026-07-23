@@ -57,12 +57,18 @@ jobs:
         run: |
           current="$(node -p "require('./package.json').version")"
           override="${{ inputs.version }}"
+          # Why: clean `X.Y.Z-lab.N` scheme (no upstream `-rc.X` noise). A bare
+          # `X.Y.Z-lab.N` sorts BELOW `X.Y.Z-rc.…` in semver, so migrating off the
+          # old `-rc.X.lab.N` tags bumps the patch to stay above installed labs and
+          # keep auto-update flowing. Once on the clean scheme, just increment N.
           if [[ -n "$override" ]]; then
             next="$override"
-          elif [[ "$current" =~ ^(.+)\.lab\.([0-9]+)$ ]]; then
-            next="${BASH_REMATCH[1]}.lab.$(( BASH_REMATCH[2] + 1 ))"
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)$ ]]; then
+            next="${BASH_REMATCH[1]}-lab.$(( BASH_REMATCH[2] + 1 ))"
           else
-            next="${current}.lab.1"
+            numeric="${current%%-*}"
+            IFS=. read -r MAJ MIN PAT <<<"$numeric"
+            next="${MAJ}.${MIN}.$(( PAT + 1 ))-lab.1"
           fi
           # Why: a reused or regressing version silently breaks auto-update for
           # installed labs, so refuse same-version and already-tagged cuts.
@@ -74,9 +80,9 @@ jobs:
             echo "Tag v$next already exists" >&2
             exit 1
           fi
-          # Human title: 1.4.150-rc.0.lab.3 -> Orca Lab v1.4.150-lab.3
+          # Human title: 1.4.152-lab.1 -> Orca Lab v1.4.152-lab.1
           base="${next%%-*}"
-          lab_n="${next##*.lab.}"
+          lab_n="${next##*-lab.}"
           echo "version=$next" >>"$GITHUB_OUTPUT"
           echo "tag=v$next" >>"$GITHUB_OUTPUT"
           echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"

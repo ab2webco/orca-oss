@@ -182,7 +182,8 @@
       "slices": {
         "browser": {
           "d175274b6d": "새 브라우저 탭",
-          "08fc23631d": "브라우저"
+          "08fc23631d": "브라우저",
+          "remoteCookieImportUnavailable": "Manual cookie file import is unavailable while a remote runtime is active."
         },
         "editor": {
           "dcb521ed29": "이 파일은 충돌 상태에 있지만 편집할 수 있는 작업 트리 파일이 없습니다.",
@@ -695,7 +696,8 @@
         "4f78ba5885": "워크스페이스가 동기화되었습니다.",
         "ef223fbb6b": "A device tried to connect but is not paired",
         "11992d0337": "If this was your phone or another Orca client, re-pair it from Settings → Mobile.",
-        "6573cfe955": "Open Mobile Settings"
+        "6573cfe955": "Open Mobile Settings",
+        "unresolvedTerminalWorktreeOwner": "Terminal creation is unavailable because the worktree owner could not be resolved"
       },
       "useSettingsNavigationMetadata": {
         "4a728cd56b": "아직 구체화되고 있는 새로운 기능입니다. 한번 시도해 보세요.",
@@ -1498,7 +1500,8 @@
         "4725b0e931": "Quick Open 스캔이 너무 큼(",
         "b227d88520": "{{value0}} 파일을 찾았습니다.",
         "995be8ea22": "복사",
-        "cf144856dc": "복사됨"
+        "cf144856dc": "복사됨",
+        "344f8a48dd": "on the host running the Quick Open scan to enable fast, gitignore-aware listing:"
       },
       "SelectedTextCopyMenu": {
         "9b40d7b018": "복사"
@@ -4899,6 +4902,13 @@
           "cancel": "취소",
           "forget": "Orca에서 제거",
           "reconnectAndDelete": "재연결 후 삭제"
+        },
+        "WorktreeCardClaudeAccountChip": {
+          "systemDefault": "System default",
+          "pinnedEndpoint": "Pinned Claude endpoint: {{value0}}",
+          "inherited": "Claude account (inherited from global): {{value0}}",
+          "pinned": "Pinned Claude account: {{value0}}",
+          "globalMarker": "(global)"
         }
       },
       "shared": {
@@ -5117,7 +5127,10 @@
           "clearAccountConfigFailed": "Failed to clear config from this account.",
           "accountConfigMenu": "Account config options",
           "syncAccountConfig": "Sync global config",
-          "clearAccountConfig": "Clear config (start fresh)"
+          "clearAccountConfig": "Clear config (start fresh)",
+          "claudeRemoveLiveOne": "1 live Claude terminal is using this account. It will be closed before the account is deleted.",
+          "claudeRemoveLiveMany": "{{count}} live Claude terminals are using this account. They will be closed before the account is deleted.",
+          "claudeRemoveCloseAndDelete": "Close & delete"
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",
@@ -6500,7 +6513,6 @@
           "b5b5114cb0": "{{value0}}을(를) 삭제했습니다.",
           "6cb6eae14f": "런타임 환경을 저장하지 못했습니다.",
           "7b5986c8df": "{{value0}}이(가) 저장되었습니다. 준비되면 활성 서버에서 전환하세요.",
-          "a5b58465b6": "{{value0}}에 연결되었습니다.",
           "5ef712f407": "\"{{value0}}\"이라는 서버가 이미 존재합니다.",
           "0c55a47480": "이름과 페어링 코드가 필요합니다.",
           "e6410d72c3": "런타임 환경을 로드하지 못했습니다.",
@@ -6548,7 +6560,10 @@
           "versionUnavailable": "Orca version unavailable",
           "updateServer": "Update",
           "reviewServerUpdates": "Server updates",
-          "orcaVersion": "Orca v{{value0}}"
+          "orcaVersion": "Orca v{{value0}}",
+          "removeActiveServerBlocked": "Choose another Active Server in Advanced before removing this server.",
+          "removeActiveServerDescription": "Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone.",
+          "updatingServers": "Updating servers…"
         },
         "RuntimePairingGeneratedUrlRows": {
           "0495f68959": "{{value0}} 복사"

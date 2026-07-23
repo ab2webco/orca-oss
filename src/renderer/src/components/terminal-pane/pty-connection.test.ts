@@ -874,6 +874,7 @@ describe('connectPanePty', () => {
           reportGeometry: vi.fn(),
           getMainBufferSnapshot: vi.fn().mockResolvedValue(null),
           getForegroundProcess: vi.fn().mockResolvedValue(null),
+          inspectProcess: vi.fn(),
           confirmForegroundProcess: vi.fn().mockResolvedValue(null),
           hasChildProcesses: vi.fn().mockResolvedValue(false),
           write: vi.fn(),
@@ -910,6 +911,11 @@ describe('connectPanePty', () => {
     vi.mocked(window.api.pty.confirmForegroundProcess).mockImplementation((id) =>
       window.api.pty.getForegroundProcess(id)
     )
+    vi.mocked(window.api.pty.inspectProcess).mockImplementation(async (id) => {
+      const foregroundProcess = await window.api.pty.getForegroundProcess(id)
+      const hasChildProcesses = await window.api.pty.hasChildProcesses(id)
+      return { foregroundProcess, hasChildProcesses }
+    })
     globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
       callback(0)
       return 1
@@ -13560,6 +13566,8 @@ describe('connectPanePty', () => {
 
   it('requests snapshot recovery for one oversized live frame deferred by replay', async () => {
     const { connectPanePty } = await import('./pty-connection')
+    const { deliverTerminalDataWithDeferredCredit } =
+      await import('@/lib/pane-manager/terminal-delivery-credit')
     const transport = createMockTransport('pty-large-live')
     const callbacksRef: {
       replay: ((data: string) => void) | null
@@ -13584,7 +13592,11 @@ describe('connectPanePty', () => {
     callbacksRef.replay?.('authoritative replay')
     await flushAsyncTicks(8)
     const oversizedLiveFrame = 'L'.repeat(512 * 1024 + 1)
-    callbacksRef.data?.(oversizedLiveFrame)
+    const acknowledgeDroppedFrame = vi.fn()
+    deliverTerminalDataWithDeferredCredit(acknowledgeDroppedFrame, () => {
+      callbacksRef.data?.(oversizedLiveFrame)
+    })
+    expect(acknowledgeDroppedFrame).not.toHaveBeenCalled()
     while (parseCallbacks.length > 0) {
       parseCallbacks.shift()?.()
       await flushAsyncTicks(4)
@@ -13595,6 +13607,7 @@ describe('connectPanePty', () => {
       scrollbackRows: 5000
     })
     expect(writes.some((write) => write.startsWith('L'))).toBe(false)
+    expect(acknowledgeDroppedFrame).toHaveBeenCalledOnce()
     binding.dispose()
   })
 
@@ -15109,6 +15122,90 @@ describe('connectPanePty', () => {
     expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('legacy-hub', expect.any(Object))
   })
 
+  it('runs an inline setup terminal locally instead of failing its host closed', async () => {
+    // Regression (#9994 fallout): the branded ephemeral-setup id resolves to no worktree/repo, so
+    // the strict owner resolver reported it unresolved and gave the pane the "Workspace identity is
+    // ambiguous across hosts" error transport instead of a real local PTY.
+    const { connectPanePty } = await import('./pty-connection')
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+    const setupWorktreeId =
+      'ephemeral-setup-terminal:settings-mobile-emulator-orca-cli-skill-terminal'
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { [setupWorktreeId]: [{ id: 'tab-1', ptyId: null }] },
+      worktreesByRepo: {
+        repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/tmp/wt-1', hostId: 'local' }]
+      },
+      repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }]
+    } as StoreState
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ worktreeId: setupWorktreeId }) as never
+    )
+
+    expect(createIpcPtyTransport).toHaveBeenCalled()
+    expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
+  })
+
+  it('runs an inline setup terminal on the single active runtime for remote skill installs', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+    const setupWorktreeId =
+      'ephemeral-setup-terminal:settings-mobile-emulator-orca-cli-skill-terminal'
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { [setupWorktreeId]: [{ id: 'tab-1', ptyId: null }] },
+      worktreesByRepo: {
+        repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/tmp/wt-1', hostId: 'local' }]
+      },
+      repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }],
+      runtimeEnvironments: [{ id: 'hub-a' }],
+      settings: { ...mockStoreState.settings, activeRuntimeEnvironmentId: 'hub-a' }
+    } as StoreState
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ worktreeId: setupWorktreeId }) as never
+    )
+
+    expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('hub-a', expect.any(Object))
+  })
+
+  it('keeps the floating terminal local even while a runtime is active', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'global-floating-terminal': [{ id: 'tab-1', ptyId: null }] },
+      worktreesByRepo: {
+        repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/tmp/wt-1', hostId: 'local' }]
+      },
+      repos: [{ id: 'repo1', connectionId: null, executionHostId: 'local' }],
+      runtimeEnvironments: [{ id: 'hub-a' }],
+      settings: { ...mockStoreState.settings, activeRuntimeEnvironmentId: 'hub-a' }
+    } as StoreState
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ worktreeId: 'global-floating-terminal' }) as never
+    )
+
+    expect(createIpcPtyTransport).toHaveBeenCalled()
+    expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
+  })
+
   it('routes a HUB-owned SSH PTY wake hint through the HUB without direct SSH', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
@@ -16501,6 +16598,7 @@ describe('connectPanePty', () => {
       terminalTitle: 'experimental-agent-observability',
       paneKey: makePaneKey('tab-1', LEAF_1)
     })
+    expect(window.api.pty.inspectProcess).toHaveBeenCalledWith('pty-codex')
   })
 
   it('does not dispatch generic spinner completions when process inspection finds no agent', async () => {

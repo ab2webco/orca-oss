@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { appendFile, mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { subscribeViaWatcherProcess } from './parcel-watcher-process'
@@ -362,8 +363,11 @@ describe('worktree git-common polling gate (non-darwin)', () => {
 
     await new Promise((resolve) => setTimeout(resolve, POLL_MS * 2))
     const worktreesDir = join(commonDir, 'worktrees')
-    await rm(worktreesDir, { recursive: true, force: true })
-    await writeFile(worktreesDir, 'not-a-dir')
+    // Swap dir -> file synchronously so no event-loop turn (and thus no poll
+    // tick) observes the transient ENOENT window, which would legitimately emit
+    // a delete and defeat the non-ENOENT assertion below.
+    rmSync(worktreesDir, { recursive: true, force: true })
+    writeFileSync(worktreesDir, 'not-a-dir')
     await new Promise((resolve) => setTimeout(resolve, POLL_MS * 4))
 
     expect(received.flat()).not.toContainEqual({ type: 'delete', path: entry })

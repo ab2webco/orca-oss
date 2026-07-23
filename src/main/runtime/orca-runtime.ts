@@ -368,6 +368,8 @@ import type {
   RuntimeTerminalFocus,
   RuntimeTerminalClose,
   RuntimeTerminalListResult,
+  RuntimeTerminalOrphanAdoptionRequest,
+  RuntimeTerminalOrphanAdoptionResult,
   RuntimeWorktreeTerminalSleepResult,
   RuntimeTerminalResolvePane,
   RuntimeTerminalState,
@@ -426,6 +428,11 @@ import {
   buildHeadlessTabGroupMove,
   buildHeadlessTabGroupSplit
 } from './headless-tab-group-split-layout'
+import {
+  hasExactTerminalOrphanGroupLayout,
+  mergeTerminalOrphanGroupLayout
+} from './terminal-orphan-topology'
+import { terminalOrphanExecutionOwnersEqual } from './terminal-orphan-owner'
 import {
   retireTerminalSurfacesFromSnapshot,
   type RetiredTerminalSurface
@@ -1134,6 +1141,7 @@ type RuntimePtyWorktreeRecord = {
   lastOscTitleAt: number | null
   managementTitle: string | null
   managementTitleAt: number | null
+  controllerTitle: string | null
   title: string | null
   titleUpdatedAt: number | null
   lastOutputAt: number | null
@@ -1419,6 +1427,9 @@ type RuntimePtyController = {
   markReversibleStops?(ptyIds: readonly string[]): () => void
   getCwd?(ptyId: string): Promise<string | null>
   getForegroundProcess(ptyId: string): Promise<string | null>
+  inspectProcess?(
+    ptyId: string
+  ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }>
   confirmForegroundProcess?(ptyId: string): Promise<string | null>
   hasChildProcesses?(ptyId: string): Promise<boolean>
   clearBuffer?(ptyId: string): Promise<void>
@@ -2462,6 +2473,10 @@ export class OrcaRuntimeService {
   private handles = new Map<string, TerminalHandleRecord>()
   private handleByLeafKey = new Map<string, string>()
   private handleByPtyId = new Map<string, string>()
+  private controllerTerminalIdentityByPtyId = new Map<
+    string,
+    { handle: string; incarnationId: string; wslDistro?: string | null }
+  >()
   private detachedPreAllocatedLeaves = new Map<string, RuntimeLeafRecord>()
   private graphSyncCallbacks: (() => void)[] = []
   private waitersByHandle = new Map<string, Set<TerminalWaiter>>()
@@ -7159,10 +7174,28 @@ export class OrcaRuntimeService {
     }
   }
 
-  private adoptControllerTerminalHandle(ptyId: string, handle: string | undefined): void {
+  private adoptControllerTerminalHandle(
+    ptyId: string,
+    handle: string | undefined,
+    incarnationId?: string
+  ): void {
     const trimmed = handle?.trim()
     if (!trimmed || !trimmed.startsWith('term_')) {
       return
+    }
+    const pty = this.ptysById.get(ptyId)
+    const changedIncarnation = Boolean(
+      incarnationId && pty?.incarnationId && incarnationId !== pty.incarnationId
+    )
+    if (changedIncarnation) {
+      const priorHandle = this.handleByPtyId.get(ptyId)
+      this.invalidateAllHandlesForPty(ptyId)
+      pty!.tabId = null
+      pty!.paneKey = null
+      // Reusing an exported handle would make stale client metadata name the replacement process.
+      if (priorHandle === trimmed) {
+        return
+      }
     }
     if (this.isTerminalHandleAdoptionBlocked(ptyId, trimmed)) {
       return
@@ -7170,6 +7203,23 @@ export class OrcaRuntimeService {
     // Why: after an app/runtime restart, the live PTY child still has its
     // original ORCA_TERMINAL_HANDLE, but the runtime's in-memory map is gone.
     this.registerPreAllocatedHandleForPty(ptyId, trimmed)
+  }
+
+  private invalidateAllHandlesForPty(ptyId: string): void {
+    this.handleByPtyId.delete(ptyId)
+    const invalidated = new Set<string>()
+    for (const [handle, record] of this.handles) {
+      if (record.ptyId === ptyId) {
+        invalidated.add(handle)
+        this.handles.delete(handle)
+        this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
+      }
+    }
+    for (const [leafKey, handle] of this.handleByLeafKey) {
+      if (invalidated.has(handle)) {
+        this.handleByLeafKey.delete(leafKey)
+      }
+    }
   }
 
   // Why: adoption is best-effort restart recovery and must be first-wins.
@@ -12435,7 +12485,7 @@ export class OrcaRuntimeService {
   async listTerminals(
     worktreeSelector?: string,
     limit = DEFAULT_TERMINAL_LIST_LIMIT,
-    opts: { requireFreshPtyLiveness?: boolean } = {}
+    opts: { handles?: readonly string[]; requireFreshPtyLiveness?: boolean } = {}
   ): Promise<RuntimeTerminalListResult> {
     if (!Number.isInteger(limit) || limit <= 0) {
       throw new Error('invalid_limit')
@@ -12547,7 +12597,11 @@ export class OrcaRuntimeService {
       terminals.push(this.buildPtyTerminalSummary(pty, worktreesById))
     }
 
-    const listedTerminals = terminals.slice(0, limit)
+    const requestedHandles = opts.handles ? new Set(opts.handles) : null
+    const matchingTerminals = requestedHandles
+      ? terminals.filter((terminal) => requestedHandles.has(terminal.handle))
+      : terminals
+    const listedTerminals = matchingTerminals.slice(0, limit)
     const visualLayouts = this.buildTerminalVisualLayouts(
       listedTerminals,
       worktreesById,
@@ -12557,8 +12611,480 @@ export class OrcaRuntimeService {
     return {
       terminals: listedTerminals,
       ...(visualLayouts.length > 0 ? { visualLayouts } : {}),
-      totalCount: terminals.length,
-      truncated: terminals.length > limit
+      topologyRevisions: Object.fromEntries(
+        [...new Set(matchingTerminals.map((terminal) => terminal.worktreeId))].map((worktreeId) => [
+          worktreeId,
+          this.getTerminalTopologyRevision(worktreeId)
+        ])
+      ),
+      totalCount: matchingTerminals.length,
+      truncated: matchingTerminals.length > limit
+    }
+  }
+
+  private getTerminalTopologyRevision(worktreeId: string): number {
+    const repoId = getRepoIdFromWorktreeId(worktreeId)
+    return (
+      this.store?.getWorkspaceSession?.()?.terminalTopologyRevisionByRepoId?.[repoId] ??
+      this.terminalTopologyRevisionByRepoId.get(repoId) ??
+      0
+    )
+  }
+
+  async adoptTerminalOrphans(
+    request: RuntimeTerminalOrphanAdoptionRequest
+  ): Promise<RuntimeTerminalOrphanAdoptionResult> {
+    if (request.claims.length === 0) {
+      throw new Error('terminal_orphan_claims_required')
+    }
+    const worktree = await this.resolveWorktreeSelector(request.worktree)
+    const livePtyIds = await this.refreshPtyWorktreeRecordsFromController([worktree], worktree.id)
+    if (!livePtyIds) {
+      throw new Error('terminal_liveness_unavailable')
+    }
+    const store = this.store
+    const session = store?.getWorkspaceSession?.()
+    if (!store?.setWorkspaceSession || !store.flushOrThrow || !session) {
+      throw new Error('workspace_session_unavailable')
+    }
+    const sessionWorktreeId = resolveTerminalSessionWorktreeId(session, worktree.id)
+    if (!sessionWorktreeId) {
+      throw new Error('terminal_orphan_competing_owner')
+    }
+    const repoId = getRepoIdFromWorktreeId(worktree.id)
+    const worktreeRepo = store.getRepo(repoId)
+    if (!worktreeRepo) {
+      throw new Error('terminal_orphan_owner_mismatch')
+    }
+    const worktreeConnectionId = worktreeRepo.connectionId ?? null
+    let worktreeWslDistro: string | null = null
+    if (!worktreeConnectionId) {
+      try {
+        worktreeWslDistro =
+          getLocalProjectWorktreeGitOptions(this.requireStore(), worktreeRepo).wslDistro ?? null
+      } catch {
+        throw new Error('terminal_orphan_owner_mismatch')
+      }
+    }
+    const currentRevision = this.getTerminalTopologyRevision(worktree.id)
+    const seenPtyIds = new Set<string>()
+    const seenPaneKeys = new Set<string>()
+    const validated = request.claims.map((claim) => {
+      const paneKey = makePaneKey(claim.tabId, claim.leafId)
+      if (seenPtyIds.has(claim.ptyId) || seenPaneKeys.has(paneKey)) {
+        throw new Error('terminal_orphan_claim_duplicate')
+      }
+      seenPtyIds.add(claim.ptyId)
+      seenPaneKeys.add(paneKey)
+      const live = this.getLivePtyForHandle(claim.terminal)
+      const pty = live?.pty
+      const controllerIdentity = this.controllerTerminalIdentityByPtyId.get(claim.ptyId)
+      if (
+        !pty ||
+        pty.ptyId !== claim.ptyId ||
+        controllerIdentity?.handle !== claim.terminal ||
+        controllerIdentity?.incarnationId !== claim.incarnationId ||
+        !livePtyIds.has(claim.ptyId) ||
+        !pty.connected ||
+        !pty.incarnationId ||
+        pty.incarnationId !== claim.incarnationId
+      ) {
+        throw new Error('terminal_orphan_stale')
+      }
+      if (
+        !runtimeWorktreeIdsEqual(pty.worktreeId, worktree.id) ||
+        !terminalOrphanExecutionOwnersEqual(
+          { connectionId: worktreeConnectionId, wslDistro: worktreeWslDistro },
+          {
+            connectionId: pty.connectionId ?? null,
+            ...(controllerIdentity?.wslDistro !== undefined
+              ? { wslDistro: controllerIdentity.wslDistro }
+              : process.platform === 'win32' && !worktreeConnectionId
+                ? {}
+                : { wslDistro: null })
+          }
+        )
+      ) {
+        throw new Error('terminal_orphan_owner_mismatch')
+      }
+      const visualOwners = this.getLeavesForPty(claim.ptyId)
+      if (
+        visualOwners.some(
+          (owner) =>
+            !runtimeWorktreeIdsEqual(owner.worktreeId, worktree.id) ||
+            owner.tabId !== claim.tabId ||
+            owner.leafId !== claim.leafId
+        )
+      ) {
+        throw new Error('terminal_orphan_already_visual')
+      }
+      if ((pty.tabId && pty.tabId !== claim.tabId) || (pty.paneKey && pty.paneKey !== paneKey)) {
+        throw new Error('terminal_orphan_competing_owner')
+      }
+      return { claim, pty, paneKey }
+    })
+
+    const persistedBindingsByPtyId = new Map<string, { worktreeId: string; paneKey: string }[]>()
+    const addPersistedBinding = (
+      ptyId: string,
+      binding: { worktreeId: string; paneKey: string }
+    ): void => {
+      const bindings = persistedBindingsByPtyId.get(ptyId) ?? []
+      bindings.push(binding)
+      persistedBindingsByPtyId.set(ptyId, bindings)
+    }
+    for (const [worktreeId, tabs] of Object.entries(session.tabsByWorktree)) {
+      for (const tab of tabs) {
+        const layout = session.terminalLayoutsByTabId[tab.id]
+        for (const [leafId, boundPtyId] of Object.entries(layout?.ptyIdsByLeafId ?? {})) {
+          if (boundPtyId) {
+            addPersistedBinding(boundPtyId, {
+              worktreeId,
+              paneKey: makePaneKey(tab.id, leafId)
+            })
+          }
+        }
+        if (tab.ptyId && !layout) {
+          addPersistedBinding(tab.ptyId, { worktreeId, paneKey: tab.id })
+        }
+      }
+    }
+    const persistedBinding = (ptyId: string): { worktreeId: string; paneKey: string } | null => {
+      const bindings = persistedBindingsByPtyId.get(ptyId) ?? []
+      if (bindings.length > 1) {
+        throw new Error('terminal_orphan_competing_owner')
+      }
+      return bindings[0] ?? null
+    }
+    const isExactPersisted = validated.every(({ claim, paneKey }) => {
+      const binding = persistedBinding(claim.ptyId)
+      return (
+        binding !== null &&
+        runtimeWorktreeIdsEqual(binding.worktreeId, worktree.id) &&
+        binding.paneKey === paneKey &&
+        session.terminalPtyIncarnationsByPaneKey?.[paneKey] === claim.incarnationId
+      )
+    })
+    if (isExactPersisted && sessionWorktreeId === worktree.id) {
+      return {
+        adopted: false,
+        topologyRevision: currentRevision,
+        snapshot: await this.listMobileSessionTabs(`id:${worktree.id}`)
+      }
+    }
+    if (currentRevision !== request.expectedTopologyRevision) {
+      throw new Error('terminal_topology_conflict')
+    }
+
+    const topologyTabsById = new Map(request.topology?.tabs.map((tab) => [tab.tabId, tab]) ?? [])
+    const topologyGroups = request.topology?.groups ?? []
+    if (request.topology) {
+      const claimedLeafIdsByTabId = new Map<string, Set<string>>()
+      for (const { claim } of validated) {
+        const leafIds = claimedLeafIdsByTabId.get(claim.tabId) ?? new Set<string>()
+        leafIds.add(claim.leafId)
+        claimedLeafIdsByTabId.set(claim.tabId, leafIds)
+      }
+      if (
+        topologyTabsById.size !== request.topology.tabs.length ||
+        topologyTabsById.size !== claimedLeafIdsByTabId.size
+      ) {
+        throw new Error('terminal_orphan_topology_invalid')
+      }
+      for (const [tabId, claimedLeafIds] of claimedLeafIdsByTabId) {
+        const topologyTab = topologyTabsById.get(tabId)
+        if (!topologyTab) {
+          throw new Error('terminal_orphan_topology_invalid')
+        }
+        const topologyLeafIds = new Set<string>()
+        const nodes = [topologyTab.root]
+        let leafCount = 0
+        while (nodes.length > 0) {
+          const node = nodes.pop()!
+          if (node.type === 'leaf') {
+            leafCount += 1
+            topologyLeafIds.add(node.leafId)
+          } else {
+            nodes.push(node.first, node.second)
+          }
+        }
+        if (
+          leafCount !== topologyLeafIds.size ||
+          topologyLeafIds.size !== claimedLeafIds.size ||
+          [...topologyLeafIds].some((leafId) => !claimedLeafIds.has(leafId)) ||
+          !topologyLeafIds.has(topologyTab.activeLeafId) ||
+          (topologyTab.expandedLeafId !== null && !topologyLeafIds.has(topologyTab.expandedLeafId))
+        ) {
+          throw new Error('terminal_orphan_topology_invalid')
+        }
+      }
+      const seenGroupIds = new Set<string>()
+      const groupedTabIds = new Set<string>()
+      for (const group of topologyGroups) {
+        if (seenGroupIds.has(group.id) || !group.tabOrder.includes(group.activeTabId)) {
+          throw new Error('terminal_orphan_topology_invalid')
+        }
+        seenGroupIds.add(group.id)
+        for (const tabId of group.tabOrder) {
+          if (!topologyTabsById.has(tabId) || groupedTabIds.has(tabId)) {
+            throw new Error('terminal_orphan_topology_invalid')
+          }
+          groupedTabIds.add(tabId)
+        }
+        if (group.recentTabIds?.some((tabId) => !group.tabOrder.includes(tabId))) {
+          throw new Error('terminal_orphan_topology_invalid')
+        }
+      }
+      if (groupedTabIds.size !== topologyTabsById.size) {
+        throw new Error('terminal_orphan_topology_invalid')
+      }
+      if (request.topology.groupLayout) {
+        if (!hasExactTerminalOrphanGroupLayout(request.topology.groupLayout, seenGroupIds)) {
+          throw new Error('terminal_orphan_topology_invalid')
+        }
+      }
+    }
+
+    for (const { claim, paneKey } of validated) {
+      const existingBinding = persistedBinding(claim.ptyId)
+      if (
+        existingBinding &&
+        (!runtimeWorktreeIdsEqual(existingBinding.worktreeId, worktree.id) ||
+          existingBinding.paneKey !== paneKey)
+      ) {
+        throw new Error('terminal_orphan_competing_owner')
+      }
+      const proposedPtyId =
+        session.terminalLayoutsByTabId[claim.tabId]?.ptyIdsByLeafId?.[claim.leafId]
+      if (proposedPtyId && proposedPtyId !== claim.ptyId) {
+        throw new Error('terminal_orphan_surface_occupied')
+      }
+      const graphOwner = this.leaves.get(this.getLeafKey(claim.tabId, claim.leafId))
+      if (
+        graphOwner &&
+        (graphOwner.ptyId !== claim.ptyId ||
+          !runtimeWorktreeIdsEqual(graphOwner.worktreeId, worktree.id))
+      ) {
+        throw new Error('terminal_orphan_surface_occupied')
+      }
+      if (
+        Object.entries(session.tabsByWorktree).some(
+          ([ownerWorktreeId, tabs]) =>
+            !runtimeWorktreeIdsEqual(ownerWorktreeId, worktree.id) &&
+            tabs.some((tab) => tab.id === claim.tabId)
+        )
+      ) {
+        throw new Error('terminal_orphan_surface_occupied')
+      }
+      if (session.terminalSurfaceTombstonesByPaneKey?.[paneKey]) {
+        throw new Error('terminal_orphan_surface_retired')
+      }
+      for (const snapshot of this.mobileSessionTabsByWorktree.values()) {
+        const surfaceOwner = snapshot.tabs.find(
+          (tab): tab is RuntimeMobileSessionTerminalTab =>
+            tab.type === 'terminal' &&
+            tab.parentTabId === claim.tabId &&
+            tab.leafId === claim.leafId
+        )
+        if (
+          surfaceOwner &&
+          (snapshot.worktree !== worktree.id || surfaceOwner.ptyId !== claim.ptyId)
+        ) {
+          throw new Error('terminal_orphan_surface_occupied')
+        }
+        const owner = snapshot.tabs.find(
+          (tab): tab is RuntimeMobileSessionTerminalTab =>
+            tab.type === 'terminal' && tab.ptyId === claim.ptyId
+        )
+        if (
+          owner &&
+          (snapshot.worktree !== worktree.id ||
+            owner.parentTabId !== claim.tabId ||
+            owner.leafId !== claim.leafId)
+        ) {
+          throw new Error('terminal_orphan_competing_owner')
+        }
+      }
+    }
+
+    const next = structuredClone(session)
+    canonicalizeTerminalSessionWorktreeId(next, sessionWorktreeId, worktree.id)
+    const existingTabs = next.tabsByWorktree[worktree.id] ?? []
+    const tabsById = new Map(existingTabs.map((tab) => [tab.id, tab]))
+    for (const { claim, pty, paneKey } of validated) {
+      let tab = tabsById.get(claim.tabId)
+      if (!tab) {
+        const title =
+          getLatestPtyTitle(pty) ?? pty.controllerTitle ?? `Terminal ${tabsById.size + 1}`
+        tab = {
+          id: claim.tabId,
+          ptyId: claim.ptyId,
+          worktreeId: worktree.id,
+          title,
+          defaultTitle: title,
+          customTitle: null,
+          color: null,
+          sortOrder: tabsById.size,
+          createdAt: Date.now(),
+          pendingActivationSpawn: true
+        }
+        tabsById.set(claim.tabId, tab)
+      }
+      const existingLayout = next.terminalLayoutsByTabId[claim.tabId]
+      const topologyTab = topologyTabsById.get(claim.tabId)
+      next.terminalLayoutsByTabId[claim.tabId] = topologyTab
+        ? {
+            ...existingLayout,
+            root: topologyTab.root,
+            activeLeafId: topologyTab.activeLeafId,
+            expandedLeafId: topologyTab.expandedLeafId,
+            ptyIdsByLeafId: {
+              ...existingLayout?.ptyIdsByLeafId,
+              [claim.leafId]: claim.ptyId
+            }
+          }
+        : existingLayout
+          ? {
+              ...existingLayout,
+              root: this.collectPersistedTerminalLeafIds(existingLayout).includes(claim.leafId)
+                ? existingLayout.root
+                : existingLayout.root === null
+                  ? { type: 'leaf', leafId: claim.leafId }
+                  : {
+                      type: 'split',
+                      direction: 'vertical',
+                      first: existingLayout.root,
+                      second: { type: 'leaf', leafId: claim.leafId }
+                    },
+              ptyIdsByLeafId: {
+                ...existingLayout.ptyIdsByLeafId,
+                [claim.leafId]: claim.ptyId
+              }
+            }
+          : {
+              root: { type: 'leaf', leafId: claim.leafId },
+              activeLeafId: claim.leafId,
+              expandedLeafId: null,
+              ptyIdsByLeafId: { [claim.leafId]: claim.ptyId }
+            }
+      next.terminalPtyIncarnationsByPaneKey = {
+        ...next.terminalPtyIncarnationsByPaneKey,
+        [paneKey]: claim.incarnationId
+      }
+    }
+    const adoptedTabIds = [...new Set(validated.map(({ claim }) => claim.tabId))]
+    next.tabsByWorktree[worktree.id] = [...tabsById.values()]
+    const activeTabId =
+      request.activeTabId && tabsById.has(request.activeTabId)
+        ? request.activeTabId
+        : (adoptedTabIds[0] ?? null)
+    const existingGroups = next.tabGroups?.[worktree.id] ?? []
+    const targetGroupId =
+      (request.activeGroupId && existingGroups.some((group) => group.id === request.activeGroupId)
+        ? request.activeGroupId
+        : existingGroups[0]?.id) ??
+      request.activeGroupId ??
+      randomUUID()
+    const proposedGroups = topologyGroups.map((group) => ({
+      ...group,
+      worktreeId: worktree.id
+    }))
+    const groups =
+      existingGroups.length === 0 && proposedGroups.length > 0
+        ? proposedGroups
+        : existingGroups.length > 0
+          ? existingGroups
+              .map((group) => {
+                const proposed = proposedGroups.find((candidate) => candidate.id === group.id)
+                const tabOrder = proposed
+                  ? [
+                      ...group.tabOrder.filter((tabId) => !adoptedTabIds.includes(tabId)),
+                      ...proposed.tabOrder
+                    ]
+                  : group.id === targetGroupId && proposedGroups.length === 0
+                    ? [...new Set([...group.tabOrder, ...adoptedTabIds])]
+                    : group.tabOrder.filter((tabId) => !adoptedTabIds.includes(tabId))
+                return {
+                  ...group,
+                  tabOrder,
+                  activeTabId: proposed
+                    ? proposed.activeTabId
+                    : group.id === targetGroupId && activeTabId
+                      ? activeTabId
+                      : group.activeTabId && tabOrder.includes(group.activeTabId)
+                        ? group.activeTabId
+                        : (tabOrder[0] ?? null),
+                  ...(proposed?.recentTabIds ? { recentTabIds: proposed.recentTabIds } : {})
+                }
+              })
+              .concat(
+                proposedGroups.filter(
+                  (proposed) => !existingGroups.some((group) => group.id === proposed.id)
+                )
+              )
+          : [{ id: targetGroupId, worktreeId: worktree.id, activeTabId, tabOrder: adoptedTabIds }]
+    const retainedGroups = groups.filter((group) => group.tabOrder.length > 0)
+    next.tabGroups = {
+      ...next.tabGroups,
+      [worktree.id]: retainedGroups
+    }
+    const mergedGroupLayout = mergeTerminalOrphanGroupLayout({
+      existingLayout: next.tabGroupLayouts?.[worktree.id],
+      existingGroupIds: existingGroups.map((group) => group.id),
+      proposedLayout: request.topology?.groupLayout,
+      proposedGroupIds: proposedGroups.map((group) => group.id),
+      mergedGroupIds: retainedGroups.map((group) => group.id)
+    })
+    if (mergedGroupLayout) {
+      next.tabGroupLayouts = {
+        ...next.tabGroupLayouts,
+        [worktree.id]: mergedGroupLayout
+      }
+    }
+    const activeGroup =
+      (request.activeGroupId
+        ? retainedGroups.find(
+            (group) =>
+              group.id === request.activeGroupId &&
+              (!activeTabId || group.tabOrder.includes(activeTabId))
+          )
+        : undefined) ??
+      retainedGroups.find((group) => activeTabId && group.tabOrder.includes(activeTabId)) ??
+      retainedGroups[0]!
+    const convergedActiveTabId =
+      activeTabId && activeGroup.tabOrder.includes(activeTabId)
+        ? activeTabId
+        : activeGroup.activeTabId
+    next.activeTabIdByWorktree = {
+      ...next.activeTabIdByWorktree,
+      ...(convergedActiveTabId ? { [worktree.id]: convergedActiveTabId } : {})
+    }
+    next.activeGroupIdByWorktree = {
+      ...next.activeGroupIdByWorktree,
+      [worktree.id]: activeGroup.id
+    }
+    const persisted = advanceTerminalTopologyRevision(next, worktree.id)
+    try {
+      store.setWorkspaceSession(persisted)
+      store.flushOrThrow()
+    } catch (error) {
+      store.setWorkspaceSession(session)
+      throw error
+    }
+    for (const { claim, pty, paneKey } of validated) {
+      pty.tabId = claim.tabId
+      pty.paneKey = paneKey
+    }
+    this.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(worktree.id, {
+      force: true,
+      allowAttachedWindow: true,
+      onlyRuntimeOwnedTerminals: true
+    })
+    this.notifyMobileSessionTabsChanged(worktree.id)
+    return {
+      adopted: true,
+      topologyRevision: persisted.terminalTopologyRevisionByRepoId?.[repoId] ?? currentRevision + 1,
+      snapshot: await this.listMobileSessionTabs(`id:${worktree.id}`)
     }
   }
 
@@ -12661,7 +13187,10 @@ export class OrcaRuntimeService {
         return {
           type: 'group',
           groupId: group.id,
-          activeTabId: group.activeTabId,
+          activeTabId:
+            group.activeTabId && tabs.some((tab) => tab.tabId === group.activeTabId)
+              ? group.activeTabId
+              : (tabs[0]?.tabId ?? null),
           tabs
         }
       })
@@ -15215,13 +15744,15 @@ export class OrcaRuntimeService {
   async inspectTerminalProcess(
     terminalSelector: string
   ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }> {
-    const leaf = this.resolveLeafForHandle(terminalSelector)
+    const leaf = this.resolveLiveLeafForHandle(terminalSelector)
     if (!leaf?.ptyId || !this.ptyController) {
-      return { foregroundProcess: null, hasChildProcesses: false }
+      throw new Error('terminal_gone')
+    }
+    if (this.ptyController.inspectProcess) {
+      return this.ptyController.inspectProcess(leaf.ptyId)
     }
     const foregroundProcess = await this.ptyController.getForegroundProcess(leaf.ptyId)
-    const hasChildProcesses =
-      (await this.ptyController.hasChildProcesses?.(leaf.ptyId).catch(() => false)) ?? false
+    const hasChildProcesses = (await this.ptyController.hasChildProcesses?.(leaf.ptyId)) ?? false
     return { foregroundProcess, hasChildProcesses }
   }
 
@@ -24551,6 +25082,7 @@ export class OrcaRuntimeService {
         lastOscTitleAt: null,
         managementTitle: null,
         managementTitleAt: null,
+        controllerTitle: null,
         title: state.title ?? null,
         titleUpdatedAt: titleObservedAt,
         lastOutputAt: state.lastOutputAt ?? null,
@@ -24676,13 +25208,56 @@ export class OrcaRuntimeService {
       return null
     }
     const sessions = sessionsResult.value
+    const controllerIdentityByPtyId = new Map<
+      string,
+      { handle: string; incarnationId: string; wslDistro?: string | null }
+    >()
+    const ptyIdByControllerHandle = new Map<string, string>()
+    const ambiguousControllerPtyIds = new Set<string>()
+    for (const session of sessions) {
+      const handle = session.terminalHandle?.trim()
+      const incarnationId = session.incarnationId?.trim()
+      if (!handle?.startsWith('term_') || !incarnationId) {
+        continue
+      }
+      const priorPtyId = ptyIdByControllerHandle.get(handle)
+      if (priorPtyId && priorPtyId !== session.id) {
+        ambiguousControllerPtyIds.add(priorPtyId)
+        ambiguousControllerPtyIds.add(session.id)
+        controllerIdentityByPtyId.delete(priorPtyId)
+        continue
+      }
+      if (controllerIdentityByPtyId.has(session.id)) {
+        ambiguousControllerPtyIds.add(session.id)
+        controllerIdentityByPtyId.delete(session.id)
+        continue
+      }
+      ptyIdByControllerHandle.set(handle, session.id)
+      controllerIdentityByPtyId.set(session.id, {
+        handle,
+        incarnationId,
+        ...(session.wslDistro !== undefined ? { wslDistro: session.wslDistro } : {})
+      })
+    }
+    for (const ptyId of ambiguousControllerPtyIds) {
+      controllerIdentityByPtyId.delete(ptyId)
+    }
+    this.controllerTerminalIdentityByPtyId = controllerIdentityByPtyId
     const persistedWorktreeIdByPtyId = indexPersistedPtyWorktreeBindings(
+      this.store?.getWorkspaceSession?.()
+    )
+    const persistedSurfaceByPtyId = indexPersistedPtySurfaceBindings(
       this.store?.getWorkspaceSession?.()
     )
     const allLivePtyIds = new Set(sessions.map((session) => session.id))
     const selectedLivePtyIds = new Set<string>()
     for (const session of sessions) {
-      this.adoptControllerTerminalHandle(session.id, session.terminalHandle)
+      const controllerIdentity = controllerIdentityByPtyId.get(session.id)
+      this.adoptControllerTerminalHandle(
+        session.id,
+        controllerIdentity?.handle ?? session.terminalHandle,
+        controllerIdentity?.incarnationId ?? session.incarnationId
+      )
       const persistedWorktreeId = persistedWorktreeIdByPtyId.get(session.id)
       const providerWorktree = resolvedWorktrees.find(
         (worktree) => session.worktreeId && runtimeWorktreeIdsEqual(worktree.id, session.worktreeId)
@@ -24721,10 +25296,23 @@ export class OrcaRuntimeService {
         continue
       }
       if (worktreeId) {
-        this.recordPtyWorktree(session.id, worktreeId, {
+        const persistedSurface = persistedSurfaceByPtyId.get(session.id)
+        const restoresExactSurface =
+          persistedSurface &&
+          session.incarnationId &&
+          persistedSurface.incarnationId === session.incarnationId &&
+          runtimeWorktreeIdsEqual(persistedSurface.worktreeId, worktreeId)
+        const pty = this.recordPtyWorktree(session.id, worktreeId, {
           connected: true,
-          ...(session.incarnationId ? { incarnationId: session.incarnationId } : {})
+          ...(session.incarnationId ? { incarnationId: session.incarnationId } : {}),
+          ...(session.wslDistro !== undefined
+            ? { isWsl: Boolean(session.wslDistro), wslDistro: session.wslDistro }
+            : {}),
+          ...(restoresExactSurface
+            ? { tabId: persistedSurface.tabId, paneKey: persistedSurface.paneKey }
+            : {})
         })
+        pty.controllerTitle = session.title?.trim() || null
       }
       // Why: fire-and-forget so this listing hot path doesn't serialize a relay round-trip per session and a throw can't abort the sweep below.
       this.refreshPtyForegroundAgent(session.id)
@@ -24962,9 +25550,12 @@ export class OrcaRuntimeService {
     const worktree = worktreesById.get(leaf.worktreeId)
     const tab = this.tabs.get(leaf.tabId) ?? null
 
+    const pty = leaf.ptyId ? this.ptysById.get(leaf.ptyId) : undefined
     return {
       handle: this.issueHandle(leaf),
       ptyId: leaf.ptyId,
+      incarnationId: pty?.incarnationId ?? null,
+      orphaned: false,
       worktreeId: leaf.worktreeId,
       worktreePath: worktree?.path ?? '',
       branch: worktree?.branch ?? '',
@@ -26312,14 +26903,18 @@ export class OrcaRuntimeService {
   ): RuntimeTerminalSummary {
     const worktree = worktreesById.get(pty.worktreeId)
 
+    const pane = parsePaneKey(pty.paneKey ?? '')
+    const orphaned = !pty.tabId || !pane || pane.tabId !== pty.tabId
     return {
       handle: this.issuePtyHandle(pty),
       ptyId: pty.ptyId,
+      incarnationId: pty.incarnationId,
+      orphaned,
       worktreeId: pty.worktreeId,
       worktreePath: worktree?.path ?? '',
       branch: worktree?.branch ?? '',
-      tabId: `pty:${pty.ptyId}`,
-      leafId: `pty:${pty.ptyId}`,
+      tabId: orphaned ? `pty:${pty.ptyId}` : pty.tabId!,
+      leafId: orphaned ? `pty:${pty.ptyId}` : pane.leafId,
       title: getLatestPtyTitle(pty),
       connected: pty.connected,
       writable: pty.connected,
@@ -31582,6 +32177,59 @@ function runtimeWorktreeIdentityKey(worktreeId: string): string {
     : worktreeId
 }
 
+function resolveTerminalSessionWorktreeId(
+  session: WorkspaceSessionState,
+  targetWorktreeId: string
+): string | null {
+  const keyedWorktreeIds = new Set([
+    ...Object.keys(session.tabsByWorktree),
+    ...Object.keys(session.tabGroups ?? {}),
+    ...Object.keys(session.tabGroupLayouts ?? {}),
+    ...Object.keys(session.activeTabIdByWorktree ?? {}),
+    ...Object.keys(session.activeGroupIdByWorktree ?? {})
+  ])
+  const matches = [...keyedWorktreeIds].filter((worktreeId) =>
+    runtimeWorktreeIdsEqual(worktreeId, targetWorktreeId)
+  )
+  return matches.length > 1 ? null : (matches[0] ?? targetWorktreeId)
+}
+
+function canonicalizeTerminalSessionWorktreeId(
+  session: WorkspaceSessionState,
+  sourceWorktreeId: string,
+  targetWorktreeId: string
+): void {
+  if (sourceWorktreeId === targetWorktreeId) {
+    return
+  }
+  const tabs = session.tabsByWorktree[sourceWorktreeId] ?? []
+  delete session.tabsByWorktree[sourceWorktreeId]
+  session.tabsByWorktree[targetWorktreeId] = tabs.map((tab) => ({
+    ...tab,
+    worktreeId: targetWorktreeId
+  }))
+
+  const groups = session.tabGroups?.[sourceWorktreeId]
+  if (groups) {
+    delete session.tabGroups![sourceWorktreeId]
+    session.tabGroups![targetWorktreeId] = groups.map((group) => ({
+      ...group,
+      worktreeId: targetWorktreeId
+    }))
+  }
+  for (const keyedState of [
+    session.tabGroupLayouts,
+    session.activeTabIdByWorktree,
+    session.activeGroupIdByWorktree
+  ]) {
+    if (!keyedState || !Object.hasOwn(keyedState, sourceWorktreeId)) {
+      continue
+    }
+    keyedState[targetWorktreeId] = keyedState[sourceWorktreeId] as never
+    delete keyedState[sourceWorktreeId]
+  }
+}
+
 function inferWorktreeIdFromPtyId(ptyId: string): string | null {
   return parsePtySessionId(ptyId).worktreeId
 }
@@ -31616,6 +32264,49 @@ function indexPersistedPtyWorktreeBindings(
     }
   }
   return worktreeIdByPtyId
+}
+
+function indexPersistedPtySurfaceBindings(
+  session: WorkspaceSessionState | null | undefined
+): ReadonlyMap<
+  string,
+  { worktreeId: string; tabId: string; paneKey: string; incarnationId: string }
+> {
+  const bindingByPtyId = new Map<
+    string,
+    { worktreeId: string; tabId: string; paneKey: string; incarnationId: string }
+  >()
+  const ambiguousPtyIds = new Set<string>()
+  for (const [worktreeId, tabs] of Object.entries(session?.tabsByWorktree ?? {})) {
+    for (const tab of tabs) {
+      for (const [leafId, ptyId] of Object.entries(
+        session?.terminalLayoutsByTabId[tab.id]?.ptyIdsByLeafId ?? {}
+      )) {
+        if (!ptyId || ambiguousPtyIds.has(ptyId)) {
+          continue
+        }
+        const paneKey = makePaneKey(tab.id, leafId)
+        const incarnationId = session?.terminalPtyIncarnationsByPaneKey?.[paneKey]
+        if (!incarnationId) {
+          continue
+        }
+        const binding = { worktreeId, tabId: tab.id, paneKey, incarnationId }
+        const existing = bindingByPtyId.get(ptyId)
+        if (
+          existing &&
+          (existing.worktreeId !== worktreeId ||
+            existing.paneKey !== paneKey ||
+            existing.incarnationId !== incarnationId)
+        ) {
+          bindingByPtyId.delete(ptyId)
+          ambiguousPtyIds.add(ptyId)
+          continue
+        }
+        bindingByPtyId.set(ptyId, binding)
+      }
+    }
+  }
+  return bindingByPtyId
 }
 
 function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {

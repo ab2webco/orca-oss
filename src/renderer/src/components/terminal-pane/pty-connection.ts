@@ -35,7 +35,7 @@ import { createIpcPtyTransport } from './pty-transport'
 import { createRemoteRuntimePtyTransport } from './remote-runtime-pty-transport'
 import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
 import { createUnresolvedOwnerPtyTransport } from './unresolved-owner-pty-transport'
-import { resolveWorktreeOperationRouteResult } from '@/lib/worktree-operation-route'
+import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import { getConnectionId } from '@/lib/connection-context'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
@@ -3213,11 +3213,13 @@ export function connectPanePty(
     deps.restoredLeafId && deps.restoredPtyIdByLeafId
       ? (deps.restoredPtyIdByLeafId[deps.restoredLeafId] ?? null)
       : null
-  const operationRouteResolution = resolveWorktreeOperationRouteResult(state, deps.worktreeId)
-  const explicitRuntimeEnvironmentId =
-    operationRouteResolution.kind === 'resolved'
-      ? operationRouteResolution.route.runtimeEnvironmentId
-      : null
+  // Why: the floating terminal and inline setup/onboarding terminals are host-agnostic synthetic
+  // ids with no worktree/repo row, so the strict owner resolver reports them as unresolved. The
+  // shared terminal router scopes them to their floating owner (local for the floating terminal,
+  // the active runtime for setup terminals so remote skill installs land there) and returns null
+  // only for a genuinely unknown/stale worktree that must fail closed (#9994).
+  const terminalWorktreeRoute = resolveTerminalWorktreeRoute(state, deps.worktreeId)
+  const explicitRuntimeEnvironmentId = terminalWorktreeRoute?.runtimeEnvironmentId ?? null
   // Why: paired-web worktrees retain HUB execution identity; their runtime-scoped mirrored pane is the session-level transport owner.
   const mirroredRuntimeOwners = new Set(
     isWebTerminalSurfaceTabId(deps.tabId)
@@ -3236,9 +3238,7 @@ export function connectPanePty(
   const noActiveRemoteRuntime = !state.settings?.activeRuntimeEnvironmentId?.trim()
   const terminalOwnerUnresolved =
     mirroredRuntimeOwners.size > 1 ||
-    (operationRouteResolution.kind !== 'resolved' &&
-      !mirroredRuntimeEnvironmentId &&
-      !noActiveRemoteRuntime)
+    (terminalWorktreeRoute === null && !mirroredRuntimeEnvironmentId && !noActiveRemoteRuntime)
   const runtimeEnvironmentId = explicitRuntimeEnvironmentId
     ? explicitRuntimeEnvironmentId
     : mirroredRuntimeEnvironmentId
@@ -5840,7 +5840,7 @@ export function connectPanePty(
       writeTerminalOutput(pane.terminal, data, {
         foreground: foregroundOutput,
         beforeWrite: beforeTerminalOutputWrite,
-        // Why: claim the delivery's parse-deferred ACK credit (null outside a delivery); the FIRST scheduler write carries it all and fires when bytes are consumed.
+        // Why: every scheduler write claims one child so a split delivery is credited only after all children parse or discard.
         ackCredit: takeCurrentTerminalDeliveryCredit() ?? undefined,
         onBackgroundBacklogDropped: markHiddenOutputRestoreNeeded,
         latencySensitive:

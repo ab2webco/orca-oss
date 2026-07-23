@@ -74,6 +74,7 @@ import {
 } from './web-runtime-wake-terminal-respawn'
 import { isRuntimeSubscriptionReplayResponse } from '../../../shared/runtime-subscription-replay'
 import { queueAcceptedWebSessionTerminalSnapshot } from './web-session-terminal-handle-events'
+import { recoverWebSessionTerminalOrphansBeforeApply } from './web-session-terminal-orphan-recovery'
 import {
   clearWebAgentSessionHandoff,
   clearWebAgentSessionHandoffsForEnvironment,
@@ -2684,7 +2685,7 @@ export function useWebSessionTabsSync(): void {
           timeoutMs: 15_000,
           expectedEnvironmentPairingRevision
         })
-        .then((response: RuntimeRpcResponse<unknown>) => {
+        .then(async (response: RuntimeRpcResponse<unknown>) => {
           if (
             disposed ||
             getRuntimeEnvironmentRevision(environmentId) !== expectedEnvironmentPairingRevision
@@ -2700,8 +2701,23 @@ export function useWebSessionTabsSync(): void {
             console.warn('[web-session-tabs-sync] initial listAll returned an invalid payload')
             return
           }
+          const recovered = await Promise.all(
+            result.snapshots.map((snapshot) =>
+              recoverWebSessionTerminalOrphansBeforeApply(
+                useAppStore.getState(),
+                snapshot,
+                environmentId
+              )
+            )
+          )
+          if (disposed) {
+            return
+          }
+          const applicable = recovered.filter(
+            (snapshot): snapshot is RuntimeMobileSessionTabsResult => snapshot !== null
+          )
           applyWebSessionTabsStorePatch((state) =>
-            applyFreshWebSessionTabsSnapshots(state, result.snapshots, environmentId)
+            applyFreshWebSessionTabsSnapshots(state, applicable, environmentId)
           )
         })
         .catch((error) => {
@@ -2740,25 +2756,60 @@ export function useWebSessionTabsSync(): void {
               const event = response.result as SessionTabsStreamEvent
               const replayed = isRuntimeSubscriptionReplayResponse(response)
               if (event.type === 'snapshots') {
-                if (replayed) {
-                  for (const snapshot of event.snapshots) {
-                    acceptReplayedWebSessionTabsSnapshot(environmentId, snapshot.worktree)
-                  }
-                }
-                applyWebSessionTabsStorePatch((state) =>
-                  applyFreshWebSessionTabsSnapshots(state, event.snapshots, environmentId)
+                void Promise.all(
+                  event.snapshots.map((snapshot) =>
+                    recoverWebSessionTerminalOrphansBeforeApply(
+                      useAppStore.getState(),
+                      snapshot,
+                      environmentId
+                    )
+                  )
                 )
+                  .then((recovered) => {
+                    if (!disposed) {
+                      const applicable = recovered.filter(
+                        (snapshot): snapshot is RuntimeMobileSessionTabsResult => snapshot !== null
+                      )
+                      if (replayed) {
+                        for (const snapshot of applicable) {
+                          acceptReplayedWebSessionTabsSnapshot(environmentId, snapshot.worktree)
+                        }
+                      }
+                      applyWebSessionTabsStorePatch((state) =>
+                        applyFreshWebSessionTabsSnapshots(state, applicable, environmentId)
+                      )
+                    }
+                  })
+                  .catch((error) => {
+                    if (!disposed) {
+                      console.warn('[web-session-tabs-sync] snapshot recovery failed:', error)
+                    }
+                  })
                 return
               }
               if (event.type !== 'snapshot' && event.type !== 'updated') {
                 return
               }
-              if (replayed) {
-                acceptReplayedWebSessionTabsSnapshot(environmentId, event.worktree)
-              }
-              applyWebSessionTabsStorePatch((state) =>
-                applyFreshWebSessionTabsSnapshot(state, event, environmentId)
+              void recoverWebSessionTerminalOrphansBeforeApply(
+                useAppStore.getState(),
+                event,
+                environmentId
               )
+                .then((recovered) => {
+                  if (!disposed && recovered) {
+                    if (replayed) {
+                      acceptReplayedWebSessionTabsSnapshot(environmentId, recovered.worktree)
+                    }
+                    applyWebSessionTabsStorePatch((state) =>
+                      applyFreshWebSessionTabsSnapshot(state, recovered, environmentId)
+                    )
+                  }
+                })
+                .catch((error) => {
+                  if (!disposed) {
+                    console.warn('[web-session-tabs-sync] snapshot recovery failed:', error)
+                  }
+                })
             },
             onError: (error) => {
               console.warn('[web-session-tabs-sync] global subscription error:', error.message)
@@ -2822,6 +2873,71 @@ export function useWebSessionTabsSync(): void {
     let requestedInitialTerminal = false
     let requestedRespawnAfterWake = false
     let unsubscribe: (() => void) | null = null
+    const applyActiveSnapshot = async (
+      event: RuntimeMobileSessionTabsResult & { type: 'snapshot' | 'updated' },
+      response: RuntimeRpcResponse<unknown>
+    ): Promise<void> => {
+      const recovered = await recoverWebSessionTerminalOrphansBeforeApply(
+        useAppStore.getState(),
+        event,
+        environmentId
+      )
+      if (disposed || !recovered) {
+        return
+      }
+      if (isRuntimeSubscriptionReplayResponse(response)) {
+        acceptReplayedWebSessionTabsSnapshot(environmentId, recovered.worktree)
+      }
+      const recoveredEvent: SessionTabsStreamEvent = { ...recovered, type: event.type }
+      const fresh = shouldApplyWebSessionTabsSnapshot(recovered, environmentId)
+      const syncState = useAppStore.getState()
+      const localWorktreeTabs = syncState.tabsByWorktree[activeWorktreeId] ?? []
+      const localTerminalCount = localWorktreeTabs.length
+      const hasLiveLocalPty = localWorktreeTabs.some(
+        (tab) => (syncState.ptyIdsByTabId[tab.id] ?? []).length > 0
+      )
+      const shouldBootstrapInitialTerminal = shouldBootstrapInitialWebRuntimeTerminal({
+        event: recoveredEvent,
+        activeWorktreeId,
+        requestedInitialTerminal,
+        snapshotIsFresh: fresh,
+        localTerminalCount
+      })
+      const shouldRespawnAfterWake = shouldRespawnWebRuntimeTerminalAfterWake({
+        event: recoveredEvent,
+        activeWorktreeId,
+        requestedRespawnAfterWake,
+        snapshotIsFresh: fresh,
+        localTerminalCount,
+        hasLiveLocalPty,
+        skipWakeRespawn: shouldSkipWebRuntimeWakeTerminalRespawn(activeWorktreeId)
+      })
+      if (fresh) {
+        applyWebSessionTabsStorePatch((state) =>
+          applyWebSessionTabsSnapshot(state, recovered, environmentId)
+        )
+      }
+      if (!disposed && shouldBootstrapInitialTerminal) {
+        requestedInitialTerminal = true
+        await createWebRuntimeSessionTerminal({
+          worktreeId: activeWorktreeId,
+          environmentId,
+          activate: true
+        })
+      } else if (
+        !disposed &&
+        shouldRespawnAfterWake &&
+        beginWebRuntimeWakeTerminalRespawn(activeWorktreeId)
+      ) {
+        requestedRespawnAfterWake = true
+        await createWebRuntimeSessionTerminal({
+          worktreeId: activeWorktreeId,
+          environmentId,
+          activate: true,
+          selectWorktree: false
+        }).finally(() => endWebRuntimeWakeTerminalRespawn(activeWorktreeId))
+      }
+    }
     void window.api.runtimeEnvironments
       .subscribe(
         {
@@ -2847,60 +2963,11 @@ export function useWebSessionTabsSync(): void {
             if (event.type !== 'snapshot' && event.type !== 'updated') {
               return
             }
-            if (isRuntimeSubscriptionReplayResponse(response)) {
-              acceptReplayedWebSessionTabsSnapshot(environmentId, event.worktree)
-            }
-            const fresh = shouldApplyWebSessionTabsSnapshot(event, environmentId)
-            const syncState = useAppStore.getState()
-            const localWorktreeTabs = syncState.tabsByWorktree[activeWorktreeId] ?? []
-            const localTerminalCount = localWorktreeTabs.length
-            const hasLiveLocalPty = localWorktreeTabs.some(
-              (tab) => (syncState.ptyIdsByTabId[tab.id] ?? []).length > 0
-            )
-            const shouldBootstrapInitialTerminal = shouldBootstrapInitialWebRuntimeTerminal({
-              event,
-              activeWorktreeId,
-              requestedInitialTerminal,
-              snapshotIsFresh: fresh,
-              localTerminalCount
+            void applyActiveSnapshot(event, response).catch((error) => {
+              if (!disposed) {
+                console.warn('[web-session-tabs-sync] active snapshot recovery failed:', error)
+              }
             })
-            const shouldRespawnAfterWake = shouldRespawnWebRuntimeTerminalAfterWake({
-              event,
-              activeWorktreeId,
-              requestedRespawnAfterWake,
-              snapshotIsFresh: fresh,
-              localTerminalCount,
-              hasLiveLocalPty,
-              skipWakeRespawn: shouldSkipWebRuntimeWakeTerminalRespawn(activeWorktreeId)
-            })
-            if (fresh) {
-              applyWebSessionTabsStorePatch((state) =>
-                applyWebSessionTabsSnapshot(state, event, environmentId)
-              )
-            }
-            if (!disposed && shouldBootstrapInitialTerminal) {
-              requestedInitialTerminal = true
-              void createWebRuntimeSessionTerminal({
-                worktreeId: activeWorktreeId,
-                environmentId,
-                activate: true
-              })
-            } else if (
-              !disposed &&
-              shouldRespawnAfterWake &&
-              beginWebRuntimeWakeTerminalRespawn(activeWorktreeId)
-            ) {
-              requestedRespawnAfterWake = true
-              // Why: recreate the terminal without changing selected worktree to avoid re-triggering activation churn.
-              void createWebRuntimeSessionTerminal({
-                worktreeId: activeWorktreeId,
-                environmentId,
-                activate: true,
-                selectWorktree: false
-              }).finally(() => {
-                endWebRuntimeWakeTerminalRespawn(activeWorktreeId)
-              })
-            }
           },
           onError: (error) => {
             console.warn('[web-session-tabs-sync] subscription error:', error.message)

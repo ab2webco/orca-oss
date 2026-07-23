@@ -205,7 +205,8 @@
       "slices": {
         "browser": {
           "d175274b6d": "New Browser Tab",
-          "08fc23631d": "Browser"
+          "08fc23631d": "Browser",
+          "remoteCookieImportUnavailable": "Manual cookie file import is unavailable while a remote runtime is active."
         },
         "editor": {
           "dcb521ed29": "This file is in a conflict state, but no working-tree file is available to edit.",
@@ -718,7 +719,8 @@
         "4f78ba5885": "Workspace synced",
         "ef223fbb6b": "A device tried to connect but is not paired",
         "11992d0337": "If this was your phone or another Orca client, re-pair it from Settings → Mobile.",
-        "6573cfe955": "Open Mobile Settings"
+        "6573cfe955": "Open Mobile Settings",
+        "unresolvedTerminalWorktreeOwner": "Terminal creation is unavailable because the worktree owner could not be resolved"
       },
       "useSettingsNavigationMetadata": {
         "4a728cd56b": "New features that are still taking shape. Give them a try.",
@@ -1521,7 +1523,8 @@
         "4725b0e931": "Quick Open scan too large (",
         "b227d88520": "{{value0}} files found",
         "995be8ea22": "Copy",
-        "cf144856dc": "Copied"
+        "cf144856dc": "Copied",
+        "344f8a48dd": "on the host running the Quick Open scan to enable fast, gitignore-aware listing:"
       },
       "SelectedTextCopyMenu": {
         "9b40d7b018": "Copy"
@@ -4922,6 +4925,13 @@
           "cancel": "Cancel",
           "forget": "Remove from Orca",
           "reconnectAndDelete": "Reconnect & Delete"
+        },
+        "WorktreeCardClaudeAccountChip": {
+          "systemDefault": "System default",
+          "pinnedEndpoint": "Pinned Claude endpoint: {{value0}}",
+          "inherited": "Claude account (inherited from global): {{value0}}",
+          "pinned": "Pinned Claude account: {{value0}}",
+          "globalMarker": "(global)"
         }
       },
       "shared": {
@@ -5155,7 +5165,10 @@
           "clearAccountConfigFailed": "Failed to clear config from this account.",
           "accountConfigMenu": "Account config options",
           "syncAccountConfig": "Sync global config",
-          "clearAccountConfig": "Clear config (start fresh)"
+          "clearAccountConfig": "Clear config (start fresh)",
+          "claudeRemoveLiveOne": "1 live Claude terminal is using this account. It will be closed before the account is deleted.",
+          "claudeRemoveLiveMany": "{{count}} live Claude terminals are using this account. They will be closed before the account is deleted.",
+          "claudeRemoveCloseAndDelete": "Close & delete"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -6582,7 +6595,6 @@
           "b5b5114cb0": "Removed {{value0}}.",
           "6cb6eae14f": "Failed to save runtime environment.",
           "7b5986c8df": "Saved {{value0}}. Use Active Server to switch when ready.",
-          "a5b58465b6": "Connected to {{value0}}.",
           "5ef712f407": "A server named \"{{value0}}\" already exists.",
           "0c55a47480": "Name and pairing code are required.",
           "e6410d72c3": "Failed to load runtime environments.",
@@ -6624,7 +6636,9 @@
           "updateServer": "Update",
           "reviewServerUpdates": "Check for Server Updates",
           "updatingServers": "Updating servers…",
-          "orcaVersion": "Orca v{{value0}}"
+          "orcaVersion": "Orca v{{value0}}",
+          "removeActiveServerBlocked": "Choose another Active Server in Advanced before removing this server.",
+          "removeActiveServerDescription": "Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone."
         },
         "RuntimePairingGeneratedUrlRows": {
           "0495f68959": "Copy {{value0}}"

@@ -10,5 +10,6 @@ describe('foreground-confirmation daemon protocol', () => {
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toContain(23)
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toContain(24)
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toContain(25)
+    expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toContain(26)
   })
 })
