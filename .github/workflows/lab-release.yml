@@ -98,13 +98,25 @@ jobs:
           fi
           next="${{ steps.next.outputs.version }}"
           tag="${{ steps.next.outputs.tag }}"
+          # Capture the version being superseded so the nudge only re-checks
+          # installs at-or-below it (the just-released $next stays out of range).
+          prev="$(node -p "require('./package.json').version")"
           node -e "
             const fs = require('fs')
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
             pkg.version = '$next'
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+            // Why: our fork hosts its own update nudge (see src/main/update-feed-target.ts
+            // UPDATE_NUDGE_URL). A fresh id each release re-nudges older installs to
+            // check; maxVersion=prev keeps the newest build from nudging itself.
+            fs.mkdirSync('whats-new', { recursive: true })
+            fs.writeFileSync('whats-new/nudge.json', JSON.stringify({
+              id: 'orca-lab-$next',
+              minVersion: '1.0.0',
+              maxVersion: '$prev'
+            }, null, 2) + '\n')
           "
-          git add package.json
+          git add package.json whats-new/nudge.json
           git commit -m "chore(release): bump version to $next"
           git tag "$tag"
           git push origin HEAD:main "$tag"
