@@ -4,6 +4,10 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection
+} from '../shared/global-config-sync'
 import type { DashboardSnapshot, DashboardRevealAgentArgs } from '../shared/dashboard-snapshot'
 import type {
   TerminalPreviewConnectResult,
@@ -1933,10 +1937,14 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:remove', args),
     countLiveTerminalsForAccount: (args: { accountId: string }): Promise<number> =>
       ipcRenderer.invoke('claudeAccounts:countLiveTerminalsForAccount', args),
-    resyncGlobalConfig: (): Promise<number> =>
-      ipcRenderer.invoke('claudeAccounts:resyncGlobalConfig'),
-    syncGlobalConfigForAccount: (args: { accountId: string }): Promise<void> =>
-      ipcRenderer.invoke('claudeAccounts:syncGlobalConfigForAccount', args),
+    previewGlobalConfig: (): Promise<GlobalConfigSyncInventory> =>
+      ipcRenderer.invoke('claudeAccounts:previewGlobalConfig'),
+    resyncGlobalConfig: (args?: { selection?: GlobalConfigSyncSelection }): Promise<number> =>
+      ipcRenderer.invoke('claudeAccounts:resyncGlobalConfig', args),
+    syncGlobalConfigForAccount: (args: {
+      accountId: string
+      selection?: GlobalConfigSyncSelection
+    }): Promise<void> => ipcRenderer.invoke('claudeAccounts:syncGlobalConfigForAccount', args),
     clearGlobalConfigForAccount: (args: { accountId: string }): Promise<void> =>
       ipcRenderer.invoke('claudeAccounts:clearGlobalConfigForAccount', args),
     select: (args: {

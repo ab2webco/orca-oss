@@ -23,11 +23,26 @@ import {
 } from './managed-auth-path'
 import {
   clearMcpServersFromVaultConfig,
+  collectGlobalMcpServerEntries,
   collectGlobalMcpServers,
+  ensureSelectiveVaultSkills,
   ensureVaultSkillsSymlink,
+  listGlobalSkillNames,
   mergeMcpServersIntoVaultConfig,
   removeVaultSkillsSymlink
 } from './global-config-inheritance'
+import {
+  collectGlobalHooks,
+  mergeHooksIntoSettingsObject,
+  mergeHooksIntoVaultSettings
+} from './plugin-hooks-inheritance'
+import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection,
+  PluginHookEntry
+} from '../../shared/global-config-sync'
+import { getConfigPath } from '../claude/hook-settings'
+import { writeHooksJson } from '../agent-hooks/installer-utils'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
   deleteManagedClaudeKeychainCredentials,
@@ -1304,7 +1319,8 @@ export class ClaudeAccountService {
   seedGlobalConfigIntoVault(
     accountId: string,
     managedAuthPath: string,
-    runtime: 'host' | 'wsl'
+    runtime: 'host' | 'wsl',
+    selection?: GlobalConfigSyncSelection
   ): void {
     if (runtime !== 'host') {
       return
@@ -1315,26 +1331,67 @@ export class ClaudeAccountService {
         return
       }
       const home = homedir()
+
       const globalMcpServers = collectGlobalMcpServers(home)
-      if (globalMcpServers) {
+      const mcpToSeed =
+        globalMcpServers && selection
+          ? Object.fromEntries(
+              Object.entries(globalMcpServers).filter(([name]) =>
+                selection.mcpServerNames.includes(name)
+              )
+            )
+          : globalMcpServers
+      if (mcpToSeed && Object.keys(mcpToSeed).length > 0) {
         const existing = readClaudeManagedAuthFile(owned, '.claude.json')
-        const merged = mergeMcpServersIntoVaultConfig(existing, globalMcpServers)
+        const merged = mergeMcpServersIntoVaultConfig(existing, mcpToSeed)
         if (merged !== null) {
           writeClaudeManagedAuthFile(owned, '.claude.json', merged)
         }
       }
-      ensureVaultSkillsSymlink(owned, home)
+
+      // No selection = the account-creation path: inherit all skills live via a
+      // whole-dir symlink. With a selection, seed only the chosen skills.
+      if (selection) {
+        ensureSelectiveVaultSkills(owned, home, selection.skillNames)
+      } else {
+        ensureVaultSkillsSymlink(owned, home)
+      }
+
+      if (selection && selection.hookIds.length > 0) {
+        const hooks = collectGlobalHooks(home).filter((hook) => selection.hookIds.includes(hook.id))
+        const existingSettings = readClaudeManagedAuthFile(owned, 'settings.json')
+        const mergedSettings = mergeHooksIntoVaultSettings(existingSettings, hooks)
+        if (mergedSettings !== null) {
+          writeClaudeManagedAuthFile(owned, 'settings.json', mergedSettings)
+        }
+      }
     } catch (error) {
       console.warn('[claude-accounts] Failed to seed global config into vault:', error)
     }
   }
 
   /**
-   * Re-seeds global MCP servers + skills into every host managed account's vault.
-   * Lets a user propagate a newly added global MCP/skill to accounts that already
-   * exist, without re-creating them. Returns how many host vaults were processed.
+   * Builds the inventory shown in the pre-sync popup: the global MCP servers,
+   * skills, and plugin hooks that could be seeded into managed vaults. Host-only
+   * (the seed itself is host-only); reads the running machine's own home.
    */
-  resyncGlobalConfigIntoManagedVaults(): number {
+  buildGlobalConfigSyncInventory(): GlobalConfigSyncInventory {
+    const home = homedir()
+    return {
+      mcpServers: collectGlobalMcpServerEntries(home),
+      skills: listGlobalSkillNames(home),
+      hooks: collectGlobalHooks(home)
+    }
+  }
+
+  /**
+   * Re-seeds the selected global config into every host managed account's vault.
+   * Lets a user propagate a chosen set of global MCP servers, skills, and plugin
+   * hooks to accounts that already exist, without re-creating them. When no
+   * selection is given (legacy callers) everything is seeded. Returns how many
+   * host vaults were processed.
+   */
+  resyncGlobalConfigIntoManagedVaults(selection?: GlobalConfigSyncSelection): number {
     const accounts = this.store.getSettings().claudeManagedAccounts
     let processed = 0
     for (const account of accounts) {
@@ -1342,20 +1399,74 @@ export class ClaudeAccountService {
       if (runtime !== 'host') {
         continue
       }
-      this.seedGlobalConfigIntoVault(account.id, account.managedAuthPath, runtime)
+      this.seedGlobalConfigIntoVault(account.id, account.managedAuthPath, runtime, selection)
       processed += 1
+    }
+    if (selection?.writeGlobalHooks) {
+      this.writeSelectedHooksToGlobalSettings(selection)
     }
     return processed
   }
 
-  /** Re-seeds global MCP servers + skills into a single account's vault. */
-  syncGlobalConfigForAccount(accountId: string): void {
+  /** Re-seeds the selected global config into a single account's vault. */
+  syncGlobalConfigForAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
     const account = this.requireAccount(accountId)
     this.seedGlobalConfigIntoVault(
       accountId,
       account.managedAuthPath,
-      account.managedAuthRuntime ?? 'host'
+      account.managedAuthRuntime ?? 'host',
+      selection
     )
+    if (selection?.writeGlobalHooks) {
+      this.writeSelectedHooksToGlobalSettings(selection)
+    }
+  }
+
+  /**
+   * Writes the selected plugin hooks into the user's global ~/.claude/settings.json
+   * so non-pinned (shared ~/.claude) sessions get them too. Merges into the hooks
+   * key without disturbing existing (e.g. Orca status) hooks, using the hardened
+   * atomic writer with rolling backup since this is the user's real config.
+   */
+  private writeSelectedHooksToGlobalSettings(selection: GlobalConfigSyncSelection): void {
+    if (selection.hookIds.length === 0) {
+      return
+    }
+    try {
+      const home = homedir()
+      const hooks: PluginHookEntry[] = collectGlobalHooks(home).filter((hook) =>
+        selection.hookIds.includes(hook.id)
+      )
+      if (hooks.length === 0) {
+        return
+      }
+      const configPath = getConfigPath()
+      const base = this.readGlobalSettingsObject(configPath)
+      if (base === null) {
+        return
+      }
+      const { config, changed } = mergeHooksIntoSettingsObject(base, hooks)
+      if (changed) {
+        writeHooksJson(configPath, config, { preserveMode: true })
+      }
+    } catch (error) {
+      console.warn('[claude-accounts] Failed to write hooks into global settings:', error)
+    }
+  }
+
+  /** Parses ~/.claude/settings.json; {} when absent, null when unparseable (never clobber). */
+  private readGlobalSettingsObject(configPath: string): Record<string, unknown> | null {
+    try {
+      if (!existsSync(configPath)) {
+        return {}
+      }
+      const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null
+    } catch {
+      return null
+    }
   }
 
   /**

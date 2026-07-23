@@ -27,6 +27,10 @@ import type {
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection
+} from '../shared/global-config-sync'
+import type {
   WriteTerminalRenderDesyncEvidenceArgs,
   WriteTerminalRenderDesyncEvidenceResult
 } from '../shared/terminal-render-desync-evidence'
@@ -2214,8 +2218,12 @@ export type PreloadApi = {
       closeLiveTerminals?: boolean
     }) => Promise<ClaudeRateLimitAccountsState>
     countLiveTerminalsForAccount: (args: { accountId: string }) => Promise<number>
-    resyncGlobalConfig: () => Promise<number>
-    syncGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
+    previewGlobalConfig: () => Promise<GlobalConfigSyncInventory>
+    resyncGlobalConfig: (args?: { selection?: GlobalConfigSyncSelection }) => Promise<number>
+    syncGlobalConfigForAccount: (args: {
+      accountId: string
+      selection?: GlobalConfigSyncSelection
+    }) => Promise<void>
     clearGlobalConfigForAccount: (args: { accountId: string }) => Promise<void>
     select: (args: {
       accountId: string | null

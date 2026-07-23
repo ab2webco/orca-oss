@@ -66,6 +66,7 @@ import {
   getAccountsPaneSearchEntries
 } from './accounts-search'
 import { GrokAccountsSection } from './GrokAccountsSection'
+import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 import { matchesSettingsSearch } from './settings-search'
@@ -816,51 +817,15 @@ export function AccountsPane({
     }
   }
 
-  const runResyncGlobalConfig = async (): Promise<void> => {
-    setClaudeAction('resyncing')
-    try {
-      const processed = await window.api.claudeAccounts.resyncGlobalConfig()
-      toast.success(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigDone',
-          'Synced global MCP servers and skills into {{value0}} account(s).',
-          { value0: String(processed) }
-        )
-      )
-    } catch (error) {
-      toast.error(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
-          'Failed to sync global config into accounts.'
-        ),
-        { description: getClaudeAccountErrorDescription(error) }
-      )
-    } finally {
-      setClaudeAction('idle')
-    }
-  }
+  const [globalConfigSyncDialog, setGlobalConfigSyncDialog] = useState<{
+    open: boolean
+    accountId: string | null
+  }>({ open: false, accountId: null })
 
-  const runSyncGlobalConfigForAccount = async (accountId: string): Promise<void> => {
-    setClaudeAction('resyncing')
-    try {
-      await window.api.claudeAccounts.syncGlobalConfigForAccount({ accountId })
-      toast.success(
-        translate(
-          'auto.components.settings.AccountsPane.syncAccountConfigDone',
-          'Synced global MCP servers and skills into this account.'
-        )
-      )
-    } catch (error) {
-      toast.error(
-        translate(
-          'auto.components.settings.AccountsPane.resyncGlobalConfigFailed',
-          'Failed to sync global config into accounts.'
-        ),
-        { description: getClaudeAccountErrorDescription(error) }
-      )
-    } finally {
-      setClaudeAction('idle')
-    }
+  // Open the pre-sync popup so the user picks which MCP servers, skills, and
+  // plugin hooks to seed. accountId null targets every managed account.
+  const openGlobalConfigSyncDialog = (accountId: string | null): void => {
+    setGlobalConfigSyncDialog({ open: true, accountId })
   }
 
   const runClearGlobalConfigForAccount = async (accountId: string): Promise<void> => {
@@ -1199,22 +1164,18 @@ export function AccountsPane({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => void runResyncGlobalConfig()}
-                // Why: pinned accounts run in isolated vaults; this copies the
-                // user's global MCP servers + skills into every existing account
-                // so a newly added global tool reaches accounts created earlier.
+                onClick={() => openGlobalConfigSyncDialog(null)}
+                // Why: pinned accounts run in isolated vaults; this opens a popup
+                // to pick which global MCP servers, skills, and plugin hooks to
+                // copy into existing accounts so newer tools reach older accounts.
                 disabled={isRemoteAccountScope || claudeAction !== 'idle'}
                 title={translate(
                   'auto.components.settings.AccountsPane.resyncGlobalConfigHint',
-                  'Copy your global MCP servers and skills into existing accounts'
+                  'Choose global MCP servers, skills, and hooks to copy into existing accounts'
                 )}
                 className="gap-1.5 text-muted-foreground hover:text-foreground"
               >
-                {claudeAction === 'resyncing' ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-3" />
-                )}
+                <RefreshCw className="size-3" />
                 {translate(
                   'auto.components.settings.AccountsPane.resyncGlobalConfig',
                   'Sync global config'
@@ -1424,45 +1385,46 @@ export function AccountsPane({
                           <Trash2 className="size-3" />
                           {translate('auto.components.settings.AccountsPane.db209ee572', 'Remove')}
                         </Button>
-                        {isCustomEndpoint ? null : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                disabled={isBusy}
-                                onClick={(event) => event.stopPropagation()}
-                                className="h-6 px-1.5 text-muted-foreground hover:text-foreground"
-                                aria-label={translate(
-                                  'auto.components.settings.AccountsPane.accountConfigMenu',
-                                  'Account config options'
-                                )}
-                              >
-                                <MoreHorizontal className="size-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onSelect={() => void runSyncGlobalConfigForAccount(account.id)}
-                              >
-                                <RefreshCw className="size-3" />
-                                {translate(
-                                  'auto.components.settings.AccountsPane.syncAccountConfig',
-                                  'Sync global config'
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => void runClearGlobalConfigForAccount(account.id)}
-                              >
-                                <Eraser className="size-3" />
-                                {translate(
-                                  'auto.components.settings.AccountsPane.clearAccountConfig',
-                                  'Clear config (start fresh)'
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        {/* Sync/Clear act on the account's own host vault, so
+                            they apply to custom-endpoint (z.ai) accounts too —
+                            only Re-authenticate above is OAuth-specific. */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              disabled={isBusy}
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-6 px-1.5 text-muted-foreground hover:text-foreground"
+                              aria-label={translate(
+                                'auto.components.settings.AccountsPane.accountConfigMenu',
+                                'Account config options'
+                              )}
+                            >
+                              <MoreHorizontal className="size-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={() => openGlobalConfigSyncDialog(account.id)}
+                            >
+                              <RefreshCw className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.syncAccountConfig',
+                                'Sync global config'
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => void runClearGlobalConfigForAccount(account.id)}
+                            >
+                              <Eraser className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.clearAccountConfig',
+                                'Clear config (start fresh)'
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
@@ -2641,6 +2603,11 @@ export function AccountsPane({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <GlobalConfigSyncDialog
+        open={globalConfigSyncDialog.open}
+        accountId={globalConfigSyncDialog.accountId}
+        onOpenChange={(open) => setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))}
+      />
       {visibleSections.map((section, index) => (
         <div key={index} className="space-y-8">
           {index > 0 ? <Separator /> : null}
