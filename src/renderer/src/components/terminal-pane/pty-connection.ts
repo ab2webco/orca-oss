@@ -3227,9 +3227,18 @@ export function connectPanePty(
       : []
   )
   const mirroredRuntimeEnvironmentId = mirroredRuntimeOwners.values().next().value ?? null
+  // Why: with no active remote runtime the client is on the local host, so a
+  // worktree whose owner can't be resolved (e.g. a stale ambiguous repo index left
+  // by a removed paired server) must still spawn its terminal locally instead of
+  // hard-failing with "Workspace identity is ambiguous across hosts." Removal,
+  // retirement, and delete keep the resolver's strict fail-closed behavior — only
+  // terminal spawn falls back to local here.
+  const noActiveRemoteRuntime = !state.settings?.activeRuntimeEnvironmentId?.trim()
   const terminalOwnerUnresolved =
     mirroredRuntimeOwners.size > 1 ||
-    (operationRouteResolution.kind !== 'resolved' && !mirroredRuntimeEnvironmentId)
+    (operationRouteResolution.kind !== 'resolved' &&
+      !mirroredRuntimeEnvironmentId &&
+      !noActiveRemoteRuntime)
   const runtimeEnvironmentId = explicitRuntimeEnvironmentId
     ? explicitRuntimeEnvironmentId
     : mirroredRuntimeEnvironmentId
