@@ -96,7 +96,8 @@ import {
   prepareWorktreePushTargetWithExec
 } from './worktree-push-target-setup'
 import { isENOENT, registerWorktreeRootsForRepo } from './filesystem-auth'
-import { createWorktreeLinkedPaths } from './worktree-symlinks'
+import { createWorktreeCopiedPaths, createWorktreeLinkedPaths } from './worktree-symlinks'
+import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import { normalizeSparseDirectories } from './sparse-checkout-directories'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import type { IFilesystemProvider } from '../providers/types'
@@ -1871,7 +1872,7 @@ export async function createRemoteWorktree(
   })
   const workspaceLineage = recordWorkspaceLineageForCreatedWorktree(store, args, worktree, now)
 
-  // Why: shared/symlink paths are local-only; remote (SSH) support needs a new relay method + auth surface, so configured symlinkPaths are ignored here.
+  // Why: shared/symlink paths and `.worktreeinclude` copies are local-only; remote (SSH) support needs a new relay method + auth surface, so both are skipped here.
 
   let setup: CreateWorktreeResult['setup']
   let defaultTabs: CreateWorktreeResult['defaultTabs']
@@ -2468,6 +2469,17 @@ export async function createLocalWorktree(
   if (symlinkPaths.length > 0) {
     await timing.time('create_symlinks', async () => {
       await createWorktreeLinkedPaths(repo.path, created.path, symlinkPaths)
+    })
+  }
+
+  // Why: project-level `.worktreeinclude` travels with the repo (issue #7549); copy semantics
+  // (never symlink) so each worktree owns its files. Paths already linked above are skipped.
+  const includePaths = await timing.time('resolve_worktreeinclude', () =>
+    resolveWorktreeIncludePaths(repo.path, localWorktreeGitOptions)
+  )
+  if (includePaths.length > 0) {
+    await timing.time('copy_worktreeinclude', async () => {
+      await createWorktreeCopiedPaths(repo.path, created.path, includePaths)
     })
   }
 

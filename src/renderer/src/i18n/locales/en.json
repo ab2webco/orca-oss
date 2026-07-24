@@ -3838,7 +3838,8 @@
           "tipBrokenLink": "A shortcut to something that no longer exists.",
           "tipReadOnly": "This copy is in a read-only location.",
           "tipInRepo": "This copy lives inside a project, not your global skills.",
-          "tipPluginCache": "This copy is managed by a plugin."
+          "tipPluginCache": "This copy is managed by a plugin.",
+          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one."
         },
         "SkillFreshnessUpdateDialog": {
           "title": "Update skills",
@@ -3859,7 +3860,9 @@
         "SkillFreshnessStatusPill": {
           "updateAvailable": "Update available",
           "upToDate": "Up to date",
-          "installed": "Installed"
+          "installed": "Installed",
+          "details": "Details",
+          "needsAttention": "Needs attention"
         }
       },
       "sidebar": {

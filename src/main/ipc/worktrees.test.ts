@@ -175,6 +175,7 @@ vi.mock('../providers/ssh-filesystem-dispatch', () => ({
 }))
 
 vi.mock('./worktree-symlinks', () => ({
+  createWorktreeCopiedPaths: vi.fn(),
   createWorktreeLinkedPaths: vi.fn(),
   findExistingWorktreeSymlinkPaths: findExistingWorktreeSymlinkPathsMock,
   removeWorktreeLinkedPaths: removeWorktreeLinkedPathsMock
@@ -1159,6 +1160,7 @@ describe('registerWorktreeHandlers', () => {
       expect.arrayContaining([
         'git_worktree_add',
         'list_created_worktree',
+        'resolve_worktreeinclude',
         'prepare_setup',
         'spawn_startup_terminal'
       ])

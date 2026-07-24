@@ -3815,7 +3815,8 @@
           "skippedReasonInRepo": "This is a project skill, not a global one — Orca only updates your global skills, so it left this out of the update.",
           "skippedReasonPluginCache": "A plugin manages this skill, so Orca left it out of the update — update the plugin instead.",
           "skippedReasonExternalLink": "This copy is a shortcut pointing outside Orca’s skill folders, so Orca left it out of the update.",
-          "skippedReasonBrokenLink": "This copy is a shortcut to something that no longer exists, so Orca left it out — you can safely delete it."
+          "skippedReasonBrokenLink": "This copy is a shortcut to something that no longer exists, so Orca left it out — you can safely delete it.",
+          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one."
         },
         "SkillFreshnessUpdateDialog": {
           "title": "スキルを更新",
@@ -3836,7 +3837,9 @@
         "SkillFreshnessStatusPill": {
           "updateAvailable": "更新があります",
           "upToDate": "最新です",
-          "installed": "インストール済み"
+          "installed": "インストール済み",
+          "details": "Details",
+          "needsAttention": "Needs attention"
         }
       },
       "sidebar": {

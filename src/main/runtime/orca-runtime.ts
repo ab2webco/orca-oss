@@ -849,10 +849,12 @@ import {
 } from '../../shared/constants'
 import { listRepoWorktrees } from '../repo-worktrees'
 import {
+  createWorktreeCopiedPaths,
   createWorktreeLinkedPaths,
   findExistingWorktreeSymlinkPaths,
   removeWorktreeLinkedPaths
 } from '../ipc/worktree-symlinks'
+import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import { deleteWorktreeHistoryDir } from '../terminal-history'
 import {
   cleanupUnusedWorktreePushTargetRemote,
@@ -19016,8 +19018,19 @@ export class OrcaRuntimeService {
       warnings: lineageWarnings
     } = this.recordCreatedWorktreeLineage(worktree, lineageResolution)
 
-    if (repo.symlinkPaths && repo.symlinkPaths.length > 0) {
-      await createWorktreeLinkedPaths(repo.path, created.path, repo.symlinkPaths)
+    const symlinkPaths = repo.symlinkPaths ?? []
+    if (symlinkPaths.length > 0) {
+      await createWorktreeLinkedPaths(repo.path, created.path, symlinkPaths)
+    }
+
+    // Why: project-level `.worktreeinclude` travels with the repo (issue #7549); copy semantics
+    // (never symlink) so each worktree owns its files. Paths already linked above are skipped.
+    const worktreeIncludePaths = await resolveWorktreeIncludePaths(
+      repo.path,
+      localWorktreeGitOptions
+    )
+    if (worktreeIncludePaths.length > 0) {
+      await createWorktreeCopiedPaths(repo.path, created.path, worktreeIncludePaths)
     }
 
     let setup: CreateWorktreeResult['setup']
