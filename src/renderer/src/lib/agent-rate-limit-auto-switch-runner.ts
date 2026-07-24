@@ -57,21 +57,18 @@ export async function runAgentRateLimitAutoSwitch(args: {
     )
   }
 
-  // Why: a custom-endpoint (gateway) session can emit Anthropic-shaped limit
-  // errors, but its universe has no quota to switch; never Ctrl+C it.
+  // Why: a custom-endpoint (gateway) session — e.g. z.ai/GLM — genuinely runs
+  // out of quota, but its own endpoint universe has no second account. It can
+  // still fail over to a Claude OAuth account that has quota (via the pinned
+  // relaunch path, since the endpoint pin is an injected session). Only when no
+  // such candidate exists do we leave it untouched — never Ctrl+C a gateway
+  // session with nowhere to go (see the no-candidate branch below).
   let livePtyAccount: ClaudeLivePtyAccountInfo | null = null
+  let sessionIsCustomEndpoint = false
   if (args.agent === 'claude') {
     const backing = await resolveClaudeSessionBackingAccount(args.ptyId)
     livePtyAccount = backing.info
-    if (backing.isCustomEndpoint) {
-      return failure(
-        'custom-endpoint-session',
-        translate(
-          'auto.lib.agentRateLimitAutoSwitchRunner.customEndpointSession',
-          'This session runs on a custom endpoint account; its errors are not Anthropic account limits.'
-        )
-      )
-    }
+    sessionIsCustomEndpoint = backing.isCustomEndpoint
   }
 
   let snapshot: AccountsSnapshotResult
@@ -98,6 +95,19 @@ export async function runAgentRateLimitAutoSwitch(args: {
       snapshot.target.kind === 'environment' ? { runtime: 'host', wslDistro: null } : providerTarget
   })
   if (!candidate) {
+    // Why: a custom-endpoint source can only fail over to a Claude OAuth account
+    // that has quota; with none available there is nowhere to switch, so leave
+    // the gateway session untouched rather than routing to an endpoint failover
+    // pin (which would just land on another quota-less custom endpoint).
+    if (sessionIsCustomEndpoint) {
+      return failure(
+        'custom-endpoint-session',
+        translate(
+          'auto.lib.agentRateLimitAutoSwitchRunner.customEndpointSession',
+          'This session runs on a custom endpoint account; its errors are not Anthropic account limits.'
+        )
+      )
+    }
     const failoverOutcome = await tryLastResortFailover({
       worktreeId: args.worktreeId,
       ptyId: args.ptyId,

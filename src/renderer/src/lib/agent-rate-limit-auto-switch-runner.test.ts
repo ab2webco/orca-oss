@@ -223,7 +223,7 @@ beforeEach(() => {
 })
 
 describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => {
-  it('aborts detections for custom-endpoint-backed sessions without touching the PTY', async () => {
+  it('leaves a custom-endpoint session untouched when no OAuth account has quota', async () => {
     api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
       accountId: ENDPOINT_ACCOUNT.id,
       injected: true
@@ -234,8 +234,55 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
 
     const result = await runClaudeAutoSwitch()
 
+    // Why: the endpoint universe has no second account and no OAuth candidate has
+    // quota, so there is nowhere to switch — never Ctrl+C a gateway session.
     expect(result).toMatchObject({ ok: false, reason: 'custom-endpoint-session' })
     expect(stopForegroundAgent).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
+  })
+
+  it('fails a custom-endpoint (z.ai) session over to an OAuth account with quota', async () => {
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: ENDPOINT_ACCOUNT.id,
+      injected: true
+    })
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([
+        claudeAccount({ id: 'active-1' }),
+        ENDPOINT_ACCOUNT,
+        claudeAccount({ id: 'spare-1' })
+      ])
+    )
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+
+    const result = await runClaudeAutoSwitch()
+
+    expect(result).toEqual({
+      ok: true,
+      agent: 'claude',
+      accountLabel: 'spare-1@example.com',
+      relaunch: 'resumed'
+    })
+    // Why: the endpoint source transcript is copied into the target OAuth universe
+    // and relaunched in a new tab (the isolated CLAUDE_CONFIG_DIR can't be re-pointed).
+    expect(api.claudeAccounts.copySessionForAccountSwitch).toHaveBeenCalledWith({
+      sessionId: PROVIDER_SESSION.id,
+      cwd: '/Users/dev/demo',
+      targetAccountId: 'spare-1',
+      sourceAccountId: ENDPOINT_ACCOUNT.id
+    })
+    expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
+      'wt-1',
+      expect.objectContaining({ claudeAccountId: 'spare-1' })
+    )
+    // Why: a pinned relaunch must stay off the gated global selection + same-PTY resume.
+    expect(api.claudeAccounts.select).not.toHaveBeenCalled()
     expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
   })
 

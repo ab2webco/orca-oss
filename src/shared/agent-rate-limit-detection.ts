@@ -32,7 +32,10 @@ const ACCOUNT_LIMIT_PATTERNS = [
   /\b(?:daily|weekly|monthly|5-hour|five-hour)\s+(?:limit|quota)\s+(?:exceeded|reached|hit)\b/i,
   // Why: Claude Code org spend caps say "hit your org's monthly spend limit" / "run /usage-credits", which no rate/usage/quota pattern matches; anchor to a limit-hit verb so domain talk about credit/billing limits can't trigger a switch.
   /\b(?:you(?:'ve|\s+have)|we(?:'ve|\s+have))\s+(?:hit|reached|exceeded)\b[\s\S]{0,60}?\b(?:spend(?:ing)?|billing|credit)\s+limit\b/i,
-  /\brun\s+\/usage-credits\b[\s\S]{0,80}?\b(?:admin|higher\s+limit)\b/i
+  /\brun\s+\/usage-credits\b[\s\S]{0,80}?\b(?:admin|higher\s+limit)\b/i,
+  // Why: z.ai/GLM (a managed custom-endpoint Claude account) reports genuine quota exhaustion as "[1310][Weekly/Monthly Limit Exhausted. Your limit will reset at <time>]"; match the exhausted/reset signal so failover can switch to a Claude OAuth account — deliberately NOT a bare transient gateway 429.
+  /\blimit\s+exhausted\b/i,
+  /\blimit\s+will\s+reset\s+at\b/i
 ] as const
 
 const AUTO_SWITCH_RATE_LIMIT_AGENTS = new Set<string>(['claude', 'codex'])

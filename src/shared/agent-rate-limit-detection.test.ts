@@ -81,4 +81,24 @@ describe('agent rate limit detection', () => {
       )
     ).toBe(false)
   })
+
+  it('detects z.ai/GLM weekly-monthly quota exhaustion on a custom-endpoint Claude session', () => {
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'API Error: Request rejected (429) · [1310][Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-07-28 05:10:38]',
+        createState()
+      )
+    ).toBe(true)
+  })
+
+  it('does not treat a transient z.ai gateway 429 (no exhaustion) as an account limit', () => {
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'API Error: Request rejected (429) · upstream temporarily unavailable, retrying',
+        createState()
+      )
+    ).toBe(false)
+  })
 })
