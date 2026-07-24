@@ -207,31 +207,47 @@ describe('listWorkItems: single project + cursor pagination', () => {
 })
 
 describe('listWorkItems: workspace-wide fan-out across connected Plane workspaces', () => {
-  it('issues exactly one work-items request per connected client -- no per-project fan-out (Step 0 spike finding)', async () => {
+  it('fans out per project within each client -- no working workspace-wide work-items route, so an "all projects" selection lists each client\'s projects then issues one project-scoped GET per project', async () => {
     const clients = [client('acme'), client('beta')]
     getClientsMock.mockReturnValue(clients)
     const { listWorkItems } = await import('./work-items')
 
     planeRequestMock.mockImplementation(
       routeRequest({
+        // acme has two projects, beta has one -- proves the per-project fan-out
+        // isn't just incidentally 1:1 with clients.
         projects: (planeClient) =>
-          projectsPage(planeClient.workspaceSlug === 'acme' ? [ALPHA] : [BETA]),
-        workspaceWorkItems: (planeClient) =>
-          page(
-            planeClient.workspaceSlug === 'acme'
-              ? [rawWorkItem('wi-1', 'proj-1', 1), rawWorkItem('wi-2', 'proj-1', 2)]
-              : [rawWorkItem('wi-3', 'proj-2', 1)]
-          )
+          projectsPage(planeClient.workspaceSlug === 'acme' ? [ALPHA, BETA] : [BETA]),
+        projectWorkItems: (planeClient, projectId) => {
+          if (planeClient.workspaceSlug === 'acme' && projectId === 'proj-1') {
+            return page([rawWorkItem('wi-1', 'proj-1', 1)])
+          }
+          if (planeClient.workspaceSlug === 'acme' && projectId === 'proj-2') {
+            return page([rawWorkItem('wi-2', 'proj-2', 2)])
+          }
+          return page([rawWorkItem('wi-3', 'proj-2', 1)])
+        }
       })
     )
 
     const items = await listWorkItems({ filter: 'all', workspaceId: 'all' })
 
-    // One workspace-wide call per client (2 total), plus one projects-list
-    // call per client to resolve each item's project (2 total) = 4, never a
-    // per-project work-items fan-out.
-    expect(planeRequestMock).toHaveBeenCalledTimes(4)
-    expect(items.map((item) => item.identifier)).toEqual(['ALPHA-1', 'ALPHA-2', 'BETA-1'])
+    // One projects-list call per client (2), plus one project-scoped
+    // work-items call per project across both clients (2 for acme + 1 for
+    // beta = 3) = 5 total. Never a workspace-wide /work-items/ call.
+    expect(planeRequestMock).toHaveBeenCalledTimes(5)
+    const calledUrls = planeRequestMock.mock.calls.map((call) => call[1] as string)
+    expect(
+      calledUrls.some((url) => /\/workspaces\/[^/]+\/work-items\/$/.test(pathOf(url).pathname))
+    ).toBe(false)
+    expect(
+      calledUrls.filter((url) =>
+        /\/workspaces\/[^/]+\/projects\/[^/]+\/work-items\/$/.test(pathOf(url).pathname)
+      )
+    ).toHaveLength(3)
+    expect(items.map((item) => item.identifier).sort()).toEqual(
+      ['ALPHA-1', 'BETA-1', 'BETA-2'].sort()
+    )
   })
 
   it('preserves client order and never runs more than MAX_CONCURRENT=4 requests at once', async () => {
@@ -244,15 +260,17 @@ describe('listWorkItems: workspace-wide fan-out across connected Plane workspace
     planeRequestMock.mockImplementation(
       async (planeClient: PlaneClientForWorkspace, url: string) => {
         const { pathname } = pathOf(url)
+        const index = Number(planeClient.workspaceSlug.split('-')[1])
         if (pathname.endsWith('/projects/')) {
-          return projectsPage([])
+          return projectsPage([
+            { id: `proj-${index}`, identifier: `WS${index}`, name: `Ws ${index}` }
+          ])
         }
         active += 1
         maxActive = Math.max(maxActive, active)
         await new Promise((resolve) => setTimeout(resolve, 5))
         active -= 1
-        const index = Number(planeClient.workspaceSlug.split('-')[1])
-        return page([rawWorkItem(`wi-${index}`, 'proj-x', index)])
+        return page([rawWorkItem(`wi-${index}`, `proj-${index}`, index)])
       }
     )
 
@@ -268,8 +286,9 @@ describe('listWorkItems: workspace-wide fan-out across connected Plane workspace
 
     planeRequestMock.mockImplementation(
       routeRequest({
-        projects: (planeClient) => projectsPage(planeClient.workspaceSlug === 'acme' ? [] : [BETA]),
-        workspaceWorkItems: (planeClient) => {
+        projects: (planeClient) =>
+          projectsPage(planeClient.workspaceSlug === 'acme' ? [ALPHA] : [BETA]),
+        projectWorkItems: (planeClient) => {
           if (planeClient.workspaceSlug === 'acme') {
             throw new Error('acme is down')
           }
