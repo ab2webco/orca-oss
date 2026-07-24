@@ -34,7 +34,12 @@ const IDENTIFIER_RE = /^[A-Z0-9]+-\d+$/
 
 type PlaneRecord = Record<string, unknown>
 
-function workItemsBase(client: PlaneClientForWorkspace, projectId: string | undefined): string {
+// Exported: plane-work-item-writes.ts (Slice 5) reuses this path builder for
+// update/comment endpoints, all nested under the same project-scoped route.
+export function workItemsBase(
+  client: PlaneClientForWorkspace,
+  projectId: string | undefined
+): string {
   const workspace = `/api/v1/workspaces/${encodeURIComponent(client.workspaceSlug)}`
   return projectId
     ? `${workspace}/projects/${encodeURIComponent(projectId)}/work-items/`

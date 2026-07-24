@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterToPql,
+  mapPlaneComment,
   mapPlaneLabel,
   mapPlaneProject,
   mapPlaneState,
@@ -76,6 +77,42 @@ describe('mapPlaneLabel', () => {
       id: 'l-1',
       name: 'bug',
       color: '#f00'
+    })
+  })
+})
+
+describe('mapPlaneComment', () => {
+  it('converts comment_html to markdown and maps the actor as the user', () => {
+    expect(
+      mapPlaneComment({
+        id: 'c-1',
+        comment_html: '<p><strong>Fixed</strong> in the latest build</p>',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-02T00:00:00Z',
+        actor: { id: 'u-1', display_name: 'Ada L' }
+      })
+    ).toEqual({
+      id: 'c-1',
+      body: '**Fixed** in the latest build',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+      user: { id: 'u-1', displayName: 'Ada L', email: undefined, avatarUrl: undefined }
+    })
+  })
+
+  it('omits updatedAt and user when absent', () => {
+    expect(
+      mapPlaneComment({
+        id: 'c-2',
+        comment_html: '<p>note</p>',
+        created_at: '2026-01-01T00:00:00Z'
+      })
+    ).toEqual({
+      id: 'c-2',
+      body: 'note',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: undefined,
+      user: undefined
     })
   })
 })
