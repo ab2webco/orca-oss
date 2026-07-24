@@ -11,6 +11,15 @@ const LINEAR_WORK_ITEM: LaunchableWorkItem = {
   linearIdentifier: 'ENG-9'
 }
 
+const PLANE_WORK_ITEM: LaunchableWorkItem = {
+  provider: 'plane',
+  title: 'Fix plane launch context handoff',
+  url: 'https://app.plane.so/acme/browse/PROJ-9',
+  type: 'issue',
+  number: 0,
+  planeIdentifier: 'PROJ-9'
+}
+
 describe('getDirectWorkItemDraftContent', () => {
   it('applies a custom Linear template', async () => {
     const draft = await getDirectWorkItemDraftContent(LINEAR_WORK_ITEM, null, 'Do {{identifier}}')
@@ -20,5 +29,15 @@ describe('getDirectWorkItemDraftContent', () => {
   it('falls back to the built-in draft without a template', async () => {
     const draft = await getDirectWorkItemDraftContent(LINEAR_WORK_ITEM, null)
     expect(draft).toBe('Linked Linear issue: ENG-9\nhttps://linear.app/acme/issue/ENG-9/x\n')
+  })
+
+  it('applies a custom Plane template', async () => {
+    const draft = await getDirectWorkItemDraftContent(PLANE_WORK_ITEM, null, 'Do {{identifier}}')
+    expect(draft).toBe('Do PROJ-9\n')
+  })
+
+  it('falls back to the built-in draft for Plane items without a template', async () => {
+    const draft = await getDirectWorkItemDraftContent(PLANE_WORK_ITEM, null)
+    expect(draft).toBe('Linked Plane issue: PROJ-9\nhttps://app.plane.so/acme/browse/PROJ-9\n')
   })
 })

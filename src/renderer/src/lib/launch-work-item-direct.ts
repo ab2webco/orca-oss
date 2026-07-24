@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { getLaunchPromptTemplateForProvider } from '@/lib/linked-work-item-context'
 import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { isTuiAgentEnabled, pickTuiAgent } from '../../../shared/tui-agent-selection'
@@ -160,7 +161,7 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
   const draftContent = await getDirectWorkItemDraftContent(
     item,
     repoConnectionId,
-    settings?.linearLaunchPromptTemplate
+    getLaunchPromptTemplateForProvider(settings, item.provider ?? null)
   )
   let startupPlanFailed = false
   try {
