@@ -3021,8 +3021,15 @@ export class Store {
           : rawTaskProviderSettings.visibleTaskProviders.includes('jira')
             ? rawTaskProviderSettings.visibleTaskProviders
             : [...rawTaskProviderSettings.visibleTaskProviders, 'jira' as const]
+        const visibleTaskProvidersDefaultedForPlane =
+          parsed.settings?.visibleTaskProvidersDefaultedForPlane === true
+        const migratedVisibleTaskProvidersWithPlane = visibleTaskProvidersDefaultedForPlane
+          ? migratedVisibleTaskProviders
+          : migratedVisibleTaskProviders.includes('plane')
+            ? migratedVisibleTaskProviders
+            : [...migratedVisibleTaskProviders, 'plane' as const]
         const taskProviderSettings = normalizeTaskProviderSettings({
-          visibleTaskProviders: migratedVisibleTaskProviders,
+          visibleTaskProviders: migratedVisibleTaskProvidersWithPlane,
           defaultTaskSource: rawTaskProviderSettings.defaultTaskSource
         })
         const primarySelectionDefaultedForLinux =
@@ -3042,6 +3049,9 @@ export class Store {
           this.loadNeedsSave = true
         }
         if (!visibleTaskProvidersDefaultedForJira) {
+          this.loadNeedsSave = true
+        }
+        if (!visibleTaskProvidersDefaultedForPlane) {
           this.loadNeedsSave = true
         }
         const claudeAgentTeamsDefaultDisabledMigrated =
@@ -3199,6 +3209,7 @@ export class Store {
             defaultTaskSource: taskProviderSettings.defaultTaskSource,
             visibleTaskProviders: taskProviderSettings.visibleTaskProviders,
             visibleTaskProvidersDefaultedForJira: true,
+            visibleTaskProvidersDefaultedForPlane: true,
             terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
               parsed.settings?.terminalShortcutPolicy
             ),
@@ -5374,6 +5385,7 @@ export class Store {
       sanitizedUpdates.visibleTaskProviders = taskProviderSettings.visibleTaskProviders
       if ('visibleTaskProviders' in updates) {
         sanitizedUpdates.visibleTaskProvidersDefaultedForJira = true
+        sanitizedUpdates.visibleTaskProvidersDefaultedForPlane = true
       }
     }
     if ('autoRenameBranchFromWork' in updates || 'autoRenameBranchFromWorkDefaultedOn' in updates) {

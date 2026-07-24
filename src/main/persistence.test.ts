@@ -2733,7 +2733,9 @@ describe('Store', () => {
     })
 
     const store = await createStore()
-    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira'])
+    // Why: neither one-shot flag is set on this legacy blob, so both the Jira
+    // and Plane migrations chain in on the same load.
+    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira', 'plane'])
   })
 
   it('preserves a deliberate Jira provider opt-out after migration', async () => {
@@ -2743,7 +2745,8 @@ describe('Store', () => {
       worktreeMeta: {},
       settings: {
         visibleTaskProviders: ['gitlab'],
-        visibleTaskProvidersDefaultedForJira: true
+        visibleTaskProvidersDefaultedForJira: true,
+        visibleTaskProvidersDefaultedForPlane: true
       },
       ui: {},
       githubCache: { pr: {}, issue: {} },
@@ -2752,6 +2755,61 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab'])
+  })
+
+  it('migrates plane into visible task providers for existing users on load', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {
+        visibleTaskProviders: ['github', 'gitlab', 'linear', 'jira'],
+        visibleTaskProvidersDefaultedForJira: true
+      },
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+
+    const store = await createStore()
+    expect(store.getSettings().visibleTaskProviders).toEqual([
+      'github',
+      'gitlab',
+      'linear',
+      'jira',
+      'plane'
+    ])
+
+    store.flush()
+    const persisted = readDataFile() as {
+      settings?: { visibleTaskProvidersDefaultedForPlane?: boolean }
+    }
+    expect(persisted.settings?.visibleTaskProvidersDefaultedForPlane).toBe(true)
+  })
+
+  it('preserves a deliberate Plane provider opt-out after migration', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {
+        visibleTaskProviders: ['gitlab'],
+        visibleTaskProvidersDefaultedForJira: true,
+        visibleTaskProvidersDefaultedForPlane: true
+      },
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+
+    const store = await createStore()
+    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab'])
+  })
+
+  it('defaults fresh installs with plane already visible and the migration flag set', async () => {
+    const store = await createStore()
+    expect(store.getSettings().visibleTaskProviders).toContain('plane')
+    expect(store.getSettings().visibleTaskProvidersDefaultedForPlane).toBe(true)
   })
 
   it('normalizes malformed terminal shortcut policy on load', async () => {
@@ -2797,7 +2855,9 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().defaultTaskSource).toBe('github')
-    expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'linear', 'jira'])
+    // Why: neither one-shot flag is set on this legacy blob, so both the Jira
+    // and Plane migrations chain in on the same load.
+    expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'linear', 'jira', 'plane'])
   })
 
   it('normalizes invalid task provider defaults on load', async () => {
@@ -2813,7 +2873,7 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().defaultTaskSource).toBe('gitlab')
-    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira'])
+    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira', 'plane'])
   })
 
   it('normalizes persisted open-in applications on load', async () => {
