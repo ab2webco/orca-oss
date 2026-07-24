@@ -1812,7 +1812,7 @@ const api = {
 
     listWorkItems: (args?: {
       projectId?: string
-      filter?: 'assigned' | 'created' | 'all' | 'done'
+      filter?: 'everything' | 'assigned' | 'created' | 'all' | 'done'
       workspaceId?: string
     }): Promise<unknown[]> => ipcRenderer.invoke('plane:listWorkItems', args),
 

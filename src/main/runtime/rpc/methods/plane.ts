@@ -4,7 +4,7 @@ import { OptionalPlainString, OptionalString, requiredString } from '../schemas'
 
 // v1 MVP write-back is limited to state/assign/comment updates; create/delete
 // work items are v1.1 (see the approved plane-task-provider scope decision).
-const VALID_FILTERS = ['assigned', 'created', 'all', 'done'] as const
+const VALID_FILTERS = ['everything', 'assigned', 'created', 'all', 'done'] as const
 const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
 
 const WorkspaceSelection = z

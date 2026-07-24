@@ -16,7 +16,13 @@ import { listLabels, listMembers, listProjects, listStates } from '../plane/plan
 import { _resetPreflightCache } from './preflight'
 import type { PlaneWorkItemFilter, PlaneWorkItemUpdate } from '../../shared/plane-types'
 
-const VALID_FILTERS = new Set<PlaneWorkItemFilter>(['assigned', 'created', 'all', 'done'])
+const VALID_FILTERS = new Set<PlaneWorkItemFilter>([
+  'everything',
+  'assigned',
+  'created',
+  'all',
+  'done'
+])
 const VALID_PRIORITIES = new Set(['none', 'low', 'medium', 'high', 'urgent'])
 
 function normalizeOptionalString(value: unknown): string | undefined {

@@ -3293,7 +3293,7 @@ export type TaskResumeState = {
   }
   jiraPreset?: 'assigned' | 'reported' | 'all' | 'done'
   jiraQuery?: string
-  planePreset?: 'assigned' | 'created' | 'all' | 'done'
+  planePreset?: 'everything' | 'assigned' | 'created' | 'all' | 'done'
   planeQuery?: string
   // Why: workspace scope persists at the connection layer (planeStatus), but
   // the project-level "all projects" vs single-project scope is a per-session

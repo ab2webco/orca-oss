@@ -211,22 +211,27 @@ describe('listWorkItems: single project + cursor pagination', () => {
     expect(items.map((item) => item.identifier)).toEqual(['ALPHA-1', 'ALPHA-2'])
   })
 
-  it('sends the pinned PQL string for the given filter', async () => {
+  it('always fetches with an all-states PQL so tenants with a limited no-pql default still return everything', async () => {
     const { listWorkItems } = await import('./work-items')
     getClientsMock.mockReturnValue([client('acme')])
-    let capturedPql: string | null = null
+    const capturedPqls: (string | null)[] = []
     planeRequestMock.mockImplementation(
       routeRequest({
         projects: () => projectsPage([ALPHA]),
         projectWorkItems: (_client, _projectId, params) => {
-          capturedPql = params.get('pql')
+          capturedPqls.push(params.get('pql'))
           return page([])
         }
       })
     )
 
-    await listWorkItems({ projectId: 'proj-1', filter: 'done', workspaceId: 'acme' })
-    expect(capturedPql).toBe('assignee = currentUser() AND stateGroup IN closedStates()')
+    // Every preset fetches the same complete set; narrowing is client-side.
+    for (const filter of ['everything', 'done', 'all'] as const) {
+      await listWorkItems({ projectId: 'proj-1', filter, workspaceId: 'acme' })
+    }
+    for (const captured of capturedPqls) {
+      expect(captured).toBe('stateGroup IN openStates() OR stateGroup IN closedStates()')
+    }
   })
 })
 

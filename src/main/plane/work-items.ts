@@ -25,7 +25,7 @@ import {
 } from '../integration-pagination-budget'
 import { fetchAllPlanePages, type PlanePage } from './plane-cursor-pagination'
 import { listProjectsForClient } from './plane-work-item-reads'
-import { filterToPql, mapPlaneWorkItem } from './plane-work-item-mappers'
+import { mapPlaneWorkItem } from './plane-work-item-mappers'
 import type {
   PlaneProject,
   PlaneWorkItem,
@@ -202,6 +202,10 @@ async function resolveViewerId(client: PlaneClientForWorkspace): Promise<string 
   }
 }
 
+// Matches every state group so the list endpoint returns the complete set
+// regardless of a tenant's no-pql default behavior (see listWorkItems).
+const FETCH_ALL_STATES_PQL = 'stateGroup IN openStates() OR stateGroup IN closedStates()'
+
 export async function listWorkItems(args: {
   projectId?: string
   filter: PlaneWorkItemFilter
@@ -211,10 +215,13 @@ export async function listWorkItems(args: {
   if (entries.length === 0) {
     return []
   }
-  // filterToPql still sends the (server-ignored) pql for forward-compat, but
-  // the real filtering happens client-side per client below -- the viewer id
-  // is per-client, so assigned/created must be resolved and applied per client.
-  const pql = filterToPql(args.filter)
+  // Why: the fetch must retrieve EVERY state group, then filter client-side.
+  // Some self-hosted Plane tenants return a limited default set when the list
+  // request carries no `pql` param at all (e.g. only open items), yet return
+  // the full set whenever any `pql` is present; other tenants ignore `pql`
+  // entirely. Sending an all-states pql yields the complete set on both, so
+  // filterPlaneWorkItems below is the single source of truth for narrowing.
+  const pql = FETCH_ALL_STATES_PQL
   const items = await fetchAcrossClients(
     entries,
     args.workspaceId,
