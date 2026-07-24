@@ -7016,7 +7016,10 @@
           "plane_launch_prompt_title": "Plantilla de prompt de inicio",
           "plane_section_description": "Personaliza la primera instrucción que Orca envía al agente cuando inicias un worktree desde un elemento de Plane.",
           "plane_section_title": "Plane",
-          "linear_launch_prompt_aria": "Linear launch prompt template"
+          "linear_launch_prompt_aria": "Linear launch prompt template",
+          "plane_strip_attribution_title": "Ocultar atribución de IA en los work items",
+          "plane_strip_attribution_description": "Elimina los footers de autoría del agente (ej. \"Planeado con Claude Code\", \"Refinado con Codex\") de descripciones y comentarios antes de escribirlos en Plane.",
+          "plane_strip_attribution_toggle": "Quitar la atribución de IA antes de escribir"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Grosor de la línea divisoria del panel.",

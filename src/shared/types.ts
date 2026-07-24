@@ -3087,6 +3087,10 @@ export type GlobalSettings = {
       worktree from a Plane work item. Empty = built-in default. Placeholders:
       {{identifier}} (e.g. PROJ-12) and {{url}}. */
   planeLaunchPromptTemplate?: string
+  /** When true (default), strip agent-authored AI provenance/attribution footers
+      (e.g. "_Planeado con Claude Code..._", "_Refined with Codex_") from work-item
+      descriptions and comments before they are written to the task provider. */
+  stripAiAttributionFromTickets?: boolean
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */

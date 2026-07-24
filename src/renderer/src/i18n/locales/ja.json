@@ -7038,7 +7038,10 @@
           "plane_launch_prompt_title": "Launch prompt template",
           "plane_section_description": "Customize the first instruction Orca sends to the agent when you start a worktree from a Plane work item.",
           "plane_section_title": "Plane",
-          "linear_launch_prompt_aria": "Linear launch prompt template"
+          "linear_launch_prompt_aria": "Linear launch prompt template",
+          "plane_strip_attribution_title": "Hide AI attribution on work items",
+          "plane_strip_attribution_description": "Remove agent-authored provenance footers (e.g. \"Planned with Claude Code\", \"Refined with Codex\") from descriptions and comments before they are written to Plane.",
+          "plane_strip_attribution_toggle": "Strip AI attribution before writing"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "ペイン分割線の太さ。",

@@ -319,6 +319,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     defaultPlaneSelection: null,
     planeProjectRepoLinks: null,
     planeLaunchPromptTemplate: '',
+    stripAiAttributionFromTickets: true,
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',
     minimaxGroupId: '',

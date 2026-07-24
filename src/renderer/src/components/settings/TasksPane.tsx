@@ -11,6 +11,7 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { Label } from '../ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
@@ -303,6 +304,41 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             onBlur={commitPlaneTemplate}
             className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
           />
+        </SearchableSetting>
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.TasksPane.plane_strip_attribution_title',
+            'Hide AI attribution on work items'
+          )}
+          description={translate(
+            'auto.components.settings.TasksPane.plane_strip_attribution_description',
+            'Remove agent-authored provenance footers (e.g. "Planned with Claude Code", "Refined with Codex") from descriptions and comments before they are written to Plane.'
+          )}
+          keywords={[
+            'plane',
+            'ai',
+            'attribution',
+            'provenance',
+            'claude',
+            'codex',
+            'footer',
+            'signature',
+            'ticket'
+          ]}
+          className="py-2"
+        >
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={settings.stripAiAttributionFromTickets !== false}
+              onCheckedChange={(value) =>
+                updateSettings({ stripAiAttributionFromTickets: value === true })
+              }
+            />
+            {translate(
+              'auto.components.settings.TasksPane.plane_strip_attribution_toggle',
+              'Strip AI attribution before writing'
+            )}
+          </label>
         </SearchableSetting>
       </section>
     </div>

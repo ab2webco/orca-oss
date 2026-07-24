@@ -709,6 +709,7 @@ import {
   searchWorkItems as searchPlaneWorkItems
 } from '../plane/work-items'
 import { createWorkItem as createPlaneWorkItem } from '../plane/plane-work-item-create'
+import { stripAiAttribution } from '../plane/plane-attribution-strip'
 import {
   addWorkItemComment as addPlaneWorkItemComment,
   createPlaneState as createPlaneBoardState,
@@ -30236,13 +30237,30 @@ export class OrcaRuntimeService {
     return { ok: true, worktreeId: worktree.id }
   }
 
+  // When enabled (default), drop agent-authored AI provenance footers before a
+  // body is written to Plane — Orca never adds them, but agents write them as
+  // content and the user opted to suppress them.
+  private stripTicketAttribution(text: string): string
+  private stripTicketAttribution(text: string | undefined): string | undefined
+  private stripTicketAttribution(text: string | undefined): string | undefined {
+    const settings = this.store?.getSettings?.() as GlobalSettings | undefined
+    if (typeof text !== 'string' || settings?.stripAiAttributionFromTickets === false) {
+      return text
+    }
+    return stripAiAttribution(text)
+  }
+
   planeUpdateWorkItem(args: {
     projectId: string
     workItemId: string
     workspaceId?: PlaneWorkspaceSelection
     updates: PlaneWorkItemUpdate
   }): ReturnType<typeof updatePlaneWorkItem> {
-    return updatePlaneWorkItem(args)
+    const updates =
+      typeof args.updates.description === 'string'
+        ? { ...args.updates, description: this.stripTicketAttribution(args.updates.description) }
+        : args.updates
+    return updatePlaneWorkItem({ ...args, updates })
   }
 
   planeAddWorkItemComment(args: {
@@ -30251,11 +30269,14 @@ export class OrcaRuntimeService {
     body: string
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof addPlaneWorkItemComment> {
-    return addPlaneWorkItemComment(args)
+    return addPlaneWorkItemComment({ ...args, body: this.stripTicketAttribution(args.body) })
   }
 
   planeCreateWorkItem(args: PlaneCreateWorkItemArgs): ReturnType<typeof createPlaneWorkItem> {
-    return createPlaneWorkItem(args)
+    return createPlaneWorkItem({
+      ...args,
+      description: this.stripTicketAttribution(args.description)
+    })
   }
 
   planeListWorkItemComments(args: {
