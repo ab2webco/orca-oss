@@ -511,7 +511,19 @@ import {
 } from '../github/client'
 import type { GitHubPRBranchLookupOptions } from '../github/client'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
-import { fetchPrHeadTrackingRef } from '../github/pr-head-tracking-ref'
+import {
+  fetchGitHubPullRequestHeadRef,
+  fetchPrHeadTrackingRef
+} from '../github/pr-head-tracking-ref'
+import {
+  gitlabMergeRequestHeadLocalRef,
+  reviewHeadRemoteRefComponent
+} from '../../shared/review-head-tracking-ref'
+import { fetchGitLabMergeRequestHeadRef } from '../gitlab/mr-head-tracking-ref'
+import { isTransientReviewHeadFetchError } from '../git/fetch-error-classification'
+import { resolveGitHubReviewHeadRemote } from '../github/review-head-remote'
+import { fetchCompareBaseRefWithLocalFallback } from '../git/compare-base-ref-fetch'
+import { pickPreferredGitRemote } from '../../shared/preferred-git-remote'
 import { getWorkItemDetails, getPRFileContents } from '../github/work-item-details'
 import { getRateLimit } from '../github/rate-limit'
 import {
@@ -4191,14 +4203,18 @@ export class OrcaRuntimeService {
     // or a stale browser-persisted session). Hydrating such a key would surface a
     // phantom "unknown"/duplicate workspace with no live repo behind it. Only
     // hydrate sessions whose repo still exists; leave unparseable keys alone.
-    // Why lazy: floating-terminal entries carry no owning repo, so a floating-only
-    // hydrate must not resolve the repo inventory (see the targeted-liveness poll test).
-    let liveRepoIds: Set<string> | null = null
+    // Resolved lazily so unparseable keys (floating terminals) never pay for a
+    // repo inventory on the hot poll path, and `null` when the store cannot
+    // report repos — an unavailable list must not read as "every repo is gone".
+    let liveRepoIds: Set<string> | null | undefined
     for (const [entryWorktreeId, persistedTabs] of entries) {
       const ownerRepoId = splitWorktreeIdForFilesystem(entryWorktreeId)?.repoId
       if (ownerRepoId) {
-        liveRepoIds ??= new Set((this.store?.getRepos?.() ?? []).map((repo) => repo.id))
-        if (!liveRepoIds.has(ownerRepoId)) {
+        if (liveRepoIds === undefined) {
+          const knownRepos = this.store?.getRepos?.()
+          liveRepoIds = knownRepos ? new Set(knownRepos.map((repo) => repo.id)) : null
+        }
+        if (liveRepoIds && !liveRepoIds.has(ownerRepoId)) {
           continue
         }
       }
@@ -20273,36 +20289,31 @@ export class OrcaRuntimeService {
     const gitExec = sshGitProvider
       ? (gitArgs: string[]) => sshGitProvider.exec(gitArgs, repo.path)
       : (gitArgs: string[]) => gitExecFileAsync(gitArgs, localGitExecOptions ?? { cwd: repo.path })
-    const resolveRemote = sshGitProvider
-      ? async () => {
-          const { stdout } = await sshGitProvider.exec(['remote'], repo.path)
-          const remotes = stdout
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean)
-          if (remotes.includes('origin')) {
-            return 'origin'
-          }
-          if (remotes.length === 1) {
-            return remotes[0]!
-          }
-          if (remotes.length === 0) {
-            throw new Error('Repo has no configured git remotes.')
-          }
-          throw new Error(
-            `Repo has multiple remotes (${remotes.join(', ')}) and no default is configured.`
-          )
-        }
-      : () => getDefaultRemote(repo.path, localWorktreeGitOptions)
+    // Why: one shared resolver for local and SSH so origin-vs-upstream cannot
+    // diverge by surface; it prefers the remote hosting the PR's project.
+    const resolveRemote = (): Promise<string> =>
+      resolveGitHubReviewHeadRemote({
+        repoPath: repo.path,
+        connectionId: repo.connectionId ?? null,
+        localGitOptions: localWorktreeGitOptions,
+        gitExec
+      })
 
-    // Why: SSH repos can't fetch over the relay's read-only git.exec channel, so
-    // route the PR head fetch through the write-capable helper instead of gitExec.
+    // Why: SSH review-head fetches require narrow write-capable RPCs.
     const fetchRemoteTrackingRef = (remote: string, branch: string): Promise<void> =>
       fetchPrHeadTrackingRef(
         repo,
         sshGitProvider,
         remote,
         branch,
+        localGitExecOptions ? { localGitExecOptions } : {}
+      )
+    const fetchPullRequestHeadRef = (remote: string, prNumber: number): Promise<string> =>
+      fetchGitHubPullRequestHeadRef(
+        repo,
+        sshGitProvider,
+        remote,
+        prNumber,
         localGitExecOptions ? { localGitExecOptions } : {}
       )
 
@@ -20316,6 +20327,7 @@ export class OrcaRuntimeService {
       localGitOptions: localWorktreeGitOptions,
       gitExec,
       fetchRemoteTrackingRef,
+      fetchPullRequestHeadRef,
       resolveRemote
     })
   }
@@ -20422,48 +20434,87 @@ export class OrcaRuntimeService {
     // failure must NOT abort the whole resolution — that would discard the
     // already-verified source-branch base and silently fall back to the repo
     // default branch. Degrade gracefully by dropping compareBaseRef instead.
-    const fetchCompareBaseRef = async (): Promise<boolean> => {
-      if (!targetBranch || !compareBaseRef) {
-        return false
-      }
-      try {
-        await fetchRemoteTrackingRef(targetBranch, compareBaseRef)
-        return true
-      } catch (error) {
-        console.warn('[runtime:resolveManagedMrBase] optional compare-base fetch failed', {
-          remote,
-          targetBranch,
-          mrIid: args.mrIid,
-          error: error instanceof Error ? error.message.split('\n')[0] : String(error)
-        })
-        return false
-      }
-    }
+    const fetchCompareBaseRef = (): Promise<boolean> =>
+      fetchCompareBaseRefWithLocalFallback({
+        compareBaseRef,
+        fetchCompareBaseRef: (ref) => fetchRemoteTrackingRef(targetBranch, ref),
+        gitExec,
+        logLabel: '[runtime:resolveManagedMrBase]',
+        logContext: { remote, targetBranch, mrIid: args.mrIid }
+      })
 
     if (isCrossRepository) {
       const mrRef = `refs/merge-requests/${args.mrIid}/head`
-      // Why: GitLab exposes fork MR heads on the target project, so mobile/SSH
-      // can match desktop without adding the contributor fork as a remote.
+      // Why: soft-keep needs identity when the fetch throws before returning a path.
+      // Success uses the path returned by the fetch itself (writer-authoritative).
+      let softKeepLocalRefPromise: Promise<string | null> | undefined
+      const resolveSoftKeepLocalRef = (): Promise<string | null> => {
+        softKeepLocalRefPromise ??= (async () => {
+          try {
+            const { stdout } = await gitExec(['remote', 'get-url', remote])
+            const remoteUrl = stdout.trim()
+            if (!remoteUrl) {
+              return null
+            }
+            return gitlabMergeRequestHeadLocalRef(
+              reviewHeadRemoteRefComponent(remote, remoteUrl),
+              args.mrIid
+            )
+          } catch {
+            return null
+          }
+        })()
+        return softKeepLocalRefPromise
+      }
+      const resolveDurableHeadSha = async (localRef: string | null): Promise<string | null> => {
+        if (!localRef) {
+          return null
+        }
+        try {
+          const { stdout } = await gitExec(['rev-parse', '--verify', `${localRef}^{commit}`])
+          return stdout.trim() || null
+        } catch {
+          return null
+        }
+      }
       try {
-        await (sshGitProvider
-          ? sshGitProvider.fetchGitLabMergeRequestHead(repo.path, remote, args.mrIid)
-          : gitExec(['fetch', remote, mrRef]))
+        const localRef = await fetchGitLabMergeRequestHeadRef(
+          repo,
+          sshGitProvider,
+          remote,
+          args.mrIid,
+          localGitExecOptions ? { localGitExecOptions } : {}
+        )
+        const sha = await resolveDurableHeadSha(localRef)
+        if (!sha) {
+          return { error: `Could not resolve fork MR !${args.mrIid} head after fetch.` }
+        }
+        const compareBaseFetched = await fetchCompareBaseRef()
+        return { baseBranch: sha, ...(compareBaseFetched ? { compareBaseRef } : {}) }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        // Why: mirror compare-base — a transient transport failure must not fail
+        // the resolve when a prior fetch already pinned the durable head ref. A
+        // missing remote ref (deleted MR/fork), auth failure, or stale-relay
+        // error must fail hard: serving the durable ref there would check out a
+        // dead or unauthorized tip and mask the actionable error.
+        if (isTransientReviewHeadFetchError(error)) {
+          const localSha = await resolveDurableHeadSha(await resolveSoftKeepLocalRef())
+          if (localSha) {
+            console.warn(
+              '[runtime:resolveManagedMrBase] MR head fetch failed; using durable local ref',
+              {
+                remote,
+                mrIid: args.mrIid,
+                error: message.split('\n')[0]
+              }
+            )
+            const compareBaseFetched = await fetchCompareBaseRef()
+            return { baseBranch: localSha, ...(compareBaseFetched ? { compareBaseRef } : {}) }
+          }
+        }
         return { error: `Failed to fetch ${mrRef}: ${message.split('\n')[0]}` }
       }
-      let sha: string
-      try {
-        const { stdout } = await gitExec(['rev-parse', '--verify', 'FETCH_HEAD'])
-        sha = stdout.trim()
-      } catch {
-        return { error: `Could not resolve fork MR !${args.mrIid} head after fetch.` }
-      }
-      if (!sha) {
-        return { error: `Empty SHA resolving fork MR !${args.mrIid} head.` }
-      }
-      const compareBaseFetched = await fetchCompareBaseRef()
-      return { baseBranch: sha, ...(compareBaseFetched ? { compareBaseRef } : {}) }
     }
 
     try {
@@ -20555,22 +20606,7 @@ export class OrcaRuntimeService {
     if (connectionId) {
       const provider = requireSshGitProvider(connectionId)
       const { stdout } = await provider.exec(['remote'], repoPath)
-      const remotes = stdout
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-      if (remotes.includes('origin')) {
-        return 'origin'
-      }
-      if (remotes.length === 1) {
-        return remotes[0]!
-      }
-      if (remotes.length === 0) {
-        throw new Error('Repo has no configured git remotes.')
-      }
-      throw new Error(
-        `Repo has multiple remotes (${remotes.join(', ')}) and no default is configured.`
-      )
+      return pickPreferredGitRemote(stdout.split('\n'))
     }
     return getDefaultRemote(repoPath, localGitOptions)
   }

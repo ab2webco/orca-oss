@@ -348,6 +348,8 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     experimentalPet: false,
     experimentalActivity: false,
     experimentalAgentDashboardPopout: false,
+    // Why: in-window screen popover is the default surface; users opt into a separate pop-out window.
+    experimentalAgentDashboardMode: 'in-window',
     experimentalActivityDefaultedOffForAllUsers: true,
     experimentalTerminalAttention: false,
     experimentalAgentHibernation: false,
