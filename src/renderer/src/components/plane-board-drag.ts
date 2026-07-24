@@ -129,32 +129,26 @@ export function readPlaneBoardDragStateId(data: unknown): string | null {
   return null
 }
 
-// Apply a saved per-project column order: known stateIds first in saved order,
-// then any remaining columns in their existing (sequence) order. Unknown saved
-// ids are ignored so a stale preference can't drop a real column.
-export function orderPlaneBoardColumns(
-  columns: readonly PlaneBoardColumn[],
-  savedOrder: readonly string[] | undefined
-): PlaneBoardColumn[] {
-  if (!savedOrder || savedOrder.length === 0) {
-    return [...columns]
-  }
-  const byId = new Map(columns.map((column) => [column.stateId, column]))
-  const ordered: PlaneBoardColumn[] = []
-  const used = new Set<string>()
-  for (const stateId of savedOrder) {
-    const column = byId.get(stateId)
-    if (column && !used.has(stateId)) {
-      ordered.push(column)
-      used.add(stateId)
+// A single column's new authoritative order, as the PATCH payload a reorder
+// sends to Plane (`sequence` is Plane's source of truth for column order).
+export type PlaneBoardSequenceUpdate = { stateId: string; sequence: number }
+
+// Map a reordered stateId list to per-state `sequence` PATCH payloads. Sequences
+// are spaced by 1000 so a later single-column insert between two columns has room
+// without renumbering the whole board. Only states whose sequence actually
+// changes are returned, so a no-op reorder issues no requests.
+export function planPlaneBoardColumnReorder(
+  orderedStateIds: readonly string[],
+  currentSequenceByStateId: ReadonlyMap<string, number | undefined>
+): PlaneBoardSequenceUpdate[] {
+  const updates: PlaneBoardSequenceUpdate[] = []
+  orderedStateIds.forEach((stateId, index) => {
+    const sequence = (index + 1) * 1000
+    if (currentSequenceByStateId.get(stateId) !== sequence) {
+      updates.push({ stateId, sequence })
     }
-  }
-  for (const column of columns) {
-    if (!used.has(column.stateId)) {
-      ordered.push(column)
-    }
-  }
-  return ordered
+  })
+  return updates
 }
 
 function findWorkItem(

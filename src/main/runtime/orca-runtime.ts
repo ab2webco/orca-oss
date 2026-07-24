@@ -712,6 +712,7 @@ import {
 import {
   addWorkItemComment as addPlaneWorkItemComment,
   createPlaneState as createPlaneBoardState,
+  deletePlaneState as deletePlaneBoardState,
   listWorkItemComments as listPlaneWorkItemComments,
   updatePlaneState as updatePlaneBoardState,
   updateWorkItem as updatePlaneWorkItem
@@ -726,6 +727,7 @@ import {
 import type {
   PlaneConnectArgs,
   PlaneCreateStateArgs,
+  PlaneDeleteStateArgs,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
   PlaneWorkItemUpdate,
@@ -1047,7 +1049,6 @@ type RuntimeStore = {
     defaultRepoSelection?: GlobalSettings['defaultRepoSelection']
     defaultLinearTeamSelection?: GlobalSettings['defaultLinearTeamSelection']
     planeProjectRepoLinks?: GlobalSettings['planeProjectRepoLinks']
-    planeBoardColumnOrder?: GlobalSettings['planeBoardColumnOrder']
     githubProjects?: GlobalSettings['githubProjects']
     experimentalNewWorktreeCardStyle?: GlobalSettings['experimentalNewWorktreeCardStyle']
     compactWorktreeCards?: GlobalSettings['compactWorktreeCards']
@@ -3086,7 +3087,6 @@ export class OrcaRuntimeService {
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'
     | 'planeProjectRepoLinks'
-    | 'planeBoardColumnOrder'
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
@@ -3111,7 +3111,6 @@ export class OrcaRuntimeService {
       defaultRepoSelection: settings.defaultRepoSelection ?? null,
       defaultLinearTeamSelection: settings.defaultLinearTeamSelection ?? null,
       planeProjectRepoLinks: settings.planeProjectRepoLinks ?? null,
-      planeBoardColumnOrder: settings.planeBoardColumnOrder ?? null,
       githubProjects: settings.githubProjects,
       experimentalNewWorktreeCardStyle: settings.experimentalNewWorktreeCardStyle === true,
       compactWorktreeCards: settings.compactWorktreeCards === true,
@@ -3156,7 +3155,6 @@ export class OrcaRuntimeService {
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'
     | 'planeProjectRepoLinks'
-    | 'planeBoardColumnOrder'
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
@@ -30012,6 +30010,10 @@ export class OrcaRuntimeService {
 
   planeUpdateState(args: PlaneUpdateStateArgs): ReturnType<typeof updatePlaneBoardState> {
     return updatePlaneBoardState(args)
+  }
+
+  planeDeleteState(args: PlaneDeleteStateArgs): ReturnType<typeof deletePlaneBoardState> {
+    return deletePlaneBoardState(args)
   }
 
   planeListProjects(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneProjects> {

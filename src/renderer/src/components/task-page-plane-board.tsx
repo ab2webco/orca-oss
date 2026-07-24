@@ -14,8 +14,10 @@ import { toast } from 'sonner'
 
 import { useAppStore } from '../store'
 import { translate } from '@/i18n/i18n'
+import { useConfirmationDialog } from './confirmation-dialog'
 import {
   planeCreateState,
+  planeDeleteState,
   planeListStates,
   planeUpdateState,
   planeUpdateWorkItem,
@@ -28,8 +30,8 @@ import { PlaneBoardFloatingMinimap } from './plane-board-floating-minimap'
 import { PlaneBoardMinimap } from './plane-board-minimap'
 import {
   applyPlaneBoardStateOverrides,
-  orderPlaneBoardColumns,
   parsePlaneBoardColumnDroppableId,
+  planPlaneBoardColumnReorder,
   planPlaneBoardDrop,
   planeBoardStatesById,
   readPlaneBoardDragStateId,
@@ -38,6 +40,7 @@ import {
   resolvePlaneBoardColumns,
   withPlaneBoardStateOverride,
   withoutPlaneBoardStateOverride,
+  type PlaneBoardSequenceUpdate,
   type PlaneBoardStateOverrides
 } from './plane-board-drag'
 import type { PlaneState, PlaneStateGroup, PlaneWorkItem } from '../../../shared/plane-types'
@@ -50,10 +53,6 @@ type TaskPagePlaneBoardProps = {
   selectedItemId: string | null
   getStateTone: (stateGroup: string) => string
   onOpenItem: (item: PlaneWorkItem) => void
-  /** Saved per-project column order (ordered stateIds); unknown states append by sequence. */
-  savedColumnOrder: string[] | undefined
-  /** Persist a new column order for this project. */
-  onReorderColumns: (stateIds: string[]) => void
 }
 
 export function TaskPagePlaneBoard({
@@ -63,11 +62,10 @@ export function TaskPagePlaneBoard({
   providerSettings,
   selectedItemId,
   getStateTone,
-  onOpenItem,
-  savedColumnOrder,
-  onReorderColumns
+  onOpenItem
 }: TaskPagePlaneBoardProps): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const confirm = useConfirmationDialog()
   const patchPlaneWorkItem = useAppStore((s) => s.patchPlaneWorkItem)
   const [projectStates, setProjectStates] = useState<PlaneState[]>([])
   const [overrides, setOverrides] = useState<PlaneBoardStateOverrides>({})
@@ -158,12 +156,13 @@ export function TaskPagePlaneBoard({
     setOverrides((current) => reconcilePlaneBoardOverrides(current, items))
   }, [items])
 
+  // Plane's `sequence` is the single source of truth for column order;
+  // resolvePlaneBoardColumns already sorts by it, so no local re-order layer.
   const columns = useMemo(() => {
     const statesById = planeBoardStatesById(resolvePlaneBoardColumns(items, projectStates))
     const displayed = applyPlaneBoardStateOverrides(items, overrides, statesById)
-    const resolved = resolvePlaneBoardColumns(displayed, projectStates)
-    return orderPlaneBoardColumns(resolved, savedColumnOrder)
-  }, [items, projectStates, overrides, savedColumnOrder])
+    return resolvePlaneBoardColumns(displayed, projectStates)
+  }, [items, projectStates, overrides])
 
   const columnStateIds = useMemo(() => columns.map((column) => column.stateId), [columns])
 
@@ -184,6 +183,37 @@ export function TaskPagePlaneBoard({
     setActiveWorkItemId(String(event.active.id))
   }
 
+  // Persist a reorder to Plane's authoritative `sequence`, one PATCH per changed
+  // column (in order). Optimistically applied already; revert + toast on failure.
+  const persistColumnReorder = useCallback(
+    async (updates: PlaneBoardSequenceUpdate[], previousStates: PlaneState[]): Promise<void> => {
+      try {
+        for (const update of updates) {
+          const result = await planeUpdateState(
+            providerSettings,
+            { projectId, stateId: update.stateId, sequence: update.sequence },
+            workspaceId
+          )
+          if (!result.ok) {
+            throw new Error(result.error)
+          }
+        }
+        await refreshStates()
+      } catch (error) {
+        setProjectStates(previousStates)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.task-page-plane-board.reorderFailed',
+                'Failed to reorder columns.'
+              )
+        )
+      }
+    },
+    [providerSettings, projectId, workspaceId, refreshStates]
+  )
+
   const handleColumnDragEnd = useCallback(
     (event: DragEndEvent): void => {
       const activeStateId = String(event.active.id)
@@ -199,9 +229,65 @@ export function TaskPagePlaneBoard({
       if (from < 0 || to < 0 || from === to) {
         return
       }
-      onReorderColumns(arrayMove(columnStateIds, from, to))
+      const orderedStateIds = arrayMove(columnStateIds, from, to)
+      const currentSequenceByStateId = new Map(
+        projectStates.map((state) => [state.id, state.sequence] as const)
+      )
+      const updates = planPlaneBoardColumnReorder(orderedStateIds, currentSequenceByStateId)
+      if (updates.length === 0) {
+        return
+      }
+      const previousStates = projectStates
+      const nextSequenceByStateId = new Map(
+        updates.map((update) => [update.stateId, update.sequence])
+      )
+      // Optimistically apply the new sequences so columns re-sort instantly.
+      setProjectStates((states) =>
+        states.map((state) => {
+          const sequence = nextSequenceByStateId.get(state.id)
+          return sequence === undefined ? state : { ...state, sequence }
+        })
+      )
+      void persistColumnReorder(updates, previousStates)
     },
-    [columnStateIds, onReorderColumns]
+    [columnStateIds, projectStates, persistColumnReorder]
+  )
+
+  const handleDeleteColumn = useCallback(
+    async (stateId: string, name: string): Promise<void> => {
+      const confirmed = await confirm({
+        title: translate(
+          'auto.components.task-page-plane-board.deleteConfirmTitle',
+          'Delete column «{{value0}}»?',
+          { value0: name }
+        ),
+        description: translate(
+          'auto.components.task-page-plane-board.deleteConfirmDescription',
+          'Work items may need reassigning.'
+        ),
+        confirmLabel: translate(
+          'auto.components.task-page-plane-board.deleteConfirmAction',
+          'Delete'
+        ),
+        confirmVariant: 'destructive'
+      })
+      if (!confirmed) {
+        return
+      }
+      const result = await planeDeleteState(providerSettings, { projectId, stateId }, workspaceId)
+      if (!result.ok) {
+        toast.error(
+          result.error ||
+            translate(
+              'auto.components.task-page-plane-board.deleteFailed',
+              'Failed to delete column.'
+            )
+        )
+        return
+      }
+      await refreshStates()
+    },
+    [confirm, providerSettings, projectId, workspaceId, refreshStates]
   )
 
   const handleDragEnd = (event: DragEndEvent): void => {
@@ -286,6 +372,7 @@ export function TaskPagePlaneBoard({
                   selectedItemId={selectedItemId}
                   onOpenItem={onOpenItem}
                   onRenameColumn={handleRenameColumn}
+                  onDeleteColumn={handleDeleteColumn}
                 />
               ))}
             </SortableContext>

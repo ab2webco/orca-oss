@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
-import { GripVertical, Pencil } from 'lucide-react'
+import { GripVertical, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { PlaneBoardCard } from './plane-board-card'
 import { planeBoardColumnDroppableId, type PlaneBoardColumn } from './plane-board-drag'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
@@ -17,6 +23,8 @@ type PlaneBoardColumnViewProps = {
   onOpenItem: (item: PlaneWorkItem) => void
   /** Commit a new name for this column (state). No-op if unchanged/empty. */
   onRenameColumn: (stateId: string, name: string) => void
+  /** Delete this column (state) after a destructive confirmation. */
+  onDeleteColumn: (stateId: string, name: string) => void
 }
 
 // One state column: sticky header (drag handle + tone dot + name + count) over a
@@ -30,7 +38,8 @@ export function PlaneBoardColumnView({
   getStateTone,
   selectedItemId,
   onOpenItem,
-  onRenameColumn
+  onRenameColumn,
+  onDeleteColumn
 }: PlaneBoardColumnViewProps): React.JSX.Element {
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: planeBoardColumnDroppableId(column.stateId),
@@ -155,6 +164,27 @@ export function PlaneBoardColumnView({
         <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
           {column.items.length}
         </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={translate('auto.components.plane-board-column.menu', 'Column actions')}
+            className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/60 opacity-0 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100 data-[state=open]:opacity-100"
+          >
+            <MoreVertical className="size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={beginEdit}>
+              <Pencil />
+              {translate('auto.components.plane-board-column.rename', 'Rename column')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => onDeleteColumn(column.stateId, column.state.name)}
+            >
+              <Trash2 />
+              {translate('auto.components.plane-board-column.delete', 'Delete column')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scrollbar-sleek p-2">
         {column.items.map((item) => (

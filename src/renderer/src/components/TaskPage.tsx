@@ -3132,7 +3132,6 @@ const hasUpstreamCandidateDivergence = (
 export default function TaskPage(): React.JSX.Element {
   useTranslation()
   const settings = useAppStore((s) => s.settings)
-  const setPlaneBoardColumnOrder = useAppStore((s) => s.setPlaneBoardColumnOrder)
   const persistedUIReady = useAppStore((s) => s.persistedUIReady)
   const taskResumeState = useAppStore((s) => s.taskResumeState)
   const setTaskResumeState = useAppStore((s) => s.setTaskResumeState)
@@ -10773,10 +10772,6 @@ export default function TaskPage(): React.JSX.Element {
                         selectedItemId={selectedPlaneWorkItem?.id ?? null}
                         getStateTone={getPlaneStateTone}
                         onOpenItem={openPlaneDetailPage}
-                        savedColumnOrder={settings?.planeBoardColumnOrder?.[selectedPlaneProjectId]}
-                        onReorderColumns={(stateIds) =>
-                          setPlaneBoardColumnOrder(selectedPlaneProjectId, stateIds)
-                        }
                       />
                     )
                   ) : (

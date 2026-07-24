@@ -158,7 +158,6 @@ export const SettingsUpdate = z
     defaultRepoSelection: z.array(z.string()).nullable().optional(),
     defaultLinearTeamSelection: z.array(z.string()).nullable().optional(),
     planeProjectRepoLinks: z.record(z.string(), z.string()).nullable().optional(),
-    planeBoardColumnOrder: z.record(z.string(), z.array(z.string())).nullable().optional(),
     compactWorktreeCards: z.boolean().optional(),
     minimaxGroupId: z.string().optional(),
     minimaxUsageModels: z.string().optional(),

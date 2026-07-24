@@ -1,7 +1,11 @@
 // Board-column (Plane state) create/rename IPC handlers, split from plane.ts to
 // keep that file under the oxlint max-lines cap without a suppression.
 import { ipcMain } from 'electron'
-import { createPlaneState, updatePlaneState } from '../plane/plane-work-item-writes'
+import {
+  createPlaneState,
+  deletePlaneState,
+  updatePlaneState
+} from '../plane/plane-work-item-writes'
 import type { PlaneStateGroup } from '../../shared/plane-types'
 
 const VALID_STATE_GROUPS = new Set<PlaneStateGroup>([
@@ -59,6 +63,7 @@ export function registerPlaneBoardStateHandlers(): void {
         workspaceId?: string
         name?: string
         color?: string
+        sequence?: number
       }
     ) => {
       if (typeof args?.projectId !== 'string' || !args.projectId.trim()) {
@@ -69,7 +74,8 @@ export function registerPlaneBoardStateHandlers(): void {
       }
       const name = normalizeOptionalString(args?.name)
       const color = normalizeOptionalString(args?.color)
-      if (name === undefined && color === undefined) {
+      const sequence = typeof args?.sequence === 'number' ? args.sequence : undefined
+      if (name === undefined && color === undefined && sequence === undefined) {
         return { ok: false, error: 'Nothing to update.' }
       }
       return updatePlaneState({
@@ -77,7 +83,25 @@ export function registerPlaneBoardStateHandlers(): void {
         stateId: args.stateId.trim(),
         workspaceId: normalizeOptionalString(args.workspaceId),
         name,
-        color
+        color,
+        sequence
+      })
+    }
+  )
+
+  ipcMain.handle(
+    'plane:deleteState',
+    async (_event, args: { projectId: string; stateId: string; workspaceId?: string }) => {
+      if (typeof args?.projectId !== 'string' || !args.projectId.trim()) {
+        return { ok: false, error: 'Project is required.' }
+      }
+      if (typeof args?.stateId !== 'string' || !args.stateId.trim()) {
+        return { ok: false, error: 'State ID is required.' }
+      }
+      return deletePlaneState({
+        projectId: args.projectId.trim(),
+        stateId: args.stateId.trim(),
+        workspaceId: normalizeOptionalString(args.workspaceId)
       })
     }
   )

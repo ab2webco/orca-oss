@@ -13925,7 +13925,9 @@
       "plane-board-column": {
         "reorder": "Reorder {{value0}} column",
         "rename": "Rename column",
-        "renameLabel": "Column name"
+        "renameLabel": "Column name",
+        "menu": "Column actions",
+        "delete": "Delete column"
       },
       "plane-board-floating-minimap": {
         "label": "Drag to scroll board columns"
@@ -13959,7 +13961,12 @@
       "task-page-plane-board": {
         "updateFailed": "Failed to move work item.",
         "renameFailed": "Failed to rename column.",
-        "createFailed": "Failed to create column."
+        "createFailed": "Failed to create column.",
+        "reorderFailed": "Failed to reorder columns.",
+        "deleteFailed": "Failed to delete column.",
+        "deleteConfirmTitle": "Delete column «{{value0}}»?",
+        "deleteConfirmDescription": "Work items may need reassigning.",
+        "deleteConfirmAction": "Delete"
       },
       "plane-board-add-column": {
         "add": "Add column",

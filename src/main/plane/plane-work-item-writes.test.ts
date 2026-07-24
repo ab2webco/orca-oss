@@ -464,6 +464,77 @@ describe('updatePlaneState', () => {
     expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
     expect(planeRequestMock).not.toHaveBeenCalled()
   })
+
+  it('includes sequence in the PATCH body when provided (column reorder)', async () => {
+    const { updatePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 'state-2', name: 'Doing', group: 'started', sequence: 2000 })
+    })
+
+    await updatePlaneState({ projectId: 'proj-1', stateId: 'state-2', sequence: 2000 })
+
+    expect(capturedBody).toEqual({ sequence: 2000 })
+  })
+})
+
+describe('deletePlaneState', () => {
+  it('DELETEs the project state path', async () => {
+    const { deletePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedPath: string | undefined
+    let capturedMethod: string | undefined
+    planeRequestMock.mockImplementation((_client, url: string, init?: RequestInit) => {
+      capturedPath = pathOf(url).pathname
+      capturedMethod = init?.method
+      return Promise.resolve(undefined)
+    })
+
+    const result = await deletePlaneState({
+      projectId: 'proj-1',
+      workspaceId: 'acme',
+      stateId: 'state-2'
+    })
+
+    expect(capturedMethod).toBe('DELETE')
+    expect(capturedPath).toBe('/api/v1/workspaces/acme/projects/proj-1/states/state-2/')
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns ok:false and clears the token on an auth error', async () => {
+    const { deletePlaneState } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await deletePlaneState({ projectId: 'proj-1', stateId: 'state-2' })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('surfaces the API error when Plane rejects the delete (state still has items)', async () => {
+    const { deletePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    planeRequestMock.mockRejectedValue(new MockPlaneApiError('State has work items', 400))
+
+    const result = await deletePlaneState({ projectId: 'proj-1', stateId: 'state-2' })
+
+    expect(result).toEqual({ ok: false, error: 'State has work items' })
+  })
+
+  it('returns ok:false when no Plane workspace is connected', async () => {
+    const { deletePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([])
+
+    const result = await deletePlaneState({ projectId: 'proj-1', stateId: 'state-2' })
+
+    expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
+    expect(planeRequestMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('listWorkItemComments', () => {

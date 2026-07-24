@@ -94,7 +94,14 @@ const UpdateState = z.object({
   stateId: requiredString('State ID is required'),
   workspaceId: OptionalString,
   name: OptionalString,
-  color: OptionalString
+  color: OptionalString,
+  sequence: z.number().optional()
+})
+
+const DeleteState = z.object({
+  projectId: requiredString('Project is required'),
+  stateId: requiredString('State ID is required'),
+  workspaceId: OptionalString
 })
 
 const ListMembers = z
@@ -223,7 +230,18 @@ export const PLANE_METHODS: RpcMethod[] = [
         stateId: params.stateId.trim(),
         workspaceId: params.workspaceId,
         name: params.name,
-        color: params.color
+        color: params.color,
+        sequence: params.sequence
+      })
+  }),
+  defineMethod({
+    name: 'plane.deleteState',
+    params: DeleteState,
+    handler: async (params, { runtime }) =>
+      runtime.planeDeleteState({
+        projectId: params.projectId.trim(),
+        stateId: params.stateId.trim(),
+        workspaceId: params.workspaceId
       })
   }),
   defineMethod({

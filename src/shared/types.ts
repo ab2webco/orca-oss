@@ -2961,8 +2961,6 @@ export type GlobalSettings = {
   defaultPlaneSelection?: { workspaceSlug: string; projectId: string } | null
   /** Why: remembers the Orca repo a Plane project was last launched into, so the composer pre-selects it. Keyed by Plane project id. */
   planeProjectRepoLinks?: Record<string, string> | null
-  /** Why: per-Plane-project board column order (ordered stateIds). Local UI preference only — never mutates Plane's global state sequence. Keyed by Plane project id. */
-  planeBoardColumnOrder?: Record<string, string[]> | null
   /** Session cookie for OpenCode Go rate-limit fetching. Stored encrypted. */
   opencodeSessionCookie: string
   /** Optional OpenCode Go workspace ID override; when set, skips the workspaces lookup and fetches usage directly. */

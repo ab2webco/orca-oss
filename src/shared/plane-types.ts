@@ -140,6 +140,14 @@ export type PlaneUpdateStateArgs = {
   stateId: string
   name?: string
   color?: string
+  // Board column order is Plane's `sequence`; a reorder PATCHes new sequences.
+  sequence?: number
+}
+
+export type PlaneDeleteStateArgs = {
+  projectId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+  stateId: string
 }
 
 // A create/update returns the resulting state so the board can insert/relabel

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { PlaneState, PlaneWorkItem } from '../../../shared/plane-types'
 import {
   applyPlaneBoardStateOverrides,
-  orderPlaneBoardColumns,
   parsePlaneBoardColumnDroppableId,
+  planPlaneBoardColumnReorder,
   planPlaneBoardDrop,
   planeBoardColumnDroppableId,
   planeBoardStatesById,
@@ -121,50 +121,51 @@ describe('optimistic overrides', () => {
   })
 })
 
-describe('orderPlaneBoardColumns', () => {
-  // resolvePlaneBoardColumns already returns columns in sequence order.
-  const sequenceColumns = resolvePlaneBoardColumns(
-    [workItem('1', TODO), workItem('2', DOING), workItem('3', DONE)],
-    [TODO, DOING, DONE]
-  )
-
-  it('applies the saved order first', () => {
-    const ordered = orderPlaneBoardColumns(sequenceColumns, [
-      'state-done',
-      'state-todo',
-      'state-doing'
+describe('planPlaneBoardColumnReorder', () => {
+  it('maps a reordered stateId list to spaced sequence PATCH payloads', () => {
+    const current = new Map<string, number | undefined>([
+      ['state-todo', 1],
+      ['state-doing', 2],
+      ['state-done', 3]
     ])
-    expect(ordered.map((column) => column.stateId)).toEqual([
-      'state-done',
-      'state-todo',
-      'state-doing'
-    ])
-  })
-
-  it('appends unknown (unsaved) states after saved ones in their sequence order', () => {
-    const ordered = orderPlaneBoardColumns(sequenceColumns, ['state-done'])
-    expect(ordered.map((column) => column.stateId)).toEqual([
-      'state-done',
-      'state-todo',
-      'state-doing'
-    ])
-  })
-
-  it('ignores stale saved ids that no longer map to a column', () => {
-    const ordered = orderPlaneBoardColumns(sequenceColumns, ['state-gone', 'state-doing'])
-    expect(ordered.map((column) => column.stateId)).toEqual([
-      'state-doing',
-      'state-todo',
-      'state-done'
-    ])
-  })
-
-  it('falls back to sequence order for empty or undefined saved order', () => {
-    const bySequence = ['state-todo', 'state-doing', 'state-done']
-    expect(orderPlaneBoardColumns(sequenceColumns, undefined).map((c) => c.stateId)).toEqual(
-      bySequence
+    // Move "done" to the front.
+    const updates = planPlaneBoardColumnReorder(
+      ['state-done', 'state-todo', 'state-doing'],
+      current
     )
-    expect(orderPlaneBoardColumns(sequenceColumns, []).map((c) => c.stateId)).toEqual(bySequence)
+    expect(updates).toEqual([
+      { stateId: 'state-done', sequence: 1000 },
+      { stateId: 'state-todo', sequence: 2000 },
+      { stateId: 'state-doing', sequence: 3000 }
+    ])
+  })
+
+  it('only returns states whose sequence actually changes', () => {
+    const current = new Map<string, number | undefined>([
+      ['state-todo', 1000],
+      ['state-doing', 2000],
+      ['state-done', 3000]
+    ])
+    // "todo" already sits at 1000; swapping "doing" and "done" changes only those two.
+    const updates = planPlaneBoardColumnReorder(
+      ['state-todo', 'state-done', 'state-doing'],
+      current
+    )
+    expect(updates).toEqual([
+      { stateId: 'state-done', sequence: 2000 },
+      { stateId: 'state-doing', sequence: 3000 }
+    ])
+  })
+
+  it('returns no updates when the order is unchanged and already spaced', () => {
+    const current = new Map<string, number | undefined>([
+      ['state-todo', 1000],
+      ['state-doing', 2000],
+      ['state-done', 3000]
+    ])
+    expect(
+      planPlaneBoardColumnReorder(['state-todo', 'state-doing', 'state-done'], current)
+    ).toEqual([])
   })
 })
 

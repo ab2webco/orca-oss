@@ -1865,8 +1865,16 @@ const api = {
       workspaceId?: string
       name?: string
       color?: string
+      sequence?: number
     }): Promise<{ ok: true; state: unknown } | { ok: false; error: string }> =>
       ipcRenderer.invoke('plane:updateState', args),
+
+    deleteState: (args: {
+      projectId: string
+      stateId: string
+      workspaceId?: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:deleteState', args),
 
     listProjects: (args?: { workspaceId?: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('plane:listProjects', args),

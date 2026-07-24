@@ -614,33 +614,3 @@ describe('setPlaneProjectRepoLink', () => {
     expect(settingsSet).not.toHaveBeenCalled()
   })
 })
-
-describe('setPlaneBoardColumnOrder', () => {
-  it('persists the per-project column order, merged with existing entries', () => {
-    const store = createTestStore()
-    store.setState({
-      settings: {
-        planeBoardColumnOrder: { 'plane-a': ['s1', 's2'] }
-      } as unknown as AppState['settings']
-    })
-
-    store.getState().setPlaneBoardColumnOrder('plane-b', ['s3', 's4'])
-
-    expect(settingsSet).toHaveBeenCalledWith({
-      planeBoardColumnOrder: { 'plane-a': ['s1', 's2'], 'plane-b': ['s3', 's4'] }
-    })
-  })
-
-  it('is a no-op when the order is unchanged', () => {
-    const store = createTestStore()
-    store.setState({
-      settings: {
-        planeBoardColumnOrder: { 'plane-a': ['s1', 's2'] }
-      } as unknown as AppState['settings']
-    })
-
-    store.getState().setPlaneBoardColumnOrder('plane-a', ['s1', 's2'])
-
-    expect(settingsSet).not.toHaveBeenCalled()
-  })
-})

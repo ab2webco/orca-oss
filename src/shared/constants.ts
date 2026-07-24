@@ -318,7 +318,6 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     linearLaunchPromptTemplate: '',
     defaultPlaneSelection: null,
     planeProjectRepoLinks: null,
-    planeBoardColumnOrder: null,
     planeLaunchPromptTemplate: '',
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',

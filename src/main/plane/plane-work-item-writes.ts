@@ -23,6 +23,7 @@ import { workItemsBase } from './work-items'
 import type {
   PlaneComment,
   PlaneCreateStateArgs,
+  PlaneDeleteStateArgs,
   PlaneStateGroup,
   PlaneMutationResult,
   PlaneStateMutationResult,
@@ -219,6 +220,10 @@ export async function updatePlaneState(
     if (args.color !== undefined) {
       body.color = args.color
     }
+    // `sequence` is Plane's authoritative column order; a board reorder PATCHes it.
+    if (args.sequence !== undefined) {
+      body.sequence = args.sequence
+    }
     const updated = await planeRequest<PlaneRecord>(
       client,
       `${statesBase(client, args.projectId)}${encodeURIComponent(args.stateId)}/`,
@@ -228,6 +233,30 @@ export async function updatePlaneState(
   } catch (error) {
     clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to update column.')
+  } finally {
+    release()
+  }
+}
+
+// Deletes a board column (Plane state). Plane rejects deleting a state that
+// still has work items or the project's default/last state; the API error is
+// surfaced to the caller rather than crashing.
+export async function deletePlaneState(args: PlaneDeleteStateArgs): Promise<PlaneMutationResult> {
+  const client = resolveClient(args.workspaceId)
+  if (!client) {
+    return { ok: false, error: 'Not connected to Plane.' }
+  }
+  await acquire()
+  try {
+    await planeRequest(
+      client,
+      `${statesBase(client, args.projectId)}${encodeURIComponent(args.stateId)}/`,
+      { method: 'DELETE' }
+    )
+    return { ok: true }
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    return toMutationError(error, 'Failed to delete column.')
   } finally {
     release()
   }

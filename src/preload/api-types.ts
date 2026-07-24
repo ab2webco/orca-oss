@@ -2190,7 +2190,13 @@ export type PreloadApi = {
       workspaceId?: string
       name?: string
       color?: string
+      sequence?: number
     }) => Promise<PlaneStateMutationResult>
+    deleteState: (args: {
+      projectId: string
+      stateId: string
+      workspaceId?: string
+    }) => Promise<PlaneMutationResult>
     listProjects: (args?: { workspaceId?: string }) => Promise<PlaneProject[]>
     listStates: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneState[]>
     listLabels: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneLabel[]>

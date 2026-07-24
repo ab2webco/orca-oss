@@ -13902,7 +13902,9 @@
       "plane-board-column": {
         "reorder": "Reordenar la columna {{value0}}",
         "rename": "Renombrar columna",
-        "renameLabel": "Nombre de la columna"
+        "renameLabel": "Nombre de la columna",
+        "menu": "Acciones de la columna",
+        "delete": "Eliminar columna"
       },
       "plane-board-floating-minimap": {
         "label": "Arrastra para desplazar las columnas del tablero"
@@ -13936,7 +13938,12 @@
       "task-page-plane-board": {
         "updateFailed": "No se pudo mover el elemento.",
         "renameFailed": "No se pudo renombrar la columna.",
-        "createFailed": "No se pudo crear la columna."
+        "createFailed": "No se pudo crear la columna.",
+        "reorderFailed": "No se pudieron reordenar las columnas.",
+        "deleteFailed": "No se pudo eliminar la columna.",
+        "deleteConfirmTitle": "¿Eliminar la columna «{{value0}}»?",
+        "deleteConfirmDescription": "Es posible que haya que reasignar los elementos.",
+        "deleteConfirmAction": "Eliminar"
       },
       "plane-board-add-column": {
         "add": "Añadir columna",

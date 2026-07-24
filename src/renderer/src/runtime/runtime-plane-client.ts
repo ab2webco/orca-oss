@@ -229,7 +229,7 @@ export async function planeCreateState(
 
 export async function planeUpdateState(
   settings: RuntimePlaneSettings,
-  args: { projectId: string; stateId: string; name?: string; color?: string },
+  args: { projectId: string; stateId: string; name?: string; color?: string; sequence?: number },
   workspaceId?: string | null
 ): Promise<PlaneStateMutationResult> {
   const target = getPlaneRuntimeTarget(settings)
@@ -239,6 +239,20 @@ export async function planeUpdateState(
         timeoutMs: 30_000
       })
     : window.api.plane.updateState(params)
+}
+
+export async function planeDeleteState(
+  settings: RuntimePlaneSettings,
+  args: { projectId: string; stateId: string },
+  workspaceId?: string | null
+): Promise<PlaneMutationResult> {
+  const target = getPlaneRuntimeTarget(settings)
+  const params = { ...args, workspaceId: workspaceId ?? undefined }
+  return target.kind === 'environment'
+    ? callRuntimeRpc<PlaneMutationResult>(target, 'plane.deleteState', params, {
+        timeoutMs: 30_000
+      })
+    : window.api.plane.deleteState(params)
 }
 
 export async function planeListLabels(
