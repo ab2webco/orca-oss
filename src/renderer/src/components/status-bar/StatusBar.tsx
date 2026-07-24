@@ -72,6 +72,10 @@ import {
   createPendingClaudeLimits,
   resolveClaudeUsageAccountScope
 } from './claude-usage-account-scope'
+import {
+  createPendingCodexLimits,
+  resolveCodexUsageAccountScope
+} from './codex-usage-account-scope'
 import { RemoteServerUpdateStatusSegment } from './RemoteServerUpdateStatusSegment'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
@@ -1480,6 +1484,34 @@ export function CodexSwitcherMenu({
     return `${settings.activeRuntimeEnvironmentId?.trim() || 'local'}:${settings.activeCodexManagedAccountId ?? 'system'}:${JSON.stringify(settings.activeCodexManagedAccountIdsByRuntime ?? null)}:${settings.codexManagedAccounts.map((account) => `${account.id}:${account.updatedAt}`).join('|')}`
   })
   const accountState = resolveCodexStatusAccountState(settings, accounts)
+  const focusedWorktreeCodexAccountId = useAppStore((s) =>
+    s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.codexAccountId ?? null) : null
+  )
+  const usageScope = resolveCodexUsageAccountScope({
+    showWorktreeAccountUsage: settings?.showWorktreeAccountUsage,
+    focusedWorktreeCodexAccountId,
+    activeCodexAccountId: getCodexStatusActiveId(
+      accountState,
+      toCodexStatusRuntimeTarget(codexTarget)
+    ),
+    accounts: accountState.accounts,
+    activeAccountLimits: codex,
+    inactiveAccountUsage: inactiveCodexAccounts
+  })
+  const displayedCodex =
+    usageScope.limits ??
+    (usageScope.kind === 'worktree' ? createPendingCodexLimits(usageScope.isFetching) : codex)
+  const pinnedInactiveAccountId =
+    usageScope.kind === 'worktree' && usageScope.limits === null ? usageScope.accountId : null
+
+  useEffect(() => {
+    // Why: pinned-worktree meters reuse the switcher's inactive-usage cache;
+    // main debounces this fetch, so worktree focus changes stay cheap.
+    // Remote-owned accounts have no local inactive-usage cache to fill.
+    if (pinnedInactiveAccountId && !hasActiveRuntimeEnvironment) {
+      void fetchInactiveCodexAccountUsage()
+    }
+  }, [pinnedInactiveAccountId, hasActiveRuntimeEnvironment, fetchInactiveCodexAccountUsage])
 
   const activeRuntimeEnvironmentId = settings?.activeRuntimeEnvironmentId?.trim() || null
   // Why: keyed on owner id, not settings identity, so routine settings mutations don't re-run the remote snapshot fetch.
@@ -1685,7 +1717,7 @@ export function CodexSwitcherMenu({
 
   return (
     <ProviderDetailsMenu
-      provider={codex}
+      provider={displayedCodex}
       compact={compact}
       iconOnly={iconOnly}
       asSubmenu={asSubmenu}
@@ -1697,16 +1729,44 @@ export function CodexSwitcherMenu({
         'auto.components.status.bar.StatusBar.ba55303942',
         'Open Codex details and account switcher'
       )}
+      triggerExtra={
+        usageScope.kind === 'worktree' ? (
+          <span className="ml-1 max-w-[110px] truncate text-[10px] text-muted-foreground">
+            {usageScope.email}
+          </span>
+        ) : undefined
+      }
       topContent={
-        <AccountRuntimeToggle
-          groups={switchGroups}
-          value={selectedGroup?.key ?? selectedRuntimeKey}
-          onChange={(group) => void handleSelectRuntime(group)}
-          ariaLabel={translate(
-            'auto.components.status.bar.StatusBar.38b5647724',
-            'Codex usage runtime'
-          )}
-        />
+        <>
+          {usageScope.kind === 'worktree' ? (
+            <div className="px-2 pt-2">
+              <div className="rounded-md border border-border/60 bg-accent/5 px-2 py-1.5">
+                <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                  {translate(
+                    'auto.components.status.bar.StatusBar.worktreeAccountLabel',
+                    'Worktree account'
+                  )}
+                </div>
+                <div className="truncate text-[11px] text-foreground">{usageScope.email}</div>
+                <div className="text-[10px] leading-4 text-muted-foreground">
+                  {translate(
+                    'auto.components.status.bar.StatusBar.worktreeAccountUsageNote',
+                    'Usage shown for the account pinned to the focused worktree.'
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <AccountRuntimeToggle
+            groups={switchGroups}
+            value={selectedGroup?.key ?? selectedRuntimeKey}
+            onChange={(group) => void handleSelectRuntime(group)}
+            ariaLabel={translate(
+              'auto.components.status.bar.StatusBar.38b5647724',
+              'Codex usage runtime'
+            )}
+          />
+        </>
       }
       open={open}
       onOpenChange={handleOpenChange}
