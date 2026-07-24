@@ -18,6 +18,7 @@ import { boundedIntegrationErrorMessage } from '../integration-error-message'
 import { PlaneRateLimiter, parsePlaneRetryAfterMs } from './plane-rate-limiter'
 import {
   assertWorkspaceFileBounds,
+  deleteWorkspaceToken,
   getPlaneWorkspaceId,
   getWorkspaceFile,
   getWorkspaceFileReadError,
@@ -338,4 +339,17 @@ export function isAuthError(error: unknown): boolean {
   // Why: Plane returns 403 for workspace-membership gaps even when a PAT is
   // otherwise valid, so only 401 means the saved credential itself is bad.
   return error instanceof PlaneApiError && error.status === 401
+}
+
+// Deferred from Slice 4/5 (read/write primitives landed without auth-error
+// handling): mirrors jira/issues.ts's clearToken(entry.site.id) pattern so a
+// revoked/rotated PAT clears its saved token the next time a read or write
+// against that workspace's client hits a 401.
+export function clearWorkspaceTokenOnAuthError(
+  client: PlaneClientForWorkspace,
+  error: unknown
+): void {
+  if (isAuthError(error)) {
+    deleteWorkspaceToken(getPlaneWorkspaceId(client.baseUrl, client.workspaceSlug))
+  }
 }

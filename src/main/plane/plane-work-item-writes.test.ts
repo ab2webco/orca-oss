@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlaneClientForWorkspace } from './client'
 
-const { acquireMock, releaseMock, getClientsMock, planeRequestMock } = vi.hoisted(() => ({
+const {
+  acquireMock,
+  releaseMock,
+  getClientsMock,
+  planeRequestMock,
+  clearWorkspaceTokenOnAuthErrorMock
+} = vi.hoisted(() => ({
   acquireMock: vi.fn(async () => undefined),
   releaseMock: vi.fn(),
   getClientsMock: vi.fn(),
-  planeRequestMock: vi.fn()
+  planeRequestMock: vi.fn(),
+  clearWorkspaceTokenOnAuthErrorMock: vi.fn()
 }))
 
 class MockPlaneApiError extends Error {
@@ -21,7 +28,8 @@ vi.mock('./client', () => ({
   release: releaseMock,
   getClients: getClientsMock,
   planeRequest: planeRequestMock,
-  PlaneApiError: MockPlaneApiError
+  PlaneApiError: MockPlaneApiError,
+  clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
 }))
 
 function client(workspaceSlug = 'acme'): PlaneClientForWorkspace {
@@ -46,6 +54,56 @@ beforeEach(() => {
   releaseMock.mockClear()
   getClientsMock.mockReset()
   planeRequestMock.mockReset()
+  clearWorkspaceTokenOnAuthErrorMock.mockClear()
+})
+
+describe('401 token clearing (deferred from Slice 4/5)', () => {
+  it('clears the workspace token when updateWorkItem hits an auth error', async () => {
+    const { updateWorkItem } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await updateWorkItem({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      updates: { stateId: 'state-2' }
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('clears the workspace token when addWorkItemComment hits an auth error', async () => {
+    const { addWorkItemComment } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await addWorkItemComment({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      body: 'Looks good'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('clears the workspace token when listWorkItemComments hits an auth error', async () => {
+    const { listWorkItemComments } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await listWorkItemComments({ projectId: 'proj-1', workItemId: 'wi-1' })
+
+    expect(result).toEqual([])
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
 })
 
 describe('updateWorkItem: partial PATCH mapping', () => {

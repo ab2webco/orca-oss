@@ -3,7 +3,14 @@
 // (see the approved MVP scope decision). Split from work-items.ts to stay
 // under the oxlint max-lines cap without a suppression; reuses its
 // project-scoped path builder so the two files never drift on routing.
-import { acquire, getClients, planeRequest, release, type PlaneClientForWorkspace } from './client'
+import {
+  acquire,
+  clearWorkspaceTokenOnAuthError,
+  getClients,
+  planeRequest,
+  release,
+  type PlaneClientForWorkspace
+} from './client'
 import { boundedIntegrationErrorLog } from '../integration-error-message'
 import { markdownToPlaneHtml } from './plane-html-markdown'
 import {
@@ -107,6 +114,7 @@ export async function updateWorkItem(args: {
     )
     return { ok: true }
   } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to update work item.')
   } finally {
     release()
@@ -135,6 +143,7 @@ export async function addWorkItemComment(args: {
     )
     return { ok: true, id: typeof created.id === 'string' ? created.id : '' }
   } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to add comment.')
   } finally {
     release()
@@ -164,6 +173,7 @@ export async function listWorkItemComments(args: {
     )
     return raws.map(mapPlaneComment)
   } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
     console.warn('[plane] listWorkItemComments failed:', boundedIntegrationErrorLog(error))
     return []
   } finally {

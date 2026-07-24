@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlaneClientForWorkspace } from './client'
 
-const { acquireMock, releaseMock, getClientsMock, planeRequestMock } = vi.hoisted(() => ({
+const {
+  acquireMock,
+  releaseMock,
+  getClientsMock,
+  planeRequestMock,
+  clearWorkspaceTokenOnAuthErrorMock
+} = vi.hoisted(() => ({
   acquireMock: vi.fn(async () => undefined),
   releaseMock: vi.fn(),
   getClientsMock: vi.fn(),
-  planeRequestMock: vi.fn()
+  planeRequestMock: vi.fn(),
+  clearWorkspaceTokenOnAuthErrorMock: vi.fn()
 }))
 
 class MockPlaneApiError extends Error {
@@ -21,7 +28,8 @@ vi.mock('./client', () => ({
   release: releaseMock,
   getClients: getClientsMock,
   planeRequest: planeRequestMock,
-  PlaneApiError: MockPlaneApiError
+  PlaneApiError: MockPlaneApiError,
+  clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
 }))
 
 function client(workspaceSlug: string): PlaneClientForWorkspace {
@@ -120,6 +128,37 @@ beforeEach(() => {
   releaseMock.mockClear()
   getClientsMock.mockReset()
   planeRequestMock.mockReset()
+  clearWorkspaceTokenOnAuthErrorMock.mockClear()
+})
+
+describe('401 token clearing (deferred from Slice 4/5)', () => {
+  it('clears the workspace token when searchWorkItems hits an auth error', async () => {
+    const { searchWorkItems } = await import('./work-items')
+    const acme = client('acme')
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    await expect(searchWorkItems({ query: 'priority = urgent', workspaceId: 'acme' })).rejects.toBe(
+      authError
+    )
+
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('clears the workspace token when getWorkItem hits an auth error', async () => {
+    const { getWorkItem } = await import('./work-items')
+    const acme = client('acme')
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    await expect(getWorkItem({ workItemId: 'ALPHA-1', workspaceId: 'acme' })).rejects.toBe(
+      authError
+    )
+
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
 })
 
 describe('listWorkItems: single project + cursor pagination', () => {

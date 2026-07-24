@@ -5,6 +5,7 @@
 // oxlint max-lines cap without a suppression.
 import {
   acquire,
+  clearWorkspaceTokenOnAuthError,
   getClients,
   PlaneApiError,
   planeRequest,
@@ -133,6 +134,7 @@ async function fetchAcrossClients(
       try {
         return await load(client)
       } catch (error) {
+        clearWorkspaceTokenOnAuthError(client, error)
         if (surfaceFailure) {
           throw error
         }
@@ -277,6 +279,9 @@ export async function getWorkItem(args: {
       if (found) {
         return found
       }
+    } catch (error) {
+      clearWorkspaceTokenOnAuthError(client, error)
+      throw error
     } finally {
       release()
     }
