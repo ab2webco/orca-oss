@@ -23,6 +23,7 @@ import { workItemsBase } from './work-items'
 import type {
   PlaneComment,
   PlaneCreateStateArgs,
+  PlaneStateGroup,
   PlaneMutationResult,
   PlaneStateMutationResult,
   PlaneUpdateStateArgs,
@@ -161,6 +162,16 @@ export async function addWorkItemComment(args: {
 
 // Creates a new board column (Plane state). Returns the mapped PlaneState so
 // the board can insert the empty column immediately.
+// Hex defaults mirroring Plane's own per-group palette, used when a column is
+// created without an explicit color (the API rejects a state with no color).
+const DEFAULT_STATE_GROUP_COLORS: Record<PlaneStateGroup, string> = {
+  backlog: '#a3a3a3',
+  unstarted: '#6b7280',
+  started: '#f59e0b',
+  completed: '#22c55e',
+  cancelled: '#ef4444'
+}
+
 export async function createPlaneState(
   args: PlaneCreateStateArgs
 ): Promise<PlaneStateMutationResult> {
@@ -170,9 +181,12 @@ export async function createPlaneState(
   }
   await acquire()
   try {
-    const body: PlaneRecord = { name: args.name, group: args.group }
-    if (args.color !== undefined) {
-      body.color = args.color
+    // Plane requires a hex `color` on state creation (POST 400s without it),
+    // so fall back to a sensible per-group default when the caller omits one.
+    const body: PlaneRecord = {
+      name: args.name,
+      group: args.group,
+      color: args.color ?? DEFAULT_STATE_GROUP_COLORS[args.group]
     }
     const created = await planeRequest<PlaneRecord>(client, statesBase(client, args.projectId), {
       method: 'POST',

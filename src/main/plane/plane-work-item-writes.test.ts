@@ -322,7 +322,8 @@ describe('createPlaneState', () => {
 
     expect(capturedMethod).toBe('POST')
     expect(capturedPath).toBe('/api/v1/workspaces/acme/projects/proj-1/states/')
-    expect(capturedBody).toEqual({ name: 'In Review', group: 'started' })
+    // color is required by the API; omitting it falls back to the group default.
+    expect(capturedBody).toEqual({ name: 'In Review', group: 'started', color: '#f59e0b' })
     expect(result).toEqual({
       ok: true,
       state: {
@@ -335,7 +336,7 @@ describe('createPlaneState', () => {
     })
   })
 
-  it('includes color in the body only when provided', async () => {
+  it('uses the explicit color when provided (overriding the group default)', async () => {
     const { createPlaneState } = await import('./plane-work-item-writes')
     getClientsMock.mockReturnValue([client()])
     let capturedBody: unknown

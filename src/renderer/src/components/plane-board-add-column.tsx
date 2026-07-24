@@ -94,7 +94,7 @@ export function PlaneBoardAddColumn({ onCreate }: PlaneBoardAddColumnProps): Rea
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-full w-52 shrink-0 flex-col items-center justify-start rounded-md border border-dashed border-border/50 bg-muted/10 px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-ring/50 hover:bg-accent/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex w-52 shrink-0 self-start items-center justify-center rounded-md border border-dashed border-border/50 bg-muted/10 px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-ring/50 hover:bg-accent/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <span className="flex items-center gap-1.5">
           <Plus className="size-3.5" />
@@ -105,7 +105,7 @@ export function PlaneBoardAddColumn({ onCreate }: PlaneBoardAddColumnProps): Rea
   }
 
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-3">
+    <div className="flex w-72 shrink-0 self-start flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-3">
       <Input
         ref={inputRef}
         value={name}
