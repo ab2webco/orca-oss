@@ -1789,6 +1789,80 @@ const api = {
     }): Promise<JiraProjectStatusOrder> => ipcRenderer.invoke('jira:getProjectStatusOrder', args)
   },
 
+  plane: {
+    connect: (args: {
+      baseUrl: string
+      workspaceSlug: string
+      apiKey: string
+    }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:connect', args),
+
+    disconnect: (args?: { workspaceId?: string }): Promise<void> =>
+      ipcRenderer.invoke('plane:disconnect', args),
+
+    selectWorkspace: (args: { workspaceId: string }): Promise<unknown> =>
+      ipcRenderer.invoke('plane:selectWorkspace', args),
+
+    status: (): Promise<unknown> => ipcRenderer.invoke('plane:status'),
+
+    testConnection: (args?: {
+      workspaceId?: string
+    }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:testConnection', args),
+
+    listWorkItems: (args?: {
+      projectId?: string
+      filter?: 'assigned' | 'created' | 'all' | 'done'
+      workspaceId?: string
+    }): Promise<unknown[]> => ipcRenderer.invoke('plane:listWorkItems', args),
+
+    searchWorkItems: (args: {
+      query: string
+      projectId?: string
+      workspaceId?: string
+    }): Promise<unknown[]> => ipcRenderer.invoke('plane:searchWorkItems', args),
+
+    getWorkItem: (args: {
+      workItemId: string
+      projectId?: string
+      workspaceId?: string
+    }): Promise<unknown> => ipcRenderer.invoke('plane:getWorkItem', args),
+
+    updateWorkItem: (args: {
+      projectId: string
+      workItemId: string
+      workspaceId?: string
+      updates: unknown
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:updateWorkItem', args),
+
+    addWorkItemComment: (args: {
+      projectId: string
+      workItemId: string
+      body: string
+      workspaceId?: string
+    }): Promise<{ ok: true; id: string } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:addWorkItemComment', args),
+
+    listWorkItemComments: (args: {
+      projectId: string
+      workItemId: string
+      workspaceId?: string
+    }): Promise<unknown[]> => ipcRenderer.invoke('plane:listWorkItemComments', args),
+
+    listProjects: (args?: { workspaceId?: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('plane:listProjects', args),
+
+    listStates: (args: { projectId: string; workspaceId?: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('plane:listStates', args),
+
+    listLabels: (args: { projectId: string; workspaceId?: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('plane:listLabels', args),
+
+    listMembers: (args?: { workspaceId?: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('plane:listMembers', args)
+  },
+
   starNag: {
     onShow: (
       callback: (payload?: { mode?: 'gh' | 'web'; surface?: 'card' | 'toast' }) => void

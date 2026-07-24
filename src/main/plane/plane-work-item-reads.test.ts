@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlaneClientForWorkspace } from './client'
 
-const { acquireMock, releaseMock, getClientsMock, planeRequestMock } = vi.hoisted(() => ({
+const {
+  acquireMock,
+  releaseMock,
+  getClientsMock,
+  planeRequestMock,
+  clearWorkspaceTokenOnAuthErrorMock
+} = vi.hoisted(() => ({
   acquireMock: vi.fn(async () => undefined),
   releaseMock: vi.fn(),
   getClientsMock: vi.fn(),
-  planeRequestMock: vi.fn()
+  planeRequestMock: vi.fn(),
+  clearWorkspaceTokenOnAuthErrorMock: vi.fn()
 }))
 
 vi.mock('./client', () => ({
   acquire: acquireMock,
   release: releaseMock,
   getClients: getClientsMock,
-  planeRequest: planeRequestMock
+  planeRequest: planeRequestMock,
+  clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
 }))
 
 function client(workspaceSlug: string): PlaneClientForWorkspace {
@@ -37,6 +45,35 @@ beforeEach(() => {
   releaseMock.mockClear()
   getClientsMock.mockReset()
   planeRequestMock.mockReset()
+  clearWorkspaceTokenOnAuthErrorMock.mockClear()
+})
+
+describe('401 token clearing (deferred from Slice 4/5)', () => {
+  it('clears the workspace token when listStates hits an auth error', async () => {
+    const { listStates } = await import('./plane-work-item-reads')
+    const acme = client('acme')
+    getClientsMock.mockReturnValue([acme])
+    const authError = new Error('Unauthorized')
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await listStates('proj-1', 'acme')
+
+    expect(result).toEqual([])
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('clears the workspace token when listMembers hits an auth error', async () => {
+    const { listMembers } = await import('./plane-work-item-reads')
+    const acme = client('acme')
+    getClientsMock.mockReturnValue([acme])
+    const authError = new Error('Unauthorized')
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await listMembers('acme')
+
+    expect(result).toEqual([])
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
 })
 
 describe('listProjects', () => {

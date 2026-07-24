@@ -697,6 +697,35 @@ import {
   searchIssues as searchJiraIssues,
   updateIssue as updateJiraIssue
 } from '../jira/issues'
+import { connect as connectPlane } from '../plane/client'
+import {
+  disconnect as disconnectPlane,
+  selectWorkspace as selectPlaneWorkspace,
+  status as getPlaneStatus,
+  testConnection as testPlaneConnection
+} from '../plane/plane-connection-lifecycle'
+import {
+  getWorkItem as getPlaneWorkItem,
+  listWorkItems as listPlaneWorkItems,
+  searchWorkItems as searchPlaneWorkItems
+} from '../plane/work-items'
+import {
+  addWorkItemComment as addPlaneWorkItemComment,
+  listWorkItemComments as listPlaneWorkItemComments,
+  updateWorkItem as updatePlaneWorkItem
+} from '../plane/plane-work-item-writes'
+import {
+  listLabels as listPlaneLabels,
+  listMembers as listPlaneMembers,
+  listProjects as listPlaneProjects,
+  listStates as listPlaneStates
+} from '../plane/plane-work-item-reads'
+import type {
+  PlaneConnectArgs,
+  PlaneWorkItemFilter,
+  PlaneWorkItemUpdate,
+  PlaneWorkspaceSelection
+} from '../../shared/plane-types'
 import {
   clearProjectItemFieldValue,
   getProjectViewTable,
@@ -29884,6 +29913,101 @@ export class OrcaRuntimeService {
     siteId?: string
   ): ReturnType<typeof getJiraProjectStatusOrder> {
     return getJiraProjectStatusOrder(projectKey, siteId)
+  }
+
+  // ── Plane integration ──
+
+  planeConnect(args: PlaneConnectArgs): ReturnType<typeof connectPlane> {
+    return connectPlane(args)
+  }
+
+  planeDisconnect(workspaceId?: string): { ok: true } {
+    disconnectPlane(workspaceId ? { workspaceId } : undefined)
+    return { ok: true }
+  }
+
+  planeSelectWorkspace(workspaceId: PlaneWorkspaceSelection): ReturnType<typeof getPlaneStatus> {
+    return selectPlaneWorkspace({ workspaceId })
+  }
+
+  planeStatus(): ReturnType<typeof getPlaneStatus> {
+    return getPlaneStatus()
+  }
+
+  planeTestConnection(workspaceId?: string): ReturnType<typeof testPlaneConnection> {
+    return testPlaneConnection({ workspaceId })
+  }
+
+  planeListWorkItems(args: {
+    projectId?: string
+    filter: PlaneWorkItemFilter
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof listPlaneWorkItems> {
+    return listPlaneWorkItems(args)
+  }
+
+  planeSearchWorkItems(args: {
+    query: string
+    projectId?: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof searchPlaneWorkItems> {
+    return searchPlaneWorkItems(args)
+  }
+
+  planeGetWorkItem(args: {
+    workItemId: string
+    projectId?: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof getPlaneWorkItem> {
+    return getPlaneWorkItem(args)
+  }
+
+  planeUpdateWorkItem(args: {
+    projectId: string
+    workItemId: string
+    workspaceId?: PlaneWorkspaceSelection
+    updates: PlaneWorkItemUpdate
+  }): ReturnType<typeof updatePlaneWorkItem> {
+    return updatePlaneWorkItem(args)
+  }
+
+  planeAddWorkItemComment(args: {
+    projectId: string
+    workItemId: string
+    body: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof addPlaneWorkItemComment> {
+    return addPlaneWorkItemComment(args)
+  }
+
+  planeListWorkItemComments(args: {
+    projectId: string
+    workItemId: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof listPlaneWorkItemComments> {
+    return listPlaneWorkItemComments(args)
+  }
+
+  planeListProjects(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneProjects> {
+    return listPlaneProjects(workspaceId)
+  }
+
+  planeListStates(
+    projectId: string,
+    workspaceId?: PlaneWorkspaceSelection
+  ): ReturnType<typeof listPlaneStates> {
+    return listPlaneStates(projectId, workspaceId)
+  }
+
+  planeListLabels(
+    projectId: string,
+    workspaceId?: PlaneWorkspaceSelection
+  ): ReturnType<typeof listPlaneLabels> {
+    return listPlaneLabels(projectId, workspaceId)
+  }
+
+  planeListMembers(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneMembers> {
+    return listPlaneMembers(workspaceId)
   }
 
   // ── Browser automation ──

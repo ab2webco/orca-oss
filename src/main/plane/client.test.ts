@@ -258,6 +258,33 @@ describe('isAuthError', () => {
   })
 })
 
+describe('clearWorkspaceTokenOnAuthError', () => {
+  it('deletes the saved token on a 401, so the workspace drops out of status()', async () => {
+    const { connect, status, getClients, PlaneApiError, clearWorkspaceTokenOnAuthError } =
+      await loadClientModule()
+    mockConnectSuccess()
+    await connect({ baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', apiKey: 'secret-key' })
+    expect(status().connected).toBe(true)
+    const [connectedClient] = getClients('all')
+
+    clearWorkspaceTokenOnAuthError(connectedClient!, new PlaneApiError('Unauthorized', 401))
+
+    expect(status().connected).toBe(false)
+  })
+
+  it('leaves the token intact for a non-401 error (e.g. 403 workspace-membership gap)', async () => {
+    const { connect, status, getClients, PlaneApiError, clearWorkspaceTokenOnAuthError } =
+      await loadClientModule()
+    mockConnectSuccess()
+    await connect({ baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', apiKey: 'secret-key' })
+    const [connectedClient] = getClients('all')
+
+    clearWorkspaceTokenOnAuthError(connectedClient!, new PlaneApiError('Forbidden', 403))
+
+    expect(status().connected).toBe(true)
+  })
+})
+
 describe('credential storage', () => {
   it('falls back to plaintext with exactly one console.warn when safeStorage is unavailable', async () => {
     const { connect } = await loadClientModule({ encryptionAvailable: false })
