@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
@@ -94,18 +96,21 @@ export function ClaudeAccountSwitchList({
     const isActive = account.id === activeAccountId
     const modelSuffix =
       isActive && activeModel && account.authMethod !== 'custom-endpoint' ? activeModel : null
+    // Why: a radio item auto-renders the active dot (matching the "Assign account"
+    // submenu) via the group value below, so OAuth and custom-endpoint (z.ai) rows
+    // both mark the active account — the plain item showed nothing for endpoints.
     return (
-      <DropdownMenuItem key={account.id} onSelect={() => onSelect(account)}>
+      <DropdownMenuRadioItem key={account.id} value={account.id} onSelect={() => onSelect(account)}>
         <span className="min-w-0 flex-1 truncate">{claudeAccountSwitchLabel(account)}</span>
         {modelSuffix ? (
           <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">{modelSuffix}</span>
         ) : null}
-      </DropdownMenuItem>
+      </DropdownMenuRadioItem>
     )
   }
 
   return (
-    <>
+    <DropdownMenuRadioGroup value={activeAccountId ?? ''}>
       {oauthAccounts.length > 0 ? (
         <>
           <DropdownMenuLabel className={SECTION_LABEL_CLASS}>
@@ -129,6 +134,6 @@ export function ClaudeAccountSwitchList({
           {endpointAccounts.map(renderAccount)}
         </>
       ) : null}
-    </>
+    </DropdownMenuRadioGroup>
   )
 }
