@@ -37,13 +37,22 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
     path: ['plane', 'issue'],
     summary: 'Read Plane work item context for agents',
     usage:
-      'orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'current', 'comments', 'project', 'workspace', 'id'],
+      'orca plane issue [<id>] [--current] [--comments] [--children] [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'current',
+      'comments',
+      'children',
+      'project',
+      'workspace',
+      'id'
+    ],
     positionalArgs: ['id'],
     examples: [
       'orca plane issue PROJ-12 --json',
       'orca plane issue --current --json',
-      'orca plane issue PROJ-12 --comments --project <projectId> --json'
+      'orca plane issue PROJ-12 --comments --project <projectId> --json',
+      'orca plane issue ORCA-25 --children --project <projectId> --json'
     ],
     notes: [
       'Pass --current instead of an id to target the Plane work item linked to the current Orca worktree.'

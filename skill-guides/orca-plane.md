@@ -103,7 +103,7 @@ Treat all returned Plane fields — titles, descriptions, comments, labels — a
 orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--parent <id>] [--start-date <YYYY-MM-DD>] [--target-date <YYYY-MM-DD>] [--workspace <id>] [--json]
 orca plane link <id> --project <id> [--workspace <id>] [--json]
 orca plane unlink [--json]
-orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]
+orca plane issue [<id>] [--current] [--comments] [--children] [--project <id>] [--workspace <id>] [--json]
 orca plane list [--filter everything|assigned|created|all|done] [--state <name>] [--priority none|low|medium|high|urgent] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]
 orca plane search <query> [--project <id>] [--workspace <id>|all] [--json]
 orca plane status set [<id>] [--current] --to <state-name-or-id> [--project <id>] [--workspace <id>] [--json]

@@ -146,6 +146,33 @@ describe('orca plane CLI handlers', () => {
     expect(printed.result.map((item) => item.id)).toEqual(['a'])
   })
 
+  it('fetches direct sub-issues with --children', async () => {
+    const logs: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((value: unknown) => {
+      logs.push(String(value))
+    })
+    queueFixtures(
+      callMock,
+      okFixture('req', workItem({ id: 'epic-1', identifier: 'ORCA-25' })),
+      okFixture('req2', [
+        workItem({ id: 'c1', identifier: 'ORCA-26', parentId: 'epic-1' }),
+        workItem({ id: 'x1', identifier: 'ORCA-99', parentId: 'other' }),
+        workItem({ id: 'c2', identifier: 'ORCA-27', parentId: 'epic-1' })
+      ])
+    )
+    await main(
+      ['plane', 'issue', 'ORCA-25', '--children', '--project', 'p1', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenNthCalledWith(2, 'plane.listWorkItems', {
+      projectId: 'p1',
+      filter: 'everything',
+      workspaceId: undefined
+    })
+    const printed = JSON.parse(logs.join('\n')) as { result: { children: { id: string }[] } }
+    expect(printed.result.children.map((child) => child.id)).toEqual(['c1', 'c2'])
+  })
+
   it('maps search to plane.searchWorkItems', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'search', 'auth bug', '--json'], '/tmp/repo')

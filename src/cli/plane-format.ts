@@ -15,6 +15,8 @@ import type { PlaneCreatedWorkItem } from './plane-request-builders'
 export type PlaneIssueView = {
   workItem: PlaneWorkItem
   comments?: PlaneComment[]
+  /** Present when `--children` was passed: the work item's direct sub-issues. */
+  children?: PlaneWorkItem[]
 }
 
 function assigneeNames(workItem: PlaneWorkItem): string {
@@ -39,6 +41,12 @@ export function formatPlaneWorkItem(view: PlaneIssueView): string {
     lines.push(`Labels: ${item.labels.join(', ')}`)
   }
   lines.push(`Updated: ${item.updatedAt}`)
+  if (view.children) {
+    lines.push(`Children: ${view.children.length}`)
+    for (const child of view.children) {
+      lines.push(`  ${formatWorkItemRow(child)}`)
+    }
+  }
   if (view.comments) {
     lines.push(`Comments: ${view.comments.length}`)
     for (const comment of view.comments) {

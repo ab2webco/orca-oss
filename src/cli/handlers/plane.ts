@@ -85,6 +85,17 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
       )
     }
     const view: PlaneIssueView = { workItem }
+    if (flags.get('children') === true) {
+      // Why: Plane has no "get children" route and the self-hosted REST ignores
+      // pql, so fetch the project's items and keep the direct sub-issues — lets
+      // an agent read "how is this epic going?" without a separate list + filter.
+      const siblings = await client.call<PlaneWorkItem[]>('plane.listWorkItems', {
+        projectId: workItem.project.id,
+        filter: 'everything',
+        workspaceId
+      })
+      view.children = siblings.result.filter((child) => child.parentId === workItem.id)
+    }
     if (flags.get('comments') === true) {
       const comments = await client.call<PlaneComment[]>('plane.listWorkItemComments', {
         projectId: workItem.project.id,
