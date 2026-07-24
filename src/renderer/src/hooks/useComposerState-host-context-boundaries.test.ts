@@ -660,7 +660,8 @@ describe('useComposerState host-context boundaries', () => {
     expect(quickSubmit).toContain(
       'const promptLinkedWorkItem = agent === null ? null : submitLinkedWorkItem'
     )
-    expect(quickSubmit).toContain('resolveQuickCreateLinkedWorkItemPrompt(promptLinkedWorkItem')
+    expect(quickSubmit).toContain('resolveQuickCreateLinkedWorkItemPrompt(')
+    expect(quickSubmit).toContain('promptLinkedWorkItem,')
     expect(quickSubmit).not.toContain('explicitAgentChoice')
     expect(quickSubmit).not.toContain('shouldPrepareQuickLinkedWorkItemAgentPrompt')
     expect(HOOK_SOURCE).not.toContain('resolveQuickWorkspaceSubmitAgent')
@@ -701,6 +702,58 @@ describe('useComposerState host-context boundaries', () => {
     )
     expect(quickSubmit).toContain('agent === null || !quickDraftPrompt')
     expect(quickSubmit).toContain('startupPlan.draftPrompt = quickDraftPrompt')
+  })
+
+  it('keeps Plane starts out of issue-command templates and routes them through the Plane launch template (plane-launch-template slice 11)', () => {
+    // Regression guard: if these gates are not updated for 'plane', a Plane-linked
+    // item with no typed prompt silently falls back to the generic issueCommand
+    // template instead of settings.planeLaunchPromptTemplate — the spec's
+    // "most likely silent failure".
+    expect(HOOK_SOURCE).toMatch(
+      /willApplyIssueCommandAsPrompt[\s\S]*linkedWorkItemProvider !== 'linear' &&\s*linkedWorkItemProvider !== 'plane'/
+    )
+
+    const previewSection = sourceBetween(
+      HOOK_SOURCE,
+      'const shouldApplyLinkedOnlyTemplate =',
+      'const linkedOnlyTemplatePrompt'
+    )
+    expect(previewSection).toContain("linkedWorkItemProvider !== 'linear'")
+    expect(previewSection).toContain("linkedWorkItemProvider !== 'plane'")
+
+    const fullSubmit = sourceBetween(
+      HOOK_SOURCE,
+      'const submit = useCallback',
+      'const submitQuick = useCallback'
+    )
+    expect(fullSubmit).toContain("submitLinkedWorkItemProvider !== 'linear'")
+    expect(fullSubmit).toContain("submitLinkedWorkItemProvider !== 'plane'")
+    expect(fullSubmit).toMatch(
+      /submitShouldRunIssueAutomation[\s\S]*submitLinkedWorkItemProvider !== 'linear' &&\s*submitLinkedWorkItemProvider !== 'plane'/
+    )
+    // The templated path itself: a Plane-linked item's startup prompt is built
+    // from getLaunchPromptTemplateForProvider (planeLaunchPromptTemplate), not
+    // a hardcoded Linear-only template read.
+    expect(fullSubmit).toContain('const linkedPromptContext = getLinkedWorkItemPromptContext(')
+    expect(fullSubmit).toContain(
+      'getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)'
+    )
+    // The useCallback deps must react to launchPromptTemplates (linear + plane)
+    // so a saved Plane template is not stale-closed.
+    expect(fullSubmit).toContain('launchPromptTemplates,')
+    expect(HOOK_SOURCE).toContain(
+      'const launchPromptTemplates = useMemo(\n    () => ({\n      linearLaunchPromptTemplate: settings?.linearLaunchPromptTemplate,\n      planeLaunchPromptTemplate: settings?.planeLaunchPromptTemplate\n    }),\n    [settings?.linearLaunchPromptTemplate, settings?.planeLaunchPromptTemplate]\n  )'
+    )
+
+    const quickSubmit = sourceBetween(
+      HOOK_SOURCE,
+      'const submitQuick = useCallback',
+      'const createGateInput'
+    )
+    expect(quickSubmit).toContain('resolveQuickCreateLinkedWorkItemPrompt(')
+    expect(quickSubmit).toContain(
+      'getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)'
+    )
   })
 
   it('gates per-workspace environment recipe discovery behind the experimental setting', () => {

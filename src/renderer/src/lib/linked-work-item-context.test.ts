@@ -3,9 +3,12 @@ import { buildAgentPromptWithContext } from './new-workspace'
 import {
   buildContainedLinkedContextBlock,
   buildLinearLaunchContextBlock,
+  buildPlaneLaunchContextBlock,
   getLaunchableWorkItemDraftContent,
+  getLaunchPromptTemplateForProvider,
   getLinkedWorkItemPromptContext,
   LINKED_CONTEXT_BLOCK_MAX_CHARS,
+  renderLaunchTemplate,
   resolveQuickCreateLinkedWorkItemPrompt
 } from './linked-work-item-context'
 
@@ -26,6 +29,13 @@ const LINEAR_ITEM = {
       'Pass Linear issue details into the agent.'
     ].join('\n')
   }
+}
+
+const PLANE_ITEM = {
+  provider: 'plane' as const,
+  url: 'https://app.plane.so/acme/browse/PROJ-12',
+  title: 'Fix plane launch context handoff',
+  planeIdentifier: 'PROJ-12'
 }
 const PRODUCT_WORKFLOW_PHRASES = [
   'orca linear',
@@ -380,5 +390,149 @@ describe('buildAgentPromptWithContext', () => {
     )
     expectNoLinearTicketContent(prompt)
     expectNoProductWorkflowDirection(prompt)
+  })
+})
+
+describe('renderLaunchTemplate', () => {
+  it('substitutes {{identifier}} and {{url}} (Linear output stays byte-identical)', () => {
+    expect(
+      renderLaunchTemplate('Work on {{identifier}} — {{url}}', 'ENG-123', 'https://x/ENG-123')
+    ).toBe('Work on ENG-123 — https://x/ENG-123')
+  })
+
+  it('substitutes tokens for a Plane identifier and URL', () => {
+    expect(
+      renderLaunchTemplate('Work on {{identifier}} — {{url}}', 'PROJ-12', 'https://app.plane.so/x')
+    ).toBe('Work on PROJ-12 — https://app.plane.so/x')
+  })
+
+  it('drops a line left with an unresolved {{token}} after substitution', () => {
+    expect(
+      renderLaunchTemplate('{{identifier}}\nowner: {{missing}}\n{{url}}', 'PROJ-12', 'https://x')
+    ).toBe('PROJ-12\nhttps://x')
+  })
+
+  it('returns null when the rendered template is fully empty', () => {
+    expect(renderLaunchTemplate('{{missing}}', 'PROJ-12', 'https://x')).toBeNull()
+  })
+})
+
+describe('getLaunchPromptTemplateForProvider', () => {
+  it('returns the Linear template for a Linear provider', () => {
+    expect(
+      getLaunchPromptTemplateForProvider(
+        {
+          linearLaunchPromptTemplate: 'Do {{identifier}}',
+          planeLaunchPromptTemplate: 'Plane tmpl'
+        },
+        'linear'
+      )
+    ).toBe('Do {{identifier}}')
+  })
+
+  it('returns the Plane template for a Plane provider', () => {
+    expect(
+      getLaunchPromptTemplateForProvider(
+        {
+          linearLaunchPromptTemplate: 'Linear tmpl',
+          planeLaunchPromptTemplate: 'Do {{identifier}}'
+        },
+        'plane'
+      )
+    ).toBe('Do {{identifier}}')
+  })
+
+  it('returns undefined for providers without a launch template', () => {
+    expect(
+      getLaunchPromptTemplateForProvider(
+        { linearLaunchPromptTemplate: 'Linear tmpl', planeLaunchPromptTemplate: 'Plane tmpl' },
+        'github'
+      )
+    ).toBeUndefined()
+    expect(getLaunchPromptTemplateForProvider(undefined, 'linear')).toBeUndefined()
+    expect(getLaunchPromptTemplateForProvider(null, 'plane')).toBeUndefined()
+  })
+})
+
+describe('buildPlaneLaunchContextBlock', () => {
+  it('builds a link-only reference by default', () => {
+    expect(buildPlaneLaunchContextBlock({ identifier: 'PROJ-12', url: 'https://x' })).toBe(
+      'Linked Plane issue: PROJ-12\nhttps://x'
+    )
+  })
+
+  it('substitutes {{identifier}} and {{url}} from a custom template', () => {
+    expect(
+      buildPlaneLaunchContextBlock({
+        identifier: 'PROJ-12',
+        url: 'https://app.plane.so/acme/browse/PROJ-12',
+        template: 'Work on {{identifier}} — {{url}}'
+      })
+    ).toBe('Work on PROJ-12 — https://app.plane.so/acme/browse/PROJ-12')
+  })
+
+  it('falls back to the built-in output when the template is blank (parity with Linear)', () => {
+    expect(
+      buildPlaneLaunchContextBlock({
+        identifier: 'PROJ-12',
+        url: 'https://app.plane.so/acme/browse/PROJ-12',
+        template: '   '
+      })
+    ).toBe('Linked Plane issue: PROJ-12\nhttps://app.plane.so/acme/browse/PROJ-12')
+  })
+
+  it('returns null when the rendered template is empty', () => {
+    expect(
+      buildPlaneLaunchContextBlock({
+        identifier: 'PROJ-12',
+        url: 'https://x',
+        template: '{{missing}}'
+      })
+    ).toBeNull()
+  })
+})
+
+describe('Plane threaded through the shared launch-context helpers', () => {
+  it('threads the Plane template through getLinkedWorkItemPromptContext', () => {
+    expect(
+      getLinkedWorkItemPromptContext(PLANE_ITEM, 'Do {{identifier}}').linkedContextBlocks
+    ).toEqual(['Do PROJ-12'])
+  })
+
+  it('drafts a link-only Plane reference for Plane items with no template', () => {
+    const draft = getLaunchableWorkItemDraftContent({ pasteContent: '   ', ...PLANE_ITEM })
+    expect(draft).toBe(['Linked Plane issue: PROJ-12', PLANE_ITEM.url, ''].join('\n'))
+  })
+
+  it('threads the Plane template through getLaunchableWorkItemDraftContent', () => {
+    expect(
+      getLaunchableWorkItemDraftContent({
+        ...PLANE_ITEM,
+        pasteContent: '',
+        template: 'Do {{identifier}}'
+      })
+    ).toBe('Do PROJ-12\n')
+  })
+
+  it('threads the Plane template through resolveQuickCreateLinkedWorkItemPrompt', () => {
+    const result = resolveQuickCreateLinkedWorkItemPrompt(
+      { number: 0, ...PLANE_ITEM },
+      'note',
+      'Do {{identifier}}'
+    )
+    expect(result.draftPrompt).toBe('note\n\nDo PROJ-12\n')
+  })
+
+  it('does not fall back to the URL when a Plane template renders empty', () => {
+    expect(
+      resolveQuickCreateLinkedWorkItemPrompt({ number: 0, ...PLANE_ITEM }, 'note', '{{missing}}')
+    ).toEqual({ prompt: 'note', draftPrompt: null })
+  })
+
+  it('falls back to a link-only Plane reference for quick-create with no template', () => {
+    expect(resolveQuickCreateLinkedWorkItemPrompt({ number: 0, ...PLANE_ITEM }, 'note')).toEqual({
+      prompt: '',
+      draftPrompt: ['note', '', 'Linked Plane issue: PROJ-12', PLANE_ITEM.url, ''].join('\n')
+    })
   })
 })

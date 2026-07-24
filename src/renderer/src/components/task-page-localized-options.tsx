@@ -2,10 +2,12 @@ import React from 'react'
 import { Github, Gitlab, LayoutGrid, List } from 'lucide-react'
 
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { translate } from '@/i18n/i18n'
 import { getTaskPresetQuery } from '@/lib/new-workspace'
 import type { TaskProvider, TaskViewPresetId } from '../../../shared/types'
+import type { PlaneWorkItemFilter } from '../../../shared/plane-types'
 
 export type GitLabTaskFilter = 'opened' | 'merged' | 'closed' | 'all'
 export type GitLabIssueFilter = 'opened' | 'assigned-to-me'
@@ -124,12 +126,29 @@ export const getSourceOptions = createLocalizedCatalog((): SourceOption[] => [
     id: 'jira',
     label: translate('auto.components.TaskPage.9cd11ba218', 'Jira'),
     Icon: ({ className }) => <JiraIcon className={className} />
+  },
+  {
+    id: 'plane',
+    label: translate('auto.components.TaskPage.planeSourceLabel', 'Plane'),
+    Icon: ({ className }) => <PlaneIcon className={className} />
   }
 ])
 
 export const getJiraPresets = createLocalizedCatalog((): JiraPreset[] => [
   { id: 'assigned', label: translate('auto.components.TaskPage.1301d376f1', 'Assigned') },
   { id: 'reported', label: translate('auto.components.TaskPage.bd9965df51', 'Reported') },
+  { id: 'all', label: translate('auto.components.TaskPage.4b6e40e42c', 'All Open') },
+  { id: 'done', label: translate('auto.components.TaskPage.18451e99df', 'Done') }
+])
+
+// Why: Plane filters compile to PQL (not JQL like Jira), and 'reported' becomes
+// 'created' since that's Plane's PQL field name for work items you authored.
+export type PlanePresetId = PlaneWorkItemFilter
+export type PlanePreset = { id: PlanePresetId; label: string }
+
+export const getPlanePresets = createLocalizedCatalog((): PlanePreset[] => [
+  { id: 'assigned', label: translate('auto.components.TaskPage.1301d376f1', 'Assigned') },
+  { id: 'created', label: translate('auto.components.TaskPage.planeCreatedPreset', 'Created') },
   { id: 'all', label: translate('auto.components.TaskPage.4b6e40e42c', 'All Open') },
   { id: 'done', label: translate('auto.components.TaskPage.18451e99df', 'Done') }
 ])

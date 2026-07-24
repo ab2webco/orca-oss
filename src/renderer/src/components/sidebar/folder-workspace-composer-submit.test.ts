@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FolderWorkspace, ProjectGroup } from '../../../../shared/types'
+import type { FolderWorkspace, GlobalSettings, ProjectGroup } from '../../../../shared/types'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import type * as NewWorkspaceModule from '@/lib/new-workspace'
+import { useAppStore } from '@/store'
 
 const mocks = vi.hoisted(() => ({
   activateAndRevealFolderWorkspace: vi.fn(),
@@ -656,5 +657,37 @@ describe('buildFolderWorkspaceLinkedStartupPlan', () => {
     })
 
     expect(plan?.launchCommand).toBe('hermes --tui "--provider" "value with space"')
+  })
+
+  it('applies a custom Plane launch template to the quick-create draft (plane-launch-template slice 11)', () => {
+    const previousSettings = useAppStore.getState().settings
+    useAppStore.setState({
+      settings: {
+        planeLaunchPromptTemplate: 'Work on {{identifier}} — {{url}}'
+      } as GlobalSettings
+    })
+    try {
+      const plan = buildFolderWorkspaceLinkedStartupPlan({
+        agent: 'claude',
+        linkedWorkItem: {
+          provider: 'plane',
+          type: 'issue',
+          number: 0,
+          title: 'Fix plane quick create',
+          url: 'https://app.plane.so/acme/browse/PROJ-7',
+          planeIdentifier: 'PROJ-7'
+        },
+        note: '',
+        agentCmdOverrides: {},
+        platform: 'darwin',
+        isRemote: false
+      })
+
+      expect(plan?.launchCommand).toBe(
+        "claude --prefill 'Work on PROJ-7 — https://app.plane.so/acme/browse/PROJ-7'"
+      )
+    } finally {
+      useAppStore.setState({ settings: previousSettings })
+    }
   })
 })

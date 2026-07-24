@@ -41,6 +41,7 @@ export function PlaneIntegrationCard(): React.JSX.Element {
   const accountScope = getProviderAccountScope(settings)
   const subordinateRowClass = useIntegrationSubordinateRowClass('flex items-center gap-3')
   const accountScopeRowClass = useIntegrationSubordinateRowClass('text-xs')
+  const boardRowClass = useIntegrationSubordinateRowClass('space-y-2')
 
   const handleDisconnect = async (workspaceId?: string): Promise<void> => {
     await disconnectPlane(workspaceId)
@@ -192,7 +193,7 @@ export function PlaneIntegrationCard(): React.JSX.Element {
                 </div>
               )
             })}
-            <PlaneBoardSelector workspaces={workspaces} />
+            <PlaneBoardSelector workspaces={workspaces} className={boardRowClass} />
           </div>
         ) : connected ? (
           <>

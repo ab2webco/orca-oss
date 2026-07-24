@@ -73,6 +73,7 @@ import {
   type SetupConfig
 } from '@/lib/new-workspace'
 import {
+  getLaunchPromptTemplateForProvider,
   getLinkedWorkItemPromptContext,
   resolveQuickCreateLinkedWorkItemPrompt
 } from '@/lib/linked-work-item-context'
@@ -585,6 +586,16 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const projectHostSetups = useAppStore((s) => s.projectHostSetups)
   const activeRepoId = useAppStore((s) => s.activeRepoId)
   const settings = useAppStore((s) => s.settings)
+  // Why: narrows the getLaunchPromptTemplateForProvider dependency to just the
+  // two per-provider template fields, so unrelated settings churn doesn't
+  // invalidate submit/submitQuick memoization.
+  const launchPromptTemplates = useMemo(
+    () => ({
+      linearLaunchPromptTemplate: settings?.linearLaunchPromptTemplate,
+      planeLaunchPromptTemplate: settings?.planeLaunchPromptTemplate
+    }),
+    [settings?.linearLaunchPromptTemplate, settings?.planeLaunchPromptTemplate]
+  )
   const newWorkspaceDraft = useAppStore((s) => s.newWorkspaceDraft)
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const sparsePresetsByRepo = useAppStore((s) => s.sparsePresetsByRepo)
@@ -1444,12 +1455,13 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   )
   const setupPolicy: SetupRunPolicy = selectedRepo?.hookSettings?.setupRunPolicy ?? 'run-by-default'
   const linkedWorkItemProvider = linkedWorkItem ? getLinkedWorkItemProvider(linkedWorkItem) : null
-  // Why: the no-prompt+linked-item path rehydrates the issueCommand template into the prompt, but Linear starts never use it, so they must not wait.
+  // Why: the no-prompt+linked-item path rehydrates the issueCommand template into the prompt, but Linear/Plane starts never use it (they have their own launch template), so they must not wait.
   const willApplyIssueCommandAsPrompt =
     enableIssueAutomation &&
     !agentPrompt.trim() &&
     Boolean(linkedWorkItem) &&
-    linkedWorkItemProvider !== 'linear'
+    linkedWorkItemProvider !== 'linear' &&
+    linkedWorkItemProvider !== 'plane'
   const shouldWaitForIssueAutomationCheck =
     enableIssueAutomation &&
     (parsedLinkedIssueNumber !== null || willApplyIssueCommandAsPrompt) &&
@@ -1481,13 +1493,14 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       }),
     [agentPrompt, fallbackCreatureName, linkedPR, name, parsedLinkedIssueNumber]
   )
-  // Why: exclude Linear — its starts may carry only a neutral issue ref, whereas repo issue-command templates are product-authored workflow direction.
+  // Why: exclude Linear/Plane — their starts may carry only a neutral issue ref, whereas repo issue-command templates are product-authored workflow direction.
   const shouldApplyLinkedOnlyTemplate =
     enableIssueAutomation &&
     !agentPrompt.trim() &&
     Boolean(linkedWorkItem) &&
     hasLoadedIssueCommand &&
-    linkedWorkItemProvider !== 'linear'
+    linkedWorkItemProvider !== 'linear' &&
+    linkedWorkItemProvider !== 'plane'
   const linkedOnlyTemplatePrompt = useMemo(() => {
     if (!shouldApplyLinkedOnlyTemplate || !linkedWorkItem) {
       return ''
@@ -3395,7 +3408,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         !agentPrompt.trim() &&
         Boolean(submitLinkedWorkItem) &&
         hasLoadedIssueCommand &&
-        submitLinkedWorkItemProvider !== 'linear'
+        submitLinkedWorkItemProvider !== 'linear' &&
+        submitLinkedWorkItemProvider !== 'plane'
       const submitLinkedOnlyTemplatePrompt =
         submitShouldApplyLinkedOnlyTemplate && submitLinkedWorkItem
           ? renderIssueCommandTemplate(
@@ -3409,7 +3423,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           : ''
       const linkedPromptContext = getLinkedWorkItemPromptContext(
         submitLinkedWorkItem,
-        settings?.linearLaunchPromptTemplate
+        getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)
       )
       const submitStartupPrompt = submitShouldApplyLinkedOnlyTemplate
         ? buildAgentPromptWithContext(
@@ -3427,6 +3441,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       const submitShouldRunIssueAutomation =
         enableIssueAutomation &&
         submitLinkedWorkItemProvider !== 'linear' &&
+        submitLinkedWorkItemProvider !== 'plane' &&
         submitLinkedIssueNumber !== null &&
         issueCommandTemplate.length > 0 &&
         !submitShouldApplyLinkedOnlyTemplate
@@ -3675,8 +3690,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     settings?.agentCmdOverrides,
     settings?.agentDefaultArgs,
     settings?.agentDefaultEnv,
+    launchPromptTemplates,
     settings?.autoRenameBranchFromWork,
-    settings?.linearLaunchPromptTemplate,
     settings?.nativeChatSessionOptions,
     smartNameMode,
     setSidebarOpen,
@@ -3902,7 +3917,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           resolveQuickCreateLinkedWorkItemPrompt(
             promptLinkedWorkItem,
             trimmedNote,
-            settings?.linearLaunchPromptTemplate
+            getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)
           )
         const draftLaunchPlan =
           agent === null || !quickDraftPrompt
@@ -4135,8 +4150,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       settings?.agentCmdOverrides,
       settings?.agentDefaultArgs,
       settings?.agentDefaultEnv,
+      launchPromptTemplates,
       settings?.autoRenameBranchFromWork,
-      settings?.linearLaunchPromptTemplate,
       settings?.nativeChatSessionOptions,
       smartNameMode,
       disabledTuiAgents,

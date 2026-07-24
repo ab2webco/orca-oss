@@ -1,10 +1,21 @@
 import type { TaskProvider } from '../../../shared/types'
+import {
+  buildLinearLaunchContextBlock,
+  buildPlaneLaunchContextBlock,
+  isLinearWorkItemReference,
+  isPlaneWorkItemReference,
+  type LinkedWorkItemContext
+} from './launch-prompt-template'
 
-export type LinkedWorkItemContext = {
-  provider: TaskProvider
-  version: 1
-  renderedText: string
-}
+export type { LinkedWorkItemContext } from './launch-prompt-template'
+export {
+  buildLinearLaunchContextBlock,
+  buildPlaneLaunchContextBlock,
+  getLaunchPromptTemplateForProvider,
+  renderLaunchTemplate,
+  type LinearLaunchContextArgs,
+  type PlaneLaunchContextArgs
+} from './launch-prompt-template'
 
 export const LINKED_CONTEXT_BLOCK_MAX_CHARS = 12000
 const LINKED_CONTEXT_TRUNCATION_MARKER = '[linked context truncated]'
@@ -56,75 +67,6 @@ function formatDraftContextBlock(value: string): string {
   // Why: Codex keeps the cursor on the final pasted line unless the draft ends
   // with a newline; leave linked source blocks visually separated for review.
   return `${value.trimEnd()}\n`
-}
-
-export type LinearLaunchContextArgs = {
-  provider?: TaskProvider
-  identifier: string | undefined
-  title?: string
-  url?: string
-  template?: string
-}
-
-function isLinearWorkItemReference(
-  args:
-    | {
-        provider?: TaskProvider
-        linearIdentifier?: string
-        linkedContext?: LinkedWorkItemContext
-      }
-    | null
-    | undefined
-): boolean {
-  return (
-    args?.provider === 'linear' ||
-    Boolean(args?.linearIdentifier?.trim()) ||
-    args?.linkedContext?.provider === 'linear'
-  )
-}
-
-const LINEAR_TEMPLATE_LINE_SPLIT = /\r\n|\r|\n/
-const UNRESOLVED_TEMPLATE_PLACEHOLDER = /\{\{[^{}]+\}\}/
-
-// Why: user templates are free text; substitute the two known tokens, then drop
-// blank lines (and lines left with an unknown placeholder) so an unfilled
-// placeholder never leaves a dangling or literal-token line.
-function renderLinearLaunchTemplate(
-  template: string,
-  identifier: string,
-  url: string
-): string | null {
-  const rendered = template
-    .split('{{identifier}}')
-    .join(identifier)
-    .split('{{url}}')
-    .join(url)
-    .split(LINEAR_TEMPLATE_LINE_SPLIT)
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0 && !UNRESOLVED_TEMPLATE_PLACEHOLDER.test(line))
-    .join('\n')
-  return rendered.length > 0 ? rendered : null
-}
-
-// Why: Linear ticket prose is third-party source data; terminal drafts may
-// carry only stable identity/link fields from the selected issue.
-export function buildLinearLaunchContextBlock(args: LinearLaunchContextArgs): string | null {
-  const identifier = args.identifier?.trim()
-  const url = args.url?.trim()
-  if (!identifier && !url) {
-    return null
-  }
-
-  const template = args.template?.trim()
-  if (template) {
-    return renderLinearLaunchTemplate(template, identifier ?? '', url ?? '')
-  }
-
-  const lines = [identifier ? `Linked Linear issue: ${identifier}` : 'Linked Linear issue']
-  if (url) {
-    lines.push(url)
-  }
-  return lines.join('\n')
 }
 
 function escapeLinkedContextControlChars(value: string): string {
@@ -182,8 +124,14 @@ function capLinkedContextSourceLines(args: { sourceLines: string; fixedChars: nu
 export function getLinkedWorkItemPromptContext(
   linkedWorkItem:
     | (Pick<
-        { provider?: TaskProvider; url: string; title?: string; linearIdentifier?: string },
-        'provider' | 'url' | 'title' | 'linearIdentifier'
+        {
+          provider?: TaskProvider
+          url: string
+          title?: string
+          linearIdentifier?: string
+          planeIdentifier?: string
+        },
+        'provider' | 'url' | 'title' | 'linearIdentifier' | 'planeIdentifier'
       > & { linkedContext?: LinkedWorkItemContext })
     | null
     | undefined,
@@ -201,6 +149,18 @@ export function getLinkedWorkItemPromptContext(
       ? { linkedUrls: [], linkedContextBlocks: [linearBlock] }
       : { linkedUrls: [], linkedContextBlocks: [] }
   }
+  if (isPlaneWorkItemReference(linkedWorkItem)) {
+    const planeBlock = buildPlaneLaunchContextBlock({
+      provider: linkedWorkItem?.provider,
+      identifier: linkedWorkItem?.planeIdentifier,
+      title: linkedWorkItem?.title,
+      url: linkedWorkItem?.url,
+      template
+    })
+    return planeBlock
+      ? { linkedUrls: [], linkedContextBlocks: [planeBlock] }
+      : { linkedUrls: [], linkedContextBlocks: [] }
+  }
   const linkedUrl = linkedWorkItem?.url?.trim()
   return linkedUrl
     ? { linkedUrls: [linkedUrl], linkedContextBlocks: [] }
@@ -213,6 +173,7 @@ export function getLaunchableWorkItemDraftContent(args: {
   url: string
   title?: string
   linearIdentifier?: string
+  planeIdentifier?: string
   linkedContext?: LinkedWorkItemContext
   template?: string
 }): string {
@@ -229,6 +190,16 @@ export function getLaunchableWorkItemDraftContent(args: {
     })
     return linearBlock ? formatDraftContextBlock(linearBlock) : ''
   }
+  if (isPlaneWorkItemReference(args)) {
+    const planeBlock = buildPlaneLaunchContextBlock({
+      provider: args.provider,
+      identifier: args.planeIdentifier,
+      title: args.title,
+      url: args.url,
+      template: args.template
+    })
+    return planeBlock ? formatDraftContextBlock(planeBlock) : ''
+  }
   return args.url
 }
 
@@ -241,8 +212,9 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
           url: string
           title?: string
           linearIdentifier?: string
+          planeIdentifier?: string
         },
-        'provider' | 'number' | 'url' | 'title' | 'linearIdentifier'
+        'provider' | 'number' | 'url' | 'title' | 'linearIdentifier' | 'planeIdentifier'
       > & { linkedContext?: LinkedWorkItemContext })
     | null
     | undefined,
@@ -251,6 +223,7 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
 ): { prompt: string; draftPrompt: string | null } {
   const trimmedNote = note.trim()
   const isLinear = isLinearWorkItemReference(linkedWorkItem)
+  const isPlane = !isLinear && isPlaneWorkItemReference(linkedWorkItem)
   const linearBlock = isLinear
     ? buildLinearLaunchContextBlock({
         provider: linkedWorkItem?.provider,
@@ -260,13 +233,26 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
         template
       })
     : null
-  const linearDraft = linearBlock ? formatDraftContextBlock(linearBlock) : null
+  const planeBlock = isPlane
+    ? buildPlaneLaunchContextBlock({
+        provider: linkedWorkItem?.provider,
+        identifier: linkedWorkItem?.planeIdentifier,
+        title: linkedWorkItem?.title,
+        url: linkedWorkItem?.url,
+        template
+      })
+    : null
+  const templatedDraft = linearBlock
+    ? formatDraftContextBlock(linearBlock)
+    : planeBlock
+      ? formatDraftContextBlock(planeBlock)
+      : null
   const linkedUrl = linkedWorkItem?.url?.trim() || null
-  // Why: a non-blank Linear template that renders empty means "no context" — don't
-  // fall back to injecting the raw URL (keeps parity with the composer path).
-  const draftPrompt = linearDraft
-    ? [trimmedNote, linearDraft].filter(Boolean).join('\n\n')
-    : isLinear && template?.trim()
+  // Why: a non-blank Linear/Plane template that renders empty means "no context" —
+  // don't fall back to injecting the raw URL (keeps parity with the composer path).
+  const draftPrompt = templatedDraft
+    ? [trimmedNote, templatedDraft].filter(Boolean).join('\n\n')
+    : (isLinear || isPlane) && template?.trim()
       ? null
       : linkedUrl
         ? [trimmedNote, linkedUrl].filter(Boolean).join('\n\n')

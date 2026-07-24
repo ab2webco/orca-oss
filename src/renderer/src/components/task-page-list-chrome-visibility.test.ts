@@ -10,6 +10,7 @@ const baseState: TaskPageListChromeVisibilityState = {
   hasGitHubDetail: false,
   hasGitLabDetail: false,
   hasJiraDetail: false,
+  hasPlaneDetail: false,
   hasLinearIssueDetail: false,
   hasLinearProjectContext: false,
   hasLinearViewContext: false
@@ -45,6 +46,13 @@ describe('shouldHideTaskPageListChrome', () => {
         hasLinearProjectContext: true
       })
     ).toBe(true)
+    expect(
+      shouldHideTaskPageListChrome({
+        ...baseState,
+        taskSource: 'plane',
+        hasPlaneDetail: true
+      })
+    ).toBe(true)
   })
 
   it('keeps chrome visible when only another provider has stale detail state', () => {
@@ -63,6 +71,14 @@ describe('shouldHideTaskPageListChrome', () => {
         taskSource: 'jira',
         hasGitHubDetail: true,
         hasGitLabDetail: true,
+        hasLinearIssueDetail: true
+      })
+    ).toBe(false)
+    expect(
+      shouldHideTaskPageListChrome({
+        ...baseState,
+        taskSource: 'plane',
+        hasJiraDetail: true,
         hasLinearIssueDetail: true
       })
     ).toBe(false)

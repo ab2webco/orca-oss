@@ -1617,7 +1617,10 @@ describe('createUISlice hydratePersistedUI', () => {
           linearPreset: 'completed',
           linearQuery: 'label:bug',
           jiraPreset: 'reported',
-          jiraQuery: 99
+          jiraQuery: 99,
+          planePreset: 'created',
+          planeQuery: 99,
+          planeProjectId: 'proj-2'
         } as unknown as PersistedUIState['taskResumeState']
       })
     )
@@ -1626,7 +1629,9 @@ describe('createUISlice hydratePersistedUI', () => {
       githubMode: 'project',
       linearPreset: 'completed',
       linearQuery: 'label:bug',
-      jiraPreset: 'reported'
+      jiraPreset: 'reported',
+      planePreset: 'created',
+      planeProjectId: 'proj-2'
     })
   })
 

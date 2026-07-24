@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import '@testing-library/jest-dom/vitest'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { PlaneProject, PlaneWorkspace } from '../../../../shared/plane-types'
 import { PlaneBoardSelector } from './plane-board-selector'
 
@@ -36,9 +38,6 @@ const projectsByWorkspace: Record<string, PlaneProject[]> = {
   'ws-2': [{ id: 'proj-2', identifier: 'BET', name: 'Beta Launch' }]
 }
 
-let root: Root | null = null
-let container: HTMLDivElement | null = null
-
 function installStore(
   defaultPlaneSelection: StoreState['settings']['defaultPlaneSelection'],
   updateSettings: StoreState['updateSettings'] = vi.fn(async () => {})
@@ -53,72 +52,29 @@ function installStore(
   return state
 }
 
-async function renderSelector(): Promise<HTMLDivElement> {
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-  await act(async () => {
-    root?.render(<PlaneBoardSelector workspaces={workspaces} />)
-  })
-  return container
-}
-
-function selectByLabel(el: HTMLDivElement, label: string): HTMLSelectElement {
-  const select = Array.from(el.querySelectorAll('select')).find(
-    (s) => s.getAttribute('aria-label') === label
-  )
-  if (!select) {
-    throw new Error(`Select "${label}" not found`)
-  }
-  return select
-}
-
-function setSelectValue(select: HTMLSelectElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set
-  setter?.call(select, value)
-  select.dispatchEvent(new Event('change', { bubbles: true }))
-}
-
 describe('PlaneBoardSelector', () => {
-  afterEach(async () => {
-    if (root) {
-      await act(async () => {
-        root?.unmount()
-      })
-    }
-    root = null
-    container?.remove()
-    container = null
+  afterEach(() => {
+    cleanup()
     mocks.store.current = null
   })
 
-  it('renders nothing when there are no connected workspaces', async () => {
+  it('renders nothing when there are no connected workspaces', () => {
     installStore(null)
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => {
-      root?.render(<PlaneBoardSelector workspaces={[]} />)
-    })
+    const { container } = render(<PlaneBoardSelector workspaces={[]} />)
     expect(container.textContent).toBe('')
   })
 
   it('persists defaultPlaneSelection when a workspace and project are chosen', async () => {
+    const user = userEvent.setup()
     const updateSettings = vi.fn(async () => {})
     installStore(null, updateSettings)
-    const rendered = await renderSelector()
+    render(<PlaneBoardSelector workspaces={workspaces} />)
 
-    await act(async () => {
-      setSelectValue(selectByLabel(rendered, 'Plane workspace'), 'ws-2')
-    })
-    // Switching workspaces loads that workspace's project list asynchronously.
-    await act(async () => {
-      await Promise.resolve()
-    })
+    await user.click(screen.getByRole('combobox', { name: 'Plane workspace' }))
+    await user.click(screen.getByRole('option', { name: 'Beta' }))
 
-    await act(async () => {
-      setSelectValue(selectByLabel(rendered, 'Plane project'), 'proj-2')
-    })
+    await user.click(screen.getByRole('combobox', { name: 'Plane project' }))
+    await user.click(screen.getByRole('option', { name: 'Beta Launch' }))
 
     expect(updateSettings).toHaveBeenCalledWith({
       defaultPlaneSelection: { workspaceSlug: 'beta', projectId: 'proj-2' }
@@ -127,12 +83,22 @@ describe('PlaneBoardSelector', () => {
 
   it('preselects the persisted workspace and project on mount', async () => {
     installStore({ workspaceSlug: 'beta', projectId: 'proj-2' })
-    const rendered = await renderSelector()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    render(<PlaneBoardSelector workspaces={workspaces} />)
 
-    expect(selectByLabel(rendered, 'Plane workspace').value).toBe('ws-2')
-    expect(selectByLabel(rendered, 'Plane project').value).toBe('proj-2')
+    expect(await screen.findByRole('combobox', { name: 'Plane workspace' })).toHaveTextContent(
+      'Beta'
+    )
+    expect(await screen.findByRole('combobox', { name: 'Plane project' })).toHaveTextContent(
+      'Beta Launch'
+    )
+  })
+
+  it('applies the supplied className to the root instead of the default stacked spacing', () => {
+    installStore(null)
+    const { container } = render(
+      <PlaneBoardSelector workspaces={workspaces} className="custom-row-class" />
+    )
+    expect(container.firstElementChild).toHaveClass('custom-row-class')
+    expect(container.firstElementChild).not.toHaveClass('space-y-2')
   })
 })

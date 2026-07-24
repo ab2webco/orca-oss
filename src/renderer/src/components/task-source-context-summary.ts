@@ -45,6 +45,7 @@ export function getTaskSourceContextSummary(args: {
   selectedRepoCount?: number
   linearWorkspaceName?: string | null
   jiraSiteName?: string | null
+  planeWorkspaceName?: string | null
 }): TaskSourceContextSummary {
   switch (args.provider) {
     case 'github':
@@ -60,7 +61,7 @@ export function getTaskSourceContextSummary(args: {
     case 'jira':
     case 'plane':
       return getAccountBackedTaskSourceSummary(args.providerLabel, {
-        accountLabel: args.provider === 'jira' ? args.jiraSiteName : null,
+        accountLabel: args.provider === 'jira' ? args.jiraSiteName : args.planeWorkspaceName,
         accountHostId: args.accountHostId,
         hostLabelById: args.hostLabelById,
         hostAvailability: args.hostAvailability

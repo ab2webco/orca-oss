@@ -428,6 +428,41 @@ describe('launchWorkItemDirect', () => {
     expect(pasteDraftWhenAgentReady).not.toHaveBeenCalled()
   })
 
+  it('applies a custom Plane launch template end-to-end for a Plane-sourced launch (plane-launch-template slice 11)', async () => {
+    mocks.ensureDetectedAgents.mockResolvedValue(['claude'])
+    mocks.store.settings = {
+      defaultTuiAgent: 'codex',
+      disabledTuiAgents: [],
+      agentCmdOverrides: {},
+      planeLaunchPromptTemplate: 'Work on {{identifier}} — {{url}}'
+    }
+    const { launchWorkItemDirect } = await import('./launch-work-item-direct')
+
+    await expect(
+      launchWorkItemDirect({
+        repoId: 'repo-1',
+        launchSource: 'task_page',
+        openModalFallback: vi.fn(),
+        agentOverride: 'claude',
+        item: {
+          provider: 'plane',
+          type: 'issue',
+          number: null,
+          title: 'Fix plane launch parity',
+          url: 'https://app.plane.so/acme/browse/PROJ-12',
+          planeIdentifier: 'PROJ-12'
+        }
+      })
+    ).resolves.toBe(true)
+
+    expect(buildAgentDraftLaunchPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: 'claude',
+        draft: 'Work on PROJ-12 — https://app.plane.so/acme/browse/PROJ-12\n'
+      })
+    )
+  })
+
   it('preserves explicit Linear paste content submit-after-ready behavior', async () => {
     mocks.ensureDetectedAgents.mockResolvedValue(['claude'])
     const { launchWorkItemDirect } = await import('./launch-work-item-direct')

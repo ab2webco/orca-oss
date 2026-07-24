@@ -31,6 +31,7 @@ import type {
   VisibleWorkspaceHostIds,
   TopLevelView
 } from '../../../../shared/types'
+import type { PlaneWorkItem } from '../../../../shared/plane-types'
 import {
   applyManualRepoOrder,
   normalizeManualRepoOrder
@@ -321,6 +322,12 @@ const VALID_JIRA_PRESETS = new Set<NonNullable<TaskResumeState['jiraPreset']>>([
   'all',
   'done'
 ])
+const VALID_PLANE_PRESETS = new Set<NonNullable<TaskResumeState['planePreset']>>([
+  'assigned',
+  'created',
+  'all',
+  'done'
+])
 
 function resolvePaneKeyWorktreeIdFromTabs(state: AppState, paneKey: string): string | null {
   const parsed = parsePaneKey(paneKey)
@@ -579,6 +586,18 @@ function sanitizeTaskResumeState(value: unknown): TaskResumeState | undefined {
   if (typeof input.jiraQuery === 'string') {
     next.jiraQuery = input.jiraQuery
   }
+  if (
+    typeof input.planePreset === 'string' &&
+    VALID_PLANE_PRESETS.has(input.planePreset as NonNullable<TaskResumeState['planePreset']>)
+  ) {
+    next.planePreset = input.planePreset as NonNullable<TaskResumeState['planePreset']>
+  }
+  if (typeof input.planeQuery === 'string') {
+    next.planeQuery = input.planeQuery
+  }
+  if (typeof input.planeProjectId === 'string' && input.planeProjectId.trim()) {
+    next.planeProjectId = input.planeProjectId
+  }
 
   return Object.keys(next).length > 0 ? next : undefined
 }
@@ -673,6 +692,8 @@ export type UISlice = {
     openLinearSourceContext?: TaskSourceContext | null
     openJiraIssue?: JiraIssue
     openJiraSourceContext?: TaskSourceContext | null
+    openPlaneWorkItem?: PlaneWorkItem
+    openPlaneSourceContext?: TaskSourceContext | null
   }
   taskResumeState: TaskResumeState | undefined
   setTaskResumeState: (updates: Partial<TaskResumeState>) => void
@@ -1243,6 +1264,9 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     if (data.openJiraIssue) {
       get().recordFeatureInteraction?.('jira-tasks')
     }
+    if (data.openPlaneWorkItem) {
+      get().recordFeatureInteraction?.('plane-tasks')
+    }
     // Why: record a Tasks visit in shared back/forward history; all task-source variants collapse to one deduped 'tasks' entry.
     const detailEntry = data.openGitHubWorkItem
       ? ({
@@ -1273,7 +1297,14 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
                 issue: data.openJiraIssue,
                 sourceContext: data.openJiraSourceContext
               } as const)
-            : null
+            : data.openPlaneWorkItem
+              ? ({
+                  kind: 'task-detail',
+                  source: 'plane',
+                  item: data.openPlaneWorkItem,
+                  sourceContext: data.openPlaneSourceContext
+                } as const)
+              : null
     const currentEntry = get().worktreeNavHistory[get().worktreeNavHistoryIndex]
     const currentIsTaskStack =
       currentEntry === 'tasks' ||
