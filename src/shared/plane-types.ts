@@ -89,10 +89,13 @@ export type PlaneComment = {
 
 export type PlaneWorkItemUpdate = {
   title?: string
-  labels?: string[]
+  description?: string
+  labelIds?: string[]
   assigneeIds?: string[]
   priority?: PlaneWorkItemPriority
   stateId?: string
+  startDate?: string
+  targetDate?: string
   parentId?: string | null
 }
 

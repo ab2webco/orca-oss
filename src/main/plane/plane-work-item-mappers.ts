@@ -3,6 +3,7 @@
 // per-site fetch) since Plane's priority set never varies by workspace.
 import { planeHtmlToMarkdown } from './plane-html-markdown'
 import type {
+  PlaneComment,
   PlaneLabel,
   PlaneProject,
   PlaneState,
@@ -137,6 +138,20 @@ export type MapPlaneWorkItemContext = {
   workspaceId?: string
   project: PlaneProject
   labelsById?: ReadonlyMap<string, string>
+}
+
+// `actor` per Plane's comment schema is the expanded creator object (same
+// shape mapPlaneUser already expects); comments are never authored by a bare
+// UUID the way assignees/labels can arrive.
+export function mapPlaneComment(raw: unknown): PlaneComment {
+  const comment = asRecord(raw)
+  return {
+    id: asString(comment.id),
+    body: planeHtmlToMarkdown(asString(comment.comment_html)),
+    createdAt: asString(comment.created_at, new Date().toISOString()),
+    updatedAt: asString(comment.updated_at) || undefined,
+    user: mapPlaneUser(comment.actor)
+  }
 }
 
 export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): PlaneWorkItem {
