@@ -13,7 +13,10 @@ describe('daemon protocol version', () => {
     // completion-inspection feature set; upstream then bumped to 28 for preflight-cache
     // replacement (see daemon-protocol-version.ts). The merged daemon carries all of them.
     expect(PROTOCOL_VERSION).toBe(28)
-    expect(COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION).toBe(27)
+    // Why 28: a merged-world v27 daemon cannot be trusted to implement inspectProcess
+    // (lab v27 had it, upstream v27 did not, same socket namespace), so only the
+    // current merged daemon is treated as inspection-capable.
+    expect(COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION).toBe(28)
     expect(AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toEqual(

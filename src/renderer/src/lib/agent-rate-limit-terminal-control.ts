@@ -32,15 +32,49 @@ function isForegroundAgent(
   return agent === 'codex' ? normalized.startsWith('codex-') : normalized === 'claude'
 }
 
+/**
+ * Tri-state foreground inspection: `unavailable` means the runtime cannot answer
+ * a liveness probe (a daemon left running across an app update predates
+ * inspectProcess), so stop/resume decisions must degrade instead of freezing.
+ */
+type ForegroundInspection = 'foreground' | 'not-foreground' | 'unavailable'
+
+/**
+ * True when an inspection error signals the executing runtime cannot answer a
+ * liveness probe: the process-inspection version gate (`terminal_liveness_unavailable`)
+ * or a pre-update daemon that never implemented the request
+ * (`Unknown request type: inspectProcess`). Matched by message so it also holds
+ * when relayed across the SSH/relay mux as a serialized error string.
+ */
+function isInspectionUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes('terminal_liveness_unavailable') || message.includes('Unknown request type')
+  )
+}
+
 /** Inspects the PTY without mutating it, so stop/resume decisions stay terminal-safe. */
-async function isAgentStillForeground(args: {
+async function inspectAgentForeground(args: {
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
   ptyId: string
   agent: AutoSwitchRateLimitAgent
   expectedProcess: string
-}): Promise<boolean> {
-  const process = await inspectRuntimeTerminalProcess(args.settings, args.ptyId)
+}): Promise<ForegroundInspection> {
+  let process: Awaited<ReturnType<typeof inspectRuntimeTerminalProcess>>
+  try {
+    process = await inspectRuntimeTerminalProcess(args.settings, args.ptyId)
+  } catch (error) {
+    if (isInspectionUnavailableError(error)) {
+      return 'unavailable'
+    }
+    throw error
+  }
+  if (process.unavailable) {
+    return 'unavailable'
+  }
   return isForegroundAgent(process.foregroundProcess, args.agent, args.expectedProcess)
+    ? 'foreground'
+    : 'not-foreground'
 }
 
 /** Exits only the foreground agent process by sending Ctrl+C to the existing PTY. */
@@ -50,7 +84,8 @@ export async function stopForegroundAgent(args: {
   agent: AutoSwitchRateLimitAgent
   expectedProcess: string
 }): Promise<boolean> {
-  if (!(await isAgentStillForeground(args))) {
+  const initial = await inspectAgentForeground(args)
+  if (initial === 'not-foreground') {
     return true
   }
 
@@ -69,7 +104,17 @@ export async function stopForegroundAgent(args: {
       return false
     }
     await wait(AGENT_STOP_WAIT_MS)
-    if (!(await isAgentStillForeground(args))) {
+    const check = await inspectAgentForeground(args)
+    if (check === 'not-foreground') {
+      return true
+    }
+    if (check === 'unavailable') {
+      // Why: a daemon left running across an app update cannot report liveness,
+      // so exit cannot be confirmed. The best-effort Ctrl+C pair above reliably
+      // quits an idle rate-limited Claude; proceed with the switch rather than
+      // freezing the agent on the exhausted account. This is the safe default —
+      // both switch flavors relaunch/resume after the stop, so an unconfirmed
+      // stop degrades to "continue on the fallback account", never a hard fail.
       return true
     }
   }
@@ -85,13 +130,22 @@ export async function waitForResumedAgent(args: {
   expectedProcess: string
 }): Promise<boolean> {
   const deadline = Date.now() + AGENT_RESUME_WAIT_MS
+  let inspectionUnavailable = false
   while (Date.now() < deadline) {
-    if (await isAgentStillForeground(args)) {
+    const inspection = await inspectAgentForeground(args)
+    if (inspection === 'foreground') {
       return true
+    }
+    if (inspection === 'unavailable') {
+      inspectionUnavailable = true
     }
     await wait(150)
   }
-  return false
+  // Why: a daemon left running across an app update cannot confirm the resumed
+  // agent took foreground. After the normal wait window (giving the resume time
+  // to boot), assume it launched so the continue step proceeds — degrading
+  // gracefully instead of aborting an otherwise-successful switch.
+  return inspectionUnavailable
 }
 
 /** Leaves a short settle window before sending the continuation prompt to the TUI. */

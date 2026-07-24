@@ -7,7 +7,14 @@ export const PROTOCOL_VERSION = 28
 // Why 26: the lab's requireReattach wire flag landed on upstream 25; older
 // daemons (including upstream 22-25) silently ignore it, so it needs its own gate.
 export const REQUIRED_REATTACH_PROTOCOL_VERSION = 26
-export const COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION = 27
+// Why 28: the lab shipped completion-process-inspection at its own v27, but the
+// merge with upstream (whose v27 was a DIFFERENT feature set that lacks the
+// inspectProcess request) makes a v27 daemon ambiguous — both share the
+// daemon-v27.sock namespace, so the version number alone cannot prove support.
+// Only the merged v28 daemon reliably answers inspectProcess; a still-running
+// pre-update daemon (<28) must be treated as "cannot inspect" and routed through
+// the degraded path instead of eliciting "Unknown request type: inspectProcess".
+export const COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION = 28
 export const PTY_STARTUP_INGRESS_PROTOCOL_VERSION = 25
 export const AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION = 27
 export const AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION = 27
