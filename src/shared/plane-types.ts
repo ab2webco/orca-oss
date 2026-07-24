@@ -75,6 +75,7 @@ export type PlaneWorkItem = {
   assignees?: PlaneUser[]
   priority?: PlaneWorkItemPriority
   parentId?: string | null
+  createdBy?: string
   updatedAt: string
   createdAt: string
 }

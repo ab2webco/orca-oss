@@ -21,6 +21,7 @@ import { fetchAllPlanePages, type PlanePage } from './plane-cursor-pagination'
 import {
   mapPlaneLabel,
   mapPlaneProject,
+  mapPlaneProjectMember,
   mapPlaneState,
   mapPlaneUser
 } from './plane-work-item-mappers'
@@ -153,9 +154,44 @@ export async function listLabels(
   }
 }
 
-export async function listMembers(
+// Project members live under the workspace's project scope. Returns [] on
+// failure or empty so callers can gracefully fall back to workspace members.
+async function listProjectMembers(
+  projectId: string,
   workspaceId?: PlaneWorkspaceSelection | null
 ): Promise<PlaneUser[]> {
+  const entry = getClients(workspaceId)[0]
+  if (!entry) {
+    return []
+  }
+  await acquire()
+  try {
+    const raws = await planeRequest<PlaneRecord[]>(
+      entry,
+      workspacePath(entry, `/projects/${encodeURIComponent(projectId)}/members/`)
+    )
+    return raws.map(mapPlaneProjectMember).filter((user): user is PlaneUser => !!user)
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(entry, error)
+    console.warn('[plane] listProjectMembers failed:', boundedIntegrationErrorLog(error))
+    return []
+  } finally {
+    release()
+  }
+}
+
+export async function listMembers(
+  workspaceId?: PlaneWorkspaceSelection | null,
+  projectId?: string
+): Promise<PlaneUser[]> {
+  // Scope the Assignee picker to the project (matching Plane's own UI); if the
+  // project-members request fails or is empty, fall back to workspace members.
+  if (projectId) {
+    const projectMembers = await listProjectMembers(projectId, workspaceId)
+    if (projectMembers.length > 0) {
+      return projectMembers
+    }
+  }
   const entries = getClients(workspaceId)
   if (entries.length === 0) {
     return []

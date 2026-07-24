@@ -28,6 +28,10 @@ export type SettingsSlice = SettingsSearchState & {
   settings: GlobalSettings | null
   fetchSettings: () => Promise<void>
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void>
+  /** Remembers the Orca repo a Plane project was launched into so the composer pre-selects it next time; no-op when the link is unchanged. */
+  setPlaneProjectRepoLink: (planeProjectId: string, repoId: string) => void
+  /** Persists the per-project Plane board column order (ordered stateIds); no-op when the order is unchanged. */
+  setPlaneBoardColumnOrder: (planeProjectId: string, stateIds: string[]) => void
   setActiveRuntimeEnvironmentPreference: (environmentId: string | null) => Promise<boolean>
 }
 
@@ -140,6 +144,35 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     } catch (err) {
       console.error('Failed to update settings:', err)
     }
+  },
+
+  setPlaneProjectRepoLink: (planeProjectId, repoId) => {
+    if (!planeProjectId || !repoId) {
+      return
+    }
+    const current = get().settings?.planeProjectRepoLinks ?? {}
+    if (current[planeProjectId] === repoId) {
+      return
+    }
+    const next = { ...current, [planeProjectId]: repoId }
+    void get().updateSettings({ planeProjectRepoLinks: next })
+  },
+
+  setPlaneBoardColumnOrder: (planeProjectId, stateIds) => {
+    if (!planeProjectId) {
+      return
+    }
+    const current = get().settings?.planeBoardColumnOrder ?? {}
+    const existing = current[planeProjectId]
+    if (
+      existing &&
+      existing.length === stateIds.length &&
+      existing.every((id, index) => id === stateIds[index])
+    ) {
+      return
+    }
+    const next = { ...current, [planeProjectId]: stateIds }
+    void get().updateSettings({ planeBoardColumnOrder: next })
   },
 
   setActiveRuntimeEnvironmentPreference: async (environmentId) => {

@@ -182,6 +182,6 @@ describe('plane RPC methods', () => {
     expect(runtime.planeListProjects).toHaveBeenCalledWith('ws-1')
     expect(runtime.planeListStates).toHaveBeenCalledWith('proj-1', 'ws-1')
     expect(runtime.planeListLabels).toHaveBeenCalledWith('proj-1', 'ws-1')
-    expect(runtime.planeListMembers).toHaveBeenCalledWith('ws-1')
+    expect(runtime.planeListMembers).toHaveBeenCalledWith('ws-1', undefined)
   })
 })

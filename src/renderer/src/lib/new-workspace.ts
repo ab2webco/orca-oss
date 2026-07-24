@@ -53,6 +53,7 @@ export const CLIENT_PLATFORM: NodeJS.Platform = navigator.userAgent.includes('Wi
     ? 'darwin'
     : 'linux'
 
+import { getLinkedWorkItemProvider } from './linked-work-item-provider'
 export { getLinkedWorkItemProvider, isGitLabIssueUrl } from './linked-work-item-provider'
 
 export type LinkedWorkItemSummary = Omit<FolderWorkspaceLinkedTask, 'provider'> & {
@@ -61,6 +62,31 @@ export type LinkedWorkItemSummary = Omit<FolderWorkspaceLinkedTask, 'provider'> 
   linearOrganizationUrlKey?: string
   linearBranchName?: string
   linkedContext?: LinkedWorkItemContext
+  // Why: Plane project id of the work item, so a successful worktree create can remember which repo this Plane project launched into.
+  planeProjectId?: string
+}
+
+/**
+ * Persist which Orca repo a Plane project was launched into, so the composer
+ * pre-selects it next time. No-op unless the linked item is a Plane item that
+ * carries its project id and a git repo was chosen. Call only after a
+ * successful worktree create — never on failure.
+ */
+export function savePlaneProjectRepoLink(args: {
+  linkedWorkItem: LinkedWorkItemSummary | null
+  repoId: string
+  isGitRepo: boolean
+  setLink: (planeProjectId: string, repoId: string) => void
+}): void {
+  const { linkedWorkItem, repoId, isGitRepo, setLink } = args
+  if (!linkedWorkItem || !isGitRepo || !repoId) {
+    return
+  }
+  const planeProjectId = linkedWorkItem.planeProjectId
+  if (!planeProjectId || getLinkedWorkItemProvider(linkedWorkItem) !== 'plane') {
+    return
+  }
+  setLink(planeProjectId, repoId)
 }
 
 // Why: when a repo has no `orca.yaml` issueCommand and no per-user override,

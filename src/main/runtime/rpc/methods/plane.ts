@@ -80,6 +80,13 @@ const ProjectScoped = z.object({
   workspaceId: OptionalString
 })
 
+const ListMembers = z
+  .object({
+    workspaceId: OptionalString,
+    projectId: OptionalString
+  })
+  .optional()
+
 export const PLANE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'plane.connect',
@@ -192,7 +199,8 @@ export const PLANE_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'plane.listMembers',
-    params: WorkspaceSelection,
-    handler: async (params, { runtime }) => runtime.planeListMembers(params?.workspaceId)
+    params: ListMembers,
+    handler: async (params, { runtime }) =>
+      runtime.planeListMembers(params?.workspaceId, params?.projectId)
   })
 ]

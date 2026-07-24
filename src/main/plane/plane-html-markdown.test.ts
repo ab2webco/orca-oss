@@ -38,6 +38,18 @@ describe('planeHtmlToMarkdown', () => {
     expect(md).toContain('[docs](https://example.com)')
   })
 
+  it('restores nested placeholders inside list items without leaking sentinels', () => {
+    const html =
+      '<ul><li>uses <code>currentUser()</code> and a <a href="https://x.io">link</a></li>' +
+      '<li>see <code>state.group</code></li></ul>'
+    const md = planeHtmlToMarkdown(html)
+
+    expect(md).toContain('- uses `currentUser()` and a [link](https://x.io)')
+    expect(md).toContain('- see `state.group`')
+    // No leaked NULL sentinels (the nested-placeholder bug rendered these as U+FFFD).
+    expect(md).not.toContain(String.fromCharCode(0))
+  })
+
   it('decodes HTML entities', () => {
     const html = '<p>Fish &amp; chips &lt;tag&gt; &quot;quoted&quot;</p>'
     expect(planeHtmlToMarkdown(html)).toContain('Fish & chips <tag> "quoted"')

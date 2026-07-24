@@ -1859,7 +1859,7 @@ const api = {
     listLabels: (args: { projectId: string; workspaceId?: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('plane:listLabels', args),
 
-    listMembers: (args?: { workspaceId?: string }): Promise<unknown[]> =>
+    listMembers: (args?: { workspaceId?: string; projectId?: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('plane:listMembers', args)
   },
 

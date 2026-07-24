@@ -1041,6 +1041,8 @@ type RuntimeStore = {
     visibleTaskProviders?: GlobalSettings['visibleTaskProviders']
     defaultRepoSelection?: GlobalSettings['defaultRepoSelection']
     defaultLinearTeamSelection?: GlobalSettings['defaultLinearTeamSelection']
+    planeProjectRepoLinks?: GlobalSettings['planeProjectRepoLinks']
+    planeBoardColumnOrder?: GlobalSettings['planeBoardColumnOrder']
     githubProjects?: GlobalSettings['githubProjects']
     experimentalNewWorktreeCardStyle?: GlobalSettings['experimentalNewWorktreeCardStyle']
     compactWorktreeCards?: GlobalSettings['compactWorktreeCards']
@@ -3078,6 +3080,8 @@ export class OrcaRuntimeService {
     | 'visibleTaskProviders'
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'
+    | 'planeProjectRepoLinks'
+    | 'planeBoardColumnOrder'
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
@@ -3101,6 +3105,8 @@ export class OrcaRuntimeService {
       visibleTaskProviders: settings.visibleTaskProviders ?? [...TASK_PROVIDERS],
       defaultRepoSelection: settings.defaultRepoSelection ?? null,
       defaultLinearTeamSelection: settings.defaultLinearTeamSelection ?? null,
+      planeProjectRepoLinks: settings.planeProjectRepoLinks ?? null,
+      planeBoardColumnOrder: settings.planeBoardColumnOrder ?? null,
       githubProjects: settings.githubProjects,
       experimentalNewWorktreeCardStyle: settings.experimentalNewWorktreeCardStyle === true,
       compactWorktreeCards: settings.compactWorktreeCards === true,
@@ -3123,6 +3129,7 @@ export class OrcaRuntimeService {
       | 'visibleTaskProviders'
       | 'defaultRepoSelection'
       | 'defaultLinearTeamSelection'
+      | 'planeProjectRepoLinks'
       | 'githubProjects'
       | 'experimentalNewWorktreeCardStyle'
       | 'compactWorktreeCards'
@@ -3143,6 +3150,8 @@ export class OrcaRuntimeService {
     | 'visibleTaskProviders'
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'
+    | 'planeProjectRepoLinks'
+    | 'planeBoardColumnOrder'
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
@@ -30006,8 +30015,11 @@ export class OrcaRuntimeService {
     return listPlaneLabels(projectId, workspaceId)
   }
 
-  planeListMembers(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneMembers> {
-    return listPlaneMembers(workspaceId)
+  planeListMembers(
+    workspaceId?: PlaneWorkspaceSelection,
+    projectId?: string
+  ): ReturnType<typeof listPlaneMembers> {
+    return listPlaneMembers(workspaceId, projectId)
   }
 
   // ── Browser automation ──

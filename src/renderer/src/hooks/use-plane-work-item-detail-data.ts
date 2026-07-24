@@ -129,7 +129,7 @@ export function usePlaneWorkItemDetailData(
 
     void Promise.all([
       planeListStates(providerSettingsRef.current, item.project.id, item.workspaceId),
-      planeListMembers(providerSettingsRef.current, item.workspaceId)
+      planeListMembers(providerSettingsRef.current, item.workspaceId, item.project.id)
     ])
       .then(([nextStates, nextMembers]) => {
         if (requestId !== requestIdRef.current) {

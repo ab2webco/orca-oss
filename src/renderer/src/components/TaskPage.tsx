@@ -22,6 +22,7 @@ import {
   GitMerge,
   GitPullRequest,
   GitPullRequestDraft,
+  Columns3,
   List,
   LoaderCircle,
   Minus,
@@ -168,9 +169,12 @@ import {
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import PlaneWorkItemWorkspace from '@/components/PlaneWorkItemWorkspace'
 import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
+import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
 import { findTaskPagePlaneWorkItem } from '@/components/task-page-plane-cache-selectors'
+import { filterPlaneItemsBySearch } from '@/components/plane-work-item-search-filter'
 import {
   createTaskPagePlaneLoadFailureState,
   type TaskPagePlaneLoadError
@@ -3128,6 +3132,7 @@ const hasUpstreamCandidateDivergence = (
 export default function TaskPage(): React.JSX.Element {
   useTranslation()
   const settings = useAppStore((s) => s.settings)
+  const setPlaneBoardColumnOrder = useAppStore((s) => s.setPlaneBoardColumnOrder)
   const persistedUIReady = useAppStore((s) => s.persistedUIReady)
   const taskResumeState = useAppStore((s) => s.taskResumeState)
   const setTaskResumeState = useAppStore((s) => s.setTaskResumeState)
@@ -3190,7 +3195,6 @@ export default function TaskPage(): React.JSX.Element {
   const planeStatusChecked = useAppStore((s) => s.planeStatusChecked)
   const planeStatusContextKey = useAppStore((s) => s.planeStatusContextKey)
   const selectPlaneWorkspace = useAppStore((s) => s.selectPlaneWorkspace)
-  const searchPlaneWorkItems = useAppStore((s) => s.searchPlaneWorkItems)
   const listPlaneWorkItems = useAppStore((s) => s.listPlaneWorkItems)
   const checkPlaneConnection = useAppStore((s) => s.checkPlaneConnection)
   const listPlaneProjects = useAppStore((s) => s.listPlaneProjects)
@@ -4793,6 +4797,8 @@ export default function TaskPage(): React.JSX.Element {
   const [planeRefreshNonce, setPlaneRefreshNonce] = useState(0)
   const [planeOrderBy, setPlaneOrderBy] = useState<PlaneWorkItemSortColumn>('updated')
   const [planeOrderDirection, setPlaneOrderDirection] = useState<PlaneWorkItemSortDirection>('desc')
+  // Session-only: list vs. Kanban board. Board requires a single project.
+  const [planeViewMode, setPlaneViewMode] = useState<'list' | 'board'>('list')
 
   const handlePlaneSort = useCallback(
     (column: PlaneWorkItemSortColumn) => {
@@ -5947,6 +5953,25 @@ export default function TaskPage(): React.JSX.Element {
   const sortedPlaneItems = useMemo(
     () => sortPlaneWorkItems(displayedPlaneItems, planeOrderBy, planeOrderDirection),
     [displayedPlaneItems, planeOrderBy, planeOrderDirection]
+  )
+  // Search composes with the active preset: the preset filters server/main-side,
+  // then this narrows the loaded items by identifier/title on the client.
+  const planeSearchedItems = useMemo(
+    () => filterPlaneItemsBySearch(sortedPlaneItems, appliedPlaneSearch),
+    [sortedPlaneItems, appliedPlaneSearch]
+  )
+  // Why: memoize so the board's state-fetch effect doesn't re-run every render
+  // on a fresh settings object identity.
+  const planeBoardProviderSettings = useMemo(
+    () => getTaskSourceRuntimeSettings(planeTaskSourceContext),
+    [planeTaskSourceContext]
+  )
+  const planeBoardWorkspaceId = useMemo(
+    () =>
+      selectedPlaneWorkspaceId && selectedPlaneWorkspaceId !== 'all'
+        ? selectedPlaneWorkspaceId
+        : (sortedPlaneItems[0]?.workspaceId ?? null),
+    [selectedPlaneWorkspaceId, sortedPlaneItems]
   )
   // New Linear project dialog state
   const [newLinearProjectOpen, setNewLinearProjectOpen] = useState(false)
@@ -8200,12 +8225,11 @@ export default function TaskPage(): React.JSX.Element {
     setPlaneError(null)
     setPlaneErrorDetailsOpen(false)
 
-    const trimmed = appliedPlaneSearch.trim()
+    // Why: the self-hosted Plane REST API ignores PQL free-text, so search is a
+    // client-side filter (see planeSearchedItems). Fetch is driven only by the
+    // preset; typing in search must not refetch.
     const projectId = getPlaneProjectIdForFetch(selectedPlaneWorkspaceId, selectedPlaneProjectId)
-    const request =
-      trimmed.length > 0
-        ? searchPlaneWorkItems(trimmed, projectId, selectedPlaneWorkspaceId)
-        : listPlaneWorkItems(activePlanePreset, projectId, selectedPlaneWorkspaceId)
+    const request = listPlaneWorkItems(activePlanePreset, projectId, selectedPlaneWorkspaceId)
 
     void request
       .then((items) => {
@@ -8233,11 +8257,9 @@ export default function TaskPage(): React.JSX.Element {
     planeConnected,
     selectedPlaneWorkspaceId,
     selectedPlaneProjectId,
-    appliedPlaneSearch,
     activePlanePreset,
     planeRefreshNonce,
     taskResumeApplied,
-    searchPlaneWorkItems,
     listPlaneWorkItems
   ])
 
@@ -8396,16 +8418,21 @@ export default function TaskPage(): React.JSX.Element {
         number: 0,
         title: `${item.identifier} ${item.title}`,
         url: item.url,
-        planeIdentifier: item.identifier
+        planeIdentifier: item.identifier,
+        // Why: threads the Plane project id to submit so a successful create can remember which repo it launched into.
+        planeProjectId: item.project.id
       }
+      // Why: pre-select the repo this Plane project last launched into (user can still adjust).
+      const preselectedRepoId = settings?.planeProjectRepoLinks?.[item.project.id]
       openModal('new-workspace-composer', {
         linkedWorkItem,
         taskSourceContext: planeTaskSourceContext,
         prefilledName: getPlaneWorkItemWorkspaceSeed(item),
+        ...(preselectedRepoId ? { initialRepoId: preselectedRepoId } : {}),
         telemetrySource: 'sidebar'
       })
     },
-    [planeTaskSourceContext, openModal]
+    [planeTaskSourceContext, openModal, settings?.planeProjectRepoLinks]
   )
 
   const handleUsePlaneItem = useCallback(
@@ -9397,7 +9424,7 @@ export default function TaskPage(): React.JSX.Element {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex flex-wrap gap-2">
                         {planePresets.map((preset) => {
-                          const active = !planeSearchInput && activePlanePreset === preset.id
+                          const active = activePlanePreset === preset.id
                           return (
                             <button
                               key={preset.id}
@@ -9477,7 +9504,7 @@ export default function TaskPage(): React.JSX.Element {
                           }}
                           placeholder={translate(
                             'auto.components.TaskPage.planeSearchPlaceholder',
-                            'Plane PQL, e.g. state.group != "completed"'
+                            'Search work items by ID or title'
                           )}
                           className="h-8 rounded-md border-border/50 bg-background pl-8 pr-8 text-xs"
                         />
@@ -10626,92 +10653,156 @@ export default function TaskPage(): React.JSX.Element {
                       'Plane work items'
                     )}
                   </div>
-                  <div className="shrink-0 text-[11px] text-muted-foreground">
-                    {displayedPlaneItems.length}{' '}
-                    {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      value={planeViewMode}
+                      onValueChange={(value) => {
+                        if (value === 'list' || value === 'board') {
+                          setPlaneViewMode(value)
+                        }
+                      }}
+                      aria-label={translate(
+                        'auto.components.TaskPage.planeViewModeLabel',
+                        'View mode'
+                      )}
+                    >
+                      <ToggleGroupItem
+                        value="list"
+                        className="h-7 gap-1.5 px-2 text-[11px]"
+                        aria-label={translate('auto.components.TaskPage.planeViewList', 'List')}
+                      >
+                        <List className="size-3.5" />
+                        {translate('auto.components.TaskPage.planeViewList', 'List')}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="board"
+                        disabled={selectedPlaneProjectId === 'all'}
+                        className="h-7 gap-1.5 px-2 text-[11px]"
+                        aria-label={translate('auto.components.TaskPage.planeViewBoard', 'Board')}
+                      >
+                        <Columns3 className="size-3.5" />
+                        {translate('auto.components.TaskPage.planeViewBoard', 'Board')}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    <div className="text-[11px] text-muted-foreground">
+                      {planeSearchedItems.length}{' '}
+                      {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                    </div>
                   </div>
                 </div>
 
-                <TaskPagePlaneSortControls
-                  direction={planeOrderDirection}
-                  onSort={handlePlaneSort}
-                  orderBy={planeOrderBy}
-                />
+                {planeViewMode === 'list' ? (
+                  <TaskPagePlaneSortControls
+                    direction={planeOrderDirection}
+                    onSort={handlePlaneSort}
+                    orderBy={planeOrderBy}
+                  />
+                ) : null}
 
-                <div className="flex min-h-0 flex-1 overflow-hidden">
-                  <div
-                    className="min-h-0 min-w-0 flex-1 overflow-y-auto scrollbar-sleek"
-                    style={{ scrollbarGutter: 'stable' }}
-                  >
-                    {planeStatus.credentialError ? (
-                      <div className="border-b border-border px-4 py-4 text-sm text-destructive">
-                        {planeStatus.credentialError}
-                      </div>
-                    ) : null}
-                    {!planeStatus.credentialError && planeError ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {planeStatus.credentialError ? (
+                    <div className="flex-none border-b border-border px-4 py-4 text-sm text-destructive">
+                      {planeStatus.credentialError}
+                    </div>
+                  ) : null}
+                  {!planeStatus.credentialError && planeError ? (
+                    <div className="flex-none">
                       <TaskPageJiraErrorBanner
                         error={planeError}
                         open={planeErrorDetailsOpen}
                         onOpenChange={setPlaneErrorDetailsOpen}
                       />
-                    ) : null}
+                    </div>
+                  ) : null}
 
-                    {planeLoading && planeItems.length === 0 ? (
-                      <div className="divide-y divide-border/50">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                          <div key={i} className="px-3 py-3">
-                            <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
-                            <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                  {planeLoading && planeItems.length === 0 ? (
+                    <div className="flex-none divide-y divide-border/50">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="px-3 py-3">
+                          <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
+                          <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
 
-                    {!planeLoading &&
-                    planeItems.length === 0 &&
-                    !planeError &&
-                    !planeStatus.credentialError ? (
-                      <div className="px-4 py-10 text-center">
-                        <p className="text-sm font-medium text-foreground">
+                  {!planeLoading &&
+                  planeItems.length === 0 &&
+                  !planeError &&
+                  !planeStatus.credentialError ? (
+                    <div className="flex-none px-4 py-10 text-center">
+                      <p className="text-sm font-medium text-foreground">
+                        {translate(
+                          'auto.components.TaskPage.planeEmptyStateTitle',
+                          'No Plane work items found'
+                        )}
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {planeSearchInput
+                          ? translate(
+                              'auto.components.TaskPage.planeEmptyStateSearchBody',
+                              'Try a different PQL query.'
+                            )
+                          : translate(
+                              'auto.components.TaskPage.94d900518d',
+                              'No issues match the selected preset.'
+                            )}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {planeViewMode === 'board' ? (
+                    selectedPlaneProjectId === 'all' ? (
+                      <div className="flex flex-1 items-center justify-center px-6 py-10 text-center">
+                        <p className="max-w-sm text-sm text-muted-foreground">
                           {translate(
-                            'auto.components.TaskPage.planeEmptyStateTitle',
-                            'No Plane work items found'
+                            'auto.components.TaskPage.planeBoardSelectProject',
+                            'Select a single project to use the board.'
                           )}
                         </p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {planeSearchInput
-                            ? translate(
-                                'auto.components.TaskPage.planeEmptyStateSearchBody',
-                                'Try a different PQL query.'
-                              )
-                            : translate(
-                                'auto.components.TaskPage.94d900518d',
-                                'No issues match the selected preset.'
-                              )}
-                        </p>
                       </div>
-                    ) : null}
-
-                    <TaskPagePlaneWorkItemList
-                      formatUpdatedAt={formatRelativeTime}
-                      getStateTone={getPlaneStateTone}
-                      items={sortedPlaneItems}
-                      onOpenItem={openPlaneDetailPage}
-                      onStartWorkspace={handleUsePlaneItem}
-                      selectedItem={selectedPlaneWorkItem}
-                      showWorkspaceContext={selectedPlaneWorkspaceId === 'all'}
-                      statusDirection={planeOrderBy === 'state' ? planeOrderDirection : 'asc'}
-                    />
-                  </div>
-                  <div className="hidden min-h-0 w-[380px] flex-none overflow-hidden lg:flex">
-                    <PlaneWorkItemWorkspace
-                      item={selectedPlaneWorkItem}
-                      onUse={handleUsePlaneItem}
-                      onClose={closeTaskDetailPage}
-                      sourceContext={planeDetailSourceContext}
-                    />
-                  </div>
+                    ) : (
+                      <TaskPagePlaneBoard
+                        items={planeSearchedItems}
+                        projectId={selectedPlaneProjectId}
+                        workspaceId={planeBoardWorkspaceId}
+                        providerSettings={planeBoardProviderSettings}
+                        selectedItemId={selectedPlaneWorkItem?.id ?? null}
+                        getStateTone={getPlaneStateTone}
+                        onOpenItem={openPlaneDetailPage}
+                        savedColumnOrder={settings?.planeBoardColumnOrder?.[selectedPlaneProjectId]}
+                        onReorderColumns={(stateIds) =>
+                          setPlaneBoardColumnOrder(selectedPlaneProjectId, stateIds)
+                        }
+                      />
+                    )
+                  ) : (
+                    <div
+                      className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek"
+                      style={{ scrollbarGutter: 'stable' }}
+                    >
+                      <TaskPagePlaneWorkItemList
+                        formatUpdatedAt={formatRelativeTime}
+                        getStateTone={getPlaneStateTone}
+                        items={planeSearchedItems}
+                        onOpenItem={openPlaneDetailPage}
+                        onStartWorkspace={handleUsePlaneItem}
+                        selectedItem={selectedPlaneWorkItem}
+                        showWorkspaceContext={selectedPlaneWorkspaceId === 'all'}
+                        statusDirection={planeOrderBy === 'state' ? planeOrderDirection : 'asc'}
+                      />
+                    </div>
+                  )}
                 </div>
+                <PlaneWorkItemWorkspace
+                  item={selectedPlaneWorkItem}
+                  onUse={handleUsePlaneItem}
+                  onClose={closeTaskDetailPage}
+                  sourceContext={planeDetailSourceContext}
+                />
               </div>
             )
           ) : taskSource === 'linear' && selectedLinearIssue ? (

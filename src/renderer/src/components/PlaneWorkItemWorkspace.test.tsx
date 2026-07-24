@@ -101,10 +101,10 @@ async function renderWorkspace(props: {
 }
 
 describe('PlaneWorkItemWorkspace', () => {
-  it('renders an empty state when no work item is selected', async () => {
+  it('keeps the drawer closed when no work item is selected', async () => {
     await renderWorkspace({ item: null })
 
-    expect(screen.getByText('Select a work item to preview it here.')).toBeInTheDocument()
+    expect(screen.queryByText('Start workspace')).not.toBeInTheDocument()
   })
 
   it('renders header, priority, and description for the selected work item', async () => {
@@ -115,7 +115,7 @@ describe('PlaneWorkItemWorkspace', () => {
 
     await renderWorkspace({ item: planeWorkItem() })
 
-    expect(screen.getByText('Fix the thing')).toBeInTheDocument()
+    expect(screen.getAllByText('Fix the thing')[0]).toBeInTheDocument()
     expect(screen.getAllByText('PROJ-7')[0]).toBeInTheDocument()
     expect(screen.getByText('Medium')).toBeInTheDocument()
     expect(screen.getByText('Some description')).toBeInTheDocument()
@@ -130,7 +130,7 @@ describe('PlaneWorkItemWorkspace', () => {
     const user = userEvent.setup()
 
     await renderWorkspace({ item: planeWorkItem(), onUse })
-    await user.click(screen.getByRole('button', { name: 'Start workspace' }))
+    await user.click(screen.getAllByRole('button', { name: 'Start workspace' })[0])
 
     expect(onUse).toHaveBeenCalledWith(expect.objectContaining({ identifier: 'PROJ-7' }))
   })

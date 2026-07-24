@@ -69,6 +69,7 @@ import {
   isGitLabIssueUrl,
   PER_REPO_FETCH_LIMIT,
   renderIssueCommandTemplate,
+  savePlaneProjectRepoLink,
   type LinkedWorkItemSummary,
   type SetupConfig
 } from '@/lib/new-workspace'
@@ -561,7 +562,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       openSettingsTarget: s.openSettingsTarget,
       prefetchWorktreeCreateBase: s.prefetchWorktreeCreateBase,
       prefetchWorkItems: s.prefetchWorkItems,
-      fetchSparsePresets: s.fetchSparsePresets
+      fetchSparsePresets: s.fetchSparsePresets,
+      setPlaneProjectRepoLink: s.setPlaneProjectRepoLink
     }))
   )
   const {
@@ -577,7 +579,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     openSettingsTarget,
     prefetchWorktreeCreateBase,
     prefetchWorkItems,
-    fetchSparsePresets
+    fetchSparsePresets,
+    setPlaneProjectRepoLink
   } = actions
 
   const repos = useAppStore((s) => s.repos)
@@ -634,18 +637,25 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     [initialWorkspaceStatus, workspaceStatuses]
   )
 
-  const resolvedInitialRepoId = resolveWorkspaceCreationRepoId({
-    eligibleRepos,
-    projects,
-    projectHostSetups,
-    draftRepoId,
-    initialRepoId,
-    activeRepoId: seedActiveRepoId,
-    projectId: initialRunSeed.projectId,
-    hostId: initialRunSeed.hostId,
-    projectHostSetupId: initialRunSeed.projectHostSetupId,
-    focusedHostScope: workspaceHostScope
-  })
+  const resolvedInitialRepoId =
+    // Why: an explicitly-passed, eligible initialRepoId (e.g. a remembered Plane
+    // project→repo link) must win over a task-source projectId so the composer
+    // opens on that repo. Callers that omit it — or pass the item's own repo,
+    // as GitHub/GitLab do — resolve to the same repo as before.
+    initialRepoId && eligibleRepos.some((repo) => repo.id === initialRepoId)
+      ? initialRepoId
+      : resolveWorkspaceCreationRepoId({
+          eligibleRepos,
+          projects,
+          projectHostSetups,
+          draftRepoId,
+          initialRepoId,
+          activeRepoId: seedActiveRepoId,
+          projectId: initialRunSeed.projectId,
+          hostId: initialRunSeed.hostId,
+          projectHostSetupId: initialRunSeed.projectHostSetupId,
+          focusedHostScope: workspaceHostScope
+        })
 
   const [internalRepoId, setInternalRepoId] = useState<string>(resolvedInitialRepoId)
   const initialFolderProjectGroupId = initialProjectGroupId ?? draftProjectGroupId
@@ -3575,6 +3585,13 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       )
       const worktree = result.worktree
 
+      savePlaneProjectRepoLink({
+        linkedWorkItem: submitLinkedWorkItem,
+        repoId,
+        isGitRepo: selectedRepoIsGit,
+        setLink: setPlaneProjectRepoLink
+      })
+
       const trimmedNote = note.trim()
       // Why: linked source metadata is already in createWorktree; re-saving it can trigger slow post-create PR push-target lookups.
       await applyWorktreeMeta(worktree.id, trimmedNote ? { comment: trimmedNote } : {})
@@ -3707,7 +3724,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     shouldWaitForSetupCheck,
     workspaceSeedName,
     isProjectGroupTarget,
-    submitFolderTarget
+    submitFolderTarget,
+    setPlaneProjectRepoLink
   ])
 
   const resetForNextCreate = useCallback(() => {
@@ -4097,6 +4115,12 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           clearNewWorkspaceDraft()
         }
         runBackgroundWorktreeCreation(request)
+        savePlaneProjectRepoLink({
+          linkedWorkItem: submitLinkedWorkItem,
+          repoId,
+          isGitRepo: selectedRepoIsGit,
+          setLink: setPlaneProjectRepoLink
+        })
         if (createMultiple) {
           // Why: creation runs in the background, so reset identity to queue another worktree right away.
           resetForNextCreate()
@@ -4169,7 +4193,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       isProjectGroupTarget,
       submitFolderTarget,
       createMultiple,
-      resetForNextCreate
+      resetForNextCreate,
+      setPlaneProjectRepoLink
     ]
   )
 

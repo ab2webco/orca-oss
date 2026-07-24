@@ -257,7 +257,13 @@ export function registerPlaneHandlers(): void {
     }
   )
 
-  ipcMain.handle('plane:listMembers', async (_event, args?: { workspaceId?: string }) => {
-    return listMembers(normalizeOptionalString(args?.workspaceId))
-  })
+  ipcMain.handle(
+    'plane:listMembers',
+    async (_event, args?: { workspaceId?: string; projectId?: string }) => {
+      return listMembers(
+        normalizeOptionalString(args?.workspaceId),
+        normalizeOptionalString(args?.projectId)
+      )
+    }
+  )
 }

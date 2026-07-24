@@ -10,8 +10,12 @@ import {
   PlaneApiError,
   planeRequest,
   release,
+  toViewer,
+  USERS_ME_PATH,
   type PlaneClientForWorkspace
 } from './client'
+import { getCachedViewer, getPlaneWorkspaceId, setCachedViewer } from './plane-workspace-store'
+import { filterNeedsViewer, filterPlaneWorkItems } from './plane-work-item-filter'
 import { runBoundedIntegrationFanout } from '../integration-fanout'
 import { boundedIntegrationErrorLog } from '../integration-error-message'
 import {
@@ -176,6 +180,28 @@ async function fetchAcrossClients(
   return fanout.results.flat()
 }
 
+// Resolves the current user's id for one client so the assigned/created
+// filters can match against it. Uses the in-memory viewer cache when present,
+// otherwise fetches users/me once and caches it. Any failure resolves to null
+// so the caller can degrade to the open set rather than surfacing an error.
+async function resolveViewerId(client: PlaneClientForWorkspace): Promise<string | null> {
+  const workspaceId = getPlaneWorkspaceId(client.baseUrl, client.workspaceSlug)
+  const cached = getCachedViewer(workspaceId)
+  if (cached) {
+    return cached.id || null
+  }
+  try {
+    const viewer = toViewer(await planeRequest<Record<string, unknown>>(client, USERS_ME_PATH))
+    if (viewer.id) {
+      setCachedViewer(workspaceId, viewer)
+      return viewer.id
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function listWorkItems(args: {
   projectId?: string
   filter: PlaneWorkItemFilter
@@ -185,11 +211,18 @@ export async function listWorkItems(args: {
   if (entries.length === 0) {
     return []
   }
+  // filterToPql still sends the (server-ignored) pql for forward-compat, but
+  // the real filtering happens client-side per client below -- the viewer id
+  // is per-client, so assigned/created must be resolved and applied per client.
   const pql = filterToPql(args.filter)
   const items = await fetchAcrossClients(
     entries,
     args.workspaceId,
-    (client) => fetchWorkItemsForClient(client, args.projectId, pql),
+    async (client) => {
+      const fetched = await fetchWorkItemsForClient(client, args.projectId, pql)
+      const viewerId = filterNeedsViewer(args.filter) ? await resolveViewerId(client) : null
+      return filterPlaneWorkItems(fetched, args.filter, viewerId)
+    },
     true
   )
   return items.slice(0, INTEGRATION_PAGINATION_MAX_ITEMS)

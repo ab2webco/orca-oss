@@ -584,3 +584,63 @@ describe('createSettingsSlice runtime switching', () => {
     })
   })
 })
+
+describe('setPlaneProjectRepoLink', () => {
+  it('persists the Plane project→repo link, merged with existing links', () => {
+    const store = createTestStore()
+    store.setState({
+      settings: {
+        planeProjectRepoLinks: { 'plane-a': 'repo-a' }
+      } as unknown as AppState['settings']
+    })
+
+    store.getState().setPlaneProjectRepoLink('plane-b', 'repo-b')
+
+    expect(settingsSet).toHaveBeenCalledWith({
+      planeProjectRepoLinks: { 'plane-a': 'repo-a', 'plane-b': 'repo-b' }
+    })
+  })
+
+  it('is a no-op when the project already maps to the same repo', () => {
+    const store = createTestStore()
+    store.setState({
+      settings: {
+        planeProjectRepoLinks: { 'plane-a': 'repo-a' }
+      } as unknown as AppState['settings']
+    })
+
+    store.getState().setPlaneProjectRepoLink('plane-a', 'repo-a')
+
+    expect(settingsSet).not.toHaveBeenCalled()
+  })
+})
+
+describe('setPlaneBoardColumnOrder', () => {
+  it('persists the per-project column order, merged with existing entries', () => {
+    const store = createTestStore()
+    store.setState({
+      settings: {
+        planeBoardColumnOrder: { 'plane-a': ['s1', 's2'] }
+      } as unknown as AppState['settings']
+    })
+
+    store.getState().setPlaneBoardColumnOrder('plane-b', ['s3', 's4'])
+
+    expect(settingsSet).toHaveBeenCalledWith({
+      planeBoardColumnOrder: { 'plane-a': ['s1', 's2'], 'plane-b': ['s3', 's4'] }
+    })
+  })
+
+  it('is a no-op when the order is unchanged', () => {
+    const store = createTestStore()
+    store.setState({
+      settings: {
+        planeBoardColumnOrder: { 'plane-a': ['s1', 's2'] }
+      } as unknown as AppState['settings']
+    })
+
+    store.getState().setPlaneBoardColumnOrder('plane-a', ['s1', 's2'])
+
+    expect(settingsSet).not.toHaveBeenCalled()
+  })
+})

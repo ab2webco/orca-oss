@@ -225,10 +225,14 @@ export async function planeListLabels(
 
 export async function planeListMembers(
   settings: RuntimePlaneSettings,
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  projectId?: string
 ): Promise<PlaneUser[]> {
   const target = getPlaneRuntimeTarget(settings)
-  const args = workspaceId ? { workspaceId } : undefined
+  const args =
+    workspaceId || projectId
+      ? { ...(workspaceId ? { workspaceId } : {}), ...(projectId ? { projectId } : {}) }
+      : undefined
   return target.kind === 'environment'
     ? callRuntimeRpc<PlaneUser[]>(target, 'plane.listMembers', args, { timeoutMs: 30_000 })
     : window.api.plane.listMembers(args)

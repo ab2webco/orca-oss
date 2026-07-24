@@ -92,6 +92,14 @@ export function mapPlaneUser(raw: unknown): PlaneUser | undefined {
   }
 }
 
+// Project-members entries nest the user under `member` (alongside `role`),
+// unlike workspace members which arrive flat. Prefer the nested user object
+// and fall back to the flat record so both API shapes map identically.
+export function mapPlaneProjectMember(raw: unknown): PlaneUser | undefined {
+  const record = asRecord(raw)
+  return mapPlaneUser(record.member ?? record)
+}
+
 export function mapPlaneLabel(raw: unknown): PlaneLabel {
   const label = asRecord(raw)
   return {
@@ -175,6 +183,7 @@ export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): Pl
     assignees: mapAssignees(item.assignees),
     priority: asPriority(item.priority),
     parentId: typeof parent === 'string' ? parent : null,
+    createdBy: asString(item.created_by) || undefined,
     updatedAt: asString(item.updated_at, new Date().toISOString()),
     createdAt: asString(item.created_at, new Date().toISOString())
   }

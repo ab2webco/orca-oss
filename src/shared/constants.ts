@@ -317,6 +317,8 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     defaultLinearTeamSelection: null,
     linearLaunchPromptTemplate: '',
     defaultPlaneSelection: null,
+    planeProjectRepoLinks: null,
+    planeBoardColumnOrder: null,
     planeLaunchPromptTemplate: '',
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',

@@ -154,4 +154,66 @@ describe('listMembers', () => {
     const members = await listMembers('all')
     expect(members.map((member) => member.id)).toEqual(['u-2'])
   })
+
+  it('uses the project-members path and maps the nested `member` shape when projectId is given', async () => {
+    const { listMembers } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce([
+      { member: { id: 'u-9', display_name: 'Nested Ada' }, role: 20 },
+      { id: 'u-3', display_name: 'Flat Grace' }
+    ])
+
+    const members = await listMembers('ws-1', 'proj-7')
+
+    expect(members.map((member) => member.id)).toEqual(['u-9', 'u-3'])
+    expect(members.map((member) => member.displayName)).toEqual(['Nested Ada', 'Flat Grace'])
+    expect(planeRequestMock).toHaveBeenCalledTimes(1)
+    const { pathname } = pathOf(planeRequestMock.mock.calls[0][1] as string)
+    expect(pathname).toBe('/api/v1/workspaces/acme/projects/proj-7/members/')
+  })
+
+  it('uses the workspace-members path when no projectId is given', async () => {
+    const { listMembers } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce([{ id: 'u-1', display_name: 'Ada' }])
+
+    await listMembers('ws-1')
+
+    const { pathname } = pathOf(planeRequestMock.mock.calls[0][1] as string)
+    expect(pathname).toBe('/api/v1/workspaces/acme/members/')
+  })
+
+  it('falls back to workspace members when the project-members list is empty', async () => {
+    const { listMembers } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'u-ws', display_name: 'Workspace Ada' }])
+
+    const members = await listMembers('ws-1', 'proj-7')
+
+    expect(members.map((member) => member.id)).toEqual(['u-ws'])
+    expect(pathOf(planeRequestMock.mock.calls[0][1] as string).pathname).toBe(
+      '/api/v1/workspaces/acme/projects/proj-7/members/'
+    )
+    expect(pathOf(planeRequestMock.mock.calls[1][1] as string).pathname).toBe(
+      '/api/v1/workspaces/acme/members/'
+    )
+  })
+
+  it('falls back to workspace members when the project-members request fails', async () => {
+    const { listMembers } = await import('./plane-work-item-reads')
+    const acme = client('acme')
+    getClientsMock.mockReturnValue([acme])
+    const boom = new Error('project members boom')
+    planeRequestMock
+      .mockRejectedValueOnce(boom)
+      .mockResolvedValueOnce([{ id: 'u-ws', display_name: 'Workspace Ada' }])
+
+    const members = await listMembers('ws-1', 'proj-7')
+
+    expect(members.map((member) => member.id)).toEqual(['u-ws'])
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, boom)
+    expect(planeRequestMock).toHaveBeenCalledTimes(2)
+  })
 })

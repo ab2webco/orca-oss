@@ -4,6 +4,7 @@ import {
   mapPlaneComment,
   mapPlaneLabel,
   mapPlaneProject,
+  mapPlaneProjectMember,
   mapPlaneState,
   mapPlaneUser,
   mapPlaneWorkItem
@@ -71,6 +72,32 @@ describe('mapPlaneUser', () => {
   })
 })
 
+describe('mapPlaneProjectMember', () => {
+  it('maps the nested `member` shape returned by the project-members endpoint', () => {
+    expect(
+      mapPlaneProjectMember({ member: { id: 'u-9', display_name: 'Nested Ada' }, role: 20 })
+    ).toEqual({
+      id: 'u-9',
+      displayName: 'Nested Ada',
+      email: undefined,
+      avatarUrl: undefined
+    })
+  })
+
+  it('falls back to the flat shape when there is no `member` wrapper', () => {
+    expect(mapPlaneProjectMember({ id: 'u-3', display_name: 'Flat Grace' })).toEqual({
+      id: 'u-3',
+      displayName: 'Flat Grace',
+      email: undefined,
+      avatarUrl: undefined
+    })
+  })
+
+  it('returns undefined when neither shape yields an id', () => {
+    expect(mapPlaneProjectMember({ role: 20 })).toBeUndefined()
+  })
+})
+
 describe('mapPlaneLabel', () => {
   it('maps id/name/color', () => {
     expect(mapPlaneLabel({ id: 'l-1', name: 'bug', color: '#f00' })).toEqual({
@@ -131,6 +158,7 @@ describe('mapPlaneWorkItem', () => {
       labels: [{ id: 'label-1', name: 'bug', color: '#f00' }],
       assignees: [{ id: 'user-1', display_name: 'Ada Lovelace', email: 'ada@example.com' }],
       parent: 'wi-0',
+      created_by: 'user-7',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-02T00:00:00Z'
     }
@@ -164,6 +192,7 @@ describe('mapPlaneWorkItem', () => {
       ],
       priority: 'high',
       parentId: 'wi-0',
+      createdBy: 'user-7',
       updatedAt: '2026-01-02T00:00:00Z',
       createdAt: '2026-01-01T00:00:00Z'
     })

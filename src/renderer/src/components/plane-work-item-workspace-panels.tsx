@@ -1,7 +1,7 @@
 // Why: split out of PlaneWorkItemWorkspace.tsx to stay under the 400-line cap —
 // these are pure presentational panels with no state of their own.
 import React from 'react'
-import { LoaderCircle, Send } from 'lucide-react'
+import { LoaderCircle, Save, Send } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,7 +62,7 @@ export function PlaneWorkItemEditChips({
 }: PlaneWorkItemEditChipsProps): React.JSX.Element {
   const assignees = item.assignees ?? []
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
+    <div className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
       <Popover>
         <PopoverTrigger asChild>
           <button
@@ -196,7 +196,7 @@ export function PlaneWorkItemFieldsSection({
             {pendingField === 'title' ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
-              translate('auto.components.PlaneWorkItemWorkspace.save', 'Save')
+              <Save className="size-4" />
             )}
           </Button>
         </div>
@@ -219,7 +219,7 @@ export function PlaneWorkItemFieldsSection({
             {pendingField === 'labels' ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
-              translate('auto.components.PlaneWorkItemWorkspace.save', 'Save')
+              <Save className="size-4" />
             )}
           </Button>
         </div>
@@ -228,13 +228,13 @@ export function PlaneWorkItemFieldsSection({
   )
 }
 
-export function PlaneWorkItemActionsRow({
+export function PlaneWorkItemActionRail({
   actions
 }: {
   actions: PlaneWorkItemActionItem[]
 }): React.JSX.Element {
   return (
-    <section className="flex flex-wrap gap-1 border-b border-border/40 px-4 py-3">
+    <div className="grid gap-1">
       {actions.map((item) => {
         const Icon = item.icon
         return (
@@ -243,116 +243,123 @@ export function PlaneWorkItemActionsRow({
               <button
                 type="button"
                 onClick={item.action}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+                className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
                 <Icon className="size-3.5 shrink-0" />
+                <span className="truncate">{item.label}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
+            <TooltipContent side="left" sideOffset={6}>
               {item.label}
             </TooltipContent>
           </Tooltip>
         )
       })}
+    </div>
+  )
+}
+
+export type PlaneWorkItemCommentsListProps = {
+  comments: PlaneComment[]
+  commentsLoading: boolean
+  commentsError: string | null
+  formatRelativeTime: (input: string) => string
+}
+
+export function PlaneWorkItemCommentsList({
+  comments,
+  commentsLoading,
+  commentsError,
+  formatRelativeTime
+}: PlaneWorkItemCommentsListProps): React.JSX.Element {
+  return (
+    <section className="px-4 py-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-[13px] font-medium text-foreground">
+          {translate('auto.components.PlaneWorkItemWorkspace.comments', 'Comments')}
+        </span>
+        {comments.length > 0 ? (
+          <span className="text-[12px] text-muted-foreground">{comments.length}</span>
+        ) : null}
+      </div>
+      {commentsError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {commentsError}
+        </div>
+      ) : commentsLoading && comments.length === 0 ? (
+        <div className="flex items-center justify-center py-8">
+          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : comments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {translate('auto.components.PlaneWorkItemWorkspace.noComments', 'No comments yet.')}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {comments.map((comment) => (
+            <div key={comment.id} className="rounded-md border border-border/50 bg-muted/20">
+              <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
+                <span className="truncate text-[13px] font-semibold text-foreground">
+                  {comment.user?.displayName ??
+                    translate('auto.components.PlaneWorkItemWorkspace.unknownUser', 'Unknown')}
+                </span>
+                <span className="shrink-0 text-[12px] text-muted-foreground">
+                  {formatRelativeTime(comment.createdAt)}
+                </span>
+              </div>
+              <div className="px-3 py-2">
+                <CommentMarkdown content={comment.body} className="text-[13px] leading-relaxed" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
 
-export type PlaneWorkItemCommentsSectionProps = {
-  comments: PlaneComment[]
-  commentsLoading: boolean
-  commentsError: string | null
+export type PlaneWorkItemCommentComposerProps = {
   commentDraft: string
   onCommentDraftChange: (value: string) => void
   commentSubmitting: boolean
   canSubmitComment: boolean
   onSubmitComment: () => void
-  formatRelativeTime: (input: string) => string
 }
 
-export function PlaneWorkItemCommentsSection({
-  comments,
-  commentsLoading,
-  commentsError,
+export function PlaneWorkItemCommentComposer({
   commentDraft,
   onCommentDraftChange,
   commentSubmitting,
   canSubmitComment,
-  onSubmitComment,
-  formatRelativeTime
-}: PlaneWorkItemCommentsSectionProps): React.JSX.Element {
+  onSubmitComment
+}: PlaneWorkItemCommentComposerProps): React.JSX.Element {
   return (
-    <>
-      <section className="px-4 py-4">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="text-[13px] font-medium text-foreground">
-            {translate('auto.components.PlaneWorkItemWorkspace.comments', 'Comments')}
-          </span>
-          {comments.length > 0 ? (
-            <span className="text-[12px] text-muted-foreground">{comments.length}</span>
-          ) : null}
-        </div>
-        {commentsError ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {commentsError}
-          </div>
-        ) : commentsLoading && comments.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        ) : comments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {translate('auto.components.PlaneWorkItemWorkspace.noComments', 'No comments yet.')}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {comments.map((comment) => (
-              <div key={comment.id} className="rounded-md border border-border/50 bg-muted/20">
-                <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
-                  <span className="truncate text-[13px] font-semibold text-foreground">
-                    {comment.user?.displayName ??
-                      translate('auto.components.PlaneWorkItemWorkspace.unknownUser', 'Unknown')}
-                  </span>
-                  <span className="shrink-0 text-[12px] text-muted-foreground">
-                    {formatRelativeTime(comment.createdAt)}
-                  </span>
-                </div>
-                <div className="px-3 py-2">
-                  <CommentMarkdown content={comment.body} className="text-[13px] leading-relaxed" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
-        <div className="flex gap-2">
-          <textarea
-            value={commentDraft}
-            onChange={(event) => onCommentDraftChange(event.target.value)}
-            placeholder={translate(
-              'auto.components.PlaneWorkItemWorkspace.commentPlaceholder',
-              'Add a Plane comment...'
-            )}
-            rows={2}
-            disabled={commentSubmitting}
-            className="min-h-10 flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-          <Button
-            onClick={onSubmitComment}
-            disabled={!canSubmitComment || commentSubmitting}
-            className="self-end gap-2"
-          >
-            {commentSubmitting ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
-            {translate('auto.components.PlaneWorkItemWorkspace.comment', 'Comment')}
-          </Button>
-        </div>
+    <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
+      <div className="flex gap-2">
+        <textarea
+          value={commentDraft}
+          onChange={(event) => onCommentDraftChange(event.target.value)}
+          placeholder={translate(
+            'auto.components.PlaneWorkItemWorkspace.commentPlaceholder',
+            'Add a Plane comment...'
+          )}
+          rows={2}
+          disabled={commentSubmitting}
+          className="min-h-10 flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        />
+        <Button
+          onClick={onSubmitComment}
+          disabled={!canSubmitComment || commentSubmitting}
+          className="self-end gap-2"
+        >
+          {commentSubmitting ? (
+            <LoaderCircle className="size-4 animate-spin" />
+          ) : (
+            <Send className="size-4" />
+          )}
+          {translate('auto.components.PlaneWorkItemWorkspace.comment', 'Comment')}
+        </Button>
       </div>
-    </>
+    </div>
   )
 }

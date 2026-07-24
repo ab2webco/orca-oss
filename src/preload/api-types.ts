@@ -2178,7 +2178,7 @@ export type PreloadApi = {
     listProjects: (args?: { workspaceId?: string }) => Promise<PlaneProject[]>
     listStates: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneState[]>
     listLabels: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneLabel[]>
-    listMembers: (args?: { workspaceId?: string }) => Promise<PlaneUser[]>
+    listMembers: (args?: { workspaceId?: string; projectId?: string }) => Promise<PlaneUser[]>
   }
   starNag: {
     onShow: (

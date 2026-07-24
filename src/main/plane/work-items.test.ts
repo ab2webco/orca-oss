@@ -1,18 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PlaneClientForWorkspace } from './client'
+import type { PlaneViewer } from '../../shared/plane-types'
 
 const {
   acquireMock,
   releaseMock,
   getClientsMock,
   planeRequestMock,
-  clearWorkspaceTokenOnAuthErrorMock
+  clearWorkspaceTokenOnAuthErrorMock,
+  getCachedViewerMock,
+  setCachedViewerMock
 } = vi.hoisted(() => ({
   acquireMock: vi.fn(async () => undefined),
   releaseMock: vi.fn(),
   getClientsMock: vi.fn(),
   planeRequestMock: vi.fn(),
-  clearWorkspaceTokenOnAuthErrorMock: vi.fn()
+  clearWorkspaceTokenOnAuthErrorMock: vi.fn(),
+  getCachedViewerMock: vi.fn((): PlaneViewer | null => null),
+  setCachedViewerMock: vi.fn()
 }))
 
 class MockPlaneApiError extends Error {
@@ -29,7 +34,19 @@ vi.mock('./client', () => ({
   getClients: getClientsMock,
   planeRequest: planeRequestMock,
   PlaneApiError: MockPlaneApiError,
-  clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
+  clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock,
+  USERS_ME_PATH: '/api/v1/users/me/',
+  toViewer: (data: Record<string, unknown>) => ({
+    id: typeof data.id === 'string' ? data.id : '',
+    displayName: typeof data.display_name === 'string' ? data.display_name : 'Plane user',
+    email: typeof data.email === 'string' ? data.email : null
+  })
+}))
+
+vi.mock('./plane-workspace-store', () => ({
+  getCachedViewer: getCachedViewerMock,
+  setCachedViewer: setCachedViewerMock,
+  getPlaneWorkspaceId: (baseUrl: string, workspaceSlug: string) => `${baseUrl}\n${workspaceSlug}`
 }))
 
 function client(workspaceSlug: string): PlaneClientForWorkspace {
@@ -90,10 +107,14 @@ function routeRequest(
       workItemId: string
     ) => unknown
     retrieveByIdentifier: (client: PlaneClientForWorkspace, identifier: string) => unknown
+    usersMe: (client: PlaneClientForWorkspace) => unknown
   }>
 ) {
   return async (planeClient: PlaneClientForWorkspace, url: string) => {
     const { pathname, params } = pathOf(url)
+    if (pathname === '/api/v1/users/me/' && handlers.usersMe) {
+      return handlers.usersMe(planeClient)
+    }
     const projectWorkItemsMatch =
       /^\/api\/v1\/workspaces\/[^/]+\/projects\/([^/]+)\/work-items\/$/.exec(pathname)
     const workspaceWorkItemsMatch = /^\/api\/v1\/workspaces\/[^/]+\/work-items\/$/.exec(pathname)
@@ -129,6 +150,9 @@ beforeEach(() => {
   getClientsMock.mockReset()
   planeRequestMock.mockReset()
   clearWorkspaceTokenOnAuthErrorMock.mockClear()
+  getCachedViewerMock.mockReset()
+  getCachedViewerMock.mockReturnValue(null)
+  setCachedViewerMock.mockClear()
 })
 
 describe('401 token clearing (deferred from Slice 4/5)', () => {
@@ -180,7 +204,7 @@ describe('listWorkItems: single project + cursor pagination', () => {
 
     const items = await listWorkItems({
       projectId: 'proj-1',
-      filter: 'assigned',
+      filter: 'all',
       workspaceId: 'acme'
     })
 
@@ -299,6 +323,165 @@ describe('listWorkItems: workspace-wide fan-out across connected Plane workspace
 
     const items = await listWorkItems({ filter: 'all', workspaceId: 'all' })
     expect(items.map((item) => item.identifier)).toEqual(['BETA-1'])
+  })
+})
+
+describe('listWorkItems: client-side preset filtering (server ignores ?pql=)', () => {
+  // Self-hosted Plane ignores the pql param, so all four presets fetch the
+  // same set; filtering happens client-side on the fetched items.
+  function mixedItem(
+    id: string,
+    group: string,
+    assigneeIds: string[],
+    createdBy: string
+  ): Record<string, unknown> {
+    return {
+      id,
+      project: 'proj-1',
+      sequence_id: Number(id.split('-')[1]),
+      name: `Work item ${id}`,
+      state: { id: `state-${group}`, name: group, group },
+      labels: [],
+      assignees: assigneeIds.map((assigneeId) => ({ id: assigneeId, display_name: assigneeId })),
+      created_by: createdBy,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    }
+  }
+
+  // A: open + assigned-to-me + created-by-me; B: open + created-by-me;
+  // C: done + assigned-to-me; D: done.
+  const mixedPage = () =>
+    page([
+      mixedItem('wi-1', 'unstarted', ['me'], 'me'),
+      mixedItem('wi-2', 'started', ['other'], 'me'),
+      mixedItem('wi-3', 'completed', ['me'], 'other'),
+      mixedItem('wi-4', 'cancelled', [], 'other')
+    ])
+
+  it('all -> open items only (backlog/unstarted/started), no viewer fetch', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    let usersMeCalls = 0
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => {
+          usersMeCalls += 1
+          return { id: 'me' }
+        }
+      })
+    )
+
+    const items = await listWorkItems({ projectId: 'proj-1', filter: 'all', workspaceId: 'acme' })
+    expect(items.map((item) => item.id)).toEqual(['wi-1', 'wi-2'])
+    expect(usersMeCalls).toBe(0)
+  })
+
+  it('done -> closed items only (completed/cancelled), no viewer fetch', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    let usersMeCalls = 0
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => {
+          usersMeCalls += 1
+          return { id: 'me' }
+        }
+      })
+    )
+
+    const items = await listWorkItems({ projectId: 'proj-1', filter: 'done', workspaceId: 'acme' })
+    expect(items.map((item) => item.id)).toEqual(['wi-3', 'wi-4'])
+    expect(usersMeCalls).toBe(0)
+  })
+
+  it('assigned -> items whose assignees include the viewer resolved via users/me', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => ({ id: 'me' })
+      })
+    )
+
+    const items = await listWorkItems({
+      projectId: 'proj-1',
+      filter: 'assigned',
+      workspaceId: 'acme'
+    })
+    expect(items.map((item) => item.id)).toEqual(['wi-1', 'wi-3'])
+    expect(setCachedViewerMock).toHaveBeenCalled()
+  })
+
+  it('created -> items whose createdBy equals the viewer', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => ({ id: 'me' })
+      })
+    )
+
+    const items = await listWorkItems({
+      projectId: 'proj-1',
+      filter: 'created',
+      workspaceId: 'acme'
+    })
+    expect(items.map((item) => item.id)).toEqual(['wi-1', 'wi-2'])
+  })
+
+  it('reuses the cached viewer without an extra users/me fetch', async () => {
+    getCachedViewerMock.mockReturnValue({ id: 'me', displayName: 'Me', email: null })
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    let usersMeCalls = 0
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => {
+          usersMeCalls += 1
+          return { id: 'me' }
+        }
+      })
+    )
+
+    const items = await listWorkItems({
+      projectId: 'proj-1',
+      filter: 'assigned',
+      workspaceId: 'acme'
+    })
+    expect(items.map((item) => item.id)).toEqual(['wi-1', 'wi-3'])
+    expect(usersMeCalls).toBe(0)
+  })
+
+  it('falls back to the open set when the viewer cannot be resolved', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { listWorkItems } = await import('./work-items')
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => mixedPage(),
+        usersMe: () => {
+          throw new MockPlaneApiError('users/me unavailable', 500)
+        }
+      })
+    )
+
+    const items = await listWorkItems({
+      projectId: 'proj-1',
+      filter: 'assigned',
+      workspaceId: 'acme'
+    })
+    expect(items.map((item) => item.id)).toEqual(['wi-1', 'wi-2'])
   })
 })
 
