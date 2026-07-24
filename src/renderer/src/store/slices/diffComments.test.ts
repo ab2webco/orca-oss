@@ -116,6 +116,7 @@ import { createKeybindingsSlice } from './keybindings'
 import { createGitHubSlice } from './github'
 import { createHostedReviewSlice } from './hosted-review'
 import { createLinearSlice } from './linear'
+import { createPlaneSlice } from './plane'
 import { createPreflightSlice } from './preflight'
 import { createJiraSlice } from './jira'
 import { createEditorSlice } from './editor'
@@ -160,6 +161,7 @@ function createTestStore() {
     ...createGitHubSlice(...a),
     ...createHostedReviewSlice(...a),
     ...createLinearSlice(...a),
+    ...createPlaneSlice(...a),
     ...createPreflightSlice(...a),
     ...createJiraSlice(...a),
     ...createEditorSlice(...a),
