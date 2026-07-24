@@ -12,7 +12,6 @@ import { toast } from 'sonner'
 
 const mockUnregisterPtyDataHandlers = vi.hoisted(() => vi.fn<() => unknown[]>(() => []))
 const mockRestorePtyDataHandlersAfterFailedShutdown = vi.hoisted(() => vi.fn())
-const mockForgetRetiredTerminalPaneRecovery = vi.hoisted(() => vi.fn())
 
 // Mock sonner (imported by repos.ts)
 vi.mock('sonner', () => ({
@@ -22,10 +21,6 @@ vi.mock('sonner', () => ({
 vi.mock('@/components/terminal-pane/pty-dispatcher', () => ({
   restorePtyDataHandlersAfterFailedShutdown: mockRestorePtyDataHandlersAfterFailedShutdown,
   unregisterPtyDataHandlers: mockUnregisterPtyDataHandlers
-}))
-
-vi.mock('@/components/terminal-pane/terminal-pane-recovery-retirement', () => ({
-  forgetRetiredTerminalPaneRecovery: mockForgetRetiredTerminalPaneRecovery
 }))
 
 // Mock agent-status (imported by terminal-helpers)
@@ -195,7 +190,6 @@ describe('removeWorktree cascade', () => {
     expect(s.activeTabTypeByWorktree[worktreeId]).toBeUndefined()
     expect(s.rightSidebarExplorerViewByWorktree[worktreeId]).toBeUndefined()
     expect(loadSessionCommitDrafts()).toEqual({ 'repo1::/path/wt2': 'fix: keep draft' })
-    expect(mockForgetRetiredTerminalPaneRecovery.mock.calls).toEqual([['tab1'], ['tab2']])
   })
 
   it('warns when workspace removal keeps the local branch', async () => {
@@ -2507,7 +2501,6 @@ describe('setActiveWorktree', () => {
     expect(s.unreadTerminalTabs[closing.id]).toBeUndefined()
     // Siblings untouched.
     expect(s.unreadTerminalTabs[surviving.id]).toBe(true)
-    expect(mockForgetRetiredTerminalPaneRecovery).toHaveBeenCalledWith(closing.id)
   })
 
   // Why: focus events that normally clear unread never arrive for dead PTYs, so the shutdown path must drop the flags itself.
@@ -3210,7 +3203,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
 
     const state = store.getState()
     expect(state.suppressedPtyExitIds['pty-agent']).toBeUndefined()
-    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toBeUndefined()
+    // Why: a done resumable agent retains its origin:'live' recovery anchor (#9454), so a failed shutdown rolls back to it, not to undefined — and must not commit a worktree-sleep record.
+    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toMatchObject({
+      origin: 'live',
+      agent: 'claude',
+      providerSession: { key: 'session_id', id: 'sess-rollback-1' }
+    })
     expect(state.agentStatusByPaneKey[targetPaneKey]).toBeDefined()
   })
 
@@ -3349,7 +3347,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
 
     const state = store.getState()
     expect(state.ptyIdsByTabId['tab-1']).toEqual(['pty-agent', 'pty-shell'])
-    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toBeUndefined()
+    // Why: done resumable agent keeps its origin:'live' anchor (#9454); a failed kill rolls back to it, not undefined, and never commits worktree-sleep.
+    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toMatchObject({
+      origin: 'live',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'target-session' }
+    })
     expect(state.agentStatusByPaneKey[targetPaneKey]).toBeDefined()
     expect(state.suppressedPtyExitIds['pty-agent']).toBeUndefined()
     expect(mockRestorePtyDataHandlersAfterFailedShutdown).toHaveBeenCalledWith(handlerSnapshots)
@@ -3651,7 +3654,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
     ])
     expect(state.suppressedPtyExitIds['remote:env-1@@terminal-1']).toBeUndefined()
     expect(state.suppressedPtyExitIds['terminal-1']).toBeUndefined()
-    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toBeUndefined()
+    // Why: done resumable agent keeps its origin:'live' anchor (#9454); a failed target-only stop rolls back to it, not undefined, and never commits worktree-sleep.
+    expect(state.sleepingAgentSessionsByPaneKey[targetPaneKey]).toMatchObject({
+      origin: 'live',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'target-session' }
+    })
     expect(state.agentStatusByPaneKey[targetPaneKey]).toBeDefined()
   })
 
@@ -4497,7 +4505,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
       })
     ).rejects.toThrow('terminal_liveness_unavailable')
 
-    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toBeUndefined()
+    // Why: done resumable agent keeps its origin:'live' anchor (#9454); an inconclusive stop rolls back to it, not undefined, and never commits worktree-sleep.
+    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toMatchObject({
+      origin: 'live',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'live-session' }
+    })
     expect(store.getState().agentStatusByPaneKey['tab-1:live']).toBeDefined()
     expect(store.getState().suppressedPtyExitIds['pty-1']).toBeUndefined()
     expect(mockApi.pty.kill).not.toHaveBeenCalled()
@@ -4551,7 +4564,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
       })
     ).rejects.toThrow('exact_terminal_stop_unverified')
 
-    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toBeUndefined()
+    // Why: done resumable agent keeps its origin:'live' anchor (#9454); an unverified stop rolls back to it, not undefined, and never commits worktree-sleep.
+    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toMatchObject({
+      origin: 'live',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'live-session' }
+    })
     expect(store.getState().agentStatusByPaneKey['tab-1:live']).toBeDefined()
     expect(store.getState().suppressedPtyExitIds['pty-1']).toBeUndefined()
     expect(mockApi.pty.kill).not.toHaveBeenCalled()
@@ -5033,7 +5051,12 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
       })
     ).rejects.toThrow('stop failed')
 
-    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toBeUndefined()
+    // Why: done resumable agent keeps its origin:'live' anchor (#9454); a failed stop rolls back to it, not undefined, and never commits worktree-sleep.
+    expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:live']).toMatchObject({
+      origin: 'live',
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'live-session' }
+    })
     expect(store.getState().agentStatusByPaneKey['tab-1:live']).toBeDefined()
     expect(mockUnregisterPtyDataHandlers).not.toHaveBeenCalledWith(['pty-1'])
     expect(mockApi.pty.kill).not.toHaveBeenCalled()

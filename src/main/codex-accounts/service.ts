@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Why: keeps Codex account lifecycle, path safety, login, and identity parsing in one audited main-process module. */
 import { randomUUID } from 'node:crypto'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { app } from 'electron'
@@ -44,8 +44,6 @@ import {
   type CodexAccountSelectionTarget
 } from './runtime-selection'
 import { assertOwnedHostCodexManagedHomePath } from './host-codex-managed-home-ownership'
-import { readAgentStateFileSync } from '../agent-state-file-reader'
-import { NodeFileReadTooLargeError } from '../../shared/node-bounded-file-reader'
 
 const LOGIN_TIMEOUT_MS = 120_000
 const MAX_LOGIN_OUTPUT_CHARS = 4_000
@@ -135,7 +133,7 @@ function killLoginProcessTree(child: ChildProcess): void {
 
 function readLoginAuthSnapshot(authJsonPath: string): string | null | undefined {
   try {
-    return readAgentStateFileSync(authJsonPath)
+    return readFileSync(authJsonPath, 'utf-8')
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
     if (code === 'ENOENT' || code === 'ENOTDIR') {
@@ -204,6 +202,20 @@ export class CodexAccountService {
     return this.serializeMutation(() => this.doSelectAccount(accountId, target))
   }
 
+  // Why: quota probes against a cold per-account CODEX_HOME can take 10–25s
+  // (RPC + PTY fallback) and queue behind an in-flight global usage refresh.
+  // The refresh synchronously flips usage to "fetching" before its first await,
+  // so the switcher updates immediately; the probe itself must never block or
+  // fail the already-durable account mutation.
+  private startQuotaRefreshInBackground(
+    outgoingAccountId: string | null | undefined,
+    target: CodexAccountSelectionTarget | undefined
+  ): void {
+    void this.rateLimits.refreshForCodexAccountChange(outgoingAccountId, target).catch((error) => {
+      console.error('[codex-accounts] Quota refresh after account change failed:', error)
+    })
+  }
+
   private async doAddAccount(target?: CodexAccountAddTarget): Promise<CodexRateLimitAccountsState> {
     const accountId = randomUUID()
     const managedHome = this.createManagedHome(accountId, target)
@@ -254,7 +266,7 @@ export class CodexAccountService {
 
       // Why: switching activates the new account, so cache the outgoing account's usage for the switcher.
       const outgoingAccountId = getSelectedCodexAccountIdForTarget(settings, targetSelection)
-      await this.rateLimits.refreshForCodexAccountChange(outgoingAccountId, targetSelection)
+      this.startQuotaRefreshInBackground(outgoingAccountId, targetSelection)
       return this.getSnapshot()
     } catch (error) {
       this.safeRemoveManagedHome(managedHomePath, accountId)
@@ -310,7 +322,7 @@ export class CodexAccountService {
     this.runtimeHome.syncForCurrentSelection(accountTarget)
 
     // Why: re-auth can change the underlying Codex identity, so force a fresh read to avoid showing stale quota.
-    await this.rateLimits.refreshForCodexAccountChange(undefined, accountTarget)
+    this.startQuotaRefreshInBackground(undefined, accountTarget)
     return this.getSnapshot()
   }
 
@@ -339,7 +351,7 @@ export class CodexAccountService {
     // Why: a removed account can no longer appear in the switcher dropdown,
     // so purge its cached usage to avoid stale entries.
     this.rateLimits.evictInactiveCodexCache(accountId)
-    await this.rateLimits.refreshForCodexAccountChange(
+    this.startQuotaRefreshInBackground(
       getSelectedCodexAccountIdForTarget(settings, getCodexSelectionTargetForAccount(account)) ===
         accountId
         ? accountId
@@ -388,7 +400,7 @@ export class CodexAccountService {
       this.lifecycle.onHostSystemDefaultSelected?.()
     }
 
-    await this.rateLimits.refreshForCodexAccountChange(outgoingAccountId, effectiveTarget)
+    this.startQuotaRefreshInBackground(outgoingAccountId, effectiveTarget)
     return this.getSnapshot()
   }
 
@@ -414,7 +426,7 @@ export class CodexAccountService {
     try {
       // Why: a single read avoids an exists/read race and halves filesystem
       // probes whenever an accounts snapshot resolves this live identity.
-      contents = readAgentStateFileSync(authFilePath)
+      contents = readFileSync(authFilePath, 'utf-8')
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | null)?.code
       if (code === 'ENOENT' || code === 'ENOTDIR') {
@@ -710,7 +722,7 @@ export class CodexAccountService {
 
     try {
       return {
-        contents: readAgentStateFileSync(primaryConfigPath),
+        contents: readFileSync(primaryConfigPath, 'utf-8'),
         sourceHomePath,
         sourceHooksPath: join(sourceHomePath, 'hooks.json')
       }
@@ -741,7 +753,7 @@ export class CodexAccountService {
       // Why: the config is read over UNC but consumed by Codex inside WSL, so
       // path rewrites must anchor to the Linux-side ~/.codex, not the UNC path.
       return {
-        contents: readAgentStateFileSync(configPath),
+        contents: readFileSync(configPath, 'utf-8'),
         sourceHomePath: `${wslHome}/.codex`,
         sourceHooksPath: `${wslHome}/.codex/hooks.json`
       }
@@ -769,13 +781,10 @@ export class CodexAccountService {
   private writeManagedConfig(managedHomePath: string, contents: string): void {
     const configPath = join(managedHomePath, 'config.toml')
     try {
-      if (existsSync(configPath) && readAgentStateFileSync(configPath) === contents) {
+      if (existsSync(configPath) && readFileSync(configPath, 'utf-8') === contents) {
         return
       }
-    } catch (error) {
-      if (error instanceof NodeFileReadTooLargeError) {
-        throw error
-      }
+    } catch {
       // Why: a read error must not make a stale config look current; atomic write owns ACL repair and error surfacing.
     }
     writeFileAtomically(configPath, contents)
@@ -944,7 +953,7 @@ export class CodexAccountService {
       }
       if (
         expectedAccountId !== undefined &&
-        readAgentStateFileSync(join(candidatePath, '.orca-managed-home')).trim() !==
+        readFileSync(join(candidatePath, '.orca-managed-home'), 'utf-8').trim() !==
           expectedAccountId
       ) {
         throw new Error('Managed WSL Codex home ownership marker does not match its account ID.')
@@ -1252,7 +1261,7 @@ export class CodexAccountService {
       this.assertManagedHomePath(managedHomePath, expectedAccountId),
       'auth.json'
     )
-    const authFileContents = readAgentStateFileSync(authFilePath)
+    const authFileContents = readFileSync(authFilePath, 'utf-8')
     let parsed: Record<string, unknown>
     try {
       parsed = JSON.parse(authFileContents) as Record<string, unknown>

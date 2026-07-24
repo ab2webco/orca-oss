@@ -11,8 +11,6 @@ import { redactPtyIdForDiagnostics } from '../../shared/pty-delivery-diagnostics
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import type { TuiAgent } from '../../shared/types'
 import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
-import { MAX_CLAIMED_AGENT_PTY_OWNER_ENTRIES } from '../../shared/claimed-agent-pty-owner'
-import type * as NodeBoundedFileReader from '../../shared/node-bounded-file-reader'
 
 const isWindowsHost = process.platform === 'win32'
 const posixOnlyIt = isWindowsHost ? it.skip : it
@@ -125,21 +123,6 @@ vi.mock('fs', () => ({
   chmodSync: chmodSyncMock,
   constants: {
     X_OK: 1
-  }
-}))
-
-vi.mock('../../shared/node-bounded-file-reader', async (importOriginal) => ({
-  ...(await importOriginal<typeof NodeBoundedFileReader>()),
-  readNodeFileSyncWithinLimit: (path: string, maxBytes: number) => {
-    const content = readFileSyncMock(path)
-    if (typeof content !== 'string' && !Buffer.isBuffer(content)) {
-      throw new Error('File unavailable')
-    }
-    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content)
-    if (buffer.byteLength > maxBytes) {
-      throw new Error('File too large')
-    }
-    return { buffer, stats: { size: buffer.byteLength } }
   }
 }))
 
@@ -1070,52 +1053,6 @@ describe('registerPtyHandlers', () => {
     clearProviderPtyState(owner.ptyId)
   })
 
-  it('fails claimed ensure closed before aggregate owner listings amplify memory', async () => {
-    const ownersPerSession = 256
-    const sessionCount = Math.floor(MAX_CLAIMED_AGENT_PTY_OWNER_ENTRIES / ownersPerSession) + 1
-    const sessions = Array.from({ length: sessionCount }, (_, sessionIndex) => {
-      const id = `pty-owner-cap-${sessionIndex}`
-      return {
-        id,
-        incarnationId: 'incarnation-owner-cap',
-        cwd: '/tmp/recovered-worktree',
-        title: 'Codex',
-        agentSessionOwners: Array.from({ length: ownersPerSession }, (_, ownerIndex) => {
-          const index = sessionIndex * ownersPerSession + ownerIndex
-          return {
-            claim: {
-              ...recoveredAgentClaim,
-              identityDigest: index.toString(36).padStart(43, 'a')
-            },
-            generation: `generation-owner-cap-${index}`,
-            phase: 'live' as const,
-            ptyId: id,
-            surface: recoveredAgentSurface
-          }
-        })
-      }
-    })
-    const provider = createAgentClaimProvider({ sessions })
-    setLocalPtyProvider(provider as never)
-    const controller = registerAgentClaimController()
-
-    await expect(
-      controller.spawn({
-        cols: 80,
-        rows: 24,
-        cwd: '/tmp/recovered-worktree',
-        agentSessionEnsure: {
-          claim: {
-            ...recoveredAgentClaim,
-            identityDigest: '7777777777777777777777777777777777777777777'
-          },
-          surface: recoveredAgentSurface
-        }
-      })
-    ).rejects.toThrow('execution_owner_unavailable')
-    expect(provider.spawn).not.toHaveBeenCalled()
-  })
-
   it('releases an adopted-owner fence when that owner exits during admission', async () => {
     const incarnationId = 'incarnation-adopted-exit'
     const owner: AgentSessionOwnerBinding = {
@@ -1708,6 +1645,14 @@ describe('registerPtyHandlers', () => {
   }
 
   describe('spawn environment', () => {
+    it('publishes a lifecycle signal after a successful renderer spawn', async () => {
+      await spawnAndGetEnv()
+
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:spawned', {
+        id: expect.any(String)
+      })
+    })
+
     it('marks local Claude launches live until the PTY is killed', async () => {
       let exitCb: ((info: { exitCode: number }) => void) | undefined
       spawnMock.mockReturnValue({
@@ -6432,6 +6377,48 @@ describe('registerPtyHandlers', () => {
     })
   })
 
+  it('starts local and SSH session inventories concurrently', async () => {
+    let resolveLocal!: (sessions: { id: string; cwd: string; title: string }[]) => void
+    const localSessions = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
+      resolveLocal = resolve
+    })
+    vi.spyOn(getLocalPtyProvider(), 'listProcesses').mockReturnValue(localSessions)
+    registerPtyHandlers(mainWindow as never)
+
+    let resolveSsh!: (sessions: { id: string; cwd: string; title: string }[]) => void
+    const sshSessions = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
+      resolveSsh = resolve
+    })
+    const sshListProcesses = vi.fn(() => sshSessions)
+    registerSshPtyProvider('ssh-1', {
+      spawn: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      shutdown: vi.fn(),
+      sendSignal: vi.fn(),
+      getCwd: vi.fn(),
+      getInitialCwd: vi.fn(),
+      clearBuffer: vi.fn(),
+      acknowledgeDataEvent: vi.fn(),
+      onData: vi.fn(() => () => {}),
+      onExit: vi.fn(() => () => {}),
+      listProcesses: sshListProcesses,
+      hasChildProcesses: vi.fn(),
+      getForegroundProcess: vi.fn(),
+      serialize: vi.fn(),
+      revive: vi.fn(),
+      getDefaultShell: vi.fn(),
+      getProfiles: vi.fn()
+    } as never)
+
+    const pendingInventory = handlers.get('pty:listSessions')!(null, undefined)
+
+    expect(sshListProcesses).toHaveBeenCalledTimes(1)
+    resolveLocal([])
+    resolveSsh([])
+    await pendingInventory
+  })
+
   it('reports authoritative snapshot capability with the owning provider context', () => {
     const capabilityProvider = {
       authoritativeIds: new Set(['current-pty']),
@@ -7439,7 +7426,7 @@ describe('registerPtyHandlers', () => {
     registerPtyHandlers(mainWindow as never, runtime as never)
     expect(controller).not.toBeNull()
     const spawnController = controller as unknown as RuntimeSpawnController
-    await spawnController.spawn({
+    const spawned = await spawnController.spawn({
       cols: 80,
       rows: 24,
       worktreeId: 'wt-1',
@@ -7454,6 +7441,9 @@ describe('registerPtyHandlers', () => {
       expect.any(String),
       'term_expected'
     )
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:spawned', {
+      id: spawned.id
+    })
   })
 
   it('does not update cached PTY size when runtime controller resize fails', async () => {
@@ -11238,6 +11228,7 @@ describe('registerPtyHandlers', () => {
         cwd: '/tmp'
       })) as { id: string }
       const writeListener = getPtyWriteListener()
+      mainWindow.webContents.send.mockClear()
 
       const pendingOutput = 'x'.repeat(1020)
       mockProc.emitData(pendingOutput)
@@ -11387,8 +11378,55 @@ describe('registerPtyHandlers', () => {
         pendingChars: 72 * 1024,
         rendererInFlightChars: 512 * 1024 + 'second-terminal-output'.length,
         peakPendingChars: 72 * 1024,
+        peakMaxPendingCharsByPty: 72 * 1024,
         peakRendererInFlightChars: 512 * 1024 + 'second-terminal-output'.length,
+        peakMaxRendererInFlightCharsByPty: 512 * 1024,
         ackGatedFlushSkipCount: 0
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not scan delivery maps for 1,000 ACKs across 100 tracked PTYs', () => {
+    vi.useFakeTimers()
+    const provider = installObservableDaemonTestProvider()
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const ptyIds = Array.from({ length: 100 }, (_, index) => `pressure-pty-${index}`)
+      for (const id of ptyIds) {
+        provider.emitData(id, 'a')
+      }
+      vi.runAllTimers()
+      for (const id of ptyIds) {
+        provider.emitData(id, 'b')
+      }
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 100,
+        pendingChars: 100,
+        rendererInFlightPtyCount: 100,
+        rendererInFlightChars: 100
+      })
+
+      const ackData = getPtyAckDataListener()
+      const mapValuesSpy = vi.spyOn(Map.prototype, 'values')
+      let mapValuesCalls = 0
+      try {
+        for (let index = 0; index < 1_000; index++) {
+          ackData(null, { id: ptyIds[0]!, processedChars: 1 })
+        }
+      } finally {
+        mapValuesCalls = mapValuesSpy.mock.calls.length
+        mapValuesSpy.mockRestore()
+      }
+
+      expect(mapValuesCalls).toBe(0)
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 100,
+        pendingChars: 100,
+        rendererInFlightPtyCount: 99,
+        rendererInFlightChars: 99
       })
     } finally {
       vi.useRealTimers()

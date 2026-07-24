@@ -31,7 +31,6 @@ export class RelayControlOrigin {
   readonly assignment: RelayAssignment
   readonly transport: CloudRelayTransport
   private readonly options: RelayControlOriginOptions
-  private readonly detachTransport: () => void
   private readonly controls = new Set<RelayControlClient>()
   private readonly retiredControlTimers = new Map<
     RelayControlClient,
@@ -43,6 +42,7 @@ export class RelayControlOrigin {
   private leaseExpiresAt = 0
   private acceptingConnections = true
   private closed = false
+  private readonly detachMobileSocketTransport: () => void
 
   constructor(options: RelayControlOriginOptions) {
     this.options = options
@@ -54,8 +54,9 @@ export class RelayControlOrigin {
       createSocket: options.createDataSocket,
       onConnectionClosed: (connectionId) => options.onConnectionReleased(connectionId, this)
     })
-    this.detachTransport = options.mobileSocketWiring.attachTransport(this.transport, (ws) =>
-      this.transport.metadataFor(ws)
+    this.detachMobileSocketTransport = options.mobileSocketWiring.attachTransport(
+      this.transport,
+      (ws) => this.transport.metadataFor(ws)
     )
   }
 
@@ -144,7 +145,6 @@ export class RelayControlOrigin {
       return
     }
     this.closed = true
-    this.detachTransport()
     for (const timer of this.retiredControlTimers.values()) {
       clearTimeout(timer)
     }
@@ -154,7 +154,12 @@ export class RelayControlOrigin {
     }
     this.controls.clear()
     this.activeControl = null
-    await this.transport.stop()
+    try {
+      await this.transport.stop()
+    } finally {
+      // Why: detaching earlier would skip socket-close cleanup in MobileSocketWiring.
+      this.detachMobileSocketTransport()
+    }
   }
 
   closeNow(): void {

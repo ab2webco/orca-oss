@@ -83,7 +83,6 @@ import {
   resolveWebAgentSessionHandoff
 } from './web-agent-session-handoff'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
-import { mapWebSessionSnapshotRecoveries } from './web-session-snapshot-recovery-pool'
 
 const WEB_SESSION_GROUP_PREFIX = 'web-session-tabs:'
 
@@ -348,7 +347,6 @@ function clearWebSessionTabsTrackingForWorktree(environmentId: string, worktreeI
   replayableSessionTabsSnapshotByWorktree.delete(key)
   lastHostTerminalTabCountByWorktree.delete(key)
   clearWebRuntimeWakeTerminalRespawnForWorktree(worktreeId)
-  clearWebSessionFocusIntent({ environmentId }, worktreeId)
   clearWebSessionReorderIntentsForWorktree({ environmentId }, worktreeId)
   clearWebSessionCloseIntentsForWorktree({ environmentId }, worktreeId)
   clearWebAgentSessionHandoffsForWorktree(environmentId, worktreeId)
@@ -470,7 +468,8 @@ function isMirroredTerminalSurfaceId(tabId: string): boolean {
 function chooseRemoteTerminalLayout(
   surfaces: readonly TerminalSurface[],
   ptyIdsByLeafId: Record<string, string>,
-  existingLayout?: TerminalLayoutSnapshot
+  existingLayout?: TerminalLayoutSnapshot,
+  requestedActiveLeafId?: string
 ): TerminalLayoutSnapshot {
   const leafIds = surfaces.map((surface) => surface.leafId)
   const knownLeafIds = new Set(leafIds)
@@ -481,6 +480,9 @@ function chooseRemoteTerminalLayout(
       ])
     : undefined
   const activeLeafId =
+    (requestedActiveLeafId && knownLeafIds.has(requestedActiveLeafId)
+      ? requestedActiveLeafId
+      : null) ??
     // Why: host title/status snapshots may still mark an agent pane active after this client selected a different split pane.
     (existingLayout?.activeLeafId && knownLeafIds.has(existingLayout.activeLeafId)
       ? existingLayout.activeLeafId
@@ -492,9 +494,12 @@ function chooseRemoteTerminalLayout(
     leafIds[0] ??
     null
   const expandedLeafId =
-    parentLayout?.expandedLeafId && knownLeafIds.has(parentLayout.expandedLeafId)
-      ? parentLayout.expandedLeafId
-      : null
+    requestedActiveLeafId &&
+    (Boolean(existingLayout?.expandedLeafId) || Boolean(parentLayout?.expandedLeafId))
+      ? requestedActiveLeafId
+      : parentLayout?.expandedLeafId && knownLeafIds.has(parentLayout.expandedLeafId)
+        ? parentLayout.expandedLeafId
+        : null
   return {
     // Why: host parentLayout is authoritative for split direction; else keep the prior client tree, then degenerate — never re-guess a direction.
     root: resolveTerminalLayoutRoot({
@@ -551,7 +556,8 @@ function buildMirroredTerminalTabs(
   existingById: ReadonlyMap<string, TerminalTab>,
   existingLayoutsByTabId: Readonly<Record<string, TerminalLayoutSnapshot>>,
   sortOffset: number,
-  now: number
+  now: number,
+  focusTarget?: { parentTabId: string; leafId: string }
 ): MirroredTerminalTab[] {
   const groups = new Map<string, TerminalSurface[]>()
   for (const tab of snapshot.tabs.filter(isTerminalSurfaceTab)) {
@@ -563,7 +569,12 @@ function buildMirroredTerminalTabs(
   return [...groups.entries()].map(([parentTabId, surfaces], index) => {
     const localTabId = toWebTerminalSurfaceTabId(parentTabId)
     const existingLayout = existingLayoutsByTabId[localTabId]
+    const requestedActiveLeafId =
+      focusTarget?.parentTabId === parentTabId ? focusTarget.leafId : undefined
     const activeSurface =
+      (requestedActiveLeafId
+        ? surfaces.find((surface) => surface.leafId === requestedActiveLeafId)
+        : undefined) ??
       (existingLayout?.activeLeafId
         ? surfaces.find((surface) => surface.leafId === existingLayout.activeLeafId)
         : undefined) ??
@@ -631,7 +642,12 @@ function buildMirroredTerminalTabs(
       },
       hostTabId: parentTabId,
       ptyIds,
-      layout: chooseRemoteTerminalLayout(surfaces, ptyIdsByLeafId, existingLayout)
+      layout: chooseRemoteTerminalLayout(
+        surfaces,
+        ptyIdsByLeafId,
+        existingLayout,
+        requestedActiveLeafId
+      )
     }
   })
 }
@@ -1720,15 +1736,24 @@ export function applyWebSessionTabsSnapshot(
       }
     : rawSnapshot
   // Why: only a caller-recorded create intent may focus its arriving tab; unsolicited server-active must not steal focus (#5435).
-  const focusIntentHostTabId = peekWebSessionFocusIntent({ environmentId }, worktreeId)
+  const focusIntent = peekWebSessionFocusIntent({ environmentId }, worktreeId)
+  const focusIntentHostTabId = focusIntent?.hostTabId ?? null
   const callerFocusIntentTab =
     focusIntentHostTabId === null
       ? null
-      : (snapshot.tabs.find(
-          (tab) =>
-            tab.id === focusIntentHostTabId ||
-            (tab.type === 'browser' && tab.browserPageId === focusIntentHostTabId)
-        ) ?? null)
+      : focusIntent?.leafId
+        ? (snapshot.tabs.find(
+            (tab) =>
+              tab.type === 'terminal' &&
+              tab.leafId === focusIntent.leafId &&
+              (tab.id === focusIntentHostTabId || tab.parentTabId === focusIntentHostTabId)
+          ) ?? null)
+        : (snapshot.tabs.find(
+            (tab) =>
+              tab.id === focusIntentHostTabId ||
+              (tab.type === 'terminal' && tab.parentTabId === focusIntentHostTabId) ||
+              (tab.type === 'browser' && tab.browserPageId === focusIntentHostTabId)
+          ) ?? null)
   const followIntentTab =
     snapshot.navigationIntent === 'follow'
       ? (snapshot.tabs.find((tab) => tab.id === snapshot.activeTabId) ?? null)
@@ -1786,7 +1811,13 @@ export function applyWebSessionTabsSnapshot(
     existingTerminalById,
     state.terminalLayoutsByTabId,
     retainedTerminalTabs.length,
-    now
+    now,
+    callerFocusIntentTab?.type === 'terminal'
+      ? {
+          parentTabId: callerFocusIntentTab.parentTabId,
+          leafId: callerFocusIntentTab.leafId
+        }
+      : undefined
   )
   const mirroredTerminalTabEntries = mirroredTerminalTabs.map((entry) => entry.tab)
   const retainedTerminalIds = new Set(retainedTerminalTabs.map((tab) => tab.id))
@@ -2703,17 +2734,16 @@ export function useWebSessionTabsSync(): void {
             console.warn('[web-session-tabs-sync] initial listAll returned an invalid payload')
             return
           }
-          const recovered = await mapWebSessionSnapshotRecoveries(result.snapshots, (snapshot) =>
-            recoverWebSessionTerminalOrphansBeforeApply(
-              useAppStore.getState(),
-              snapshot,
-              environmentId
+          const recovered = await Promise.all(
+            result.snapshots.map((snapshot) =>
+              recoverWebSessionTerminalOrphansBeforeApply(
+                useAppStore.getState(),
+                snapshot,
+                environmentId
+              )
             )
           )
-          if (
-            disposed ||
-            getRuntimeEnvironmentRevision(environmentId) !== expectedEnvironmentPairingRevision
-          ) {
+          if (disposed) {
             return
           }
           const applicable = recovered.filter(
@@ -2759,19 +2789,17 @@ export function useWebSessionTabsSync(): void {
               const event = response.result as SessionTabsStreamEvent
               const replayed = isRuntimeSubscriptionReplayResponse(response)
               if (event.type === 'snapshots') {
-                void mapWebSessionSnapshotRecoveries(event.snapshots, (snapshot) =>
-                  recoverWebSessionTerminalOrphansBeforeApply(
-                    useAppStore.getState(),
-                    snapshot,
-                    environmentId
+                void Promise.all(
+                  event.snapshots.map((snapshot) =>
+                    recoverWebSessionTerminalOrphansBeforeApply(
+                      useAppStore.getState(),
+                      snapshot,
+                      environmentId
+                    )
                   )
                 )
                   .then((recovered) => {
-                    if (
-                      !disposed &&
-                      getRuntimeEnvironmentRevision(environmentId) ===
-                        expectedEnvironmentPairingRevision
-                    ) {
+                    if (!disposed) {
                       const applicable = recovered.filter(
                         (snapshot): snapshot is RuntimeMobileSessionTabsResult => snapshot !== null
                       )
@@ -2801,12 +2829,7 @@ export function useWebSessionTabsSync(): void {
                 environmentId
               )
                 .then((recovered) => {
-                  if (
-                    !disposed &&
-                    recovered &&
-                    getRuntimeEnvironmentRevision(environmentId) ===
-                      expectedEnvironmentPairingRevision
-                  ) {
+                  if (!disposed && recovered) {
                     if (replayed) {
                       acceptReplayedWebSessionTabsSnapshot(environmentId, recovered.worktree)
                     }
@@ -2892,11 +2915,7 @@ export function useWebSessionTabsSync(): void {
         event,
         environmentId
       )
-      if (
-        disposed ||
-        !recovered ||
-        getRuntimeEnvironmentRevision(environmentId) !== expectedEnvironmentPairingRevision
-      ) {
+      if (disposed || !recovered) {
         return
       }
       if (isRuntimeSubscriptionReplayResponse(response)) {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
+import { notifyLiveClaudePtysDrainedOnTransition } from './live-pty-drain-listeners'
 
 const liveClaudePtyIds = new Set<string>()
 // Why: exported for sibling account-removal enumeration; only this module mutates them.
@@ -9,7 +9,6 @@ export const liveInjectedClaudePtyAccounts = new Map<string, string>()
 const injectedClaudeLaunchReservations = new Map<string, string>()
 const sharedClaudeLaunchReservations = new Map<string, string | null>()
 const managedClaudeAccountMutations = new Set<string>()
-const managedClaudeAccountMutationContext = new AsyncLocalStorage<ReadonlySet<string>>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
 // cannot rotate the single-use refresh token out from under a Claude CLI that
@@ -69,6 +68,7 @@ export function hasSeededUnconfirmedClaudePtys(): boolean {
  * their pane never reattaches: that daemon process still owns the credentials.
  */
 export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]): void {
+  const hadLivePtys = liveClaudePtyIds.size > 0
   const alive = new Set(aliveSessionIds)
   for (const sessionId of seededUnconfirmedPtyIds) {
     if (!alive.has(sessionId)) {
@@ -87,6 +87,7 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
   }
   seededUnconfirmedPtyIds.clear()
   seededUnconfirmedInjectedPtyIds.clear()
+  notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
 }
 
 export function markClaudePtySpawned(
@@ -174,6 +175,7 @@ export function markInjectedClaudePtySpawned(
 }
 
 export function markClaudePtyExited(ptyId: string): void {
+  const hadLivePtys = liveClaudePtyIds.size > 0
   liveClaudePtyIds.delete(ptyId)
   liveSharedClaudePtyAccounts.delete(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
@@ -182,6 +184,7 @@ export function markClaudePtyExited(ptyId: string): void {
   ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
   seededUnconfirmedInjectedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtyAccountBinding?.(ptyId)
+  notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
 }
 
 export function hasLiveClaudePtys(): boolean {
@@ -288,26 +291,6 @@ export function beginManagedClaudeAccountMutation(
 
 export function endManagedClaudeAccountMutation(accountId: string): void {
   managedClaudeAccountMutations.delete(accountId)
-}
-
-export async function runManagedClaudeAccountMutation<T>(
-  accountId: string,
-  operation: () => Promise<T>,
-  allowLiveSharedPtys = false
-): Promise<T> {
-  const inherited = managedClaudeAccountMutationContext.getStore()
-  if (inherited?.has(accountId)) {
-    return operation()
-  }
-  beginManagedClaudeAccountMutation(accountId, allowLiveSharedPtys)
-  try {
-    return await managedClaudeAccountMutationContext.run(
-      new Set([...(inherited ?? []), accountId]),
-      operation
-    )
-  } finally {
-    endManagedClaudeAccountMutation(accountId)
-  }
 }
 
 export function releaseInjectedClaudeAccountLaunch(reservationId: string | undefined): void {

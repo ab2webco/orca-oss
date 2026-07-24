@@ -84,11 +84,18 @@ describe('MobileSocketWiring', () => {
       onBinary: vi.fn(),
       onClose: vi.fn()
     })
-    wiring.attachTransport(direct)
+    const detachDirect = wiring.attachTransport(direct)
     wiring.attachTransport(relay)
 
     expect(wiring.terminateDeviceConnections('valid-token')).toBe(3)
     expect(direct.terminateClientConnections).toHaveBeenCalledWith('valid-token')
+    expect(relay.terminateClientConnections).toHaveBeenCalledWith('valid-token')
+
+    detachDirect()
+    direct.terminateClientConnections.mockClear()
+    relay.terminateClientConnections.mockClear()
+    expect(wiring.terminateDeviceConnections('valid-token')).toBe(2)
+    expect(direct.terminateClientConnections).not.toHaveBeenCalled()
     expect(relay.terminateClientConnections).toHaveBeenCalledWith('valid-token')
   })
 

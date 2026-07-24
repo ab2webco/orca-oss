@@ -37,7 +37,6 @@ import type {
 import type { MobileRelayStatus } from '../shared/mobile-relay-status'
 import type { MobilePairingConnectionMode } from '../shared/mobile-pairing-connection-mode'
 import type { SshMutationExpectation } from '../shared/ssh-types'
-import type { RasterImageDimensions } from '../shared/raster-image-dimensions'
 import type {
   CreateLocalOrcaProfileArgs,
   CreateLocalOrcaProfileResult,
@@ -1483,6 +1482,7 @@ export type PreloadApi = {
     onExit: (
       callback: (data: { id: string; code: number; preserveRendererBinding?: boolean }) => void
     ) => () => void
+    onSpawned: (callback: (data: { id: string }) => void) => () => void
     onSerializeBufferRequest: (
       callback: (data: {
         requestId: string
@@ -2638,7 +2638,6 @@ export type PreloadApi = {
       isBinary: boolean
       isImage?: boolean
       mimeType?: string
-      imageDimensions?: RasterImageDimensions
       fileIdentity?: string
     }>
     readLocalLogTail: (args: LocalLogTailReadArgs) => Promise<LocalLogTailReadResult>
@@ -3208,6 +3207,7 @@ export type PreloadApi = {
     popupMenu: () => void
     onWindowCloseRequested: (callback: (data: { isQuitting: boolean }) => void) => () => void
     confirmWindowClose: () => void
+    notifyWindowRevealed: () => void
   }
   runtime: {
     syncWindowGraph: (graph: RuntimeSyncWindowGraph) => Promise<RuntimeSyncWindowGraphResult>

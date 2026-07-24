@@ -13,8 +13,8 @@ vi.mock('node:child_process', () => ({
   spawn: childSpawnMock
 }))
 
-vi.mock('../integration-credential-file', () => ({
-  readIntegrationCredentialFileText: readFileMock
+vi.mock('node:fs/promises', () => ({
+  readFile: readFileMock
 }))
 
 vi.mock('../codex-cli/command', () => ({
@@ -51,6 +51,31 @@ function makeRpcChild() {
   child.stdin = { write: vi.fn() }
   child.kill = vi.fn()
   return child
+}
+
+function respondToRpcRateLimitRead(
+  rpcChild: ReturnType<typeof makeRpcChild>,
+  rateLimits: unknown
+): void {
+  rpcChild.stdin.write.mockImplementation((line: string) => {
+    const msg = JSON.parse(line) as { id?: number; method?: string }
+    if (msg.method === 'initialize') {
+      setTimeout(() => {
+        rpcChild.stdout.emit(
+          'data',
+          Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} })}\n`)
+        )
+      }, 0)
+    }
+    if (msg.method === 'account/rateLimits/read') {
+      setTimeout(() => {
+        rpcChild.stdout.emit(
+          'data',
+          Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { rateLimits } })}\n`)
+        )
+      }, 0)
+    }
+  })
 }
 
 function makePtyTerm() {
@@ -325,38 +350,12 @@ describe('fetchCodexRateLimits', () => {
     expect(ptySpawnMock).not.toHaveBeenCalled()
   })
 
-  it('classifies Codex RPC windows by their real duration (session vs weekly)', async () => {
+  it('normalizes near-canonical Codex RPC windows to fixed display durations', async () => {
     const rpcChild = makeRpcChild()
     childSpawnMock.mockReturnValue(rpcChild)
-    rpcChild.stdin.write.mockImplementation((line: string) => {
-      const msg = JSON.parse(line) as { id?: number; method?: string }
-      if (msg.method === 'initialize') {
-        setTimeout(() => {
-          rpcChild.stdout.emit(
-            'data',
-            Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} })}\n`)
-          )
-        }, 0)
-      }
-      if (msg.method === 'account/rateLimits/read') {
-        setTimeout(() => {
-          rpcChild.stdout.emit(
-            'data',
-            Buffer.from(
-              `${JSON.stringify({
-                jsonrpc: '2.0',
-                id: msg.id,
-                result: {
-                  rateLimits: {
-                    primary: { usedPercent: 0, windowDurationMins: 300 },
-                    secondary: { usedPercent: 0, windowDurationMins: 10080 }
-                  }
-                }
-              })}\n`
-            )
-          )
-        }, 0)
-      }
+    respondToRpcRateLimitRead(rpcChild, {
+      primary: { usedPercent: 0, windowDurationMins: 299 },
+      secondary: { usedPercent: 0, windowDurationMins: 10079 }
     })
 
     const resultPromise = fetchCodexRateLimits()
@@ -368,57 +367,40 @@ describe('fetchCodexRateLimits', () => {
     expect(result.weekly?.windowMinutes).toBe(10080)
   })
 
-  it('maps a weekly window delivered in the primary slot to weekly, not session (#9969)', async () => {
+  it('keeps a weekly-only Codex primary window out of the 5-hour slot', async () => {
     const rpcChild = makeRpcChild()
     childSpawnMock.mockReturnValue(rpcChild)
-    // Why: a Codex plus plan returns only a weekly window, carried in `primary`
-    // with `secondary: null`. Slot-based mapping mislabeled this as the 5h
-    // session with a ~7-day reset; it must land in `weekly` and leave session null.
-    const weeklyResetsAt = 1785426094
-    rpcChild.stdin.write.mockImplementation((line: string) => {
-      const msg = JSON.parse(line) as { id?: number; method?: string }
-      if (msg.method === 'initialize') {
-        setTimeout(() => {
-          rpcChild.stdout.emit(
-            'data',
-            Buffer.from(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} })}\n`)
-          )
-        }, 0)
-      }
-      if (msg.method === 'account/rateLimits/read') {
-        setTimeout(() => {
-          rpcChild.stdout.emit(
-            'data',
-            Buffer.from(
-              `${JSON.stringify({
-                jsonrpc: '2.0',
-                id: msg.id,
-                result: {
-                  rateLimits: {
-                    primary: {
-                      usedPercent: 12,
-                      windowDurationMins: 10080,
-                      resetsAt: weeklyResetsAt
-                    },
-                    secondary: null,
-                    planType: 'plus'
-                  }
-                }
-              })}\n`
-            )
-          )
-        }, 0)
-      }
+    respondToRpcRateLimitRead(rpcChild, {
+      primary: { usedPercent: 22, windowDurationMins: 10080 },
+      secondary: null
     })
 
     const resultPromise = fetchCodexRateLimits()
     await vi.advanceTimersByTimeAsync(1)
     await vi.advanceTimersByTimeAsync(1)
-    const result = await resultPromise
 
-    expect(result.session).toBeNull()
-    expect(result.weekly?.windowMinutes).toBe(10080)
-    expect(result.weekly?.resetsAt).toBe(weeklyResetsAt * 1000)
+    await expect(resultPromise).resolves.toMatchObject({
+      session: null,
+      weekly: { usedPercent: 22, windowMinutes: 10080 }
+    })
+  })
+
+  it('does not map a duplicate session-duration window into the weekly slot', async () => {
+    const rpcChild = makeRpcChild()
+    childSpawnMock.mockReturnValue(rpcChild)
+    respondToRpcRateLimitRead(rpcChild, {
+      primary: { usedPercent: 11, windowDurationMins: 300 },
+      secondary: { usedPercent: 12, windowDurationMins: 300 }
+    })
+
+    const resultPromise = fetchCodexRateLimits()
+    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(resultPromise).resolves.toMatchObject({
+      session: { usedPercent: 11, windowMinutes: 300 },
+      weekly: null
+    })
   })
 
   it('fills reset-credit count from the backend when the installed app-server omits it', async () => {
@@ -514,7 +496,7 @@ describe('fetchCodexRateLimits', () => {
         }
       ]
     })
-    expect(readFileMock).toHaveBeenCalledWith(join('/managed/codex-home', 'auth.json'))
+    expect(readFileMock).toHaveBeenCalledWith(join('/managed/codex-home', 'auth.json'), 'utf8')
     expect(fetch).toHaveBeenCalledWith(
       'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits',
       expect.objectContaining({

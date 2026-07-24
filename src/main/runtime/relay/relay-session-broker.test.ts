@@ -134,6 +134,8 @@ describe('RelaySessionBroker lifecycle ownership', () => {
       onStatus: (status) => statuses.push(status)
     })
     await vi.waitFor(() => expect(fakes.controls).toHaveLength(1))
+    const transportStopped = deferred<void>()
+    fakes.transports[0]!.stop.mockReturnValue(transportStopped.promise)
     current = false
     controlAck.resolve({
       type: 'host-hello-ack',
@@ -148,7 +150,9 @@ describe('RelaySessionBroker lifecycle ownership', () => {
     await expect(connecting).rejects.toBeInstanceOf(StaleRelayBrokerError)
     expect(fakes.controls[0]!.closeNow).toHaveBeenCalledOnce()
     expect(fakes.transports[0]!.stop).toHaveBeenCalledOnce()
-    expect(detachTransport).toHaveBeenCalledOnce()
+    expect(detachTransport).not.toHaveBeenCalled()
+    transportStopped.resolve(undefined)
+    await vi.waitFor(() => expect(detachTransport).toHaveBeenCalledOnce())
     expect(statuses).toEqual(['connecting'])
   })
 
@@ -318,7 +322,7 @@ function brokerOptions(
       publicKeyB64: Buffer.from(keypair.publicKey).toString('base64')
     },
     appVersion: '1.0.0',
-    mobileSocketWiring: { attachTransport: vi.fn(() => vi.fn()) } as never,
+    mobileSocketWiring: { attachTransport: vi.fn(() => () => {}) } as never,
     isCurrent: () => true,
     refreshAccessToken: async () => null,
     onStatus: vi.fn(),

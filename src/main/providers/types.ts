@@ -19,7 +19,6 @@ import type {
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
 import type { CommitMessageDraftContext } from '../../shared/commit-message-generation'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
-import type { FilesystemPathListingProvider } from './filesystem-path-listing-provider'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { GitProviderStatusOptions } from './git-provider-status-options'
 import type { PtyBackgroundStreamEvent, PtyDataEvent } from './pty-provider-events'
@@ -163,13 +162,10 @@ export type FileReadResult = {
   isBinary: boolean
   isImage?: boolean
   mimeType?: string
-  imageDimensions?: { width: number; height: number }
 }
 
-type FilesystemDirectoryReadOptions = { maxEntries?: number; maxRetainedBytes?: number }
-
-export type IFilesystemProvider = FilesystemPathListingProvider & {
-  readDir(dirPath: string, options?: FilesystemDirectoryReadOptions): Promise<DirEntry[]>
+export type IFilesystemProvider = {
+  readDir(dirPath: string): Promise<DirEntry[]>
   readFile(filePath: string): Promise<FileReadResult>
   readTerminalArtifact?(
     filePath: string,
@@ -198,6 +194,10 @@ export type IFilesystemProvider = FilesystemPathListingProvider & {
   copy(source: string, destination: string): Promise<void>
   realpath(filePath: string): Promise<string>
   search(opts: SearchOptions): Promise<SearchResult>
+  listFiles(
+    rootPath: string,
+    options?: { excludePaths?: string[]; signal?: AbortSignal; maxResults?: number }
+  ): Promise<string[]>
   scanWorkspaceSpace?(
     rootPath: string,
     options?: { signal?: AbortSignal }

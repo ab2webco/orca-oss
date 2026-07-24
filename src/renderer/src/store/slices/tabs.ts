@@ -40,6 +40,10 @@ import {
   addAdditionalValidWorkspaceKeys,
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
+import {
+  buildValidWorktreeIdsForSessionHydration,
+  collectPersistedWorktreeIdsForSessionHydration
+} from './degraded-repo-worktree-validity'
 
 export type TabSplitDirection = 'left' | 'right' | 'up' | 'down'
 
@@ -1971,11 +1975,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
 
   hydrateTabsSession: (session, options) => {
     const state = get()
-    const validWorktreeIds = new Set(
-      Object.values(state.worktreesByRepo)
-        .flat()
-        .map((w) => w.id)
-    )
+    const persistedWorktreeIds = collectPersistedWorktreeIdsForSessionHydration(session)
+    const validWorktreeIds = buildValidWorktreeIdsForSessionHydration(state, persistedWorktreeIds)
     validWorktreeIds.add(FLOATING_TERMINAL_WORKTREE_ID)
     for (const workspace of state.folderWorkspaces) {
       validWorktreeIds.add(folderWorkspaceKey(workspace.id))

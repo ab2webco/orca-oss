@@ -13,7 +13,7 @@ import { mapClaudeUsageWindow } from './claude-usage-window'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
-import { runManagedClaudeAccountMutation } from '../claude-accounts/live-pty-gate'
+import { runManagedClaudeAccountMutation } from '../claude-accounts/run-managed-claude-account-mutation'
 import type { NetworkProxySettings } from '../../shared/network-proxy'
 import {
   normalizeClaudeAccountSelectionTarget,
@@ -93,16 +93,6 @@ const RATE_LIMITED_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000
 const LIVE_CLAUDE_INGEST_DEDUPE_MS = 30 * 1000
 const INACTIVE_FETCH_DEBOUNCE_MS = 60 * 1000 // 60 seconds — debounce fetch-on-open
 const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
-export const MAX_ACTIVE_RATE_LIMIT_FETCH_CYCLES = 8
-export const MAX_INACTIVE_RATE_LIMIT_ACCOUNTS = 256
-export const MAX_RATE_LIMIT_ACCOUNT_ID_BYTES = 1024
-
-export class RateLimitFetchCycleCapacityError extends Error {
-  constructor() {
-    super(`Active rate-limit fetch cycles exceed ${MAX_ACTIVE_RATE_LIMIT_FETCH_CYCLES}`)
-    this.name = 'RateLimitFetchCycleCapacityError'
-  }
-}
 
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
 type InternalRateLimitState = {
@@ -121,36 +111,6 @@ function normalizePollingInterval(ms: number): number {
     return DEFAULT_POLL_MS
   }
   return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, ms))
-}
-
-function boundedInactiveAccounts<T extends { id: string }>(accounts: T[]): T[] {
-  const bounded: T[] = []
-  const inspectedCount = Math.min(accounts.length, MAX_INACTIVE_RATE_LIMIT_ACCOUNTS)
-  for (let index = 0; index < inspectedCount; index += 1) {
-    const account = accounts[index]
-    if (account && Buffer.byteLength(account.id, 'utf8') <= MAX_RATE_LIMIT_ACCOUNT_ID_BYTES) {
-      bounded.push(account)
-    }
-  }
-  return bounded
-}
-
-function hasBoundedInactiveAccount<T extends { id: string }>(
-  accounts: T[],
-  accountId: string
-): boolean {
-  const inspectedCount = Math.min(accounts.length, MAX_INACTIVE_RATE_LIMIT_ACCOUNTS)
-  for (let index = 0; index < inspectedCount; index += 1) {
-    const account = accounts[index]
-    if (
-      account &&
-      Buffer.byteLength(account.id, 'utf8') <= MAX_RATE_LIMIT_ACCOUNT_ID_BYTES &&
-      account.id === accountId
-    ) {
-      return true
-    }
-  }
-  return false
 }
 
 function isSystemDefaultClaudeAuth(
@@ -229,8 +189,7 @@ export class RateLimitService {
   private claudeOnlyFetchQueued = false
   private grokOnlyFetchQueued = false
   private activeFetchAbortControllers = new Set<AbortController>()
-  private fetchIdlePromise: Promise<void> | null = null
-  private resolveFetchIdlePromise: (() => void) | null = null
+  private fetchIdleResolvers: (() => void)[] = []
   private codexFetchGeneration = 0
   private claudeFetchGeneration = 0
   // Why: statusline ingest must attribute live windows to the selected account without re-running the side-effectful auth sync per post.
@@ -537,6 +496,17 @@ export class RateLimitService {
     return this.getState()
   }
 
+  async refreshAfterClaudeLivePtysDrained(): Promise<void> {
+    // Why: "Waiting for Claude session" can only recover once no live claude
+    // owns the credentials. Refetch on the last PTY exit instead of leaving
+    // the stale terminal error up until the failure backoff elapses.
+    if (!this.state.claude?.usageMetadata?.deferredByLiveClaudeSession) {
+      return
+    }
+    this.activeFailureStreakByProvider.claude = 0
+    await this.fetchClaudeOnly({ force: true })
+  }
+
   async fetchInactiveClaudeAccountsOnOpen(): Promise<void> {
     if (Date.now() - this.lastInactiveClaudeFetchAt < INACTIVE_FETCH_DEBOUNCE_MS) {
       return
@@ -545,7 +515,7 @@ export class RateLimitService {
     if (this.inactiveClaudeFetching.size > 0) {
       return
     }
-    const accounts = boundedInactiveAccounts(this.inactiveClaudeAccountsResolver?.() ?? [])
+    const accounts = this.inactiveClaudeAccountsResolver?.() ?? []
     if (accounts.length === 0) {
       return
     }
@@ -624,7 +594,7 @@ export class RateLimitService {
     if (this.inactiveCodexFetching.size > 0) {
       return
     }
-    const accounts = boundedInactiveAccounts(this.inactiveCodexAccountsResolver?.() ?? [])
+    const accounts = this.inactiveCodexAccountsResolver?.() ?? []
     if (accounts.length === 0) {
       return
     }
@@ -704,18 +674,20 @@ export class RateLimitService {
   }
 
   private isCurrentInactiveClaudeAccount(accountId: string): boolean {
-    return hasBoundedInactiveAccount(this.inactiveClaudeAccountsResolver?.() ?? [], accountId)
+    return (this.inactiveClaudeAccountsResolver?.() ?? []).some(
+      (account) => account.id === accountId
+    )
   }
 
   private isCurrentInactiveCodexAccount(accountId: string): boolean {
-    return hasBoundedInactiveAccount(this.inactiveCodexAccountsResolver?.() ?? [], accountId)
+    return (this.inactiveCodexAccountsResolver?.() ?? []).some(
+      (account) => account.id === accountId
+    )
   }
 
   private pruneInactiveClaudeState(): void {
     const currentIds = new Set(
-      boundedInactiveAccounts(this.inactiveClaudeAccountsResolver?.() ?? []).map(
-        (account) => account.id
-      )
+      (this.inactiveClaudeAccountsResolver?.() ?? []).map((account) => account.id)
     )
     for (const accountId of this.inactiveClaudeCache.keys()) {
       if (!currentIds.has(accountId)) {
@@ -731,9 +703,7 @@ export class RateLimitService {
 
   private pruneInactiveCodexState(): void {
     const currentIds = new Set(
-      boundedInactiveAccounts(this.inactiveCodexAccountsResolver?.() ?? []).map(
-        (account) => account.id
-      )
+      (this.inactiveCodexAccountsResolver?.() ?? []).map((account) => account.id)
     )
     for (const accountId of this.inactiveCodexCache.keys()) {
       if (!currentIds.has(accountId)) {
@@ -1175,10 +1145,9 @@ export class RateLimitService {
       return Promise.resolve()
     }
     // Why: explicit-refresh callers must await the queued follow-up cycle when a poll is in flight, else the UI stops spinning early.
-    this.fetchIdlePromise ??= new Promise((resolve) => {
-      this.resolveFetchIdlePromise = resolve
+    return new Promise((resolve) => {
+      this.fetchIdleResolvers.push(resolve)
     })
-    return this.fetchIdlePromise
   }
 
   private resolveFetchIdleWaiters(): void {
@@ -1191,16 +1160,14 @@ export class RateLimitService {
     ) {
       return
     }
-    const resolve = this.resolveFetchIdlePromise
-    this.fetchIdlePromise = null
-    this.resolveFetchIdlePromise = null
-    resolve?.()
+    const resolvers = this.fetchIdleResolvers
+    this.fetchIdleResolvers = []
+    for (const resolve of resolvers) {
+      resolve()
+    }
   }
 
   private beginFetchCycle(): AbortController {
-    if (this.activeFetchAbortControllers.size >= MAX_ACTIVE_RATE_LIMIT_FETCH_CYCLES) {
-      throw new RateLimitFetchCycleCapacityError()
-    }
     const controller = new AbortController()
     this.activeFetchAbortControllers.add(controller)
     return controller
@@ -1237,10 +1204,11 @@ export class RateLimitService {
   }
 
   private resolveAndClearFetchIdleWaiters(): void {
-    const resolve = this.resolveFetchIdlePromise
-    this.fetchIdlePromise = null
-    this.resolveFetchIdlePromise = null
-    resolve?.()
+    const resolvers = this.fetchIdleResolvers
+    this.fetchIdleResolvers = []
+    for (const resolve of resolvers) {
+      resolve()
+    }
   }
 
   private isSameCodexTarget(

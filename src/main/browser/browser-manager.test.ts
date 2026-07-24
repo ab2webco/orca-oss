@@ -54,7 +54,7 @@ vi.mock('./popup-origin-bar-window', () => ({
   openPopupWithOriginBar: openPopupWithOriginBarMock
 }))
 
-import { MAX_ACTIVE_BROWSER_DOWNLOADS, browserManager } from './browser-manager'
+import { browserManager } from './browser-manager'
 
 describe('browserManager', () => {
   const rendererWebContentsId = 5001
@@ -1927,24 +1927,6 @@ describe('browserManager', () => {
     )
   })
 
-  it('cancels excess concurrent downloads before retaining another item', () => {
-    const item = createDownloadItem()
-    const managerState = browserManager as unknown as { downloadsById: Map<string, unknown> }
-    for (let index = 0; index < MAX_ACTIVE_BROWSER_DOWNLOADS; index += 1) {
-      managerState.downloadsById.set(`active-${index}`, {})
-    }
-
-    try {
-      browserManager.handleGuestWillDownload({ guestWebContentsId: 999, item })
-
-      expect(item.cancel).toHaveBeenCalledTimes(1)
-      expect(item.setSavePath).not.toHaveBeenCalled()
-      expect(managerState.downloadsById.size).toBe(MAX_ACTIVE_BROWSER_DOWNLOADS)
-    } finally {
-      managerState.downloadsById.clear()
-    }
-  })
-
   it('flushes started and terminal snapshots for downloads that finish before registration', () => {
     const rendererSendMock = vi.fn()
     const guest = {
@@ -2616,7 +2598,8 @@ describe('browserManager', () => {
       }
     )
 
-    expect(keyDownPreventDefault).toHaveBeenCalledTimes(1)
+    // Why: keydown must not preventDefault or Electron drops the commit keyup.
+    expect(keyDownPreventDefault).not.toHaveBeenCalled()
     expect(keyUpPreventDefault).toHaveBeenCalledTimes(1)
     expect(rendererSendMock).toHaveBeenNthCalledWith(1, 'ui:ctrlTabKeyDown', { shiftKey: false })
     expect(rendererSendMock).toHaveBeenNthCalledWith(2, 'ui:ctrlTabKeyUp')

@@ -1,19 +1,22 @@
 import { join } from 'node:path'
 import { existsSync, opendirSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import type { SessionMeta } from './history-manager'
 import type { TerminalCheckpointFile, TerminalModes } from './types'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import { getHistorySessionDirName } from './history-paths'
-import { decodeTerminalHistoryLog } from './terminal-history-log'
+import { decodeTerminalHistoryLog, LOG_HEADER_BYTES } from './terminal-history-log'
 import { HeadlessEmulator } from './headless-emulator'
+import { PrioritySemaphore } from './priority-semaphore'
+import { ColdRestoreReplayWriter } from './cold-restore-replay-writer'
 import {
-  readTerminalHistoryBuffer,
+  readTerminalHistoryBufferAsync,
   readTerminalHistoryJson,
-  readTerminalHistoryText
+  readTerminalHistoryJsonAsync
 } from './terminal-history-file-reader'
+import { detectColdRestoreFromLegacyScrollback } from './terminal-history-legacy-scrollback-restore'
 import {
   TERMINAL_HISTORY_CHECKPOINT_MAX_BYTES,
-  TERMINAL_HISTORY_LEGACY_SCROLLBACK_MAX_BYTES,
   TERMINAL_HISTORY_LOG_MAX_BYTES,
   TERMINAL_HISTORY_META_MAX_BYTES
 } from './terminal-history-file-limits'
@@ -33,8 +36,8 @@ export type ColdRestoreInfo = {
   modes: TerminalModes
 }
 
-const ALT_SCREEN_ON = '\x1b[?1049h'
-const ALT_SCREEN_OFF = '\x1b[?1049l'
+// Why: parallel pane mounts should interleave with main-process work without multiplying replay slices per turn.
+const coldRestoreReplaySemaphore = new PrioritySemaphore(1)
 
 export class HistoryReader {
   private basePath: string
@@ -52,10 +55,10 @@ export class HistoryReader {
     return meta !== null && meta.endedAt === null
   }
 
-  detectColdRestore(
+  async detectColdRestore(
     sessionId: string,
     opts?: { ignoreCleanEnd?: boolean; wslDistro?: string }
-  ): ColdRestoreInfo | null {
+  ): Promise<ColdRestoreInfo | null> {
     const meta = this.readMeta(sessionId)
     if (!meta) {
       return null
@@ -74,7 +77,7 @@ export class HistoryReader {
     let checkpoint: TerminalCheckpointFile | null = null
     if (checkpointExists) {
       try {
-        checkpoint = readTerminalHistoryJson<TerminalCheckpointFile>(
+        checkpoint = await readTerminalHistoryJsonAsync<TerminalCheckpointFile>(
           checkpointPath,
           TERMINAL_HISTORY_CHECKPOINT_MAX_BYTES
         )
@@ -87,7 +90,12 @@ export class HistoryReader {
     // byte-exact output up to ~5s before the crash (up to the full-snapshot
     // cooldown, ~45s, for a streaming session mid-deferral), while the
     // checkpoint can be a full log-cap (~5MB of output) stale.
-    const logRestore = this.restoreFromIncrementalLog(sessionDir, meta, checkpoint, opts?.wslDistro)
+    const logRestore = await this.restoreFromIncrementalLog(
+      sessionDir,
+      meta,
+      checkpoint,
+      opts?.wslDistro
+    )
     if (logRestore) {
       return logRestore
     }
@@ -95,7 +103,7 @@ export class HistoryReader {
     if (!checkpoint) {
       // Why: backward compatibility with pre-checkpoint sessions, and corrupt
       // checkpoints — the old scrollback.bin is the best remaining data.
-      return this.detectColdRestoreFromScrollback(sessionId, meta)
+      return await detectColdRestoreFromLegacyScrollback(this.basePath, sessionId, meta)
     }
 
     return this.coldRestoreInfoFromSnapshot(checkpoint, checkpoint.cwd, meta)
@@ -161,80 +169,90 @@ export class HistoryReader {
   // emulator the daemon used reproduces the exact terminal state at the last
   // appended batch — including alt-screen and mode handling — and reuses
   // getSnapshot()'s normalization instead of string-level reconstruction.
-  private restoreFromIncrementalLog(
+  private async restoreFromIncrementalLog(
     sessionDir: string,
     meta: SessionMeta,
     checkpoint: TerminalCheckpointFile | null,
     wslDistro?: string
-  ): ColdRestoreInfo | null {
-    let logBuffer: Buffer
+  ): Promise<ColdRestoreInfo | null> {
+    const logPath = join(sessionDir, 'output.log')
     try {
-      logBuffer = readTerminalHistoryBuffer(
-        join(sessionDir, 'output.log'),
-        TERMINAL_HISTORY_LOG_MAX_BYTES
-      )
-    } catch {
-      return null
-    }
-    const log = decodeTerminalHistoryLog(logBuffer)
-    if (!log || log.batches.length === 0) {
-      return null
-    }
-    // Generation mismatch means the log does not continue this checkpoint
-    // (e.g. crash between checkpoint rename and log reset, or a pre-log
-    // checkpoint without a generation field). Replaying it would duplicate or
-    // garble content; the checkpoint alone is consistent.
-    if (checkpoint) {
-      if (typeof checkpoint.generation !== 'number' || log.generation !== checkpoint.generation) {
+      // Why: final checkpoints leave a header-only log; they need no scarce replay slot and must not queue sleep teardown behind startup restores.
+      if ((await stat(logPath)).size <= LOG_HEADER_BYTES) {
         return null
       }
-    } else if (log.generation !== 0) {
+    } catch {
       return null
     }
-
-    const emulator = new HeadlessEmulator({
-      cols: checkpoint?.cols ?? meta.cols,
-      rows: checkpoint?.rows ?? meta.rows,
-      wslDistro
-    })
+    const release = await coldRestoreReplaySemaphore.acquire(0)
     try {
+      let logBuffer: Buffer
+      try {
+        logBuffer = await readTerminalHistoryBufferAsync(logPath, TERMINAL_HISTORY_LOG_MAX_BYTES)
+      } catch {
+        return null
+      }
+      const log = decodeTerminalHistoryLog(logBuffer)
+      if (!log || log.batches.length === 0) {
+        return null
+      }
+      // Generation mismatch means the log does not continue this checkpoint
+      // (e.g. crash between checkpoint rename and log reset, or a pre-log
+      // checkpoint without a generation field). Replaying it would duplicate or
+      // garble content; the checkpoint alone is consistent.
       if (checkpoint) {
-        if (
-          !emulator.writeSync(
-            (checkpoint.scrollbackAnsi ?? '') +
-              checkpoint.rehydrateSequences +
-              checkpoint.snapshotAnsi
-          )
-        ) {
+        if (typeof checkpoint.generation !== 'number' || log.generation !== checkpoint.generation) {
           return null
         }
-        emulator.setRestoredOscLinks(checkpoint.oscLinks)
+      } else if (log.generation !== 0) {
+        return null
       }
-      for (const batch of log.batches) {
-        for (const record of batch.records) {
-          if (record.kind === 'output') {
-            if (!emulator.writeSync(record.data)) {
-              return null
+
+      const emulator = new HeadlessEmulator({
+        cols: checkpoint?.cols ?? meta.cols,
+        rows: checkpoint?.rows ?? meta.rows,
+        wslDistro
+      })
+      const replay = new ColdRestoreReplayWriter(emulator)
+      try {
+        if (checkpoint) {
+          if (
+            !(await replay.write(checkpoint.scrollbackAnsi ?? '')) ||
+            !(await replay.write(checkpoint.rehydrateSequences)) ||
+            !(await replay.write(checkpoint.snapshotAnsi))
+          ) {
+            return null
+          }
+          emulator.setRestoredOscLinks(checkpoint.oscLinks)
+        }
+        for (const batch of log.batches) {
+          for (const record of batch.records) {
+            if (record.kind === 'output') {
+              if (!(await replay.write(record.data))) {
+                return null
+              }
+            } else if (record.kind === 'resize') {
+              await replay.resize(record.cols, record.rows)
+            } else {
+              await replay.clearScrollback()
             }
-          } else if (record.kind === 'resize') {
-            emulator.resize(record.cols, record.rows)
-          } else {
-            emulator.clearScrollback()
           }
         }
+        const snapshot = emulator.getSnapshot()
+        return this.coldRestoreInfoFromSnapshot(
+          snapshot,
+          snapshot.cwd ?? checkpoint?.cwd ?? meta.cwd,
+          meta
+        )
+      } catch {
+        // Why: a replay failure must degrade to checkpoint-only restore, never
+        // surface as a failed spawn.
+        return null
+      } finally {
+        emulator.dispose()
       }
-      const snapshot = emulator.getSnapshot()
-      return this.coldRestoreInfoFromSnapshot(
-        snapshot,
-        snapshot.cwd ?? checkpoint?.cwd ?? meta.cwd,
-        meta
-      )
-    } catch {
-      // Why: a replay failure must degrade to checkpoint-only restore, never
-      // surface as a failed spawn.
-      return null
     } finally {
-      emulator.dispose()
+      release()
     }
   }
 
@@ -277,82 +295,5 @@ export class HistoryReader {
     } catch {
       return null
     }
-  }
-
-  // Why: handles the upgrade transition where sessions created before the
-  // checkpoint migration still have scrollback.bin but no checkpoint.json.
-  private detectColdRestoreFromScrollback(
-    sessionId: string,
-    meta: SessionMeta
-  ): ColdRestoreInfo | null {
-    const scrollbackPath = join(
-      this.basePath,
-      getHistorySessionDirName(sessionId),
-      'scrollback.bin'
-    )
-    if (!existsSync(scrollbackPath)) {
-      return null
-    }
-    try {
-      const scrollback = readTerminalHistoryText(
-        scrollbackPath,
-        TERMINAL_HISTORY_LEGACY_SCROLLBACK_MAX_BYTES
-      )
-      const truncated = this.truncateAltScreen(scrollback)
-      return {
-        snapshotAnsi: truncated,
-        scrollbackAnsi: truncated,
-        rehydrateSequences: '',
-        cwd: meta.cwd,
-        cols: meta.cols,
-        rows: meta.rows,
-        modes: {
-          bracketedPaste: false,
-          mouseTracking: false,
-          applicationCursor: false,
-          alternateScreen: false
-        }
-      }
-    } catch {
-      return null
-    }
-  }
-
-  // Why: raw scrollback from TUI sessions (vim, less, htop) contains
-  // alternate-screen switches that produce garbled output when replayed.
-  // Truncate before the outermost unmatched alt-screen-on so only normal
-  // terminal output is restored.
-  private truncateAltScreen(data: string): string {
-    let depth = 0
-    let outermostUnmatchedOnIdx = -1
-
-    let searchFrom = 0
-    while (searchFrom < data.length) {
-      const onIdx = data.indexOf(ALT_SCREEN_ON, searchFrom)
-      const offIdx = data.indexOf(ALT_SCREEN_OFF, searchFrom)
-
-      if (onIdx === -1 && offIdx === -1) {
-        break
-      }
-
-      if (onIdx !== -1 && (offIdx === -1 || onIdx < offIdx)) {
-        if (depth === 0) {
-          outermostUnmatchedOnIdx = onIdx
-        }
-        depth++
-        searchFrom = onIdx + ALT_SCREEN_ON.length
-      } else {
-        if (depth > 0) {
-          depth--
-        }
-        searchFrom = offIdx + ALT_SCREEN_OFF.length
-      }
-    }
-
-    if (depth > 0 && outermostUnmatchedOnIdx !== -1) {
-      return data.slice(0, outermostUnmatchedOnIdx)
-    }
-
-    return data
   }
 }

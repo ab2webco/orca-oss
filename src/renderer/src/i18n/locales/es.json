@@ -2991,7 +2991,8 @@
                   "5a9c83c04b": "Abrir cualquier archivo, URL, agente, ...",
                   "90eb94dc48": "Introduce una URL http:// o https://.",
                   "5553b283ce": "Introduce una URL o ruta de archivo.",
-                  "queryTooLarge": "El texto de búsqueda es demasiado grande."
+                  "queryTooLarge": "El texto de búsqueda es demasiado grande.",
+                  "absolutePathRemoteBlocked": "Las rutas absolutas requieren un espacio de trabajo local."
                 }
               },
               "menu": {
@@ -5854,6 +5855,11 @@
           "273e7e81fe": "Configuraciones",
           "1f744a72f4": "configuración"
         },
+        "BranchPrefixFeedback": {
+          "6c40c0908f": "El prefijo no puede contener espacios ni caracteres especiales como ~ ^ : ? * [ \\",
+          "64d70b156a": "Las ramas se llamarán {{example}}",
+          "808f9a726e": "No se aplicará ningún prefijo"
+        },
         "GitPane": {
           "d2eede4c54": "Agrega la atribución de Orca a commits, PR e issues.",
           "e02ea23a32": "Atribución de Orca",
@@ -6457,6 +6463,7 @@
           "removeSetup": "Eliminar",
           "hostSetupBlockedVersion": "La versión del servidor Orca no es compatible",
           "hostSetupMissingCapability": "Actualiza Orca en este host para configurar proyectos",
+          "hostSetupConnectionRequired": "Conecta este host antes de importar o clonar el proyecto",
           "setupProjectOnHost": "Configurar en otro host",
           "setupProjectOnHostHelp": "Elige un host y luego importa un checkout existente, clona el repositorio allí o registra una configuración que se aprovisionará más tarde.",
           "setupExistingFolder": "Importar carpeta existente",
@@ -10152,7 +10159,8 @@
               "834cb3f23d": "Corregir con AI",
               "783a808870": "Cerrar"
             },
-            "97e7124eac": "No se pudo actualizar Source Control. Vuelve a intentarlo."
+            "97e7124eac": "No se pudo actualizar Source Control. Vuelve a intentarlo.",
+            "a4e93c21d7": "Rama actual: {{value0}}"
           },
           "SourceControlAgentActionDialog": {
             "8e856842d1": "No se pudo iniciar el agente seleccionado.",
@@ -12190,10 +12198,7 @@
         "CsvViewer": {
           "eedd0d37a7": "columnas",
           "ac31d2cd60": "filas",
-          "a233d55b77": "Archivo vacío",
-          "2b65aa2913": "Este CSV es demasiado grande para mostrarse de forma segura.",
-          "59cfb175a2": "Cambia al modo de código fuente para inspeccionar el texto sin procesar.",
-          "d5e8a2b453": "La vista de tabla está limitada a {{rows}} filas, {{columns}} columnas y {{cells}} celdas."
+          "a233d55b77": "Archivo vacío"
         },
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "Este archivo",

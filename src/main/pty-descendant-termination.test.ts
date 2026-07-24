@@ -378,45 +378,6 @@ describe('killWithDescendantSweep', () => {
     expect(events).toEqual(['descendant-term', 'root-kill'])
   })
 
-  it('terminates the Windows process tree before closing the ConPTY root', async () => {
-    const events: string[] = []
-    const terminateWindowsTree = vi.fn(async () => {
-      events.push('tree-kill')
-    })
-    const killRoot = vi.fn(() => events.push('root-kill'))
-
-    await killWithDescendantSweep(10, killRoot, {
-      platform: 'win32',
-      terminateWindowsTree
-    })
-
-    expect(terminateWindowsTree).toHaveBeenCalledWith(10)
-    expect(events).toEqual(['tree-kill', 'root-kill'])
-  })
-
-  it('closes the Windows root and reports process-tree termination failure', async () => {
-    const killRoot = vi.fn()
-    await expect(
-      killWithDescendantSweep(10, killRoot, {
-        platform: 'win32',
-        terminateWindowsTree: vi.fn().mockRejectedValue(new Error('taskkill failed'))
-      })
-    ).rejects.toThrow('taskkill failed')
-    expect(killRoot).toHaveBeenCalledOnce()
-  })
-
-  it('does not target a Windows pid after root ownership is lost', async () => {
-    const terminateWindowsTree = vi.fn()
-    const killRoot = vi.fn()
-    await killWithDescendantSweep(10, killRoot, {
-      platform: 'win32',
-      ownsRoot: () => false,
-      terminateWindowsTree
-    })
-    expect(terminateWindowsTree).not.toHaveBeenCalled()
-    expect(killRoot).toHaveBeenCalledOnce()
-  })
-
   it('still kills the root when the snapshot is unavailable', async () => {
     const sendSignal = vi.fn()
     const readTable = vi.fn().mockRejectedValue(new Error('ps exploded'))
@@ -430,6 +391,55 @@ describe('killWithDescendantSweep', () => {
     await pending
     expect(killRoot).toHaveBeenCalledOnce()
     expect(sendSignal).not.toHaveBeenCalled()
+  })
+
+  it('on Windows taskkills the process tree before killRoot (#10004)', async () => {
+    const events: string[] = []
+    const killWindowsTree = vi.fn(async () => {
+      events.push('tree-kill')
+    })
+    const killRoot = vi.fn(() => events.push('root-kill'))
+    const sendSignal = vi.fn()
+    const readTable = vi.fn()
+    await killWithDescendantSweep(4242, killRoot, {
+      platform: 'win32',
+      killWindowsTree,
+      sendSignal,
+      readTable
+    })
+    expect(killWindowsTree).toHaveBeenCalledWith(4242)
+    expect(killRoot).toHaveBeenCalledOnce()
+    expect(sendSignal).not.toHaveBeenCalled()
+    expect(readTable).not.toHaveBeenCalled()
+    expect(events).toEqual(['tree-kill', 'root-kill'])
+  })
+
+  it('on Windows still kills the root when ownership is lost mid-sweep', async () => {
+    const killWindowsTree = vi.fn(async () => {
+      throw new Error('should not run')
+    })
+    const killRoot = vi.fn()
+    await killWithDescendantSweep(4242, killRoot, {
+      platform: 'win32',
+      killWindowsTree,
+      ownsRoot: () => false
+    })
+    expect(killWindowsTree).not.toHaveBeenCalled()
+    expect(killRoot).toHaveBeenCalledOnce()
+  })
+
+  it('on Windows still kills the root when taskkill fails', async () => {
+    const killWindowsTree = vi.fn(async () => {
+      throw new Error('taskkill failed')
+    })
+    const killRoot = vi.fn()
+    await expect(
+      killWithDescendantSweep(99, killRoot, {
+        platform: 'win32',
+        killWindowsTree
+      })
+    ).resolves.toBeUndefined()
+    expect(killRoot).toHaveBeenCalledOnce()
   })
 
   it('does not signal a captured tree after the caller loses root ownership', async () => {

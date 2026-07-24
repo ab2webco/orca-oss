@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: persistence keeps schema defaults, migration, and load/save/flush in one file so the storage contract reviews as a unit. */
 import { app, safeStorage } from 'electron'
 import {
+  readFileSync,
   writeFileSync,
   mkdirSync,
   existsSync,
@@ -247,19 +248,6 @@ import {
 import { track } from './telemetry/client'
 import { getCohortAtEmit } from './telemetry/cohort-classifier'
 import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from './startup/startup-diagnostics'
-import {
-  assertPersistedStateSecretWithinLimit,
-  encodePersistedStateJsonStringContent,
-  isPersistedStateFileCapacityError,
-  parsePersistedStateJsonBuffer,
-  readPersistedStateJsonFileSync,
-  readPersistedStateFileBytesSync,
-  replacePersistedStateJsonWithinLimit,
-  replacedPersistedStateJsonByteLength,
-  restorePersistedStateBackupSync,
-  stringifyPersistedStateWithinLimit,
-  updatePersistedStateHashWithJsonRange
-} from '../shared/persisted-state-file-bounds'
 
 function encrypt(plaintext: string): string {
   if (!plaintext || !safeStorage.isEncryptionAvailable()) {
@@ -421,7 +409,7 @@ function gcStaleWorktreeMeta(state: PersistedState): number {
 
 function readGithubCacheSnapshot(dataFile: string): PersistedState['githubCache'] | null {
   try {
-    const { value: parsed } = readPersistedStateJsonFileSync<unknown>(getGithubCacheFile(dataFile))
+    const parsed = JSON.parse(readFileSync(getGithubCacheFile(dataFile), 'utf-8')) as unknown
     const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
       typeof value === 'object' && value !== null && !Array.isArray(value)
     if (
@@ -2434,50 +2422,36 @@ function cloneWorkspaceSessionState(session: WorkspaceSessionState): WorkspaceSe
   return structuredClone(session)
 }
 
-function removeWorkspaceSessionOwner(
-  session: WorkspaceSessionState | undefined,
+// Deletes the O(1) owner-keyed fields for `ownerKey` from an already-cloned
+// session in place, recording removed tab ids into `removedTabIds`. The
+// pane-key-scanned maps (pty incarnations, surface tombstones, sleeping agents)
+// and the shutdown list are handled by deleteScannedSessionFieldsForOwners so a
+// batch prune scans each collection once instead of once per owner.
+function deleteOwnerKeyedSessionFields(
+  next: WorkspaceSessionState,
   ownerKey: string,
+  removedTabIds: Set<string>,
   options: { advanceTerminalTopologyRevision?: boolean } = {}
-): WorkspaceSessionState | undefined {
-  if (!session) {
-    return session
-  }
-  const next = cloneWorkspaceSessionState(session)
+): void {
   const removedTerminalTabs = next.tabsByWorktree?.[ownerKey] ?? []
   if (next.tabsByWorktree) {
     delete next.tabsByWorktree[ownerKey]
   }
   for (const tab of removedTerminalTabs) {
+    removedTabIds.add(tab.id)
     delete next.terminalLayoutsByTabId[tab.id]
     if (next.activeTabId === tab.id) {
       next.activeTabId = null
     }
   }
-  if (next.terminalPtyIncarnationsByPaneKey) {
-    const removedTabIds = new Set(removedTerminalTabs.map((tab) => tab.id))
-    next.terminalPtyIncarnationsByPaneKey = Object.fromEntries(
-      Object.entries(next.terminalPtyIncarnationsByPaneKey).filter(([paneKey]) => {
-        const separator = paneKey.lastIndexOf(':')
-        return separator < 1 || !removedTabIds.has(paneKey.slice(0, separator))
-      })
-    )
-  }
-  if (next.terminalSurfaceTombstonesByPaneKey) {
-    next.terminalSurfaceTombstonesByPaneKey = Object.fromEntries(
-      Object.entries(next.terminalSurfaceTombstonesByPaneKey).filter(
-        ([, tombstone]) => tombstone.worktreeId !== ownerKey
-      )
-    )
-  }
-  const repoId = getRepoIdFromWorktreeId(ownerKey)
-  const previousTopologyRevision = next.terminalTopologyRevisionByRepoId?.[repoId] ?? 0
   if (options.advanceTerminalTopologyRevision) {
+    const repoId = getRepoIdFromWorktreeId(ownerKey)
+    const previousTopologyRevision = next.terminalTopologyRevisionByRepoId?.[repoId] ?? 0
     next.terminalTopologyRevisionByRepoId = {
       ...next.terminalTopologyRevisionByRepoId,
       [repoId]: previousTopologyRevision + 1
     }
   }
-
   if (next.openFilesByWorktree) {
     delete next.openFilesByWorktree[ownerKey]
   }
@@ -2520,21 +2494,83 @@ function removeWorkspaceSessionOwner(
   if (next.defaultTerminalTabsAppliedByWorktreeId) {
     delete next.defaultTerminalTabsAppliedByWorktreeId[ownerKey]
   }
-  if (next.sleepingAgentSessionsByPaneKey) {
-    for (const [paneKey, record] of Object.entries(next.sleepingAgentSessionsByPaneKey)) {
-      if (record.worktreeId === ownerKey) {
-        delete next.sleepingAgentSessionsByPaneKey[paneKey]
-      }
-    }
-  }
   if (next.activeWorkspaceKey === ownerKey) {
     next.activeWorkspaceKey = null
   }
   if (next.activeWorktreeId === ownerKey) {
     next.activeWorktreeId = null
   }
+}
+
+// Scans the pane-key-keyed maps and the shutdown list once, removing every entry
+// owned by a key matched by `isRemovedOwner` (or, for pty incarnations, whose tab
+// was removed). Kept separate from the O(1) deletes so a batch prune scans each
+// collection a single time regardless of how many owners are being removed.
+function deleteScannedSessionFieldsForOwners(
+  next: WorkspaceSessionState,
+  removedTabIds: ReadonlySet<string>,
+  isRemovedOwner: (worktreeId: string) => boolean
+): void {
+  if (next.terminalPtyIncarnationsByPaneKey) {
+    next.terminalPtyIncarnationsByPaneKey = Object.fromEntries(
+      Object.entries(next.terminalPtyIncarnationsByPaneKey).filter(([paneKey]) => {
+        const separator = paneKey.lastIndexOf(':')
+        return separator < 1 || !removedTabIds.has(paneKey.slice(0, separator))
+      })
+    )
+  }
+  if (next.terminalSurfaceTombstonesByPaneKey) {
+    next.terminalSurfaceTombstonesByPaneKey = Object.fromEntries(
+      Object.entries(next.terminalSurfaceTombstonesByPaneKey).filter(
+        ([, tombstone]) => !isRemovedOwner(tombstone.worktreeId)
+      )
+    )
+  }
+  if (next.sleepingAgentSessionsByPaneKey) {
+    for (const [paneKey, record] of Object.entries(next.sleepingAgentSessionsByPaneKey)) {
+      if (isRemovedOwner(record.worktreeId)) {
+        delete next.sleepingAgentSessionsByPaneKey[paneKey]
+      }
+    }
+  }
   next.activeWorktreeIdsOnShutdown = next.activeWorktreeIdsOnShutdown?.filter(
-    (worktreeId) => worktreeId !== ownerKey
+    (worktreeId) => !isRemovedOwner(worktreeId)
+  )
+}
+
+function removeWorkspaceSessionOwner(
+  session: WorkspaceSessionState | undefined,
+  ownerKey: string,
+  options: { advanceTerminalTopologyRevision?: boolean } = {}
+): WorkspaceSessionState | undefined {
+  if (!session) {
+    return session
+  }
+  const next = cloneWorkspaceSessionState(session)
+  const removedTabIds = new Set<string>()
+  deleteOwnerKeyedSessionFields(next, ownerKey, removedTabIds, options)
+  deleteScannedSessionFieldsForOwners(next, removedTabIds, (worktreeId) => worktreeId === ownerKey)
+  return next
+}
+
+// Batch variant of removeWorkspaceSessionOwner: prunes every owner in `ownerKeys`
+// with a single structuredClone and a single scan of each collection, instead of
+// one clone+scan per owner. Project removal can touch many worktrees across many
+// host partitions, so the per-owner clones added up to O(worktrees × hosts).
+function removeWorkspaceSessionOwners(
+  session: WorkspaceSessionState | undefined,
+  ownerKeys: ReadonlySet<string>
+): WorkspaceSessionState | undefined {
+  if (!session || ownerKeys.size === 0) {
+    return session
+  }
+  const next = cloneWorkspaceSessionState(session)
+  const removedTabIds = new Set<string>()
+  for (const ownerKey of ownerKeys) {
+    deleteOwnerKeyedSessionFields(next, ownerKey, removedTabIds)
+  }
+  deleteScannedSessionFieldsForOwners(next, removedTabIds, (worktreeId) =>
+    ownerKeys.has(worktreeId)
   )
   return next
 }
@@ -2654,6 +2690,7 @@ export class Store {
   private lastWrittenStateHash: string | null = null
   private firstPendingSaveAt: number | null = null
   private githubCacheDirty = false
+  private gitUsernameCache = new Map<string, string>()
   private loadNeedsSave = false
   private settingsChangeListeners = new Set<
     (
@@ -2842,26 +2879,24 @@ export class Store {
     }
   }
 
-  private restoreFromBackup(dataFile: string): {
-    rejectedOversizedBackup: boolean
-    restored: boolean
-  } {
-    let rejectedOversizedBackup = false
+  private restoreFromBackup(dataFile: string): boolean {
     for (let i = 0; i < BACKUP_COUNT; i++) {
       const path = backupPath(dataFile, i)
       if (!existsSync(path)) {
         continue
       }
       try {
-        restorePersistedStateBackupSync(path, dataFile)
+        const raw = readFileSync(path, 'utf-8')
+        JSON.parse(raw)
+        mkdirSync(dirname(dataFile), { recursive: true })
+        writeFileSync(dataFile, raw, 'utf-8')
         console.warn(`[persistence] Recovered state from backup slot ${i}: ${path}`)
-        return { rejectedOversizedBackup, restored: true }
+        return true
       } catch (err) {
-        rejectedOversizedBackup ||= isPersistedStateFileCapacityError(err)
         console.error(`[persistence] Backup slot ${i} unusable, trying next:`, err)
       }
     }
-    return { rejectedOversizedBackup, restored: false }
+    return false
   }
 
   private load(allowBackupRecovery = true): PersistedState {
@@ -2873,17 +2908,16 @@ export class Store {
     })
 
     let result: PersistedState | null = null
-    let rejectedOversizedState = false
     try {
       if (fileExistedOnLoad) {
         const readStartedAt = performance.now()
-        const { buffer } = readPersistedStateFileBytesSync(dataFile)
+        const raw = readFileSync(dataFile, 'utf-8')
         logPersistenceStartupMilestone('persistence-read-done', {
-          bytes: buffer.byteLength,
+          bytes: Buffer.byteLength(raw),
           durationMs: Math.round(performance.now() - readStartedAt)
         })
         logPersistenceStartupMilestone('persistence-json-parse-start')
-        const parsed = parsePersistedStateJsonBuffer<PersistedState>(buffer)
+        const parsed = JSON.parse(raw) as PersistedState
         logPersistenceStartupMilestone('persistence-json-parse-done')
 
         // Why: secrets are stored encrypted via safeStorage; decrypt at the load boundary so the app sees plaintext.
@@ -3450,7 +3484,6 @@ export class Store {
         }
       }
     } catch (err) {
-      rejectedOversizedState = isPersistedStateFileCapacityError(err)
       console.error('[persistence] Failed to load primary state, trying backups:', err)
     }
 
@@ -3464,23 +3497,14 @@ export class Store {
         }
       }
       if (fileExistedOnLoad || hasBackup) {
-        const recovery = this.restoreFromBackup(dataFile)
-        if (recovery.restored) {
+        if (this.restoreFromBackup(dataFile)) {
           return this.load(false)
         }
-        rejectedOversizedState ||= recovery.rejectedOversizedBackup
         console.error('[persistence] No usable state file or backup found, using defaults')
       }
     }
 
     if (result === null) {
-      if (rejectedOversizedState) {
-        // Why: keep recoverable oversized bytes intact instead of replacing them with fallback defaults.
-        this.writesFrozen = true
-        console.error(
-          '[persistence] State exceeds the safe load limit; using defaults with state writes frozen'
-        )
-      }
       result = getDefaultPersistedState(homedir())
     }
 
@@ -3669,79 +3693,49 @@ export class Store {
     // on deterministic-IV platforms (macOS/legacy-Linux OSCrypt). A per-slot
     // random UUID can't occur anywhere else in the serialized state (the user
     // sets their data before it is minted), so it appears exactly once.
-    const secretSubs: { sentinel: string; plaintext: string }[] = []
-    const replaceSecretWithSentinel = (plaintext: string): string => {
-      assertPersistedStateSecretWithinLimit(plaintext)
+    const secretSubs: { sentinel: string; blob: string; plaintext: string }[] = []
+    const encryptToSentinel = (plaintext: string): string => {
+      const blob = encrypt(plaintext)
+      // Deterministic already (empty secret / safeStorage unavailable / encrypt
+      // failure): blob === plaintext, so no normalization — and no sentinel,
+      // which also avoids substituting an empty or plaintext-shaped slot.
+      if (blob === plaintext) {
+        return blob
+      }
       const sentinel = `orca-secret-slot-${randomUUID()}`
-      secretSubs.push({ sentinel, plaintext })
+      secretSubs.push({ sentinel, blob, plaintext })
       return sentinel
     }
-    // Why: clone with sentinels so in-memory this.state stays plaintext.
+    // Why: clone before encrypting secrets so in-memory this.state stays plaintext.
     const stateToSave = {
       ...this.getDurableState(),
       settings: {
         ...this.state.settings,
-        opencodeSessionCookie: replaceSecretWithSentinel(this.state.settings.opencodeSessionCookie),
-        httpProxyUrl: replaceSecretWithSentinel(this.state.settings.httpProxyUrl ?? '')
+        opencodeSessionCookie: encryptToSentinel(this.state.settings.opencodeSessionCookie),
+        httpProxyUrl: encryptToSentinel(this.state.settings.httpProxyUrl ?? '')
       },
       ui: {
         ...this.state.ui,
         browserKagiSessionLink: this.state.ui.browserKagiSessionLink
-          ? replaceSecretWithSentinel(this.state.ui.browserKagiSessionLink)
+          ? encryptToSentinel(this.state.ui.browserKagiSessionLink)
           : null
       }
     }
     // Why compact: ~20% fewer bytes and less serialize time; all readers JSON.parse so formatting is irrelevant.
     // One full-state stringify; secret slots currently hold sentinels.
-    const { serialized, byteLength: serializedBytes } =
-      stringifyPersistedStateWithinLimit(stateToSave)
-    const preparedSecretSubs: {
-      escapedPlaintext: string
-      escapedSentinel: string
-      index: number
-      plaintext: string
-    }[] = []
-    let normalizedBytes = serializedBytes
-    for (const { sentinel, plaintext } of secretSubs) {
-      const escapedSentinel = encodePersistedStateJsonStringContent(sentinel)
-      const escapedPlaintext = encodePersistedStateJsonStringContent(plaintext)
-      const index = serialized.indexOf(escapedSentinel)
-      if (index === -1 || serialized.includes(escapedSentinel, index + escapedSentinel.length)) {
-        throw new Error('Persisted state secret sentinel is missing or ambiguous')
-      }
-      normalizedBytes = replacedPersistedStateJsonByteLength({
-        currentBytes: normalizedBytes,
-        search: escapedSentinel,
-        replacement: escapedPlaintext
-      })
-      preparedSecretSubs.push({ escapedPlaintext, escapedSentinel, index, plaintext })
-    }
-
-    const normalizedHash = createHash('sha1')
-    let normalizedOffset = 0
-    for (const { escapedPlaintext, escapedSentinel, index } of preparedSecretSubs.sort(
-      (left, right) => left.index - right.index
-    )) {
-      updatePersistedStateHashWithJsonRange(normalizedHash, serialized, normalizedOffset, index)
-      updatePersistedStateHashWithJsonRange(normalizedHash, escapedPlaintext)
-      normalizedOffset = index + escapedSentinel.length
-    }
-    updatePersistedStateHashWithJsonRange(normalizedHash, serialized, normalizedOffset)
-
+    const serialized = JSON.stringify(stateToSave)
+    // Substitute each unique sentinel exactly once: ciphertext for the on-disk
+    // payload, plaintext for the guard hash. Function-form replacement keeps
+    // `$` in blob/plaintext inert; both sides read the sentinel as JSON-escaped
+    // in `serialized`, so each replace is byte-for-byte position-exact.
     let payload = serialized
-    let payloadBytes = serializedBytes
-    for (const { escapedSentinel, plaintext } of preparedSecretSubs) {
-      const escapedBlob = encodePersistedStateJsonStringContent(encrypt(plaintext))
-      const nextPayload = replacePersistedStateJsonWithinLimit({
-        serialized: payload,
-        currentBytes: payloadBytes,
-        search: escapedSentinel,
-        replacement: escapedBlob
-      })
-      payload = nextPayload.serialized
-      payloadBytes = nextPayload.byteLength
+    let hashInput = serialized
+    for (const { sentinel, blob, plaintext } of secretSubs) {
+      const escapedSentinel = JSON.stringify(sentinel).slice(1, -1)
+      payload = payload.replace(escapedSentinel, () => blob)
+      hashInput = hashInput.replace(escapedSentinel, () => JSON.stringify(plaintext).slice(1, -1))
     }
-    const stateHash = normalizedHash.digest('hex')
+    const stateHash = createHash('sha1').update(hashInput).digest('hex')
     return { payload, stateHash }
   }
 
@@ -3984,7 +3978,8 @@ export class Store {
     if (!repo) {
       return false
     }
-    const previous = repo.gitUsername ?? ''
+    const previous = this.gitUsernameCache.get(repo.path) ?? repo.gitUsername ?? ''
+    this.gitUsernameCache.set(repo.path, username)
     if (previous === username) {
       return false
     }
@@ -4387,9 +4382,63 @@ export class Store {
       hostMembership.set(key, result)
       return result
     }
+    // Why: session state (legacy blob + per-host partitions) references worktrees
+    // by the same `${repoId}::${path}` owner key; if it is not pruned here, a
+    // deleted project's worktrees stay in lastVisitedAtByWorktreeId /
+    // sleepingAgentSessionsByPaneKey and get re-materialized into worktreeMeta on
+    // the next launch, surfacing as an orphaned "unknown" workspace.
+    // worktreeMeta is host-classified via belongsToHost, but session partitions
+    // are keyed by host directly. A session owner key carries no host, and the
+    // same key can exist in multiple partitions (shared repo id/path across
+    // hosts). So for session cleanup we collect every prefix-matching owner key
+    // regardless of belongsToHost, and let the per-partition host gating below
+    // decide which partition to touch. (belongsToHost still governs
+    // worktreeMeta/lineage deletion. Collect before deleting worktreeMeta.)
+    const ownerKeysToPrune = new Set<string>()
+    const collectPrefixedKeys = (keys: Iterable<string>): void => {
+      for (const key of keys) {
+        if (key.startsWith(prefix)) {
+          ownerKeysToPrune.add(key)
+        }
+      }
+    }
+    collectPrefixedKeys(Object.keys(this.state.worktreeMeta))
+    collectPrefixedKeys(Object.keys(this.state.workspaceSession?.lastVisitedAtByWorktreeId ?? {}))
+    for (const session of Object.values(this.state.workspaceSessionsByHostId ?? {})) {
+      collectPrefixedKeys(Object.keys(session?.lastVisitedAtByWorktreeId ?? {}))
+    }
+
     for (const key of Object.keys(this.state.worktreeMeta)) {
       if (belongsToHost(key)) {
         delete this.state.worktreeMeta[key]
+      }
+    }
+    // Why: owner keys are `${repoId}::${path}` and do not carry a host, so a
+    // host-scoped prune (hostId != null) must only touch that host's session:
+    // the legacy blob is the local host's session, and each
+    // workspaceSessionsByHostId partition is one non-local host. Pruning every
+    // partition here would wipe a surviving host's tabs, sleeping-agent state,
+    // and active-worktree pointer for a shared repo id/path. A full removal
+    // (hostId === null) still clears every host.
+    const pruneLegacyLocalSession = hostId === null || hostId === LOCAL_EXECUTION_HOST_ID
+    const pruneAllHostPartitions = hostId === null
+    if (pruneLegacyLocalSession) {
+      this.state.workspaceSession = removeWorkspaceSessionOwners(
+        this.state.workspaceSession,
+        ownerKeysToPrune
+      )!
+    }
+    if (this.state.workspaceSessionsByHostId) {
+      for (const [partitionHostId, session] of Object.entries(
+        this.state.workspaceSessionsByHostId
+      )) {
+        if (!pruneAllHostPartitions && partitionHostId !== hostId) {
+          continue
+        }
+        const pruned = removeWorkspaceSessionOwners(session, ownerKeysToPrune)
+        if (pruned) {
+          this.state.workspaceSessionsByHostId[partitionHostId] = pruned
+        }
       }
     }
     for (const [childId, lineage] of Object.entries(this.state.worktreeLineageById)) {
@@ -4636,7 +4685,9 @@ export class Store {
     const projectHostSetupMethod = sanitizeRepoProjectHostSetupMethod(rawProjectHostSetupMethod)
     const forkSyncMode = sanitizeForkSyncMode(rawForkSyncMode)
     // Why: never spawn git/gh username resolution in hydration — a stuck probe froze Windows startup for minutes (issue #7225); read only cache/persisted value.
-    const gitUsername = isFolderRepo(repo) ? '' : (repo.gitUsername ?? '')
+    const gitUsername = isFolderRepo(repo)
+      ? ''
+      : (this.gitUsernameCache.get(repo.path) ?? repo.gitUsername ?? '')
 
     return {
       ...repoWithoutIcon,
@@ -6823,8 +6874,7 @@ export class Store {
     const cacheFile = getGithubCacheFile(this.dataFile)
     const tmpFile = `${cacheFile}.${process.pid}.tmp`
     try {
-      const { serialized } = stringifyPersistedStateWithinLimit(this.state.githubCache)
-      writeFileSync(tmpFile, serialized, 'utf-8')
+      writeFileSync(tmpFile, JSON.stringify(this.state.githubCache), 'utf-8')
       renameSync(tmpFile, cacheFile)
       this.githubCacheDirty = false
     } catch (err) {

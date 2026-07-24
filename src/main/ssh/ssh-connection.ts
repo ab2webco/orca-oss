@@ -5,7 +5,6 @@ import { Client as SshClient } from 'ssh2'
 import type { ChildProcess } from 'node:child_process'
 import type { ClientChannel, ConnectConfig, SFTPWrapper } from 'ssh2'
 import type { SshTarget, SshConnectionState, SshConnectionStatus } from '../../shared/ssh-types'
-import { clampSshConnectionError } from '../../shared/ssh-retained-payload-admission'
 import {
   getOrcaControlSocketPath,
   spawnSystemSsh,
@@ -47,7 +46,6 @@ import {
   createLinkedSshFileTransferSignal,
   raceSftpFileTransferWithAbort
 } from './ssh-file-transfer-abort'
-import { SystemSshOutputTail } from './system-ssh-output-tail'
 export type { SshConnectionCallbacks } from './ssh-connection-utils'
 
 type SshRemoteFileOptions = {
@@ -66,6 +64,36 @@ function cloneResolvedConfig(config: SshResolvedConfig | null): SshResolvedConfi
     return null
   }
   return { ...config, identityFile: [...config.identityFile] }
+}
+
+function isGitHubRestrictedShellProbeSuccess(
+  target: SshTarget,
+  resolvedConfig: SshResolvedConfig | null,
+  code: number | null,
+  stderr: string
+): boolean {
+  if (code !== 1) {
+    return false
+  }
+
+  const effectiveUser = (target.username?.trim() || resolvedConfig?.user?.trim())?.toLowerCase()
+  if (effectiveUser !== 'git') {
+    return false
+  }
+
+  // GitHub appends git:// advisory lines after the invalid-command line (issue #6988), so match the first line only.
+  const firstLine = stderr.split('\n', 1)[0]?.trim()
+  if (firstLine !== 'Invalid command: echo ORCA-SYSTEM-SSH-OK') {
+    return false
+  }
+
+  const resolvedHost = resolvedConfig?.hostname?.trim()
+  const hostCandidates = resolvedHost ? [resolvedHost] : [target.host, target.configHost]
+
+  return hostCandidates.some((host) => {
+    const normalizedHost = host?.trim().toLowerCase()
+    return normalizedHost === 'github.com' || normalizedHost === 'ssh.github.com'
+  })
 }
 
 export class SshConnection {
@@ -815,8 +843,8 @@ export class SshConnection {
     })
     try {
       await new Promise<void>((resolve, reject) => {
-        const stdout = new SystemSshOutputTail()
-        const stderr = new SystemSshOutputTail()
+        let stdout = ''
+        let stderr = ''
         let settled = false
         const cleanup = (): void => {
           clearTimeout(timeout)
@@ -835,10 +863,10 @@ export class SshConnection {
           callback()
         }
         const onStdoutData = (data: Buffer): void => {
-          stdout.push(data)
+          stdout += data.toString('utf-8')
         }
         const onStderrData = (data: Buffer): void => {
-          stderr.push(data)
+          stderr += data.toString('utf-8')
         }
         const onError = (err: Error): void => {
           settle(() => reject(err))
@@ -849,17 +877,24 @@ export class SshConnection {
               reject(new Error('SSH connection attempt was cancelled'))
               return
             }
-            if (code !== 0 || !stdout.toString().includes('ORCA-SYSTEM-SSH-OK')) {
-              const stderrText = stderr.toString()
-              reject(
-                new Error(
-                  `System SSH probe failed${code != null ? ` (exit ${code})` : ''}.${stderrText ? ` stderr: ${stderrText.trim()}` : ''}`
-                )
+            if (
+              (code === 0 && stdout.includes('ORCA-SYSTEM-SSH-OK')) ||
+              isGitHubRestrictedShellProbeSuccess(
+                this.target,
+                this.systemSshResolvedConfig,
+                code,
+                stderr
               )
+            ) {
+              this.setState('connected')
+              resolve()
               return
             }
-            this.setState('connected')
-            resolve()
+            reject(
+              new Error(
+                `System SSH probe failed${code != null ? ` (exit ${code})` : ''}.${stderr ? ` stderr: ${stderr.trim()}` : ''}`
+              )
+            )
           })
         }
         const timeout = setTimeout(() => {
@@ -1330,7 +1365,7 @@ export class SshConnection {
     this.state = {
       ...this.state,
       status,
-      error: clampSshConnectionError(error ?? null),
+      error: error ?? null,
       supportsFolderDownload: status === 'connected' && !this.useSystemSshTransport
     }
     this.callbacks.onStateChange(this.target.id, { ...this.state })

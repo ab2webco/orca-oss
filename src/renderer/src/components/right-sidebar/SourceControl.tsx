@@ -43,10 +43,8 @@ import { basename, dirname, joinPath } from '@/lib/path'
 import { cn } from '@/lib/utils'
 import { WORKSPACE_FILE_PATH_MIME } from '@/lib/workspace-file-drag'
 import { isFolderRepo } from '../../../../shared/repo-kind'
-import { mapSettledWithConcurrency } from '../../../../shared/map-with-concurrency'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
-import { DetachedHeadBadge } from '@/components/DetachedHeadBadge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -535,7 +533,6 @@ const SOURCE_CONTROL_TREE_INDENT_PX = 12
 const SOURCE_CONTROL_TREE_DIRECTORY_PADDING_PX = 8
 const SOURCE_CONTROL_TREE_FILE_PADDING_PX = 20
 const CAPPED_STATUS_RETRY_TIMEOUT_MS = 15_000
-const SOURCE_CONTROL_QUIESCE_CONCURRENCY = 8
 const EMPTY_GIT_HISTORY_STATE: GitHistoryPanelState = { status: 'idle' }
 const DEFAULT_COLLAPSED_SECTIONS = ['history'] as const
 const SUBMODULE_WORKTREE_ONLY_LABEL = 'Stage inside submodule'
@@ -811,7 +808,6 @@ function SourceControlInner(): React.JSX.Element {
   const activeRepoConnectionId = activeRepo?.connectionId ?? null
   const activeRepoExecutionHostId = activeRepo?.executionHostId ?? null
   const gitIdentityDisplay = activeWorktree ? getWorktreeGitIdentityDisplay(activeWorktree) : null
-  const detachedHeadDisplay = gitIdentityDisplay?.kind === 'detached' ? gitIdentityDisplay : null
   const branchName = gitIdentityDisplay?.kind === 'branch' ? gitIdentityDisplay.branchName : ''
   const entries = useAppStore((s) =>
     activeWorktreeId
@@ -5250,23 +5246,16 @@ function SourceControlInner(): React.JSX.Element {
       const runtimeEnvironmentId =
         useAppStore.getState().settings?.activeRuntimeEnvironmentId?.trim() || null
       // Why: quiesce matching editor autosaves first so a delayed save can't recreate edits after git mutates the files.
-      const quiesces = await mapSettledWithConcurrency(
-        filePaths,
-        SOURCE_CONTROL_QUIESCE_CONCURRENCY,
-        (relativePath) =>
+      await Promise.all(
+        filePaths.map((relativePath) =>
           requestEditorSaveQuiesce({
             worktreeId: activeWorktreeId,
             worktreePath,
             relativePath,
             runtimeEnvironmentId
           })
+        )
       )
-      const failedQuiesce = quiesces.find(
-        (result): result is PromiseRejectedResult => result.status === 'rejected'
-      )
-      if (failedQuiesce) {
-        throw failedQuiesce.reason
-      }
       const connectionId = getConnectionId(activeWorktreeId) ?? undefined
       await bulkDiscardRuntimeGitPaths(
         {
@@ -5461,6 +5450,7 @@ function SourceControlInner(): React.JSX.Element {
     <>
       <div ref={setSourceControlRoot} className="relative flex h-full flex-col overflow-hidden">
         <SourceControlHeaderToolbar
+          gitIdentityDisplay={gitIdentityDisplay}
           filterQuery={filterQuery}
           filterExpanded={filterExpanded}
           onFilterQueryChange={setFilterQuery}
@@ -5484,12 +5474,6 @@ function SourceControlInner(): React.JSX.Element {
           upstreamStatus={remoteStatus}
           manualReviewUrl={manualReviewUrl}
         />
-
-        {detachedHeadDisplay && (
-          <div className="border-b border-border px-3 py-2">
-            <DetachedHeadBadge display={detachedHeadDisplay} side="bottom" />
-          </div>
-        )}
 
         {/* Why: hidden when count is 0 — notes are created from the diff view, so an empty Notes shelf here is pure chrome. */}
         {activeWorktreeId && worktreePath && diffCommentCount > 0 && (

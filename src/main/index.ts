@@ -80,11 +80,14 @@ import {
   installDevParentDisconnectQuit,
   installDevParentSignalQuit,
   installDevParentWatchdog,
-  installUncaughtPipeErrorGuard,
   isDevParentShutdownRequested,
   patchPackagedProcessPath,
   shouldInstallManagedHooks
 } from './startup/configure-process'
+import {
+  installUncaughtPipeErrorGuard,
+  installUnhandledRejectionLogging
+} from './startup/main-process-error-guards'
 import { enableRendererHeapHeadroom } from './startup/renderer-heap-headroom'
 import { ensureVirtualDisplayForHeadlessServe } from './startup/ensure-virtual-display'
 import {
@@ -182,6 +185,7 @@ import {
   seedLiveClaudePtysFromPersistence,
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
+import { onLiveClaudePtysDrained } from './claude-accounts/live-pty-drain-listeners'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer } from './agent-hooks/server'
 import { wslHookRelayManager } from './agent-hooks/wsl-hook-relay-manager'
@@ -189,6 +193,7 @@ import { maybeAutoRenameBranchOnFirstWork } from './agent-hooks/first-work-branc
 import { rememberBranchRenameFailureOutput } from './agent-hooks/branch-rename-failure-output'
 import { renameWorktreeFolderOnFirstWork } from './agent-hooks/first-work-folder-rename'
 import { moveWorktree } from './git/worktree'
+import { setDefaultWslDistroOverride } from './git/runner'
 import { getRepoIdFromWorktreeId } from '../shared/worktree-id'
 import { parseWorkspaceKey } from '../shared/workspace-scope'
 import { setMigrationUnsupportedPtyListener } from './agent-hooks/migration-unsupported-pty-state'
@@ -211,6 +216,7 @@ import { createHeadlessAutomationOutputSnapshotBuffer } from './automations/head
 import { buildHeadlessAutomationWorktreeCreateArgs } from './automations/headless-workspace-create'
 import { AgentAwakeService } from './agent-awake-service'
 import { registerSystemResumeBroadcast } from './system-resume-broadcast'
+import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import {
   recordCoalescedCrashBreadcrumb,
   recordCrashBreadcrumb
@@ -466,6 +472,8 @@ const devAgentHookEndpointNamespace = devInstanceIdentity.isDev
   : undefined
 
 installUncaughtPipeErrorGuard()
+// Why (issue #9441): without this, one rejected background promise during startup restore kills main silently (exit 1, no crash report).
+installUnhandledRejectionLogging()
 // Why: expose the app version via process.env so main and the forked daemon can set TERM_PROGRAM_VERSION without importing electron.
 process.env.ORCA_APP_VERSION = app.getVersion()
 configureRemoteServerUpdater({
@@ -1832,7 +1840,13 @@ app.whenReady().then(async () => {
   const activeOrcaProfile = ensureActiveOrcaProfile()
   store = new Store({ dataFile: activeOrcaProfile.dataFile })
   logStartupMilestone('store-loaded')
+  // Why: apply initial fallback WSL distro from store settings for global git/CLI calls.
+  setDefaultWslDistroOverride(store.getSettings().terminalWindowsWslDistro ?? null)
   store.onSettingsChanged((updates, settings) => {
+    if ('terminalWindowsWslDistro' in updates) {
+      // Why: synchronize fallback WSL distro updates to runner.
+      setDefaultWslDistroOverride(settings.terminalWindowsWslDistro ?? null)
+    }
     if ('showMenuBarIcon' in updates) {
       // Why: Store is the mutation authority for all settings writes, so every macOS toggle updates the native item live.
       syncMacMenuBarIcon(settings.showMenuBarIcon !== false)
@@ -1840,6 +1854,12 @@ app.whenReady().then(async () => {
   })
   // Why: run before ClaudeRuntimeAuthService's constructor sync — a surviving daemon Claude CLI holds the single-use refresh token; early refresh rotates it out mid-session.
   attachClaudeLivePtyPersistence(store)
+  // Why: while a live claude defers the managed OAuth refresh, usage shows
+  // "Waiting for Claude session"; refetch when the last live PTY exits so the
+  // error clears immediately instead of after the failure backoff.
+  onLiveClaudePtysDrained(() => {
+    void rateLimits?.refreshAfterClaudeLivePtysDrained()
+  })
   const persistedClaudePtyIds = store.getClaudeLivePtySessionIds()
   const persistedSharedClaudePtys = store.getClaudeLiveSharedPtyAccountBindings()
   seedLiveClaudePtysFromPersistence(persistedClaudePtyIds, persistedSharedClaudePtys)
@@ -2564,7 +2584,19 @@ app.on('will-quit', (e) => {
     // Why: telemetry flush folds in before app.quit() (bounded 2s); catch defensively so a flush failure can't cancel the quit chain.
     // Why: normal quits keep the detached daemon for warm reattach, but a dead dev parent leaves the temp/dev profile ownerless.
     const daemonTeardown = isDevParentShutdownRequested() ? shutdownDaemon() : disconnectDaemon()
-    Promise.allSettled([daemonTeardown, rpcStopAndClear, watcherShutdown, emulatorShutdown])
+    // Why: a wedged transport (half-open post-sleep socket) can leave one
+    // member unsettled forever and block app.quit() until Force Quit (#9447).
+    settleTeardownWithinDeadline([
+      { name: 'daemon', promise: daemonTeardown },
+      { name: 'runtime-rpc', promise: rpcStopAndClear },
+      { name: 'watchers', promise: watcherShutdown },
+      { name: 'emulator', promise: emulatorShutdown }
+    ])
+      .then((pendingTeardowns) => {
+        if (pendingTeardowns.length > 0) {
+          console.warn('[shutdown] Quit teardown deadline reached', { pendingTeardowns })
+        }
+      })
       .then(() => shutdownTelemetry())
       .then(() => shutdownObservability())
       .catch(() => {

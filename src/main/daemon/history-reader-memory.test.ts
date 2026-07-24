@@ -73,24 +73,23 @@ afterEach(() => {
 })
 
 describe('terminal history restore memory limits', () => {
-  it('falls back to a valid checkpoint when the incremental log is oversized', () => {
+  it('falls back to a valid checkpoint when the incremental log is oversized', async () => {
     const { basePath, sessionPath } = createSession('oversized-log')
     writeFileSync(join(sessionPath, 'checkpoint.json'), checkpoint())
     createSparseFile(join(sessionPath, 'output.log'), TERMINAL_HISTORY_LOG_MAX_BYTES + 1)
 
-    expect(new HistoryReader(basePath).detectColdRestore('oversized-log')?.snapshotAnsi).toBe(
-      'safe checkpoint'
-    )
+    const restore = await new HistoryReader(basePath).detectColdRestore('oversized-log')
+    expect(restore?.snapshotAnsi).toBe('safe checkpoint')
   })
 
-  it('ignores oversized checkpoint and metadata files before parsing', () => {
+  it('ignores oversized checkpoint and metadata files before parsing', async () => {
     const checkpointSession = createSession('oversized-checkpoint')
     createSparseFile(
       join(checkpointSession.sessionPath, 'checkpoint.json'),
       TERMINAL_HISTORY_CHECKPOINT_MAX_BYTES + 1
     )
     expect(
-      new HistoryReader(checkpointSession.basePath).detectColdRestore('oversized-checkpoint')
+      await new HistoryReader(checkpointSession.basePath).detectColdRestore('oversized-checkpoint')
     ).toBeNull()
 
     const metadataSession = createSession('oversized-metadata')

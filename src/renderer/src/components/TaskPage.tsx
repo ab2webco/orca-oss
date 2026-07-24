@@ -125,7 +125,6 @@ import {
   getLinearStatePillStyle
 } from '@/components/linear-state-pill-style'
 import { parseTaskQuery, stripRepoQualifiers, withQualifier } from '../../../shared/task-query'
-import { mapSettledWithConcurrency } from '../../../shared/map-with-concurrency'
 import { githubProjectHost } from '../../../shared/github-project-identity'
 import {
   buildLinearTeamUrl,
@@ -206,7 +205,6 @@ import {
   readLinearBoardIssueDragData,
   writeLinearBoardIssueDragData
 } from '@/lib/linear-board-drag-payload'
-import { isGitRepoKind } from '../../../shared/repo-kind'
 import { getRepoExecutionHostId } from '../../../shared/execution-host'
 import { projectHostSetupProjectionFromRepos } from '../../../shared/project-host-setup-projection'
 import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
@@ -265,6 +263,7 @@ import { findTaskPageJiraIssue } from '@/components/task-page-jira-cache-selecto
 import { getRepoBackedTaskEmptyState } from '@/components/task-page-empty-state'
 import {
   getDefaultTaskRepoSelection,
+  getTaskEligibleRepos,
   getTaskProjectPickerGroups,
   normalizeTaskRepoSelection
 } from '@/components/task-page-default-repo-selection'
@@ -418,7 +417,6 @@ const TASK_SEARCH_DEBOUNCE_MS = 300
 const LINEAR_ITEM_LIMIT = 36
 const JIRA_ITEM_LIMIT = 50
 const PR_CHECKS_EAGER_PREFETCH_LIMIT = 20
-const GITLAB_REPO_FETCH_CONCURRENCY = 8
 
 const GITHUB_TASK_GRID_CLASS =
   'min-w-[790px] grid-cols-[72px_minmax(320px,1fr)_84px_100px_92px_122px]'
@@ -3212,7 +3210,7 @@ export default function TaskPage(): React.JSX.Element {
   const jiraConnected = jiraStatusCurrent && jiraStatus.connected
   const planeConnected = planeStatusCurrent && planeStatus.connected
   const submitShortcutLabel = getScreenSubmitShortcutLabel()
-  const eligibleRepos = useMemo(() => repos.filter((repo) => isGitRepoKind(repo)), [repos])
+  const eligibleRepos = useMemo(() => getTaskEligibleRepos(repos), [repos])
 
   // Why: initial selection precedence — explicit preselection > persisted defaultRepoSelection > all eligible; preselection wins so "open tasks for this repo" lands single-repo.
   const resolvedInitialSelection = useMemo<ReadonlySet<string>>(() => {
@@ -5229,12 +5227,7 @@ export default function TaskPage(): React.JSX.Element {
                 return { repoId: repo.id, items: typed.items, error }
               })
 
-    void mapSettledWithConcurrency(eligibleRepos, GITLAB_REPO_FETCH_CONCURRENCY, async (repo) => {
-      if (stale) {
-        return { repoId: repo.id, items: [] as GitLabWorkItem[], error: undefined }
-      }
-      return fetchItems(repo)
-    })
+    void Promise.allSettled(eligibleRepos.map(fetchItems))
       .then((results) => {
         if (stale) {
           return
@@ -9182,7 +9175,8 @@ export default function TaskPage(): React.JSX.Element {
                             workspaceId={selectedLinearWorkspaceId ?? null}
                             isAllWorkspaces={selectedLinearWorkspaceId === 'all'}
                             primaryTeam={linearAttributePrimaryTeam}
-                            selectedTeamCount={linearTeamSelection.size}
+                            selectedTeamIds={[...linearTeamSelection]}
+                            availableTeams={linearTeamOptions}
                             settings={linearTaskSourceContext ?? settings}
                           />
                         ) : null}

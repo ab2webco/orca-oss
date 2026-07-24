@@ -121,6 +121,7 @@ type StoreState = {
   ptyIdsByTabId?: Record<string, string[]>
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot>
   unreadTerminalTabs?: Record<string, true>
+  deleteStateByWorktreeId?: Record<string, { isDeleting?: boolean; phase?: string }>
   worktreesByRepo: Record<
     string,
     {
@@ -783,6 +784,7 @@ describe('connectPanePty', () => {
         }
       },
       unreadTerminalTabs: {},
+      deleteStateByWorktreeId: {},
       worktreesByRepo: {
         repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/tmp/wt-1', displayName: 'feat/notis' }]
       },
@@ -1022,6 +1024,91 @@ describe('connectPanePty', () => {
     await flushAsyncTicks()
 
     expect(staleTracker.flags).toBe(0)
+  })
+
+  // Why: deleting a worktree kills its PTYs for the filesystem teardown; the
+  // renderer must not race a doomed respawn into a directory main is deleting
+  // (main fences it with TerminalRemovalInProgressError and the pane is about to
+  // unmount). See docs — bad UI was the raw fence error flashing on the tab.
+  it('skips a fresh spawn while the pane worktree is being deleted', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      deleteStateByWorktreeId: { 'wt-1': { isDeleting: true, phase: 'deleting' } }
+    }
+    // Why: a unique tab id keeps this pane's key clear of other tests' pendingSpawnByPaneKey entries so the connect deterministically fresh-spawns.
+    const deps = createDeps({ tabId: 'tab-removal-skip-spawn' })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(transport.connect).not.toHaveBeenCalled()
+    expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
+  })
+
+  it('fresh-spawns normally when the pane worktree is not being deleted', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+    // Why: unique tab id → deterministic fresh spawn (mirrors the skip test's control).
+    const deps = createDeps({ tabId: 'tab-removal-control-spawn' })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(transport.connect).toHaveBeenCalled()
+  })
+
+  // Why: a doomed pane (or a child pane whose parent worktree is being removed,
+  // which startFreshSpawn's own-worktree skip cannot see) can still race a spawn
+  // that main fences. reportError must swallow that fence so the tab never flashes
+  // the raw "Terminal cannot start while the worktree is being removed" banner.
+  it('swallows a worktree-removal fence error instead of surfacing it', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { TERMINAL_REMOVAL_IN_PROGRESS_MESSAGE } =
+      await import('../../../../shared/worktree-removal-fence-error')
+    const transport = createMockTransport()
+    const capturedOnError: { current: ((message: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedOnError.current = callbacks.onError ?? null
+      return 'pty-1'
+    })
+    transportFactoryQueue.push(transport)
+    const deps = createDeps({ tabId: 'tab-fence-swallow' })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    // Why: assert the callback was captured before invoking — optional invocation
+    // would let this test false-pass (not.toHaveBeenCalled trivially true) if the
+    // transport onError wiring ever broke, exercising no suppression at all.
+    expect(capturedOnError.current).toBeTypeOf('function')
+    // Electron wraps the rejected ipcMain error with its own prefix; still swallowed.
+    capturedOnError.current!(
+      `Error invoking remote method 'pty:spawn': Error: ${TERMINAL_REMOVAL_IN_PROGRESS_MESSAGE}`
+    )
+    expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
+  })
+
+  it('still surfaces non-fence spawn errors through the pane error sink', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport()
+    const capturedOnError: { current: ((message: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedOnError.current = callbacks.onError ?? null
+      return 'pty-1'
+    })
+    transportFactoryQueue.push(transport)
+    const deps = createDeps({ tabId: 'tab-real-error-surface' })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(capturedOnError.current).toBeTypeOf('function')
+    capturedOnError.current!('shell exited with code 1')
+    expect(deps.onPtyErrorRef.current).toHaveBeenCalledWith(1, 'shell exited with code 1')
   })
 
   it('threads the resolved local project runtime into IPC terminal transport options', async () => {

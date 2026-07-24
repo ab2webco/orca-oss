@@ -43,6 +43,7 @@ import { createNewIssueDraftSlice } from './slices/new-issue-draft'
 import { createClaudeAccountRosterSlice } from './slices/claude-account-roster'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { e2eConfig } from '@/lib/e2e-config'
+import type { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-session'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 import {
   registerRendererMemoryProfileContributor,
@@ -109,5 +110,12 @@ export type { AppState } from './types'
 // to avoid fragile DOM scraping. Harmless — the store is already reachable
 // via React DevTools in any environment.
 if ((import.meta.env.DEV || e2eConfig.exposeStore) && typeof window !== 'undefined') {
-  ;(window as unknown as Record<string, unknown>).__store = useAppStore
+  const testWindow = window as unknown as Record<string, unknown>
+  testWindow.__store = useAppStore
+  if (e2eConfig.exposeStore) {
+    testWindow.__webRuntimeSessionE2E = {
+      createTerminal: async (args: Parameters<typeof createWebRuntimeSessionTerminal>[0]) =>
+        (await import('@/runtime/web-runtime-session')).createWebRuntimeSessionTerminal(args)
+    }
+  }
 }

@@ -52,9 +52,10 @@ import type {
   ClaudeManagedAccountSummary,
   CodexManagedAccountSummary,
   Repo,
-  Worktree
+  Worktree,
+  WorkspaceStatus,
+  WorkspaceStatusDefinition
 } from '../../../../shared/types'
-import { mapSettledWithConcurrency } from '../../../../shared/map-with-concurrency'
 import { runWorktreeBatchDelete, runWorktreeDelete } from './delete-worktree-flow'
 import { runSleepWorktrees } from './sleep-worktree-flow'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -85,6 +86,7 @@ type Props = {
   contentClassName?: string
   selectedWorktrees?: readonly Worktree[]
   onContextMenuSelect?: (event: React.MouseEvent<HTMLElement>) => readonly Worktree[]
+  onAssignWorkspaceStatus?: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onOpenChange?: (open: boolean) => void
 }
 
@@ -94,16 +96,6 @@ const WORKTREE_NATIVE_CONTEXT_MENU_ATTR = 'data-worktree-native-context-menu'
 const CONTEXT_MENU_CLICK_SUPPRESSION_MS = 500
 const DELETE_POSITION_RESTORE_MAX_FRAMES = 180
 const DELETE_POSITION_RESTORE_STABLE_FRAMES = 6
-const WORKTREE_META_MUTATION_CONCURRENCY = 8
-
-function rethrowFirstMutationFailure(results: readonly PromiseSettledResult<unknown>[]): void {
-  const failure = results.find(
-    (result): result is PromiseRejectedResult => result.status === 'rejected'
-  )
-  if (failure) {
-    throw failure.reason
-  }
-}
 
 // Why: stable empty sentinels let closed menu wrappers subscribe to a referentially
 // stable value instead of the high-churn maps that delete teardown replaces. The
@@ -336,12 +328,36 @@ function preserveDeleteSiblingPosition(scope: HTMLElement | null): () => void {
   }
 }
 
+export type WorkspaceStatusAssignmentPlan =
+  | { readonly kind: 'board-sync'; readonly worktreeIds: readonly string[] }
+  | { readonly kind: 'local-only'; readonly localWriteIds: readonly string[] }
+
+// Why: the context-menu "Move to Status" routes to the board's local-first +
+// Linear-sync path when the board wired a callback, else a local-only write of
+// only the status-changed worktrees. Extracted pure so the routing and the
+// no-op filter stay unit-testable without opening the Radix menu.
+export function planWorkspaceStatusAssignment(
+  worktrees: readonly Worktree[],
+  status: WorkspaceStatus,
+  workspaceStatuses: readonly WorkspaceStatusDefinition[],
+  boardSyncEnabled: boolean
+): WorkspaceStatusAssignmentPlan {
+  if (boardSyncEnabled) {
+    return { kind: 'board-sync', worktreeIds: worktrees.map((item) => item.id) }
+  }
+  const localWriteIds = worktrees
+    .filter((item) => getWorkspaceStatus(item, workspaceStatuses) !== status)
+    .map((item) => item.id)
+  return { kind: 'local-only', localWriteIds }
+}
+
 const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   worktree,
   children,
   contentClassName,
   selectedWorktrees,
   onContextMenuSelect,
+  onAssignWorkspaceStatus,
   onOpenChange
 }: Props) {
   const defaultSelectedWorktrees = useMemo(() => [worktree], [worktree])
@@ -684,16 +700,29 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleAssignWorkspaceStatus = useCallback(
     (status: string) => {
       setMenuOpenState(false)
-      void mapSettledWithConcurrency(
+      const plan = planWorkspaceStatusAssignment(
         activeContextWorktrees,
-        WORKTREE_META_MUTATION_CONCURRENCY,
-        (item) =>
-          getWorkspaceStatus(item, workspaceStatuses) === status
-            ? Promise.resolve()
-            : updateWorktreeMeta(item.id, { workspaceStatus: status })
-      ).then(rethrowFirstMutationFailure)
+        status,
+        workspaceStatuses,
+        Boolean(onAssignWorkspaceStatus)
+      )
+      if (plan.kind === 'board-sync') {
+        onAssignWorkspaceStatus?.(plan.worktreeIds, status)
+        return
+      }
+      // Why: outside the workspace board (e.g. the sidebar list) status changes
+      // are local-only; Linear sync is scoped to board moves like drag-and-drop.
+      void Promise.all(
+        plan.localWriteIds.map((id) => updateWorktreeMeta(id, { workspaceStatus: status }))
+      )
     },
-    [activeContextWorktrees, setMenuOpenState, updateWorktreeMeta, workspaceStatuses]
+    [
+      activeContextWorktrees,
+      onAssignWorkspaceStatus,
+      setMenuOpenState,
+      updateWorktreeMeta,
+      workspaceStatuses
+    ]
   )
 
   const handleAssignClaudeAccount = useCallback(
@@ -831,11 +860,9 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   )
 
   const handleRemoveParentLink = useCallback(() => {
-    void mapSettledWithConcurrency(
-      activeContextWorktrees,
-      WORKTREE_META_MUTATION_CONCURRENCY,
-      (item) => updateWorktreeLineage(item.id, { noParent: true })
-    ).then(rethrowFirstMutationFailure)
+    void Promise.all(
+      activeContextWorktrees.map((item) => updateWorktreeLineage(item.id, { noParent: true }))
+    )
   }, [activeContextWorktrees, updateWorktreeLineage])
 
   const suppressOpeningPointerEvent = useCallback((event: React.SyntheticEvent) => {

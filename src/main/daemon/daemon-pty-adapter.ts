@@ -45,18 +45,10 @@ import { resolveWslSessionContext } from './wsl-session-context'
 import { normalizeWslColdRestoreCwd } from './wsl-cold-restore-cwd'
 import { recognizeAgentProcessFromCommandLine } from '../../shared/agent-process-recognition'
 import { shouldUseShellReadyStartupDelivery } from '../../shared/codex-startup-delivery'
-import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { PtyIncarnationId } from '../../shared/pty-incarnation'
 import { resolveSafePtyDefaultCwd } from '../providers/pty-default-cwd'
+import { ColdRestorePayloadCache, type ColdRestorePayload } from './cold-restore-payload-cache'
 import { PtyProcessListAdmission } from '../providers/pty-process-list-admission'
-
-type ColdRestorePayload = {
-  scrollback: string
-  cwd: string
-  cols: number
-  rows: number
-  oscLinks?: TerminalOscLinkRange[]
-}
 
 type PendingDaemonSpawnOperation = {
   exitsBySessionId: Map<string, { incarnationId?: string }[]>
@@ -140,8 +132,10 @@ export class DaemonPtyAdapter implements IPtyProvider {
   // Why: StrictMode/re-render remounts can call createOrAttach for a just-killed session; tombstones stop the daemon resurrecting it (Map evicts oldest-first, per terminal-host.ts).
   private killedSessionTombstones = new Map<string, number>()
   // Why: React StrictMode double-mounts; this sticky cache returns the same cold restore data on remount until the renderer acknowledges it.
-  private coldRestoreCache = new Map<string, ColdRestorePayload>()
   private sleepRestoreSessionIds = new Set<string>()
+  private coldRestoreCache = new ColdRestorePayloadCache(undefined, (sessionId) => {
+    this.sleepRestoreSessionIds.delete(sessionId)
+  })
   private activeSessionIds = new Set<string>()
   private sessionIncarnations = new Map<string, string>()
   private pendingSpawnOperationsBySessionId = new Map<string, Set<PendingDaemonSpawnOperation>>()
@@ -260,9 +254,11 @@ export class DaemonPtyAdapter implements IPtyProvider {
       shellOverride: opts.shellOverride,
       terminalWindowsWslDistro: opts.terminalWindowsWslDistro
     })?.distro
-    const detectColdRestore = (options?: { ignoreCleanEnd?: boolean }): ColdRestoreInfo | null => {
+    const detectColdRestore = async (options?: {
+      ignoreCleanEnd?: boolean
+    }): Promise<ColdRestoreInfo | null> => {
       const restoreInfo =
-        this.historyReader?.detectColdRestore(sessionId, { ...options, wslDistro }) ?? null
+        (await this.historyReader?.detectColdRestore(sessionId, { ...options, wslDistro })) ?? null
       if (!restoreInfo) {
         return null
       }
@@ -309,7 +305,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
       if ((await this.getAppliedSize(sessionId)) !== null) {
         restoreSkippedForLiveSession = true
       } else {
-        restoreInfo = detectColdRestore()
+        restoreInfo = await detectColdRestore()
       }
     }
     let effectiveCwd = restoreInfo?.cwd ?? opts.cwd
@@ -420,7 +416,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
     // Why: the probe→createOrAttach gap is racy — the session can exit in between, so re-detect to match the unprobed restore path.
     // Why ignoreCleanEnd: the raced exit event can write endedAt before the reply; nulling the restore here would delete the checkpoint instead of restoring it.
     if (result.isNew && restoreSkippedForLiveSession) {
-      restoreInfo = detectColdRestore({ ignoreCleanEnd: true })
+      restoreInfo = await detectColdRestore({ ignoreCleanEnd: true })
       scrollback = restoreInfo ? getRecoveredHistorySeed(restoreInfo) : null
       if (restoreInfo && scrollback) {
         // Why: the aliveness probe raced with session death, so the first
@@ -452,7 +448,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
         this.initialCwds.set(sessionId, effectiveCwd)
       }
     } else if (!result.isNew && result.historySeeded === false) {
-      restoreInfo = detectColdRestore()
+      restoreInfo = await detectColdRestore()
       scrollback = restoreInfo ? getRecoveredHistorySeed(restoreInfo) : null
     }
 
@@ -672,7 +668,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
       }
       await this.checkpointSessions([id], { final: true, teardown: true })
       const wslDistro = this.wslDistrosBySessionId.get(id)
-      const detected = this.historyReader?.detectColdRestore(id, { wslDistro }) ?? null
+      const detected = (await this.historyReader?.detectColdRestore(id, { wslDistro })) ?? null
       const restoreInfo = detected
         ? {
             ...detected,
@@ -687,7 +683,9 @@ export class DaemonPtyAdapter implements IPtyProvider {
       const coldRestore = restoreInfo ? this.buildColdRestorePayload(restoreInfo) : null
       if (coldRestore) {
         this.coldRestoreCache.set(id, coldRestore)
-        this.sleepRestoreSessionIds.add(id)
+        if (this.coldRestoreCache.has(id)) {
+          this.sleepRestoreSessionIds.add(id)
+        }
         // Why: physical exit must not mark intentional sleep as a clean end; the final checkpoint stays the wake-time recovery authority.
         this.historyManager?.suspendSession(id)
       }

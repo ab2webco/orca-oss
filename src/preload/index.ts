@@ -3,10 +3,6 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
-import {
-  subscribeFrameStreamFrames,
-  subscribeVideoStreamFrames
-} from './emulator-stream-frame-listeners'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
   GlobalConfigSyncInventory,
@@ -1068,6 +1064,12 @@ const api = {
         callback(data)
       ipcRenderer.on('pty:exit', listener)
       return () => ipcRenderer.removeListener('pty:exit', listener)
+    },
+
+    onSpawned: (callback: (data: { id: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { id: string }) => callback(data)
+      ipcRenderer.on('pty:spawned', listener)
+      return () => ipcRenderer.removeListener('pty:spawned', listener)
     },
 
     onSerializeBufferRequest: (
@@ -2757,7 +2759,14 @@ const api = {
       ipcRenderer.invoke('emulator:frameStreamStop', args),
     onFrameStreamFrame: (
       callback: (data: { streamId: string; bytes: ArrayBuffer }) => void
-    ): (() => void) => subscribeFrameStreamFrames(ipcRenderer, callback),
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { streamId: string; bytes: ArrayBuffer }
+      ) => callback(data)
+      ipcRenderer.on('emulator:frameStreamFrame', listener)
+      return () => ipcRenderer.removeListener('emulator:frameStreamFrame', listener)
+    },
     onFrameStreamError: (
       callback: (data: { streamId: string; message: string }) => void
     ): (() => void) => {
@@ -2800,7 +2809,20 @@ const api = {
         keyFrame: boolean
         bytes: ArrayBuffer
       }) => void
-    ): (() => void) => subscribeVideoStreamFrames(ipcRenderer, callback),
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: {
+          streamId: string
+          deviceId: string
+          config: boolean
+          keyFrame: boolean
+          bytes: ArrayBuffer
+        }
+      ) => callback(data)
+      ipcRenderer.on('emulator:videoStreamFrame', listener)
+      return () => ipcRenderer.removeListener('emulator:videoStreamFrame', listener)
+    },
     onPaneFocus: (callback: (data: { worktreeId: string }) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, data: { worktreeId: string }) =>
         callback(data)
@@ -4028,14 +4050,24 @@ const api = {
     /** Fired by main when the user tries to close the window; renderer confirms running
      *  terminals then calls confirmWindowClose(). isQuitting (Cmd+Q / app.quit) skips that dialog. */
     onWindowCloseRequested: (callback: (data: { isQuitting: boolean }) => void): (() => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, data: { isQuitting: boolean }) =>
-        callback(data ?? { isQuitting: false })
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { isQuitting: boolean; requestId?: number }
+      ): void => {
+        // Why: main cannot reach will-quit while a frozen renderer owns the window close handshake.
+        ipcRenderer.send('window:close-request-received', data?.requestId)
+        callback({ isQuitting: data?.isQuitting ?? false })
+      }
       ipcRenderer.on('window:close-requested', listener)
       return () => ipcRenderer.removeListener('window:close-requested', listener)
     },
     /** Tell the main process to proceed with the window close. */
     confirmWindowClose: (): void => {
       ipcRenderer.send('window:confirm-close')
+    },
+    /** Report a genuine hidden→visible reveal so main can recover a stale (throttled) layout/compositor surface. */
+    notifyWindowRevealed: (): void => {
+      ipcRenderer.send('ui:window-revealed')
     }
   } satisfies PreloadApi['ui'],
 

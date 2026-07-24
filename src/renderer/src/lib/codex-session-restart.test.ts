@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
+import { shouldUseShellReadyStartupDelivery } from '../../../shared/codex-startup-delivery'
 import {
-  CODEX_PTY_INSPECTION_CONCURRENCY,
+  CODEX_ACCOUNT_RESTART_STARTUP,
   markLiveCodexSessionsForRestart
 } from './codex-session-restart'
 import {
@@ -13,6 +14,16 @@ import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-cl
 const ACCOUNT_A = 'account-a@example.com'
 const ACCOUNT_B = 'account-b@example.com'
 const ACCOUNT_C = 'account-c@example.com'
+
+describe('CODEX_ACCOUNT_RESTART_STARTUP', () => {
+  it('waits for shell readiness before relaunching Codex after an account switch', () => {
+    expect(CODEX_ACCOUNT_RESTART_STARTUP).toEqual({
+      command: 'codex',
+      startupCommandDelivery: 'shell-ready'
+    })
+    expect(shouldUseShellReadyStartupDelivery(CODEX_ACCOUNT_RESTART_STARTUP)).toBe(true)
+  })
+})
 
 describe('markLiveCodexSessionsForRestart', () => {
   const originalWindow = (globalThis as { window?: typeof window }).window
@@ -258,43 +269,6 @@ describe('markLiveCodexSessionsForRestart', () => {
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_C
     })
-  })
-
-  it.each([
-    ['at the limit', CODEX_PTY_INSPECTION_CONCURRENCY],
-    ['above the limit', CODEX_PTY_INSPECTION_CONCURRENCY + 1]
-  ])('bounds live PTY inspections %s', async (_, count) => {
-    const ptyIds = Array.from({ length: count }, (_, index) => `pty-${index}`)
-    useAppStore.setState({
-      ptyIdsByTabId: { 'tab-1': ptyIds }
-    })
-    let active = 0
-    let peak = 0
-    let started = 0
-    const releases: (() => void)[] = []
-    vi.mocked(window.api.pty.inspectProcess).mockImplementation(async () => {
-      started++
-      active++
-      peak = Math.max(peak, active)
-      await new Promise<void>((resolve) => releases.push(resolve))
-      active--
-      return { foregroundProcess: 'codex', hasChildProcesses: false }
-    })
-
-    const marking = markLiveCodexSessionsForRestart({
-      previousAccountLabel: ACCOUNT_A,
-      nextAccountLabel: ACCOUNT_B
-    })
-    await vi.waitFor(() => expect(started).toBe(Math.min(count, CODEX_PTY_INSPECTION_CONCURRENCY)))
-    if (count > CODEX_PTY_INSPECTION_CONCURRENCY) {
-      releases.shift()?.()
-      await vi.waitFor(() => expect(started).toBe(count))
-    }
-    releases.splice(0).forEach((release) => release())
-    await marking
-
-    expect(peak).toBe(Math.min(count, CODEX_PTY_INSPECTION_CONCURRENCY))
-    expect(Object.keys(useAppStore.getState().codexRestartNoticeByPtyId)).toHaveLength(count)
   })
 
   it('inspects remote runtime PTYs through the active runtime environment', async () => {

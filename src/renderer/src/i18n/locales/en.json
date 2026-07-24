@@ -3014,7 +3014,8 @@
                   "5a9c83c04b": "Open any file, URL, agent, ...",
                   "90eb94dc48": "Enter an http:// or https:// URL.",
                   "5553b283ce": "Enter a URL or file path.",
-                  "queryTooLarge": "Search text is too large."
+                  "queryTooLarge": "Search text is too large.",
+                  "absolutePathRemoteBlocked": "Absolute paths require a local workspace."
                 }
               },
               "menu": {
@@ -5914,6 +5915,11 @@
         "YamlThemeImportButton": {
           "label": "Import from YAML"
         },
+        "BranchPrefixFeedback": {
+          "6c40c0908f": "Prefix cannot contain spaces or special characters like ~ ^ : ? * [ \\",
+          "64d70b156a": "Branches will be named {{example}}",
+          "808f9a726e": "No prefix will be applied"
+        },
         "GitPane": {
           "d2eede4c54": "Add Orca attribution to commits, PRs, and issues.",
           "e02ea23a32": "Orca Attribution",
@@ -6516,6 +6522,7 @@
           "removeSetup": "Remove",
           "hostSetupBlockedVersion": "Orca server version is incompatible",
           "hostSetupMissingCapability": "Update Orca on this host to set up projects",
+          "hostSetupConnectionRequired": "Connect this host before importing or cloning the project",
           "setupProjectOnHost": "Set up on another host",
           "setupProjectOnHostHelp": "Choose a host, then import an existing checkout, clone the repository there, or track a setup that will be provisioned later.",
           "setupExistingFolder": "Import existing folder",
@@ -10175,7 +10182,8 @@
               "834cb3f23d": "Fix with AI",
               "783a808870": "Close"
             },
-            "97e7124eac": "Could not refresh Source Control. Try again."
+            "97e7124eac": "Could not refresh Source Control. Try again.",
+            "a4e93c21d7": "Current branch: {{value0}}"
           },
           "SourceControlAgentActionDialog": {
             "8e856842d1": "Could not start the selected agent.",
@@ -12213,10 +12221,7 @@
         "CsvViewer": {
           "eedd0d37a7": "columns",
           "ac31d2cd60": "rows",
-          "a233d55b77": "Empty file",
-          "2b65aa2913": "This CSV is too large to display safely.",
-          "59cfb175a2": "Switch to source mode to inspect the raw text.",
-          "d5e8a2b453": "Table view is limited to {{rows}} rows, {{columns}} columns, and {{cells}} cells."
+          "a233d55b77": "Empty file"
         },
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "This file",

@@ -15,6 +15,7 @@ import {
   MOBILE_NATIVE_CHAT_IMAGE_SETTLE_MS,
   pasteMobileNativeChatImagePaths
 } from './mobile-native-chat-image-send'
+import type { MobileNativeChatSendOutcome } from './mobile-native-chat-send'
 
 type CurrentRef<T> = { readonly current: T }
 type ShowToast = (message: string, durationMs?: number) => void
@@ -32,9 +33,14 @@ type Args = {
   /** The native-chat input lease is ready — same gate `handleNativeChatSend` uses. */
   readonly enabled: boolean
   readonly showToast: ShowToast
-  /** The plain text send (controller.handleNativeChatSend); wrapped so images ride
-   *  along. The optional URIs drive the optimistic echo's thumbnails. */
-  readonly baseSend: (text: string, imagePreviewUris?: string[]) => Promise<boolean>
+  /** The plain text send (controller.handleNativeChatSendWithOutcome); wrapped so
+   *  images ride along. The optional URIs drive the optimistic echo's thumbnails.
+   *  Must preserve 'unknown': after a successful paste, an ambiguously-delivered
+   *  text+Enter may have left the image on the input line, which needs healing. */
+  readonly baseSend: (
+    text: string,
+    imagePreviewUris?: string[]
+  ) => Promise<MobileNativeChatSendOutcome>
   readonly onAttachSuccess?: () => void
   readonly onError?: () => void
   // Injected so the settle between image paste and submit is instant in tests.
@@ -71,6 +77,10 @@ function withScopeAttachments(
   return remaining
 }
 
+function markTerminalInputStale(staleInputs: Set<string>, terminal: string): void {
+  staleInputs.add(terminal)
+}
+
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -99,9 +109,10 @@ export function useMobileNativeChatImageAttachments({
   // checked 'connected' at entry, so only a ref can see a mid-upload disconnect.
   const connStateRef = useRef(connState)
   connStateRef.current = connState
-  // Terminal whose input line may hold a partial paste from a failed send; the
-  // next send TO THAT terminal must lead with Ctrl+U even if it has no images.
-  const staleInputTerminalRef = useRef<string | null>(null)
+  // Terminals whose input may hold a failed paste; each must heal independently.
+  const staleInputTerminalsRef = useRef(new Set<string>())
+  // Serialize clear/paste/submit ownership per terminal while allowing other tabs to send.
+  const sendInFlightTerminalsRef = useRef(new Set<string>())
 
   const attachments = (scopeKey ? attachmentsByScope[scopeKey] : undefined) ?? NO_ATTACHMENTS
 
@@ -192,91 +203,123 @@ export function useMobileNativeChatImageAttachments({
 
   const sendNativeChat = useCallback(
     async (text: string): Promise<boolean> => {
-      const scope = scopeKey
-      const pendingImages = (scope ? attachmentsByScope[scope] : undefined) ?? NO_ATTACHMENTS
-      if (pendingImages.length === 0 || !scope) {
-        // Heal a previously failed paste: a text-only send to that terminal would
-        // otherwise glue the stale image paste onto this message. Best-effort —
-        // on failure the marker stays set and the send proceeds as before.
-        const staleTerminal = staleInputTerminalRef.current
-        if (staleTerminal && staleTerminal === activeHandleRef.current && client) {
-          try {
-            await pasteMobileNativeChatImagePaths({
-              client,
-              terminal: staleTerminal,
-              deviceToken: deviceTokenRef.current,
-              imagePaths: []
-            })
-            staleInputTerminalRef.current = null
-          } catch {
-            // Leave marked for the next attempt.
-          }
-        }
-        return baseSend(text)
-      }
-      const handle = activeHandleRef.current
-      if (!client || !handle || !enabled || connState !== 'connected') {
-        onError?.()
-        // Mirror the text path's failure surface (the base send is never reached).
-        showToast('Message not sent (disconnected)', 1500)
-        return false
-      }
-      try {
-        const pasted = await pasteMobileNativeChatImagePaths({
-          client,
-          terminal: handle,
-          deviceToken: deviceTokenRef.current,
-          imagePaths: pendingImages.map((attachment) => attachment.path)
-        })
-        if (!pasted) {
-          // Keep the chips so the user can retry; the failed paste never submitted.
-          staleInputTerminalRef.current = handle
-          onError?.()
-          showToast('Message not sent', 1500)
-          return false
-        }
-        // The paste's leading Ctrl+U cleared any earlier stale input in `handle`.
-        if (staleInputTerminalRef.current === handle) {
-          staleInputTerminalRef.current = null
-        }
-        // Let the TUI absorb the image paste before the text + Enter follow. The
-        // preview URIs ride along to baseSend so the sent bubble shows the photo
-        // immediately (empty text still submits a bare Enter through baseSend).
-        await sleep(MOBILE_NATIVE_CHAT_IMAGE_SETTLE_MS)
-        // The paste above targeted `handle`; a tab switch during the settle would
-        // route the text + Enter to a different terminal than the images. Abort —
-        // the chips keep their scope and a retry's Ctrl+U clears the stale paste.
-        if (activeHandleRef.current !== handle) {
-          staleInputTerminalRef.current = handle
-          onError?.()
-          showToast('Message not sent', 1500)
-          return false
-        }
-        const accepted = await baseSend(
-          text,
-          pendingImages.map((attachment) => attachment.previewUri)
-        )
-        if (accepted) {
-          // Drop only what rode along — a chip attached while this send was in
-          // flight keeps waiting for its own send.
-          const sentIds = new Set(pendingImages.map((attachment) => attachment.id))
-          setAttachmentsByScope((prev) =>
-            withScopeAttachments(
-              prev,
-              scope,
-              (prev[scope] ?? []).filter((attachment) => !sentIds.has(attachment.id))
-            )
-          )
-        }
-        return accepted
-      } catch {
-        // A thrown paste/send (network/RPC) keeps the chips and honors the
-        // Promise<boolean> contract instead of rejecting. Retry-safe: the next
-        // attempt's leading Ctrl+U clears whatever fraction of the paste landed.
-        staleInputTerminalRef.current = handle
+      const operationTerminal = activeHandleRef.current
+      if (operationTerminal && sendInFlightTerminalsRef.current.has(operationTerminal)) {
         onError?.()
         showToast('Message not sent', 1500)
         return false
+      }
+      if (operationTerminal) {
+        sendInFlightTerminalsRef.current.add(operationTerminal)
+      }
+      try {
+        const scope = scopeKey
+        const pendingImages = (scope ? attachmentsByScope[scope] : undefined) ?? NO_ATTACHMENTS
+        if (pendingImages.length === 0 || !scope) {
+          // Heal a previously failed paste: a text-only send to that terminal would
+          // otherwise glue the stale image paste onto this message. Best-effort —
+          // on failure the marker stays set and the text must not be submitted.
+          const staleTerminal = activeHandleRef.current
+          if (staleTerminal && staleInputTerminalsRef.current.has(staleTerminal) && client) {
+            let cleared = false
+            try {
+              cleared = await pasteMobileNativeChatImagePaths({
+                client,
+                terminal: staleTerminal,
+                deviceToken: deviceTokenRef.current,
+                imagePaths: []
+              })
+            } catch {
+              // Leave marked for the next attempt.
+            }
+            if (!cleared) {
+              onError?.()
+              showToast('Message not sent', 1500)
+              return false
+            }
+            staleInputTerminalsRef.current.delete(staleTerminal)
+            if (activeHandleRef.current !== staleTerminal) {
+              onError?.()
+              showToast('Message not sent', 1500)
+              return false
+            }
+          }
+          // Text-only sends paste nothing first, so 'unknown' leaves no stale input.
+          return (await baseSend(text)) !== 'rejected'
+        }
+        const handle = activeHandleRef.current
+        if (!client || !handle || !enabled || connState !== 'connected') {
+          onError?.()
+          // Mirror the text path's failure surface (the base send is never reached).
+          showToast('Message not sent (disconnected)', 1500)
+          return false
+        }
+        try {
+          const pasted = await pasteMobileNativeChatImagePaths({
+            client,
+            terminal: handle,
+            deviceToken: deviceTokenRef.current,
+            imagePaths: pendingImages.map((attachment) => attachment.path)
+          })
+          if (!pasted) {
+            // Keep the chips so the user can retry; the failed paste never submitted.
+            markTerminalInputStale(staleInputTerminalsRef.current, handle)
+            onError?.()
+            showToast('Message not sent', 1500)
+            return false
+          }
+          // The paste's leading Ctrl+U cleared any earlier stale input in `handle`.
+          staleInputTerminalsRef.current.delete(handle)
+          // Let the TUI absorb the image paste before the text + Enter follow. The
+          // preview URIs ride along to baseSend so the sent bubble shows the photo
+          // immediately (empty text still submits a bare Enter through baseSend).
+          await sleep(MOBILE_NATIVE_CHAT_IMAGE_SETTLE_MS)
+          // The paste above targeted `handle`; a tab switch during the settle would
+          // route the text + Enter to a different terminal than the images. Abort —
+          // the chips keep their scope and a retry's Ctrl+U clears the stale paste.
+          if (activeHandleRef.current !== handle) {
+            markTerminalInputStale(staleInputTerminalsRef.current, handle)
+            onError?.()
+            showToast('Message not sent', 1500)
+            return false
+          }
+          const outcome = await baseSend(
+            text,
+            pendingImages.map((attachment) => attachment.previewUri)
+          )
+          if (outcome !== 'accepted') {
+            // 'rejected' leaves the pasted image path on this input line; 'unknown'
+            // may have lost the text+Enter AFTER the paste landed, orphaning the
+            // image onto whatever is sent next (#10228) — both must heal first.
+            markTerminalInputStale(staleInputTerminalsRef.current, handle)
+          }
+          if (outcome !== 'rejected') {
+            // Drop only what rode along — a chip attached while this send was in
+            // flight keeps waiting for its own send. 'unknown' clears too: the
+            // send usually DID land, and a kept chip would double-send the image.
+            const sentIds = new Set(pendingImages.map((attachment) => attachment.id))
+            setAttachmentsByScope((prev) =>
+              withScopeAttachments(
+                prev,
+                scope,
+                (prev[scope] ?? []).filter((attachment) => !sentIds.has(attachment.id))
+              )
+            )
+          }
+          return outcome !== 'rejected'
+        } catch {
+          // A thrown paste/send (network/RPC) keeps the chips and honors the
+          // Promise<boolean> contract instead of rejecting. Retry-safe: the next
+          // attempt's leading Ctrl+U clears whatever fraction of the paste landed.
+          markTerminalInputStale(staleInputTerminalsRef.current, handle)
+          onError?.()
+          showToast('Message not sent', 1500)
+          return false
+        }
+      } finally {
+        if (operationTerminal) {
+          sendInFlightTerminalsRef.current.delete(operationTerminal)
+        }
       }
     },
     [

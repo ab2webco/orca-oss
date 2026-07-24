@@ -13,6 +13,7 @@ import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import { isRuntimeOwnedSshTargetId } from '../../../../shared/execution-host'
 import { createTerminalZeroDimensionsMessage } from '../../../../shared/terminal-zero-dimensions-diagnostic'
+import { isWorktreeRemovalFenceError } from '../../../../shared/worktree-removal-fence-error'
 import { parseTerminalOscColorQuery } from '../../../../shared/terminal-osc-color-reply'
 import {
   HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS,
@@ -4224,6 +4225,14 @@ export function connectPanePty(
       if (disposed) {
         return
       }
+      if (isWorktreeRemovalFenceError(message)) {
+        // Why: main fences a spawn/reattach whose worktree (or an overlapping
+        // parent/child root) is being deleted. That is expected teardown, not a
+        // user-facing failure — the pane unmounts once removal completes, so never
+        // surface the raw fence error. Covers the parent-removal-fences-child case
+        // that startFreshSpawn's own-worktree isDeleting skip cannot see.
+        return
+      }
       deps.onPtyErrorRef?.current?.(pane.id, message)
     }
 
@@ -4573,6 +4582,9 @@ export function connectPanePty(
             ? launchConfig.agentEnv
             : resolveTuiAgentLaunchEnv(agent, state.settings?.agentDefaultEnv),
         ...(launchConfig?.agentCommand ? { agentCommand: launchConfig.agentCommand } : {}),
+        ...(launchConfig?.ompResumeFilePath
+          ? { ompResumeFilePath: launchConfig.ompResumeFilePath }
+          : {}),
         platform: resumePlatform
       })
       if (!startupPlan) {
@@ -4761,6 +4773,13 @@ export function connectPanePty(
       startupOverride?: PendingStartupCommand | null,
       options: FreshSpawnOptions = {}
     ): Promise<string | null> => {
+      if (useAppStore.getState().deleteStateByWorktreeId?.[deps.worktreeId]?.isDeleting) {
+        // Why: the worktree is being deleted; its PTYs were just killed for the
+        // filesystem teardown. A fresh shell must not spawn into a directory the
+        // removal is about to delete (main fences it anyway), and the pane is
+        // about to unmount — so skip the doomed respawn instead of racing it.
+        return Promise.resolve(null)
+      }
       clearPaneMode2031State()
       clearHiddenOutputRestoreState()
       // Why: a canceled old replay clear can preserve xterm's native
