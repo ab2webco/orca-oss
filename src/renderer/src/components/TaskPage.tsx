@@ -10638,76 +10638,80 @@ export default function TaskPage(): React.JSX.Element {
                   orderBy={planeOrderBy}
                 />
 
-                <div
-                  className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek"
-                  style={{ scrollbarGutter: 'stable' }}
-                >
-                  {planeStatus.credentialError ? (
-                    <div className="border-b border-border px-4 py-4 text-sm text-destructive">
-                      {planeStatus.credentialError}
-                    </div>
-                  ) : null}
-                  {!planeStatus.credentialError && planeError ? (
-                    <TaskPageJiraErrorBanner
-                      error={planeError}
-                      open={planeErrorDetailsOpen}
-                      onOpenChange={setPlaneErrorDetailsOpen}
+                <div className="flex min-h-0 flex-1 overflow-hidden">
+                  <div
+                    className="min-h-0 min-w-0 flex-1 overflow-y-auto scrollbar-sleek"
+                    style={{ scrollbarGutter: 'stable' }}
+                  >
+                    {planeStatus.credentialError ? (
+                      <div className="border-b border-border px-4 py-4 text-sm text-destructive">
+                        {planeStatus.credentialError}
+                      </div>
+                    ) : null}
+                    {!planeStatus.credentialError && planeError ? (
+                      <TaskPageJiraErrorBanner
+                        error={planeError}
+                        open={planeErrorDetailsOpen}
+                        onOpenChange={setPlaneErrorDetailsOpen}
+                      />
+                    ) : null}
+
+                    {planeLoading && planeItems.length === 0 ? (
+                      <div className="divide-y divide-border/50">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} className="px-3 py-3">
+                            <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
+                            <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {!planeLoading &&
+                    planeItems.length === 0 &&
+                    !planeError &&
+                    !planeStatus.credentialError ? (
+                      <div className="px-4 py-10 text-center">
+                        <p className="text-sm font-medium text-foreground">
+                          {translate(
+                            'auto.components.TaskPage.planeEmptyStateTitle',
+                            'No Plane work items found'
+                          )}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {planeSearchInput
+                            ? translate(
+                                'auto.components.TaskPage.planeEmptyStateSearchBody',
+                                'Try a different PQL query.'
+                              )
+                            : translate(
+                                'auto.components.TaskPage.94d900518d',
+                                'No issues match the selected preset.'
+                              )}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <TaskPagePlaneWorkItemList
+                      formatUpdatedAt={formatRelativeTime}
+                      getStateTone={getPlaneStateTone}
+                      items={sortedPlaneItems}
+                      onOpenItem={openPlaneDetailPage}
+                      onStartWorkspace={handleUsePlaneItem}
+                      selectedItem={selectedPlaneWorkItem}
+                      showWorkspaceContext={selectedPlaneWorkspaceId === 'all'}
+                      statusDirection={planeOrderBy === 'state' ? planeOrderDirection : 'asc'}
                     />
-                  ) : null}
-
-                  {planeLoading && planeItems.length === 0 ? (
-                    <div className="divide-y divide-border/50">
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="px-3 py-3">
-                          <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
-                          <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {!planeLoading &&
-                  planeItems.length === 0 &&
-                  !planeError &&
-                  !planeStatus.credentialError ? (
-                    <div className="px-4 py-10 text-center">
-                      <p className="text-sm font-medium text-foreground">
-                        {translate(
-                          'auto.components.TaskPage.planeEmptyStateTitle',
-                          'No Plane work items found'
-                        )}
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {planeSearchInput
-                          ? translate(
-                              'auto.components.TaskPage.planeEmptyStateSearchBody',
-                              'Try a different PQL query.'
-                            )
-                          : translate(
-                              'auto.components.TaskPage.94d900518d',
-                              'No issues match the selected preset.'
-                            )}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <TaskPagePlaneWorkItemList
-                    formatUpdatedAt={formatRelativeTime}
-                    getStateTone={getPlaneStateTone}
-                    items={sortedPlaneItems}
-                    onOpenItem={openPlaneDetailPage}
-                    onStartWorkspace={handleUsePlaneItem}
-                    selectedItem={selectedPlaneWorkItem}
-                    showWorkspaceContext={selectedPlaneWorkspaceId === 'all'}
-                    statusDirection={planeOrderBy === 'state' ? planeOrderDirection : 'asc'}
-                  />
+                  </div>
+                  <div className="hidden min-h-0 w-[380px] flex-none overflow-hidden lg:flex">
+                    <PlaneWorkItemWorkspace
+                      item={selectedPlaneWorkItem}
+                      onUse={handleUsePlaneItem}
+                      onClose={closeTaskDetailPage}
+                      sourceContext={planeDetailSourceContext}
+                    />
+                  </div>
                 </div>
-                <PlaneWorkItemWorkspace
-                  item={selectedPlaneWorkItem}
-                  onUse={handleUsePlaneItem}
-                  onClose={closeTaskDetailPage}
-                  sourceContext={planeDetailSourceContext}
-                />
               </div>
             )
           ) : taskSource === 'linear' && selectedLinearIssue ? (
