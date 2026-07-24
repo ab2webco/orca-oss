@@ -31,12 +31,17 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['plane', 'issue'],
     summary: 'Read Plane work item context for agents',
-    usage: 'orca plane issue <id> [--comments] [--project <id>] [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'comments', 'project', 'workspace', 'id'],
+    usage:
+      'orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'comments', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
     examples: [
       'orca plane issue PROJ-12 --json',
+      'orca plane issue --current --json',
       'orca plane issue PROJ-12 --comments --project <projectId> --json'
+    ],
+    notes: [
+      'Pass --current instead of an id to target the Plane work item linked to the current Orca worktree.'
     ]
   },
   {
@@ -59,54 +64,75 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     path: ['plane', 'status', 'set'],
     summary: 'Set a Plane work item state',
     usage:
-      'orca plane status set <id> --to <state-name-or-id> --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'to', 'project', 'workspace', 'id'],
+      'orca plane status set [<id>] [--current] --to <state-name-or-id> [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'to', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane status set PROJ-12 --to "In Review" --project <projectId> --json']
+    examples: [
+      'orca plane status set PROJ-12 --to "In Review" --project <projectId> --json',
+      'orca plane status set --current --to "In Review" --json'
+    ],
+    notes: [
+      'Pass --current instead of <id> --project to target the work item linked to the current worktree.'
+    ]
   },
   {
     path: ['plane', 'assignee', 'set'],
     summary: 'Assign a Plane work item',
     usage:
-      'orca plane assignee set <id> (--me | --to-id <userId>) --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'me', 'to-id', 'project', 'workspace', 'id'],
+      'orca plane assignee set [<id>] [--current] (--me | --to-id <userId>) [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'me', 'to-id', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane assignee set PROJ-12 --me --project <projectId> --json']
+    examples: [
+      'orca plane assignee set PROJ-12 --me --project <projectId> --json',
+      'orca plane assignee set --current --me --json'
+    ]
   },
   {
     path: ['plane', 'assignee', 'clear'],
     summary: 'Clear a Plane work item assignee',
-    usage: 'orca plane assignee clear <id> --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace', 'id'],
+    usage:
+      'orca plane assignee clear [<id>] [--current] [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane assignee clear PROJ-12 --project <projectId> --json']
+    examples: [
+      'orca plane assignee clear PROJ-12 --project <projectId> --json',
+      'orca plane assignee clear --current --json'
+    ]
   },
   {
     path: ['plane', 'priority', 'set'],
     summary: 'Set a Plane work item priority',
     usage:
-      'orca plane priority set <id> --to none|low|medium|high|urgent --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'to', 'project', 'workspace', 'id'],
+      'orca plane priority set [<id>] [--current] --to none|low|medium|high|urgent [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'to', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane priority set PROJ-12 --to high --project <projectId> --json']
+    examples: [
+      'orca plane priority set PROJ-12 --to high --project <projectId> --json',
+      'orca plane priority set --current --to high --json'
+    ]
   },
   {
     path: ['plane', 'priority', 'clear'],
     summary: 'Clear a Plane work item priority',
-    usage: 'orca plane priority clear <id> --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace', 'id'],
+    usage:
+      'orca plane priority clear [<id>] [--current] [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane priority clear PROJ-12 --project <projectId> --json']
+    examples: [
+      'orca plane priority clear PROJ-12 --project <projectId> --json',
+      'orca plane priority clear --current --json'
+    ]
   },
   {
     path: ['plane', 'comment', 'add'],
     summary: 'Add a comment to a Plane work item',
     usage:
-      'orca plane comment add <id> (--body <text> | --body-file <path|->) --project <id> [--workspace <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'body', 'body-file', 'project', 'workspace', 'id'],
+      'orca plane comment add [<id>] [--current] (--body <text> | --body-file <path|->) [--project <id>] [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'body', 'body-file', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
     examples: [
       'orca plane comment add PROJ-12 --body "Ready for review." --project <projectId>',
+      'orca plane comment add --current --body "Ready for review." --json',
       'orca plane comment add PROJ-12 --body-file - --project <projectId> --json'
     ],
     notes: ['Use --body-file - to read multiline comment bodies from stdin.']
@@ -163,9 +189,10 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     path: ['plane', 'save-issue'],
     summary: 'Update Plane work item fields in one partial write',
     usage:
-      'orca plane save-issue <id> --project <id> [--title <title>] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]',
+      'orca plane save-issue [<id>] [--current] [--project <id>] [--title <title>] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
+      'current',
       'project',
       'title',
       'state',
@@ -177,8 +204,12 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     ],
     positionalArgs: ['id'],
     examples: [
-      'orca plane save-issue PROJ-12 --project <projectId> --state "In Review" --assignee me --json'
+      'orca plane save-issue PROJ-12 --project <projectId> --state "In Review" --assignee me --json',
+      'orca plane save-issue --current --state "In Review" --assignee me --json'
     ],
-    notes: ['Repeated --label replaces the full label set with the provided label ids.']
+    notes: [
+      'Repeated --label replaces the full label set with the provided label ids.',
+      'Pass --current instead of <id> --project to target the work item linked to the current worktree.'
+    ]
   }
 ]

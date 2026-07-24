@@ -6,8 +6,8 @@ import { buildPlaneSaveIssueRequest } from '../plane-save-issue-request'
 
 const PLANE_WRITE_TIMEOUT_MS = 75_000
 
-export const runPlaneSaveIssue: CommandHandler = async ({ flags, client, json }) => {
-  const request = await buildPlaneSaveIssueRequest(flags, client)
+export const runPlaneSaveIssue: CommandHandler = async ({ flags, client, cwd, json }) => {
+  const request = await buildPlaneSaveIssueRequest(flags, client, cwd)
   const response = await client.call<PlaneMutationResult>('plane.updateWorkItem', request, {
     timeoutMs: PLANE_WRITE_TIMEOUT_MS
   })

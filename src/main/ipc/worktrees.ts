@@ -840,6 +840,7 @@ function mergeFolderWorkspace(repo: Repo, worktreeId: string, meta: WorktreeMeta
     linkedLinearIssue: meta.linkedLinearIssue ?? null,
     linkedLinearIssueWorkspaceId: meta.linkedLinearIssueWorkspaceId ?? null,
     linkedLinearIssueOrganizationUrlKey: meta.linkedLinearIssueOrganizationUrlKey ?? null,
+    linkedPlaneWorkItem: meta.linkedPlaneWorkItem ?? null,
     linkedGitLabMR: meta.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta.linkedGitLabIssue ?? null,
     linkedBitbucketPR: meta.linkedBitbucketPR ?? null,
@@ -964,6 +965,9 @@ function createFolderWorkspace(
       : {}),
     ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
       ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
+      : {}),
+    ...(args.linkedPlaneWorkItem !== undefined
+      ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
       : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),

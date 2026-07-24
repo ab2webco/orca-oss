@@ -166,7 +166,12 @@ async function executeWorktreeCreation(
         preparedRequest.linkedAzureDevOpsPR,
         preparedRequest.linkedGiteaPR,
         preparedRequest.compareBaseRef,
-        { claudeAccountId: preparedRequest.claudeAccountId }
+        {
+          claudeAccountId: preparedRequest.claudeAccountId,
+          ...(preparedRequest.linkedPlaneWorkItem !== undefined
+            ? { linkedPlaneWorkItem: preparedRequest.linkedPlaneWorkItem }
+            : {})
+        }
       )
   } catch (error) {
     // Why: a missing entry means the user cancelled mid-flight — abandon

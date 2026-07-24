@@ -64,6 +64,9 @@ export type LinkedWorkItemSummary = Omit<FolderWorkspaceLinkedTask, 'provider'> 
   linkedContext?: LinkedWorkItemContext
   // Why: Plane project id of the work item, so a successful worktree create can remember which repo this Plane project launched into.
   planeProjectId?: string
+  // Why: Plane workspace id of the work item, persisted on the worktree link so the
+  // CLI `--current` shortcut can scope retrieval to the exact workspace.
+  planeWorkspaceId?: string
 }
 
 /**

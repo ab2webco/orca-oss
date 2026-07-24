@@ -1,6 +1,7 @@
 import type {
   CreateSparseCheckoutRequest,
   GitPushTarget,
+  LinkedPlaneWorkItem,
   SetupDecision,
   TuiAgent,
   WorkspaceCreateTelemetrySource,
@@ -66,6 +67,7 @@ export type WorktreeCreationRequest = {
   linkedLinearIssue?: string
   linkedLinearIssueWorkspaceId?: string | null
   linkedLinearIssueOrganizationUrlKey?: string | null
+  linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
   branchNameOverride?: string
   workspaceStatus?: WorkspaceStatus
   /** Claude managed account to pin this worktree to at creation. Omitted/null

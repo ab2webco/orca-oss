@@ -80,6 +80,26 @@ export type PlaneWorkItem = {
   createdAt: string
 }
 
+// Hints the CLI passes so the runtime can resolve the enclosing worktree for
+// the `--current` shortcut. Mirrors LinearCurrentIssueContextHints.
+export type PlaneCurrentWorkItemContextHints = {
+  worktreeId?: string
+  terminalHandle?: string
+  cwd?: string
+  remote?: boolean
+}
+
+// Result of resolving the Plane work item linked to the current worktree. Ids
+// come from the persisted worktree link; workItem is the fetched item (null if
+// the link exists but the item could not be retrieved).
+export type PlaneCurrentWorkItem = {
+  identifier: string
+  projectId: string
+  workspaceId?: string
+  url?: string
+  workItem: PlaneWorkItem | null
+}
+
 export type PlaneComment = {
   id: string
   body: string

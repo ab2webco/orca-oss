@@ -22,6 +22,18 @@ const OptionalTuiAgent = z
   .transform((value): TuiAgent | undefined => (isTuiAgent(value) ? value : undefined))
   .optional()
 
+// Why: mirrors the linkedLinearIssue link slot for Plane. Nullable so a meta
+// update can clear it; optional so legacy clients that never send it are fine.
+const LinkedPlaneWorkItemSchema = z
+  .object({
+    identifier: z.string().min(1),
+    projectId: z.string().min(1),
+    workspaceId: OptionalString,
+    url: OptionalString
+  })
+  .nullable()
+  .optional()
+
 const AutomationWorkspaceProvenanceRequest = z.object({
   automationId: z.string(),
   automationRunId: z.string(),
@@ -76,6 +88,7 @@ export const WorktreeCreate = z
     linkedLinearIssue: z.string().optional(),
     linkedLinearIssueWorkspaceId: z.union([z.string(), z.null()]).optional(),
     linkedLinearIssueOrganizationUrlKey: z.union([z.string(), z.null()]).optional(),
+    linkedPlaneWorkItem: LinkedPlaneWorkItemSchema,
     linkedGitLabMR: TriStateLinkedIssue,
     linkedGitLabIssue: TriStateLinkedIssue,
     linkedBitbucketPR: TriStateLinkedIssue,
@@ -190,6 +203,7 @@ const WorktreeMetaSet = WorktreeSelector.extend({
   linkedLinearIssue: z.union([z.string(), z.null()]).optional(),
   linkedLinearIssueWorkspaceId: z.union([z.string(), z.null()]).optional(),
   linkedLinearIssueOrganizationUrlKey: z.union([z.string(), z.null()]).optional(),
+  linkedPlaneWorkItem: LinkedPlaneWorkItemSchema,
   linkedGitLabMR: TriStateLinkedIssue,
   linkedGitLabIssue: TriStateLinkedIssue,
   linkedBitbucketPR: TriStateLinkedIssue,

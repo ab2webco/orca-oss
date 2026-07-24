@@ -23,10 +23,14 @@ import {
   getPlaneStateGroupFlag,
   readPlaneBody,
   rejectAllWorkspaceForPlaneWrite,
+  resolvePlaneCurrentWorkItem,
   resolvePlaneStateId,
+  resolvePlaneWriteTarget,
   throwOnPlaneMutationFailure,
-  unwrapPlaneStateMutation
+  unwrapPlaneStateMutation,
+  type PlaneWriteTarget
 } from '../plane-request-builders'
+import type { RuntimeRpcSuccess } from '../runtime-client'
 import {
   formatPlaneLabels,
   formatPlaneList,
@@ -47,20 +51,34 @@ const PLANE_WRITE_TIMEOUT_MS = 75_000
 export const PLANE_HANDLERS: Record<string, CommandHandler> = {
   'plane create': runPlaneCreate,
   'plane save-issue': runPlaneSaveIssue,
-  'plane issue': async ({ flags, client, json }) => {
-    const workItemId = getRequiredStringFlag(flags, 'id')
-    const projectId = getOptionalStringFlag(flags, 'project')
+  'plane issue': async ({ flags, client, cwd, json }) => {
+    const explicitId = getOptionalStringFlag(flags, 'id')
+    const current = flags.get('current') === true
+    if (explicitId && current) {
+      throw new RuntimeClientError('invalid_argument', 'Pass either <id> or --current, not both')
+    }
     const workspaceId = getOptionalStringFlag(flags, 'workspace')
-    const response = await client.call<PlaneWorkItem | null>('plane.getWorkItem', {
-      workItemId,
-      projectId,
-      workspaceId
-    })
+    let response: RuntimeRpcSuccess<PlaneWorkItem | null>
+    let label: string
+    if (current) {
+      // Why: resolveCurrentWorkItem already fetched the item, so reuse it rather
+      // than issuing a second getWorkItem round-trip.
+      const resolved = await resolvePlaneCurrentWorkItem(client, cwd)
+      response = { ...resolved, result: resolved.result.workItem }
+      label = resolved.result.identifier
+    } else {
+      label = getRequiredStringFlag(flags, 'id')
+      response = await client.call<PlaneWorkItem | null>('plane.getWorkItem', {
+        workItemId: label,
+        projectId: getOptionalStringFlag(flags, 'project'),
+        workspaceId
+      })
+    }
     const workItem = response.result
     if (!workItem) {
       throw new RuntimeClientError(
         'plane_work_item_not_found',
-        `Plane work item ${workItemId} not found`
+        `Plane work item ${label} not found`
       )
     }
     const view: PlaneIssueView = { workItem }
@@ -94,7 +112,7 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
   },
   'plane status set': async (ctx) => {
     const { flags, client } = ctx
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     const states = await client.call<PlaneState[]>('plane.listStates', {
       projectId: target.projectId,
       workspaceId: target.workspaceId
@@ -103,16 +121,16 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     await runPlaneUpdate(ctx, target, { stateId }, `Set ${target.workItemId} state.`)
   },
   'plane assignee set': async (ctx) => {
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     const assigneeIds = await resolveAssigneeSet(ctx, target.workspaceId)
     await runPlaneUpdate(ctx, target, { assigneeIds }, `Updated ${target.workItemId} assignee.`)
   },
   'plane assignee clear': async (ctx) => {
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     await runPlaneUpdate(ctx, target, { assigneeIds: [] }, `Cleared ${target.workItemId} assignee.`)
   },
   'plane priority set': async (ctx) => {
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     const priority = getPlanePriorityFlag(ctx.flags, 'to')
     await runPlaneUpdate(
       ctx,
@@ -122,7 +140,7 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'plane priority clear': async (ctx) => {
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     await runPlaneUpdate(
       ctx,
       target,
@@ -132,7 +150,7 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
   },
   'plane comment add': async (ctx) => {
     const { flags, client, cwd, json } = ctx
-    const target = planeWriteTarget(ctx)
+    const target = await planeWriteTarget(ctx)
     const body = await readPlaneBody(flags, cwd, { required: true })
     const response = await client.call<PlaneMutationResult>(
       'plane.addWorkItemComment',
@@ -208,19 +226,8 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
   }
 }
 
-type PlaneWriteTarget = {
-  workItemId: string
-  projectId: string
-  workspaceId: string | undefined
-}
-
-function planeWriteTarget({ flags }: HandlerContext): PlaneWriteTarget {
-  rejectAllWorkspaceForPlaneWrite(flags)
-  return {
-    workItemId: getRequiredStringFlag(flags, 'id'),
-    projectId: getRequiredStringFlag(flags, 'project'),
-    workspaceId: getOptionalStringFlag(flags, 'workspace')
-  }
+function planeWriteTarget({ flags, client, cwd }: HandlerContext): Promise<PlaneWriteTarget> {
+  return resolvePlaneWriteTarget({ flags, client, cwd })
 }
 
 async function resolveAssigneeSet(

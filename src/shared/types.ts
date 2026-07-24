@@ -352,6 +352,18 @@ export type FolderWorkspaceLinkedTask = {
   repoId?: string
 }
 
+// Why: durable link from a worktree to the Plane work item it was created for,
+// so the CLI `--current` shortcut can resolve the work item from the enclosing
+// worktree without an explicit id. Mirrors the Linear linkedLinearIssue link,
+// but Plane retrieval needs the project scope (and optional workspace), so the
+// identifier is stored alongside its projectId/workspaceId as one record.
+export type LinkedPlaneWorkItem = {
+  identifier: string
+  projectId: string
+  workspaceId?: string
+  url?: string
+}
+
 export type NestedRepoScanOptions = {
   maxDepth?: number
   maxRepos?: number
@@ -484,6 +496,8 @@ export type Worktree = {
   linkedLinearIssue: string | null
   linkedLinearIssueWorkspaceId?: string | null
   linkedLinearIssueOrganizationUrlKey?: string | null
+  /** Plane work item this worktree was created for. See LinkedPlaneWorkItem. */
+  linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
   // Why: parallel slots for non-GitHub work-item references. Kept as separate
   // fields (rather than reusing linkedIssue / linkedPR with a provider
   // discriminator) so the persistence layer is unambiguous when a user
@@ -617,6 +631,8 @@ export type WorktreeMeta = {
   linkedLinearIssue: string | null
   linkedLinearIssueWorkspaceId?: string | null
   linkedLinearIssueOrganizationUrlKey?: string | null
+  /** Plane work item this worktree was created for. See LinkedPlaneWorkItem. */
+  linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
   /** Optional for backward compatibility — see Worktree.linkedGitLabMR. */
   linkedGitLabMR?: number | null
   /** Optional for backward compatibility — see Worktree.linkedGitLabIssue. */
@@ -2235,6 +2251,7 @@ export type CreateWorktreeArgs = {
   linkedLinearIssue?: string
   linkedLinearIssueWorkspaceId?: string | null
   linkedLinearIssueOrganizationUrlKey?: string | null
+  linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
   linkedGitLabIssue?: number
   linkedGitLabMR?: number
   linkedBitbucketPR?: number | null

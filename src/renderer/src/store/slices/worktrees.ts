@@ -2996,6 +2996,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   ) => {
     const automationProvenanceRequest = options?.automationProvenanceRequest
     const claudeAccountId = options?.claudeAccountId
+    const linkedPlaneWorkItem = options?.linkedPlaneWorkItem
     try {
       for (let attempt = 0; attempt < CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS; attempt += 1) {
         const candidateName = getClientWorktreeCreateCandidate(name, attempt)
@@ -3035,6 +3036,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(linkedLinearIssueOrganizationUrlKey !== undefined
               ? { linkedLinearIssueOrganizationUrlKey }
               : {}),
+            ...(linkedPlaneWorkItem !== undefined ? { linkedPlaneWorkItem } : {}),
             ...(manualOrder !== undefined ? { manualOrder } : {}),
             ...(parentWorkspace ? { parentWorkspace } : {}),
             ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
@@ -3081,6 +3083,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(linkedLinearIssueOrganizationUrlKey !== undefined
                       ? { linkedLinearIssueOrganizationUrlKey }
                       : {}),
+                    ...(linkedPlaneWorkItem !== undefined ? { linkedPlaneWorkItem } : {}),
                     ...(manualOrder !== undefined ? { manualOrder } : {}),
                     ...(parentWorkspace ? { parentWorkspace } : {}),
                     ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),

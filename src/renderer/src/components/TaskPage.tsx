@@ -8419,7 +8419,9 @@ export default function TaskPage(): React.JSX.Element {
         url: item.url,
         planeIdentifier: item.identifier,
         // Why: threads the Plane project id to submit so a successful create can remember which repo it launched into.
-        planeProjectId: item.project.id
+        planeProjectId: item.project.id,
+        // Why: threads the Plane workspace id so the persisted worktree link can scope `--current` retrieval.
+        ...(item.workspaceId ? { planeWorkspaceId: item.workspaceId } : {})
       }
       // Why: pre-select the repo this Plane project last launched into (user can still adjust).
       const preselectedRepoId = settings?.planeProjectRepoLinks?.[item.project.id]

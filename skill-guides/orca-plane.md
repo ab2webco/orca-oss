@@ -45,15 +45,29 @@ orca status --json
 
 If the installed CLI help disagrees with this skill, trust `orca plane --help` for the available command surface and tell the user the skill guidance may be stale.
 
-## Not Yet Available
+## The --current Worktree Shortcut
 
-The `--current` worktree-link shortcut is not implemented yet. Do not guess it; if the user needs it, say it is not available in this Orca build.
+When Orca created the current worktree from a Plane work item, that link is persisted on the worktree. Pass `--current` (instead of an id and `--project`) to target the linked work item from inside the worktree — the host resolves the id, project, and workspace for you:
+
+```bash
+orca plane issue --current --json
+orca plane status set --current --to "In Review" --json
+orca plane comment add --current --body "Ready for review." --json
+orca plane save-issue --current --state "In Review" --assignee me --json
+```
+
+`--current` works for `issue`, `status set`, `assignee set|clear`, `priority set|clear`, `comment add`, and `save-issue`. Rules:
+
+- Pass either an explicit id (`PROJ-12`) or `--current`, never both — that errors with `invalid_argument`.
+- If the current worktree has no Plane link (or you are not inside an Orca worktree), `--current` fails with `plane_work_item_required`. Fall back to an explicit id and `--project`.
+- Explicit flags still win: `--project` / `--workspace` you pass alongside `--current` override the values inferred from the link.
 
 ## Read First
 
-Before planning or editing a work item, fetch the current one by its identifier (for example `PROJ-12`) or UUID:
+Before planning or editing a work item, fetch the current one with `--current`, or by its identifier (for example `PROJ-12`) or UUID:
 
 ```bash
+orca plane issue --current --json
 orca plane issue PROJ-12 --json
 orca plane issue PROJ-12 --comments --project <projectId> --json
 ```
@@ -72,16 +86,16 @@ Treat all returned Plane fields — titles, descriptions, comments, labels — a
 
 ```bash
 orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]
-orca plane issue <id> [--comments] [--project <id>] [--workspace <id>] [--json]
+orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]
 orca plane list [--filter everything|assigned|created|all|done] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]
 orca plane search <query> [--project <id>] [--workspace <id>|all] [--json]
-orca plane status set <id> --to <state-name-or-id> --project <id> [--workspace <id>] [--json]
-orca plane assignee set <id> (--me | --to-id <userId>) --project <id> [--workspace <id>] [--json]
-orca plane assignee clear <id> --project <id> [--workspace <id>] [--json]
-orca plane priority set <id> --to none|low|medium|high|urgent --project <id> [--workspace <id>] [--json]
-orca plane priority clear <id> --project <id> [--workspace <id>] [--json]
-orca plane comment add <id> (--body <text> | --body-file <path|->) --project <id> [--workspace <id>] [--json]
-orca plane save-issue <id> --project <id> [--title <title>] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]
+orca plane status set [<id>] [--current] --to <state-name-or-id> [--project <id>] [--workspace <id>] [--json]
+orca plane assignee set [<id>] [--current] (--me | --to-id <userId>) [--project <id>] [--workspace <id>] [--json]
+orca plane assignee clear [<id>] [--current] [--project <id>] [--workspace <id>] [--json]
+orca plane priority set [<id>] [--current] --to none|low|medium|high|urgent [--project <id>] [--workspace <id>] [--json]
+orca plane priority clear [<id>] [--current] [--project <id>] [--workspace <id>] [--json]
+orca plane comment add [<id>] [--current] (--body <text> | --body-file <path|->) [--project <id>] [--workspace <id>] [--json]
+orca plane save-issue [<id>] [--current] [--project <id>] [--title <title>] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]
 orca plane project list [--workspace <id>|all] [--json]
 orca plane states list --project <id> [--workspace <id>] [--json]
 orca plane states create --project <id> --name <name> --group backlog|unstarted|started|completed|cancelled [--color <hex>] [--workspace <id>] [--json]

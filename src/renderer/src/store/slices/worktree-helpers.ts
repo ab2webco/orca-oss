@@ -171,6 +171,9 @@ export type WorktreeSlice = {
       /** Claude managed account to pin the new worktree to. Omitted/null =
        *  inherit the global host selection. */
       claudeAccountId?: CreateWorktreeArgs['claudeAccountId']
+      /** Plane work item this worktree is created for, so the CLI `--current`
+       *  shortcut can resolve it later. Mirrors linkedLinearIssue threading. */
+      linkedPlaneWorkItem?: CreateWorktreeArgs['linkedPlaneWorkItem']
     }
   ) => Promise<CreateWorktreeResult>
   /** Register an in-flight background creation and make it the active surface. */

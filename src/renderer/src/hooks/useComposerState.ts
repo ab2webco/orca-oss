@@ -78,6 +78,7 @@ import {
   getLinkedWorkItemPromptContext,
   resolveQuickCreateLinkedWorkItemPrompt
 } from '@/lib/linked-work-item-context'
+import { buildComposerLinkedPlaneWorkItem } from '@/lib/composer-linked-plane-work-item'
 import { getLocalRepoProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import type { ClaudeAccountLaunchRuntime } from '@/lib/claude-account-runtime-filter'
 import { captureDirectSshMutationExpectation } from '@/lib/ssh-mutation-expectation'
@@ -3484,6 +3485,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'
           ? submitLinkedWorkItem.linearOrganizationUrlKey
           : undefined
+      const linkedPlaneWorkItem = buildComposerLinkedPlaneWorkItem(
+        submitLinkedWorkItem,
+        submitLinkedWorkItemProvider
+      )
       const effectiveBranchNameOverride = resolveComposerBranchNameOverrideForCreate({
         branchNameOverride: submitBranchNameOverride,
         branchAutoName: branchAutoNameRef.current,
@@ -3581,7 +3586,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         undefined,
         undefined,
         undefined,
-        submitCompareBaseRef
+        submitCompareBaseRef,
+        linkedPlaneWorkItem ? { linkedPlaneWorkItem } : undefined
       )
       const worktree = result.worktree
 
@@ -3900,6 +3906,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'
             ? submitLinkedWorkItem.linearOrganizationUrlKey
             : undefined
+        const linkedPlaneWorkItem = buildComposerLinkedPlaneWorkItem(
+          submitLinkedWorkItem,
+          submitLinkedWorkItemProvider
+        )
         const effectiveBranchNameOverride = resolveComposerBranchNameOverrideForCreate({
           branchNameOverride: submitBranchNameOverride,
           branchAutoName: branchAutoNameRef.current,
@@ -4088,6 +4098,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           ...(linkedLinearIssueOrganizationUrlKey !== undefined
             ? { linkedLinearIssueOrganizationUrlKey }
             : {}),
+          ...(linkedPlaneWorkItem ? { linkedPlaneWorkItem } : {}),
           ...(effectiveBranchNameOverride
             ? { branchNameOverride: effectiveBranchNameOverride }
             : {}),

@@ -1,6 +1,8 @@
 import { isAbsolute, join } from 'node:path'
 import type {
   PlaneCreateWorkItemResult,
+  PlaneCurrentWorkItem,
+  PlaneCurrentWorkItemContextHints,
   PlaneMutationResult,
   PlaneState,
   PlaneStateGroup,
@@ -16,6 +18,80 @@ import {
   getRequiredStringFlagAllowingEmpty
 } from './flags'
 import { RuntimeClientError } from './runtime-client'
+import type { RuntimeClient, RuntimeRpcSuccess } from './runtime-client'
+
+export type PlaneWriteTarget = {
+  workItemId: string
+  projectId: string
+  workspaceId: string | undefined
+}
+
+// Builds the resolution hints for `--current`. Mirrors buildLinearCurrentContext:
+// on a remote runtime the cwd is meaningless, so the host resolves the worktree
+// from the ORCA_WORKTREE_ID / ORCA_TERMINAL_HANDLE env instead.
+export function buildPlaneCurrentContext(
+  cwd: string,
+  remote: boolean
+): PlaneCurrentWorkItemContextHints {
+  return {
+    remote,
+    ...(remote ? {} : { cwd }),
+    ...(process.env.ORCA_WORKTREE_ID ? { worktreeId: process.env.ORCA_WORKTREE_ID } : {}),
+    ...(process.env.ORCA_TERMINAL_HANDLE
+      ? { terminalHandle: process.env.ORCA_TERMINAL_HANDLE }
+      : {})
+  }
+}
+
+// Resolves the Plane work item linked to the current worktree, or throws a
+// stable plane_work_item_required error when there is no link to fall back on.
+export async function resolvePlaneCurrentWorkItem(
+  client: RuntimeClient,
+  cwd: string
+): Promise<RuntimeRpcSuccess<PlaneCurrentWorkItem>> {
+  const response = await client.call<PlaneCurrentWorkItem | null>(
+    'plane.resolveCurrentWorkItem',
+    buildPlaneCurrentContext(cwd, client.isRemote)
+  )
+  if (!response.result) {
+    throw new RuntimeClientError(
+      'plane_work_item_required',
+      'Run --current inside a Plane-linked Orca worktree, or pass a work item id.'
+    )
+  }
+  return { ...response, result: response.result }
+}
+
+// Resolves the {id, project, workspace} a Plane write targets, from either an
+// explicit id (project required) or the `--current` worktree link (project/
+// workspace inherited from the link unless overridden by flags).
+export async function resolvePlaneWriteTarget(args: {
+  flags: Map<string, string | boolean>
+  client: RuntimeClient
+  cwd: string
+}): Promise<PlaneWriteTarget> {
+  const { flags, client, cwd } = args
+  rejectAllWorkspaceForPlaneWrite(flags)
+  const explicitId = getOptionalStringFlag(flags, 'id')
+  const current = flags.get('current') === true
+  if (explicitId && current) {
+    throw new RuntimeClientError('invalid_argument', 'Pass either <id> or --current, not both')
+  }
+  const workspaceId = getOptionalStringFlag(flags, 'workspace')
+  if (current) {
+    const resolved = (await resolvePlaneCurrentWorkItem(client, cwd)).result
+    return {
+      workItemId: resolved.identifier,
+      projectId: getOptionalStringFlag(flags, 'project') ?? resolved.projectId,
+      workspaceId: workspaceId ?? resolved.workspaceId
+    }
+  }
+  return {
+    workItemId: getRequiredStringFlag(flags, 'id'),
+    projectId: getRequiredStringFlag(flags, 'project'),
+    workspaceId
+  }
+}
 import {
   NodeReadableTextTooLargeError,
   readNodeReadableTextWithinLimit

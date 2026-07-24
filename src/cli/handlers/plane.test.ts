@@ -388,4 +388,89 @@ describe('orca plane CLI handlers', () => {
     expect(callMock).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(1)
   })
+
+  it('reads the current worktree work item without a second fetch for issue --current', async () => {
+    queueFixtures(callMock, okFixture('req', currentResolve()))
+    await main(['plane', 'issue', '--current', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('plane.resolveCurrentWorkItem', {
+      remote: false,
+      cwd: '/tmp/repo'
+    })
+  })
+
+  it('resolves the current work item id and project before a status write', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req', currentResolve()),
+      okFixture('req2', [{ id: 's1', name: 'In Review', group: 'started' }]),
+      okFixture('req3', { ok: true })
+    )
+    await main(['plane', 'status', 'set', '--current', '--to', 'In Review', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.resolveCurrentWorkItem', {
+      remote: false,
+      cwd: '/tmp/repo'
+    })
+    expect(callMock).toHaveBeenNthCalledWith(2, 'plane.listStates', {
+      projectId: 'p1',
+      workspaceId: 'w1'
+    })
+    expect(callMock).toHaveBeenNthCalledWith(
+      3,
+      'plane.updateWorkItem',
+      {
+        projectId: 'p1',
+        workItemId: 'PROJ-12',
+        workspaceId: 'w1',
+        updates: { stateId: 's1' }
+      },
+      WRITE_OPTS
+    )
+  })
+
+  it('threads the worktree/terminal hints into the resolve context', async () => {
+    process.env.ORCA_WORKTREE_ID = 'wt-1'
+    process.env.ORCA_TERMINAL_HANDLE = 'term-1'
+    queueFixtures(callMock, okFixture('req', currentResolve()), okFixture('req2', { ok: true }))
+    await main(['plane', 'assignee', 'clear', '--current', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.resolveCurrentWorkItem', {
+      remote: false,
+      cwd: '/tmp/repo',
+      worktreeId: 'wt-1',
+      terminalHandle: 'term-1'
+    })
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'plane.updateWorkItem',
+      { projectId: 'p1', workItemId: 'PROJ-12', workspaceId: 'w1', updates: { assigneeIds: [] } },
+      WRITE_OPTS
+    )
+  })
+
+  it('errors when the current worktree has no Plane link', async () => {
+    queueFixtures(callMock, okFixture('req', null))
+    await main(['plane', 'issue', '--current', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('rejects passing both an id and --current', async () => {
+    await main(
+      ['plane', 'status', 'set', 'PROJ-12', '--current', '--to', 'Done', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+  })
 })
+
+function currentResolve(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    identifier: 'PROJ-12',
+    projectId: 'p1',
+    workspaceId: 'w1',
+    url: 'https://app.plane.so/acme/browse/PROJ-12/',
+    workItem: workItem(),
+    ...overrides
+  }
+}

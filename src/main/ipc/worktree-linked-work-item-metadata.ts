@@ -2,6 +2,7 @@ import type { Worktree, WorktreeMeta } from '../../shared/types'
 
 type LinkedWorkItemMetadata = Pick<
   Worktree,
+  | 'linkedPlaneWorkItem'
   | 'linkedGitLabMR'
   | 'linkedGitLabIssue'
   | 'linkedBitbucketPR'
@@ -11,6 +12,7 @@ type LinkedWorkItemMetadata = Pick<
 
 export function getLinkedWorkItemMetadata(meta: WorktreeMeta | undefined): LinkedWorkItemMetadata {
   return {
+    linkedPlaneWorkItem: meta?.linkedPlaneWorkItem ?? null,
     linkedGitLabMR: meta?.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta?.linkedGitLabIssue ?? null,
     linkedBitbucketPR: meta?.linkedBitbucketPR ?? null,

@@ -125,6 +125,17 @@ const ListMembers = z
   })
   .optional()
 
+// Hints for `--current`: resolve the work item linked to the caller's worktree.
+// Mirrors Linear's LinearCurrentContext shape.
+const PlaneCurrentWorkItemContext = z
+  .object({
+    worktreeId: OptionalString,
+    terminalHandle: OptionalString,
+    cwd: OptionalString,
+    remote: z.boolean().optional()
+  })
+  .optional()
+
 export const PLANE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'plane.connect',
@@ -190,6 +201,11 @@ export const PLANE_METHODS: RpcMethod[] = [
         projectId: params.projectId,
         workspaceId: params.workspaceId
       })
+  }),
+  defineMethod({
+    name: 'plane.resolveCurrentWorkItem',
+    params: PlaneCurrentWorkItemContext,
+    handler: async (params, { runtime }) => runtime.planeResolveCurrentWorkItem(params)
   }),
   defineMethod({
     name: 'plane.updateWorkItem',

@@ -117,6 +117,7 @@ import type {
   GitHubCreateIssueFields,
   GitHubOwnerRepo,
   GlobalSettings,
+  LinkedPlaneWorkItem,
   PersistedUIState,
   Project,
   ProjectUpdateArgs,
@@ -729,12 +730,15 @@ import type {
   PlaneConnectArgs,
   PlaneCreateStateArgs,
   PlaneCreateWorkItemArgs,
+  PlaneCurrentWorkItem,
+  PlaneCurrentWorkItemContextHints,
   PlaneDeleteStateArgs,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
   PlaneWorkItemUpdate,
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
+import { getPlaneCurrentWorkItemFromWorktree } from '../plane/plane-current-work-item'
 import {
   clearProjectItemFieldValue,
   getProjectViewTable,
@@ -1852,6 +1856,7 @@ function mergeRuntimeFolderWorkspace(repo: Repo, worktreeId: string, meta: Workt
     linkedLinearIssue: meta.linkedLinearIssue ?? null,
     linkedLinearIssueWorkspaceId: meta.linkedLinearIssueWorkspaceId ?? null,
     linkedLinearIssueOrganizationUrlKey: meta.linkedLinearIssueOrganizationUrlKey ?? null,
+    linkedPlaneWorkItem: meta.linkedPlaneWorkItem ?? null,
     linkedGitLabMR: meta.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta.linkedGitLabIssue ?? null,
     linkedBitbucketPR: meta.linkedBitbucketPR ?? null,
@@ -18216,6 +18221,7 @@ export class OrcaRuntimeService {
     linkedLinearIssue?: string
     linkedLinearIssueWorkspaceId?: string | null
     linkedLinearIssueOrganizationUrlKey?: string | null
+    linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
     linkedGitLabMR?: number | null
     linkedGitLabIssue?: number | null
     linkedBitbucketPR?: number | null
@@ -18309,6 +18315,9 @@ export class OrcaRuntimeService {
           : {}),
         ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
           ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
+          : {}),
+        ...(args.linkedPlaneWorkItem !== undefined
+          ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
           : {}),
         ...(args.linkedGitLabIssue !== undefined
           ? { linkedGitLabIssue: args.linkedGitLabIssue }
@@ -18889,6 +18898,9 @@ export class OrcaRuntimeService {
       ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
         ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
         : {}),
+      ...(args.linkedPlaneWorkItem !== undefined
+        ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
+        : {}),
       ...(args.linkedGitLabIssue !== undefined
         ? { linkedGitLabIssue: args.linkedGitLabIssue }
         : {}),
@@ -19217,6 +19229,7 @@ export class OrcaRuntimeService {
       linkedLinearIssue?: string
       linkedLinearIssueWorkspaceId?: string | null
       linkedLinearIssueOrganizationUrlKey?: string | null
+      linkedPlaneWorkItem?: LinkedPlaneWorkItem | null
       linkedGitLabMR?: number | null
       linkedGitLabIssue?: number | null
       linkedBitbucketPR?: number | null
@@ -19271,6 +19284,9 @@ export class OrcaRuntimeService {
           : {}),
         ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
           ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
+          : {}),
+        ...(args.linkedPlaneWorkItem !== undefined
+          ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
           : {}),
         ...(args.linkedGitLabMR != null ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
         ...(args.linkedGitLabIssue != null ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
@@ -29978,6 +29994,59 @@ export class OrcaRuntimeService {
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof getPlaneWorkItem> {
     return getPlaneWorkItem(args)
+  }
+
+  // Resolves the Plane work item linked to the worktree that contains the
+  // caller's cwd (or terminal/worktree hint), for the CLI `--current` shortcut.
+  // Mirrors linearResolveCurrentIssue's worktree resolution, but returns null
+  // rather than throwing when there is no enclosing worktree or no Plane link,
+  // letting the CLI surface a single stable "id required" error.
+  async planeResolveCurrentWorkItem(
+    context?: PlaneCurrentWorkItemContextHints
+  ): Promise<PlaneCurrentWorkItem | null> {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    const worktree = await this.resolvePlaneCurrentContextWorktree(context)
+    if (!worktree) {
+      return null
+    }
+    const link = getPlaneCurrentWorkItemFromWorktree(worktree)
+    if (!link) {
+      return null
+    }
+    const workItem = await getPlaneWorkItem({
+      workItemId: link.identifier,
+      projectId: link.projectId,
+      workspaceId: link.workspaceId
+    })
+    return {
+      identifier: link.identifier,
+      projectId: link.projectId,
+      ...(link.workspaceId ? { workspaceId: link.workspaceId } : {}),
+      ...(link.url ? { url: link.url } : {}),
+      workItem
+    }
+  }
+
+  private async resolvePlaneCurrentContextWorktree(
+    context?: PlaneCurrentWorkItemContextHints
+  ): Promise<ResolvedWorktree | null> {
+    if (context?.terminalHandle) {
+      try {
+        const terminal = await this.showTerminal(context.terminalHandle)
+        if (context.worktreeId && context.worktreeId !== terminal.worktreeId) {
+          return null
+        }
+        return await this.resolveWorktreeSelector(`id:${terminal.worktreeId}`)
+      } catch {
+        return null
+      }
+    }
+    if (context?.remote !== true && context?.cwd) {
+      return await this.resolveWorktreeForContainedPath(context.cwd)
+    }
+    return null
   }
 
   planeUpdateWorkItem(args: {

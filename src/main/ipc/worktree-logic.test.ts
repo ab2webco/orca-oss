@@ -384,6 +384,7 @@ describe('mergeWorktree', () => {
       linkedLinearIssue: null,
       linkedLinearIssueWorkspaceId: null,
       linkedLinearIssueOrganizationUrlKey: null,
+      linkedPlaneWorkItem: null,
       linkedGitLabMR: null,
       linkedGitLabIssue: null,
       linkedBitbucketPR: null,
@@ -423,12 +424,39 @@ describe('mergeWorktree', () => {
     expect(result.comment).toBe('')
     expect(result.linkedIssue).toBeNull()
     expect(result.linkedPR).toBeNull()
+    expect(result.linkedPlaneWorkItem).toBeNull()
     expect(result.isArchived).toBe(false)
     expect(result.isUnread).toBe(false)
     expect(result.isPinned).toBe(false)
     expect(result.sortOrder).toBe(0)
     expect(result.lastActivityAt).toBe(0)
     expect(result.workspaceStatus).toBe('in-progress')
+  })
+
+  it('carries the persisted Plane work item link through the merge', () => {
+    const result = mergeWorktree('repo1', baseGit, {
+      displayName: '',
+      comment: '',
+      linkedIssue: null,
+      linkedPR: null,
+      linkedLinearIssue: null,
+      linkedPlaneWorkItem: {
+        identifier: 'PROJ-12',
+        projectId: 'project-1',
+        workspaceId: 'workspace-1'
+      },
+      isArchived: false,
+      isUnread: false,
+      isPinned: false,
+      sortOrder: 0,
+      lastActivityAt: 0,
+      workspaceStatus: 'in-progress'
+    })
+    expect(result.linkedPlaneWorkItem).toEqual({
+      identifier: 'PROJ-12',
+      projectId: 'project-1',
+      workspaceId: 'workspace-1'
+    })
   })
 
   it('strips refs/heads/ prefix from branch for display name', () => {

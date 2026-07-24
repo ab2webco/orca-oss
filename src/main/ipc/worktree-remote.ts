@@ -1856,6 +1856,9 @@ export async function createRemoteWorktree(
     ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
       ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
       : {}),
+    ...(args.linkedPlaneWorkItem !== undefined
+      ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
+      : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
     ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
@@ -2438,6 +2441,9 @@ export async function createLocalWorktree(
       : {}),
     ...(args.linkedLinearIssueOrganizationUrlKey !== undefined
       ? { linkedLinearIssueOrganizationUrlKey: args.linkedLinearIssueOrganizationUrlKey }
+      : {}),
+    ...(args.linkedPlaneWorkItem !== undefined
+      ? { linkedPlaneWorkItem: args.linkedPlaneWorkItem }
       : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),

@@ -4,8 +4,8 @@ import { RuntimeClientError } from './runtime-client'
 import { getOptionalStringFlag, getRepeatedStringFlag, getRequiredStringFlag } from './flags'
 import {
   getPlanePriorityFlag,
-  rejectAllWorkspaceForPlaneWrite,
-  resolvePlaneStateId
+  resolvePlaneStateId,
+  resolvePlaneWriteTarget
 } from './plane-request-builders'
 
 export type PlaneUpdateWorkItemRequest = {
@@ -20,12 +20,14 @@ export type PlaneUpdateWorkItemRequest = {
 // present become update keys so an omitted field is never written server-side.
 export async function buildPlaneSaveIssueRequest(
   flags: Map<string, string | boolean>,
-  client: RuntimeClient
+  client: RuntimeClient,
+  cwd: string
 ): Promise<PlaneUpdateWorkItemRequest> {
-  rejectAllWorkspaceForPlaneWrite(flags)
-  const workItemId = getRequiredStringFlag(flags, 'id')
-  const projectId = getRequiredStringFlag(flags, 'project')
-  const workspaceId = getOptionalStringFlag(flags, 'workspace')
+  const { workItemId, projectId, workspaceId } = await resolvePlaneWriteTarget({
+    flags,
+    client,
+    cwd
+  })
   const updates: PlaneWorkItemUpdate = {}
 
   const title = getOptionalStringFlag(flags, 'title')
