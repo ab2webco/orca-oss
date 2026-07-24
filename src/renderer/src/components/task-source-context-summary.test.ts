@@ -292,6 +292,17 @@ describe('task source context summary', () => {
     ).toBe('Jira · server · Stably Jira')
   })
 
+  it('shows an account-backed Plane source using its workspace name', () => {
+    expect(
+      getTaskSourceContextSummary({
+        provider: 'plane',
+        providerLabel: 'Plane',
+        accountHostId: 'local',
+        planeWorkspaceName: 'Stably Plane'
+      }).label
+    ).toBe(`Plane · ${LOCAL_HOST_LABEL} · Stably Plane`)
+  })
+
   it('shows account-backed source host availability', () => {
     const summary = getTaskSourceContextSummary({
       provider: 'linear',

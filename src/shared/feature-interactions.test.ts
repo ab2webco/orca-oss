@@ -47,6 +47,7 @@ describe('feature interactions', () => {
       'gitlab-tasks',
       'linear-tasks',
       'jira-tasks',
+      'plane-tasks',
       'automations',
       'automation-created',
       'automation-run',

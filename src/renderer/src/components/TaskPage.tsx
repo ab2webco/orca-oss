@@ -166,6 +166,28 @@ import {
   loadTaskPageJiraProjectStatusOrder
 } from '@/components/task-page-jira-status-order'
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import PlaneWorkItemWorkspace from '@/components/PlaneWorkItemWorkspace'
+import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
+import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
+import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
+import { findTaskPagePlaneWorkItem } from '@/components/task-page-plane-cache-selectors'
+import {
+  createTaskPagePlaneLoadFailureState,
+  type TaskPagePlaneLoadError
+} from '@/components/task-page-plane-load-state'
+import {
+  getPlaneProjectIdForFetch,
+  isPlaneProjectSwitcherEnabled,
+  resolveInitialPlaneProjectId,
+  resolvePlaneWorkspaceIdForSlug
+} from '@/components/task-page-plane-scope'
+import {
+  sortPlaneWorkItems,
+  type PlaneWorkItemSortColumn,
+  type PlaneWorkItemSortDirection
+} from '@/components/plane-work-item-sorter'
+import { PlaneConnectDialog } from '@/components/plane-connect-dialog'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { cn } from '@/lib/utils'
 import {
   getLinkedWorkItemSuggestedName,
@@ -301,6 +323,11 @@ import type {
   TaskProvider,
   TaskViewPresetId
 } from '../../../shared/types'
+import type {
+  PlaneProject,
+  PlaneWorkItem,
+  PlaneWorkspaceSelection
+} from '../../../shared/plane-types'
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { GitLabProjectRef } from '../../../shared/gitlab-types'
 import {
@@ -358,11 +385,13 @@ import {
   getLinearOrderOptions,
   getLinearPriorityLabel,
   getLinearViewOptions,
+  getPlanePresets,
   getSourceOptions,
   type GitHubTaskKind,
   type GitLabIssueFilter,
   type GitLabTaskFilter,
   type JiraPresetId,
+  type PlanePresetId,
   LinearIcon,
   type LinearDisplayProperty,
   type LinearGroupBy,
@@ -420,6 +449,18 @@ function getJiraIssueWorkspaceSeed(issue: JiraIssue): string {
       title: `${issue.key} ${issue.title}`,
       jiraIdentifier: issue.key
     })?.seedName ?? getLinkedWorkItemSuggestedName(issue)
+  )
+}
+
+function getPlaneWorkItemWorkspaceSeed(item: PlaneWorkItem): string {
+  return (
+    getLinkedWorkItemWorkspaceName({
+      type: 'issue',
+      provider: 'plane',
+      number: 0,
+      title: `${item.identifier} ${item.title}`,
+      planeIdentifier: item.identifier
+    })?.seedName ?? getLinkedWorkItemSuggestedName(item)
   )
 }
 
@@ -958,6 +999,19 @@ function getJiraStatusTone(categoryKey: string): string {
   }
   if (categoryKey === 'indeterminate') {
     return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+  }
+  return 'border-border/50 bg-muted/40 text-muted-foreground'
+}
+
+function getPlaneStateTone(stateGroup: string): string {
+  if (stateGroup === 'completed') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+  }
+  if (stateGroup === 'started') {
+    return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+  }
+  if (stateGroup === 'cancelled') {
+    return 'border-destructive/30 bg-destructive/10 text-destructive'
   }
   return 'border-border/50 bg-muted/40 text-muted-foreground'
 }
@@ -3132,16 +3186,28 @@ export default function TaskPage(): React.JSX.Element {
   const searchJiraIssues = useAppStore((s) => s.searchJiraIssues)
   const listJiraIssues = useAppStore((s) => s.listJiraIssues)
   const checkJiraConnection = useAppStore((s) => s.checkJiraConnection)
+  const planeStatus = useAppStore((s) => s.planeStatus)
+  const planeStatusChecked = useAppStore((s) => s.planeStatusChecked)
+  const planeStatusContextKey = useAppStore((s) => s.planeStatusContextKey)
+  const selectPlaneWorkspace = useAppStore((s) => s.selectPlaneWorkspace)
+  const searchPlaneWorkItems = useAppStore((s) => s.searchPlaneWorkItems)
+  const listPlaneWorkItems = useAppStore((s) => s.listPlaneWorkItems)
+  const checkPlaneConnection = useAppStore((s) => s.checkPlaneConnection)
+  const listPlaneProjects = useAppStore((s) => s.listPlaneProjects)
+  const getCachedPlaneProjects = useAppStore((s) => s.getCachedPlaneProjects)
   const providerRuntimeContextKey = getProviderRuntimeContextKey(settings)
   const providerRuntimeContextKeyRef = useRef(providerRuntimeContextKey)
   providerRuntimeContextKeyRef.current = providerRuntimeContextKey
   const linearStatusCurrent = linearStatusContextKey === providerRuntimeContextKey
   const jiraStatusCurrent = jiraStatusContextKey === providerRuntimeContextKey
+  const planeStatusCurrent = planeStatusContextKey === providerRuntimeContextKey
   const preflightStatusCurrent = preflightStatusContextKey === expectedPreflightContextKey
   const linearStatusReady = linearStatusCurrent && linearStatusChecked
   const jiraStatusReady = jiraStatusCurrent && jiraStatusChecked
+  const planeStatusReady = planeStatusCurrent && planeStatusChecked
   const linearConnected = linearStatusCurrent && linearStatus.connected
   const jiraConnected = jiraStatusCurrent && jiraStatus.connected
+  const planeConnected = planeStatusCurrent && planeStatus.connected
   const submitShortcutLabel = getScreenSubmitShortcutLabel()
   const eligibleRepos = useMemo(() => repos.filter((repo) => isGitRepoKind(repo)), [repos])
 
@@ -3225,6 +3291,20 @@ export default function TaskPage(): React.JSX.Element {
     selectedJiraSiteId && selectedJiraSiteId !== 'all'
       ? (jiraSites.find((site) => site.id === selectedJiraSiteId) ?? null)
       : null
+  const planeWorkspaces = planeStatus.workspaces ?? []
+  const selectedPlaneWorkspaceId: PlaneWorkspaceSelection | null =
+    planeStatus.selectedWorkspaceId ??
+    planeStatus.activeWorkspaceId ??
+    planeWorkspaces[0]?.id ??
+    null
+  const selectedPlaneWorkspace =
+    selectedPlaneWorkspaceId && selectedPlaneWorkspaceId !== 'all'
+      ? (planeWorkspaces.find((workspace) => workspace.id === selectedPlaneWorkspaceId) ?? null)
+      : null
+  // Why: declared here (not with the other Plane tab state below) because
+  // planeTaskSourceContext needs it immediately after — Plane's project-level
+  // "all projects" scope has no Jira equivalent to piggyback on (mem #2205).
+  const [selectedPlaneProjectId, setSelectedPlaneProjectId] = useState<string>('all')
   const preferredVisibleTaskProviders = useMemo(
     () => normalizeVisibleTaskProviders(settings?.visibleTaskProviders),
     [settings?.visibleTaskProviders]
@@ -3252,6 +3332,7 @@ export default function TaskPage(): React.JSX.Element {
   const githubModeButtons = getGitHubModeButtons()
   const linearModeOptions = getLinearModeOptions()
   const jiraPresets = getJiraPresets()
+  const planePresets = getPlanePresets()
   const gitLabIssueFilters = getGitLabIssueFilters()
   const gitLabMRFilters = getGitLabMRFilters()
   const linearViewOptions = getLinearViewOptions()
@@ -3517,8 +3598,34 @@ export default function TaskPage(): React.JSX.Element {
   const jiraTaskSourceScopeKey = jiraTaskSourceContext
     ? getTaskSourceCacheScope(jiraTaskSourceContext)
     : providerRuntimeContextKey
+  const planeTaskSourceContext = useMemo(
+    () =>
+      normalizeTaskSourceContext({
+        provider: 'plane',
+        projectId: fallbackTaskSourceProjectId,
+        hostId: accountBackedTaskSourceHostId,
+        providerIdentity: {
+          provider: 'plane',
+          workspaceSlug: selectedPlaneWorkspace?.workspaceSlug ?? null,
+          workspaceId:
+            selectedPlaneWorkspaceId && selectedPlaneWorkspaceId !== 'all'
+              ? selectedPlaneWorkspaceId
+              : null,
+          projectId: selectedPlaneProjectId !== 'all' ? selectedPlaneProjectId : null
+        },
+        accountLabel:
+          selectedPlaneWorkspace?.displayName ?? selectedPlaneWorkspace?.workspaceSlug ?? null
+      }),
+    [
+      accountBackedTaskSourceHostId,
+      fallbackTaskSourceProjectId,
+      selectedPlaneProjectId,
+      selectedPlaneWorkspace,
+      selectedPlaneWorkspaceId
+    ]
+  )
   const accountBackedTaskSourceHostAvailability = useMemo<TaskSourceHostAvailability[]>(() => {
-    if (taskSource !== 'linear' && taskSource !== 'jira') {
+    if (taskSource !== 'linear' && taskSource !== 'jira' && taskSource !== 'plane') {
       return []
     }
     const host = hostRegistryById.get(accountBackedTaskSourceHostId)
@@ -3591,6 +3698,13 @@ export default function TaskPage(): React.JSX.Element {
           sourceCount: 1,
           hostLabelById,
           hostAvailability: accountAvailability
+        }) ?? undefined,
+      plane:
+        getTaskSourceAvailabilityNotice({
+          providerLabel: labelFor('plane'),
+          sourceCount: 1,
+          hostLabelById,
+          hostAvailability: accountAvailability
         }) ?? undefined
     }
   }, [
@@ -3612,7 +3726,7 @@ export default function TaskPage(): React.JSX.Element {
       providerLabel,
       repoContexts: taskSourceRepoContexts,
       hostAvailability:
-        taskSource === 'linear' || taskSource === 'jira'
+        taskSource === 'linear' || taskSource === 'jira' || taskSource === 'plane'
           ? accountBackedTaskSourceHostAvailability
           : taskSourceHostAvailability,
       accountHostId: accountBackedTaskSourceHostId,
@@ -3620,11 +3734,14 @@ export default function TaskPage(): React.JSX.Element {
       selectedRepoCount: selectedRepos.length,
       linearWorkspaceName:
         selectedLinearWorkspace?.organizationName ?? selectedLinearWorkspace?.id ?? null,
-      jiraSiteName: selectedJiraSite?.displayName ?? selectedJiraSite?.siteUrl ?? null
+      jiraSiteName: selectedJiraSite?.displayName ?? selectedJiraSite?.siteUrl ?? null,
+      planeWorkspaceName:
+        selectedPlaneWorkspace?.displayName ?? selectedPlaneWorkspace?.workspaceSlug ?? null
     })
   }, [
     selectedJiraSite,
     selectedLinearWorkspace,
+    selectedPlaneWorkspace,
     selectedRepos.length,
     sourceOptions,
     taskSource,
@@ -3640,11 +3757,11 @@ export default function TaskPage(): React.JSX.Element {
     return getTaskSourceAvailabilityNotice({
       providerLabel,
       sourceCount:
-        taskSource === 'linear' || taskSource === 'jira'
+        taskSource === 'linear' || taskSource === 'jira' || taskSource === 'plane'
           ? 1
           : Math.max(1, taskSourceRepoContexts.length),
       hostAvailability:
-        taskSource === 'linear' || taskSource === 'jira'
+        taskSource === 'linear' || taskSource === 'jira' || taskSource === 'plane'
           ? accountBackedTaskSourceHostAvailability
           : taskSourceHostAvailability,
       hostLabelById
@@ -3671,6 +3788,7 @@ export default function TaskPage(): React.JSX.Element {
   const githubSearchPersistReadyRef = useRef(false)
   const linearSearchPersistReadyRef = useRef(false)
   const jiraSearchPersistReadyRef = useRef(false)
+  const planeSearchPersistReadyRef = useRef(false)
   const [taskResumeApplied, setTaskResumeApplied] = useState(false)
 
   // Why: useState only inits once, so sync taskSource from the store when a sidebar source-icon click changes pageData.taskSource.
@@ -4261,7 +4379,9 @@ export default function TaskPage(): React.JSX.Element {
         openLinearIssue: undefined,
         openLinearSourceContext: undefined,
         openJiraIssue: undefined,
-        openJiraSourceContext: undefined
+        openJiraSourceContext: undefined,
+        openPlaneWorkItem: undefined,
+        openPlaneSourceContext: undefined
       }
     }))
   }, [clearSelectedLinearIssue, setDialogWorkItem])
@@ -4324,6 +4444,71 @@ export default function TaskPage(): React.JSX.Element {
       )
     },
     [jiraTaskSourceContext, openTaskPage]
+  )
+
+  const [selectedPlaneWorkItemId, setSelectedPlaneWorkItemId] = useState<string | null>(null)
+  const [selectedPlaneWorkItemFallback, setSelectedPlaneWorkItemFallback] =
+    useState<PlaneWorkItem | null>(null)
+  const planeCacheSnapshot = useAppStore(
+    useShallow((s) => ({
+      workItemCache: s.planeWorkItemCache,
+      searchCache: s.planeSearchCache,
+      listCache: s.planeListCache
+    }))
+  )
+  const cachedSelectedPlaneWorkItem = findTaskPagePlaneWorkItem(
+    planeCacheSnapshot.workItemCache,
+    planeCacheSnapshot.searchCache,
+    planeCacheSnapshot.listCache,
+    selectedPlaneWorkItemId,
+    {
+      workspaceId:
+        selectedPlaneWorkItemFallback?.workspaceId ??
+        pageData.openPlaneWorkItem?.workspaceId ??
+        null
+    }
+  )
+  const selectedPlaneWorkItem = selectedPlaneWorkItemId
+    ? (cachedSelectedPlaneWorkItem ?? selectedPlaneWorkItemFallback)
+    : null
+  const planeDetailSourceContext = useMemo(() => {
+    if (
+      selectedPlaneWorkItem &&
+      pageData.openPlaneSourceContext?.provider === 'plane' &&
+      pageData.openPlaneWorkItem?.identifier === selectedPlaneWorkItem.identifier &&
+      pageData.openPlaneWorkItem.workspaceId === selectedPlaneWorkItem.workspaceId
+    ) {
+      return pageData.openPlaneSourceContext
+    }
+    return planeTaskSourceContext
+  }, [
+    pageData.openPlaneSourceContext,
+    pageData.openPlaneWorkItem,
+    planeTaskSourceContext,
+    selectedPlaneWorkItem
+  ])
+
+  const setSelectedPlaneWorkItem = useCallback((item: PlaneWorkItem | null) => {
+    setSelectedPlaneWorkItemId(item?.identifier ?? null)
+    setSelectedPlaneWorkItemFallback(item)
+  }, [])
+
+  useEffect(() => {
+    setSelectedPlaneWorkItem(pageData.openPlaneWorkItem ?? null)
+  }, [pageData.openPlaneWorkItem, setSelectedPlaneWorkItem])
+
+  const openPlaneDetailPage = useCallback(
+    (item: PlaneWorkItem) => {
+      openTaskPage(
+        {
+          taskSource: 'plane',
+          openPlaneWorkItem: item,
+          openPlaneSourceContext: planeTaskSourceContext
+        },
+        { recordTasksInteraction: false }
+      )
+    },
+    [planeTaskSourceContext, openTaskPage]
   )
 
   // Linear tab state
@@ -4595,6 +4780,32 @@ export default function TaskPage(): React.JSX.Element {
     [jiraOrderBy]
   )
 
+  // Plane tab state. Why: no priority-fetch or project-status-order effect —
+  // Plane has a static priority enum and a native per-item state.sequence
+  // (see mem #2200), unlike Jira which fetches both per site/project.
+  const [planeItems, setPlaneItems] = useState<PlaneWorkItem[]>([])
+  const [planeLoading, setPlaneLoading] = useState(false)
+  const [planeError, setPlaneError] = useState<TaskPagePlaneLoadError | null>(null)
+  const [planeErrorDetailsOpen, setPlaneErrorDetailsOpen] = useState(false)
+  const [planeSearchInput, setPlaneSearchInput] = useState('')
+  const [appliedPlaneSearch, setAppliedPlaneSearch] = useState('')
+  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('assigned')
+  const [planeRefreshNonce, setPlaneRefreshNonce] = useState(0)
+  const [planeOrderBy, setPlaneOrderBy] = useState<PlaneWorkItemSortColumn>('updated')
+  const [planeOrderDirection, setPlaneOrderDirection] = useState<PlaneWorkItemSortDirection>('desc')
+
+  const handlePlaneSort = useCallback(
+    (column: PlaneWorkItemSortColumn) => {
+      if (planeOrderBy === column) {
+        setPlaneOrderDirection((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'))
+      } else {
+        setPlaneOrderBy(column)
+        setPlaneOrderDirection(column === 'updated' || column === 'state' ? 'desc' : 'asc')
+      }
+    },
+    [planeOrderBy]
+  )
+
   useEffect(() => {
     if (taskResumeAppliedRef.current || !persistedUIReady || !settings) {
       return
@@ -4636,6 +4847,12 @@ export default function TaskPage(): React.JSX.Element {
     setJiraSearchInput(jiraQuery)
     setAppliedJiraSearch(jiraQuery)
 
+    const planePreset = taskResumeState?.planePreset ?? 'assigned'
+    const planeQuery = taskResumeState?.planeQuery ?? ''
+    setActivePlanePreset(planePreset)
+    setPlaneSearchInput(planeQuery)
+    setAppliedPlaneSearch(planeQuery)
+
     // Why: settings/UI hydrate async; apply the restored Tasks context exactly once so later source/filter clicks stay local.
     taskResumeAppliedRef.current = true
     setTaskResumeApplied(true)
@@ -4646,6 +4863,46 @@ export default function TaskPage(): React.JSX.Element {
     resolvedInitialSelection,
     taskResumeState,
     visibleTaskProviders
+  ])
+
+  // Why: settings.defaultPlaneSelection is only the *starting* scope for a
+  // fresh Tasks session (mem #2205) — seed it once real workspaces are known,
+  // preferring a resumed project id (an in-session switch survives reopen)
+  // over the persisted default.
+  const planeScopeSeededRef = useRef(false)
+  useEffect(() => {
+    if (planeScopeSeededRef.current || !taskResumeApplied || !planeStatusReady) {
+      return
+    }
+    planeScopeSeededRef.current = true
+    const resumeProjectId = taskResumeState?.planeProjectId ?? null
+    if (resumeProjectId) {
+      setSelectedPlaneProjectId(resumeProjectId)
+      return
+    }
+    const defaultSelection = settings?.defaultPlaneSelection ?? null
+    const targetWorkspaceId = resolvePlaneWorkspaceIdForSlug(
+      planeWorkspaces,
+      defaultSelection?.workspaceSlug
+    )
+    if (targetWorkspaceId && targetWorkspaceId !== selectedPlaneWorkspaceId) {
+      void selectPlaneWorkspace(targetWorkspaceId).catch(() => {})
+    }
+    setSelectedPlaneProjectId(
+      resolveInitialPlaneProjectId(
+        planeWorkspaces,
+        targetWorkspaceId ?? selectedPlaneWorkspaceId,
+        defaultSelection
+      )
+    )
+  }, [
+    planeStatusReady,
+    planeWorkspaces,
+    selectedPlaneWorkspaceId,
+    selectPlaneWorkspace,
+    settings?.defaultPlaneSelection,
+    taskResumeApplied,
+    taskResumeState?.planeProjectId
   ])
 
   useEffect(() => {
@@ -4828,6 +5085,62 @@ export default function TaskPage(): React.JSX.Element {
     selectedJiraSiteId,
     taskResumeApplied,
     jiraTaskSourceContext
+  ])
+
+  // Why: feeds the project-level scope switcher (not a create-dialog picker
+  // like Jira's — Plane create/delete is deferred to v1.1, see mem #2185),
+  // so it fetches whenever a single workspace is in scope, not gated to a
+  // dialog-open flag.
+  const [availablePlaneProjects, setAvailablePlaneProjects] = useState<PlaneProject[]>(
+    () => getCachedPlaneProjects(selectedPlaneWorkspaceId) ?? []
+  )
+  const [planeProjectsLoading, setPlaneProjectsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!taskResumeApplied) {
+      return
+    }
+    if (
+      taskSource !== 'plane' ||
+      !planeConnected ||
+      !isPlaneProjectSwitcherEnabled(selectedPlaneWorkspaceId)
+    ) {
+      setAvailablePlaneProjects([])
+      setPlaneProjectsLoading(false)
+      return
+    }
+    let cancelled = false
+    const cached = getCachedPlaneProjects(selectedPlaneWorkspaceId)
+    if (cached) {
+      setAvailablePlaneProjects(cached)
+    }
+    setPlaneProjectsLoading(true)
+    void listPlaneProjects(selectedPlaneWorkspaceId)
+      .then((projects) => {
+        if (!cancelled) {
+          setAvailablePlaneProjects(projects)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          console.warn('[TaskPage] Failed to fetch Plane projects')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPlaneProjectsLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    taskSource,
+    planeConnected,
+    selectedPlaneWorkspaceId,
+    taskResumeApplied,
+    getCachedPlaneProjects,
+    listPlaneProjects
   ])
 
   // Why: stable string key for selectedRepos so the GitLab effect doesn't re-run on every parent render from a new array ref.
@@ -5611,6 +5924,30 @@ export default function TaskPage(): React.JSX.Element {
       jiraPrioritiesBySite
     )
   }, [displayedJiraIssues, jiraOrderBy, jiraOrderDirection, jiraPrioritiesBySite])
+
+  const displayedPlaneItems = useMemo(
+    () =>
+      planeItems.map(
+        (item) =>
+          findTaskPagePlaneWorkItem(
+            planeCacheSnapshot.workItemCache,
+            planeCacheSnapshot.searchCache,
+            planeCacheSnapshot.listCache,
+            item.identifier,
+            { workspaceId: item.workspaceId }
+          ) ?? item
+      ),
+    [
+      planeItems,
+      planeCacheSnapshot.workItemCache,
+      planeCacheSnapshot.searchCache,
+      planeCacheSnapshot.listCache
+    ]
+  )
+  const sortedPlaneItems = useMemo(
+    () => sortPlaneWorkItems(displayedPlaneItems, planeOrderBy, planeOrderDirection),
+    [displayedPlaneItems, planeOrderBy, planeOrderDirection]
+  )
   // New Linear project dialog state
   const [newLinearProjectOpen, setNewLinearProjectOpen] = useState(false)
   const [newLinearProjectName, setNewLinearProjectName] = useState('')
@@ -5747,6 +6084,7 @@ export default function TaskPage(): React.JSX.Element {
 
   const [linearConnectOpen, setLinearConnectOpen] = useState(false)
   const [jiraConnectOpen, setJiraConnectOpen] = useState(false)
+  const [planeConnectOpen, setPlaneConnectOpen] = useState(false)
   useContextualTour(
     'tasks',
     !dialogWorkItem &&
@@ -5757,6 +6095,7 @@ export default function TaskPage(): React.JSX.Element {
       !newLinearIssueOpen &&
       !linearConnectOpen &&
       !jiraConnectOpen &&
+      !planeConnectOpen &&
       activeModal === 'none',
     'tasks_open'
   )
@@ -7175,14 +7514,20 @@ export default function TaskPage(): React.JSX.Element {
     if (!jiraStatusReady) {
       void checkJiraConnection()
     }
+    if (!planeStatusReady) {
+      void checkPlaneConnection()
+    }
   }, [
     checkJiraConnection,
     checkLinearConnection,
+    checkPlaneConnection,
     expectedPreflightContextKey,
     jiraStatusContextKey,
     jiraStatusReady,
     linearStatusContextKey,
     linearStatusReady,
+    planeStatusContextKey,
+    planeStatusReady,
     providerRuntimeContextKey,
     preflightStatusContextKey,
     preflightStatusChecked,
@@ -7811,6 +8156,120 @@ export default function TaskPage(): React.JSX.Element {
     taskSource
   ])
 
+  useEffect(() => {
+    if (!taskResumeApplied) {
+      return
+    }
+    const timeout = window.setTimeout(() => {
+      setAppliedPlaneSearch(planeSearchInput)
+    }, TASK_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timeout)
+  }, [planeSearchInput, taskResumeApplied])
+
+  useEffect(() => {
+    if (!taskResumeApplied) {
+      return
+    }
+    if (!planeSearchPersistReadyRef.current) {
+      planeSearchPersistReadyRef.current = true
+      return
+    }
+    setTaskResumeState({ planeQuery: appliedPlaneSearch.trim() })
+  }, [appliedPlaneSearch, setTaskResumeState, taskResumeApplied])
+
+  useEffect(() => {
+    if (!taskResumeApplied) {
+      return
+    }
+    setTaskResumeState({ planeProjectId: selectedPlaneProjectId })
+  }, [selectedPlaneProjectId, setTaskResumeState, taskResumeApplied])
+
+  useEffect(() => {
+    if (!taskResumeApplied) {
+      return
+    }
+    if (taskSource !== 'plane') {
+      return
+    }
+    if (!planeConnected) {
+      return
+    }
+
+    let cancelled = false
+    setPlaneLoading(true)
+    setPlaneError(null)
+    setPlaneErrorDetailsOpen(false)
+
+    const trimmed = appliedPlaneSearch.trim()
+    const projectId = getPlaneProjectIdForFetch(selectedPlaneWorkspaceId, selectedPlaneProjectId)
+    const request =
+      trimmed.length > 0
+        ? searchPlaneWorkItems(trimmed, projectId, selectedPlaneWorkspaceId)
+        : listPlaneWorkItems(activePlanePreset, projectId, selectedPlaneWorkspaceId)
+
+    void request
+      .then((items) => {
+        if (cancelled) {
+          return
+        }
+        setPlaneItems(items)
+        setPlaneLoading(false)
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return
+        }
+        const failureState = createTaskPagePlaneLoadFailureState(err)
+        setPlaneItems(failureState.items)
+        setPlaneError(failureState.error)
+        setPlaneLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    taskSource,
+    planeConnected,
+    selectedPlaneWorkspaceId,
+    selectedPlaneProjectId,
+    appliedPlaneSearch,
+    activePlanePreset,
+    planeRefreshNonce,
+    taskResumeApplied,
+    searchPlaneWorkItems,
+    listPlaneWorkItems
+  ])
+
+  useEffect(() => {
+    if (!taskResumeApplied || taskSource !== 'plane') {
+      return
+    }
+    if (!planeConnected || displayedPlaneItems.length === 0) {
+      if (selectedPlaneWorkItemId !== null) {
+        setSelectedPlaneWorkItemId(null)
+      }
+      if (selectedPlaneWorkItemFallback !== null) {
+        setSelectedPlaneWorkItemFallback(null)
+      }
+      return
+    }
+    if (
+      selectedPlaneWorkItemId &&
+      !displayedPlaneItems.some((item) => item.identifier === selectedPlaneWorkItemId)
+    ) {
+      setSelectedPlaneWorkItemId(null)
+      setSelectedPlaneWorkItemFallback(null)
+    }
+  }, [
+    displayedPlaneItems,
+    planeConnected,
+    selectedPlaneWorkItemFallback,
+    selectedPlaneWorkItemId,
+    taskResumeApplied,
+    taskSource
+  ])
+
   // Why: Linear ids are strings (e.g. "ENG-123") but the provider-generic shape needs a numeric number, so the adapter uses 0 as placeholder.
   const openComposerForLinearItem = useCallback(
     (issue: LinearIssue): void => {
@@ -7929,11 +8388,70 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForJiraItem]
   )
 
+  const openComposerForPlaneItem = useCallback(
+    (item: PlaneWorkItem): void => {
+      const linkedWorkItem: LinkedWorkItemSummary = {
+        type: 'issue',
+        provider: 'plane',
+        number: 0,
+        title: `${item.identifier} ${item.title}`,
+        url: item.url,
+        planeIdentifier: item.identifier
+      }
+      openModal('new-workspace-composer', {
+        linkedWorkItem,
+        taskSourceContext: planeTaskSourceContext,
+        prefilledName: getPlaneWorkItemWorkspaceSeed(item),
+        telemetrySource: 'sidebar'
+      })
+    },
+    [planeTaskSourceContext, openModal]
+  )
+
+  const handleUsePlaneItem = useCallback(
+    (item: PlaneWorkItem): void => {
+      useAppStore.getState().recordFeatureInteraction('plane-tasks')
+      openComposerForPlaneItem(item)
+    },
+    [openComposerForPlaneItem]
+  )
+
+  const handlePlaneWorkspaceChange = useCallback(
+    (workspaceId: PlaneWorkspaceSelection): void => {
+      setSelectedPlaneWorkItem(null)
+      setSelectedPlaneProjectId('all')
+      setAvailablePlaneProjects([])
+      setPlaneItems([])
+      setPlaneError(null)
+      setPlaneLoading(true)
+      void selectPlaneWorkspace(workspaceId).catch(() => {
+        setPlaneLoading(false)
+        toast.error(
+          translate(
+            'auto.components.TaskPage.planeWorkspaceSwitchFailed',
+            'Failed to switch Plane workspace.'
+          )
+        )
+      })
+    },
+    [selectPlaneWorkspace, setSelectedPlaneWorkItem]
+  )
+
+  const handlePlaneProjectChange = useCallback(
+    (projectId: string): void => {
+      setSelectedPlaneWorkItem(null)
+      setSelectedPlaneProjectId(projectId)
+      setPlaneRefreshNonce((n) => n + 1)
+    },
+    [setSelectedPlaneWorkItem]
+  )
+
   const taskPageListChromeHidden = shouldHideTaskPageListChrome({
     taskSource,
     hasGitHubDetail: Boolean(dialogWorkItem),
     hasGitLabDetail: Boolean(gitlabDialogItem),
     hasJiraDetail: Boolean(selectedJiraIssue),
+    hasPlaneDetail: Boolean(selectedPlaneWorkItem),
     hasLinearIssueDetail: Boolean(selectedLinearIssue),
     hasLinearProjectContext: Boolean(selectedLinearProject),
     hasLinearViewContext: Boolean(selectedLinearCustomView)
@@ -8126,6 +8644,17 @@ export default function TaskPage(): React.JSX.Element {
                         </Select>
                       ) : null}
                     </div>
+                  ) : null}
+                  {taskSource === 'plane' && planeConnected ? (
+                    <TaskPagePlaneScopeSwitcher
+                      workspaces={planeWorkspaces}
+                      selectedWorkspaceId={selectedPlaneWorkspaceId ?? 'all'}
+                      onWorkspaceChange={handlePlaneWorkspaceChange}
+                      projects={availablePlaneProjects}
+                      projectsLoading={planeProjectsLoading}
+                      selectedProjectId={selectedPlaneProjectId}
+                      onProjectChange={handlePlaneProjectChange}
+                    />
                   ) : null}
                 </div>
 
@@ -8854,6 +9383,116 @@ export default function TaskPage(): React.JSX.Element {
                               setAppliedJiraSearch('')
                               setTaskResumeState({ jiraQuery: '' })
                               setJiraRefreshNonce((n) => n + 1)
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
+                          >
+                            <X className="size-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : taskSource === 'plane' && planeConnected ? (
+                  <div className="rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        {planePresets.map((preset) => {
+                          const active = !planeSearchInput && activePlanePreset === preset.id
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setPlaneSearchInput('')
+                                setAppliedPlaneSearch('')
+                                setActivePlanePreset(preset.id)
+                                setTaskResumeState({ planePreset: preset.id, planeQuery: '' })
+                                setPlaneRefreshNonce((n) => n + 1)
+                              }}
+                              className={cn(
+                                'rounded-md border px-2 py-1 text-xs transition',
+                                active
+                                  ? 'border-border/50 bg-foreground/90 text-background backdrop-blur-md'
+                                  : 'border-border/50 bg-transparent text-foreground hover:bg-muted/50'
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setPlaneRefreshNonce((n) => n + 1)}
+                              disabled={planeLoading}
+                              aria-label={translate(
+                                'auto.components.TaskPage.planeRefreshWorkItems',
+                                'Refresh Plane work items'
+                              )}
+                              className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
+                            >
+                              {planeLoading ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" sideOffset={6}>
+                            {translate(
+                              'auto.components.TaskPage.planeRefreshWorkItems',
+                              'Refresh Plane work items'
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="relative min-w-[320px] flex-1">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={planeSearchInput}
+                          onChange={(e) => setPlaneSearchInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              if (
+                                shouldSuppressEnterSubmit(
+                                  { isComposing: e.nativeEvent.isComposing, shiftKey: e.shiftKey },
+                                  false
+                                )
+                              ) {
+                                return
+                              }
+                              e.preventDefault()
+                              const trimmed = planeSearchInput.trim()
+                              setPlaneSearchInput(trimmed)
+                              setAppliedPlaneSearch(trimmed)
+                              setTaskResumeState({ planeQuery: trimmed })
+                              setPlaneRefreshNonce((n) => n + 1)
+                            }
+                          }}
+                          placeholder={translate(
+                            'auto.components.TaskPage.planeSearchPlaceholder',
+                            'Plane PQL, e.g. state.group != "completed"'
+                          )}
+                          className="h-8 rounded-md border-border/50 bg-background pl-8 pr-8 text-xs"
+                        />
+                        {planeSearchInput ? (
+                          <button
+                            type="button"
+                            aria-label={translate(
+                              'auto.components.TaskPage.b797bdd7c3',
+                              'Clear search'
+                            )}
+                            onClick={() => {
+                              setPlaneSearchInput('')
+                              setAppliedPlaneSearch('')
+                              setTaskResumeState({ planeQuery: '' })
+                              setPlaneRefreshNonce((n) => n + 1)
                             }}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                           >
@@ -9946,6 +10585,128 @@ export default function TaskPage(): React.JSX.Element {
                   onUse={handleUseJiraItem}
                   onClose={closeTaskDetailPage}
                   sourceContext={jiraDetailSourceContext}
+                />
+              </div>
+            )
+          ) : taskSource === 'plane' ? (
+            !planeStatusReady ? (
+              <div className="mt-4 flex items-center justify-center py-14">
+                <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : !planeConnected ? (
+              <div className="mt-4 flex flex-col items-center justify-center rounded-md border border-border/50 bg-muted/50 px-6 py-14 text-center shadow-sm">
+                <PlaneIcon className="mb-4 size-8 text-muted-foreground/60" />
+                <p className="text-base font-medium text-foreground">
+                  {translate(
+                    'auto.components.TaskPage.planeConnectPrompt',
+                    'Connect your Plane workspace'
+                  )}
+                </p>
+                <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                  {translate(
+                    'auto.components.TaskPage.planeConnectPromptBody',
+                    'Browse, edit, and start work from Plane work items directly from here.'
+                  )}
+                </p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  <Button onClick={() => setPlaneConnectOpen(true)}>
+                    {translate('auto.components.TaskPage.planeConnectCta', 'Connect Plane')}
+                  </Button>
+                  <Button variant="outline" onClick={() => hideTaskSource('plane', 'Plane')}>
+                    {translate('auto.components.TaskPage.planeHideCta', 'Hide Plane')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm">
+                <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3">
+                  <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    {translate(
+                      'auto.components.TaskPage.planeWorkItemsHeading',
+                      'Plane work items'
+                    )}
+                  </div>
+                  <div className="shrink-0 text-[11px] text-muted-foreground">
+                    {displayedPlaneItems.length}{' '}
+                    {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                  </div>
+                </div>
+
+                <TaskPagePlaneSortControls
+                  direction={planeOrderDirection}
+                  onSort={handlePlaneSort}
+                  orderBy={planeOrderBy}
+                />
+
+                <div
+                  className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek"
+                  style={{ scrollbarGutter: 'stable' }}
+                >
+                  {planeStatus.credentialError ? (
+                    <div className="border-b border-border px-4 py-4 text-sm text-destructive">
+                      {planeStatus.credentialError}
+                    </div>
+                  ) : null}
+                  {!planeStatus.credentialError && planeError ? (
+                    <TaskPageJiraErrorBanner
+                      error={planeError}
+                      open={planeErrorDetailsOpen}
+                      onOpenChange={setPlaneErrorDetailsOpen}
+                    />
+                  ) : null}
+
+                  {planeLoading && planeItems.length === 0 ? (
+                    <div className="divide-y divide-border/50">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="px-3 py-3">
+                          <div className="h-4 w-4/5 animate-pulse rounded bg-muted/70" />
+                          <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-muted/60" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {!planeLoading &&
+                  planeItems.length === 0 &&
+                  !planeError &&
+                  !planeStatus.credentialError ? (
+                    <div className="px-4 py-10 text-center">
+                      <p className="text-sm font-medium text-foreground">
+                        {translate(
+                          'auto.components.TaskPage.planeEmptyStateTitle',
+                          'No Plane work items found'
+                        )}
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {planeSearchInput
+                          ? translate(
+                              'auto.components.TaskPage.planeEmptyStateSearchBody',
+                              'Try a different PQL query.'
+                            )
+                          : translate(
+                              'auto.components.TaskPage.94d900518d',
+                              'No issues match the selected preset.'
+                            )}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <TaskPagePlaneWorkItemList
+                    formatUpdatedAt={formatRelativeTime}
+                    getStateTone={getPlaneStateTone}
+                    items={sortedPlaneItems}
+                    onOpenItem={openPlaneDetailPage}
+                    onStartWorkspace={handleUsePlaneItem}
+                    selectedItem={selectedPlaneWorkItem}
+                    showWorkspaceContext={selectedPlaneWorkspaceId === 'all'}
+                    statusDirection={planeOrderBy === 'state' ? planeOrderDirection : 'asc'}
+                  />
+                </div>
+                <PlaneWorkItemWorkspace
+                  item={selectedPlaneWorkItem}
+                  onUse={handleUsePlaneItem}
+                  onClose={closeTaskDetailPage}
+                  sourceContext={planeDetailSourceContext}
                 />
               </div>
             )
@@ -12430,6 +13191,7 @@ export default function TaskPage(): React.JSX.Element {
       />
 
       <JiraConnectDialog open={jiraConnectOpen} onOpenChange={setJiraConnectOpen} />
+      <PlaneConnectDialog open={planeConnectOpen} onOpenChange={setPlaneConnectOpen} />
     </div>
   )
 }

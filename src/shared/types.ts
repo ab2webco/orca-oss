@@ -3287,6 +3287,12 @@ export type TaskResumeState = {
   }
   jiraPreset?: 'assigned' | 'reported' | 'all' | 'done'
   jiraQuery?: string
+  planePreset?: 'assigned' | 'created' | 'all' | 'done'
+  planeQuery?: string
+  // Why: workspace scope persists at the connection layer (planeStatus), but
+  // the project-level "all projects" vs single-project scope is a per-session
+  // Tasks concept (see mem #2205) that must survive a resume/reopen.
+  planeProjectId?: string
 }
 
 export type RightSidebarTab =
