@@ -55,6 +55,42 @@ describe('planeHtmlToMarkdown', () => {
     expect(planeHtmlToMarkdown(html)).toContain('Fish & chips <tag> "quoted"')
   })
 
+  it('converts Plane editor tags that carry class/data attributes', () => {
+    // Plane's rich-text editor (TipTap) emits attributed tags, e.g.
+    // <h3 class="editor-heading-block" data-id="...">, <p class="...">,
+    // <code class="...">. The converter must still recognize them; otherwise
+    // stripTags drops the tag with no block break and the whole description
+    // collapses into one run-on line ("Bugorca plane search...").
+    const html =
+      '<h3 class="editor-heading-block" data-id="a1">Bug</h3>' +
+      '<p class="editor-paragraph-block" data-id="b2">' +
+      '<code class="rounded-sm bg-layer-3" spellcheck="false">orca plane search</code>' +
+      ' devuelve <strong>todos</strong> los items.</p>' +
+      '<h3 class="editor-heading-block" data-id="c3">Fix</h3>' +
+      '<p class="editor-paragraph-block" data-id="d4">Filtrado client-side.</p>'
+
+    const md = planeHtmlToMarkdown(html)
+
+    expect(md).toContain('### Bug')
+    expect(md).toContain('### Fix')
+    expect(md).toContain('`orca plane search`')
+    expect(md).toContain('**todos**')
+    // The heading must not be glued to the following paragraph text.
+    expect(md).not.toContain('Bugorca')
+    expect(md).not.toContain('.Fix')
+  })
+
+  it('converts attributed list and pre/code blocks', () => {
+    const html =
+      '<ul class="list-block"><li data-id="1">item one</li><li data-id="2">item two</li></ul>' +
+      '<pre class="code-block"><code class="language-ts">const x = 1</code></pre>'
+    const md = planeHtmlToMarkdown(html)
+
+    expect(md).toContain('- item one')
+    expect(md).toContain('- item two')
+    expect(md).toContain('```\nconst x = 1\n```')
+  })
+
   it('never imports the Jira ADF conversion module', async () => {
     const source = await import('node:fs/promises').then((fs) =>
       fs.readFile(new URL('./plane-html-markdown.ts', import.meta.url), 'utf-8')
