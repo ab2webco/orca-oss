@@ -48,6 +48,11 @@ export function usePlaneWorkItemDetailData(
   const [labelsDraft, setLabelsDraft] = useState('')
   const requestIdRef = useRef(0)
   const optimisticCommentsRef = useRef<PlaneComment[]>([])
+  // Why: the caller recomputes providerSettings fresh each render; holding it in a
+  // ref keeps loadComments + the load effect stable so they don't re-run every
+  // render (which caused a setState→render→effect infinite loop, max-update-depth).
+  const providerSettingsRef = useRef(providerSettings)
+  providerSettingsRef.current = providerSettings
 
   const loadComments = useCallback(
     async (targetItem: PlaneWorkItem, requestId: number): Promise<void> => {
@@ -55,7 +60,7 @@ export function usePlaneWorkItemDetailData(
       setCommentsError(null)
       try {
         let fetched = await planeListWorkItemComments(
-          providerSettings,
+          providerSettingsRef.current,
           targetItem.project.id,
           targetItem.id,
           targetItem.workspaceId
@@ -79,7 +84,7 @@ export function usePlaneWorkItemDetailData(
         }
       }
     },
-    [providerSettings]
+    []
   )
 
   useEffect(() => {
@@ -106,7 +111,7 @@ export function usePlaneWorkItemDetailData(
     setCommentsError(null)
     setItemLoading(true)
 
-    void planeGetWorkItem(providerSettings, item.id, item.project.id, item.workspaceId)
+    void planeGetWorkItem(providerSettingsRef.current, item.id, item.project.id, item.workspaceId)
       .then((result) => {
         if (requestId !== requestIdRef.current || !result) {
           return
@@ -123,8 +128,8 @@ export function usePlaneWorkItemDetailData(
       })
 
     void Promise.all([
-      planeListStates(providerSettings, item.project.id, item.workspaceId),
-      planeListMembers(providerSettings, item.workspaceId)
+      planeListStates(providerSettingsRef.current, item.project.id, item.workspaceId),
+      planeListMembers(providerSettingsRef.current, item.workspaceId)
     ])
       .then(([nextStates, nextMembers]) => {
         if (requestId !== requestIdRef.current) {
@@ -136,7 +141,7 @@ export function usePlaneWorkItemDetailData(
       .catch(() => {})
 
     void loadComments(item, requestId)
-  }, [item, loadComments, providerSettings])
+  }, [item, loadComments])
 
   return {
     displayed: fullItem ?? item,

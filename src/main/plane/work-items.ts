@@ -83,16 +83,12 @@ function toWorkItem(
   })
 }
 
-// Fetches every page for one connected Plane workspace. projectId scopes to
-// a single project; omitted, this hits Plane's native workspace-wide
-// work-items endpoint -- a single call that already spans every project in
-// the workspace, so no per-project fan-out is needed (see Step 0 spike).
-async function fetchWorkItemsForClient(
+async function fetchProjectWorkItems(
   client: PlaneClientForWorkspace,
-  projectId: string | undefined,
-  pql: string | undefined
+  projectId: string,
+  pql: string | undefined,
+  projectsById: Map<string, PlaneProject>
 ): Promise<PlaneWorkItem[]> {
-  const projectsById = await buildProjectsById(client)
   const budget = new IntegrationPaginationBudget()
   const raws = await fetchAllPlanePages<PlaneRecord>(
     (cursor) =>
@@ -104,6 +100,28 @@ async function fetchWorkItemsForClient(
     INTEGRATION_PAGINATION_MAX_PAGES
   )
   return raws.map((raw) => toWorkItem(raw, client, projectsById))
+}
+
+// Fetches work items for one connected Plane workspace. Plane's public REST API
+// scopes work-item lists to a single project (there is no working workspace-wide
+// list endpoint), so an omitted projectId ("all projects") fans out across every
+// project in the workspace via the project-scoped route, bounded concurrency.
+async function fetchWorkItemsForClient(
+  client: PlaneClientForWorkspace,
+  projectId: string | undefined,
+  pql: string | undefined
+): Promise<PlaneWorkItem[]> {
+  const projectsById = await buildProjectsById(client)
+  const projectIds = projectId ? [projectId] : [...projectsById.keys()]
+  if (projectIds.length === 0) {
+    return []
+  }
+  const fanout = await runBoundedIntegrationFanout(
+    projectIds,
+    (pid) => fetchProjectWorkItems(client, pid, pql, projectsById),
+    (items) => items
+  )
+  return fanout.results.flat()
 }
 
 function shouldSurfaceFailure(
