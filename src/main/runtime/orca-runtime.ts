@@ -733,6 +733,8 @@ import type {
   PlaneCurrentWorkItem,
   PlaneCurrentWorkItemContextHints,
   PlaneDeleteStateArgs,
+  PlaneLinkCurrentWorkItemResult,
+  PlaneUnlinkCurrentWorkItemResult,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
   PlaneWorkItemUpdate,
@@ -30047,6 +30049,69 @@ export class OrcaRuntimeService {
       return await this.resolveWorktreeForContainedPath(context.cwd)
     }
     return null
+  }
+
+  // Attaches a Plane work item to the worktree that contains the caller's cwd
+  // (or terminal/worktree hint), for worktrees that were NOT created from a
+  // Plane task. Validates the id/project against Plane before persisting so
+  // `--current` reads resolve later, and writes through the same worktree meta
+  // setter used at creation time (updateManagedWorktreeMeta → setWorktreeMeta).
+  async planeLinkCurrentWorkItem(args: {
+    context?: PlaneCurrentWorkItemContextHints
+    identifier: string
+    projectId: string
+    workspaceId?: string
+  }): Promise<PlaneLinkCurrentWorkItemResult> {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    const worktree = await this.resolvePlaneCurrentContextWorktree(args.context)
+    if (!worktree) {
+      return { ok: false, error: 'no_worktree' }
+    }
+    const workItem = await getPlaneWorkItem({
+      workItemId: args.identifier,
+      projectId: args.projectId,
+      workspaceId: args.workspaceId
+    })
+    if (!workItem) {
+      return { ok: false, error: 'work_item_not_found' }
+    }
+    const workspaceId = workItem.workspaceId ?? args.workspaceId
+    const linked: LinkedPlaneWorkItem = {
+      identifier: workItem.identifier,
+      projectId: workItem.project.id,
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(workItem.url ? { url: workItem.url } : {})
+    }
+    await this.updateManagedWorktreeMeta(`id:${worktree.id}`, { linkedPlaneWorkItem: linked })
+    return {
+      ok: true,
+      linked: {
+        identifier: linked.identifier,
+        projectId: linked.projectId,
+        ...(linked.workspaceId ? { workspaceId: linked.workspaceId } : {}),
+        ...(linked.url ? { url: linked.url } : {}),
+        workItem
+      }
+    }
+  }
+
+  // Clears the Plane link on the worktree that contains the caller's cwd (or
+  // terminal/worktree hint). Purely additive to the persisted meta — leaves
+  // Linear/GitHub links untouched — via the shared worktree meta setter.
+  async planeUnlinkCurrentWorkItem(args: {
+    context?: PlaneCurrentWorkItemContextHints
+  }): Promise<PlaneUnlinkCurrentWorkItemResult> {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    const worktree = await this.resolvePlaneCurrentContextWorktree(args.context)
+    if (!worktree) {
+      return { ok: false, error: 'no_worktree' }
+    }
+    await this.updateManagedWorktreeMeta(`id:${worktree.id}`, { linkedPlaneWorkItem: null })
+    return { ok: true, worktreeId: worktree.id }
   }
 
   planeUpdateWorkItem(args: {

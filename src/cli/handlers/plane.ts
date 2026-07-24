@@ -44,12 +44,15 @@ import {
 } from '../plane-format'
 import { resolveViewerId } from '../plane-save-issue-request'
 import { runPlaneCreate } from './plane-create'
+import { runPlaneLink, runPlaneUnlink } from './plane-link'
 import { runPlaneSaveIssue } from './plane-save-issue'
 
 const PLANE_WRITE_TIMEOUT_MS = 75_000
 
 export const PLANE_HANDLERS: Record<string, CommandHandler> = {
   'plane create': runPlaneCreate,
+  'plane link': runPlaneLink,
+  'plane unlink': runPlaneUnlink,
   'plane save-issue': runPlaneSaveIssue,
   'plane issue': async ({ flags, client, cwd, json }) => {
     const explicitId = getOptionalStringFlag(flags, 'id')

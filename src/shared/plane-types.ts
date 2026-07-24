@@ -100,6 +100,20 @@ export type PlaneCurrentWorkItem = {
   workItem: PlaneWorkItem | null
 }
 
+// Result of attaching a Plane work item to the current worktree after the fact
+// (for worktrees not created from a task). `no_worktree` means the caller is
+// not inside an Orca-managed worktree; `work_item_not_found` means the given
+// id/project did not resolve to a real Plane work item, so nothing was linked.
+export type PlaneLinkCurrentWorkItemResult =
+  | { ok: true; linked: PlaneCurrentWorkItem }
+  | { ok: false; error: 'no_worktree' | 'work_item_not_found' }
+
+// Result of clearing the Plane link on the current worktree. `no_worktree`
+// mirrors the link path: the caller is not inside an Orca-managed worktree.
+export type PlaneUnlinkCurrentWorkItemResult =
+  | { ok: true; worktreeId: string }
+  | { ok: false; error: 'no_worktree' }
+
 export type PlaneComment = {
   id: string
   body: string

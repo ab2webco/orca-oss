@@ -2,6 +2,7 @@
 // stay under the 300-line cap), so the component only imports one hook.
 import { useAppStore } from '@/store'
 import { usePlaneWorkItemDetailData } from './use-plane-work-item-detail-data'
+import { usePlaneWorkItemLinkWorktreeAction } from './use-plane-work-item-link-worktree'
 import {
   usePlaneWorkItemMutations,
   type PlaneWorkItemActionItem
@@ -57,6 +58,7 @@ export function usePlaneWorkItemWorkspace(
 
   const detail = usePlaneWorkItemDetailData(item, providerSettings)
   const mutations = usePlaneWorkItemMutations(detail, providerSettings, patchPlaneWorkItem)
+  const linkAction = usePlaneWorkItemLinkWorktreeAction(detail.displayed)
 
   return {
     displayed: detail.displayed,
@@ -70,6 +72,9 @@ export function usePlaneWorkItemWorkspace(
     comments: detail.comments,
     commentsLoading: detail.commentsLoading,
     commentsError: detail.commentsError,
-    ...mutations
+    ...mutations,
+    // Append the link affordance only when an active worktree exists, so
+    // worktrees not created from a task can still be attached to this item.
+    actionItems: linkAction ? [...mutations.actionItems, linkAction] : mutations.actionItems
   }
 }

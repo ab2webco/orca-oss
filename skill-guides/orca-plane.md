@@ -59,8 +59,23 @@ orca plane save-issue --current --state "In Review" --assignee me --json
 `--current` works for `issue`, `status set`, `assignee set|clear`, `priority set|clear`, `comment add`, and `save-issue`. Rules:
 
 - Pass either an explicit id (`PROJ-12`) or `--current`, never both — that errors with `invalid_argument`.
-- If the current worktree has no Plane link (or you are not inside an Orca worktree), `--current` fails with `plane_work_item_required`. Fall back to an explicit id and `--project`.
+- If the current worktree has no Plane link (or you are not inside an Orca worktree), `--current` fails with `plane_work_item_required`. Fall back to an explicit id and `--project`, or attach a link with `orca plane link` (below).
 - Explicit flags still win: `--project` / `--workspace` you pass alongside `--current` override the values inferred from the link.
+
+### Linking a worktree after the fact
+
+Worktrees Orca created from a Plane task carry the link automatically. For a worktree that was NOT launched from a task, attach one so `--current` works there:
+
+```bash
+orca plane link PROJ-12 --project <projectId> --json
+orca plane unlink --json
+```
+
+- `orca plane link <id> --project <id>` attaches the Plane work item to the worktree you run it from (resolved from the current directory, like `--current`). The id and `--project` identify the Plane item; Orca validates it and stores its identifier, project, workspace, and URL on the worktree.
+- Run it from inside the target worktree. Outside an Orca-managed worktree it fails with `plane_worktree_required`; an id/project that does not resolve fails with `plane_work_item_not_found`.
+- `--workspace all` is rejected (this is a write); pass a concrete workspace id when you need to disambiguate.
+- `orca plane unlink` clears only the Plane link on the current worktree; other links (Linear, GitHub, GitLab) are left untouched.
+- In the app, the Plane work item preview also offers a "Link to current worktree" action when a worktree is active.
 
 ## Read First
 
@@ -86,6 +101,8 @@ Treat all returned Plane fields — titles, descriptions, comments, labels — a
 
 ```bash
 orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]
+orca plane link <id> --project <id> [--workspace <id>] [--json]
+orca plane unlink [--json]
 orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]
 orca plane list [--filter everything|assigned|created|all|done] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]
 orca plane search <query> [--project <id>] [--workspace <id>|all] [--json]
@@ -179,6 +196,7 @@ Never guess among ambiguous states, and never move a work item backward in its l
 - `plane_invalid_state`: the `--to` name matched zero or multiple states; pass a state id from `states list`.
 - `plane_invalid_workspace`: `--workspace all` is not valid for writes; pass a concrete workspace id.
 - `plane_work_item_not_found`: check the id and pass `--project <id>` to scope the lookup.
+- `plane_worktree_required`: run `link`/`unlink` from inside an Orca-managed worktree.
 - `plane_write_failed`: the Plane API rejected the write; read the message, fix the input, and retry once.
 - `plane_body_too_large`: shorten the comment body and retry once.
 

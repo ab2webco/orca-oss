@@ -462,6 +462,75 @@ describe('orca plane CLI handlers', () => {
     expect(callMock).not.toHaveBeenCalled()
     expect(process.exitCode).toBe(1)
   })
+
+  it('maps link to plane.linkCurrentWorkItem with the current-worktree context', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req', {
+        ok: true,
+        linked: {
+          identifier: 'PROJ-12',
+          projectId: 'p1',
+          workspaceId: 'w1',
+          url: 'https://app.plane.so/acme/browse/PROJ-12/',
+          workItem: workItem()
+        }
+      })
+    )
+    await main(['plane', 'link', 'PROJ-12', '--project', 'p1', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith(
+      'plane.linkCurrentWorkItem',
+      {
+        context: { remote: false, cwd: '/tmp/repo' },
+        identifier: 'PROJ-12',
+        projectId: 'p1',
+        workspaceId: undefined
+      },
+      WRITE_OPTS
+    )
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it('rejects --workspace all for link', async () => {
+    await main(
+      ['plane', 'link', 'PROJ-12', '--project', 'p1', '--workspace', 'all', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('errors when link cannot resolve a worktree', async () => {
+    queueFixtures(callMock, okFixture('req', { ok: false, error: 'no_worktree' }))
+    await main(['plane', 'link', 'PROJ-12', '--project', 'p1', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('errors when link cannot find the work item', async () => {
+    queueFixtures(callMock, okFixture('req', { ok: false, error: 'work_item_not_found' }))
+    await main(['plane', 'link', 'PROJ-999', '--project', 'p1', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('maps unlink to plane.unlinkCurrentWorkItem with the current-worktree context', async () => {
+    queueFixtures(callMock, okFixture('req', { ok: true, worktreeId: 'repo::/tmp/repo' }))
+    await main(['plane', 'unlink', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith(
+      'plane.unlinkCurrentWorkItem',
+      { context: { remote: false, cwd: '/tmp/repo' } },
+      WRITE_OPTS
+    )
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it('errors when unlink cannot resolve a worktree', async () => {
+    queueFixtures(callMock, okFixture('req', { ok: false, error: 'no_worktree' }))
+    await main(['plane', 'unlink', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(process.exitCode).toBe(1)
+  })
 })
 
 function currentResolve(overrides: Record<string, unknown> = {}): Record<string, unknown> {

@@ -1,140 +1,24 @@
-import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
-import { OptionalPlainString, OptionalString, requiredString } from '../schemas'
-
-// Write-back covers create + state/assign/comment updates; work-item delete
-// remains deferred (see the approved plane-task-provider scope decision).
-const VALID_FILTERS = ['everything', 'assigned', 'created', 'all', 'done'] as const
-const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
-const VALID_STATE_GROUPS = ['backlog', 'unstarted', 'started', 'completed', 'cancelled'] as const
-
-const WorkspaceSelection = z
-  .object({
-    workspaceId: OptionalString
-  })
-  .optional()
-
-const Connect = z.object({
-  baseUrl: requiredString('Base URL is required'),
-  workspaceSlug: requiredString('Workspace slug is required'),
-  apiKey: requiredString('API key is required')
-})
-
-const SelectWorkspace = z.object({
-  workspaceId: requiredString('Workspace is required')
-})
-
-const ListWorkItems = z
-  .object({
-    projectId: OptionalString,
-    filter: z.enum(VALID_FILTERS).optional(),
-    workspaceId: OptionalString
-  })
-  .optional()
-
-const SearchWorkItems = z.object({
-  query: requiredString('Missing search query'),
-  projectId: OptionalString,
-  workspaceId: OptionalString
-})
-
-const GetWorkItem = z.object({
-  workItemId: requiredString('Work item ID is required'),
-  projectId: OptionalString,
-  workspaceId: OptionalString
-})
-
-const WorkItemUpdate = z.object({
-  title: OptionalString,
-  description: OptionalPlainString,
-  labelIds: z.array(z.string()).optional(),
-  assigneeIds: z.array(z.string()).optional(),
-  priority: z.enum(VALID_PRIORITIES).optional(),
-  stateId: OptionalString,
-  startDate: OptionalString,
-  targetDate: OptionalString,
-  parentId: z.union([z.string(), z.null()]).optional()
-})
-
-const UpdateWorkItem = z.object({
-  projectId: requiredString('Project is required'),
-  workItemId: requiredString('Work item ID is required'),
-  workspaceId: OptionalString,
-  updates: WorkItemUpdate
-})
-
-const CreateWorkItem = z.object({
-  projectId: requiredString('Project is required'),
-  title: requiredString('Title is required'),
-  workspaceId: OptionalString,
-  description: OptionalPlainString,
-  stateId: OptionalString,
-  assigneeIds: z.array(z.string()).optional(),
-  labelIds: z.array(z.string()).optional(),
-  priority: z.enum(VALID_PRIORITIES).optional(),
-  startDate: OptionalString,
-  targetDate: OptionalString,
-  parentId: z.union([z.string(), z.null()]).optional()
-})
-
-const AddWorkItemComment = z.object({
-  projectId: requiredString('Project is required'),
-  workItemId: requiredString('Work item ID is required'),
-  body: requiredString('Comment body is required'),
-  workspaceId: OptionalString
-})
-
-const WorkItemComments = z.object({
-  projectId: requiredString('Project is required'),
-  workItemId: requiredString('Work item ID is required'),
-  workspaceId: OptionalString
-})
-
-const ProjectScoped = z.object({
-  projectId: requiredString('Project is required'),
-  workspaceId: OptionalString
-})
-
-const CreateState = z.object({
-  projectId: requiredString('Project is required'),
-  workspaceId: OptionalString,
-  name: requiredString('Column name is required'),
-  group: z.enum(VALID_STATE_GROUPS),
-  color: OptionalString
-})
-
-const UpdateState = z.object({
-  projectId: requiredString('Project is required'),
-  stateId: requiredString('State ID is required'),
-  workspaceId: OptionalString,
-  name: OptionalString,
-  color: OptionalString,
-  sequence: z.number().optional()
-})
-
-const DeleteState = z.object({
-  projectId: requiredString('Project is required'),
-  stateId: requiredString('State ID is required'),
-  workspaceId: OptionalString
-})
-
-const ListMembers = z
-  .object({
-    workspaceId: OptionalString,
-    projectId: OptionalString
-  })
-  .optional()
-
-// Hints for `--current`: resolve the work item linked to the caller's worktree.
-// Mirrors Linear's LinearCurrentContext shape.
-const PlaneCurrentWorkItemContext = z
-  .object({
-    worktreeId: OptionalString,
-    terminalHandle: OptionalString,
-    cwd: OptionalString,
-    remote: z.boolean().optional()
-  })
-  .optional()
+import {
+  AddWorkItemComment,
+  Connect,
+  CreateState,
+  CreateWorkItem,
+  DeleteState,
+  GetWorkItem,
+  LinkCurrentWorkItem,
+  ListMembers,
+  ListWorkItems,
+  PlaneCurrentWorkItemContext,
+  ProjectScoped,
+  SearchWorkItems,
+  SelectWorkspace,
+  UnlinkCurrentWorkItem,
+  UpdateState,
+  UpdateWorkItem,
+  WorkItemComments,
+  WorkspaceSelection
+} from './plane-method-schemas'
 
 export const PLANE_METHODS: RpcMethod[] = [
   defineMethod({
@@ -206,6 +90,23 @@ export const PLANE_METHODS: RpcMethod[] = [
     name: 'plane.resolveCurrentWorkItem',
     params: PlaneCurrentWorkItemContext,
     handler: async (params, { runtime }) => runtime.planeResolveCurrentWorkItem(params)
+  }),
+  defineMethod({
+    name: 'plane.linkCurrentWorkItem',
+    params: LinkCurrentWorkItem,
+    handler: async (params, { runtime }) =>
+      runtime.planeLinkCurrentWorkItem({
+        context: params.context,
+        identifier: params.identifier.trim(),
+        projectId: params.projectId.trim(),
+        workspaceId: params.workspaceId
+      })
+  }),
+  defineMethod({
+    name: 'plane.unlinkCurrentWorkItem',
+    params: UnlinkCurrentWorkItem,
+    handler: async (params, { runtime }) =>
+      runtime.planeUnlinkCurrentWorkItem({ context: params?.context })
   }),
   defineMethod({
     name: 'plane.updateWorkItem',

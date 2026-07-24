@@ -45,6 +45,29 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['plane', 'link'],
+    summary: 'Link the current Orca worktree to a Plane work item',
+    usage: 'orca plane link <id> --project <id> [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace', 'id'],
+    positionalArgs: ['id'],
+    examples: [
+      'orca plane link PROJ-12 --project <projectId> --json',
+      'orca plane link 6f1c… --project <projectId> --workspace <id> --json'
+    ],
+    notes: [
+      'Attaches a Plane work item to the worktree you run this from, so later commands accept --current.',
+      'Use this for worktrees not created from a Plane task; run from inside the target worktree.'
+    ]
+  },
+  {
+    path: ['plane', 'unlink'],
+    summary: 'Clear the Plane work item link on the current worktree',
+    usage: 'orca plane unlink [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    examples: ['orca plane unlink --json'],
+    notes: ['Removes only the Plane link; other worktree links are left untouched.']
+  },
+  {
     path: ['plane', 'list'],
     summary: 'List Plane work items for task triage',
     usage:
