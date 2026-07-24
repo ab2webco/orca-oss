@@ -63,6 +63,7 @@ export type PlaneWorkItemPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent
 export type PlaneWorkItem = {
   id: string
   identifier: string
+  sequenceId: number
   workspaceSlug?: string
   workspaceId?: string
   title: string
@@ -73,6 +74,7 @@ export type PlaneWorkItem = {
   labels: string[]
   assignees?: PlaneUser[]
   priority?: PlaneWorkItemPriority
+  parentId?: string | null
   updatedAt: string
   createdAt: string
 }
