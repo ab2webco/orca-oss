@@ -116,6 +116,36 @@ describe('orca plane CLI handlers', () => {
     })
   })
 
+  it('filters list by --state and --priority client-side', async () => {
+    const logs: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((value: unknown) => {
+      logs.push(String(value))
+    })
+    queueFixtures(
+      callMock,
+      okFixture('req', [
+        workItem({
+          id: 'a',
+          state: { id: 's0', name: 'Todo', group: 'unstarted' },
+          priority: 'high'
+        }),
+        workItem({
+          id: 'b',
+          state: { id: 's1', name: 'Done', group: 'completed' },
+          priority: 'high'
+        }),
+        workItem({
+          id: 'c',
+          state: { id: 's0', name: 'Todo', group: 'unstarted' },
+          priority: 'low'
+        })
+      ])
+    )
+    await main(['plane', 'list', '--state', 'todo', '--priority', 'High', '--json'], '/tmp/repo')
+    const printed = JSON.parse(logs.join('\n')) as { result: { id: string }[] }
+    expect(printed.result.map((item) => item.id)).toEqual(['a'])
+  })
+
   it('maps search to plane.searchWorkItems', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'search', 'auth bug', '--json'], '/tmp/repo')

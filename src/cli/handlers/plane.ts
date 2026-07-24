@@ -102,7 +102,17 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
       workspaceId: getOptionalStringFlag(flags, 'workspace')
     })
     const limit = getOptionalPositiveIntegerFlag(flags, 'limit')
-    const items = limit === undefined ? response.result : response.result.slice(0, limit)
+    // Why: --state/--priority filter client-side because the self-hosted REST v1
+    // ignores server-side pql (see plane-pql-filter); state matches on name,
+    // priority on the static enum, both case-insensitive.
+    const stateFilter = getOptionalStringFlag(flags, 'state')?.toLowerCase()
+    const priorityFilter = getOptionalStringFlag(flags, 'priority')?.toLowerCase()
+    const filtered = response.result.filter(
+      (item) =>
+        (stateFilter === undefined || item.state.name.toLowerCase() === stateFilter) &&
+        (priorityFilter === undefined || (item.priority ?? 'none').toLowerCase() === priorityFilter)
+    )
+    const items = limit === undefined ? filtered : filtered.slice(0, limit)
     printResult({ ...response, result: items }, json, formatPlaneList)
   },
   'plane search': async ({ flags, client, json }) => {

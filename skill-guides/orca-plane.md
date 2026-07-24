@@ -104,7 +104,7 @@ orca plane create --project <id> --title <title> [--body <text> | --body-file <p
 orca plane link <id> --project <id> [--workspace <id>] [--json]
 orca plane unlink [--json]
 orca plane issue [<id>] [--current] [--comments] [--project <id>] [--workspace <id>] [--json]
-orca plane list [--filter everything|assigned|created|all|done] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]
+orca plane list [--filter everything|assigned|created|all|done] [--state <name>] [--priority none|low|medium|high|urgent] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]
 orca plane search <query> [--project <id>] [--workspace <id>|all] [--json]
 orca plane status set [<id>] [--current] --to <state-name-or-id> [--project <id>] [--workspace <id>] [--json]
 orca plane assignee set [<id>] [--current] (--me | --to-id <userId>) [--project <id>] [--workspace <id>] [--json]

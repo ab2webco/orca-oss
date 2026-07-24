@@ -76,9 +76,12 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
     path: ['plane', 'list'],
     summary: 'List Plane work items for task triage',
     usage:
-      'orca plane list [--filter everything|assigned|created|all|done] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'filter', 'project', 'limit', 'workspace'],
-    examples: ['orca plane list --filter assigned --limit 10 --json']
+      'orca plane list [--filter everything|assigned|created|all|done] [--state <name>] [--priority none|low|medium|high|urgent] [--project <id>] [--limit <n>] [--workspace <id>|all] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'filter', 'state', 'priority', 'project', 'limit', 'workspace'],
+    examples: [
+      'orca plane list --filter assigned --limit 10 --json',
+      'orca plane list --filter everything --state "In Progress" --priority high --json'
+    ]
   },
   {
     path: ['plane', 'search'],
