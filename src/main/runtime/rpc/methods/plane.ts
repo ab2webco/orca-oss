@@ -131,6 +131,11 @@ export const PLANE_METHODS: RpcMethod[] = [
     handler: async (_params, { runtime }) => runtime.planeStatus()
   }),
   defineMethod({
+    name: 'plane.getMe',
+    params: WorkspaceSelection,
+    handler: async (params, { runtime }) => runtime.planeGetMe(params?.workspaceId)
+  }),
+  defineMethod({
     name: 'plane.testConnection',
     params: WorkspaceSelection,
     handler: async (params, { runtime }) => runtime.planeTestConnection(params?.workspaceId)

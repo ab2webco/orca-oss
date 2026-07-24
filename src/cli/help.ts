@@ -120,6 +120,9 @@ Computer Use:
 Linear:
   linear                    Read Linear ticket context for agents
 
+Plane:
+  plane                     Read and update Plane work items for agents
+
 Mobile Emulator (iOS Simulator):
   emulator list             List available/running emulators (Orca-managed + raw serve-sim)
   emulator attach <device>  Attach/start helper and make active for the worktree

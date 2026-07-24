@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import { OrcaLogoSettingsIcon } from '@/components/settings/orca-logo-settings-icon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import type { Repo } from '../../../shared/types'
 import { getRepoKindLabel } from '../../../shared/repo-kind'
 import { useAppStore } from '@/store'
@@ -57,6 +58,7 @@ import { getBrowserPaneCombinedSearchEntries } from '@/components/settings/brows
 import { getNotificationsPaneSearchEntries } from '@/components/settings/notifications-search'
 import { getOrchestrationPaneSearchEntries } from '@/components/settings/orchestration-search'
 import { getLinearAgentSkillPaneSearchEntries } from '@/components/settings/linear-agent-skill-search'
+import { getPlaneAgentSkillPaneSearchEntries } from '@/components/settings/plane-agent-skill-search'
 import {
   getRuntimeEnvironmentsSearchEntry,
   getWebRuntimeEnvironmentsSearchEntry
@@ -81,6 +83,7 @@ import {
 } from '@/lib/windows-terminal-capabilities'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
+import { usePlaneProviderConnected } from '@/hooks/usePlaneProviderConnected'
 import { translate } from '@/i18n/i18n'
 
 export { isWebClientLocation } from '@/lib/web-client-location'
@@ -117,6 +120,7 @@ export function buildSettingsNavigationMetadata({
   isWebClient,
   isDev = import.meta.env.DEV,
   isLinearConnected = false,
+  isPlaneConnected = false,
   repos
 }: {
   isMac: boolean
@@ -125,6 +129,7 @@ export function buildSettingsNavigationMetadata({
   isWebClient: boolean
   isDev?: boolean
   isLinearConnected?: boolean
+  isPlaneConnected?: boolean
   repos: readonly Repo[]
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
@@ -197,6 +202,23 @@ export function buildSettingsNavigationMetadata({
             ),
             icon: LinearIcon,
             searchEntries: getLinearAgentSkillPaneSearchEntries(),
+            group: 'capabilities'
+          }
+        ]
+      : []),
+    // Why: only surfaced once Plane is connected — a capability that needs a
+    // linked provider before the agent skill has anything to act on.
+    ...(isPlaneConnected
+      ? [
+          {
+            id: 'plane',
+            title: translate('auto.hooks.useSettingsNavigationMetadata.planeTitle', 'Plane'),
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.planeDescription',
+              'Give agents the skill to read and update your Plane work items.'
+            ),
+            icon: PlaneIcon,
+            searchEntries: getPlaneAgentSkillPaneSearchEntries(),
             group: 'capabilities'
           }
         ]
@@ -607,6 +629,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const isWindows = isWindowsUserAgent()
   const isWebClient = isWebClientLocation()
   const isLinearConnected = useLinearProviderConnected()
+  const isPlaneConnected = usePlaneProviderConnected()
   const windowsTerminalCapabilityOwnerKey = getWindowsTerminalCapabilityOwnerKey(
     settings?.activeRuntimeEnvironmentId
   )
@@ -631,9 +654,19 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isWebClient,
         isDev: import.meta.env.DEV,
         isLinearConnected,
+        isPlaneConnected,
         repos
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
-    [isMac, isWindows, isWindowsTerminalHost, isWebClient, isLinearConnected, repos, activeLocale]
+    [
+      isMac,
+      isWindows,
+      isWindowsTerminalHost,
+      isWebClient,
+      isLinearConnected,
+      isPlaneConnected,
+      repos,
+      activeLocale
+    ]
   )
 }

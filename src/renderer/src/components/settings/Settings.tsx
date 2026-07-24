@@ -54,6 +54,7 @@ import { ExperimentalPane } from './ExperimentalPane'
 import { AgentsPane } from './AgentsPane'
 import { OrchestrationPane } from './OrchestrationPane'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
+import { PlaneAgentSkillPane } from './PlaneAgentSkillPane'
 import { AccountsPane } from './AccountsPane'
 import { StatsPane } from '../stats/StatsPane'
 import { IntegrationsPane } from './IntegrationsPane'
@@ -96,7 +97,9 @@ import type {
 import {
   COMPUTER_USE_SKILL_NAME,
   LINEAR_AGENT_SKILL_NAMES,
-  ORCHESTRATION_SKILL_NAME
+  ORCA_PLANE_SKILL_NAME,
+  ORCHESTRATION_SKILL_NAME,
+  PLANE_AGENT_SKILL_NAMES
 } from '@/lib/agent-feature-install-commands'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
@@ -105,6 +108,7 @@ import {
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
 import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
+import { usePlaneProviderConnected } from '@/hooks/usePlaneProviderConnected'
 import { useSkillFreshness } from '@/hooks/useSkillFreshness'
 import {
   getAgentSkillNavInstallStatus,
@@ -333,6 +337,7 @@ function Settings(): React.JSX.Element {
   const showDesktopOnlySettings = !isWebClient
   // Why: mirror the nav registry's gate so the Linear sidebar entry and section appear/disappear together.
   const linearConnected = useLinearProviderConnected()
+  const planeConnected = usePlaneProviderConnected()
   const activeSkillRuntime = useActiveProjectSkillRuntime()
   const orchestrationSkill = useInstalledAgentSkill(ORCHESTRATION_SKILL_NAME, {
     discoveryTarget: activeSkillRuntime.discoveryTarget,
@@ -340,6 +345,11 @@ function Settings(): React.JSX.Element {
   })
   const linearSkill = useInstalledAgentSkillNames(LINEAR_AGENT_SKILL_NAMES, {
     enabled: linearConnected,
+    discoveryTarget: activeSkillRuntime.discoveryTarget,
+    sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
+  })
+  const planeSkill = useInstalledAgentSkillNames(PLANE_AGENT_SKILL_NAMES, {
+    enabled: planeConnected,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
@@ -706,6 +716,7 @@ function Settings(): React.JSX.Element {
     loading: linearSkillLoading,
     skills: linearSkills
   } = linearSkill
+  const { installed: planeSkillInstalled, loading: planeSkillLoading } = planeSkill
   const { installed: computerUseSkillInstalled, loading: computerUseSkillLoading } =
     computerUseSkill
   const capabilityInstallStatusBySectionId = useMemo(() => {
@@ -728,6 +739,17 @@ function Settings(): React.JSX.Element {
           skills: linearSkills,
           installed: linearSkillInstalled,
           loading: linearSkillLoading,
+          inventory: applicableFreshnessInventory
+        })
+      )
+    }
+    if (planeConnected) {
+      next.set(
+        'plane',
+        getAgentSkillNavInstallStatus({
+          name: ORCA_PLANE_SKILL_NAME,
+          installed: planeSkillInstalled,
+          loading: planeSkillLoading,
           inventory: applicableFreshnessInventory
         })
       )
@@ -761,6 +783,9 @@ function Settings(): React.JSX.Element {
     linearSkillInstalled,
     linearSkillLoading,
     linearSkills,
+    planeConnected,
+    planeSkillInstalled,
+    planeSkillLoading,
     modelStates,
     orchestrationSkillInstalled,
     orchestrationSkillLoading,
@@ -1244,6 +1269,20 @@ function Settings(): React.JSX.Element {
                     searchEntries={getSectionSearchEntries('linear')}
                   >
                     {isSectionMounted('linear') ? <LinearAgentSkillPane /> : null}
+                  </SettingsSection>
+                ) : null}
+
+                {planeConnected ? (
+                  <SettingsSection
+                    id="plane"
+                    title={translate('auto.components.settings.Settings.planeTitle', 'Plane')}
+                    description={translate(
+                      'auto.components.settings.Settings.planeDescription',
+                      'Give agents the skill to read and update your Plane work items.'
+                    )}
+                    searchEntries={getSectionSearchEntries('plane')}
+                  >
+                    {isSectionMounted('plane') ? <PlaneAgentSkillPane /> : null}
                   </SettingsSection>
                 ) : null}
 

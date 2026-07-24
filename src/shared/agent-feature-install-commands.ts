@@ -7,6 +7,8 @@ export const EPHEMERAL_VMS_SKILL_NAME = 'orca-per-workspace-env'
 export const ORCA_LINEAR_SKILL_NAME = 'orca-linear'
 export const LINEAR_TICKETS_SKILL_NAME = 'linear-tickets'
 export const LINEAR_AGENT_SKILL_NAMES = [ORCA_LINEAR_SKILL_NAME, LINEAR_TICKETS_SKILL_NAME] as const
+export const ORCA_PLANE_SKILL_NAME = 'orca-plane'
+export const PLANE_AGENT_SKILL_NAMES = [ORCA_PLANE_SKILL_NAME] as const
 
 export function buildAgentFeatureSkillInstallCommand(skillNames: readonly string[]): string {
   if (skillNames.length === 0) {
@@ -69,3 +71,10 @@ export const LINEAR_TICKETS_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstal
 
 export const LINEAR_TICKETS_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(LINEAR_TICKETS_SKILL_NAME)
+
+export const ORCA_PLANE_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
+  ORCA_PLANE_SKILL_NAME
+])
+
+export const ORCA_PLANE_SKILL_UPDATE_COMMAND =
+  buildAgentFeatureSkillUpdateCommand(ORCA_PLANE_SKILL_NAME)

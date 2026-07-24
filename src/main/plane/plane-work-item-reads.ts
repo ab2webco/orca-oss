@@ -9,8 +9,11 @@ import {
   getClients,
   release,
   planeRequest,
+  toViewer,
+  USERS_ME_PATH,
   type PlaneClientForWorkspace
 } from './client'
+import { getCachedViewer, getPlaneWorkspaceId, setCachedViewer } from './plane-workspace-store'
 import { runBoundedIntegrationFanout } from '../integration-fanout'
 import {
   INTEGRATION_PAGINATION_MAX_PAGES,
@@ -30,6 +33,7 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneUser,
+  PlaneViewer,
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
 
@@ -92,6 +96,39 @@ export async function listProjects(
     )
   }
   return fanout.results.flat().sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// Resolves the connected viewer (users/me) for the selected workspace so the
+// CLI can map `--me` to a concrete assignee id. Uses the in-memory viewer cache
+// when present, otherwise fetches once and caches. Returns null when not
+// connected or the identity cannot be resolved so callers degrade cleanly.
+export async function getViewer(
+  workspaceId?: PlaneWorkspaceSelection | null
+): Promise<PlaneViewer | null> {
+  const client = getClients(workspaceId)[0]
+  if (!client) {
+    return null
+  }
+  const cacheKey = getPlaneWorkspaceId(client.baseUrl, client.workspaceSlug)
+  const cached = getCachedViewer(cacheKey)
+  if (cached) {
+    return cached
+  }
+  await acquire()
+  try {
+    const viewer = toViewer(await planeRequest<Record<string, unknown>>(client, USERS_ME_PATH))
+    if (viewer.id) {
+      setCachedViewer(cacheKey, viewer)
+      return viewer
+    }
+    return null
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    console.warn('[plane] getViewer failed:', boundedIntegrationErrorLog(error))
+    return null
+  } finally {
+    release()
+  }
 }
 
 export async function listStates(

@@ -589,7 +589,7 @@
       }
     },
     {
-      "appVersion": "1.4.151-rc.1",
+      "appVersion": "1.4.151-rc.0.lab.1",
       "skills": {
         "computer-use": 6,
         "linear-tickets": 8,
@@ -615,7 +615,7 @@
       }
     },
     {
-      "appVersion": "1.4.151-rc.2",
+      "appVersion": "1.4.151-rc.1.lab.1",
       "skills": {
         "computer-use": 8,
         "linear-tickets": 10,

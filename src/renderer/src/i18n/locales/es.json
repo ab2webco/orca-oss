@@ -647,6 +647,24 @@
         "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
         "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
         "launchPlanFailed": "Could not build a launch command for the switched session."
+      },
+      "plane": {
+        "usage": {
+          "examples": {
+            "readWorkItem": "Lee el elemento de trabajo",
+            "readWorkItemSummary": "Obtén todo el contexto de un elemento de trabajo de Plane antes de empezar.",
+            "readWorkItemPrompt": "Usa {{value0}} para leer el elemento de trabajo de Plane de esta tarea y resume el objetivo y los criterios de aceptación antes de empezar.",
+            "postUpdate": "Publica una actualización de progreso",
+            "postUpdateSummary": "Comenta el progreso o un resumen de finalización en el elemento de trabajo de Plane.",
+            "postUpdatePrompt": "Usa {{value0}} para publicar una actualización de finalización en el elemento de trabajo de Plane con qué cambió y cómo se verificó.",
+            "moveState": "Avanza el elemento de trabajo",
+            "moveStateSummary": "Avanza el estado del proyecto de Plane a medida que progresa el trabajo.",
+            "moveStatePrompt": "Usa {{value0}} para mover el elemento de trabajo de Plane a En revisión ahora que el cambio está listo.",
+            "triage": "Clasifica responsable y prioridad",
+            "triageSummary": "Asigna el responsable y la prioridad de un elemento de trabajo de Plane.",
+            "triagePrompt": "Usa {{value0}} para asignarme el elemento de trabajo de Plane y establecer su prioridad en alta."
+          }
+        }
       }
     },
     "hooks": {
@@ -771,7 +789,9 @@
         "devSearchKeywordNotification": "notification",
         "projectHostsSummary": "{{value0}} hosts",
         "linearTitle": "Linear",
-        "linearDescription": "Give agents the skill to read and update your linked Linear tickets."
+        "linearDescription": "Give agents the skill to read and update your linked Linear tickets.",
+        "planeTitle": "Plane",
+        "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
@@ -5175,7 +5195,13 @@
           "clearAccountConfig": "Clear config (start fresh)",
           "claudeRemoveLiveOne": "1 live Claude terminal is using this account. It will be closed before the account is deleted.",
           "claudeRemoveLiveMany": "{{count}} live Claude terminals are using this account. They will be closed before the account is deleted.",
-          "claudeRemoveCloseAndDelete": "Close & delete"
+          "claudeRemoveCloseAndDelete": "Close & delete",
+          "editEndpointLoadFailed": "Could not load the endpoint settings.",
+          "editEndpoint": "Edit",
+          "editEndpointTitle": "Edit Custom Endpoint Account",
+          "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
+          "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
+          "editEndpointSubmit": "Save changes"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",
@@ -6724,7 +6750,9 @@
           "dev": "Herramientas de desarrollo",
           "devDescription": "Herramientas solo de desarrollo para probar estados de la UI.",
           "linearTitle": "Linear",
-          "linearDescription": "Give agents the skill to read and update your linked Linear tickets."
+          "linearDescription": "Give agents the skill to read and update your linked Linear tickets.",
+          "planeTitle": "Plane",
+          "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No hay fuentes coincidentes.",
@@ -6975,7 +7003,8 @@
           "plane_launch_prompt_placeholder": "Elemento de Plane vinculado: {{identifier}}\n{{url}}",
           "plane_launch_prompt_title": "Plantilla de prompt de inicio",
           "plane_section_description": "Personaliza la primera instrucción que Orca envía al agente cuando inicias un worktree desde un elemento de Plane.",
-          "plane_section_title": "Plane"
+          "plane_section_title": "Plane",
+          "linear_launch_prompt_aria": "Linear launch prompt template"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Grosor de la línea divisoria del panel.",
@@ -9582,7 +9611,48 @@
               "verified": "Verificado",
               "workspace_count": "{{value0}} espacio{{value1}} de trabajo conectado"
             }
+          },
+          "agent": {
+            "skill": {
+              "search": {
+                "title": "Plane",
+                "description": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
+              }
+            }
           }
+        },
+        "GlobalConfigSyncDialog": {
+          "sourceUserConfig": ".claude.json",
+          "sourceSettings": "settings.json",
+          "sourcePluginDir": "plugin",
+          "previewFailed": "Could not read your global config.",
+          "syncedAccount": "Synced selected config into this account.",
+          "syncedAll": "Synced selected config into {{value0}} account(s).",
+          "syncFailed": "Failed to sync global config.",
+          "title": "Choose what to sync",
+          "description": "Pick which global MCP servers, skills, and plugin hooks to copy into managed accounts. Unchecked items are left untouched.",
+          "loading": "Reading config…",
+          "empty": "No global MCP servers, skills, or plugin hooks were found.",
+          "mcpTitle": "MCP servers",
+          "skillsTitle": "Skills",
+          "hooksTitle": "Plugin hooks",
+          "globalHooksToggle": "Also write selected hooks to global ~/.claude/settings.json (for non-pinned sessions).",
+          "cancel": "Cancel",
+          "confirm": "Sync selected",
+          "selectAll": "All",
+          "selectNone": "None"
+        },
+        "PlaneAgentSkillPane": {
+          "title": "Plane",
+          "description": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane.",
+          "skillTitle": "Habilidad de Plane",
+          "skillDescription": "Permite a los agentes leer elementos de trabajo y publicar actualizaciones en Plane a través de Orca.",
+          "terminalTitle": "Configuración de la habilidad de Plane",
+          "terminalAriaLabel": "Terminal de instalación de la habilidad de Plane",
+          "howToUse": "Cómo usarla",
+          "howToUseDescription": "Pide a un agente que trabaja en una tarea de Plane que lea el contexto, publique actualizaciones o mueva el elemento de trabajo.",
+          "manageConnectionHint": "Revisa los espacios de trabajo de Plane conectados y las claves de API en",
+          "manageConnectionLink": "Configuración de integraciones"
         }
       },
       "right": {

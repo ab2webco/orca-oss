@@ -1,0 +1,254 @@
+import type {
+  PlaneComment,
+  PlaneLabel,
+  PlaneMutationResult,
+  PlaneProject,
+  PlaneState,
+  PlaneStateMutationResult,
+  PlaneUser,
+  PlaneWorkItem,
+  PlaneWorkItemUpdate
+} from '../../shared/plane-types'
+import type { CommandHandler, HandlerContext } from '../dispatch'
+import { printResult } from '../format'
+import { RuntimeClientError } from '../runtime-client'
+import {
+  getOptionalPositiveIntegerFlag,
+  getOptionalStringFlag,
+  getRequiredStringFlag
+} from '../flags'
+import {
+  getPlaneListFilter,
+  getPlanePriorityFlag,
+  getPlaneStateGroupFlag,
+  readPlaneBody,
+  rejectAllWorkspaceForPlaneWrite,
+  resolvePlaneStateId,
+  throwOnPlaneMutationFailure,
+  unwrapPlaneStateMutation
+} from '../plane-request-builders'
+import {
+  formatPlaneLabels,
+  formatPlaneList,
+  formatPlaneMembers,
+  formatPlaneProjectList,
+  formatPlaneSearch,
+  formatPlaneStateMutation,
+  formatPlaneStates,
+  formatPlaneWorkItem,
+  type PlaneIssueView
+} from '../plane-format'
+import { resolveViewerId } from '../plane-save-issue-request'
+import { runPlaneSaveIssue } from './plane-save-issue'
+
+const PLANE_WRITE_TIMEOUT_MS = 75_000
+
+export const PLANE_HANDLERS: Record<string, CommandHandler> = {
+  'plane save-issue': runPlaneSaveIssue,
+  'plane issue': async ({ flags, client, json }) => {
+    const workItemId = getRequiredStringFlag(flags, 'id')
+    const projectId = getOptionalStringFlag(flags, 'project')
+    const workspaceId = getOptionalStringFlag(flags, 'workspace')
+    const response = await client.call<PlaneWorkItem | null>('plane.getWorkItem', {
+      workItemId,
+      projectId,
+      workspaceId
+    })
+    const workItem = response.result
+    if (!workItem) {
+      throw new RuntimeClientError(
+        'plane_work_item_not_found',
+        `Plane work item ${workItemId} not found`
+      )
+    }
+    const view: PlaneIssueView = { workItem }
+    if (flags.get('comments') === true) {
+      const comments = await client.call<PlaneComment[]>('plane.listWorkItemComments', {
+        projectId: workItem.project.id,
+        workItemId: workItem.id,
+        workspaceId
+      })
+      view.comments = comments.result
+    }
+    printResult({ ...response, result: view }, json, formatPlaneWorkItem)
+  },
+  'plane list': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneWorkItem[]>('plane.listWorkItems', {
+      projectId: getOptionalStringFlag(flags, 'project'),
+      filter: getPlaneListFilter(flags),
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    })
+    const limit = getOptionalPositiveIntegerFlag(flags, 'limit')
+    const items = limit === undefined ? response.result : response.result.slice(0, limit)
+    printResult({ ...response, result: items }, json, formatPlaneList)
+  },
+  'plane search': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneWorkItem[]>('plane.searchWorkItems', {
+      query: getRequiredStringFlag(flags, 'query'),
+      projectId: getOptionalStringFlag(flags, 'project'),
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    })
+    printResult(response, json, formatPlaneSearch)
+  },
+  'plane status set': async (ctx) => {
+    const { flags, client } = ctx
+    const target = planeWriteTarget(ctx)
+    const states = await client.call<PlaneState[]>('plane.listStates', {
+      projectId: target.projectId,
+      workspaceId: target.workspaceId
+    })
+    const stateId = resolvePlaneStateId(states.result, getRequiredStringFlag(flags, 'to'))
+    await runPlaneUpdate(ctx, target, { stateId }, `Set ${target.workItemId} state.`)
+  },
+  'plane assignee set': async (ctx) => {
+    const target = planeWriteTarget(ctx)
+    const assigneeIds = await resolveAssigneeSet(ctx, target.workspaceId)
+    await runPlaneUpdate(ctx, target, { assigneeIds }, `Updated ${target.workItemId} assignee.`)
+  },
+  'plane assignee clear': async (ctx) => {
+    const target = planeWriteTarget(ctx)
+    await runPlaneUpdate(ctx, target, { assigneeIds: [] }, `Cleared ${target.workItemId} assignee.`)
+  },
+  'plane priority set': async (ctx) => {
+    const target = planeWriteTarget(ctx)
+    const priority = getPlanePriorityFlag(ctx.flags, 'to')
+    await runPlaneUpdate(
+      ctx,
+      target,
+      { priority },
+      `Set ${target.workItemId} priority ${priority}.`
+    )
+  },
+  'plane priority clear': async (ctx) => {
+    const target = planeWriteTarget(ctx)
+    await runPlaneUpdate(
+      ctx,
+      target,
+      { priority: 'none' },
+      `Cleared ${target.workItemId} priority.`
+    )
+  },
+  'plane comment add': async (ctx) => {
+    const { flags, client, cwd, json } = ctx
+    const target = planeWriteTarget(ctx)
+    const body = await readPlaneBody(flags, cwd, { required: true })
+    const response = await client.call<PlaneMutationResult>(
+      'plane.addWorkItemComment',
+      {
+        projectId: target.projectId,
+        workItemId: target.workItemId,
+        body,
+        workspaceId: target.workspaceId
+      },
+      { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+    )
+    throwOnPlaneMutationFailure(response.result)
+    printResult(response, json, () => `Added comment to ${target.workItemId}.`)
+  },
+  'plane project list': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneProject[]>('plane.listProjects', {
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    })
+    printResult(response, json, formatPlaneProjectList)
+  },
+  'plane states list': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneState[]>('plane.listStates', {
+      projectId: getRequiredStringFlag(flags, 'project'),
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    })
+    printResult(response, json, formatPlaneStates)
+  },
+  'plane states create': async ({ flags, client, json }) => {
+    rejectAllWorkspaceForPlaneWrite(flags)
+    const response = await client.call<PlaneStateMutationResult>(
+      'plane.createState',
+      {
+        projectId: getRequiredStringFlag(flags, 'project'),
+        workspaceId: getOptionalStringFlag(flags, 'workspace'),
+        name: getRequiredStringFlag(flags, 'name'),
+        group: getPlaneStateGroupFlag(flags, 'group'),
+        color: getOptionalStringFlag(flags, 'color')
+      },
+      { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+    )
+    const state = unwrapPlaneStateMutation(response.result)
+    printResult({ ...response, result: state }, json, formatPlaneStateMutation)
+  },
+  'plane states rename': async ({ flags, client, json }) => {
+    rejectAllWorkspaceForPlaneWrite(flags)
+    const response = await client.call<PlaneStateMutationResult>(
+      'plane.updateState',
+      {
+        projectId: getRequiredStringFlag(flags, 'project'),
+        stateId: getRequiredStringFlag(flags, 'state'),
+        workspaceId: getOptionalStringFlag(flags, 'workspace'),
+        name: getRequiredStringFlag(flags, 'name'),
+        color: getOptionalStringFlag(flags, 'color')
+      },
+      { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+    )
+    const state = unwrapPlaneStateMutation(response.result)
+    printResult({ ...response, result: state }, json, formatPlaneStateMutation)
+  },
+  'plane labels list': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneLabel[]>('plane.listLabels', {
+      projectId: getRequiredStringFlag(flags, 'project'),
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    })
+    printResult(response, json, formatPlaneLabels)
+  },
+  'plane members list': async ({ flags, client, json }) => {
+    const response = await client.call<PlaneUser[]>('plane.listMembers', {
+      workspaceId: getOptionalStringFlag(flags, 'workspace'),
+      projectId: getOptionalStringFlag(flags, 'project')
+    })
+    printResult(response, json, formatPlaneMembers)
+  }
+}
+
+type PlaneWriteTarget = {
+  workItemId: string
+  projectId: string
+  workspaceId: string | undefined
+}
+
+function planeWriteTarget({ flags }: HandlerContext): PlaneWriteTarget {
+  rejectAllWorkspaceForPlaneWrite(flags)
+  return {
+    workItemId: getRequiredStringFlag(flags, 'id'),
+    projectId: getRequiredStringFlag(flags, 'project'),
+    workspaceId: getOptionalStringFlag(flags, 'workspace')
+  }
+}
+
+async function resolveAssigneeSet(
+  { flags, client }: HandlerContext,
+  workspaceId: string | undefined
+): Promise<string[]> {
+  const me = flags.get('me') === true
+  const toId = getOptionalStringFlag(flags, 'to-id')
+  if (me === Boolean(toId)) {
+    throw new RuntimeClientError('invalid_argument', 'Pass exactly one of --me or --to-id')
+  }
+  return me ? [await resolveViewerId(client, workspaceId)] : [toId as string]
+}
+
+async function runPlaneUpdate(
+  { client, json }: HandlerContext,
+  target: PlaneWriteTarget,
+  updates: PlaneWorkItemUpdate,
+  message: string
+): Promise<void> {
+  const response = await client.call<PlaneMutationResult>(
+    'plane.updateWorkItem',
+    {
+      projectId: target.projectId,
+      workItemId: target.workItemId,
+      workspaceId: target.workspaceId,
+      updates
+    },
+    { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+  )
+  throwOnPlaneMutationFailure(response.result)
+  printResult(response, json, () => message)
+}

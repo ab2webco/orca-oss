@@ -717,6 +717,7 @@ import {
   updateWorkItem as updatePlaneWorkItem
 } from '../plane/plane-work-item-writes'
 import {
+  getViewer as getPlaneViewer,
   listLabels as listPlaneLabels,
   listMembers as listPlaneMembers,
   listProjects as listPlaneProjects,
@@ -29945,6 +29946,10 @@ export class OrcaRuntimeService {
 
   planeStatus(): ReturnType<typeof getPlaneStatus> {
     return getPlaneStatus()
+  }
+
+  planeGetMe(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof getPlaneViewer> {
+    return getPlaneViewer(workspaceId)
   }
 
   planeTestConnection(workspaceId?: string): ReturnType<typeof testPlaneConnection> {

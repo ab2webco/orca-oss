@@ -15,6 +15,7 @@ const CANONICAL_GUIDE_NAMES = [
   'orca-emulator-android',
   'orca-linear',
   'orca-per-workspace-env',
+  'orca-plane',
   'orchestration'
 ]
 
@@ -28,6 +29,7 @@ const GUIDE_ALIASES = {
   'orca-emulator-android': [],
   'orca-linear': [],
   'orca-per-workspace-env': [],
+  'orca-plane': [],
   orchestration: []
 }
 
@@ -44,6 +46,7 @@ const STUB_TOPICS = [
   'orca-emulator-android',
   'orca-linear',
   'orca-per-workspace-env',
+  'orca-plane',
   'orchestration'
 ]
 
