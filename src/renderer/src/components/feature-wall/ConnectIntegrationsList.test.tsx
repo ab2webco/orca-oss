@@ -29,6 +29,12 @@ type StoreState = {
   checkJiraConnection: () => Promise<void>
   testJiraConnection: () => Promise<{ ok: boolean; error?: string }>
   disconnectJira: () => Promise<void>
+  planeStatus: { connected: boolean; workspaces?: unknown[] }
+  planeStatusChecked: boolean
+  planeStatusContextKey: string | null
+  checkPlaneConnection: () => Promise<void>
+  testPlaneConnection: () => Promise<{ ok: boolean; error?: string }>
+  disconnectPlane: () => Promise<void>
 }
 
 const { storeState } = vi.hoisted(() => ({
@@ -50,6 +56,10 @@ vi.mock('@/components/linear-api-key-dialog', () => ({
 
 vi.mock('@/components/jira-connect-dialog', () => ({
   JiraConnectDialog: () => null
+}))
+
+vi.mock('@/components/plane-connect-dialog', () => ({
+  PlaneConnectDialog: () => null
 }))
 
 function makePreflightStatus(overrides: Partial<PreflightStatus> = {}): PreflightStatus {
@@ -107,7 +117,13 @@ function installStore(preflightStatus: PreflightStatus): void {
     jiraStatusContextKey: providerContextKey,
     checkJiraConnection: vi.fn(async () => {}),
     testJiraConnection: vi.fn(async () => ({ ok: true })),
-    disconnectJira: vi.fn(async () => {})
+    disconnectJira: vi.fn(async () => {}),
+    planeStatus: { connected: false, workspaces: [] },
+    planeStatusChecked: true,
+    planeStatusContextKey: providerContextKey,
+    checkPlaneConnection: vi.fn(async () => {}),
+    testPlaneConnection: vi.fn(async () => ({ ok: true })),
+    disconnectPlane: vi.fn(async () => {})
   }
 }
 

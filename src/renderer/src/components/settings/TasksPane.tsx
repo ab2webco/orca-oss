@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
@@ -76,6 +77,19 @@ const TASK_PROVIDER_OPTIONS: readonly {
       )
     },
     Icon: ({ className }) => <JiraIcon className={className} />
+  },
+  {
+    id: 'plane',
+    get label() {
+      return translate('auto.components.settings.TasksPane.plane_label', 'Plane')
+    },
+    get description() {
+      return translate(
+        'auto.components.settings.TasksPane.plane_description',
+        'Show Plane in the Tasks source picker and sidebar shortcuts.'
+      )
+    },
+    Icon: ({ className }) => <PlaneIcon className={className} />
   }
 ]
 
@@ -95,6 +109,21 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
       return
     }
     updateSettings({ linearLaunchPromptTemplate: linearTemplateDraft })
+  }
+
+  const [planeTemplateDraft, setPlaneTemplateDraft] = useState(
+    settings.planeLaunchPromptTemplate ?? ''
+  )
+  // Keep the draft in sync when the persisted value changes elsewhere.
+  useEffect(() => {
+    setPlaneTemplateDraft(settings.planeLaunchPromptTemplate ?? '')
+  }, [settings.planeLaunchPromptTemplate])
+
+  const commitPlaneTemplate = (): void => {
+    if ((settings.planeLaunchPromptTemplate ?? '') === planeTemplateDraft) {
+      return
+    }
+    updateSettings({ planeLaunchPromptTemplate: planeTemplateDraft })
   }
 
   const toggleProvider = (provider: TaskProvider): void => {
@@ -139,6 +168,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             'linear',
             'jira',
             'atlassian',
+            'plane',
             'display',
             'hide'
           ]}
@@ -218,8 +248,8 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
         >
           <textarea
             aria-label={translate(
-              'auto.components.settings.TasksPane.8490b38b7e',
-              'Launch prompt template'
+              'auto.components.settings.TasksPane.linear_launch_prompt_aria',
+              'Linear launch prompt template'
             )}
             value={linearTemplateDraft}
             rows={3}
@@ -231,6 +261,46 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             )}
             onChange={(event) => setLinearTemplateDraft(event.target.value)}
             onBlur={commitLinearTemplate}
+            className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        </SearchableSetting>
+      </section>
+
+      <section className="space-y-3">
+        <SettingsSubsectionHeader
+          title={translate('auto.components.settings.TasksPane.plane_section_title', 'Plane')}
+          description={translate(
+            'auto.components.settings.TasksPane.plane_section_description',
+            'Customize the first instruction Orca sends to the agent when you start a worktree from a Plane work item.'
+          )}
+        />
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.TasksPane.plane_launch_prompt_title',
+            'Launch prompt template'
+          )}
+          description={translate(
+            'auto.components.settings.TasksPane.plane_launch_prompt_description',
+            'Leave empty to use the default. The work item identifier and URL variables are shown in the field placeholder.'
+          )}
+          keywords={['plane', 'prompt', 'template', 'launch', 'instruction', 'identifier', 'url']}
+          className="space-y-2 py-2"
+        >
+          <textarea
+            aria-label={translate(
+              'auto.components.settings.TasksPane.plane_launch_prompt_aria',
+              'Plane launch prompt template'
+            )}
+            value={planeTemplateDraft}
+            rows={3}
+            spellCheck={false}
+            placeholder={translate(
+              'auto.components.settings.TasksPane.plane_launch_prompt_placeholder',
+              'Linked Plane work item: {{identifier}}\n{{url}}',
+              { identifier: '{{identifier}}', url: '{{url}}' }
+            )}
+            onChange={(event) => setPlaneTemplateDraft(event.target.value)}
+            onBlur={commitPlaneTemplate}
             className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
           />
         </SearchableSetting>
