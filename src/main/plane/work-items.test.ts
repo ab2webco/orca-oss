@@ -491,12 +491,9 @@ describe('listWorkItems: client-side preset filtering (server ignores ?pql=)', (
 })
 
 describe('searchWorkItems', () => {
-  it('passes the raw PQL query through unmodified', async () => {
+  it('fetches every state with an all-states pql instead of passing the raw query through', async () => {
     getClientsMock.mockReturnValue([client('acme')])
     const { searchWorkItems } = await import('./work-items')
-    const complexQuery =
-      'priority = "urgent" AND assignee = currentUser() AND stateGroup NOT IN closedStates() ' +
-      'AND labels IN ("bug", "regression") AND createdAt > "2026-01-01" OR parent IS NOT EMPTY'
     let capturedPql: string | null = null
     planeRequestMock.mockImplementation(
       routeRequest({
@@ -508,29 +505,55 @@ describe('searchWorkItems', () => {
       })
     )
 
-    await searchWorkItems({ query: complexQuery, projectId: 'proj-1', workspaceId: 'acme' })
-    expect(capturedPql).toBe(complexQuery)
+    await searchWorkItems({ query: 'state = "Todo"', projectId: 'proj-1', workspaceId: 'acme' })
+    // Why: the self-hosted REST v1 ignores ?pql=, so search fetches the full set
+    // and filters client-side — it must never pass the raw query to the server.
+    expect(capturedPql).toBe('stateGroup IN openStates() OR stateGroup IN closedStates()')
   })
 
-  it('lets a Plane 400 for an over-complex PQL surface instead of being swallowed', async () => {
+  it('filters results client-side by a supported query', async () => {
+    getClientsMock.mockReturnValue([client('acme')])
+    const { searchWorkItems } = await import('./work-items')
+    const todo = {
+      ...rawWorkItem('wi-1', 'proj-1', 1),
+      state: { id: 's1', name: 'Todo', group: 'unstarted', sequence: 1 }
+    }
+    const done = {
+      ...rawWorkItem('wi-2', 'proj-1', 2),
+      state: { id: 's2', name: 'Done', group: 'completed', sequence: 4 }
+    }
+    planeRequestMock.mockImplementation(
+      routeRequest({
+        projects: () => projectsPage([ALPHA]),
+        projectWorkItems: () => page([todo, done])
+      })
+    )
+
+    const results = await searchWorkItems({
+      query: 'state = "Todo"',
+      projectId: 'proj-1',
+      workspaceId: 'acme'
+    })
+    expect(results.map((item) => item.id)).toEqual(['wi-1'])
+  })
+
+  it('throws a clear error for an unsupported query field instead of returning everything', async () => {
     getClientsMock.mockReturnValue([client('acme')])
     const { searchWorkItems } = await import('./work-items')
     planeRequestMock.mockImplementation(
       routeRequest({
         projects: () => projectsPage([ALPHA]),
-        projectWorkItems: () => {
-          throw new MockPlaneApiError('Query too complex: max 5 conditions', 400)
-        }
+        projectWorkItems: () => page([rawWorkItem('wi-1', 'proj-1', 1)])
       })
     )
 
     await expect(
       searchWorkItems({
-        query: 'a=1 AND b=2 AND c=3 AND d=4 AND e=5 AND f=6',
+        query: 'campo_inexistente = "x"',
         projectId: 'proj-1',
         workspaceId: 'acme'
       })
-    ).rejects.toThrow('Query too complex')
+    ).rejects.toThrow(/Unsupported query field/)
   })
 
   it('returns [] for a blank query without making any request', async () => {

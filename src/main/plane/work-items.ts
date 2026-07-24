@@ -16,6 +16,7 @@ import {
 } from './client'
 import { getCachedViewer, getPlaneWorkspaceId, setCachedViewer } from './plane-workspace-store'
 import { filterNeedsViewer, filterPlaneWorkItems } from './plane-work-item-filter'
+import { applyPlaneQuery, parsePlaneQuery, queryNeedsViewer } from './plane-pql-filter'
 import { runBoundedIntegrationFanout } from '../integration-fanout'
 import { boundedIntegrationErrorLog } from '../integration-error-message'
 import {
@@ -235,8 +236,11 @@ export async function listWorkItems(args: {
   return items.slice(0, INTEGRATION_PAGINATION_MAX_ITEMS)
 }
 
-// Passes query through unmodified as raw PQL -- unlike listWorkItems, no
-// server error is ever swallowed here (per-spec: "let Plane's 400 surface").
+// Why: the self-hosted REST v1 ignores ?pql=, so a server-side search returns
+// every item (silently, with ok:true). Parse a supported query subset and
+// filter client-side — throwing on anything unsupported so an unfiltered set is
+// never mistaken for a filtered one — fetching the full set with an all-states
+// pql the same way listWorkItems does.
 export async function searchWorkItems(args: {
   query: string
   projectId?: string
@@ -247,10 +251,16 @@ export async function searchWorkItems(args: {
   if (entries.length === 0 || !query) {
     return []
   }
+  const clauses = parsePlaneQuery(query)
+  const needsViewer = queryNeedsViewer(clauses)
   const items = await fetchAcrossClients(
     entries,
     args.workspaceId,
-    (client) => fetchWorkItemsForClient(client, args.projectId, query),
+    async (client) => {
+      const fetched = await fetchWorkItemsForClient(client, args.projectId, FETCH_ALL_STATES_PQL)
+      const viewerId = needsViewer ? await resolveViewerId(client) : null
+      return applyPlaneQuery(fetched, clauses, viewerId)
+    },
     false
   )
   return items.slice(0, INTEGRATION_PAGINATION_MAX_ITEMS)
