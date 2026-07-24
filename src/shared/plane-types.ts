@@ -100,7 +100,7 @@ export type PlaneWorkItemUpdate = {
   parentId?: string | null
 }
 
-export type PlaneWorkItemFilter = 'assigned' | 'created' | 'all' | 'done'
+export type PlaneWorkItemFilter = 'everything' | 'assigned' | 'created' | 'all' | 'done'
 
 export type PlaneConnectArgs = {
   baseUrl: string

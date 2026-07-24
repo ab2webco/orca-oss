@@ -147,6 +147,7 @@ export type PlanePresetId = PlaneWorkItemFilter
 export type PlanePreset = { id: PlanePresetId; label: string }
 
 export const getPlanePresets = createLocalizedCatalog((): PlanePreset[] => [
+  { id: 'everything', label: translate('auto.components.TaskPage.planeAllPreset', 'All') },
   { id: 'assigned', label: translate('auto.components.TaskPage.1301d376f1', 'Assigned') },
   { id: 'created', label: translate('auto.components.TaskPage.planeCreatedPreset', 'Created') },
   { id: 'all', label: translate('auto.components.TaskPage.4b6e40e42c', 'All Open') },

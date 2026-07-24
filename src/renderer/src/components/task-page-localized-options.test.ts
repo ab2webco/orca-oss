@@ -60,6 +60,7 @@ describe('task-page-localized-options', () => {
 
   it('shapes Plane presets as PQL filters, not JQL', () => {
     expect(getPlanePresets()).toEqual([
+      { id: 'everything', label: 'All' },
       { id: 'assigned', label: 'Assigned' },
       { id: 'created', label: 'Created' },
       { id: 'all', label: 'All Open' },

@@ -35,6 +35,23 @@ const items: PlaneWorkItem[] = [
 ]
 
 describe('filterPlaneWorkItems', () => {
+  it('everything -> every item regardless of state or viewer', () => {
+    expect(filterPlaneWorkItems(items, 'everything', 'me').map((item) => item.id)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5'
+    ])
+    expect(filterPlaneWorkItems(items, 'everything', null).map((item) => item.id)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5'
+    ])
+  })
+
   it('all -> only open state groups (backlog/unstarted/started)', () => {
     expect(filterPlaneWorkItems(items, 'all', 'me').map((item) => item.id)).toEqual(['1', '2', '3'])
   })

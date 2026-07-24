@@ -21,6 +21,10 @@ export function filterPlaneWorkItems(
   filter: PlaneWorkItemFilter,
   viewerId: string | null
 ): PlaneWorkItem[] {
+  if (filter === 'everything') {
+    // "Todos": every item in scope, regardless of state or assignee/creator.
+    return items
+  }
   if (filter === 'done') {
     return items.filter((item) => CLOSED_STATE_GROUPS.has(item.state.group))
   }

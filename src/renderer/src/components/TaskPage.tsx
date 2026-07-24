@@ -4793,7 +4793,7 @@ export default function TaskPage(): React.JSX.Element {
   const [planeErrorDetailsOpen, setPlaneErrorDetailsOpen] = useState(false)
   const [planeSearchInput, setPlaneSearchInput] = useState('')
   const [appliedPlaneSearch, setAppliedPlaneSearch] = useState('')
-  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('assigned')
+  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('everything')
   const [planeRefreshNonce, setPlaneRefreshNonce] = useState(0)
   const [planeOrderBy, setPlaneOrderBy] = useState<PlaneWorkItemSortColumn>('updated')
   const [planeOrderDirection, setPlaneOrderDirection] = useState<PlaneWorkItemSortDirection>('desc')
@@ -4853,7 +4853,7 @@ export default function TaskPage(): React.JSX.Element {
     setJiraSearchInput(jiraQuery)
     setAppliedJiraSearch(jiraQuery)
 
-    const planePreset = taskResumeState?.planePreset ?? 'assigned'
+    const planePreset = taskResumeState?.planePreset ?? 'everything'
     const planeQuery = taskResumeState?.planeQuery ?? ''
     setActivePlanePreset(planePreset)
     setPlaneSearchInput(planeQuery)
