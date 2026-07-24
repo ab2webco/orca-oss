@@ -70,7 +70,7 @@ type Props = {
   selectedRepoIds: ReadonlySet<string>
 }
 
-const ORCA_FEATURE_REQUEST_URL = 'https://github.com/stablyai/orca/issues/new'
+const ORCA_FEATURE_REQUEST_URL = 'https://github.com/ab2webco/orca-oss/issues/new'
 
 function listProjectViewsForRuntime(
   settings: Parameters<typeof getActiveRuntimeTarget>[0],
