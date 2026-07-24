@@ -1850,6 +1850,24 @@ const api = {
       workspaceId?: string
     }): Promise<unknown[]> => ipcRenderer.invoke('plane:listWorkItemComments', args),
 
+    createState: (args: {
+      projectId: string
+      workspaceId?: string
+      name: string
+      group: 'backlog' | 'unstarted' | 'started' | 'completed' | 'cancelled'
+      color?: string
+    }): Promise<{ ok: true; state: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:createState', args),
+
+    updateState: (args: {
+      projectId: string
+      stateId: string
+      workspaceId?: string
+      name?: string
+      color?: string
+    }): Promise<{ ok: true; state: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:updateState', args),
+
     listProjects: (args?: { workspaceId?: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('plane:listProjects', args),
 

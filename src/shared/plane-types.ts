@@ -122,3 +122,28 @@ export type PlaneCreateWorkItemResult =
   | { ok: false; error: string }
 
 export type PlaneMutationResult = { ok: true } | { ok: false; error: string }
+
+// Plane's fixed set of state groups a column can belong to.
+export type PlaneStateGroup = 'backlog' | 'unstarted' | 'started' | 'completed' | 'cancelled'
+
+export type PlaneCreateStateArgs = {
+  projectId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+  name: string
+  group: PlaneStateGroup
+  color?: string
+}
+
+export type PlaneUpdateStateArgs = {
+  projectId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+  stateId: string
+  name?: string
+  color?: string
+}
+
+// A create/update returns the resulting state so the board can insert/relabel
+// the column without a full refetch race.
+export type PlaneStateMutationResult =
+  | { ok: true; state: PlaneState }
+  | { ok: false; error: string }

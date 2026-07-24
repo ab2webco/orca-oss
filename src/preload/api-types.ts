@@ -249,6 +249,8 @@ import type {
   PlaneMutationResult,
   PlaneProject,
   PlaneState,
+  PlaneStateGroup,
+  PlaneStateMutationResult,
   PlaneUser,
   PlaneViewer,
   PlaneWorkItem,
@@ -2175,6 +2177,20 @@ export type PreloadApi = {
       workItemId: string
       workspaceId?: string
     }) => Promise<PlaneComment[]>
+    createState: (args: {
+      projectId: string
+      workspaceId?: string
+      name: string
+      group: PlaneStateGroup
+      color?: string
+    }) => Promise<PlaneStateMutationResult>
+    updateState: (args: {
+      projectId: string
+      stateId: string
+      workspaceId?: string
+      name?: string
+      color?: string
+    }) => Promise<PlaneStateMutationResult>
     listProjects: (args?: { workspaceId?: string }) => Promise<PlaneProject[]>
     listStates: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneState[]>
     listLabels: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneLabel[]>

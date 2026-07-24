@@ -15,10 +15,13 @@ import { toast } from 'sonner'
 import { useAppStore } from '../store'
 import { translate } from '@/i18n/i18n'
 import {
+  planeCreateState,
   planeListStates,
+  planeUpdateState,
   planeUpdateWorkItem,
   type RuntimePlaneSettings
 } from '@/runtime/runtime-plane-client'
+import { PlaneBoardAddColumn } from './plane-board-add-column'
 import { PlaneBoardCard } from './plane-board-card'
 import { PlaneBoardColumnView } from './plane-board-column'
 import { PlaneBoardFloatingMinimap } from './plane-board-floating-minimap'
@@ -37,7 +40,7 @@ import {
   withoutPlaneBoardStateOverride,
   type PlaneBoardStateOverrides
 } from './plane-board-drag'
-import type { PlaneState, PlaneWorkItem } from '../../../shared/plane-types'
+import type { PlaneState, PlaneStateGroup, PlaneWorkItem } from '../../../shared/plane-types'
 
 type TaskPagePlaneBoardProps = {
   items: PlaneWorkItem[]
@@ -74,22 +77,81 @@ export function TaskPagePlaneBoard({
   // real pointer movement past the threshold begins a drag (mouse-friendly).
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
+  // Monotonic token so a slow refetch from a previous project can never clobber
+  // the current project's states after a rapid switch.
+  const fetchTokenRef = useRef(0)
+
+  // Lifted so column rename/create can re-run it after a successful mutation.
+  const refreshStates = useCallback(async (): Promise<void> => {
+    const token = ++fetchTokenRef.current
+    try {
+      const states = await planeListStates(providerSettings, projectId, workspaceId)
+      if (fetchTokenRef.current === token) {
+        setProjectStates(states)
+      }
+    } catch {
+      // Keep the current columns rendered; a later refresh retries.
+    }
+  }, [providerSettings, projectId, workspaceId])
+
   // Load the project's full state list so empty columns render, ordered by
   // sequence. Falls back to item-derived states inside resolvePlaneBoardColumns.
   useEffect(() => {
-    let cancelled = false
     setProjectStates([])
-    void planeListStates(providerSettings, projectId, workspaceId)
-      .then((states) => {
-        if (!cancelled) {
-          setProjectStates(states)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [providerSettings, projectId, workspaceId])
+    void refreshStates()
+  }, [refreshStates])
+
+  const handleRenameColumn = useCallback(
+    (stateId: string, name: string): void => {
+      const previous = projectStates
+      // Optimistically relabel; revert on failure.
+      setProjectStates((states) =>
+        states.map((state) => (state.id === stateId ? { ...state, name } : state))
+      )
+      void planeUpdateState(providerSettings, { projectId, stateId, name }, workspaceId)
+        .then((result) => {
+          if (!result.ok) {
+            throw new Error(result.error)
+          }
+          void refreshStates()
+        })
+        .catch((error: unknown) => {
+          setProjectStates(previous)
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : translate(
+                  'auto.components.task-page-plane-board.renameFailed',
+                  'Failed to rename column.'
+                )
+          )
+        })
+    },
+    [projectStates, providerSettings, projectId, workspaceId, refreshStates]
+  )
+
+  const handleCreateColumn = useCallback(
+    async (name: string, group: PlaneStateGroup): Promise<boolean> => {
+      const result = await planeCreateState(
+        providerSettings,
+        { projectId, name, group },
+        workspaceId
+      )
+      if (!result.ok) {
+        toast.error(
+          result.error ||
+            translate(
+              'auto.components.task-page-plane-board.createFailed',
+              'Failed to create column.'
+            )
+        )
+        return false
+      }
+      await refreshStates()
+      return true
+    },
+    [providerSettings, projectId, workspaceId, refreshStates]
+  )
 
   // Drop overrides that an incoming refresh has already reconciled.
   useEffect(() => {
@@ -223,9 +285,11 @@ export function TaskPagePlaneBoard({
                   getStateTone={getStateTone}
                   selectedItemId={selectedItemId}
                   onOpenItem={onOpenItem}
+                  onRenameColumn={handleRenameColumn}
                 />
               ))}
             </SortableContext>
+            <PlaneBoardAddColumn onCreate={handleCreateColumn} />
           </div>
           <PlaneBoardFloatingMinimap
             columnCount={columns.length}

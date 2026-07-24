@@ -6,6 +6,7 @@ import { OptionalPlainString, OptionalString, requiredString } from '../schemas'
 // work items are v1.1 (see the approved plane-task-provider scope decision).
 const VALID_FILTERS = ['everything', 'assigned', 'created', 'all', 'done'] as const
 const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
+const VALID_STATE_GROUPS = ['backlog', 'unstarted', 'started', 'completed', 'cancelled'] as const
 
 const WorkspaceSelection = z
   .object({
@@ -78,6 +79,22 @@ const WorkItemComments = z.object({
 const ProjectScoped = z.object({
   projectId: requiredString('Project is required'),
   workspaceId: OptionalString
+})
+
+const CreateState = z.object({
+  projectId: requiredString('Project is required'),
+  workspaceId: OptionalString,
+  name: requiredString('Column name is required'),
+  group: z.enum(VALID_STATE_GROUPS),
+  color: OptionalString
+})
+
+const UpdateState = z.object({
+  projectId: requiredString('Project is required'),
+  stateId: requiredString('State ID is required'),
+  workspaceId: OptionalString,
+  name: OptionalString,
+  color: OptionalString
 })
 
 const ListMembers = z
@@ -178,6 +195,30 @@ export const PLANE_METHODS: RpcMethod[] = [
         projectId: params.projectId.trim(),
         workItemId: params.workItemId.trim(),
         workspaceId: params.workspaceId
+      })
+  }),
+  defineMethod({
+    name: 'plane.createState',
+    params: CreateState,
+    handler: async (params, { runtime }) =>
+      runtime.planeCreateState({
+        projectId: params.projectId.trim(),
+        workspaceId: params.workspaceId,
+        name: params.name.trim(),
+        group: params.group,
+        color: params.color
+      })
+  }),
+  defineMethod({
+    name: 'plane.updateState',
+    params: UpdateState,
+    handler: async (params, { runtime }) =>
+      runtime.planeUpdateState({
+        projectId: params.projectId.trim(),
+        stateId: params.stateId.trim(),
+        workspaceId: params.workspaceId,
+        name: params.name,
+        color: params.color
       })
   }),
   defineMethod({

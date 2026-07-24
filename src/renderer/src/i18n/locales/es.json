@@ -13830,7 +13830,9 @@
         "unassigned": "Sin asignar"
       },
       "plane-board-column": {
-        "reorder": "Reordenar la columna {{value0}}"
+        "reorder": "Reordenar la columna {{value0}}",
+        "rename": "Renombrar columna",
+        "renameLabel": "Nombre de la columna"
       },
       "plane-board-floating-minimap": {
         "label": "Arrastra para desplazar las columnas del tablero"
@@ -13862,7 +13864,22 @@
         }
       },
       "task-page-plane-board": {
-        "updateFailed": "No se pudo mover el elemento."
+        "updateFailed": "No se pudo mover el elemento.",
+        "renameFailed": "No se pudo renombrar la columna.",
+        "createFailed": "No se pudo crear la columna."
+      },
+      "plane-board-add-column": {
+        "add": "Añadir columna",
+        "namePlaceholder": "Nombre de la columna",
+        "nameLabel": "Nombre de la columna",
+        "groupLabel": "Grupo de estado",
+        "create": "Añadir",
+        "cancel": "Cancelar",
+        "groupBacklog": "Pendientes",
+        "groupUnstarted": "Sin empezar",
+        "groupStarted": "En curso",
+        "groupCompleted": "Completado",
+        "groupCancelled": "Cancelado"
       }
     },
     "i18n": {

@@ -7,6 +7,8 @@ import type {
   PlaneMutationResult,
   PlaneProject,
   PlaneState,
+  PlaneStateGroup,
+  PlaneStateMutationResult,
   PlaneUser,
   PlaneViewer,
   PlaneWorkItem,
@@ -209,6 +211,34 @@ export async function planeListStates(
   return target.kind === 'environment'
     ? callRuntimeRpc<PlaneState[]>(target, 'plane.listStates', params, { timeoutMs: 30_000 })
     : window.api.plane.listStates(params)
+}
+
+export async function planeCreateState(
+  settings: RuntimePlaneSettings,
+  args: { projectId: string; name: string; group: PlaneStateGroup; color?: string },
+  workspaceId?: string | null
+): Promise<PlaneStateMutationResult> {
+  const target = getPlaneRuntimeTarget(settings)
+  const params = { ...args, workspaceId: workspaceId ?? undefined }
+  return target.kind === 'environment'
+    ? callRuntimeRpc<PlaneStateMutationResult>(target, 'plane.createState', params, {
+        timeoutMs: 30_000
+      })
+    : window.api.plane.createState(params)
+}
+
+export async function planeUpdateState(
+  settings: RuntimePlaneSettings,
+  args: { projectId: string; stateId: string; name?: string; color?: string },
+  workspaceId?: string | null
+): Promise<PlaneStateMutationResult> {
+  const target = getPlaneRuntimeTarget(settings)
+  const params = { ...args, workspaceId: workspaceId ?? undefined }
+  return target.kind === 'environment'
+    ? callRuntimeRpc<PlaneStateMutationResult>(target, 'plane.updateState', params, {
+        timeoutMs: 30_000
+      })
+    : window.api.plane.updateState(params)
 }
 
 export async function planeListLabels(

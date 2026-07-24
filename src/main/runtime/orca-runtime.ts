@@ -711,7 +711,9 @@ import {
 } from '../plane/work-items'
 import {
   addWorkItemComment as addPlaneWorkItemComment,
+  createPlaneState as createPlaneBoardState,
   listWorkItemComments as listPlaneWorkItemComments,
+  updatePlaneState as updatePlaneBoardState,
   updateWorkItem as updatePlaneWorkItem
 } from '../plane/plane-work-item-writes'
 import {
@@ -722,6 +724,8 @@ import {
 } from '../plane/plane-work-item-reads'
 import type {
   PlaneConnectArgs,
+  PlaneCreateStateArgs,
+  PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
   PlaneWorkItemUpdate,
   PlaneWorkspaceSelection
@@ -29995,6 +29999,14 @@ export class OrcaRuntimeService {
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof listPlaneWorkItemComments> {
     return listPlaneWorkItemComments(args)
+  }
+
+  planeCreateState(args: PlaneCreateStateArgs): ReturnType<typeof createPlaneBoardState> {
+    return createPlaneBoardState(args)
+  }
+
+  planeUpdateState(args: PlaneUpdateStateArgs): ReturnType<typeof updatePlaneBoardState> {
+    return updatePlaneBoardState(args)
   }
 
   planeListProjects(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneProjects> {

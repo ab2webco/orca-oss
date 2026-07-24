@@ -13830,7 +13830,9 @@
         "unassigned": "Unassigned"
       },
       "plane-board-column": {
-        "reorder": "Reorder {{value0}} column"
+        "reorder": "Reorder {{value0}} column",
+        "rename": "Rename column",
+        "renameLabel": "Column name"
       },
       "plane-board-floating-minimap": {
         "label": "Drag to scroll board columns"
@@ -13862,7 +13864,22 @@
         }
       },
       "task-page-plane-board": {
-        "updateFailed": "Failed to move work item."
+        "updateFailed": "Failed to move work item.",
+        "renameFailed": "Failed to rename column.",
+        "createFailed": "Failed to create column."
+      },
+      "plane-board-add-column": {
+        "add": "Add column",
+        "namePlaceholder": "Column name",
+        "nameLabel": "Column name",
+        "groupLabel": "State group",
+        "create": "Add",
+        "cancel": "Cancel",
+        "groupBacklog": "Backlog",
+        "groupUnstarted": "Unstarted",
+        "groupStarted": "Started",
+        "groupCompleted": "Completed",
+        "groupCancelled": "Cancelled"
       }
     },
     "i18n": {

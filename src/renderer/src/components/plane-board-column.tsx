@@ -1,10 +1,11 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Pencil } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { Input } from '@/components/ui/input'
 import { PlaneBoardCard } from './plane-board-card'
 import { planeBoardColumnDroppableId, type PlaneBoardColumn } from './plane-board-drag'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
@@ -14,6 +15,8 @@ type PlaneBoardColumnViewProps = {
   getStateTone: (stateGroup: string) => string
   selectedItemId: string | null
   onOpenItem: (item: PlaneWorkItem) => void
+  /** Commit a new name for this column (state). No-op if unchanged/empty. */
+  onRenameColumn: (stateId: string, name: string) => void
 }
 
 // One state column: sticky header (drag handle + tone dot + name + count) over a
@@ -21,12 +24,13 @@ type PlaneBoardColumnViewProps = {
 // a card anywhere inside → this state) AND a horizontal sortable (reorder
 // columns) — the two dnd-kit refs are composed onto the root node. Only the
 // header grip carries the sortable listeners so grabbing the body still drags
-// cards.
+// cards. The name is inline-editable (click or pencil) without disturbing drag.
 export function PlaneBoardColumnView({
   column,
   getStateTone,
   selectedItemId,
-  onOpenItem
+  onOpenItem,
+  onRenameColumn
 }: PlaneBoardColumnViewProps): React.JSX.Element {
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: planeBoardColumnDroppableId(column.stateId),
@@ -43,6 +47,43 @@ export function PlaneBoardColumnView({
     id: column.stateId,
     data: { type: 'column', stateId: column.stateId }
   })
+
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(column.state.name)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  const beginEdit = useCallback(() => {
+    setDraft(column.state.name)
+    setEditing(true)
+  }, [column.state.name])
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
+
+  const commit = useCallback(() => {
+    setEditing(false)
+    const next = draft.trim()
+    if (next && next !== column.state.name) {
+      onRenameColumn(column.stateId, next)
+    }
+  }, [draft, column.state.name, column.stateId, onRenameColumn])
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        commit()
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        setEditing(false)
+      }
+    },
+    [commit]
+  )
 
   // Compose both dnd-kit refs onto the single column node.
   const composedRef = useCallback(
@@ -70,7 +111,7 @@ export function PlaneBoardColumnView({
         isDragging && 'z-10 opacity-60'
       )}
     >
-      <div className="flex flex-none items-center gap-2 border-b border-border/50 px-3 py-2">
+      <div className="group flex flex-none items-center gap-2 border-b border-border/50 px-3 py-2">
         <button
           type="button"
           {...attributes}
@@ -88,9 +129,29 @@ export function PlaneBoardColumnView({
           aria-hidden
           className={cn('size-2 shrink-0 rounded-full border', getStateTone(column.state.group))}
         />
-        <span className="min-w-0 truncate text-[12px] font-medium text-foreground">
-          {column.state.name}
-        </span>
+        {editing ? (
+          <Input
+            ref={inputRef}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            aria-label={translate('auto.components.plane-board-column.renameLabel', 'Column name')}
+            className="h-6 min-w-0 flex-1 px-1.5 py-0 text-[12px]"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={beginEdit}
+            title={translate('auto.components.plane-board-column.rename', 'Rename column')}
+            className="flex min-w-0 flex-1 items-center gap-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <span className="min-w-0 truncate text-[12px] font-medium text-foreground">
+              {column.state.name}
+            </span>
+            <Pencil className="size-3 shrink-0 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground/60" />
+          </button>
+        )}
         <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
           {column.items.length}
         </span>

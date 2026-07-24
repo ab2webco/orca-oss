@@ -13,6 +13,7 @@ import {
   updateWorkItem
 } from '../plane/plane-work-item-writes'
 import { listLabels, listMembers, listProjects, listStates } from '../plane/plane-work-item-reads'
+import { registerPlaneBoardStateHandlers } from './plane-board-state-ipc'
 import { _resetPreflightCache } from './preflight'
 import type { PlaneWorkItemFilter, PlaneWorkItemUpdate } from '../../shared/plane-types'
 
@@ -238,6 +239,8 @@ export function registerPlaneHandlers(): void {
       })
     }
   )
+
+  registerPlaneBoardStateHandlers()
 
   ipcMain.handle('plane:listProjects', async (_event, args?: { workspaceId?: string }) => {
     return listProjects(normalizeOptionalString(args?.workspaceId))

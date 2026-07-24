@@ -18,11 +18,14 @@ import {
   IntegrationPaginationBudget
 } from '../integration-pagination-budget'
 import { fetchAllPlanePages, type PlanePage } from './plane-cursor-pagination'
-import { mapPlaneComment } from './plane-work-item-mappers'
+import { mapPlaneComment, mapPlaneState } from './plane-work-item-mappers'
 import { workItemsBase } from './work-items'
 import type {
   PlaneComment,
+  PlaneCreateStateArgs,
   PlaneMutationResult,
+  PlaneStateMutationResult,
+  PlaneUpdateStateArgs,
   PlaneWorkItemUpdate,
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
@@ -41,6 +44,12 @@ function commentsPath(
   workItemId: string
 ): string {
   return `${workItemsBase(client, projectId)}${encodeURIComponent(workItemId)}/comments/`
+}
+
+// States are project-scoped like work items but under a sibling /states/ route,
+// mirroring the read path in plane-work-item-reads.ts (listStates).
+function statesBase(client: PlaneClientForWorkspace, projectId: string): string {
+  return `/api/v1/workspaces/${encodeURIComponent(client.workspaceSlug)}/projects/${encodeURIComponent(projectId)}/states/`
 }
 
 function commentsQuery(cursor: string | undefined): string {
@@ -145,6 +154,66 @@ export async function addWorkItemComment(args: {
   } catch (error) {
     clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to add comment.')
+  } finally {
+    release()
+  }
+}
+
+// Creates a new board column (Plane state). Returns the mapped PlaneState so
+// the board can insert the empty column immediately.
+export async function createPlaneState(
+  args: PlaneCreateStateArgs
+): Promise<PlaneStateMutationResult> {
+  const client = resolveClient(args.workspaceId)
+  if (!client) {
+    return { ok: false, error: 'Not connected to Plane.' }
+  }
+  await acquire()
+  try {
+    const body: PlaneRecord = { name: args.name, group: args.group }
+    if (args.color !== undefined) {
+      body.color = args.color
+    }
+    const created = await planeRequest<PlaneRecord>(client, statesBase(client, args.projectId), {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+    return { ok: true, state: mapPlaneState(created) }
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    return toMutationError(error, 'Failed to create column.')
+  } finally {
+    release()
+  }
+}
+
+// Renames/recolors an existing column (Plane state); only provided fields are
+// sent so an omitted field is never overwritten server-side.
+export async function updatePlaneState(
+  args: PlaneUpdateStateArgs
+): Promise<PlaneStateMutationResult> {
+  const client = resolveClient(args.workspaceId)
+  if (!client) {
+    return { ok: false, error: 'Not connected to Plane.' }
+  }
+  await acquire()
+  try {
+    const body: PlaneRecord = {}
+    if (args.name !== undefined) {
+      body.name = args.name
+    }
+    if (args.color !== undefined) {
+      body.color = args.color
+    }
+    const updated = await planeRequest<PlaneRecord>(
+      client,
+      `${statesBase(client, args.projectId)}${encodeURIComponent(args.stateId)}/`,
+      { method: 'PATCH', body: JSON.stringify(body) }
+    )
+    return { ok: true, state: mapPlaneState(updated) }
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    return toMutationError(error, 'Failed to update column.')
   } finally {
     release()
   }

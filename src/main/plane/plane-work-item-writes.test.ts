@@ -293,6 +293,178 @@ describe('addWorkItemComment', () => {
   })
 })
 
+describe('createPlaneState', () => {
+  it('POSTs to the project states path with name + group and maps the result', async () => {
+    const { createPlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedPath: string | undefined
+    let capturedMethod: string | undefined
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, url: string, init?: RequestInit) => {
+      capturedPath = pathOf(url).pathname
+      capturedMethod = init?.method
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({
+        id: 'state-new',
+        name: 'In Review',
+        group: 'started',
+        sequence: 30000,
+        color: '#abc'
+      })
+    })
+
+    const result = await createPlaneState({
+      projectId: 'proj-1',
+      workspaceId: 'acme',
+      name: 'In Review',
+      group: 'started'
+    })
+
+    expect(capturedMethod).toBe('POST')
+    expect(capturedPath).toBe('/api/v1/workspaces/acme/projects/proj-1/states/')
+    expect(capturedBody).toEqual({ name: 'In Review', group: 'started' })
+    expect(result).toEqual({
+      ok: true,
+      state: {
+        id: 'state-new',
+        name: 'In Review',
+        group: 'started',
+        sequence: 30000,
+        color: '#abc'
+      }
+    })
+  })
+
+  it('includes color in the body only when provided', async () => {
+    const { createPlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 's', name: 'X', group: 'backlog' })
+    })
+
+    await createPlaneState({
+      projectId: 'proj-1',
+      name: 'X',
+      group: 'backlog',
+      color: '#123456'
+    })
+
+    expect(capturedBody).toEqual({ name: 'X', group: 'backlog', color: '#123456' })
+  })
+
+  it('returns ok:false and clears the token on an auth error', async () => {
+    const { createPlaneState } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await createPlaneState({ projectId: 'proj-1', name: 'X', group: 'unstarted' })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('returns ok:false when no Plane workspace is connected', async () => {
+    const { createPlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([])
+
+    const result = await createPlaneState({ projectId: 'proj-1', name: 'X', group: 'unstarted' })
+
+    expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
+    expect(planeRequestMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('updatePlaneState', () => {
+  it('PATCHes the project state path with only the provided fields', async () => {
+    const { updatePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedPath: string | undefined
+    let capturedMethod: string | undefined
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, url: string, init?: RequestInit) => {
+      capturedPath = pathOf(url).pathname
+      capturedMethod = init?.method
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 'state-2', name: 'Renamed', group: 'unstarted' })
+    })
+
+    const result = await updatePlaneState({
+      projectId: 'proj-1',
+      workspaceId: 'acme',
+      stateId: 'state-2',
+      name: 'Renamed'
+    })
+
+    expect(capturedMethod).toBe('PATCH')
+    expect(capturedPath).toBe('/api/v1/workspaces/acme/projects/proj-1/states/state-2/')
+    expect(capturedBody).toEqual({ name: 'Renamed' })
+    expect(result).toEqual({
+      ok: true,
+      state: {
+        id: 'state-2',
+        name: 'Renamed',
+        group: 'unstarted',
+        sequence: undefined,
+        color: undefined
+      }
+    })
+  })
+
+  it('sends both name and color when both are provided', async () => {
+    const { updatePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 'state-2', name: 'Renamed', group: 'started' })
+    })
+
+    await updatePlaneState({
+      projectId: 'proj-1',
+      stateId: 'state-2',
+      name: 'Renamed',
+      color: '#00ff00'
+    })
+
+    expect(capturedBody).toEqual({ name: 'Renamed', color: '#00ff00' })
+  })
+
+  it('returns ok:false and clears the token on an auth error', async () => {
+    const { updatePlaneState } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await updatePlaneState({
+      projectId: 'proj-1',
+      stateId: 'state-2',
+      name: 'Renamed'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('returns ok:false when no Plane workspace is connected', async () => {
+    const { updatePlaneState } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([])
+
+    const result = await updatePlaneState({
+      projectId: 'proj-1',
+      stateId: 'state-2',
+      name: 'Renamed'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
+    expect(planeRequestMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('listWorkItemComments', () => {
   it('paginates via cursor and maps html bodies to markdown', async () => {
     const { listWorkItemComments } = await import('./plane-work-item-writes')
