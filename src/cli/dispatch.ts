@@ -24,6 +24,11 @@ import { INTROSPECTION_HANDLERS } from './handlers/introspection'
 import { EMULATOR_HANDLERS } from './handlers/emulator'
 import { LINEAR_HANDLERS } from './handlers/linear'
 import { PLANE_HANDLERS } from './handlers/plane'
+import { PLANE_DELETE_ARCHIVE_HANDLERS } from './handlers/plane-delete-archive'
+import { PLANE_RELATION_HANDLERS } from './handlers/plane-relation'
+import { PLANE_ATTACH_HANDLERS } from './handlers/plane-attach'
+import { PLANE_LABEL_HANDLERS } from './handlers/plane-label'
+import { PLANE_COMMENT_LIST_HANDLERS } from './handlers/plane-comment-list'
 import { VM_HANDLERS } from './handlers/vm'
 import { SKILL_HANDLERS } from './handlers/skills'
 
@@ -64,6 +69,11 @@ function buildHandlers(): Map<string, CommandHandler> {
     ENVIRONMENT_HANDLERS,
     LINEAR_HANDLERS,
     PLANE_HANDLERS,
+    PLANE_DELETE_ARCHIVE_HANDLERS,
+    PLANE_RELATION_HANDLERS,
+    PLANE_ATTACH_HANDLERS,
+    PLANE_LABEL_HANDLERS,
+    PLANE_COMMENT_LIST_HANDLERS,
     VM_HANDLERS,
     SKILL_HANDLERS
   ]

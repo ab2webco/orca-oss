@@ -706,6 +706,17 @@ import {
   updatePlaneState as updatePlaneBoardState,
   updateWorkItem as updatePlaneWorkItem
 } from '../plane/plane-work-item-writes'
+import { deleteWorkItem as deletePlaneWorkItem } from '../plane/plane-work-item-delete'
+import {
+  addWorkItemRelation as addPlaneWorkItemRelation,
+  listWorkItemRelations as listPlaneWorkItemRelations
+} from '../plane/plane-work-item-relations'
+import {
+  addWorkItemLink as addPlaneWorkItemLink,
+  deleteWorkItemLink as deletePlaneWorkItemLink,
+  listWorkItemLinks as listPlaneWorkItemLinks
+} from '../plane/plane-work-item-links'
+import { createLabel as createPlaneLabel } from '../plane/plane-label'
 import {
   getViewer as getPlaneViewer,
   listLabels as listPlaneLabels,
@@ -714,12 +725,17 @@ import {
   listStates as listPlaneStates
 } from '../plane/plane-work-item-reads'
 import type {
+  PlaneAddLinkArgs,
+  PlaneAddRelationArgs,
   PlaneConnectArgs,
+  PlaneCreateLabelArgs,
   PlaneCreateStateArgs,
   PlaneCreateWorkItemArgs,
   PlaneCurrentWorkItem,
   PlaneCurrentWorkItemContextHints,
+  PlaneDeleteLinkArgs,
   PlaneDeleteStateArgs,
+  PlaneDeleteWorkItemArgs,
   PlaneLinkCurrentWorkItemResult,
   PlaneUnlinkCurrentWorkItemResult,
   PlaneUpdateStateArgs,
@@ -30258,6 +30274,44 @@ export class OrcaRuntimeService {
     projectId?: string
   ): ReturnType<typeof listPlaneMembers> {
     return listPlaneMembers(workspaceId, projectId)
+  }
+
+  planeDeleteWorkItem(args: PlaneDeleteWorkItemArgs): ReturnType<typeof deletePlaneWorkItem> {
+    return deletePlaneWorkItem(args)
+  }
+
+  planeAddWorkItemRelation(
+    args: PlaneAddRelationArgs
+  ): ReturnType<typeof addPlaneWorkItemRelation> {
+    return addPlaneWorkItemRelation(args)
+  }
+
+  planeListWorkItemRelations(args: {
+    projectId: string
+    workItemId: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof listPlaneWorkItemRelations> {
+    return listPlaneWorkItemRelations(args)
+  }
+
+  planeAddWorkItemLink(args: PlaneAddLinkArgs): ReturnType<typeof addPlaneWorkItemLink> {
+    return addPlaneWorkItemLink(args)
+  }
+
+  planeDeleteWorkItemLink(args: PlaneDeleteLinkArgs): ReturnType<typeof deletePlaneWorkItemLink> {
+    return deletePlaneWorkItemLink(args)
+  }
+
+  planeListWorkItemLinks(args: {
+    projectId: string
+    workItemId: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof listPlaneWorkItemLinks> {
+    return listPlaneWorkItemLinks(args)
+  }
+
+  planeCreateLabel(args: PlaneCreateLabelArgs): ReturnType<typeof createPlaneLabel> {
+    return createPlaneLabel(args)
   }
 
   // ── Browser automation ──

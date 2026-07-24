@@ -182,6 +182,7 @@ describe('mapPlaneWorkItem', () => {
       project,
       state: { id: 'state-1', name: 'In Progress', group: 'started', sequence: 2, color: '#00f' },
       labels: ['bug'],
+      labelIds: ['label-1'],
       assignees: [
         {
           id: 'user-1',

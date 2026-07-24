@@ -20,8 +20,9 @@ import {
   WorkItemComments,
   WorkspaceSelection
 } from './plane-method-schemas'
+import { PLANE_EXTENDED_METHODS } from './plane-extended'
 
-export const PLANE_METHODS: RpcMethod[] = [
+const PLANE_BASE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'plane.connect',
     params: Connect,
@@ -229,3 +230,5 @@ export const PLANE_METHODS: RpcMethod[] = [
       runtime.planeListMembers(params?.workspaceId, params?.projectId)
   })
 ]
+
+export const PLANE_METHODS: RpcMethod[] = [...PLANE_BASE_METHODS, ...PLANE_EXTENDED_METHODS]

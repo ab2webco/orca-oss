@@ -4,6 +4,8 @@ import { RuntimeClientError } from './runtime-client'
 import { getOptionalStringFlag, getRepeatedStringFlag, getRequiredStringFlag } from './flags'
 import {
   getPlanePriorityFlag,
+  readPlaneBody,
+  resolvePlaneParentFlag,
   resolvePlaneStateId,
   resolvePlaneWriteTarget
 } from './plane-request-builders'
@@ -45,6 +47,22 @@ export async function buildPlaneSaveIssueRequest(
   }
   if (flags.has('label')) {
     updates.labelIds = getRepeatedStringFlag(flags, 'label')
+  }
+  const description = await readPlaneBody(flags, cwd, { required: false })
+  if (description !== undefined) {
+    updates.description = description
+  }
+  const parentId = await resolvePlaneParentFlag(flags, client, projectId, workspaceId)
+  if (parentId !== undefined) {
+    updates.parentId = parentId
+  }
+  const startDate = getOptionalStringFlag(flags, 'start-date')
+  if (startDate !== undefined) {
+    updates.startDate = startDate
+  }
+  const targetDate = getOptionalStringFlag(flags, 'target-date')
+  if (targetDate !== undefined) {
+    updates.targetDate = targetDate
   }
 
   return { projectId, workItemId, workspaceId, updates }

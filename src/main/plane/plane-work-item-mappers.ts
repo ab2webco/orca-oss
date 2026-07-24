@@ -132,6 +132,17 @@ function mapLabelNames(value: unknown, labelsById: ReadonlyMap<string, string>):
   )
 }
 
+// Label UUIDs, tolerating both the expanded-object form and the bare-UUID
+// fallback, so incremental label edits can diff against the current id set.
+function mapLabelIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value
+    .map((entry) => (typeof entry === 'string' ? entry : mapPlaneLabel(entry).id))
+    .filter((id) => id.length > 0)
+}
+
 function workItemUrl(baseUrl: string, workspaceSlug: string, identifier: string): string {
   // Plane's cloud API host (api.plane.so) is not the web app host
   // (app.plane.so); self-hosted instances typically serve both from the
@@ -180,6 +191,7 @@ export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): Pl
     project: ctx.project,
     state,
     labels: mapLabelNames(item.labels, ctx.labelsById ?? new Map()),
+    labelIds: mapLabelIds(item.labels),
     assignees: mapAssignees(item.assignees),
     priority: asPriority(item.priority),
     parentId: typeof parent === 'string' ? parent : null,

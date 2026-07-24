@@ -4,7 +4,8 @@ import { getOptionalStringFlag, getRepeatedStringFlag, getRequiredStringFlag } f
 import {
   getPlanePriorityFlag,
   readPlaneBody,
-  rejectAllWorkspaceForPlaneWrite
+  rejectAllWorkspaceForPlaneWrite,
+  resolvePlaneParentFlag
 } from './plane-request-builders'
 import { resolveAssigneeIds, resolveStateId } from './plane-save-issue-request'
 
@@ -37,6 +38,20 @@ export async function buildPlaneCreateRequest(
   }
   if (flags.has('label')) {
     request.labelIds = getRepeatedStringFlag(flags, 'label')
+  }
+  // Create only nests under an existing parent; the null-clear form is
+  // save-issue-only, so a resolved string is the sole value forwarded here.
+  const parentId = await resolvePlaneParentFlag(flags, client, projectId, workspaceId)
+  if (typeof parentId === 'string') {
+    request.parentId = parentId
+  }
+  const startDate = getOptionalStringFlag(flags, 'start-date')
+  if (startDate !== undefined) {
+    request.startDate = startDate
+  }
+  const targetDate = getOptionalStringFlag(flags, 'target-date')
+  if (targetDate !== undefined) {
+    request.targetDate = targetDate
   }
   return request
 }

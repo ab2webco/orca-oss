@@ -72,6 +72,9 @@ export type PlaneWorkItem = {
   project: PlaneProject
   state: PlaneState
   labels: string[]
+  // Label UUIDs alongside the display names in `labels`, so incremental
+  // label add/remove can compute a new id set without a separate read.
+  labelIds?: string[]
   assignees?: PlaneUser[]
   priority?: PlaneWorkItemPriority
   parentId?: string | null
@@ -193,4 +196,74 @@ export type PlaneDeleteStateArgs = {
 // the column without a full refetch race.
 export type PlaneStateMutationResult =
   | { ok: true; state: PlaneState }
+  | { ok: false; error: string }
+
+export type PlaneDeleteWorkItemArgs = {
+  projectId: string
+  workItemId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+// Plane's relation_type set (list_work_item_relations groups results by these);
+// the CLI exposes a friendlier alias set that maps onto these verbatim.
+export type PlaneRelationType =
+  | 'relates_to'
+  | 'blocking'
+  | 'blocked_by'
+  | 'duplicate'
+  | 'start_after'
+  | 'start_before'
+  | 'finish_after'
+  | 'finish_before'
+
+export type PlaneWorkItemRelation = {
+  id: string
+  relationType: PlaneRelationType
+  relatedWorkItemId: string
+  name?: string
+  sequenceId?: number
+}
+
+export type PlaneAddRelationArgs = {
+  projectId: string
+  workItemId: string
+  relationType: PlaneRelationType
+  relatedWorkItemId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneWorkItemLink = {
+  id: string
+  url: string
+  title?: string
+}
+
+export type PlaneAddLinkArgs = {
+  projectId: string
+  workItemId: string
+  url: string
+  title?: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneDeleteLinkArgs = {
+  projectId: string
+  workItemId: string
+  linkId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneLinkMutationResult =
+  | { ok: true; link: PlaneWorkItemLink }
+  | { ok: false; error: string }
+
+export type PlaneCreateLabelArgs = {
+  projectId: string
+  name: string
+  color?: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneLabelMutationResult =
+  | { ok: true; label: PlaneLabel }
   | { ok: false; error: string }

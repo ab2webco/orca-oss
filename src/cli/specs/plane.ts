@@ -1,12 +1,13 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
+import { PLANE_EXTENDED_COMMAND_SPECS } from './plane-extended'
 
-export const PLANE_COMMAND_SPECS: CommandSpec[] = [
+const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['plane', 'create'],
     summary: 'Create a Plane work item',
     usage:
-      'orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]',
+      'orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--parent <id>] [--start-date <YYYY-MM-DD>] [--target-date <YYYY-MM-DD>] [--workspace <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'project',
@@ -17,6 +18,9 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
       'assignee',
       'priority',
       'label',
+      'parent',
+      'start-date',
+      'target-date',
       'workspace'
     ],
     examples: [
@@ -25,7 +29,8 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Use --body-file - to read a multiline description from stdin.',
-      'Repeated --label sets the label set from the provided label ids.'
+      'Repeated --label sets the label set from the provided label ids.',
+      '--parent takes a work item id/identifier and nests the new item under it.'
     ]
   },
   {
@@ -229,16 +234,21 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     path: ['plane', 'save-issue'],
     summary: 'Update Plane work item fields in one partial write',
     usage:
-      'orca plane save-issue [<id>] [--current] [--project <id>] [--title <title>] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]',
+      'orca plane save-issue [<id>] [--current] [--project <id>] [--title <title>] [--body <text> | --body-file <path|->] [--state <state>] [--assignee me|<userId>|null] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--parent <id>|null] [--start-date <YYYY-MM-DD>] [--target-date <YYYY-MM-DD>] [--workspace <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'current',
       'project',
       'title',
+      'body',
+      'body-file',
       'state',
       'assignee',
       'priority',
       'label',
+      'parent',
+      'start-date',
+      'target-date',
       'workspace',
       'id'
     ],
@@ -249,7 +259,14 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Repeated --label replaces the full label set with the provided label ids.',
+      '--body/--body-file set the description (Markdown; --body-file - reads stdin).',
+      '--parent takes a work item id/identifier; pass --parent null to clear it.',
       'Pass --current instead of <id> --project to target the work item linked to the current worktree.'
     ]
   }
+]
+
+export const PLANE_COMMAND_SPECS: CommandSpec[] = [
+  ...PLANE_BASE_COMMAND_SPECS,
+  ...PLANE_EXTENDED_COMMAND_SPECS
 ]

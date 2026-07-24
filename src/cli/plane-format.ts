@@ -4,7 +4,9 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneUser,
-  PlaneWorkItem
+  PlaneWorkItem,
+  PlaneWorkItemLink,
+  PlaneWorkItemRelation
 } from '../shared/plane-types'
 import type { PlaneCreatedWorkItem } from './plane-request-builders'
 
@@ -109,4 +111,36 @@ export function formatPlaneStateMutation(state: PlaneState): string {
 
 export function formatPlaneCreate(created: PlaneCreatedWorkItem): string {
   return [`Created ${created.identifier} (${created.id})`, `URL: ${created.url}`].join('\n')
+}
+
+export function formatPlaneComments(comments: PlaneComment[]): string {
+  if (comments.length === 0) {
+    return 'No comments.'
+  }
+  return comments.map((comment) => `${comment.id}\n${formatPlaneCommentRow(comment)}`).join('\n')
+}
+
+export function formatPlaneRelations(relations: PlaneWorkItemRelation[]): string {
+  if (relations.length === 0) {
+    return 'No relations.'
+  }
+  return relations
+    .map((relation) => {
+      const label = relation.name ?? relation.relatedWorkItemId
+      return `${relation.relationType.padEnd(14)} ${label.padEnd(28)} ${relation.relatedWorkItemId}`
+    })
+    .join('\n')
+}
+
+export function formatPlaneLinks(links: PlaneWorkItemLink[]): string {
+  if (links.length === 0) {
+    return 'No links.'
+  }
+  return links
+    .map((link) => `${(link.title ?? '').padEnd(28)} ${link.url}${link.id ? ` (${link.id})` : ''}`)
+    .join('\n')
+}
+
+export function formatPlaneLabelCreated(label: PlaneLabel): string {
+  return `Created label ${label.name} (${label.id}).`
 }

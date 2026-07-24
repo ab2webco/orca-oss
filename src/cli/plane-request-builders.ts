@@ -1,14 +1,17 @@
-import { isAbsolute, join } from 'node:path'
 import type {
   PlaneCreateWorkItemResult,
   PlaneCurrentWorkItem,
   PlaneCurrentWorkItemContextHints,
+  PlaneLabel,
+  PlaneLabelMutationResult,
+  PlaneLinkMutationResult,
   PlaneMutationResult,
   PlaneState,
   PlaneStateGroup,
   PlaneStateMutationResult,
   PlaneWorkItem,
   PlaneWorkItemFilter,
+  PlaneWorkItemLink,
   PlaneWorkItemPriority
 } from '../shared/plane-types'
 
@@ -101,10 +104,30 @@ export async function resolvePlaneWriteTarget(args: {
   return { workItemId, projectId, workspaceId }
 }
 
+// Resolves the --parent flag to the UUID Plane's write routes require. The
+// literal `null` clears the parent (returns null); any other value resolves
+// through getWorkItem exactly like the target id; an absent flag returns
+// undefined so the caller leaves `parent` untouched.
+export async function resolvePlaneParentFlag(
+  flags: Map<string, string | boolean>,
+  client: RuntimeClient,
+  projectId: string,
+  workspaceId: string | undefined
+): Promise<string | null | undefined> {
+  if (!flags.has('parent')) {
+    return undefined
+  }
+  const value = getRequiredStringFlagAllowingEmpty(flags, 'parent')
+  if (value === 'null') {
+    return null
+  }
+  return resolvePlaneWorkItemUuid(client, value, projectId, workspaceId)
+}
+
 // Resolves an explicit id flag (identifier like "NETSA-74" OR a UUID) to the
 // work item UUID that Plane's write routes require. getWorkItem accepts either
 // form and returns the item with `.id` set to the UUID.
-async function resolvePlaneWorkItemUuid(
+export async function resolvePlaneWorkItemUuid(
   client: RuntimeClient,
   requestedId: string,
   projectId: string,
@@ -123,14 +146,10 @@ async function resolvePlaneWorkItemUuid(
   }
   return response.result.id
 }
-import {
-  NodeReadableTextTooLargeError,
-  readNodeReadableTextWithinLimit
-} from '../shared/node-readable-text'
-import {
-  NodeFileReadTooLargeError,
-  readNodeFileWithinLimit
-} from '../shared/node-bounded-file-reader'
+
+// Re-exported from its own module so the existing import sites keep working
+// while both files stay under the per-file line cap.
+export { readPlaneBody } from './plane-body-input'
 
 const PLANE_LIST_FILTERS: readonly PlaneWorkItemFilter[] = [
   'everything',
@@ -154,9 +173,6 @@ const PLANE_STATE_GROUPS: readonly PlaneStateGroup[] = [
   'completed',
   'cancelled'
 ]
-
-const PLANE_WRITE_BODY_CAP = 50_000
-const PLANE_WRITE_BODY_MAX_BYTES = PLANE_WRITE_BODY_CAP * 4
 
 export function getPlaneStateGroupFlag(
   flags: Map<string, string | boolean>,
@@ -259,72 +275,20 @@ export function unwrapPlaneCreateMutation(result: PlaneCreateWorkItemResult): Pl
   return result
 }
 
-export function readPlaneBody(
-  flags: Map<string, string | boolean>,
-  cwd: string,
-  options: { required: true }
-): Promise<string>
-export function readPlaneBody(
-  flags: Map<string, string | boolean>,
-  cwd: string,
-  options: { required: false }
-): Promise<string | undefined>
-export async function readPlaneBody(
-  flags: Map<string, string | boolean>,
-  cwd: string,
-  options: { required: boolean }
-): Promise<string | undefined> {
-  const hasBody = flags.has('body')
-  const hasBodyFile = flags.has('body-file')
-  if (hasBody && hasBodyFile) {
-    throw new RuntimeClientError('invalid_argument', 'Use either --body or --body-file, not both')
+// Link create returns the created link on success; surface a failure as a CLI
+// error and otherwise hand back the link so the caller can echo it.
+export function unwrapPlaneLinkMutation(result: PlaneLinkMutationResult): PlaneWorkItemLink {
+  if (!result.ok) {
+    throw new RuntimeClientError('plane_write_failed', result.error)
   }
-  if (!hasBody && !hasBodyFile) {
-    if (options.required) {
-      throw new RuntimeClientError('invalid_argument', 'Missing --body or --body-file')
-    }
-    return undefined
-  }
-  const body = hasBody
-    ? getRequiredStringFlagAllowingEmpty(flags, 'body')
-    : await readPlaneBodyFile(getRequiredStringFlag(flags, 'body-file'), cwd)
-  if (body.length > PLANE_WRITE_BODY_CAP) {
-    throw planeBodyTooLargeError()
-  }
-  return body
+  return result.link
 }
 
-async function readPlaneBodyFile(path: string, cwd: string): Promise<string> {
-  if (path !== '-') {
-    try {
-      const { buffer } = await readNodeFileWithinLimit(
-        isAbsolute(path) ? path : join(cwd, path),
-        PLANE_WRITE_BODY_MAX_BYTES
-      )
-      return buffer.toString('utf8')
-    } catch (error) {
-      if (error instanceof NodeFileReadTooLargeError) {
-        throw planeBodyTooLargeError()
-      }
-      throw error
-    }
+// Label create returns the created label on success; surface a failure as a
+// CLI error and otherwise hand back the label so the caller can echo it.
+export function unwrapPlaneLabelMutation(result: PlaneLabelMutationResult): PlaneLabel {
+  if (!result.ok) {
+    throw new RuntimeClientError('plane_write_failed', result.error)
   }
-  if (process.stdin.isTTY) {
-    throw new RuntimeClientError('invalid_argument', 'stdin body requested but stdin is a TTY')
-  }
-  try {
-    return await readNodeReadableTextWithinLimit(process.stdin, PLANE_WRITE_BODY_MAX_BYTES)
-  } catch (error) {
-    if (error instanceof NodeReadableTextTooLargeError) {
-      throw planeBodyTooLargeError()
-    }
-    throw error
-  }
-}
-
-function planeBodyTooLargeError(): RuntimeClientError {
-  return new RuntimeClientError(
-    'plane_body_too_large',
-    `Plane body must be at most ${PLANE_WRITE_BODY_CAP} characters`
-  )
+  return result.label
 }
