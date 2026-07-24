@@ -1,7 +1,7 @@
 import { killWithDescendantSweep } from '../pty-descendant-termination'
 import type { Session } from './session'
 
-type SessionTeardownOperation = {
+type AgentTeardownOperation = {
   promise: Promise<void>
   immediate: boolean
   rootSignalled: boolean
@@ -9,10 +9,10 @@ type SessionTeardownOperation = {
   session: Session
 }
 
-/** Owns terminal teardown by session id until descendant capture and root
+/** Owns agent teardown by session id until descendant capture and root
  * signalling finish, even when the root exits and its Session is reaped. */
 export class TerminalSessionTeardown {
-  private operations = new Map<string, SessionTeardownOperation>()
+  private operations = new Map<string, AgentTeardownOperation>()
 
   constructor(private sessions: ReadonlyMap<string, Session>) {}
 
@@ -33,11 +33,44 @@ export class TerminalSessionTeardown {
     return pending?.promise
   }
 
-  killSession(sessionId: string, session: Session, immediate: boolean): Promise<void> {
-    return this.killOwnedSession(sessionId, session, immediate)
+  killSession(sessionId: string, session: Session, immediate: boolean): void | Promise<void> {
+    if (session.launchAgent) {
+      return this.killAgentSession(sessionId, session, immediate)
+    }
+    if (immediate) {
+      return this.forceKillPlainShellSession(sessionId, session)
+    } else {
+      session.kill()
+    }
   }
 
-  private killOwnedSession(sessionId: string, session: Session, immediate: boolean): Promise<void> {
+  /**
+   * Immediate teardown of a non-agent shell. On Windows, closing the ConPTY does not
+   * reap orphaned children (node-pty `useConptyDll` skips the console-process reap), so a
+   * live `pnpm i`/`node` survives shell exit, keeps the ConPTY console non-empty, and holds
+   * the worktree cwd — failing destructive worktree removal with "Failed to physically stop
+   * every PTY". taskkill /T /F the tree first so physical exit becomes verifiable. Mirrors
+   * the agent path (#10004/#10100). POSIX shells already reach their child pgroup on
+   * forceKill, so they stay on the plain force-kill path.
+   */
+  private async forceKillPlainShellSession(sessionId: string, session: Session): Promise<void> {
+    if (process.platform === 'win32') {
+      // Why: forceKillAndWaitForExit claims termination synchronously; awaiting the sweep
+      // ahead of it would leave attach open on a doomed session for the taskkill's duration.
+      session.beginTermination()
+      await killWithDescendantSweep(session.pid, () => {}, {
+        // Why: the descendant tree is only ours while this Session still owns the live root PID.
+        ownsRoot: () => this.sessions.get(sessionId) === session && session.isAlive
+      })
+    }
+    await session.forceKillAndWaitForExit()
+  }
+
+  private killAgentSession(
+    sessionId: string,
+    session: Session,
+    immediate: boolean
+  ): void | Promise<void> {
     const pending = this.operations.get(sessionId)
     if (pending) {
       // Why: an immediate caller is a stronger teardown request and must not
@@ -52,13 +85,13 @@ export class TerminalSessionTeardown {
       if (immediate && session.isAlive && session.isTerminating) {
         return session.forceKillAndWaitForExit()
       }
-      return Promise.resolve()
+      return
     }
     if (!immediate) {
       session.scheduleForceDisposeFallback()
     }
 
-    const entry: SessionTeardownOperation = {
+    const entry: AgentTeardownOperation = {
       promise: Promise.resolve(),
       immediate,
       rootSignalled: false,
@@ -88,14 +121,9 @@ export class TerminalSessionTeardown {
         }
       )
     )
-    // Why: sweep failure still must retain the native owner until OS-confirmed root exit.
-    const operation = sweep.then(
-      () => entry.rootCompletion,
-      async (error: unknown) => {
-        await entry.rootCompletion
-        throw error
-      }
-    )
+    // Why: descendant capture completion only proves signals were requested;
+    // destructive callers must retain the native owner until OS-confirmed exit.
+    const operation = sweep.then(() => entry.rootCompletion)
     entry.promise = operation
     this.operations.set(sessionId, entry)
     const clearOperation = (): void => {

@@ -521,7 +521,14 @@ jobs:
           # message and tag name explicitly (avoids npm's `v1.2.3` prefix
           # assumptions and any lifecycle scripts that would run on bump).
           npm version "$VERSION" --no-git-tag-version --allow-same-version
-          git add package.json
+          # Why: release cut is the single authoritative point where the released
+          # skill ledger advances — this version's working-tree bytes become an
+          # immutable released revision so future builds recognize them as an
+          # official snapshot. It is the only place skill artifacts regenerate;
+          # ordinary lint verifies working-tree bytes against the committed ledger
+          # and never walks tags. Uses only Node built-ins, so no install needed.
+          node config/scripts/generate-skill-bundle-manifest.mjs --release "$VERSION"
+          git add package.json resources/skills
           commit_message="release: v$VERSION"
           if [[ "$EVENT_NAME" == "schedule" ]]; then
             commit_message="$commit_message [rc-slot:$SLOT]"

@@ -1140,6 +1140,14 @@ export class LocalPtyProvider implements IPtyProvider {
       await killWithDescendantSweep(proc.pid, signalRoot, {
         ownsRoot: () => ptyProcesses.get(id) === proc
       })
+    } else if (process.platform === 'win32' && operation.immediate) {
+      // Why: a plain shell's ConPTY teardown doesn't reap orphaned children (useConptyDll
+      // skips the console reap), so a live `pnpm i`/`node` keeps the ConPTY console alive and
+      // holds the worktree cwd, failing destructive removal. taskkill /T /F clears the tree so
+      // physical stop is verifiable. POSIX shells reach their child pgroup on forceKill (#10004).
+      await killWithDescendantSweep(proc.pid, signalRoot, {
+        ownsRoot: () => ptyProcesses.get(id) === proc
+      })
     } else {
       signalRoot()
     }

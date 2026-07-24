@@ -66,9 +66,14 @@ describe('TerminalHost', () => {
     _onDataCb: ((data: string) => void) | null
     _onExitCb: ((code: number) => void) | null
   }
+  let platformDescriptor: PropertyDescriptor | undefined
 
   beforeEach(() => {
-    killWithDescendantSweepMock.mockReset().mockImplementation((_pid, kill) => kill())
+    // Pin POSIX so plain-shell teardown is deterministic across host OSes (matches linux CI);
+    // the Windows taskkill /T /F tree-kill path is covered in terminal-session-teardown.test.ts.
+    platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+    killWithDescendantSweepMock.mockReset()
     spawnFn = vi.fn(() => {
       const sub = createMockSubprocess() as ReturnType<typeof createMockSubprocess> & {
         _onDataCb: ((data: string) => void) | null
@@ -82,6 +87,9 @@ describe('TerminalHost', () => {
 
   afterEach(async () => {
     await host.dispose()
+    if (platformDescriptor) {
+      Object.defineProperty(process, 'platform', platformDescriptor)
+    }
   })
 
   it('rejects missing strict inspection', () =>
@@ -111,7 +119,6 @@ describe('TerminalHost', () => {
 
       const result = await host.createOrAttach({
         sessionId: 'session-1',
-        requireReattach: true,
         cols: 80,
         rows: 24,
         streamClient: { onData: vi.fn(), onExit: vi.fn() }
@@ -416,30 +423,8 @@ describe('TerminalHost', () => {
       ).resolves.toMatchObject({ isNew: false })
     })
 
-    it('force-kills immediately when requested', async () => {
-      await host.createOrAttach({
-        sessionId: 'session-1',
-        cols: 80,
-        rows: 24,
-        streamClient: { onData: vi.fn(), onExit: vi.fn() }
-      })
-      lastSubprocess.forceKill = vi.fn()
-
-      const killed = host.kill('session-1', { immediate: true })
-
-      expect(lastSubprocess.kill).not.toHaveBeenCalled()
-      expect(lastSubprocess.forceKill).toHaveBeenCalled()
-      expect(killWithDescendantSweepMock).toHaveBeenCalledOnce()
-      expect(lastSubprocess.dispose).not.toHaveBeenCalled()
-      expect(host.listSessions()).toHaveLength(1)
-
-      lastSubprocess._onExitCb?.(137)
-      await killed
-
-      expect(lastSubprocess.dispose).toHaveBeenCalled()
-      expect(host.listSessions()).toHaveLength(0)
-      expect(host.isKilled('session-1')).toBe(true)
-    })
+    // Plain-shell immediate force-kill (POSIX no-sweep + Windows taskkill tree) is covered in
+    // terminal-host-session-reaping-leak.test.ts and terminal-session-teardown.test.ts.
 
     it('escalates an already-graceful termination and joins its physical exit', async () => {
       await host.createOrAttach({
@@ -507,7 +492,7 @@ describe('TerminalHost', () => {
       expect(() => host.kill('missing')).toThrow('Session not found')
     })
 
-    it('waits for physical exit before surfacing a descendant sweep failure', async () => {
+    it('agent immediate kill routes through the descendant sweep and defers the force-kill to it', async () => {
       await host.createOrAttach({
         sessionId: 'agent-1',
         cols: 80,
@@ -516,19 +501,27 @@ describe('TerminalHost', () => {
         streamClient: { onData: vi.fn(), onExit: vi.fn() }
       })
       lastSubprocess.forceKill = vi.fn()
-      killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
-        killRoot()
-        throw new Error('taskkill failed')
-      })
 
       const killing = host.kill('agent-1', { immediate: true })
-      let settled = false
-      void killing.finally(() => (settled = true)).catch(() => {})
-      await new Promise<void>((resolve) => setImmediate(resolve))
-      const settledBeforeExit = settled
+
+      // Why order matters: force-killing first would let orphans reparent to
+      // pid 1 and escape the sweep's ppid walk entirely.
+      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+        99999,
+        expect.any(Function),
+        expect.objectContaining({ ownsRoot: expect.any(Function) })
+      )
+      expect(lastSubprocess.forceKill).not.toHaveBeenCalled()
+      expect(host.isKilled('agent-1')).toBe(true)
+
+      const finish = killWithDescendantSweepMock.mock.calls[0][1] as () => void
+      finish()
+      expect(lastSubprocess.forceKill).toHaveBeenCalled()
+      expect(lastSubprocess.dispose).not.toHaveBeenCalled()
+
       lastSubprocess._onExitCb?.(137)
-      await expect(killing).rejects.toThrow('taskkill failed')
-      expect(settledBeforeExit).toBe(false)
+      await killing
+      expect(lastSubprocess.dispose).toHaveBeenCalled()
     })
 
     it('rejects reattach while an agent immediate-kill snapshot is pending', async () => {

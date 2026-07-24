@@ -468,15 +468,14 @@ describe('Session', () => {
       expect(session.isTerminating).toBe(true)
     })
 
-    it('non-agent kill routes through the descendant sweep', () => {
+    it('non-agent kill signals the root directly without a descendant sweep', () => {
+      // Why: POSIX plain shells reach their own child pgroup on signal, so upstream
+      // #10339 signals the root directly and reserves the descendant sweep for agents
+      // (whose tool children live in detached groups a dying shell never reaches).
       createSession()
       session.kill()
       expect(subprocess.killed).toBe(true)
-      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
-        subprocess.pid,
-        expect.any(Function),
-        expect.objectContaining({ ownsRoot: expect.any(Function) })
-      )
+      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
     })
 
     it('agent kill routes through the descendant sweep with the subprocess as root', () => {
