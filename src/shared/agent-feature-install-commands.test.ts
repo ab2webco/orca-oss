@@ -8,7 +8,8 @@ import {
   ORCA_LINEAR_SKILL_UPDATE_COMMAND,
   ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND,
   ORCA_CLI_SKILL_UPDATE_COMMAND,
-  ORCHESTRATION_SKILL_UPDATE_COMMAND
+  ORCHESTRATION_SKILL_UPDATE_COMMAND,
+  ORCA_PLANE_SKILL_INSTALL_COMMAND
 } from './agent-feature-install-commands'
 
 describe('agent feature skill commands', () => {
@@ -36,6 +37,13 @@ describe('agent feature skill commands', () => {
     expect(LINEAR_TICKETS_SKILL_UPDATE_COMMAND).toBe('npx skills update linear-tickets --global')
     expect(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND).toBe(
       buildAgentFeatureSkillInstallCommand(['orca-cli', 'orchestration'])
+    )
+  })
+
+  it('installs orca-plane from the lab fork, not the official Orca repo', () => {
+    // orca-plane ships only in the fork, so its install URL must be the fork.
+    expect(ORCA_PLANE_SKILL_INSTALL_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-plane --global'
     )
   })
 })
