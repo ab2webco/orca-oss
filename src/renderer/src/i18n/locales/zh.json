@@ -1839,7 +1839,37 @@
         "jiraToggleSortDirection": "按{{value0}}排序",
         "75a38d7df8": "GitHub data is temporarily unavailable. Its API may be down, rate-limited, or unreachable. Please try again shortly.",
         "noGithubSourceDetected": "No GitHub source detected for",
-        "noGithubSourceDetectedHint": "it may have no GitHub remote, or the source could not be resolved."
+        "noGithubSourceDetectedHint": "it may have no GitHub remote, or the source could not be resolved.",
+        "planeAllPreset": "All",
+        "planeAllProjects": "All projects",
+        "planeAllWorkspaces": "All Plane workspaces",
+        "planeBoardSelectProject": "Select a single project to use the board.",
+        "planeConnectCta": "Connect Plane",
+        "planeConnectPrompt": "Connect your Plane workspace",
+        "planeConnectPromptBody": "Browse, edit, and start work from Plane work items directly from here.",
+        "planeCreatedPreset": "Created",
+        "planeEmptyStateSearchBody": "Try a different PQL query.",
+        "planeEmptyStateTitle": "No Plane work items found",
+        "planeHideCta": "Hide Plane",
+        "planeOpenInPlane": "Open {{value0}} in Plane",
+        "planeOpenInPlaneShort": "Open in Plane",
+        "planeProjectSwitcherLabel": "Plane project",
+        "planeRefreshWorkItems": "Refresh Plane work items",
+        "planeSearchPlaceholder": "Search work items by ID or title",
+        "planeSortAscending": "ascending",
+        "planeSortBy": "Sort by",
+        "planeSortDescending": "descending",
+        "planeSortId": "ID",
+        "planeSortWorkItem": "Work item",
+        "planeSourceLabel": "Plane",
+        "planeStartWorkspaceFrom": "Start workspace from {{value0}}",
+        "planeToggleSortDirection": "Sort {{value0}}",
+        "planeViewBoard": "Board",
+        "planeViewList": "List",
+        "planeViewModeLabel": "View mode",
+        "planeWorkItemsHeading": "Plane work items",
+        "planeWorkspaceSwitchFailed": "Failed to switch Plane workspace.",
+        "planeWorkspaceSwitcherLabel": "Plane workspace"
       },
       "Terminal": {
         "73768427cf": "关闭",
@@ -6922,7 +6952,15 @@
           "dd67a1b6e1": "在任务源选择器和侧边栏快捷方式中显示 GitLab。",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "在任务源选择器和侧边栏快捷方式中显示 GitHub。",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "plane_description": "Show Plane in the Tasks source picker and sidebar shortcuts.",
+          "plane_label": "Plane",
+          "plane_launch_prompt_aria": "Plane launch prompt template",
+          "plane_launch_prompt_description": "Leave empty to use the default. The work item identifier and URL variables are shown in the field placeholder.",
+          "plane_launch_prompt_placeholder": "Linked Plane work item: {{identifier}}\n{{url}}",
+          "plane_launch_prompt_title": "Launch prompt template",
+          "plane_section_description": "Customize the first instruction Orca sends to the agent when you start a worktree from a Plane work item.",
+          "plane_section_title": "Plane"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "窗格分隔线的厚度。",
@@ -9515,6 +9553,36 @@
           "serviceManagerHelp": "Update Orca through the service manager that starts this server.",
           "unpackedHelp": "Development builds must be updated from their source checkout.",
           "legacyHelp": "Update this server manually once to enable remote updates."
+        },
+        "plane": {
+          "board": {
+            "selector": {
+              "label": "Active board",
+              "loading_projects": "Loading projects…",
+              "project_aria": "Plane project",
+              "select_project": "Select a project",
+              "workspace_aria": "Plane workspace"
+            }
+          },
+          "integration": {
+            "card": {
+              "account_scope_prefix": "Account scope",
+              "add_workspace": "Add workspace",
+              "checking": "Checking Plane access before showing setup actions.",
+              "connect": "Connect Plane",
+              "connected_label": "Connected",
+              "disconnect_aria": "Disconnect {{value0}}",
+              "not_connected": "Add Plane access to browse and launch from work items.",
+              "not_connected_label": "Not connected",
+              "recheck": "Re-check",
+              "setup_hint": "Connect with a Plane base URL, workspace slug, and personal access token. The same token can be reused to add more workspaces.",
+              "stale_hint": "Plane is connected for this runtime. Re-check if the connected workspace list looks stale.",
+              "test": "Test",
+              "testing": "Testing...",
+              "verified": "Verified",
+              "workspace_count": "{{value0}} workspace{{value1}} connected"
+            }
+          }
         }
       },
       "right": {
@@ -13730,6 +13798,71 @@
           "undo": "撤销",
           "widthOption": "{{value0}} px"
         }
+      },
+      "PlaneWorkItemWorkspace": {
+        "addAssignee": "+ Assignee",
+        "close": "Close Plane work item preview",
+        "closeShort": "Close",
+        "comment": "Comment",
+        "commentFailed": "Failed to add comment.",
+        "commentPlaceholder": "Add a Plane comment...",
+        "commentTooLarge": "Comment is too large to submit safely.",
+        "comments": "Comments",
+        "copied": "{{value0}} copied",
+        "copyBranch": "Copy suggested branch name",
+        "copyFailed": "Failed to copy {{value0}}",
+        "copyId": "Copy identifier",
+        "copyPrompt": "Copy prompt",
+        "copyUrl": "Copy URL",
+        "labels": "Labels",
+        "noComments": "No comments yet.",
+        "noDescription": "No description provided.",
+        "openInPlane": "Open in Plane",
+        "sheetDescription": "Preview, edit, and start work from the selected work item.",
+        "sheetTitle": "Plane work item",
+        "startWorkspace": "Start workspace",
+        "title": "Title",
+        "unassigned": "Unassigned",
+        "unknownUser": "Unknown",
+        "updateFailed": "Failed to update Plane work item."
+      },
+      "plane-board-card": {
+        "unassigned": "Unassigned"
+      },
+      "plane-board-column": {
+        "reorder": "Reorder {{value0}} column"
+      },
+      "plane-board-floating-minimap": {
+        "label": "Drag to scroll board columns"
+      },
+      "plane-board-minimap": {
+        "label": "Board columns",
+        "navigate": "Go to {{value0}} column"
+      },
+      "plane": {
+        "connect": {
+          "dialog": {
+            "api_key_label": "Personal access token",
+            "api_key_placeholder": "Plane personal access token",
+            "base_url_label": "Plane base URL",
+            "base_url_placeholder": "https://api.plane.so",
+            "cancel": "Cancel",
+            "connect": "Connect",
+            "connection_failed": "Connection failed",
+            "description": "Use your Plane instance URL, workspace slug, and a personal access token to browse work items. The same token can be reused to add more workspaces.",
+            "pat_hint": "Create a personal access token from your Plane profile settings.",
+            "pat_link": "Plane personal access tokens",
+            "storage_local": "Your token is stored locally and encrypted when local runtime storage supports it.",
+            "storage_remote": "Your token is sent to the selected remote runtime and stored there with runtime-supported encryption.",
+            "title": "Connect Plane workspace",
+            "verifying": "Verifying…",
+            "workspace_slug_label": "Workspace slug",
+            "workspace_slug_placeholder": "my-workspace"
+          }
+        }
+      },
+      "task-page-plane-board": {
+        "updateFailed": "Failed to move work item."
       }
     },
     "i18n": {

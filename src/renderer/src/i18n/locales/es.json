@@ -1839,7 +1839,37 @@
         "jiraToggleSortDirection": "Ordenar de forma {{value0}}",
         "75a38d7df8": "GitHub data is temporarily unavailable. Its API may be down, rate-limited, or unreachable. Please try again shortly.",
         "noGithubSourceDetected": "No GitHub source detected for",
-        "noGithubSourceDetectedHint": "it may have no GitHub remote, or the source could not be resolved."
+        "noGithubSourceDetectedHint": "it may have no GitHub remote, or the source could not be resolved.",
+        "planeAllPreset": "Todos",
+        "planeAllProjects": "Todos los proyectos",
+        "planeAllWorkspaces": "Todos los espacios de trabajo de Plane",
+        "planeBoardSelectProject": "Selecciona un solo proyecto para usar el tablero.",
+        "planeConnectCta": "Conectar Plane",
+        "planeConnectPrompt": "Conecta tu espacio de trabajo de Plane",
+        "planeConnectPromptBody": "Explora, edita e inicia el trabajo desde los elementos de Plane directamente desde aquí.",
+        "planeCreatedPreset": "Creados",
+        "planeEmptyStateSearchBody": "Prueba con otra consulta PQL.",
+        "planeEmptyStateTitle": "No se encontraron elementos de Plane",
+        "planeHideCta": "Ocultar Plane",
+        "planeOpenInPlane": "Abrir {{value0}} en Plane",
+        "planeOpenInPlaneShort": "Abrir en Plane",
+        "planeProjectSwitcherLabel": "Proyecto de Plane",
+        "planeRefreshWorkItems": "Actualizar elementos de Plane",
+        "planeSearchPlaceholder": "Buscar elementos por ID o título",
+        "planeSortAscending": "ascendente",
+        "planeSortBy": "Ordenar por",
+        "planeSortDescending": "descendente",
+        "planeSortId": "ID",
+        "planeSortWorkItem": "Elemento",
+        "planeSourceLabel": "Plane",
+        "planeStartWorkspaceFrom": "Iniciar espacio de trabajo desde {{value0}}",
+        "planeToggleSortDirection": "Ordenar {{value0}}",
+        "planeViewBoard": "Tablero",
+        "planeViewList": "Lista",
+        "planeViewModeLabel": "Modo de vista",
+        "planeWorkItemsHeading": "Elementos de Plane",
+        "planeWorkspaceSwitchFailed": "No se pudo cambiar el espacio de trabajo de Plane.",
+        "planeWorkspaceSwitcherLabel": "Espacio de trabajo de Plane"
       },
       "Terminal": {
         "73768427cf": "Cerrar",
@@ -6937,7 +6967,15 @@
           "dd67a1b6e1": "Muestra GitLab en el selector de fuentes de Tareas y en los accesos directos de la barra lateral.",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "Muestra GitHub en el selector de fuentes de Tareas y en los accesos directos de la barra lateral.",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "plane_description": "Muestra Plane en el selector de fuentes de Tareas y en los accesos directos de la barra lateral.",
+          "plane_label": "Plane",
+          "plane_launch_prompt_aria": "Plantilla de prompt de inicio de Plane",
+          "plane_launch_prompt_description": "Déjalo vacío para usar el valor predeterminado. Las variables del identificador del elemento y la URL se muestran en el marcador de posición del campo.",
+          "plane_launch_prompt_placeholder": "Elemento de Plane vinculado: {{identifier}}\n{{url}}",
+          "plane_launch_prompt_title": "Plantilla de prompt de inicio",
+          "plane_section_description": "Personaliza la primera instrucción que Orca envía al agente cuando inicias un worktree desde un elemento de Plane.",
+          "plane_section_title": "Plane"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Grosor de la línea divisoria del panel.",
@@ -9515,6 +9553,36 @@
           "serviceManagerHelp": "Update Orca through the service manager that starts this server.",
           "unpackedHelp": "Development builds must be updated from their source checkout.",
           "legacyHelp": "Update this server manually once to enable remote updates."
+        },
+        "plane": {
+          "board": {
+            "selector": {
+              "label": "Tablero activo",
+              "loading_projects": "Cargando proyectos…",
+              "project_aria": "Proyecto de Plane",
+              "select_project": "Selecciona un proyecto",
+              "workspace_aria": "Espacio de trabajo de Plane"
+            }
+          },
+          "integration": {
+            "card": {
+              "account_scope_prefix": "Ámbito de la cuenta",
+              "add_workspace": "Agregar espacio de trabajo",
+              "checking": "Comprobando el acceso a Plane antes de mostrar las acciones de configuración.",
+              "connect": "Conectar Plane",
+              "connected_label": "Conectado",
+              "disconnect_aria": "Desconectar {{value0}}",
+              "not_connected": "Agrega acceso a Plane para explorar e iniciar desde los elementos.",
+              "not_connected_label": "No conectado",
+              "recheck": "Volver a comprobar",
+              "setup_hint": "Conéctate con una URL base de Plane, un slug de espacio de trabajo y un token de acceso personal. El mismo token puede reutilizarse para agregar más espacios de trabajo.",
+              "stale_hint": "Plane está conectado para este entorno. Vuelve a comprobar si la lista de espacios de trabajo conectados parece desactualizada.",
+              "test": "Probar",
+              "testing": "Probando...",
+              "verified": "Verificado",
+              "workspace_count": "{{value0}} espacio{{value1}} de trabajo conectado"
+            }
+          }
         }
       },
       "right": {
@@ -13730,6 +13798,71 @@
           "undo": "Deshacer",
           "widthOption": "{{value0}} px"
         }
+      },
+      "PlaneWorkItemWorkspace": {
+        "addAssignee": "+ Asignado",
+        "close": "Cerrar vista previa del elemento de Plane",
+        "closeShort": "Cerrar",
+        "comment": "Comentar",
+        "commentFailed": "No se pudo agregar el comentario.",
+        "commentPlaceholder": "Agregar un comentario de Plane...",
+        "commentTooLarge": "El comentario es demasiado grande para enviarlo de forma segura.",
+        "comments": "Comentarios",
+        "copied": "{{value0}} copiado",
+        "copyBranch": "Copiar nombre de rama sugerido",
+        "copyFailed": "No se pudo copiar {{value0}}",
+        "copyId": "Copiar identificador",
+        "copyPrompt": "Copiar prompt",
+        "copyUrl": "Copiar URL",
+        "labels": "Etiquetas",
+        "noComments": "Aún no hay comentarios.",
+        "noDescription": "Sin descripción.",
+        "openInPlane": "Abrir en Plane",
+        "sheetDescription": "Previsualiza, edita e inicia el trabajo desde el elemento seleccionado.",
+        "sheetTitle": "Elemento de Plane",
+        "startWorkspace": "Iniciar espacio de trabajo",
+        "title": "Título",
+        "unassigned": "Sin asignar",
+        "unknownUser": "Desconocido",
+        "updateFailed": "No se pudo actualizar el elemento de Plane."
+      },
+      "plane-board-card": {
+        "unassigned": "Sin asignar"
+      },
+      "plane-board-column": {
+        "reorder": "Reordenar la columna {{value0}}"
+      },
+      "plane-board-floating-minimap": {
+        "label": "Arrastra para desplazar las columnas del tablero"
+      },
+      "plane-board-minimap": {
+        "label": "Columnas del tablero",
+        "navigate": "Ir a la columna {{value0}}"
+      },
+      "plane": {
+        "connect": {
+          "dialog": {
+            "api_key_label": "Token de acceso personal",
+            "api_key_placeholder": "Token de acceso personal de Plane",
+            "base_url_label": "URL base de Plane",
+            "base_url_placeholder": "https://api.plane.so",
+            "cancel": "Cancelar",
+            "connect": "Conectar",
+            "connection_failed": "Error de conexión",
+            "description": "Usa la URL de tu instancia de Plane, el slug del espacio de trabajo y un token de acceso personal para explorar elementos. El mismo token puede reutilizarse para agregar más espacios de trabajo.",
+            "pat_hint": "Crea un token de acceso personal desde la configuración de tu perfil de Plane.",
+            "pat_link": "Tokens de acceso personal de Plane",
+            "storage_local": "Tu token se almacena localmente y se cifra cuando el almacenamiento del entorno local lo permite.",
+            "storage_remote": "Tu token se envía al entorno remoto seleccionado y se almacena allí con el cifrado que admita el entorno.",
+            "title": "Conectar espacio de trabajo de Plane",
+            "verifying": "Verificando…",
+            "workspace_slug_label": "Slug del espacio de trabajo",
+            "workspace_slug_placeholder": "mi-espacio-de-trabajo"
+          }
+        }
+      },
+      "task-page-plane-board": {
+        "updateFailed": "No se pudo mover el elemento."
       }
     },
     "i18n": {
