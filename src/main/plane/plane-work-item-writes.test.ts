@@ -418,6 +418,78 @@ describe('createWorkItem', () => {
   })
 })
 
+describe('deleteWorkItemComment', () => {
+  it('DELETEs the comment path under the work item', async () => {
+    const { deleteWorkItemComment } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    let capturedPath: string | undefined
+    let capturedMethod: string | undefined
+    planeRequestMock.mockImplementation((_client, url: string, init?: RequestInit) => {
+      capturedPath = pathOf(url).pathname
+      capturedMethod = init?.method
+      return Promise.resolve(undefined)
+    })
+
+    const result = await deleteWorkItemComment({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      commentId: 'c-1',
+      workspaceId: 'acme'
+    })
+
+    expect(capturedMethod).toBe('DELETE')
+    expect(capturedPath).toBe(
+      '/api/v1/workspaces/acme/projects/proj-1/work-items/wi-1/comments/c-1/'
+    )
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns ok:false and clears the token on an auth error', async () => {
+    const { deleteWorkItemComment } = await import('./plane-work-item-writes')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await deleteWorkItemComment({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      commentId: 'c-1'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('surfaces the API error when Plane rejects the delete (comment not found)', async () => {
+    const { deleteWorkItemComment } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([client()])
+    planeRequestMock.mockRejectedValue(new MockPlaneApiError('Page not found', 404))
+
+    const result = await deleteWorkItemComment({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      commentId: 'missing'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Page not found' })
+  })
+
+  it('returns ok:false when no Plane workspace is connected', async () => {
+    const { deleteWorkItemComment } = await import('./plane-work-item-writes')
+    getClientsMock.mockReturnValue([])
+
+    const result = await deleteWorkItemComment({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      commentId: 'c-1'
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
+    expect(planeRequestMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('createPlaneState', () => {
   it('POSTs to the project states path with name + group and maps the result', async () => {
     const { createPlaneState } = await import('./plane-work-item-writes')

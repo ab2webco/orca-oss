@@ -162,6 +162,35 @@ export async function addWorkItemComment(args: {
   }
 }
 
+// Deletes a single comment on a work item. Plane surfaces a 404 when the
+// comment id (or work item UUID) is wrong; that API error is mapped to the
+// caller rather than crashing. workItemId is the work item UUID.
+export async function deleteWorkItemComment(args: {
+  projectId: string
+  workItemId: string
+  commentId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}): Promise<PlaneMutationResult> {
+  const client = resolveClient(args.workspaceId)
+  if (!client) {
+    return { ok: false, error: 'Not connected to Plane.' }
+  }
+  await acquire()
+  try {
+    await planeRequest(
+      client,
+      `${commentsPath(client, args.projectId, args.workItemId)}${encodeURIComponent(args.commentId)}/`,
+      { method: 'DELETE' }
+    )
+    return { ok: true }
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    return toMutationError(error, 'Failed to delete comment.')
+  } finally {
+    release()
+  }
+}
+
 // Creates a new board column (Plane state). Returns the mapped PlaneState so
 // the board can insert the empty column immediately.
 // Hex defaults mirroring Plane's own per-group palette, used when a column is

@@ -7,6 +7,7 @@ import type {
   PlaneState,
   PlaneStateGroup,
   PlaneStateMutationResult,
+  PlaneWorkItem,
   PlaneWorkItemFilter,
   PlaneWorkItemPriority
 } from '../shared/plane-types'
@@ -64,7 +65,9 @@ export async function resolvePlaneCurrentWorkItem(
 
 // Resolves the {id, project, workspace} a Plane write targets, from either an
 // explicit id (project required) or the `--current` worktree link (project/
-// workspace inherited from the link unless overridden by flags).
+// workspace inherited from the link unless overridden by flags). The Plane REST
+// write routes require the work item UUID, so both paths resolve to `.id`
+// rather than the human identifier (which 404s on the write endpoints).
 export async function resolvePlaneWriteTarget(args: {
   flags: Map<string, string | boolean>
   client: RuntimeClient
@@ -80,17 +83,45 @@ export async function resolvePlaneWriteTarget(args: {
   const workspaceId = getOptionalStringFlag(flags, 'workspace')
   if (current) {
     const resolved = (await resolvePlaneCurrentWorkItem(client, cwd)).result
+    if (!resolved.workItem) {
+      throw new RuntimeClientError(
+        'plane_work_item_not_found',
+        `Plane work item ${resolved.identifier} is linked to this worktree but could not be fetched`
+      )
+    }
     return {
-      workItemId: resolved.identifier,
+      workItemId: resolved.workItem.id,
       projectId: getOptionalStringFlag(flags, 'project') ?? resolved.projectId,
       workspaceId: workspaceId ?? resolved.workspaceId
     }
   }
-  return {
-    workItemId: getRequiredStringFlag(flags, 'id'),
-    projectId: getRequiredStringFlag(flags, 'project'),
+  const requestedId = getRequiredStringFlag(flags, 'id')
+  const projectId = getRequiredStringFlag(flags, 'project')
+  const workItemId = await resolvePlaneWorkItemUuid(client, requestedId, projectId, workspaceId)
+  return { workItemId, projectId, workspaceId }
+}
+
+// Resolves an explicit id flag (identifier like "NETSA-74" OR a UUID) to the
+// work item UUID that Plane's write routes require. getWorkItem accepts either
+// form and returns the item with `.id` set to the UUID.
+async function resolvePlaneWorkItemUuid(
+  client: RuntimeClient,
+  requestedId: string,
+  projectId: string,
+  workspaceId: string | undefined
+): Promise<string> {
+  const response = await client.call<PlaneWorkItem | null>('plane.getWorkItem', {
+    workItemId: requestedId,
+    projectId,
     workspaceId
+  })
+  if (!response.result) {
+    throw new RuntimeClientError(
+      'plane_work_item_not_found',
+      `Plane work item ${requestedId} not found`
+    )
   }
+  return response.result.id
 }
 import {
   NodeReadableTextTooLargeError,

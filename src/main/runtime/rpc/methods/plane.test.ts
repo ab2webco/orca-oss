@@ -64,17 +64,16 @@ describe('plane RPC methods', () => {
       planeListWorkItems: vi.fn().mockResolvedValue([{ id: 'wi-1' }]),
       planeSearchWorkItems: vi.fn().mockResolvedValue([{ id: 'wi-2' }]),
       planeGetWorkItem: vi.fn().mockResolvedValue({ id: 'wi-3' }),
-      planeCreateWorkItem: vi
-        .fn()
-        .mockResolvedValue({
-          ok: true,
-          id: 'wi-9',
-          identifier: 'PROJ-9',
-          url: 'https://x/PROJ-9/'
-        }),
+      planeCreateWorkItem: vi.fn().mockResolvedValue({
+        ok: true,
+        id: 'wi-9',
+        identifier: 'PROJ-9',
+        url: 'https://x/PROJ-9/'
+      }),
       planeUpdateWorkItem: vi.fn().mockResolvedValue({ ok: true }),
       planeAddWorkItemComment: vi.fn().mockResolvedValue({ ok: true, id: 'comment-1' }),
-      planeListWorkItemComments: vi.fn().mockResolvedValue([{ id: 'comment-2' }])
+      planeListWorkItemComments: vi.fn().mockResolvedValue([{ id: 'comment-2' }]),
+      planeDeleteWorkItemComment: vi.fn().mockResolvedValue({ ok: true })
     } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
 
@@ -127,6 +126,14 @@ describe('plane RPC methods', () => {
         workspaceId: 'ws-1'
       })
     )
+    await dispatcher.dispatch(
+      makeRequest('plane.deleteWorkItemComment', {
+        projectId: '  proj-1  ',
+        workItemId: '  wi-3  ',
+        commentId: '  comment-2  ',
+        workspaceId: 'ws-1'
+      })
+    )
 
     expect(runtime.planeListWorkItems).toHaveBeenCalledWith({
       projectId: undefined,
@@ -176,6 +183,12 @@ describe('plane RPC methods', () => {
     expect(runtime.planeListWorkItemComments).toHaveBeenCalledWith({
       projectId: 'proj-1',
       workItemId: 'wi-3',
+      workspaceId: 'ws-1'
+    })
+    expect(runtime.planeDeleteWorkItemComment).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      workItemId: 'wi-3',
+      commentId: 'comment-2',
       workspaceId: 'ws-1'
     })
   })

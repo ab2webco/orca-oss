@@ -5,6 +5,7 @@ import {
   CreateState,
   CreateWorkItem,
   DeleteState,
+  DeleteWorkItemComment,
   GetWorkItem,
   LinkCurrentWorkItem,
   ListMembers,
@@ -155,6 +156,17 @@ export const PLANE_METHODS: RpcMethod[] = [
       runtime.planeListWorkItemComments({
         projectId: params.projectId.trim(),
         workItemId: params.workItemId.trim(),
+        workspaceId: params.workspaceId
+      })
+  }),
+  defineMethod({
+    name: 'plane.deleteWorkItemComment',
+    params: DeleteWorkItemComment,
+    handler: async (params, { runtime }) =>
+      runtime.planeDeleteWorkItemComment({
+        projectId: params.projectId.trim(),
+        workItemId: params.workItemId.trim(),
+        commentId: params.commentId.trim(),
         workspaceId: params.workspaceId
       })
   }),

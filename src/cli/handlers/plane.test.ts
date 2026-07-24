@@ -126,9 +126,10 @@ describe('orca plane CLI handlers', () => {
     })
   })
 
-  it('resolves a state name to an id before updating for status set', async () => {
+  it('resolves the identifier to the work item UUID before a status write', async () => {
     queueFixtures(
       callMock,
+      okFixture('req0', workItem()),
       okFixture('req', [{ id: 's1', name: 'In Review', group: 'started' }]),
       okFixture('req2', { ok: true })
     )
@@ -136,16 +137,21 @@ describe('orca plane CLI handlers', () => {
       ['plane', 'status', 'set', 'PROJ-12', '--to', 'In Review', '--project', 'p1', '--json'],
       '/tmp/repo'
     )
-    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.listStates', {
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.getWorkItem', {
+      workItemId: 'PROJ-12',
+      projectId: 'p1',
+      workspaceId: undefined
+    })
+    expect(callMock).toHaveBeenNthCalledWith(2, 'plane.listStates', {
       projectId: 'p1',
       workspaceId: undefined
     })
     expect(callMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: undefined,
         updates: { stateId: 's1' }
       },
@@ -156,6 +162,7 @@ describe('orca plane CLI handlers', () => {
   it('resolves the viewer id for assignee set --me', async () => {
     queueFixtures(
       callMock,
+      okFixture('req0', workItem()),
       okFixture('req', { id: 'u1', displayName: 'Me', email: null }),
       okFixture('req2', { ok: true })
     )
@@ -163,13 +170,18 @@ describe('orca plane CLI handlers', () => {
       ['plane', 'assignee', 'set', 'PROJ-12', '--me', '--project', 'p1', '--json'],
       '/tmp/repo'
     )
-    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.getMe', { workspaceId: undefined })
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.getWorkItem', {
+      workItemId: 'PROJ-12',
+      projectId: 'p1',
+      workspaceId: undefined
+    })
+    expect(callMock).toHaveBeenNthCalledWith(2, 'plane.getMe', { workspaceId: undefined })
     expect(callMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: undefined,
         updates: { assigneeIds: ['u1'] }
       },
@@ -178,13 +190,13 @@ describe('orca plane CLI handlers', () => {
   })
 
   it('clears the assignee with an empty id set', async () => {
-    queueFixtures(callMock, okFixture('req', { ok: true }))
+    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', { ok: true }))
     await main(['plane', 'assignee', 'clear', 'PROJ-12', '--project', 'p1', '--json'], '/tmp/repo')
     expect(callMock).toHaveBeenCalledWith(
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: undefined,
         updates: { assigneeIds: [] }
       },
@@ -193,7 +205,7 @@ describe('orca plane CLI handlers', () => {
   })
 
   it('maps priority set to a priority update', async () => {
-    queueFixtures(callMock, okFixture('req', { ok: true }))
+    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', { ok: true }))
     await main(
       ['plane', 'priority', 'set', 'PROJ-12', '--to', 'high', '--project', 'p1', '--json'],
       '/tmp/repo'
@@ -202,7 +214,7 @@ describe('orca plane CLI handlers', () => {
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: undefined,
         updates: { priority: 'high' }
       },
@@ -211,20 +223,63 @@ describe('orca plane CLI handlers', () => {
   })
 
   it('maps comment add to plane.addWorkItemComment', async () => {
-    queueFixtures(callMock, okFixture('req', { ok: true, id: 'c1' }))
+    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', { ok: true, id: 'c1' }))
     await main(
       ['plane', 'comment', 'add', 'PROJ-12', '--body', 'Ready.', '--project', 'p1', '--json'],
       '/tmp/repo'
     )
     expect(callMock).toHaveBeenCalledWith(
       'plane.addWorkItemComment',
-      { projectId: 'p1', workItemId: 'PROJ-12', body: 'Ready.', workspaceId: undefined },
+      { projectId: 'p1', workItemId: 'wi1', body: 'Ready.', workspaceId: undefined },
       WRITE_OPTS
     )
   })
 
+  it('maps comment delete to plane.deleteWorkItemComment with the resolved UUID', async () => {
+    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', { ok: true }))
+    await main(
+      ['plane', 'comment', 'delete', 'c1', 'PROJ-12', '--project', 'p1', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.getWorkItem', {
+      workItemId: 'PROJ-12',
+      projectId: 'p1',
+      workspaceId: undefined
+    })
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'plane.deleteWorkItemComment',
+      { projectId: 'p1', workItemId: 'wi1', commentId: 'c1', workspaceId: undefined },
+      WRITE_OPTS
+    )
+  })
+
+  it('deletes a comment on the current worktree work item', async () => {
+    queueFixtures(callMock, okFixture('req0', currentResolve()), okFixture('req', { ok: true }))
+    await main(['plane', 'comment', 'delete', 'c1', '--current', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.resolveCurrentWorkItem', {
+      remote: false,
+      cwd: '/tmp/repo'
+    })
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'plane.deleteWorkItemComment',
+      { projectId: 'p1', workItemId: 'wi1', commentId: 'c1', workspaceId: 'w1' },
+      WRITE_OPTS
+    )
+  })
+
+  it('rejects --workspace all for comment delete', async () => {
+    await main(
+      ['plane', 'comment', 'delete', 'c1', 'PROJ-12', '--project', 'p1', '--workspace', 'all'],
+      '/tmp/repo'
+    )
+    expect(callMock).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+  })
+
   it('maps save-issue to a partial updateWorkItem PATCH', async () => {
-    queueFixtures(callMock, okFixture('req', { ok: true }))
+    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', { ok: true }))
     await main(
       ['plane', 'save-issue', 'PROJ-12', '--project', 'p1', '--title', 'New title', '--json'],
       '/tmp/repo'
@@ -233,12 +288,27 @@ describe('orca plane CLI handlers', () => {
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: undefined,
         updates: { title: 'New title' }
       },
       WRITE_OPTS
     )
+  })
+
+  it('throws plane_work_item_not_found when an explicit id does not resolve', async () => {
+    queueFixtures(callMock, okFixture('req', null))
+    await main(
+      ['plane', 'priority', 'clear', 'MISSING-1', '--project', 'p1', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('plane.getWorkItem', {
+      workItemId: 'MISSING-1',
+      projectId: 'p1',
+      workspaceId: undefined
+    })
+    expect(process.exitCode).toBe(1)
   })
 
   it('maps project list to plane.listProjects', async () => {
@@ -420,7 +490,7 @@ describe('orca plane CLI handlers', () => {
       'plane.updateWorkItem',
       {
         projectId: 'p1',
-        workItemId: 'PROJ-12',
+        workItemId: 'wi1',
         workspaceId: 'w1',
         updates: { stateId: 's1' }
       },
@@ -442,7 +512,7 @@ describe('orca plane CLI handlers', () => {
     expect(callMock).toHaveBeenNthCalledWith(
       2,
       'plane.updateWorkItem',
-      { projectId: 'p1', workItemId: 'PROJ-12', workspaceId: 'w1', updates: { assigneeIds: [] } },
+      { projectId: 'p1', workItemId: 'wi1', workspaceId: 'w1', updates: { assigneeIds: [] } },
       WRITE_OPTS
     )
   })
@@ -528,6 +598,13 @@ describe('orca plane CLI handlers', () => {
   it('errors when unlink cannot resolve a worktree', async () => {
     queueFixtures(callMock, okFixture('req', { ok: false, error: 'no_worktree' }))
     await main(['plane', 'unlink', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('errors on a --current write when the linked work item could not be fetched', async () => {
+    queueFixtures(callMock, okFixture('req', currentResolve({ workItem: null })))
+    await main(['plane', 'assignee', 'clear', '--current', '--json'], '/tmp/repo')
     expect(callMock).toHaveBeenCalledTimes(1)
     expect(process.exitCode).toBe(1)
   })

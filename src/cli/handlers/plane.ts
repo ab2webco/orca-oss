@@ -168,6 +168,23 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     throwOnPlaneMutationFailure(response.result)
     printResult(response, json, () => `Added comment to ${target.workItemId}.`)
   },
+  'plane comment delete': async (ctx) => {
+    const { client, json } = ctx
+    const commentId = getRequiredStringFlag(ctx.flags, 'commentId')
+    const target = await planeWriteTarget(ctx)
+    const response = await client.call<PlaneMutationResult>(
+      'plane.deleteWorkItemComment',
+      {
+        projectId: target.projectId,
+        workItemId: target.workItemId,
+        commentId,
+        workspaceId: target.workspaceId
+      },
+      { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+    )
+    throwOnPlaneMutationFailure(response.result)
+    printResult(response, json, () => `Deleted comment ${commentId} from ${target.workItemId}.`)
+  },
   'plane project list': async ({ flags, client, json }) => {
     const response = await client.call<PlaneProject[]>('plane.listProjects', {
       workspaceId: getOptionalStringFlag(flags, 'workspace')

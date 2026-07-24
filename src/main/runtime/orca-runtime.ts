@@ -701,6 +701,7 @@ import {
   addWorkItemComment as addPlaneWorkItemComment,
   createPlaneState as createPlaneBoardState,
   deletePlaneState as deletePlaneBoardState,
+  deleteWorkItemComment as deletePlaneWorkItemComment,
   listWorkItemComments as listPlaneWorkItemComments,
   updatePlaneState as updatePlaneBoardState,
   updateWorkItem as updatePlaneWorkItem
@@ -30211,6 +30212,15 @@ export class OrcaRuntimeService {
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof listPlaneWorkItemComments> {
     return listPlaneWorkItemComments(args)
+  }
+
+  planeDeleteWorkItemComment(args: {
+    projectId: string
+    workItemId: string
+    commentId: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof deletePlaneWorkItemComment> {
+    return deletePlaneWorkItemComment(args)
   }
 
   planeCreateState(args: PlaneCreateStateArgs): ReturnType<typeof createPlaneBoardState> {

@@ -91,6 +91,13 @@ export const WorkItemComments = z.object({
   workspaceId: OptionalString
 })
 
+export const DeleteWorkItemComment = z.object({
+  projectId: requiredString('Project is required'),
+  workItemId: requiredString('Work item ID is required'),
+  commentId: requiredString('Comment ID is required'),
+  workspaceId: OptionalString
+})
+
 export const ProjectScoped = z.object({
   projectId: requiredString('Project is required'),
   workspaceId: OptionalString

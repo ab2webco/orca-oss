@@ -161,6 +161,23 @@ export const PLANE_COMMAND_SPECS: CommandSpec[] = [
     notes: ['Use --body-file - to read multiline comment bodies from stdin.']
   },
   {
+    path: ['plane', 'comment', 'delete'],
+    aliases: [['plane', 'comment', 'rm']],
+    summary: 'Delete a comment from a Plane work item',
+    usage:
+      'orca plane comment delete <commentId> ([<workItemId>] | --current) --project <id> [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'current', 'project', 'workspace', 'id', 'commentId'],
+    positionalArgs: ['commentId', 'id'],
+    destructive: true,
+    examples: [
+      'orca plane comment delete <commentId> PROJ-12 --project <projectId> --json',
+      'orca plane comment delete <commentId> --current --json'
+    ],
+    notes: [
+      'Pass --current instead of <workItemId> --project to target the work item linked to the current worktree.'
+    ]
+  },
+  {
     path: ['plane', 'project', 'list'],
     summary: 'List connected Plane projects',
     usage: 'orca plane project list [--workspace <id>|all] [--json]',

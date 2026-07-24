@@ -2,8 +2,9 @@ name: Lab Release
 
 # Why: one-click Orca Lab release from the fork. Computes the next
 # `<upstream-base>.lab.N` version (a bare -lab.N would sort BELOW -rc.N in
-# semver and the updater would never offer it), builds unsigned macOS (x64 +
-# arm64) and Linux x64 artifacts, and lets electron-builder publish them with
+# semver and the updater would never offer it), builds signed+notarized macOS
+# on real runs (x64 + arm64; unsigned only on dry runs) and Linux x64 artifacts,
+# and lets electron-builder publish them with
 # the auto-update manifests (latest-mac.yml / latest-linux.yml) attached —
 # the two things the hand-rolled lab.1 release got wrong.
 
@@ -291,10 +292,8 @@ jobs:
               git log --no-merges --pretty='- %s' "${prev_tag}..${tag}" | head -50
               echo
             fi
-            echo "## Instalación en macOS (build sin firmar)"
-            echo '```bash'
-            echo 'xattr -dr com.apple.quarantine "/Applications/Orca.app"'
-            echo '```'
+            echo "## Instalación en macOS"
+            echo "El build de macOS va firmado y notarizado con Developer ID, así que Gatekeeper lo abre sin pasos extra. Descarga el \`.dmg\` o deja que Orca se auto-actualice."
             echo
             echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
           } > /tmp/notes.md
