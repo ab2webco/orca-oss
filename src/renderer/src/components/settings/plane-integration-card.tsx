@@ -1,28 +1,27 @@
 import { useState } from 'react'
 import { AlertCircle, CheckCircle2, LoaderCircle, Unlink } from 'lucide-react'
-import { LinearIcon } from '@/components/icons/LinearIcon'
-import { LinearApiKeyDialog } from '@/components/linear-api-key-dialog'
+import { PlaneConnectDialog } from '@/components/plane-connect-dialog'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { useAppStore } from '@/store'
 import { IntegrationCardDetails, IntegrationCardShell } from './integration-card-shell'
 import { useIntegrationSubordinateRowClass } from './integration-card-presentation'
-import { LinearAgentSkillInstallCta } from './linear-agent-skill-install-cta'
 import { getProviderAccountScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
+import { PlaneBoardSelector } from './plane-board-selector'
 import { translate } from '@/i18n/i18n'
 
 type VerificationResult = { state: 'ok' | 'error'; error?: string }
 
-export function LinearIntegrationCard(): React.JSX.Element {
-  const linearStatus = useAppStore((s) => s.linearStatus)
-  const linearStatusChecked = useAppStore((s) => s.linearStatusChecked)
-  const linearStatusContextKey = useAppStore((s) => s.linearStatusContextKey)
-  const disconnectLinear = useAppStore((s) => s.disconnectLinear)
-  const disconnectLinearWorkspace = useAppStore((s) => s.disconnectLinearWorkspace)
-  const checkLinearConnection = useAppStore((s) => s.checkLinearConnection)
-  const testLinearConnection = useAppStore((s) => s.testLinearConnection)
+export function PlaneIntegrationCard(): React.JSX.Element {
+  const planeStatus = useAppStore((s) => s.planeStatus)
+  const planeStatusChecked = useAppStore((s) => s.planeStatusChecked)
+  const planeStatusContextKey = useAppStore((s) => s.planeStatusContextKey)
+  const checkPlaneConnection = useAppStore((s) => s.checkPlaneConnection)
+  const disconnectPlane = useAppStore((s) => s.disconnectPlane)
+  const testPlaneConnection = useAppStore((s) => s.testPlaneConnection)
   const settings = useAppStore((s) => s.settings)
   const mountedRef = useMountedRef()
 
@@ -32,22 +31,24 @@ export function LinearIntegrationCard(): React.JSX.Element {
     Record<string, VerificationResult>
   >({})
 
-  const contextMatches = linearStatusContextKey === getProviderRuntimeContextKey(settings)
-  const checking = !contextMatches || !linearStatusChecked
-  const connected = contextMatches && linearStatus.connected
-  const workspaces = linearStatus.workspaces ?? []
+  // Why: checking also covers a remote-environment switch mid-flight, so the
+  // action row (and any per-workspace Test/Unlink button) hides rather than
+  // acting on the previous runtime's stale connection status.
+  const contextMatches = planeStatusContextKey === getProviderRuntimeContextKey(settings)
+  const checking = !contextMatches || !planeStatusChecked
+  const connected = contextMatches && planeStatus.connected
+  const workspaces = planeStatus.workspaces ?? []
   const accountScope = getProviderAccountScope(settings)
   const subordinateRowClass = useIntegrationSubordinateRowClass('flex items-center gap-3')
+  const accountScopeRowClass = useIntegrationSubordinateRowClass('text-xs')
 
   const handleDisconnect = async (workspaceId?: string): Promise<void> => {
-    await (workspaceId ? disconnectLinearWorkspace(workspaceId) : disconnectLinear())
+    await disconnectPlane(workspaceId)
     if (mountedRef.current) {
       setTestResultByWorkspace({})
     }
   }
 
-  // Why: explicit user-triggered verification. This is the only settings path
-  // that decrypts a stored Linear key, avoiding surprise keychain prompts.
   const handleTest = async (workspaceId: string): Promise<void> => {
     setTestingWorkspaceId(workspaceId)
     setTestResultByWorkspace((prev) => {
@@ -55,7 +56,7 @@ export function LinearIntegrationCard(): React.JSX.Element {
       delete next[workspaceId]
       return next
     })
-    const result = await testLinearConnection(workspaceId)
+    const result = await testPlaneConnection(workspaceId)
     if (!mountedRef.current) {
       return
     }
@@ -68,28 +69,38 @@ export function LinearIntegrationCard(): React.JSX.Element {
 
   return (
     <IntegrationCardShell
-      icon={<LinearIcon className="size-5" />}
-      name="Linear"
+      icon={<PlaneIcon className="size-5" />}
+      name="Plane"
       description={
         connected
           ? translate(
-              'auto.components.settings.task.tracker.integration.cards.e1f5e6424c',
+              'auto.components.settings.plane.integration.card.workspace_count',
               '{{value0}} workspace{{value1}} connected',
               { value0: workspaces.length, value1: workspaces.length === 1 ? '' : 's' }
             )
           : checking
             ? translate(
-                'auto.components.settings.task.tracker.integration.cards.fe9231215b',
-                'Checking Linear access before showing setup actions.'
+                'auto.components.settings.plane.integration.card.checking',
+                'Checking Plane access before showing setup actions.'
               )
             : translate(
-                'auto.components.settings.task.tracker.integration.cards.eae4a9f16b',
-                'Add Linear access to browse and link issues.'
+                'auto.components.settings.plane.integration.card.not_connected',
+                'Add Plane access to browse and launch from work items.'
               )
       }
       checking={checking}
       statusTone={connected ? 'connected' : 'attention'}
-      statusLabel={connected ? 'Connected' : 'Not connected'}
+      statusLabel={
+        connected
+          ? translate(
+              'auto.components.settings.plane.integration.card.connected_label',
+              'Connected'
+            )
+          : translate(
+              'auto.components.settings.plane.integration.card.not_connected_label',
+              'Not connected'
+            )
+      }
       actions={
         !checking ? (
           <Button
@@ -99,20 +110,27 @@ export function LinearIntegrationCard(): React.JSX.Element {
           >
             {connected
               ? translate(
-                  'auto.components.settings.task.tracker.integration.cards.622c224082',
-                  'Add workspace access'
+                  'auto.components.settings.plane.integration.card.add_workspace',
+                  'Add workspace'
                 )
               : translate(
-                  'auto.components.settings.task.tracker.integration.cards.1a12e33fe5',
-                  'Add Linear access'
+                  'auto.components.settings.plane.integration.card.connect',
+                  'Connect Plane'
                 )}
           </Button>
         ) : null
       }
     >
       <IntegrationCardDetails>
-        <ProviderAccountScopeRow scope={accountScope} />
-        {connected ? (
+        <ProviderHostScopeControl
+          labelPrefix={translate(
+            'auto.components.settings.plane.integration.card.account_scope_prefix',
+            'Account scope'
+          )}
+          scope={accountScope}
+          className={accountScopeRowClass}
+        />
+        {connected && workspaces.length > 0 ? (
           <div className="space-y-2">
             {workspaces.map((workspace) => {
               const testResult = testResultByWorkspace[workspace.id]
@@ -121,18 +139,17 @@ export function LinearIntegrationCard(): React.JSX.Element {
                 <div key={workspace.id} className={subordinateRowClass}>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {workspace.organizationName}
+                      {workspace.displayName ?? workspace.workspaceSlug}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {workspace.displayName}
-                      {workspace.email ? ` · ${workspace.email}` : ''}
+                      {workspace.workspaceSlug}
                     </p>
                   </div>
                   {testResult?.state === 'ok' ? (
                     <span className="flex shrink-0 items-center gap-1 text-xs text-status-success">
                       <CheckCircle2 className="size-3.5" />
                       {translate(
-                        'auto.components.settings.task.tracker.integration.cards.a2c0015fb8',
+                        'auto.components.settings.plane.integration.card.verified',
                         'Verified'
                       )}
                     </span>
@@ -153,23 +170,20 @@ export function LinearIntegrationCard(): React.JSX.Element {
                       <>
                         <LoaderCircle className="size-3.5 mr-1.5 animate-spin" />
                         {translate(
-                          'auto.components.settings.task.tracker.integration.cards.3e7c10d286',
+                          'auto.components.settings.plane.integration.card.testing',
                           'Testing...'
                         )}
                       </>
                     ) : (
-                      translate(
-                        'auto.components.settings.task.tracker.integration.cards.c24e56c532',
-                        'Test'
-                      )
+                      translate('auto.components.settings.plane.integration.card.test', 'Test')
                     )}
                   </Button>
                   <button
                     onClick={() => void handleDisconnect(workspace.id)}
                     aria-label={translate(
-                      'auto.components.settings.task.tracker.integration.cards.dd3529015d',
+                      'auto.components.settings.plane.integration.card.disconnect_aria',
                       'Disconnect {{value0}}',
-                      { value0: workspace.organizationName }
+                      { value0: workspace.displayName ?? workspace.workspaceSlug }
                     )}
                     className="rounded-md p-1 text-muted-foreground/50 transition-colors hover:text-destructive"
                   >
@@ -178,36 +192,38 @@ export function LinearIntegrationCard(): React.JSX.Element {
                 </div>
               )
             })}
-            <p className="text-[11px] text-muted-foreground/70">
+            <PlaneBoardSelector workspaces={workspaces} />
+          </div>
+        ) : connected ? (
+          <>
+            <p className="text-xs text-muted-foreground">
               {translate(
-                'auto.components.settings.task.tracker.integration.cards.6224fe9d34',
-                'Each connected Linear workspace has one key stored by the active runtime. Full-access keys can cover all teams the key owner can access; restricted keys can be replaced any time.'
+                'auto.components.settings.plane.integration.card.stale_hint',
+                'Plane is connected for this runtime. Re-check if the connected workspace list looks stale.'
               )}
             </p>
-          </div>
+            <Button variant="ghost" size="sm" onClick={() => void checkPlaneConnection(true)}>
+              {translate('auto.components.settings.plane.integration.card.recheck', 'Re-check')}
+            </Button>
+          </>
         ) : !checking ? (
           <>
             <p className="text-xs text-muted-foreground">
               {translate(
-                'auto.components.settings.task.tracker.integration.cards.cef18762a2',
-                'Add access with a Personal API key from your Linear settings. Full-access keys can see every team the key owner can reach.'
+                'auto.components.settings.plane.integration.card.setup_hint',
+                'Connect with a Plane base URL, workspace slug, and personal access token. The same token can be reused to add more workspaces.'
               )}
             </p>
-            <Button variant="ghost" size="sm" onClick={() => void checkLinearConnection(true)}>
-              {translate(
-                'auto.components.settings.task.tracker.integration.cards.c90f2ef419',
-                'Re-check'
-              )}
+            <Button variant="ghost" size="sm" onClick={() => void checkPlaneConnection(true)}>
+              {translate('auto.components.settings.plane.integration.card.recheck', 'Re-check')}
             </Button>
           </>
         ) : null}
-        <LinearAgentSkillInstallCta settings={settings} />
       </IntegrationCardDetails>
 
-      <LinearApiKeyDialog
+      <PlaneConnectDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        connectLabel="Add Linear access"
         onConnected={() => setTestResultByWorkspace({})}
         overlayClassName="z-[110]"
         contentClassName="z-[120]"
@@ -215,21 +231,3 @@ export function LinearIntegrationCard(): React.JSX.Element {
     </IntegrationCardShell>
   )
 }
-
-function ProviderAccountScopeRow({ scope }: { scope: ReturnType<typeof getProviderAccountScope> }) {
-  const subordinateRowClass = useIntegrationSubordinateRowClass('text-xs')
-
-  return (
-    <ProviderHostScopeControl
-      labelPrefix={translate(
-        'auto.components.settings.task.tracker.integration.cards.account_scope_prefix',
-        'Account scope'
-      )}
-      scope={scope}
-      className={subordinateRowClass}
-    />
-  )
-}
-
-export { JiraIntegrationCard } from './jira-integration-card'
-export { PlaneIntegrationCard } from './plane-integration-card'
