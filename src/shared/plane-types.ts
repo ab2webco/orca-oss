@@ -109,12 +109,17 @@ export type PlaneConnectArgs = {
 }
 
 export type PlaneCreateWorkItemArgs = {
-  workspaceSlug?: string
   projectId: string
   title: string
+  workspaceId?: PlaneWorkspaceSelection | null
   description?: string
   stateId?: string
+  assigneeIds?: string[]
+  labelIds?: string[]
   priority?: PlaneWorkItemPriority
+  startDate?: string
+  targetDate?: string
+  parentId?: string | null
 }
 
 export type PlaneCreateWorkItemResult =

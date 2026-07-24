@@ -298,6 +298,88 @@ describe('orca plane CLI handlers', () => {
     })
   })
 
+  it('maps a minimal create to plane.createWorkItem', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req', {
+        ok: true,
+        id: 'wi9',
+        identifier: 'PROJ-9',
+        url: 'https://app.plane.so/acme/browse/PROJ-9/'
+      })
+    )
+    await main(['plane', 'create', '--project', 'p1', '--title', 'New task', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith(
+      'plane.createWorkItem',
+      { projectId: 'p1', title: 'New task', workspaceId: undefined },
+      WRITE_OPTS
+    )
+  })
+
+  it('resolves state, assignee, priority, and labels before create', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req', [{ id: 's1', name: 'In Progress', group: 'started' }]),
+      okFixture('req2', { id: 'u1', displayName: 'Me', email: null }),
+      okFixture('req3', {
+        ok: true,
+        id: 'wi9',
+        identifier: 'PROJ-9',
+        url: 'https://app.plane.so/acme/browse/PROJ-9/'
+      })
+    )
+    await main(
+      [
+        'plane',
+        'create',
+        '--project',
+        'p1',
+        '--title',
+        'Enriched',
+        '--state',
+        'In Progress',
+        '--assignee',
+        'me',
+        '--priority',
+        'high',
+        '--label',
+        'l1',
+        '--label',
+        'l2',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenNthCalledWith(1, 'plane.listStates', {
+      projectId: 'p1',
+      workspaceId: undefined
+    })
+    expect(callMock).toHaveBeenNthCalledWith(2, 'plane.getMe', { workspaceId: undefined })
+    expect(callMock).toHaveBeenNthCalledWith(
+      3,
+      'plane.createWorkItem',
+      {
+        projectId: 'p1',
+        title: 'Enriched',
+        workspaceId: undefined,
+        stateId: 's1',
+        assigneeIds: ['u1'],
+        priority: 'high',
+        labelIds: ['l1', 'l2']
+      },
+      WRITE_OPTS
+    )
+  })
+
+  it('rejects --workspace all for create', async () => {
+    await main(
+      ['plane', 'create', '--project', 'p1', '--title', 'X', '--workspace', 'all', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+  })
+
   it('rejects --workspace all for writes', async () => {
     await main(
       ['plane', 'priority', 'clear', 'PROJ-12', '--project', 'p1', '--workspace', 'all', '--json'],

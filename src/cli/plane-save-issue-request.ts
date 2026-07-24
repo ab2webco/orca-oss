@@ -48,7 +48,7 @@ export async function buildPlaneSaveIssueRequest(
   return { projectId, workItemId, workspaceId, updates }
 }
 
-async function resolveStateId(
+export async function resolveStateId(
   flags: Map<string, string | boolean>,
   client: RuntimeClient,
   projectId: string,
@@ -59,7 +59,7 @@ async function resolveStateId(
   return resolvePlaneStateId(response.result, input)
 }
 
-async function resolveAssigneeIds(
+export async function resolveAssigneeIds(
   flags: Map<string, string | boolean>,
   client: RuntimeClient,
   workspaceId: string | undefined

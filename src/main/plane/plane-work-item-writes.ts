@@ -1,8 +1,9 @@
-// Plane work-item write-back (plane-task-provider Slice 5): update (partial
-// PATCH), add comment, list comments. No create/delete -- those are v1.1
-// (see the approved MVP scope decision). Split from work-items.ts to stay
-// under the oxlint max-lines cap without a suppression; reuses its
-// project-scoped path builder so the two files never drift on routing.
+// Plane work-item write-back: update (partial PATCH), add comment, list
+// comments, and board-state (Plane state) create/update/delete. Work-item
+// create lives in plane-work-item-create.ts (which reuses the client resolver
+// and error mapper exported here) so both stay under the oxlint max-lines cap
+// without a suppression; all reuse work-items.ts's project-scoped path builder
+// so the files never drift on routing.
 import {
   acquire,
   clearWorkspaceTokenOnAuthError,
@@ -32,9 +33,9 @@ import type {
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
 
-type PlaneRecord = Record<string, unknown>
+export type PlaneRecord = Record<string, unknown>
 
-function resolveClient(
+export function resolveClient(
   workspaceId: PlaneWorkspaceSelection | null | undefined
 ): PlaneClientForWorkspace | undefined {
   return getClients(workspaceId)[0]
@@ -97,7 +98,7 @@ function buildUpdateBody(updates: PlaneWorkItemUpdate): PlaneRecord {
   return body
 }
 
-function toMutationError(error: unknown, fallback: string): { ok: false; error: string } {
+export function toMutationError(error: unknown, fallback: string): { ok: false; error: string } {
   console.warn('[plane]', fallback, boundedIntegrationErrorLog(error))
   return { ok: false, error: error instanceof Error ? error.message : fallback }
 }

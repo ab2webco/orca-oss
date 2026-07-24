@@ -3,6 +3,32 @@ import { GLOBAL_FLAGS } from '../args'
 
 export const PLANE_COMMAND_SPECS: CommandSpec[] = [
   {
+    path: ['plane', 'create'],
+    summary: 'Create a Plane work item',
+    usage:
+      'orca plane create --project <id> --title <title> [--body <text> | --body-file <path|->] [--state <name-or-id>] [--assignee me|<userId>] [--priority none|low|medium|high|urgent] [--label <labelId>]... [--workspace <id>] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'project',
+      'title',
+      'body',
+      'body-file',
+      'state',
+      'assignee',
+      'priority',
+      'label',
+      'workspace'
+    ],
+    examples: [
+      'orca plane create --project <projectId> --title "Investigate flaky login" --json',
+      'orca plane create --project <projectId> --title "Follow-up" --assignee me --body-file - --json'
+    ],
+    notes: [
+      'Use --body-file - to read a multiline description from stdin.',
+      'Repeated --label sets the label set from the provided label ids.'
+    ]
+  },
+  {
     path: ['plane', 'issue'],
     summary: 'Read Plane work item context for agents',
     usage: 'orca plane issue <id> [--comments] [--project <id>] [--workspace <id>] [--json]',

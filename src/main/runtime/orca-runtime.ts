@@ -709,6 +709,7 @@ import {
   listWorkItems as listPlaneWorkItems,
   searchWorkItems as searchPlaneWorkItems
 } from '../plane/work-items'
+import { createWorkItem as createPlaneWorkItem } from '../plane/plane-work-item-create'
 import {
   addWorkItemComment as addPlaneWorkItemComment,
   createPlaneState as createPlaneBoardState,
@@ -727,6 +728,7 @@ import {
 import type {
   PlaneConnectArgs,
   PlaneCreateStateArgs,
+  PlaneCreateWorkItemArgs,
   PlaneDeleteStateArgs,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
@@ -29994,6 +29996,10 @@ export class OrcaRuntimeService {
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof addPlaneWorkItemComment> {
     return addPlaneWorkItemComment(args)
+  }
+
+  planeCreateWorkItem(args: PlaneCreateWorkItemArgs): ReturnType<typeof createPlaneWorkItem> {
+    return createPlaneWorkItem(args)
   }
 
   planeListWorkItemComments(args: {

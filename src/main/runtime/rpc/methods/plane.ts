@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalPlainString, OptionalString, requiredString } from '../schemas'
 
-// v1 MVP write-back is limited to state/assign/comment updates; create/delete
-// work items are v1.1 (see the approved plane-task-provider scope decision).
+// Write-back covers create + state/assign/comment updates; work-item delete
+// remains deferred (see the approved plane-task-provider scope decision).
 const VALID_FILTERS = ['everything', 'assigned', 'created', 'all', 'done'] as const
 const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
 const VALID_STATE_GROUPS = ['backlog', 'unstarted', 'started', 'completed', 'cancelled'] as const
@@ -61,6 +61,20 @@ const UpdateWorkItem = z.object({
   workItemId: requiredString('Work item ID is required'),
   workspaceId: OptionalString,
   updates: WorkItemUpdate
+})
+
+const CreateWorkItem = z.object({
+  projectId: requiredString('Project is required'),
+  title: requiredString('Title is required'),
+  workspaceId: OptionalString,
+  description: OptionalPlainString,
+  stateId: OptionalString,
+  assigneeIds: z.array(z.string()).optional(),
+  labelIds: z.array(z.string()).optional(),
+  priority: z.enum(VALID_PRIORITIES).optional(),
+  startDate: OptionalString,
+  targetDate: OptionalString,
+  parentId: z.union([z.string(), z.null()]).optional()
 })
 
 const AddWorkItemComment = z.object({
@@ -186,6 +200,24 @@ export const PLANE_METHODS: RpcMethod[] = [
         workItemId: params.workItemId.trim(),
         workspaceId: params.workspaceId,
         updates: params.updates
+      })
+  }),
+  defineMethod({
+    name: 'plane.createWorkItem',
+    params: CreateWorkItem,
+    handler: async (params, { runtime }) =>
+      runtime.planeCreateWorkItem({
+        projectId: params.projectId.trim(),
+        title: params.title.trim(),
+        workspaceId: params.workspaceId,
+        description: params.description,
+        stateId: params.stateId,
+        assigneeIds: params.assigneeIds,
+        labelIds: params.labelIds,
+        priority: params.priority,
+        startDate: params.startDate,
+        targetDate: params.targetDate,
+        parentId: params.parentId
       })
   }),
   defineMethod({

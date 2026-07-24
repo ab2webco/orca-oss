@@ -293,6 +293,131 @@ describe('addWorkItemComment', () => {
   })
 })
 
+describe('createWorkItem', () => {
+  it('POSTs the mapped body and derives identifier/url from the response', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    getClientsMock.mockReturnValue([client()])
+    let capturedPath: string | undefined
+    let capturedMethod: string | undefined
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, url: string, init?: RequestInit) => {
+      capturedPath = pathOf(url).pathname
+      capturedMethod = init?.method
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({
+        id: 'wi-new',
+        sequence_id: 42,
+        project: 'proj-1',
+        project_identifier: 'PROJ'
+      })
+    })
+
+    const result = await createWorkItem({
+      projectId: 'proj-1',
+      title: 'Investigate flaky login',
+      workspaceId: 'acme',
+      stateId: 'state-3',
+      assigneeIds: ['user-1'],
+      labelIds: ['label-1', 'label-2'],
+      priority: 'high',
+      startDate: '2026-01-01',
+      targetDate: '2026-02-01',
+      parentId: 'wi-parent'
+    })
+
+    expect(capturedMethod).toBe('POST')
+    expect(capturedPath).toBe('/api/v1/workspaces/acme/projects/proj-1/work-items/')
+    expect(capturedBody).toEqual({
+      name: 'Investigate flaky login',
+      state: 'state-3',
+      assignees: ['user-1'],
+      labels: ['label-1', 'label-2'],
+      priority: 'high',
+      start_date: '2026-01-01',
+      target_date: '2026-02-01',
+      parent: 'wi-parent'
+    })
+    expect(result).toEqual({
+      ok: true,
+      id: 'wi-new',
+      identifier: 'PROJ-42',
+      url: 'https://app.plane.so/acme/browse/PROJ-42/'
+    })
+  })
+
+  it('sends only name when only the required title is set', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    getClientsMock.mockReturnValue([client()])
+    let capturedBody: unknown
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 'wi-new', sequence_id: 1, project_identifier: 'PROJ' })
+    })
+
+    await createWorkItem({ projectId: 'proj-1', title: 'Bare item' })
+
+    expect(capturedBody).toEqual({ name: 'Bare item' })
+  })
+
+  it('runs description through markdownToPlaneHtml', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    getClientsMock.mockReturnValue([client()])
+    let capturedBody: { description_html?: string } | undefined
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return Promise.resolve({ id: 'wi-new', sequence_id: 1, project_identifier: 'PROJ' })
+    })
+
+    await createWorkItem({ projectId: 'proj-1', title: 'X', description: '**bold** text' })
+
+    expect(capturedBody?.description_html).toBe('<p><strong>bold</strong> text</p>')
+  })
+
+  it('resolves the project identifier from the project list when absent from the response', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    getClientsMock.mockReturnValue([client()])
+    planeRequestMock.mockImplementation((_client, _url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({ id: 'wi-new', sequence_id: 7, project: 'proj-1' })
+      }
+      // Fallback path: the projects list resolves proj-1 -> PROJ.
+      return Promise.resolve(page([{ id: 'proj-1', identifier: 'PROJ', name: 'Project' }]))
+    })
+
+    const result = await createWorkItem({ projectId: 'proj-1', title: 'X' })
+
+    expect(result).toEqual({
+      ok: true,
+      id: 'wi-new',
+      identifier: 'PROJ-7',
+      url: 'https://app.plane.so/acme/browse/PROJ-7/'
+    })
+  })
+
+  it('returns ok:false and clears the token on an auth error', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    const acme = client()
+    getClientsMock.mockReturnValue([acme])
+    const authError = new MockPlaneApiError('Unauthorized', 401)
+    planeRequestMock.mockRejectedValue(authError)
+
+    const result = await createWorkItem({ projectId: 'proj-1', title: 'X' })
+
+    expect(result).toEqual({ ok: false, error: 'Unauthorized' })
+    expect(clearWorkspaceTokenOnAuthErrorMock).toHaveBeenCalledWith(acme, authError)
+  })
+
+  it('returns ok:false when no Plane workspace is connected', async () => {
+    const { createWorkItem } = await import('./plane-work-item-create')
+    getClientsMock.mockReturnValue([])
+
+    const result = await createWorkItem({ projectId: 'proj-1', title: 'X' })
+
+    expect(result).toEqual({ ok: false, error: 'Not connected to Plane.' })
+    expect(planeRequestMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('createPlaneState', () => {
   it('POSTs to the project states path with name + group and maps the result', async () => {
     const { createPlaneState } = await import('./plane-work-item-writes')

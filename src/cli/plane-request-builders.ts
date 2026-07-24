@@ -1,5 +1,6 @@
 import { isAbsolute, join } from 'node:path'
 import type {
+  PlaneCreateWorkItemResult,
   PlaneMutationResult,
   PlaneState,
   PlaneStateGroup,
@@ -7,6 +8,8 @@ import type {
   PlaneWorkItemFilter,
   PlaneWorkItemPriority
 } from '../shared/plane-types'
+
+export type PlaneCreatedWorkItem = Extract<PlaneCreateWorkItemResult, { ok: true }>
 import {
   getOptionalStringFlag,
   getRequiredStringFlag,
@@ -138,6 +141,15 @@ export function unwrapPlaneStateMutation(result: PlaneStateMutationResult): Plan
     throw new RuntimeClientError('plane_write_failed', result.error)
   }
   return result.state
+}
+
+// Work-item create returns id/identifier/url on success; surface a failure as
+// a CLI error and otherwise hand back the created item so the caller can echo it.
+export function unwrapPlaneCreateMutation(result: PlaneCreateWorkItemResult): PlaneCreatedWorkItem {
+  if (!result.ok) {
+    throw new RuntimeClientError('plane_write_failed', result.error)
+  }
+  return result
 }
 
 export function readPlaneBody(

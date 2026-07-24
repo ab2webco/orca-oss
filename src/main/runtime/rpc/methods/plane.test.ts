@@ -64,6 +64,14 @@ describe('plane RPC methods', () => {
       planeListWorkItems: vi.fn().mockResolvedValue([{ id: 'wi-1' }]),
       planeSearchWorkItems: vi.fn().mockResolvedValue([{ id: 'wi-2' }]),
       planeGetWorkItem: vi.fn().mockResolvedValue({ id: 'wi-3' }),
+      planeCreateWorkItem: vi
+        .fn()
+        .mockResolvedValue({
+          ok: true,
+          id: 'wi-9',
+          identifier: 'PROJ-9',
+          url: 'https://x/PROJ-9/'
+        }),
       planeUpdateWorkItem: vi.fn().mockResolvedValue({ ok: true }),
       planeAddWorkItemComment: vi.fn().mockResolvedValue({ ok: true, id: 'comment-1' }),
       planeListWorkItemComments: vi.fn().mockResolvedValue([{ id: 'comment-2' }])
@@ -83,6 +91,18 @@ describe('plane RPC methods', () => {
     )
     await dispatcher.dispatch(
       makeRequest('plane.getWorkItem', { workItemId: '  wi-3  ', workspaceId: 'ws-1' })
+    )
+    await dispatcher.dispatch(
+      makeRequest('plane.createWorkItem', {
+        projectId: '  proj-1  ',
+        title: '  New item  ',
+        workspaceId: 'ws-1',
+        description: 'body',
+        stateId: 'state-1',
+        assigneeIds: ['user-1'],
+        labelIds: ['bug'],
+        priority: 'high'
+      })
     )
     await dispatcher.dispatch(
       makeRequest('plane.updateWorkItem', {
@@ -127,6 +147,19 @@ describe('plane RPC methods', () => {
       workItemId: 'wi-3',
       projectId: undefined,
       workspaceId: 'ws-1'
+    })
+    expect(runtime.planeCreateWorkItem).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      title: 'New item',
+      workspaceId: 'ws-1',
+      description: 'body',
+      stateId: 'state-1',
+      assigneeIds: ['user-1'],
+      labelIds: ['bug'],
+      priority: 'high',
+      startDate: undefined,
+      targetDate: undefined,
+      parentId: undefined
     })
     expect(runtime.planeUpdateWorkItem).toHaveBeenCalledWith({
       projectId: 'proj-1',

@@ -6,6 +6,7 @@ import type {
   PlaneUser,
   PlaneWorkItem
 } from '../shared/plane-types'
+import type { PlaneCreatedWorkItem } from './plane-request-builders'
 
 // Combined view for `plane issue`: the work item plus optionally its comments,
 // fetched by the handler from two RPC calls (getWorkItem + listWorkItemComments).
@@ -104,4 +105,8 @@ export function formatPlaneMembers(users: PlaneUser[]): string {
 
 export function formatPlaneStateMutation(state: PlaneState): string {
   return `Saved column ${state.name} (${state.group}) ${state.id}.`
+}
+
+export function formatPlaneCreate(created: PlaneCreatedWorkItem): string {
+  return [`Created ${created.identifier} (${created.id})`, `URL: ${created.url}`].join('\n')
 }
