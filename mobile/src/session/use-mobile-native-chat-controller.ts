@@ -21,6 +21,7 @@ import {
   sendMobileNativeChatMessageWithOutcome,
   type MobileNativeChatSendOutcome
 } from './mobile-native-chat-send'
+import { healMobileNativeChatStaleInput } from './mobile-native-chat-stale-input'
 import { useMobileNativeChatAnswerSend } from './use-mobile-native-chat-answer-send'
 import {
   useMobileNativeChatDrafts,
@@ -184,6 +185,8 @@ export function useMobileNativeChatController(args: {
       return false
     }
     cancelNativeChatAnswer()
+    // Escape never submits the composer, so no stale-input heal: it would consume
+    // the marker still protecting the next real message.
     const outcome = await sendMobileNativeChatMessageWithOutcome({
       client,
       terminal: handle,
@@ -239,6 +242,14 @@ export function useMobileNativeChatController(args: {
       const origin = captureSendOrigin(text)
       if (!client || !handle || !origin || !nativeChatInputLeaseReady) {
         onSendError('Message not sent (disconnected)')
+        return 'rejected'
+      }
+      // The composer may still hold an orphaned image paste from an earlier send
+      // (#10228); submitting on top of it would glue the image onto this message.
+      // Also covers question-card answers, which reach this send directly.
+      const healArgs = { client, terminal: handle, deviceToken: deviceTokenRef.current }
+      if (!(await healMobileNativeChatStaleInput(healArgs))) {
+        onSendError('Message not sent')
         return 'rejected'
       }
       const outcome = await sendMobileNativeChatMessageWithOutcome({

@@ -831,17 +831,30 @@ export class DaemonPtyAdapter implements IPtyProvider {
     // No flow control for daemon-backed terminals
   }
 
-  async hasChildProcesses(id: string): Promise<boolean> {
-    const foregroundProcess = await this.getForegroundProcess(id)
-    // Why: daemon-backed PTYs can host long-lived agents while detached; cleanup prompts must not treat them as idle shells.
+  // Why: daemon-backed PTYs can host long-lived agents while detached; cleanup prompts must not treat them as idle shells.
+  private hasChildProcessesFromForeground(foregroundProcess: string | null): boolean {
     return foregroundProcess !== null && !isShellProcess(foregroundProcess)
+  }
+
+  async hasChildProcesses(id: string): Promise<boolean> {
+    return this.hasChildProcessesFromForeground(await this.getForegroundProcess(id))
   }
 
   async inspectProcess(
     id: string
   ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }> {
     if (this.protocolVersion < COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION) {
-      throw new Error('terminal_liveness_unavailable')
+      // Why: pre-v27 daemons survive an in-place app update; compose the inspection client-side from the
+      // one call they do support instead of throwing, or completion detection stays dead until recreate.
+      // Requests directly (not via getForegroundProcess) so a dead socket still rejects rather than
+      // reading as an idle foreground and dispatching a false completion.
+      const { foregroundProcess } = await this.client.request<{
+        foregroundProcess: string | null
+      }>('getForegroundProcess', { sessionId: id })
+      return {
+        foregroundProcess,
+        hasChildProcesses: this.hasChildProcessesFromForeground(foregroundProcess)
+      }
     }
     return this.client.request<{
       foregroundProcess: string | null

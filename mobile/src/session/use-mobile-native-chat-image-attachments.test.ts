@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse, RpcSuccess } from '../transport/types'
+import { resetMobileNativeChatStaleInputForTests } from './mobile-native-chat-stale-input'
 import { useMobileNativeChatImageAttachments } from './use-mobile-native-chat-image-attachments'
 
 // Fully stub the picker so the real expo/react-native chain never loads under
@@ -84,6 +85,9 @@ describe('useMobileNativeChatImageAttachments', () => {
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     pick.mockReset()
+    // Stale markers live at module scope now (they outlive the screen), so they
+    // also outlive a test.
+    resetMobileNativeChatStaleInputForTests()
   })
   afterEach(() => {
     act(() => renderer?.unmount())
@@ -545,6 +549,42 @@ describe('useMobileNativeChatImageAttachments', () => {
     expect(sendCalls).toHaveLength(3)
     expect(sendCalls[2]?.params).toMatchObject({ text: '\x15', enter: false })
     expect(baseSend).toHaveBeenNthCalledWith(1, 'pic', ['file:///a.jpg'])
+    expect(baseSend).toHaveBeenNthCalledWith(2, 'later message')
+  })
+
+  it('still heals after the session screen unmounts and remounts (#10228)', async () => {
+    pick.mockResolvedValue({ base64: 'AAAA', uri: 'file:///a.jpg' })
+    const client = makeClient([
+      methodNotFound('start'),
+      ok('save', '/tmp/a.png'),
+      sendResult(true), // Ctrl+U clear
+      sendResult(true), // image paste accepted — path now sits on term-1's input
+      sendResult(true) // healing Ctrl+U on the remounted screen
+    ])
+    const baseSend = vi.fn().mockResolvedValueOnce('unknown').mockResolvedValueOnce('accepted')
+    mount(baseArgs({ client: client as unknown as RpcClient, baseSend }))
+    await act(async () => {
+      await hook!.attachImage('library')
+    })
+    await act(async () => {
+      await hook!.sendNativeChat('pic')
+    })
+
+    // Back out of the session screen and return. The orphaned paste sits on the
+    // HOST's input line, so a fresh hook must still know to clear it.
+    act(() => renderer!.unmount())
+    renderer = null
+    mount(baseArgs({ client: client as unknown as RpcClient, baseSend }))
+    expect(hook!.attachments).toEqual([])
+
+    let accepted = false
+    await act(async () => {
+      accepted = await hook!.sendNativeChat('later message')
+    })
+    expect(accepted).toBe(true)
+    const sendCalls = client.calls.filter((c) => c.method === 'terminal.send')
+    expect(sendCalls).toHaveLength(3)
+    expect(sendCalls[2]?.params).toMatchObject({ terminal: 'term-1', text: '\x15', enter: false })
     expect(baseSend).toHaveBeenNthCalledWith(2, 'later message')
   })
 

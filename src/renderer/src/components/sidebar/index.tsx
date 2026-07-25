@@ -146,11 +146,13 @@ function Sidebar({
       closeWorkspaceBoard()
     }
   }, [agentDashboardDrawerOpen, closeWorkspaceBoard])
+  // Why: a transient drag preview is not the user opening the board, so it must
+  // not evict the dashboard — key on the opened state, not the rendered state.
   useEffect(() => {
-    if (workspaceBoardRenderedOpen) {
+    if (workspaceBoardOpen) {
       setAgentDashboardDrawerOpen(false)
     }
-  }, [setAgentDashboardDrawerOpen, workspaceBoardRenderedOpen])
+  }, [setAgentDashboardDrawerOpen, workspaceBoardOpen])
 
   const { containerRef, onResizeStart, isResizing } = useSidebarResize<HTMLDivElement>({
     isOpen: sidebarOpen,

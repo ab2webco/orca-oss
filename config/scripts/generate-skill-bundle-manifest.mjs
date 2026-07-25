@@ -18,6 +18,11 @@ const OUTPUT_ROOT = path.join(REPO_ROOT, 'resources', 'skills')
 const CURRENT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'current-manifest.json')
 const SNAPSHOT_REGISTRY_PATH = path.join(OUTPUT_ROOT, 'snapshot-registry.json')
 const RELEASE_MAPPING_PATH = path.join(OUTPUT_ROOT, 'release-mapping.json')
+// Why: the manifest and registry are content-addressed — they describe skill
+// bytes. The mapping is provenance: which already-committed revision a tag
+// shipped. A release cut may append the second without regenerating the first.
+const CONTENT_ADDRESSED_PATHS = [CURRENT_MANIFEST_PATH, SNAPSHOT_REGISTRY_PATH]
+const ALL_ARTIFACT_PATHS = [...CONTENT_ADDRESSED_PATHS, RELEASE_MAPPING_PATH]
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
@@ -551,13 +556,14 @@ function serialized(value) {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-async function writeArtifacts(artifacts) {
-  await mkdir(OUTPUT_ROOT, { recursive: true })
-  await Promise.all([
-    writeFile(CURRENT_MANIFEST_PATH, serialized(artifacts.currentManifest)),
-    writeFile(SNAPSHOT_REGISTRY_PATH, serialized(artifacts.snapshotRegistry)),
-    writeFile(RELEASE_MAPPING_PATH, serialized(artifacts.releaseMapping))
+async function writeArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
+  const values = new Map([
+    [CURRENT_MANIFEST_PATH, artifacts.currentManifest],
+    [SNAPSHOT_REGISTRY_PATH, artifacts.snapshotRegistry],
+    [RELEASE_MAPPING_PATH, artifacts.releaseMapping]
   ])
+  await mkdir(OUTPUT_ROOT, { recursive: true })
+  await Promise.all(paths.map((filePath) => writeFile(filePath, serialized(values.get(filePath)))))
 }
 
 // Why: cutting a release tag adds a trailing mapping row on every checkout at
@@ -592,12 +598,12 @@ function isToleratedReleaseMappingPrefix(committedText, artifacts) {
     .every((release) => isDeepStrictEqual(release.skills, currentRevisions))
 }
 
-async function verifyArtifacts(artifacts) {
+async function verifyArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
   const expected = [
     [CURRENT_MANIFEST_PATH, artifacts.currentManifest, null],
     [SNAPSHOT_REGISTRY_PATH, artifacts.snapshotRegistry, null],
     [RELEASE_MAPPING_PATH, artifacts.releaseMapping, isToleratedReleaseMappingPrefix]
-  ]
+  ].filter(([filePath]) => paths.includes(filePath))
   const stale = []
   for (const [filePath, value, tolerated] of expected) {
     try {
@@ -636,16 +642,25 @@ async function main() {
   const artifacts = await buildArtifacts(releasedHistory)
 
   if (releaseVersion) {
+    // Why: the row names revisions the committed registry must already contain,
+    // so proving those artifacts match this ref is what lets the cut record
+    // provenance without regenerating them. If regeneration disagrees with what
+    // is committed, the row would name a revision this tag does not ship.
+    await verifyArtifacts(artifacts, CONTENT_ADDRESSED_PATHS)
     appendReleaseRow(artifacts, releaseVersion)
   }
 
   // Why: released snapshots are append-only. The committed registry/mapping are
   // read fresh here so the artifacts (which may have appended a release row) can
-  // never alias what we validate against.
+  // never alias what we validate against. This mapping must stay the PRE-append
+  // one to match artifacts.releasedSnapshotCounts, which seeding fixed before the
+  // row existed; the post-append mapping names one more revision than the counts
+  // do, which reads as incomplete history and would throw on every cut.
   assertReleasedHistoryPreserved(committedRegistry, artifacts, committedMapping)
 
   const shouldWrite = releaseVersion !== null || argv.includes('--write')
-  await (shouldWrite ? writeArtifacts : verifyArtifacts)(artifacts)
+  const writePaths = releaseVersion ? [RELEASE_MAPPING_PATH] : ALL_ARTIFACT_PATHS
+  await (shouldWrite ? writeArtifacts(artifacts, writePaths) : verifyArtifacts(artifacts))
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {

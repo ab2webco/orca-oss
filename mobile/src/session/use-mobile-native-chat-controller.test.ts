@@ -46,6 +46,11 @@ vi.mock('./mobile-native-chat-send', () => ({
 
 import { sendMobileNativeChatMessageWithOutcome } from './mobile-native-chat-send'
 import {
+  isMobileNativeChatInputStale,
+  markMobileNativeChatInputStale,
+  resetMobileNativeChatStaleInputForTests
+} from './mobile-native-chat-stale-input'
+import {
   useMobileNativeChatController,
   type MobileNativeChatController
 } from './use-mobile-native-chat-controller'
@@ -64,10 +69,13 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
   let renderer: ReactTestRenderer | null = null
   let controller: MobileNativeChatController | null = null
   const onSendError = vi.fn()
+  // Only the stale-input heal reaches the transport directly (the message send
+  // itself is mocked above).
+  const clientStub = { sendRequest: vi.fn() }
 
   function Harness(): null {
     controller = useMobileNativeChatController({
-      client: {} as RpcClient,
+      client: clientStub as unknown as RpcClient,
       hostId: 'h',
       worktreeId: 'w',
       activeSessionTab: null,
@@ -84,6 +92,7 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     vi.clearAllMocks()
+    resetMobileNativeChatStaleInputForTests()
     captureSendOrigin.mockReturnValue(ORIGIN)
     const original = console.error
     const spy = vi.spyOn(console, 'error').mockImplementation((...a) => {
@@ -104,6 +113,63 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     act(() => renderer?.unmount())
     renderer = null
     controller = null
+  })
+
+  it('clears an orphaned image paste before a question-card answer (#10228)', async () => {
+    // The chat overlay wires the question card straight to this send, bypassing
+    // the image hook that used to own the only heal.
+    markMobileNativeChatInputStale('term-1')
+    clientStub.sendRequest.mockResolvedValue({
+      id: 'send',
+      ok: true,
+      result: { send: { accepted: true } },
+      _meta: { runtimeId: 'r' }
+    })
+    sendWithOutcome.mockResolvedValue('accepted')
+    let accepted = false
+    await act(async () => {
+      accepted = await controller!.handleNativeChatSend('answer')
+    })
+    expect(accepted).toBe(true)
+    expect(clientStub.sendRequest).toHaveBeenCalledTimes(1)
+    expect(clientStub.sendRequest.mock.calls[0]?.[1]).toMatchObject({
+      terminal: 'term-1',
+      text: '\x15',
+      enter: false
+    })
+    expect(isMobileNativeChatInputStale('term-1')).toBe(false)
+  })
+
+  it('does not send when the healing clear is rejected, keeping the marker', async () => {
+    markMobileNativeChatInputStale('term-1')
+    clientStub.sendRequest.mockResolvedValue({
+      id: 'send',
+      ok: true,
+      result: { send: { accepted: false } },
+      _meta: { runtimeId: 'r' }
+    })
+    let accepted = true
+    await act(async () => {
+      accepted = await controller!.handleNativeChatSend('answer')
+    })
+    expect(accepted).toBe(false)
+    expect(sendWithOutcome).not.toHaveBeenCalled()
+    expect(onSendError).toHaveBeenCalledWith('Message not sent')
+    expect(isMobileNativeChatInputStale('term-1')).toBe(true)
+  })
+
+  it('keeps the marker when Escape cancels an ask, which never submits the composer', async () => {
+    markMobileNativeChatInputStale('term-1')
+    sendWithOutcome.mockResolvedValue('accepted')
+    let accepted = false
+    await act(async () => {
+      accepted = await controller!.handleNativeChatCancelAsk()
+    })
+    expect(accepted).toBe(true)
+    // The clear would be swallowed by the live overlay but still acked, burning
+    // the marker and leaving the paste to corrupt the next real message.
+    expect(clientStub.sendRequest).not.toHaveBeenCalled()
+    expect(isMobileNativeChatInputStale('term-1')).toBe(true)
   })
 
   it('threads the optimistic-echo image URIs into acceptSend on an accepted send', async () => {

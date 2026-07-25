@@ -30,6 +30,19 @@ const TASK_STATUSES: TaskStatus[] = [
   'blocked'
 ]
 
+const ASK_DEFAULT_TIMEOUT_MS = 600_000
+
+// Why: ask pins a shared long-poll slot for its entire timeout, so a caller-supplied
+// value can't be unbounded; 30 min covers a slow human gate and still frees the slot.
+const ASK_MAX_TIMEOUT_MS = 1_800_000
+
+export function clampAskTimeoutMs(timeoutMs: number | undefined): number {
+  if (timeoutMs === undefined) {
+    return ASK_DEFAULT_TIMEOUT_MS
+  }
+  return Math.min(Math.max(0, timeoutMs), ASK_MAX_TIMEOUT_MS)
+}
+
 function getLifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages must be sent to a concrete coordinator terminal handle, not a group address.`
 }
@@ -567,7 +580,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       const db = runtime.getOrchestrationDb()
       const from = params.from ?? 'unknown'
-      const timeoutMs = params.timeoutMs ?? 600_000
+      const timeoutMs = clampAskTimeoutMs(params.timeoutMs)
       const options =
         params.options
           ?.split(',')

@@ -4517,6 +4517,29 @@ describe('Store', () => {
     expect(reloaded.getRepo('r1')!.upstream).toBeNull()
   })
 
+  it('updateRepo persists the resolved no-usable-remote identity marker', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+
+    const updated = store.updateRepo('r1', {
+      gitRemoteIdentity: {
+        canonicalKey: 'gitlab.example.com/team/orca',
+        remoteName: 'origin',
+        remoteUrl: 'git@gitlab.example.com:team/orca.git'
+      }
+    })
+    expect(updated!.gitRemoteIdentity).toEqual({
+      canonicalKey: 'gitlab.example.com/team/orca',
+      remoteName: 'origin',
+      remoteUrl: 'git@gitlab.example.com:team/orca.git'
+    })
+
+    store.updateRepo('r1', { gitRemoteIdentity: null })
+    store.flush()
+    const reloaded = await createStore()
+    expect(reloaded.getRepo('r1')!.gitRemoteIdentity).toBeNull()
+  })
+
   it('getRepo does not expose invalid persisted repo upstream metadata', async () => {
     const store = await createStore()
     store.addRepo(makeRepo({ upstream: { owner: '', repo: 42 } as never }))

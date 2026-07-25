@@ -237,6 +237,7 @@ import {
 } from '../providers/ssh-pty-errors'
 import { resolveWindowsShellLaunchArgs } from '../providers/windows-shell-args'
 import { _resetWslCachesForTests, _setWslCachesForTests } from '../wsl'
+import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { acquireWatcherRemovalGate } from './watcher-removal-gate'
 
 // Why: Windows resolves a bare PowerShell name to an absolute exe before ConPTY, else CreateProcessW fails with error 5 (PR #6537 / #5161).
@@ -3782,6 +3783,40 @@ describe('registerPtyHandlers', () => {
             configurable: true,
             value: originalPlatform
           })
+        }
+      })
+
+      it('drops OPENCODE_CONFIG_DIR for a WSL daemon spawn until the guest overlay is known', async () => {
+        await withWin32Platform(async () => {
+          const env = await daemonSpawnAndGetEnv({}, undefined, undefined, undefined, {
+            shellOverride: 'wsl.exe'
+          })
+          // Why: relay not connected yet → never cross the Windows overlay path into WSL.
+          expect(env.OPENCODE_CONFIG_DIR).toBeUndefined()
+          expect(env.ORCA_OPENCODE_CONFIG_DIR).toBeUndefined()
+          expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+        })
+      })
+
+      it('points OPENCODE_CONFIG_DIR at the guest overlay when the WSL relay reports it', async () => {
+        const guestDir = '/home/jin/.orca-relay/opencode-overlays/abc'
+        const spy = vi.spyOn(wslHookRelayManager, 'getOpenCodeOverlayDir').mockReturnValue(guestDir)
+        try {
+          await withWin32Platform(async () => {
+            const env = await daemonSpawnAndGetEnv(
+              { ORCA_OPENCODE_SOURCE_CONFIG_DIR: '/home/jin/.config/opencode' },
+              undefined,
+              undefined,
+              undefined,
+              { shellOverride: 'wsl.exe' }
+            )
+            expect(env.OPENCODE_CONFIG_DIR).toBe(guestDir)
+            expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe(guestDir)
+            // The Windows-side source pointer must not cross into the guest.
+            expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+          })
+        } finally {
+          spy.mockRestore()
         }
       })
 
@@ -11299,6 +11334,173 @@ describe('registerPtyHandlers', () => {
     }
   })
 
+  it('defers reentrant new, unvisited, and same-partial output to the next drain round', async () => {
+    vi.useFakeTimers()
+    const firstProc = createMockProc()
+    const secondProc = createMockProc()
+    const newProc = createMockProc()
+    spawnMock.mockReturnValueOnce(firstProc.proc)
+    spawnMock.mockReturnValueOnce(secondProc.proc)
+    spawnMock.mockReturnValueOnce(newProc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const firstSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const secondSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const newSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const firstChunk = 'x'.repeat(16 * 1024)
+      const setActiveRendererPty = getPtySetActiveRendererPtyListener()
+      let reentered = false
+      mainWindow.webContents.send.mockImplementation(
+        (channel: string, payload: { id?: string }) => {
+          if (channel !== 'pty:data' || payload.id !== firstSpawn.id || reentered) {
+            return
+          }
+          reentered = true
+          firstProc.emitData('+same')
+          secondProc.emitData('+append')
+          newProc.emitData('new')
+          setActiveRendererPty(null, { id: newSpawn.id, active: true })
+        }
+      )
+
+      firstProc.emitData(`${firstChunk}tail`)
+      secondProc.emitData('second')
+      vi.advanceTimersByTime(2)
+      expect(getPtyDataSendCalls()).toEqual([['pty:data', { id: firstSpawn.id, data: firstChunk }]])
+
+      vi.advanceTimersByTime(2)
+      expect(getPtyDataSendCalls().slice(1)).toEqual([
+        ['pty:data', { id: newSpawn.id, data: 'new' }],
+        ['pty:data', { id: secondSpawn.id, data: 'second+append' }]
+      ])
+
+      vi.advanceTimersByTime(1)
+      expect(getPtyDataSendCalls().at(-1)).toEqual([
+        'pty:data',
+        { id: firstSpawn.id, data: 'tail+same' }
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('commits a partial remainder before notification-reentrant exit', async () => {
+    vi.useFakeTimers()
+    const firstProc = createMockProc()
+    const secondProc = createMockProc()
+    spawnMock.mockReturnValueOnce(firstProc.proc).mockReturnValueOnce(secondProc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const firstSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string; incarnationId: string }
+      const secondSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const firstChunk = 'x'.repeat(16 * 1024)
+      mainWindow.webContents.send.mockClear()
+      let exited = false
+      mainWindow.webContents.send.mockImplementation(
+        (channel: string, payload: { id?: string; data?: string }) => {
+          if (
+            channel === 'pty:data' &&
+            payload.id === firstSpawn.id &&
+            payload.data === firstChunk &&
+            !exited
+          ) {
+            exited = true
+            firstProc.emitExit(0)
+          }
+        }
+      )
+
+      firstProc.emitData(`${firstChunk}tail`)
+      secondProc.emitData('next')
+      vi.advanceTimersByTime(2)
+
+      expect(mainWindow.webContents.send.mock.calls).toEqual([
+        ['pty:data', { id: firstSpawn.id, data: firstChunk }],
+        ['pty:data', { id: firstSpawn.id, data: 'tail' }],
+        ['pty:exit', { id: firstSpawn.id, code: 0, incarnationId: firstSpawn.incarnationId }],
+        ['pty:data', { id: secondSpawn.id, data: 'next' }]
+      ])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        rendererInFlightPtyCount: 1,
+        rendererInFlightChars: 'next'.length,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('aborts the open drain when renderer lifecycle clear reenters notification', async () => {
+    vi.useFakeTimers()
+    const firstProc = createMockProc()
+    const detachedProc = createMockProc()
+    spawnMock.mockReturnValueOnce(firstProc.proc).mockReturnValueOnce(detachedProc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const firstSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })
+      const handleRendererLoading = getMainWindowWebContentsListener('did-start-loading')
+      let cleared = false
+      mainWindow.webContents.send.mockImplementation(
+        (channel: string, payload: { id?: string }) => {
+          if (channel === 'pty:data' && payload.id === firstSpawn.id && !cleared) {
+            cleared = true
+            handleRendererLoading()
+          }
+        }
+      )
+
+      firstProc.emitData('first')
+      detachedProc.emitData('must-not-send')
+      vi.advanceTimersByTime(2)
+
+      expect(getPtyDataSendCalls()).toEqual([['pty:data', { id: firstSpawn.id, data: 'first' }]])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        rendererInFlightPtyCount: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false,
+        rendererPtyDispatcherReady: false
+      })
+      expect(vi.getTimerCount()).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('waits for renderer ACKs before sending more output for a saturated PTY', async () => {
     vi.useFakeTimers()
     const firstProc = createMockProc()
@@ -11614,7 +11816,8 @@ describe('registerPtyHandlers', () => {
       registerPtyHandlers(mainWindow as never)
       mainWindow.webContents.send.mockClear()
 
-      provider.emitData('flood-pty', 'x'.repeat(320 * 1024))
+      const finalPendingData = 'x'.repeat(320 * 1024)
+      provider.emitData('flood-pty', finalPendingData)
       expect(provider.pauseProducer).toHaveBeenCalledTimes(1)
 
       // Exit while pending is above the low watermark: the exit path must release the pause, not leave a stale mark.
@@ -11622,6 +11825,321 @@ describe('registerPtyHandlers', () => {
       expect(provider.resumeProducer).toHaveBeenCalledTimes(1)
       expect(provider.resumeProducer).toHaveBeenCalledWith('flood-pty')
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fences synchronous producer data and duplicate exit while releasing an exiting PTY', () => {
+    vi.useFakeTimers()
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      mainWindow.webContents.send.mockClear()
+
+      const finalPendingData = 'x'.repeat(320 * 1024)
+      provider.emitData('flood-pty', finalPendingData)
+      expect(provider.pauseProducer).toHaveBeenCalledTimes(1)
+      provider.resumeProducer.mockImplementation((id: string) => {
+        provider.emitData(id, 'must-not-follow-exit')
+        provider.emitExit(id, 0)
+      })
+
+      provider.emitExit('flood-pty', 0)
+
+      expect(provider.resumeProducer).toHaveBeenCalledTimes(1)
+      expect(mainWindow.webContents.send.mock.calls).toEqual([
+        ['pty:data', { id: 'flood-pty', data: finalPendingData }],
+        ['pty:exit', { id: 'flood-pty', code: 0 }]
+      ])
+      expect(
+        getPtyDataSendCalls().some(
+          (call) => (call[1] as { data?: string } | undefined)?.data === 'must-not-follow-exit'
+        )
+      ).toBe(false)
+      expect(
+        mainWindow.webContents.send.mock.calls.filter((call) => call[0] === 'pty:exit')
+      ).toHaveLength(1)
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        rendererInFlightPtyCount: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not retry a complete payload after a synchronous renderer send failure', () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      mainWindow.webContents.send.mockClear()
+      let failed = false
+      let markerFailed = false
+      mainWindow.webContents.send.mockImplementation(
+        (channel: string, payload: { id?: string }) => {
+          if (channel === 'pty:data' && payload.id === 'send-fail-complete' && !failed) {
+            failed = true
+            throw new Error('synthetic send failure')
+          }
+          if (channel === 'pty:modelRestoreNeeded' && !markerFailed) {
+            markerFailed = true
+            throw new Error('synthetic marker failure')
+          }
+        }
+      )
+
+      provider.emitData('send-fail-complete', 'lost-once')
+      vi.advanceTimersByTime(2)
+
+      expect(getPtyDataSendCalls()).toEqual([
+        ['pty:data', { id: 'send-fail-complete', data: 'lost-once' }]
+      ])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        pendingChars: 0,
+        rendererInFlightPtyCount: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+
+      provider.emitData('send-fail-complete', 'recovery')
+      vi.advanceTimersByTime(2)
+      expect(getPtyDataSendCalls()).toEqual([
+        ['pty:data', { id: 'send-fail-complete', data: 'lost-once' }],
+        ['pty:data', { id: 'send-fail-complete', data: 'recovery' }]
+      ])
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:modelRestoreNeeded', {
+        id: 'send-fail-complete',
+        reason: 'delivery-heal'
+      })
+      provider.emitData('send-fail-complete', 'after-marker-failure')
+      vi.advanceTimersByTime(2)
+      expect(
+        mainWindow.webContents.send.mock.calls.filter(
+          (call) => call[0] === 'pty:modelRestoreNeeded'
+        )
+      ).toHaveLength(2)
+      expect(getPtyDataSendCalls().at(-1)).toEqual([
+        'pty:data',
+        { id: 'send-fail-complete', data: 'after-marker-failure' }
+      ])
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps only a partial remainder after a synchronous renderer send failure', () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      mainWindow.webContents.send.mockClear()
+      const firstChunk = 'x'.repeat(16 * 1024)
+      let failed = false
+      mainWindow.webContents.send.mockImplementation((channel: string) => {
+        if (channel === 'pty:data' && !failed) {
+          failed = true
+          throw new Error('synthetic send failure')
+        }
+      })
+
+      provider.emitData('send-fail-partial', `${firstChunk}tail`)
+      vi.advanceTimersByTime(2)
+
+      expect(getPtyDataSendCalls()).toEqual([
+        ['pty:data', { id: 'send-fail-partial', data: firstChunk }]
+      ])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 1,
+        pendingChars: 4,
+        rendererInFlightChars: 0,
+        flushScheduled: true
+      })
+      expect(vi.getTimerCount()).toBe(1)
+
+      vi.advanceTimersByTime(1)
+      expect(getPtyDataSendCalls()).toEqual([
+        ['pty:data', { id: 'send-fail-partial', data: firstChunk }],
+        ['pty:data', { id: 'send-fail-partial', data: 'tail' }]
+      ])
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:modelRestoreNeeded', {
+        id: 'send-fail-partial',
+        reason: 'delivery-heal'
+      })
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        rendererInFlightChars: 4,
+        flushScheduled: false
+      })
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears failed-delivery restore state when the renderer lifecycle resets', () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      const resetRenderer = getMainWindowWebContentsListener('did-start-loading')
+      const readyRenderer = getPtyRendererDispatcherReadyListener()
+      let failed = false
+      mainWindow.webContents.send.mockImplementation((channel: string) => {
+        if (channel === 'pty:data' && !failed) {
+          failed = true
+          throw new Error('synthetic send failure')
+        }
+      })
+
+      provider.emitData('send-fail-reset', 'lost-once')
+      vi.advanceTimersByTime(2)
+      resetRenderer()
+      readyRenderer()
+      mainWindow.webContents.send.mockClear()
+      provider.emitData('send-fail-reset', 'repainted-page-data')
+      vi.advanceTimersByTime(2)
+
+      expect(getPtyDataSendCalls()).toEqual([
+        ['pty:data', { id: 'send-fail-reset', data: 'repainted-page-data' }]
+      ])
+      expect(
+        mainWindow.webContents.send.mock.calls.filter(
+          (call) => call[0] === 'pty:modelRestoreNeeded'
+        )
+      ).toHaveLength(0)
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('commits interactive bypass removal and producer flow after a synchronous send failure', async () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mockProc = createMockProc()
+    spawnMock.mockReturnValue(mockProc.proc)
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const spawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const writePty = getPtyWriteListener()
+      mainWindow.webContents.send.mockClear()
+      let failed = false
+      mainWindow.webContents.send.mockImplementation((channel: string) => {
+        if (channel === 'pty:data' && !failed) {
+          failed = true
+          throw new Error('synthetic send failure')
+        }
+      })
+
+      mockProc.emitData('older-')
+      writePty(mainWindowIpcEvent, { id: spawn.id, data: 'x' })
+      mockProc.emitData('redraw')
+
+      expect(getPtyDataSendCalls()).toEqual([['pty:data', { id: spawn.id, data: 'older-redraw' }]])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        pendingChars: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+
+      mockProc.emitData('recovery')
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:modelRestoreNeeded', {
+        id: spawn.id,
+        reason: 'delivery-heal'
+      })
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('cleans up and emits exit once when the final data send fails synchronously', () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      const pending = 'x'.repeat(320 * 1024)
+      provider.emitData('send-fail-exit', pending)
+      expect(provider.pauseProducer).toHaveBeenCalledWith('send-fail-exit')
+      mainWindow.webContents.send.mockClear()
+      mainWindow.webContents.send.mockImplementation((channel: string) => {
+        if (channel === 'pty:data') {
+          throw new Error('synthetic send failure')
+        }
+      })
+
+      provider.emitExit('send-fail-exit', 7)
+
+      expect(getPtyDataSendCalls()).toEqual([['pty:data', { id: 'send-fail-exit', data: pending }]])
+      expect(
+        mainWindow.webContents.send.mock.calls.filter((call) => call[0] === 'pty:exit')
+      ).toEqual([['pty:exit', { id: 'send-fail-exit', code: 7 }]])
+      expect(
+        mainWindow.webContents.send.mock.calls.filter(
+          (call) => call[0] === 'pty:modelRestoreNeeded'
+        )
+      ).toHaveLength(0)
+      expect(provider.resumeProducer).toHaveBeenCalledWith('send-fail-exit')
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        pendingChars: 0,
+        rendererInFlightPtyCount: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('delivers a pending-cap sentinel before exit and clears its pending timer', () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      provider.emitData('flood-pty', 'x'.repeat(3 * 1024 * 1024))
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 1,
+        pendingChars: 0,
+        flushScheduled: true
+      })
+      mainWindow.webContents.send.mockClear()
+
+      provider.emitExit('flood-pty', 0)
+
+      expect(mainWindow.webContents.send.mock.calls).toEqual([
+        ['pty:data', { id: 'flood-pty', data: '', droppedOutput: true }],
+        ['pty:exit', { id: 'flood-pty', code: 0 }]
+      ])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        rendererInFlightPtyCount: 0,
+        rendererInFlightChars: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      errorSpy.mockRestore()
       vi.useRealTimers()
     }
   })
@@ -11736,6 +12254,37 @@ describe('registerPtyHandlers', () => {
       expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
         rendererInFlightChars: 256 * 1024
       })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps zero, duplicate, and stale ACKs to one legacy no-write timer', async () => {
+    vi.useFakeTimers()
+    const mockProc = createMockProc()
+    spawnMock.mockReturnValue(mockProc.proc)
+
+    try {
+      const spawnResult = await spawnAndSaturateRendererDeliveryGate(mockProc)
+      const ackData = getPtyAckDataListener()
+      expect(getPtyDataSendCalls()).toHaveLength(32)
+      expect(vi.getTimerCount()).toBe(0)
+
+      ackData(null, { id: spawnResult.id, processedChars: 0 })
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(true)
+      expect(vi.getTimerCount()).toBe(1)
+      ackData(null, { id: spawnResult.id, processedChars: 0 })
+      ackData(null, { id: spawnResult.id, processedChars: -1 })
+      expect(vi.getTimerCount()).toBe(1)
+
+      vi.runOnlyPendingTimers()
+      expect(getPtyDataSendCalls()).toHaveLength(32)
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+
+      ackData(null, { id: spawnResult.id, processedChars: 16 * 1024 })
+      vi.runOnlyPendingTimers()
+      expect(getPtyDataSendCalls()).toHaveLength(33)
     } finally {
       vi.useRealTimers()
     }
@@ -12077,6 +12626,54 @@ describe('registerPtyHandlers', () => {
     }
   })
 
+  it('reactivates globally blocked work immediately after a delivery writeoff', () => {
+    vi.useFakeTimers()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const provider = installObservableDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never)
+      const bulkIds = Array.from({ length: 16 }, (_, index) => `writeoff-bulk-${index}`)
+      mainWindow.webContents.send.mockClear()
+      for (const id of bulkIds) {
+        provider.emitData(id, 'x'.repeat(600 * 1024))
+      }
+      vi.advanceTimersByTime(2)
+      for (let index = 0; index < 400; index++) {
+        vi.advanceTimersByTime(1)
+      }
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        rendererInFlightChars: 8 * 1024 * 1024,
+        flushScheduled: false
+      })
+
+      provider.emitData('writeoff-held', 'held')
+      vi.advanceTimersByTime(2)
+      expect(
+        getPtyDataSendCalls().some(
+          (call) => (call[1] as { id?: string } | undefined)?.id === 'writeoff-held'
+        )
+      ).toBe(false)
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(false)
+
+      reportRendererDeliveryState({
+        receivedCharsByPty: {},
+        processedCharsByPty: {},
+        heal: true,
+        rendererPtyDataListenerCount: 1
+      })
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(true)
+      vi.advanceTimersByTime(0)
+
+      expect(getPtyDataSendCalls().at(-1)).toEqual([
+        'pty:data',
+        { id: 'writeoff-held', data: 'held' }
+      ])
+    } finally {
+      warnSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('never writes off bytes the renderer received but has not parsed yet', async () => {
     vi.useFakeTimers()
     const mockProc = createMockProc()
@@ -12338,6 +12935,242 @@ describe('registerPtyHandlers', () => {
       vi.advanceTimersByTime(1)
 
       expect(mainWindow.webContents.send).toHaveBeenCalledTimes(513)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reactivates every globally blocked PTY when an exit releases renderer credit', async () => {
+    vi.useFakeTimers()
+    const procs = Array.from({ length: 17 }, () => createMockProc())
+    for (const proc of procs) {
+      spawnMock.mockReturnValueOnce(proc.proc)
+    }
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const spawns: { id: string }[] = []
+      for (const _proc of procs) {
+        spawns.push(
+          (await handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            cwd: '/tmp'
+          })) as { id: string }
+        )
+      }
+      mainWindow.webContents.send.mockClear()
+      for (const proc of procs) {
+        proc.emitData('x'.repeat(600 * 1024))
+      }
+      vi.advanceTimersByTime(2)
+      for (let index = 0; index < 400; index++) {
+        vi.advanceTimersByTime(1)
+      }
+      expect(getPtyDataSendCalls()).toHaveLength(512)
+      expect(vi.getTimerCount()).toBe(0)
+
+      mainWindow.webContents.send.mockClear()
+      procs[0]!.emitExit(0)
+      const exitIndex = mainWindow.webContents.send.mock.calls.findIndex(
+        (call) => call[0] === 'pty:exit'
+      )
+      expect(exitIndex).toBeGreaterThanOrEqual(0)
+      vi.advanceTimersByTime(0)
+
+      expect(
+        mainWindow.webContents.send.mock.calls
+          .slice(exitIndex + 1)
+          .some(
+            (call) =>
+              call[0] === 'pty:data' &&
+              (call[1] as { id?: string } | undefined)?.id !== spawns[0]!.id
+          )
+      ).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('wakes blocked PTYs when a zero-write hidden drop reentrantly releases exit credit', async () => {
+    vi.useFakeTimers()
+    const bulkProcs = Array.from({ length: 16 }, () => createMockProc())
+    const hiddenProc = createMockProc()
+    const heldProc = createMockProc()
+    for (const proc of [...bulkProcs, hiddenProc, heldProc]) {
+      spawnMock.mockReturnValueOnce(proc.proc)
+    }
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const bulkSpawns: { id: string }[] = []
+      for (const _proc of bulkProcs) {
+        bulkSpawns.push(
+          (await handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            cwd: '/tmp'
+          })) as { id: string }
+        )
+      }
+      const hiddenSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })
+
+      for (const proc of bulkProcs) {
+        proc.emitData('x'.repeat(600 * 1024))
+      }
+      vi.advanceTimersByTime(2)
+      for (let index = 0; index < 400; index++) {
+        vi.advanceTimersByTime(1)
+      }
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        rendererInFlightChars: 8 * 1024 * 1024,
+        flushScheduled: false
+      })
+
+      const setHidden = getPtySetHiddenRendererPtyListener()
+      const setInterest = getPtySetDeliveryInterestListener()
+      setHidden(null, { id: hiddenSpawn.id, hidden: true })
+      setInterest(null, { id: hiddenSpawn.id, interested: true })
+      hiddenProc.emitData('drop-without-write')
+      heldProc.emitData('held')
+      setInterest(null, { id: hiddenSpawn.id, interested: false })
+      mainWindow.webContents.send.mockClear()
+      let reentered = false
+      mainWindow.webContents.send.mockImplementation(
+        (channel: string, payload: { id?: string }) => {
+          if (channel === 'pty:modelRestoreNeeded' && payload.id === hiddenSpawn.id && !reentered) {
+            reentered = true
+            bulkProcs[0]!.emitExit(0)
+          }
+        }
+      )
+
+      vi.advanceTimersByTime(2)
+
+      const exitIndex = mainWindow.webContents.send.mock.calls.findIndex(
+        (call) => call[0] === 'pty:exit'
+      )
+      expect(exitIndex).toBeGreaterThanOrEqual(0)
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(true)
+      vi.advanceTimersByTime(1)
+      expect(
+        mainWindow.webContents.send.mock.calls
+          .slice(exitIndex + 1)
+          .some(
+            (call) =>
+              call[0] === 'pty:data' &&
+              (call[1] as { id?: string } | undefined)?.id !== bulkSpawns[0]!.id
+          )
+      ).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not reactivate globally blocked PTYs when exit releases no prior credit', async () => {
+    vi.useFakeTimers()
+    const bulkProcs = Array.from({ length: 16 }, () => createMockProc())
+    const finalProc = createMockProc()
+    const heldProc = createMockProc()
+    for (const proc of [...bulkProcs, finalProc, heldProc]) {
+      spawnMock.mockReturnValueOnce(proc.proc)
+    }
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      for (const _proc of bulkProcs) {
+        await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          cwd: '/tmp'
+        })
+      }
+      const finalSpawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string; incarnationId: string }
+      await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })
+
+      for (const proc of bulkProcs) {
+        proc.emitData('x'.repeat(600 * 1024))
+      }
+      vi.advanceTimersByTime(2)
+      for (let index = 0; index < 400; index++) {
+        vi.advanceTimersByTime(1)
+      }
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        rendererInFlightChars: 8 * 1024 * 1024,
+        flushScheduled: false
+      })
+
+      finalProc.emitData('final-tail')
+      heldProc.emitData('held')
+      vi.advanceTimersByTime(2)
+      expect(getPtyRendererDeliveryDebugSnapshot().flushScheduled).toBe(false)
+      const timerCountBeforeExit = vi.getTimerCount()
+      mainWindow.webContents.send.mockClear()
+
+      finalProc.emitExit(0)
+
+      expect(mainWindow.webContents.send.mock.calls).toEqual([
+        ['pty:data', { id: finalSpawn.id, data: 'final-tail' }],
+        ['pty:exit', { id: finalSpawn.id, code: 0, incarnationId: finalSpawn.incarnationId }]
+      ])
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        rendererInFlightChars: 8 * 1024 * 1024,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(timerCountBeforeExit)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not schedule a teardown-only flush for the last active blocked PTY', async () => {
+    vi.useFakeTimers()
+    const proc = createMockProc()
+    spawnMock.mockReturnValue(proc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const spawn = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      getPtySetActiveRendererPtyListener()(null, { id: spawn.id, active: true })
+      proc.emitData('x'.repeat(1200 * 1024))
+      vi.advanceTimersByTime(2)
+      for (let index = 0; index < 80; index++) {
+        vi.advanceTimersByTime(1)
+      }
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 1,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
+
+      proc.emitExit(0)
+
+      expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+        pendingPtyCount: 0,
+        flushScheduled: false
+      })
+      expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
     }
@@ -12668,6 +13501,58 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    it('drops queued hidden data when interest ends before dispatcher readiness', async () => {
+      vi.useFakeTimers()
+      const mockProc = createMockProc()
+      spawnMock.mockReturnValue(mockProc.proc)
+
+      try {
+        registerPtyHandlers(mainWindow as never)
+        const spawnResult = (await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          cwd: '/tmp'
+        })) as { id: string }
+        const setHidden = getPtySetHiddenRendererPtyListener()
+        const setInterest = getPtySetDeliveryInterestListener()
+        const setActive = getPtySetActiveRendererPtyListener()
+        getMainWindowWebContentsListener('did-start-loading')()
+        mainWindow.webContents.send.mockClear()
+
+        setHidden(null, { id: spawnResult.id, hidden: true })
+        setInterest(null, { id: spawnResult.id, interested: true })
+        mockProc.emitData('boot-window sidecar bytes')
+        vi.advanceTimersByTime(2)
+        expect(mainWindow.webContents.send).not.toHaveBeenCalled()
+        expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+          pendingPtyCount: 1,
+          rendererPtyDispatcherReady: false,
+          ackGatedFlushSkipCount: 0
+        })
+
+        const timerCountBeforeNoops = vi.getTimerCount()
+        setHidden(null, { id: spawnResult.id, hidden: true })
+        setInterest(null, { id: spawnResult.id, interested: true })
+        setActive(null, { id: spawnResult.id, active: false })
+        expect(vi.getTimerCount()).toBe(timerCountBeforeNoops)
+
+        setInterest(null, { id: spawnResult.id, interested: false })
+        vi.advanceTimersByTime(0)
+
+        expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:modelRestoreNeeded', {
+          id: spawnResult.id,
+          reason: 'hidden-drop'
+        })
+        expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+          pendingPtyCount: 0,
+          rendererPtyDispatcherReady: false,
+          ackGatedFlushSkipCount: 0
+        })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it.each([
       ['terminalHiddenDeliveryGate', { terminalHiddenDeliveryGate: false }],
       ['terminalMainSideEffectAuthority', { terminalMainSideEffectAuthority: false }]
@@ -12699,6 +13584,53 @@ describe('registerPtyHandlers', () => {
         vi.useRealTimers()
       }
     })
+
+    it.each(['terminalHiddenDeliveryGate', 'terminalMainSideEffectAuthority'] as const)(
+      'reevaluates blocked hidden data when the live %s setting enables the derived gate',
+      async (settingName) => {
+        vi.useFakeTimers()
+        const mockProc = createMockProc()
+        spawnMock.mockReturnValue(mockProc.proc)
+        const settings = {
+          terminalHiddenDeliveryGate: true,
+          terminalMainSideEffectAuthority: true
+        }
+        settings[settingName] = false
+
+        try {
+          registerPtyHandlers(mainWindow as never, undefined, undefined, (() => settings) as never)
+          const spawnResult = (await handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            cwd: '/tmp'
+          })) as { id: string }
+          getMainWindowWebContentsListener('did-start-loading')()
+          getPtySetHiddenRendererPtyListener()(null, { id: spawnResult.id, hidden: true })
+          mainWindow.webContents.send.mockClear()
+          mockProc.emitData('blocked while gate disabled')
+          vi.advanceTimersByTime(2)
+          expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+            pendingPtyCount: 1,
+            rendererPtyDispatcherReady: false
+          })
+
+          settings[settingName] = true
+          getPtyAckDataListener()(null, { id: spawnResult.id, processedChars: 0 })
+          vi.advanceTimersByTime(0)
+
+          expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:modelRestoreNeeded', {
+            id: spawnResult.id,
+            reason: 'hidden-drop'
+          })
+          expect(getPtyRendererDeliveryDebugSnapshot()).toMatchObject({
+            pendingPtyCount: 0,
+            rendererPtyDispatcherReady: false
+          })
+        } finally {
+          vi.useRealTimers()
+        }
+      }
+    )
 
     it('drops queued pending data when a PTY is marked hidden', async () => {
       vi.useFakeTimers()
