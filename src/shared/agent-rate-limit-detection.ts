@@ -33,6 +33,12 @@ const ACCOUNT_LIMIT_PATTERNS = [
   // Why: Claude Code org spend caps say "hit your org's monthly spend limit" / "run /usage-credits", which no rate/usage/quota pattern matches; anchor to a limit-hit verb so domain talk about credit/billing limits can't trigger a switch.
   /\b(?:you(?:'ve|\s+have)|we(?:'ve|\s+have))\s+(?:hit|reached|exceeded)\b[\s\S]{0,60}?\b(?:spend(?:ing)?|billing|credit)\s+limit\b/i,
   /\brun\s+\/usage-credits\b[\s\S]{0,80}?\b(?:admin|higher\s+limit)\b/i,
+  // Why: on a spend cap the CLI first renders an interactive menu that blocks the
+  // PTY waiting for input, and its prompt never says "limit exceeded" — so the
+  // switch only fired after the user dismissed it by hand. Require BOTH options so
+  // prose containing one of them alone can't trigger a switch.
+  /\bstop\s+and\s+wait\s+for\s+(?:the\s+)?limit\s+to\s+reset\b[\s\S]{0,160}?\bask\s+your\s+admin\b/i,
+  /\bask\s+your\s+admin\s+for\s+more\s+usage\b[\s\S]{0,160}?\bstop\s+and\s+wait\s+for\s+(?:the\s+)?limit\b/i,
   // Why: z.ai/GLM (a managed custom-endpoint Claude account) reports genuine quota exhaustion as "[1310][Weekly/Monthly Limit Exhausted. Your limit will reset at <time>]"; match the exhausted/reset signal so failover can switch to a Claude OAuth account — deliberately NOT a bare transient gateway 429.
   /\blimit\s+exhausted\b/i,
   /\blimit\s+will\s+reset\s+at\b/i

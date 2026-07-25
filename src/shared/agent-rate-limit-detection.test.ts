@@ -42,6 +42,59 @@ describe('agent rate limit detection', () => {
     ).toBe(true)
   })
 
+  it('does not switch on narration about waiting for a limit to reset', () => {
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'The retry helper will stop and wait for limit to reset before the next attempt.',
+        createState()
+      )
+    ).toBe(false)
+  })
+
+  it('detects the interactive spend-limit menu that precedes the limit message', () => {
+    // Why: this menu blocks the PTY waiting for input, so the switch used to fire
+    // only after the user dismissed it by hand.
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'What do you want to do?\n  1. Stop and wait for limit to reset\n  2. Ask your admin for more usage',
+        createState()
+      )
+    ).toBe(true)
+  })
+
+  it('detects the spend-limit menu when its options render in reverse order', () => {
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'Ask your admin for more usage\nStop and wait for the limit to reset',
+        createState()
+      )
+    ).toBe(true)
+  })
+
+  it('detects the spend-limit menu split across PTY chunks', () => {
+    const state = createState()
+    expect(detectAgentRateLimitOutput('claude', '1. Stop and wait for limit to reset', state)).toBe(
+      false
+    )
+    // The tail must carry the first option until the second one arrives.
+    expect(
+      detectAgentRateLimitOutput('claude', '\n  2. Ask your admin for more usage', state)
+    ).toBe(true)
+  })
+
+  it('does not treat one menu option alone as an account limit', () => {
+    expect(
+      detectAgentRateLimitOutput(
+        'claude',
+        'If the build fails, ask your admin for more usage of the CI runners',
+        createState()
+      )
+    ).toBe(false)
+  })
+
   it('does not treat benign mentions of the /usage-credits command as account limits', () => {
     expect(
       detectAgentRateLimitOutput(
