@@ -34,7 +34,7 @@ const ITEMS: PlaneWorkItem[] = [
     state: { id: 's1', name: 'Todo', group: 'unstarted' },
     priority: 'low',
     labels: ['bug'],
-    assignees: [{ id: 'u1', displayName: 'Fabian', email: 'f@x.com' }]
+    assignees: [{ id: 'u1', displayName: 'Test User', email: 'user@example.com' }]
   }),
   workItem({ id: 'D', state: { id: 's3', name: 'Done', group: 'completed' }, priority: 'none' })
 ]
@@ -81,7 +81,7 @@ describe('parsePlaneQuery', () => {
 describe('queryNeedsViewer', () => {
   it('is true only for assignee = me', () => {
     expect(queryNeedsViewer(parsePlaneQuery('assignee = me'))).toBe(true)
-    expect(queryNeedsViewer(parsePlaneQuery('assignee = "Fabian"'))).toBe(false)
+    expect(queryNeedsViewer(parsePlaneQuery('assignee = "Test User"'))).toBe(false)
     expect(queryNeedsViewer(parsePlaneQuery('state = Todo'))).toBe(false)
   })
 })
@@ -110,9 +110,9 @@ describe('applyPlaneQuery', () => {
   })
 
   it('filters by assignee name/email', () => {
-    expect(ids(applyPlaneQuery(ITEMS, parsePlaneQuery('assignee = "f@x.com"'), null))).toEqual([
-      'C'
-    ])
+    expect(
+      ids(applyPlaneQuery(ITEMS, parsePlaneQuery('assignee = "user@example.com"'), null))
+    ).toEqual(['C'])
   })
 
   it('resolves assignee = me against the viewer id', () => {

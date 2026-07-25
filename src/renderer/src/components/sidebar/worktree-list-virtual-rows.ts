@@ -94,6 +94,9 @@ export function insertProjectUsageRows(
     return rows
   }
   const output: RenderRow[] = []
+  // Why: a project is a repo header OR a project-group header — group headers
+  // carry `projectGroup` instead of `repo`, and their worktrees can hang
+  // directly off the group, so anchoring to `repo` alone rendered nothing.
   let openRepoId: string | null = null
   let openKey: string | null = null
   let collected: string[] = []
@@ -115,9 +118,12 @@ export function insertProjectUsageRows(
   for (const row of rows) {
     if (row.type === 'header' || row.type === 'host-header') {
       flush()
-      if (row.type === 'header' && row.repo?.id) {
-        openRepoId = row.repo.id
-        openKey = row.key
+      if (row.type === 'header') {
+        const projectId = row.repo?.id ?? row.projectGroup?.id ?? null
+        if (projectId) {
+          openRepoId = projectId
+          openKey = row.key
+        }
       }
       output.push(row)
       continue

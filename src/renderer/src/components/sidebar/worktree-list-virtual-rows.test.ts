@@ -89,6 +89,24 @@ describe('insertProjectUsageRows', () => {
     expect(insertProjectUsageRows(input, false)).toBe(input)
   })
 
+  it('anchors to a project-group header whose worktrees hang off the group', () => {
+    // Why: project-group headers carry `projectGroup`, not `repo`; anchoring to
+    // repo alone rendered nothing when the sidebar groups by project.
+    const groupHeader = {
+      type: 'header',
+      key: 'project-group:group-1',
+      label: 'Group One',
+      count: 1,
+      tone: 'text-foreground',
+      projectGroup: { id: 'group-1', name: 'Group One', tabOrder: 0 }
+    } as unknown as RenderRow
+    const out = insertProjectUsageRows([groupHeader, worktreeItemRow('wt-1')], true)
+    const usage = out.find((row) => row.type === 'project-usage') as
+      | Extract<RenderRow, { type: 'project-usage' }>
+      | undefined
+    expect(usage).toMatchObject({ repoId: 'group-1', worktreeIds: ['wt-1'] })
+  })
+
   it('does not attach a usage row to a non-project header', () => {
     const out = insertProjectUsageRows([groupRow('status-open'), worktreeItemRow('wt-1')], true)
     expect(out.some((row) => row.type === 'project-usage')).toBe(false)
