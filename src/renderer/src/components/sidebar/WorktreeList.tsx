@@ -101,9 +101,12 @@ import {
   getStickyHeaderIndexes,
   getVirtualRowTransform,
   pruneStaleVirtualRowElementCache,
+  insertProjectUsageRows,
   shouldUseHeaderTopSpacing,
   type RenderRow
 } from './worktree-list-virtual-rows'
+import { SidebarProjectUsageIndicator } from './SidebarProjectUsageIndicator'
+import { buildSidebarProjectUsage, type SidebarUsageEntry } from './sidebar-project-usage-model'
 import {
   revealElementInScrollContainer,
   WORKTREE_SIDEBAR_REVEAL_TOP_INSET
@@ -1228,6 +1231,9 @@ export function getRenderRowKey(row: RenderRow): string {
   if (row.type === 'folder-workspace') {
     return `folder-workspace:${row.folderWorkspace.id}`
   }
+  if (row.type === 'project-usage') {
+    return row.key
+  }
   return `wt:${row.rowKey}`
 }
 
@@ -1474,6 +1480,34 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   const prVisibleRefreshGeneration = useAppStore((s) => s.prVisibleRefreshGeneration)
   const settings = useAppStore((s) => s.settings)
   const newCardStyle = settings?.experimentalNewWorktreeCardStyle === true
+  // Why: the per-project usage row reuses the status bar's account-scope
+  // resolvers, so the sidebar can never disagree with the Usage popover.
+  const rateLimits = useAppStore((s) => s.rateLimits)
+  const getKnownWorktreeById = useAppStore((s) => s.getKnownWorktreeById)
+  const getProjectUsageEntries = useCallback(
+    (worktreeIds: readonly string[]): SidebarUsageEntry[] => {
+      // Why: tolerate a store without this selector (older/partial mocks) — a
+      // missing lookup just means no pin is known, so usage falls back to global.
+      const pinned =
+        typeof getKnownWorktreeById === 'function'
+          ? worktreeIds.map((id) => getKnownWorktreeById(id))
+          : []
+      return buildSidebarProjectUsage({
+        claudePinnedAccountIds: pinned.map((worktree) => worktree?.claudeAccountId),
+        codexPinnedAccountIds: pinned.map((worktree) => worktree?.codexAccountId),
+        showWorktreeAccountUsage: settings?.showWorktreeAccountUsage,
+        claudeAccounts: settings?.claudeManagedAccounts ?? [],
+        codexAccounts: settings?.codexManagedAccounts ?? [],
+        activeClaudeAccountId: settings?.activeClaudeManagedAccountId ?? null,
+        activeCodexAccountId: settings?.activeCodexManagedAccountId ?? null,
+        claudeLimits: rateLimits?.claude ?? null,
+        codexLimits: rateLimits?.codex ?? null,
+        inactiveClaudeUsage: rateLimits?.inactiveClaudeAccounts ?? [],
+        inactiveCodexUsage: rateLimits?.inactiveCodexAccounts ?? []
+      })
+    },
+    [getKnownWorktreeById, settings, rateLimits]
+  )
   const reorderRepos = useAppStore((s) => s.reorderRepos)
   const folderBackedProjectGroupIds = useMemo(
     () =>
@@ -1654,7 +1688,13 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     },
     [computeWorktreeDropForGroup]
   )
-  const renderRows = useMemo(() => buildRenderableRows(rows), [rows])
+  // Why: the per-project usage row only makes sense under a project's tree, so
+  // it is inserted for repo grouping only — other groupings have no project trees.
+  const showProjectUsageRows = groupBy === 'repo' && settings?.showWorktreeAccountUsage !== false
+  const renderRows = useMemo(
+    () => insertProjectUsageRows(buildRenderableRows(rows), showProjectUsageRows) as RenderRow[],
+    [rows, showProjectUsageRows]
+  )
   const sidebarRepoHeaderIdsByBucket = useMemo(
     () =>
       getSidebarOrderedRepoHeaderIdsByBucket(
@@ -5110,6 +5150,23 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                       <FolderPathStatusIndicator status={folderWorkspacePathStatus} />
                     </div>
                   </div>
+                </div>
+              )
+            }
+
+            if (row.type === 'project-usage') {
+              return (
+                <div
+                  key={vItem.key}
+                  role="presentation"
+                  data-worktree-virtual-row
+                  data-worktree-virtual-row-key={String(vItem.key)}
+                  data-index={vItem.index}
+                  ref={measureVirtualRowElement}
+                  className="absolute left-0 right-0 top-0"
+                  style={{ transform: getVirtualRowTransform(vItem.start) }}
+                >
+                  <SidebarProjectUsageIndicator entries={getProjectUsageEntries(row.worktreeIds)} />
                 </div>
               )
             }

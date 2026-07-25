@@ -4963,6 +4963,10 @@
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
+        },
+        "projectUsage": {
+          "loading": "Cargando uso…",
+          "pending": "Uso aún no cargado"
         }
       },
       "shared": {

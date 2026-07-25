@@ -10,10 +10,16 @@ const IMPORTED_WORKTREES_LINE_ROW_HEIGHT = 36
 const PENDING_CREATION_ROW_HEIGHT = 56
 const FOLDER_WORKSPACE_ROW_HEIGHT = 64
 
+const PROJECT_USAGE_ROW_HEIGHT = 34
+
 type WorktreeItemRow = Extract<HostSectionRow, { type: 'item' }>
 export type RenderRow =
   | HostSectionRow
   | { type: 'lineage-group'; key: string; rows: WorktreeItemRow[] }
+  // Inert row: carries no worktree, so sticky-header/keyboard-nav/drag logic
+  // ignores it. `worktreeIds` are the project's worktrees whose account pins
+  // decide whose usage the row shows.
+  | { type: 'project-usage'; key: string; repoId: string; worktreeIds: readonly string[] }
 
 export function shouldUseHeaderTopSpacing(args: {
   rows: readonly RenderRow[]
@@ -60,6 +66,9 @@ export function estimateRenderRowSize(
   if (row?.type === 'lineage-group') {
     return 100 + Math.max(0, row.rows.length - 1) * 96
   }
+  if (row?.type === 'project-usage') {
+    return PROJECT_USAGE_ROW_HEIGHT
+  }
   if (row?.type === 'imported-worktrees-card' || row?.type === 'new-external-worktrees-inbox') {
     return IMPORTED_WORKTREES_LINE_ROW_HEIGHT
   }
@@ -70,6 +79,63 @@ export function estimateRenderRowSize(
     return FOLDER_WORKSPACE_ROW_HEIGHT
   }
   return 116
+}
+
+/**
+ * Appends one inert usage row after each project (repo) header's worktrees, so
+ * the sidebar can show that project's account usage under its tree. Projects
+ * with no visible worktrees (collapsed or empty) get no row.
+ */
+export function insertProjectUsageRows(
+  rows: readonly RenderRow[],
+  enabled: boolean
+): readonly RenderRow[] {
+  if (!enabled) {
+    return rows
+  }
+  const output: RenderRow[] = []
+  let openRepoId: string | null = null
+  let openKey: string | null = null
+  let collected: string[] = []
+
+  const flush = (): void => {
+    if (openRepoId && collected.length > 0) {
+      output.push({
+        type: 'project-usage',
+        key: `project-usage:${openKey ?? openRepoId}`,
+        repoId: openRepoId,
+        worktreeIds: collected
+      })
+    }
+    openRepoId = null
+    openKey = null
+    collected = []
+  }
+
+  for (const row of rows) {
+    if (row.type === 'header' || row.type === 'host-header') {
+      flush()
+      if (row.type === 'header' && row.repo?.id) {
+        openRepoId = row.repo.id
+        openKey = row.key
+      }
+      output.push(row)
+      continue
+    }
+    output.push(row)
+    if (!openRepoId) {
+      continue
+    }
+    if (row.type === 'item') {
+      collected.push(row.worktree.id)
+    } else if (row.type === 'lineage-group') {
+      for (const item of row.rows) {
+        collected.push(item.worktree.id)
+      }
+    }
+  }
+  flush()
+  return output
 }
 
 export function getVirtualRowTransform(start: number): string {
