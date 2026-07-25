@@ -57,6 +57,7 @@ import { registerTerminalRenderDesyncEvidenceHandler } from './terminal-render-d
 import { registerOrcaProfileHandlers } from './orca-profiles'
 import { registerCodexAccountHandlers } from './codex-accounts'
 import { registerAgentHookHandlers } from './agent-hooks'
+import { registerCodexConfigSyncHandlers } from './codex-config-sync'
 import { getPtyIdForPaneKey } from './pty'
 import { registerAgentTrustHandlers } from './agent-trust'
 import { registerClaudeAccountHandlers } from './claude-accounts'
@@ -138,6 +139,7 @@ export function registerCoreHandlers(
   registerOpenCodeUsageHandlers(openCodeUsage)
   registerCodexAccountHandlers(codexAccounts)
   registerAgentHookHandlers(runtime, { getPtyIdForPaneKey })
+  registerCodexConfigSyncHandlers(codexAccounts.runtimeHomeService)
   registerAgentTrustHandlers()
   registerClaudeAccountHandlers(claudeAccounts, store)
   registerMiniMaxCredentialsHandlers(rateLimits)

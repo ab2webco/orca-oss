@@ -13,6 +13,7 @@ import {
   type CodexSettingsPromotionPlan
 } from './config-settings-promotion'
 import { readCodexSettingsBaseline } from './config-settings-baseline'
+import { getCodexConfigSyncStatus, reportCodexConfigSyncOutcome } from './config-sync-stall'
 import { preserveRuntimeConflictValues } from './codex-config-settings-preservation'
 import {
   deduplicateProjectTomlSections,
@@ -39,15 +40,32 @@ export function syncSystemConfigIntoManagedCodexHome(
   if (!promotionPlan) {
     // Why: mirroring after a failed write-back would erase the runtime change;
     // leave both runtime and its old baseline intact so the next launch retries.
+    // Report first: once a baseline exists, an unreadable source throws inside
+    // promotion rather than the mirror, so reporting only later would leave the
+    // steady-state stall logging a reasonless failure on every pass forever.
+    // Only a stall, never a clear: promotion failing on a readable source still
+    // means no mirror ran, so clearing the latch here would claim a recovery
+    // that did not happen and silence every later pass.
+    const stalledStatus = getCodexConfigSyncStatus(homes)
+    if (stalledStatus.state === 'stalled') {
+      reportCodexConfigSyncOutcome(homes.runtimeHomePath, stalledStatus)
+    }
     return
   }
   let mirrorResult: CodexConfigMirrorResult
   try {
     mirrorResult = syncSystemConfigIntoManagedCodexHomeUnsafe(homes, promotionPlan)
   } catch (error) {
-    console.warn('[codex-config] Failed to mirror system Codex config:', error)
+    // Why: an unreadable source throws out of the mirror, so reporting only on
+    // the success path would leave that stall latch-less — logging the generic
+    // failure on every launch and quota poll while the surfaced reason never
+    // reaches the user.
+    reportCodexConfigSyncOutcome(homes.runtimeHomePath, getCodexConfigSyncStatus(homes), error)
     return
   }
+  // Why: report from the same pass that decided, so the surfaced status can
+  // never disagree with what the mirror actually did.
+  reportCodexConfigSyncOutcome(homes.runtimeHomePath, getCodexConfigSyncStatus(homes))
   if (mirrorResult.status === 'skipped-missing-source') {
     // Why: advancing an existing baseline would mark the unmirrored runtime
     // change as promoted, so it could never retry once the source reappears.

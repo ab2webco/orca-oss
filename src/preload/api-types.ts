@@ -335,6 +335,7 @@ import type { BrowserSetAnnotationViewportBridgeArgs } from '../shared/browser-a
 import type { CliInstallStatus } from '../shared/cli-install-types'
 import type { E2EConfig } from '../shared/e2e-config'
 import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
+import type { CodexConfigSyncStatus } from '../shared/codex-config-sync-types'
 import type {
   AgentStatusClearIpcPayload,
   AgentStatusIpcPayload,
@@ -2366,6 +2367,9 @@ export type PreloadApi = {
     getWslInstallStatus: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
     installWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
     removeWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
+  }
+  codexConfigSync: {
+    status: () => Promise<CodexConfigSyncStatus>
   }
   agentHooks: {
     claudeStatus: () => Promise<AgentHookInstallStatus>

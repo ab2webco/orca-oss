@@ -261,6 +261,15 @@ export class CodexAccountService {
     this.safeSyncCanonicalConfigToManagedHomes()
   }
 
+  /**
+   * Read-only access for surfaces that report on the runtime home rather than
+   * prepare it — notably the config-sync status channel, which must resolve the
+   * home the current selection actually mirrors into without creating anything.
+   */
+  get runtimeHomeService(): CodexRuntimeHomeService {
+    return this.runtimeHome
+  }
+
   private serializeMutation<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.mutationQueue.then(fn, fn)
     this.mutationQueue = next.catch(() => {})

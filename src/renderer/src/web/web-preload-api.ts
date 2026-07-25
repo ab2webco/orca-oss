@@ -781,6 +781,12 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     claudeAccounts: createClaudeAccountsApi(),
     cli: createCliApi(),
     agentHooks: createAgentHooksApi(),
+    // Why: the desktop derives this from the host filesystem, which the web
+    // client has no view of; reporting synced keeps the warning banner silent.
+    codexConfigSync: {
+      status: () =>
+        Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '' } as const)
+    },
     developerPermissions: createDeveloperPermissionsApi(),
     computerUsePermissions: createComputerUsePermissionsApi(),
     updater: createUpdaterApi(),
