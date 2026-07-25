@@ -1189,6 +1189,13 @@ export async function fetchManagedAccountUsage(
     return abortedClaudeRateLimitResult()
   }
   if (!location || !credentialsJson) {
+    // Why: surface why a managed account's usage can't be fetched — a missing
+    // credentials location/file (keychain item absent or unreadable) otherwise
+    // fails silently and shows as a hard "Error al actualizar" on the meter.
+    console.warn('[claude-rate-limits] managed account usage: no credentials', {
+      accountId: account.id,
+      reason: !location ? 'unresolved-location' : 'empty-credentials'
+    })
     return {
       provider: 'claude',
       session: null,
@@ -1218,6 +1225,9 @@ export async function fetchManagedAccountUsage(
   }
 
   if (!token) {
+    console.warn('[claude-rate-limits] managed account usage: no oauth token in credentials', {
+      accountId: account.id
+    })
     return {
       provider: 'claude',
       session: null,

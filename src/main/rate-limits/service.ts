@@ -577,7 +577,7 @@ export class RateLimitService {
           }
           const cached = this.inactiveClaudeCache.get(account.id) ?? null
           this.inactiveClaudeCache.set(account.id, this.applyStalePolicy(fresh, cached))
-        } catch {
+        } catch (error) {
           // Why: per-account try/catch keeps one Keychain/network error from aborting the remaining accounts in the batch.
           if (
             signal.aborted ||
@@ -585,6 +585,15 @@ export class RateLimitService {
             !this.isCurrentInactiveClaudeAccount(account.id)
           ) {
             this.inactiveClaudeCache.delete(account.id)
+          } else if (!signal.aborted) {
+            // Why: this path used to fail silently, so a per-account usage fetch
+            // error (e.g. missing managed credentials, an unrefreshable OAuth
+            // token) was invisible — surface it so the worktree usage meter's
+            // "Error al actualizar" / "Not yet updated" can be diagnosed.
+            console.warn('[claude-rate-limits] inactive account usage fetch failed', {
+              accountId: account.id,
+              message: error instanceof Error ? error.message : String(error)
+            })
           }
         }
         this.inactiveClaudeFetching.delete(account.id)
