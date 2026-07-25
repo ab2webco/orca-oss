@@ -174,6 +174,17 @@ describe('parseCoreSparseCheckoutFlag', () => {
     expect(parseCoreSparseCheckoutFlag('[core "sub"] sparseCheckout = true\n')).toBeUndefined()
   })
 
+  it('leaves [core] when a subsection header carries its own same-line assignment', () => {
+    // A `[section "sub"]key = value` line matched neither branch of the old anchored regex, so the
+    // parser never left `[core]` and credited the next indented line to it — a bogus sparse badge.
+    // Git reports core.sparseCheckout as unset here.
+    expect(
+      parseCoreSparseCheckoutFlag(
+        '[core]\n[core "sub"]worktreeConfig = x\n\tsparseCheckout = true\n'
+      )
+    ).toBeUndefined()
+  })
+
   it('honors the last assignment across mixed same-line and indented forms', () => {
     expect(
       parseCoreSparseCheckoutFlag(
