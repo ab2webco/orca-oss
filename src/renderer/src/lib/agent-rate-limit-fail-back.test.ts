@@ -208,3 +208,90 @@ describe('evaluateFailBackReadiness', () => {
     expect(readiness.ready).toBe(true)
   })
 })
+
+describe('restoreFailoverOriginPin', () => {
+  it('returns the worktree to its origin without a live session', async () => {
+    // Why this path exists: the full fail-back needs a PTY to Ctrl+C, so closing the
+    // endpoint tab used to leave the worktree pinned to the endpoint forever.
+    const updateWorktreeMeta = vi.fn(async () => undefined)
+    const { useAppStore } = await import('@/store')
+    vi.mocked(useAppStore.getState).mockReturnValue({
+      updateWorktreeMeta
+    } as unknown as ReturnType<typeof useAppStore.getState>)
+    const { restoreFailoverOriginPin } = await import('./agent-rate-limit-fail-back')
+
+    const result = await restoreFailoverOriginPin({
+      worktreeId: 'wt-1',
+      originAccountId: 'origin',
+      originLabel: 'origin@example.com'
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      accountLabel: 'origin@example.com',
+      failBack: 'pinned'
+    })
+    // The markers must be cleared too, or the watcher keeps re-firing.
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', {
+      claudeAccountId: 'origin',
+      claudeFailoverOriginAccountId: null,
+      claudeFailoverResetsAt: null
+    })
+  })
+
+  it('restores the global selection when the origin was the shared account', async () => {
+    const updateWorktreeMeta = vi.fn(async () => undefined)
+    const { useAppStore } = await import('@/store')
+    vi.mocked(useAppStore.getState).mockReturnValue({
+      updateWorktreeMeta
+    } as unknown as ReturnType<typeof useAppStore.getState>)
+    const { restoreFailoverOriginPin } = await import('./agent-rate-limit-fail-back')
+
+    await restoreFailoverOriginPin({
+      worktreeId: 'wt-1',
+      originAccountId: null,
+      originLabel: 'the global account selection'
+    })
+
+    expect(updateWorktreeMeta).toHaveBeenCalledWith(
+      'wt-1',
+      expect.objectContaining({ claudeAccountId: null })
+    )
+  })
+
+  it('reports a pin failure instead of silently leaving the failover pin', async () => {
+    const { useAppStore } = await import('@/store')
+    vi.mocked(useAppStore.getState).mockReturnValue({
+      updateWorktreeMeta: vi.fn(async () => {
+        throw new Error('disk full')
+      })
+    } as unknown as ReturnType<typeof useAppStore.getState>)
+    const { restoreFailoverOriginPin } = await import('./agent-rate-limit-fail-back')
+
+    const result = await restoreFailoverOriginPin({
+      worktreeId: 'wt-1',
+      originAccountId: 'origin',
+      originLabel: 'origin@example.com'
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ reason: 'pin-failed' })
+  })
+})
+
+describe('fail-back mode default', () => {
+  it('defaults to auto so the return trip does not wait on a toast', async () => {
+    // Why asserted here: the default lives in three places (persistence
+    // normalizer, settings pane, watcher hook) and they must not drift apart.
+    const { readFileSync } = await import('node:fs')
+    const normalizer = readFileSync('src/main/persistence.ts', 'utf-8')
+    expect(normalizer).toContain("value === 'off' || value === 'notify' ? value : 'auto'")
+
+    for (const path of [
+      'src/renderer/src/components/settings/AccountsPane.tsx',
+      'src/renderer/src/components/terminal-pane/use-agent-rate-limit-fail-back.ts'
+    ]) {
+      expect(readFileSync(path, 'utf-8')).toContain("rateLimitFailBackMode ?? 'auto'")
+    }
+  })
+})

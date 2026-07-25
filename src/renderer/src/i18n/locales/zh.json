@@ -13840,7 +13840,8 @@
           "doneTitle": "已切回 {{value0}}。",
           "doneResumed": "会话已在新标签页中恢复，并已发送 continue。",
           "doneLaunched": "会话已在新标签页中恢复，但 continue 未送达 — 请手动发送。",
-          "doneFresh": "无法复制回会话记录，会话将在新标签页中重新开始。"
+          "doneFresh": "无法复制回会话记录，会话将在新标签页中重新开始。",
+          "donePinned": "No session was running, so the next terminal you open here starts on it."
         },
         "TerminalClaudeAccountSwitchMenu": {
           "trigger": "Switch Account & Continue",

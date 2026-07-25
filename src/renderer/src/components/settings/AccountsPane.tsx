@@ -1077,7 +1077,7 @@ export function AccountsPane({
               )}
               control={
                 <Select
-                  value={settings.rateLimitFailBackMode ?? 'notify'}
+                  value={settings.rateLimitFailBackMode ?? 'auto'}
                   onValueChange={(value) =>
                     updateSettings({
                       rateLimitFailBackMode: value as RateLimitFailBackMode

@@ -4,16 +4,22 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import {
   evaluateFailBackReadiness,
+  restoreFailoverOriginPin,
   runRateLimitFailBack,
   type AgentRateLimitFailBackResult
 } from '@/lib/agent-rate-limit-fail-back'
 import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
 
 const FAIL_BACK_CHECK_INTERVAL_MS = 60_000
+/** Why: an ignored offer must come back — the worktree is still stuck on the
+ *  failover account — but not every minute. Re-offer on this cadence instead. */
+const FAIL_BACK_REOFFER_COOLDOWN_MS = 15 * 60_000
 // Why: module-scoped — split panes and tab remounts must offer each worktree's
 // return trip once per app session, not once per mounted pane.
 const handledWorktreeIds = new Set<string>()
 const evaluatingWorktreeIds = new Set<string>()
+/** Worktrees whose offer is on cooldown, keyed by when it may be shown again. */
+const offeredAtByWorktreeId = new Map<string, number>()
 
 export type LiveClaudePaneContext = {
   ptyId: string
@@ -34,7 +40,7 @@ export function useAgentRateLimitFailBack(args: {
   useEffect(() => {
     const tick = async (): Promise<void> => {
       const state = useAppStore.getState()
-      const mode = state.settings?.rateLimitFailBackMode ?? 'notify'
+      const mode = state.settings?.rateLimitFailBackMode ?? 'auto'
       if (mode === 'off') {
         return
       }
@@ -83,22 +89,32 @@ export function useAgentRateLimitFailBack(args: {
           }
           return
         }
+        // Why: no live pane means the endpoint tab was closed or its agent exited.
+        // The return trip used to bail out here and the worktree stayed pinned to
+        // the endpoint forever — restoring the pin needs no session at all.
         const context = getLiveClaudePaneContext()
-        if (!context) {
-          return
-        }
-        handledWorktreeIds.add(worktreeId)
         const performFailBack = (): void => {
-          void runRateLimitFailBack({
-            worktreeId,
-            ptyId: context.ptyId,
-            providerSession: context.providerSession,
-            currentAccountId,
-            currentAccountIsCustomEndpoint,
-            originAccountId: readiness.originAccountId,
-            originLabel: readiness.originLabel,
-            settings: useAppStore.getState().settings
-          })
+          // Why marked here and not before the offer: marking on sight meant a
+          // dismissed/expired toast silenced the return for the whole app session.
+          handledWorktreeIds.add(worktreeId)
+          void (
+            context
+              ? runRateLimitFailBack({
+                  worktreeId,
+                  ptyId: context.ptyId,
+                  providerSession: context.providerSession,
+                  currentAccountId,
+                  currentAccountIsCustomEndpoint,
+                  originAccountId: readiness.originAccountId,
+                  originLabel: readiness.originLabel,
+                  settings: useAppStore.getState().settings
+                })
+              : restoreFailoverOriginPin({
+                  worktreeId,
+                  originAccountId: readiness.originAccountId,
+                  originLabel: readiness.originLabel
+                })
+          )
             .then((result) => notifyFailBackResult(result, worktreeId))
             .catch((error) => {
               handledWorktreeIds.delete(worktreeId)
@@ -122,6 +138,14 @@ export function useAgentRateLimitFailBack(args: {
           performFailBack()
           return
         }
+        const offeredAt = offeredAtByWorktreeId.get(worktreeId)
+        if (
+          typeof offeredAt === 'number' &&
+          Date.now() - offeredAt < FAIL_BACK_REOFFER_COOLDOWN_MS
+        ) {
+          return
+        }
+        offeredAtByWorktreeId.set(worktreeId, Date.now())
         toast.info(
           translate(
             'auto.components.terminalPane.useAgentRateLimitFailBack.notifyTitle',
@@ -173,10 +197,15 @@ function notifyFailBackResult(result: AgentRateLimitFailBackResult, worktreeId: 
                   'auto.components.terminalPane.useAgentRateLimitFailBack.doneLaunched',
                   'The session resumed in a new tab, but continue was not delivered — send it manually.'
                 )
-              : translate(
-                  'auto.components.terminalPane.useAgentRateLimitFailBack.doneFresh',
-                  'The transcript could not be copied back, so the session starts fresh in a new tab.'
-                )
+              : result.failBack === 'pinned'
+                ? translate(
+                    'auto.components.terminalPane.useAgentRateLimitFailBack.donePinned',
+                    'No session was running, so the next terminal you open here starts on it.'
+                  )
+                : translate(
+                    'auto.components.terminalPane.useAgentRateLimitFailBack.doneFresh',
+                    'The transcript could not be copied back, so the session starts fresh in a new tab.'
+                  )
       }
     )
     return

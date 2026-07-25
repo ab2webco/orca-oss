@@ -2153,7 +2153,10 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
 
 // Why: unknown strings from hand-edited payloads fall back to the safe default.
 function normalizeRateLimitFailBackMode(value: unknown): RateLimitFailBackMode {
-  return value === 'off' || value === 'auto' ? value : 'notify'
+  // Why 'auto' by default: the point of failing over is to keep working, so the
+  // return trip should not wait on a toast the user may never see. 'notify' and
+  // 'off' stay available for anyone who wants to approve each return.
+  return value === 'off' || value === 'notify' ? value : 'auto'
 }
 
 function normalizeClaudeLivePtyAccountBindings(value: unknown): ClaudeLivePtyAccountBinding[] {

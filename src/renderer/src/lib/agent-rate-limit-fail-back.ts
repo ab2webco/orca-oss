@@ -23,7 +23,8 @@ import { stopForegroundAgent } from '@/lib/agent-rate-limit-terminal-control'
 import { deliverLaunchPromptToAgentTab } from '@/lib/agent-launch-prompt-delivery'
 import { appendTabToWorktreeOrder } from '@/lib/sleeping-agent-session-launch'
 
-export type AgentRateLimitFailBackMode = 'resumed' | 'launched' | 'fresh'
+/** `pinned`: the origin account was restored with no live session to relaunch. */
+export type AgentRateLimitFailBackMode = 'resumed' | 'launched' | 'fresh' | 'pinned'
 
 export type AgentRateLimitFailBackResult =
   | { ok: true; accountLabel: string; failBack: AgentRateLimitFailBackMode }
@@ -124,6 +125,42 @@ export function evaluateFailBackReadiness(args: {
  * failover — a live PTY can never swap its CLAUDE_CONFIG_DIR in place). Handles
  * both endpoint failovers and managed→managed (OAuth) account switches.
  */
+/**
+ * Return a worktree to its origin account when no live Claude session is left to
+ * stop — the endpoint tab was closed, or its agent exited.
+ *
+ * Why this exists: the full fail-back needs a live PTY to Ctrl+C and a session to
+ * resume, so it used to bail out whenever that context was gone and the worktree
+ * stayed pinned to the endpoint forever. Restoring the pin needs neither: the next
+ * terminal opened in this worktree spawns under the origin account, which is what
+ * the user wanted. No transcript is copied because there is no live session whose
+ * history would need to move.
+ */
+export async function restoreFailoverOriginPin(args: {
+  worktreeId: string
+  originAccountId: string | null
+  originLabel: string
+}): Promise<AgentRateLimitFailBackResult> {
+  try {
+    await useAppStore.getState().updateWorktreeMeta(args.worktreeId, {
+      claudeAccountId: args.originAccountId,
+      claudeFailoverOriginAccountId: null,
+      claudeFailoverResetsAt: null
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'pin-failed',
+      message: translate(
+        'auto.lib.agentRateLimitFailBack.pinFailed',
+        'Could not restore the original account on this worktree: {{value0}}',
+        { value0: error instanceof Error ? error.message : String(error) }
+      )
+    }
+  }
+  return { ok: true, accountLabel: args.originLabel, failBack: 'pinned' }
+}
+
 export async function runRateLimitFailBack(args: {
   worktreeId: string
   ptyId: string

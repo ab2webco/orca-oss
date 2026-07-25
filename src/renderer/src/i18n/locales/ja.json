@@ -13840,7 +13840,8 @@
           "doneTitle": "{{value0}} に戻りました。",
           "doneResumed": "セッションは新しいタブで再開され、continue が送信されました。",
           "doneLaunched": "セッションは新しいタブで再開されましたが、continue は送信されませんでした — 手動で送信してください。",
-          "doneFresh": "トランスクリプトをコピーして戻せなかったため、セッションは新しいタブで最初から開始します。"
+          "doneFresh": "トランスクリプトをコピーして戻せなかったため、セッションは新しいタブで最初から開始します。",
+          "donePinned": "No session was running, so the next terminal you open here starts on it."
         },
         "TerminalClaudeAccountSwitchMenu": {
           "trigger": "Switch Account & Continue",

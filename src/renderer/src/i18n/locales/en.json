@@ -13863,7 +13863,8 @@
           "doneTitle": "Back on {{value0}}.",
           "doneResumed": "The session resumed in a new tab and continue was sent.",
           "doneLaunched": "The session resumed in a new tab, but continue was not delivered — send it manually.",
-          "doneFresh": "The transcript could not be copied back, so the session starts fresh in a new tab."
+          "doneFresh": "The transcript could not be copied back, so the session starts fresh in a new tab.",
+          "donePinned": "No session was running, so the next terminal you open here starts on it."
         },
         "TerminalClaudeAccountSwitchMenu": {
           "trigger": "Switch Account & Continue",

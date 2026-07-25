@@ -87,6 +87,33 @@ export async function runLastResortFailoverIfConfigured(args: {
   })
 }
 
+/**
+ * Close the tab whose agent just hit its limit, once its replacement exists.
+ *
+ * Why: the replacement must be a NEW tab (CLAUDE_CONFIG_DIR is injected at PTY
+ * spawn, so the old shell can never adopt the failover universe), but the old tab
+ * was left open holding a stopped agent. Repeated switches stacked up dead tabs,
+ * and closing them by hand is what killed the fail-back watcher's live context.
+ */
+function closeLimitedAgentTab(limitedPtyId: string, replacementTabId: string): void {
+  const state = useAppStore.getState()
+  const limitedTabId = Object.entries(state.ptyIdsByTabId ?? {}).find(
+    ([tabId, ptyIds]) => tabId !== replacementTabId && ptyIds?.includes(limitedPtyId)
+  )?.[0]
+  if (!limitedTabId) {
+    return
+  }
+  try {
+    // Why 'cleanup' and not 'user': Orca closed this, so it must not count as a
+    // deliberate close. It still lands in recently-closed, so the user can reopen
+    // that shell if they wanted it.
+    state.closeTab(limitedTabId, { reason: 'cleanup' })
+  } catch (error) {
+    // Why: a stale tab is cosmetic; never fail the failover over cleanup.
+    console.warn('[rate-limit-failover] Could not close the limited agent tab:', error)
+  }
+}
+
 /** Resolves the configured last-resort failover account; only an existing custom-endpoint account qualifies. */
 export function resolveRateLimitFailoverAccount(args: {
   settings: Pick<GlobalSettings, 'rateLimitFailoverAccountId'> | null | undefined
@@ -237,6 +264,7 @@ export async function runRateLimitFailoverRelaunch(args: {
   }
   state.setActiveTabType('terminal')
   appendTabToWorktreeOrder(args.worktreeId, tab.id)
+  closeLimitedAgentTab(args.ptyId, tab.id)
 
   if (!copyResult.ok) {
     return { ok: true, accountLabel, failover: 'fresh' }

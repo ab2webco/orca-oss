@@ -13840,7 +13840,8 @@
           "doneTitle": "{{value0}}(으)로 돌아왔습니다.",
           "doneResumed": "세션이 새 탭에서 재개되었고 continue가 전송되었습니다.",
           "doneLaunched": "세션이 새 탭에서 재개되었지만 continue가 전달되지 않았습니다 — 수동으로 보내주세요.",
-          "doneFresh": "대화 기록을 다시 복사하지 못해 세션이 새 탭에서 처음부터 시작됩니다."
+          "doneFresh": "대화 기록을 다시 복사하지 못해 세션이 새 탭에서 처음부터 시작됩니다.",
+          "donePinned": "No session was running, so the next terminal you open here starts on it."
         },
         "TerminalClaudeAccountSwitchMenu": {
           "trigger": "Switch Account & Continue",

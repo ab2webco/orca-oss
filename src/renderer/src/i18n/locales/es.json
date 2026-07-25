@@ -13840,7 +13840,8 @@
           "doneTitle": "De vuelta en {{value0}}.",
           "doneResumed": "La sesión se reanudó en una pestaña nueva y se envió continue.",
           "doneLaunched": "La sesión se reanudó en una pestaña nueva, pero continue no se entregó — envíalo manualmente.",
-          "doneFresh": "No se pudo copiar la transcripción de vuelta, así que la sesión inicia desde cero en una pestaña nueva."
+          "doneFresh": "No se pudo copiar la transcripción de vuelta, así que la sesión inicia desde cero en una pestaña nueva.",
+          "donePinned": "No session was running, so the next terminal you open here starts on it."
         },
         "TerminalClaudeAccountSwitchMenu": {
           "trigger": "Switch Account & Continue",
