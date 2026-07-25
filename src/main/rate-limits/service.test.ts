@@ -1924,6 +1924,30 @@ describe('RateLimitService', () => {
     releaseInjectedClaudeAccountLaunch(reservationId)
   })
 
+  it('disables the PTY fallback when a live pinned CLI owns the fetched account', async () => {
+    const service = new RateLimitService()
+    service.setClaudeAccountIdResolver(() => 'account-1')
+    service.setClaudeAuthPreparationResolver(async () => ({
+      configDir: '/tmp/account-1/auth',
+      runtime: 'host',
+      wslDistro: null,
+      wslLinuxConfigDir: null,
+      envPatch: {},
+      stripAuthEnv: true,
+      managedRefreshDeferredByLivePty: true,
+      provenance: 'managed:account-1:live-pinned-read'
+    }))
+    vi.mocked(fetchClaudeRateLimits).mockResolvedValueOnce(okProvider('claude', 33, Date.now()))
+
+    await service.refreshClaudeForTarget()
+
+    // Why: a fallback CLI on the pinned account's config dir would rotate the
+    // single-use refresh token out from under the running session.
+    expect(fetchClaudeRateLimits).toHaveBeenCalledWith(
+      expect.objectContaining({ allowPtyFallback: false })
+    )
+  })
+
   it('yields the active managed account usage read to an in-flight mutation', async () => {
     const service = new RateLimitService()
     service.setClaudeAccountIdResolver(() => 'account-1')

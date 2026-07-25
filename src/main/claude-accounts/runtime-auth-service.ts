@@ -66,6 +66,10 @@ export type ClaudeRuntimeAuthPreparation = {
   envPatch: ClaudeEnvPatch
   stripAuthEnv: boolean
   managedRefreshDeferredByLivePty?: boolean
+  /** configDir is one account's private dir (not the shared runtime dir), so the
+   *  unsuffixed legacy Keychain item belongs to a different identity — readers
+   *  must stay on the config-dir-scoped item and never fall back to legacy. */
+  accountScopedConfigDir?: boolean
   injectedAccountId?: string
   injectedAccountReservationId?: string
   sharedAccountReservationId?: string
@@ -232,6 +236,18 @@ export class ClaudeRuntimeAuthService {
     target?: ClaudeAccountSelectionTarget
   ): Promise<ClaudeRuntimeAuthPreparation> {
     const effectiveTarget = target ?? this.getDefaultAccountSelectionTarget()
+    // Why: when a pinned CLI owns the active account, syncing would throw (it protects
+    // that CLI's single-use refresh chain), which left the ACTIVE account's usage stuck
+    // on "Error al actualizar". A usage read needs no materialization — read the
+    // credentials that live CLI itself maintains in its managed config dir, rotation-free.
+    const settings = this.store.getSettings()
+    const activeAccount = this.getActiveAccount(
+      settings.claudeManagedAccounts,
+      getSelectedClaudeAccountIdForTarget(settings, this.resolveWslDefaultTarget(effectiveTarget))
+    )
+    if (activeAccount && hasLiveInjectedClaudePtysForAccount(activeAccount.id)) {
+      return this.getLivePinnedReadPreparation(activeAccount)
+    }
     await this.syncForCurrentSelection(effectiveTarget)
     return this.getPreparation(effectiveTarget)
   }
@@ -827,6 +843,38 @@ export class ClaudeRuntimeAuthService {
         activeAccountId && activeAccount?.managedAuthRuntime !== 'wsl'
           ? `managed:${activeAccountId}`
           : 'system'
+    }
+  }
+
+  /** Read-only preparation for the active account while a pinned CLI owns it.
+   *  Points at the account's own managed config dir — the credentials that live
+   *  CLI keeps fresh — and flags the fetch so it never rotates or spawns a CLI. */
+  private getLivePinnedReadPreparation(
+    account: ClaudeManagedAccount
+  ): ClaudeRuntimeAuthPreparation {
+    if (account.managedAuthRuntime === 'wsl' && account.wslLinuxAuthPath) {
+      return {
+        configDir: account.managedAuthPath,
+        runtime: 'wsl',
+        wslDistro: account.wslDistro ?? null,
+        wslLinuxConfigDir: account.wslLinuxAuthPath,
+        envPatch: { CLAUDE_CONFIG_DIR: account.wslLinuxAuthPath },
+        stripAuthEnv: true,
+        managedRefreshDeferredByLivePty: true,
+        accountScopedConfigDir: true,
+        provenance: `managed:${account.id}:wsl:live-pinned-read`
+      }
+    }
+    return {
+      configDir: account.managedAuthPath,
+      runtime: 'host',
+      wslDistro: null,
+      wslLinuxConfigDir: null,
+      envPatch: { CLAUDE_CONFIG_DIR: account.managedAuthPath },
+      stripAuthEnv: true,
+      managedRefreshDeferredByLivePty: true,
+      accountScopedConfigDir: true,
+      provenance: `managed:${account.id}:live-pinned-read`
     }
   }
 

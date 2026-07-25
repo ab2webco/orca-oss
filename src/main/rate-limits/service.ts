@@ -1430,6 +1430,11 @@ export class RateLimitService {
     if (process.platform === 'win32') {
       return false
     }
+    // Why: a fallback CLI on a live-pinned account's config dir would rotate the
+    // single-use refresh token out from under that running session.
+    if (authPreparation?.managedRefreshDeferredByLivePty) {
+      return false
+    }
     // Why: system-default Claude isn't Orca-managed; refresh may read existing OAuth but must not launch Claude and trigger auth/browser flows.
     return !isSystemDefaultClaudeAuth(authPreparation)
   }

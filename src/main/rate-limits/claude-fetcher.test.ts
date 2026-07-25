@@ -1673,6 +1673,45 @@ describe('fetchClaudeRateLimits', () => {
     expect(netFetchMock).not.toHaveBeenCalled()
   })
 
+  it('never falls back to the legacy keychain identity for a live-pinned account read', async () => {
+    setPlatform('darwin')
+    const pinnedConfigDir = '/tmp/orca-accounts/account-1/auth'
+    // The pinned CLI's scoped item is momentarily blank; the legacy unsuffixed
+    // item holds the GLOBAL account's token — a different identity.
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (configDir) =>
+      configDir
+        ? null
+        : JSON.stringify({
+            claudeAiOauth: { accessToken: 'other-identity-token', expiresAt: Date.now() + 60_000 }
+          })
+    )
+
+    const result = await fetchClaudeRateLimits({
+      authPreparation: {
+        configDir: pinnedConfigDir,
+        runtime: 'host',
+        wslDistro: null,
+        wslLinuxConfigDir: null,
+        envPatch: { CLAUDE_CONFIG_DIR: pinnedConfigDir },
+        stripAuthEnv: true,
+        managedRefreshDeferredByLivePty: true,
+        accountScopedConfigDir: true,
+        provenance: 'managed:account-1:live-pinned-read'
+      }
+    })
+
+    expect(result.usageMetadata?.failureKind).toBe('deferred-by-live-session')
+    // Another account's usage must never render on this account's meter.
+    expect(
+      netFetchMock.mock.calls.some(
+        ([, init]) =>
+          (init as RequestInit | undefined)?.headers?.['Authorization' as never] ===
+          'Bearer other-identity-token'
+      )
+    ).toBe(false)
+    expect(fetchViaPty).not.toHaveBeenCalled()
+  })
+
   it('skips rotation when a Claude launch reservation races the usage read', async () => {
     setPlatform('linux')
     tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))

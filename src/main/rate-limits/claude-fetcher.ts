@@ -88,6 +88,9 @@ type OAuthCredentialReadResult = {
 type OAuthCredentialReadOptions = {
   credentialsFileConfigDir?: string
   keychainConfigDir?: string
+  /** The config dir is one account's private dir; the unsuffixed legacy Keychain
+   *  item belongs to a different identity, so never fall back to it. */
+  keychainScopedOnly?: boolean
 }
 
 type OAuthCredentialSource = 'scoped-keychain' | 'legacy-keychain' | 'credentials-file' | 'none'
@@ -141,7 +144,10 @@ function keychainUnavailableOAuthCredentialReadResult(): OAuthCredentialReadResu
  * Read OAuth token from macOS Keychain.
  * Why: Claude Code 2.1+ scopes Keychain services by CLAUDE_CONFIG_DIR; older builds used the legacy unsuffixed service.
  */
-async function readFromKeychain(configDir?: string): Promise<OAuthCredentialReadResult> {
+async function readFromKeychain(
+  configDir?: string,
+  scopedOnly?: boolean
+): Promise<OAuthCredentialReadResult> {
   if (process.platform !== 'darwin') {
     return emptyOAuthCredentialReadResult()
   }
@@ -149,6 +155,9 @@ async function readFromKeychain(configDir?: string): Promise<OAuthCredentialRead
   if (configDir) {
     const scopedCredentials = await readCredentialsFromStrictKeychain(configDir, 'scoped-keychain')
     if (scopedCredentials.token) {
+      return scopedCredentials
+    }
+    if (scopedOnly) {
       return scopedCredentials
     }
     const legacyCredentials = await readCredentialsFromStrictKeychain(undefined, 'legacy-keychain')
@@ -213,7 +222,10 @@ async function readOAuthCredentials(
   options?: OAuthCredentialReadOptions
 ): Promise<OAuthCredentialReadResult> {
   // 1. macOS Keychain (Claude Max/Pro OAuth)
-  const fromKeychain = await readFromKeychain(options?.keychainConfigDir)
+  const fromKeychain = await readFromKeychain(
+    options?.keychainConfigDir,
+    options?.keychainScopedOnly
+  )
   if (fromKeychain.token) {
     return fromKeychain
   }
@@ -246,7 +258,8 @@ function resolveOAuthCredentialReadOptions(
   // Why: Claude Code 2.1+ can scope even the default config dir's Keychain item; try scoped first, legacy as fallback.
   const readOptions: OAuthCredentialReadOptions = {
     credentialsFileConfigDir: authPreparation.configDir,
-    keychainConfigDir: authPreparation.configDir
+    keychainConfigDir: authPreparation.configDir,
+    keychainScopedOnly: authPreparation.accountScopedConfigDir === true
   }
   return readOptions
 }

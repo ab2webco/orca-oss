@@ -4936,6 +4936,38 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  it('reads the active account usage from its own config dir while a pinned CLI owns it', async () => {
+    const managedAuthPath1 = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'one-token', null, 9_999_999_999_999)
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-1', managedAuthPath1, { email: 'one@example.com' })
+      ],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+
+    const { markInjectedClaudePtySpawned, markClaudePtyExited } = await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    markInjectedClaudePtySpawned('pinned-pty-1', 'account-1')
+    try {
+      // Why: syncing here used to throw 'in use by an assigned worktree', leaving
+      // the ACTIVE account's usage permanently stuck on a refresh error.
+      const preparation = await service.prepareForRateLimitFetch()
+      expect(preparation.configDir).toBe(managedAuthPath1)
+      expect(preparation.managedRefreshDeferredByLivePty).toBe(true)
+      expect(preparation.provenance).toBe('managed:account-1:live-pinned-read')
+      expect(refreshClaudeOauthCredentials).not.toHaveBeenCalled()
+    } finally {
+      markClaudePtyExited('pinned-pty-1')
+    }
+  })
+
   it('adopts a rotated-refresh-token runtime credential on cold-start read-back', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     // Same expiry on both sides (cold start), but the runtime refresh token has
