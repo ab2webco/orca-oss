@@ -97,6 +97,7 @@ import {
 } from './worktree-push-target-setup'
 import { isENOENT, registerWorktreeRootsForRepo } from './filesystem-auth'
 import { createWorktreeCopiedPaths, createWorktreeLinkedPaths } from './worktree-symlinks'
+import { formatWorktreeIncludeCopyWarning } from './worktree-include-copy-budget'
 import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import { normalizeSparseDirectories } from './sparse-checkout-directories'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
@@ -2477,9 +2478,18 @@ export async function createLocalWorktree(
   const includePaths = await timing.time('resolve_worktreeinclude', () =>
     resolveWorktreeIncludePaths(repo.path, localWorktreeGitOptions)
   )
+  let includeCopyWarning: string | undefined
   if (includePaths.length > 0) {
     await timing.time('copy_worktreeinclude', async () => {
-      await createWorktreeCopiedPaths(repo.path, created.path, includePaths)
+      const skippedIncludePaths = await createWorktreeCopiedPaths(
+        repo.path,
+        created.path,
+        includePaths
+      )
+      includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
+      if (includeCopyWarning) {
+        console.warn(`[worktree-include] ${includeCopyWarning}`)
+      }
     })
   }
 
@@ -2553,7 +2563,11 @@ export async function createLocalWorktree(
       ? { localBaseRefUpdateSuggestion: addResult.localBaseRefUpdateSuggestion }
       : {}),
     ...(stagedStartup.startupTerminal ? { startupTerminal: stagedStartup.startupTerminal } : {}),
-    ...(stagedStartup.warning ? { warning: stagedStartup.warning } : {}),
+    ...(stagedStartup.warning
+      ? { warning: appendWorktreeCreateWarning(includeCopyWarning, stagedStartup.warning) }
+      : includeCopyWarning
+        ? { warning: includeCopyWarning }
+        : {}),
     timing: timing.finish()
   }
 }

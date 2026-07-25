@@ -854,6 +854,7 @@ import {
   findExistingWorktreeSymlinkPaths,
   removeWorktreeLinkedPaths
 } from '../ipc/worktree-symlinks'
+import { formatWorktreeIncludeCopyWarning } from '../ipc/worktree-include-copy-budget'
 import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import { deleteWorktreeHistoryDir } from '../terminal-history'
 import {
@@ -19029,12 +19030,21 @@ export class OrcaRuntimeService {
       repo.path,
       localWorktreeGitOptions
     )
+    let includeCopyWarning: string | undefined
     if (worktreeIncludePaths.length > 0) {
-      await createWorktreeCopiedPaths(repo.path, created.path, worktreeIncludePaths)
+      const skippedIncludePaths = await createWorktreeCopiedPaths(
+        repo.path,
+        created.path,
+        worktreeIncludePaths
+      )
+      includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
+      if (includeCopyWarning) {
+        console.warn(`[worktree-include] ${includeCopyWarning}`)
+      }
     }
 
     let setup: CreateWorktreeResult['setup']
-    let warning: string | undefined
+    let warning: string | undefined = includeCopyWarning
     // Why: CLI-created worktrees do not have a renderer preview to mismatch
     // against. Trust is granted by the direct CLI invocation (`--run-hooks`),
     // so loading the setup hook from the created worktree is intentional here.
@@ -19088,8 +19098,9 @@ export class OrcaRuntimeService {
       }
     } else if (hooks?.scripts.setup && effectiveDecision !== 'skip') {
       // Runtime RPC calls have no renderer trust prompt, so hooks require explicit CLI opt-in.
-      warning = `orca.yaml setup hook skipped for ${worktreePath}; pass --setup run to run it.`
-      console.warn(`[hooks] ${warning}`)
+      const setupSkipped = `orca.yaml setup hook skipped for ${worktreePath}; pass --setup run to run it.`
+      warning = warning ? `${warning} Also ${setupSkipped}` : setupSkipped
+      console.warn(`[hooks] ${setupSkipped}`)
     }
 
     this.invalidateResolvedWorktreeCache()
