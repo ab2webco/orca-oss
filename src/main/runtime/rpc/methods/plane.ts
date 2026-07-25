@@ -21,6 +21,7 @@ import {
   WorkspaceSelection
 } from './plane-method-schemas'
 import { PLANE_EXTENDED_METHODS } from './plane-extended'
+import { PLANE_PLANNING_METHODS } from './plane-planning'
 
 const PLANE_BASE_METHODS: RpcMethod[] = [
   defineMethod({
@@ -231,4 +232,8 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
   })
 ]
 
-export const PLANE_METHODS: RpcMethod[] = [...PLANE_BASE_METHODS, ...PLANE_EXTENDED_METHODS]
+export const PLANE_METHODS: RpcMethod[] = [
+  ...PLANE_BASE_METHODS,
+  ...PLANE_EXTENDED_METHODS,
+  ...PLANE_PLANNING_METHODS
+]

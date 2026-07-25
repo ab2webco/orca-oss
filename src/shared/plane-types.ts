@@ -267,3 +267,37 @@ export type PlaneCreateLabelArgs = {
 export type PlaneLabelMutationResult =
   | { ok: true; label: PlaneLabel }
   | { ok: false; error: string }
+
+export type PlanePlanningKind = 'cycle' | 'module'
+
+export type PlanePlanningContainer = {
+  id: string
+  name: string
+  description?: string
+  startDate?: string
+  endDate?: string
+  targetDate?: string
+  status?: string
+}
+
+export type PlanePlanningWorkItem = {
+  id: string
+  workItemId: string
+  title?: string
+  identifier?: string
+  createdAt?: string
+}
+
+export type PlanePlanningContainerArgs = {
+  kind: PlanePlanningKind
+  projectId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlanePlanningWorkItemsArgs = PlanePlanningContainerArgs & {
+  containerId: string
+}
+
+export type PlaneAddPlanningWorkItemsArgs = PlanePlanningWorkItemsArgs & {
+  workItemIds: string[]
+}

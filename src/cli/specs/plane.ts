@@ -1,6 +1,7 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
 import { PLANE_EXTENDED_COMMAND_SPECS } from './plane-extended'
+import { PLANE_PLANNING_COMMAND_SPECS } from './plane-planning'
 
 const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -280,5 +281,6 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
 
 export const PLANE_COMMAND_SPECS: CommandSpec[] = [
   ...PLANE_BASE_COMMAND_SPECS,
-  ...PLANE_EXTENDED_COMMAND_SPECS
+  ...PLANE_EXTENDED_COMMAND_SPECS,
+  ...PLANE_PLANNING_COMMAND_SPECS
 ]

@@ -731,6 +731,11 @@ import {
 } from '../plane/plane-work-item-links'
 import { createLabel as createPlaneLabel } from '../plane/plane-label'
 import {
+  addPlanningWorkItems as addPlanePlanningWorkItems,
+  listPlanningContainers as listPlanePlanningContainers,
+  listPlanningWorkItems as listPlanePlanningWorkItems
+} from '../plane/plane-planning'
+import {
   getViewer as getPlaneViewer,
   listLabels as listPlaneLabels,
   listMembers as listPlaneMembers,
@@ -739,6 +744,7 @@ import {
 } from '../plane/plane-work-item-reads'
 import type {
   PlaneAddLinkArgs,
+  PlaneAddPlanningWorkItemsArgs,
   PlaneAddRelationArgs,
   PlaneConnectArgs,
   PlaneCreateLabelArgs,
@@ -750,6 +756,8 @@ import type {
   PlaneDeleteStateArgs,
   PlaneDeleteWorkItemArgs,
   PlaneLinkCurrentWorkItemResult,
+  PlanePlanningContainerArgs,
+  PlanePlanningWorkItemsArgs,
   PlaneUnlinkCurrentWorkItemResult,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
@@ -30446,6 +30454,24 @@ export class OrcaRuntimeService {
 
   planeCreateLabel(args: PlaneCreateLabelArgs): ReturnType<typeof createPlaneLabel> {
     return createPlaneLabel(args)
+  }
+
+  planeListPlanningContainers(
+    args: PlanePlanningContainerArgs
+  ): ReturnType<typeof listPlanePlanningContainers> {
+    return listPlanePlanningContainers(args)
+  }
+
+  planeListPlanningWorkItems(
+    args: PlanePlanningWorkItemsArgs
+  ): ReturnType<typeof listPlanePlanningWorkItems> {
+    return listPlanePlanningWorkItems(args)
+  }
+
+  planeAddPlanningWorkItems(
+    args: PlaneAddPlanningWorkItemsArgs
+  ): ReturnType<typeof addPlanePlanningWorkItems> {
+    return addPlanePlanningWorkItems(args)
   }
 
   // ── Browser automation ──

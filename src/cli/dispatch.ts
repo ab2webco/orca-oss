@@ -29,6 +29,7 @@ import { PLANE_RELATION_HANDLERS } from './handlers/plane-relation'
 import { PLANE_ATTACH_HANDLERS } from './handlers/plane-attach'
 import { PLANE_LABEL_HANDLERS } from './handlers/plane-label'
 import { PLANE_COMMENT_LIST_HANDLERS } from './handlers/plane-comment-list'
+import { PLANE_PLANNING_HANDLERS } from './handlers/plane-planning'
 import { VM_HANDLERS } from './handlers/vm'
 import { SKILL_HANDLERS } from './handlers/skills'
 
@@ -74,6 +75,7 @@ function buildHandlers(): Map<string, CommandHandler> {
     PLANE_ATTACH_HANDLERS,
     PLANE_LABEL_HANDLERS,
     PLANE_COMMENT_LIST_HANDLERS,
+    PLANE_PLANNING_HANDLERS,
     VM_HANDLERS,
     SKILL_HANDLERS
   ]
