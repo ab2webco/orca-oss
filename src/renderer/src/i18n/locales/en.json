@@ -13920,6 +13920,7 @@
         "comment": "Comment",
         "commentFailed": "Failed to add comment.",
         "commentPlaceholder": "Add a Plane comment...",
+        "labelsPlaceholder": "backend, bug",
         "commentTooLarge": "Comment is too large to submit safely.",
         "comments": "Comments",
         "copied": "{{value0}} copied",

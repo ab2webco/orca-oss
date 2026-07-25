@@ -13897,6 +13897,7 @@
         "comment": "Comentar",
         "commentFailed": "No se pudo agregar el comentario.",
         "commentPlaceholder": "Agregar un comentario de Plane...",
+        "labelsPlaceholder": "backend, bug",
         "commentTooLarge": "El comentario es demasiado grande para enviarlo de forma segura.",
         "comments": "Comentarios",
         "copied": "{{value0}} copiado",

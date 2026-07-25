@@ -35,7 +35,8 @@ export function getPlanePriorityLabel(priority?: PlaneWorkItemPriority): string 
       return translate('auto.components.TaskPage.7fd59c18d8', 'Medium')
     case 'low':
       return translate('auto.components.TaskPage.69591944e7', 'Low')
-    default:
+    case 'none':
+    case undefined:
       return translate('auto.components.TaskPage.713179dfdc', 'No priority')
   }
 }

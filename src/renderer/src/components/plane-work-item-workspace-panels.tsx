@@ -207,7 +207,10 @@ export function PlaneWorkItemFieldsSection({
           <Input
             value={labelsDraft}
             onChange={(event) => onLabelsDraftChange(event.target.value)}
-            placeholder="backend, bug"
+            placeholder={translate(
+              'auto.components.PlaneWorkItemWorkspace.labelsPlaceholder',
+              'backend, bug'
+            )}
             className="h-8 text-xs"
           />
           <Button
