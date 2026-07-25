@@ -32,6 +32,7 @@ import {
   isOauthTokenExpiring,
   refreshClaudeOauthCredentialsDetailed
 } from '../claude-accounts/oauth-refresh'
+import { tryRunManagedClaudeAccountMutation } from '../claude-accounts/run-managed-claude-account-mutation'
 import { createOAuthUsageError, OAuthUsageError } from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnostic'
@@ -747,6 +748,10 @@ export type FetchClaudeRateLimitsOptions = {
 
 export type FetchManagedAccountUsageOptions = {
   allowUsagePanelSupplement?: boolean
+  /** Defaults to true. Set false when a live Claude CLI owns the account: the read
+   *  then never rotates the shared single-use refresh token, nor spawns a CLI copy
+   *  that would rotate it. */
+  allowTokenRotation?: boolean
   networkProxySettings?: NetworkProxySettings
   signal?: AbortSignal
 }
@@ -1180,6 +1185,53 @@ async function fetchManagedUsagePanelSupplement(input: {
   })
 }
 
+/**
+ * Fresher credentials the live Claude CLI itself maintains for this account.
+ * On macOS the CLI rotates the config-dir-scoped Keychain item, not Orca's
+ * managed copy, so the managed copy can be stale while the CLI's is current.
+ * File locations need no equivalent: the managed .credentials.json IS the
+ * CLI's config-dir file. Returns null unless the scoped copy is strictly usable.
+ */
+async function readLiveCliMaintainedCredentials(
+  location: ManagedCredentialsLocation,
+  managedCredentialsJson: string,
+  managedToken: string | null
+): Promise<string | null> {
+  if (location.kind !== 'keychain') {
+    return null
+  }
+  if (managedToken && !isOauthTokenExpiring(managedCredentialsJson)) {
+    // The managed copy is current; don't second-guess it with runtime state.
+    return null
+  }
+  try {
+    const scopedCredentialsJson = await readActiveClaudeKeychainCredentialsStrict(
+      location.managedAuthPath
+    )
+    if (
+      !scopedCredentialsJson ||
+      !parseOAuthCredentialsJson(scopedCredentialsJson, 'scoped-keychain').token
+    ) {
+      return null
+    }
+    // Why: a stale leftover would 401 and blame the account; adopt only a current token.
+    return isOauthTokenExpiring(scopedCredentialsJson) ? null : scopedCredentialsJson
+  } catch {
+    return null
+  }
+}
+
+function liveClaudeDeferredManagedResult(accountId: string): ProviderRateLimits {
+  console.warn('[claude-rate-limits] managed account usage: deferred to live Claude session', {
+    accountId
+  })
+  return makeClaudeUsageResult('error', LIVE_CLAUDE_REFRESH_DEFERRED_MESSAGE, {
+    failureKind: 'deferred-by-live-session',
+    deferredByLiveClaudeSession: true,
+    credentialSource: 'credentials-file'
+  })
+}
+
 export async function fetchManagedAccountUsage(
   account: InactiveClaudeAccountInfo,
   options: FetchManagedAccountUsageOptions = {}
@@ -1212,27 +1264,57 @@ export async function fetchManagedAccountUsage(
 
   // Why: refresh+persist an expiring token now so inactive accounts' single-use refresh tokens stay fresh for a later switch-in (persist failure is non-fatal).
   let token = parseOAuthCredentialsJson(credentialsJson, 'credentials-file').token
-  if (isOauthTokenExpiring(credentialsJson)) {
-    const outcome = await refreshClaudeOauthCredentialsDetailed(credentialsJson)
+  const canRotateToken = options.allowTokenRotation !== false
+  // Also true when the atomic gate below refuses rotation: a live session or a
+  // launch reservation appeared after the caller's liveness check.
+  let liveSessionOwnsToken = !canRotateToken
+  if (!canRotateToken) {
+    // Why: a live Claude CLI owns this account's single-use refresh token; rotating it
+    // to read a usage percentage would strand that session on a dead token. That CLI
+    // keeps its own copy fresh, though — on macOS in the config-dir-scoped Keychain
+    // item, not Orca's managed copy — so adopt its rotation read-only instead.
+    const liveCliCredentialsJson = await readLiveCliMaintainedCredentials(
+      location,
+      credentialsJson,
+      token
+    )
+    if (liveCliCredentialsJson) {
+      credentialsJson = liveCliCredentialsJson
+      token = parseOAuthCredentialsJson(liveCliCredentialsJson, 'scoped-keychain').token
+    }
+  } else if (isOauthTokenExpiring(credentialsJson)) {
+    // Why: rotation must be mutually exclusive with Claude launches — a CLI spawning
+    // mid-rotation would copy the pre-rotation refresh token and get stranded when
+    // its single-use copy is invalidated. The gate acquire re-checks liveness
+    // atomically; when it yields, fall through and let the usage endpoint decide.
+    const staleCredentialsJson = credentialsJson
+    const rotation = await tryRunManagedClaudeAccountMutation(account.id, async () => {
+      const outcome = await refreshClaudeOauthCredentialsDetailed(staleCredentialsJson)
+      if (outcome.credentialsJson) {
+        try {
+          await writeManagedCredentialsJson(location, outcome.credentialsJson)
+        } catch {
+          // Keep the refreshed token in memory; next poll refreshes again if the write failed.
+        }
+      }
+      return outcome
+    })
     if (options.signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
-    if (outcome.credentialsJson) {
-      try {
-        await writeManagedCredentialsJson(location, outcome.credentialsJson)
-      } catch {
-        // Keep the refreshed token in memory; next poll refreshes again if the write failed.
-      }
-      credentialsJson = outcome.credentialsJson
-      token = parseOAuthCredentialsJson(outcome.credentialsJson, 'credentials-file').token
-    } else if (outcome.throttled) {
+    if (!rotation.acquired) {
+      liveSessionOwnsToken = true
+    } else if (rotation.value.credentialsJson) {
+      credentialsJson = rotation.value.credentialsJson
+      token = parseOAuthCredentialsJson(rotation.value.credentialsJson, 'credentials-file').token
+    } else if (rotation.value.throttled) {
       // Why: the token endpoint throttled us, so the expiring token would 401 and
       // report "invalid credentials" — a lie that makes a working account look
       // broken. Report the throttle instead so the caller can cool down and the
       // meter can say "rate limited" rather than blaming the account.
       console.warn('[claude-rate-limits] managed account usage: token refresh throttled', {
         accountId: account.id,
-        retryAfterSeconds: outcome.retryAfterSeconds
+        retryAfterSeconds: rotation.value.retryAfterSeconds
       })
       return {
         provider: 'claude',
@@ -1246,6 +1328,11 @@ export async function fetchManagedAccountUsage(
   }
 
   if (!token) {
+    // Why: mid-rotation the live CLI can leave a blank runtime blob; "No credentials"
+    // would blame a healthy account when the truth is "wait for the live session".
+    if (liveSessionOwnsToken) {
+      return liveClaudeDeferredManagedResult(account.id)
+    }
     console.warn('[claude-rate-limits] managed account usage: no oauth token in credentials', {
       accountId: account.id
     })
@@ -1260,11 +1347,30 @@ export async function fetchManagedAccountUsage(
   }
 
   // Why: no PTY fallback for inactive accounts — PTY only supplements after OAuth succeeds.
-  const oauthLimits = await fetchViaOAuth(token, options.signal)
+  // The token may be past expiresAt when a live CLI owns it and we must not rotate;
+  // the usage endpoint accepts recently-expired tokens, so let the server decide
+  // instead of pre-emptively deferring.
+  let oauthLimits: ProviderRateLimits
+  try {
+    oauthLimits = await fetchViaOAuth(token, options.signal)
+  } catch (error) {
+    // Why: an auth rejection here isn't a broken account — it's a token the live CLI
+    // hasn't rotated yet. Report the wait; the caller keeps its cached snapshot.
+    if (
+      liveSessionOwnsToken &&
+      classifyClaudeOAuthUsageError(error).failureKind === 'stale-token'
+    ) {
+      return liveClaudeDeferredManagedResult(account.id)
+    }
+    throw error
+  }
   if (options.signal?.aborted) {
     return abortedClaudeRateLimitResult()
   }
   if (
+    // Why: the supplement runs a second CLI on these credentials, which rotates the
+    // token the live session still holds — the exact fork the rotation gate prevents.
+    liveSessionOwnsToken ||
     !canSupplementOAuthUsageFromCli({
       oauthLimits,
       authPreparation: undefined,
@@ -1274,15 +1380,20 @@ export async function fetchManagedAccountUsage(
     return oauthLimits
   }
   try {
-    const cliLimits = await fetchManagedUsagePanelSupplement({
-      account,
-      location,
-      credentialsJson,
-      oauthLimits,
-      networkProxySettings: options.networkProxySettings,
-      signal: options.signal
-    })
-    return mergeClaudeUsageWindows(oauthLimits, cliLimits)
+    // Why: the supplement CLI can rotate these credentials too, so it holds the same
+    // launch-exclusive gate; when a launch races it, skip the supplement this cycle.
+    const supplementCredentialsJson = credentialsJson
+    const supplement = await tryRunManagedClaudeAccountMutation(account.id, () =>
+      fetchManagedUsagePanelSupplement({
+        account,
+        location,
+        credentialsJson: supplementCredentialsJson,
+        oauthLimits,
+        networkProxySettings: options.networkProxySettings,
+        signal: options.signal
+      })
+    )
+    return mergeClaudeUsageWindows(oauthLimits, supplement.acquired ? supplement.value : null)
   } catch (err) {
     warnClaudeUsageFetchFailure(
       undefined,

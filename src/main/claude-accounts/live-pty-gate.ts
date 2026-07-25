@@ -216,6 +216,15 @@ export function getLiveInjectedClaudePtyAccountId(ptyId: string): string | null 
   return liveInjectedClaudePtyAccounts.get(ptyId) ?? null
 }
 
+/** True when any live Claude CLI (global or worktree-pinned) owns this account's
+ *  credentials. Read-only callers use it to refuse rotating its single-use
+ *  refresh token, which would strand the running session on a dead token. */
+export function hasLiveClaudePtysUsingAccount(accountId: string): boolean {
+  return (
+    hasLiveInjectedClaudePtysForAccount(accountId) || hasLiveSharedClaudePtysForAccount(accountId)
+  )
+}
+
 export function reserveInjectedClaudeAccountLaunch(
   accountId: string,
   // Why: custom-endpoint accounts authenticate with a static token in their own
@@ -287,6 +296,12 @@ export function beginManagedClaudeAccountMutation(
     throw new Error('This Claude account is already being changed.')
   }
   managedClaudeAccountMutations.add(accountId)
+}
+
+/** True while a managed mutation holds this account. Read-only callers use this
+ *  to yield to an in-flight credential swap without taking the live-PTY gate. */
+export function isManagedClaudeAccountMutating(accountId: string): boolean {
+  return managedClaudeAccountMutations.has(accountId)
 }
 
 export function endManagedClaudeAccountMutation(accountId: string): void {

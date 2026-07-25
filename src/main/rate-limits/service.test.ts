@@ -19,6 +19,7 @@ import {
   releaseInjectedClaudeAccountLaunch,
   reserveInjectedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import { runManagedClaudeAccountMutation } from '../claude-accounts/run-managed-claude-account-mutation'
 
 vi.mock('./claude-fetcher', () => ({
   fetchClaudeRateLimits: vi.fn(),
@@ -1863,21 +1864,39 @@ describe('RateLimitService', () => {
     )
   })
 
-  it('does not mutate inactive account credentials while an injected launch owns them', async () => {
+  it('reads inactive account usage without rotating a token an injected launch owns', async () => {
     const service = new RateLimitService()
     const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
     service.setInactiveClaudeAccountsResolver(() => [account])
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValueOnce(okProvider('claude', 33, Date.now()))
     const reservationId = reserveInjectedClaudeAccountLaunch(account.id)
 
     try {
       await service.fetchInactiveClaudeAccountsOnOpen()
-      expect(fetchManagedAccountUsage).not.toHaveBeenCalled()
+      expect(fetchManagedAccountUsage).toHaveBeenCalledWith(
+        account,
+        expect.objectContaining({ allowTokenRotation: false })
+      )
     } finally {
       releaseInjectedClaudeAccountLaunch(reservationId)
     }
   })
 
-  it('owns an active managed account across preparation and quota fetch', async () => {
+  it('allows token rotation when no live Claude owns the inactive account', async () => {
+    const service = new RateLimitService()
+    const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+    service.setInactiveClaudeAccountsResolver(() => [account])
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValueOnce(okProvider('claude', 33, Date.now()))
+
+    await service.fetchInactiveClaudeAccountsOnOpen()
+
+    expect(fetchManagedAccountUsage).toHaveBeenCalledWith(
+      account,
+      expect.objectContaining({ allowTokenRotation: true })
+    )
+  })
+
+  it('reads an active managed account without blocking injected launches', async () => {
     const service = new RateLimitService()
     const fetch = deferred<ProviderRateLimits>()
     service.setClaudeAccountIdResolver(() => 'account-1')
@@ -1894,12 +1913,41 @@ describe('RateLimitService', () => {
 
     const refresh = service.refreshClaudeForTarget()
     await flushMicrotasks()
-    expect(() => reserveInjectedClaudeAccountLaunch('account-1')).toThrow('being changed')
+    // Why: a usage read changes nothing, so it must not hold the account's
+    // mutation gate — that is what made a pinned account's usage unreadable.
+    const inFlightReservationId = reserveInjectedClaudeAccountLaunch('account-1')
+    releaseInjectedClaudeAccountLaunch(inFlightReservationId)
 
     fetch.resolve(okProvider('claude', 33, Date.now()))
     await refresh
     const reservationId = reserveInjectedClaudeAccountLaunch('account-1')
     releaseInjectedClaudeAccountLaunch(reservationId)
+  })
+
+  it('yields the active managed account usage read to an in-flight mutation', async () => {
+    const service = new RateLimitService()
+    service.setClaudeAccountIdResolver(() => 'account-1')
+    service.setClaudeAuthPreparationResolver(async () => ({
+      configDir: '/tmp/account-1/auth',
+      runtime: 'host',
+      wslDistro: null,
+      wslLinuxConfigDir: null,
+      envPatch: {},
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }))
+    const mutation = deferred<void>()
+    const mutationRun = runManagedClaudeAccountMutation('account-1', () => mutation.promise)
+
+    await service.refreshClaudeForTarget()
+
+    // Why: reading half-swapped credentials would report a false auth failure;
+    // the read backs off and the next cycle sees settled credentials.
+    expect(fetchClaudeRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().claude?.status).toBe('error')
+
+    mutation.resolve(undefined)
+    await mutationRun
   })
 
   it('does not start overlapping inactive Claude preview fetches', async () => {

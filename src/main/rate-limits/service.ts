@@ -19,7 +19,8 @@ import { mapClaudeUsageWindow } from './claude-usage-window'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
-import { runManagedClaudeAccountMutation } from '../claude-accounts/run-managed-claude-account-mutation'
+import { runManagedClaudeAccountRead } from '../claude-accounts/run-managed-claude-account-mutation'
+import { hasLiveClaudePtysUsingAccount } from '../claude-accounts/live-pty-gate'
 import type { NetworkProxySettings } from '../../shared/network-proxy'
 import {
   normalizeClaudeAccountSelectionTarget,
@@ -639,6 +640,9 @@ export class RateLimitService {
           const fresh = await this.withClaudeAccountOperation(account.id, () =>
             fetchManagedAccountUsage(account, {
               allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+              // Why: a live CLI holds this account's single-use refresh token; reading a
+              // usage percentage must never rotate it out from under that session.
+              allowTokenRotation: !hasLiveClaudePtysUsingAccount(account.id),
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             })
@@ -1691,6 +1695,9 @@ export class RateLimitService {
     return { ...current, status: 'fetching' }
   }
 
+  // Why: a usage fetch only reads, so it yields to an in-flight mutation of the same
+  // account instead of taking the live-PTY gate — which used to make the usage of any
+  // account with an open Claude terminal permanently unreadable.
   private withClaudeAccountOperation<T>(
     accountId: string | null,
     operation: () => Promise<T>
@@ -1698,7 +1705,7 @@ export class RateLimitService {
     if (!accountId) {
       return operation()
     }
-    return runManagedClaudeAccountMutation(accountId, operation)
+    return runManagedClaudeAccountRead(accountId, operation)
   }
 
   // Why: serializes prep+fetch against managed-account mutations so a fetch can't

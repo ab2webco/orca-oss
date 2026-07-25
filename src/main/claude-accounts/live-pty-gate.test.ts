@@ -11,6 +11,7 @@ import {
   hasLiveSharedClaudePtysForAccount,
   hasLiveInjectedClaudePtysForAccount,
   hasLiveClaudePtys,
+  hasLiveClaudePtysUsingAccount,
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
   markClaudePtySpawned,
@@ -23,6 +24,11 @@ import {
   seedLiveInjectedClaudePtysFromPersistence
 } from './live-pty-gate'
 import { onLiveClaudePtysDrained } from './live-pty-drain-listeners'
+import {
+  runManagedClaudeAccountMutation,
+  runManagedClaudeAccountRead,
+  tryRunManagedClaudeAccountMutation
+} from './run-managed-claude-account-mutation'
 
 describe('Claude live PTY gate', () => {
   afterEach(() => {
@@ -324,6 +330,91 @@ describe('Claude live PTY gate', () => {
     } finally {
       releaseSharedClaudeAccountLaunch(reservationId)
     }
+  })
+
+  it('reports live ownership for both shared and pinned Claude terminals', () => {
+    expect(hasLiveClaudePtysUsingAccount('account-a')).toBe(false)
+
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+    expect(hasLiveClaudePtysUsingAccount('account-a')).toBe(true)
+    expect(hasLiveClaudePtysUsingAccount('account-b')).toBe(false)
+    markClaudePtyExited('injected-pty')
+
+    markClaudePtySpawned('live-claude-pty', 'account-a')
+    expect(hasLiveClaudePtysUsingAccount('account-a')).toBe(true)
+    markClaudePtyExited('live-claude-pty')
+  })
+
+  it('lets a read run under live PTYs but yields to an in-flight mutation', async () => {
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+    try {
+      // Why: a usage read changes nothing, so live ownership must not block it.
+      await expect(runManagedClaudeAccountRead('account-a', async () => 'read')).resolves.toBe(
+        'read'
+      )
+    } finally {
+      markClaudePtyExited('injected-pty')
+    }
+
+    beginManagedClaudeAccountMutation('account-a')
+    try {
+      await expect(runManagedClaudeAccountRead('account-a', async () => 'read')).rejects.toThrow(
+        'being changed'
+      )
+    } finally {
+      endManagedClaudeAccountMutation('account-a')
+    }
+  })
+
+  it('lets a read nested inside its own mutation proceed', async () => {
+    await runManagedClaudeAccountMutation('account-a', async () => {
+      await expect(runManagedClaudeAccountRead('account-a', async () => 'read')).resolves.toBe(
+        'read'
+      )
+    })
+  })
+
+  it('try-mutation acquires when idle and yields to live owners instead of throwing', async () => {
+    await expect(
+      tryRunManagedClaudeAccountMutation('account-a', async () => 'ran')
+    ).resolves.toEqual({ acquired: true, value: 'ran' })
+
+    // Yields to a launch reservation — the race a pre-checked rotation must lose.
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-a')
+    try {
+      await expect(
+        tryRunManagedClaudeAccountMutation('account-a', async () => 'ran')
+      ).resolves.toEqual({ acquired: false })
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
+
+    // Yields to a live PTY and to an in-flight mutation.
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+    try {
+      await expect(
+        tryRunManagedClaudeAccountMutation('account-a', async () => 'ran')
+      ).resolves.toEqual({ acquired: false })
+    } finally {
+      markClaudePtyExited('injected-pty')
+    }
+    beginManagedClaudeAccountMutation('account-a')
+    try {
+      await expect(
+        tryRunManagedClaudeAccountMutation('account-a', async () => 'ran')
+      ).resolves.toEqual({ acquired: false })
+    } finally {
+      endManagedClaudeAccountMutation('account-a')
+    }
+
+    // Reentrant inside its own mutation, and releases the gate afterwards.
+    await runManagedClaudeAccountMutation('account-a', async () => {
+      await expect(
+        tryRunManagedClaudeAccountMutation('account-a', async () => 'ran')
+      ).resolves.toEqual({ acquired: true, value: 'ran' })
+    })
+    expect(() => beginManagedClaudeAccountMutation('account-a')).not.toThrow()
+    endManagedClaudeAccountMutation('account-a')
   })
 
   it('prevents unknown shared preparation from racing account-specific ownership', () => {

@@ -14,6 +14,10 @@ import {
   writeManagedClaudeKeychainCredentials
 } from '../claude-accounts/keychain'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
+import {
+  releaseInjectedClaudeAccountLaunch,
+  reserveInjectedClaudeAccountLaunch
+} from '../claude-accounts/live-pty-gate'
 
 const { netFetchMock, readFileMock, resolveProxyMock, setProxyMock, appGetPathMock } = vi.hoisted(
   () => ({
@@ -1567,5 +1571,320 @@ describe('fetchClaudeRateLimits', () => {
       String(url).includes('/api/oauth/usage')
     )
     expect(usageCall?.[1]?.headers?.Authorization).toBe('Bearer fresh-access')
+  })
+
+  it('reads usage with an expired token a live Claude owns when the endpoint accepts it', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    const credentialsPath = join(ownedAuthPath, '.credentials.json')
+    const credentialsJson = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'expired-access',
+        refreshToken: 'live-refresh',
+        expiresAt: Date.now() - 60_000
+      }
+    })
+    writeFileSync(credentialsPath, credentialsJson, 'utf-8')
+    // Why: local expiresAt isn't authoritative for /api/oauth/usage — the server decides.
+    netFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ five_hour: { utilization: 12 }, seven_day: { utilization: 34 } })
+    })
+
+    const result = await fetchManagedAccountUsage(
+      { id: 'account-1', managedAuthPath: ownedAuthPath },
+      { allowTokenRotation: false }
+    )
+
+    expect(result.status).toBe('ok')
+    const usageCall = netFetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/api/oauth/usage')
+    )
+    expect(usageCall?.[1]?.headers?.Authorization).toBe('Bearer expired-access')
+    expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+      false
+    )
+    // The live session's single-use refresh token is left untouched.
+    expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+  })
+
+  it('defers instead of surfacing an auth error when the endpoint rejects the un-rotated token', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    const credentialsPath = join(ownedAuthPath, '.credentials.json')
+    const credentialsJson = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'expired-access',
+        refreshToken: 'live-refresh',
+        expiresAt: Date.now() - 60_000
+      }
+    })
+    writeFileSync(credentialsPath, credentialsJson, 'utf-8')
+    netFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: 'Invalid authentication credentials' } }), {
+        status: 401
+      })
+    )
+
+    const result = await fetchManagedAccountUsage(
+      { id: 'account-1', managedAuthPath: ownedAuthPath },
+      { allowTokenRotation: false }
+    )
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('deferred-by-live-session')
+    expect(result.error).not.toMatch(/Invalid authentication/)
+    expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+      false
+    )
+    expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+  })
+
+  it('defers a blank live-CLI credentials blob instead of reporting no credentials', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    // A live CLI that lost a refresh race can leave an empty-token blob behind.
+    writeFileSync(
+      join(ownedAuthPath, '.credentials.json'),
+      JSON.stringify({ claudeAiOauth: { accessToken: '', refreshToken: 'live-refresh' } }),
+      'utf-8'
+    )
+
+    const result = await fetchManagedAccountUsage(
+      { id: 'account-1', managedAuthPath: ownedAuthPath },
+      { allowTokenRotation: false }
+    )
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('deferred-by-live-session')
+    expect(result.error).not.toBe('No credentials')
+    expect(netFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('skips rotation when a Claude launch reservation races the usage read', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    const credentialsPath = join(ownedAuthPath, '.credentials.json')
+    const credentialsJson = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'expiring-access',
+        refreshToken: 'single-use-refresh',
+        expiresAt: Date.now() + 60_000
+      }
+    })
+    writeFileSync(credentialsPath, credentialsJson, 'utf-8')
+    netFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ five_hour: { utilization: 12 }, seven_day: { utilization: 34 } })
+    })
+    // A worktree launch is preparing this account; rotating now would hand the
+    // spawning CLI a pre-rotation refresh token that dies on first refresh.
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-1')
+
+    try {
+      const result = await fetchManagedAccountUsage({
+        id: 'account-1',
+        managedAuthPath: ownedAuthPath
+      })
+
+      expect(result.status).toBe('ok')
+      expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+        false
+      )
+      expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('adopts the live CLI scoped keychain rotation instead of rotating the managed copy (macOS)', async () => {
+    setPlatform('darwin')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    // Orca's managed copy is stale — the live CLI rotated the scoped Keychain item.
+    vi.mocked(readManagedClaudeKeychainCredentials).mockResolvedValueOnce(
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: 'stale-managed-access',
+          refreshToken: 'stale-managed-refresh',
+          expiresAt: Date.now() - 60_000
+        }
+      })
+    )
+    // Why: the managed-location resolver may realpath the dir, so match by suffix.
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (configDir) =>
+      configDir?.endsWith(join('account-1', 'auth'))
+        ? JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'live-cli-access',
+              refreshToken: 'live-cli-refresh',
+              expiresAt: Date.now() + 60 * 60_000
+            }
+          })
+        : null
+    )
+    netFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ five_hour: { utilization: 12 }, seven_day: { utilization: 34 } })
+    })
+
+    const result = await fetchManagedAccountUsage(
+      { id: 'account-1', managedAuthPath: ownedAuthPath },
+      { allowTokenRotation: false }
+    )
+
+    expect(result.status).toBe('ok')
+    const usageCall = netFetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/api/oauth/usage')
+    )
+    expect(usageCall?.[1]?.headers?.Authorization).toBe('Bearer live-cli-access')
+    expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+      false
+    )
+    // Read-only: the adoption never writes back to managed or runtime storage.
+    expect(writeManagedClaudeKeychainCredentials).not.toHaveBeenCalled()
+    expect(writeActiveClaudeKeychainCredentials).not.toHaveBeenCalled()
+  })
+
+  it('reads with a still-valid token inside the refresh buffer without rotating it', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    const credentialsPath = join(ownedAuthPath, '.credentials.json')
+    const credentialsJson = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'buffered-access',
+        refreshToken: 'live-refresh',
+        // Inside the 5-minute refresh buffer, but not yet expired.
+        expiresAt: Date.now() + 60_000
+      }
+    })
+    writeFileSync(credentialsPath, credentialsJson, 'utf-8')
+    netFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ five_hour: { utilization: 12 }, seven_day: { utilization: 34 } })
+    })
+
+    const result = await fetchManagedAccountUsage(
+      { id: 'account-1', managedAuthPath: ownedAuthPath },
+      { allowTokenRotation: false, allowUsagePanelSupplement: true }
+    )
+
+    expect(result.status).toBe('ok')
+    const usageCall = netFetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/api/oauth/usage')
+    )
+    expect(usageCall?.[1]?.headers?.Authorization).toBe('Bearer buffered-access')
+    // No token-endpoint rotation and no second CLI that would rotate it either.
+    expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+      false
+    )
+    expect(fetchViaPty).not.toHaveBeenCalled()
+    expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+  })
+
+  it('yields rotation to a Claude launch that reserved the account mid-read', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    const credentialsPath = join(ownedAuthPath, '.credentials.json')
+    const credentialsJson = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'expiring-access',
+        refreshToken: 'launch-owned-refresh',
+        expiresAt: Date.now() + 60_000
+      }
+    })
+    writeFileSync(credentialsPath, credentialsJson, 'utf-8')
+    netFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ five_hour: { utilization: 12 }, seven_day: { utilization: 34 } })
+    })
+    // The caller's liveness check passed, but a launch reserves the account before rotation.
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-1')
+
+    try {
+      const result = await fetchManagedAccountUsage(
+        { id: 'account-1', managedAuthPath: ownedAuthPath },
+        { allowTokenRotation: true, allowUsagePanelSupplement: true }
+      )
+
+      expect(result.status).toBe('ok')
+      // The atomic gate refused rotation, the read proceeded with the stored token,
+      // and no supplement CLI ran on the reserved credentials.
+      expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+        false
+      )
+      expect(fetchViaPty).not.toHaveBeenCalled()
+      expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('defers when rotation yielded to a launch and the endpoint rejects the token', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    writeFileSync(
+      join(ownedAuthPath, '.credentials.json'),
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: 'expired-access',
+          refreshToken: 'launch-owned-refresh',
+          expiresAt: Date.now() - 60_000
+        }
+      }),
+      'utf-8'
+    )
+    netFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: 'Invalid authentication credentials' } }), {
+        status: 401
+      })
+    )
+    const reservationId = reserveInjectedClaudeAccountLaunch('account-1')
+
+    try {
+      const result = await fetchManagedAccountUsage(
+        { id: 'account-1', managedAuthPath: ownedAuthPath },
+        { allowTokenRotation: true }
+      )
+
+      expect(result.status).toBe('error')
+      expect(result.usageMetadata?.failureKind).toBe('deferred-by-live-session')
+      expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+        false
+      )
+    } finally {
+      releaseInjectedClaudeAccountLaunch(reservationId)
+    }
   })
 })
