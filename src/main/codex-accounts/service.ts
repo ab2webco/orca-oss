@@ -61,6 +61,10 @@ import { assertOwnedHostCodexManagedHomePath } from './host-codex-managed-home-o
 
 const LOGIN_TIMEOUT_MS = 120_000
 const MAX_LOGIN_OUTPUT_CHARS = 4_000
+const INCOMPLETE_CODEX_CLI_MESSAGE =
+  'Codex CLI appears incomplete or corrupted. Reinstall it with `npm i -g @openai/codex@latest` and try again.'
+const VENDORED_CODEX_SPAWN_ENOENT =
+  /\bspawn\s+[^\r\n]*[\\/]vendor[\\/][^\s\\/]+[\\/]codex[\\/]codex(?:\.exe)?\s+ENOENT\b/i
 // Why: mirrors the Windows rm retry policy in local-worktree-filesystem — a
 // just-terminated codex login can briefly keep handles inside a managed home.
 const WINDOWS_RM_MAX_RETRIES = 8
@@ -1674,6 +1678,10 @@ export class CodexAccountService {
             return
           }
           const trimmedOutput = output.trim()
+          if (VENDORED_CODEX_SPAWN_ENOENT.test(trimmedOutput)) {
+            rejectPromise(new Error(INCOMPLETE_CODEX_CLI_MESSAGE))
+            return
+          }
           rejectPromise(
             new Error(
               trimmedOutput

@@ -3237,6 +3237,99 @@ describe('CodexAccountService config sync', () => {
     }
   })
 
+  it.each([
+    {
+      label: 'a bare Codex command',
+      command: 'codex',
+      message: 'Codex CLI not found.'
+    },
+    {
+      label: 'a resolved Codex path',
+      command: join(testState.fakeHomeDir, 'bin', 'codex.js'),
+      message: 'Codex CLI found but could not run — Node.js may not be in your PATH.'
+    }
+  ])('preserves the direct ENOENT diagnosis for $label', async ({ command, message }) => {
+    vi.resetModules()
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: PassThrough
+      stderr: PassThrough
+      kill: () => void
+    }
+    child.stdout = new PassThrough()
+    child.stderr = new PassThrough()
+    child.kill = vi.fn()
+    vi.doMock('node:child_process', () => ({
+      execFileSync: vi.fn(),
+      spawn: vi.fn(() => child)
+    }))
+    vi.doMock('../codex-cli/command', () => ({
+      resolveCodexCommand: () => command
+    }))
+
+    try {
+      const { CodexAccountService } = await import('./service')
+      const service = new CodexAccountService(
+        createStore(createSettings()) as never,
+        createRateLimits() as never,
+        createRuntimeHome() as never
+      )
+      const loginPromise = (
+        service as unknown as { runCodexLogin(managedHomePath: string): Promise<void> }
+      ).runCodexLogin(testState.fakeHomeDir)
+      const error = Object.assign(new Error('spawn codex ENOENT'), { code: 'ENOENT' })
+
+      child.emit('error', error)
+
+      await expect(loginPromise).rejects.toThrow(message)
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.doUnmock('../codex-cli/command')
+    }
+  })
+
+  it('reports an actionable error for a vendored Codex ENOENT trace', async () => {
+    vi.resetModules()
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: PassThrough
+      stderr: PassThrough
+      kill: () => void
+    }
+    child.stdout = new PassThrough()
+    child.stderr = new PassThrough()
+    child.kill = vi.fn()
+    vi.doMock('node:child_process', () => ({
+      execFileSync: vi.fn(),
+      spawn: vi.fn(() => child)
+    }))
+    vi.doMock('../codex-cli/command', () => ({
+      resolveCodexCommand: () => join(testState.fakeHomeDir, 'bin', 'codex.js')
+    }))
+
+    try {
+      const { CodexAccountService } = await import('./service')
+      const service = new CodexAccountService(
+        createStore(createSettings()) as never,
+        createRateLimits() as never,
+        createRuntimeHome() as never
+      )
+      const loginPromise = (
+        service as unknown as { runCodexLogin(managedHomePath: string): Promise<void> }
+      ).runCodexLogin(testState.fakeHomeDir)
+      child.stderr.write(
+        'Error: spawn C:\\npm\\node_modules\\@openai\\codex\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe ENOENT\n'
+      )
+
+      child.emit('close', 1)
+
+      await expect(loginPromise).rejects.toThrow(
+        'Codex CLI appears incomplete or corrupted. Reinstall it with `npm i -g @openai/codex@latest` and try again.'
+      )
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.doUnmock('../codex-cli/command')
+    }
+  })
+
   it('force-kills a lingering Windows codex login tree once auth.json exists', async () => {
     vi.resetModules()
     vi.useFakeTimers()
