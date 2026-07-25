@@ -48,13 +48,20 @@ export function resolveWithSshG(host: string): Promise<SshResolvedConfig | null>
     // Why: '--' prevents host labels starting with '-' from becoming SSH flags.
     // execFile's timeout only signals ssh; keep the null fallback for stuck callbacks.
     try {
-      child = execFile('ssh', ['-G', '--', host], { timeout: SSH_G_TIMEOUT_MS }, (err, stdout) => {
-        if (err) {
-          settle(() => resolve(null))
-          return
+      // Why: ssh.exe is a console-subsystem binary on Windows; without windowsHide a
+      // visible conhost flashes and steals keyboard focus on every connect/reconnect (#10488).
+      child = execFile(
+        'ssh',
+        ['-G', '--', host],
+        { timeout: SSH_G_TIMEOUT_MS, windowsHide: true },
+        (err, stdout) => {
+          if (err) {
+            settle(() => resolve(null))
+            return
+          }
+          settle(() => resolve(parseSshGOutput(stdout)))
         }
-        settle(() => resolve(parseSshGOutput(stdout)))
-      })
+      )
     } catch {
       settle(() => resolve(null))
     }

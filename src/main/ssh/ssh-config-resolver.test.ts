@@ -51,7 +51,7 @@ describe('resolveWithSshG', () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       'ssh',
       ['-G', '--', 'testserver'],
-      expect.objectContaining({ timeout: 5000 }),
+      expect.objectContaining({ timeout: 5000, windowsHide: true }),
       expect.any(Function)
     )
   })

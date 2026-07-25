@@ -723,4 +723,40 @@ describe('spawnProxyCommand', () => {
     expect(proc.stdin.listenerCount('error')).toBe(0)
     expect(proc.listenerCount('error')).toBe(0)
   })
+
+  it('hides Windows console windows for jump-host and ProxyCommand spawns (#10488)', () => {
+    const proc = createMockProxyProcess()
+    spawnMock.mockReturnValue(proc)
+
+    spawnProxyCommand(
+      { kind: 'jump-host', jumpHost: 'bastion.example.com' },
+      'target.example.com',
+      22,
+      'deploy'
+    )
+    expect(spawnMock).toHaveBeenCalledWith(
+      'ssh',
+      ['-W', 'target.example.com:22', '--', 'bastion.example.com'],
+      expect.objectContaining({
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true
+      })
+    )
+
+    spawnMock.mockClear()
+    spawnProxyCommand(
+      { kind: 'proxy-command', command: 'nc %h %p' },
+      'target.example.com',
+      22,
+      'deploy'
+    )
+    expect(spawnMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true
+      })
+    )
+  })
 })
