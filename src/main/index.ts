@@ -75,7 +75,6 @@ import {
 import {
   configureElectronNetworkCompatibility,
   configureDevUserDataPath,
-  configurePackagedLinuxUserDataPath,
   configureOrcaUserDataPathEnv,
   enableMainProcessGpuFeatures,
   installDevParentDisconnectQuit,
@@ -85,6 +84,7 @@ import {
   patchPackagedProcessPath,
   shouldInstallManagedHooks
 } from './startup/configure-process'
+import { configurePackagedLinuxUserDataPath } from './startup/packaged-linux-user-data-path'
 import {
   installUncaughtPipeErrorGuard,
   installUnhandledRejectionLogging
