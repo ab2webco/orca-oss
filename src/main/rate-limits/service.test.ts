@@ -5,7 +5,7 @@ Keeping them in one file makes the ordering contract reviewable as a unit. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
-import { RateLimitService } from './service'
+import { isFreshInactiveUsage, RateLimitService } from './service'
 import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
@@ -2386,5 +2386,34 @@ describe('RateLimitService', () => {
 
       expect(fetchClaudeRateLimits).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('isFreshInactiveUsage', () => {
+  const NOW = 1_000_000
+  const TTL = 5 * 60 * 1000
+
+  function cached(over: Partial<Pick<ProviderRateLimits, 'status' | 'updatedAt'>> = {}) {
+    return { status: 'ok' as const, updatedAt: NOW, ...over }
+  }
+
+  it('reuses a snapshot read inside the window', () => {
+    expect(isFreshInactiveUsage(cached({ updatedAt: NOW - TTL + 1 }), NOW, TTL)).toBe(true)
+  })
+
+  it('refetches once the window has passed', () => {
+    expect(isFreshInactiveUsage(cached({ updatedAt: NOW - TTL }), NOW, TTL)).toBe(false)
+  })
+
+  it('never treats an error entry as fresh — a failed read must retry', () => {
+    expect(isFreshInactiveUsage(cached({ status: 'error' }), NOW, TTL)).toBe(false)
+  })
+
+  it('refetches when nothing is cached', () => {
+    expect(isFreshInactiveUsage(null, NOW, TTL)).toBe(false)
+  })
+
+  it('treats a backwards clock jump as stale rather than fresh forever', () => {
+    expect(isFreshInactiveUsage(cached({ updatedAt: NOW + 60_000 }), NOW, TTL)).toBe(false)
   })
 })

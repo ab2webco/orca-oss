@@ -92,6 +92,15 @@ const RATE_LIMITED_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000
 // Why: statusline posts arrive on every turn; skip renderer pushes for identical windows so streaming sessions don't spam state updates.
 const LIVE_CLAUDE_INGEST_DEDUPE_MS = 30 * 1000
 const INACTIVE_FETCH_DEBOUNCE_MS = 60 * 1000 // 60 seconds — debounce fetch-on-open
+// Why: every inactive-account read refreshes that account's OAuth token, so
+// re-reading all accounts on each open hammers the token endpoint and earns a
+// 429 — which then surfaces as a bogus "invalid credentials" error. A per-account
+// freshness window means only accounts nobody has read recently are refetched;
+// weekly/session usage moves slowly, so a few minutes old is still accurate.
+const INACTIVE_ACCOUNT_USAGE_TTL_MS = 5 * 60 * 1000
+// Why: space sequential per-account refreshes so a large roster arrives as a
+// trickle instead of a burst the token endpoint rate-limits.
+const INACTIVE_FETCH_ACCOUNT_GAP_MS = 750
 const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
 
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
@@ -126,6 +135,40 @@ function isSystemDefaultClaudeAuth(
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Reusable-as-is check for a cached per-account usage snapshot: recent enough,
+ *  and not an error (a failed read must always be retried). */
+export function isFreshInactiveUsage(
+  cached: Pick<ProviderRateLimits, 'status' | 'updatedAt'> | null,
+  now: number,
+  ttlMs: number = INACTIVE_ACCOUNT_USAGE_TTL_MS
+): boolean {
+  if (!cached || cached.status === 'error') {
+    return false
+  }
+  const age = now - cached.updatedAt
+  // Why: a clock jump backwards would make `age` negative; treat that as stale
+  // rather than pinning the entry as fresh forever.
+  return age >= 0 && age < ttlMs
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolvePromise) => {
+    if (signal?.aborted) {
+      resolvePromise()
+      return
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolvePromise()
+    }, ms)
+    function onAbort(): void {
+      clearTimeout(timer)
+      resolvePromise()
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function normalizeClaudeConfigDir(dir: string | null | undefined): string | null {
@@ -528,7 +571,11 @@ export class RateLimitService {
     if (this.inactiveClaudeFetching.size > 0) {
       return
     }
-    const accounts = this.inactiveClaudeAccountsResolver?.() ?? []
+    const allAccounts = this.inactiveClaudeAccountsResolver?.() ?? []
+    // Why: skip accounts whose usage is still fresh — each refetch costs an
+    // OAuth token refresh, and refreshing every account on every open is what
+    // triggers the token endpoint's 429.
+    const accounts = allAccounts.filter((account) => !this.hasFreshInactiveClaudeUsage(account.id))
     if (accounts.length === 0) {
       return
     }
@@ -540,6 +587,7 @@ export class RateLimitService {
       this.inactiveClaudeFetching.add(account.id)
     }
     this.pushToRenderer()
+    let fetchedInThisCycle = 0
 
     try {
       for (const account of accounts) {
@@ -556,6 +604,17 @@ export class RateLimitService {
           continue
         }
         try {
+          // Why: trickle the per-account refreshes; a burst is what the token
+          // endpoint 429s. Skipped before the first fetch so one account is instant.
+          if (fetchedInThisCycle > 0) {
+            await delay(INACTIVE_FETCH_ACCOUNT_GAP_MS, signal)
+            if (signal.aborted) {
+              this.inactiveClaudeFetching.delete(account.id)
+              this.pushToRenderer()
+              continue
+            }
+          }
+          fetchedInThisCycle += 1
           const fresh = await this.withClaudeAccountOperation(account.id, () =>
             fetchManagedAccountUsage(account, {
               allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
@@ -616,7 +675,12 @@ export class RateLimitService {
     if (this.inactiveCodexFetching.size > 0) {
       return
     }
-    const accounts = this.inactiveCodexAccountsResolver?.() ?? []
+    const allCodexAccounts = this.inactiveCodexAccountsResolver?.() ?? []
+    // Why: same freshness window as Claude — re-reading every account on each
+    // open is wasted work and needless load on the provider.
+    const accounts = allCodexAccounts.filter(
+      (account) => !this.hasFreshInactiveCodexUsage(account.id)
+    )
     if (accounts.length === 0) {
       return
     }
@@ -699,6 +763,16 @@ export class RateLimitService {
     return (this.inactiveClaudeAccountsResolver?.() ?? []).some(
       (account) => account.id === accountId
     )
+  }
+
+  /** True when this account's usage was read recently enough to reuse as-is.
+   *  An error entry is never "fresh" — a failed read must be retried. */
+  private hasFreshInactiveClaudeUsage(accountId: string): boolean {
+    return isFreshInactiveUsage(this.inactiveClaudeCache.get(accountId) ?? null, Date.now())
+  }
+
+  private hasFreshInactiveCodexUsage(accountId: string): boolean {
+    return isFreshInactiveUsage(this.inactiveCodexCache.get(accountId) ?? null, Date.now())
   }
 
   private isCurrentInactiveCodexAccount(accountId: string): boolean {
