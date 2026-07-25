@@ -14,6 +14,7 @@ import {
   resolveOwnedClaudeManagedAuthPath,
   writeClaudeManagedAuthFile
 } from './managed-auth-path'
+import { linkAccountTranscriptsToSharedStore } from './shared-transcript-store'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { resolveLocalAccountRuntimeTarget } from '../../shared/local-account-runtime'
 import {
@@ -1100,6 +1101,9 @@ export class ClaudeRuntimeAuthService {
     if (account.managedAuthRuntime === 'wsl') {
       return
     }
+    // Why: `/resume` and `claude -c` read only the launching account's projects/,
+    // so without one shared store the user's history is split per account.
+    linkAccountTranscriptsToSharedStore(account.managedAuthPath)
     try {
       const currentSettingsJson = readClaudeManagedAuthFile(
         account.managedAuthPath,
