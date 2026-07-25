@@ -125,9 +125,31 @@ export async function refreshClaudeOauthCredentials(
   credentialsJson: string,
   now: number = Date.now()
 ): Promise<string | null> {
+  return (await refreshClaudeOauthCredentialsDetailed(credentialsJson, now)).credentialsJson
+}
+
+/** Outcome of a refresh attempt. `throttled` distinguishes a 429 from a dead
+ *  refresh token: a throttle means "retry later", not "these credentials are
+ *  invalid", so callers can cool down instead of reporting a bogus auth error. */
+export type ClaudeOauthRefreshOutcome = {
+  credentialsJson: string | null
+  throttled: boolean
+  /** Seconds the endpoint asked us to wait, when it said so. */
+  retryAfterSeconds: number | null
+}
+
+export async function refreshClaudeOauthCredentialsDetailed(
+  credentialsJson: string,
+  now: number = Date.now()
+): Promise<ClaudeOauthRefreshOutcome> {
+  const notRefreshed: ClaudeOauthRefreshOutcome = {
+    credentialsJson: null,
+    throttled: false,
+    retryAfterSeconds: null
+  }
   const refreshToken = readRefreshToken(credentialsJson)
   if (!refreshToken) {
-    return null
+    return notRefreshed
   }
 
   await ensureElectronProxyFromEnvironment({
@@ -156,15 +178,25 @@ export async function refreshClaudeOauthCredentials(
       // Callers keep the existing credentials on null — a transient 429 just
       // means the still-valid token is reused until the next attempt.
       console.warn(`[claude-oauth-refresh] token endpoint returned ${res.status}`)
-      return null
+      const retryAfterHeader = res.headers.get('retry-after')
+      const retryAfterSeconds = Number.parseInt(retryAfterHeader ?? '', 10)
+      return {
+        credentialsJson: null,
+        throttled: res.status === 429,
+        retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : null
+      }
     }
     const data = (await res.json()) as TokenEndpointResponse
-    return applyRefreshedToken(credentialsJson, data, now)
+    return {
+      credentialsJson: applyRefreshedToken(credentialsJson, data, now),
+      throttled: false,
+      retryAfterSeconds: null
+    }
   } catch (error) {
     console.warn(
       '[claude-oauth-refresh] token refresh request failed:',
       error instanceof Error ? error.message : error
     )
-    return null
+    return notRefreshed
   }
 }

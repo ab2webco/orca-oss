@@ -30,7 +30,7 @@ import {
 import { writeManagedClaudeKeychainCredentials } from '../claude-accounts/keychain'
 import {
   isOauthTokenExpiring,
-  refreshClaudeOauthCredentials
+  refreshClaudeOauthCredentialsDetailed
 } from '../claude-accounts/oauth-refresh'
 import { createOAuthUsageError, OAuthUsageError } from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
@@ -49,6 +49,10 @@ const CLAUDE_CODE_USER_AGENT = 'claude-code/2.1.0'
 const API_TIMEOUT_MS = 10_000
 const LIVE_CLAUDE_REFRESH_DEFERRED_MESSAGE =
   'Claude usage refresh is waiting for the live Claude terminal to rotate its credentials.'
+/** Marks a usage read that failed because the OAuth token endpoint throttled us,
+ *  not because the account's credentials are bad. Callers cool down on this
+ *  instead of retrying immediately and reporting a false auth failure. */
+export const CLAUDE_USAGE_THROTTLED_ERROR = 'Rate limited by the token endpoint'
 
 /**
  * Bridge standard HTTP proxy env vars into Electron's session proxy config.
@@ -1209,18 +1213,35 @@ export async function fetchManagedAccountUsage(
   // Why: refresh+persist an expiring token now so inactive accounts' single-use refresh tokens stay fresh for a later switch-in (persist failure is non-fatal).
   let token = parseOAuthCredentialsJson(credentialsJson, 'credentials-file').token
   if (isOauthTokenExpiring(credentialsJson)) {
-    const refreshed = await refreshClaudeOauthCredentials(credentialsJson)
+    const outcome = await refreshClaudeOauthCredentialsDetailed(credentialsJson)
     if (options.signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
-    if (refreshed) {
+    if (outcome.credentialsJson) {
       try {
-        await writeManagedCredentialsJson(location, refreshed)
+        await writeManagedCredentialsJson(location, outcome.credentialsJson)
       } catch {
         // Keep the refreshed token in memory; next poll refreshes again if the write failed.
       }
-      credentialsJson = refreshed
-      token = parseOAuthCredentialsJson(refreshed, 'credentials-file').token
+      credentialsJson = outcome.credentialsJson
+      token = parseOAuthCredentialsJson(outcome.credentialsJson, 'credentials-file').token
+    } else if (outcome.throttled) {
+      // Why: the token endpoint throttled us, so the expiring token would 401 and
+      // report "invalid credentials" — a lie that makes a working account look
+      // broken. Report the throttle instead so the caller can cool down and the
+      // meter can say "rate limited" rather than blaming the account.
+      console.warn('[claude-rate-limits] managed account usage: token refresh throttled', {
+        accountId: account.id,
+        retryAfterSeconds: outcome.retryAfterSeconds
+      })
+      return {
+        provider: 'claude',
+        session: null,
+        weekly: null,
+        updatedAt: Date.now(),
+        error: CLAUDE_USAGE_THROTTLED_ERROR,
+        status: 'error'
+      }
     }
   }
 

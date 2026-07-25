@@ -7,7 +7,11 @@ import type {
   InactiveAccountUsage,
   RateLimitRuntimeTarget
 } from '../../shared/rate-limit-types'
-import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
+import {
+  CLAUDE_USAGE_THROTTLED_ERROR,
+  fetchClaudeRateLimits,
+  fetchManagedAccountUsage
+} from './claude-fetcher'
 import type { InactiveClaudeAccountInfo } from './claude-fetcher'
 import { mapClaudeUsageWindow } from './claude-usage-window'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
@@ -101,6 +105,11 @@ const INACTIVE_ACCOUNT_USAGE_TTL_MS = 5 * 60 * 1000
 // Why: space sequential per-account refreshes so a large roster arrives as a
 // trickle instead of a burst the token endpoint rate-limits.
 const INACTIVE_FETCH_ACCOUNT_GAP_MS = 750
+// Why: an error entry is normally retried immediately (a failure must not be
+// cached as good). But a token-endpoint throttle is the one failure where
+// retrying makes it worse, so those accounts get an explicit cooldown —
+// otherwise every panel open re-hammers exactly the accounts that are 429ing.
+const INACTIVE_FETCH_THROTTLE_COOLDOWN_MS = 10 * 60 * 1000
 const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
 
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
@@ -140,17 +149,27 @@ function toErrorMessage(error: unknown): string {
 /** Reusable-as-is check for a cached per-account usage snapshot: recent enough,
  *  and not an error (a failed read must always be retried). */
 export function isFreshInactiveUsage(
-  cached: Pick<ProviderRateLimits, 'status' | 'updatedAt'> | null,
+  cached: Pick<ProviderRateLimits, 'status' | 'updatedAt' | 'error'> | null,
   now: number,
   ttlMs: number = INACTIVE_ACCOUNT_USAGE_TTL_MS
 ): boolean {
-  if (!cached || cached.status === 'error') {
+  if (!cached) {
     return false
   }
   const age = now - cached.updatedAt
   // Why: a clock jump backwards would make `age` negative; treat that as stale
   // rather than pinning the entry as fresh forever.
-  return age >= 0 && age < ttlMs
+  if (age < 0) {
+    return false
+  }
+  if (cached.status === 'error') {
+    // Why: failures normally retry at once, EXCEPT a token-endpoint throttle —
+    // retrying that is what sustains the 429. Hold those off for a cooldown.
+    return (
+      cached.error === CLAUDE_USAGE_THROTTLED_ERROR && age < INACTIVE_FETCH_THROTTLE_COOLDOWN_MS
+    )
+  }
+  return age < ttlMs
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {

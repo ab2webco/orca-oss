@@ -22,7 +22,8 @@ import {
 
 vi.mock('./claude-fetcher', () => ({
   fetchClaudeRateLimits: vi.fn(),
-  fetchManagedAccountUsage: vi.fn()
+  fetchManagedAccountUsage: vi.fn(),
+  CLAUDE_USAGE_THROTTLED_ERROR: 'Rate limited by the token endpoint'
 }))
 
 vi.mock('./codex-fetcher', () => ({
@@ -2393,8 +2394,8 @@ describe('isFreshInactiveUsage', () => {
   const NOW = 1_000_000
   const TTL = 5 * 60 * 1000
 
-  function cached(over: Partial<Pick<ProviderRateLimits, 'status' | 'updatedAt'>> = {}) {
-    return { status: 'ok' as const, updatedAt: NOW, ...over }
+  function cached(over: Partial<Pick<ProviderRateLimits, 'status' | 'updatedAt' | 'error'>> = {}) {
+    return { status: 'ok' as const, updatedAt: NOW, error: null, ...over }
   }
 
   it('reuses a snapshot read inside the window', () => {
@@ -2405,8 +2406,30 @@ describe('isFreshInactiveUsage', () => {
     expect(isFreshInactiveUsage(cached({ updatedAt: NOW - TTL }), NOW, TTL)).toBe(false)
   })
 
-  it('never treats an error entry as fresh — a failed read must retry', () => {
-    expect(isFreshInactiveUsage(cached({ status: 'error' }), NOW, TTL)).toBe(false)
+  it('retries a plain error entry at once — a failed read must not be cached as good', () => {
+    expect(
+      isFreshInactiveUsage(cached({ status: 'error', error: 'No credentials' }), NOW, TTL)
+    ).toBe(false)
+  })
+
+  it('cools down a token-endpoint throttle instead of re-hammering it', () => {
+    // Why: retrying a 429 is what sustains it, so the throttled account is the
+    // one failure that must be skipped for a while.
+    const throttled = cached({
+      status: 'error',
+      error: 'Rate limited by the token endpoint',
+      updatedAt: NOW - 60_000
+    })
+    expect(isFreshInactiveUsage(throttled, NOW, TTL)).toBe(true)
+  })
+
+  it('retries a throttled account once the cooldown has elapsed', () => {
+    const throttled = cached({
+      status: 'error',
+      error: 'Rate limited by the token endpoint',
+      updatedAt: NOW - 11 * 60 * 1000
+    })
+    expect(isFreshInactiveUsage(throttled, NOW, TTL)).toBe(false)
   })
 
   it('refetches when nothing is cached', () => {
