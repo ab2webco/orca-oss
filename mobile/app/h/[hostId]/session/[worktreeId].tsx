@@ -5091,8 +5091,8 @@ export default function SessionScreen() {
                 {
                   label: 'Browser',
                   icon: Globe,
+                  closeBeforePress: true,
                   onPress: () => {
-                    setShowCreateTabDrawer(false)
                     if (browserScreencastSupported !== true) {
                       showToast('Desktop update required for mobile browser streaming', 1600)
                       return
@@ -5168,9 +5168,11 @@ export default function SessionScreen() {
           {
             label: 'Refresh',
             icon: RefreshCw,
+            // Why: dirty refresh opens ConfirmModal; wait for this sheet's native
+            // Modal to unmount first (same dual-Modal race as tab Rename, #10331).
+            closeBeforePress: true,
             onPress: () => {
               const target = markdownActionTarget
-              setMarkdownActionTarget(null)
               if (target) {
                 discardMarkdownLocalContent(target)
               }
