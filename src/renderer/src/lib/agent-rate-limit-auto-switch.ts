@@ -90,9 +90,26 @@ function getActiveAccountId(
   return selectedIds.length === 1 ? selectedIds[0] : null
 }
 
-/** Scores an inactive account by its tightest reported quota window. */
-function getUsageScore(limits: ProviderRateLimits | null | undefined): number | null {
-  if (!limits || limits.status !== 'ok') {
+/**
+ * Scores an inactive account by its tightest reported quota window.
+ *
+ * Why a stale-but-readable snapshot still scores: requiring `status === 'ok'` hid
+ * healthy accounts behind a transient read failure — a deferred read while a live
+ * CLI owns the account, a token-endpoint throttle, a network blip — and the switch
+ * then skipped straight to the quota-less endpoint account. `applyStalePolicy`
+ * keeps the last good windows on those results, so the quota is still known.
+ * `fresh` lets the caller prefer a currently-verified account over a retained one.
+ */
+function getUsageScore(
+  limits: ProviderRateLimits | null | undefined
+): { usedPercent: number; fresh: boolean } | null {
+  // Why 'unavailable' is still excluded: it means the provider reported no quota
+  // for this account at all, not that Orca failed to read it.
+  if (!limits || limits.status === 'unavailable' || limits.status === 'fetching') {
+    return null
+  }
+  // Why: no credentials means the account cannot run at all, whatever it last read.
+  if (limits.usageMetadata?.failureKind === 'missing-credentials') {
     return null
   }
   const windows = [
@@ -105,12 +122,14 @@ function getUsageScore(limits: ProviderRateLimits | null | undefined): number | 
     return null
   }
   const usedPercent = Math.max(...windows.map((window) => window.usedPercent))
-  return usedPercent < 100 ? usedPercent : null
+  return usedPercent < 100 ? { usedPercent, fresh: limits.status === 'ok' } : null
 }
 
-/** Indexes only usable inactive accounts; exhausted or errored accounts are omitted. */
-function getInactiveUsageByAccountId(usages: readonly InactiveAccountUsage[]): Map<string, number> {
-  const result = new Map<string, number>()
+/** Indexes only usable inactive accounts; exhausted or unreadable ones are omitted. */
+function getInactiveUsageByAccountId(
+  usages: readonly InactiveAccountUsage[]
+): Map<string, { usedPercent: number; fresh: boolean }> {
+  const result = new Map<string, { usedPercent: number; fresh: boolean }>()
   for (const usage of usages) {
     const score = getUsageScore(usage.rateLimits)
     if (score !== null) {
@@ -141,19 +160,31 @@ export function selectAutoSwitchAccount(args: {
     .filter((account) => !('authMethod' in account) || account.authMethod !== 'custom-endpoint')
     .filter((account) => accountMatchesTarget(args.agent, account, args.target))
     .map((account) => {
-      const usedPercent = usageByAccountId.get(account.id)
-      if (usedPercent === undefined) {
+      const score = usageByAccountId.get(account.id)
+      if (!score) {
         return null
       }
       return {
-        accountId: account.id,
-        label: account.email,
-        target: getAccountRuntime(args.agent, account),
-        usedPercent
-      } satisfies AutoSwitchAccountCandidate
+        candidate: {
+          accountId: account.id,
+          label: account.email,
+          target: getAccountRuntime(args.agent, account),
+          usedPercent: score.usedPercent
+        } satisfies AutoSwitchAccountCandidate,
+        fresh: score.fresh
+      }
     })
-    .filter((candidate): candidate is AutoSwitchAccountCandidate => candidate !== null)
-    .sort((left, right) => left.usedPercent - right.usedPercent)
+    .filter(
+      (entry): entry is { candidate: AutoSwitchAccountCandidate; fresh: boolean } => entry !== null
+    )
+    // Why fresh first: an account whose quota was just verified is a safer landing
+    // spot than one scored from a retained snapshot, even if the latter reads lower.
+    .sort(
+      (left, right) =>
+        Number(right.fresh) - Number(left.fresh) ||
+        left.candidate.usedPercent - right.candidate.usedPercent
+    )
+    .map((entry) => entry.candidate)
 
   return candidates[0] ?? null
 }

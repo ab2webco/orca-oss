@@ -288,3 +288,138 @@ describe('selectAutoSwitchAccount', () => {
     expect(result?.accountId).toBe('ubuntu')
   })
 })
+
+function claudeAccount(id: string): ClaudeRateLimitAccountsState['accounts'][number] {
+  return {
+    id,
+    email: `${id}@example.com`,
+    managedAuthRuntime: 'host',
+    createdAt: 1,
+    updatedAt: 1,
+    lastAuthenticatedAt: 1
+  } as unknown as ClaudeRateLimitAccountsState['accounts'][number]
+}
+
+/** Quota is known but the read itself failed — the shape applyStalePolicy retains. */
+function retainedLimits(usedPercent: number, failureKind?: string): ProviderRateLimits {
+  return {
+    provider: 'claude',
+    session: { usedPercent, windowMinutes: 300, resetsAt: null, resetDescription: null },
+    weekly: null,
+    updatedAt: 1,
+    error: 'read failed',
+    status: 'error',
+    ...(failureKind ? { usageMetadata: { failureKind } } : {})
+  } as unknown as ProviderRateLimits
+}
+
+function selectClaude(
+  accountIds: readonly string[],
+  inactiveClaudeAccounts: RateLimitState['inactiveClaudeAccounts']
+): ReturnType<typeof selectAutoSwitchAccount> {
+  return selectAutoSwitchAccount({
+    agent: 'claude',
+    target: { runtime: 'host', wslDistro: null },
+    accounts: {
+      claude: {
+        accounts: accountIds.map(claudeAccount),
+        activeAccountId: 'active',
+        activeAccountIdsByRuntime: { host: 'active', wsl: {} }
+      },
+      codex: emptyCodex,
+      rateLimits: rateLimitState({ inactiveClaudeAccounts })
+    }
+  })
+}
+
+describe('selectAutoSwitchAccount — accounts whose usage read failed', () => {
+  it('still switches to a healthy account whose usage read was deferred', () => {
+    // Why: a live CLI owning the account defers its read (lab.17/18). Excluding it
+    // sent the switch straight to the quota-less endpoint — the reported bug.
+    const result = selectClaude(
+      ['active', 'spare'],
+      [
+        {
+          accountId: 'spare',
+          rateLimits: retainedLimits(12, 'deferred-by-live-session'),
+          updatedAt: 1,
+          isFetching: false
+        }
+      ]
+    )
+
+    expect(result?.accountId).toBe('spare')
+  })
+
+  it('prefers a freshly verified account over one scored from a retained snapshot', () => {
+    const result = selectClaude(
+      ['active', 'retained', 'verified'],
+      [
+        {
+          accountId: 'retained',
+          rateLimits: retainedLimits(5),
+          updatedAt: 1,
+          isFetching: false
+        },
+        {
+          accountId: 'verified',
+          rateLimits: limits('claude', 40),
+          updatedAt: 1,
+          isFetching: false
+        }
+      ]
+    )
+
+    // Why: 'retained' reads lower, but its number may be stale — a verified account
+    // is the safer landing spot.
+    expect(result?.accountId).toBe('verified')
+  })
+
+  it('never switches to an account with no credentials', () => {
+    const result = selectClaude(
+      ['active', 'signed-out'],
+      [
+        {
+          accountId: 'signed-out',
+          rateLimits: retainedLimits(0, 'missing-credentials'),
+          updatedAt: 1,
+          isFetching: false
+        }
+      ]
+    )
+
+    expect(result).toBeNull()
+  })
+
+  it('never switches to an exhausted account even when its read failed', () => {
+    const result = selectClaude(
+      ['active', 'exhausted'],
+      [
+        {
+          accountId: 'exhausted',
+          rateLimits: retainedLimits(100),
+          updatedAt: 1,
+          isFetching: false
+        }
+      ]
+    )
+
+    expect(result).toBeNull()
+  })
+
+  it('ignores an account still being fetched', () => {
+    const result = selectClaude(
+      ['active', 'loading'],
+      [
+        {
+          accountId: 'loading',
+          rateLimits: { ...retainedLimits(10), status: 'fetching' } as ProviderRateLimits,
+          updatedAt: 1,
+          isFetching: true
+        }
+      ]
+    )
+
+    expect(result).toBeNull()
+  })
+})
