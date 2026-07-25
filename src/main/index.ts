@@ -75,6 +75,7 @@ import {
 import {
   configureElectronNetworkCompatibility,
   configureDevUserDataPath,
+  configurePackagedLinuxUserDataPath,
   configureOrcaUserDataPathEnv,
   enableMainProcessGpuFeatures,
   installDevParentDisconnectQuit,
@@ -492,6 +493,10 @@ if (app.isPackaged && process.platform !== 'win32') {
   })
 }
 configureDevUserDataPath(is.dev)
+// Why: must run before the single-instance lock and every userData reader —
+// Electron derives the Linux path from the app name, so app.setName('Orca') at
+// whenReady would otherwise move it and orphan the user's transcripts.
+configurePackagedLinuxUserDataPath()
 configureOrcaUserDataPathEnv()
 installServeSupervisorDisconnectQuit(isServeMode)
 

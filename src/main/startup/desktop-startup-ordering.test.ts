@@ -27,6 +27,23 @@ describe('startup ordering', () => {
     expect(Math.max(rpcStartIndex, legacyRpcStartIndex)).toBeGreaterThanOrEqual(0)
   })
 
+  it('pins the Linux userData path before the lock, persistence, and setName', () => {
+    const source = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
+    const pinIndex = source.indexOf('configurePackagedLinuxUserDataPath()')
+    const lockIndex = source.indexOf('acquireSingleInstanceLock(')
+    const initDataIndex = source.indexOf('initDataPath()')
+    // Anchored to the call, not the prose: comments mention setName by name too.
+    const setNameIndex = source.indexOf('app.setName(devInstanceIdentity.appName)')
+
+    // Why: Electron derives the Linux userData directory from the app name, so any
+    // reader that runs before the pin — or setName itself — can move the profile and
+    // orphan the user's Claude transcripts under claude-accounts/.
+    expect(pinIndex).toBeGreaterThanOrEqual(0)
+    expect(pinIndex).toBeLessThan(lockIndex)
+    expect(pinIndex).toBeLessThan(initDataIndex)
+    expect(pinIndex).toBeLessThan(setNameIndex)
+  })
+
   it('bounds WSL reconciliation before serve RPC while leaving desktop startup independent', () => {
     const source = readFileSync(join(process.cwd(), 'src/main/index.ts'), 'utf8')
     const barrierStart = source.indexOf("ipcMain.handle('app:awaitFirstWindowStartupServices'")
