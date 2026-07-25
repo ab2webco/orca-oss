@@ -123,13 +123,40 @@ export async function listPlanningContainers(
   }
 }
 
+/**
+ * Why: Plane answers 200 + `results: []` for a container that does not exist, so an
+ * empty listing alone can't tell "empty cycle" from "typo'd id". Probe the container
+ * only on the empty path — a container with items must not pay an extra request.
+ */
+async function assertPlanningContainerExists(
+  client: PlaneClientForWorkspace,
+  args: PlanePlanningWorkItemsArgs
+): Promise<void> {
+  const path = `${resourceBase(client, args.kind, args.projectId)}${encodeURIComponent(args.containerId)}/`
+  try {
+    await planeRequest<PlaneRecord>(client, path)
+  } catch (error) {
+    if (error instanceof PlaneApiError && error.status === 404) {
+      throw new PlaneApiError(
+        `${args.kind === 'cycle' ? 'Cycle' : 'Module'} ${args.containerId} not found in project ${args.projectId}.`,
+        404
+      )
+    }
+    throw error
+  }
+}
+
 export async function listPlanningWorkItems(
   args: PlanePlanningWorkItemsArgs
 ): Promise<PlanePlanningWorkItem[]> {
   const client = requireClient(args.workspaceId)
   await acquire()
   try {
-    return await listPaged(client, workItemsPath(client, args), mapPlanningWorkItem)
+    const items = await listPaged(client, workItemsPath(client, args), mapPlanningWorkItem)
+    if (items.length === 0) {
+      await assertPlanningContainerExists(client, args)
+    }
+    return items
   } catch (error) {
     clearWorkspaceTokenOnAuthError(client, error)
     throw error

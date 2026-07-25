@@ -111,6 +111,53 @@ describe('Plane planning client', () => {
     expect(result).toEqual({ ok: true })
   })
 
+  it('reports a missing cycle instead of an empty work item list', async () => {
+    const { listPlanningWorkItems } = await import('./plane-planning')
+    // Why: Plane answers 200 + results:[] for a nonexistent container, so only the
+    // follow-up container probe can tell a typo'd id from a genuinely empty cycle.
+    planeRequestMock.mockImplementation(async (_client: unknown, path: string) => {
+      if (path.includes('cycle-issues')) {
+        return { results: [], next_cursor: '', next_page_results: false }
+      }
+      throw new MockPlaneApiError('Not found', 404)
+    })
+
+    await expect(
+      listPlanningWorkItems({ kind: 'cycle', projectId: 'project-1', containerId: 'ghost' })
+    ).rejects.toThrow('Cycle ghost not found in project project-1.')
+  })
+
+  it('returns an empty list for a module that exists but has no work items', async () => {
+    const { listPlanningWorkItems } = await import('./plane-planning')
+    planeRequestMock.mockImplementation(async (_client: unknown, path: string) =>
+      path.includes('module-issues')
+        ? { results: [], next_cursor: '', next_page_results: false }
+        : { id: 'module-1', name: 'Usage meter' }
+    )
+
+    await expect(
+      listPlanningWorkItems({ kind: 'module', projectId: 'project-1', containerId: 'module-1' })
+    ).resolves.toEqual([])
+  })
+
+  it('does not probe the container when the listing already returned work items', async () => {
+    const { listPlanningWorkItems } = await import('./plane-planning')
+    planeRequestMock.mockResolvedValue({
+      results: [{ id: 'assignment-1', issue: 'item-1' }],
+      next_cursor: '',
+      next_page_results: false
+    })
+
+    await listPlanningWorkItems({
+      kind: 'cycle',
+      projectId: 'project-1',
+      containerId: 'cycle-1'
+    })
+
+    // Why: the common path must stay one request; the probe is empty-path only.
+    expect(planeRequestMock).toHaveBeenCalledTimes(1)
+  })
+
   it('propagates list API errors instead of returning an empty success', async () => {
     const { listPlanningContainers } = await import('./plane-planning')
     const error = new MockPlaneApiError('Forbidden', 403)
