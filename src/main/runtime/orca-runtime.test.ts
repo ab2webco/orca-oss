@@ -12103,6 +12103,66 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('degrades focused terminal creates on headless serve instead of requiring a renderer window', async () => {
+    // Why (#10553): desktop clients always send presentation:'focused' for agent
+    // creates; headless orca serve must still return a handle, not hard-error.
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-focused-headless' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await expect(
+      runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        command: 'codex',
+        presentation: 'focused'
+      })
+    ).resolves.toMatchObject({
+      worktreeId: TEST_WORKTREE_ID,
+      surface: 'background',
+      handle: expect.stringMatching(/^term_/)
+    })
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        worktreeId: TEST_WORKTREE_ID,
+        persistHostSessionBinding: true
+      })
+    )
+  })
+
+  it('degrades focused createAgentSession on headless serve without a renderer window', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-headless' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const clientOperationId = `${Date.now()}-0123456789abcdef0123456789abcdef`
+
+    await expect(
+      runtime.createAgentSession({
+        clientOperationId,
+        worktree: `path:${TEST_WORKTREE_PATH}`,
+        agent: 'codex',
+        prompt: 'hello',
+        presentation: 'focused'
+      })
+    ).resolves.toMatchObject({
+      disposition: 'created',
+      terminal: expect.objectContaining({
+        worktreeId: TEST_WORKTREE_ID,
+        surface: 'background',
+        handle: expect.stringMatching(/^term_/)
+      })
+    })
+    expect(spawn).toHaveBeenCalled()
+  })
+
   it('accepts renderer-backed terminal create replies only from the target renderer', async () => {
     const webContents = { send: vi.fn() }
     const send = vi.fn((_channel: string, payload: { requestId: string }) => {

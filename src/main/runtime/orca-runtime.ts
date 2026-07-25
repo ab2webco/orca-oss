@@ -21865,7 +21865,12 @@ export class OrcaRuntimeService {
         // Why: `orca serve` exposes the local runtime without a renderer
         // window. Renderer-backed Codex terminals are preferred for the app,
         // but headless CLI users still need a usable terminal handle.
-        (opts.rendererBacked === true && rendererWindow === null))
+        (opts.rendererBacked === true && rendererWindow === null) ||
+        // Why (#10553): paired desktop clients send presentation:'focused' for
+        // agent creates. Without a BrowserWindow (headless `orca serve`), fall
+        // through to the headless spawn path instead of getAuthoritativeWindow()
+        // hard-erroring with "No renderer window available".
+        (requiresRendererFocus && availableAuthoritativeWindow === null))
 
     if (shouldCreateInBackground) {
       if (!this.ptyController?.spawn) {
