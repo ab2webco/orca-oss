@@ -5,7 +5,6 @@ import {
   extractWorktreeVirtualRowIndexes,
   getActiveStickyIndexesForScroll,
   getStickyHeaderIndexes,
-  insertProjectUsageRows,
   pruneStaleVirtualRowElementCache,
   type RenderRow
 } from './worktree-list-virtual-rows'
@@ -35,83 +34,6 @@ function itemStub(id: string): RenderRow {
 function virtualItem(index: number, start: number): VirtualItem {
   return { index, start } as VirtualItem
 }
-
-function repoGroupRow(key: string, repoId: string): RenderRow {
-  return {
-    type: 'header',
-    key,
-    label: key,
-    count: 1,
-    tone: 'text-foreground',
-    repo: { id: repoId }
-  } as unknown as RenderRow
-}
-
-function worktreeItemRow(worktreeId: string): RenderRow {
-  return { type: 'item', rowKey: worktreeId, worktree: { id: worktreeId } } as unknown as RenderRow
-}
-
-describe('insertProjectUsageRows', () => {
-  it('appends one usage row after each project’s worktrees', () => {
-    const out = insertProjectUsageRows(
-      [
-        repoGroupRow('repo-a', 'r1'),
-        worktreeItemRow('wt-1'),
-        worktreeItemRow('wt-2'),
-        repoGroupRow('repo-b', 'r2'),
-        worktreeItemRow('wt-3')
-      ],
-      true
-    )
-    expect(out.map((row) => row.type)).toEqual([
-      'header',
-      'item',
-      'item',
-      'project-usage',
-      'header',
-      'item',
-      'project-usage'
-    ])
-    const first = out[3] as Extract<RenderRow, { type: 'project-usage' }>
-    expect(first).toMatchObject({ repoId: 'r1', worktreeIds: ['wt-1', 'wt-2'] })
-  })
-
-  it('skips projects with no visible worktrees (collapsed or empty)', () => {
-    const out = insertProjectUsageRows(
-      [repoGroupRow('repo-a', 'r1'), repoGroupRow('repo-b', 'r2')],
-      true
-    )
-    expect(out.some((row) => row.type === 'project-usage')).toBe(false)
-  })
-
-  it('is a no-op when disabled', () => {
-    const input = [repoGroupRow('repo-a', 'r1'), worktreeItemRow('wt-1')]
-    expect(insertProjectUsageRows(input, false)).toBe(input)
-  })
-
-  it('anchors to a project-group header whose worktrees hang off the group', () => {
-    // Why: project-group headers carry `projectGroup`, not `repo`; anchoring to
-    // repo alone rendered nothing when the sidebar groups by project.
-    const groupHeader = {
-      type: 'header',
-      key: 'project-group:group-1',
-      label: 'Group One',
-      count: 1,
-      tone: 'text-foreground',
-      projectGroup: { id: 'group-1', name: 'Group One', tabOrder: 0 }
-    } as unknown as RenderRow
-    const out = insertProjectUsageRows([groupHeader, worktreeItemRow('wt-1')], true)
-    const usage = out.find((row) => row.type === 'project-usage') as
-      | Extract<RenderRow, { type: 'project-usage' }>
-      | undefined
-    expect(usage).toMatchObject({ repoId: 'group-1', worktreeIds: ['wt-1'] })
-  })
-
-  it('does not attach a usage row to a non-project header', () => {
-    const out = insertProjectUsageRows([groupRow('status-open'), worktreeItemRow('wt-1')], true)
-    expect(out.some((row) => row.type === 'project-usage')).toBe(false)
-  })
-})
 
 // rows: [host-a, group-a1, item, item, host-b, group-b1, item]
 const rows: RenderRow[] = [

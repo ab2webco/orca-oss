@@ -13,6 +13,8 @@ import {
   fetchManagedAccountUsage
 } from './claude-fetcher'
 import type { InactiveClaudeAccountInfo } from './claude-fetcher'
+import { resolveManagedClaudeAccountIdFromConfigDir } from '../claude-accounts/managed-config-dir-account'
+import { getClaudeManagedAccountsRoot } from '../claude-accounts/managed-auth-path'
 import { mapClaudeUsageWindow } from './claude-usage-window'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
@@ -1522,6 +1524,53 @@ export class RateLimitService {
   }
 
   /** Live usage windows forwarded from a Claude session's statusLine command. */
+  /**
+   * Files a live usage post that came from a managed account other than the
+   * globally active one — i.e. a worktree-pinned session. Writes into the same
+   * per-account cache the worktree meters read, so a pinned account reports real
+   * usage without an OAuth token refresh (no live-PTY gate, no 429).
+   */
+  private ingestLiveClaudeUsageForOtherAccount(event: ClaudeStatusLineRateLimits): void {
+    // Why: the managed root comes from Electron's userData, which is absent in
+    // unit tests and before app-ready; without it a dir cannot be attributed, so
+    // fall back to the previous drop behavior rather than guessing an account.
+    let managedRoot: string | null = null
+    try {
+      managedRoot = normalizeClaudeConfigDir(getClaudeManagedAccountsRoot())
+    } catch {
+      managedRoot = null
+    }
+    const accountId = resolveManagedClaudeAccountIdFromConfigDir(
+      normalizeClaudeConfigDir(event.configDir),
+      managedRoot
+    )
+    if (!accountId) {
+      // Not a managed account dir (e.g. the shared ~/.claude of another runtime).
+      console.debug('[rate-limits] dropped live Claude usage: unattributable configDir', {
+        eventConfigDir: event.configDir
+      })
+      return
+    }
+    const session = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
+    const weekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
+    if (!session && !weekly) {
+      return
+    }
+    const previous = this.inactiveClaudeCache.get(accountId) ?? null
+    this.inactiveClaudeCache.set(accountId, {
+      provider: 'claude',
+      // Why: a payload can carry a single window; an absent one means "no
+      // update", not "cleared" — keep the other bar populated.
+      session: session ?? previous?.session ?? null,
+      weekly: weekly ?? previous?.weekly ?? null,
+      updatedAt: Date.now(),
+      error: null,
+      status: 'ok',
+      usageMetadata: { source: 'live-session', lastSuccessfulSource: 'live-session' }
+    })
+    this.pushToRenderer()
+  }
+
   ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {
     // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
     const snapshot = this.lastClaudeAuthSnapshot
@@ -1534,10 +1583,12 @@ export class RateLimitService {
     }
     // Why: sessions of other accounts (or other runtimes) report their own quota; mixing them into the active account's bar would lie.
     if (normalizeClaudeConfigDir(event.configDir) !== snapshot.configDir) {
-      console.debug('[rate-limits] dropped live Claude usage: configDir mismatch', {
-        eventConfigDir: event.configDir,
-        snapshotConfigDir: snapshot.configDir
-      })
+      // Why: a worktree-pinned (injected) session runs against its own managed
+      // config dir and never becomes the globally active account, so its posts
+      // used to be dropped outright — leaving that account's meter permanently
+      // "not loaded" even though this is the freshest usage data available for
+      // it. Attribute the post to its own account instead of discarding it.
+      this.ingestLiveClaudeUsageForOtherAccount(event)
       return
     }
     // Capture the active model even when no usage window is fresh — the switcher
