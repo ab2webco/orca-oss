@@ -114,11 +114,16 @@ export function resolveClaudeUsageAccountScope(
     }
   }
   const usage = input.inactiveAccountUsage.find((entry) => entry.accountId === pinnedId)
+  // Why: a per-account fetch error (e.g. an unrefreshable OAuth token) used to
+  // surface as a permanent hard "Error al actualizar" on the worktree meter.
+  // Treat it as no-data-yet so the meter stays pending and the fetch retries,
+  // instead of locking the worktree scope onto a stale error state.
+  const limits = usage?.rateLimits?.status === 'error' ? null : (usage?.rateLimits ?? null)
   return {
     kind: 'worktree',
     accountId: pinnedId,
     email: resolution.account.email,
-    limits: usage?.rateLimits ?? null,
+    limits,
     isFetching: usage?.isFetching ?? false
   }
 }

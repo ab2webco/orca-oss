@@ -93,11 +93,14 @@ export function resolveCodexUsageAccountScope(
     }
   }
   const usage = input.inactiveAccountUsage.find((entry) => entry.accountId === pinnedId)
+  // Why: mirror the Claude resolver — a per-account fetch error should show as
+  // pending (retry) rather than a permanent hard error on the worktree meter.
+  const limits = usage?.rateLimits?.status === 'error' ? null : (usage?.rateLimits ?? null)
   return {
     kind: 'worktree',
     accountId: pinnedId,
     email: resolution.account.email,
-    limits: usage?.rateLimits ?? null,
+    limits,
     isFetching: usage?.isFetching ?? false
   }
 }

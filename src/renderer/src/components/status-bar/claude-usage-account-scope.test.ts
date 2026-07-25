@@ -104,6 +104,28 @@ describe('resolveClaudeUsageAccountScope', () => {
     })
   })
 
+  it('treats a cached pinned-account fetch error as pending, not a hard error', () => {
+    // Why: a per-account OAuth failure must not lock the worktree meter onto a
+    // permanent "Error al actualizar" — null limits keep it pending for retry.
+    const scope = resolveClaudeUsageAccountScope(
+      input({
+        focusedWorktreeClaudeAccountId: 'acct-pinned',
+        inactiveAccountUsage: [
+          inactiveUsage('acct-pinned', {
+            rateLimits: limits({ status: 'error', error: 'No credentials', updatedAt: 500 })
+          })
+        ]
+      })
+    )
+    expect(scope).toEqual({
+      kind: 'worktree',
+      accountId: 'acct-pinned',
+      email: 'pinned@example.com',
+      limits: null,
+      isFetching: false
+    })
+  })
+
   it('uses the live active-account snapshot when the pin matches the active account', () => {
     const activeLimits = limits()
     const scope = resolveClaudeUsageAccountScope(
