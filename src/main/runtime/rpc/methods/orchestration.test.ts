@@ -1801,26 +1801,28 @@ describe('orchestration RPC methods', () => {
         observedTimeoutMs = options?.timeoutMs
         // End the wait loop so the assertion runs against the first budget slice.
         const outbound = db.getInbox(10).find((m) => m.type === 'decision_gate')
-        if (outbound) {
-          db.insertMessage({
-            from: 'term_coord',
-            to: 'term_worker',
-            subject: 'Re: Question',
-            body: 'ok',
-            threadId: outbound.id
-          })
-        }
+        // Why: without a reply the handler's while(true) spins on this mock until vitest times out, hanging instead of failing.
+        expect(outbound).toBeDefined()
+        db.insertMessage({
+          from: 'term_coord',
+          to: 'term_worker',
+          subject: 'Re: Question',
+          body: 'ok',
+          threadId: outbound!.id
+        })
       })
 
-      await call('orchestration.ask', {
+      const result = (await call('orchestration.ask', {
         from: 'term_worker',
         to: 'term_coord',
         question: 'forever?',
         timeoutMs: Number.MAX_SAFE_INTEGER
-      })
+      })) as { timeoutMs: number }
 
       expect(observedTimeoutMs).toBeLessThanOrEqual(1_800_000)
       expect(observedTimeoutMs).toBeGreaterThan(1_700_000)
+      // The clamp must be observable: callers report the budget waited, not the one they asked for.
+      expect(result.timeoutMs).toBe(1_800_000)
     })
 
     it('clamps timeoutMs at the exported boundary', () => {

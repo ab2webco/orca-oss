@@ -580,6 +580,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       const db = runtime.getOrchestrationDb()
       const from = params.from ?? 'unknown'
+      // Why: echoed on every return so a clamped caller reports the budget actually waited, not the one it asked for.
       const timeoutMs = clampAskTimeoutMs(params.timeoutMs)
       const options =
         params.options
@@ -613,15 +614,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             answer: reply.body,
             messageId: reply.id,
             threadId,
-            timedOut: false
+            timedOut: false,
+            timeoutMs
           }
         }
         if (signal?.aborted) {
-          return { answer: null, messageId: null, threadId, timedOut: true }
+          return { answer: null, messageId: null, threadId, timedOut: true, timeoutMs }
         }
         const remainingMs = deadline - Date.now()
         if (remainingMs <= 0) {
-          return { answer: null, messageId: null, threadId, timedOut: true }
+          return { answer: null, messageId: null, threadId, timedOut: true, timeoutMs }
         }
         // Why: signal releases the waiter on client disconnect while the already-sent decision gate stays visible to the recipient.
         await runtime.waitForMessage(from, { timeoutMs: remainingMs, signal })

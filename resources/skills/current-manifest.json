@@ -131,17 +131,17 @@
       "name": "orca-plane",
       "sourcePath": "skills/orca-plane",
       "releaseRevision": 1,
-      "packageDigest": "53cf748317eda4341905df9d041a1260ea7c98218328e33ef5e3b3d618a05ce2",
-      "gitTreeSha": "f7bc22e1f010db42105d6dbf57752b2ee2a15fe8",
+      "packageDigest": "79f8065c475a7d360cd271059a36b086cf045c57b4f4dfd034867ec4fdf523d3",
+      "gitTreeSha": "5b7efdb5e400ecf6c1353207c00917d94ea5dfa7",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3646,
+          "size": 3691,
           "executable": false,
           "classification": "text",
-          "exactSha256": "d38fcb876b6a7f30d969f2d6f7d71c9ff19edb2f5251ff8b9113ab07d86b96ee",
-          "textNormalizedSha256": "d38fcb876b6a7f30d969f2d6f7d71c9ff19edb2f5251ff8b9113ab07d86b96ee",
-          "identitySha256": "d38fcb876b6a7f30d969f2d6f7d71c9ff19edb2f5251ff8b9113ab07d86b96ee"
+          "exactSha256": "562a72b79423a6c2f090cce66ea8fa5849b890866b336a2945e88a7d63b2696c",
+          "textNormalizedSha256": "562a72b79423a6c2f090cce66ea8fa5849b890866b336a2945e88a7d63b2696c",
+          "identitySha256": "562a72b79423a6c2f090cce66ea8fa5849b890866b336a2945e88a7d63b2696c"
         }
       ]
     },
