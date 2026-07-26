@@ -573,6 +573,8 @@ export const CLAUDE_FAILOVER_ORIGIN_SHARED = '__shared__'
 /** Behavior when a failed-over worktree's origin account recovers quota. */
 export type RateLimitFailBackMode = 'off' | 'notify' | 'auto'
 
+export type PlaneViewMode = 'list' | 'board'
+
 export type AutomationWorkspaceProvenance = {
   kind: 'created-by-automation'
   automationId: string
@@ -2932,9 +2934,12 @@ export type GlobalSettings = {
    *  auto-switch finds no Anthropic account with quota. null = off. */
   rateLimitFailoverAccountId?: string | null
   /** What to do when a failed-over worktree's origin account recovers quota:
-   *  'notify' (default) offers a toast action, 'auto' fails back immediately,
+   *  'auto' (default) fails back immediately, 'notify' offers a toast action,
    *  'off' leaves the endpoint pin until the user changes it. */
   rateLimitFailBackMode?: RateLimitFailBackMode
+  /** How the Plane task view opens. Defaults to 'board': with agents moving work
+   *  in parallel, the kanban reads the state of everything at a glance. */
+  planeViewMode?: PlaneViewMode
   /** When true (default), the Claude usage meters show the pinned managed
    *  account's usage while the focused worktree carries a claudeAccountId pin.
    *  false always shows the globally active account. */

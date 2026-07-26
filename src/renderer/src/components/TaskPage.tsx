@@ -172,6 +172,8 @@ import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
+import { resolvePlaneViewMode } from '@/components/task-page-plane-view-mode'
+import type { PlaneViewMode } from '../../../shared/types'
 import { shouldRefetchPlaneForChange } from '@/components/task-page-plane-change-scope'
 import { findTaskPagePlaneWorkItem } from '@/components/task-page-plane-cache-selectors'
 import { filterPlaneItemsBySearch } from '@/components/plane-work-item-search-filter'
@@ -4796,7 +4798,18 @@ export default function TaskPage(): React.JSX.Element {
   const [planeOrderBy, setPlaneOrderBy] = useState<PlaneWorkItemSortColumn>('updated')
   const [planeOrderDirection, setPlaneOrderDirection] = useState<PlaneWorkItemSortDirection>('desc')
   // Session-only: list vs. Kanban board. Board requires a single project.
-  const [planeViewMode, setPlaneViewMode] = useState<'list' | 'board'>('list')
+  // Why seeded from settings: the chosen view is a preference, not per-mount
+  // state — it used to reset to list on every remount. Board is the default.
+  const [planeViewMode, setPlaneViewMode] = useState<PlaneViewMode>(
+    () => settings?.planeViewMode ?? 'board'
+  )
+  // Why an effective mode instead of rewriting the preference: the board needs
+  // one project's states for its columns, so it falls back to the list while the
+  // scope is every project — and narrowing the scope restores the chosen board.
+  const effectivePlaneViewMode = resolvePlaneViewMode({
+    preference: planeViewMode,
+    projectSelection: selectedPlaneProjectId
+  })
 
   const handlePlaneSort = useCallback(
     (column: PlaneWorkItemSortColumn) => {
@@ -10680,6 +10693,7 @@ export default function TaskPage(): React.JSX.Element {
                       onValueChange={(value) => {
                         if (value === 'list' || value === 'board') {
                           setPlaneViewMode(value)
+                          void updateSettings({ planeViewMode: value })
                         }
                       }}
                       aria-label={translate(
@@ -10712,7 +10726,7 @@ export default function TaskPage(): React.JSX.Element {
                   </div>
                 </div>
 
-                {planeViewMode === 'list' ? (
+                {effectivePlaneViewMode === 'list' ? (
                   <TaskPagePlaneSortControls
                     direction={planeOrderDirection}
                     onSort={handlePlaneSort}
@@ -10772,7 +10786,7 @@ export default function TaskPage(): React.JSX.Element {
                     </div>
                   ) : null}
 
-                  {planeViewMode === 'board' ? (
+                  {effectivePlaneViewMode === 'board' ? (
                     selectedPlaneProjectId === 'all' ? (
                       <div className="flex flex-1 items-center justify-center px-6 py-10 text-center">
                         <p className="max-w-sm text-sm text-muted-foreground">

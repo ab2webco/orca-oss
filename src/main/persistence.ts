@@ -67,6 +67,7 @@ import type {
   WorkspaceSessionState,
   ClaudeLivePtyAccountBinding,
   ClaudeLiveSharedPtyAccountBinding,
+  PlaneViewMode,
   RateLimitFailBackMode
 } from '../shared/types'
 import {
@@ -2152,6 +2153,12 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
 }
 
 // Why: unknown strings from hand-edited payloads fall back to the safe default.
+function normalizePlaneViewMode(value: unknown): PlaneViewMode {
+  // Why 'board' by default: with agents moving work in parallel, the kanban shows
+  // the state of everything at a glance. 'list' stays one click away.
+  return value === 'list' ? 'list' : 'board'
+}
+
 function normalizeRateLimitFailBackMode(value: unknown): RateLimitFailBackMode {
   // Why 'auto' by default: the point of failing over is to keep working, so the
   // return trip should not wait on a toast the user may never see. 'notify' and
@@ -3246,6 +3253,7 @@ export class Store {
             rateLimitFailoverAccountId: normalizeRateLimitFailoverAccountId(
               parsed.settings?.rateLimitFailoverAccountId
             ),
+            planeViewMode: normalizePlaneViewMode(parsed.settings?.planeViewMode),
             rateLimitFailBackMode: normalizeRateLimitFailBackMode(
               parsed.settings?.rateLimitFailBackMode
             ),
@@ -5411,6 +5419,9 @@ export class Store {
       sanitizedUpdates.rateLimitFailoverAccountId = normalizeRateLimitFailoverAccountId(
         updates.rateLimitFailoverAccountId
       )
+    }
+    if ('planeViewMode' in updates) {
+      sanitizedUpdates.planeViewMode = normalizePlaneViewMode(updates.planeViewMode)
     }
     if ('rateLimitFailBackMode' in updates) {
       sanitizedUpdates.rateLimitFailBackMode = normalizeRateLimitFailBackMode(
