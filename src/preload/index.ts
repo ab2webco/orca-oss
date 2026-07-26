@@ -3328,6 +3328,7 @@ const api = {
     }): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('git:commit', args),
     generateCommitMessage: (args: {
       worktreePath: string
+      worktreeId?: string
       repoId?: string
       connectionId?: string
       sourceControlAiResolvedParams?: unknown
@@ -3345,6 +3346,7 @@ const api = {
     }): Promise<void> => ipcRenderer.invoke('git:cancelGenerateCommitMessage', args),
     generatePullRequestFields: (args: {
       worktreePath: string
+      worktreeId?: string
       repoId?: string
       base: string
       title: string

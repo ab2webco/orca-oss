@@ -6323,6 +6323,7 @@ function SourceControlInner(): React.JSX.Element {
         settings={settings}
         repo={activeRepo ?? null}
         discoveryHostKey={sourceControlAiDiscoveryHostKey}
+        linkedIssue={activeWorktree?.linkedIssue ?? null}
         onGenerate={(params) => {
           void handleGenerate({ sourceControlAiResolvedParams: params })
         }}
@@ -6344,6 +6345,7 @@ function SourceControlInner(): React.JSX.Element {
         settings={settings}
         repo={activeRepo ?? null}
         discoveryHostKey={sourceControlAiDiscoveryHostKey}
+        linkedIssue={activeWorktree?.linkedIssue ?? null}
         onGenerate={(params) => {
           void handleGeneratePullRequestFields({ sourceControlAiResolvedParams: params })
         }}
