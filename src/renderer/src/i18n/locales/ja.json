@@ -13930,7 +13930,13 @@
         "title": "Title",
         "unassigned": "Unassigned",
         "unknownUser": "Unknown",
-        "updateFailed": "Failed to update Plane work item."
+        "updateFailed": "Failed to update Plane work item.",
+        "descriptionPlaceholder": "Describe this work item (Markdown supported)",
+        "descriptionLabel": "Description",
+        "saveDescription": "Save",
+        "cancelDescription": "Cancel",
+        "editDescription": "Edit description",
+        "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
         "unassigned": "Unassigned"
