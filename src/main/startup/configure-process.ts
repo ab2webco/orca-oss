@@ -262,6 +262,11 @@ export function enableMainProcessGpuFeatures(): void {
     return
   }
 
+  if (process.platform === 'darwin') {
+    // Why: Graphite can strand corrupt Metal tiles after idle; Ganesh preserves GPU compositing without the stale surface.
+    app.commandLine.appendSwitch('disable-skia-graphite')
+  }
+
   // Why: Blink evicts the oldest WebGL context past 16/renderer and each terminal pane holds one, silently downgrading panes to DOM.
   // 128 raises the ceiling for real layouts while staying bounded so context leaks still surface.
   app.commandLine.appendSwitch('max-active-webgl-contexts', '128')
