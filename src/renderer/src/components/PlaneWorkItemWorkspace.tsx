@@ -53,6 +53,12 @@ export default function PlaneWorkItemWorkspace({
   const workspace = usePlaneWorkItemWorkspace(item, sourceContext)
   const { displayed } = workspace
   const assignees = displayed?.assignees ?? []
+  const [editingDescription, setEditingDescription] = React.useState(false)
+  // Why keyed on the item: opening a different work item must not inherit the
+  // previous one's open editor, which would show its draft against a new title.
+  React.useEffect(() => {
+    setEditingDescription(false)
+  }, [item?.id])
 
   return (
     <Sheet open={item !== null} onOpenChange={(open) => !open && onClose()}>
@@ -166,19 +172,80 @@ export default function PlaneWorkItemWorkspace({
                           )}
                     </span>
                   </div>
-                  {displayed.description?.trim() ? (
-                    <CommentMarkdown
-                      content={displayed.description}
-                      variant="document"
-                      className="text-[14px] leading-relaxed"
-                    />
+                  {editingDescription ? (
+                    <div className="flex flex-col gap-2">
+                      <textarea
+                        value={workspace.descriptionDraft}
+                        onChange={(event) => workspace.setDescriptionDraft(event.target.value)}
+                        rows={8}
+                        autoFocus
+                        placeholder={translate(
+                          'auto.components.PlaneWorkItemWorkspace.descriptionPlaceholder',
+                          'Describe this work item (Markdown supported)'
+                        )}
+                        aria-label={translate(
+                          'auto.components.PlaneWorkItemWorkspace.descriptionLabel',
+                          'Description'
+                        )}
+                        className="min-h-32 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-[14px] leading-relaxed outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            workspace.handleSaveDescription()
+                            setEditingDescription(false)
+                          }}
+                        >
+                          {translate(
+                            'auto.components.PlaneWorkItemWorkspace.saveDescription',
+                            'Save'
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            // Why restore: cancelling must not leave a half-typed
+                            // draft that a later save would silently commit.
+                            workspace.setDescriptionDraft(displayed.description ?? '')
+                            setEditingDescription(false)
+                          }}
+                        >
+                          {translate(
+                            'auto.components.PlaneWorkItemWorkspace.cancelDescription',
+                            'Cancel'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
-                    <p className="text-sm italic text-muted-foreground">
-                      {translate(
-                        'auto.components.PlaneWorkItemWorkspace.noDescription',
-                        'No description provided.'
+                    <button
+                      type="button"
+                      onClick={() => setEditingDescription(true)}
+                      className="w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      aria-label={translate(
+                        'auto.components.PlaneWorkItemWorkspace.editDescription',
+                        'Edit description'
                       )}
-                    </p>
+                    >
+                      {displayed.description?.trim() ? (
+                        <CommentMarkdown
+                          content={displayed.description}
+                          variant="document"
+                          className="text-[14px] leading-relaxed"
+                        />
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground">
+                          {translate(
+                            'auto.components.PlaneWorkItemWorkspace.noDescriptionEditable',
+                            'No description yet — click to add one.'
+                          )}
+                        </p>
+                      )}
+                    </button>
                   )}
                 </section>
 

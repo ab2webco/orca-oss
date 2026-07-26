@@ -29,6 +29,8 @@ export type PlaneWorkItemDetailData = {
   optimisticCommentsRef: { current: PlaneComment[] }
   titleDraft: string
   setTitleDraft: (value: string) => void
+  descriptionDraft: string
+  setDescriptionDraft: (value: string) => void
   labelsDraft: string
   setLabelsDraft: (value: string) => void
 }
@@ -45,6 +47,7 @@ export function usePlaneWorkItemDetailData(
   const [states, setStates] = useState<PlaneState[]>([])
   const [members, setMembers] = useState<PlaneUser[]>([])
   const [titleDraft, setTitleDraft] = useState('')
+  const [descriptionDraft, setDescriptionDraft] = useState('')
   const [labelsDraft, setLabelsDraft] = useState('')
   const requestIdRef = useRef(0)
   const optimisticCommentsRef = useRef<PlaneComment[]>([])
@@ -96,6 +99,7 @@ export function usePlaneWorkItemDetailData(
       setStates([])
       setMembers([])
       setTitleDraft('')
+      setDescriptionDraft('')
       setLabelsDraft('')
       optimisticCommentsRef.current = []
       return
@@ -106,6 +110,7 @@ export function usePlaneWorkItemDetailData(
     optimisticCommentsRef.current = []
     setFullItem(item)
     setTitleDraft(item.title)
+    setDescriptionDraft(item.description ?? '')
     setLabelsDraft(item.labels.join(', '))
     setComments([])
     setCommentsError(null)
@@ -155,6 +160,8 @@ export function usePlaneWorkItemDetailData(
     commentsError,
     optimisticCommentsRef,
     titleDraft,
+    descriptionDraft,
+    setDescriptionDraft,
     setTitleDraft,
     labelsDraft,
     setLabelsDraft

@@ -31,6 +31,9 @@ export function usePlaneWorkItemWorkspace(
   members: PlaneUser[]
   pendingField: string | null
   titleDraft: string
+  descriptionDraft: string
+  setDescriptionDraft: (value: string) => void
+  handleSaveDescription: () => void
   setTitleDraft: (value: string) => void
   labelsDraft: string
   setLabelsDraft: (value: string) => void
@@ -66,6 +69,8 @@ export function usePlaneWorkItemWorkspace(
     states: detail.states,
     members: detail.members,
     titleDraft: detail.titleDraft,
+    descriptionDraft: detail.descriptionDraft,
+    setDescriptionDraft: detail.setDescriptionDraft,
     setTitleDraft: detail.setTitleDraft,
     labelsDraft: detail.labelsDraft,
     setLabelsDraft: detail.setLabelsDraft,
