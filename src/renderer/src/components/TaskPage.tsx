@@ -8201,6 +8201,24 @@ export default function TaskPage(): React.JSX.Element {
     setTaskResumeState({ planeProjectId: selectedPlaneProjectId })
   }, [selectedPlaneProjectId, setTaskResumeState, taskResumeApplied])
 
+  // Why: an orchestrated agent moving a work item through the CLI mutates Plane in
+  // main, which the renderer never observes — the board showed stale cards until a
+  // manual reload. Main now announces every mutation; refetch the affected project.
+  useEffect(() => {
+    const subscribe = window.api.plane?.onChanged
+    if (typeof subscribe !== 'function') {
+      return
+    }
+    return subscribe((event) => {
+      // A workspace-wide change (null projectId) always refetches; a scoped one only
+      // when it names the project on screen.
+      if (event.projectId && selectedPlaneProjectId && event.projectId !== selectedPlaneProjectId) {
+        return
+      }
+      setPlaneRefreshNonce((n) => n + 1)
+    })
+  }, [selectedPlaneProjectId])
+
   useEffect(() => {
     if (!taskResumeApplied) {
       return

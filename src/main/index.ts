@@ -85,6 +85,7 @@ import {
   shouldInstallManagedHooks
 } from './startup/configure-process'
 import { configurePackagedLinuxUserDataPath } from './startup/packaged-linux-user-data-path'
+import { attachPlaneChangeBroadcast } from './plane/plane-change-broadcast'
 import {
   installUncaughtPipeErrorGuard,
   installUnhandledRejectionLogging
@@ -1205,6 +1206,8 @@ function openMainWindow(): BrowserWindow {
     (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
   )
   rateLimits.attach(window)
+  // Why: Plane views refetch on this channel when any route mutates a work item.
+  attachPlaneChangeBroadcast(window)
   // Why: quota probes spawn CLIs and hit network, so don't fetch immediately and compete with first paint; show/focus listeners refresh later.
   rateLimits.start({ fetchImmediately: false })
   window.on('closed', () => {

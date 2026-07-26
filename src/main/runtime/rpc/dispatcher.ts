@@ -15,6 +15,11 @@ import {
   type RpcRequest,
   type RpcResponse
 } from './core'
+import {
+  broadcastPlaneChange,
+  isPlaneMutationMethod,
+  resolveChangedProjectId
+} from '../../plane/plane-change-broadcast'
 import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protocol'
 import type { FeatureInteractionId } from '../../../shared/feature-interactions'
 import { isBrowserPaneUiRuntimeRpcParams } from '../../../shared/runtime-rpc-feature-interaction-source'
@@ -83,6 +88,7 @@ export class RpcDispatcher {
         signal: options?.signal
       })
       this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
+      this.broadcastPlaneMutation(request.method, request.params)
       return successResponse(request.id, meta, result)
     } catch (error) {
       if (isEmulator) {
@@ -144,6 +150,7 @@ export class RpcDispatcher {
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler
         })
         this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
+        this.broadcastPlaneMutation(request.method, request.params)
         reply(JSON.stringify(successResponse(request.id, meta, result)))
       } catch (error) {
         reply(JSON.stringify(this.mapError(request, meta, error)))
@@ -187,6 +194,7 @@ export class RpcDispatcher {
         recordedStreamingFeatureInteractions,
         request.params
       )
+      this.broadcastPlaneMutation(request.method, request.params)
     } catch (error) {
       reply(JSON.stringify(this.mapError(request, meta, error)))
     }
@@ -247,6 +255,26 @@ export class RpcDispatcher {
 
   private meta(): RpcEnvelopeMeta {
     return { runtimeId: this.runtime.getRuntimeId() }
+  }
+
+  /**
+   * Tell open Plane views a work item changed.
+   *
+   * Why here and not in each handler: the mutations that matter most come from
+   * orchestrated agents through the CLI, which never touch the renderer's own
+   * call path. Every route — renderer IPC, CLI, paired client — funnels through
+   * this dispatcher, so one hook covers them all.
+   */
+  private broadcastPlaneMutation(method: string, rawParams: unknown): void {
+    if (!isPlaneMutationMethod(method)) {
+      return
+    }
+    try {
+      broadcastPlaneChange({ method, projectId: resolveChangedProjectId(rawParams) })
+    } catch {
+      // Best-effort: the mutation already succeeded, so a failed notice must not
+      // turn into an RPC error.
+    }
   }
 
   private recordRuntimeFeatureInteraction(

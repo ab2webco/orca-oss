@@ -1889,7 +1889,20 @@ const api = {
       ipcRenderer.invoke('plane:listLabels', args),
 
     listMembers: (args?: { workspaceId?: string; projectId?: string }): Promise<unknown[]> =>
-      ipcRenderer.invoke('plane:listMembers', args)
+      ipcRenderer.invoke('plane:listMembers', args),
+
+    // Why: an orchestrated agent mutating Plane through the CLI never touches this
+    // bridge, so open views need main to tell them a refetch is due.
+    onChanged: (
+      callback: (event: { method: string; projectId: string | null }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { method: string; projectId: string | null }
+      ): void => callback(payload)
+      ipcRenderer.on('plane:changed', listener)
+      return () => ipcRenderer.removeListener('plane:changed', listener)
+    }
   },
 
   starNag: {
