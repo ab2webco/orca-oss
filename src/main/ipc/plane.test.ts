@@ -273,6 +273,8 @@ describe('registerPlaneHandlers', () => {
     await getHandler('plane:listMembers')(undefined, { workspaceId: 'ws-1' })
 
     expect(listProjectsMock).toHaveBeenCalledWith('ws-1')
-    expect(listMembersMock).toHaveBeenCalledWith('ws-1')
+    // Why two arguments: listMembers is scopeable by project, and an absent
+    // projectId normalizes to undefined rather than being omitted.
+    expect(listMembersMock).toHaveBeenCalledWith('ws-1', undefined)
   })
 })
