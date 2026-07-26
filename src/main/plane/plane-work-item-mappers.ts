@@ -195,6 +195,11 @@ export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): Pl
     assignees: mapAssignees(item.assignees),
     priority: asPriority(item.priority),
     parentId: typeof parent === 'string' ? parent : null,
+    // Why undefined and not '': these are optional in Plane, and an empty string
+    // would render as a blank date rather than "not set".
+    startDate: asString(item.start_date) || undefined,
+    targetDate: asString(item.target_date) || undefined,
+    estimatePoint: asString(item.estimate_point) || undefined,
     createdBy: asString(item.created_by) || undefined,
     updatedAt: asString(item.updated_at, new Date().toISOString()),
     createdAt: asString(item.created_at, new Date().toISOString())

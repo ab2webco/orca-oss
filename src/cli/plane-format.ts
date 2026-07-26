@@ -40,6 +40,17 @@ export function formatPlaneWorkItem(view: PlaneIssueView): string {
   if (item.labels.length > 0) {
     lines.push(`Labels: ${item.labels.join(', ')}`)
   }
+  // Why only when set: printing "Start: none" on every item that never had a
+  // schedule would bury the ones that do.
+  if (item.startDate) {
+    lines.push(`Start: ${item.startDate}`)
+  }
+  if (item.targetDate) {
+    lines.push(`Target: ${item.targetDate}`)
+  }
+  if (item.estimatePoint) {
+    lines.push(`Estimate: ${item.estimatePoint}`)
+  }
   lines.push(`Updated: ${item.updatedAt}`)
   if (view.children) {
     lines.push(`Children: ${view.children.length}`)

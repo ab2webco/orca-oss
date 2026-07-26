@@ -100,4 +100,24 @@ describe('plane-format', () => {
       'Saved column In Review (started) s1.'
     )
   })
+
+  it('shows the schedule and estimate when the item has them', () => {
+    const output = formatPlaneWorkItem({
+      workItem: workItem({ startDate: '2026-07-01', targetDate: '2026-07-15', estimatePoint: '5' })
+    })
+
+    expect(output).toContain('Start: 2026-07-01')
+    expect(output).toContain('Target: 2026-07-15')
+    expect(output).toContain('Estimate: 5')
+  })
+
+  it('omits the schedule lines for an unplanned item', () => {
+    // Why omit rather than print "none": every unscheduled item would otherwise
+    // carry three noise lines and bury the ones that are actually planned.
+    const output = formatPlaneWorkItem({ workItem: workItem() })
+
+    expect(output).not.toContain('Start:')
+    expect(output).not.toContain('Target:')
+    expect(output).not.toContain('Estimate:')
+  })
 })

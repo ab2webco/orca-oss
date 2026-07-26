@@ -241,4 +241,34 @@ describe('mapPlaneWorkItem', () => {
     )
     expect(selfHosted.url).toBe('https://plane.mycompany.com/acme/browse/ALPHA-6/')
   })
+  it('reads the schedule and estimate the write path already accepted', () => {
+    // Why this gap mattered: save-issue could set start/target dates and the API
+    // stored them, but `issue` never read them back — planned work looked unplanned.
+    const item = mapPlaneWorkItem(
+      {
+        id: 'wi-7',
+        sequence_id: 7,
+        name: 'Scheduled',
+        start_date: '2026-07-01',
+        target_date: '2026-07-15',
+        estimate_point: '5'
+      },
+      { baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', project }
+    )
+    expect(item.startDate).toBe('2026-07-01')
+    expect(item.targetDate).toBe('2026-07-15')
+    expect(item.estimatePoint).toBe('5')
+  })
+
+  it('leaves an unscheduled item without empty-string dates', () => {
+    // Why undefined and not '': an empty string would render as a blank date
+    // instead of reading as "not set".
+    const item = mapPlaneWorkItem(
+      { id: 'wi-8', sequence_id: 8, name: 'Unscheduled', start_date: null, target_date: '' },
+      { baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', project }
+    )
+    expect(item.startDate).toBeUndefined()
+    expect(item.targetDate).toBeUndefined()
+    expect(item.estimatePoint).toBeUndefined()
+  })
 })

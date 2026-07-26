@@ -78,6 +78,12 @@ export type PlaneWorkItem = {
   assignees?: PlaneUser[]
   priority?: PlaneWorkItemPriority
   parentId?: string | null
+  /** Planned start, as stored by Plane (YYYY-MM-DD). Absent when unset. */
+  startDate?: string
+  /** Planned target/due date (YYYY-MM-DD). Absent when unset. */
+  targetDate?: string
+  /** Story points, when the project has an estimate scheme. */
+  estimatePoint?: string
   createdBy?: string
   updatedAt: string
   createdAt: string
