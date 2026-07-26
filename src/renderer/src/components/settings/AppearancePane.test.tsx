@@ -167,6 +167,42 @@ async function renderAppearancePane(
   return container
 }
 
+async function rerenderAppearancePane(
+  settings: GlobalSettings = getDefaultSettings('/tmp')
+): Promise<void> {
+  const root = mountedRoots.at(-1)
+  if (!root) {
+    throw new Error('expected a mounted AppearancePane root')
+  }
+  await act(async () => {
+    root.render(
+      <I18nextProvider i18n={i18n}>
+        <TooltipProvider>
+          <AppearancePane
+            settings={settings}
+            updateSettings={vi.fn()}
+            applyTheme={vi.fn()}
+            fontSuggestions={[]}
+            terminalFontSuggestions={[]}
+            systemPrefersDark={false}
+            ghostty={createGhosttyStub() as never}
+            warpThemes={createWarpThemesStub() as never}
+          />
+        </TooltipProvider>
+      </I18nextProvider>
+    )
+  })
+}
+
+function appearanceSectionToggle(
+  container: HTMLElement,
+  sectionId: 'interface' | 'terminal' | 'window'
+): HTMLButtonElement | undefined {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')).find(
+    (button) => button.getAttribute('aria-controls') === `appearance-section-${sectionId}`
+  )
+}
+
 describe('AppearancePane', () => {
   afterEach(async () => {
     await act(async () => {
@@ -182,6 +218,7 @@ describe('AppearancePane', () => {
     mocks.state.availableStatusBarToggles = []
     mocks.state.appPlatform = 'linux'
     mocks.state.settingsSearchQuery = 'automations'
+    mocks.state.appearanceAccordionDeepLink = null
     mocks.state.usagePercentageDisplay = 'used'
     // UIZoomControl reads window.api.ui on mount; the inline-expansion pane can
     // render the full Interface section, so provide a minimal renderer bridge
@@ -481,7 +518,7 @@ describe('AppearancePane', () => {
     expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('antigravity')
   })
 
-  it('collapses sibling sections so only the Interface section is expanded by default', async () => {
+  it('expands Interface, Terminal, and Window & Sidebar by default', async () => {
     mocks.state.settingsSearchQuery = ''
     const container = await renderAppearancePane(getDefaultSettings('/tmp'))
 
@@ -489,7 +526,80 @@ describe('AppearancePane', () => {
       container.querySelectorAll<HTMLButtonElement>('button[aria-expanded="true"]')
     ).filter((button) => button.getAttribute('aria-controls')?.startsWith('appearance-section-'))
 
-    expect(expanded).toHaveLength(1)
-    expect(expanded[0]?.textContent).toContain('Interface')
+    expect(expanded).toHaveLength(3)
+    expect(expanded.map((button) => button.textContent).join(' ')).toContain('Interface')
+    expect(expanded.map((button) => button.textContent).join(' ')).toContain('Terminal')
+    expect(expanded.map((button) => button.textContent).join(' ')).toContain('Window & Sidebar')
+  })
+
+  it('lets each appearance section collapse independently', async () => {
+    mocks.state.settingsSearchQuery = ''
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+
+    const terminalToggle = appearanceSectionToggle(container, 'terminal')
+
+    expect(terminalToggle?.getAttribute('aria-expanded')).toBe('true')
+
+    await act(async () => {
+      terminalToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(terminalToggle?.getAttribute('aria-expanded')).toBe('false')
+
+    const stillExpanded = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[aria-expanded="true"]')
+    ).filter((button) => button.getAttribute('aria-controls')?.startsWith('appearance-section-'))
+
+    expect(stillExpanded).toHaveLength(2)
+    expect(stillExpanded.map((button) => button.textContent).join(' ')).toContain('Interface')
+    expect(stillExpanded.map((button) => button.textContent).join(' ')).toContain(
+      'Window & Sidebar'
+    )
+  })
+
+  it('re-opens a collapsed section for appearance deep links without collapsing siblings', async () => {
+    mocks.state.settingsSearchQuery = ''
+    mocks.state.appearanceAccordionDeepLink = null
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+
+    const windowToggle = appearanceSectionToggle(container, 'window')
+    const terminalToggle = appearanceSectionToggle(container, 'terminal')
+    expect(windowToggle?.getAttribute('aria-expanded')).toBe('true')
+
+    await act(async () => {
+      windowToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(windowToggle?.getAttribute('aria-expanded')).toBe('false')
+    expect(terminalToggle?.getAttribute('aria-expanded')).toBe('true')
+
+    mocks.state.appearanceAccordionDeepLink = 'window'
+    await rerenderAppearancePane()
+
+    expect(appearanceSectionToggle(container, 'window')?.getAttribute('aria-expanded')).toBe('true')
+    expect(appearanceSectionToggle(container, 'terminal')?.getAttribute('aria-expanded')).toBe(
+      'true'
+    )
+    expect(mocks.state.clearAppearanceAccordionDeepLink).toHaveBeenCalled()
+  })
+
+  it('disables section toggles while searching so clearing search does not surprise-collapse', async () => {
+    mocks.state.settingsSearchQuery = 'terminal'
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+
+    const terminalToggle = appearanceSectionToggle(container, 'terminal')
+    expect(terminalToggle?.disabled).toBe(true)
+    expect(terminalToggle?.getAttribute('aria-expanded')).toBe('true')
+
+    await act(async () => {
+      terminalToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(terminalToggle?.getAttribute('aria-expanded')).toBe('true')
+
+    mocks.state.settingsSearchQuery = ''
+    await rerenderAppearancePane()
+
+    const afterClear = appearanceSectionToggle(container, 'terminal')
+    expect(afterClear?.disabled).toBe(false)
+    expect(afterClear?.getAttribute('aria-expanded')).toBe('true')
   })
 })

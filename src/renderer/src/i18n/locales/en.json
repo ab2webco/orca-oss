@@ -8841,7 +8841,6 @@
             "10f9fb6fea": "settings",
             "2ade3ea490": "config",
             "fd752b3cac": "import",
-            "82b63d07fe": "ghostty",
             "73e9422f19": "One-time import of supported Ghostty terminal settings.",
             "a979df0083": "Import from Ghostty",
             "warp_import": {
