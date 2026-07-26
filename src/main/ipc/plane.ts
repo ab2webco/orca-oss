@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { connect } from '../plane/client'
+import { withPlaneChangeBroadcast } from '../plane/plane-change-broadcast'
 import {
   disconnect,
   selectWorkspace,
@@ -190,12 +191,14 @@ export function registerPlaneHandlers(): void {
       if (!updates) {
         return { ok: false, error: 'Updates object is required.' }
       }
-      return updateWorkItem({
-        projectId: args.projectId.trim(),
-        workItemId: args.workItemId.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId),
-        updates
-      })
+      return withPlaneChangeBroadcast('plane:updateWorkItem', args.projectId.trim(), () =>
+        updateWorkItem({
+          projectId: args.projectId.trim(),
+          workItemId: args.workItemId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId),
+          updates
+        })
+      )
     }
   )
 
@@ -214,12 +217,14 @@ export function registerPlaneHandlers(): void {
       if (typeof args?.body !== 'string' || !args.body.trim()) {
         return { ok: false, error: 'Comment body is required.' }
       }
-      return addWorkItemComment({
-        projectId: args.projectId.trim(),
-        workItemId: args.workItemId.trim(),
-        body: args.body.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId)
-      })
+      return withPlaneChangeBroadcast('plane:addWorkItemComment', args.projectId.trim(), () =>
+        addWorkItemComment({
+          projectId: args.projectId.trim(),
+          workItemId: args.workItemId.trim(),
+          body: args.body.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId)
+        })
+      )
     }
   )
 

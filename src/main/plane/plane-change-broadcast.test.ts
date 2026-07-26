@@ -3,7 +3,8 @@ import {
   attachPlaneChangeBroadcast,
   broadcastPlaneChange,
   isPlaneMutationMethod,
-  resolveChangedProjectId
+  resolveChangedProjectId,
+  withPlaneChangeBroadcast
 } from './plane-change-broadcast'
 
 vi.mock('electron', () => ({}))
@@ -116,5 +117,66 @@ describe('broadcastPlaneChange', () => {
     expect(() =>
       broadcastPlaneChange({ method: 'plane.createWorkItem', projectId: 'project-1' })
     ).not.toThrow()
+  })
+})
+
+describe('withPlaneChangeBroadcast', () => {
+  it('announces a successful IPC mutation', async () => {
+    // Why this exists: the board writes through plane:* IPC channels, which never
+    // reach the RPC dispatcher — a card created from a column was saved but no
+    // view was told, so it only appeared after reopening the app.
+    const window = fakeWindow()
+    attachPlaneChangeBroadcast(window as never)
+
+    const result = await withPlaneChangeBroadcast(
+      'plane:createWorkItem',
+      'project-1',
+      async () => ({
+        ok: true as const,
+        id: 'wi-1'
+      })
+    )
+
+    expect(result).toEqual({ ok: true, id: 'wi-1' })
+    expect(window.webContents.send).toHaveBeenCalledWith('plane:changed', {
+      method: 'plane:createWorkItem',
+      projectId: 'project-1'
+    })
+  })
+
+  it('stays silent when the write was rejected', async () => {
+    // Why: a failed write changed nothing, so announcing it would make every open
+    // view refetch for no reason.
+    const window = fakeWindow()
+    attachPlaneChangeBroadcast(window as never)
+
+    await withPlaneChangeBroadcast('plane:createWorkItem', 'project-1', async () => ({
+      ok: false as const,
+      error: 'Project is required.'
+    }))
+
+    expect(window.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('announces results that carry no ok flag', async () => {
+    // Some writes resolve to plain data; absence of `ok` is not a failure.
+    const window = fakeWindow()
+    attachPlaneChangeBroadcast(window as never)
+
+    await withPlaneChangeBroadcast('plane:updateState', 'project-1', async () => ({}))
+
+    expect(window.webContents.send).toHaveBeenCalled()
+  })
+
+  it('lets the write error propagate without announcing', async () => {
+    const window = fakeWindow()
+    attachPlaneChangeBroadcast(window as never)
+
+    await expect(
+      withPlaneChangeBroadcast('plane:updateWorkItem', 'project-1', async () => {
+        throw new Error('network down')
+      })
+    ).rejects.toThrow('network down')
+    expect(window.webContents.send).not.toHaveBeenCalled()
   })
 })

@@ -55,6 +55,29 @@ export function resolveChangedProjectId(params: unknown): string | null {
   return typeof projectId === 'string' && projectId.length > 0 ? projectId : null
 }
 
+/**
+ * Announce a mutation made through a direct IPC handler.
+ *
+ * Why this exists alongside the dispatcher hook: the board writes through
+ * `plane:*` IPC channels, which never reach the RPC dispatcher — so a card
+ * created from a column was saved but no view was told, and it only appeared
+ * after reopening the app. Handlers wrap their result with this instead of
+ * repeating the shape check.
+ */
+export async function withPlaneChangeBroadcast<T extends { ok?: boolean }>(
+  method: string,
+  projectId: string | null,
+  run: () => Promise<T>
+): Promise<T> {
+  const result = await run()
+  // Why gated on ok !== false: a rejected write changed nothing, so announcing it
+  // would make every view refetch for no reason.
+  if (result?.ok !== false) {
+    broadcastPlaneChange({ method, projectId })
+  }
+  return result
+}
+
 export function broadcastPlaneChange(event: PlaneChangeEvent): void {
   const window = broadcastWindow
   if (!window || window.isDestroyed()) {

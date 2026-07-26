@@ -7,6 +7,7 @@ import {
   updatePlaneState
 } from '../plane/plane-work-item-writes'
 import { createWorkItem } from '../plane/plane-work-item-create'
+import { withPlaneChangeBroadcast } from '../plane/plane-change-broadcast'
 import type { PlaneStateGroup } from '../../shared/plane-types'
 
 const VALID_STATE_GROUPS = new Set<PlaneStateGroup>([
@@ -38,12 +39,14 @@ export function registerPlaneBoardStateHandlers(): void {
       if (!title) {
         return { ok: false, error: 'Work item title is required.' }
       }
-      return createWorkItem({
-        projectId: args.projectId.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId),
-        title,
-        stateId: normalizeOptionalString(args.stateId)
-      })
+      return withPlaneChangeBroadcast('plane:createWorkItem', args.projectId.trim(), () =>
+        createWorkItem({
+          projectId: args.projectId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId),
+          title,
+          stateId: normalizeOptionalString(args.stateId)
+        })
+      )
     }
   )
 
@@ -69,13 +72,15 @@ export function registerPlaneBoardStateHandlers(): void {
       if (!VALID_STATE_GROUPS.has(args?.group)) {
         return { ok: false, error: 'A valid state group is required.' }
       }
-      return createPlaneState({
-        projectId: args.projectId.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId),
-        name,
-        group: args.group,
-        color: normalizeOptionalString(args.color)
-      })
+      return withPlaneChangeBroadcast('plane:createState', args.projectId.trim(), () =>
+        createPlaneState({
+          projectId: args.projectId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId),
+          name,
+          group: args.group,
+          color: normalizeOptionalString(args.color)
+        })
+      )
     }
   )
 
@@ -104,14 +109,16 @@ export function registerPlaneBoardStateHandlers(): void {
       if (name === undefined && color === undefined && sequence === undefined) {
         return { ok: false, error: 'Nothing to update.' }
       }
-      return updatePlaneState({
-        projectId: args.projectId.trim(),
-        stateId: args.stateId.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId),
-        name,
-        color,
-        sequence
-      })
+      return withPlaneChangeBroadcast('plane:updateState', args.projectId.trim(), () =>
+        updatePlaneState({
+          projectId: args.projectId.trim(),
+          stateId: args.stateId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId),
+          name,
+          color,
+          sequence
+        })
+      )
     }
   )
 
@@ -124,11 +131,13 @@ export function registerPlaneBoardStateHandlers(): void {
       if (typeof args?.stateId !== 'string' || !args.stateId.trim()) {
         return { ok: false, error: 'State ID is required.' }
       }
-      return deletePlaneState({
-        projectId: args.projectId.trim(),
-        stateId: args.stateId.trim(),
-        workspaceId: normalizeOptionalString(args.workspaceId)
-      })
+      return withPlaneChangeBroadcast('plane:deleteState', args.projectId.trim(), () =>
+        deletePlaneState({
+          projectId: args.projectId.trim(),
+          stateId: args.stateId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId)
+        })
+      )
     }
   )
 }
