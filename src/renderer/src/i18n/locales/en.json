@@ -13992,7 +13992,8 @@
         "deleteFailed": "Failed to delete column.",
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
         "deleteConfirmDescription": "Work items may need reassigning.",
-        "deleteConfirmAction": "Delete"
+        "deleteConfirmAction": "Delete",
+        "createItemFailed": "Failed to create work item."
       },
       "plane-board-add-column": {
         "add": "Add column",
@@ -14006,6 +14007,13 @@
         "groupStarted": "Started",
         "groupCompleted": "Completed",
         "groupCancelled": "Cancelled"
+      },
+      "plane-board-add-card": {
+        "add": "Add work item",
+        "titlePlaceholder": "Work item title",
+        "titleLabel": "Work item title",
+        "create": "Add",
+        "cancel": "Cancel"
       }
     },
     "i18n": {

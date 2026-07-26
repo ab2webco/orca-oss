@@ -13969,7 +13969,8 @@
         "deleteFailed": "No se pudo eliminar la columna.",
         "deleteConfirmTitle": "¿Eliminar la columna «{{value0}}»?",
         "deleteConfirmDescription": "Es posible que haya que reasignar los elementos.",
-        "deleteConfirmAction": "Eliminar"
+        "deleteConfirmAction": "Eliminar",
+        "createItemFailed": "Failed to create work item."
       },
       "plane-board-add-column": {
         "add": "Añadir columna",
@@ -13983,6 +13984,13 @@
         "groupStarted": "En curso",
         "groupCompleted": "Completado",
         "groupCancelled": "Cancelado"
+      },
+      "plane-board-add-card": {
+        "add": "Add work item",
+        "titlePlaceholder": "Work item title",
+        "titleLabel": "Work item title",
+        "create": "Add",
+        "cancel": "Cancel"
       }
     },
     "i18n": {
