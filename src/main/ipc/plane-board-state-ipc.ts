@@ -6,6 +6,7 @@ import {
   deletePlaneState,
   updatePlaneState
 } from '../plane/plane-work-item-writes'
+import { createWorkItem } from '../plane/plane-work-item-create'
 import type { PlaneStateGroup } from '../../shared/plane-types'
 
 const VALID_STATE_GROUPS = new Set<PlaneStateGroup>([
@@ -21,6 +22,31 @@ function normalizeOptionalString(value: unknown): string | undefined {
 }
 
 export function registerPlaneBoardStateHandlers(): void {
+  // Why here: the board's inline composer is the only renderer caller, and the
+  // RPC surface already had plane.createWorkItem for the CLI — this exposes the
+  // same write to the app without duplicating its logic.
+  ipcMain.handle(
+    'plane:createWorkItem',
+    async (
+      _event,
+      args: { projectId: string; workspaceId?: string; title: string; stateId?: string }
+    ) => {
+      if (typeof args?.projectId !== 'string' || !args.projectId.trim()) {
+        return { ok: false, error: 'Project is required.' }
+      }
+      const title = normalizeOptionalString(args?.title)
+      if (!title) {
+        return { ok: false, error: 'Work item title is required.' }
+      }
+      return createWorkItem({
+        projectId: args.projectId.trim(),
+        workspaceId: normalizeOptionalString(args.workspaceId),
+        title,
+        stateId: normalizeOptionalString(args.stateId)
+      })
+    }
+  )
+
   ipcMain.handle(
     'plane:createState',
     async (

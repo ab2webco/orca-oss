@@ -172,6 +172,7 @@ import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
+import { shouldRefetchPlaneForChange } from '@/components/task-page-plane-change-scope'
 import { findTaskPagePlaneWorkItem } from '@/components/task-page-plane-cache-selectors'
 import { filterPlaneItemsBySearch } from '@/components/plane-work-item-search-filter'
 import {
@@ -8210,14 +8211,18 @@ export default function TaskPage(): React.JSX.Element {
       return
     }
     return subscribe((event) => {
-      // A workspace-wide change (null projectId) always refetches; a scoped one only
-      // when it names the project on screen.
-      if (event.projectId && selectedPlaneProjectId && event.projectId !== selectedPlaneProjectId) {
+      if (
+        !shouldRefetchPlaneForChange({
+          changedProjectId: event.projectId,
+          workspaceSelection: selectedPlaneWorkspaceId,
+          projectSelection: selectedPlaneProjectId
+        })
+      ) {
         return
       }
       setPlaneRefreshNonce((n) => n + 1)
     })
-  }, [selectedPlaneProjectId])
+  }, [selectedPlaneProjectId, selectedPlaneWorkspaceId])
 
   useEffect(() => {
     if (!taskResumeApplied) {

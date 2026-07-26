@@ -249,6 +249,7 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneStateGroup,
+  PlaneCreateWorkItemResult,
   PlaneStateMutationResult,
   PlaneUser,
   PlaneViewer,
@@ -2202,6 +2203,12 @@ export type PreloadApi = {
     listStates: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneState[]>
     listLabels: (args: { projectId: string; workspaceId?: string }) => Promise<PlaneLabel[]>
     listMembers: (args?: { workspaceId?: string; projectId?: string }) => Promise<PlaneUser[]>
+    createWorkItem: (args: {
+      projectId: string
+      workspaceId?: string
+      title: string
+      stateId?: string
+    }) => Promise<PlaneCreateWorkItemResult>
     /** Fires when any route (renderer, CLI, paired client) mutates Plane, so open
      *  views can refetch instead of showing stale cards. Returns an unsubscribe. */
     onChanged: (

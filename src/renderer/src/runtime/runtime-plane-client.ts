@@ -8,6 +8,7 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneStateGroup,
+  PlaneCreateWorkItemResult,
   PlaneStateMutationResult,
   PlaneUser,
   PlaneViewer,
@@ -211,6 +212,20 @@ export async function planeListStates(
   return target.kind === 'environment'
     ? callRuntimeRpc<PlaneState[]>(target, 'plane.listStates', params, { timeoutMs: 30_000 })
     : window.api.plane.listStates(params)
+}
+
+export async function planeCreateWorkItem(
+  settings: RuntimePlaneSettings,
+  args: { projectId: string; title: string; stateId?: string },
+  workspaceId?: string | null
+): Promise<PlaneCreateWorkItemResult> {
+  const target = getPlaneRuntimeTarget(settings)
+  const params = { ...args, workspaceId: workspaceId ?? undefined }
+  return target.kind === 'environment'
+    ? callRuntimeRpc<PlaneCreateWorkItemResult>(target, 'plane.createWorkItem', params, {
+        timeoutMs: 30_000
+      })
+    : window.api.plane.createWorkItem(params)
 }
 
 export async function planeCreateState(

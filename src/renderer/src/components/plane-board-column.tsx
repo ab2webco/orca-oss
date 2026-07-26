@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { PlaneBoardAddCard } from '@/components/plane-board-add-card'
 import { PlaneBoardCard } from './plane-board-card'
 import { planeBoardColumnDroppableId, type PlaneBoardColumn } from './plane-board-drag'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
@@ -25,6 +26,8 @@ type PlaneBoardColumnViewProps = {
   onRenameColumn: (stateId: string, name: string) => void
   /** Delete this column (state) after a destructive confirmation. */
   onDeleteColumn: (stateId: string, name: string) => void
+  /** Create a work item in this column's state; true on success. */
+  onCreateItem: (stateId: string, title: string) => Promise<boolean>
 }
 
 // One state column: sticky header (drag handle + tone dot + name + count) over a
@@ -39,7 +42,8 @@ export function PlaneBoardColumnView({
   selectedItemId,
   onOpenItem,
   onRenameColumn,
-  onDeleteColumn
+  onDeleteColumn,
+  onCreateItem
 }: PlaneBoardColumnViewProps): React.JSX.Element {
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: planeBoardColumnDroppableId(column.stateId),
@@ -195,6 +199,7 @@ export function PlaneBoardColumnView({
             onOpenItem={onOpenItem}
           />
         ))}
+        <PlaneBoardAddCard onCreate={(title) => onCreateItem(column.stateId, title)} />
       </div>
     </div>
   )

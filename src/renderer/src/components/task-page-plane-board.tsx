@@ -16,6 +16,7 @@ import { useAppStore } from '../store'
 import { translate } from '@/i18n/i18n'
 import { useConfirmationDialog } from './confirmation-dialog'
 import {
+  planeCreateWorkItem,
   planeCreateState,
   planeDeleteState,
   planeListStates,
@@ -126,6 +127,31 @@ export function TaskPagePlaneBoard({
         })
     },
     [projectStates, providerSettings, projectId, workspaceId, refreshStates]
+  )
+
+  const handleCreateItem = useCallback(
+    async (stateId: string, title: string): Promise<boolean> => {
+      const result = await planeCreateWorkItem(
+        providerSettings,
+        { projectId, title, stateId },
+        workspaceId
+      )
+      if (!result.ok) {
+        toast.error(
+          result.error ||
+            translate(
+              'auto.components.task-page-plane-board.createItemFailed',
+              'Failed to create work item.'
+            )
+        )
+        return false
+      }
+      // Why nothing else here: main broadcasts plane:changed for this mutation and
+      // TaskPage refetches the project, so the new card arrives with the ids and
+      // identifier Plane assigned — a local insert would have to invent them.
+      return true
+    },
+    [providerSettings, projectId, workspaceId]
   )
 
   const handleCreateColumn = useCallback(
@@ -373,6 +399,7 @@ export function TaskPagePlaneBoard({
                   onOpenItem={onOpenItem}
                   onRenameColumn={handleRenameColumn}
                   onDeleteColumn={handleDeleteColumn}
+                  onCreateItem={handleCreateItem}
                 />
               ))}
             </SortableContext>
