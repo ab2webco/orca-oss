@@ -17,6 +17,15 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
 
+# Verification
+
+Before reporting work as verified, ask what the check would have shown if the thing were broken. If the answer is "the same output", the check proves nothing. Every trap in [`docs/reference/agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) is one an agent here already hit while believing it had verified — read it before claiming green, and before acting on someone else's green.
+
+Two that bite most often:
+
+- **Tests need the repo config.** There is no root `vitest.config.*`, so a bare `npx vitest run` resolves no `@/` alias and no `ORCA_FEATURE_WALL_ENABLED`. Renderer suites then fail at import and read as regressions. Use `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`.
+- **A delegated report's summary is not its evidence.** When a `worker_done` payload carries a `reportPath`, read that file before accepting or contradicting the worker.
+
 # Considerations
 ## Worktree Safety
 
