@@ -4,6 +4,11 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { app } from 'electron'
 import type { ClaudeManagedAccount } from '../../shared/types'
+import type {
+  ManagedClaudeRefreshChainAliasConflictSet,
+  ManagedClaudeRefreshChainAliasReport,
+  ManagedClaudeRefreshChainAliasReportAccount
+} from '../../shared/claude-refresh-chain-alias-report'
 import {
   getManagedClaudeRefreshAccounts,
   readManagedClaudeRefreshCredentials
@@ -33,32 +38,13 @@ export type ManagedClaudeRefreshChainAliasStatus =
   | { status: 'unresolved' }
   | { status: 'alias-conflict'; accountIds: string[] }
 
-export type ManagedClaudeRefreshChainAliasReportAccount = {
-  accountId: string
-  profileKey: string
-  profileScope: 'current' | 'other'
-  email: string | null
-}
-
-export type ManagedClaudeRefreshChainAliasConflictSet = {
-  conflictId: string
-  certainty: 'recorded-chain-match'
-  accounts: ManagedClaudeRefreshChainAliasReportAccount[]
-  remediation: {
-    action: 'reauthenticate-one-account'
-    accountDirectoryPolicy: 'preserve'
-  }
-}
-
-export type ManagedClaudeRefreshChainAliasReport =
-  | {
-      status: 'available'
-      conflictSets: ManagedClaudeRefreshChainAliasConflictSet[]
-    }
-  | {
-      status: 'unavailable'
-      conflictSets: []
-    }
+// The report types live in shared so the IPC/preload/renderer contract is this
+// exact shape; re-exported here for main-side consumers of the registry.
+export type {
+  ManagedClaudeRefreshChainAliasConflictSet,
+  ManagedClaudeRefreshChainAliasReport,
+  ManagedClaudeRefreshChainAliasReportAccount
+} from '../../shared/claude-refresh-chain-alias-report'
 
 export async function inspectManagedClaudeRefreshChainAliases(
   accountId: string,

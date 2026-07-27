@@ -69,6 +69,7 @@ import {
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
+import { ClaudeRefreshChainConflictNotice } from './ClaudeRefreshChainConflictNotice'
 import { classifyClaudeAccountBlock } from './claude-account-reassign-plan'
 import { useClaudeAccountReassign } from './use-claude-account-reassign'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
@@ -88,6 +89,7 @@ import {
 import { getCodexAccountAuthWarning } from './codex-account-auth-warning'
 import { getCodexConfigSyncWarning } from './codex-config-sync-warning'
 import type { CodexConfigSyncStatus } from '../../../../shared/codex-config-sync-types'
+import type { ManagedClaudeRefreshChainAliasReport } from '../../../../shared/claude-refresh-chain-alias-report'
 import {
   getProviderAccountActiveIdForView,
   getProviderAccountRuntime,
@@ -876,6 +878,49 @@ export function AccountsPane({
       .map((account) => ({ accountId: account.id, label: account.email }))
   ]
 
+  const [refreshChainAliasReport, setRefreshChainAliasReport] =
+    useState<ManagedClaudeRefreshChainAliasReport | null>(null)
+  // Why: refetch when an account is (re)authenticated — that rotates its chain
+  // and is exactly what clears an alias conflict — not on every snapshot.
+  const claudeRefreshChainRosterKey = claudeAccounts.accounts
+    .map((account) => `${account.id}:${account.lastAuthenticatedAt}`)
+    .join('|')
+  useEffect(() => {
+    // Why: the alias registry describes this desktop's profiles; a remote scope
+    // shows the server's accounts, which the local registry says nothing about.
+    if (isRemoteAccountScope) {
+      setRefreshChainAliasReport(null)
+      return
+    }
+    let cancelled = false
+    void window.api.claudeAccounts
+      .getRefreshChainAliasReport()
+      .then((report) => {
+        if (!cancelled) {
+          setRefreshChainAliasReport(report)
+        }
+      })
+      .catch(() => {
+        // A failed IPC is still "could not look", never "no conflicts".
+        if (!cancelled) {
+          setRefreshChainAliasReport({ status: 'unavailable', conflictSets: [] })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isRemoteAccountScope, claudeRefreshChainRosterKey])
+
+  const reauthenticateForRefreshChainConflict = (accountId: string): void => {
+    const account = claudeAccounts.accounts.find((candidate) => candidate.id === accountId)
+    void runClaudeAccountAction(
+      `reauth:${accountId}`,
+      () => window.api.claudeAccounts.reauthenticate({ accountId }),
+      account ? getProviderAccountRuntime(account) : accountRuntime,
+      accountId
+    )
+  }
+
   const [globalConfigSyncDialog, setGlobalConfigSyncDialog] = useState<{
     open: boolean
     accountId: string | null
@@ -1318,6 +1363,17 @@ export function AccountsPane({
             </div>
           </div>
           {remoteAccountScopeNotice}
+          <ClaudeRefreshChainConflictNotice
+            report={refreshChainAliasReport}
+            resolveAccountEmail={(accountId) =>
+              claudeAccounts.accounts.find((account) => account.id === accountId)?.email ?? null
+            }
+            onReauthenticate={reauthenticateForRefreshChainConflict}
+            reauthenticatingAccountId={
+              claudeAction.startsWith('reauth:') ? claudeAction.slice('reauth:'.length) : null
+            }
+            busy={claudeAction !== 'idle' || accountRuntimeUnavailable}
+          />
 
           <div className="space-y-2">
             <button

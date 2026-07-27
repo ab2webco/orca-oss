@@ -241,6 +241,7 @@ import type {
   ClaudeAccountWorktreeUsageReport,
   ClaudeWorktreeAccountReassignment
 } from '../shared/claude-account-worktree-usage'
+import type { ManagedClaudeRefreshChainAliasReport } from '../shared/claude-refresh-chain-alias-report'
 import type {
   LocalhostWorktreeLabelResult,
   LocalhostWorktreeLabelRoute
@@ -2169,6 +2170,8 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
+    getRefreshChainAliasReport: (): Promise<ManagedClaudeRefreshChainAliasReport> =>
+      ipcRenderer.invoke('claudeAccounts:getRefreshChainAliasReport'),
     remove: (args: {
       accountId: string
       closeLiveTerminals?: boolean

@@ -9739,6 +9739,17 @@
           "confirmUnblock": "Reassign & continue",
           "confirmPlainRemove": "Remove Account"
         },
+        "ClaudeRefreshChainConflictNotice": {
+          "title": "Estas cuentas comparten una cadena de refresh registrada",
+          "description": "Estos inicios de sesión guardados coinciden en la cadena de refresh que Orca tiene registrada, así que refrescar uno puede cerrar la sesión del otro. Orca pausa la rotación de tokens entre ellos. Vuelve a autenticar una de las cuentas para darle su propia cadena; sus chats e historial quedan intactos.",
+          "unavailable": "Orca no pudo verificar si las cuentas de Claude guardadas comparten una cadena de refresh. Si existe una cadena compartida, aquí no se muestra.",
+          "currentProfileBadge": "Este perfil",
+          "otherProfileBadge": "Otro perfil",
+          "otherProfileAccountLabel": "Cuenta de Claude en otro perfil de Orca",
+          "fallbackAccountLabel": "Cuenta de Claude guardada",
+          "reauthenticate": "Volver a autenticar",
+          "otherProfileHint": "Una cuenta marcada como «Otro perfil» pertenece a un perfil de Orca distinto en esta máquina, por lo que no aparece en la lista de arriba y no se puede volver a autenticar desde aquí. Para arreglarlo allí, abre ese perfil y vuelve a autenticar la cuenta en Configuración → Cuentas."
+        },
         "PluginConsentDialog": {
           "workerTrust": "Proceso en segundo plano — se ejecuta en su propio proceso",
           "panelTrust": "Panel o contenido integrado con el host — sin proceso en segundo plano",

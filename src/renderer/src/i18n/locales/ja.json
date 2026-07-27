@@ -9739,6 +9739,17 @@
           "confirmUnblock": "Reassign & continue",
           "confirmPlainRemove": "Remove Account"
         },
+        "ClaudeRefreshChainConflictNotice": {
+          "title": "これらのアカウントは記録上同じリフレッシュチェーンを共有しています",
+          "description": "保存されたログイン同士が、Orca が記録したリフレッシュチェーンで一致しています。片方を更新するともう片方がサインアウトされる可能性があるため、Orca は両者間のトークンローテーションを一時停止しています。どちらかを再認証すると新しいチェーンが発行されます。チャットや履歴はそのまま残ります。",
+          "unavailable": "保存された Claude アカウントがリフレッシュチェーンを共有しているかどうかを Orca が確認できませんでした。共有チェーンが存在しても、ここには表示されません。",
+          "currentProfileBadge": "このプロファイル",
+          "otherProfileBadge": "別のプロファイル",
+          "otherProfileAccountLabel": "別の Orca プロファイルの Claude アカウント",
+          "fallbackAccountLabel": "保存された Claude アカウント",
+          "reauthenticate": "再認証",
+          "otherProfileHint": "「別のプロファイル」と表示されたアカウントは、このマシン上の別の Orca プロファイルに属しているため、上のリストには表示されず、ここから再認証できません。そちらで修正するには、そのプロファイルを開き、設定 → アカウント からアカウントを再認証してください。"
+        },
         "PluginConsentDialog": {
           "workerTrust": "バックグラウンドワーカー — 独自のプロセスで実行",
           "panelTrust": "パネルまたはホスト統合コンテンツ — バックグラウンドワーカーなし",

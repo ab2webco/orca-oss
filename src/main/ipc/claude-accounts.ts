@@ -29,6 +29,7 @@ import {
   type CopyClaudeSessionForFailoverArgs
 } from '../claude-accounts/session-failover'
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
+import { reportManagedClaudeRefreshChainAliases } from '../claude-accounts/claude-refresh-chain-alias-registry'
 
 type ClaudeAccountSettingsStore = {
   getSettings(): Pick<GlobalSettings, 'claudeManagedAccounts'>
@@ -70,6 +71,9 @@ export function registerClaudeAccountHandlers(
   ipcMain.handle('claudeAccounts:cancelPendingLogin', () => claudeAccounts.cancelPendingLogin())
   ipcMain.handle('claudeAccounts:reauthenticate', (_event, args: { accountId: string }) =>
     claudeAccounts.reauthenticateAccount(args.accountId)
+  )
+  ipcMain.handle('claudeAccounts:getRefreshChainAliasReport', () =>
+    reportManagedClaudeRefreshChainAliases()
   )
   ipcMain.handle(
     'claudeAccounts:remove',

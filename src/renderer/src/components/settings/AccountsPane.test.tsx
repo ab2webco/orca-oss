@@ -168,6 +168,15 @@ describe('AccountsPane', () => {
     ).not.toContain('disabled=""')
   })
 
+  it('reserves no space for the refresh-chain conflict notice before its report arrives', () => {
+    // Effects never run under static SSR, so the alias report stays null — the
+    // notice must render nothing rather than a placeholder that occupies space.
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).not.toContain('recorded refresh chain')
+    expect(markup).not.toContain('Orca couldn&#x27;t verify')
+  })
+
   it('offers the Claude custom endpoint action locally', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 

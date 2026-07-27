@@ -9762,6 +9762,17 @@
           "confirmUnblock": "Reassign & continue",
           "confirmPlainRemove": "Remove Account"
         },
+        "ClaudeRefreshChainConflictNotice": {
+          "title": "These accounts share a recorded refresh chain",
+          "description": "These saved logins match on the refresh chain Orca has recorded, so refreshing one can sign the other out. Orca pauses token rotation between them. Re-authenticate one of them to give it its own chain — its chats and history stay intact.",
+          "unavailable": "Orca couldn't verify whether saved Claude accounts share a refresh chain. If a shared chain exists, it is not shown here.",
+          "currentProfileBadge": "This profile",
+          "otherProfileBadge": "Another profile",
+          "otherProfileAccountLabel": "Claude account in another Orca profile",
+          "fallbackAccountLabel": "Saved Claude account",
+          "reauthenticate": "Re-authenticate",
+          "otherProfileHint": "An account marked “Another profile” belongs to a different Orca profile on this machine, so it is not in the list above and cannot be re-authenticated from here. To fix it there instead, open that profile and re-authenticate the account in Settings → Accounts."
+        },
         "PluginConsentDialog": {
           "workerTrust": "Background worker — runs its own process",
           "panelTrust": "Panel or host-integrated content — no worker process",

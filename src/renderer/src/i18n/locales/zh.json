@@ -9739,6 +9739,17 @@
           "confirmUnblock": "Reassign & continue",
           "confirmPlainRemove": "Remove Account"
         },
+        "ClaudeRefreshChainConflictNotice": {
+          "title": "这些账户共享同一条已记录的刷新链",
+          "description": "这些已保存的登录在 Orca 记录的刷新链上相互匹配，刷新其中一个可能会使另一个退出登录。Orca 已暂停它们之间的令牌轮换。重新验证其中一个账户即可为其生成独立的刷新链，聊天和历史记录会保持不变。",
+          "unavailable": "Orca 无法确认已保存的 Claude 账户是否共享刷新链。即使存在共享的刷新链，此处也不会显示。",
+          "currentProfileBadge": "当前配置文件",
+          "otherProfileBadge": "其他配置文件",
+          "otherProfileAccountLabel": "另一个 Orca 配置文件中的 Claude 账户",
+          "fallbackAccountLabel": "已保存的 Claude 账户",
+          "reauthenticate": "重新验证",
+          "otherProfileHint": "标记为“其他配置文件”的账户属于本机上另一个 Orca 配置文件，因此不在上方列表中，也无法在此处重新验证。要在那边处理，请打开该配置文件，并在 设置 → 账户 中重新验证该账户。"
+        },
         "PluginConsentDialog": {
           "workerTrust": "后台工作进程 — 在独立进程中运行",
           "panelTrust": "面板或主机集成内容 — 无后台工作进程",

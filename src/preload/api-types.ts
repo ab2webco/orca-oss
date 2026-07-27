@@ -29,6 +29,7 @@ import type {
   ClaudeAccountWorktreeUsageReport,
   ClaudeWorktreeAccountReassignment
 } from '../shared/claude-account-worktree-usage'
+import type { ManagedClaudeRefreshChainAliasReport } from '../shared/claude-refresh-chain-alias-report'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
   GlobalConfigSyncInventory,
@@ -2487,6 +2488,8 @@ export type PreloadApi = {
     }>
     cancelPendingLogin: () => Promise<boolean>
     reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
+    /** Which saved accounts share a recorded refresh chain (quarantined by main; see ORCA-69). */
+    getRefreshChainAliasReport: () => Promise<ManagedClaudeRefreshChainAliasReport>
     remove: (args: {
       accountId: string
       closeLiveTerminals?: boolean

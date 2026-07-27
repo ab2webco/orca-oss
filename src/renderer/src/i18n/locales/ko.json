@@ -9739,6 +9739,17 @@
           "confirmUnblock": "Reassign & continue",
           "confirmPlainRemove": "Remove Account"
         },
+        "ClaudeRefreshChainConflictNotice": {
+          "title": "이 계정들은 기록된 리프레시 체인을 공유합니다",
+          "description": "저장된 로그인들이 Orca가 기록한 리프레시 체인에서 일치하므로, 한쪽을 갱신하면 다른 쪽이 로그아웃될 수 있습니다. Orca는 두 계정 간의 토큰 회전을 일시 중지했습니다. 둘 중 하나를 재인증하면 새 체인이 발급되며, 채팅과 기록은 그대로 유지됩니다.",
+          "unavailable": "저장된 Claude 계정들이 리프레시 체인을 공유하는지 Orca가 확인하지 못했습니다. 공유된 체인이 있어도 여기에는 표시되지 않습니다.",
+          "currentProfileBadge": "이 프로필",
+          "otherProfileBadge": "다른 프로필",
+          "otherProfileAccountLabel": "다른 Orca 프로필의 Claude 계정",
+          "fallbackAccountLabel": "저장된 Claude 계정",
+          "reauthenticate": "재인증",
+          "otherProfileHint": "“다른 프로필”로 표시된 계정은 이 컴퓨터의 다른 Orca 프로필에 속하므로 위 목록에 없고 여기서 재인증할 수 없습니다. 해당 프로필을 열고 설정 → 계정에서 그 계정을 재인증하세요."
+        },
         "PluginConsentDialog": {
           "workerTrust": "백그라운드 워커 — 별도 프로세스에서 실행",
           "panelTrust": "패널 또는 호스트 통합 콘텐츠 — 백그라운드 워커 없음",
