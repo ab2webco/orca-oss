@@ -60,10 +60,17 @@ A test written alongside a change usually passes on both sides of that change. R
 unmodified code first; if it passes there, it is a guard, not a regression test, and should be
 described as one.
 
+With the fix still uncommitted in the working tree:
+
 ```sh
-git stash && npx vitest run --config config/vitest.config.ts <test>   # must FAIL
-git stash pop && npx vitest run --config config/vitest.config.ts <test> # must PASS
+git stash push -- <changed source files>                                # keep the test staged
+npx vitest run --config config/vitest.config.ts <test>                  # must FAIL
+git stash pop
+npx vitest run --config config/vitest.config.ts <test>                  # must PASS
 ```
+
+If the fix is already committed, revert the source file to the base commit instead — a bare
+`git stash` on a clean tree stashes nothing and the run gives a false green.
 
 This is Q1 of [`upstream-pr-adoption.md`](./upstream-pr-adoption.md), and it applies to work
 written here, not only to adopted PRs.
