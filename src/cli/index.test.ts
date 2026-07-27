@@ -3141,6 +3141,302 @@ describe('orca cli worktree awareness', () => {
     })
   })
 
+  const accountsSnapshotFixture = () =>
+    okFixture('req_accounts_snapshot', {
+      claude: {
+        accounts: [
+          {
+            id: 'acc-claude-work',
+            email: 'work@example.com',
+            authMethod: 'subscription-oauth',
+            createdAt: 1,
+            updatedAt: 1,
+            lastAuthenticatedAt: 1
+          },
+          {
+            id: 'acc-claude-zai',
+            email: 'glm@example.com',
+            authMethod: 'custom-endpoint',
+            endpointLabel: 'z.ai',
+            createdAt: 1,
+            updatedAt: 1,
+            lastAuthenticatedAt: 1
+          }
+        ],
+        activeAccountId: 'acc-claude-work'
+      },
+      codex: {
+        accounts: [
+          {
+            id: 'acc-codex-work',
+            email: 'work@example.com',
+            createdAt: 1,
+            updatedAt: 1,
+            lastAuthenticatedAt: 1
+          }
+        ],
+        activeAccountId: null
+      },
+      rateLimits: {
+        claude: {
+          provider: 'claude',
+          session: {
+            usedPercent: 12,
+            windowMinutes: 300,
+            resetsAt: null,
+            resetDescription: '2:30 PM'
+          },
+          weekly: {
+            usedPercent: 81,
+            windowMinutes: 10080,
+            resetsAt: null,
+            resetDescription: 'Thu'
+          },
+          updatedAt: 5,
+          error: null,
+          status: 'ok'
+        },
+        codex: null,
+        gemini: null,
+        opencodeGo: null,
+        kimi: null,
+        antigravity: null,
+        minimax: null,
+        grok: null,
+        minimaxCookieConfigured: false,
+        grokAuthConfigured: false,
+        claudeTarget: { runtime: 'host', wslDistro: null },
+        codexTarget: { runtime: 'host', wslDistro: null },
+        inactiveClaudeAccounts: [],
+        inactiveCodexAccounts: [
+          {
+            accountId: 'acc-codex-work',
+            rateLimits: {
+              provider: 'codex',
+              session: null,
+              weekly: {
+                usedPercent: 40,
+                windowMinutes: 10080,
+                resetsAt: null,
+                resetDescription: 'Fri'
+              },
+              updatedAt: 6,
+              error: null,
+              status: 'ok'
+            },
+            updatedAt: 6,
+            isFetching: false
+          }
+        ]
+      }
+    })
+
+  it('resolves --claude-account by email and keeps the create on the background path', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_terminal_create', {
+        terminal: {
+          handle: 'term_1',
+          worktreeId: 'repo-1::/tmp/repo/feature',
+          title: 'Claude'
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'terminal',
+        'create',
+        '--worktree',
+        'path:/tmp/repo/feature',
+        '--command',
+        'claude',
+        '--claude-account',
+        'work@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'accounts.snapshot')
+    // Why: no rendererBacked despite an interactive Claude command — the
+    // launch-account override only applies on the background spawn path.
+    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.create', {
+      worktree: 'path:/tmp/repo/feature',
+      command: 'claude',
+      title: undefined,
+      focus: false,
+      claudeAccountId: 'acc-claude-work'
+    })
+  })
+
+  it('resolves --codex-account by id on terminal.create', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_terminal_create', {
+        terminal: {
+          handle: 'term_1',
+          worktreeId: 'repo-1::/tmp/repo/feature',
+          title: 'Codex'
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'terminal',
+        'create',
+        '--worktree',
+        'path:/tmp/repo/feature',
+        '--command',
+        'codex',
+        '--codex-account',
+        'acc-codex-work',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.create', {
+      worktree: 'path:/tmp/repo/feature',
+      command: 'codex',
+      title: undefined,
+      focus: false,
+      codexAccountId: 'acc-codex-work'
+    })
+  })
+
+  it('rejects an unknown account selector and names the available accounts', async () => {
+    queueFixtures(callMock, accountsSnapshotFixture())
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+
+    await main(
+      [
+        'terminal',
+        'create',
+        '--worktree',
+        'path:/tmp/repo/feature',
+        '--command',
+        'claude',
+        '--claude-account',
+        'nobody@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('accounts.snapshot')
+    const printed = [...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')
+    expect(printed).toContain('does not match any Claude account')
+    expect(printed).toContain('work@example.com (id acc-claude-work)')
+    expect(process.exitCode).toBe(1)
+
+    process.exitCode = priorExitCode
+  })
+
+  it('pins both accounts on worktree.create via --claude-account and --codex-account', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_create', {
+        worktree: buildWorktree('/tmp/repo/pinned-task', 'pinned-task', 'abc', 'repo-1'),
+        lineage: null,
+        warnings: []
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'worktree',
+        'create',
+        '--repo',
+        'id:repo-1',
+        '--name',
+        'pinned-task',
+        '--no-parent',
+        '--claude-account',
+        'work@example.com',
+        '--codex-account',
+        'work@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'accounts.snapshot')
+    expect(callMock).toHaveBeenNthCalledWith(2, 'worktree.create', {
+      repo: 'id:repo-1',
+      name: 'pinned-task',
+      claudeAccountId: 'acc-claude-work',
+      codexAccountId: 'acc-codex-work',
+      baseBranch: undefined,
+      linkedIssue: undefined,
+      comment: undefined,
+      runHooks: false,
+      activate: false,
+      parentWorktree: undefined,
+      noParent: true,
+      callerTerminalHandle: undefined,
+      cliProvenanceRequest: {}
+    })
+  })
+
+  it('lists managed accounts with quota via accounts.snapshot', async () => {
+    queueFixtures(callMock, accountsSnapshotFixture())
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(['account', 'list', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenCalledWith('accounts.snapshot')
+    const printed = JSON.parse(String(logSpy.mock.calls[0]?.[0]))
+    expect(printed.result.accounts).toEqual([
+      expect.objectContaining({
+        provider: 'claude',
+        id: 'acc-claude-work',
+        email: 'work@example.com',
+        active: true,
+        quota: expect.objectContaining({
+          weekly: expect.objectContaining({ usedPercent: 81 })
+        })
+      }),
+      expect.objectContaining({
+        provider: 'claude',
+        id: 'acc-claude-zai',
+        authMethod: 'custom-endpoint',
+        active: false,
+        quota: null
+      }),
+      expect.objectContaining({
+        provider: 'codex',
+        id: 'acc-codex-work',
+        active: false,
+        quota: expect.objectContaining({
+          weekly: expect.objectContaining({ usedPercent: 40 })
+        })
+      })
+    ])
+    const printedText = JSON.stringify(printed)
+    expect(printedText).not.toContain('managedAuthPath')
+    expect(printedText).not.toContain('managedHomePath')
+  })
+
+  it('forces a provider usage fetch with account list --refresh', async () => {
+    queueFixtures(callMock, accountsSnapshotFixture())
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(['account', 'list', '--refresh', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenCalledWith('accounts.list')
+  })
+
   it('keeps explicit focus semantics when forcing Codex through the renderer path', async () => {
     queueFixtures(
       callMock,

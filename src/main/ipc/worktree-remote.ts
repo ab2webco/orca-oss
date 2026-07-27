@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
 import { normalizeClaudeAccountPinForCreate } from '../claude-accounts/worktree-account-pin'
+import { normalizeCodexAccountPinForCreate } from '../codex-accounts/worktree-account-pin'
 import type {
   AutomationWorkspaceProvenance,
   CliWorkspaceProvenance,
@@ -1814,6 +1815,7 @@ export async function createRemoteWorktree(
     )
   }
   const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
+  const codexAccountId = normalizeCodexAccountPinForCreate(store, args.codexAccountId)
   const metaUpdates: Partial<WorktreeMeta> = {
     // Why: path-derived IDs get reused after external deletion; rotate instance identity so stale lineage can't attach to the new occupant.
     instanceId: randomUUID(),
@@ -1868,7 +1870,8 @@ export async function createRemoteWorktree(
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-    ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
+    ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+    ...(codexAccountId !== undefined ? { codexAccountId } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {
     const meta = store.setWorktreeMeta(worktreeId, metaUpdates)
@@ -2401,6 +2404,7 @@ export async function createLocalWorktree(
   // Why: PR/MR worktrees start from a head ref/SHA but Source Control must compare against the review target branch.
   const metadataBaseRef = args.compareBaseRef ?? remoteTrackingBase?.ref ?? baseBranch
   const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
+  const codexAccountId = normalizeCodexAccountPinForCreate(store, args.codexAccountId)
   const metaUpdates: Partial<WorktreeMeta> = {
     // Why: path-derived IDs can be reused after external deletion; rotate instance identity so stale lineage can't attach to the new occupant.
     instanceId: randomUUID(),
@@ -2456,7 +2460,8 @@ export async function createLocalWorktree(
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-    ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
+    ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+    ...(codexAccountId !== undefined ? { codexAccountId } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {
     const meta = store.setWorktreeMeta(worktreeId, metaUpdates)

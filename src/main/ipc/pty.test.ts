@@ -1996,6 +1996,202 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    type RuntimeControllerForTest = {
+      spawn(args: {
+        cols: number
+        rows: number
+        command?: string
+        worktreeId?: string
+        sessionId?: string
+        claudeAccountId?: string
+        codexAccountId?: string
+      }): Promise<{ id: string }>
+    }
+
+    function makeRuntimeControllerHarness(): {
+      runtime: Record<string, ReturnType<typeof vi.fn>>
+      getController: () => RuntimeControllerForTest
+    } {
+      const runtime = {
+        setPtyController: vi.fn(),
+        registerPty: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn(),
+        preAllocateHandleForPty: vi.fn()
+      }
+      return {
+        runtime,
+        getController: () => runtime.setPtyController.mock.calls[0]?.[0] as RuntimeControllerForTest
+      }
+    }
+
+    const injectedLaunchPreparation = (accountId: string) => async () => ({
+      configDir: `/tmp/claude-${accountId}`,
+      envPatch: { CLAUDE_CONFIG_DIR: `/tmp/claude-${accountId}` },
+      stripAuthEnv: true,
+      injectedAccountId: accountId,
+      provenance: `managed:${accountId}:injected`
+    })
+
+    it('lets a launch-scoped Claude account beat the worktree pin on the runtime path', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-launch'))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        worktreeId: 'wt-pinned',
+        claudeAccountId: 'account-launch'
+      })
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-launch' }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
+    it('keeps the worktree pin when no launch account is passed on the runtime path', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-pinned'))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        worktreeId: 'wt-pinned'
+      })
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-pinned' }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
+    it('keeps a surviving injected session on its own account even when a launch account is passed', async () => {
+      installExitOnKillSpawnMock()
+      livePtyGate.markInjectedClaudePtySpawned('surviving-launch-session', 'account-a')
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-a'))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      try {
+        const result = await getController().spawn({
+          cols: 80,
+          rows: 24,
+          command: 'claude',
+          worktreeId: 'wt-pinned',
+          sessionId: 'surviving-launch-session',
+          claudeAccountId: 'account-launch'
+        })
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-a' }),
+          { reattachLiveInjectedPtyId: 'surviving-launch-session' }
+        )
+        await handlers.get('pty:kill')!(null, { id: result.id })
+      } finally {
+        livePtyGate.markClaudePtyExited('surviving-launch-session')
+      }
+    })
+
+    it('lets a launch-scoped Codex account beat the worktree pin on the runtime path', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      const getSelectedCodexHomePath = vi.fn(() => null)
+      const store = { getWorktreeMeta: vi.fn(() => ({ codexAccountId: 'codex-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        getSelectedCodexHomePath as never,
+        undefined,
+        undefined,
+        store as never
+      )
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex',
+        codexAccountId: 'codex-launch'
+      })
+
+      expect(getSelectedCodexHomePath).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'codex-launch' }),
+        expect.anything(),
+        expect.anything()
+      )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
+    it('keeps the Codex worktree pin when no launch account is passed on the runtime path', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      const getSelectedCodexHomePath = vi.fn(() => null)
+      const store = { getWorktreeMeta: vi.fn(() => ({ codexAccountId: 'codex-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        getSelectedCodexHomePath as never,
+        undefined,
+        undefined,
+        store as never
+      )
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex'
+      })
+
+      expect(getSelectedCodexHomePath).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'codex-pinned' }),
+        expect.anything(),
+        expect.anything()
+      )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
     it('clears stale shared ownership when runtime-controller attach-only fails', async () => {
       const runtime = {
         setPtyController: vi.fn(),

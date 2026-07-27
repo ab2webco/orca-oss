@@ -1288,6 +1288,10 @@ type TerminalCreateOptions = {
   leafId?: string
   sessionId?: string
   preAllocatedHandle?: string
+  /** Launch-scoped managed-account override for this terminal only. Beats the
+   *  worktree pin at spawn; never persisted to worktree meta. */
+  claudeAccountId?: string
+  codexAccountId?: string
   persistHostSessionBinding?: boolean
   // Why: only the host-derived structured resume path may attach provider
   // identity; opaque terminal.create commands remain ordinary shells.
@@ -1506,6 +1510,9 @@ type RuntimePtyController = {
     telemetry?: WorktreeStartupLaunch['telemetry']
     connectionId?: string | null
     worktreeId?: string
+    /** Launch-scoped managed-account override; beats the worktree pin. */
+    claudeAccountId?: string
+    codexAccountId?: string
     preAllocatedHandle?: string
     tabId?: string
     leafId?: string
@@ -18343,6 +18350,7 @@ export class OrcaRuntimeService {
     telemetrySource?: WorkspaceCreateTelemetrySource
     workspaceStatus?: string
     claudeAccountId?: string | null
+    codexAccountId?: string | null
     manualOrder?: number
     sparseCheckout?: { directories: string[]; presetId?: string }
     pushTarget?: GitPushTarget
@@ -18366,6 +18374,7 @@ export class OrcaRuntimeService {
 
     const repo = await this.resolveRepoSelector(args.repoSelector)
     this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: args.claudeAccountId }])
+    this.assertCurrentManagedCodexAccountPins([{ codexAccountId: args.codexAccountId }])
     const createSettings = this.store.getSettings()
     const requestedAgent = args.startupAgent ?? args.createdWithAgent
     const requestedAgentEnabled =
@@ -18404,6 +18413,7 @@ export class OrcaRuntimeService {
       const instanceId = randomUUID()
       const worktreeId = getRuntimeFolderWorkspaceInstanceId(repo, instanceId)
       const claudeAccountId = this.normalizeManagedClaudeAccountPinForCreate(args.claudeAccountId)
+      const codexAccountId = this.normalizeManagedCodexAccountPinForCreate(args.codexAccountId)
       const meta = this.store.setWorktreeMeta(worktreeId, {
         instanceId,
         ...getProjectHostSetupWorktreeMeta(this.store.getProjectHostSetups?.() ?? [], repo),
@@ -18447,7 +18457,8 @@ export class OrcaRuntimeService {
         ...(args.comment !== undefined ? { comment: args.comment } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
         ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-        ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
+        ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+        ...(codexAccountId !== undefined ? { codexAccountId } : {})
       })
       const worktree = mergeRuntimeFolderWorkspace(repo, worktreeId, meta)
       this.invalidateResolvedWorktreeCache()
@@ -18975,6 +18986,7 @@ export class OrcaRuntimeService {
         ? { displayName: effectiveRequestedName }
         : {}
     const claudeAccountId = this.normalizeManagedClaudeAccountPinForCreate(args.claudeAccountId)
+    const codexAccountId = this.normalizeManagedCodexAccountPinForCreate(args.codexAccountId)
     const meta = this.store.setWorktreeMeta(worktreeId, {
       // Why: worktree IDs are path-derived. If a path is deleted outside Orca
       // and later recreated, creation must mint a fresh instance identity so
@@ -19035,7 +19047,8 @@ export class OrcaRuntimeService {
       ...(args.comment !== undefined ? { comment: args.comment } : {}),
       ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
       ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
-      ...(claudeAccountId !== undefined ? { claudeAccountId } : {})
+      ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+      ...(codexAccountId !== undefined ? { codexAccountId } : {})
     })
     const worktree = {
       ...mergeWorktree(repo.id, created, meta),
@@ -19375,6 +19388,7 @@ export class OrcaRuntimeService {
       displayName?: string
       workspaceStatus?: string
       claudeAccountId?: string | null
+      codexAccountId?: string | null
       manualOrder?: number
       sparseCheckout?: { directories: string[]; presetId?: string }
       pushTarget?: GitPushTarget
@@ -19435,6 +19449,7 @@ export class OrcaRuntimeService {
         ...(args.pushTarget ? { pushTarget: args.pushTarget } : {}),
         ...(args.workspaceStatus ? { workspaceStatus: args.workspaceStatus as never } : {}),
         ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
+        ...(args.codexAccountId !== undefined ? { codexAccountId: args.codexAccountId } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
         ...(args.createdWithAgent ? { createdWithAgent: args.createdWithAgent } : {}),
         ...(args.pendingFirstAgentMessageRename === true
@@ -20228,6 +20243,19 @@ export class OrcaRuntimeService {
     }
     return this.requireAccountServices()
       .claudeAccounts.listAccounts()
+      .accounts.some((account) => account.id === accountId)
+      ? accountId
+      : null
+  }
+
+  private normalizeManagedCodexAccountPinForCreate(
+    accountId: string | null | undefined
+  ): string | null | undefined {
+    if (typeof accountId !== 'string') {
+      return accountId
+    }
+    return this.requireAccountServices()
+      .codexAccounts.listAccounts()
       .accounts.some((account) => account.id === accountId)
       ? accountId
       : null
@@ -21877,6 +21905,17 @@ export class OrcaRuntimeService {
     const presentation = resolveTerminalPresentation(opts)
     const requiresRendererFocus = opts.presentation === 'focused' || opts.focus === true
     const availableAuthoritativeWindow = this.getAvailableAuthoritativeWindow()
+    const hasLaunchAccountOverride =
+      opts.claudeAccountId !== undefined || opts.codexAccountId !== undefined
+    if (hasLaunchAccountOverride) {
+      // Why: the renderer spawn path cannot carry the override; a launch that
+      // silently landed on the wrong account would defeat the selector.
+      if (worktreeSelector === undefined) {
+        throw new Error('Pass a worktree selector when choosing a launch account.')
+      }
+      this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: opts.claudeAccountId }])
+      this.assertCurrentManagedCodexAccountPins([{ codexAccountId: opts.codexAccountId }])
+    }
     // Why: pre-diff createTerminal fell back to the renderer's active worktree
     // when no selector was provided. The new background-spawn branch hard-
     // requires a resolvable selector, so route the no-selector case through
@@ -21885,6 +21924,7 @@ export class OrcaRuntimeService {
     const shouldCreateInBackground =
       worktreeSelector !== undefined &&
       (Boolean(opts.agentSessionClaim) ||
+        hasLaunchAccountOverride ||
         (!requiresRendererFocus && opts.rendererBacked !== true) ||
         // Why: `orca serve` exposes the local runtime without a renderer
         // window. Renderer-backed Codex terminals are preferred for the app,
@@ -22023,6 +22063,8 @@ export class OrcaRuntimeService {
         telemetry: launchOpts.telemetry,
         connectionId: workspace.connectionId,
         worktreeId: workspace.id,
+        ...(opts.claudeAccountId ? { claudeAccountId: opts.claudeAccountId } : {}),
+        ...(opts.codexAccountId ? { codexAccountId: opts.codexAccountId } : {}),
         preAllocatedHandle,
         tabId,
         leafId,

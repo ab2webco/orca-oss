@@ -86,7 +86,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     path: ['worktree', 'create'],
     summary: 'Create a new Orca-managed worktree',
     usage:
-      'orca worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--setup run|skip|inherit] [--base-branch <ref>] [--issue <number>] [--linear-issue <identifier-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--json]',
+      'orca worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--setup run|skip|inherit] [--base-branch <ref>] [--issue <number>] [--linear-issue <identifier-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'repo',
@@ -96,6 +96,8 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'name',
       'agent',
       'prompt',
+      'claude-account',
+      'codex-account',
       'base-branch',
       'issue',
       'linear-issue',
@@ -119,7 +121,8 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'With --agent --json, read the new agent handle from result.agentTerminalHandle; older runtimes return only result.startupTerminal.handle, and may return neither for folder-based repos.',
       'Repo-defined setup hooks follow the repository setup policy; pass --setup run to force them.',
       'Pass --activate when the CLI caller intentionally wants to reveal the new worktree in the app.',
-      'Passing --run-hooks is kept as a legacy alias for --setup run and reveals the worktree.'
+      'Passing --run-hooks is kept as a legacy alias for --setup run and reveals the worktree.',
+      'Pass --claude-account or --codex-account (email or id from `orca account list --json`) to pin the new worktree to a managed account; the startup agent and later terminals in it launch against that account.'
     ],
     examples: [
       'orca worktree create --name agent-task --agent codex --prompt "hi" --json',
@@ -229,17 +232,28 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     path: ['terminal', 'create'],
     summary: 'Create a terminal session in the current worktree',
     usage:
-      'orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'command', 'title', 'focus'],
+      'orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--focus] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'worktree',
+      'command',
+      'title',
+      'focus',
+      'claude-account',
+      'codex-account'
+    ],
     notes: [
       'Creates a visible terminal tab without switching focus when possible; falls back to a background handle if the UI cannot adopt it. Pass --focus to switch to it.',
-      'Use this, not worktree create, for a fresh agent in the current checkout.'
+      'Use this, not worktree create, for a fresh agent in the current checkout.',
+      'Pass --claude-account or --codex-account (email or id from `orca account list --json`) to launch this terminal against a specific managed account. The launch flag beats the worktree account pin; the pin beats the global selection.',
+      'An account-directed terminal always spawns on the background path, so it skips renderer-backed niceties for interactive agent TUIs.'
     ],
     examples: [
       'orca terminal create --json',
       'orca terminal create --worktree active --command "codex" --json',
       'orca terminal create --worktree path:/projects/myapp --title "RUNNER" --command "opencode"',
-      'orca terminal create --worktree path:/projects/myapp --command "opencode" --focus'
+      'orca terminal create --worktree path:/projects/myapp --command "opencode" --focus',
+      'orca terminal create --worktree active --command "claude" --claude-account dev@example.com --json'
     ]
   },
   {

@@ -483,6 +483,10 @@ export function formatFlagHelp(flag: string): string {
   const helpByFlag: Record<string, string> = {
     agent: '--agent <id>          Launch a known TUI agent in the first terminal',
     'base-branch': '--base-branch <ref>    Base branch/ref to create the worktree from',
+    'claude-account':
+      '--claude-account <email|id>  Managed Claude account to launch against (see `orca account list`)',
+    'codex-account':
+      '--codex-account <email|id>   Managed Codex account to launch against (see `orca account list`)',
     command: '--command <text>       Command to run in the terminal on startup',
     comment: '--comment <text>       Comment stored in Orca metadata',
     cursor: '--cursor <n>           Line cursor from a previous read (returns only new output)',
@@ -522,6 +526,7 @@ export function formatFlagHelp(flag: string): string {
     prompt: '--prompt <text>        Prompt text for agent-backed commands',
     query: '--query <text>        Search text for matching refs',
     ref: '--ref <ref>            Base ref to persist for the repo',
+    refresh: '--refresh              Force a provider usage fetch before listing (slower)',
     repo: '--repo <selector>      Repo selector such as id:<id>, name:<name>, or path:<path>',
     'restore-window':
       '--restore-window     Bring the target app/window forward before the operation',

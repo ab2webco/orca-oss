@@ -115,6 +115,7 @@ export const WORKTREE_METHODS: RpcMethod[] = [
             telemetrySource: params.telemetrySource,
             workspaceStatus: params.workspaceStatus,
             claudeAccountId: params.claudeAccountId,
+            codexAccountId: params.codexAccountId,
             manualOrder: params.manualOrder,
             sparseCheckout: params.sparseCheckout,
             pushTarget: params.pushTarget,

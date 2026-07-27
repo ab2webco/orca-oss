@@ -478,6 +478,7 @@ export type LocalPtyProviderOptions = {
       command?: string
       launchAgent?: PtySpawnOptions['launchAgent']
       codexHomePathOverride?: PtySpawnOptions['codexHomePathOverride']
+      codexLaunchAccountId?: PtySpawnOptions['codexLaunchAccountId']
       cwd?: string
       shellPath?: string
       isWsl?: boolean
@@ -691,6 +692,7 @@ export class LocalPtyProvider implements IPtyProvider {
           command: args.command,
           launchAgent: args.launchAgent,
           codexHomePathOverride: args.codexHomePathOverride,
+          codexLaunchAccountId: args.codexLaunchAccountId,
           cwd,
           shellPath,
           isWsl: isWslShell,

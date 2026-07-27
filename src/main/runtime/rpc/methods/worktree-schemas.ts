@@ -112,6 +112,7 @@ export const WorktreeCreate = z
       .optional(),
     workspaceStatus: OptionalString,
     claudeAccountId: z.union([z.string().min(1).max(512), z.null()]).optional(),
+    codexAccountId: z.union([z.string().min(1).max(512), z.null()]).optional(),
     manualOrder: OptionalFiniteNumber,
     sparseCheckout: z
       .object({

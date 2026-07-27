@@ -964,7 +964,9 @@ const TerminalCreateParams = z.object({
   activate: z.unknown().optional(),
   presentation: z.enum(['background', 'focused']).optional(),
   tabId: OptionalString,
-  leafId: OptionalString
+  leafId: OptionalString,
+  claudeAccountId: z.string().min(1).max(512).optional(),
+  codexAccountId: z.string().min(1).max(512).optional()
 })
 
 const TerminalSplit = TerminalHandle.extend({
@@ -1426,6 +1428,8 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
             presentation: params.presentation,
             tabId: params.tabId,
             leafId: params.leafId,
+            ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
+            ...(params.codexAccountId ? { codexAccountId: params.codexAccountId } : {}),
             ...(preAllocatedHandle ? { preAllocatedHandle } : {})
           })
       )

@@ -27,6 +27,21 @@ describe('account RPC methods', () => {
     expect(runtime.refreshAccountsForMobile).toHaveBeenCalledOnce()
   })
 
+  it('serves accounts.snapshot from the cache without a provider refresh', async () => {
+    const snapshot = { claude: null, codex: null }
+    const runtime = {
+      refreshAccountsForMobile: vi.fn().mockResolvedValue(undefined),
+      getAccountsSnapshot: vi.fn(() => snapshot)
+    } as unknown as OrcaRuntimeService
+    const snapshotMethod = method('accounts.snapshot')
+    if (isStreamingMethod(snapshotMethod)) {
+      throw new Error('accounts.snapshot must be a request method')
+    }
+
+    await expect(snapshotMethod.handler(undefined, { runtime })).resolves.toBe(snapshot)
+    expect(runtime.refreshAccountsForMobile).not.toHaveBeenCalled()
+  })
+
   it('forwards a client idempotency key when consuming a Codex reset credit', async () => {
     const idempotencyKey = '11111111-1111-4111-8111-111111111111'
     const expectedScope = {

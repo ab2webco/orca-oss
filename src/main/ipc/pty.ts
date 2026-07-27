@@ -852,15 +852,18 @@ function getCodexLaunchTargetForPty(
   base: CodexAccountSelectionTarget,
   store: Store | undefined,
   worktreeId: string | undefined,
-  command: string | undefined
+  command: string | undefined,
+  launchAccountId?: string
 ): CodexAccountLaunchTarget {
   if (!isCodexLaunchCommand(command)) {
     return base
   }
+  // Precedence: launch account beats the worktree pin, the pin beats the global selection.
   const overrideAccountId =
-    store && typeof worktreeId === 'string'
+    launchAccountId ??
+    (store && typeof worktreeId === 'string'
       ? (store.getWorktreeMeta(worktreeId)?.codexAccountId ?? undefined)
-      : undefined
+      : undefined)
   return overrideAccountId ? { ...base, overrideAccountId } : base
 }
 
@@ -870,12 +873,15 @@ function getCodexLaunchTargetForPty(
 function getClaudeSelectionTargetForPty(
   base: CodexAccountSelectionTarget,
   store: Store | undefined,
-  worktreeId: string | undefined
+  worktreeId: string | undefined,
+  launchAccountId?: string
 ): ClaudeAccountSelectionTarget {
+  // Precedence: launch account beats the worktree pin, the pin beats the global selection.
   const overrideAccountId =
-    store && typeof worktreeId === 'string'
+    launchAccountId ??
+    (store && typeof worktreeId === 'string'
       ? (store.getWorktreeMeta(worktreeId)?.claudeAccountId ?? undefined)
-      : undefined
+      : undefined)
   return overrideAccountId ? { ...base, overrideAccountId } : base
 }
 
@@ -1805,7 +1811,8 @@ export function registerPtyHandlers(
                   codexSelectionTarget,
                   store,
                   ctx?.worktreeId,
-                  ctx?.command
+                  ctx?.command,
+                  ctx?.codexLaunchAccountId
                 ),
                 baseEnv,
                 {
@@ -3505,7 +3512,8 @@ export function registerPtyHandlers(
       let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         codexSelectionTarget,
         store,
-        args.worktreeId
+        args.worktreeId,
+        isClaudeLaunch ? args.claudeAccountId : undefined
       )
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)
@@ -3655,7 +3663,8 @@ export function registerPtyHandlers(
                     codexSelectionTarget,
                     store,
                     args.worktreeId,
-                    args.command
+                    args.command,
+                    args.codexAccountId
                   ),
                   env,
                   {
@@ -3712,6 +3721,9 @@ export function registerPtyHandlers(
       }
       if (!isDaemonHostSpawn && codexResumeHome) {
         spawnOptions.codexHomePathOverride = { value: codexResumeHome.codexHomePath }
+      }
+      if (!args.connectionId && args.codexAccountId) {
+        spawnOptions.codexLaunchAccountId = args.codexAccountId
       }
       const startupTerminalColorQueryReplyColors = getStartupTerminalColorQueryReplyColors(args)
       if (startupTerminalColorQueryReplyColors) {

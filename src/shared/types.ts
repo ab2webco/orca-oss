@@ -2283,6 +2283,9 @@ export type CreateWorktreeArgs = {
   /** Claude managed account to pin this worktree to at creation. Omitted/null =
    *  inherit the global host selection. See {@link Worktree.claudeAccountId}. */
   claudeAccountId?: string | null
+  /** Codex managed account to pin this worktree to at creation. Omitted/null =
+   *  inherit the global selection. See {@link Worktree.codexAccountId}. */
+  codexAccountId?: string | null
   manualOrder?: number
   /** Parent workspace for in-app creates launched from a folder workspace. */
   parentWorkspace?: WorkspaceKey

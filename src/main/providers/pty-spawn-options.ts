@@ -16,6 +16,9 @@ export type PtySpawnOptions = {
   envToDelete?: string[]
   /** Main-validated home provenance for an automatic Codex session resume. */
   codexHomePathOverride?: { value: string | null }
+  /** Launch-scoped Codex account override; beats the worktree pin when the
+   *  env hook resolves this spawn's CODEX_HOME. */
+  codexLaunchAccountId?: string
   command?: string
   commandDelivery?: 'renderer' | 'provider'
   startupCommandDelivery?: StartupCommandDelivery

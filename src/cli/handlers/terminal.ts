@@ -31,6 +31,7 @@ import {
   getRequiredStringFlag
 } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
+import { resolveAccountSelectorFlags } from '../account-selector'
 import {
   getBrowserWorktreeSelector,
   getOptionalWorktreeSelector,
@@ -132,8 +133,14 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
       )
     }
     const command = getOptionalStringFlag(flags, 'command')
+    const accountOverrides = await resolveAccountSelectorFlags(flags, client)
+    const hasAccountOverride =
+      accountOverrides.claudeAccountId !== undefined ||
+      accountOverrides.codexAccountId !== undefined
+    // Why: the launch-account override only applies on the background spawn
+    // path; the renderer-backed path spawns from the renderer and would drop it.
     const useRendererBackedInteractiveTerminal =
-      !client.isRemote && shouldUseRendererBackedInteractiveTerminal(command)
+      !client.isRemote && !hasAccountOverride && shouldUseRendererBackedInteractiveTerminal(command)
     const focus = flags.get('focus') === true
     const result = await client.call<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
       worktree: await getBrowserWorktreeSelector(flags, cwd, client),
@@ -144,7 +151,8 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
       // unless the caller explicitly asks for focus.
       focus,
       ...(focus ? { presentation: 'focused' } : {}),
-      ...(useRendererBackedInteractiveTerminal ? { rendererBacked: true, activate: focus } : {})
+      ...(useRendererBackedInteractiveTerminal ? { rendererBacked: true, activate: focus } : {}),
+      ...accountOverrides
     })
     printResult(result, json, formatTerminalCreate)
   },

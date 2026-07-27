@@ -82,6 +82,13 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     }
   }),
   defineMethod({
+    // Why: accounts.list blocks behind provider usage refreshes; CLI callers
+    // need the cached roster + quota without risking a stall on broken auth.
+    name: 'accounts.snapshot',
+    params: null,
+    handler: async (_params, { runtime }) => runtime.getAccountsSnapshot()
+  }),
+  defineMethod({
     name: 'accounts.selectClaude',
     params: SelectAccountParams,
     handler: async (params, { runtime }) => runtime.selectClaudeAccount(params.accountId)

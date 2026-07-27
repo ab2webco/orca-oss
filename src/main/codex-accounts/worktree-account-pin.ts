@@ -57,6 +57,18 @@ export function isManagedCodexAccountId(store: CodexAccountPinStore, accountId: 
   return store.getSettings().codexManagedAccounts.some((account) => account.id === accountId)
 }
 
+export function normalizeCodexAccountPinForCreate(
+  store: CodexAccountPinStore,
+  accountId: string | null | undefined
+): string | null | undefined {
+  if (typeof accountId !== 'string' || isManagedCodexAccountId(store, accountId)) {
+    return accountId
+  }
+  // Why: a slow worktree create may finish after its selected account was
+  // removed; inherit global auth instead of durably resurrecting a dead pin.
+  return null
+}
+
 export function assertValidCodexAccountPin(
   store: CodexAccountPinStore,
   accountId: string | null | undefined

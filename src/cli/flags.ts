@@ -28,6 +28,23 @@ export function getOptionalStringFlag(
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+/** Distinguishes "flag absent" (undefined) from "flag present without a value"
+ *  (error) — parseArgs stores a valueless non-boolean flag as `true`. */
+export function getPresentStringFlag(
+  flags: Map<string, string | boolean>,
+  name: string,
+  options: { allowEmpty?: boolean } = {}
+): string | undefined {
+  if (!flags.has(name)) {
+    return undefined
+  }
+  const value = flags.get(name)
+  if (typeof value === 'string' && (options.allowEmpty || value.length > 0)) {
+    return value
+  }
+  throw new RuntimeClientError('invalid_argument', `Missing value for --${name}`)
+}
+
 export function getRepeatedStringFlag(
   flags: Map<string, string | boolean>,
   name: string

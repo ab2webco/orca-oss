@@ -13,8 +13,10 @@ import {
   getOptionalNumberFlag,
   getOptionalPositiveIntegerFlag,
   getOptionalStringFlag,
+  getPresentStringFlag,
   getRequiredStringFlag
 } from '../flags'
+import { resolveAccountSelectorFlags } from '../account-selector'
 import {
   getOptionalWorktreeSelector,
   getRequiredWorktreeSelector,
@@ -84,21 +86,6 @@ function getEnvParentWorkspace(): string | undefined {
     return isWorkspaceKey(worktreeId) ? worktreeId : worktreeWorkspaceKey(worktreeId)
   }
   return undefined
-}
-
-function getPresentStringFlag(
-  flags: Map<string, string | boolean>,
-  name: string,
-  options: { allowEmpty?: boolean } = {}
-): string | undefined {
-  if (!flags.has(name)) {
-    return undefined
-  }
-  const value = flags.get(name)
-  if (typeof value === 'string' && (options.allowEmpty || value.length > 0)) {
-    return value
-  }
-  throw new RuntimeClientError('invalid_argument', `Missing value for --${name}`)
 }
 
 function getOptionalStartupAgent(flags: Map<string, string | boolean>): string | undefined {
@@ -229,9 +216,11 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       }
     }
     const linearIssueLink = getOptionalLinearIssueLinkFlag(flags, 'linear-issue')
+    const accountPins = await resolveAccountSelectorFlags(flags, client)
     const result = await client.call<RuntimeWorktreeCreateResult>('worktree.create', {
       repo: await getCreateRepoSelector(flags, cwdParentWorktree, client),
       name: getRequiredStringFlag(flags, 'name'),
+      ...accountPins,
       baseBranch: getOptionalStringFlag(flags, 'base-branch'),
       linkedIssue: getOptionalNumberFlag(flags, 'issue'),
       ...linearIssueLink,

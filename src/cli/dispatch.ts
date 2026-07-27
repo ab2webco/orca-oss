@@ -1,6 +1,7 @@
 import type { RuntimeClient } from './runtime-client'
 import { RuntimeClientError } from './runtime-client'
 import { CORE_HANDLERS } from './handlers/core'
+import { ACCOUNT_HANDLERS } from './handlers/account'
 import { AUTOMATION_HANDLERS } from './handlers/automations'
 import { PROJECT_HANDLERS } from './handlers/project'
 import { REPO_HANDLERS } from './handlers/repo'
@@ -47,6 +48,7 @@ function buildHandlers(): Map<string, CommandHandler> {
   const table = new Map<string, CommandHandler>()
   const groups = [
     CORE_HANDLERS,
+    ACCOUNT_HANDLERS,
     AUTOMATION_HANDLERS,
     PROJECT_HANDLERS,
     REPO_HANDLERS,
