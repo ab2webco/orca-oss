@@ -35,6 +35,23 @@ Two ways to get it onto your machine:
 > exposed. If that is not acceptable, RCs belong in a separate repository, which the updater never
 > reads at all.
 
+## Validated end to end (2026-07-27, `v1.4.152-lab.37.rc`)
+
+The channel was proven on real installs against the real feed, not a mocked one. All four
+preconditions held at once, which is what makes the result unambiguous: the candidate was fully
+published (15 assets, `latest-mac.yml` present), it was strictly newer than the installs under
+test, and both installs carried the exclusion.
+
+| Install | Action | Result |
+| --- | --- | --- |
+| `lab.35` | plain *Check for Updates* | "up to date" — the candidate is never offered |
+| `lab.36.rc` | ⌥+click | offers `1.4.152-lab.37.rc`, installs over the real update path |
+
+Two earlier attempts proved nothing and are worth remembering as the shape of a bad test: the
+first was run with ⌥ instead of a plain click, and the second landed while the candidate's assets
+were still uploading, so the updater would have skipped it for a second, unrelated reason. Both
+returned "up to date" — the same output a broken exclusion would produce.
+
 ## The checks
 
 Confirm the title bar shows the `.rc` version before starting — otherwise you are testing the
