@@ -254,6 +254,222 @@ describe('ClaudeUsageStore', () => {
     ).toBeCloseTo(36.75)
   })
 
+  it('prices Claude 5-series models with current Anthropic rates', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: [
+        {
+          day: '2026-07-25',
+          model: 'claude-opus-5-20260724',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        },
+        {
+          day: '2026-07-25',
+          model: 'anthropic/claude-fable-5',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        },
+        {
+          day: '2026-07-25',
+          model: 'claude-sonnet-5-thinking',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        }
+      ]
+    })
+
+    const summary = await store.getSummary('orca', '30d')
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(summary.estimatedCostUsd).toBeCloseTo(124.95)
+    expect(
+      breakdown.find((row) => row.key === 'claude-opus-5-20260724')?.estimatedCostUsd
+    ).toBeCloseTo(36.75)
+    expect(
+      breakdown.find((row) => row.key === 'anthropic/claude-fable-5')?.estimatedCostUsd
+    ).toBeCloseTo(73.5)
+    expect(
+      breakdown.find((row) => row.key === 'claude-sonnet-5-thinking')?.estimatedCostUsd
+    ).toBeCloseTo(14.7)
+  })
+
+  it('prices Claude Sonnet 5 usage before 2026-09-01 at introductory rates', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: [
+        {
+          day: '2026-08-31',
+          model: 'claude-sonnet-5',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        }
+      ]
+    })
+
+    const breakdown = await store.getBreakdown('orca', 'all', 'model')
+
+    expect(breakdown[0]?.estimatedCostUsd).toBeCloseTo(14.7)
+  })
+
+  it('prices Claude Sonnet 5 usage from 2026-09-01 at standard rates', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: [
+        {
+          day: '2026-09-01',
+          model: 'claude-sonnet-5',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        }
+      ]
+    })
+
+    const breakdown = await store.getBreakdown('orca', 'all', 'model')
+
+    expect(breakdown[0]?.estimatedCostUsd).toBeCloseTo(22.05)
+  })
+
+  it('sums Claude Sonnet 5 usage across introductory and standard pricing days', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: [
+        {
+          day: '2026-08-31',
+          model: 'claude-sonnet-5',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        },
+        {
+          day: '2026-09-01',
+          model: 'claude-sonnet-5',
+          projectKey: 'worktree:repo-1::/workspace/repo-a',
+          projectLabel: 'Repo A',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo-a',
+          turnCount: 1,
+          zeroCacheReadTurnCount: 0,
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheWriteTokens: 1_000_000
+        }
+      ]
+    })
+
+    const breakdown = await store.getBreakdown('orca', 'all', 'model')
+
+    expect(breakdown[0]?.estimatedCostUsd).toBeCloseTo(36.75)
+  })
+
+  it('does not collapse Opus 4.5 or Sonnet 4.5 usage into Claude 5 pricing', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: ['claude-sonnet-4-5-20250929', 'claude-opus-4-5-20251101'].map((model) => ({
+        day: '2026-04-09',
+        model,
+        projectKey: 'worktree:repo-1::/workspace/repo-a',
+        projectLabel: 'Repo A',
+        repoId: 'repo-1',
+        worktreeId: 'repo-1::/workspace/repo-a',
+        turnCount: 1,
+        zeroCacheReadTurnCount: 0,
+        inputTokens: 300_000,
+        outputTokens: 300_000,
+        cacheReadTokens: 300_000,
+        cacheWriteTokens: 300_000
+      }))
+    })
+
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    // Why: the 4.5 tier premium only survives if `-4-5-` never matches the `-5`
+    // family regex, so this doubles as the digit-boundary proof for both families.
+    expect(
+      breakdown.find((row) => row.key === 'claude-sonnet-4-5-20250929')?.estimatedCostUsd
+    ).toBeCloseTo(8.07)
+    // Why: Opus 4.5 and Opus 5 share rates today, so this pins the rate rather
+    // than the routing — it fails only if the two ever diverge.
+    expect(
+      breakdown.find((row) => row.key === 'claude-opus-4-5-20251101')?.estimatedCostUsd
+    ).toBeCloseTo(11.025)
+  })
+
+  it('drops a genuinely unknown model from cost and reports it once, not per row', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const store = createStoreWithState({
+      dailyAggregates: ['2026-04-08', '2026-04-09'].map((day) => ({
+        day,
+        model: 'someone-elses-llm-9',
+        projectKey: 'worktree:repo-1::/workspace/repo-a',
+        projectLabel: 'Repo A',
+        repoId: 'repo-1',
+        worktreeId: 'repo-1::/workspace/repo-a',
+        turnCount: 1,
+        zeroCacheReadTurnCount: 0,
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+        cacheReadTokens: 1_000_000,
+        cacheWriteTokens: 1_000_000
+      }))
+    })
+
+    const summary = await store.getSummary('orca', '30d')
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(summary.estimatedCostUsd).toBeNull()
+    expect(summary.inputTokens).toBe(2_000_000)
+    expect(breakdown[0]?.estimatedCostUsd).toBeNull()
+    expect(
+      consoleError.mock.calls.filter((call) => String(call[0]).includes('someone-elses-llm-9'))
+    ).toHaveLength(1)
+
+    consoleError.mockRestore()
+  })
+
   it('prices unknown newer Opus 4 point releases with current Opus rates', async () => {
     const store = createStoreWithState({
       dailyAggregates: [

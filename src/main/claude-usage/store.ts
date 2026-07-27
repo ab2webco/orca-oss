@@ -50,6 +50,13 @@ type AutomationUsageLookupInput = {
 }
 
 const LONG_CONTEXT_THRESHOLD_TOKENS = 200_000
+const SONNET_5_STANDARD_PRICING_START_DAY = '2026-09-01'
+const SONNET_5_STANDARD_PRICING = {
+  input: 3,
+  output: 15,
+  cacheRead: 0.3,
+  cacheWrite: 3.75
+} satisfies ClaudeModelPricing
 const SONNET_LONG_CONTEXT_PRICING = {
   thresholdTokens: LONG_CONTEXT_THRESHOLD_TOKENS,
   inputAboveThreshold: 6,
@@ -59,12 +66,18 @@ const SONNET_LONG_CONTEXT_PRICING = {
 } satisfies Partial<ClaudeModelPricing>
 
 const MODEL_PRICING: Record<string, ClaudeModelPricing> = {
+  'claude-fable-5': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-1': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   'claude-opus-4': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
+  // Why: introductory rates, in effect through 2026-08-31; SONNET_5_STANDARD_PRICING
+  // takes over from 2026-09-01. Unlike Sonnet 4.x it bills its full 1M window flat,
+  // so no long-context tier here.
+  'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'claude-sonnet-4-6': {
     input: 3,
     output: 15,
@@ -102,6 +115,9 @@ const MODEL_ALIASES: Record<string, string> = {
   'claude-opus-4.8-thinking': 'claude-opus-4-8',
   'claude-opus-4.6-thinking': 'claude-opus-4-6',
   'claude-sonnet-4.6-thinking': 'claude-sonnet-4-6',
+  'claude-opus-5-thinking': 'claude-opus-5',
+  'claude-sonnet-5-thinking': 'claude-sonnet-5',
+  'claude-fable-5-thinking': 'claude-fable-5',
   'claude-opus-4-8-thinking': 'claude-opus-4-8',
   'claude-opus-4-6-thinking': 'claude-opus-4-6',
   'claude-sonnet-4-6-thinking': 'claude-sonnet-4-6'
@@ -155,6 +171,15 @@ function normalizeModelForPricing(model: string | null): string | null {
   const alias = MODEL_ALIASES[lower]
   if (alias) {
     return alias
+  }
+  if (hasClaudeModelVersion(lower, 'fable', '5')) {
+    return 'claude-fable-5'
+  }
+  if (hasClaudeModelVersion(lower, 'opus', '5')) {
+    return 'claude-opus-5'
+  }
+  if (hasClaudeModelVersion(lower, 'sonnet', '5')) {
+    return 'claude-sonnet-5'
   }
   if (hasClaudeModelVersion(lower, 'opus', '4-8')) {
     return 'claude-opus-4-8'
@@ -236,13 +261,15 @@ function estimateCostUsd(
   inputTokens: number,
   outputTokens: number,
   cacheReadTokens: number,
-  cacheWriteTokens: number
+  cacheWriteTokens: number,
+  day?: string | null
 ): number | null {
   const normalized = normalizeModelForPricing(model)
   if (!normalized) {
+    reportUnpricedModel(model)
     return null
   }
-  const pricing = MODEL_PRICING[normalized]
+  const pricing = resolvePricingForDay(normalized, day)
   return (
     (calculateTieredCost(
       inputTokens,
@@ -272,6 +299,43 @@ function estimateCostUsd(
   )
 }
 
+// Why: an unpriced model is dropped from the cost total silently, so the next new
+// model goes unbilled until someone audits by hand. Warn once per model — this runs
+// per aggregate row on every refresh, and a null model is legitimately unpriceable.
+const unpricedModelsReported = new Set<string>()
+
+function reportUnpricedModel(model: string | null): void {
+  if (!model) {
+    return
+  }
+  const key = model.toLowerCase().trim()
+  if (unpricedModelsReported.has(key)) {
+    return
+  }
+  unpricedModelsReported.add(key)
+  console.error(
+    `[claude-usage] No pricing entry for model "${model}"; its cost is excluded from the breakdown.`
+  )
+}
+
+function resolvePricingForDay(normalizedModel: string, day?: string | null): ClaudeModelPricing {
+  const effectiveDay = day ?? formatLocalDay(new Date())
+  if (
+    normalizedModel === 'claude-sonnet-5' &&
+    effectiveDay >= SONNET_5_STANDARD_PRICING_START_DAY
+  ) {
+    return SONNET_5_STANDARD_PRICING
+  }
+  return MODEL_PRICING[normalizedModel]
+}
+
+function formatLocalDay(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function getRangeCutoff(range: ClaudeUsageRange): string | null {
   if (range === 'all') {
     return null
@@ -280,10 +344,7 @@ function getRangeCutoff(range: ClaudeUsageRange): string | null {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   now.setDate(now.getDate() - (days - 1))
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatLocalDay(now)
 }
 
 function getLocalDay(timestamp: string): string | null {
@@ -291,10 +352,7 @@ function getLocalDay(timestamp: string): string | null {
   if (Number.isNaN(parsed.getTime())) {
     return null
   }
-  const year = parsed.getFullYear()
-  const month = String(parsed.getMonth() + 1).padStart(2, '0')
-  const day = String(parsed.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatLocalDay(parsed)
 }
 
 function getWorktreeFingerprint(worktreesByRepo: Map<string, UsageWorktreeRef[]>): string {
@@ -494,7 +552,8 @@ export class ClaudeUsageStore {
         row.inputTokens,
         row.outputTokens,
         row.cacheReadTokens,
-        row.cacheWriteTokens
+        row.cacheWriteTokens,
+        row.day
       )
       if (cost !== null) {
         hasAnyBillableCost = true
@@ -595,6 +654,19 @@ export class ClaudeUsageStore {
       existing.outputTokens += daily.outputTokens
       existing.cacheReadTokens += daily.cacheReadTokens
       existing.cacheWriteTokens += daily.cacheWriteTokens
+      if (kind === 'model') {
+        const cost = estimateCostUsd(
+          daily.model,
+          daily.inputTokens,
+          daily.outputTokens,
+          daily.cacheReadTokens,
+          daily.cacheWriteTokens,
+          daily.day
+        )
+        if (cost !== null) {
+          existing.estimatedCostUsd = (existing.estimatedCostUsd ?? 0) + cost
+        }
+      }
       rows.set(key, existing)
     }
 
@@ -620,18 +692,6 @@ export class ClaudeUsageStore {
         if (row) {
           row.sessions++
         }
-      }
-    }
-
-    for (const row of rows.values()) {
-      if (kind === 'model') {
-        row.estimatedCostUsd = estimateCostUsd(
-          row.key,
-          row.inputTokens,
-          row.outputTokens,
-          row.cacheReadTokens,
-          row.cacheWriteTokens
-        )
       }
     }
 
@@ -795,7 +855,8 @@ export class ClaudeUsageStore {
       totals.inputTokens,
       totals.outputTokens,
       totals.cacheReadTokens,
-      totals.cacheWriteTokens
+      totals.cacheWriteTokens,
+      getLocalDay(session.lastTimestamp)
     )
 
     return {
