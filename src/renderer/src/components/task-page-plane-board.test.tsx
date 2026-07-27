@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const { confirmationMocks, runtimeMocks, storeMocks, toastMocks } = vi.hoisted(() => ({
   confirmationMocks: { confirm: vi.fn() },
@@ -31,7 +32,7 @@ vi.mock('@/store', () => ({
 vi.mock('sonner', () => ({ toast: toastMocks }))
 
 import { TaskPagePlaneBoard } from './task-page-plane-board'
-import type { PlaneWorkItem } from '../../../shared/plane-types'
+import type { PlaneState, PlaneWorkItem } from '../../../shared/plane-types'
 
 afterEach(() => {
   cleanup()
@@ -57,15 +58,17 @@ function planeWorkItem(identifier: string, title: string): PlaneWorkItem {
 
 function renderBoard(item: PlaneWorkItem): ReturnType<typeof render> {
   return render(
-    <TaskPagePlaneBoard
-      items={[item]}
-      projectId="proj-1"
-      workspaceId="ws-1"
-      providerSettings={null}
-      selectedItemId={null}
-      getStateTone={() => ''}
-      onOpenItem={vi.fn()}
-    />
+    <TooltipProvider>
+      <TaskPagePlaneBoard
+        items={[item]}
+        projectId="proj-1"
+        workspaceId="ws-1"
+        providerSettings={null}
+        selectedItemId={null}
+        getStateTone={() => ''}
+        onOpenItem={vi.fn()}
+      />
+    </TooltipProvider>
   )
 }
 
@@ -163,6 +166,58 @@ describe('TaskPagePlaneBoard card creation failures', () => {
     expect(consoleError).toHaveBeenCalledWith(
       '[plane-board] mutation failed:',
       'net::ERR_INTERNET_DISCONNECTED'
+    )
+  })
+})
+
+describe('TaskPagePlaneBoard column creation position', () => {
+  it('keeps a created column when positioning fails and explains that it remains at the end', async () => {
+    const states: PlaneState[] = [
+      { id: 'state-1', name: 'Todo', group: 'unstarted', sequence: 1000 },
+      { id: 'state-2', name: 'Doing', group: 'started', sequence: 2000 }
+    ]
+    runtimeMocks.planeListStates.mockResolvedValue(states)
+    runtimeMocks.planeCreateState.mockResolvedValue({
+      ok: true,
+      state: {
+        id: 'state-new',
+        name: 'Review',
+        group: 'started',
+        sequence: 20000
+      }
+    })
+    runtimeMocks.planeUpdateState.mockResolvedValue({
+      ok: false,
+      error: 'Plane rejected the sequence.'
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const user = userEvent.setup()
+    renderBoard(planeWorkItem('ORCA-7', 'Existing work item'))
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Add column here' })).toHaveLength(2)
+    )
+    await user.click(screen.getAllByRole('button', { name: 'Add column here' })[1])
+    await user.type(screen.getByRole('textbox', { name: 'Column name' }), 'Review')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() =>
+      expect(runtimeMocks.planeUpdateState).toHaveBeenCalledWith(
+        null,
+        { projectId: 'proj-1', stateId: 'state-new', sequence: 1500 },
+        'ws-1'
+      )
+    )
+    expect(runtimeMocks.planeDeleteState).not.toHaveBeenCalled()
+    expect(toastMocks.error).toHaveBeenCalledWith(
+      "The column was created at the end, but couldn't be moved into position. You can drag it into place."
+    )
+    expect(consoleError).toHaveBeenCalledWith(
+      '[plane-board] mutation failed:',
+      'Plane rejected the sequence.'
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Column name' })).not.toBeInTheDocument()
     )
   })
 })

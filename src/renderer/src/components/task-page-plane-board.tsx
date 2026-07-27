@@ -17,7 +17,6 @@ import { translate } from '@/i18n/i18n'
 import { useConfirmationDialog } from './confirmation-dialog'
 import {
   planeCreateWorkItem,
-  planeCreateState,
   planeDeleteState,
   planeListStates,
   planeUpdateState,
@@ -26,7 +25,7 @@ import {
 } from '@/runtime/runtime-plane-client'
 import { confirmAndDeletePlaneWorkItem } from './plane-board-card-delete'
 import { getPlaneMutationErrorMessage } from './plane-mutation-error-message'
-import { PlaneBoardAddColumn } from './plane-board-add-column'
+import { createPlaneBoardColumnAtPosition, PlaneBoardAddColumn } from './plane-board-add-column'
 import { PlaneBoardCard } from './plane-board-card'
 import { PlaneBoardColumnView } from './plane-board-column'
 import { PlaneBoardFloatingMinimap } from './plane-board-floating-minimap'
@@ -165,29 +164,6 @@ export function TaskPagePlaneBoard({
     [providerSettings, projectId, workspaceId, onItemCreated]
   )
 
-  const handleCreateColumn = useCallback(
-    async (name: string, group: PlaneStateGroup): Promise<boolean> => {
-      const result = await planeCreateState(
-        providerSettings,
-        { projectId, name, group },
-        workspaceId
-      )
-      if (!result.ok) {
-        showPlaneMutationError(
-          result.error,
-          translate(
-            'auto.components.task-page-plane-board.createFailed',
-            'Failed to create column.'
-          )
-        )
-        return false
-      }
-      await refreshStates()
-      return true
-    },
-    [providerSettings, projectId, workspaceId, refreshStates]
-  )
-
   // Drop overrides that an incoming refresh has already reconciled.
   useEffect(() => {
     setOverrides((current) => reconcilePlaneBoardOverrides(current, items))
@@ -202,6 +178,26 @@ export function TaskPagePlaneBoard({
   }, [items, projectStates, overrides])
 
   const columnStateIds = useMemo(() => columns.map((column) => column.stateId), [columns])
+
+  const handleCreateColumn = useCallback(
+    async (insertionIndex: number, name: string, group: PlaneStateGroup): Promise<boolean> => {
+      const result = await createPlaneBoardColumnAtPosition({
+        providerSettings,
+        projectId,
+        workspaceId,
+        name,
+        group,
+        insertionIndex,
+        states: columns.map((column) => column.state),
+        showError: showPlaneMutationError
+      })
+      if (result) {
+        await refreshStates()
+      }
+      return result
+    },
+    [providerSettings, projectId, workspaceId, columns, refreshStates]
+  )
 
   const activeItem = useMemo(
     () =>
@@ -411,21 +407,27 @@ export function TaskPagePlaneBoard({
             className="flex h-full min-h-0 gap-3 overflow-x-auto scrollbar-sleek p-3"
           >
             <SortableContext items={columnStateIds} strategy={horizontalListSortingStrategy}>
-              {columns.map((column) => (
-                <PlaneBoardColumnView
-                  key={column.stateId}
-                  column={column}
-                  getStateTone={getStateTone}
-                  selectedItemId={selectedItemId}
-                  onOpenItem={onOpenItem}
-                  onRenameColumn={handleRenameColumn}
-                  onDeleteColumn={handleDeleteColumn}
-                  onCreateItem={handleCreateItem}
-                  onDeleteItem={handleDeleteItem}
-                />
+              {columns.map((column, index) => (
+                <React.Fragment key={column.stateId}>
+                  <PlaneBoardAddColumn
+                    compact
+                    insertionIndex={index}
+                    onCreate={handleCreateColumn}
+                  />
+                  <PlaneBoardColumnView
+                    column={column}
+                    getStateTone={getStateTone}
+                    selectedItemId={selectedItemId}
+                    onOpenItem={onOpenItem}
+                    onRenameColumn={handleRenameColumn}
+                    onDeleteColumn={handleDeleteColumn}
+                    onCreateItem={handleCreateItem}
+                    onDeleteItem={handleDeleteItem}
+                  />
+                </React.Fragment>
               ))}
             </SortableContext>
-            <PlaneBoardAddColumn onCreate={handleCreateColumn} />
+            <PlaneBoardAddColumn insertionIndex={columns.length} onCreate={handleCreateColumn} />
           </div>
           <PlaneBoardFloatingMinimap
             columnCount={columns.length}

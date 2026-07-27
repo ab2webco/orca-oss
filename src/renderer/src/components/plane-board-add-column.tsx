@@ -2,8 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 
 import { translate } from '@/i18n/i18n'
+import {
+  planeCreateState,
+  planeUpdateState,
+  type RuntimePlaneSettings
+} from '@/runtime/runtime-plane-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -11,11 +17,14 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import type { PlaneStateGroup } from '../../../shared/plane-types'
+import { planPlaneBoardColumnInsertion } from './plane-board-drag'
+import type { PlaneState, PlaneStateGroup } from '../../../shared/plane-types'
 
 type PlaneBoardAddColumnProps = {
+  compact?: boolean
+  insertionIndex: number
   /** Returns true on success so the form can reset and close. */
-  onCreate: (name: string, group: PlaneStateGroup) => Promise<boolean>
+  onCreate: (insertionIndex: number, name: string, group: PlaneStateGroup) => Promise<boolean>
 }
 
 const STATE_GROUPS: readonly PlaneStateGroup[] = [
@@ -25,6 +34,50 @@ const STATE_GROUPS: readonly PlaneStateGroup[] = [
   'completed',
   'cancelled'
 ]
+
+export async function createPlaneBoardColumnAtPosition(args: {
+  providerSettings: RuntimePlaneSettings
+  projectId: string
+  workspaceId: string | null
+  name: string
+  group: PlaneStateGroup
+  insertionIndex: number
+  states: readonly PlaneState[]
+  showError: (error: unknown, fallback: string) => void
+}): Promise<boolean> {
+  const created = await planeCreateState(
+    args.providerSettings,
+    { projectId: args.projectId, name: args.name, group: args.group },
+    args.workspaceId
+  )
+  if (!created.ok) {
+    args.showError(
+      created.error,
+      translate('auto.components.task-page-plane-board.createFailed', 'Failed to create column.')
+    )
+    return false
+  }
+  const sequence = planPlaneBoardColumnInsertion(
+    args.states.map((state) => state.id),
+    new Map(args.states.map((state) => [state.id, state.sequence] as const)),
+    args.insertionIndex
+  )
+  const positioned = await planeUpdateState(
+    args.providerSettings,
+    { projectId: args.projectId, stateId: created.state.id, sequence },
+    args.workspaceId
+  )
+  if (!positioned.ok) {
+    args.showError(
+      positioned.error,
+      translate(
+        'auto.components.task-page-plane-board.createPositionFailed',
+        "The column was created at the end, but couldn't be moved into position. You can drag it into place."
+      )
+    )
+  }
+  return true
+}
 
 function groupLabel(group: PlaneStateGroup): string {
   switch (group) {
@@ -41,10 +94,11 @@ function groupLabel(group: PlaneStateGroup): string {
   }
 }
 
-// Slim column-width affordance at the end of the board row: a "+ Add column"
-// button that reveals an inline name + state-group form. Board-mode single
-// project only (the board itself is disabled for "all projects").
-export function PlaneBoardAddColumn({ onCreate }: PlaneBoardAddColumnProps): React.JSX.Element {
+export function PlaneBoardAddColumn({
+  compact = false,
+  insertionIndex,
+  onCreate
+}: PlaneBoardAddColumnProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [group, setGroup] = useState<PlaneStateGroup>('unstarted')
@@ -69,12 +123,12 @@ export function PlaneBoardAddColumn({ onCreate }: PlaneBoardAddColumnProps): Rea
       return
     }
     setSubmitting(true)
-    const ok = await onCreate(trimmed, group)
+    const ok = await onCreate(insertionIndex, trimmed, group)
     setSubmitting(false)
     if (ok) {
       reset()
     }
-  }, [name, group, submitting, onCreate, reset])
+  }, [name, group, submitting, insertionIndex, onCreate, reset])
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -90,6 +144,28 @@ export function PlaneBoardAddColumn({ onCreate }: PlaneBoardAddColumnProps): Rea
   )
 
   if (!open) {
+    if (compact) {
+      const label = translate('auto.components.plane-board-add-column.addHere', 'Add column here')
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={label}
+              onClick={() => setOpen(true)}
+              className="h-8 w-6 shrink-0 self-start border border-dashed border-border/50 text-muted-foreground hover:border-ring/50 hover:text-foreground"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={4}>
+            {label}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
     return (
       <button
         type="button"

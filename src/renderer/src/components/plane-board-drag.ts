@@ -133,6 +133,12 @@ export function readPlaneBoardDragStateId(data: unknown): string | null {
 // sends to Plane (`sequence` is Plane's source of truth for column order).
 export type PlaneBoardSequenceUpdate = { stateId: string; sequence: number }
 
+const COLUMN_SEQUENCE_STEP = 1000
+
+function sequenceForReorderIndex(index: number): number {
+  return (index + 1) * COLUMN_SEQUENCE_STEP
+}
+
 // Map a reordered stateId list to per-state `sequence` PATCH payloads. Sequences
 // are spaced by 1000 so a later single-column insert between two columns has room
 // without renumbering the whole board. Only states whose sequence actually
@@ -143,12 +149,41 @@ export function planPlaneBoardColumnReorder(
 ): PlaneBoardSequenceUpdate[] {
   const updates: PlaneBoardSequenceUpdate[] = []
   orderedStateIds.forEach((stateId, index) => {
-    const sequence = (index + 1) * 1000
+    const sequence = sequenceForReorderIndex(index)
     if (currentSequenceByStateId.get(stateId) !== sequence) {
       updates.push({ stateId, sequence })
     }
   })
   return updates
+}
+
+export function planPlaneBoardColumnInsertion(
+  orderedStateIds: readonly string[],
+  currentSequenceByStateId: ReadonlyMap<string, number | undefined>,
+  insertionIndex: number
+): number {
+  const index = Math.max(0, Math.min(insertionIndex, orderedStateIds.length))
+  const leftId = orderedStateIds[index - 1]
+  const rightId = orderedStateIds[index]
+  const left =
+    leftId === undefined
+      ? undefined
+      : (currentSequenceByStateId.get(leftId) ?? sequenceForReorderIndex(index - 1))
+  const right =
+    rightId === undefined
+      ? undefined
+      : (currentSequenceByStateId.get(rightId) ?? sequenceForReorderIndex(index))
+
+  if (left !== undefined && right !== undefined) {
+    return left + (right - left) / 2
+  }
+  if (left !== undefined) {
+    return left + COLUMN_SEQUENCE_STEP
+  }
+  if (right !== undefined) {
+    return right > 0 ? right / 2 : right - COLUMN_SEQUENCE_STEP
+  }
+  return COLUMN_SEQUENCE_STEP
 }
 
 function findWorkItem(

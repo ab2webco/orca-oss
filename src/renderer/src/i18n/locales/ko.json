@@ -14345,6 +14345,7 @@
         "updateFailed": "Failed to move work item.",
         "renameFailed": "Failed to rename column.",
         "createFailed": "Failed to create column.",
+        "createPositionFailed": "열이 끝에 생성되었지만 선택한 위치로 이동하지 못했습니다. 드래그하여 옮길 수 있습니다.",
         "reorderFailed": "Failed to reorder columns.",
         "deleteFailed": "Failed to delete column.",
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
@@ -14362,6 +14363,7 @@
       },
       "plane-board-add-column": {
         "add": "Add column",
+        "addHere": "여기에 열 추가",
         "namePlaceholder": "Column name",
         "nameLabel": "Column name",
         "groupLabel": "State group",

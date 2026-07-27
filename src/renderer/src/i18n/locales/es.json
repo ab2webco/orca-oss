@@ -14345,6 +14345,7 @@
         "updateFailed": "No se pudo mover el elemento.",
         "renameFailed": "No se pudo renombrar la columna.",
         "createFailed": "No se pudo crear la columna.",
+        "createPositionFailed": "La columna se creó al final, pero no se pudo mover a la posición elegida. Puedes arrastrarla hasta allí.",
         "reorderFailed": "No se pudieron reordenar las columnas.",
         "deleteFailed": "No se pudo eliminar la columna.",
         "deleteConfirmTitle": "¿Eliminar la columna «{{value0}}»?",
@@ -14362,6 +14363,7 @@
       },
       "plane-board-add-column": {
         "add": "Añadir columna",
+        "addHere": "Añadir columna aquí",
         "namePlaceholder": "Nombre de la columna",
         "nameLabel": "Nombre de la columna",
         "groupLabel": "Grupo de estado",

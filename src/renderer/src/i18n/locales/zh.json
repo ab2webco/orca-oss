@@ -14345,6 +14345,7 @@
         "updateFailed": "Failed to move work item.",
         "renameFailed": "Failed to rename column.",
         "createFailed": "Failed to create column.",
+        "createPositionFailed": "该列已在末尾创建，但无法移动到所选位置。你可以将其拖动到相应位置。",
         "reorderFailed": "Failed to reorder columns.",
         "deleteFailed": "Failed to delete column.",
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
@@ -14362,6 +14363,7 @@
       },
       "plane-board-add-column": {
         "add": "Add column",
+        "addHere": "在此处添加列",
         "namePlaceholder": "Column name",
         "nameLabel": "Column name",
         "groupLabel": "State group",

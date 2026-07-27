@@ -14345,6 +14345,7 @@
         "updateFailed": "Failed to move work item.",
         "renameFailed": "Failed to rename column.",
         "createFailed": "Failed to create column.",
+        "createPositionFailed": "列は末尾に作成されましたが、指定した位置に移動できませんでした。ドラッグして移動できます。",
         "reorderFailed": "Failed to reorder columns.",
         "deleteFailed": "Failed to delete column.",
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
@@ -14362,6 +14363,7 @@
       },
       "plane-board-add-column": {
         "add": "Add column",
+        "addHere": "ここに列を追加",
         "namePlaceholder": "Column name",
         "nameLabel": "Column name",
         "groupLabel": "State group",

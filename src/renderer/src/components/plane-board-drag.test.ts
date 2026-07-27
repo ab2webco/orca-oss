@@ -3,6 +3,7 @@ import type { PlaneState, PlaneWorkItem } from '../../../shared/plane-types'
 import {
   applyPlaneBoardStateOverrides,
   parsePlaneBoardColumnDroppableId,
+  planPlaneBoardColumnInsertion,
   planPlaneBoardColumnReorder,
   planPlaneBoardDrop,
   planeBoardColumnDroppableId,
@@ -166,6 +167,34 @@ describe('planPlaneBoardColumnReorder', () => {
     expect(
       planPlaneBoardColumnReorder(['state-todo', 'state-doing', 'state-done'], current)
     ).toEqual([])
+  })
+})
+
+describe('planPlaneBoardColumnInsertion', () => {
+  const current = new Map<string, number | undefined>([
+    ['state-todo', 1000],
+    ['state-doing', 2000],
+    ['state-done', 3000]
+  ])
+  const ordered = ['state-todo', 'state-doing', 'state-done']
+
+  it('plans distinct sequences at the beginning, middle, and end', () => {
+    expect(planPlaneBoardColumnInsertion(ordered, current, 0)).toBe(500)
+    expect(planPlaneBoardColumnInsertion(ordered, current, 1)).toBe(1500)
+    expect(planPlaneBoardColumnInsertion(ordered, current, 3)).toBe(4000)
+  })
+
+  it('does not collide when two columns are inserted successively at the same position', () => {
+    const afterFirst = new Map(current)
+    afterFirst.set('state-first-new', 1500)
+
+    expect(
+      planPlaneBoardColumnInsertion(
+        ['state-todo', 'state-first-new', 'state-doing', 'state-done'],
+        afterFirst,
+        1
+      )
+    ).toBe(1250)
   })
 })
 

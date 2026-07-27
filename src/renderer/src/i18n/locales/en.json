@@ -14368,6 +14368,7 @@
         "updateFailed": "Failed to move work item.",
         "renameFailed": "Failed to rename column.",
         "createFailed": "Failed to create column.",
+        "createPositionFailed": "The column was created at the end, but couldn't be moved into position. You can drag it into place.",
         "reorderFailed": "Failed to reorder columns.",
         "deleteFailed": "Failed to delete column.",
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
@@ -14385,6 +14386,7 @@
       },
       "plane-board-add-column": {
         "add": "Add column",
+        "addHere": "Add column here",
         "namePlaceholder": "Column name",
         "nameLabel": "Column name",
         "groupLabel": "State group",
