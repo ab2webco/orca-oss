@@ -33,6 +33,33 @@ export type ManagedClaudeRefreshChainAliasStatus =
   | { status: 'unresolved' }
   | { status: 'alias-conflict'; accountIds: string[] }
 
+export type ManagedClaudeRefreshChainAliasReportAccount = {
+  accountId: string
+  profileKey: string
+  profileScope: 'current' | 'other'
+  email: string | null
+}
+
+export type ManagedClaudeRefreshChainAliasConflictSet = {
+  conflictId: string
+  certainty: 'recorded-chain-match'
+  accounts: ManagedClaudeRefreshChainAliasReportAccount[]
+  remediation: {
+    action: 'reauthenticate-one-account'
+    accountDirectoryPolicy: 'preserve'
+  }
+}
+
+export type ManagedClaudeRefreshChainAliasReport =
+  | {
+      status: 'available'
+      conflictSets: ManagedClaudeRefreshChainAliasConflictSet[]
+    }
+  | {
+      status: 'unavailable'
+      conflictSets: []
+    }
+
 export async function inspectManagedClaudeRefreshChainAliases(
   accountId: string,
   candidateChainKey: ClaudeRefreshChainFingerprint,
@@ -76,6 +103,91 @@ export async function reconcileManagedClaudeRefreshChainAliases(
   } catch {
     // Rotation still fails closed when the registry cannot be reconciled.
   }
+}
+
+export async function reportManagedClaudeRefreshChainAliases(
+  dependencies: AliasRegistryDependencies = {}
+): Promise<ManagedClaudeRefreshChainAliasReport> {
+  try {
+    const rootPath =
+      dependencies.rootPath ??
+      join(homedir(), '.orca', 'claude-refresh-chain-leases', 'managed-aliases')
+    const profilePath = dependencies.profilePath ?? app.getPath('userData')
+    const accounts = dependencies.accounts ?? getManagedClaudeRefreshAccounts()
+    await reconcileProfileAliases(
+      rootPath,
+      profilePath,
+      accounts,
+      dependencies.readManagedCredentials ?? readManagedClaudeRefreshCredentials,
+      dependencies.prune ?? true
+    )
+    return {
+      status: 'available',
+      conflictSets: buildAliasConflictSets(readAliasRecords(rootPath), profilePath, accounts)
+    }
+  } catch {
+    return { status: 'unavailable', conflictSets: [] }
+  }
+}
+
+function buildAliasConflictSets(
+  records: readonly AliasRecord[],
+  profilePath: string,
+  accounts: readonly ClaudeManagedAccount[]
+): ManagedClaudeRefreshChainAliasConflictSet[] {
+  const currentProfileKey = stableKey(profilePath)
+  const currentAccounts = new Map(accounts.map((account) => [account.id, account]))
+  const recordsByChain = new Map<ClaudeRefreshChainFingerprint, AliasRecord[]>()
+  for (const record of records) {
+    const chainRecords = recordsByChain.get(record.chainKey) ?? []
+    if (
+      !chainRecords.some(
+        (candidate) =>
+          candidate.profileKey === record.profileKey && candidate.accountId === record.accountId
+      )
+    ) {
+      chainRecords.push(record)
+      recordsByChain.set(record.chainKey, chainRecords)
+    }
+  }
+  return [...recordsByChain.entries()]
+    .filter(([, chainRecords]) => chainRecords.length > 1)
+    .map(
+      ([chainKey, chainRecords]): ManagedClaudeRefreshChainAliasConflictSet => ({
+        conflictId: stableKey(chainKey),
+        certainty: 'recorded-chain-match',
+        accounts: chainRecords
+          .map((record) => {
+            const isCurrentProfile = record.profileKey === currentProfileKey
+            return {
+              accountId: record.accountId,
+              profileKey: record.profileKey,
+              profileScope: isCurrentProfile ? ('current' as const) : ('other' as const),
+              email: isCurrentProfile
+                ? (currentAccounts.get(record.accountId)?.email ?? null)
+                : null
+            }
+          })
+          .sort(compareReportAccounts),
+        remediation: {
+          action: 'reauthenticate-one-account',
+          accountDirectoryPolicy: 'preserve'
+        }
+      })
+    )
+    .sort((left, right) => left.conflictId.localeCompare(right.conflictId))
+}
+
+function compareReportAccounts(
+  left: ManagedClaudeRefreshChainAliasReportAccount,
+  right: ManagedClaudeRefreshChainAliasReportAccount
+): number {
+  if (left.profileScope !== right.profileScope) {
+    return left.profileScope === 'current' ? -1 : 1
+  }
+  return (
+    left.profileKey.localeCompare(right.profileKey) || left.accountId.localeCompare(right.accountId)
+  )
 }
 
 async function reconcileProfileAliases(
@@ -130,7 +242,7 @@ function writeAliasRecord(path: string, record: AliasRecord): void {
 
 function readAliasRecords(rootPath: string): AliasRecord[] {
   const records: AliasRecord[] = []
-  for (const profileName of readdirSync(rootPath)) {
+  for (const profileName of safeReadDirectory(rootPath)) {
     const profilePath = join(rootPath, profileName)
     for (const filename of safeReadDirectory(profilePath)) {
       if (!filename.endsWith('.json')) {

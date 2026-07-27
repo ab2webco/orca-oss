@@ -64,3 +64,18 @@ export async function closeLiveClaudeTerminalsForAccount(
     )
   }
 }
+
+/**
+ * Close terminals for several accounts in one pass. The runtime-auth sync guards
+ * the *active* account's pinned CLIs, which can be a different account than the
+ * one being changed — clearing only the changed account leaves that block in
+ * place with no path out of the UI.
+ */
+export async function closeLiveClaudeTerminalsForAccounts(
+  accountIds: readonly string[],
+  terminate: ClaudePtyTerminator
+): Promise<void> {
+  for (const accountId of new Set(accountIds)) {
+    await closeLiveClaudeTerminalsForAccount(accountId, terminate)
+  }
+}

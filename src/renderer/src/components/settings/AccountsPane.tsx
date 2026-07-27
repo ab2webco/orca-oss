@@ -68,6 +68,9 @@ import {
 } from './accounts-search'
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
+import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
+import { classifyClaudeAccountBlock } from './claude-account-reassign-plan'
+import { useClaudeAccountReassign } from './use-claude-account-reassign'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { SearchableSetting } from './SearchableSetting'
@@ -98,11 +101,9 @@ import { cn } from '@/lib/utils'
 import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
-  countLiveClaudeTerminalsForAccount,
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
   hasRemoteProviderAccountOwner,
-  removeClaudeProviderAccount,
   removeCodexProviderAccount,
   selectClaudeProviderAccount,
   selectCodexProviderAccount,
@@ -418,6 +419,7 @@ export function AccountsPane({
     | 'resyncing'
     | `reauth:${string}`
     | `remove:${string}`
+    | `reassign:${string}`
     | `select:${string | 'system'}`
   >('idle')
   const [addEndpointOpen, setAddEndpointOpen] = useState(false)
@@ -438,39 +440,6 @@ export function AccountsPane({
     id: string
     runtime: ProviderAccountRuntimeView
   } | null>(null)
-  const [removeClaudeTarget, setRemoveClaudeTarget] = useState<{
-    id: string
-    runtime: ProviderAccountRuntimeView
-  } | null>(null)
-  // Why: null = still counting; the dialog stays generic until the live-terminal
-  // count resolves so the destructive "Close & delete" path is never offered blind.
-  const [removeClaudeLiveTerminalCount, setRemoveClaudeLiveTerminalCount] = useState<number | null>(
-    null
-  )
-  useEffect(() => {
-    if (!removeClaudeTarget) {
-      setRemoveClaudeLiveTerminalCount(null)
-      return
-    }
-    let cancelled = false
-    setRemoveClaudeLiveTerminalCount(null)
-    void countLiveClaudeTerminalsForAccount(settings, removeClaudeTarget.id)
-      .then((count) => {
-        if (!cancelled) {
-          setRemoveClaudeLiveTerminalCount(count)
-        }
-      })
-      .catch(() => {
-        // Why: fall back to the plain-delete copy if counting fails rather than
-        // block removal entirely.
-        if (!cancelled) {
-          setRemoveClaudeLiveTerminalCount(0)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [removeClaudeTarget, settings])
   const accountVisibilityOptions = {
     remoteOwner: isRemoteAccountScope,
     ownerPlatform: accountOwnerPlatform
@@ -829,7 +798,10 @@ export function AccountsPane({
   const runClaudeAccountAction = async (
     action: typeof claudeAction,
     operation: () => Promise<ClaudeRateLimitAccountsState>,
-    actionRuntime: ProviderAccountRuntimeView = accountRuntime
+    actionRuntime: ProviderAccountRuntimeView = accountRuntime,
+    // Why: when the live-PTY gate refuses this account, name what is holding it
+    // and offer the reassignment instead of a toast that leads nowhere.
+    blockedAccountId?: string
   ): Promise<void> => {
     const previousActiveAccountId = getProviderAccountActiveIdForView(claudeAccounts, actionRuntime)
     setClaudeAction(action)
@@ -863,19 +835,46 @@ export function AccountsPane({
       if (isClaudeAccountCancellation(error)) {
         return
       }
+      const description = getClaudeAccountErrorDescription(error)
+      if (blockedAccountId && classifyClaudeAccountBlock(description) !== null) {
+        claudeReassign.open({
+          accountId: blockedAccountId,
+          mode: 'unblock',
+          runtime: actionRuntime,
+          retry: operation
+        })
+        return
+      }
       toast.error(
         translate(
           'auto.components.settings.AccountsPane.2743cdc0af',
           'Claude account update failed.'
         ),
-        {
-          description: getClaudeAccountErrorDescription(error)
-        }
+        { description }
       )
     } finally {
       setClaudeAction('idle')
     }
   }
+
+  const claudeReassign = useClaudeAccountReassign({
+    settings,
+    runAction: (action, operation, runtime) => runClaudeAccountAction(action, operation, runtime)
+  })
+  // Why: every other managed account is a valid landing spot, including custom
+  // endpoints — a static token has no single-use refresh chain to fork.
+  const claudeReassignDestinations = [
+    {
+      accountId: null,
+      label: translate(
+        'auto.components.settings.AccountsPane.reassignSystemDefault',
+        'System default'
+      )
+    },
+    ...claudeAccounts.accounts
+      .filter((account) => account.id !== claudeReassign.target?.accountId)
+      .map((account) => ({ accountId: account.id, label: account.email }))
+  ]
 
   const [globalConfigSyncDialog, setGlobalConfigSyncDialog] = useState<{
     open: boolean
@@ -968,33 +967,38 @@ export function AccountsPane({
       return
     }
     const editingId = editEndpointAccountId
-    await runClaudeAccountAction('adding-endpoint', async () => {
-      const fields = {
-        label: endpointLabelDraft.trim(),
-        baseUrl: endpointBaseUrlDraft.trim(),
-        model: endpointModelDraft.trim() || null,
-        opusModel: endpointOpusModelDraft.trim() || null,
-        sonnetModel: endpointSonnetModelDraft.trim() || null,
-        haikuModel: endpointHaikuModelDraft.trim() || null,
-        subagentModel: endpointSubagentModelDraft.trim() || null
-      }
-      const next = editingId
-        ? await window.api.claudeAccounts.updateCustomEndpoint({
-            accountId: editingId,
-            // Blank token keeps the stored one.
-            token: endpointTokenDraft.trim() || null,
-            ...fields
-          })
-        : await window.api.claudeAccounts.addCustomEndpoint({
-            token: endpointTokenDraft.trim(),
-            ...fields
-          })
-      // Why: close only on success so a validation error keeps the draft editable.
-      setAddEndpointOpen(false)
-      setEditEndpointAccountId(null)
-      setEndpointTokenDraft('')
-      return next
-    })
+    await runClaudeAccountAction(
+      'adding-endpoint',
+      async () => {
+        const fields = {
+          label: endpointLabelDraft.trim(),
+          baseUrl: endpointBaseUrlDraft.trim(),
+          model: endpointModelDraft.trim() || null,
+          opusModel: endpointOpusModelDraft.trim() || null,
+          sonnetModel: endpointSonnetModelDraft.trim() || null,
+          haikuModel: endpointHaikuModelDraft.trim() || null,
+          subagentModel: endpointSubagentModelDraft.trim() || null
+        }
+        const next = editingId
+          ? await window.api.claudeAccounts.updateCustomEndpoint({
+              accountId: editingId,
+              // Blank token keeps the stored one.
+              token: endpointTokenDraft.trim() || null,
+              ...fields
+            })
+          : await window.api.claudeAccounts.addCustomEndpoint({
+              token: endpointTokenDraft.trim(),
+              ...fields
+            })
+        // Why: close only on success so a validation error keeps the draft editable.
+        setAddEndpointOpen(false)
+        setEditEndpointAccountId(null)
+        setEndpointTokenDraft('')
+        return next
+      },
+      accountRuntime,
+      editingId ?? undefined
+    )
   }
 
   const visibleSections = [
@@ -1413,7 +1417,8 @@ export function AccountsPane({
                                 accountId: account.id,
                                 ...accountRuntimeView
                               }),
-                            accountRuntimeView
+                            accountRuntimeView,
+                            account.id
                           )
                         }}
                         disabled={isBusy || isCustomEndpoint}
@@ -1489,7 +1494,8 @@ export function AccountsPane({
                                   window.api.claudeAccounts.reauthenticate({
                                     accountId: account.id
                                   }),
-                                getProviderAccountRuntime(account)
+                                getProviderAccountRuntime(account),
+                                account.id
                               )
                             }}
                             disabled={isRemoteAccountScope || isBusy}
@@ -1511,9 +1517,11 @@ export function AccountsPane({
                           size="xs"
                           onClick={(event) => {
                             event.stopPropagation()
-                            setRemoveClaudeTarget({
-                              id: account.id,
-                              runtime: getProviderAccountRuntime(account)
+                            claudeReassign.open({
+                              accountId: account.id,
+                              mode: 'remove',
+                              runtime: getProviderAccountRuntime(account),
+                              retry: null
                             })
                           }}
                           disabled={isBusy}
@@ -2469,70 +2477,19 @@ export function AccountsPane({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={removeClaudeTarget !== null}
-        onOpenChange={(open) => !open && setRemoveClaudeTarget(null)}
-      >
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>
-              {translate(
-                'auto.components.settings.AccountsPane.63843e37e2',
-                'Remove Claude Account?'
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {translate(
-                'auto.components.settings.AccountsPane.854ebbcc45',
-                'Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.'
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {(removeClaudeLiveTerminalCount ?? 0) > 0 ? (
-            <p className="text-sm text-destructive">
-              {removeClaudeLiveTerminalCount === 1
-                ? translate(
-                    'auto.components.settings.AccountsPane.claudeRemoveLiveOne',
-                    '1 live Claude terminal is using this account. It will be closed before the account is deleted.'
-                  )
-                : translate(
-                    'auto.components.settings.AccountsPane.claudeRemoveLiveMany',
-                    '{{count}} live Claude terminals are using this account. They will be closed before the account is deleted.',
-                    { count: removeClaudeLiveTerminalCount ?? 0 }
-                  )}
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveClaudeTarget(null)}>
-              {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={removeClaudeLiveTerminalCount === null}
-              onClick={() => {
-                const target = removeClaudeTarget
-                if (!target) {
-                  return
-                }
-                const closeLiveTerminals = (removeClaudeLiveTerminalCount ?? 0) > 0
-                setRemoveClaudeTarget(null)
-                void runClaudeAccountAction(
-                  `remove:${target.id}`,
-                  () => removeClaudeProviderAccount(settings, target.id, { closeLiveTerminals }),
-                  target.runtime
-                )
-              }}
-            >
-              {(removeClaudeLiveTerminalCount ?? 0) > 0
-                ? translate(
-                    'auto.components.settings.AccountsPane.claudeRemoveCloseAndDelete',
-                    'Close & delete'
-                  )
-                : translate('auto.components.settings.AccountsPane.c2d2751587', 'Remove Account')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ClaudeAccountReassignDialog
+        open={claudeReassign.target !== null}
+        onOpenChange={(open) => !open && claudeReassign.close()}
+        accountLabel={getClaudeAccountLabel(claudeAccounts, claudeReassign.target?.accountId)}
+        report={claudeReassign.report}
+        destinations={claudeReassignDestinations}
+        destination={claudeReassign.destination}
+        onDestinationChange={claudeReassign.setDestination}
+        mode={claudeReassign.target?.mode ?? 'remove'}
+        submitting={claudeAction.startsWith('remove:') || claudeAction.startsWith('reassign:')}
+        onConfirm={claudeReassign.confirm}
+        resolveAccountLabel={(accountId) => getClaudeAccountLabel(claudeAccounts, accountId)}
+      />
       <Dialog
         open={addEndpointOpen}
         onOpenChange={(open) => {

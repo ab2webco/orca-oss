@@ -4,6 +4,11 @@ import type {
   GlobalSettings
 } from '../../../shared/types'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
+import {
+  emptyClaudeAccountWorktreeUsageReport,
+  type ClaudeAccountWorktreeUsageReport,
+  type ClaudeWorktreeAccountReassignment
+} from '../../../shared/claude-account-worktree-usage'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
 
@@ -272,7 +277,11 @@ export async function selectCodexProviderAccount(
 export async function removeClaudeProviderAccount(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   accountId: string,
-  options: { closeLiveTerminals?: boolean } = {}
+  options: {
+    closeLiveTerminals?: boolean
+    closeLiveTerminalAccountIds?: readonly string[]
+    reassignPinnedTo?: string | null
+  } = {}
 ): Promise<ClaudeRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
@@ -287,8 +296,32 @@ export async function removeClaudeProviderAccount(
   }
   return window.api.claudeAccounts.remove({
     accountId,
-    closeLiveTerminals: options.closeLiveTerminals === true
+    closeLiveTerminals: options.closeLiveTerminals === true,
+    closeLiveTerminalAccountIds: options.closeLiveTerminalAccountIds,
+    reassignPinnedTo: options.reassignPinnedTo ?? null
   })
+}
+
+/** Describe the worktrees and live terminals holding a Claude account. Remote
+ *  runtimes own no host PTYs or pins here, so they report an unsupported empty. */
+export async function getClaudeAccountWorktreeUsage(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  accountId: string
+): Promise<ClaudeAccountWorktreeUsageReport> {
+  if (getActiveRuntimeTarget(settings).kind === 'environment') {
+    return emptyClaudeAccountWorktreeUsageReport(accountId)
+  }
+  return window.api.claudeAccounts.worktreeUsageReport({ accountId })
+}
+
+export async function reassignClaudeWorktreeAccounts(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  request: ClaudeWorktreeAccountReassignment
+): Promise<ClaudeRateLimitAccountsState> {
+  if (getActiveRuntimeTarget(settings).kind === 'environment') {
+    throw new Error('Reassigning worktree accounts is only available on the local runtime.')
+  }
+  return window.api.claudeAccounts.reassignWorktrees(request)
 }
 
 /** Count local live Claude terminals bound to an account; remote runtimes own no host PTYs so report zero. */

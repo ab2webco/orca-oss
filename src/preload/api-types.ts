@@ -25,6 +25,10 @@ import type {
   LocalLogTailWatchArgs
 } from '../shared/local-log-tail-types'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
+import type {
+  ClaudeAccountWorktreeUsageReport,
+  ClaudeWorktreeAccountReassignment
+} from '../shared/claude-account-worktree-usage'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
   GlobalConfigSyncInventory,
@@ -2349,8 +2353,16 @@ export type PreloadApi = {
     remove: (args: {
       accountId: string
       closeLiveTerminals?: boolean
+      closeLiveTerminalAccountIds?: readonly string[]
+      reassignPinnedTo?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
     countLiveTerminalsForAccount: (args: { accountId: string }) => Promise<number>
+    worktreeUsageReport: (args: {
+      accountId: string
+    }) => Promise<ClaudeAccountWorktreeUsageReport>
+    reassignWorktrees: (
+      args: ClaudeWorktreeAccountReassignment
+    ) => Promise<ClaudeRateLimitAccountsState>
     previewGlobalConfig: () => Promise<GlobalConfigSyncInventory>
     resyncGlobalConfig: (args?: { selection?: GlobalConfigSyncSelection }) => Promise<number>
     syncGlobalConfigForAccount: (args: {

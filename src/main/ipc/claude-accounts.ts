@@ -1,10 +1,16 @@
 import { ipcMain } from 'electron'
 import type {
   ClaudeAccountAddTarget,
+  ClaudeAccountRemovalOptions,
   ClaudeAccountService,
   ClaudeCustomEndpointAccountInput,
   ClaudeCustomEndpointAccountUpdateInput
 } from '../claude-accounts/service'
+import {
+  emptyClaudeAccountWorktreeUsageReport,
+  type ClaudeAccountWorktreeUsageReport,
+  type ClaudeWorktreeAccountReassignment
+} from '../../shared/claude-account-worktree-usage'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import type { GlobalConfigSyncSelection } from '../../shared/global-config-sync'
 import type { ClaudeLivePtyAccountInfo, GlobalSettings } from '../../shared/types'
@@ -67,15 +73,34 @@ export function registerClaudeAccountHandlers(
   )
   ipcMain.handle(
     'claudeAccounts:remove',
-    (_event, args: { accountId: string; closeLiveTerminals?: boolean }) =>
+    (_event, args: { accountId: string } & ClaudeAccountRemovalOptions) =>
       claudeAccounts.removeAccount(args.accountId, {
-        closeLiveTerminals: args.closeLiveTerminals === true
+        closeLiveTerminals: args.closeLiveTerminals === true,
+        closeLiveTerminalAccountIds: args.closeLiveTerminalAccountIds,
+        reassignPinnedTo: args.reassignPinnedTo ?? null
       })
   )
   ipcMain.handle(
     'claudeAccounts:countLiveTerminalsForAccount',
     (_event, args: { accountId: string }): number =>
       typeof args?.accountId === 'string' ? getLiveClaudePtyIdsForAccount(args.accountId).length : 0
+  )
+  ipcMain.handle(
+    'claudeAccounts:worktreeUsageReport',
+    (_event, args: { accountId: string }): ClaudeAccountWorktreeUsageReport =>
+      typeof args?.accountId === 'string'
+        ? claudeAccounts.getAccountWorktreeUsageReport(args.accountId)
+        : emptyClaudeAccountWorktreeUsageReport('')
+  )
+  ipcMain.handle(
+    'claudeAccounts:reassignWorktrees',
+    (_event, args: ClaudeWorktreeAccountReassignment) =>
+      claudeAccounts.reassignWorktreeAccountPins({
+        fromAccountId: args.fromAccountId,
+        toAccountId: args.toAccountId ?? null,
+        closeLiveTerminals: args.closeLiveTerminals === true,
+        closeLiveTerminalAccountIds: args.closeLiveTerminalAccountIds
+      })
   )
   ipcMain.handle('claudeAccounts:previewGlobalConfig', () =>
     claudeAccounts.buildGlobalConfigSyncInventory()

@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeManagedAccount } from '../../shared/types'
 import {
   inspectManagedClaudeRefreshChainAliases,
-  reconcileManagedClaudeRefreshChainAliases
+  reconcileManagedClaudeRefreshChainAliases,
+  reportManagedClaudeRefreshChainAliases
 } from './claude-refresh-chain-alias-registry'
 import { fingerprintClaudeRefreshChain } from './claude-refresh-chain-fingerprint'
 
@@ -158,5 +159,124 @@ describe('Claude refresh-chain alias registry', () => {
     expect(chainKey).toHaveLength(32)
     expect(record).not.toContain('persisted-chain')
     expect(JSON.parse(record)).toMatchObject({ chainKey })
+  })
+
+  it('reports different-email accounts sharing one chain as a conflict set', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+
+    await reconcileManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca-dev',
+      accounts: [account('account-b', 'second@example.com')],
+      readManagedCredentials: async () => credentials('shared-grant')
+    })
+    const report = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [account('account-a', 'first@example.com')],
+      readManagedCredentials: async () => credentials('shared-grant')
+    })
+
+    expect(report).toMatchObject({
+      status: 'available',
+      conflictSets: [
+        {
+          conflictId: expect.any(String),
+          certainty: 'recorded-chain-match',
+          accounts: [
+            {
+              accountId: 'account-a',
+              profileKey: expect.any(String),
+              profileScope: 'current',
+              email: 'first@example.com'
+            },
+            {
+              accountId: 'account-b',
+              profileKey: expect.any(String),
+              profileScope: 'other',
+              email: null
+            }
+          ],
+          remediation: {
+            action: 'reauthenticate-one-account',
+            accountDirectoryPolicy: 'preserve'
+          }
+        }
+      ]
+    })
+  })
+
+  it('does not report same-email accounts backed by different chains', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+
+    await reconcileManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca-dev',
+      accounts: [account('account-b', 'same@example.com')],
+      readManagedCredentials: async () => credentials('grant-b')
+    })
+    const report = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [account('account-a', 'same@example.com')],
+      readManagedCredentials: async () => credentials('grant-a')
+    })
+
+    expect(report).toEqual({ status: 'available', conflictSets: [] })
+  })
+
+  it('identifies an unreadable cross-profile account by profile key and account id', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+
+    await reconcileManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca-dev',
+      accounts: [account('foreign-account', 'foreign@example.com')],
+      readManagedCredentials: async () => credentials('shared-grant')
+    })
+    const report = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [account('local-account', 'local@example.com')],
+      readManagedCredentials: async () => credentials('shared-grant')
+    })
+    const foreignAccount = report.conflictSets[0]?.accounts.find(
+      (candidate) => candidate.profileScope === 'other'
+    )
+
+    expect(foreignAccount).toEqual({
+      accountId: 'foreign-account',
+      profileKey: expect.stringMatching(/^[a-f0-9]{24}$/),
+      profileScope: 'other',
+      email: null
+    })
+  })
+
+  it('only reads credentials and preserves account data while reporting remediation', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+    const readManagedCredentials = vi.fn(async () => credentials('shared-grant'))
+
+    await reconcileManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca-dev',
+      accounts: [account('account-b')],
+      readManagedCredentials
+    })
+    const report = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [account('account-a')],
+      readManagedCredentials
+    })
+
+    expect(readManagedCredentials).toHaveBeenCalledTimes(2)
+    expect(report.conflictSets[0]?.remediation).toEqual({
+      action: 'reauthenticate-one-account',
+      accountDirectoryPolicy: 'preserve'
+    })
   })
 })

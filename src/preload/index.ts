@@ -232,6 +232,10 @@ import type { RuntimeEnvironmentSubscriptionHandle } from './runtime-environment
 import type { HostedReviewForBranchArgs } from '../shared/hosted-review'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type {
+  ClaudeAccountWorktreeUsageReport,
+  ClaudeWorktreeAccountReassignment
+} from '../shared/claude-account-worktree-usage'
+import type {
   LocalhostWorktreeLabelResult,
   LocalhostWorktreeLabelRoute
 } from '../shared/localhost-worktree-labels'
@@ -2102,10 +2106,20 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
-    remove: (args: { accountId: string; closeLiveTerminals?: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeAccounts:remove', args),
+    remove: (args: {
+      accountId: string
+      closeLiveTerminals?: boolean
+      closeLiveTerminalAccountIds?: readonly string[]
+      reassignPinnedTo?: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:remove', args),
     countLiveTerminalsForAccount: (args: { accountId: string }): Promise<number> =>
       ipcRenderer.invoke('claudeAccounts:countLiveTerminalsForAccount', args),
+    worktreeUsageReport: (args: {
+      accountId: string
+    }): Promise<ClaudeAccountWorktreeUsageReport> =>
+      ipcRenderer.invoke('claudeAccounts:worktreeUsageReport', args),
+    reassignWorktrees: (args: ClaudeWorktreeAccountReassignment): Promise<unknown> =>
+      ipcRenderer.invoke('claudeAccounts:reassignWorktrees', args),
     previewGlobalConfig: (): Promise<GlobalConfigSyncInventory> =>
       ipcRenderer.invoke('claudeAccounts:previewGlobalConfig'),
     resyncGlobalConfig: (args?: { selection?: GlobalConfigSyncSelection }): Promise<number> =>
