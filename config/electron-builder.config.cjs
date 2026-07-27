@@ -425,7 +425,10 @@ module.exports = {
     provider: 'github',
     owner: 'ab2webco',
     repo: 'orca-oss',
-    releaseType: 'release'
+    // Why: the release must be born a prerelease. finalize's --prerelease lands only after every
+    // platform job, and until then a full release holds GitHub's Latest pointer — which is how a
+    // release candidate reached installs that were never meant to see it.
+    releaseType: process.env.ORCA_LAB_RELEASE_CANDIDATE === '1' ? 'prerelease' : 'release'
   }
 }
 

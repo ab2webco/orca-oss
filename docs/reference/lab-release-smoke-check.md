@@ -25,9 +25,15 @@ Two ways to get it onto your machine:
   in-app route to this channel, and it exercises the real auto-update path.
 - **By hand** — download the installer from the release page and install over your current build.
 
-> Never cut an RC unless a normal lab release carrying the exclusion
-> (`isLabRcPrereleaseTag`, shipped in `1.4.152-lab.35`) has already reached users. Installs older
-> than that still resolve RC tags and would update to it.
+> **The exclusion protects only installs that already have it.** It shipped in `1.4.152-lab.35`;
+> anything older resolves an RC tag as an ordinary update and will offer it. This already
+> happened: a machine still on `lab.33` was offered `lab.36.rc` minutes after it was cut.
+>
+> "A release carrying the exclusion has shipped" is **not** the condition — the condition is that
+> every install is on it, and you cannot verify that from here. Before cutting an RC, confirm the
+> machines you know about are on `lab.35` or newer, and accept that any you do not know about are
+> exposed. If that is not acceptable, RCs belong in a separate repository, which the updater never
+> reads at all.
 
 ## The checks
 

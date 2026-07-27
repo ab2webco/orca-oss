@@ -153,6 +153,7 @@ jobs:
     # ORCA_MAC_RELEASE=1 flips hardenedRuntime + notarize on in the builder config.
     env:
       ORCA_MAC_RELEASE: ${{ !inputs.dry_run && '1' || '' }}
+      ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
       CSC_LINK: ${{ !inputs.dry_run && secrets.CSC_LINK || '' }}
       CSC_KEY_PASSWORD: ${{ !inputs.dry_run && secrets.CSC_KEY_PASSWORD || '' }}
       APPLE_ID: ${{ !inputs.dry_run && secrets.APPLE_ID || '' }}
@@ -231,6 +232,7 @@ jobs:
       - name: Package and publish Linux artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
         run: |
           node config/scripts/ensure-native-runtime.mjs --runtime=electron
           publish="always"
@@ -277,6 +279,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
         # Why: unsigned lab build — installable past SmartScreen, but Windows
         # auto-update will NOT apply it (electron-updater's Authenticode check
         # rejects unsigned installers and must never be disabled). Windows lab
