@@ -79,7 +79,12 @@ export function PlaneBoardCard({
             >
               <MoreVertical className="size-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent
+              align="end"
+              // Portaled menu events still bubble through React to the clickable, draggable card.
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
               <DropdownMenuItem variant="destructive" onSelect={() => onDeleteItem(item)}>
                 <Trash2 />
                 {translate('auto.components.plane-board-card.delete', 'Delete work item')}
