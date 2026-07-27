@@ -236,6 +236,7 @@ type ConnectCallbacks = {
   ) => void
   onReplayData?: (data: string, meta?: { clearBeforeReplay?: boolean }) => void
   onError?: (msg: string) => void
+  onWriteUnavailable?: () => void
 }
 
 type MockTransport = {
@@ -933,6 +934,7 @@ describe('connectPanePty', () => {
     // Why: drain in-flight foreground-confirm microtasks while this test still owns the store mock, so its async fallout can't leak into (and flake) the next test.
     await flushAsyncTicks()
     vi.useRealTimers()
+    vi.restoreAllMocks()
     if (originalRequestAnimationFrame) {
       globalThis.requestAnimationFrame = originalRequestAnimationFrame
     } else {
@@ -4775,6 +4777,30 @@ describe('connectPanePty', () => {
     expect(transport.sendInputAccepted).toHaveBeenCalledWith('\x03')
     expect(transport.sendInput).not.toHaveBeenCalled()
     expect(window.api.agentStatus.inferInterrupt).not.toHaveBeenCalled()
+  })
+
+  it('remounts a connected pane when main reports its daemon write unavailable', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { _resetTerminalPaneRecoveryForTests } = await import('./terminal-pane-recovery')
+    _resetTerminalPaneRecoveryForTests()
+    const remountTerminalTabForRecovery = vi.fn<(tabId: string) => boolean>(() => true)
+    mockStoreState = { ...mockStoreState, remountTerminalTabForRecovery } as StoreState
+    const transport = createMockTransport('daemon-pty')
+    let writeUnavailable: (() => void) | undefined
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      writeUnavailable = callbacks.onWriteUnavailable
+      return { id: 'daemon-pty' }
+    })
+    transportFactoryQueue.push(transport)
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, createDeps() as never)
+    await flushAsyncTicks(6)
+    writeUnavailable?.()
+    await flushAsyncTicks(6)
+
+    expect(window.api.pty.hasPty).toHaveBeenCalledWith('daemon-pty')
+    expect(remountTerminalTabForRecovery).toHaveBeenCalledWith('tab-1')
+    _resetTerminalPaneRecoveryForTests()
   })
 
   it('recovers a wedged write pipeline after accepted input without renderer output', async () => {

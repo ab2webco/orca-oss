@@ -682,7 +682,9 @@ function createWebPreloadApi(): Partial<PreloadApi> {
         Promise.resolve({
           ok: false,
           error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
-        })
+        }),
+      // Why: no Electron process on web; the caller falls back to performance.memory.
+      readHeapStatistics: () => null
     },
     diagnostics: {
       getStatus: () =>

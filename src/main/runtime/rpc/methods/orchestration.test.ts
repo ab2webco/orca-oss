@@ -1,11 +1,12 @@
 /* eslint-disable max-lines -- Why: orchestration tests share a mock runtime factory; splitting by method would duplicate 40 lines of setup per file without improving clarity. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ORCHESTRATION_METHODS, clampAskTimeoutMs } from './orchestration'
+import { ORCHESTRATION_METHODS } from './orchestration'
 import { RpcDispatcher } from '../dispatcher'
 import { buildRegistry, type RpcContext, type RpcRequest } from '../core'
 import { OrchestrationDb } from '../../orchestration/db'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
+import { ORCHESTRATION_ASK_MAX_TIMEOUT_MS } from '../../../../shared/orchestration-ask-timeout'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages must be sent to a concrete coordinator terminal handle, not a group address.`
@@ -1792,16 +1793,18 @@ describe('orchestration RPC methods', () => {
       expect(result.answer).toBe('correct answer')
     })
 
-    it('clamps an absurd caller-supplied timeoutMs so the long-poll slot is bounded', async () => {
+    it.each<[number | undefined, number]>([
+      [undefined, 600_000],
+      [ORCHESTRATION_ASK_MAX_TIMEOUT_MS, ORCHESTRATION_ASK_MAX_TIMEOUT_MS],
+      [Number.MAX_SAFE_INTEGER, ORCHESTRATION_ASK_MAX_TIMEOUT_MS]
+    ])('applies effective timeout %s at the RPC handler boundary', async (requested, expected) => {
       setup()
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
       vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
       let observedTimeoutMs: number | undefined
       vi.spyOn(runtime, 'waitForMessage').mockImplementation(async (_handle, options) => {
         observedTimeoutMs = options?.timeoutMs
-        // End the wait loop so the assertion runs against the first budget slice.
         const outbound = db.getInbox(10).find((m) => m.type === 'decision_gate')
-        // Why: without a reply the handler's while(true) spins on this mock until vitest times out, hanging instead of failing.
         expect(outbound).toBeDefined()
         db.insertMessage({
           from: 'term_coord',
@@ -1815,23 +1818,28 @@ describe('orchestration RPC methods', () => {
       const result = (await call('orchestration.ask', {
         from: 'term_worker',
         to: 'term_coord',
-        question: 'forever?',
-        timeoutMs: Number.MAX_SAFE_INTEGER
+        question: 'bounded?',
+        timeoutMs: requested
       })) as { timeoutMs: number }
 
-      expect(observedTimeoutMs).toBeLessThanOrEqual(1_800_000)
-      expect(observedTimeoutMs).toBeGreaterThan(1_700_000)
-      // The clamp must be observable: callers report the budget waited, not the one they asked for.
-      expect(result.timeoutMs).toBe(1_800_000)
+      expect(observedTimeoutMs).toBeLessThanOrEqual(expected)
+      expect(observedTimeoutMs).toBeGreaterThan(expected - 1_000)
+      expect(result.timeoutMs).toBe(expected)
     })
 
-    it('clamps timeoutMs at the exported boundary', () => {
-      expect(clampAskTimeoutMs(undefined)).toBe(600_000)
-      expect(clampAskTimeoutMs(1_000)).toBe(1_000)
-      expect(clampAskTimeoutMs(1_800_000)).toBe(1_800_000)
-      expect(clampAskTimeoutMs(86_400_000)).toBe(1_800_000)
-      expect(clampAskTimeoutMs(Number.MAX_SAFE_INTEGER)).toBe(1_800_000)
-      expect(clampAskTimeoutMs(-5)).toBe(0)
+    it('returns a zero effective timeout without entering the waiter', async () => {
+      setup()
+      const waitForMessage = vi.spyOn(runtime, 'waitForMessage')
+
+      const result = (await call('orchestration.ask', {
+        from: 'term_worker',
+        to: 'term_coord',
+        question: 'negative?',
+        timeoutMs: -5
+      })) as { timedOut: boolean; timeoutMs: number }
+
+      expect(waitForMessage).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ timedOut: true, timeoutMs: 0 })
     })
 
     it('parses options CSV with whitespace and empty entries', async () => {

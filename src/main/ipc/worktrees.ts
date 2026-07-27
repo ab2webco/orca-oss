@@ -22,6 +22,7 @@ import { projectResolvedWorktreeLineage } from '../../shared/resolved-worktree-l
 import { deleteWorktreeHistoryDir } from '../terminal-history'
 import type {
   AutomationWorkspaceProvenance,
+  CliWorkspaceProvenance,
   CreateWorktreeArgs,
   CreateWorktreeResult,
   DetectedWorktree,
@@ -115,6 +116,7 @@ import { shouldEmitBoundedWarning } from './bounded-warning-dedupe'
 
 type CreateWorktreeArgsWithSystemProvenance = CreateWorktreeArgs & {
   automationProvenance?: AutomationWorkspaceProvenance
+  cliProvenance?: CliWorkspaceProvenance
 }
 
 type RemoveWorktreeArgs = {
@@ -847,6 +849,7 @@ function mergeFolderWorkspace(repo: Repo, worktreeId: string, meta: WorktreeMeta
     ...(meta.automationProvenance !== undefined
       ? { automationProvenance: meta.automationProvenance }
       : {}),
+    ...(meta.cliProvenance !== undefined ? { cliProvenance: meta.cliProvenance } : {}),
     ...(meta.priorWorktreeIds !== undefined ? { priorWorktreeIds: meta.priorWorktreeIds } : {}),
     workspaceStatus: meta.workspaceStatus ?? DEFAULT_WORKSPACE_STATUS_ID,
     ...(meta.claudeAccountId !== undefined ? { claudeAccountId: meta.claudeAccountId } : {}),
@@ -946,6 +949,7 @@ function createFolderWorkspace(
     orcaCreatedAt: now,
     orcaCreationSource: 'desktop',
     ...(args.automationProvenance ? { automationProvenance: args.automationProvenance } : {}),
+    ...(args.cliProvenance ? { cliProvenance: args.cliProvenance } : {}),
     ...(args.createdWithAgent ? { createdWithAgent: args.createdWithAgent } : {}),
     ...(args.linkedIssue !== undefined ? { linkedIssue: args.linkedIssue } : {}),
     ...(args.linkedPR !== undefined ? { linkedPR: args.linkedPR } : {}),
@@ -1361,16 +1365,18 @@ export function registerWorktreeHandlers(
         headRefName: args.headRefName,
         baseRefName: args.baseRefName,
         isCrossRepository: args.isCrossRepository,
+        issueSourcePreference: repo.issueSourcePreference,
         connectionId: repo.connectionId ?? null,
         localGitOptions: getLocalProjectWorktreeGitOptions(store, repo),
         gitExec,
         fetchRemoteTrackingRef,
         fetchPullRequestHeadRef,
-        // Why: one shared resolver for local and SSH so origin-vs-upstream
-        // cannot diverge by surface; it prefers the remote hosting the PR's project.
+        // Why: one resolver keeps source preference and hosting identity aligned
+        // across local, WSL, and SSH worktree creation.
         resolveRemote: () =>
           resolveGitHubReviewHeadRemote({
             repoPath: repo.path,
+            issueSourcePreference: repo.issueSourcePreference,
             connectionId: repo.connectionId ?? null,
             localGitOptions: getLocalProjectWorktreeGitOptions(store, repo),
             gitExec

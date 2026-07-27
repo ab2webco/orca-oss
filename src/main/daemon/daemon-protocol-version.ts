@@ -15,6 +15,7 @@ export const REQUIRED_REATTACH_PROTOCOL_VERSION = 26
 // pre-update daemon (<28) must be treated as "cannot inspect" and routed through
 // the degraded path instead of eliciting "Unknown request type: inspectProcess".
 export const COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION = 28
+export const GET_FOREGROUND_PROCESS_PROTOCOL_VERSION = 11
 export const PTY_STARTUP_INGRESS_PROTOCOL_VERSION = 25
 export const AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION = 27
 export const AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION = 27

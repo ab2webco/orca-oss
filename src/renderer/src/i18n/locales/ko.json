@@ -4157,7 +4157,9 @@
           "75405270ed": "필터 편집({{value0}} 활성)",
           "489d1c8c9f": "프로젝트 검색...",
           "ee240a39eb": "필터 편집",
-          "automationCreated": "자동화로 생성된 워크스페이스 숨기기"
+          "automationCreated": "자동화로 생성된 워크스페이스 숨기기",
+          "cliCreated": "Hide CLI-created",
+          "detachedHead": "분리된 HEAD 숨기기"
         },
         "SidebarHeader": {
           "92154beb7e": "새로운 워크스페이스",
@@ -4220,7 +4222,9 @@
           "c3fa13dc2e": "기본 브랜치 숨기기",
           "ed1611b65b": "슬립 중인 항목 숨기기",
           "82594419ba": "필터",
-          "automationCreated": "자동화로 생성된 워크스페이스 숨기기"
+          "automationCreated": "자동화로 생성된 워크스페이스 숨기기",
+          "cliCreated": "Hide CLI-created",
+          "detachedHead": "분리된 HEAD 숨기기"
         },
         "SidebarWorkspaceOptionsMenu": {
           "95c9754653": "Agent 활동 레이아웃",
@@ -4275,7 +4279,8 @@
           "65a9820bd1": "Agent 상태",
           "219ebf1961": "브랜치 이름",
           "automation": "자동화",
-          "folderPathIdentity": "브랜치 / 폴더 경로"
+          "folderPathIdentity": "브랜치 / 폴더 경로",
+          "cli": "Orca CLI"
         },
         "SshDisconnectedDialog": {
           "ca4a7892af": "연결 중...",
@@ -4396,7 +4401,12 @@
           "copyLinkSuccess": "{{value0}} 복사됨",
           "copyLinkFailure": "링크 복사 실패",
           "issueLinkLabel": "이슈 링크",
-          "reviewLinkLabel": "{{value0}} 링크"
+          "reviewLinkLabel": "{{value0}} 링크",
+          "cliHeader": "Orca CLI",
+          "cliCreatedFromAgent": "Created by an agent via `orca worktree create`",
+          "cliCreatedFromShell": "Created via `orca worktree create`",
+          "cliStartupAgent": "Started with {{value0}}",
+          "cliCreated": "Created by Orca CLI"
         },
         "WorktreeCardMetadataStatusBadges": {
           "fe188062a1": "상태: 열림",
@@ -5140,6 +5150,9 @@
           "remoteServerFallback": "원격 서버",
           "loadAccountsFailed": "프로바이더 계정을 불러오지 못했습니다.",
           "remoteScopeAccounts": "{{value0}}에서 관리하는 계정을 표시하고 있습니다. 계정 추가나 재인증은 해당 서버에서 진행하세요.",
+          "accountScopePrefix": "계정 범위",
+          "accountScopeRemoteServerUnnamed": "원격 서버",
+          "remoteScopeLocalAccountsKept": "이 데스크탑에서 관리되는 계정은 그대로 유지됩니다. 기본 런타임을 로컬 데스크탑으로 다시 전환하면 확인할 수 있습니다.",
           "remoteScopeAuthContext": "각 계정은 {{value0}}에 자체 로그인 컨텍스트를 유지합니다.",
           "remoteEmptyClaudeAccounts": "{{value0}}에 관리되는 Claude 계정이 없습니다. 해당 서버의 시스템 기본 Claude 로그인을 사용하며, 계정 추가는 그 서버에서 진행하세요.",
           "remoteEmptyCodexAccounts": "{{value0}}에 관리되는 Codex 계정이 없습니다. 해당 서버의 시스템 기본 Codex 로그인을 사용하며, 계정 추가는 그 서버에서 진행하세요.",
@@ -14160,7 +14173,16 @@
       "bar": {
         "SortableTabContextMenu": {
           "switchToTerminalView": "terminal 보기로 전환",
-          "switchToChatView": "채팅 보기로 전환"
+          "switchToChatView": "채팅 보기로 전환",
+          "closeTabsToLeft": "왼쪽으로 탭 닫기"
+        },
+        "BrowserTab": {
+          "closeOthers": "다른 탭 닫기",
+          "closeTabsToLeft": "왼쪽으로 탭 닫기"
+        },
+        "EditorFileTabContextMenu": {
+          "closeOthers": "다른 탭 닫기",
+          "closeTabsToLeft": "왼쪽으로 탭 닫기"
         }
       }
     },

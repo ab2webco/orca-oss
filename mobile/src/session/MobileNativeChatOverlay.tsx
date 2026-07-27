@@ -48,7 +48,7 @@ export function MobileNativeChatOverlay({
         onAnswerAsk={controller.handleNativeChatAnswerAsk}
         onCancelAsk={controller.handleNativeChatCancelAsk}
         question={controller.nativeChatQuestion}
-        onAnswerQuestion={controller.handleNativeChatSend}
+        onAnswerQuestion={controller.handleNativeChatQuestionAnswer}
         permission={controller.nativeChatPermission}
         onRespondPermission={controller.handleNativeChatRespondPermission}
         onOpenFile={controller.handleNativeChatOpenFile}

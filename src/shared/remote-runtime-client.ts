@@ -42,6 +42,7 @@ import {
   type RemoteRuntimeSocketLivenessOptions
 } from './remote-runtime-socket-liveness'
 import { createWsOutboundBackpressureQueue } from './ws-outbound-backpressure-queue'
+import { MAX_TIMER_DELAY_MS, isSafeTimerDelayMs } from './timer-delay'
 
 export { RemoteRuntimeClientError } from './remote-runtime-client-error'
 
@@ -82,6 +83,12 @@ export async function sendRemoteRuntimeRequest<TResult>(
   params: unknown,
   timeoutMs: number
 ): Promise<RuntimeRpcResponse<TResult>> {
+  if (!isSafeTimerDelayMs(timeoutMs)) {
+    throw new RemoteRuntimeClientError(
+      'invalid_argument',
+      `Runtime request timeout must be an integer between 0 and ${MAX_TIMER_DELAY_MS}ms.`
+    )
+  }
   const requestId = randomUUID()
   const serializedAuth = serializeRemoteRuntimePayload({
     type: 'e2ee_auth',
@@ -140,8 +147,7 @@ export async function sendRemoteRuntimeRequest<TResult>(
         refreshableTimeout.refresh()
         return
       }
-      // Why: mobile typechecks shared code with DOM timer types, where
-      // setTimeout returns a number and Node's Timeout.refresh is absent.
+      // Mobile's DOM timer type has no refresh().
       clearTimeout(timeout)
       timeout = setTimeout(onTimeout, timeoutMs)
     }

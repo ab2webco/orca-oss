@@ -5,6 +5,8 @@ import type { RpcClient } from '../transport/rpc-client'
 
 const acceptSend = vi.fn()
 const captureSendOrigin = vi.fn()
+const clearDraftForSend = vi.fn()
+const restoreRejectedDraft = vi.fn()
 const holdUnconfirmedSend = vi.fn()
 
 // The controller composes many session hooks; each is mocked to a minimal shape
@@ -21,6 +23,8 @@ vi.mock('./use-mobile-native-chat-drafts', () => ({
     setComposerText: vi.fn(),
     pending: [],
     captureSendOrigin,
+    clearDraftForSend,
+    restoreRejectedDraft,
     acceptSend,
     holdUnconfirmedSend
   })
@@ -180,6 +184,9 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     })
     expect(accepted).toBe(true)
     expect(acceptSend).toHaveBeenCalledWith(ORIGIN, 'look', ['file:///a.jpg'])
+    // Optimistic clear happens at send time, never a restore on success.
+    expect(clearDraftForSend).toHaveBeenCalledWith(ORIGIN, 'look')
+    expect(restoreRejectedDraft).not.toHaveBeenCalled()
   })
 
   it('holds an unknown-outcome send without posting the optimistic echo', async () => {
@@ -191,6 +198,9 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     expect(accepted).toBe(true)
     expect(acceptSend).not.toHaveBeenCalled()
     expect(holdUnconfirmedSend).toHaveBeenCalledWith(ORIGIN, 'look', expect.any(Function))
+    // Delivery-unknown usually means delivered — keep the composer clear.
+    expect(clearDraftForSend).toHaveBeenCalledWith(ORIGIN, 'look')
+    expect(restoreRejectedDraft).not.toHaveBeenCalled()
   })
 
   it('preserves the unknown outcome on the WithOutcome surface for paste-first callers', async () => {
@@ -213,6 +223,21 @@ describe('useMobileNativeChatController handleNativeChatSend', () => {
     })
     expect(accepted).toBe(false)
     expect(acceptSend).not.toHaveBeenCalled()
+    expect(onSendError).toHaveBeenCalledWith('Message not sent')
+    // A definite rejection puts the optimistically-cleared text back.
+    expect(restoreRejectedDraft).toHaveBeenCalledWith(ORIGIN, 'look')
+  })
+
+  it('does not restore a rejected question answer into the composer', async () => {
+    sendWithOutcome.mockResolvedValue('rejected')
+    let accepted = true
+    await act(async () => {
+      accepted = await controller!.handleNativeChatQuestionAnswer('1')
+    })
+
+    expect(accepted).toBe(false)
+    expect(clearDraftForSend).not.toHaveBeenCalled()
+    expect(restoreRejectedDraft).not.toHaveBeenCalled()
     expect(onSendError).toHaveBeenCalledWith('Message not sent')
   })
 })

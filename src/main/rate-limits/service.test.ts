@@ -1813,6 +1813,25 @@ describe('RateLimitService', () => {
     )
   })
 
+  it('does not cache an outgoing Codex account that has no usage windows', async () => {
+    const service = new RateLimitService()
+    service.setInactiveCodexAccountsResolver(() => [
+      { id: 'account-empty', managedHomePath: '/tmp/account-empty/home' }
+    ])
+
+    vi.mocked(fetchClaudeRateLimits).mockResolvedValueOnce(okProvider('claude', 10, Date.now()))
+    vi.mocked(fetchCodexRateLimits)
+      .mockResolvedValueOnce(errorProvider('codex', 'codex not signed in'))
+      .mockResolvedValueOnce(okProvider('codex', 40, Date.now()))
+
+    await service.refresh()
+    await service.refreshForCodexAccountChange('account-empty')
+
+    expect(service.getState().inactiveCodexAccounts).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ accountId: 'account-empty' })])
+    )
+  })
+
   it('does not cache host Claude usage under an outgoing WSL account', async () => {
     const service = new RateLimitService()
     service.setInactiveClaudeAccountsResolver(() => [

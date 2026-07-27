@@ -87,6 +87,7 @@ export type KeybindingActionId =
   | 'editor.replace'
   | 'editor.save'
   | 'editor.markdownPreview'
+  | 'editor.toggleWordWrap'
   | 'editor.copyContext'
   | 'editor.previousChange'
   | 'editor.nextChange'
@@ -802,6 +803,15 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     scope: 'editor',
     searchKeywords: ['shortcut', 'editor', 'markdown', 'preview'],
     defaultBindings: platformBindings(['Mod+Shift+V'])
+  },
+  {
+    id: 'editor.toggleWordWrap',
+    title: 'Toggle Word Wrap',
+    group: 'Editors',
+    scope: 'editor',
+    searchKeywords: ['shortcut', 'editor', 'word wrap', 'wrap', 'long lines', 'soft wrap'],
+    // Why: Alt+Z matches VS Code; bare Alt+letter is not AltGr, so it stays cross-platform (#9974).
+    defaultBindings: platformBindings(['Alt+Z'])
   },
   {
     id: 'editor.copyContext',
