@@ -85,15 +85,16 @@ async function reconcileProfileAliases(
   readManagedCredentials: (accountId: string) => Promise<string | null>,
   prune: boolean
 ): Promise<void> {
+  const eligibleAccounts = accounts.filter((account) => account.authMethod === 'subscription-oauth')
+  if (eligibleAccounts.length === 0) {
+    return
+  }
   mkdirSync(rootPath, { recursive: true, mode: 0o700 })
   const profileKey = stableKey(profilePath)
   const profileDirectory = join(rootPath, profileKey)
   mkdirSync(profileDirectory, { recursive: true, mode: 0o700 })
   const expectedFiles = new Set<string>()
-  for (const account of accounts) {
-    if (account.authMethod !== 'subscription-oauth') {
-      continue
-    }
+  for (const account of eligibleAccounts) {
     const credentialsJson = await readManagedCredentials(account.id)
     const chainKey = credentialsJson ? fingerprintClaudeRefreshChain(credentialsJson) : null
     if (!chainKey) {

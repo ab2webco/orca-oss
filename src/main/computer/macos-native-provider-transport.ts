@@ -1,10 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import type net from 'node:net'
-import { release, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { release } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { connectMacOSProviderSocket } from './macos-native-provider-socket'
+import { createMacOSNativeProviderSocketPaths } from './macos-native-provider-socket-path'
 import { RuntimeClientError } from './runtime-client-error'
 
 const HELPER_CONNECT_TIMEOUT_MS = 10_000
@@ -70,11 +70,12 @@ export async function startMacOSNativeProviderSocket({
   helperExecutablePath: string
   isCurrent: (socketPath: string) => boolean
 }): Promise<StartedMacOSProviderSocket> {
-  const socketDirectory = mkdtempSync(join(tmpdir(), 'orca-computer-use-'))
-  chmodSync(socketDirectory, 0o700)
-  const socketPath = join(socketDirectory, 'provider.sock')
+  const {
+    socketDirectory,
+    socketPath,
+    tokenPath: socketTokenPath
+  } = createMacOSNativeProviderSocketPaths()
   const socketToken = randomUUID()
-  const socketTokenPath = join(socketDirectory, 'provider.token')
   writeFileSync(socketTokenPath, socketToken, { encoding: 'utf8', mode: 0o600 })
   // Why: launching the nested helper via LaunchServices can make TCC evaluate
   // Orca.app as responsible; the signed helper executable owns this grant.

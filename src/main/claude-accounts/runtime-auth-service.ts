@@ -38,7 +38,6 @@ import {
 import { isOauthTokenExpiring, refreshClaudeOauthCredentials } from './oauth-refresh'
 import { tryRunManagedClaudeAccountBackgroundRotation } from './run-managed-claude-account-mutation'
 import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
-import { reconcileManagedClaudeRefreshChainAliases } from './claude-refresh-chain-alias-registry'
 import { ClaudeRuntimePathResolver } from './runtime-paths'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -150,12 +149,6 @@ export class ClaudeRuntimeAuthService {
 
   constructor(private readonly store: Store) {
     configureManagedClaudeRefreshAccounts(() => this.store.getSettings().claudeManagedAccounts)
-    void reconcileManagedClaudeRefreshChainAliases({
-      accounts: this.store
-        .getSettings()
-        .claudeManagedAccounts.filter((account) => account.managedAuthRuntime !== 'wsl'),
-      prune: false
-    })
     this.initializeLastSyncedState()
     void this.safeSyncForCurrentSelection()
   }

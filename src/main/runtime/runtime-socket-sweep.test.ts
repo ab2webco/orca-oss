@@ -1,12 +1,12 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { RUNTIME_SOCKET_NAME_REGEX, sweepOrphanedRuntimeSockets } from './runtime-rpc'
 import {
   createRuntimeTransportMetadata,
-  RUNTIME_SOCKET_NAME_REGEX,
-  sweepOrphanedRuntimeSockets
-} from './runtime-rpc'
+  getRuntimeSocketFallbackDirectory
+} from './runtime-socket-path'
 
 describe('sweepOrphanedRuntimeSockets', () => {
   // Why: a pid we know is always alive and is never the test runner's own
@@ -52,6 +52,22 @@ describe('sweepOrphanedRuntimeSockets', () => {
 
     expect(() => sweepOrphanedRuntimeSockets(userDataPath, SYNTHETIC_OWN_PID)).not.toThrow()
   })
+
+  it.runIf(process.platform !== 'win32')(
+    'sweeps orphaned sockets in the fallback directory',
+    () => {
+      const temporaryDirectory = '/tmp'
+      const userDataPath = join('/profiles', `sweep-${process.pid}-${'u'.repeat(120)}`)
+      const fallbackDirectory = getRuntimeSocketFallbackDirectory(userDataPath, temporaryDirectory)
+      const deadSocket = join(fallbackDirectory, `o-${KNOWN_DEAD_PID}-cccc.sock`)
+      mkdirSync(fallbackDirectory, { recursive: true, mode: 0o700 })
+      writeFileSync(deadSocket, '')
+
+      sweepOrphanedRuntimeSockets(userDataPath, SYNTHETIC_OWN_PID, 'darwin', temporaryDirectory)
+
+      expect(existsSync(deadSocket)).toBe(false)
+    }
+  )
 
   it('regex invariant: matches sockets produced by createRuntimeTransportMetadata', () => {
     // Why: if the socket-name factory ever changes shape (e.g. adds a new

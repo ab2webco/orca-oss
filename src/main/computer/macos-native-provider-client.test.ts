@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   chmodSyncMock,
   connectMacOSProviderSocketMock,
+  lstatSyncMock,
   mkdtempSyncMock,
   resolveMacOSComputerUseExecutablePathMock,
   rmSyncMock,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   chmodSyncMock: vi.fn(),
   connectMacOSProviderSocketMock: vi.fn(),
+  lstatSyncMock: vi.fn(),
   mkdtempSyncMock: vi.fn(),
   resolveMacOSComputerUseExecutablePathMock: vi.fn(),
   rmSyncMock: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock('child_process', () => ({
 
 vi.mock('fs', () => ({
   chmodSync: chmodSyncMock,
+  lstatSync: lstatSyncMock,
   mkdtempSync: mkdtempSyncMock,
   rmSync: rmSyncMock,
   writeFileSync: writeFileSyncMock
@@ -91,6 +94,11 @@ describe('MacOSNativeProviderClient', () => {
     sockets.length = 0
     providers.length = 0
     mkdtempSyncMock.mockImplementation((prefix: string) => `${prefix}${sockets.length}`)
+    lstatSyncMock.mockReturnValue({
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+      uid: typeof process.getuid === 'function' ? process.getuid() : 0
+    })
     resolveMacOSComputerUseExecutablePathMock.mockReturnValue(
       '/Applications/Orca Computer Use.app/Contents/MacOS/orca-computer-use-macos'
     )
@@ -109,6 +117,7 @@ describe('MacOSNativeProviderClient', () => {
   afterEach(() => {
     chmodSyncMock.mockReset()
     connectMacOSProviderSocketMock.mockReset()
+    lstatSyncMock.mockReset()
     mkdtempSyncMock.mockReset()
     resolveMacOSComputerUseExecutablePathMock.mockReset()
     rmSyncMock.mockReset()

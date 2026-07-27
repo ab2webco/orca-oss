@@ -1,6 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { constants, copyFileSync, existsSync, readFileSync, renameSync, unlinkSync } from 'node:fs'
-import { join } from 'node:path'
+import { getDaemonArtifactPaths } from './daemon-artifact-paths'
 import { PROTOCOL_VERSION } from './types'
 
 export type DaemonConnectionInfo = {
@@ -45,9 +45,10 @@ export class DaemonSpawner {
   constructor(opts: DaemonSpawnerOptions) {
     this.runtimeDir = opts.runtimeDir
     this.launcher = opts.launcher
-    this.socketPath = getDaemonSocketPath(this.runtimeDir)
-    this.tokenPath = getDaemonTokenPath(this.runtimeDir)
-    this.pidPath = getDaemonPidPath(this.runtimeDir)
+    const paths = getDaemonArtifactPaths(this.runtimeDir, PROTOCOL_VERSION)
+    this.socketPath = paths.socketPath
+    this.tokenPath = paths.tokenPath
+    this.pidPath = paths.pidPath
   }
 
   async ensureRunning(): Promise<DaemonConnectionInfo> {
@@ -87,22 +88,15 @@ export function getDaemonSocketPath(
   runtimeDir: string,
   protocolVersion = PROTOCOL_VERSION
 ): string {
-  // Why: Windows IPC servers use named pipes rather than filesystem socket
-  // files. Include the protocol version in the endpoint name so a daemon from
-  // an older build is never reused after a breaking protocol change.
-  if (process.platform === 'win32') {
-    const suffix = createHash('sha256').update(runtimeDir).digest('hex').slice(0, 12)
-    return `\\\\?\\pipe\\orca-terminal-host-v${protocolVersion}-${suffix}`
-  }
-  return join(runtimeDir, `daemon-v${protocolVersion}.sock`)
+  return getDaemonArtifactPaths(runtimeDir, protocolVersion).socketPath
 }
 
 export function getDaemonTokenPath(runtimeDir: string, protocolVersion = PROTOCOL_VERSION): string {
-  return join(runtimeDir, `daemon-v${protocolVersion}.token`)
+  return getDaemonArtifactPaths(runtimeDir, protocolVersion).tokenPath
 }
 
 export function getDaemonPidPath(runtimeDir: string, protocolVersion = PROTOCOL_VERSION): string {
-  return join(runtimeDir, `daemon-v${protocolVersion}.pid`)
+  return getDaemonArtifactPaths(runtimeDir, protocolVersion).pidPath
 }
 
 export function serializeDaemonPidFile(pidFile: DaemonPidFile): string {

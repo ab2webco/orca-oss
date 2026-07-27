@@ -289,6 +289,25 @@ describe('ClaudeRuntimeAuthService', () => {
     rmSync(testState.fakeHomeDir, { recursive: true, force: true })
   })
 
+  it('does not touch alias storage or managed credentials when constructed without accounts', async () => {
+    const settings = createSettings({ claudeManagedAccounts: [] })
+    const store = createStore(settings)
+    const aliasRoot = join(
+      testState.fakeHomeDir,
+      '.orca',
+      'claude-refresh-chain-leases',
+      'managed-aliases'
+    )
+    const { readManagedClaudeKeychainCredentials } = await import('./keychain')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+
+    new ClaudeRuntimeAuthService(store as never)
+    await Promise.resolve()
+
+    expect(existsSync(aliasRoot)).toBe(false)
+    expect(readManagedClaudeKeychainCredentials).not.toHaveBeenCalled()
+  })
+
   it('rematerializes unchanged managed credentials when the runtime file is missing', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     const managedCredentials = createClaudeCredentialsJson('user@example.com', 'managed')

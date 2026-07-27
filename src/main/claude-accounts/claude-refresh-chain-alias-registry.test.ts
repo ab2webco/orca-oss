@@ -1,9 +1,12 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeManagedAccount } from '../../shared/types'
-import { inspectManagedClaudeRefreshChainAliases } from './claude-refresh-chain-alias-registry'
+import {
+  inspectManagedClaudeRefreshChainAliases,
+  reconcileManagedClaudeRefreshChainAliases
+} from './claude-refresh-chain-alias-registry'
 import { fingerprintClaudeRefreshChain } from './claude-refresh-chain-fingerprint'
 
 const roots: string[] = []
@@ -73,6 +76,45 @@ describe('Claude refresh-chain alias registry', () => {
       status: 'alias-conflict',
       accountIds: ['account-a', 'account-b']
     })
+  })
+
+  it('reconciles an eligible account when aliases are first inspected', async () => {
+    const parentPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(parentPath)
+    const rootPath = join(parentPath, 'managed-aliases')
+    const readManagedCredentials = vi.fn(async () => credentials('deferred-chain'))
+
+    const result = await inspectManagedClaudeRefreshChainAliases(
+      'account-a',
+      fingerprint('deferred-chain'),
+      {
+        rootPath,
+        profilePath: '/profiles/orca',
+        accounts: [account('account-a')],
+        readManagedCredentials
+      }
+    )
+
+    expect(result).toEqual({ status: 'unique' })
+    expect(readManagedCredentials).toHaveBeenCalledOnce()
+    expect(readdirSync(rootPath)).toHaveLength(1)
+  })
+
+  it('does not touch storage or credentials when no account is eligible', async () => {
+    const parentPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(parentPath)
+    const rootPath = join(parentPath, 'managed-aliases')
+    const readManagedCredentials = vi.fn(async () => credentials('unused-chain'))
+
+    await reconcileManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [{ ...account('account-a'), authMethod: 'custom-endpoint' }],
+      readManagedCredentials
+    })
+
+    expect(readdirSync(parentPath)).toEqual([])
+    expect(readManagedCredentials).not.toHaveBeenCalled()
   })
 
   it('preserves same-email accounts backed by independent grants', async () => {
