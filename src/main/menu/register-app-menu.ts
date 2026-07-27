@@ -99,7 +99,8 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
     const includePerfPrerelease =
       modifierClick && (isMac ? event.metaKey === true : event.ctrlKey === true)
     const includePrerelease = modifierClick && event.shiftKey === true
-    onCheckForUpdates({ includePrerelease, includePerfPrerelease })
+    const includeLabRcPrerelease = modifierClick && event.altKey === true
+    onCheckForUpdates({ includePrerelease, includePerfPrerelease, includeLabRcPrerelease })
   }
 
   const checkForUpdatesItem: Electron.MenuItemConstructorOptions = {

@@ -181,13 +181,17 @@ describe('registerAppMenu', () => {
       } as Electron.KeyboardEvent
     )
 
+    // Why: Alt reaches the lab RC channel, which ordinary checks exclude by tag shape.
+    item?.click?.({} as never, undefined as never, { altKey: true } as Electron.KeyboardEvent)
+
     expect(options.onCheckForUpdates.mock.calls).toEqual([
-      [{ includePrerelease: true, includePerfPrerelease: false }],
-      [{ includePrerelease: false, includePerfPrerelease: false }],
-      [{ includePrerelease: true, includePerfPrerelease: true }],
-      [{ includePrerelease: false, includePerfPrerelease: true }],
-      [{ includePrerelease: false, includePerfPrerelease: false }],
-      [{ includePrerelease: false, includePerfPrerelease: false }]
+      [{ includePrerelease: true, includePerfPrerelease: false, includeLabRcPrerelease: false }],
+      [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: false }],
+      [{ includePrerelease: true, includePerfPrerelease: true, includeLabRcPrerelease: false }],
+      [{ includePrerelease: false, includePerfPrerelease: true, includeLabRcPrerelease: false }],
+      [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: false }],
+      [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: false }],
+      [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: true }]
     ])
   })
 

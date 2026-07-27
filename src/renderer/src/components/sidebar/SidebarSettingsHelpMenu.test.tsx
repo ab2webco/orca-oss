@@ -293,17 +293,31 @@ describe('SidebarSettingsHelpMenu', () => {
       checkButton.click()
     })
 
+    // Why: Alt is the only in-app route to a lab RC, which ordinary checks exclude by tag shape.
+    await act(async () => {
+      checkButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, altKey: true }))
+      checkButton.click()
+    })
+
     expect(mocks.updaterCheck).toHaveBeenNthCalledWith(1, {
       includePrerelease: true,
-      includePerfPrerelease: false
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
     })
     expect(mocks.updaterCheck).toHaveBeenNthCalledWith(2, {
       includePrerelease: false,
-      includePerfPrerelease: true
+      includePerfPrerelease: true,
+      includeLabRcPrerelease: false
     })
     expect(mocks.updaterCheck).toHaveBeenNthCalledWith(3, {
       includePrerelease: false,
-      includePerfPrerelease: false
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
+    })
+    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(4, {
+      includePrerelease: false,
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: true
     })
   })
 
