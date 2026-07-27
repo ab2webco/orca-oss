@@ -78,6 +78,7 @@ import type {
   WorktreeRemoteBranchConflictEvent
 } from '../shared/types'
 import type { PtyModelRestoreNeededEvent } from '../shared/pty-model-restore-marker'
+import type { PtyListedSession } from '../shared/pty-listed-session'
 import type {
   PtyRendererDeliveryHealthReply,
   PtyRendererDeliveryStateReport
@@ -1002,8 +1003,7 @@ const api = {
     kill: (id: string, opts?: { keepHistory?: boolean }): Promise<void> =>
       ipcRenderer.invoke('pty:kill', { id, keepHistory: opts?.keepHistory ?? false }),
 
-    listSessions: (): Promise<{ id: string; cwd: string; title: string }[]> =>
-      ipcRenderer.invoke('pty:listSessions'),
+    listSessions: (): Promise<PtyListedSession[]> => ipcRenderer.invoke('pty:listSessions'),
     getAuthoritativeBufferSnapshotCapabilities: (
       ids: string[]
     ): { id: string; authoritative: boolean | null }[] =>

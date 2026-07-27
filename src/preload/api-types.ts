@@ -273,6 +273,7 @@ import type {
   PlaneWorkspaceSelection
 } from '../shared/plane-types'
 import type { PtyModelRestoreNeededEvent } from '../shared/pty-model-restore-marker'
+import type { PtyListedSession } from '../shared/pty-listed-session'
 import type {
   PtyRendererDeliveryHealthReply,
   PtyRendererDeliveryStateReport
@@ -1552,7 +1553,7 @@ export type PreloadApi = {
     confirmForegroundProcess: (id: string) => Promise<string | null>
     getCwd: (id: string) => Promise<string>
     getSize: (id: string) => Promise<{ cols: number; rows: number } | null>
-    listSessions: () => Promise<{ id: string; cwd: string; title: string }[]>
+    listSessions: () => Promise<PtyListedSession[]>
     getAuthoritativeBufferSnapshotCapabilities?: (
       ids: string[]
     ) => { id: string; authoritative: boolean | null }[]
