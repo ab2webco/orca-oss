@@ -800,7 +800,24 @@ export async function initDaemonPtyProvider(
   await reconcileSeededClaudeLivePtys(routedAdapter)
 }
 
-// Why: release gate ids only for daemon-confirmed-dead sessions; keep seeds on listing failure since releasing early can rotate a live CLI's refresh token.
+/**
+ * Release gate ids for seeded sessions the daemons no longer host.
+ *
+ * Why bounded retries instead of keeping seeds on any listing failure: seeds are
+ * re-read from persistence on every launch, so bailing out left them asserted
+ * forever — and an unconfirmed seed does not merely defer a usage refresh, it
+ * blocks EVERY managed-account mutation (select, re-auth, remove) through
+ * runManagedClaudeAccountMutation. Users hit that as an account they can neither
+ * change nor delete, with no in-product way out and no terminal to close.
+ *
+ * Why releasing on a still-unreachable daemon is safe: a seeded session lives
+ * INSIDE a daemon process, so if no daemon answers, nothing is holding that
+ * session's refresh chain and there is no live CLI to strand. The retries exist
+ * so "unreachable" is a conclusion rather than a transient hiccup.
+ */
+const SEEDED_CLAUDE_GATE_LIST_ATTEMPTS = 3
+const SEEDED_CLAUDE_GATE_RETRY_DELAY_MS = 500
+
 async function reconcileSeededClaudeLivePtys(provider: DaemonProvider): Promise<void> {
   if (!hasSeededUnconfirmedClaudePtys()) {
     return
@@ -810,18 +827,38 @@ async function reconcileSeededClaudeLivePtys(provider: DaemonProvider): Promise<
       provider instanceof DaemonPtyRouter || provider instanceof DegradedDaemonPtyProvider
         ? provider.getAllAdapters()
         : [provider]
-    const results = await Promise.allSettled(adapters.map((entry) => entry.listSessions()))
-    if (results.some((result) => result.status === 'rejected')) {
-      console.warn('[daemon] Keeping seeded Claude live-PTY gate — session listing failed')
-      return
+    const aliveSessionIds: string[] = []
+    let unreachableAdapters = 0
+    for (const entry of adapters) {
+      let listed: Awaited<ReturnType<typeof entry.listSessions>> | null = null
+      for (let attempt = 1; attempt <= SEEDED_CLAUDE_GATE_LIST_ATTEMPTS; attempt += 1) {
+        try {
+          listed = await entry.listSessions()
+          break
+        } catch {
+          if (attempt < SEEDED_CLAUDE_GATE_LIST_ATTEMPTS) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, SEEDED_CLAUDE_GATE_RETRY_DELAY_MS * attempt)
+            )
+          }
+        }
+      }
+      if (listed) {
+        aliveSessionIds.push(...listed.map((session) => session.sessionId))
+      } else {
+        unreachableAdapters += 1
+      }
     }
-    confirmSeededClaudeLivePtys(
-      results.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value.map((session) => session.sessionId) : []
+    if (unreachableAdapters > 0) {
+      // Why warn rather than keep the gate: a permanent lockout of account management is a
+      // worse failure than the bounded risk of releasing a session no daemon can even see.
+      console.warn(
+        `[daemon] Releasing seeded Claude live-PTY gate — ${unreachableAdapters} daemon(s) unreachable after ${SEEDED_CLAUDE_GATE_LIST_ATTEMPTS} attempts, so no daemon hosts those sessions`
       )
-    )
+    }
+    confirmSeededClaudeLivePtys(aliveSessionIds)
   } catch (error) {
-    // Why: gate bookkeeping must never fail daemon init; stale seeds only defer a usage refresh until next restart.
+    // Why: gate bookkeeping must never fail daemon init.
     console.warn('[daemon] Failed to reconcile seeded Claude live-PTY gate:', error)
   }
 }
