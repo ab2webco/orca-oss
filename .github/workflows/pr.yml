@@ -165,3 +165,83 @@ jobs:
       # temp copy so Node cannot mask missing package deps with repo node_modules.
       - name: Smoke packaged CLI
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/linux-unpacked
+
+      # Why: this runner skips every skipIf(platform !== 'win32') spec; surface
+      # that gap explicitly instead of burying it as "N skipped" in the test
+      # output. The verify-windows job executes what this runner leaves behind.
+      - name: Report platform test coverage
+        if: always()
+        run: node config/scripts/report-platform-test-coverage.mjs
+
+  # Why: verify runs only on ubuntu-latest, so every skipIf(platform !== 'win32')
+  # spec — the cmd.exe status line, the Windows hook-service variants, ConPTY
+  # repair, the managed-hook stdin lifecycle — merged without a single line of
+  # Windows executing in CI (ORCA-75). This sibling job runs exactly that suite
+  # on a Windows host. windows-2022 (not -latest): windows-latest moved to the
+  # VS 2026 image before node-gyp detects VS 18, breaking native install — see
+  # release-cut.yml. Selection is discovered, not hardcoded, so new Windows-only
+  # specs are picked up automatically; an empty match fails loud rather than
+  # passing green on zero execution.
+  verify-windows:
+    name: Windows platform tests
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: verify-windows-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Why: setup-node can only cache pnpm's store after the pnpm binary exists
+      # — same ordering as the packaged Windows e2e jobs.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Why: postinstall rebuilds native deps for Electron's ABI; vitest runs
+      # under system Node, so mirror verify's Node-runtime prep.
+      - name: Ensure Node native runtime
+        run: node config/scripts/ensure-native-runtime.mjs --runtime=node
+
+      - name: Rebuild better-sqlite3 for Node
+        run: pnpm rebuild better-sqlite3
+
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
+
+      # Why: discover the specs by their guard so the selection self-maintains.
+      # On Windows the POSIX guards skip and these run; an empty discovery is an
+      # error, never a silent pass.
+      - name: Run Windows-only tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(grep -rl "skipIf(process.platform !== 'win32')" src config/scripts \
+            --include='*.test.ts' --include='*.test.tsx' --include='*.test.mjs' || true)
+          if [ -z "$files" ]; then
+            echo "::error::No Windows-only test files matched — the guard pattern may have drifted from skipIf(process.platform !== 'win32')."
+            exit 1
+          fi
+          echo "Running Windows-only selection:"
+          printf '  %s\n' $files
+          pnpm exec vitest run --config config/vitest.config.ts $files
+
+      - name: Report platform test coverage
+        if: always()
+        run: node config/scripts/report-platform-test-coverage.mjs
