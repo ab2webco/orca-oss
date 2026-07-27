@@ -16,6 +16,15 @@ afterEach(() => {
   }
 })
 
+function listingFor(files: Record<string, string[]>): (root: string) => AsyncIterable<string> {
+  return (root) => {
+    const paths = files[root] ?? []
+    return (async function* () {
+      yield* paths
+    })()
+  }
+}
+
 describe('resolveTrustedCodexSessionResumeHome', () => {
   it('returns the trusted home containing a persisted rollout', () => {
     expect(
@@ -193,11 +202,9 @@ describe('resolveTrustedCodexSessionResumeHome', () => {
     expect(listSessionFiles).not.toHaveBeenCalled()
   })
 
-  it('does not replace rejected transcript provenance with a same-id rollout from another home', async () => {
+  it('keeps rejected transcript provenance blocked when no trusted fallback exists', async () => {
     const sessionId = '019f81b9-19a9-7651-a8d1-352d9420bd11'
-    const listSessionFiles = vi.fn((): AsyncIterable<string> => {
-      throw new Error('must not scan')
-    })
+    const listSessionFiles = vi.fn(listingFor({}))
 
     await expect(
       findTrustedCodexSessionResume({
@@ -208,7 +215,78 @@ describe('resolveTrustedCodexSessionResumeHome', () => {
         listSessionFiles
       })
     ).resolves.toBeNull()
-    expect(listSessionFiles).not.toHaveBeenCalled()
+    expect(listSessionFiles).toHaveBeenCalledTimes(2)
+  })
+
+  it('repairs stale transcript provenance from one trusted home', async () => {
+    const sessionId = '019f81b9-19a9-7651-a8d1-352d9420bd11'
+    const stalePath = `/managed/origin/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+    const resolvedPath = `/managed/current/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+
+    await expect(
+      findTrustedCodexSessionResume({
+        sessionId,
+        transcriptPath: stalePath,
+        trustedCodexHomes: ['/managed/origin/home', '/managed/current/home'],
+        fileIsRegular: () => false,
+        listSessionFiles: listingFor({ [`/managed/current/home/sessions`]: [resolvedPath] })
+      })
+    ).resolves.toEqual({
+      homePath: '/managed/current/home',
+      transcriptPath: resolvedPath,
+      repair: { sessionId, recordedTranscriptPath: stalePath, resolvedTranscriptPath: resolvedPath }
+    })
+  })
+
+  it('rejects an ambiguous same-id fallback across trusted homes after scanning each home once', async () => {
+    const sessionId = '019f81b9-19a9-7651-a8d1-352d9420bd11'
+    const stalePath = `/managed/stale/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+    const firstPath = `/managed/one/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+    const secondPath = `/managed/two/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+    const listSessionFiles = vi.fn(
+      listingFor({
+        ['/managed/one/home/sessions']: [firstPath],
+        ['/managed/two/home/sessions']: [secondPath]
+      })
+    )
+
+    await expect(
+      findTrustedCodexSessionResume({
+        sessionId,
+        transcriptPath: stalePath,
+        trustedCodexHomes: [
+          '/managed/one/home',
+          '/managed/one/home',
+          '/managed/two/home',
+          '/managed/two/home',
+          '/managed/three/home'
+        ],
+        fileIsRegular: () => false,
+        listSessionFiles
+      })
+    ).resolves.toBeNull()
+    expect(listSessionFiles).toHaveBeenCalledTimes(3)
+    expect(listSessionFiles).toHaveBeenCalledWith('/managed/one/home/sessions')
+    expect(listSessionFiles).toHaveBeenCalledWith('/managed/two/home/sessions')
+    expect(listSessionFiles).toHaveBeenCalledWith('/managed/three/home/sessions')
+  })
+
+  it('never selects same-id files outside trusted homes during stale-path repair', async () => {
+    const sessionId = '019f81b9-19a9-7651-a8d1-352d9420bd11'
+    const stalePath = `/managed/stale/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+    const untrustedPath = `/untrusted/home/sessions/2026/07/20/rollout-${sessionId}.jsonl`
+
+    await expect(
+      findTrustedCodexSessionResume({
+        sessionId,
+        transcriptPath: stalePath,
+        trustedCodexHomes: ['/managed/current/home'],
+        fileIsRegular: () => false,
+        listSessionFiles: listingFor({
+          ['/managed/current/home/sessions']: [untrustedPath]
+        })
+      })
+    ).resolves.toBeNull()
   })
 
   it('does not scan homes for an untrusted legacy session id shape', async () => {
@@ -223,6 +301,22 @@ describe('resolveTrustedCodexSessionResumeHome', () => {
         listSessionFiles
       })
     ).resolves.toBeNull()
+  })
+
+  it('does not scan stale transcript provenance with an invalid session id', async () => {
+    const listSessionFiles = vi.fn((): AsyncIterable<string> => {
+      throw new Error('must not scan')
+    })
+
+    await expect(
+      findTrustedCodexSessionResume({
+        sessionId: 'not-a-uuid',
+        transcriptPath: '/removed/home/sessions/2026/07/20/rollout-not-a-uuid.jsonl',
+        trustedCodexHomes: ['/managed/current/home'],
+        listSessionFiles
+      })
+    ).resolves.toBeNull()
+    expect(listSessionFiles).not.toHaveBeenCalled()
   })
 })
 

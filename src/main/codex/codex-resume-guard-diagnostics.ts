@@ -1,5 +1,14 @@
 import { lstatSync } from 'node:fs'
-import { findTrustedCodexSessionResume } from './codex-session-resume-home'
+import {
+  findTrustedCodexSessionResume,
+  type TrustedCodexSessionResume
+} from './codex-session-resume-home'
+
+export type CodexResumeFallbackDiagnostics = {
+  sessionId: string
+  recordedTranscriptPath: string
+  resolvedTranscriptPath: string
+}
 
 export type CodexResumeGuardDiagnostics = {
   sessionId: string
@@ -29,6 +38,18 @@ function recordedPathVariants(transcriptPath: string): string[] {
     return [transcriptPath, `${transcriptPath}.zst`]
   }
   return [transcriptPath]
+}
+
+export function collectCodexResumeFallbackDiagnostics(
+  session: TrustedCodexSessionResume
+): CodexResumeFallbackDiagnostics | null {
+  return session.repair
+    ? {
+        sessionId: session.repair.sessionId,
+        recordedTranscriptPath: session.repair.recordedTranscriptPath,
+        resolvedTranscriptPath: session.repair.resolvedTranscriptPath
+      }
+    : null
 }
 
 /**

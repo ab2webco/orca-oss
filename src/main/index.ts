@@ -182,7 +182,10 @@ import {
   claimsCodexRolloutLayout,
   findTrustedCodexSessionResume
 } from './codex/codex-session-resume-home'
-import { collectCodexResumeGuardDiagnostics } from './codex/codex-resume-guard-diagnostics'
+import {
+  collectCodexResumeFallbackDiagnostics,
+  collectCodexResumeGuardDiagnostics
+} from './codex/codex-resume-guard-diagnostics'
 import { getSystemCodexHomePath } from './codex/codex-home-paths'
 import { normalizeRuntimePathForComparison } from '../shared/cross-platform-path'
 import {
@@ -891,6 +894,11 @@ async function prepareCodexSessionResumeForLaunch(args: {
       throw new Error(CODEX_RESUME_BLOCKED_MESSAGE)
     }
     return null
+  }
+
+  const fallbackDiagnostics = collectCodexResumeFallbackDiagnostics(sessionSource)
+  if (fallbackDiagnostics) {
+    console.warn('[codex-session-resume] Recovered stale transcript path:', fallbackDiagnostics)
   }
 
   let migrated = { useRealCodexHome: false }

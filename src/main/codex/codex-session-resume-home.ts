@@ -13,6 +13,18 @@ const ROLLOUT_RELATIVE_PATH = new RegExp(`^${DATED_ROLLOUT_TAIL}$`)
 // Why: case-insensitive because trusted-home matching folds Windows path case too.
 const CODEX_ROLLOUT_LAYOUT_PATH = new RegExp(`(?:^|/)sessions/${DATED_ROLLOUT_TAIL}$`, 'i')
 
+export type CodexSessionResumeRepair = {
+  sessionId: string
+  recordedTranscriptPath: string
+  resolvedTranscriptPath: string
+}
+
+export type TrustedCodexSessionResume = {
+  homePath: string
+  transcriptPath: string
+  repair?: CodexSessionResumeRepair
+}
+
 function isCodexRolloutInsideSessionsRoot(sessionsRoot: string, filePath: string): boolean {
   const relativePath = relativePathInsideRoot(sessionsRoot, filePath)
   return Boolean(relativePath && ROLLOUT_RELATIVE_PATH.test(relativePath.replace(/\\/g, '/')))
@@ -49,7 +61,7 @@ function resolveTrustedCodexSessionResume(args: {
   transcriptPath: string | undefined
   trustedCodexHomes: readonly string[]
   fileIsRegular?: (filePath: string) => boolean
-}): { homePath: string; transcriptPath: string } | null {
+}): TrustedCodexSessionResume | null {
   const persistedPath = args.transcriptPath?.trim()
   if (!persistedPath) {
     return null
@@ -99,14 +111,10 @@ export async function findTrustedCodexSessionResume(args: {
   trustedCodexHomes: readonly string[]
   fileIsRegular?: (filePath: string) => boolean
   listSessionFiles?: (sessionsRoot: string) => AsyncIterable<string>
-}): Promise<{ homePath: string; transcriptPath: string } | null> {
+}): Promise<TrustedCodexSessionResume | null> {
   const directSession = resolveTrustedCodexSessionResume(args)
   if (directSession) {
     return directSession
-  }
-  if (args.transcriptPath?.trim()) {
-    // Why: stale/rejected provenance must not select a same-id rollout under different account credentials; scanning is legacy-only.
-    return null
   }
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(args.sessionId)) {
     return null
@@ -118,6 +126,8 @@ export async function findTrustedCodexSessionResume(args: {
       listCodexSessionRolloutFilesIncrementally(sessionsRoot, { batchSize: 64, yieldMs: 0 }))
   const expectedSuffix = `-${args.sessionId}.jsonl`.toLowerCase()
   const seenHomes = new Set<string>()
+  let matchedSession: TrustedCodexSessionResume | null = null
+  let isAmbiguous = false
   for (const homePath of args.trustedCodexHomes) {
     const comparisonHome = normalizeRuntimePathForComparison(homePath)
     if (seenHomes.has(comparisonHome)) {
@@ -144,9 +154,25 @@ export async function findTrustedCodexSessionResume(args: {
         isCodexRolloutInsideSessionsRoot(sessionsRoot, preferredFilePath) &&
         plainFileName.endsWith(expectedSuffix)
       ) {
-        return { homePath, transcriptPath: preferredFilePath }
+        if (matchedSession && matchedSession.homePath !== homePath) {
+          isAmbiguous = true
+        }
+        matchedSession = { homePath, transcriptPath: preferredFilePath }
       }
     }
   }
-  return null
+  const recordedTranscriptPath = args.transcriptPath?.trim()
+  if (!matchedSession || isAmbiguous) {
+    return null
+  }
+  return recordedTranscriptPath
+    ? {
+        ...matchedSession,
+        repair: {
+          sessionId: args.sessionId,
+          recordedTranscriptPath,
+          resolvedTranscriptPath: matchedSession.transcriptPath
+        }
+      }
+    : matchedSession
 }

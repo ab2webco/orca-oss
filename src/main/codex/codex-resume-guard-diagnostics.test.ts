@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { collectCodexResumeGuardDiagnostics } from './codex-resume-guard-diagnostics'
+import {
+  collectCodexResumeFallbackDiagnostics,
+  collectCodexResumeGuardDiagnostics
+} from './codex-resume-guard-diagnostics'
 
 const SESSION_ID = '019f9c89-244d-7232-b6e6-0874d3557f76'
 
@@ -56,5 +59,26 @@ describe('collectCodexResumeGuardDiagnostics', () => {
       listSessionFiles: () => emptyListing()
     })
     expect(diagnostics.recordedTranscriptPathExists).toBe(true)
+  })
+})
+
+describe('collectCodexResumeFallbackDiagnostics', () => {
+  it('records the exact trusted transcript repair', () => {
+    expect(
+      collectCodexResumeFallbackDiagnostics({
+        homePath: '/managed/current/home',
+        transcriptPath: '/managed/current/home/sessions/2026/07/26/rollout-current.jsonl',
+        repair: {
+          sessionId: SESSION_ID,
+          recordedTranscriptPath: '/managed/stale/home/sessions/2026/07/26/rollout-stale.jsonl',
+          resolvedTranscriptPath:
+            '/managed/current/home/sessions/2026/07/26/rollout-current.jsonl'
+        }
+      })
+    ).toEqual({
+      sessionId: SESSION_ID,
+      recordedTranscriptPath: '/managed/stale/home/sessions/2026/07/26/rollout-stale.jsonl',
+      resolvedTranscriptPath: '/managed/current/home/sessions/2026/07/26/rollout-current.jsonl'
+    })
   })
 })
