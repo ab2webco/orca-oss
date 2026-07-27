@@ -3196,6 +3196,7 @@ export default function TaskPage(): React.JSX.Element {
   const planeStatusContextKey = useAppStore((s) => s.planeStatusContextKey)
   const selectPlaneWorkspace = useAppStore((s) => s.selectPlaneWorkspace)
   const listPlaneWorkItems = useAppStore((s) => s.listPlaneWorkItems)
+  const invalidatePlaneWorkItemLists = useAppStore((s) => s.invalidatePlaneWorkItemLists)
   const checkPlaneConnection = useAppStore((s) => s.checkPlaneConnection)
   const listPlaneProjects = useAppStore((s) => s.listPlaneProjects)
   const getCachedPlaneProjects = useAppStore((s) => s.getCachedPlaneProjects)
@@ -4795,6 +4796,12 @@ export default function TaskPage(): React.JSX.Element {
   const [appliedPlaneSearch, setAppliedPlaneSearch] = useState('')
   const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('everything')
   const [planeRefreshNonce, setPlaneRefreshNonce] = useState(0)
+  // Why tracked by id: the sheet should open into the description editor only for
+  // the card the composer just made, not for every item opened afterwards.
+  const [planeJustCreatedItemId, setPlaneJustCreatedItemId] = useState<string | null>(null)
+  // Why wait for the refetch: opening the detail needs the real work item, so the
+  // composer only hands over the id and this opens it once the list carries it.
+  const [planePendingOpenItemId, setPlanePendingOpenItemId] = useState<string | null>(null)
   const [planeOrderBy, setPlaneOrderBy] = useState<PlaneWorkItemSortColumn>('updated')
   const [planeOrderDirection, setPlaneOrderDirection] = useState<PlaneWorkItemSortDirection>('desc')
   // Session-only: list vs. Kanban board. Board requires a single project.
@@ -5962,6 +5969,20 @@ export default function TaskPage(): React.JSX.Element {
   )
   // Search composes with the active preset: the preset filters server/main-side,
   // then this narrows the loaded items by identifier/title on the client.
+  // Why here and not in the board: opening the detail needs the real work item,
+  // which only exists after the refetch triggered by the create event lands.
+  useEffect(() => {
+    if (!planePendingOpenItemId) {
+      return
+    }
+    const created = planeItems.find((entry) => entry.id === planePendingOpenItemId)
+    if (!created) {
+      return
+    }
+    setPlanePendingOpenItemId(null)
+    openPlaneDetailPage(created)
+  }, [planePendingOpenItemId, planeItems, openPlaneDetailPage])
+
   const planeSearchedItems = useMemo(
     () => filterPlaneItemsBySearch(sortedPlaneItems, appliedPlaneSearch),
     [sortedPlaneItems, appliedPlaneSearch]
@@ -8233,9 +8254,14 @@ export default function TaskPage(): React.JSX.Element {
       ) {
         return
       }
+      // Why invalidate before bumping: listPlaneWorkItems serves a fresh cache
+      // entry unless forced, so bumping the nonce alone refetched into the SAME
+      // cached list — the board never saw the new card even though the event
+      // arrived. Dropping the cache is what makes the refetch real.
+      invalidatePlaneWorkItemLists()
       setPlaneRefreshNonce((n) => n + 1)
     })
-  }, [selectedPlaneProjectId, selectedPlaneWorkspaceId])
+  }, [selectedPlaneProjectId, selectedPlaneWorkspaceId, invalidatePlaneWorkItemLists])
 
   useEffect(() => {
     if (!taskResumeApplied) {
@@ -9485,7 +9511,13 @@ export default function TaskPage(): React.JSX.Element {
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => setPlaneRefreshNonce((n) => n + 1)}
+                              onClick={() => {
+                                // Why invalidate here too: without it the manual
+                                // refresh refetched into the same cached list, so
+                                // the button appeared to do nothing at all.
+                                invalidatePlaneWorkItemLists()
+                                setPlaneRefreshNonce((n) => n + 1)
+                              }}
                               disabled={planeLoading}
                               aria-label={translate(
                                 'auto.components.TaskPage.planeRefreshWorkItems',
@@ -10805,6 +10837,10 @@ export default function TaskPage(): React.JSX.Element {
                         selectedItemId={selectedPlaneWorkItem?.id ?? null}
                         getStateTone={getPlaneStateTone}
                         onOpenItem={openPlaneDetailPage}
+                        onItemCreated={(itemId) => {
+                          setPlaneJustCreatedItemId(itemId)
+                          setPlanePendingOpenItemId(itemId)
+                        }}
                       />
                     )
                   ) : (
@@ -10830,6 +10866,7 @@ export default function TaskPage(): React.JSX.Element {
                   onUse={handleUsePlaneItem}
                   onClose={closeTaskDetailPage}
                   sourceContext={planeDetailSourceContext}
+                  startEditingDescription={selectedPlaneWorkItem?.id === planeJustCreatedItemId}
                 />
               </div>
             )

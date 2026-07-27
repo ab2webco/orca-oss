@@ -54,6 +54,9 @@ type TaskPagePlaneBoardProps = {
   selectedItemId: string | null
   getStateTone: (stateGroup: string) => string
   onOpenItem: (item: PlaneWorkItem) => void
+  /** Reports the id of a card the inline composer just created, so the caller can
+   *  open its sheet into the description editor. */
+  onItemCreated?: (itemId: string) => void
 }
 
 export function TaskPagePlaneBoard({
@@ -63,7 +66,8 @@ export function TaskPagePlaneBoard({
   providerSettings,
   selectedItemId,
   getStateTone,
-  onOpenItem
+  onOpenItem,
+  onItemCreated
 }: TaskPagePlaneBoardProps): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const confirm = useConfirmationDialog()
@@ -146,12 +150,13 @@ export function TaskPagePlaneBoard({
         )
         return false
       }
-      // Why nothing else here: main broadcasts plane:changed for this mutation and
-      // TaskPage refetches the project, so the new card arrives with the ids and
-      // identifier Plane assigned — a local insert would have to invent them.
+      // Why only report the id: opening the detail needs the REAL work item (the
+      // page route resolves project/state/labels from it), and a synthetic stand-in
+      // silently failed to navigate. The caller opens it once the refetch lands.
+      onItemCreated?.(result.id)
       return true
     },
-    [providerSettings, projectId, workspaceId]
+    [providerSettings, projectId, workspaceId, onItemCreated]
   )
 
   const handleCreateColumn = useCallback(

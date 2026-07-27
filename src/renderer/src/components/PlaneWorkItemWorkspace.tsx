@@ -24,6 +24,9 @@ type PlaneWorkItemWorkspaceProps = {
   onUse: (item: PlaneWorkItem) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
+  /** Open straight into the description editor — set when the caller just created
+   *  this item from a title-only composer, so filling it in is the next step. */
+  startEditingDescription?: boolean
 }
 
 const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
@@ -48,7 +51,8 @@ export default function PlaneWorkItemWorkspace({
   item,
   onUse,
   onClose,
-  sourceContext
+  sourceContext,
+  startEditingDescription = false
 }: PlaneWorkItemWorkspaceProps): React.JSX.Element {
   const workspace = usePlaneWorkItemWorkspace(item, sourceContext)
   const { displayed } = workspace
@@ -57,8 +61,8 @@ export default function PlaneWorkItemWorkspace({
   // Why keyed on the item: opening a different work item must not inherit the
   // previous one's open editor, which would show its draft against a new title.
   React.useEffect(() => {
-    setEditingDescription(false)
-  }, [item?.id])
+    setEditingDescription(startEditingDescription)
+  }, [item?.id, startEditingDescription])
 
   return (
     <Sheet open={item !== null} onOpenChange={(open) => !open && onClose()}>
