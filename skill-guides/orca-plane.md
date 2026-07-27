@@ -119,6 +119,7 @@ orca plane comment delete <commentId> ([<workItemId>] | --current) --project <id
 orca plane relation add <id> --related <id> --type blocks|blocked-by|related|duplicate --project <id> [--workspace <id>] [--json]
 orca plane relation list <id> --project <id> [--workspace <id>] [--json]
 orca plane attach add <id> --url <url> [--title <t>] --project <id> [--workspace <id>] [--json]
+orca plane attach upload <id> --file <path> --project <id> [--workspace <id>] [--json]
 orca plane attach list <id> --project <id> [--workspace <id>] [--json]
 orca plane attach remove <id> --link <linkId> --project <id> [--workspace <id>] [--json]
 orca plane project list [--workspace <id>|all] [--json]
@@ -232,17 +233,27 @@ These commands are not exposed yet because their Plane REST endpoints are still 
 - `plane archive` / `plane unarchive` — work item archive toggle.
 - `plane relation remove` — removing a typed relation between work items.
 
-## Attachments (URL Links)
+## Attachments (URL Links and Uploaded Files)
 
-Attach and manage URL links on a work item (named `attach` so it never collides with the worktree-linking `plane link`):
+Named `attach` so it never collides with the worktree-linking `plane link`. Links and uploaded
+files are **different Plane resources**: `attach add` registers a URL, `attach upload` sends a
+file through Plane's three-step presigned flow.
 
 ```bash
 orca plane attach add PROJ-12 --url https://example.com/design --title "Design doc" --project <projectId> --json
+orca plane attach upload PROJ-12 --file ./screenshot.png --project <projectId> --json
 orca plane attach list PROJ-12 --project <projectId> --json
 orca plane attach remove PROJ-12 --link <linkId> --project <projectId> --json
 ```
 
 - `--title` is optional. Get `<linkId>` from `attach list`.
+- `attach list --json` returns `{ links, attachments }` — two arrays, not one. Read
+  `result.links` for URL links and `result.attachments` for uploaded files.
+- `attach remove` removes a **link**, not an uploaded file.
+- `attach upload` reads `--file` on the machine running the Orca app, so it refuses over a
+  remote pairing rather than uploading the wrong file.
+- An upload that fails names the step it failed on. If it fails at `confirm`, the binary
+  reached storage but is not attached: the error carries `unconfirmedAssetId`.
 
 ## Labels
 

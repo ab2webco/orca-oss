@@ -359,3 +359,27 @@ describe('429 handling', () => {
     expect(netFetchMock).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('planeFetch (exported transport)', () => {
+  it('forwards the raw init — including the abort signal — without Plane auth headers', async () => {
+    const { planeFetch } = await loadClientModule()
+    netFetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const controller = new AbortController()
+
+    const response = await planeFetch('https://storage.example.com/uploads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data; boundary=b' },
+      body: new Uint8Array([1, 2, 3]),
+      signal: controller.signal
+    })
+
+    expect(response.status).toBe(204)
+    const [url, init] = netFetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://storage.example.com/uploads')
+    expect(init.method).toBe('POST')
+    expect(init.signal).toBe(controller.signal)
+    // The presigned storage POST authenticates via the signed form fields; an
+    // x-api-key header here would leak the Plane credential to storage.
+    expect(new Headers(init.headers).has('x-api-key')).toBe(false)
+  })
+})

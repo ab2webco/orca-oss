@@ -59,12 +59,29 @@ export const PLANE_EXTENDED_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['plane', 'attach', 'upload'],
+    summary: 'Upload a local file as a Plane work item attachment',
+    usage: 'orca plane attach upload <id> --file <path> --project <id> [--workspace <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'file', 'project', 'workspace', 'id'],
+    positionalArgs: ['id'],
+    examples: [
+      'orca plane attach upload PROJ-12 --file ./qa-video.mp4 --project <projectId> --json'
+    ],
+    notes: [
+      'Three-step upload: Plane issues a signed URL, the file goes straight to storage, then the asset is confirmed.',
+      'The file is read by the Orca app host; not supported over a remote pairing. For URL links use attach add.'
+    ]
+  },
+  {
     path: ['plane', 'attach', 'list'],
-    summary: 'List URL links on a Plane work item',
+    summary: 'List URL links and uploaded file attachments on a Plane work item',
     usage: 'orca plane attach list <id> --project <id> [--workspace <id>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
-    examples: ['orca plane attach list PROJ-12 --project <projectId> --json']
+    examples: ['orca plane attach list PROJ-12 --project <projectId> --json'],
+    notes: [
+      'JSON result is { links, attachments }; links and uploaded files are listed separately.'
+    ]
   },
   {
     path: ['plane', 'attach', 'remove'],

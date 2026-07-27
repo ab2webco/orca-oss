@@ -119,7 +119,9 @@ function describeErrorCause(error: unknown): string | undefined {
   return cause === undefined ? undefined : boundedIntegrationErrorMessage(cause)
 }
 
-async function planeFetch(url: string, init: RequestInit): Promise<Response> {
+// Exported: plane-work-item-attachments.ts posts the presigned upload form
+// straight to storage, which must stay proxy-aware but carry NO Plane headers.
+export async function planeFetch(url: string, init: RequestInit): Promise<Response> {
   return withSpan(
     'plane.request',
     async (span) => {

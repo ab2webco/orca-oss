@@ -59,7 +59,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'plane-attach',
-    keys: ['plane attach add', 'plane attach list', 'plane attach remove'],
+    keys: ['plane attach add', 'plane attach upload', 'plane attach list', 'plane attach remove'],
     load: async () => (await import('./handlers/plane-attach.js')).PLANE_ATTACH_HANDLERS
   },
   {

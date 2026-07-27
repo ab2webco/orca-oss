@@ -443,6 +443,9 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   if (command === 'linear comment add' && flag === 'reply-to') {
     return '--reply-to <id>       Comment id to reply to'
   }
+  if (command === 'plane attach upload' && flag === 'file') {
+    return '--file <path>         Local file to upload as an attachment'
+  }
   if (command === 'linear attach' && flag === 'url') {
     return '--url <url>           Absolute http(s) link to attach'
   }

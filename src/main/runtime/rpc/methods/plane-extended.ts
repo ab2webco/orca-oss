@@ -1,10 +1,17 @@
 import { defineMethod, type RpcMethod } from '../core'
+// Direct module import (clipboard.ts precedent): the attachment flow keeps its
+// own state in the plane module, so the runtime facade adds no indirection.
+import {
+  listWorkItemAttachments,
+  uploadWorkItemAttachment
+} from '../../../plane/plane-work-item-attachments'
 import {
   AddLink,
   AddRelation,
   CreateLabel,
   DeleteLink,
-  ProjectWorkItem
+  ProjectWorkItem,
+  UploadAttachment
 } from './plane-extended-schemas'
 
 // Extended Plane RPC methods (delete, relations, links, label create).
@@ -71,6 +78,27 @@ export const PLANE_EXTENDED_METHODS: RpcMethod[] = [
     params: ProjectWorkItem,
     handler: async (params, { runtime }) =>
       runtime.planeListWorkItemLinks({
+        projectId: params.projectId.trim(),
+        workItemId: params.workItemId.trim(),
+        workspaceId: params.workspaceId
+      })
+  }),
+  defineMethod({
+    name: 'plane.uploadWorkItemAttachment',
+    params: UploadAttachment,
+    handler: async (params) =>
+      uploadWorkItemAttachment({
+        projectId: params.projectId.trim(),
+        workItemId: params.workItemId.trim(),
+        filePath: params.filePath.trim(),
+        workspaceId: params.workspaceId
+      })
+  }),
+  defineMethod({
+    name: 'plane.listWorkItemAttachments',
+    params: ProjectWorkItem,
+    handler: async (params) =>
+      listWorkItemAttachments({
         projectId: params.projectId.trim(),
         workItemId: params.workItemId.trim(),
         workspaceId: params.workspaceId

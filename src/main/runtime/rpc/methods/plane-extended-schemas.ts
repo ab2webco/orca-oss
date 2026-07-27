@@ -46,6 +46,13 @@ export const DeleteLink = z.object({
   workspaceId: OptionalString
 })
 
+export const UploadAttachment = z.object({
+  projectId: requiredString('Project is required'),
+  workItemId: requiredString('Work item ID is required'),
+  filePath: requiredString('File path is required'),
+  workspaceId: OptionalString
+})
+
 export const CreateLabel = z.object({
   projectId: requiredString('Project is required'),
   name: requiredString('Label name is required'),

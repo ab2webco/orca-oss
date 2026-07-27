@@ -1,4 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
+
+const { uploadAttachmentMock, listAttachmentsMock } = vi.hoisted(() => ({
+  uploadAttachmentMock: vi.fn(),
+  listAttachmentsMock: vi.fn()
+}))
+
+// The attachment methods bypass the runtime facade and call the plane module
+// directly; mock it so importing PLANE_METHODS stays free of electron.
+vi.mock('../../../plane/plane-work-item-attachments', () => ({
+  uploadWorkItemAttachment: uploadAttachmentMock,
+  listWorkItemAttachments: listAttachmentsMock
+}))
+
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -100,6 +113,51 @@ describe('extended Plane RPC methods', () => {
       color: '#ef4444',
       workspaceId: undefined
     })
+  })
+
+  it('routes attachment upload and list to the plane module, trimming input', async () => {
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+    uploadAttachmentMock.mockResolvedValue({ ok: true, attachment: { id: 'a1' } })
+    listAttachmentsMock.mockResolvedValue([])
+
+    const uploadResponse = await dispatcher.dispatch(
+      makeRequest('plane.uploadWorkItemAttachment', {
+        projectId: '  p1  ',
+        workItemId: '  wi1  ',
+        filePath: '  /qa/shot.png  ',
+        workspaceId: 'ws1'
+      })
+    )
+    await dispatcher.dispatch(
+      makeRequest('plane.listWorkItemAttachments', { projectId: 'p1', workItemId: 'wi1' })
+    )
+
+    expect(uploadResponse.ok).toBe(true)
+    expect(uploadAttachmentMock).toHaveBeenCalledWith({
+      projectId: 'p1',
+      workItemId: 'wi1',
+      filePath: '/qa/shot.png',
+      workspaceId: 'ws1'
+    })
+    expect(listAttachmentsMock).toHaveBeenCalledWith({
+      projectId: 'p1',
+      workItemId: 'wi1',
+      workspaceId: undefined
+    })
+  })
+
+  it('rejects an attachment upload without a filePath', async () => {
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+    uploadAttachmentMock.mockClear()
+
+    const response = await dispatcher.dispatch(
+      makeRequest('plane.uploadWorkItemAttachment', { projectId: 'p1', workItemId: 'wi1' })
+    )
+
+    expect(response.ok).toBe(false)
+    expect(uploadAttachmentMock).not.toHaveBeenCalled()
   })
 
   it('rejects an unknown relation_type', async () => {

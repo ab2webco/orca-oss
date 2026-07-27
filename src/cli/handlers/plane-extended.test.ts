@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
@@ -325,10 +326,20 @@ describe('orca plane extended CLI handlers', () => {
     )
   })
 
-  it('maps attach list and remove to their RPCs', async () => {
-    queueFixtures(callMock, okFixture('req0', workItem()), okFixture('req', []))
+  it('maps attach list to links + attachments and remove to its RPC', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req0', workItem()),
+      okFixture('req', []),
+      okFixture('req2', [])
+    )
     await main(['plane', 'attach', 'list', 'PROJ-12', '--project', 'p1', '--json'], '/tmp/repo')
     expect(callMock).toHaveBeenNthCalledWith(2, 'plane.listWorkItemLinks', {
+      projectId: 'p1',
+      workItemId: 'wi1',
+      workspaceId: undefined
+    })
+    expect(callMock).toHaveBeenNthCalledWith(3, 'plane.listWorkItemAttachments', {
       projectId: 'p1',
       workItemId: 'wi1',
       workspaceId: undefined
@@ -345,6 +356,95 @@ describe('orca plane extended CLI handlers', () => {
       { projectId: 'p1', workItemId: 'wi1', linkId: 'l1', workspaceId: undefined },
       WRITE_OPTS
     )
+  })
+
+  it('maps attach upload to plane.uploadWorkItemAttachment with the long timeout', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req0', workItem()),
+      okFixture('req', {
+        ok: true,
+        attachment: {
+          id: 'a1',
+          name: 'shot.png',
+          size: 14,
+          contentType: 'image/png',
+          isUploaded: true
+        }
+      })
+    )
+    await main(
+      [
+        'plane',
+        'attach',
+        'upload',
+        'PROJ-12',
+        '--file',
+        '/qa/shot.png',
+        '--project',
+        'p1',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'plane.uploadWorkItemAttachment',
+      { projectId: 'p1', workItemId: 'wi1', filePath: '/qa/shot.png', workspaceId: undefined },
+      { timeoutMs: 660_000 }
+    )
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it('resolves a relative --file against the CLI cwd', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req0', workItem()),
+      okFixture('req', {
+        ok: true,
+        attachment: {
+          id: 'a1',
+          name: 'shot.png',
+          size: 14,
+          contentType: 'image/png',
+          isUploaded: true
+        }
+      })
+    )
+    await main(
+      ['plane', 'attach', 'upload', 'PROJ-12', '--file', 'shot.png', '--project', 'p1', '--json'],
+      '/tmp/repo'
+    )
+    const [, params] = callMock.mock.calls[1]
+    expect((params as { filePath: string }).filePath).toBe(join('/tmp/repo', 'shot.png'))
+  })
+
+  it('surfaces a failed upload step as a CLI error', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req0', workItem()),
+      okFixture('req', {
+        ok: false,
+        failedStep: 'confirm',
+        unconfirmedAssetId: 'a1',
+        error: 'The file reached storage but was NOT confirmed: boom.'
+      })
+    )
+    await main(
+      ['plane', 'attach', 'upload', 'PROJ-12', '--file', '/qa/shot.png', '--project', 'p1'],
+      '/tmp/repo'
+    )
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('rejects attach upload over a remote pairing before any RPC', async () => {
+    process.env.ORCA_PAIRING_CODE = 'orca://pair?code=x'
+    await main(
+      ['plane', 'attach', 'upload', 'PROJ-12', '--file', '/qa/shot.png', '--project', 'p1'],
+      '/tmp/repo'
+    )
+    expect(callMock).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
   })
 
   // ── Part C: labels ──
