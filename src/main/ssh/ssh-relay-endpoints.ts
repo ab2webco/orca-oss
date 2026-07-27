@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { UNIX_SOCKET_PATH_LIMIT_BYTES } from '../runtime/runtime-socket-path'
 import {
   isWindowsRemoteHost,
   joinRemotePath,
@@ -8,19 +9,39 @@ import {
 
 export const WINDOWS_ACTIVE_PIPE_MARKER_PREFIX = '.windows-active-pipe-'
 
+function unixSocketPathLimit(hostPlatform: RemoteHostPlatform): number {
+  return hostPlatform.os === 'linux'
+    ? UNIX_SOCKET_PATH_LIMIT_BYTES.linux
+    : UNIX_SOCKET_PATH_LIMIT_BYTES.darwin
+}
+
+function remotePlatformDisplayName(hostPlatform: RemoteHostPlatform): string {
+  return hostPlatform.os === 'darwin' ? 'macOS' : 'Linux'
+}
+
 export function relayEndpointForHost(
   hostPlatform: RemoteHostPlatform,
   remoteDir: string,
   sockName: string
 ): string {
-  if (!isWindowsRemoteHost(hostPlatform)) {
-    return joinRemotePath(hostPlatform, remoteDir, sockName)
+  if (isWindowsRemoteHost(hostPlatform)) {
+    const endpointHash = createHash('sha256')
+      .update(`${remoteDir}\0${sockName}`)
+      .digest('hex')
+      .slice(0, 20)
+    return `\\\\.\\pipe\\orca-relay-${endpointHash}`
   }
-  const endpointHash = createHash('sha256')
-    .update(`${remoteDir}\0${sockName}`)
-    .digest('hex')
-    .slice(0, 20)
-  return `\\\\.\\pipe\\orca-relay-${endpointHash}`
+
+  const endpoint = joinRemotePath(hostPlatform, remoteDir, sockName)
+  const endpointBytes = Buffer.byteLength(endpoint, 'utf8')
+  const limit = unixSocketPathLimit(hostPlatform)
+  if (endpointBytes >= limit) {
+    throw new Error(
+      `SSH relay Unix socket path is ${endpointBytes} bytes; ` +
+        `${remotePlatformDisplayName(hostPlatform)} sun_path requires fewer than ${limit} bytes because the NUL terminator counts`
+    )
+  }
+  return endpoint
 }
 
 export function relayHookEndpointDirForHost(
