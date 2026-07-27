@@ -32,7 +32,10 @@ import {
   isOauthTokenExpiring,
   refreshClaudeOauthCredentialsDetailed
 } from '../claude-accounts/oauth-refresh'
-import { tryRunManagedClaudeAccountMutation } from '../claude-accounts/run-managed-claude-account-mutation'
+import {
+  tryRunManagedClaudeAccountBackgroundRotation,
+  tryRunManagedClaudeAccountMutation
+} from '../claude-accounts/run-managed-claude-account-mutation'
 import { createOAuthUsageError, OAuthUsageError } from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnostic'
@@ -83,14 +86,6 @@ type OAuthCredentialReadResult = {
   hasRefreshableCredentials: boolean
   source: OAuthCredentialSource
   keychainUnavailable?: boolean
-}
-
-type OAuthCredentialReadOptions = {
-  credentialsFileConfigDir?: string
-  keychainConfigDir?: string
-  /** The config dir is one account's private dir; the unsuffixed legacy Keychain
-   *  item belongs to a different identity, so never fall back to it. */
-  keychainScopedOnly?: boolean
 }
 
 type OAuthCredentialSource = 'scoped-keychain' | 'legacy-keychain' | 'credentials-file' | 'none'
@@ -145,19 +140,19 @@ function keychainUnavailableOAuthCredentialReadResult(): OAuthCredentialReadResu
  * Why: Claude Code 2.1+ scopes Keychain services by CLAUDE_CONFIG_DIR; older builds used the legacy unsuffixed service.
  */
 async function readFromKeychain(
-  configDir?: string,
-  scopedOnly?: boolean
+  authPreparation?: ClaudeRuntimeAuthPreparation
 ): Promise<OAuthCredentialReadResult> {
   if (process.platform !== 'darwin') {
     return emptyOAuthCredentialReadResult()
   }
 
+  const configDir = authPreparation?.configDir
   if (configDir) {
     const scopedCredentials = await readCredentialsFromStrictKeychain(configDir, 'scoped-keychain')
     if (scopedCredentials.token) {
       return scopedCredentials
     }
-    if (scopedOnly) {
+    if (!canUseLegacyKeychainIdentity(authPreparation)) {
       return scopedCredentials
     }
     const legacyCredentials = await readCredentialsFromStrictKeychain(undefined, 'legacy-keychain')
@@ -219,13 +214,11 @@ async function readFromCredentialsFile(configDir?: string): Promise<OAuthCredent
  * Why: skip ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY — those are API keys that 401 on the OAuth usage endpoint (PTY fallback serves them).
  */
 async function readOAuthCredentials(
-  options?: OAuthCredentialReadOptions
+  authPreparation?: ClaudeRuntimeAuthPreparation
 ): Promise<OAuthCredentialReadResult> {
+  // Why: policy lives here so managed/remote callers cannot forget to request scoped-only reads.
   // 1. macOS Keychain (Claude Max/Pro OAuth)
-  const fromKeychain = await readFromKeychain(
-    options?.keychainConfigDir,
-    options?.keychainScopedOnly
-  )
+  const fromKeychain = await readFromKeychain(authPreparation)
   if (fromKeychain.token) {
     return fromKeychain
   }
@@ -234,7 +227,7 @@ async function readOAuthCredentials(
   }
 
   // 2. Legacy credentials file
-  const fromFile = await readFromCredentialsFile(options?.credentialsFileConfigDir)
+  const fromFile = await readFromCredentialsFile(authPreparation?.configDir)
   if (fromFile.token) {
     return fromFile
   }
@@ -249,19 +242,10 @@ async function readOAuthCredentials(
   return emptyOAuthCredentialReadResult()
 }
 
-function resolveOAuthCredentialReadOptions(
-  authPreparation?: ClaudeRuntimeAuthPreparation
-): OAuthCredentialReadOptions | undefined {
-  if (!authPreparation) {
-    return undefined
-  }
-  // Why: Claude Code 2.1+ can scope even the default config dir's Keychain item; try scoped first, legacy as fallback.
-  const readOptions: OAuthCredentialReadOptions = {
-    credentialsFileConfigDir: authPreparation.configDir,
-    keychainConfigDir: authPreparation.configDir,
-    keychainScopedOnly: authPreparation.accountScopedConfigDir === true
-  }
-  return readOptions
+function canUseLegacyKeychainIdentity(
+  authPreparation: ClaudeRuntimeAuthPreparation | undefined
+): boolean {
+  return (authPreparation?.runtime ?? 'host') === 'host' && !isManagedClaudeAuth(authPreparation)
 }
 
 function buildClaudeUsageFetchDiagnostic(
@@ -606,8 +590,7 @@ function canRetryWithLegacyKeychainToken(input: {
   return (
     input.classification.failureKind === 'stale-token' &&
     input.oauthCredentials.source === 'scoped-keychain' &&
-    (input.authPreparation?.runtime ?? 'host') === 'host' &&
-    !isManagedClaudeAuth(input.authPreparation)
+    canUseLegacyKeychainIdentity(input.authPreparation)
   )
 }
 
@@ -716,9 +699,7 @@ async function attemptCliRepairThenRetryOAuth(input: {
     return abortedClaudeRateLimitResult()
   }
 
-  const refreshedCredentials = await readOAuthCredentials(
-    resolveOAuthCredentialReadOptions(input.options?.authPreparation)
-  )
+  const refreshedCredentials = await readOAuthCredentials(input.options?.authPreparation)
   if (input.options?.signal?.aborted) {
     return abortedClaudeRateLimitResult()
   }
@@ -794,9 +775,7 @@ export async function fetchClaudeRateLimits(
     )
   }
 
-  const oauthCredentials = await readOAuthCredentials(
-    resolveOAuthCredentialReadOptions(options?.authPreparation)
-  )
+  const oauthCredentials = await readOAuthCredentials(options?.authPreparation)
   if (options?.signal?.aborted) {
     return abortedClaudeRateLimitResult()
   }
@@ -1301,17 +1280,21 @@ export async function fetchManagedAccountUsage(
     // its single-use copy is invalidated. The gate acquire re-checks liveness
     // atomically; when it yields, fall through and let the usage endpoint decide.
     const staleCredentialsJson = credentialsJson
-    const rotation = await tryRunManagedClaudeAccountMutation(account.id, async () => {
-      const outcome = await refreshClaudeOauthCredentialsDetailed(staleCredentialsJson)
-      if (outcome.credentialsJson) {
-        try {
-          await writeManagedCredentialsJson(location, outcome.credentialsJson)
-        } catch {
-          // Keep the refreshed token in memory; next poll refreshes again if the write failed.
+    const rotation = await tryRunManagedClaudeAccountBackgroundRotation(
+      account.id,
+      staleCredentialsJson,
+      async () => {
+        const outcome = await refreshClaudeOauthCredentialsDetailed(staleCredentialsJson)
+        if (outcome.credentialsJson) {
+          try {
+            await writeManagedCredentialsJson(location, outcome.credentialsJson)
+          } catch {
+            // Keep the refreshed token in memory; next poll refreshes again if the write failed.
+          }
         }
+        return outcome
       }
-      return outcome
-    })
+    )
     if (options.signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
@@ -1329,13 +1312,19 @@ export async function fetchManagedAccountUsage(
         accountId: account.id,
         retryAfterSeconds: rotation.value.retryAfterSeconds
       })
+      const updatedAt = Date.now()
+      const retryAtMs =
+        rotation.value.retryAfterSeconds === null
+          ? undefined
+          : updatedAt + rotation.value.retryAfterSeconds * 1000
       return {
         provider: 'claude',
         session: null,
         weekly: null,
-        updatedAt: Date.now(),
+        updatedAt,
         error: CLAUDE_USAGE_THROTTLED_ERROR,
-        status: 'error'
+        status: 'error',
+        ...(retryAtMs === undefined ? {} : { usageMetadata: { retryAtMs } })
       }
     }
   }

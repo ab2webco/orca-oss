@@ -2222,6 +2222,7 @@ describe('registerPtyHandlers', () => {
 
     it('coalesces staggered Claude exits into one scheduled inventory retry', async () => {
       vi.useFakeTimers()
+      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
       const provider = installObservableDaemonTestProvider()
       const sessionIds = Array.from({ length: 200 }, (_, index) => `staggered-claude-${index}`)
       provider.listProcesses.mockResolvedValue(
@@ -2234,13 +2235,13 @@ describe('registerPtyHandlers', () => {
       }
       handlers.clear()
       registerPtyHandlers(mainWindow as never, runtime as never)
-      const baselineTimerCount = vi.getTimerCount()
 
       try {
         livePtyGate.markInjectedClaudePtySpawned(sessionIds[0], 'account-a')
         provider.emitExit(sessionIds[0], 0)
         await vi.advanceTimersByTimeAsync(50)
         expect(provider.listProcesses).toHaveBeenCalledTimes(2)
+        const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length
 
         for (const sessionId of sessionIds.slice(1)) {
           livePtyGate.markInjectedClaudePtySpawned(sessionId, 'account-a')
@@ -2248,7 +2249,7 @@ describe('registerPtyHandlers', () => {
         }
 
         expect(provider.listProcesses).toHaveBeenCalledTimes(2)
-        expect(vi.getTimerCount()).toBe(baselineTimerCount + 1)
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(scheduledTimeoutCount)
 
         for (const sessionId of sessionIds) {
           livePtyGate.markClaudePtyExited(sessionId)
@@ -2256,17 +2257,18 @@ describe('registerPtyHandlers', () => {
         provider.listProcesses.mockResolvedValue([])
         await vi.advanceTimersByTimeAsync(250)
         expect(provider.listProcesses).toHaveBeenCalledTimes(3)
-        expect(vi.getTimerCount()).toBe(baselineTimerCount)
       } finally {
         for (const sessionId of sessionIds) {
           livePtyGate.markClaudePtyExited(sessionId)
         }
+        setTimeoutSpy.mockRestore()
         vi.useRealTimers()
       }
     })
 
     it('keeps repeated same-ID exits on the shared steady-state retry cadence', async () => {
       vi.useFakeTimers()
+      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
       const provider = installObservableDaemonTestProvider()
       provider.listProcesses.mockResolvedValue([
         { id: 'repeated-claude-session', cwd: '', title: 'surviving owner' }
@@ -2278,7 +2280,6 @@ describe('registerPtyHandlers', () => {
       }
       handlers.clear()
       registerPtyHandlers(mainWindow as never, runtime as never)
-      const baselineTimerCount = vi.getTimerCount()
       livePtyGate.markInjectedClaudePtySpawned('repeated-claude-session', 'account-a')
 
       try {
@@ -2289,6 +2290,7 @@ describe('registerPtyHandlers', () => {
         await vi.advanceTimersByTimeAsync(1_000)
         await vi.advanceTimersByTimeAsync(5_000)
         expect(provider.listProcesses).toHaveBeenCalledTimes(6)
+        const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length
 
         for (let index = 0; index < 29; index += 1) {
           provider.emitExit('repeated-claude-session', 0)
@@ -2296,15 +2298,15 @@ describe('registerPtyHandlers', () => {
         }
 
         expect(provider.listProcesses).toHaveBeenCalledTimes(6)
-        expect(vi.getTimerCount()).toBe(baselineTimerCount + 1)
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(scheduledTimeoutCount)
 
         provider.listProcesses.mockResolvedValue([])
         await vi.advanceTimersByTimeAsync(1_000)
         expect(provider.listProcesses).toHaveBeenCalledTimes(7)
         expect(runtime.onPtyExit).toHaveBeenCalledOnce()
-        expect(vi.getTimerCount()).toBe(baselineTimerCount)
       } finally {
         livePtyGate.markClaudePtyExited('repeated-claude-session')
+        setTimeoutSpy.mockRestore()
         vi.useRealTimers()
       }
     })

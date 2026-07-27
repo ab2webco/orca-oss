@@ -252,6 +252,110 @@ describe('fetchClaudeRateLimits', () => {
     )
   })
 
+  it('keeps legacy-keychain credentials read-only and never routes them into OAuth refresh', async () => {
+    const configDir = '/Users/test/.claude'
+    const authPreparation: ClaudeRuntimeAuthPreparation = {
+      configDir,
+      runtime: 'host',
+      envPatch: {},
+      stripAuthEnv: false,
+      provenance: 'system'
+    }
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (dir) =>
+      dir
+        ? null
+        : JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'legacy-usage-token',
+              refreshToken: 'synthetic-refresh-credential'
+            }
+          })
+    )
+
+    await expect(
+      fetchClaudeRateLimits({ authPreparation, allowPtyFallback: false })
+    ).resolves.toMatchObject({
+      provider: 'claude',
+      status: 'ok',
+      usageMetadata: { credentialSource: 'legacy-keychain' }
+    })
+
+    expect(netFetchMock.mock.calls).toHaveLength(1)
+    expect(netFetchMock.mock.calls[0]?.[0]).toBe('https://api.anthropic.com/api/oauth/usage')
+  })
+
+  it('does not borrow the host legacy keychain token when managed scoped credentials are empty', async () => {
+    const configDir = '/Users/test/managed-account'
+    const authPreparation: ClaudeRuntimeAuthPreparation = {
+      configDir,
+      runtime: 'host',
+      envPatch: { CLAUDE_CONFIG_DIR: configDir },
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (dir) =>
+      dir
+        ? JSON.stringify({ claudeAiOauth: { refreshToken: '' } })
+        : JSON.stringify({ claudeAiOauth: { accessToken: 'host-legacy-token' } })
+    )
+
+    await expect(
+      fetchClaudeRateLimits({ authPreparation, allowPtyFallback: false })
+    ).resolves.toMatchObject({
+      provider: 'claude',
+      status: 'unavailable',
+      usageMetadata: {
+        failureKind: 'missing-credentials',
+        credentialSource: 'none'
+      }
+    })
+
+    expect(readActiveClaudeKeychainCredentialsStrict).toHaveBeenCalledWith(configDir)
+    expect(readActiveClaudeKeychainCredentialsStrict).not.toHaveBeenCalledWith(undefined)
+    expect(netFetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not borrow the host legacy keychain token when a managed scoped token is dead', async () => {
+    const configDir = '/Users/test/managed-account'
+    const authPreparation: ClaudeRuntimeAuthPreparation = {
+      configDir,
+      runtime: 'host',
+      envPatch: { CLAUDE_CONFIG_DIR: configDir },
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (dir) =>
+      dir
+        ? JSON.stringify({ claudeAiOauth: { accessToken: 'dead-managed-token' } })
+        : JSON.stringify({ claudeAiOauth: { accessToken: 'host-legacy-token' } })
+    )
+    netFetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'Invalid authentication credentials' } }), {
+        status: 401
+      })
+    )
+
+    await expect(
+      fetchClaudeRateLimits({ authPreparation, allowPtyFallback: false })
+    ).resolves.toMatchObject({
+      provider: 'claude',
+      status: 'error',
+      usageMetadata: {
+        failureKind: 'stale-token',
+        credentialSource: 'scoped-keychain'
+      }
+    })
+
+    expect(readActiveClaudeKeychainCredentialsStrict).not.toHaveBeenCalledWith(undefined)
+    expect(netFetchMock).toHaveBeenCalledTimes(1)
+    expect(netFetchMock).toHaveBeenCalledWith(
+      'https://api.anthropic.com/api/oauth/usage',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer dead-managed-token' })
+      })
+    )
+  })
+
   it('does not retry with the legacy keychain for managed account credentials', async () => {
     const configDir = '/Users/test/managed-account'
     const authPreparation: ClaudeRuntimeAuthPreparation = {
@@ -681,6 +785,35 @@ describe('fetchClaudeRateLimits', () => {
         })
       })
     )
+  })
+
+  it('borrows the legacy keychain token only for the host global account when its scoped item is empty', async () => {
+    const configDir = '/Users/test/.claude'
+    const authPreparation: ClaudeRuntimeAuthPreparation = {
+      configDir,
+      runtime: 'host',
+      envPatch: {},
+      stripAuthEnv: false,
+      provenance: 'system'
+    }
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (dir) =>
+      dir
+        ? JSON.stringify({ claudeAiOauth: { refreshToken: '' } })
+        : JSON.stringify({ claudeAiOauth: { accessToken: 'host-legacy-token' } })
+    )
+
+    await expect(
+      fetchClaudeRateLimits({ authPreparation, allowPtyFallback: false })
+    ).resolves.toMatchObject({
+      provider: 'claude',
+      status: 'ok',
+      session: { usedPercent: 12 },
+      weekly: { usedPercent: 34 },
+      usageMetadata: { credentialSource: 'legacy-keychain' }
+    })
+
+    expect(readActiveClaudeKeychainCredentialsStrict).toHaveBeenNthCalledWith(1, configDir)
+    expect(readActiveClaudeKeychainCredentialsStrict).toHaveBeenNthCalledWith(2, undefined)
   })
 
   it('reads scoped Keychain credentials for host system default without an explicit config dir', async () => {
@@ -1301,7 +1434,7 @@ describe('fetchClaudeRateLimits', () => {
       JSON.stringify({
         claudeAiOauth: {
           accessToken: 'inactive-token',
-          expiresAt: Date.now() + 60_000
+          expiresAt: Date.now() + 60 * 60_000
         }
       }),
       'utf-8'
@@ -1351,7 +1484,7 @@ describe('fetchClaudeRateLimits', () => {
     const credentialsJson = JSON.stringify({
       claudeAiOauth: {
         accessToken: 'managed-keychain-token',
-        expiresAt: Date.now() + 60_000
+        expiresAt: Date.now() + 60 * 60_000
       }
     })
     mkdirSync(ownedAuthPath, { recursive: true })
@@ -1573,6 +1706,68 @@ describe('fetchClaudeRateLimits', () => {
     expect(usageCall?.[1]?.headers?.Authorization).toBe('Bearer fresh-access')
   })
 
+  it('surfaces token-endpoint Retry-After as an absolute managed retry time', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    writeFileSync(
+      join(ownedAuthPath, '.credentials.json'),
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: 'expiring-access',
+          refreshToken: 'synthetic-refresh-credential',
+          expiresAt: Date.now() + 60_000
+        }
+      }),
+      'utf-8'
+    )
+    netFetchMock.mockResolvedValueOnce(
+      new Response('', { status: 429, headers: { 'retry-after': '120' } })
+    )
+
+    const before = Date.now()
+    const result = await fetchManagedAccountUsage({
+      id: 'account-1',
+      managedAuthPath: ownedAuthPath
+    })
+
+    expect(result.error).toBe('Rate limited by the token endpoint')
+    expect(result.usageMetadata?.retryAtMs).toBeGreaterThanOrEqual(before + 120_000)
+    expect(result.usageMetadata?.retryAtMs).toBeLessThanOrEqual(Date.now() + 120_000)
+  })
+
+  it('does not fabricate a managed retry time when token-endpoint Retry-After is absent', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    writeFileSync(
+      join(ownedAuthPath, '.credentials.json'),
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: 'expiring-access',
+          refreshToken: 'synthetic-refresh-credential',
+          expiresAt: Date.now() + 60_000
+        }
+      }),
+      'utf-8'
+    )
+    netFetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+
+    const result = await fetchManagedAccountUsage({
+      id: 'account-1',
+      managedAuthPath: ownedAuthPath
+    })
+
+    expect(result.error).toBe('Rate limited by the token endpoint')
+    expect(result.usageMetadata).toBeUndefined()
+  })
+
   it('reads usage with an expired token a live Claude owns when the endpoint accepts it', async () => {
     setPlatform('linux')
     tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
@@ -1646,6 +1841,42 @@ describe('fetchClaudeRateLimits', () => {
       false
     )
     expect(readFileSync(credentialsPath, 'utf-8')).toBe(credentialsJson)
+  })
+
+  it('defers when background rotation cannot fingerprint the managed credentials', async () => {
+    setPlatform('linux')
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-claude-fetcher-'))
+    appGetPathMock.mockReturnValue(tempDir)
+    const ownedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
+    mkdirSync(ownedAuthPath, { recursive: true })
+    writeFileSync(join(ownedAuthPath, '.orca-managed-claude-auth'), 'account-1\n', 'utf-8')
+    writeFileSync(
+      join(ownedAuthPath, '.credentials.json'),
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: 'expiring-access',
+          expiresAt: Date.now() + 60_000
+        }
+      }),
+      'utf-8'
+    )
+    netFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: 'Invalid authentication credentials' } }), {
+        status: 401
+      })
+    )
+
+    const result = await fetchManagedAccountUsage({
+      id: 'account-1',
+      managedAuthPath: ownedAuthPath
+    })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata?.failureKind).toBe('deferred-by-live-session')
+    expect(result.error).not.toBe('No credentials')
+    expect(netFetchMock.mock.calls.some(([url]) => String(url).includes('/v1/oauth/token'))).toBe(
+      false
+    )
   })
 
   it('defers a blank live-CLI credentials blob instead of reporting no credentials', async () => {

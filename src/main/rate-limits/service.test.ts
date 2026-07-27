@@ -4,9 +4,17 @@ semantics covered in service.ts, which already carries the same pragma.
 Keeping them in one file makes the ordering contract reviewable as a unit. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import { isFreshInactiveUsage, RateLimitService } from './service'
-import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
+import {
+  CLAUDE_USAGE_THROTTLED_ERROR,
+  fetchClaudeRateLimits,
+  fetchManagedAccountUsage
+} from './claude-fetcher'
+import { ClaudeOauthRefreshCooldownStore } from './claude-oauth-refresh-cooldown'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './kimi-fetcher'
@@ -2512,6 +2520,209 @@ describe('RateLimitService', () => {
       await service.refreshAfterClaudeLivePtysDrained()
 
       expect(fetchClaudeRateLimits).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('claude token refresh cooldown', () => {
+    function throttledClaudeProvider(retryAtMs?: number): ProviderRateLimits {
+      return {
+        provider: 'claude',
+        session: null,
+        weekly: null,
+        updatedAt: Date.now(),
+        error: CLAUDE_USAGE_THROTTLED_ERROR,
+        status: 'error',
+        ...(retryAtMs !== undefined
+          ? { usageMetadata: { failureKind: 'rate-limited' as const, retryAtMs } }
+          : {})
+      }
+    }
+
+    function memoryCooldownService(): RateLimitService {
+      return new RateLimitService({
+        claudeOauthRefreshCooldowns: new ClaudeOauthRefreshCooldownStore(null)
+      })
+    }
+
+    it('does not retry a throttled inactive account before its cooldown expires, and does after', async () => {
+      vi.useFakeTimers()
+      try {
+        const service = memoryCooldownService()
+        const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+        service.setInactiveClaudeAccountsResolver(() => [account])
+        vi.mocked(fetchManagedAccountUsage).mockResolvedValue(throttledClaudeProvider())
+
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+
+        // Past the open-debounce but inside the 10-minute default cooldown.
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+
+        // Past the cooldown: the account is retried.
+        await vi.advanceTimersByTimeAsync(6 * 60 * 1000)
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('surfaces a cooling-down account as rate-limited with a retry time, not broken', async () => {
+      vi.useFakeTimers()
+      try {
+        const service = memoryCooldownService()
+        const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+        service.setInactiveClaudeAccountsResolver(() => [account])
+        vi.mocked(fetchManagedAccountUsage).mockResolvedValue(throttledClaudeProvider())
+
+        await service.fetchInactiveClaudeAccountsOnOpen()
+
+        const entry = service.getState().inactiveClaudeAccounts[0]
+        expect(entry?.rateLimits?.error).toBe(CLAUDE_USAGE_THROTTLED_ERROR)
+        expect(entry?.rateLimits?.usageMetadata?.failureKind).toBe('rate-limited')
+        // Bounded default: no Retry-After was supplied.
+        expect(entry?.rateLimits?.usageMetadata?.retryAtMs).toBe(Date.now() + 10 * 60 * 1000)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('honors a server-supplied retry time over the bounded default', async () => {
+      vi.useFakeTimers()
+      try {
+        const service = memoryCooldownService()
+        const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+        service.setInactiveClaudeAccountsResolver(() => [account])
+        vi.mocked(fetchManagedAccountUsage).mockResolvedValue(
+          throttledClaudeProvider(Date.now() + 30 * 60 * 1000)
+        )
+
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+
+        // Past the 10-minute default but inside the server's window: still held.
+        await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+
+        await vi.advanceTimersByTimeAsync(16 * 60 * 1000)
+        await service.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('cools down only the throttled account, not its siblings', async () => {
+      vi.useFakeTimers()
+      try {
+        const service = memoryCooldownService()
+        const throttledAccount = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+        const healthyAccount = { id: 'account-2', managedAuthPath: '/tmp/account-2/auth' }
+        service.setInactiveClaudeAccountsResolver(() => [throttledAccount, healthyAccount])
+        vi.mocked(fetchManagedAccountUsage).mockImplementation(async (account) =>
+          account.id === 'account-1'
+            ? throttledClaudeProvider()
+            : okProvider('claude', 20, Date.now())
+        )
+
+        const firstOpen = service.fetchInactiveClaudeAccountsOnOpen()
+        // Cover the trickle gap between sequential per-account fetches.
+        await vi.advanceTimersByTimeAsync(1000)
+        await firstOpen
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(2)
+
+        // Past the healthy account's freshness TTL, inside the throttled cooldown.
+        await vi.advanceTimersByTimeAsync(6 * 60 * 1000)
+        vi.mocked(fetchManagedAccountUsage).mockClear()
+        await service.fetchInactiveClaudeAccountsOnOpen()
+
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+        expect(fetchManagedAccountUsage).toHaveBeenCalledWith(healthyAccount, expect.anything())
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps a throttled account cooling down across a service restart', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'claude-cooldown-service-'))
+      try {
+        const filePath = join(dir, 'oauth-refresh-cooldowns.json')
+        const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+        const firstService = new RateLimitService({
+          claudeOauthRefreshCooldowns: new ClaudeOauthRefreshCooldownStore(filePath)
+        })
+        firstService.setInactiveClaudeAccountsResolver(() => [account])
+        vi.mocked(fetchManagedAccountUsage).mockResolvedValue(throttledClaudeProvider())
+        await firstService.fetchInactiveClaudeAccountsOnOpen()
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+
+        // A restarted app builds a fresh service and store over the same file.
+        const restartedService = new RateLimitService({
+          claudeOauthRefreshCooldowns: new ClaudeOauthRefreshCooldownStore(filePath)
+        })
+        restartedService.setInactiveClaudeAccountsResolver(() => [account])
+        await restartedService.fetchInactiveClaudeAccountsOnOpen()
+
+        expect(fetchManagedAccountUsage).toHaveBeenCalledTimes(1)
+        const entry = restartedService.getState().inactiveClaudeAccounts[0]
+        expect(entry?.rateLimits?.error).toBe(CLAUDE_USAGE_THROTTLED_ERROR)
+        expect(entry?.rateLimits?.usageMetadata?.retryAtMs).toBeGreaterThan(Date.now())
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('stops refetching the active account while its token refresh cools down', async () => {
+      vi.useFakeTimers()
+      try {
+        const service = memoryCooldownService()
+        service.setClaudeAccountIdResolver(() => 'account-1')
+        service.setClaudeAuthPreparationResolver(async () => ({
+          configDir: '/tmp/account-1/auth',
+          runtime: 'host',
+          wslDistro: null,
+          wslLinuxConfigDir: null,
+          envPatch: {},
+          stripAuthEnv: true,
+          provenance: 'managed:account-1'
+        }))
+        vi.mocked(fetchClaudeRateLimits).mockResolvedValue(throttledClaudeProvider())
+
+        await service.refresh()
+        expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(1)
+        const throttledState = service.getState().claude
+        expect(throttledState?.error).toBe(CLAUDE_USAGE_THROTTLED_ERROR)
+        expect(throttledState?.usageMetadata?.retryAtMs).toBe(Date.now() + 10 * 60 * 1000)
+
+        // Even a user-forced refresh must not rotate the throttled token again.
+        await service.refresh()
+        expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(1)
+
+        // Past the cooldown the account fetches again and a success clears it.
+        await vi.advanceTimersByTimeAsync(11 * 60 * 1000)
+        vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 12, Date.now()))
+        await service.refresh()
+        expect(fetchClaudeRateLimits).toHaveBeenCalledTimes(2)
+        expect(service.getState().claude?.status).toBe('ok')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not rotate a cooled-down account when switching to it', async () => {
+      const cooldowns = new ClaudeOauthRefreshCooldownStore(null)
+      cooldowns.beginCooldown('account-2', {})
+      const service = new RateLimitService({ claudeOauthRefreshCooldowns: cooldowns })
+      service.setClaudeAccountIdResolver(() => 'account-2')
+
+      await service.refreshForClaudeAccountChange()
+
+      expect(fetchClaudeRateLimits).not.toHaveBeenCalled()
+      expect(service.getState().claude?.error).toBe(CLAUDE_USAGE_THROTTLED_ERROR)
+      expect(service.getState().claude?.usageMetadata?.retryAtMs).toBeGreaterThan(Date.now())
     })
   })
 })

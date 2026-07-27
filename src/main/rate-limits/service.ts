@@ -39,6 +39,7 @@ import {
   type CodexAccountSelectionTarget,
   type NormalizedCodexAccountSelectionTarget
 } from '../codex-accounts/runtime-selection'
+import { ClaudeOauthRefreshCooldownStore } from './claude-oauth-refresh-cooldown'
 
 export type InactiveCodexAccountInfo = {
   id: string
@@ -152,7 +153,7 @@ function toErrorMessage(error: unknown): string {
 /** Reusable-as-is check for a cached per-account usage snapshot: recent enough,
  *  and not an error (a failed read must always be retried). */
 export function isFreshInactiveUsage(
-  cached: Pick<ProviderRateLimits, 'status' | 'updatedAt' | 'error'> | null,
+  cached: Pick<ProviderRateLimits, 'status' | 'updatedAt' | 'error' | 'usageMetadata'> | null,
   now: number,
   ttlMs: number = INACTIVE_ACCOUNT_USAGE_TTL_MS
 ): boolean {
@@ -166,13 +167,33 @@ export function isFreshInactiveUsage(
     return false
   }
   if (cached.status === 'error') {
+    if (cached.error !== CLAUDE_USAGE_THROTTLED_ERROR) {
+      return false
+    }
     // Why: failures normally retry at once, EXCEPT a token-endpoint throttle —
-    // retrying that is what sustains the 429. Hold those off for a cooldown.
-    return (
-      cached.error === CLAUDE_USAGE_THROTTLED_ERROR && age < INACTIVE_FETCH_THROTTLE_COOLDOWN_MS
-    )
+    // retrying that is what sustains the 429. Hold those off until the server's
+    // retry time when known, else for the fixed cooldown.
+    const retryAtMs = cached.usageMetadata?.retryAtMs
+    if (typeof retryAtMs === 'number') {
+      return now < retryAtMs
+    }
+    return age < INACTIVE_FETCH_THROTTLE_COOLDOWN_MS
   }
   return age < ttlMs
+}
+
+/** Usage state shown while an account's token refresh is cooling down: the
+ *  account isn't broken — it's rate-limited with a known retry time. */
+function makeThrottledClaudeUsageResult(retryAtMs: number): ProviderRateLimits {
+  return {
+    provider: 'claude',
+    session: null,
+    weekly: null,
+    updatedAt: Date.now(),
+    error: CLAUDE_USAGE_THROTTLED_ERROR,
+    status: 'error',
+    usageMetadata: { failureKind: 'rate-limited', retryAtMs }
+  }
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -292,8 +313,15 @@ export class RateLimitService {
   private lastInactiveCodexFetchAt = 0
   private inactiveCodexAccountsGeneration = 0
   private stateListeners = new Set<(state: RateLimitState) => void>()
+  // Why: a 429 from the OAuth token endpoint means every further refresh attempt
+  // keeps the account throttled; this store pauses rotation per account and
+  // persists so an app restart doesn't restart the refresh storm.
+  private claudeOauthRefreshCooldowns: ClaudeOauthRefreshCooldownStore
 
-  constructor() {}
+  constructor(options: { claudeOauthRefreshCooldowns?: ClaudeOauthRefreshCooldownStore } = {}) {
+    this.claudeOauthRefreshCooldowns =
+      options.claudeOauthRefreshCooldowns ?? new ClaudeOauthRefreshCooldownStore()
+  }
 
   onStateChange(listener: (state: RateLimitState) => void): () => void {
     this.stateListeners.add(listener)
@@ -596,10 +624,25 @@ export class RateLimitService {
       return
     }
     const allAccounts = this.inactiveClaudeAccountsResolver?.() ?? []
+    // Why: an account inside its token-refresh cooldown must be skipped entirely
+    // — fetching it would rotate the throttled token again and keep the 429
+    // alive — but its meter should read rate-limited-with-a-retry-time.
+    let cooldownStateChanged = false
+    for (const account of allAccounts) {
+      cooldownStateChanged =
+        this.reflectInactiveClaudeRefreshCooldown(account.id) || cooldownStateChanged
+    }
+    if (cooldownStateChanged) {
+      this.pushToRenderer()
+    }
     // Why: skip accounts whose usage is still fresh — each refetch costs an
     // OAuth token refresh, and refreshing every account on every open is what
     // triggers the token endpoint's 429.
-    const accounts = allAccounts.filter((account) => !this.hasFreshInactiveClaudeUsage(account.id))
+    const accounts = allAccounts.filter(
+      (account) =>
+        !this.hasFreshInactiveClaudeUsage(account.id) &&
+        !this.claudeOauthRefreshCooldowns.isCoolingDown(account.id)
+    )
     if (accounts.length === 0) {
       return
     }
@@ -662,7 +705,10 @@ export class RateLimitService {
             continue
           }
           const cached = this.inactiveClaudeCache.get(account.id) ?? null
-          this.inactiveClaudeCache.set(account.id, this.applyStalePolicy(fresh, cached))
+          this.inactiveClaudeCache.set(
+            account.id,
+            this.applyStalePolicy(this.recordClaudeRefreshThrottle(account.id, fresh), cached)
+          )
         } catch (error) {
           // Why: per-account try/catch keeps one Keychain/network error from aborting the remaining accounts in the batch.
           if (
@@ -796,6 +842,87 @@ export class RateLimitService {
    *  An error entry is never "fresh" — a failed read must be retried. */
   private hasFreshInactiveClaudeUsage(accountId: string): boolean {
     return isFreshInactiveUsage(this.inactiveClaudeCache.get(accountId) ?? null, Date.now())
+  }
+
+  /** Starts/clears the account's token-rotation cooldown from a fetch result and
+   *  stamps the retry time onto a throttled one so the UI can show it. */
+  private recordClaudeRefreshThrottle(
+    accountId: string | null,
+    fresh: ProviderRateLimits
+  ): ProviderRateLimits {
+    if (!accountId) {
+      return fresh
+    }
+    if (fresh.status === 'ok') {
+      this.claudeOauthRefreshCooldowns.clear(accountId)
+      return fresh
+    }
+    if (fresh.error !== CLAUDE_USAGE_THROTTLED_ERROR) {
+      return fresh
+    }
+    // Why: the fetcher's retryAtMs carries the server's Retry-After when it sent
+    // one; absent that, the store applies its bounded default.
+    const retryAtMs = this.claudeOauthRefreshCooldowns.beginCooldown(accountId, {
+      retryAtMs: fresh.usageMetadata?.retryAtMs ?? null
+    })
+    return {
+      ...fresh,
+      usageMetadata: { ...fresh.usageMetadata, failureKind: 'rate-limited', retryAtMs }
+    }
+  }
+
+  /** Makes a cooling-down inactive account's cache entry read as
+   *  rate-limited-with-a-retry-time. Returns true when the entry changed. */
+  private reflectInactiveClaudeRefreshCooldown(accountId: string): boolean {
+    const retryAtMs = this.claudeOauthRefreshCooldowns.getRetryAtMs(accountId)
+    if (retryAtMs === null) {
+      return false
+    }
+    const cached = this.inactiveClaudeCache.get(accountId) ?? null
+    // Fresh OK data (e.g. a live session's statusline feed) outranks the notice.
+    if (cached?.status === 'ok' && isFreshInactiveUsage(cached, Date.now())) {
+      return false
+    }
+    if (
+      cached?.error === CLAUDE_USAGE_THROTTLED_ERROR &&
+      cached.usageMetadata?.retryAtMs === retryAtMs
+    ) {
+      return false
+    }
+    this.inactiveClaudeCache.set(
+      accountId,
+      this.applyStalePolicy(makeThrottledClaudeUsageResult(retryAtMs), cached)
+    )
+    return true
+  }
+
+  /** Retry time of the active account's rotation cooldown, or null when it may
+   *  fetch. Null account id means unmanaged auth — nothing Orca rotates. */
+  private getActiveClaudeRefreshCooldownRetryAtMs(): number | null {
+    const accountId = this.claudeAccountIdResolver?.(this.claudeFetchTarget) ?? null
+    if (!accountId) {
+      return null
+    }
+    return this.claudeOauthRefreshCooldowns.getRetryAtMs(accountId)
+  }
+
+  /** Claude state to publish while the active account cools down. */
+  private withClaudeCooldownState(
+    previous: ProviderRateLimits | null,
+    retryAtMs: number
+  ): ProviderRateLimits | null {
+    // Why: a live session's statusline feed is fresher than any OAuth poll and
+    // involves no token rotation; leave it untouched.
+    if (this.isLiveClaudeUsageFresh(previous)) {
+      return previous
+    }
+    if (
+      previous?.error === CLAUDE_USAGE_THROTTLED_ERROR &&
+      previous.usageMetadata?.retryAtMs === retryAtMs
+    ) {
+      return previous
+    }
+    return this.applyStalePolicy(makeThrottledClaudeUsageResult(retryAtMs), previous)
   }
 
   private hasFreshInactiveCodexUsage(accountId: string): boolean {
@@ -1762,6 +1889,10 @@ export class RateLimitService {
     const claudeTarget = this.claudeFetchTarget
     // Why: capture before any await so an account switch during the fetch invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
+    const claudeAccountId = this.claudeAccountIdResolver?.(claudeTarget) ?? null
+    // Why: even a forced fetch must not rotate a throttled account's token —
+    // retrying is what keeps the 429 alive. Publish the retry time instead.
+    const claudeCooldownRetryAtMs = this.getActiveClaudeRefreshCooldownRetryAtMs()
     const codexTarget = this.codexFetchTarget
     const codexHomePath = this.codexHomePathResolver?.(codexTarget) ?? null
     const codexProvenance = this.getCodexProvenance(codexTarget, codexHomePath)
@@ -1799,7 +1930,10 @@ export class RateLimitService {
     // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
     this.updateState({
       ...previousState,
-      claude: this.withFetchingStatus(previousState.claude, 'claude'),
+      claude:
+        claudeCooldownRetryAtMs !== null
+          ? this.withClaudeCooldownState(previousState.claude, claudeCooldownRetryAtMs)
+          : this.withFetchingStatus(previousState.claude, 'claude'),
       codex: this.withFetchingStatus(previousState.codex, 'codex'),
       gemini: this.withFetchingStatus(previousState.gemini, 'gemini'),
       opencodeGo: opencodeConfigChanged
@@ -1826,7 +1960,8 @@ export class RateLimitService {
 
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
     const claudeFetchGated =
-      !options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude)
+      claudeCooldownRetryAtMs !== null ||
+      (!options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude))
 
     const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
       await Promise.allSettled([
@@ -1984,11 +2119,15 @@ export class RateLimitService {
       this.trackActiveFailureStreak('minimax', miniMax)
     }
 
+    const claudeToApply = shouldApplyClaude
+      ? this.recordClaudeRefreshThrottle(claudeAccountId, claude)
+      : claude
+
     // Why: apply a Codex result only when provenance and generation still match, else a raced in-flight fetch overwrites the new account.
     this.updateState({
       ...this.state,
       claude: shouldApplyClaude
-        ? this.resolveClaudeFetchApply(claude, previousState.claude)
+        ? this.resolveClaudeFetchApply(claudeToApply, previousState.claude)
         : this.state.claude,
       codex: shouldApplyCodex
         ? this.applyStalePolicy(codex, previousState.codex)
@@ -2096,9 +2235,20 @@ export class RateLimitService {
     if (!options?.force && this.shouldSkipAutomatedClaudeFetch(this.state.claude)) {
       return
     }
+    // Why: even a forced fetch must not rotate a throttled account's token —
+    // retrying is what keeps the 429 alive. Publish the retry time instead.
+    const claudeCooldownRetryAtMs = this.getActiveClaudeRefreshCooldownRetryAtMs()
+    if (claudeCooldownRetryAtMs !== null) {
+      const cooldownState = this.withClaudeCooldownState(this.state.claude, claudeCooldownRetryAtMs)
+      if (cooldownState !== this.state.claude) {
+        this.updateState({ ...this.state, claude: cooldownState })
+      }
+      return
+    }
     const claudeTarget = this.claudeFetchTarget
     // Why: capture before any await so an account switch during the fetch invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
+    const claudeAccountId = this.claudeAccountIdResolver?.(claudeTarget) ?? null
     const previousState = this.state
 
     this.updateState({
@@ -2135,10 +2285,13 @@ export class RateLimitService {
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', result.limits)
     }
+    const appliedLimits = shouldApplyClaude
+      ? this.recordClaudeRefreshThrottle(claudeAccountId, result.limits)
+      : result.limits
     this.updateState({
       ...this.state,
       claude: shouldApplyClaude
-        ? this.resolveClaudeFetchApply(result.limits, previousState.claude)
+        ? this.resolveClaudeFetchApply(appliedLimits, previousState.claude)
         : this.state.claude
     })
   }

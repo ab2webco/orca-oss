@@ -1,13 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
 import { notifyLiveClaudePtysDrainedOnTransition } from './live-pty-drain-listeners'
-
-const liveClaudePtyIds = new Set<string>()
-// Why: exported for sibling account-removal enumeration; only this module mutates them.
-export const liveSharedClaudePtyAccounts = new Map<string, string | null>()
-export const liveInjectedClaudePtyAccounts = new Map<string, string>()
-const injectedClaudeLaunchReservations = new Map<string, string>()
-const sharedClaudeLaunchReservations = new Map<string, string | null>()
+import {
+  releaseClaudeLaunchRefreshChain,
+  releaseLiveClaudePtyRefreshChain,
+  reserveClaudeLaunchRefreshChain,
+  reserveLiveClaudePtyRefreshChain,
+  transferClaudeLaunchRefreshChain
+} from './live-claude-refresh-chain-claims'
+import {
+  injectedClaudeLaunchReservations,
+  liveClaudePtyIds,
+  liveInjectedClaudePtyAccounts,
+  liveSharedClaudePtyAccounts,
+  sharedClaudeLaunchReservations
+} from './live-pty-account-state'
+import {
+  hasLiveInjectedClaudePtysForAccount,
+  hasLiveSharedClaudePtysForAccount
+} from './live-pty-account-ownership'
 const managedClaudeAccountMutations = new Set<string>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
@@ -42,6 +53,7 @@ export function seedLiveClaudePtysFromPersistence(
     // Why: pre-binding releases have unknown ownership; block them
     // conservatively instead of assuming the current global account.
     liveSharedClaudePtyAccounts.set(sessionId, accountBySessionId.get(sessionId) ?? null)
+    reserveLiveClaudePtyRefreshChain(sessionId, accountBySessionId.get(sessionId) ?? null)
     ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
     seededUnconfirmedPtyIds.add(sessionId)
   }
@@ -52,6 +64,7 @@ export function seedLiveInjectedClaudePtysFromPersistence(
 ): void {
   for (const { sessionId, accountId } of bindings) {
     liveInjectedClaudePtyAccounts.set(sessionId, accountId)
+    reserveLiveClaudePtyRefreshChain(sessionId, accountId)
     ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
     seededUnconfirmedInjectedPtyIds.add(sessionId)
   }
@@ -74,6 +87,7 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
     if (!alive.has(sessionId)) {
       liveClaudePtyIds.delete(sessionId)
       liveSharedClaudePtyAccounts.delete(sessionId)
+      releaseLiveClaudePtyRefreshChain(sessionId)
       ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtySessionId(sessionId)
     }
@@ -81,6 +95,7 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
   for (const sessionId of seededUnconfirmedInjectedPtyIds) {
     if (!alive.has(sessionId)) {
       liveInjectedClaudePtyAccounts.delete(sessionId)
+      releaseLiveClaudePtyRefreshChain(sessionId)
       ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtyAccountBinding?.(sessionId)
     }
@@ -117,6 +132,11 @@ export function markClaudePtySpawned(
       }
       seededUnconfirmedPtyIds.delete(ptyId)
       ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
+      if (reservationId) {
+        transferClaudeLaunchRefreshChain(reservationId, ptyId)
+      } else if (!wasLive) {
+        reserveLiveClaudePtyRefreshChain(ptyId, bindingAccountId)
+      }
     } catch (error) {
       liveClaudePtyIds.delete(ptyId)
       if (wasLive) {
@@ -160,6 +180,11 @@ export function markInjectedClaudePtySpawned(
       }
       seededUnconfirmedInjectedPtyIds.delete(ptyId)
       ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
+      if (reservationId) {
+        transferClaudeLaunchRefreshChain(reservationId, ptyId)
+      } else if (!existingAccountId) {
+        reserveLiveClaudePtyRefreshChain(ptyId, accountId)
+      }
     } catch (error) {
       if (existingAccountId) {
         liveInjectedClaudePtyAccounts.set(ptyId, existingAccountId)
@@ -178,6 +203,7 @@ export function markClaudePtyExited(ptyId: string): void {
   const hadLivePtys = liveClaudePtyIds.size > 0
   liveClaudePtyIds.delete(ptyId)
   liveSharedClaudePtyAccounts.delete(ptyId)
+  releaseLiveClaudePtyRefreshChain(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtySessionId(ptyId)
   liveInjectedClaudePtyAccounts.delete(ptyId)
@@ -185,44 +211,6 @@ export function markClaudePtyExited(ptyId: string): void {
   seededUnconfirmedInjectedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtyAccountBinding?.(ptyId)
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
-}
-
-export function hasLiveClaudePtys(): boolean {
-  return liveClaudePtyIds.size > 0
-}
-
-export function isLiveSharedClaudePty(ptyId: string): boolean {
-  return liveClaudePtyIds.has(ptyId)
-}
-
-export function getLiveSharedClaudePtyAccountId(ptyId: string): string | null {
-  return liveSharedClaudePtyAccounts.get(ptyId) ?? null
-}
-
-export function hasLiveSharedClaudePtysForAccount(accountId: string): boolean {
-  return [...liveSharedClaudePtyAccounts.values()].some(
-    (liveAccountId) => liveAccountId === null || liveAccountId === accountId
-  )
-}
-
-export function hasLiveInjectedClaudePtysForAccount(accountId: string): boolean {
-  return (
-    [...liveInjectedClaudePtyAccounts.values()].includes(accountId) ||
-    [...injectedClaudeLaunchReservations.values()].includes(accountId)
-  )
-}
-
-export function getLiveInjectedClaudePtyAccountId(ptyId: string): string | null {
-  return liveInjectedClaudePtyAccounts.get(ptyId) ?? null
-}
-
-/** True when any live Claude CLI (global or worktree-pinned) owns this account's
- *  credentials. Read-only callers use it to refuse rotating its single-use
- *  refresh token, which would strand the running session on a dead token. */
-export function hasLiveClaudePtysUsingAccount(accountId: string): boolean {
-  return (
-    hasLiveInjectedClaudePtysForAccount(accountId) || hasLiveSharedClaudePtysForAccount(accountId)
-  )
 }
 
 export function reserveInjectedClaudeAccountLaunch(
@@ -249,6 +237,7 @@ export function reserveInjectedClaudeAccountLaunch(
   }
   const reservationId = randomUUID()
   injectedClaudeLaunchReservations.set(reservationId, accountId)
+  reserveClaudeLaunchRefreshChain(reservationId, accountId)
   return reservationId
 }
 
@@ -274,6 +263,7 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
   }
   const reservationId = randomUUID()
   sharedClaudeLaunchReservations.set(reservationId, accountId)
+  reserveClaudeLaunchRefreshChain(reservationId, accountId)
   return reservationId
 }
 
@@ -313,6 +303,7 @@ export function releaseInjectedClaudeAccountLaunch(reservationId: string | undef
     return
   }
   injectedClaudeLaunchReservations.delete(reservationId)
+  releaseClaudeLaunchRefreshChain(reservationId)
 }
 
 export function releaseSharedClaudeAccountLaunch(reservationId: string | undefined): void {
@@ -320,6 +311,7 @@ export function releaseSharedClaudeAccountLaunch(reservationId: string | undefin
     return
   }
   sharedClaudeLaunchReservations.delete(reservationId)
+  releaseClaudeLaunchRefreshChain(reservationId)
 }
 
 export function beginClaudeAuthSwitch(): void {
@@ -341,3 +333,6 @@ export function endClaudeAuthSwitch(): void {
 export function isClaudeAuthSwitchInProgress(): boolean {
   return switchInProgress
 }
+
+export { liveInjectedClaudePtyAccounts, liveSharedClaudePtyAccounts }
+export * from './live-pty-account-ownership'

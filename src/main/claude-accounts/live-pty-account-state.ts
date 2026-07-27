@@ -1,0 +1,5 @@
+export const liveClaudePtyIds = new Set<string>()
+export const liveSharedClaudePtyAccounts = new Map<string, string | null>()
+export const liveInjectedClaudePtyAccounts = new Map<string, string>()
+export const injectedClaudeLaunchReservations = new Map<string, string>()
+export const sharedClaudeLaunchReservations = new Map<string, string | null>()

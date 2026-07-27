@@ -36,6 +36,9 @@ import {
   reserveSharedClaudeAccountLaunch
 } from './live-pty-gate'
 import { isOauthTokenExpiring, refreshClaudeOauthCredentials } from './oauth-refresh'
+import { tryRunManagedClaudeAccountBackgroundRotation } from './run-managed-claude-account-mutation'
+import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
+import { reconcileManagedClaudeRefreshChainAliases } from './claude-refresh-chain-alias-registry'
 import { ClaudeRuntimePathResolver } from './runtime-paths'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -146,6 +149,13 @@ export class ClaudeRuntimeAuthService {
   private wslDefaultDistroInflight: Promise<string | null> | null = null
 
   constructor(private readonly store: Store) {
+    configureManagedClaudeRefreshAccounts(() => this.store.getSettings().claudeManagedAccounts)
+    void reconcileManagedClaudeRefreshChainAliases({
+      accounts: this.store
+        .getSettings()
+        .claudeManagedAccounts.filter((account) => account.managedAuthRuntime !== 'wsl'),
+      prune: false
+    })
     this.initializeLastSyncedState()
     void this.safeSyncForCurrentSelection()
   }
@@ -1604,7 +1614,15 @@ export class ClaudeRuntimeAuthService {
     if (!isOauthTokenExpiring(credentialsJson)) {
       return null
     }
-    const refreshed = await refreshClaudeOauthCredentials(credentialsJson)
+    const rotation = await tryRunManagedClaudeAccountBackgroundRotation(
+      account.id,
+      credentialsJson,
+      () => refreshClaudeOauthCredentials(credentialsJson)
+    )
+    if (!rotation.acquired) {
+      return null
+    }
+    const refreshed = rotation.value
     if (!refreshed || !this.isValidCredentialsJsonObject(refreshed)) {
       return null
     }

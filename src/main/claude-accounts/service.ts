@@ -79,6 +79,7 @@ import {
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree-id'
+import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const STATUS_TIMEOUT_MS = 20_000
@@ -175,7 +176,9 @@ export class ClaudeAccountService {
     // Why: local-runtime hook to stop a live Claude PTY so removal can delete an
     // account still owned by a terminal; absent on remote runtimes we do not own.
     private readonly terminateLiveClaudePty?: ClaudePtyTerminator
-  ) {}
+  ) {
+    configureManagedClaudeRefreshAccounts(() => this.store.getSettings().claudeManagedAccounts)
+  }
 
   listAccounts(): ClaudeRateLimitAccountsState {
     this.normalizeActiveSelection()
