@@ -21,6 +21,14 @@ on:
         required: false
         type: boolean
         default: false
+      release_candidate:
+        description: >-
+          Publish as a lab RC (X.Y.Z-lab.N.rc). Downloadable, but excluded from
+          ordinary update checks and announced to nobody. Promote by re-running
+          without this flag.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -63,10 +71,26 @@ jobs:
           # `X.Y.Z-lab.N` sorts BELOW `X.Y.Z-rc.…` in semver, so migrating off the
           # old `-rc.X.lab.N` tags bumps the patch to stay above installed labs and
           # keep auto-update flowing. Once on the clean scheme, just increment N.
+          rc="${{ inputs.release_candidate }}"
+          # Why: an RC carries `.rc` on the number it is a candidate FOR, and promoting takes the
+          # NEXT number — `lab.36.rc` outranks `lab.36` in semver, so reusing 36 would leave every
+          # RC tester unable to update to the very build they validated.
           if [[ -n "$override" ]]; then
             next="$override"
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)\.rc$ ]]; then
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
           elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)$ ]]; then
-            next="${BASH_REMATCH[1]}-lab.$(( BASH_REMATCH[2] + 1 ))"
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
           else
             numeric="${current%%-*}"
             IFS=. read -r MAJ MIN PAT <<<"$numeric"
@@ -87,7 +111,11 @@ jobs:
           lab_n="${next##*-lab.}"
           echo "version=$next" >>"$GITHUB_OUTPUT"
           echo "tag=v$next" >>"$GITHUB_OUTPUT"
-          echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"
+          if [[ "$rc" == "true" ]]; then
+            echo "title=Orca Lab v${base}-lab.${lab_n} (release candidate)" >>"$GITHUB_OUTPUT"
+          else
+            echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"
+          fi
           echo "Next lab version: $next"
 
       - name: Bump, commit, tag and push
@@ -296,11 +324,27 @@ jobs:
             echo "El build de macOS va firmado y notarizado con Developer ID, así que Gatekeeper lo abre sin pasos extra. Descarga el \`.dmg\` o deja que Orca se auto-actualice."
             echo
             echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
+            if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+              echo
+              echo "## Release candidate"
+              echo "No se anuncia ni llega por auto-update: los chequeos normales excluyen los tags \`-lab.N.rc\`. Descargá el instalador a mano para validarlo. Una vez validado, se promueve con un release normal, que sale con el número siguiente."
+            fi
           } > /tmp/notes.md
-          gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
-          echo "Release $tag published as Latest."
+          if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+            # Why: --prerelease keeps it off the repo's Latest pointer, but the real gate is the
+            # tag shape — src/main/updater-prerelease-feed.ts excludes X.Y.Z-lab.N.rc from ordinary
+            # checks. Installs older than that exclusion still resolve it, so never cut an RC until
+            # a normal lab release carrying the exclusion has shipped.
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease --draft=false
+            echo "Release $tag published as a release candidate (not Latest, no nudge)."
+          else
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
+            echo "Release $tag published as Latest."
+          fi
 
       - name: Publish update nudge
+        # Why: an RC announces to nobody — the nudge is what makes installs check early.
+        if: inputs.release_candidate != true
         # Why: written here (after mac/linux/windows assets are confirmed published)
         # instead of in the version job, so installs polling the nudge never see a
         # release announced before its latest-*.yml/zip/dmg assets exist — that race

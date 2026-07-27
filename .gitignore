@@ -92,6 +92,7 @@ docs/**
 !docs/reference/
 !docs/reference/agent-verification-traps.md
 !docs/reference/git-compatibility.md
+!docs/reference/lab-release-smoke-check.md
 !docs/reference/headless-linux-server.md
 !docs/reference/linux-glibc-compatibility.md
 !docs/reference/upstream-pr-adoption.md
