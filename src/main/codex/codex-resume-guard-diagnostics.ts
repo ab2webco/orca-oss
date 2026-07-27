@@ -1,0 +1,66 @@
+import { lstatSync } from 'node:fs'
+import { findTrustedCodexSessionResume } from './codex-session-resume-home'
+
+export type CodexResumeGuardDiagnostics = {
+  sessionId: string
+  recordedTranscriptPath: string
+  /** Whether the recorded path (or its plain/.zst sibling) is a file on disk. */
+  recordedTranscriptPathExists: boolean
+  trustedCodexHomes: readonly string[]
+  /** First same-id rollout found by scanning the trusted homes, if any. A hit
+   *  with a different path than the recorded one means the metadata went stale
+   *  while the session itself is still inside the trust boundary. */
+  sameIdRolloutInTrustedHomes: { homePath: string; transcriptPath: string } | null
+}
+
+function isRegularFile(filePath: string): boolean {
+  try {
+    return lstatSync(filePath).isFile()
+  } catch {
+    return false
+  }
+}
+
+function recordedPathVariants(transcriptPath: string): string[] {
+  if (transcriptPath.endsWith('.jsonl.zst')) {
+    return [transcriptPath, transcriptPath.slice(0, -'.zst'.length)]
+  }
+  if (transcriptPath.endsWith('.jsonl')) {
+    return [transcriptPath, `${transcriptPath}.zst`]
+  }
+  return [transcriptPath]
+}
+
+/**
+ * Read-only evidence for a fired Codex resume guard: the trusted-home list the
+ * guard saw versus where a same-id rollout actually lives. The guard's fire-time
+ * state is unrecoverable after the fact, so this must be logged at the throw
+ * site. Never used to select a resume home — the same-id scan here is evidence
+ * collection, not trust.
+ */
+export async function collectCodexResumeGuardDiagnostics(args: {
+  sessionId: string
+  transcriptPath: string
+  trustedCodexHomes: readonly string[]
+  fileIsRegular?: (filePath: string) => boolean
+  listSessionFiles?: (sessionsRoot: string) => AsyncIterable<string>
+}): Promise<CodexResumeGuardDiagnostics> {
+  const fileIsRegular = args.fileIsRegular ?? isRegularFile
+  const recordedTranscriptPathExists = recordedPathVariants(args.transcriptPath).some(fileIsRegular)
+  // Why: omitting transcriptPath forces the legacy same-id scan the guard
+  // deliberately skips, answering "where is this session really?".
+  const sameIdRolloutInTrustedHomes = await findTrustedCodexSessionResume({
+    sessionId: args.sessionId,
+    transcriptPath: undefined,
+    trustedCodexHomes: args.trustedCodexHomes,
+    ...(args.fileIsRegular ? { fileIsRegular: args.fileIsRegular } : {}),
+    ...(args.listSessionFiles ? { listSessionFiles: args.listSessionFiles } : {})
+  })
+  return {
+    sessionId: args.sessionId,
+    recordedTranscriptPath: args.transcriptPath,
+    recordedTranscriptPathExists,
+    trustedCodexHomes: args.trustedCodexHomes,
+    sameIdRolloutInTrustedHomes
+  }
+}

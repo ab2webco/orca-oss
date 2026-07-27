@@ -61,6 +61,11 @@ export type PtyConnectionDeps = {
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
+  /** Guard-blocked Codex resume: show that session's transcript read-only in this
+   *  pane (null clears it once a later spawn succeeds). Replaces the error toast. */
+  onPtyCodexResumeBlockedRef?: React.RefObject<
+    (paneId: number, providerSession: AgentProviderSessionMetadata | null) => void
+  >
   onAgentRateLimitDetected?: (event: {
     paneId: number
     paneKey: string

@@ -176,6 +176,7 @@ import { scheduleImagePasteWebglAtlasRecovery } from './terminal-webgl-atlas-rec
 import { restoreTerminalFitToDesktop, restoreTerminalFitsToDesktop } from './terminal-fit-restore'
 import { useVisibleTerminalTabClaim } from './use-visible-terminal-tab-claim'
 import { TerminalSshReconnectOverlay } from './TerminalSshReconnectOverlay'
+import { CodexResumeBlockedTranscript } from './CodexResumeBlockedTranscript'
 import { TerminalRemoteRuntimeReconnectBanner } from './TerminalRemoteRuntimeReconnectBanner'
 import { selectTerminalTabAgentTypesByLeaf } from './terminal-tab-agent-type-index'
 import type { AutoSwitchRateLimitAgent } from '../../../../shared/agent-rate-limit-detection'
@@ -411,6 +412,9 @@ export default function TerminalPane({
   const [agentSessionContinuation, setAgentSessionContinuation] =
     useState<AgentSessionContinuationRequest | null>(null)
   const [terminalError, setTerminalError] = useState<string | null>(null)
+  const [codexResumeBlockedByPaneId, setCodexResumeBlockedByPaneId] = useState<
+    Record<number, AgentProviderSessionMetadata>
+  >({})
   const [ptyRecoveryStatesByPaneId, setPtyRecoveryStatesByPaneId] = useState<
     Record<number, VisiblePtyRecoveryState>
   >({})
@@ -597,6 +601,20 @@ export default function TerminalPane({
     }
     setTerminalError((prev) => (prev ? `${prev}\n${message}` : message))
   })
+  const onPtyCodexResumeBlockedRef = useRef(
+    (paneId: number, providerSession: AgentProviderSessionMetadata | null) => {
+      setCodexResumeBlockedByPaneId((previous) => {
+        if (!providerSession) {
+          if (!(paneId in previous)) {
+            return previous
+          }
+          const { [paneId]: _cleared, ...rest } = previous
+          return rest
+        }
+        return { ...previous, [paneId]: providerSession }
+      })
+    }
+  )
   const onPtyRecoveryStateRef = useRef(
     (paneId: number, state: PtyTransportRecoveryState | null) => {
       setPtyRecoveryStatesByPaneId((previous) =>
@@ -1605,6 +1623,7 @@ export default function TerminalPane({
     onPtyExitRef,
     onAgentExitedRef,
     onPtyErrorRef,
+    onPtyCodexResumeBlockedRef,
     onAgentRateLimitDetected: handleAgentRateLimitDetected,
     onPtyRecoveryStateRef,
     clearTabPtyId,
@@ -1810,6 +1829,7 @@ export default function TerminalPane({
         onPtyExitRef,
         onAgentExitedRef,
         onPtyErrorRef,
+        onPtyCodexResumeBlockedRef,
         onAgentRateLimitDetected: handleAgentRateLimitDetected,
         onPtyRecoveryStateRef,
         clearTabPtyId,
@@ -3167,6 +3187,21 @@ export default function TerminalPane({
             )
           )
         : null}
+      {/* Why: portal into the pane (same pattern as the SSH overlay) so the read-only
+          transcript replaces the blank surface a guard-blocked resume leaves behind. */}
+      {managedPanes.map((pane) => {
+        const blockedProviderSession = codexResumeBlockedByPaneId[pane.id]
+        return blockedProviderSession
+          ? createPortal(
+              <CodexResumeBlockedTranscript
+                paneKey={makePaneKey(tabId, pane.leafId)}
+                providerSession={blockedProviderSession}
+              />,
+              pane.container,
+              `codex-resume-blocked-${pane.id}`
+            )
+          : null
+      })}
       <DaemonActionDialog api={daemonActions} />
       {isActive && (
         <TerminalSessionStateSaveFailureDialog

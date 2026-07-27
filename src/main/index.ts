@@ -182,9 +182,13 @@ import {
   claimsCodexRolloutLayout,
   findTrustedCodexSessionResume
 } from './codex/codex-session-resume-home'
+import { collectCodexResumeGuardDiagnostics } from './codex/codex-resume-guard-diagnostics'
 import { getSystemCodexHomePath } from './codex/codex-home-paths'
 import { normalizeRuntimePathForComparison } from '../shared/cross-platform-path'
-import type { AgentProviderSessionMetadata } from '../shared/agent-session-resume'
+import {
+  CODEX_RESUME_BLOCKED_MESSAGE,
+  type AgentProviderSessionMetadata
+} from '../shared/agent-session-resume'
 import { getDefaultWslDistro } from './wsl'
 import { ClaudeAccountService } from './claude-accounts/service'
 import { notifyWorktreesChanged } from './ipc/worktree-remote'
@@ -872,9 +876,19 @@ async function prepareCodexSessionResumeForLaunch(args: {
     // Why: an unverifiable Codex rollout still blocks; only paths that never claimed Codex
     // provenance (e.g. ~/.claude/… on a pane mislabeled "codex") fall through to a normal launch.
     if (claimsCodexRolloutLayout(args.providerSession.transcriptPath)) {
-      throw new Error(
-        'Orca could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.'
-      )
+      try {
+        // Why: the guard's fire-time state is unrecoverable later; both lists decide
+        // whether this block was stale metadata or a genuinely untrusted session (ORCA-61).
+        const diagnostics = await collectCodexResumeGuardDiagnostics({
+          sessionId: args.providerSession.id,
+          transcriptPath: args.providerSession.transcriptPath!,
+          trustedCodexHomes: trustedHomes
+        })
+        console.warn('[codex-session-resume] Resume guard blocked a session:', diagnostics)
+      } catch (error) {
+        console.warn('[codex-session-resume] Resume guard diagnostics failed:', error)
+      }
+      throw new Error(CODEX_RESUME_BLOCKED_MESSAGE)
     }
     return null
   }

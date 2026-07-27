@@ -266,6 +266,9 @@ type UseTerminalPaneLifecycleDeps = {
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
+  onPtyCodexResumeBlockedRef?: React.RefObject<
+    (paneId: number, providerSession: AgentProviderSessionMetadata | null) => void
+  >
   onAgentRateLimitDetected?: (event: {
     paneId: number
     paneKey: string
@@ -532,6 +535,7 @@ export function useTerminalPaneLifecycle({
   onPtyExitRef,
   onAgentExitedRef,
   onPtyErrorRef,
+  onPtyCodexResumeBlockedRef,
   onAgentRateLimitDetected,
   onPtyRecoveryStateRef,
   clearTabPtyId,
@@ -747,6 +751,7 @@ export function useTerminalPaneLifecycle({
       onPtyExitRef,
       onAgentExitedRef,
       onPtyErrorRef,
+      onPtyCodexResumeBlockedRef,
       onAgentRateLimitDetected,
       onPtyRecoveryStateRef,
       clearTabPtyId,

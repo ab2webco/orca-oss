@@ -246,12 +246,14 @@ import {
 } from '../../../../shared/tui-agent-launch-defaults'
 import {
   agentProviderSessionsEqual,
+  isCodexResumeBlockedError,
   isResumableTuiAgent,
   normalizeAgentProviderSession,
   type AgentProviderSessionMetadata,
   type ResumableTuiAgent,
   type SleepingAgentSessionRecord
 } from '../../../../shared/agent-session-resume'
+import { resolveCodexResumeBlockedProviderSession } from './codex-resume-blocked-fallback'
 import {
   normalizeCompatibleAgentTitleForOwner,
   resolveCompatibleAgentTypeForOwner
@@ -4236,6 +4238,22 @@ export function connectPanePty(
         // that startFreshSpawn's own-worktree isDeleting skip cannot see.
         return
       }
+      if (isCodexResumeBlockedError(message)) {
+        // Why: the guard protects account isolation, not the transcript — losing
+        // sight of an agent conversation is worse than not auto-resuming it, so
+        // show the session read-only instead of an error toast over a blank pane.
+        const state = useAppStore.getState()
+        const blockedProviderSession = resolveCodexResumeBlockedProviderSession({
+          startupLaunchAgent: paneStartup?.launchAgent,
+          startupProviderSession: paneStartup?.resumeProviderSession,
+          liveEntry: state.agentStatusByPaneKey[cacheKey],
+          sleepingRecord: getSleepingRecordForPane(state)?.record
+        })
+        if (blockedProviderSession && deps.onPtyCodexResumeBlockedRef?.current) {
+          deps.onPtyCodexResumeBlockedRef.current(pane.id, blockedProviderSession)
+          return
+        }
+      }
       deps.onPtyErrorRef?.current?.(pane.id, message)
     }
 
@@ -4874,6 +4892,9 @@ export function connectPanePty(
               showSessionRestoredBanner()
             }
             clearSleepingRecordAfterColdRestoreSpawn(coldRestoreOverride)
+            // Why: a later successful spawn supersedes the read-only fallback; a
+            // stale overlay would hide the live PTY it sits above.
+            deps.onPtyCodexResumeBlockedRef?.current?.(pane.id, null)
           } else if (
             paneStartup?.launchConfig ||
             (startupOverride && 'launchConfig' in startupOverride)

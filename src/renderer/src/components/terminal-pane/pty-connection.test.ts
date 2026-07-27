@@ -1117,6 +1117,69 @@ describe('connectPanePty', () => {
     expect(deps.onPtyErrorRef.current).toHaveBeenCalledWith(1, 'shell exited with code 1')
   })
 
+  // Why: losing sight of a Codex conversation is the failure ORCA-61 guards
+  // against — a blocked resume must degrade to the read-only transcript view,
+  // never to an error toast over a blank pane.
+  it('routes a guard-blocked codex resume to the read-only fallback instead of the error sink', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { CODEX_RESUME_BLOCKED_MESSAGE } = await import('../../../../shared/agent-session-resume')
+    const providerSession = {
+      key: 'session_id',
+      id: '019f9c89-244d-7232-b6e6-0874d3557f76',
+      transcriptPath: '/managed/home/sessions/2026/07/26/rollout-2026-07-26T00-17-55-a.jsonl'
+    }
+    const transport = createMockTransport()
+    const capturedOnError: { current: ((message: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedOnError.current = callbacks.onError ?? null
+      return undefined
+    })
+    transportFactoryQueue.push(transport)
+    const onPtyCodexResumeBlockedRef = { current: vi.fn() }
+    const deps = createDeps({
+      tabId: 'tab-codex-resume-blocked',
+      startup: {
+        command: 'codex resume 019f9c89-244d-7232-b6e6-0874d3557f76',
+        launchAgent: 'codex',
+        resumeProviderSession: providerSession
+      },
+      onPtyCodexResumeBlockedRef
+    })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(capturedOnError.current).toBeTypeOf('function')
+    capturedOnError.current!(
+      `Error invoking remote method 'pty:spawn': Error: ${CODEX_RESUME_BLOCKED_MESSAGE}`
+    )
+    expect(onPtyCodexResumeBlockedRef.current).toHaveBeenCalledWith(1, providerSession)
+    expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
+  })
+
+  it('keeps the error sink for a blocked resume whose codex session cannot be identified', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { CODEX_RESUME_BLOCKED_MESSAGE } = await import('../../../../shared/agent-session-resume')
+    const transport = createMockTransport()
+    const capturedOnError: { current: ((message: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedOnError.current = callbacks.onError ?? null
+      return undefined
+    })
+    transportFactoryQueue.push(transport)
+    const onPtyCodexResumeBlockedRef = { current: vi.fn() }
+    const deps = createDeps({ tabId: 'tab-codex-blocked-unresolved', onPtyCodexResumeBlockedRef })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(capturedOnError.current).toBeTypeOf('function')
+    const blockedMessage = `Error invoking remote method 'pty:spawn': Error: ${CODEX_RESUME_BLOCKED_MESSAGE}`
+    capturedOnError.current!(blockedMessage)
+    expect(onPtyCodexResumeBlockedRef.current).not.toHaveBeenCalled()
+    expect(deps.onPtyErrorRef.current).toHaveBeenCalledWith(1, blockedMessage)
+  })
+
   it('threads the resolved local project runtime into IPC terminal transport options', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport()
