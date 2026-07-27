@@ -48,6 +48,26 @@ export const STATUSLINE_TREND_ASCII: StatuslineTrendGlyphs = {
 }
 
 /**
+ * The reset-countdown file contract, shared with the writer in `statusline-reset-countdown.ts`.
+ *
+ * Why the two sides must agree byte for byte: a path or charset mismatch renders as "the field
+ * never appears", which is the failure mode nobody reports.
+ */
+export const STATUSLINE_RESET_FILE_PREFIX = 'orca-claude-statusline-reset-'
+// Why a literal rather than no file at all: a session with no CLAUDE_CONFIG_DIR runs on the
+// system-default account, which has a reset too. Account vault directories are UUIDs, so this
+// name cannot collide with one.
+export const STATUSLINE_RESET_DEFAULT_KEY = 'system-default'
+export const STATUSLINE_RESET_KEY_MAX_CHARS = 64
+// Longest value the writer can emit is "23h59m"; anything longer is a stale or foreign file.
+export const STATUSLINE_RESET_MAX_CHARS = 6
+
+// Why `>` on cmd and not the trend's spare glyphs: `+ - ~` already mean a direction on this line,
+// and `↻` would arrive as mojibake through the OEM codepage — the same trade as `…` vs `...`.
+export const STATUSLINE_RESET_MARK_UNICODE = '↻'
+export const STATUSLINE_RESET_MARK_ASCII = '>'
+
+/**
  * One bar per level, from empty to full.
  *
  * Why floor and never round up: an overstated bar claims consumption that has not happened, and
@@ -128,6 +148,58 @@ export function posixContextTrendLines(): readonly string[] {
     '    fi',
     '  fi',
     'fi'
+  ]
+}
+
+/**
+ * The quota reset countdown, read from the per-account file Orca refreshes on every live post.
+ *
+ * Why the script never computes it: turning `resets_at` into "2h14m" needs the wall clock, and a
+ * POSIX shell only reaches one through `date` — a subprocess on a path that runs ~3x/sec. Why not
+ * an injected env var either: it would freeze at spawn, so an hours-long session would count down
+ * from the wrong instant, and a countdown that lies by hours is worse than no countdown.
+ *
+ * Why the pane-key gate: outside Orca nothing refreshes this file, so its content could be days
+ * old. The percentages on the same line come from the payload and stay true either way.
+ */
+export function posixResetCountdownLines(): readonly string[] {
+  const resetFile = `"\${TMPDIR:-/tmp}/${STATUSLINE_RESET_FILE_PREFIX}\${orca_statusline_reset_key}"`
+  return [
+    'orca_statusline_reset=',
+    'if [ -n "$ORCA_PANE_KEY" ]; then',
+    '  orca_statusline_reset_key=$orca_statusline_acct_key',
+    `  if [ -z "$orca_statusline_reset_key" ] || [ "\${#orca_statusline_reset_key}" -gt ${STATUSLINE_RESET_KEY_MAX_CHARS} ]; then`,
+    `    orca_statusline_reset_key=${STATUSLINE_RESET_DEFAULT_KEY}`,
+    '  fi',
+    `  orca_statusline_reset_file=${resetFile}`,
+    '  if [ -r "$orca_statusline_reset_file" ]; then',
+    '    IFS= read -r orca_statusline_reset <"$orca_statusline_reset_file" 2>/dev/null || :',
+    '  fi',
+    // Why an allow-list and not a trim: whatever else is in that file is stale or foreign, and
+    // the one place it would surface is the user's status line.
+    '  case "$orca_statusline_reset" in \'\'|*[!0-9dhm]*) orca_statusline_reset= ;; esac',
+    `  if [ "\${#orca_statusline_reset}" -gt ${STATUSLINE_RESET_MAX_CHARS} ]; then orca_statusline_reset=; fi`,
+    'fi'
+  ]
+}
+
+/**
+ * cmd's reset countdown, mirroring the POSIX rule.
+ *
+ * Why no separate length bound on the key: the account block already clears a key past 64
+ * characters, so an overlong one lands on the same default file POSIX picks.
+ */
+export function windowsResetCountdownLines(doneLabel: string): readonly string[] {
+  return [
+    'set "ORCA_STATUSLINE_RESET="',
+    `if not defined ORCA_PANE_KEY goto :${doneLabel}`,
+    'set "ORCA_STATUSLINE_RESET_KEY=!ORCA_STATUSLINE_ACCT_KEY!"',
+    `if not defined ORCA_STATUSLINE_RESET_KEY set "ORCA_STATUSLINE_RESET_KEY=${STATUSLINE_RESET_DEFAULT_KEY}"`,
+    `set "ORCA_STATUSLINE_RESET_FILE=%TEMP%\\${STATUSLINE_RESET_FILE_PREFIX}!ORCA_STATUSLINE_RESET_KEY!.tmp"`,
+    'if exist "!ORCA_STATUSLINE_RESET_FILE!" set /p ORCA_STATUSLINE_RESET=<"!ORCA_STATUSLINE_RESET_FILE!"',
+    'if defined ORCA_STATUSLINE_RESET for /f "delims=0123456789dhm" %%r in ("!ORCA_STATUSLINE_RESET!") do set "ORCA_STATUSLINE_RESET="',
+    `if defined ORCA_STATUSLINE_RESET if not "!ORCA_STATUSLINE_RESET:~${STATUSLINE_RESET_MAX_CHARS}!"=="" set "ORCA_STATUSLINE_RESET="`,
+    `:${doneLabel}`
   ]
 }
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CLAUDE_STATUSLINE_MIN_POST_INTERVAL_SECONDS } from '../../shared/claude-statusline-rate-limits'
+import { publishStatuslineResetCountdown } from './statusline-reset-countdown'
 import { getManagedStatusLineScript } from './statusline-script'
 
 const ORIGINAL_PLATFORM = process.platform
@@ -660,6 +661,129 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     expect(await lineFor('Claude Opus 5 (1M context) preview build 2026', 'c')).toBe(
       'Claude Opus 5 (1M context) preview build 2026 · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…@'
     )
+  })
+
+  function writeResetFile(dir: string, value: string, key = 'system-default'): void {
+    writeFileSync(join(dir, `orca-claude-statusline-reset-${key}`), `${value}\n`)
+  }
+
+  it('renders the precomputed reset countdown as the last field', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 37 }, seven_day: { used_percentage: 68 } }
+    })
+    writeResetFile(dir, '2d4h')
+    const far = await runScript(scriptPath, dir, payload, 'tab-1:reset-far')
+    expect(far.trimEnd()).toBe(
+      'Orca by Ab2Web · Fable · ctx ██░░░ 42% · 5h █▌░░░ 37% · 7d ███░░ 68% · ↻ 2d4h'
+    )
+    // Why an imminent reset renders the same way: the script only reads a value Orca already
+    // formatted, so it has no clock of its own to disagree with.
+    writeResetFile(dir, '12m')
+    const soon = await runScript(scriptPath, dir, payload, 'tab-1:reset-soon')
+    expect(soon.trimEnd()).toContain('· ↻ 12m')
+  })
+
+  it('leaves the slot empty when there is no reset value at all', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const payload = displayPayload({ rate_limits: { five_hour: { used_percentage: 37 } } })
+    // Why nothing rather than a placeholder: an invented "now" in the reset slot reads as data.
+    const missing = await runScript(scriptPath, dir, payload, 'tab-1:reset-none')
+    expect(missing.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · 5h █▌░░░ 37%')
+    expect(missing).not.toContain('↻')
+    writeResetFile(dir, '')
+    const empty = await runScript(scriptPath, dir, payload, 'tab-1:reset-empty')
+    expect(empty).not.toContain('↻')
+  })
+
+  it('renders no countdown it did not get from Orca', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const payload = displayPayload({ rate_limits: { five_hour: { used_percentage: 37 } } })
+    // Why: this file is the one place arbitrary text could reach the user's line, and a stale or
+    // foreign value must render as absent, never as text.
+    writeResetFile(dir, 'rm -rf /')
+    expect(await runScript(scriptPath, dir, payload, 'tab-1:reset-junk')).not.toContain('rm')
+    writeResetFile(dir, '1234d56h')
+    expect(await runScript(scriptPath, dir, payload, 'tab-1:reset-long')).not.toContain('1234')
+  })
+
+  it('never reads a countdown nothing is refreshing', async () => {
+    const { scriptPath, dir } = makeHarness()
+    writeResetFile(dir, '2d4h')
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = spawn('sh', [scriptPath], {
+        env: { PATH: `${join(dir, 'stub-bin')}:${process.env.PATH ?? ''}`, TMPDIR: dir },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+      let out = ''
+      child.stdout.on('data', (chunk: Buffer) => {
+        out += chunk.toString()
+      })
+      child.on('error', reject)
+      child.on('close', () => resolve(out))
+      child.stdin.write(displayPayload())
+      child.stdin.end()
+    })
+    // Why the pane-key gate: with no Orca behind the session nothing rewrites that file, so the
+    // value it holds could be days old — and a countdown wrong by days is worse than none.
+    expect(stdout).not.toContain('↻')
+  })
+
+  it('drops the countdown before the weekly quota when columns run out', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-budget', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(
+      join(configDir, 'oauth-account.json'),
+      JSON.stringify({ emailAddress: `${'a'.repeat(60)}@example.com` })
+    )
+    writeResetFile(dir, '23h59m', 'acct-budget')
+    const payload = displayPayload({
+      model: { id: 'claude-opus-5', display_name: 'Claude Opus 5 (1M context)' },
+      context_window: { used_percentage: 93 },
+      rate_limits: { five_hour: { used_percentage: 88 }, seven_day: { used_percentage: 77 } }
+    })
+    await runScript(scriptPath, dir, payload, 'tab-1:reset-budget', configDir)
+    const stdout = await runScript(scriptPath, dir, payload, 'tab-1:reset-budget', configDir)
+    // Why the countdown falls first: level and direction are what the line exists to say, so a
+    // reset must never cost the weekly quota on a pane that is already out of columns.
+    expect(columns(stdout)).toBeLessThanOrEqual(96)
+    expect(stdout).not.toContain('↻')
+    expect(stdout).toContain('5h ████░ 88%')
+  })
+
+  it('reads back exactly what Orca wrote for the same account', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-roundtrip', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    const originalTmpdir = process.env.TMPDIR
+    process.env.TMPDIR = dir
+    try {
+      // Why this test and not two independent ones: writer and reader derive the same path from
+      // opposite languages, and a mismatch degrades to "the field never appears" — invisible.
+      publishStatuslineResetCountdown(
+        {
+          configDir,
+          fiveHour: { used_percentage: 37, resets_at: (Date.now() + 3 * 60 * 60_000) / 1000 },
+          sevenDay: null
+        },
+        Date.now()
+      )
+    } finally {
+      if (originalTmpdir === undefined) {
+        delete process.env.TMPDIR
+      } else {
+        process.env.TMPDIR = originalTmpdir
+      }
+    }
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      displayPayload({ rate_limits: { five_hour: { used_percentage: 37 } } }),
+      'tab-1:reset-roundtrip',
+      configDir
+    )
+    expect(stdout.trimEnd()).toContain('· ↻ 3h')
   })
 
   it('prints without any Orca env so sessions outside Orca keep their line', async () => {

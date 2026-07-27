@@ -201,6 +201,7 @@ import {
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
 import { onLiveClaudePtysDrained } from './claude-accounts/live-pty-drain-listeners'
+import { publishStatuslineResetCountdown } from './claude/statusline-reset-countdown'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
 import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provider-session-invalidation'
@@ -2102,6 +2103,9 @@ app.whenReady().then(async () => {
   )
   // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
   agentHookServer.setClaudeStatusLineListener((event) => {
+    // Why here: this is the only wall-clock the status line gets — its script runs on builtins
+    // alone and cannot shell out to `date` to turn resets_at into a duration.
+    publishStatuslineResetCountdown(event)
     rateLimits?.ingestLiveClaudeRateLimits(event)
   })
   rateLimits.setOpenCodeGoConfigResolver(() => {

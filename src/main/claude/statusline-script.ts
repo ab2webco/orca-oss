@@ -1,5 +1,10 @@
 import { getWindowsManagedStatusLineScript } from './statusline-script-windows'
-import { posixContextTrendLines, posixGaugeFunctionLines } from './statusline-usage-gauge'
+import {
+  posixContextTrendLines,
+  posixGaugeFunctionLines,
+  posixResetCountdownLines,
+  STATUSLINE_RESET_MARK_UNICODE
+} from './statusline-usage-gauge'
 import {
   CLAUDE_STATUSLINE_MIN_POST_INTERVAL_SECONDS,
   CLAUDE_STATUSLINE_PATHNAME
@@ -188,6 +193,7 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     '  fi',
     'fi',
     ...posixContextTrendLines(),
+    ...posixResetCountdownLines(),
     ...posixGaugeFunctionLines(),
     // Why columns are counted and never measured: a bar cell and the `·` separator are multi-byte,
     // and `${#}` counts bytes under dash — measuring would charge 32 phantom columns for three
@@ -247,6 +253,11 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     'orca_statusline_try "$orca_statusline_seven" \\',
     '  "7d ${orca_statusline_seven_bar:+$orca_statusline_seven_bar }${orca_statusline_seven}%" \\',
     '  $(( ${#orca_statusline_seven} + 10 ))',
+    // Why the countdown falls first: level and direction are what the line exists to say, and a
+    // reset is context on top of them — never worth the weekly quota it would push off a narrow pane.
+    'orca_statusline_try "$orca_statusline_reset" \\',
+    `  "${STATUSLINE_RESET_MARK_UNICODE} $orca_statusline_reset" \\`,
+    '  $(( ${#orca_statusline_reset} + 2 ))',
     'if [ -n "$orca_statusline_line" ]; then',
     '  printf \'%s\\n\' "$orca_statusline_line"',
     'fi',

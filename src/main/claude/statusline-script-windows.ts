@@ -1,8 +1,10 @@
 import { WINDOWS_HOOK_STDIN_READER } from '../agent-hooks/hook-stdin-contract'
 import {
+  STATUSLINE_RESET_MARK_ASCII,
   windowsContextTrendLines,
   windowsGaugeLines,
-  windowsGaugeTableLine
+  windowsGaugeTableLine,
+  windowsResetCountdownLines
 } from './statusline-usage-gauge'
 import {
   CLAUDE_STATUSLINE_MIN_POST_INTERVAL_SECONDS,
@@ -17,6 +19,8 @@ const STATUSLINE_ACCOUNT_LABEL = 'orca_statusline_account'
 const STATUSLINE_SEVEN_LABEL = 'orca_statusline_quota_seven'
 const STATUSLINE_TREND_WRITE_LABEL = 'orca_statusline_trend_write'
 const STATUSLINE_TREND_DONE_LABEL = 'orca_statusline_trend_done'
+const STATUSLINE_RESET_DONE_LABEL = 'orca_statusline_reset_done'
+const STATUSLINE_RESET_FIELD_LABEL = 'orca_statusline_field_reset'
 const STATUSLINE_BAR_TABLE_VAR = 'ORCA_STATUSLINE_BARS'
 // Why 96: the POSIX branch's budget, kept identical so a pane renders the same width on either OS.
 // Why a raw substring test still measures it correctly here: this variant is ASCII by contract,
@@ -206,8 +210,13 @@ export function getWindowsManagedStatusLineScript(): string {
     'break>"!ORCA_STATUSLINE_INTRO_STAMP!" 2>nul',
     ':orca_statusline_compose',
     ...windowsContextTrendLines(STATUSLINE_TREND_DONE_LABEL, STATUSLINE_TREND_WRITE_LABEL),
+    ...windowsResetCountdownLines(STATUSLINE_RESET_DONE_LABEL),
     windowsGaugeTableLine(STATUSLINE_BAR_TABLE_VAR),
-    ...windowsGaugeLines('ORCA_STATUSLINE_CTX', 'ORCA_STATUSLINE_CTX_BAR', STATUSLINE_BAR_TABLE_VAR),
+    ...windowsGaugeLines(
+      'ORCA_STATUSLINE_CTX',
+      'ORCA_STATUSLINE_CTX_BAR',
+      STATUSLINE_BAR_TABLE_VAR
+    ),
     ...windowsGaugeLines(
       'ORCA_STATUSLINE_FIVE',
       'ORCA_STATUSLINE_FIVE_BAR',
@@ -249,6 +258,14 @@ export function getWindowsManagedStatusLineScript(): string {
     ...budgetedFieldLines(
       'ORCA_STATUSLINE_SEVEN',
       '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
+      STATUSLINE_RESET_FIELD_LABEL
+    ),
+    `:${STATUSLINE_RESET_FIELD_LABEL}`,
+    // Why last: level and direction are what the line exists to say, and a reset is context on
+    // top of them — never worth the weekly quota it would push off a narrow pane.
+    ...budgetedFieldLines(
+      'ORCA_STATUSLINE_RESET',
+      `${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`,
       STATUSLINE_EMIT_LABEL
     ),
     `:${STATUSLINE_EMIT_LABEL}`,

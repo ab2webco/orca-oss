@@ -8,6 +8,8 @@ import {
   STATUSLINE_BAR_CELLS,
   STATUSLINE_BAR_LEVELS_ASCII,
   STATUSLINE_BAR_LEVELS_UNICODE,
+  STATUSLINE_RESET_MARK_ASCII,
+  STATUSLINE_RESET_MAX_CHARS,
   STATUSLINE_TREND_ASCII,
   STATUSLINE_TREND_THRESHOLD
 } from './statusline-usage-gauge'
@@ -28,7 +30,9 @@ function sliceBetween(start: string, end: string): string {
 // runs in CI. `pr.yml` runs vitest on ubuntu only, so the win32 suite below never runs there.
 describe('getWindowsManagedStatusLineScript (structure)', () => {
   it('resolves every goto to exactly one label', () => {
-    const labels = lines.filter((line) => /^:[A-Za-z0-9_]+$/.test(line)).map((line) => line.slice(1))
+    const labels = lines
+      .filter((line) => /^:[A-Za-z0-9_]+$/.test(line))
+      .map((line) => line.slice(1))
     const targets = [...script.matchAll(/goto :([A-Za-z0-9_]+)/g)].map((match) => match[1])
     expect(labels.length).toBeGreaterThan(0)
     // Why unique: cmd jumps to the first match, so a duplicated label silently reroutes control.
@@ -52,8 +56,8 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
 
   it('spawns nothing but the stdin reader on the render path', () => {
     const renderPath = sliceBetween('more.com', 'echo(!ORCA_STATUSLINE_LINE!')
-    const spawns = [...renderPath.matchAll(/[\w%\\.-]*\.(?:exe|com|bat|cmd)\b/gi)].map(
-      (match) => match[0].split('\\').pop()
+    const spawns = [...renderPath.matchAll(/[\w%\\.-]*\.(?:exe|com|bat|cmd)\b/gi)].map((match) =>
+      match[0].split('\\').pop()
     )
     // Why: the render runs on every tick — findstr and curl belong to the POST path only.
     expect(spawns).toEqual(['more.com'])
@@ -91,7 +95,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     expect(script).toContain(
       'if not defined ORCA_STATUSLINE_FIVE goto :orca_statusline_field_seven'
     )
-    expect(script).toContain('if not defined ORCA_STATUSLINE_SEVEN goto :orca_statusline_emit')
+    expect(script).toContain(
+      'if not defined ORCA_STATUSLINE_SEVEN goto :orca_statusline_field_reset'
+    )
   })
 
   it('keys the account cache on the config dir name and reads the vault at most once', () => {
@@ -105,7 +111,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     const vaultReadIndex = script.indexOf('oauth-account.json')
     expect(cacheReadIndex).toBeGreaterThan(-1)
     expect(cacheReadIndex).toBeLessThan(vaultReadIndex)
-    expect(script).toContain('if defined ORCA_STATUSLINE_ACCOUNT goto :orca_statusline_account_render')
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_ACCOUNT goto :orca_statusline_account_render'
+    )
     // Why the whole file: the vault ships pretty-printed, so emailAddress is never on line 1.
     expect(script).toContain(
       'for /f "usebackq delims=" %%a in ("!ORCA_STATUSLINE_VAULT!") do set "ORCA_STATUSLINE_ACCT_RAW=!ORCA_STATUSLINE_ACCT_RAW!%%a"'
@@ -125,7 +133,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     expect(script).toContain(
       'set "ORCA_STATUSLINE_INTRO_STAMP=%TEMP%\\orca-claude-statusline-intro-!ORCA_STATUSLINE_INTRO_KEY!.tmp"'
     )
-    expect(script).toContain('if exist "!ORCA_STATUSLINE_INTRO_STAMP!" goto :orca_statusline_compose')
+    expect(script).toContain(
+      'if exist "!ORCA_STATUSLINE_INTRO_STAMP!" goto :orca_statusline_compose'
+    )
     // Why the pane-key gate: the orphan id carries %RANDOM%, so reusing it would strobe the banner.
     expect(script).toContain(
       'if defined ORCA_PANE_KEY set "ORCA_STATUSLINE_INTRO_KEY=!ORCA_STATUSLINE_PANE_ID!"'
@@ -146,14 +156,19 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     const sevenIndex = script.indexOf(
       'set "ORCA_STATUSLINE_NEXT=7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%"'
     )
+    // Why the countdown is last: it is context on top of the level, never worth the weekly quota.
+    const resetIndex = script.indexOf(
+      `set "ORCA_STATUSLINE_NEXT=${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!"`
+    )
     expect(accountIndex).toBeGreaterThan(-1)
     expect(fiveIndex).toBeGreaterThan(accountIndex)
     expect(sevenIndex).toBeGreaterThan(fiveIndex)
+    expect(resetIndex).toBeGreaterThan(sevenIndex)
     // Why break, not skip: admitting a shorter field behind one that did not fit inverts priority.
     const overflow = script.match(
       /if not "!ORCA_STATUSLINE_NEXT:~96!"=="" goto :orca_statusline_emit/g
     )
-    expect(overflow?.length).toBe(3)
+    expect(overflow?.length).toBe(4)
     expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!...@"')
   })
 
@@ -221,6 +236,47 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     expect(script).toContain(
       'set "ORCA_STATUSLINE_TREND_FILE=%TEMP%\\orca-claude-statusline-ctx-!ORCA_STATUSLINE_INTRO_KEY!.tmp"'
     )
+  })
+
+  it('reads the reset countdown from the same per-account file the POSIX branch does', () => {
+    expect(script).toContain(
+      'set "ORCA_STATUSLINE_RESET_FILE=%TEMP%\\orca-claude-statusline-reset-!ORCA_STATUSLINE_RESET_KEY!.tmp"'
+    )
+    // Why the same fallback name: a session with no CLAUDE_CONFIG_DIR must find the file Orca
+    // wrote for the system-default account, on either OS.
+    expect(script).toContain(
+      'if not defined ORCA_STATUSLINE_RESET_KEY set "ORCA_STATUSLINE_RESET_KEY=system-default"'
+    )
+    // Why the pane-key gate: outside Orca nothing refreshes that file, so it could be days old.
+    expect(script).toContain('if not defined ORCA_PANE_KEY goto :orca_statusline_reset_done')
+    // Why the allow-list: this file is the one place arbitrary text could reach the user's line.
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_RESET for /f "delims=0123456789dhm" %%r in ("!ORCA_STATUSLINE_RESET!") do set "ORCA_STATUSLINE_RESET="'
+    )
+    expect(script).toContain(
+      `if defined ORCA_STATUSLINE_RESET if not "!ORCA_STATUSLINE_RESET:~${STATUSLINE_RESET_MAX_CHARS}!"=="" set "ORCA_STATUSLINE_RESET="`
+    )
+    // The read happens on the render path, so it must stay builtin-only.
+    const renderPath = sliceBetween('set "ORCA_STATUSLINE_RESET="', 'echo(!ORCA_STATUSLINE_LINE!')
+    expect(renderPath).not.toMatch(/\.(?:exe|com|bat|cmd)\b/i)
+  })
+
+  it('marks the countdown with an ASCII glyph no other field already means', () => {
+    // Why not `+ - ~`: those already mean a direction on this line, and `↻` would arrive as
+    // mojibake through the OEM codepage — the same trade the `…` vs `...` elision makes.
+    expect(STATUSLINE_RESET_MARK_ASCII).toBe('>')
+    expect(Object.values(STATUSLINE_TREND_ASCII)).not.toContain(STATUSLINE_RESET_MARK_ASCII)
+    expect(STATUSLINE_BAR_LEVELS_ASCII.join('')).not.toContain(STATUSLINE_RESET_MARK_ASCII)
+    // Why it can be a redirection character at all: every line that embeds it keeps it inside a
+    // fully quoted `set`, and it reaches stdout through delayed expansion, which cmd does not
+    // re-parse for redirection.
+    const markLines = lines.filter((entry) =>
+      entry.includes(`${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`)
+    )
+    expect(markLines).toHaveLength(2)
+    for (const line of markLines) {
+      expect(line).toMatch(/set "ORCA_STATUSLINE_NEXT=[^"]*"$/)
+    }
   })
 
   it('carries no credential material onto the line', () => {
