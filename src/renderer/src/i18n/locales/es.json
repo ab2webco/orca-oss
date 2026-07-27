@@ -38,6 +38,13 @@
       }
     }
   },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "El inicio de sesión de Claude necesita reparación",
+      "message": "El inicio de sesión de Claude Code de todo el sistema ya no es utilizable.",
+      "detail": "Tus cuentas de Claude administradas por Orca no se ven afectadas. Para restaurar el inicio de sesión de todo el sistema, ejecuta claude fuera de Orca y completa /login una vez."
+    }
+  },
   "menu": {
     "checkForUpdates": "Buscar actualizaciones...",
     "settings": "Ajustes",
@@ -13952,7 +13959,9 @@
         "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
-        "unassigned": "Sin asignar"
+        "unassigned": "Sin asignar",
+        "menu": "Work item actions",
+        "delete": "Delete work item"
       },
       "plane-board-column": {
         "reorder": "Reordenar la columna {{value0}}",
@@ -13999,7 +14008,10 @@
         "deleteConfirmTitle": "¿Eliminar la columna «{{value0}}»?",
         "deleteConfirmDescription": "Es posible que haya que reasignar los elementos.",
         "deleteConfirmAction": "Eliminar",
-        "createItemFailed": "Failed to create work item."
+        "createItemFailed": "Failed to create work item.",
+        "deleteItemConfirmTitle": "Delete work item {{value0}}?",
+        "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
+        "deleteItemFailed": "Failed to delete work item."
       },
       "plane-board-add-column": {
         "add": "Añadir columna",
@@ -14222,6 +14234,14 @@
       "sent": "El contexto de la sesión se envió a {{agent}} en una sesión nueva.",
       "deliveryFailed": "La nueva sesión de {{agent}} se inició, pero no se pudo enviar su contexto.",
       "launchFailed": "No se pudo iniciar una sesión nueva de {{agent}}."
+    },
+    "terminal-pane": {
+      "codex-resume-blocked": {
+        "title": "Tu conversación está a salvo y se muestra abajo",
+        "subtitle": "Orca pausó la reanudación automática porque no pudo confirmar que esta sesión de Codex pertenezca a la cuenta seleccionada. La transcripción de abajo es de solo lectura: no se envió ni se perdió nada. Para seguir trabajando, inicia una nueva sesión de Codex o cambia a la cuenta dueña de esta.",
+        "read-error": "Orca tampoco pudo leer el archivo de sesión guardado. Puede haberse movido o eliminado; la reanudación automática siguió en pausa y no se envió nada.",
+        "read-empty": "El archivo de sesión guardado se encontró, pero no contiene mensajes legibles."
+      }
     }
   },
   "dashboardPopout": {

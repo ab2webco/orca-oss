@@ -7,6 +7,7 @@ import {
   updatePlaneState
 } from '../plane/plane-work-item-writes'
 import { createWorkItem } from '../plane/plane-work-item-create'
+import { deleteWorkItem } from '../plane/plane-work-item-delete'
 import { withPlaneChangeBroadcast } from '../plane/plane-change-broadcast'
 import type { PlaneStateGroup } from '../../shared/plane-types'
 
@@ -117,6 +118,25 @@ export function registerPlaneBoardStateHandlers(): void {
           name,
           color,
           sequence
+        })
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'plane:deleteWorkItem',
+    async (_event, args: { projectId: string; workItemId: string; workspaceId?: string }) => {
+      if (typeof args?.projectId !== 'string' || !args.projectId.trim()) {
+        return { ok: false, error: 'Project is required.' }
+      }
+      if (typeof args?.workItemId !== 'string' || !args.workItemId.trim()) {
+        return { ok: false, error: 'Work item ID is required.' }
+      }
+      return withPlaneChangeBroadcast('plane:deleteWorkItem', args.projectId.trim(), () =>
+        deleteWorkItem({
+          projectId: args.projectId.trim(),
+          workItemId: args.workItemId.trim(),
+          workspaceId: normalizeOptionalString(args.workspaceId)
         })
       )
     }

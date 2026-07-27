@@ -1,8 +1,15 @@
 import React from 'react'
 import { useDraggable } from '@dnd-kit/core'
+import { MoreVertical, Trash2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { getPlanePriorityLabel } from './plane-work-item-sorter'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 
@@ -10,6 +17,8 @@ type PlaneBoardCardProps = {
   item: PlaneWorkItem
   selected: boolean
   onOpenItem: (item: PlaneWorkItem) => void
+  /** Delete this work item after a destructive confirmation. Omitted for the drag overlay clone. */
+  onDeleteItem?: (item: PlaneWorkItem) => void
 }
 
 // A single draggable work-item card. Mirrors the list row's info (identifier,
@@ -19,7 +28,8 @@ type PlaneBoardCardProps = {
 export function PlaneBoardCard({
   item,
   selected,
-  onOpenItem
+  onOpenItem,
+  onDeleteItem
 }: PlaneBoardCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: item.id,
@@ -57,6 +67,26 @@ export function PlaneBoardCard({
           {item.identifier}
         </span>
         <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{priorityLabel}</span>
+        {onDeleteItem ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={translate('auto.components.plane-board-card.menu', 'Work item actions')}
+              // Why the stops: the trigger sits inside the draggable, clickable card —
+              // without them a menu press opens the detail sheet or arms a drag.
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/60 opacity-0 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover/card:opacity-100 data-[state=open]:opacity-100"
+            >
+              <MoreVertical className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onSelect={() => onDeleteItem(item)}>
+                <Trash2 />
+                {translate('auto.components.plane-board-card.delete', 'Delete work item')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
       <h3 className="line-clamp-2 min-w-0 text-[13px] font-medium text-foreground">{item.title}</h3>
       <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">

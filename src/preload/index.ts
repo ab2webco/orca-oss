@@ -1910,6 +1910,13 @@ const api = {
       stateId?: string
     }): Promise<unknown> => ipcRenderer.invoke('plane:createWorkItem', args),
 
+    deleteWorkItem: (args: {
+      projectId: string
+      workItemId: string
+      workspaceId?: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('plane:deleteWorkItem', args),
+
     // Why: an orchestrated agent mutating Plane through the CLI never touches this
     // bridge, so open views need main to tell them a refetch is due.
     onChanged: (

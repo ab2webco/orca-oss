@@ -36,6 +36,7 @@ import {
   tryRunManagedClaudeAccountBackgroundRotation,
   tryRunManagedClaudeAccountMutation
 } from '../claude-accounts/run-managed-claude-account-mutation'
+import { noteLegacyClaudeKeychainSlotBlob } from '../claude-accounts/claude-legacy-keychain-slot-warning'
 import { createOAuthUsageError, OAuthUsageError } from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnostic'
@@ -173,6 +174,9 @@ async function readFromKeychain(
 
   try {
     const credentials = await readActiveClaudeKeychainCredentials(configDir)
+    if (credentials) {
+      noteLegacyClaudeKeychainSlotBlob(credentials)
+    }
     return credentials
       ? parseOAuthCredentialsJson(credentials, 'legacy-keychain')
       : emptyOAuthCredentialReadResult()
@@ -187,6 +191,11 @@ async function readCredentialsFromStrictKeychain(
 ): Promise<OAuthCredentialReadResult> {
   try {
     const credentials = await readActiveClaudeKeychainCredentialsStrict(configDir)
+    // Why: the usage poll is Orca's only recurring look at the machine-wide slot;
+    // an unusable blob there strands every plain `claude` (detection only, no write).
+    if (credentials && source === 'legacy-keychain') {
+      noteLegacyClaudeKeychainSlotBlob(credentials)
+    }
     return credentials
       ? parseOAuthCredentialsJson(credentials, source)
       : emptyOAuthCredentialReadResult()

@@ -28,6 +28,8 @@ type PlaneBoardColumnViewProps = {
   onDeleteColumn: (stateId: string, name: string) => void
   /** Create a work item in this column's state; true on success. */
   onCreateItem: (stateId: string, title: string) => Promise<boolean>
+  /** Delete a work item after a destructive confirmation. */
+  onDeleteItem: (item: PlaneWorkItem) => void
 }
 
 // One state column: sticky header (drag handle + tone dot + name + count) over a
@@ -43,7 +45,8 @@ export function PlaneBoardColumnView({
   onOpenItem,
   onRenameColumn,
   onDeleteColumn,
-  onCreateItem
+  onCreateItem,
+  onDeleteItem
 }: PlaneBoardColumnViewProps): React.JSX.Element {
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: planeBoardColumnDroppableId(column.stateId),
@@ -197,6 +200,7 @@ export function PlaneBoardColumnView({
             item={item}
             selected={item.id === selectedItemId}
             onOpenItem={onOpenItem}
+            onDeleteItem={onDeleteItem}
           />
         ))}
         <PlaneBoardAddCard onCreate={(title) => onCreateItem(column.stateId, title)} />

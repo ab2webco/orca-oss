@@ -13,6 +13,7 @@ import {
   writeActiveClaudeKeychainCredentials,
   writeManagedClaudeKeychainCredentials
 } from '../claude-accounts/keychain'
+import { noteLegacyClaudeKeychainSlotBlob } from '../claude-accounts/claude-legacy-keychain-slot-warning'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
 import {
   releaseInjectedClaudeAccountLaunch,
@@ -50,6 +51,10 @@ vi.mock('electron', () => ({
 
 vi.mock('./claude-pty', () => ({
   fetchViaPty: vi.fn()
+}))
+
+vi.mock('../claude-accounts/claude-legacy-keychain-slot-warning', () => ({
+  noteLegacyClaudeKeychainSlotBlob: vi.fn()
 }))
 
 vi.mock('../claude-accounts/keychain', () => ({
@@ -814,6 +819,27 @@ describe('fetchClaudeRateLimits', () => {
 
     expect(readActiveClaudeKeychainCredentialsStrict).toHaveBeenNthCalledWith(1, configDir)
     expect(readActiveClaudeKeychainCredentialsStrict).toHaveBeenNthCalledWith(2, undefined)
+  })
+
+  it('notes the machine-wide slot blob it observes so an unusable one can warn the user', async () => {
+    const configDir = '/Users/test/.claude'
+    const authPreparation: ClaudeRuntimeAuthPreparation = {
+      configDir,
+      runtime: 'host',
+      envPatch: {},
+      stripAuthEnv: false,
+      provenance: 'system'
+    }
+    const brokenLegacyBlob = JSON.stringify({
+      claudeAiOauth: { accessToken: 'expired-access', refreshToken: '', expiresAt: 1 }
+    })
+    vi.mocked(readActiveClaudeKeychainCredentialsStrict).mockImplementation(async (dir) =>
+      dir ? null : brokenLegacyBlob
+    )
+
+    await fetchClaudeRateLimits({ authPreparation, allowPtyFallback: false })
+
+    expect(noteLegacyClaudeKeychainSlotBlob).toHaveBeenCalledWith(brokenLegacyBlob)
   })
 
   it('reads scoped Keychain credentials for host system default without an explicit config dir', async () => {

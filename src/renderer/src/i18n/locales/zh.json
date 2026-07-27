@@ -38,6 +38,13 @@
       }
     }
   },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "Claude 登录需要修复",
+      "message": "系统级 Claude Code 登录已不可用。",
+      "detail": "由 Orca 管理的 Claude 账户不受影响。要恢复系统级登录，请在 Orca 之外运行 claude 并完成一次 /login。"
+    }
+  },
   "menu": {
     "checkForUpdates": "检查更新...",
     "settings": "设置",
@@ -13952,7 +13959,9 @@
         "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
-        "unassigned": "Unassigned"
+        "unassigned": "Unassigned",
+        "menu": "Work item actions",
+        "delete": "Delete work item"
       },
       "plane-board-column": {
         "reorder": "Reorder {{value0}} column",
@@ -13999,7 +14008,10 @@
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
         "deleteConfirmDescription": "Work items may need reassigning.",
         "deleteConfirmAction": "Delete",
-        "createItemFailed": "Failed to create work item."
+        "createItemFailed": "Failed to create work item.",
+        "deleteItemConfirmTitle": "Delete work item {{value0}}?",
+        "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
+        "deleteItemFailed": "Failed to delete work item."
       },
       "plane-board-add-column": {
         "add": "Add column",
@@ -14222,6 +14234,14 @@
       "sent": "已将会话上下文发送到新的 {{agent}} 会话。",
       "deliveryFailed": "新的 {{agent}} 会话已启动，但无法发送上下文。",
       "launchFailed": "无法启动新的 {{agent}} 会话。"
+    },
+    "terminal-pane": {
+      "codex-resume-blocked": {
+        "title": "你的对话已安全保存，显示在下方",
+        "subtitle": "Orca 暂停了自动恢复，因为无法确认此 Codex 会话属于当前选择的账户。下方的会话记录为只读——没有发送也没有丢失任何内容。要继续工作，请开始新的 Codex 会话，或切换到拥有此会话的账户。",
+        "read-error": "Orca 也无法读取已保存的会话文件。文件可能已被移动或删除；自动恢复保持暂停状态，没有发送任何内容。",
+        "read-empty": "找到了已保存的会话文件，但其中没有可读取的消息。"
+      }
     }
   },
   "dashboardPopout": {

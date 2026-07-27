@@ -52,6 +52,7 @@ describe('readRefreshToken', () => {
   })
 
   it('returns null for blank or missing tokens', () => {
+    expect(readRefreshToken(credentials({ refreshToken: '' }))).toBeNull()
     expect(readRefreshToken(credentials({ refreshToken: '   ' }))).toBeNull()
     expect(readRefreshToken(credentials({ refreshToken: undefined }))).toBeNull()
   })

@@ -24,6 +24,7 @@ import {
   planeUpdateWorkItem,
   type RuntimePlaneSettings
 } from '@/runtime/runtime-plane-client'
+import { confirmAndDeletePlaneWorkItem } from './plane-board-card-delete'
 import { PlaneBoardAddColumn } from './plane-board-add-column'
 import { PlaneBoardCard } from './plane-board-card'
 import { PlaneBoardColumnView } from './plane-board-column'
@@ -321,6 +322,18 @@ export function TaskPagePlaneBoard({
     [confirm, providerSettings, projectId, workspaceId, refreshStates]
   )
 
+  const handleDeleteItem = useCallback(
+    (item: PlaneWorkItem): void =>
+      void confirmAndDeletePlaneWorkItem({
+        confirm,
+        item,
+        projectId,
+        workspaceId,
+        providerSettings
+      }),
+    [confirm, providerSettings, projectId, workspaceId]
+  )
+
   const handleDragEnd = (event: DragEndEvent): void => {
     setActiveWorkItemId(null)
     if (readPlaneBoardDragType(event.active.data.current) === 'column') {
@@ -405,6 +418,7 @@ export function TaskPagePlaneBoard({
                   onRenameColumn={handleRenameColumn}
                   onDeleteColumn={handleDeleteColumn}
                   onCreateItem={handleCreateItem}
+                  onDeleteItem={handleDeleteItem}
                 />
               ))}
             </SortableContext>

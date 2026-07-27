@@ -61,6 +61,13 @@
       }
     }
   },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "Claude login needs repair",
+      "message": "The system-wide Claude Code login is no longer usable.",
+      "detail": "Your Orca-managed Claude accounts are unaffected. To restore the system-wide login, run claude outside Orca and complete /login once."
+    }
+  },
   "menu": {
     "checkForUpdates": "Check for Updates...",
     "settings": "Settings",
@@ -13975,7 +13982,9 @@
         "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
-        "unassigned": "Unassigned"
+        "unassigned": "Unassigned",
+        "menu": "Work item actions",
+        "delete": "Delete work item"
       },
       "plane-board-column": {
         "reorder": "Reorder {{value0}} column",
@@ -14022,7 +14031,10 @@
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
         "deleteConfirmDescription": "Work items may need reassigning.",
         "deleteConfirmAction": "Delete",
-        "createItemFailed": "Failed to create work item."
+        "createItemFailed": "Failed to create work item.",
+        "deleteItemConfirmTitle": "Delete work item {{value0}}?",
+        "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
+        "deleteItemFailed": "Failed to delete work item."
       },
       "plane-board-add-column": {
         "add": "Add column",
@@ -14245,6 +14257,14 @@
       "sent": "Session context sent to {{agent}} in a new session.",
       "deliveryFailed": "The new {{agent}} session started, but its context could not be sent.",
       "launchFailed": "Could not start a new {{agent}} session."
+    },
+    "terminal-pane": {
+      "codex-resume-blocked": {
+        "title": "Your conversation is safe and shown below",
+        "subtitle": "Orca paused automatic resume because it could not confirm this Codex session belongs to the selected account. The transcript below is read-only — nothing was sent or lost. To keep working, start a new Codex session or switch to the account that owns this one.",
+        "read-error": "Orca could not read the saved session file either. It may have been moved or deleted; automatic resume stayed paused and nothing was sent.",
+        "read-empty": "The saved session file was found but contains no readable messages."
+      }
     }
   },
   "dashboardPopout": {

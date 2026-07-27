@@ -228,6 +228,20 @@ export async function planeCreateWorkItem(
     : window.api.plane.createWorkItem(params)
 }
 
+export async function planeDeleteWorkItem(
+  settings: RuntimePlaneSettings,
+  args: { projectId: string; workItemId: string },
+  workspaceId?: string | null
+): Promise<PlaneMutationResult> {
+  const target = getPlaneRuntimeTarget(settings)
+  const params = { ...args, workspaceId: workspaceId ?? undefined }
+  return target.kind === 'environment'
+    ? callRuntimeRpc<PlaneMutationResult>(target, 'plane.deleteWorkItem', params, {
+        timeoutMs: 30_000
+      })
+    : window.api.plane.deleteWorkItem(params)
+}
+
 export async function planeCreateState(
   settings: RuntimePlaneSettings,
   args: { projectId: string; name: string; group: PlaneStateGroup; color?: string },

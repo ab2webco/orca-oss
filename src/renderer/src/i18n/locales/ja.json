@@ -38,6 +38,13 @@
       }
     }
   },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "Claude ログインの修復が必要です",
+      "message": "システム全体の Claude Code ログインが使用できなくなっています。",
+      "detail": "Orca が管理する Claude アカウントには影響ありません。システム全体のログインを復元するには、Orca の外で claude を実行し、/login を一度完了してください。"
+    }
+  },
   "menu": {
     "checkForUpdates": "アップデートを確認...",
     "settings": "設定",
@@ -13952,7 +13959,9 @@
         "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
-        "unassigned": "Unassigned"
+        "unassigned": "Unassigned",
+        "menu": "Work item actions",
+        "delete": "Delete work item"
       },
       "plane-board-column": {
         "reorder": "Reorder {{value0}} column",
@@ -13999,7 +14008,10 @@
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
         "deleteConfirmDescription": "Work items may need reassigning.",
         "deleteConfirmAction": "Delete",
-        "createItemFailed": "Failed to create work item."
+        "createItemFailed": "Failed to create work item.",
+        "deleteItemConfirmTitle": "Delete work item {{value0}}?",
+        "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
+        "deleteItemFailed": "Failed to delete work item."
       },
       "plane-board-add-column": {
         "add": "Add column",
@@ -14222,6 +14234,14 @@
       "sent": "セッションコンテキストを新しい {{agent}} セッションに送信しました。",
       "deliveryFailed": "新しい {{agent}} セッションは開始しましたが、コンテキストを送信できませんでした。",
       "launchFailed": "新しい {{agent}} セッションを開始できませんでした。"
+    },
+    "terminal-pane": {
+      "codex-resume-blocked": {
+        "title": "会話は安全に保存されており、以下に表示されています",
+        "subtitle": "この Codex セッションが選択中のアカウントのものであることを確認できなかったため、Orca は自動再開を一時停止しました。以下のトランスクリプトは読み取り専用です。何も送信されておらず、失われてもいません。作業を続けるには、新しい Codex セッションを開始するか、このセッションを所有するアカウントに切り替えてください。",
+        "read-error": "保存されたセッションファイルも読み取れませんでした。移動または削除された可能性があります。自動再開は停止したままで、何も送信されていません。",
+        "read-empty": "保存されたセッションファイルは見つかりましたが、読み取り可能なメッセージが含まれていません。"
+      }
     }
   },
   "dashboardPopout": {

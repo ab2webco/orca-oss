@@ -30,6 +30,7 @@ describe('isPlaneMutationMethod', () => {
     for (const method of [
       'plane.createWorkItem',
       'plane.updateWorkItem',
+      'plane.deleteWorkItem',
       'plane.addWorkItemComment',
       'plane.deleteWorkItemComment',
       'plane.createState',

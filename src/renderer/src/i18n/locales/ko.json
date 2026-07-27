@@ -38,6 +38,13 @@
       }
     }
   },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "Claude 로그인 복구가 필요합니다",
+      "message": "시스템 전체 Claude Code 로그인을 더 이상 사용할 수 없습니다.",
+      "detail": "Orca가 관리하는 Claude 계정은 영향을 받지 않습니다. 시스템 전체 로그인을 복원하려면 Orca 밖에서 claude를 실행하고 /login을 한 번 완료하세요."
+    }
+  },
   "menu": {
     "checkForUpdates": "업데이트 확인...",
     "settings": "설정",
@@ -13952,7 +13959,9 @@
         "noDescriptionEditable": "No description yet — click to add one."
       },
       "plane-board-card": {
-        "unassigned": "Unassigned"
+        "unassigned": "Unassigned",
+        "menu": "Work item actions",
+        "delete": "Delete work item"
       },
       "plane-board-column": {
         "reorder": "Reorder {{value0}} column",
@@ -13999,7 +14008,10 @@
         "deleteConfirmTitle": "Delete column «{{value0}}»?",
         "deleteConfirmDescription": "Work items may need reassigning.",
         "deleteConfirmAction": "Delete",
-        "createItemFailed": "Failed to create work item."
+        "createItemFailed": "Failed to create work item.",
+        "deleteItemConfirmTitle": "Delete work item {{value0}}?",
+        "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
+        "deleteItemFailed": "Failed to delete work item."
       },
       "plane-board-add-column": {
         "add": "Add column",
@@ -14222,6 +14234,14 @@
       "sent": "세션 컨텍스트를 새 {{agent}} 세션으로 보냈습니다.",
       "deliveryFailed": "새 {{agent}} 세션은 시작되었지만 컨텍스트를 보내지 못했습니다.",
       "launchFailed": "새 {{agent}} 세션을 시작할 수 없습니다."
+    },
+    "terminal-pane": {
+      "codex-resume-blocked": {
+        "title": "대화는 안전하게 보존되어 아래에 표시됩니다",
+        "subtitle": "이 Codex 세션이 선택된 계정의 것인지 확인할 수 없어 Orca가 자동 재개를 일시 중지했습니다. 아래 대화 내용은 읽기 전용이며, 아무것도 전송되거나 손실되지 않았습니다. 계속 작업하려면 새 Codex 세션을 시작하거나 이 세션을 소유한 계정으로 전환하세요.",
+        "read-error": "저장된 세션 파일도 읽을 수 없었습니다. 파일이 이동되었거나 삭제되었을 수 있습니다. 자동 재개는 중지된 상태이며 아무것도 전송되지 않았습니다.",
+        "read-empty": "저장된 세션 파일을 찾았지만 읽을 수 있는 메시지가 없습니다."
+      }
     }
   },
   "dashboardPopout": {

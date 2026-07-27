@@ -2215,6 +2215,11 @@ export type PreloadApi = {
       title: string
       stateId?: string
     }) => Promise<PlaneCreateWorkItemResult>
+    deleteWorkItem: (args: {
+      projectId: string
+      workItemId: string
+      workspaceId?: string
+    }) => Promise<PlaneMutationResult>
     /** Fires when any route (renderer, CLI, paired client) mutates Plane, so open
      *  views can refetch instead of showing stale cards. Returns an unsubscribe. */
     onChanged: (

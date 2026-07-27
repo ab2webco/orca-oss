@@ -169,6 +169,10 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import PlaneWorkItemWorkspace from '@/components/PlaneWorkItemWorkspace'
 import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
 import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
+import {
+  TaskPagePlaneBoardSkeleton,
+  resolvePlaneLoadingSkeleton
+} from '@/components/task-page-plane-board-skeleton'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
@@ -4816,6 +4820,11 @@ export default function TaskPage(): React.JSX.Element {
   const effectivePlaneViewMode = resolvePlaneViewMode({
     preference: planeViewMode,
     projectSelection: selectedPlaneProjectId
+  })
+  const planeLoadingSkeleton = resolvePlaneLoadingSkeleton({
+    loading: planeLoading,
+    itemCount: planeItems.length,
+    viewMode: effectivePlaneViewMode
   })
 
   const handlePlaneSort = useCallback(
@@ -10782,7 +10791,8 @@ export default function TaskPage(): React.JSX.Element {
                     </div>
                   ) : null}
 
-                  {planeLoading && planeItems.length === 0 ? (
+                  {/* Why view-gated: the board branch swaps in its own board-shaped skeleton; row shimmer over columns read as a broken table. */}
+                  {planeLoadingSkeleton === 'list' ? (
                     <div className="flex-none divide-y divide-border/50">
                       {Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} className="px-3 py-3">
@@ -10828,6 +10838,8 @@ export default function TaskPage(): React.JSX.Element {
                           )}
                         </p>
                       </div>
+                    ) : planeLoadingSkeleton === 'board' ? (
+                      <TaskPagePlaneBoardSkeleton />
                     ) : (
                       <TaskPagePlaneBoard
                         items={planeSearchedItems}
