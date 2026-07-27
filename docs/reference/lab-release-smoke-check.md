@@ -16,8 +16,14 @@ gh workflow run "Lab Release" -R ab2webco/orca-oss --ref main -f release_candida
 ```
 
 It publishes a real, downloadable release tagged `vX.Y.Z-lab.N.rc`, marked prerelease, with no
-update nudge. Ordinary update checks exclude that tag shape, so no user receives it. Download the
-installer by hand and install it over your current build.
+update nudge. It shows up on the repo's releases page like any other release, badged
+**Pre-release**. Ordinary update checks exclude that tag shape, so no user receives it.
+
+Two ways to get it onto your machine:
+
+- **From the app** — **Alt+click** (⌥+click) *Check for Updates*. That modifier is the only
+  in-app route to this channel, and it exercises the real auto-update path.
+- **By hand** — download the installer from the release page and install over your current build.
 
 > Never cut an RC unless a normal lab release carrying the exclusion
 > (`isLabRcPrereleaseTag`, shipped in `1.4.152-lab.35`) has already reached users. Installs older
