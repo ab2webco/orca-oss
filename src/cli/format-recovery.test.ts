@@ -4,6 +4,18 @@ import { formatCliError } from './format'
 import { RuntimeClientError, RuntimeRpcFailureError } from './runtime-client'
 
 describe('CLI error recovery', () => {
+  it('distinguishes denied runtime access from an app that is not running', () => {
+    const error = new RuntimeClientError(
+      'runtime_access_denied',
+      'The operating system denied access to the Orca runtime transport.'
+    )
+
+    const output = formatCliError(error)
+
+    expect(output).toContain('denied access')
+    expect(output).not.toContain('Orca is not running')
+  })
+
   it('prints did-you-mean next steps for an unknown-command error carrying data', () => {
     const error = new RuntimeClientError('invalid_argument', 'Unknown command: worktree remov', {
       suggestions: ['worktree rm'],

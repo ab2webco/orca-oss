@@ -5,7 +5,7 @@ import { createServer, type Socket } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import { MAX_TIMER_DELAY_MS } from '../../shared/timer-delay'
-import { sendRequest } from './transport'
+import { classifyRuntimeConnectionError, sendRequest } from './transport'
 
 const servers = new Set<ReturnType<typeof createServer>>()
 const sockets = new Set<Socket>()
@@ -47,9 +47,47 @@ describe('runtime transport timeout validation', () => {
   )
 })
 
+describe('runtime transport connection errors', () => {
+  it('classifies a denied socket connection without claiming Orca is stopped', () => {
+    expect(
+      classifyRuntimeConnectionError(
+        Object.assign(new Error('connect EPERM'), { code: 'EPERM' })
+      )
+    ).toMatchObject({
+      code: 'runtime_access_denied',
+      message: expect.stringContaining('does not mean Orca is not running')
+    })
+  })
+
+  it('classifies a missing socket as an unavailable runtime', () => {
+    expect(
+      classifyRuntimeConnectionError(
+        Object.assign(new Error('connect ENOENT'), { code: 'ENOENT' })
+      )
+    ).toMatchObject({
+      code: 'runtime_unavailable'
+    })
+  })
+})
+
 // Why: these tests create Unix domain socket servers in temp directories.
 // Windows does not support Unix domain sockets in the same way.
 describe.skipIf(process.platform === 'win32')('runtime transport', () => {
+  it('reports an unavailable runtime when the socket connection fails', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-transport-'))
+    const metadata: RuntimeMetadata = {
+      runtimeId: 'runtime-1',
+      pid: 123,
+      transports: [{ kind: 'unix', endpoint: join(userDataPath, 'missing.sock') }],
+      authToken: 'token',
+      startedAt: 1
+    }
+
+    await expect(sendRequest(metadata, 'status.get', undefined, 200)).rejects.toMatchObject({
+      code: 'runtime_unavailable'
+    })
+  })
+
   it('refreshes the per-call timeout when the runtime sends keepalive frames', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-transport-'))
     const endpoint = join(userDataPath, 'runtime.sock')

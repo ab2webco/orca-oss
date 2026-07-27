@@ -15,6 +15,7 @@ const sockets = new Set<Socket>()
 
 afterEach(async () => {
   vi.mocked(launchOrcaApp).mockClear()
+  vi.restoreAllMocks()
   for (const socket of sockets) {
     socket.destroy()
   }
@@ -138,6 +139,22 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
 
     expect(status.result.runtime.state).toBe('stale_bootstrap')
     expect(status.result.runtime.reachable).toBe(false)
+  })
+
+  it('does not report the app stopped when process inspection is denied', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    writeMetadata(userDataPath, join(userDataPath, 'missing.sock'), 'token', 4242)
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+    })
+
+    const status = await new RuntimeClient(userDataPath, 100).getCliStatus()
+
+    expect(status.result.app).toEqual({
+      running: true,
+      pid: 4242
+    })
+    expect(status.result.runtime.state).toBe('starting')
   })
 
   it('reports graph_not_ready when the runtime is reachable but graph is unavailable', async () => {

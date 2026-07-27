@@ -5,6 +5,27 @@ import { isKeepaliveFrame, RuntimeRpcEnvelopeSchema } from './envelope-schema'
 import { RuntimeClientError, type RuntimeRpcResponse } from './types'
 import { MAX_TIMER_DELAY_MS, isSafeTimerDelayMs } from '../../shared/timer-delay'
 
+export function classifyRuntimeConnectionError(error: unknown): RuntimeClientError {
+  const code = getErrorCode(error)
+  if (code === 'EACCES' || code === 'EPERM') {
+    return new RuntimeClientError(
+      'runtime_access_denied',
+      'The operating system denied access to the Orca runtime transport. Check the caller sandbox or permissions and retry; this does not mean Orca is not running.'
+    )
+  }
+  return new RuntimeClientError(
+    'runtime_unavailable',
+    'Could not connect to the running Orca app. Restart Orca and try again.'
+  )
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('code' in error)) {
+    return undefined
+  }
+  return typeof error.code === 'string' ? error.code : undefined
+}
+
 export async function sendRequest<TResult>(
   metadata: RuntimeMetadata,
   method: string,
@@ -64,13 +85,10 @@ export async function sendRequest<TResult>(
     }
 
     socket.setEncoding('utf8')
-    socket.once('error', () => {
+    socket.once('error', (error) => {
       finish({
         ok: false,
-        error: new RuntimeClientError(
-          'runtime_unavailable',
-          'Could not connect to the running Orca app. Restart Orca and try again.'
-        )
+        error: classifyRuntimeConnectionError(error)
       })
     })
     // Why: a clean peer close (FIN, no 'error') before a terminal frame never
