@@ -74,6 +74,11 @@ export async function collectCodexResumeGuardDiagnostics(args: {
     sessionId: args.sessionId,
     transcriptPath: undefined,
     trustedCodexHomes: args.trustedCodexHomes,
+    // Why neutral ranking inputs: this only reports where the id lives, so which home would win
+    // a resume is irrelevant — and a diagnostic must not consult the live account selection.
+    getSelectedAccountCodexHome: () => null,
+    systemCodexHomePath: null,
+    sharedRuntimeCodexHomePath: null,
     ...(args.fileIsRegular ? { fileIsRegular: args.fileIsRegular } : {}),
     ...(args.listSessionFiles ? { listSessionFiles: args.listSessionFiles } : {})
   })

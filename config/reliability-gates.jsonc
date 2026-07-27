@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-07-26",
   "policy": {
     "maturityLevels": [
       "experimental",
@@ -140,6 +140,108 @@
         "Background-to-foreground recovery remains covered by existing supervisor tests but lacks a physical sleep/wake run."
       ],
       "demotionRule": "Keep experimental or demote if focused tests flake, HOST_OFFLINE can park indefinitely, direct probes serialize configured endpoints, loser cleanup leaks clients, or physical-device radio cost exceeds the measured budget."
+    },
+    {
+      "id": "desktop-relay.assignment-backpressure",
+      "title": "Desktop relay drain recovery cannot amplify a director outage",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "desktop-runtime",
+      "layer": "main-relay-state-machine",
+      "surfaces": [
+        "desktop relay drain recovery",
+        "director assignment overload",
+        "relay broker shutdown"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "cloud-relay"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [
+        "cloud-relay"
+      ],
+      "coverageNotes": "Deterministic main-process tests cover duplicate drain notifications, full-jitter backoff, Retry-After during initial setup and drain recovery, successful recovery, and broker-close cleanup. Packaged desktop, mixed-version fleets, GFE, and production Cloud SQL remain live-test gaps.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca-cloud/actions/runs/30223521062"
+      ],
+      "invariant": "One relay host may have at most one assignment attempt or retry timer per recovery path. Sustained director failure must increase the retry window up to five minutes, a bounded Retry-After must be respected during initial setup and drain recovery, shutdown must cancel pending work, and recovery must activate the authoritative assigned origin.",
+      "oracle": "Inject duplicate drain events, deterministic randomness, fake time, repeated assignment failures, a 30-second Retry-After during initial setup and drain recovery, broker close, and eventual director recovery. Count every assignment call, require 500 ms then 1,000 ms retry windows, reject duplicate fanout, require no pre-hint retry or post-close work, and prove the recovered cell becomes authoritative.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/relay/relay-session-broker.test.ts src/main/runtime/relay/relay-http-client.test.ts src/main/runtime/relay/relay-auth-coordinator-recovery.test.ts --reporter=dot"
+      ],
+      "testFiles": [
+        "src/main/runtime/relay/relay-session-broker.test.ts",
+        "src/main/runtime/relay/relay-http-client.test.ts",
+        "src/main/runtime/relay/relay-auth-coordinator-recovery.test.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/main/runtime/relay/relay-session-broker.test.ts",
+          "assertions": [
+            "duplicate drain notifications share one exponentially backed-off retry schedule",
+            "Retry-After suppresses early assignment requests",
+            "broker close prevents retry resurrection",
+            "a later successful assignment activates the new origin"
+          ]
+        },
+        {
+          "file": "src/main/runtime/relay/relay-http-client.test.ts",
+          "assertions": [
+            "assignment overload preserves a bounded Retry-After hint"
+          ]
+        },
+        {
+          "file": "src/main/runtime/relay/relay-auth-coordinator-recovery.test.ts",
+          "assertions": [
+            "initial relay setup does not retry before Retry-After expires"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-07-26",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/relay/relay-session-broker.test.ts src/main/runtime/relay/relay-http-client.test.ts src/main/runtime/relay/relay-auth-coordinator-recovery.test.ts --reporter=dot",
+          "result": "passed",
+          "durationSeconds": 0.49,
+          "summary": "Three focused relay files passed with 25 assertions."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 5,
+        "scope": "focused desktop relay state-machine tests"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "One deterministic local run exists; CI and soak history are not yet available."
+      },
+      "redGreenEvidence": {
+        "status": "complete",
+        "evidence": "The prior fixed-delay implementation issued a duplicate assignment within 499 ms and ignored Retry-After, while the candidate passes the byte-identical timer and call-count oracle."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "One host retains at most one assignment attempt or retry timer, retry windows grow to a five-minute cap, duplicate drain events add no calls, and close leaves no timer-driven work."
+      },
+      "promotionCriteria": [
+        "Collect 100 consecutive CI passes or 14 days of soak history.",
+        "Run a mixed-version load test with at least the incident-scale desktop population.",
+        "Verify production director request rate decays during an injected assignment outage."
+      ],
+      "knownGaps": [
+        "No packaged desktop or physical phone was exercised.",
+        "The deterministic seam does not measure production GFE, carrier NAT, DNS, TLS, or Cloud SQL behavior.",
+        "Legacy desktop versions remain dependent on server-side overload protection."
+      ],
+      "demotionRule": "Keep experimental or demote if assignment calls overlap, duplicate drain events bypass backoff, Retry-After is ignored, close resurrects work, or mixed-version request rate exceeds the reviewed director budget."
     },
     {
       "id": "git-worktree.refresh-event-semantics",
@@ -6593,6 +6695,112 @@
         "Windows native runtime watches bypass this child path; WSL reservation/release is deterministic-contract tested but not live fault-injected, and SSH registration ownership is not live-relay fault-injected."
       ],
       "demotionRule": "Demote or quarantine if the fault harness flakes without a product or harness bug, if healthy operation exceeds one runtime watcher child, if total physical operation exceeds eight children including retiring generations, if quarantine children outlive their roots or repeat after fusing, if event delivery becomes unbounded, or if metadata/stat work returns to the serve process."
+    },
+    {
+      "id": "terminal-input.plugin-explicit-worktree-routing",
+      "title": "Plugin terminal input stays inside the freshly resolved worktree",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "plugin-platform",
+      "layer": "main-relay-contract",
+      "surfaces": [
+        "plugin host API terminal input",
+        "active worktree resolution",
+        "provider terminal inventory",
+        "relay capability enforcement"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "local",
+        "daemon",
+        "ssh",
+        "wsl",
+        "remote-runtime",
+        "mobile-relay"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [
+        "local",
+        "ssh"
+      ],
+      "coverageNotes": "Deterministic macOS contract evidence covers opaque local- and SSH-shaped terminal ids, one bounded worktree listing, mismatch rejection, and the main/relay host-call adapter matrix. It does not launch a live PTY or provision a relay-hosted plugin.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca/pull/8549"
+      ],
+      "invariant": "terminal.sendText accepts only an explicit provider-owned terminal id present in one bounded inventory of the worktree resolved immediately before the send; an absent id causes zero send calls, and relay callers cannot supply their own capability grants or transport classification.",
+      "oracle": "Resolve the active worktree once, list that worktree with the v0 terminal cap once, and assert zero sendTerminal calls for a mismatched opaque id versus exactly one send for matching local- and SSH-shaped ids; then run the same permission and schema cases through desktop-main and registered relay panel/worker adapters and compare error codes.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/plugins/plugin-host-methods.test.ts src/main/plugins/plugin-host-conformance.test.ts"
+      ],
+      "testFiles": [
+        "src/main/plugins/plugin-host-methods.test.ts",
+        "src/main/plugins/plugin-host-conformance.test.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/main/plugins/plugin-host-methods.test.ts",
+          "assertions": [
+            "a terminal outside the freshly resolved worktree performs one capped list and zero sends",
+            "matching local- and SSH-shaped opaque ids each perform one capped list and one exact send",
+            "workspace.readContext drops provider paths, path-bearing internal worktree ids, and terminal titles while capping its terminal projection"
+          ]
+        },
+        {
+          "file": "src/main/plugins/plugin-host-conformance.test.ts",
+          "assertions": [
+            "all 13 v0 methods succeed with the required consented capability through desktop-main and relay adapters",
+            "missing consent, missing capability, unknown method, malformed params, panel-forbidden access, malformed results, and mutation-audit failure return identical codes",
+            "malformed qualified keys, client-supplied grants, and client-supplied transport flags are rejected before host policy resolution"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-07-10",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/plugins/plugin-host-methods.test.ts src/main/plugins/plugin-host-conformance.test.ts",
+          "result": "passed",
+          "durationSeconds": 0.18,
+          "summary": "2 files and 17 tests passed, covering the 13-method main/relay conformance matrix and exact terminal routing call counts."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 10,
+        "scope": "plugin host main/relay contract tests"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "The deterministic focused suite passed locally once and needs CI and soak history before promotion."
+      },
+      "redGreenEvidence": {
+        "status": "partial",
+        "evidence": "Exact mismatch/send counts and adapter error parity are asserted; intentional-break and saved CI evidence are still missing."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "Each plugin send resolves once, performs exactly one list capped at 50 terminals, and performs at most one send. The path adds no polling, subprocesses, provider fanout, renderer work, or startup await."
+      },
+      "promotionCriteria": [
+        "Run for at least 100 consecutive passes or 14 days across required CI platforms.",
+        "Attach intentional-break evidence for the worktree membership check and relay transport binding.",
+        "Exercise live local and SSH provider terminals, including mismatch rejection and successful input echo.",
+        "Keep relay-hosted plugin provisioning behind a separate reviewed policy before replacing the fail-closed registration."
+      ],
+      "knownGaps": [
+        "Linux and Windows execution evidence is not recorded.",
+        "Daemon, WSL, remote-runtime, and mobile-relay providers have no live input evidence.",
+        "Local and SSH coverage is contract-level over opaque ids, not a live PTY input/echo run.",
+        "The bounded 50-terminal inventory intentionally rejects a target not present in the capped result; scale behavior above that cap needs a targeted membership API before expansion.",
+        "Relay-hosted plugin provisioning, consent persistence, workers, and audit services remain out of scope and the relay registration therefore denies every provisioned identity by default."
+      ],
+      "demotionRule": "Keep experimental or demote to protection none if the suite flakes, permits a mismatched terminal send, performs more than one inventory list per call, accepts client-supplied grants, or relay and desktop error codes diverge."
     }
   ]
 }

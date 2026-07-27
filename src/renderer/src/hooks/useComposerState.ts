@@ -131,6 +131,7 @@ import {
   type NewWorkspaceProjectOption
 } from '@/lib/new-workspace-project-options'
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
+import { useEphemeralVmRecipeOptions } from '@/hooks/useEphemeralVmRecipeOptions'
 import {
   getFolderSourceRepos,
   getLinkedItemDisplayName,
@@ -749,13 +750,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   )
   const selectedRepo = eligibleRepos.find((repo) => repo.id === repoId)
   const selectedRepoIsGit = selectedRepo ? isGitRepoKind(selectedRepo) : false
-  const [ephemeralVmRecipes, setEphemeralVmRecipes] = useState<
-    NonNullable<OrcaHooks['environmentRecipes']>
-  >([])
-  const [selectedEphemeralVmRecipeId, setSelectedEphemeralVmRecipeId] = useState<string | null>(
-    null
-  )
-  const [ephemeralVmRecipeError, setEphemeralVmRecipeError] = useState<string | null>(null)
   const selectedRepoProjectRuntime = useMemo(
     () =>
       !selectedRepo || selectedRepo.connectionId
@@ -852,64 +846,19 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const selectedRecipeRepoConnectionId = selectedRepo?.connectionId ?? null
   // Why: gate recipe probing on the experimental toggle, since discovery can surface setup errors for a hidden feature.
   const ephemeralVmsEnabled = settings?.experimentalEphemeralVms === true
-  useEffect(() => {
-    let cancelled = false
-    setEphemeralVmRecipes([])
-    setSelectedEphemeralVmRecipeId(null)
-    setEphemeralVmRecipeError(null)
-    if (
-      !ephemeralVmsEnabled ||
-      !selectedRecipeRepoId ||
-      !selectedRepoIsGit ||
-      selectedRecipeRepoConnectionId ||
-      isProjectGroupTarget
-    ) {
-      return () => {
-        cancelled = true
-      }
-    }
-    void window.api.ephemeralVm
-      .listRecipes({ repoId: selectedRecipeRepoId })
-      .then((result) => {
-        if (cancelled) {
-          return
-        }
-        setEphemeralVmRecipes(result.recipes ?? [])
-        setSelectedEphemeralVmRecipeId(
-          initialEphemeralVmRecipeId &&
-            result.recipes?.some((recipe) => recipe.id === initialEphemeralVmRecipeId)
-            ? initialEphemeralVmRecipeId
-            : null
-        )
-        const diagnosticMessages = (result.diagnostics ?? []).map((diagnostic) => {
-          const recipeLabel = `environmentRecipes[${diagnostic.index}]`
-          const fieldLabel = diagnostic.field ? `.${diagnostic.field}` : ''
-          return `${recipeLabel}${fieldLabel}: ${diagnostic.message}`
-        })
-        setEphemeralVmRecipeError(
-          [result.status === 'error' ? result.message : null, ...diagnosticMessages]
-            .filter((message): message is string => Boolean(message))
-            .join('\n') || null
-        )
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return
-        }
-        setEphemeralVmRecipes([])
-        setEphemeralVmRecipeError(error instanceof Error ? error.message : String(error))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    ephemeralVmsEnabled,
-    initialEphemeralVmRecipeId,
-    isProjectGroupTarget,
-    selectedRecipeRepoConnectionId,
-    selectedRecipeRepoId,
-    selectedRepoIsGit
-  ])
+  const {
+    recipes: ephemeralVmRecipes,
+    selectedRecipeId: selectedEphemeralVmRecipeId,
+    setSelectedRecipeId: setSelectedEphemeralVmRecipeId,
+    error: ephemeralVmRecipeError
+  } = useEphemeralVmRecipeOptions({
+    enabled: ephemeralVmsEnabled,
+    repoId: selectedRecipeRepoId,
+    repoIsGit: selectedRepoIsGit,
+    repoConnectionId: selectedRecipeRepoConnectionId,
+    projectGroupTarget: isProjectGroupTarget,
+    initialRecipeId: initialEphemeralVmRecipeId
+  })
   const selectedRepoConnectionId = selectedRepo?.connectionId ?? null
   const selectedRepoSshState = selectedRepoConnectionId
     ? (sshConnectionStates.get(selectedRepoConnectionId) ?? null)
