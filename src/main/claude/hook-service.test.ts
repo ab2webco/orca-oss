@@ -258,6 +258,39 @@ describe('ClaudeHookService.install', () => {
     }
   })
 
+  it('refreshes the shared statusline script even when the user owns the statusLine slot', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-shared-script-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      mkdirSync(join(tmpHome, '.claude'), { recursive: true })
+      writeFileSync(
+        join(tmpHome, '.claude', 'settings.json'),
+        JSON.stringify({ statusLine: { type: 'command', command: '/usr/local/bin/my-statusline' } })
+      )
+
+      expect(new ClaudeHookService().install().state).toBe('installed')
+
+      // Why this matters beyond consistency: the script is shared, and every managed account's
+      // vault settings.json points at it. Skipping the write because THIS config has a
+      // user-owned line froze the script for every pinned vault — so a user with their own
+      // status line silently stopped their own pinned accounts from ever getting an updated one.
+      const scriptPath = join(tmpHome, '.orca', 'agent-hooks', 'claude-statusline.sh')
+      expect(existsSync(scriptPath)).toBe(true)
+      expect(readFileSync(scriptPath, 'utf-8')).toContain('statusline/claude')
+
+      // And the user's own slot is still untouched.
+      const settings = JSON.parse(readFileSync(join(tmpHome, '.claude', 'settings.json'), 'utf-8'))
+      expect(settings.statusLine).toEqual({
+        type: 'command',
+        command: '/usr/local/bin/my-statusline'
+      })
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
   it('removes the managed statusLine on remove()', () => {
     const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-statusline-remove-'))
     vi.stubEnv('HOME', tmpHome)

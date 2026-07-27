@@ -223,11 +223,16 @@ export class ClaudeHookService {
     const scriptFileName = getStatusLineScriptFileName(this.options.settings)
     const markerPath = getStatusLineInstallMarkerPath(this.options.settings)
     const slot = getStatusLineSlotState(config, scriptFileName)
+    // Why refresh the script before the slot decision: the file is shared, and every managed
+    // account's vault settings.json points at it. Skipping the write because THIS config has a
+    // user-owned statusLine froze the script for every pinned vault that depends on it — a user
+    // with their own line stopped everyone from getting statusline updates, including themselves
+    // through their pinned accounts.
+    const statusLineScriptPath = getStatusLineScriptPath(this.options.settings)
+    writeManagedScript(statusLineScriptPath, getManagedStatusLineScript('local'))
     if (slot === 'user' || (slot === 'empty' && existsSync(markerPath))) {
       return config
     }
-    const statusLineScriptPath = getStatusLineScriptPath(this.options.settings)
-    writeManagedScript(statusLineScriptPath, getManagedStatusLineScript('local'))
     const next = applyManagedStatusLine(
       config,
       getManagedCommand(statusLineScriptPath),
