@@ -1,12 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { join } from 'node:path'
 import { PROTOCOL_VERSION } from './types'
 
-const FAKE_USER_DATA_PATH = '/fake/userData'
-const FAKE_RUNTIME_DIR = join(FAKE_USER_DATA_PATH, 'daemon')
-const FAKE_APP_PATH = '/fake/app'
-const FAKE_APP_OUT_MAIN_PATH = join(FAKE_APP_PATH, 'out', 'main')
-const FAKE_DAEMON_ENTRY_PATH = join(FAKE_APP_OUT_MAIN_PATH, 'daemon-entry.js')
 
 // Why: reconcileSeededClaudeLivePtys is only reachable through initDaemonPtyProvider, so these
 // tests reuse the same adapter/spawner fake shape as daemon-init.test.ts. The single addition is
@@ -35,7 +29,6 @@ const {
   adapterInstances,
   listSessionsControl,
   getLocalPtyProviderMock,
-  localFallbackProvider,
   setLocalPtyProviderMock,
   unbindLocalProviderListenersMock,
   rebindLocalProviderListenersMock,
