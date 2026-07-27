@@ -1,7 +1,10 @@
 import { join } from 'node:path'
 import type { ClaudeManagedAccount } from '../../shared/types'
 import { buildEncodedWslBashCommand } from '../wsl-bash-command'
-import { readManagedClaudeKeychainCredentials } from './keychain'
+import {
+  readActiveClaudeKeychainCredentialsStrict,
+  readManagedClaudeKeychainCredentials
+} from './keychain'
 import {
   getClaudeManagedAccountsRoot,
   readClaudeManagedAuthFile,
@@ -57,8 +60,15 @@ export async function readManagedClaudeRefreshCredentials(
     return null
   }
   if (process.platform === 'darwin') {
-    return readManagedClaudeKeychainCredentials(accountId)
+    // Why the account's own scoped item first: a live Claude CLI rotates its token into the
+    // Keychain item scoped to its config dir, while Orca's managed copy only changes when Orca
+    // materializes. Reading the managed copy therefore fingerprints a chain the session has
+    // already replaced, which is how a live session ended up unprotected. Strict — never the
+    // machine-wide unsuffixed item, which belongs to whichever identity wrote it last.
+    const liveScoped = await readActiveClaudeKeychainCredentialsStrict(managedAuthPath)
+    return liveScoped ?? readManagedClaudeKeychainCredentials(accountId)
   }
+  // Other platforms already read the file the CLI itself writes, so they track the live chain.
   return readClaudeManagedAuthFile(managedAuthPath, '.credentials.json')
 }
 

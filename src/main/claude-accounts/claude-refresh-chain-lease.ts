@@ -21,6 +21,11 @@ import {
   readClaudeRefreshChainLeaseRecord,
   type ClaudeRefreshChainLeaseRecord
 } from './claude-refresh-chain-lease-record'
+import {
+  isClaudeRefreshChainClaimOwnerValid,
+  isClaudeRefreshChainClaimProvablyDead,
+  type ClaudeRefreshChainClaimLivenessContext
+} from './claude-refresh-chain-claim-liveness'
 
 // Why: twenty missed renewals tolerate long event-loop stalls while a crash blocks rotation for at most ten minutes.
 export const CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS = 10 * 60 * 1000
@@ -47,6 +52,7 @@ export class ClaudeRefreshChainLeaseStore {
   private readonly claimIds = new Map<string, ClaudeRefreshChainLeaseRecord>()
   private renewTimer: NodeJS.Timeout | null = null
   private warnedClaimFailure = false
+  private renewalObserver: (() => void) | null = null
 
   constructor(private readonly options: ClaudeRefreshChainLeaseStoreOptions) {
     this.processId = options.processId ?? process.pid
@@ -179,6 +185,13 @@ export class ClaudeRefreshChainLeaseStore {
     this.renewTimer.unref()
   }
 
+  // Why an observer instead of resolving here: the store knows nothing about accounts, and the
+  // claim's chain has to be re-read on every heartbeat — a fingerprint frozen at registration
+  // stops matching as soon as the live CLI rotates its own token, silently unprotecting it.
+  setRenewalObserver(observer: (() => void) | null): void {
+    this.renewalObserver = observer
+  }
+
   private renewClaims(): void {
     try {
       this.writeInstanceRecord()
@@ -193,6 +206,11 @@ export class ClaudeRefreshChainLeaseStore {
       } catch {
         this.warnClaimFailureOnce()
       }
+    }
+    try {
+      this.renewalObserver?.()
+    } catch {
+      this.warnClaimFailureOnce()
     }
   }
 
@@ -246,31 +264,16 @@ export class ClaudeRefreshChainLeaseStore {
     return false
   }
 
+  private get livenessContext(): ClaudeRefreshChainClaimLivenessContext {
+    return { rootPath: this.options.rootPath, now: this.now, processIsAlive: this.processIsAlive }
+  }
+
   private isProvablyDead(record: ClaudeRefreshChainLeaseRecord): boolean {
-    if (record.expiresAt <= this.now()) {
-      return true
-    }
-    const alive = this.processIsAlive(record.processId)
-    if (alive === false) {
-      return true
-    }
-    const instance = readClaudeRefreshChainLeaseRecord(
-      claudeRefreshInstancePath(this.options.rootPath, record.processId)
-    )
-    return instance !== null && instance.instanceId !== record.instanceId
+    return isClaudeRefreshChainClaimProvablyDead(record, this.livenessContext)
   }
 
   private isRecordOwnerValid(record: ClaudeRefreshChainLeaseRecord): boolean {
-    if (record.expiresAt <= this.now() || this.processIsAlive(record.processId) !== true) {
-      return false
-    }
-    const instance = readClaudeRefreshChainLeaseRecord(
-      claudeRefreshInstancePath(this.options.rootPath, record.processId)
-    )
-    return (
-      instance?.instanceId === record.instanceId &&
-      instance.instanceStartedAt === record.instanceStartedAt
-    )
+    return isClaudeRefreshChainClaimOwnerValid(record, this.livenessContext)
   }
 
   private acquireLockDirectory(lockPath: string): boolean {
