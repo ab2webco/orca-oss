@@ -1,5 +1,10 @@
 import { WINDOWS_HOOK_STDIN_READER } from '../agent-hooks/hook-stdin-contract'
 import {
+  windowsContextTrendLines,
+  windowsGaugeLines,
+  windowsGaugeTableLine
+} from './statusline-usage-gauge'
+import {
   CLAUDE_STATUSLINE_MIN_POST_INTERVAL_SECONDS,
   CLAUDE_STATUSLINE_PATHNAME
 } from '../../shared/claude-statusline-rate-limits'
@@ -10,7 +15,12 @@ const STATUSLINE_EMIT_LABEL = 'orca_statusline_emit'
 const STATUSLINE_INTRO_LABEL = 'orca_statusline_intro'
 const STATUSLINE_ACCOUNT_LABEL = 'orca_statusline_account'
 const STATUSLINE_SEVEN_LABEL = 'orca_statusline_quota_seven'
+const STATUSLINE_TREND_WRITE_LABEL = 'orca_statusline_trend_write'
+const STATUSLINE_TREND_DONE_LABEL = 'orca_statusline_trend_done'
+const STATUSLINE_BAR_TABLE_VAR = 'ORCA_STATUSLINE_BARS'
 // Why 96: the POSIX branch's budget, kept identical so a pane renders the same width on either OS.
+// Why a raw substring test still measures it correctly here: this variant is ASCII by contract,
+// so one byte is one column — the POSIX branch has to count columns because its bars are not.
 const STATUSLINE_MAX_WIDTH = 96
 
 /**
@@ -195,13 +205,32 @@ export function getWindowsManagedStatusLineScript(): string {
     // Why break: an internal no-op, so the marker costs a 0-byte file and never a spawn.
     'break>"!ORCA_STATUSLINE_INTRO_STAMP!" 2>nul',
     ':orca_statusline_compose',
+    ...windowsContextTrendLines(STATUSLINE_TREND_DONE_LABEL, STATUSLINE_TREND_WRITE_LABEL),
+    windowsGaugeTableLine(STATUSLINE_BAR_TABLE_VAR),
+    ...windowsGaugeLines('ORCA_STATUSLINE_CTX', 'ORCA_STATUSLINE_CTX_BAR', STATUSLINE_BAR_TABLE_VAR),
+    ...windowsGaugeLines(
+      'ORCA_STATUSLINE_FIVE',
+      'ORCA_STATUSLINE_FIVE_BAR',
+      STATUSLINE_BAR_TABLE_VAR
+    ),
+    ...windowsGaugeLines(
+      'ORCA_STATUSLINE_SEVEN',
+      'ORCA_STATUSLINE_SEVEN_BAR',
+      STATUSLINE_BAR_TABLE_VAR
+    ),
+    // Why the field is assembled before it is appended: an absent bar or trend must leave no
+    // stray space behind, and cmd has no conditional-expansion form to do it inline.
+    'set "ORCA_STATUSLINE_CTX_FIELD="',
+    'if defined ORCA_STATUSLINE_CTX set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX!%%"',
+    'if defined ORCA_STATUSLINE_CTX_BAR set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX_BAR! !ORCA_STATUSLINE_CTX!%%"',
+    'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_TREND set "ORCA_STATUSLINE_CTX_FIELD=!ORCA_STATUSLINE_CTX_FIELD! !ORCA_STATUSLINE_TREND!"',
     // Why identity, model and context are the fixed prefix: all three are short and bounded, so
     // dropping them buys almost no width while costing the two things the line exists to say.
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"',
     'if defined ORCA_STATUSLINE_MODEL if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_MODEL!"',
     'if defined ORCA_STATUSLINE_MODEL if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_MODEL!"',
-    'if defined ORCA_STATUSLINE_CTX if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | ctx !ORCA_STATUSLINE_CTX!%%"',
-    'if defined ORCA_STATUSLINE_CTX if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=ctx !ORCA_STATUSLINE_CTX!%%"',
+    'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_CTX_FIELD!"',
+    'if defined ORCA_STATUSLINE_CTX_FIELD if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_CTX_FIELD!"',
     // Why a length budget instead of reading the terminal width: width needs a subprocess, which
     // is exactly what this path must not do. Appending in priority order makes the ladder fall
     // out of the budget on its own.
@@ -213,11 +242,15 @@ export function getWindowsManagedStatusLineScript(): string {
     ':orca_statusline_field_five',
     ...budgetedFieldLines(
       'ORCA_STATUSLINE_FIVE',
-      '5h !ORCA_STATUSLINE_FIVE!%%',
+      '5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%',
       'orca_statusline_field_seven'
     ),
     ':orca_statusline_field_seven',
-    ...budgetedFieldLines('ORCA_STATUSLINE_SEVEN', '7d !ORCA_STATUSLINE_SEVEN!%%', STATUSLINE_EMIT_LABEL),
+    ...budgetedFieldLines(
+      'ORCA_STATUSLINE_SEVEN',
+      '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
+      STATUSLINE_EMIT_LABEL
+    ),
     `:${STATUSLINE_EMIT_LABEL}`,
     // Why: stdout IS the status line — echo( survives arbitrary expanded content.
     'if defined ORCA_STATUSLINE_LINE echo(!ORCA_STATUSLINE_LINE!',

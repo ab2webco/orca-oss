@@ -328,6 +328,12 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     }
   }
 
+  // Why code points and not `.length`: the budget is a column budget, and a bar cell is one
+  // column. Measuring anything else is the mistake the script itself has to avoid.
+  function columns(line: string): number {
+    return [...line.trimEnd()].length
+  }
+
   function stampPathFor(dir: string, leafId = LEAF_ID): string {
     return join(dir, `orca-claude-statusline-last-${leafId}`)
   }
@@ -431,7 +437,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
   it('prints model and context usage for a payload without rate_limits (the flicker case)', async () => {
     const { scriptPath, dir, curlLog } = makeHarness()
     const stdout = await runScript(scriptPath, dir, displayPayload())
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42%\n')
+    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42%\n')
     expect(lineCount(curlLog)).toBe(0)
   })
 
@@ -442,7 +448,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
       dir,
       displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } })
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42% | 5h 12%\n')
+    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%\n')
     expect(lineCount(curlLog)).toBe(1)
   })
 
@@ -458,9 +464,9 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     const third = await runScript(scriptPath, dir, payloadFor(3_000))
     // Why the first line differs: the lab identity announces once per pane, so a banner
     // cannot strobe on a line the CLI requests several times a second.
-    expect(first).toBe('Orca by Ab2Web | Fable | ctx 42% | 5h 12%\n')
-    expect(second).toBe('Fable | ctx 42% | 5h 12%\n')
-    expect(third).toBe('Fable | ctx 42% | 5h 12%\n')
+    expect(first).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%\n')
+    expect(second).toBe('Fable · ctx ██░░░ 42% → · 5h ▌░░░░ 12%\n')
+    expect(third).toBe('Fable · ctx ██░░░ 42% → · 5h ▌░░░░ 12%\n')
     expect(lineCount(curlLog)).toBe(1)
   })
 
@@ -476,7 +482,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
       })
     )
     // The 12% is the five-hour quota, labelled as such — never borrowed as context usage.
-    expect(stdout).toBe('Orca by Ab2Web | Fable | 5h 12%\n')
+    expect(stdout).toBe('Orca by Ab2Web · Fable · 5h ▌░░░░ 12%\n')
   })
 
   it('falls back to model.id when display_name is absent', async () => {
@@ -484,7 +490,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     const parsed = JSON.parse(displayPayload()) as { model: Record<string, unknown> }
     parsed.model = { id: 'claude-fable-5' }
     const stdout = await runScript(scriptPath, dir, JSON.stringify(parsed))
-    expect(stdout).toBe('Orca by Ab2Web | claude-fable-5 | ctx 42%\n')
+    expect(stdout).toBe('Orca by Ab2Web · claude-fable-5 · ctx ██░░░ 42%\n')
   })
 
   it('prints from a pretty-printed payload too', async () => {
@@ -494,7 +500,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
       dir,
       JSON.stringify(JSON.parse(displayPayload()), null, 2)
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42%\n')
+    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42%\n')
   })
 
   it('renders the account from the vault, truncated at the domain', async () => {
@@ -508,7 +514,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     const stdout = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
     // Why the local part survives and the domain does not: several accounts share one domain,
     // so the local part is what disambiguates, and the whole line has to fit a narrow pane.
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42% | @fabian.altahona@\n')
+    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · @fabian.altahona@\n')
   })
 
   it('reads the vault once and serves the account from a cache keyed to the config dir', async () => {
@@ -546,10 +552,114 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     // Why assert the bound and not a ladder: with the account itself bounded, the line is short
     // by construction, so quota survives. A wrapped status line reads as a broken app, and the
     // one field that could have caused it is the address — so that is what gets shortened.
-    expect(stdout.trimEnd().length).toBeLessThanOrEqual(96)
-    expect(stdout).toContain('5h 12%')
-    expect(stdout).toContain('7d 45%')
+    expect(columns(stdout)).toBeLessThanOrEqual(96)
+    expect(stdout).toContain('5h ▌░░░░ 12%')
+    expect(stdout).toContain('7d ██░░░ 45%')
     expect(stdout).not.toContain('a'.repeat(30))
+  })
+
+  it('fills the context bar in proportion to consumption, and only fills it at 100', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const barFor = async (percent: number, pane: string): Promise<string> => {
+      const stdout = await runScript(
+        scriptPath,
+        dir,
+        displayPayload({ context_window: { used_percentage: percent } }),
+        `tab-1:bar-${pane}`
+      )
+      return stdout.trimEnd()
+    }
+    // Why 99 still shows a half cell: a bar that rounds up would claim consumption that has not
+    // happened, and reserving the all-full bar for a true 100% makes exhaustion unmistakable.
+    expect(await barFor(0, 'a')).toBe('Orca by Ab2Web · Fable · ctx ░░░░░ 0%')
+    expect(await barFor(50, 'b')).toBe('Orca by Ab2Web · Fable · ctx ██▌░░ 50%')
+    expect(await barFor(99, 'c')).toBe('Orca by Ab2Web · Fable · ctx ████▌ 99%')
+    expect(await barFor(100, 'd')).toBe('Orca by Ab2Web · Fable · ctx █████ 100%')
+  })
+
+  it('claims no direction until it has a baseline, then only past the flicker threshold', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const tick = async (percent: number): Promise<string> => {
+      const stdout = await runScript(
+        scriptPath,
+        dir,
+        displayPayload({ context_window: { used_percentage: percent } }),
+        'tab-1:trend-pane'
+      )
+      return stdout.trimEnd()
+    }
+    // Why the first tick carries no arrow: a direction invented from a missing baseline is a lie.
+    expect(await tick(40)).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 40%')
+    expect(await tick(40)).toBe('Fable · ctx ██░░░ 40% →')
+    expect(await tick(41)).toBe('Fable · ctx ██░░░ 41% →')
+    expect(await tick(46)).toBe('Fable · ctx ██░░░ 46% ↑')
+    expect(await tick(20)).toBe('Fable · ctx █░░░░ 20% ↓')
+  })
+
+  it('accumulates a drift the threshold alone would swallow', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const tick = async (percent: number): Promise<string> => {
+      const stdout = await runScript(
+        scriptPath,
+        dir,
+        displayPayload({ context_window: { used_percentage: percent } }),
+        'tab-1:drift-pane'
+      )
+      return stdout.trimEnd()
+    }
+    // Why this matters: the baseline is the last *significant* level, not the previous tick. If it
+    // were rewritten every tick, a context climbing one point per turn would read steady forever.
+    await tick(40)
+    expect(await tick(41)).toContain('→')
+    expect(await tick(42)).toContain('↑')
+  })
+
+  it('draws no quota bar at all rather than a bar at zero when rate_limits are absent', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const stdout = await runScript(scriptPath, dir, displayPayload(), 'tab-1:degrade-a')
+    // Why never a 0% bar: an empty bar reads as real data, and a false zero is worse than nothing.
+    expect(stdout.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42%')
+    const partial = await runScript(
+      scriptPath,
+      dir,
+      displayPayload({
+        rate_limits: { five_hour: { resets_at: 'later' }, seven_day: { used_percentage: 81 } }
+      }),
+      'tab-1:degrade-b'
+    )
+    expect(partial.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · 7d ████░ 81%')
+  })
+
+  it('drops quota from the bottom up when the line runs out of columns', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-narrow', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(
+      join(configDir, 'oauth-account.json'),
+      JSON.stringify({ emailAddress: `${'a'.repeat(60)}@example.com` })
+    )
+    const lineFor = async (displayName: string, pane: string): Promise<string> => {
+      const payload = displayPayload({
+        model: { id: 'claude-opus-5', display_name: displayName },
+        context_window: { used_percentage: 93 },
+        rate_limits: { five_hour: { used_percentage: 88 }, seven_day: { used_percentage: 77 } }
+      })
+      // Why measure the second tick: the banner shows once per pane, so the steady-state line —
+      // trend arrow included — is what the user actually looks at.
+      await runScript(scriptPath, dir, payload, `tab-1:narrow-${pane}`, configDir)
+      const stdout = await runScript(scriptPath, dir, payload, `tab-1:narrow-${pane}`, configDir)
+      expect(columns(stdout)).toBeLessThanOrEqual(96)
+      return stdout.trimEnd()
+    }
+    // Why columns and not bytes: a bar cell is three bytes and one column, so a byte-measured
+    // budget would drop quota that fits. Context is the field that never falls.
+    expect(await lineFor('Opus 5', 'a')).toContain('7d ███▌░ 77%')
+    expect(await lineFor('Claude Opus 5 (1M context) preview', 'b')).toBe(
+      'Claude Opus 5 (1M context) preview · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…@ · 5h ████░ 88%'
+    )
+    expect(await lineFor('Claude Opus 5 (1M context) preview build 2026', 'c')).toBe(
+      'Claude Opus 5 (1M context) preview build 2026 · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…@'
+    )
   })
 
   it('prints without any Orca env so sessions outside Orca keep their line', async () => {
@@ -570,7 +680,7 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     })
     // Why no identity here: with no pane key and no config dir there is nothing to key the
     // once-per-pane marker to, so the banner is skipped rather than repeated every tick.
-    expect(stdout).toBe('Fable | ctx 42% | 5h 12%\n')
+    expect(stdout).toBe('Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%\n')
     expect(lineCount(curlLog)).toBe(0)
   })
 })

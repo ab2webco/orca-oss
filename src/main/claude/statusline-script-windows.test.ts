@@ -4,6 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { getWindowsManagedStatusLineScript } from './statusline-script-windows'
+import {
+  STATUSLINE_BAR_CELLS,
+  STATUSLINE_BAR_LEVELS_ASCII,
+  STATUSLINE_BAR_LEVELS_UNICODE,
+  STATUSLINE_TREND_ASCII,
+  STATUSLINE_TREND_THRESHOLD
+} from './statusline-usage-gauge'
 
 const script = getWindowsManagedStatusLineScript()
 const lines = script.split('\r\n')
@@ -79,7 +86,8 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
   it('never renders a percentage it could not parse', () => {
     // Why: a false 0% reads as real data. Both quota fields and ctx clear on any non-digit.
     const clears = script.match(/for \/f "delims=0123456789"/g) ?? []
-    expect(clears.length).toBe(4)
+    // Four percentages plus the trend baseline read back from the per-pane file.
+    expect(clears.length).toBe(5)
     expect(script).toContain(
       'if not defined ORCA_STATUSLINE_FIVE goto :orca_statusline_field_seven'
     )
@@ -132,8 +140,12 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
   it('admits the optional fields in priority order under one width budget', () => {
     const accountIndex = script.indexOf('set "ORCA_STATUSLINE_NEXT=@!ORCA_STATUSLINE_ACCOUNT!"')
     // %% is how a literal percent sign is written in a batch file.
-    const fiveIndex = script.indexOf('set "ORCA_STATUSLINE_NEXT=5h !ORCA_STATUSLINE_FIVE!%%"')
-    const sevenIndex = script.indexOf('set "ORCA_STATUSLINE_NEXT=7d !ORCA_STATUSLINE_SEVEN!%%"')
+    const fiveIndex = script.indexOf(
+      'set "ORCA_STATUSLINE_NEXT=5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%"'
+    )
+    const sevenIndex = script.indexOf(
+      'set "ORCA_STATUSLINE_NEXT=7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%"'
+    )
     expect(accountIndex).toBeGreaterThan(-1)
     expect(fiveIndex).toBeGreaterThan(accountIndex)
     expect(sevenIndex).toBeGreaterThan(fiveIndex)
@@ -143,6 +155,72 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     )
     expect(overflow?.length).toBe(3)
     expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!...@"')
+  })
+
+  it('slices every bar out of one table that matches the POSIX one cell for cell', () => {
+    // Why compare the two alphabets and not just the batch: the glyphs diverge because cmd reads
+    // this file in the OEM codepage, but the levels must not — a pane that shows three filled
+    // cells on macOS has to show three on Windows.
+    expect(STATUSLINE_BAR_LEVELS_ASCII).toHaveLength(STATUSLINE_BAR_LEVELS_UNICODE.length)
+    for (const [level, ascii] of STATUSLINE_BAR_LEVELS_ASCII.entries()) {
+      expect([...ascii]).toHaveLength(STATUSLINE_BAR_CELLS)
+      expect(ascii.replaceAll('#', '█').replaceAll('=', '▌').replaceAll('.', '░')).toBe(
+        STATUSLINE_BAR_LEVELS_UNICODE[level]
+      )
+    }
+    expect(script).toContain(`set "ORCA_STATUSLINE_BARS=${STATUSLINE_BAR_LEVELS_ASCII.join('')}"`)
+    // Why the for-variable offset: a %VAR% offset is expanded at parse time and would still hold
+    // the previous tick's value, while a for-variable resolves before delayed expansion.
+    for (const target of ['CTX', 'FIVE', 'SEVEN']) {
+      expect(script).toContain(
+        `for %%o in (!ORCA_STATUSLINE_OFFSET!) do set "ORCA_STATUSLINE_${target}_BAR=!ORCA_STATUSLINE_BARS:~%%o,${STATUSLINE_BAR_CELLS}!"`
+      )
+      expect(script).toContain(
+        `if defined ORCA_STATUSLINE_${target} set /a "ORCA_STATUSLINE_LEVEL=ORCA_STATUSLINE_${target}/10" 2>nul`
+      )
+    }
+  })
+
+  it('never lets the trend compare a negative, and invents no direction without a baseline', () => {
+    // Why the larger side is taken first: cmd's IF falls back to a string compare the moment
+    // either operand is not all digits, so a negative delta would silently mis-order.
+    const riseIndex = script.indexOf(
+      'if !ORCA_STATUSLINE_CTX! GTR !ORCA_STATUSLINE_PREV! goto :orca_statusline_trend_rise'
+    )
+    const fallIndex = script.indexOf(
+      'if !ORCA_STATUSLINE_PREV! GTR !ORCA_STATUSLINE_CTX! goto :orca_statusline_trend_fall'
+    )
+    expect(riseIndex).toBeGreaterThan(-1)
+    expect(fallIndex).toBeGreaterThan(riseIndex)
+    expect(script).toContain(
+      'set /a "ORCA_STATUSLINE_DELTA=ORCA_STATUSLINE_CTX-ORCA_STATUSLINE_PREV" 2>nul'
+    )
+    expect(script).toContain(
+      'set /a "ORCA_STATUSLINE_DELTA=ORCA_STATUSLINE_PREV-ORCA_STATUSLINE_CTX" 2>nul'
+    )
+    const thresholds =
+      script.match(
+        new RegExp(
+          `if !ORCA_STATUSLINE_DELTA! LSS ${STATUSLINE_TREND_THRESHOLD} goto :orca_statusline_trend_done`,
+          'g'
+        )
+      ) ?? []
+    expect(thresholds).toHaveLength(2)
+    // A missing baseline records one and claims nothing — the arrow slot stays empty.
+    const emptyIndex = script.indexOf('set "ORCA_STATUSLINE_TREND="')
+    const skipIndex = script.indexOf(
+      'if not defined ORCA_STATUSLINE_PREV goto :orca_statusline_trend_write'
+    )
+    const steadyIndex = script.indexOf(
+      `set "ORCA_STATUSLINE_TREND=${STATUSLINE_TREND_ASCII.steady}"`
+    )
+    expect(emptyIndex).toBeGreaterThan(-1)
+    expect(skipIndex).toBeGreaterThan(emptyIndex)
+    expect(steadyIndex).toBeGreaterThan(skipIndex)
+    // Why a file separate from the post stamp and the banner marker: this one tracks the render.
+    expect(script).toContain(
+      'set "ORCA_STATUSLINE_TREND_FILE=%TEMP%\\orca-claude-statusline-ctx-!ORCA_STATUSLINE_INTRO_KEY!.tmp"'
+    )
   })
 
   it('carries no credential material onto the line', () => {
@@ -246,7 +324,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
   it('prints identity, model and context for a payload without rate_limits', async () => {
     const { scriptPath, temp } = makeHarness()
     const stdout = await runScript(scriptPath, temp, displayPayload())
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42%\r\n')
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx ##... 42%\r\n')
   })
 
   it('prints both quota windows alongside the account', async () => {
@@ -261,7 +339,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
       configDir
     )
     expect(stdout).toBe(
-      'Orca by Ab2Web | Fable | ctx 42% | @fabian.altahona@ | 5h 29% | 7d 81%\r\n'
+      'Orca by Ab2Web | Fable | ctx ##... 42% | @fabian.altahona@ | 5h #.... 29% | 7d ####. 81%\r\n'
     )
   })
 
@@ -270,8 +348,9 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     const payload = displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } })
     const first = await runScript(scriptPath, temp, payload)
     const second = await runScript(scriptPath, temp, payload)
-    expect(first).toBe('Orca by Ab2Web | Fable | ctx 42% | 5h 12%\r\n')
-    expect(second).toBe('Fable | ctx 42% | 5h 12%\r\n')
+    expect(first).toBe('Orca by Ab2Web | Fable | ctx ##... 42% | 5h =.... 12%\r\n')
+    // Why the arrow only appears on the second tick: the first one had no baseline to compare to.
+    expect(second).toBe('Fable | ctx ##... 42% ~ | 5h =.... 12%\r\n')
   })
 
   it('reads the vault once and serves the account from the cache after', async () => {
@@ -296,7 +375,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         rate_limits: { five_hour: { resets_at: 'later' }, seven_day: { used_percentage: 81 } }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42% | 7d 81%\r\n')
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx ##... 42% | 7d ####. 81%\r\n')
     expect(stdout).not.toContain('5h')
   })
 
@@ -310,7 +389,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         rate_limits: { five_hour: { used_percentage: 12 } }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | 5h 12%\r\n')
+    expect(stdout).toBe('Orca by Ab2Web | Fable | 5h =.... 12%\r\n')
   })
 
   it('falls back to model.id when display_name is absent', async () => {
@@ -323,7 +402,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         context_window: { used_percentage: 42.7 }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | claude-fable-5 | ctx 42%\r\n')
+    expect(stdout).toBe('Orca by Ab2Web | claude-fable-5 | ctx ##... 42%\r\n')
   })
 
   it('bounds a long address instead of letting it push quota off the line', async () => {
@@ -338,8 +417,8 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
       configDir
     )
     expect(stdout.trimEnd().length).toBeLessThanOrEqual(96)
-    expect(stdout).toContain('5h 12%')
-    expect(stdout).toContain('7d 45%')
+    expect(stdout).toContain('5h =.... 12%')
+    expect(stdout).toContain('7d ##... 45%')
     expect(stdout).not.toContain('a'.repeat(30))
   })
 })
