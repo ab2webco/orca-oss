@@ -60,6 +60,27 @@ export function isPerfPrereleaseTag(tag: string): boolean {
   )
 }
 
+/**
+ * Lab release candidates: `X.Y.Z-lab.<n>.rc`.
+ *
+ * Why a dedicated channel instead of upstream's plain `-rc.N`: upstream's stable version is clean
+ * semver, so `isPrereleaseVersion` alone keeps RCs away from stable installs. Every lab version is
+ * `-lab.N` — already a semver prerelease — so that filter matches nothing here and an RC would
+ * reach every lab install on the next automatic check. Excluding these tags by shape is what makes
+ * a lab RC testable without shipping it to users.
+ */
+export function isLabRcPrereleaseTag(tag: string): boolean {
+  const version = normalizeTagToVersion(tag)
+  const match = version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-.]+)(?:\+[0-9A-Za-z-.]+)?$/)
+  const identifiers = match?.[1]?.split('.') ?? []
+  return (
+    identifiers.length === 3 &&
+    identifiers[0] === 'lab' &&
+    /^\d+$/.test(identifiers[1]) &&
+    identifiers[2] === 'rc'
+  )
+}
+
 async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
   try {
     const res = await net.fetch(ATOM_FEED_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -161,7 +182,7 @@ async function hasReadyPlatformManifest(tag: string): Promise<boolean> {
  */
 type FetchNewerReleaseTagOptions = {
   includePrerelease?: boolean
-  releaseFilter?: 'perf'
+  releaseFilter?: 'perf' | 'lab-rc'
 }
 
 export type FetchNewerReleaseTagsResult = {
@@ -196,14 +217,16 @@ export async function fetchNewerReleaseTagsWithReadiness(
     return { tags: [], state: 'unavailable' }
   }
 
-  // Why: perf builds are explicit opt-in; regular prerelease checks should
-  // stay on the main RC/stable series even though perf tags are semver-newer.
+  // Why: perf and lab-rc builds are explicit opt-in; regular prerelease checks should
+  // stay on the main RC/stable series even though those tags are semver-newer.
   const candidates =
     options.releaseFilter === 'perf'
       ? tags.filter(({ tag }) => isPerfPrereleaseTag(tag))
-      : includePrerelease
-        ? tags.filter(({ tag }) => !isPerfPrereleaseTag(tag))
-        : tags.filter(({ version }) => !isPrereleaseVersion(version))
+      : options.releaseFilter === 'lab-rc'
+        ? tags.filter(({ tag }) => isLabRcPrereleaseTag(tag))
+        : includePrerelease
+          ? tags.filter(({ tag }) => !isPerfPrereleaseTag(tag) && !isLabRcPrereleaseTag(tag))
+          : tags.filter(({ version }) => !isPrereleaseVersion(version))
   const newestNewerIndex = candidates.findIndex(
     ({ version }) => compareVersions(version, currentVersion) > 0
   )

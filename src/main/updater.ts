@@ -49,7 +49,7 @@ import {
 type CheckFailureSource = 'event' | 'promise' | 'fallback-promise'
 type MissingManifestPrereleaseFallbackResult = { userInitiated: boolean }
 type PrimaryEventSuppression = { failureKey: string; error: unknown }
-type UpdateCheckVariant = 'default' | 'prerelease' | 'perf'
+type UpdateCheckVariant = 'default' | 'prerelease' | 'perf' | 'lab-rc'
 type ReleaseFeedPreflightResult = 'ready' | 'not-available'
 export type UpdateInstallMode =
   | 'interactive'
@@ -258,6 +258,8 @@ function getOptionsForUpdateCheckVariant(variant: UpdateCheckVariant): UpdateChe
   switch (variant) {
     case 'perf':
       return { includePrerelease: true, includePerfPrerelease: true }
+    case 'lab-rc':
+      return { includePrerelease: true, includeLabRcPrerelease: true }
     case 'prerelease':
       return { includePrerelease: true }
     case 'default':
@@ -268,6 +270,9 @@ function getOptionsForUpdateCheckVariant(variant: UpdateCheckVariant): UpdateChe
 function getUpdateCheckVariant(options?: UpdateCheckOptions): UpdateCheckVariant {
   if (options?.includePerfPrerelease) {
     return 'perf'
+  }
+  if (options?.includeLabRcPrerelease) {
+    return 'lab-rc'
   }
   if (options?.includePrerelease) {
     return 'prerelease'
@@ -1037,14 +1042,16 @@ async function pinDefaultReleaseFeed(
   // Why: the latest/download redirect can move between check and download, so pin the concrete tag (prerelease users resolve any channel, stable only stable).
   const currentVersion = app.getVersion()
   const isPerfCheck = variant === 'perf'
+  const isLabRcCheck = variant === 'lab-rc'
   const includePrerelease =
-    isPerfCheck || includePrereleaseActive || isPrereleaseVersion(currentVersion)
+    isPerfCheck || isLabRcCheck || includePrereleaseActive || isPrereleaseVersion(currentVersion)
   const releaseTagsResult = await fetchNewerReleaseTagsWithReadiness(
     currentVersion,
     includePrerelease ? 2 : 1,
     {
       includePrerelease,
-      ...(isPerfCheck ? { releaseFilter: 'perf' as const } : {})
+      ...(isPerfCheck ? { releaseFilter: 'perf' as const } : {}),
+      ...(isLabRcCheck ? { releaseFilter: 'lab-rc' as const } : {})
     }
   )
   const newerTag = releaseTagsResult.tags[0] ?? null
@@ -1090,16 +1097,17 @@ async function pinDefaultReleaseFeed(
       `[updater] release feed deferred: current=${currentVersion} includePrerelease=${includePrerelease}; newest release assets are still publishing`
     )
     throw new Error('Latest release assets are still publishing')
-  } else if (isPerfCheck) {
+  } else if (isPerfCheck || isLabRcCheck) {
+    const channel = isPerfCheck ? 'perf' : 'lab-rc'
     clearPrereleaseFallbackContext()
     clearPublishingWindowLastGoodCheck()
     if (releaseTagsResult.state === 'no-newer') {
       console.info(
-        `[updater] perf release not found: current=${currentVersion} includePrerelease=${includePrerelease}`
+        `[updater] ${channel} release not found: current=${currentVersion} includePrerelease=${includePrerelease}`
       )
       return 'not-available'
     }
-    throw new Error('Could not resolve perf update feed')
+    throw new Error(`Could not resolve ${channel} update feed`)
   } else {
     clearPrereleaseFallbackContext()
     clearPublishingWindowLastGoodCheck()

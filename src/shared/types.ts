@@ -2408,6 +2408,7 @@ export type ChangelogData = {
 export type UpdateCheckOptions = {
   includePrerelease?: boolean
   includePerfPrerelease?: boolean
+  includeLabRcPrerelease?: boolean
 }
 
 export type UpdateStatus =

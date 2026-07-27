@@ -210,6 +210,53 @@ describe('fetchNewerReleaseTag', () => {
     })
   })
 
+  it('hides a lab RC from a lab install checking automatically', async () => {
+    // Why this is the whole point of the channel: a lab version is itself a semver prerelease, so
+    // includePrerelease is always true here. Without the shape filter the RC ships to every user.
+    respondWithAtom(['v1.4.152-lab.36.rc', 'v1.4.152-lab.35'])
+
+    const { fetchNewerReleaseTagsWithReadiness } = await import('./updater-prerelease-feed')
+
+    await expect(
+      fetchNewerReleaseTagsWithReadiness('1.4.152-lab.35', 1, { includePrerelease: true })
+    ).resolves.toEqual({ tags: [], state: 'no-newer' })
+  })
+
+  it('finds the lab RC only when the check explicitly opts into that channel', async () => {
+    respondWithAtom(['v1.4.152-lab.36.rc', 'v1.4.152-lab.35'])
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    expect(
+      await fetchNewerReleaseTag('1.4.152-lab.35', {
+        includePrerelease: true,
+        releaseFilter: 'lab-rc'
+      })
+    ).toBe('v1.4.152-lab.36.rc')
+  })
+
+  it('keeps a promoted lab release reachable while its RC is hidden', async () => {
+    // Why: promoting must burn a number — `lab.36.rc` outranks `lab.36` in semver, so the final
+    // ships as lab.37 and an install on lab.35 still sees it on an ordinary check.
+    respondWithAtom(['v1.4.152-lab.37', 'v1.4.152-lab.36.rc', 'v1.4.152-lab.35'])
+
+    const { fetchNewerReleaseTag } = await import('./updater-prerelease-feed')
+
+    expect(await fetchNewerReleaseTag('1.4.152-lab.35', { includePrerelease: true })).toBe(
+      'v1.4.152-lab.37'
+    )
+  })
+
+  it('matches only literal lab.N.rc prerelease tags', async () => {
+    const { isLabRcPrereleaseTag } = await import('./updater-prerelease-feed')
+
+    expect(isLabRcPrereleaseTag('v1.4.152-lab.36.rc')).toBe(true)
+    expect(isLabRcPrereleaseTag('v1.4.152-lab.36')).toBe(false)
+    expect(isLabRcPrereleaseTag('v1.4.152-lab.36.rc.1')).toBe(false)
+    expect(isLabRcPrereleaseTag('v1.4.152-rc.36.lab')).toBe(false)
+    expect(isLabRcPrereleaseTag('v1.4.152-lab.x.rc')).toBe(false)
+  })
+
   it('picks the semver-newest perf-tagged prerelease', async () => {
     respondWithAtom([
       'v1.4.121-rc.6.perf',
