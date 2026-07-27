@@ -58,6 +58,8 @@ const SendParams = z
     payload: OptionalString,
     // Why: pane key is the remint-stable identity used to verify worker_done/heartbeat ownership; the from handle stays routing metadata.
     senderPaneKey: OptionalString,
+    // Why: the launch token is the proof behind that pane key; without it the key is just a claim.
+    senderLaunchToken: OptionalString,
     devMode: OptionalBoolean
   })
   .superRefine((params, ctx) => {
@@ -105,7 +107,9 @@ const CheckParams = z
 const ReplyParams = z.object({
   id: requiredString('Missing --id'),
   body: requiredString('Missing --body'),
-  from: OptionalString
+  from: OptionalString,
+  senderPaneKey: OptionalString,
+  senderLaunchToken: OptionalString
 })
 
 const InboxParams = z.object({
@@ -171,7 +175,9 @@ const AskParams = z.object({
   question: requiredString('Missing --question'),
   options: OptionalString,
   timeoutMs: OptionalFiniteNumber,
-  from: OptionalString
+  from: OptionalString,
+  senderPaneKey: OptionalString,
+  senderLaunchToken: OptionalString
 })
 
 const ResetParams = z
@@ -198,9 +204,15 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: SendParams,
     handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const from = params.from ?? 'unknown'
-      // Why: older shells may lack ORCA_PANE_KEY, but the runtime still knows the pane behind their handle; persist that authority.
-      const senderPaneKey = params.senderPaneKey ?? runtime.getTerminalPaneKey(from) ?? undefined
+      // Why: the sender's identity is derived from proof it holds the pane, never from --from —
+      // otherwise any pane could file a worker_done under another worker's name.
+      const sender = runtime.authenticateOrchestrationSender({
+        claimedHandle: params.from,
+        paneKey: params.senderPaneKey,
+        launchToken: params.senderLaunchToken
+      })
+      const from = sender.handle
+      const senderPaneKey = sender.paneKey
 
       if (!isGroupAddress(params.to)) {
         // Point-to-point — existing single-recipient behavior
@@ -344,14 +356,33 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         throw new Error(`Message not found: ${params.id}`)
       }
 
-      db.markAsRead([original.id])
+      const sender = runtime.authenticateOrchestrationSender({
+        claimedHandle: params.from,
+        paneKey: params.senderPaneKey,
+        launchToken: params.senderLaunchToken
+      })
+      // Why: only the pane the message was addressed to may answer it. Comparing pane keys as well
+      // as handles keeps the real recipient able to reply after its handle is reminted.
+      const recipientPaneKey = runtime.getTerminalPaneKey(original.to_handle)
+      // Why: a shell with none of Orca's terminal env vars resolves to no identity at all; answering
+      // as the addressed recipient (the pre-authentication default) beats refusing its reply.
+      const identityless = sender.handle === 'unknown' && !sender.paneKey
+      const from = identityless ? original.to_handle : sender.handle
+      if (
+        !identityless &&
+        sender.handle !== original.to_handle &&
+        (!recipientPaneKey || recipientPaneKey !== sender.paneKey)
+      ) {
+        throw new Error('orchestration_sender_identity_mismatch')
+      }
 
-      const reply = db.insertMessage({
-        from: params.from ?? original.to_handle,
+      const reply = db.insertReplyAndMarkRead(original.id, {
+        from,
         to: original.from_handle,
         subject: `Re: ${original.subject}`,
         body: params.body,
-        threadId: original.thread_id ?? original.id
+        threadId: original.thread_id ?? original.id,
+        senderPaneKey: sender.paneKey
       })
 
       runtime.notifyMessageArrived(original.from_handle, reply.type)
@@ -483,6 +514,21 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               'or dispatch without --inject and send the prompt manually.'
           )
         }
+        // Why (#10666): the preamble is delivered as terminal input terminated by Enter. A pane
+        // parked on an interactive prompt (directory trust, permission, upgrade notice) consumes
+        // that Enter to answer the prompt — granting the decision as a side effect of task
+        // delivery — and swallows the TASK body, so the task stays dispatched forever with no error
+        // anywhere. Refuse before createDispatchContext so no dispatch row is created; the
+        // renderer's send path already gates on this readiness signal and dispatch must not be weaker.
+        const blockedOnPrompt = await runtime.isTerminalBlockedOnInteractivePrompt(to)
+        if (blockedOnPrompt) {
+          throw new Error(
+            `Cannot dispatch --inject to terminal ${to}: the agent is waiting on an interactive ` +
+              'prompt (for example a directory-trust, permission, or upgrade prompt). Injecting now ' +
+              'would answer that prompt instead of delivering the task. Answer it in the terminal, ' +
+              'then dispatch again — or dispatch without --inject and send the prompt manually.'
+          )
+        }
       }
 
       const ctx = db.createDispatchContext(
@@ -567,7 +613,12 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       }
 
       const db = runtime.getOrchestrationDb()
-      const from = params.from ?? 'unknown'
+      const sender = runtime.authenticateOrchestrationSender({
+        claimedHandle: params.from,
+        paneKey: params.senderPaneKey,
+        launchToken: params.senderLaunchToken
+      })
+      const from = sender.handle
       // Why: echoed on every return so a clamped caller reports the budget actually waited, not the one it asked for.
       const timeoutMs = clampOrchestrationAskTimeoutMs(params.timeoutMs)
       const options =
@@ -583,7 +634,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         subject: 'Question',
         body: params.question,
         type: 'decision_gate',
-        payload
+        payload,
+        senderPaneKey: sender.paneKey
       })
       runtime.deliverPendingMessagesForHandle(params.to)
       runtime.notifyMessageArrived(params.to, outbound.type)

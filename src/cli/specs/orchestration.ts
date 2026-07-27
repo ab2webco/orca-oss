@@ -26,6 +26,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'On Windows PowerShell, quote group addresses such as --to "@all" or --to "@worktree:<id>".',
       'worker_done and heartbeat must target a concrete coordinator terminal handle; use status for broadcast updates.',
+      'Managed agent terminals authenticate the sender pane with their launch token, so --from cannot claim their identity; it still names the sender for panes without one (SSH without remote hooks, reattached or hand-opened shells).',
       'A worker_done with the active task/dispatch IDs completes that task only from the dispatched pane. When stable pane identity is unavailable, the sender handle must exactly match the dispatch assignee; injected preambles include the correct --from value.',
       'Prefer --task-id/--dispatch-id/etc. over raw --payload JSON in worker commands; PowerShell strips JSON quotes easily.'
     ]
@@ -62,7 +63,10 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['orchestration', 'reply'],
     summary: 'Reply to a message',
     usage: 'orca orchestration reply --id <msg_id> --body <text> [--from <handle>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'body', 'from']
+    allowedFlags: [...GLOBAL_FLAGS, 'id', 'body', 'from'],
+    notes: [
+      'Only the pane a message was addressed to may answer it. A managed agent pane proves that with its launch token, so --from cannot impersonate it; injected reply banners still carry --from for shells without Orca env vars.'
+    ]
   },
   {
     path: ['orchestration', 'inbox'],

@@ -518,6 +518,8 @@ describe('orca cli worktree awareness', () => {
     // Isolate the pane key so claude-teams tests that set it don't leak a
     // senderPaneKey into later orchestration.send assertions.
     delete process.env.ORCA_PANE_KEY
+    // Same for the launch token, which the enclosing managed agent pane also exports.
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
     serveOrcaAppMock.mockReset()
     getDefaultUserDataPathMock.mockClear()
     addEnvironmentFromPairingCodeMock.mockReset()
@@ -3955,6 +3957,8 @@ describe('orca cli worktree awareness', () => {
       priority: undefined,
       threadId: undefined,
       payload: undefined,
+      senderPaneKey: undefined,
+      senderLaunchToken: undefined,
       devMode: false
     })
     expect(logSpy).toHaveBeenCalledWith('Sent 2 messages to 2 recipients')

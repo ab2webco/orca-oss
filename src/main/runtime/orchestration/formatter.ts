@@ -25,8 +25,8 @@ export function formatMessageBanner(msg: MessageRow): string {
     lines.push(`[Payload: ${msg.payload}]`)
   }
 
-  // Why: injected reply commands must retain the receiving pane's identity
-  // even when an older shell lacks Orca's terminal environment variables.
+  // Why: keep --from for shells lacking Orca's terminal env vars — a token-bound pane authenticates
+  // ahead of it, so it can no longer grant an identity it doesn't hold.
   lines.push(
     `[Reply: orca orchestration reply --id ${msg.id} --from ${msg.to_handle} --body "..."]`
   )

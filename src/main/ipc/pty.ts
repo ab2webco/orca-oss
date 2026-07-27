@@ -4655,6 +4655,7 @@ export function registerPtyHandlers(
         command?: string
         commandDelivery?: 'renderer' | 'provider'
         launchConfig?: SleepingAgentLaunchConfig
+        launchToken?: string
         resumeProviderSession?: AgentProviderSessionMetadata
         launchAgent?: TuiAgent
         startupCommandDelivery?: StartupCommandDelivery
@@ -4911,6 +4912,17 @@ export function registerPtyHandlers(
         delete baseEnv.ORCA_WORKTREE_ID
         delete baseEnv.ORCA_AGENT_LAUNCH_TOKEN
       }
+      // Why: main may only trust a launch token it can see the child actually receiving. Accepting
+      // the renderer's claim on its own would let any spawn mint an identity for a pane it does not own.
+      const trustedLaunchToken =
+        effectiveLaunchConfig &&
+        stablePaneKey &&
+        typeof args.launchToken === 'string' &&
+        args.launchToken.length > 0 &&
+        args.launchToken.length <= 128 &&
+        baseEnv?.ORCA_AGENT_LAUNCH_TOKEN === args.launchToken
+          ? args.launchToken
+          : undefined
       const validatedPaneKey = stablePaneKey
       // Why: SSH can strip ORCA_PANE_KEY when remote hooks are off; IPC tab/leaf metadata still names the pane.
       const reservationPaneKey = metadataPaneKey ?? validatedPaneKey
@@ -5428,7 +5440,16 @@ export function registerPtyHandlers(
               ? {
                   tabId: args.tabId,
                   leafId: metadataLeafId,
-                  ...(result.incarnationId ? { incarnationId: result.incarnationId } : {})
+                  ...(result.incarnationId ? { incarnationId: result.incarnationId } : {}),
+                  // Why: hand the verified launch credential back to main so orchestration messages
+                  // from this pane can be authenticated; a reattach reuses an existing PTY record.
+                  ...(!result.isReattach && effectiveLaunchConfig && trustedLaunchToken
+                    ? {
+                        launchConfig: effectiveLaunchConfig,
+                        launchToken: trustedLaunchToken,
+                        ...(isTuiAgent(args.launchAgent) ? { launchAgent: args.launchAgent } : {})
+                      }
+                    : {})
                 }
               : undefined,
             !args.connectionId

@@ -93,6 +93,15 @@ describe('runRemoteOrcaCli', () => {
       }),
       getOrchestrationDb: () => db,
       getTerminalPaneKey: () => null,
+      // Why: a remote pane has no local PTY to hold a launch token, so it authenticates through the
+      // handle-derived tier — the same one the real runtime falls back to.
+      authenticateOrchestrationSender: ({
+        claimedHandle,
+        paneKey
+      }: {
+        claimedHandle?: string
+        paneKey?: string
+      }) => ({ handle: claimedHandle ?? 'unknown', paneKey }),
       deliverPendingMessagesForHandle: vi.fn(),
       notifyMessageArrived: vi.fn(),
       linearIssueContext: vi.fn(async (request: unknown) => ({

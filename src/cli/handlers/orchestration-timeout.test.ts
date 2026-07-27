@@ -4,6 +4,8 @@ const callMock = vi.fn()
 const getTerminalHandleMock = vi.hoisted(() => vi.fn())
 const originalTerminalHandle = process.env.ORCA_TERMINAL_HANDLE
 const originalPaneKey = process.env.ORCA_PANE_KEY
+// Why: an ambient launch token from the enclosing agent pane would otherwise leak into the payload.
+const originalLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
 
 vi.mock('../format', () => ({ printResult: vi.fn() }))
 vi.mock('../selectors', () => ({ getTerminalHandle: getTerminalHandleMock }))
@@ -44,6 +46,7 @@ beforeEach(() => {
   vi.mocked(printResult).mockReset()
   delete process.env.ORCA_TERMINAL_HANDLE
   delete process.env.ORCA_PANE_KEY
+  delete process.env.ORCA_AGENT_LAUNCH_TOKEN
 })
 
 afterEach(() => {
@@ -56,6 +59,11 @@ afterEach(() => {
     delete process.env.ORCA_PANE_KEY
   } else {
     process.env.ORCA_PANE_KEY = originalPaneKey
+  }
+  if (originalLaunchToken === undefined) {
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+  } else {
+    process.env.ORCA_AGENT_LAUNCH_TOKEN = originalLaunchToken
   }
   vi.restoreAllMocks()
 })
@@ -276,7 +284,9 @@ describe('orchestration timeout flag validation', () => {
         question: 'Proceed?',
         options: undefined,
         timeoutMs: 123,
-        from: 'term_worker'
+        from: 'term_worker',
+        senderPaneKey: undefined,
+        senderLaunchToken: undefined
       },
       { timeoutMs: 5_123 }
     )

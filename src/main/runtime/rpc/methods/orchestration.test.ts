@@ -12,6 +12,8 @@ function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string
   return `${type} messages must be sent to a concrete coordinator terminal handle, not a group address.`
 }
 
+const LAUNCH_TOKEN = 'launch_test'
+
 describe('orchestration RPC methods', () => {
   let db: OrchestrationDb
   let dbOpen = false
@@ -23,6 +25,21 @@ describe('orchestration RPC methods', () => {
     dbOpen = true
     runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(db)
+    // Why: only the token-bound tier needs a live PTY the unit runtime cannot spawn, so stand in for
+    // that check alone and mirror the handle-derived tier verbatim — otherwise every token-less
+    // sender (SSH, reattach, hand-opened shell) drops out of coverage.
+    vi.spyOn(runtime, 'authenticateOrchestrationSender').mockImplementation(
+      ({ claimedHandle, paneKey, launchToken }) => {
+        if (launchToken === LAUNCH_TOKEN) {
+          return {
+            handle: claimedHandle ?? 'term_test',
+            paneKey: paneKey ?? 'tab_test:leaf_test'
+          }
+        }
+        const handle = claimedHandle ?? 'unknown'
+        return { handle, paneKey: paneKey ?? runtime.getTerminalPaneKey(handle) ?? undefined }
+      }
+    )
     ctx = { runtime }
   }
 
@@ -45,9 +62,17 @@ describe('orchestration RPC methods', () => {
     return method
   }
 
+  const AUTHENTICATED_METHODS = ['orchestration.send', 'orchestration.reply', 'orchestration.ask']
+
   async function call(name: string, params: Record<string, unknown>) {
     const method = findMethod(name)
-    const parsed = method.params ? method.params.parse(params) : undefined
+    // Why: only supply the launch credential when the case does not state its own sender identity —
+    // a test that passes --from or a pane key is exercising the token-less tier on purpose.
+    const authenticatedParams =
+      AUTHENTICATED_METHODS.includes(name) && !('from' in params) && !('senderPaneKey' in params)
+        ? { senderPaneKey: 'tab_test:leaf_test', senderLaunchToken: LAUNCH_TOKEN, ...params }
+        : params
+    const parsed = method.params ? method.params.parse(authenticatedParams) : undefined
     return method.handler(parsed, ctx)
   }
 
@@ -1423,6 +1448,105 @@ describe('orchestration RPC methods', () => {
           inject: true
         })
       ).rejects.toThrow('no recognized agent detected')
+    })
+
+    // Why (#10666): the preamble is Enter-terminated input. Injecting into a pane parked on
+    // Codex's directory-trust prompt answered the prompt — silently granting trust — and swallowed
+    // the TASK body, leaving the task dispatched forever while dispatch reported injected: true.
+    it('rejects inject when the target pane is parked on an interactive prompt', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(true)
+      // Why: a resolving send makes the guard the only possible source of the rejection.
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      await expect(
+        call('orchestration.dispatch', {
+          task: task.id,
+          to: 'term_a',
+          inject: true
+        })
+      ).rejects.toThrow('waiting on an interactive prompt')
+
+      // Nothing may reach the terminal, and no dispatch may be recorded against the task.
+      expect(send).not.toHaveBeenCalled()
+      expect(db.getTask(task.id)?.status).toBe('ready')
+      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
+    })
+
+    it('still injects when the target pane reports no interactive prompt', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a',
+        inject: true
+      })) as { injected: boolean }
+
+      expect(result.injected).toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not block dispatch when the pane is unreachable', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      // A gone/exited/stale pane is not evidence of a prompt, so the send path keeps surfacing its
+      // own precise error instead of a misleading "blocked on a prompt" one.
+      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('terminal_gone'))
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a',
+        inject: true
+      })) as { injected: boolean }
+
+      expect(result.injected).toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    // Why: undetermined readiness must fail closed. Refusing costs a retry; accepting costs a
+    // swallowed task and a prompt answered on the user's behalf.
+    it('refuses inject when pane readiness cannot be determined', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('timeout'))
+      // Why: a resolving send means a fail-open guard would report success instead of throwing.
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      await expect(
+        call('orchestration.dispatch', {
+          task: task.id,
+          to: 'term_a',
+          inject: true
+        })
+      ).rejects.toThrow('waiting on an interactive prompt')
+
+      expect(send).not.toHaveBeenCalled()
+      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
     })
 
     it('rejects dispatch to occupied terminal', async () => {

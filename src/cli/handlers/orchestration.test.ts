@@ -4,6 +4,9 @@ const callMock = vi.fn()
 const getTerminalHandleMock = vi.hoisted(() => vi.fn())
 const originalTerminalHandle = process.env.ORCA_TERMINAL_HANDLE
 const originalPaneKey = process.env.ORCA_PANE_KEY
+// Why: these run inside a managed agent pane, so an ambient launch token would leak into the
+// asserted payload and make the expectation pass or fail depending on who ran the suite.
+const originalLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages must be sent to a concrete coordinator terminal handle, not a group address.`
 }
@@ -45,6 +48,11 @@ afterEach(() => {
     delete process.env.ORCA_PANE_KEY
   } else {
     process.env.ORCA_PANE_KEY = originalPaneKey
+  }
+  if (originalLaunchToken === undefined) {
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+  } else {
+    process.env.ORCA_AGENT_LAUNCH_TOKEN = originalLaunchToken
   }
 })
 
@@ -94,6 +102,7 @@ describe('orchestration send structured payload flags', () => {
     getTerminalHandleMock.mockReset()
     delete process.env.ORCA_TERMINAL_HANDLE
     delete process.env.ORCA_PANE_KEY
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
   })
 
   const invokeSend = (flags: Map<string, string | boolean>) =>
@@ -132,6 +141,8 @@ describe('orchestration send structured payload flags', () => {
         filesModified: ['src/a.ts', 'src/b.ts'],
         reportPath: 'reports/done.md'
       }),
+      senderPaneKey: undefined,
+      senderLaunchToken: undefined,
       devMode: false
     })
   })
@@ -225,6 +236,8 @@ describe('orchestration send structured payload flags', () => {
       priority: undefined,
       threadId: undefined,
       payload: undefined,
+      senderPaneKey: undefined,
+      senderLaunchToken: undefined,
       devMode: false
     })
   })
@@ -250,8 +263,32 @@ describe('orchestration send structured payload flags', () => {
       priority: undefined,
       threadId: undefined,
       payload: undefined,
+      senderPaneKey: undefined,
+      senderLaunchToken: undefined,
       devMode: false
     })
+  })
+
+  it('forwards the pane launch token so the runtime can authenticate the sender', async () => {
+    process.env.ORCA_TERMINAL_HANDLE = 'term_worker_env'
+    process.env.ORCA_PANE_KEY = 'tab_worker:leaf_worker'
+    process.env.ORCA_AGENT_LAUNCH_TOKEN = 'launch_worker'
+
+    await invokeSend(
+      new Map<string, string | boolean>([
+        ['to', 'term_coord'],
+        ['subject', 'done'],
+        ['type', 'worker_done']
+      ])
+    )
+
+    expect(callMock).toHaveBeenCalledWith(
+      'orchestration.send',
+      expect.objectContaining({
+        senderPaneKey: 'tab_worker:leaf_worker',
+        senderLaunchToken: 'launch_worker'
+      })
+    )
   })
 
   it.each(['worker_done', 'heartbeat'] as const)(

@@ -7490,7 +7490,14 @@ export class OrcaRuntimeService {
     ptyId: string,
     worktreeId: string,
     connectionId: string | null = null,
-    binding?: { tabId: string; leafId: string; incarnationId?: PtyIncarnationId },
+    binding?: {
+      tabId: string
+      leafId: string
+      incarnationId?: PtyIncarnationId
+      launchConfig?: SleepingAgentLaunchConfig
+      launchToken?: string
+      launchAgent?: TuiAgent
+    },
     isWsl?: boolean
   ): void {
     this.assertPtyDidNotExitBeforeRegistration(ptyId, binding?.incarnationId)
@@ -7500,13 +7507,20 @@ export class OrcaRuntimeService {
       binding && isValidTerminalTabId(binding.tabId) && isTerminalLeafId(binding.leafId)
         ? makePaneKey(binding.tabId, binding.leafId)
         : null
-    this.recordPtyWorktree(ptyId, worktreeId, {
+    const pty = this.recordPtyWorktree(ptyId, worktreeId, {
       connected: true,
       connectionId,
       ...(isWsl !== undefined ? { isWsl } : {}),
       ...(binding && paneKey ? { tabId: binding.tabId, paneKey } : {}),
       ...(binding?.incarnationId ? { incarnationId: binding.incarnationId } : {})
     })
+    if (binding?.launchConfig && binding.launchToken && paneKey) {
+      // Why: the renderer spawns this PTY, so registration is main's only chance to keep the same
+      // launch credential the child got — without this copy there is nothing to authenticate against.
+      pty.launchConfig = copySleepingAgentLaunchConfig(binding.launchConfig)
+      pty.launchToken = binding.launchToken
+      pty.launchAgent = binding.launchAgent ?? null
+    }
     const pendingIncarnation = this.pendingPtyRegistrationIncarnations.get(ptyId)
     if (
       pendingIncarnation === null ||
@@ -13683,6 +13697,44 @@ export class OrcaRuntimeService {
     } catch {
       return null
     }
+  }
+
+  /**
+   * Resolves the sender's canonical handle, preferring proof over the `--from` it declared. The
+   * launch token is minted per launch and handed only to that pane's child process, so presenting
+   * it proves pane ownership; deriving the handle from the pane key instead of the claim is also
+   * what keeps a legitimate worker alive across a handle remint.
+   *
+   * A pane that holds a launch token on record MUST present it — that is what closes impersonation
+   * of managed agent panes. Panes with no token on record (SSH with remote hooks off strips
+   * ORCA_PANE_KEY, reattached PTYs, hand-opened shells) keep the previous handle-derived identity:
+   * failing them closed would lose the very worker_done this authentication exists to protect.
+   */
+  authenticateOrchestrationSender(args: {
+    claimedHandle?: string
+    paneKey?: string
+    launchToken?: string
+  }): { handle: string; paneKey?: string } {
+    if (args.paneKey) {
+      const pty = this.getPtyRecordForPaneKey(args.paneKey)
+      if (pty?.launchToken) {
+        // Why: never degrade to the handle-derived tier once the pane is known to be token-bound,
+        // or presenting no token would be an easier impersonation than presenting a forged one.
+        if (!pty.connected || args.launchToken !== pty.launchToken) {
+          throw new Error('orchestration_sender_unauthenticated')
+        }
+        const handle = this.getTerminalHandleForPaneKey(args.paneKey)
+        if (!handle) {
+          throw new Error('orchestration_sender_unauthenticated')
+        }
+        return { handle, paneKey: args.paneKey }
+      }
+    }
+    const handle =
+      args.claimedHandle ??
+      (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null) ??
+      'unknown'
+    return { handle, paneKey: args.paneKey ?? this.getTerminalPaneKey(handle) ?? undefined }
   }
 
   resolveTerminalPane(paneKey: string, expectedWorktreeId?: string): RuntimeTerminalResolvePane {
@@ -22400,6 +22452,11 @@ export class OrcaRuntimeService {
     const launchOpts = workspace
       ? await this.resolveAgentTerminalCreateOptions(workspace, opts)
       : opts
+    // Why: the renderer spawns this PTY, so a token must exist before the request goes out —
+    // otherwise the agent child has no credential and can never authenticate its own messages.
+    const launchToken = launchOpts.launchConfig
+      ? (launchOpts.launchToken ?? randomUUID())
+      : undefined
     const worktreeId = workspace?.id
     const cwd = workspace
       ? this.resolveWorkspaceTerminalStartupCwd(workspace, launchOpts.cwd)
@@ -22441,7 +22498,7 @@ export class OrcaRuntimeService {
         ...(launchOpts.resumeProviderSession
           ? { resumeProviderSession: launchOpts.resumeProviderSession }
           : {}),
-        ...(launchOpts.launchToken ? { launchToken: launchOpts.launchToken } : {}),
+        ...(launchToken ? { launchToken } : {}),
         ...(launchOpts.launchAgent ? { launchAgent: launchOpts.launchAgent } : {}),
         ...(launchOpts.viewMode ? { viewMode: launchOpts.viewMode } : {}),
         startupCommandDelivery: launchOpts.startupCommandDelivery,
@@ -27289,6 +27346,24 @@ export class OrcaRuntimeService {
   private nextTitleObservationSequence(): number {
     this.titleObservationSequence += 1
     return this.titleObservationSequence
+  }
+
+  /**
+   * Positive-evidence check for a pane parked on an interactive prompt — directory trust,
+   * permission, upgrade notice. Callers that deliver Enter-terminated input must refuse when this
+   * is true, because that Enter answers the prompt instead of submitting the input (#10666).
+   *
+   * A gone/exited/stale/unavailable handle is not "blocked": the send path then surfaces its own
+   * precise error. Every other failure counts as blocked, because refusing costs a retry while
+   * accepting costs a silently swallowed task plus a prompt answered as a side effect.
+   */
+  async isTerminalBlockedOnInteractivePrompt(handle: string): Promise<boolean> {
+    try {
+      const { status } = await this.getTerminalAgentStatus(handle)
+      return status === 'permission'
+    } catch (err) {
+      return !isUnreachableTerminalError(err)
+    }
   }
 
   // Why: title is the tightest agent-presence signal, but a Claude management title is negative evidence for task activity.
@@ -32853,6 +32928,19 @@ function isKnownReadyPromptPreview(preview: string): boolean {
   return true
 }
 
+// Why: the send path raises these itself with better context, so readiness probes must not translate
+// them into a blocked verdict; anything else is genuinely undetermined readiness.
+const UNREACHABLE_TERMINAL_ERRORS: ReadonlySet<string> = new Set([
+  'terminal_gone',
+  'terminal_exited',
+  'terminal_handle_stale',
+  'runtime_unavailable'
+])
+
+function isUnreachableTerminalError(err: unknown): boolean {
+  return UNREACHABLE_TERMINAL_ERRORS.has(err instanceof Error ? err.message : String(err))
+}
+
 function detectTerminalWaitBlockedReason(preview: string): RuntimeTerminalWaitBlockedReason | null {
   const normalized = preview.toLowerCase()
   return findActionableTerminalWaitBlockedSignal(normalized)?.reason ?? null
@@ -32944,14 +33032,14 @@ function findAntigravityReadyPromptIndex(normalized: string): number | null {
       trimmedEnd -= 1
     }
     if (lineStart > headerIndex && trimmedStart < trimmedEnd) {
-      if (modelIndex === null && normalized.startsWith('gemini', trimmedStart)) {
+      // Why (#10666): keep the LAST match of each line, matching the lastIndexOf semantics the Codex
+      // and Cursor probes above use. Antigravity draws a startup modal after its first paint and then
+      // repaints model/prompt without repeating the header; first-match kept the ready evidence
+      // behind the modal text forever, so the pane reported blocked long after the prompt was answered.
+      if (normalized.startsWith('gemini', trimmedStart)) {
         modelIndex = trimmedStart
       }
-      if (
-        promptIndex === null &&
-        trimmedEnd - trimmedStart === 1 &&
-        normalized.charCodeAt(trimmedStart) === 62
-      ) {
+      if (trimmedEnd - trimmedStart === 1 && normalized.charCodeAt(trimmedStart) === 62) {
         promptIndex = trimmedStart
       }
     }
