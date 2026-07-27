@@ -177,7 +177,7 @@ orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
 orca terminal send --terminal <handle> --text "<task brief>" --enter --json
 ```
 
-Wait only for `tui-idle` when needed to avoid losing the prompt. Do not monitor task completion.
+Wait only for `tui-idle` when needed to avoid losing the prompt. Do not monitor task completion. A raw `--command` launch like the one above applies none of the agent defaults configured in Settings, permission mode included; use `--agent <id>` whenever custom argv is not required.
 
 `--no-parent` only controls Orca lineage; it does not choose the Git base. If the work should start from the repo default base, omit `--base-branch` so Orca uses that default, or explicitly pass the repo default base (`origin/main`, `origin/master`, or the `orca repo show --repo <selector> --json` value); never base it on the current feature branch unless the user explicitly asks for stacked work or "branch from current". Put current-branch context in the prompt instead.
 
@@ -186,10 +186,12 @@ Wait only for `tui-idle` when needed to avoid losing the prompt. Do not monitor 
 Choose the worker location before creating a terminal. `Fresh worker` means a fresh agent session, not a new git worktree. For parallel work, create one fresh agent terminal per worker in the same required worktree, falling back to the active worktree when none is named. If the task says current worktree only, depends on uncommitted files/artifacts, or must validate/PR the current branch, keep every worker in the active worktree:
 
 ```bash
-orca terminal create --worktree active --title <task-name> --command "codex" --json
+orca terminal create --worktree active --title <task-name> --agent codex --json
 orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
 orca orchestration dispatch --task <task_id> --to <handle> --inject --json
 ```
+
+Launch workers with `--agent <id>`, not `--command "<agent>"`. `--agent` applies the launch arguments and environment configured in Settings, including the permission mode, so a user on an approval-free mode gets workers that do not stall on permission prompts, and a user on a manual mode still gets the prompts they asked for. Raw `--command` launches argv verbatim and applies none of those defaults, so an agent started that way keeps its own built-in prompts regardless of the configuration. The two flags are mutually exclusive; use `--command` only when custom argv is required (for example Codex `--model`/`-c model_reasoning_effort=...`), and expect no permission defaults on that path. `--agent` composes with `--claude-account` / `--codex-account`.
 
 Reuse an idle agent in the required worktree only if the prompt allows reuse; otherwise create a fresh terminal there. Create a new worktree only when the user explicitly requests one or a concrete checkout or filesystem conflict makes sharing unsafe or impossible; if the user did not request it, state that conflict before running `worktree create`. Independent tasks, parallel execution, convenience, or a preference for separate checkouts are not isolation requirements.
 
@@ -215,16 +217,32 @@ Other terminal commands coordinators often need:
 
 ```bash
 orca terminal list [--worktree <selector>] [--json]
-orca terminal create [--worktree <selector>] [--title <text>] [--command <cmd>] [--json]
+orca terminal create [--worktree <selector>] [--title <text>] [--agent <id>] [--command <cmd>] [--json]
 orca terminal split --terminal <handle> [--direction horizontal|vertical] [--command <cmd>] [--json]
 orca terminal wait --terminal <handle> --for tui-idle --timeout-ms <n> --json
 orca terminal read --terminal <handle> --json
 orca terminal send --terminal <handle> --text <text> --enter --json
+orca terminal close --terminal <handle> --json
 ```
 
-If an older CLI rejects `worktree create --agent`, create the worktree normally, then run `orca terminal create --worktree <selector> --command "codex" --json` or `--command "claude"`.
+If an older CLI rejects `worktree create --agent`, create the worktree normally, then run `orca terminal create --worktree <selector> --agent codex --json`. If that CLI also rejects `terminal create --agent`, fall back to `--command "codex"` and state that the worker is running without the configured permission defaults.
 
 Wait for `tui-idle` before dispatching. Always pass `--timeout-ms`; real coding tasks can take 15-60 minutes. During supervision, use rolling `check --wait` windows. If a window returns no matching message, inspect `task-list`, `terminal read`, or `terminal wait --for tui-idle` as a liveness checkpoint; if the terminal is still working or producing activity, keep waiting instead of retrying the task.
+
+## Closing Workers
+
+Closing is part of the dispatch cycle, not a courtesy. A round of fan-out that never closes its panes leaves the workspace unusable after a few rounds.
+
+Close a worker's pane once `worker_done` arrives **and** its result has been consumed — report read, files committed, follow-up dispatched. Do not close a worker that has only sent heartbeats or shown terminal activity; that rule in Ownership still holds.
+
+```bash
+orca terminal close --terminal <handle> --json
+orca terminal list --worktree <selector> --json
+```
+
+Verify the close by re-listing, never by the return value alone. Terminal handles rotate — the same pane can carry a new handle after a restart — so `terminal close` can answer `terminal_handle_stale` while the shell is still alive and now untitled. When that happens, or when the worker's pane is still in `terminal list`, resolve the current handle from `terminal list` (match on worktree plus the title you gave the worker at create time) and close that handle instead.
+
+Close the round with one final `orca terminal list --worktree <selector> --json` and confirm no worker pane survived. Untitled shells in that list are the usual residue of a stale-handle close; close them by their current handle.
 
 ## Agent Guidance
 
@@ -240,15 +258,18 @@ Wait for `tui-idle` before dispatching. Always pass `--timeout-ms`; real coding 
 ## Example
 
 ```bash
-orca terminal create --worktree active --title login-css-worker --command "claude" --json
+orca terminal create --worktree active --title login-css-worker --agent claude --json
 orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
 orca orchestration task-create --spec "Fix the login button CSS" --json
 orca orchestration dispatch --task <task_id> --to <handle> --inject --json
 orca orchestration check --wait --types worker_done,escalation,decision_gate --timeout-ms 900000 --json
+# After consuming the worker's result:
+orca terminal close --terminal <handle> --json
+orca terminal list --worktree active --json
 ```
 
 ## Next Action
 
-Coordinator: confirm `orca status --json`, inspect `task-list`/`dispatch-show` if inheriting state, then choose either a manual loop (`task-create` -> worker -> `dispatch --inject` -> `check --wait`) or `orchestration run`.
+Coordinator: confirm `orca status --json`, inspect `task-list`/`dispatch-show` if inheriting state, then choose either a manual loop (`task-create` -> worker -> `dispatch --inject` -> `check --wait` -> consume result -> `terminal close` -> verify with `terminal list`) or `orchestration run`.
 
 Worker: if the current prompt contains a live dispatch preamble, do the task, use `ask` for blocking questions, and send `worker_done` once with the required payload. If the preamble is stale or absent, do not send lifecycle messages; inspect state or treat the prompt as an ordinary handoff.

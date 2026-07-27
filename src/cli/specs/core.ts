@@ -1,6 +1,7 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
 import { SERVE_COMMAND_SPECS } from './serve'
+import { TERMINAL_CREATE_COMMAND_SPECS } from './terminal-create'
 import { TERMINAL_SPLIT_COMMAND_SPECS } from './terminal-split'
 
 export const CORE_COMMAND_SPECS: CommandSpec[] = [
@@ -110,7 +111,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'activate'
     ],
     notes: [
-      'This creates a new checkout. For a fresh agent in an existing worktree, use `orca terminal create --worktree active --command "codex"` instead.',
+      'This creates a new checkout. For a fresh agent in an existing worktree, use `orca terminal create --worktree active --agent codex` instead.',
       'By default, Orca records the new worktree as a child of the caller context when it can infer one from the Orca terminal or current directory.',
       'If --repo is omitted, Orca infers the repo from the current Orca-managed worktree.',
       'Use --project with --host to create on a ready project host setup without spelling the backing repo id.',
@@ -229,34 +230,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca terminal stop --worktree <selector> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'worktree']
   },
-  {
-    path: ['terminal', 'create'],
-    summary: 'Create a terminal session in the current worktree',
-    usage:
-      'orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--focus] [--json]',
-    allowedFlags: [
-      ...GLOBAL_FLAGS,
-      'worktree',
-      'command',
-      'title',
-      'focus',
-      'claude-account',
-      'codex-account'
-    ],
-    notes: [
-      'Creates a visible terminal tab without switching focus when possible; falls back to a background handle if the UI cannot adopt it. Pass --focus to switch to it.',
-      'Use this, not worktree create, for a fresh agent in the current checkout.',
-      'Pass --claude-account or --codex-account (email or id from `orca account list --json`) to launch this terminal against a specific managed account. The launch flag beats the worktree account pin; the pin beats the global selection.',
-      'An account-directed terminal always spawns on the background path, so it skips renderer-backed niceties for interactive agent TUIs.'
-    ],
-    examples: [
-      'orca terminal create --json',
-      'orca terminal create --worktree active --command "codex" --json',
-      'orca terminal create --worktree path:/projects/myapp --title "RUNNER" --command "opencode"',
-      'orca terminal create --worktree path:/projects/myapp --command "opencode" --focus',
-      'orca terminal create --worktree active --command "claude" --claude-account dev@example.com --json'
-    ]
-  },
+  ...TERMINAL_CREATE_COMMAND_SPECS,
   {
     path: ['terminal', 'switch'],
     // Why: `focus` is the legacy verb for this action; keep it working as an

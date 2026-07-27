@@ -224,7 +224,7 @@ Common Commands:
   orca terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
   orca terminal wait [--terminal <handle>] --for exit|tui-idle [--timeout-ms <ms>] [--json]
   orca terminal stop --worktree <selector> [--json]
-  orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]
+  orca terminal create [--worktree <selector>] [--title <name>] [--agent <id>] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--focus] [--json]
   orca terminal split [--terminal <handle>] [--direction horizontal|vertical] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--json]
   orca terminal switch [--terminal <handle>] [--json]
   orca terminal close [--terminal <handle>] [--tab] [--json]
@@ -271,7 +271,9 @@ Behavior:
 Agent Sessions And Worktrees:
   \`worktree create --agent\` creates a new checkout with an agent.
   To start a fresh agent in the current worktree, use:
-    orca terminal create --worktree active --command "codex"
+    orca terminal create --worktree active --agent codex
+  \`--agent\` applies the agent defaults configured in Settings, including the permission mode.
+  \`--command\` launches raw argv and skips those defaults; the two flags are mutually exclusive.
 
 Browser Workflow:
   1. Create or navigate:  orca tab create --url https://example.com
@@ -322,7 +324,7 @@ Examples:
   $ orca worktree ps --limit 10
   $ orca file open-changed --mode diff
   $ orca file open src/App.tsx
-  $ orca terminal create --worktree active --command "codex"
+  $ orca terminal create --worktree active --agent codex
   $ orca terminal list --worktree path:/Users/me/orca/workspaces/orca/cli-test-1 --json
   $ orca terminal send --terminal term_123 --text "hi" --enter
   $ orca terminal wait --terminal term_123 --for exit --timeout-ms 60000 --json

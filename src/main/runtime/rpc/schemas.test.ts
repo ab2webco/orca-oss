@@ -78,6 +78,22 @@ describe('RPC optional pipe schemas', () => {
       terminal: 'terminal-1',
       telemetrySource: 'raw-source'
     })
+    expectParses(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      agent: 'claude',
+      claudeAccountId: 'account-claude'
+    })
+    expectRejects(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      agent: 'clawed'
+    })
+    // Why: honoring one and dropping the other would launch a worker without the
+    // permission mode the caller asked for.
+    expectRejects(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      agent: 'claude',
+      command: 'claude'
+    })
     expectParses(methodParams(WORKTREE_METHODS, 'worktree.create'), { repo: 'repo-1' })
     expectParses(methodParams(WORKTREE_METHODS, 'worktree.set'), {
       worktree: 'id:wt-1',

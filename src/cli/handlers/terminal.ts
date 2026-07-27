@@ -28,8 +28,11 @@ import {
 import {
   getOptionalPositiveIntegerFlag,
   getOptionalStringFlag,
+  getPresentStringFlag,
   getRequiredStringFlag
 } from '../flags'
+import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import type { TuiAgent } from '../../shared/types'
 import { RuntimeClientError } from '../runtime-client'
 import { resolveAccountSelectorFlags } from '../account-selector'
 import {
@@ -43,6 +46,32 @@ import {
 // timeout. Even without an explicit server timeout, the client must allow
 // long waits instead of failing at the generic 15s transport cap.
 const DEFAULT_TERMINAL_WAIT_RPC_TIMEOUT_MS = 5 * 60 * 1000
+
+function getRequestedTuiAgent(
+  flags: Map<string, string | boolean>,
+  command: string | undefined
+): TuiAgent | undefined {
+  const agent = getPresentStringFlag(flags, 'agent')
+  if (agent === undefined) {
+    return undefined
+  }
+  if (command !== undefined) {
+    // Why: silently preferring one would reproduce the defect --agent exists to
+    // fix — a worker launched without the configured permission mode, with no
+    // signal that the flag was dropped.
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Pass either --agent or --command, not both. --agent applies the agent defaults configured in Settings; --command launches raw argv without them.'
+    )
+  }
+  if (!isTuiAgent(agent)) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `Unknown TUI agent "${agent}". Valid agents: ${Object.keys(TUI_AGENT_CONFIG).join(', ')}`
+    )
+  }
+  return agent
+}
 
 const terminalFocusHandler: CommandHandler = async ({ flags, client, cwd, json }) => {
   const result = await client.call<{ focus: RuntimeTerminalFocus }>('terminal.focus', {
@@ -133,18 +162,24 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
       )
     }
     const command = getOptionalStringFlag(flags, 'command')
+    const agent = getRequestedTuiAgent(flags, command)
     const accountOverrides = await resolveAccountSelectorFlags(flags, client)
     const hasAccountOverride =
       accountOverrides.claudeAccountId !== undefined ||
       accountOverrides.codexAccountId !== undefined
     // Why: the launch-account override only applies on the background spawn
     // path; the renderer-backed path spawns from the renderer and would drop it.
+    // The runtime expands --agent into argv, so classify by the agent id, which
+    // is the same bare command --command would have carried.
     const useRendererBackedInteractiveTerminal =
-      !client.isRemote && !hasAccountOverride && shouldUseRendererBackedInteractiveTerminal(command)
+      !client.isRemote &&
+      !hasAccountOverride &&
+      shouldUseRendererBackedInteractiveTerminal(agent ?? command)
     const focus = flags.get('focus') === true
     const result = await client.call<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
       worktree: await getBrowserWorktreeSelector(flags, cwd, client),
       command,
+      ...(agent ? { agent } : {}),
       title: getOptionalStringFlag(flags, 'title'),
       // Why: interactive local agent TUIs need the renderer-backed terminal
       // path for browser-side features, but CLI creates must stay backgrounded

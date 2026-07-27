@@ -351,7 +351,10 @@ describe('orca root help', () => {
       '`worktree create --agent` creates a new checkout with an agent.'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
-      'orca terminal create --worktree active --command "codex"'
+      'orca terminal create --worktree active --agent codex'
+    )
+    expect(logSpy.mock.calls[0][0]).toContain(
+      '`--command` launches raw argv and skips those defaults'
     )
     expect(callMock).not.toHaveBeenCalled()
   })
@@ -483,7 +486,7 @@ describe('orca root help', () => {
 
     expect(String(logSpy.mock.calls[0][0])).toContain('This creates a new checkout.')
     expect(String(logSpy.mock.calls[0][0])).toContain(
-      'orca terminal create --worktree active --command "codex"'
+      'orca terminal create --worktree active --agent codex'
     )
 
     logSpy.mockClear()
@@ -491,9 +494,8 @@ describe('orca root help', () => {
 
     const terminalHelp = String(logSpy.mock.calls[0][0])
     expect(terminalHelp).toContain('Use this, not worktree create')
-    expect(terminalHelp).toContain(
-      'orca terminal create --worktree active --command "codex" --json'
-    )
+    expect(terminalHelp).toContain('orca terminal create --worktree active --agent codex --json')
+    expect(terminalHelp).toContain('never applies the configured agent defaults')
     expect(callMock).not.toHaveBeenCalled()
   })
 })
@@ -3307,6 +3309,47 @@ describe('orca cli worktree awareness', () => {
       title: undefined,
       focus: false,
       codexAccountId: 'acc-codex-work'
+    })
+  })
+
+  it('composes --agent with --claude-account on terminal.create', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_terminal_create', {
+        terminal: {
+          handle: 'term_1',
+          worktreeId: 'repo-1::/tmp/repo/feature',
+          title: 'worker-1'
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'terminal',
+        'create',
+        '--worktree',
+        'path:/tmp/repo/feature',
+        '--title',
+        'worker-1',
+        '--agent',
+        'claude',
+        '--claude-account',
+        'work@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.create', {
+      worktree: 'path:/tmp/repo/feature',
+      command: undefined,
+      agent: 'claude',
+      title: 'worker-1',
+      focus: false,
+      claudeAccountId: 'acc-claude-work'
     })
   })
 

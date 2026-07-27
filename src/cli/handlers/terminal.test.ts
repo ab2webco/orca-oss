@@ -61,3 +61,104 @@ describe('terminal close CLI', () => {
     expect(help).toContain('durable persistence')
   })
 })
+
+describe('terminal create --agent CLI', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function createClient(call: ReturnType<typeof vi.fn>): RuntimeClient {
+    return { call, isRemote: false } as unknown as RuntimeClient
+  }
+
+  function createResultCall(): ReturnType<typeof vi.fn> {
+    return vi.fn().mockResolvedValue({
+      result: { terminal: { handle: 'term-1', worktreeId: 'repo-1::/tmp/worktree', title: null } }
+    })
+  }
+
+  async function runCreate(argv: string[], call: ReturnType<typeof vi.fn>): Promise<void> {
+    const parsed = parseArgs(argv)
+    await TERMINAL_HANDLERS['terminal create']({
+      flags: parsed.flags,
+      client: createClient(call),
+      cwd: '/tmp/worktree',
+      json: true
+    })
+  }
+
+  it('forwards the selected agent so the runtime applies the configured defaults', async () => {
+    const call = createResultCall()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await runCreate(
+      [
+        'terminal',
+        'create',
+        '--worktree',
+        'path:/tmp/worktree',
+        '--title',
+        'worker-1',
+        '--agent',
+        'claude',
+        '--json'
+      ],
+      call
+    )
+
+    expect(call).toHaveBeenCalledWith(
+      'terminal.create',
+      expect.objectContaining({
+        worktree: 'path:/tmp/worktree',
+        agent: 'claude',
+        title: 'worker-1',
+        command: undefined,
+        rendererBacked: true
+      })
+    )
+  })
+
+  it('rejects --agent together with --command instead of silently dropping one', async () => {
+    const call = createResultCall()
+
+    await expect(
+      runCreate(
+        [
+          'terminal',
+          'create',
+          '--worktree',
+          'path:/tmp/worktree',
+          '--agent',
+          'claude',
+          '--command',
+          'claude'
+        ],
+        call
+      )
+    ).rejects.toThrow('Pass either --agent or --command, not both.')
+    expect(call).not.toHaveBeenCalled()
+  })
+
+  it('names the valid agents when --agent is unknown', async () => {
+    const call = createResultCall()
+
+    await expect(
+      runCreate(
+        ['terminal', 'create', '--worktree', 'path:/tmp/worktree', '--agent', 'clawed'],
+        call
+      )
+    ).rejects.toThrow(/Unknown TUI agent "clawed"\. Valid agents: .*\bclaude\b.*\bcodex\b/)
+    expect(call).not.toHaveBeenCalled()
+  })
+
+  it('documents that --command skips the configured agent defaults', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    printHelp(COMMAND_SPECS, ['terminal', 'create'])
+
+    const help = String(log.mock.calls[0]?.[0])
+    expect(help).toContain('[--agent <id>]')
+    expect(help).toContain('never applies the configured agent defaults')
+    expect(help).toContain('mutually exclusive')
+  })
+})

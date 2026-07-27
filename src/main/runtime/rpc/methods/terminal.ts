@@ -25,7 +25,7 @@ import {
   isTerminalInputTooLargeWithYield
 } from '../../../../shared/terminal-input'
 import { measureClipboardTextByteLength } from '../../../../shared/clipboard-text'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
 import { isTerminalQueryReply } from '../../../../shared/terminal-query-reply'
 import {
   EMPTY_TERMINAL_REPLY_QUERY_SCAN_STATE,
@@ -923,51 +923,66 @@ const TerminalWait = TerminalHandle.extend({
   timeoutMs: OptionalFiniteNumber
 })
 
-const TerminalCreateParams = z.object({
-  worktree: OptionalString,
-  clientMutationId: z.string().min(1).max(128).optional(),
-  reconcileExisting: z.boolean().optional(),
-  command: OptionalString,
-  startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  envToDelete: z.array(z.string().min(1).max(256)).max(32).optional(),
-  launchConfig: z
-    .object({
-      agentCommand: z.string().optional(),
-      agentArgs: z.string(),
-      agentEnv: z.record(z.string(), z.string()),
-      ompResumeFilePath: z
-        .string()
-        .min(1)
-        .max(32 * 1024)
-        .optional()
-    })
-    .optional(),
-  resumeProviderSession: z
-    .object({
-      key: z.enum(['session_id', 'conversation_id']),
-      id: z.string().min(1).max(512),
-      transcriptPath: z.string().min(1).max(32_768).optional()
-    })
-    .optional(),
-  launchToken: OptionalString,
-  launchAgent: z.string().refine(isTuiAgent).optional(),
-  terminalColorQueryReplies: z
-    .object({
-      foreground: z.string().max(128).optional(),
-      background: z.string().max(128).optional()
-    })
-    .optional(),
-  title: OptionalString,
-  focus: z.unknown().optional(),
-  rendererBacked: z.unknown().optional(),
-  activate: z.unknown().optional(),
-  presentation: z.enum(['background', 'focused']).optional(),
-  tabId: OptionalString,
-  leafId: OptionalString,
-  claudeAccountId: z.string().min(1).max(512).optional(),
-  codexAccountId: z.string().min(1).max(512).optional()
-})
+const TerminalCreateParams = z
+  .object({
+    worktree: OptionalString,
+    clientMutationId: z.string().min(1).max(128).optional(),
+    reconcileExisting: z.boolean().optional(),
+    command: OptionalString,
+    /** Launch this agent with the Settings-configured args/env, including the
+     *  permission mode, instead of a caller-authored command line. */
+    agent: z
+      .string()
+      .refine(isTuiAgent, {
+        message: `Unknown TUI agent. Valid agents: ${Object.keys(TUI_AGENT_CONFIG).join(', ')}`
+      })
+      .optional(),
+    startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    envToDelete: z.array(z.string().min(1).max(256)).max(32).optional(),
+    launchConfig: z
+      .object({
+        agentCommand: z.string().optional(),
+        agentArgs: z.string(),
+        agentEnv: z.record(z.string(), z.string()),
+        ompResumeFilePath: z
+          .string()
+          .min(1)
+          .max(32 * 1024)
+          .optional()
+      })
+      .optional(),
+    resumeProviderSession: z
+      .object({
+        key: z.enum(['session_id', 'conversation_id']),
+        id: z.string().min(1).max(512),
+        transcriptPath: z.string().min(1).max(32_768).optional()
+      })
+      .optional(),
+    launchToken: OptionalString,
+    launchAgent: z.string().refine(isTuiAgent).optional(),
+    terminalColorQueryReplies: z
+      .object({
+        foreground: z.string().max(128).optional(),
+        background: z.string().max(128).optional()
+      })
+      .optional(),
+    title: OptionalString,
+    focus: z.unknown().optional(),
+    rendererBacked: z.unknown().optional(),
+    activate: z.unknown().optional(),
+    presentation: z.enum(['background', 'focused']).optional(),
+    tabId: OptionalString,
+    leafId: OptionalString,
+    claudeAccountId: z.string().min(1).max(512).optional(),
+    codexAccountId: z.string().min(1).max(512).optional()
+  })
+  // Why: honoring one and dropping the other would launch a worker without the
+  // configured permission mode while the caller believes it asked for it.
+  .refine((params) => params.agent === undefined || params.command === undefined, {
+    message:
+      'Pass either agent or command, not both. agent applies the configured agent defaults; command launches raw argv without them.'
+  })
 
 const TerminalSplit = TerminalHandle.extend({
   direction: z
@@ -1411,6 +1426,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         (canonicalWorktreeSelector, preAllocatedHandle) =>
           runtime.createTerminal(canonicalWorktreeSelector, {
             command: params.command,
+            ...(params.agent ? { agent: params.agent } : {}),
             startupCommandDelivery: params.startupCommandDelivery,
             env: params.env,
             envToDelete: params.envToDelete,

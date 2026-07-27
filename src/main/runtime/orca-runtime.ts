@@ -1268,6 +1268,10 @@ type RuntimePtyWorktreeRecord = {
 
 type TerminalCreateOptions = {
   command?: string
+  /** Launch this agent with the Settings-configured args/env (permission mode
+   *  included) instead of a caller-authored command line. Mutually exclusive
+   *  with `command`. */
+  agent?: TuiAgent
   claudeAgentTeamsSourceCommand?: string
   cwd?: string
   env?: Record<string, string>
@@ -21600,6 +21604,9 @@ export class OrcaRuntimeService {
     workspace: TerminalWorkspaceLaunchScope,
     opts: TerminalCreateOptions
   ): Promise<TerminalCreateOptions> {
+    if (opts.agent) {
+      return await this.resolveRequestedAgentTerminalCreateOptions(workspace, opts, opts.agent)
+    }
     // Why: raw shell commands like `codex exec` must remain user-authored shell.
     // Only unmanaged, repo-backed, bare agent launches get Settings defaults.
     if (
@@ -21616,23 +21623,53 @@ export class OrcaRuntimeService {
     }
 
     const settings = this.store.getSettings()
-    const platform = this.getAgentLaunchPlatformForWorkspace(workspace)
-    const isRemote = repoIsRemote(workspace.repo)
-    const queuedShell = resolveLocalWindowsAgentStartupShell({
-      platform,
-      isRemote,
-      terminalWindowsShell: settings.terminalWindowsShell
-    })
     const agent = resolveBareAgentLaunchCommand({
       command: opts.command,
       settings,
-      platform,
-      isRemote
+      platform: this.getAgentLaunchPlatformForWorkspace(workspace),
+      isRemote: repoIsRemote(workspace.repo)
     })
     if (!agent) {
       return opts
     }
+    return (await this.buildAgentTerminalCreateOptions(workspace, opts, agent)) ?? opts
+  }
 
+  /** `--agent` is an explicit request for the configured launch defaults, so an
+   *  unusable agent must fail loudly instead of degrading to a bare shell. */
+  private async resolveRequestedAgentTerminalCreateOptions(
+    workspace: TerminalWorkspaceLaunchScope,
+    opts: TerminalCreateOptions,
+    agent: TuiAgent
+  ): Promise<TerminalCreateOptions> {
+    if (opts.command) {
+      throw new Error('Pass either an agent or a command, not both.')
+    }
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    if (!isTuiAgentEnabled(agent, this.store.getSettings().disabledTuiAgents)) {
+      throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
+    }
+    const resolved = await this.buildAgentTerminalCreateOptions(workspace, opts, agent)
+    if (!resolved) {
+      throw new Error(`Could not build launch command for ${agent}.`)
+    }
+    return resolved
+  }
+
+  private async buildAgentTerminalCreateOptions(
+    workspace: TerminalWorkspaceLaunchScope,
+    opts: TerminalCreateOptions,
+    agent: TuiAgent
+  ): Promise<TerminalCreateOptions | null> {
+    if (!this.store) {
+      return null
+    }
+    const settings = this.store.getSettings()
+    const platform = this.getAgentLaunchPlatformForWorkspace(workspace)
+    // Why: folder workspaces have no repo, so remoteness comes from the connection.
+    const isRemote = workspace.repo ? repoIsRemote(workspace.repo) : Boolean(workspace.connectionId)
     const startupPlan = buildAgentStartupPlan({
       agent,
       prompt: '',
@@ -21640,12 +21677,16 @@ export class OrcaRuntimeService {
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
       agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
       platform,
-      shell: queuedShell,
+      shell: resolveLocalWindowsAgentStartupShell({
+        platform,
+        isRemote,
+        terminalWindowsShell: settings.terminalWindowsShell
+      }),
       isRemote,
       allowEmptyPromptLaunch: true
     })
     if (!startupPlan) {
-      return opts
+      return null
     }
 
     if (workspace.connectionId) {
@@ -21656,6 +21697,7 @@ export class OrcaRuntimeService {
 
     return {
       ...opts,
+      agent: undefined,
       command: startupPlan.launchCommand,
       ...(startupPlan.env ? { env: startupPlan.env } : {}),
       launchConfig: startupPlan.launchConfig,
@@ -22050,6 +22092,11 @@ export class OrcaRuntimeService {
     const availableAuthoritativeWindow = this.getAvailableAuthoritativeWindow()
     const hasLaunchAccountOverride =
       opts.claudeAccountId !== undefined || opts.codexAccountId !== undefined
+    if (opts.agent && worktreeSelector === undefined) {
+      // Why: the agent launch plan is workspace-scoped; without a selector the
+      // request would silently degrade to a bare shell with no agent at all.
+      throw new Error('Pass a worktree selector when choosing an agent.')
+    }
     if (hasLaunchAccountOverride) {
       // Why: the renderer spawn path cannot carry the override; a launch that
       // silently landed on the wrong account would defeat the selector.

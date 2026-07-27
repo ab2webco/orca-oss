@@ -11549,6 +11549,194 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  function createAgentLaunchRuntime(
+    agentDefaultArgs: Record<string, string>,
+    agentDefaultEnv: Record<string, Record<string, string>> = {},
+    storeOverrides: Record<string, unknown> = {}
+  ): { runtime: OrcaRuntimeService; spawn: ReturnType<typeof vi.fn> } {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-flag' })
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      ...storeOverrides,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: [],
+        agentCmdOverrides: {},
+        agentDefaultArgs,
+        agentDefaultEnv
+      })
+    } as never)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    return { runtime, spawn }
+  }
+
+  it('applies the configured permission-mode args to agent-selected terminal creates', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime(
+      { claude: '--dangerously-skip-permissions' },
+      { claude: { CLAUDE_PROFILE: 'captured' } }
+    )
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      title: 'worker'
+    })
+
+    const spawnCall = spawn.mock.calls[0]?.[0] as
+      | { command?: string; env?: Record<string, string>; launchAgent?: string }
+      | undefined
+    expect(spawnCall?.command).toBe("claude '--dangerously-skip-permissions'")
+    expect(spawnCall?.launchAgent).toBe('claude')
+    expect(spawnCall?.env).toMatchObject({ CLAUDE_PROFILE: 'captured' })
+  })
+
+  it('never forces a permission bypass when the configured agent mode is manual', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({ claude: '' })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      title: 'worker'
+    })
+
+    const spawnCall = spawn.mock.calls[0]?.[0] as { command?: string } | undefined
+    expect(spawnCall?.command).toBe('claude')
+    expect(spawnCall?.command).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('composes the selected agent with a launch account override', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({
+      codex: '--dangerously-bypass-approvals-and-sandbox'
+    })
+    runtime.setAccountServices({
+      claudeAccounts: { listAccounts: () => ({ accounts: [] }) },
+      codexAccounts: { listAccounts: () => ({ accounts: [{ id: 'account-codex' }] }) }
+    } as never)
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'codex',
+      codexAccountId: 'account-codex'
+    })
+
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        launchAgent: 'codex',
+        codexAccountId: 'account-codex'
+      })
+    )
+  })
+
+  it('resolves agent launch defaults for folder workspaces without a repo', async () => {
+    const folderPath = await mkdtemp(join(tmpdir(), 'orca-folder-agent-'))
+    try {
+      const folderWorkspace = makeFolderWorkspace({ folderPath })
+      const projectGroup = makeFolderProjectGroup({ parentPath: folderPath })
+      const { runtime, spawn } = createAgentLaunchRuntime(
+        { claude: '--dangerously-skip-permissions' },
+        {},
+        createFolderWorkspaceRuntimeStore(folderWorkspace, projectGroup)
+      )
+
+      await runtime.createTerminal(TEST_FOLDER_WORKSPACE_KEY, { agent: 'claude' })
+
+      const spawnCall = spawn.mock.calls[0]?.[0] as { command?: string } | undefined
+      expect(spawnCall?.command).toBe("claude '--dangerously-skip-permissions'")
+    } finally {
+      await rm(folderPath, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to launch a disabled agent instead of falling back to a bare shell', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-disabled' })
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: ['claude'],
+        agentCmdOverrides: {},
+        agentDefaultArgs: {},
+        agentDefaultEnv: {}
+      })
+    })
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await expect(
+      runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { agent: 'claude' })
+    ).rejects.toThrow('Selected agent is disabled')
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('rejects an agent-selected create with no worktree selector', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({ claude: '' })
+
+    await expect(runtime.createTerminal(undefined, { agent: 'claude' })).rejects.toThrow(
+      'Pass a worktree selector when choosing an agent.'
+    )
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('sends agent launch defaults through renderer-backed agent-selected creates', async () => {
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: [],
+        agentCmdOverrides: {},
+        agentDefaultArgs: { claude: '--dangerously-skip-permissions' },
+        agentDefaultEnv: {}
+      })
+    })
+    const webContents = { send: vi.fn() }
+    webContents.send.mockImplementation((_channel: string, payload: { requestId: string }) => {
+      runtime.syncWindowGraph(1, {
+        tabs: [],
+        leaves: [
+          {
+            tabId: 'tab-renderer',
+            worktreeId: TEST_WORKTREE_ID,
+            leafId: 'pane:1',
+            paneRuntimeId: 1,
+            ptyId: 'pty-renderer',
+            paneTitle: null
+          }
+        ]
+      })
+      ipcMain.emit(
+        'terminal:tabCreateReply',
+        { sender: webContents },
+        { requestId: payload.requestId, tabId: 'tab-renderer', title: 'Claude' }
+      )
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    electronMocks.BrowserWindow.fromId.mockReturnValue({
+      isDestroyed: () => false,
+      webContents
+    })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      rendererBacked: true
+    })
+
+    expect(webContents.send).toHaveBeenCalledWith(
+      'terminal:requestTabCreate',
+      expect.objectContaining({
+        command: "claude '--dangerously-skip-permissions'",
+        launchAgent: 'claude'
+      })
+    )
+  })
+
   it('injects runtime hook receiver env into terminal sessions', async () => {
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-hooked' })
     const runtime = new OrcaRuntimeService(store, undefined, {
