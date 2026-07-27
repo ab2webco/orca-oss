@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ChildProcess from 'node:child_process'
 import { createFakeChild, createHandlers, requestContext } from './agent-exec-handler-test-harness'
 import { TERMINAL_GIT_CREDENTIAL_GUARD_POLICY_ENV } from '../shared/terminal-git-credential-guard'
@@ -15,13 +15,27 @@ vi.mock('child_process', async (importOriginal) => {
 
 const spawnMock = vi.mocked(spawn)
 const execFileMock = vi.mocked(execFile)
+const originalProcessEnv = { ...process.env }
+const processEnvFixture = { ORCA_TEST_ENV: 'fixture' } satisfies NodeJS.ProcessEnv
 
 type AgentExecResult = { exitCode: number | null; timedOut: boolean }
 
+function replaceProcessEnv(env: NodeJS.ProcessEnv): void {
+  for (const key of Object.keys(process.env)) {
+    delete process.env[key]
+  }
+  Object.assign(process.env, env)
+}
+
 describe('AgentExecHandler', () => {
   beforeEach(() => {
+    replaceProcessEnv(processEnvFixture)
     spawnMock.mockReset()
     execFileMock.mockReset()
+  })
+
+  afterEach(() => {
+    replaceProcessEnv(originalProcessEnv)
   })
 
   it('executes a non-interactive command with captured output and stdin', async () => {
@@ -54,7 +68,7 @@ describe('AgentExecHandler', () => {
     expect(spawnMock).toHaveBeenCalledWith('agent', ['--flag', '42'], {
       cwd: '/repo',
       env: expect.objectContaining({
-        ...process.env,
+        ...processEnvFixture,
         GIT_TERMINAL_PROMPT: '0',
         GCM_INTERACTIVE: 'never'
       }),
@@ -93,7 +107,7 @@ describe('AgentExecHandler', () => {
     expect(spawnMock).toHaveBeenCalledWith('codex', ['exec'], {
       cwd: '/repo',
       env: expect.objectContaining({
-        ...process.env,
+        ...processEnvFixture,
         CODEX_HOME: '/managed/codex-home',
         PATH: '/managed/bin'
       }),

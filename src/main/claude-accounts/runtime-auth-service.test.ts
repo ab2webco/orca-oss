@@ -261,6 +261,7 @@ function readRuntimeOauthAccountForTest(): unknown {
 
 describe('ClaudeRuntimeAuthService', () => {
   beforeEach(() => {
+    vi.stubEnv('CLAUDE_CONFIG_DIR', '')
     setPlatform('darwin')
     vi.resetModules()
     vi.clearAllMocks()
@@ -280,6 +281,7 @@ describe('ClaudeRuntimeAuthService', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     if (originalPlatform) {
       Object.defineProperty(process, 'platform', originalPlatform)
     }

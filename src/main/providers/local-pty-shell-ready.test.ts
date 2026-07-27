@@ -777,16 +777,11 @@ path=(/custom/bin $path)
       const config = getShellReadyLaunchConfig('/bin/zsh')
 
       // Verify the wrapper discovered XDG ZDOTDIR, sourced user .zshrc, and kept typeset -U path (proves top-level scoping).
-      const cleanEnv: Record<string, string | undefined> = {
-        ...process.env,
+      const cleanEnv: NodeJS.ProcessEnv = {
         HOME: testHome,
-        PATH: '/usr/bin:/bin'
+        PATH: '/usr/bin:/bin',
+        ZDOTDIR: config.env.ZDOTDIR
       }
-      delete cleanEnv.ZDOTDIR
-      delete cleanEnv.ORCA_ORIG_ZDOTDIR
-      // Why: this test isolates zsh top-level path scoping, not attribution shim ordering.
-      delete cleanEnv.ORCA_ATTRIBUTION_SHIM_DIR
-      cleanEnv.ZDOTDIR = config.env.ZDOTDIR // Point to Orca wrapper dir
 
       const result = spawnSync(
         'zsh',
@@ -796,7 +791,7 @@ path=(/custom/bin $path)
           'echo "ORCA_ORIG_ZDOTDIR=${ORCA_ORIG_ZDOTDIR}" && echo "PATH_HAS_CUSTOM=${PATH%%:*}"'
         ],
         {
-          env: cleanEnv as NodeJS.ProcessEnv,
+          env: cleanEnv,
           encoding: 'utf8'
         }
       )
