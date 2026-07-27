@@ -199,7 +199,8 @@ describe('remote server update execution', () => {
     )
     expect(check).toHaveBeenCalledWith('server-1', {
       includePrerelease: true,
-      includePerfPrerelease: false
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
     })
   })
 
@@ -219,7 +220,8 @@ describe('remote server update execution', () => {
     )
     expect(check).toHaveBeenCalledWith('server-1', {
       includePrerelease: false,
-      includePerfPrerelease: false
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
     })
   })
 

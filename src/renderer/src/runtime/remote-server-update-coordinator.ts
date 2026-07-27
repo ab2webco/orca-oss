@@ -1,5 +1,6 @@
 import {
   compareAppVersions,
+  isLabRcPrereleaseAppVersion,
   isPerfPrereleaseAppVersion,
   isPrereleaseAppVersion,
   isValidAppVersion
@@ -199,7 +200,9 @@ export async function runRemoteServerUpdate(
       includePrerelease:
         entry.targetVersion !== null && isPrereleaseAppVersion(entry.targetVersion),
       includePerfPrerelease:
-        entry.targetVersion !== null && isPerfPrereleaseAppVersion(entry.targetVersion)
+        entry.targetVersion !== null && isPerfPrereleaseAppVersion(entry.targetVersion),
+      includeLabRcPrerelease:
+        entry.targetVersion !== null && isLabRcPrereleaseAppVersion(entry.targetVersion)
     }
     await transport.check(entry.environmentId, options.checkOptions ?? inferredCheckOptions)
     const available = await pollRemoteServerUpdater(

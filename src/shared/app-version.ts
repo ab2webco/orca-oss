@@ -32,6 +32,17 @@ export function isPerfPrereleaseAppVersion(value: string): boolean {
   return parsed?.prerelease.some((identifier) => identifier.toLowerCase() === 'perf') ?? false
 }
 
+/** Lab release candidate (`X.Y.Z-lab.N.rc`); hidden from ordinary update checks. */
+export function isLabRcPrereleaseAppVersion(value: string): boolean {
+  const identifiers = parseVersion(value)?.prerelease ?? []
+  return (
+    identifiers.length === 3 &&
+    identifiers[0]?.toLowerCase() === 'lab' &&
+    /^\d+$/.test(identifiers[1] ?? '') &&
+    identifiers[2]?.toLowerCase() === 'rc'
+  )
+}
+
 function compareIdentifiers(left: string, right: string): number {
   const leftNumeric = /^\d+$/.test(left)
   const rightNumeric = /^\d+$/.test(right)

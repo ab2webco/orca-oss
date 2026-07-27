@@ -81,7 +81,8 @@ export const createRemoteServerUpdatesSlice: StateCreator<
     const checkOptions = options
       ? {
           includePrerelease: Boolean(options.includePrerelease),
-          includePerfPrerelease: Boolean(options.includePerfPrerelease)
+          includePerfPrerelease: Boolean(options.includePerfPrerelease),
+          includeLabRcPrerelease: Boolean(options.includeLabRcPrerelease)
         }
       : undefined
     set({

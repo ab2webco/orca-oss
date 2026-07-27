@@ -54,7 +54,8 @@ describe('GeneralRemoteServerUpdates', () => {
     expect(storeMock.state.setRemoteServerUpdateDialogOpen).toHaveBeenCalledWith(true)
     expect(storeMock.state.refreshRemoteServerUpdates).toHaveBeenCalledWith({
       includePrerelease: true,
-      includePerfPrerelease: false
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
     })
     await act(async () => root.unmount())
   })

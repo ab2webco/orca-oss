@@ -170,15 +170,17 @@ describe('remote server updates mixed inventory', () => {
       ...createSlice(...args),
       setRuntimeEnvironments
     }))
+    // Why: the slice normalizes every channel flag, so the retained options carry all three.
     const options = { includePrerelease: false, includePerfPrerelease: true }
+    const normalizedOptions = { ...options, includeLabRcPrerelease: false }
 
     await store.getState().refreshRemoteServerUpdates(options)
 
     expect(call).toHaveBeenCalledTimes(2)
     expect(call).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'updater.check', params: options })
+      expect.objectContaining({ method: 'updater.check', params: normalizedOptions })
     )
-    expect(store.getState().remoteServerUpdateCheckOptions).toEqual(options)
+    expect(store.getState().remoteServerUpdateCheckOptions).toEqual(normalizedOptions)
     expect(store.getState().remoteServerUpdates.get('current')).toMatchObject({
       phase: 'available',
       targetVersion: '1.6.0-rc.1.perf'
