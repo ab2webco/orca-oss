@@ -4,6 +4,7 @@ import { toAppSshPtyId } from '../../../shared/ssh-pty-id'
 const mockCreateTab = vi.fn()
 const mockQueueTabStartupCommand = vi.fn()
 const mockSetActiveTabType = vi.fn()
+const mockSetActiveTabTypeForWorktree = vi.fn()
 const mockSetTabBarOrder = vi.fn()
 const mockSetAgentStatus = vi.fn()
 const mockPasteDraftWhenAgentReady = vi.fn()
@@ -77,6 +78,7 @@ const store = {
   closeTab: vi.fn(),
   queueTabStartupCommand: mockQueueTabStartupCommand,
   setActiveTabType: mockSetActiveTabType,
+  setActiveTabTypeForWorktree: mockSetActiveTabTypeForWorktree,
   setTabBarOrder: mockSetTabBarOrder,
   setAgentStatus: mockSetAgentStatus,
   seedNativeChatLaunchPrompt: mockSeedNativeChatLaunchPrompt,
@@ -391,6 +393,16 @@ describe('launchAgentInNewTab', () => {
     expect(mockToastError).toHaveBeenCalledWith(
       'Upgrade the remote Orca host before starting or resuming agent sessions.'
     )
+    expect(mockSetActiveTabTypeForWorktree).not.toHaveBeenCalled()
+  })
+
+  it('stamps the launch target worktree, not the worktree the user is viewing', async () => {
+    store.activeWorktreeId = 'wt-2'
+    const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+
+    launchAgentInNewTab({ agent: 'claude', worktreeId: 'wt-1' })
+
+    expect(mockSetActiveTabTypeForWorktree).toHaveBeenCalledWith('wt-1', 'terminal')
     expect(mockSetActiveTabType).not.toHaveBeenCalled()
   })
 
