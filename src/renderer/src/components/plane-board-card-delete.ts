@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { planeDeleteWorkItem, type RuntimePlaneSettings } from '@/runtime/runtime-plane-client'
 import type { useConfirmationDialog } from '@/components/confirmation-dialog'
+import { getPlaneMutationErrorMessage } from './plane-mutation-error-message'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 
 /**
@@ -41,12 +42,15 @@ export async function confirmAndDeletePlaneWorkItem(args: {
     workspaceId
   )
   if (!result.ok) {
+    console.error('[plane-board] mutation failed:', result.error)
     toast.error(
-      result.error ||
+      getPlaneMutationErrorMessage(
+        result.error,
         translate(
           'auto.components.task-page-plane-board.deleteItemFailed',
           'Failed to delete work item.'
         )
+      )
     )
   }
 }

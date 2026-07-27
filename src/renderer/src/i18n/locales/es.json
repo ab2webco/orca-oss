@@ -14342,7 +14342,12 @@
         "createItemFailed": "Failed to create work item.",
         "deleteItemConfirmTitle": "Delete work item {{value0}}?",
         "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
-        "deleteItemFailed": "Failed to delete work item."
+        "deleteItemFailed": "Failed to delete work item.",
+        "internetDisconnected": "No tienes conexión a internet. Comprueba tu conexión e inténtalo de nuevo.",
+        "dnsFailure": "No se pudo resolver la dirección de Plane. Comprueba la red o la configuración de DNS e inténtalo de nuevo.",
+        "requestTimedOut": "La solicitud a Plane agotó el tiempo de espera. Inténtalo de nuevo.",
+        "serverFailure": "Plane tuvo un error del servidor. Inténtalo de nuevo más tarde.",
+        "mutationFailed": "No se pudo completar la operación. Inténtalo de nuevo."
       },
       "plane-board-add-column": {
         "add": "Añadir columna",

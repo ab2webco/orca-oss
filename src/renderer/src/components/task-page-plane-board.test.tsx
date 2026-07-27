@@ -33,7 +33,10 @@ vi.mock('sonner', () => ({ toast: toastMocks }))
 import { TaskPagePlaneBoard } from './task-page-plane-board'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 function planeWorkItem(identifier: string, title: string): PlaneWorkItem {
   return {
@@ -118,13 +121,48 @@ describe('TaskPagePlaneBoard card deletion', () => {
       ok: false,
       error: 'Plane rejected the delete.'
     })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const user = userEvent.setup()
     renderBoard(planeWorkItem('ORCA-7', 'Fix the flux capacitor'))
 
     await openCardMenuAndDelete(user)
 
-    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('Plane rejected the delete.'))
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith('Failed to delete work item.')
+    )
+    expect(consoleError).toHaveBeenCalledWith(
+      '[plane-board] mutation failed:',
+      'Plane rejected the delete.'
+    )
     // No optimistic removal: the card must survive the failed delete.
     expect(screen.getByText('Fix the flux capacitor')).toBeInTheDocument()
+  })
+})
+
+describe('TaskPagePlaneBoard card creation failures', () => {
+  it('keeps the typed title and hides the raw network code', async () => {
+    runtimeMocks.planeCreateWorkItem.mockResolvedValue({
+      ok: false,
+      error: 'net::ERR_INTERNET_DISCONNECTED'
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const user = userEvent.setup()
+    renderBoard(planeWorkItem('ORCA-7', 'Existing work item'))
+
+    await user.click(screen.getByRole('button', { name: 'Add work item' }))
+    const titleInput = screen.getByRole('textbox', { name: 'Work item title' })
+    await user.type(titleInput, 'Keep this title')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith(
+        "You're offline. Check your connection and try again."
+      )
+    )
+    expect(titleInput).toHaveValue('Keep this title')
+    expect(consoleError).toHaveBeenCalledWith(
+      '[plane-board] mutation failed:',
+      'net::ERR_INTERNET_DISCONNECTED'
+    )
   })
 })

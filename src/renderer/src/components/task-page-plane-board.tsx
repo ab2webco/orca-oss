@@ -25,6 +25,7 @@ import {
   type RuntimePlaneSettings
 } from '@/runtime/runtime-plane-client'
 import { confirmAndDeletePlaneWorkItem } from './plane-board-card-delete'
+import { getPlaneMutationErrorMessage } from './plane-mutation-error-message'
 import { PlaneBoardAddColumn } from './plane-board-add-column'
 import { PlaneBoardCard } from './plane-board-card'
 import { PlaneBoardColumnView } from './plane-board-column'
@@ -58,6 +59,11 @@ type TaskPagePlaneBoardProps = {
   /** Reports the id of a card the inline composer just created, so the caller can
    *  open its sheet into the description editor. */
   onItemCreated?: (itemId: string) => void
+}
+
+function showPlaneMutationError(error: unknown, fallback: string): void {
+  console.error('[plane-board] mutation failed:', error)
+  toast.error(getPlaneMutationErrorMessage(error, fallback))
 }
 
 export function TaskPagePlaneBoard({
@@ -121,13 +127,12 @@ export function TaskPagePlaneBoard({
         })
         .catch((error: unknown) => {
           setProjectStates(previous)
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.components.task-page-plane-board.renameFailed',
-                  'Failed to rename column.'
-                )
+          showPlaneMutationError(
+            error,
+            translate(
+              'auto.components.task-page-plane-board.renameFailed',
+              'Failed to rename column.'
+            )
           )
         })
     },
@@ -142,12 +147,12 @@ export function TaskPagePlaneBoard({
         workspaceId
       )
       if (!result.ok) {
-        toast.error(
-          result.error ||
-            translate(
-              'auto.components.task-page-plane-board.createItemFailed',
-              'Failed to create work item.'
-            )
+        showPlaneMutationError(
+          result.error,
+          translate(
+            'auto.components.task-page-plane-board.createItemFailed',
+            'Failed to create work item.'
+          )
         )
         return false
       }
@@ -168,12 +173,12 @@ export function TaskPagePlaneBoard({
         workspaceId
       )
       if (!result.ok) {
-        toast.error(
-          result.error ||
-            translate(
-              'auto.components.task-page-plane-board.createFailed',
-              'Failed to create column.'
-            )
+        showPlaneMutationError(
+          result.error,
+          translate(
+            'auto.components.task-page-plane-board.createFailed',
+            'Failed to create column.'
+          )
         )
         return false
       }
@@ -233,13 +238,12 @@ export function TaskPagePlaneBoard({
         await refreshStates()
       } catch (error) {
         setProjectStates(previousStates)
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : translate(
-                'auto.components.task-page-plane-board.reorderFailed',
-                'Failed to reorder columns.'
-              )
+        showPlaneMutationError(
+          error,
+          translate(
+            'auto.components.task-page-plane-board.reorderFailed',
+            'Failed to reorder columns.'
+          )
         )
       }
     },
@@ -308,12 +312,12 @@ export function TaskPagePlaneBoard({
       }
       const result = await planeDeleteState(providerSettings, { projectId, stateId }, workspaceId)
       if (!result.ok) {
-        toast.error(
-          result.error ||
-            translate(
-              'auto.components.task-page-plane-board.deleteFailed',
-              'Failed to delete column.'
-            )
+        showPlaneMutationError(
+          result.error,
+          translate(
+            'auto.components.task-page-plane-board.deleteFailed',
+            'Failed to delete column.'
+          )
         )
         return
       }
@@ -377,13 +381,12 @@ export function TaskPagePlaneBoard({
       .catch((error: unknown) => {
         setOverrides((current) => withoutPlaneBoardStateOverride(current, workItem.id))
         patchPlaneWorkItem(workItem.id, { state: workItem.state })
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : translate(
-                'auto.components.task-page-plane-board.updateFailed',
-                'Failed to move work item.'
-              )
+        showPlaneMutationError(
+          error,
+          translate(
+            'auto.components.task-page-plane-board.updateFailed',
+            'Failed to move work item.'
+          )
         )
       })
   }

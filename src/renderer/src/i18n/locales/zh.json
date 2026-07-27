@@ -14342,7 +14342,12 @@
         "createItemFailed": "Failed to create work item.",
         "deleteItemConfirmTitle": "Delete work item {{value0}}?",
         "deleteItemConfirmDescription": "«{{value0}}» will be permanently deleted. This cannot be undone.",
-        "deleteItemFailed": "Failed to delete work item."
+        "deleteItemFailed": "Failed to delete work item.",
+        "internetDisconnected": "你当前未连接到互联网。请检查连接后重试。",
+        "dnsFailure": "无法解析 Plane 的地址。请检查网络或 DNS 设置后重试。",
+        "requestTimedOut": "向 Plane 发送的请求已超时。请重试。",
+        "serverFailure": "Plane 服务器发生错误。请稍后重试。",
+        "mutationFailed": "无法完成此操作。请重试。"
       },
       "plane-board-add-column": {
         "add": "Add column",
