@@ -174,10 +174,12 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     ) {
       throw new RuntimeClientError('invalid_argument', '--direction must be horizontal or vertical')
     }
+    const accountOverrides = await resolveAccountSelectorFlags(flags, client)
     const result = await client.call<{ split: RuntimeTerminalSplit }>('terminal.split', {
       terminal: await getTerminalHandle(flags, cwd, client),
       direction: directionFlag,
-      command: getOptionalStringFlag(flags, 'command')
+      command: getOptionalStringFlag(flags, 'command'),
+      ...accountOverrides
     })
     printResult(result, json, formatTerminalSplit)
   }

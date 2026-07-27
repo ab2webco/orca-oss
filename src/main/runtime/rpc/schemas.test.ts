@@ -70,7 +70,9 @@ describe('RPC optional pipe schemas', () => {
     expectParses(methodParams(TERMINAL_METHODS, 'terminal.split'), { terminal: 'terminal-1' })
     expectParses(methodParams(TERMINAL_METHODS, 'terminal.split'), {
       terminal: 'terminal-1',
-      telemetrySource: 'contextual_tour'
+      telemetrySource: 'contextual_tour',
+      claudeAccountId: 'account-claude',
+      codexAccountId: 'account-codex'
     })
     expectRejects(methodParams(TERMINAL_METHODS, 'terminal.split'), {
       terminal: 'terminal-1',

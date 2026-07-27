@@ -3310,6 +3310,138 @@ describe('orca cli worktree awareness', () => {
     })
   })
 
+  it('resolves --claude-account by email on terminal.split', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_terminal_split', {
+        split: {
+          handle: 'term_split',
+          tabId: 'tab_1',
+          paneRuntimeId: -1
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'terminal',
+        'split',
+        '--terminal',
+        'term_1',
+        '--command',
+        'claude',
+        '--claude-account',
+        'work@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'accounts.snapshot')
+    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.split', {
+      terminal: 'term_1',
+      direction: undefined,
+      command: 'claude',
+      claudeAccountId: 'acc-claude-work'
+    })
+  })
+
+  it('resolves --codex-account by id on terminal.split', async () => {
+    queueFixtures(
+      callMock,
+      accountsSnapshotFixture(),
+      okFixture('req_terminal_split', {
+        split: {
+          handle: 'term_split',
+          tabId: 'tab_1',
+          paneRuntimeId: -1
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'terminal',
+        'split',
+        '--terminal',
+        'term_1',
+        '--command',
+        'codex',
+        '--codex-account',
+        'acc-codex-work',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.split', {
+      terminal: 'term_1',
+      direction: undefined,
+      command: 'codex',
+      codexAccountId: 'acc-codex-work'
+    })
+  })
+
+  it('rejects an unknown terminal.split account selector and names available accounts', async () => {
+    queueFixtures(callMock, accountsSnapshotFixture())
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+
+    await main(
+      [
+        'terminal',
+        'split',
+        '--terminal',
+        'term_1',
+        '--command',
+        'claude',
+        '--claude-account',
+        'nobody@example.com',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('accounts.snapshot')
+    const printed = [...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')
+    expect(printed).toContain('does not match any Claude account')
+    expect(printed).toContain('work@example.com (id acc-claude-work)')
+    expect(process.exitCode).toBe(1)
+
+    process.exitCode = priorExitCode
+  })
+
+  it('preserves terminal.split behavior when no account selector is passed', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_terminal_split', {
+        split: {
+          handle: 'term_split',
+          tabId: 'tab_1',
+          paneRuntimeId: -1
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      ['terminal', 'split', '--terminal', 'term_1', '--direction', 'vertical', '--json'],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenCalledOnce()
+    expect(callMock).toHaveBeenCalledWith('terminal.split', {
+      terminal: 'term_1',
+      direction: 'vertical',
+      command: undefined
+    })
+  })
+
   it('rejects an unknown account selector and names the available accounts', async () => {
     queueFixtures(callMock, accountsSnapshotFixture())
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})

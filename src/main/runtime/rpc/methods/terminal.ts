@@ -977,7 +977,9 @@ const TerminalSplit = TerminalHandle.extend({
     .optional(),
   command: OptionalString,
   env: z.record(z.string(), z.string()).optional(),
-  telemetrySource: z.enum(TERMINAL_PANE_SPLIT_SOURCES).optional()
+  telemetrySource: z.enum(TERMINAL_PANE_SPLIT_SOURCES).optional(),
+  claudeAccountId: z.string().min(1).max(512).optional(),
+  codexAccountId: z.string().min(1).max(512).optional()
 })
 
 const TerminalStop = z.object({
@@ -1443,7 +1445,9 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         direction: params.direction,
         command: params.command,
         env: params.env,
-        telemetrySource: params.telemetrySource
+        telemetrySource: params.telemetrySource,
+        ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
+        ...(params.codexAccountId ? { codexAccountId: params.codexAccountId } : {})
       })
     })
   }),

@@ -1308,6 +1308,18 @@ type TerminalCreateOptions = {
   deferMobileSessionPublish?: boolean
 }
 
+type TerminalSplitOptions = {
+  direction?: 'horizontal' | 'vertical'
+  command?: string
+  env?: Record<string, string>
+  envToDelete?: string[]
+  activate?: boolean
+  telemetrySource?: TerminalPaneSplitSource
+  /** Launch-scoped managed-account override for the new pane only. */
+  claudeAccountId?: string
+  codexAccountId?: string
+}
+
 function mergeTerminalEnvDeletionKeys(
   first: readonly string[] | undefined,
   second: readonly string[] | undefined
@@ -23425,15 +23437,14 @@ export class OrcaRuntimeService {
 
   async splitTerminal(
     handle: string,
-    opts: {
-      direction?: 'horizontal' | 'vertical'
-      command?: string
-      env?: Record<string, string>
-      envToDelete?: string[]
-      activate?: boolean
-      telemetrySource?: TerminalPaneSplitSource
-    } = {}
+    opts: TerminalSplitOptions = {}
   ): Promise<RuntimeTerminalSplit> {
+    const hasLaunchAccountOverride =
+      opts.claudeAccountId !== undefined || opts.codexAccountId !== undefined
+    if (hasLaunchAccountOverride) {
+      this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: opts.claudeAccountId }])
+      this.assertCurrentManagedCodexAccountPins([{ codexAccountId: opts.codexAccountId }])
+    }
     const livePty = this.getLivePtyForHandle(handle)
     if (livePty) {
       return await this.splitPtyBackedTerminal(livePty.pty, opts)
@@ -23441,6 +23452,16 @@ export class OrcaRuntimeService {
     this.assertGraphReady()
     const { leaf } = this.getLiveLeafForHandle(handle)
     const direction = opts.direction ?? 'horizontal'
+    if (hasLaunchAccountOverride) {
+      return await this.splitTerminalOnBackgroundPath(
+        {
+          worktreeId: leaf.worktreeId,
+          parentTabId: leaf.tabId,
+          sourceLeafId: leaf.leafId
+        },
+        opts
+      )
+    }
 
     // Snapshot current leaf keys so the post-split graph-sync delta reveals the new pane.
     const leafKeysBefore = new Set<string>()
@@ -23462,18 +23483,8 @@ export class OrcaRuntimeService {
 
   private async splitPtyBackedTerminal(
     pty: RuntimePtyWorktreeRecord,
-    opts: {
-      direction?: 'horizontal' | 'vertical'
-      command?: string
-      env?: Record<string, string>
-      envToDelete?: string[]
-      activate?: boolean
-      telemetrySource?: TerminalPaneSplitSource
-    } = {}
+    opts: TerminalSplitOptions = {}
   ): Promise<RuntimeTerminalSplit> {
-    if (!this.ptyController?.spawn) {
-      throw new Error('runtime_unavailable')
-    }
     if (!pty.connected) {
       throw new Error('terminal_exited')
     }
@@ -23482,23 +23493,46 @@ export class OrcaRuntimeService {
     if (!parentTabId || !parsedPaneKey) {
       throw new Error('terminal_handle_stale')
     }
+    return await this.splitTerminalOnBackgroundPath(
+      {
+        worktreeId: pty.worktreeId,
+        parentTabId,
+        sourceLeafId: parsedPaneKey.leafId
+      },
+      opts
+    )
+  }
+
+  private async splitTerminalOnBackgroundPath(
+    source: {
+      worktreeId: string
+      parentTabId: string
+      sourceLeafId: string
+    },
+    opts: TerminalSplitOptions
+  ): Promise<RuntimeTerminalSplit> {
+    if (!this.ptyController?.spawn) {
+      throw new Error('runtime_unavailable')
+    }
     const direction = opts.direction ?? 'horizontal'
-    const workspace = await this.resolveTerminalWorkspaceLaunchScope(`id:${pty.worktreeId}`)
+    const workspace = await this.resolveTerminalWorkspaceLaunchScope(`id:${source.worktreeId}`)
     const leafId = randomUUID()
     const preAllocatedHandle = this.createPreAllocatedTerminalHandle()
-    const paneKey = makePaneKey(parentTabId, leafId)
+    const paneKey = makePaneKey(source.parentTabId, leafId)
     const result = await this.ptyController.spawn({
       cols: 120,
       rows: 40,
       cwd: workspace.path,
       command: opts.command,
       commandDelivery: 'provider',
-      env: this.buildTerminalWorkspaceEnv(workspace, opts.env ?? {}, paneKey, parentTabId),
+      env: this.buildTerminalWorkspaceEnv(workspace, opts.env ?? {}, paneKey, source.parentTabId),
       envToDelete: opts.envToDelete,
       connectionId: workspace.connectionId,
       worktreeId: workspace.id,
+      ...(opts.claudeAccountId ? { claudeAccountId: opts.claudeAccountId } : {}),
+      ...(opts.codexAccountId ? { codexAccountId: opts.codexAccountId } : {}),
       preAllocatedHandle,
-      tabId: parentTabId,
+      tabId: source.parentTabId,
       leafId,
       persistHostSessionBinding: true
     })
@@ -23508,19 +23542,20 @@ export class OrcaRuntimeService {
     }
     this.registerPty(result.id, workspace.id, workspace.connectionId)
     const createdPty = this.getOrCreatePtyWorktreeRecord(result.id)
-    if (createdPty) {
-      createdPty.tabId = parentTabId
-      createdPty.paneKey = paneKey
+    if (!createdPty) {
+      throw new Error('runtime_unavailable')
     }
+    createdPty.tabId = source.parentTabId
+    createdPty.paneKey = paneKey
 
     try {
       await this.notifier?.revealTerminalSession?.(workspace.id, {
         ptyId: result.id,
         title: null,
         activate: opts.activate !== false,
-        tabId: parentTabId,
+        tabId: source.parentTabId,
         leafId,
-        splitFromLeafId: parsedPaneKey.leafId,
+        splitFromLeafId: source.sourceLeafId,
         splitDirection: direction,
         splitTelemetrySource: opts.telemetrySource
       })
@@ -23528,26 +23563,28 @@ export class OrcaRuntimeService {
       this.ptyController.kill?.(result.id)
       throw error
     }
-    if (createdPty) {
-      this.publishPtyBackedMobileSessionTerminal(workspace.id, createdPty, {
-        tabId: parentTabId,
-        leafId,
-        title: null,
-        activate: opts.activate !== false,
-        split: { splitFromLeafId: parsedPaneKey.leafId, direction }
-      })
-      // Why: persist the split so a later snapshot rebuild keeps it instead of collapsing to a single pane.
-      this.persistHeadlessTerminalSplit({
-        worktreeId: workspace.id,
-        tabId: parentTabId,
-        leafId,
-        ptyId: createdPty.ptyId,
-        splitFromLeafId: parsedPaneKey.leafId,
-        direction
-      })
-    }
+    this.publishPtyBackedMobileSessionTerminal(workspace.id, createdPty, {
+      tabId: source.parentTabId,
+      leafId,
+      title: null,
+      activate: opts.activate !== false,
+      split: { splitFromLeafId: source.sourceLeafId, direction }
+    })
+    // Why: persist the split so a later snapshot rebuild keeps it instead of collapsing to a single pane.
+    this.persistHeadlessTerminalSplit({
+      worktreeId: workspace.id,
+      tabId: source.parentTabId,
+      leafId,
+      ptyId: createdPty.ptyId,
+      splitFromLeafId: source.sourceLeafId,
+      direction
+    })
 
-    return { handle: this.issuePtyHandle(createdPty ?? pty), tabId: parentTabId, paneRuntimeId: -1 }
+    return {
+      handle: this.issuePtyHandle(createdPty),
+      tabId: source.parentTabId,
+      paneRuntimeId: -1
+    }
   }
 
   async handleAgentTeamsTmuxCompat(

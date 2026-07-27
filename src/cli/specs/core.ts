@@ -1,6 +1,7 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
 import { SERVE_COMMAND_SPECS } from './serve'
+import { TERMINAL_SPLIT_COMMAND_SPECS } from './terminal-split'
 
 export const CORE_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -290,15 +291,5 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'orca terminal rename --terminal term_abc123 --json'
     ]
   },
-  {
-    path: ['terminal', 'split'],
-    summary: 'Split an existing terminal pane',
-    usage:
-      'orca terminal split [--terminal <handle>] [--direction horizontal|vertical] [--command <text>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'terminal', 'direction', 'command'],
-    examples: [
-      'orca terminal split --terminal term_abc123 --direction horizontal --json',
-      'orca terminal split --terminal term_abc123 --command "codex"'
-    ]
-  }
+  ...TERMINAL_SPLIT_COMMAND_SPECS
 ]

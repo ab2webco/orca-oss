@@ -69,3 +69,40 @@ describe('terminal focus navigation authority', () => {
     expect(runtime.focusTerminal).not.toHaveBeenCalled()
   })
 })
+
+describe('terminal split launch accounts', () => {
+  it('forwards launch-scoped account ids to the runtime split', async () => {
+    const splitTerminal = vi.fn().mockResolvedValue({
+      handle: 'term-split',
+      tabId: 'tab-1',
+      paneRuntimeId: -1
+    })
+    const runtime = {
+      getRuntimeId: () => 'runtime-1',
+      splitTerminal
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: TERMINAL_METHODS })
+
+    await dispatcher.dispatch({
+      id: 'split-1',
+      authToken: 'token',
+      method: 'terminal.split',
+      params: {
+        terminal: 'term-1',
+        direction: 'vertical',
+        command: 'codex',
+        claudeAccountId: 'account-claude',
+        codexAccountId: 'account-codex'
+      }
+    })
+
+    expect(splitTerminal).toHaveBeenCalledWith('term-1', {
+      direction: 'vertical',
+      command: 'codex',
+      env: undefined,
+      telemetrySource: undefined,
+      claudeAccountId: 'account-claude',
+      codexAccountId: 'account-codex'
+    })
+  })
+})

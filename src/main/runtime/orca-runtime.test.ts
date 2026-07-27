@@ -12266,13 +12266,12 @@ describe('OrcaRuntimeService', () => {
       webContents
     })
 
-    await expect(
-      runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
-        command: 'codex',
-        rendererBacked: true,
-        title: 'Renderer Terminal'
-      })
-    ).resolves.toMatchObject({
+    const created = await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      command: 'codex',
+      rendererBacked: true,
+      title: 'Renderer Terminal'
+    })
+    expect(created).toMatchObject({
       handle: expect.stringMatching(/^term_/),
       tabId: 'tab-renderer',
       title: 'Renderer Terminal',
@@ -12292,9 +12291,64 @@ describe('OrcaRuntimeService', () => {
       'terminal:tabCreateReply',
       expect.any(Function)
     )
+
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-directed-split' })
+    const splitTerminal = vi.fn()
+    const revealTerminalSession = vi.fn().mockResolvedValue({ tabId: 'tab-renderer' })
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    runtime.setNotifier({
+      worktreesChanged: vi.fn(),
+      reposChanged: vi.fn(),
+      activateWorktree: vi.fn(),
+      createTerminal: vi.fn(),
+      revealTerminalSession,
+      splitTerminal,
+      renameTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminal: vi.fn(),
+      sleepWorktree: vi.fn(),
+      terminalFitOverrideChanged: vi.fn(),
+      terminalDriverChanged: vi.fn()
+    })
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-claude' }] })
+      },
+      codexAccounts: {
+        listAccounts: () => ({ accounts: [] })
+      }
+    } as never)
+
+    await runtime.splitTerminal(created.handle, {
+      direction: 'vertical',
+      command: 'claude',
+      claudeAccountId: 'account-claude'
+    })
+
+    expect(splitTerminal).not.toHaveBeenCalled()
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'claude',
+        claudeAccountId: 'account-claude',
+        tabId: 'tab-renderer'
+      })
+    )
+    expect(revealTerminalSession).toHaveBeenCalledWith(
+      TEST_WORKTREE_ID,
+      expect.objectContaining({
+        tabId: 'tab-renderer',
+        splitFromLeafId: 'pane:1',
+        splitDirection: 'vertical'
+      })
+    )
   })
 
-  it('splits visible pty-backed terminal sessions through the parent renderer tab', async () => {
+  it('forwards launch accounts when splitting visible pty-backed terminal sessions', async () => {
     const spawn = vi
       .fn()
       .mockResolvedValueOnce({ id: 'pty-source' })
@@ -12324,22 +12378,45 @@ describe('OrcaRuntimeService', () => {
     })
     runtime.attachWindow(1)
     runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-claude' }] })
+      },
+      codexAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-codex' }] })
+      }
+    } as never)
 
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
     const sourceEnv =
       (spawn.mock.calls[0]?.[0] as { env?: Record<string, string> } | undefined)?.env ?? {}
     const sourceLeafId = sourceEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
 
-    await expect(runtime.splitTerminal(handle, { direction: 'vertical' })).resolves.toMatchObject({
+    await expect(
+      runtime.splitTerminal(handle, { claudeAccountId: 'missing-account' })
+    ).rejects.toThrow('That Claude account no longer exists.')
+    expect(spawn).toHaveBeenCalledTimes(1)
+
+    await expect(
+      runtime.splitTerminal(handle, {
+        direction: 'vertical',
+        claudeAccountId: 'account-claude',
+        codexAccountId: 'account-codex'
+      })
+    ).resolves.toMatchObject({
       handle: expect.stringMatching(/^term_/),
       tabId: sourceEnv.ORCA_TAB_ID,
       paneRuntimeId: -1
     })
 
-    const splitEnv =
-      (spawn.mock.calls[1]?.[0] as { env?: Record<string, string> } | undefined)?.env ?? {}
+    const splitSpawn = spawn.mock.calls[1]?.[0]
+    const splitEnv = (splitSpawn as { env?: Record<string, string> } | undefined)?.env ?? {}
     const splitLeafId = splitEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
     expect(splitTerminal).not.toHaveBeenCalled()
+    expect(splitSpawn).toMatchObject({
+      claudeAccountId: 'account-claude',
+      codexAccountId: 'account-codex'
+    })
     expect(splitEnv.ORCA_TAB_ID).toBe(sourceEnv.ORCA_TAB_ID)
     expect(splitEnv.ORCA_WORKTREE_ID).toBe(TEST_WORKTREE_ID)
     expect(revealTerminalSession).toHaveBeenLastCalledWith(TEST_WORKTREE_ID, {
