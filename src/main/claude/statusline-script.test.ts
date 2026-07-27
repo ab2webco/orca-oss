@@ -21,7 +21,9 @@ describe('getManagedStatusLineScript (posix)', () => {
     stubPlatform('darwin')
     const script = getManagedStatusLineScript('local')
     expect(script).toBe(getManagedStatusLineScript('posix'))
-    const guardIndex = script.indexOf('*\'"rate_limits"\'*')
+    // Why anchor on the `) ;;` form: the quota extraction also matches on "rate_limits",
+    // so a bare key match would find that earlier block instead of the guard.
+    const guardIndex = script.indexOf('*\'"rate_limits"\'*) ;;')
     const endpointIndex = script.indexOf('ORCA_AGENT_HOOK_ENDPOINT')
     const curlIndex = script.indexOf('curl -sS')
     expect(guardIndex).toBeGreaterThan(-1)
@@ -36,6 +38,19 @@ describe('getManagedStatusLineScript (posix)', () => {
     const script = getManagedStatusLineScript('posix')
     expect(script).toContain('#!/bin/sh')
     expect(script).not.toContain('curl.exe')
+  })
+
+  it('prints before the rate_limits guard and the throttle so the render never flickers', () => {
+    stubPlatform('darwin')
+    const script = getManagedStatusLineScript('local')
+    const printIndex = script.indexOf(`printf '%s\\n' "$orca_statusline_line"`)
+    // Why anchor on the `) ;;` form: the quota extraction also matches on "rate_limits",
+    // so a bare key match would find that earlier block instead of the guard.
+    const guardIndex = script.indexOf('*\'"rate_limits"\'*) ;;')
+    const stampIndex = script.indexOf('orca-claude-statusline-last-')
+    expect(printIndex).toBeGreaterThan(-1)
+    expect(printIndex).toBeLessThan(guardIndex)
+    expect(printIndex).toBeLessThan(stampIndex)
   })
 })
 
@@ -85,16 +100,51 @@ describe('getManagedStatusLineScript (win32 local)', () => {
     expect(script).not.toContain('"configDir=%CLAUDE_CONFIG_DIR%"')
   })
 
-  it('drains stdin before exiting when the pane key is missing', () => {
+  it('captures and prints even when the pane key is missing, but never posts', () => {
     stubPlatform('win32')
     const script = getManagedStatusLineScript('local')
-    const paneGuardIndex = script.indexOf(
-      'if "%ORCA_PANE_KEY%"=="" goto :orca_agent_hook_drain_stdin'
+    // Why: sessions outside Orca share this settings.json — a silent drain there is the blank-line bug.
+    expect(script).not.toContain(':orca_agent_hook_drain_stdin')
+    expect(script).toContain('set "ORCA_STATUSLINE_PANE_ID=orphan-%RANDOM%"')
+    const printIndex = script.indexOf('echo(!ORCA_STATUSLINE_LINE!')
+    const forwardGuardIndex = script.indexOf(
+      `if "%ORCA_PANE_KEY%"=="" goto :orca_statusline_cleanup`
     )
+    const findstrIndex = script.indexOf('findstr.exe')
+    expect(printIndex).toBeGreaterThan(-1)
+    expect(forwardGuardIndex).toBeGreaterThan(printIndex)
+    expect(forwardGuardIndex).toBeLessThan(findstrIndex)
+  })
+
+  it('prints before the throttle check so the render is never debounced', () => {
+    stubPlatform('win32')
+    const script = getManagedStatusLineScript('local')
     const captureIndex = script.indexOf('more.com')
-    expect(paneGuardIndex).toBeGreaterThan(-1)
-    expect(paneGuardIndex).toBeLessThan(captureIndex)
-    expect(script).toContain(':orca_agent_hook_drain_stdin')
+    const delayedExpansionIndex = script.indexOf('setlocal enabledelayedexpansion')
+    const printIndex = script.indexOf('echo(!ORCA_STATUSLINE_LINE!')
+    const stampIndex = script.indexOf('ORCA_STATUSLINE_STAMP_FILE=')
+    const findstrIndex = script.indexOf('findstr.exe')
+    expect(captureIndex).toBeLessThan(delayedExpansionIndex)
+    expect(delayedExpansionIndex).toBeLessThan(printIndex)
+    // Why: the stamp throttle and rate_limits guard exit early — printing after either would flicker.
+    expect(printIndex).toBeLessThan(stampIndex)
+    expect(printIndex).toBeLessThan(findstrIndex)
+  })
+
+  it('scopes the context percentage to context_window, not rate_limits', () => {
+    stubPlatform('win32')
+    const script = getManagedStatusLineScript('local')
+    const contextStripIndex = script.indexOf(':*"context_window"=')
+    const usedStripIndex = script.indexOf(':*"used_percentage"=')
+    expect(contextStripIndex).toBeGreaterThan(-1)
+    expect(usedStripIndex).toBeGreaterThan(contextStripIndex)
+    // Digits-only validation caps the printed value at three characters.
+    expect(script).toContain(
+      'for /f "delims=0123456789" %%d in ("!ORCA_STATUSLINE_CTX!") do set "ORCA_STATUSLINE_CTX="'
+    )
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_CTX if not "!ORCA_STATUSLINE_CTX:~3!"=="" set "ORCA_STATUSLINE_CTX="'
+    )
   })
 
   it('throttles with an all-builtin seconds-of-day stamp that fails open to posting', () => {
@@ -177,6 +227,25 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     })
   }
 
+  // Mirrors the CLI's statusline payload shape: context_window.current_usage nests the raw
+  // API usage and rate_limits carries a same-named but unrelated used_percentage.
+  function displayPayload(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      model: { id: 'claude-fable-5', display_name: 'Fable' },
+      workspace: { current_dir: '/tmp/x', project_dir: '/tmp/x' },
+      cost: { total_duration_ms: 1_000 },
+      context_window: {
+        total_input_tokens: 85_400,
+        total_output_tokens: 1_200,
+        context_window_size: 200_000,
+        current_usage: { input_tokens: 3, cache_read_input_tokens: 85_000, output_tokens: 19 },
+        used_percentage: 42.7,
+        remaining_percentage: 57.3
+      },
+      ...overrides
+    })
+  }
+
   function makeHarness(): {
     scriptPath: string
     dir: string
@@ -215,8 +284,9 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     scriptPath: string,
     dir: string,
     payload: string,
-    paneKey = PANE_KEY
-  ): Promise<void> {
+    paneKey = PANE_KEY,
+    configDir?: string
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn('sh', [scriptPath], {
         env: {
@@ -224,18 +294,23 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
           TMPDIR: dir,
           ORCA_AGENT_HOOK_PORT: '65535',
           ORCA_AGENT_HOOK_TOKEN: 'test-token',
-          ORCA_PANE_KEY: paneKey
+          ORCA_PANE_KEY: paneKey,
+          ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {})
         },
-        stdio: ['pipe', 'ignore', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe']
       })
+      let stdout = ''
       let stderr = ''
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString()
+      })
       child.stderr.on('data', (chunk: Buffer) => {
         stderr += chunk.toString()
       })
       child.on('error', reject)
       child.on('close', (code) => {
         if (code === 0) {
-          resolve()
+          resolve(stdout)
         } else {
           reject(new Error(`statusline script exited ${code}: ${stderr}`))
         }
@@ -351,5 +426,151 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     expect(lineCount(curlLog)).toBe(0)
     expect(lineCount(dateLog)).toBe(0)
     expect(() => readFileSync(stampPathFor(dir), 'utf8')).toThrow()
+  })
+
+  it('prints model and context usage for a payload without rate_limits (the flicker case)', async () => {
+    const { scriptPath, dir, curlLog } = makeHarness()
+    const stdout = await runScript(scriptPath, dir, displayPayload())
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42%\n')
+    expect(lineCount(curlLog)).toBe(0)
+  })
+
+  it('prints and still forwards when rate_limits are present', async () => {
+    const { scriptPath, dir, curlLog } = makeHarness()
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } })
+    )
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42% | 5h 12%\n')
+    expect(lineCount(curlLog)).toBe(1)
+  })
+
+  it('prints on every tick while the forward stays debounced', async () => {
+    const { scriptPath, dir, curlLog } = makeHarness()
+    const payloadFor = (durationMs: number): string =>
+      displayPayload({
+        cost: { total_duration_ms: durationMs },
+        rate_limits: { five_hour: { used_percentage: 12 } }
+      })
+    const first = await runScript(scriptPath, dir, payloadFor(1_000))
+    const second = await runScript(scriptPath, dir, payloadFor(2_000))
+    const third = await runScript(scriptPath, dir, payloadFor(3_000))
+    // Why the first line differs: the lab identity announces once per pane, so a banner
+    // cannot strobe on a line the CLI requests several times a second.
+    expect(first).toBe('Orca by Ab2Web | Fable | ctx 42% | 5h 12%\n')
+    expect(second).toBe('Fable | ctx 42% | 5h 12%\n')
+    expect(third).toBe('Fable | ctx 42% | 5h 12%\n')
+    expect(lineCount(curlLog)).toBe(1)
+  })
+
+  it('never reads rate-limit percentages as context usage', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      JSON.stringify({
+        model: { id: 'claude-fable-5', display_name: 'Fable' },
+        cost: { total_duration_ms: 1_000 },
+        rate_limits: { five_hour: { used_percentage: 12 } }
+      })
+    )
+    // The 12% is the five-hour quota, labelled as such — never borrowed as context usage.
+    expect(stdout).toBe('Orca by Ab2Web | Fable | 5h 12%\n')
+  })
+
+  it('falls back to model.id when display_name is absent', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const parsed = JSON.parse(displayPayload()) as { model: Record<string, unknown> }
+    parsed.model = { id: 'claude-fable-5' }
+    const stdout = await runScript(scriptPath, dir, JSON.stringify(parsed))
+    expect(stdout).toBe('Orca by Ab2Web | claude-fable-5 | ctx 42%\n')
+  })
+
+  it('prints from a pretty-printed payload too', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      JSON.stringify(JSON.parse(displayPayload()), null, 2)
+    )
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42%\n')
+  })
+
+  it('renders the account from the vault, truncated at the domain', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-1234', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(
+      join(configDir, 'oauth-account.json'),
+      JSON.stringify({ emailAddress: 'fabian.altahona@koombea.com', displayName: 'Fabian' })
+    )
+    const stdout = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
+    // Why the local part survives and the domain does not: several accounts share one domain,
+    // so the local part is what disambiguates, and the whole line has to fit a narrow pane.
+    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx 42% | @fabian.altahona@\n')
+  })
+
+  it('reads the vault once and serves the account from a cache keyed to the config dir', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-cache', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    const vault = join(configDir, 'oauth-account.json')
+    writeFileSync(vault, JSON.stringify({ emailAddress: 'first@example.com' }))
+    await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
+    // Why rewrite then re-run: a second read of the vault would pick the new value up. The cache
+    // must serve the first one, proving this runs at most once per account rather than per tick.
+    writeFileSync(vault, JSON.stringify({ emailAddress: 'second@example.com' }))
+    const cached = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
+    expect(cached).toContain('@first@')
+    expect(cached).not.toContain('second')
+  })
+
+  it('bounds a long address instead of letting it push quota off the line', async () => {
+    const { scriptPath, dir } = makeHarness()
+    const configDir = join(dir, 'claude-accounts', 'acct-long', 'auth')
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(
+      join(configDir, 'oauth-account.json'),
+      JSON.stringify({ emailAddress: `${'a'.repeat(60)}@example.com` })
+    )
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      displayPayload({
+        rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+      }),
+      PANE_KEY,
+      configDir
+    )
+    // Why assert the bound and not a ladder: with the account itself bounded, the line is short
+    // by construction, so quota survives. A wrapped status line reads as a broken app, and the
+    // one field that could have caused it is the address — so that is what gets shortened.
+    expect(stdout.trimEnd().length).toBeLessThanOrEqual(96)
+    expect(stdout).toContain('5h 12%')
+    expect(stdout).toContain('7d 45%')
+    expect(stdout).not.toContain('a'.repeat(30))
+  })
+
+  it('prints without any Orca env so sessions outside Orca keep their line', async () => {
+    const { scriptPath, dir, curlLog } = makeHarness()
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = spawn('sh', [scriptPath], {
+        env: { PATH: `${join(dir, 'stub-bin')}:${process.env.PATH ?? ''}`, TMPDIR: dir },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+      let out = ''
+      child.stdout.on('data', (chunk: Buffer) => {
+        out += chunk.toString()
+      })
+      child.on('error', reject)
+      child.on('close', () => resolve(out))
+      child.stdin.write(displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } }))
+      child.stdin.end()
+    })
+    // Why no identity here: with no pane key and no config dir there is nothing to key the
+    // once-per-pane marker to, so the banner is skipped rather than repeated every tick.
+    expect(stdout).toBe('Fable | ctx 42% | 5h 12%\n')
+    expect(lineCount(curlLog)).toBe(0)
   })
 })
