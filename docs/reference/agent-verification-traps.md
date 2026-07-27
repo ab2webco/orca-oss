@@ -109,6 +109,19 @@ npm run dev > /tmp/dev.log 2>&1 &
 The same applies to any `--wait`, `tail -f`, or watch command you filter through a
 head-terminated pipeline.
 
+## 8. "Flaky" is a hypothesis, not a verdict
+
+A test that fails in the full suite and passes in isolation has told you *where* the failure lives
+(shared load, ordering, timers), not that it is harmless. Dismissing it is how a real
+concurrency bug hides for months behind the word "flaky".
+
+You own every failure in your run, including ones you did not cause. If it is out of scope to fix,
+say so plainly and leave it tracked with the evidence you already gathered — the full-suite
+failure, the isolated pass, and the run conditions. Never let it disappear into a sentence.
+
+The same rule covers anything handed to you: a delegated worker's report, an upstream PR, another
+agent's "verified". Review it before building on it *or* contradicting it.
+
 ## The common rule
 
 Before reporting something verified, answer one question: **what would this check have shown if

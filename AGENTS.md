@@ -19,6 +19,8 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 # Verification
 
+**Everything in your run is yours.** A failure you did not cause is still a failure you own: never dismiss one as flaky, pre-existing, or someone else's and move on. Explaining a failure is not the same as closing it — if you cannot fix it in scope, say so plainly and leave it tracked with the evidence you gathered. The same applies to anything handed to you: a delegated worker's report, an upstream PR, another agent's "verified". Review it before you build on it or contradict it.
+
 Before reporting work as verified, ask what the check would have shown if the thing were broken. If the answer is "the same output", the check proves nothing. Every trap in [`docs/reference/agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) is one an agent here already hit while believing it had verified — read it before claiming green, and before acting on someone else's green.
 
 Two that bite most often:
