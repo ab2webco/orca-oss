@@ -967,6 +967,9 @@ export class AgentHookServer {
         ? rootContextPreservingPayload
         : {
             ...rootContextPreservingPayload,
+            // Why: session provenance belongs to the incoming agent, not the pane identity that
+            // replaced it — keeping it pairs a Codex pane with a Claude session id and transcript.
+            providerSession: undefined,
             payload: {
               ...rootContextPreservingPayload.payload,
               agentType: identity.agentType
