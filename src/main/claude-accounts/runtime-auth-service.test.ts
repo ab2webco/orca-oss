@@ -30,7 +30,6 @@ const testState = {
   throwScopedKeychainRead: false,
   throwLegacyKeychainRead: false,
   throwRuntimeKeychainWrite: false,
-  throwLegacyRuntimeKeychainWrite: false,
   throwScopedKeychainWrite: false,
   runtimeWriteConfigDir: null as string | null,
   managedKeychainCredentials: new Map<string, string>()
@@ -130,10 +129,6 @@ vi.mock('./keychain', () => ({
       }
       testState.runtimeWriteConfigDir = configDir
       testState.scopedKeychainCredentials = contents
-      if (testState.throwLegacyRuntimeKeychainWrite) {
-        throw new Error('legacy runtime keychain write failed')
-      }
-      testState.legacyKeychainCredentials = contents
       testState.activeKeychainCredentials = contents
     }
   ),
@@ -271,7 +266,6 @@ describe('ClaudeRuntimeAuthService', () => {
     testState.throwScopedKeychainRead = false
     testState.throwLegacyKeychainRead = false
     testState.throwRuntimeKeychainWrite = false
-    testState.throwLegacyRuntimeKeychainWrite = false
     testState.throwScopedKeychainWrite = false
     testState.runtimeWriteConfigDir = null
     testState.managedKeychainCredentials.clear()
@@ -1653,7 +1647,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(refreshedCredentials)
   })
 
-  it('reads back refreshed legacy keychain credentials on old Claude Code builds', async () => {
+  it('does not read another identity from the legacy keychain during managed read-back', async () => {
     if (process.platform !== 'darwin') {
       return
     }
@@ -1680,9 +1674,9 @@ describe('ClaudeRuntimeAuthService', () => {
     testState.legacyKeychainCredentials = refreshedCredentials
     await service.syncForCurrentSelection()
 
-    expect(readManagedCredentialsForTest('account-1', managedAuthPath)).toBe(refreshedCredentials)
-    expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(refreshedCredentials)
-    expect(testState.scopedKeychainCredentials).toBe(refreshedCredentials)
+    expect(readManagedCredentialsForTest('account-1', managedAuthPath)).toBe(originalCredentials)
+    expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(originalCredentials)
+    expect(testState.scopedKeychainCredentials).toBe(originalCredentials)
     expect(testState.legacyKeychainCredentials).toBe(refreshedCredentials)
   })
 
@@ -1717,7 +1711,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readManagedCredentialsForTest('account-1', managedAuthPath)).toBe(managedCredentials)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(managedCredentials)
     expect(testState.scopedKeychainCredentials).toBe(managedCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
+    expect(testState.legacyKeychainCredentials).toBe(staleCredentials)
   })
 
   it('uses fresher file credentials when scoped keychain is stale', async () => {
@@ -1758,7 +1752,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readManagedCredentialsForTest('account-1', managedAuthPath)).toBe(refreshedCredentials)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(refreshedCredentials)
     expect(testState.scopedKeychainCredentials).toBe(refreshedCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(refreshedCredentials)
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
   })
 
   it('restores system default when mismatched Claude keychain auth appears before deselect', async () => {
@@ -2041,7 +2035,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
     expect(testState.scopedKeychainCredentials).toBe(externalScopedCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
   })
 
   it('preserves external file and scoped login while restoring unchanged legacy keychain', async () => {
@@ -2077,7 +2071,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
   })
 
-  it('restores legacy keychain credentials from old system-default snapshots', async () => {
+  it('leaves legacy keychain credentials untouched when restoring old snapshots', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     const snapshotPath = join(
       testState.userDataDir,
@@ -2118,7 +2112,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
     expect(testState.scopedKeychainCredentials).toBe(systemCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
   })
 
   it('does not recapture managed file as system default after a partial keychain write failure', async () => {
@@ -2151,36 +2145,6 @@ describe('ClaudeRuntimeAuthService', () => {
 
     settings.activeClaudeManagedAccountId = null
     await service.syncForCurrentSelection()
-
-    expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
-    expect(testState.scopedKeychainCredentials).toBe(systemCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
-  })
-
-  it('restores scoped keychain after legacy runtime keychain write fails', async () => {
-    const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
-    const systemCredentials = createClaudeCredentialsJson('system@example.com', 'system')
-    const managedCredentials = createClaudeCredentialsJson('user@example.com', 'managed')
-    writeFileSync(runtimeCredentialsPath, systemCredentials, 'utf-8')
-    testState.scopedKeychainCredentials = systemCredentials
-    testState.legacyKeychainCredentials = systemCredentials
-    const managedAuthPath = createManagedClaudeAuth(
-      testState.userDataDir,
-      'account-1',
-      managedCredentials
-    )
-    const settings = createSettings({
-      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)]
-    })
-    const store = createStore(settings)
-
-    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
-    const service = new ClaudeRuntimeAuthService(store as never)
-    settings.activeClaudeManagedAccountId = 'account-1'
-    testState.throwLegacyRuntimeKeychainWrite = true
-    await expect(service.syncForCurrentSelection()).rejects.toThrow(
-      'legacy runtime keychain write failed'
-    )
 
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
     expect(testState.scopedKeychainCredentials).toBe(systemCredentials)
@@ -2332,7 +2296,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(existsSync(runtimeCredentialsPath)).toBe(false)
     expect(readRuntimeOauthAccountForTest()).toBeNull()
     expect(testState.scopedKeychainCredentials).toBeNull()
-    expect(testState.legacyKeychainCredentials).toBeNull()
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
     warn.mockRestore()
   })
 
@@ -2386,7 +2350,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(existsSync(runtimeCredentialsPath)).toBe(false)
     expect(readRuntimeOauthAccountForTest()).toBeNull()
     expect(testState.scopedKeychainCredentials).toBeNull()
-    expect(testState.legacyKeychainCredentials).toBeNull()
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
     warn.mockRestore()
   })
 
@@ -2431,7 +2395,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(existsSync(snapshotPath)).toBe(false)
     expect(existsSync(runtimeCredentialsPath)).toBe(false)
     expect(testState.scopedKeychainCredentials).toBeNull()
-    expect(testState.legacyKeychainCredentials).toBeNull()
+    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
     warn.mockRestore()
   })
 
@@ -2603,7 +2567,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(managedCredentials)
     expect(testState.scopedKeychainCredentials).toBe(managedCredentials)
-    expect(testState.legacyKeychainCredentials).toBe(managedCredentials)
+    expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
     expect(readFileSync(runtimeConfigPath, 'utf-8')).toBe('{not-json')
 
     settings.activeClaudeManagedAccountId = null
@@ -3044,7 +3008,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(account2Credentials)
     if (process.platform === 'darwin') {
       expect(testState.scopedKeychainCredentials).toBe(account2Credentials)
-      expect(testState.legacyKeychainCredentials).toBe(account2Credentials)
+      expect(testState.legacyKeychainCredentials).toBeNull()
     }
   })
 
@@ -3135,7 +3099,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(activeCredentials)
     if (process.platform === 'darwin') {
       expect(testState.scopedKeychainCredentials).toBe(activeCredentials)
-      expect(testState.legacyKeychainCredentials).toBe(activeCredentials)
+      expect(testState.legacyKeychainCredentials).toBeNull()
     }
   })
 

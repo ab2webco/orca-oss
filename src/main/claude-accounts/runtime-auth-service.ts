@@ -600,7 +600,7 @@ export class ClaudeRuntimeAuthService {
     const paths = this.pathResolver.getRuntimePaths()
     this.writeRuntimeCredentials(credentialsJson)
     if (process.platform === 'darwin') {
-      // Why: Claude Code 2.1+ reads the scoped service, older builds the legacy unsuffixed one; runtime switching must satisfy both.
+      // Why: managed identities must not overwrite the system-default account's legacy slot.
       try {
         await writeActiveClaudeKeychainCredentialsForRuntime(credentialsJson, paths.configDir)
       } catch (error) {
@@ -764,17 +764,14 @@ export class ClaudeRuntimeAuthService {
       const scopedKeychainCredentials = await this.readActiveClaudeKeychainCredentialsBestEffort(
         paths.configDir
       )
-      const legacyKeychainCredentials = await this.readActiveClaudeKeychainCredentialsBestEffort()
       if (this.lastWrittenCredentialsJson === null) {
         pushCandidate(scopedKeychainCredentials)
-        pushCandidate(legacyKeychainCredentials)
         pushCandidate(fileCredentials)
         return candidates.filter(
           (candidate) => candidate.credentialsJson !== baselineCredentialsJson
         )
       }
       pushCandidate(scopedKeychainCredentials)
-      pushCandidate(legacyKeychainCredentials)
     }
     pushCandidate(fileCredentials)
     return candidates
@@ -1846,23 +1843,15 @@ export class ClaudeRuntimeAuthService {
     // Why: prove ownership before mutating anything, and restore OAuth first so a failure leaves the credential proof intact for retry.
     this.lastWrittenCredentialsJson = previouslyWrittenCredentialsJson
     let scopedSnapshot: ClaudeKeychainSnapshotValue | null = null
-    let legacySnapshot: ClaudeKeychainSnapshotValue | null = null
     let scopedKeychainOwned = false
-    let legacyKeychainOwned = false
     if (process.platform === 'darwin') {
       scopedSnapshot = this.readKeychainSnapshotValue(snapshot, 'scoped')
-      legacySnapshot = this.readKeychainSnapshotValue(snapshot, 'legacy')
       scopedKeychainOwned = await this.hasUnchangedActiveClaudeKeychainCredentials(
         scopedSnapshot,
         previouslyWrittenCredentialsJson,
         paths.configDir
       )
-      legacyKeychainOwned = await this.hasUnchangedActiveClaudeKeychainCredentials(
-        legacySnapshot,
-        previouslyWrittenCredentialsJson
-      )
-      hasCredentialSurfaceOwnership =
-        fileCredentialsOwned || scopedKeychainOwned || legacyKeychainOwned
+      hasCredentialSurfaceOwnership = fileCredentialsOwned || scopedKeychainOwned
     }
     this.restoreRuntimeOauthAccountIfOwned(
       snapshot?.configOauthAccount ?? null,
@@ -1878,9 +1867,6 @@ export class ClaudeRuntimeAuthService {
           scopedSnapshot.credentialsJson,
           paths.configDir
         )
-      }
-      if (legacySnapshot?.status === 'captured' && legacyKeychainOwned) {
-        await this.restoreActiveClaudeKeychainCredentials(legacySnapshot.credentialsJson)
       }
     }
     this.lastWrittenCredentialsJson = null
@@ -1931,20 +1917,14 @@ export class ClaudeRuntimeAuthService {
       managedOauthAccount
     )
     let scopedKeychainOwned = false
-    let legacyKeychainOwned = false
     if (process.platform === 'darwin') {
       scopedKeychainOwned = await this.hasActiveKeychainCredentialsForAccount(
         account,
         managedOauthAccount,
         paths.configDir
       )
-      legacyKeychainOwned = await this.hasActiveKeychainCredentialsForAccount(
-        account,
-        managedOauthAccount
-      )
     }
-    const hasCredentialSurfaceOwnership =
-      fileCredentialsOwned || scopedKeychainOwned || legacyKeychainOwned
+    const hasCredentialSurfaceOwnership = fileCredentialsOwned || scopedKeychainOwned
     this.restoreRuntimeOauthAccountIfOwned(
       null,
       this.getOwnedRuntimeOauthBaseline(managedOauthAccount, hasCredentialSurfaceOwnership),
@@ -1958,9 +1938,6 @@ export class ClaudeRuntimeAuthService {
     if (process.platform === 'darwin') {
       if (scopedKeychainOwned) {
         await deleteActiveClaudeKeychainCredentialsStrict(paths.configDir)
-      }
-      if (legacyKeychainOwned) {
-        await deleteActiveClaudeKeychainCredentialsStrict()
       }
     }
   }
@@ -1982,24 +1959,16 @@ export class ClaudeRuntimeAuthService {
       managedOauthAccount
     )
     let scopedSnapshot: ClaudeKeychainSnapshotValue | null = null
-    let legacySnapshot: ClaudeKeychainSnapshotValue | null = null
     let scopedKeychainOwned = false
-    let legacyKeychainOwned = false
     if (process.platform === 'darwin') {
       scopedSnapshot = this.readKeychainSnapshotValue(snapshot, 'scoped')
-      legacySnapshot = this.readKeychainSnapshotValue(snapshot, 'legacy')
       scopedKeychainOwned = await this.hasActiveKeychainCredentialsForAccount(
         account,
         managedOauthAccount,
         paths.configDir
       )
-      legacyKeychainOwned = await this.hasActiveKeychainCredentialsForAccount(
-        account,
-        managedOauthAccount
-      )
     }
-    const hasCredentialSurfaceOwnership =
-      fileCredentialsOwned || scopedKeychainOwned || legacyKeychainOwned
+    const hasCredentialSurfaceOwnership = fileCredentialsOwned || scopedKeychainOwned
     this.restoreRuntimeOauthAccountIfOwned(
       snapshot.configOauthAccount,
       this.getOwnedRuntimeOauthBaseline(managedOauthAccount, hasCredentialSurfaceOwnership),
@@ -2016,9 +1985,6 @@ export class ClaudeRuntimeAuthService {
           scopedSnapshot.credentialsJson,
           paths.configDir
         )
-      }
-      if (legacySnapshot?.status === 'captured' && legacyKeychainOwned) {
-        await this.restoreActiveClaudeKeychainCredentials(legacySnapshot.credentialsJson)
       }
     }
     this.clearLastWrittenRuntimeState()

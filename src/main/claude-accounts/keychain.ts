@@ -39,18 +39,12 @@ export async function writeActiveClaudeKeychainCredentialsForRuntime(
   contents: string,
   configDir: string
 ): Promise<void> {
-  const user = getKeychainUser()
-  const scopedService = getActiveClaudeService(configDir)
-  await writeKeychainPassword(scopedService, user, contents)
-  if (scopedService !== ACTIVE_CLAUDE_SERVICE) {
-    await writeKeychainPassword(ACTIVE_CLAUDE_SERVICE, user, contents)
-  }
+  // Why: managed runtimes never own the machine-wide legacy identity.
+  await writeKeychainPassword(getActiveClaudeService(configDir), getKeychainUser(), contents)
 }
 
 export async function deleteActiveClaudeKeychainCredentials(configDir?: string): Promise<void> {
-  for (const service of getActiveClaudeServices(configDir)) {
-    await deleteKeychainPassword(service, getKeychainUser())
-  }
+  await deleteKeychainPassword(getActiveClaudeService(configDir), getKeychainUser())
 }
 
 export async function deleteActiveClaudeKeychainCredentialsStrict(

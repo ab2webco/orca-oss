@@ -121,7 +121,7 @@ describe('Claude Keychain credentials', () => {
     ])
   })
 
-  it('writes runtime credentials to scoped and legacy services for old Claude Code compatibility', async () => {
+  it('writes managed runtime credentials only to the scoped service', async () => {
     const configDir = '/tmp/orca-claude-login-test'
     const scopedService = serviceForConfigDir(configDir)
     execFileMock.mockImplementation((_file, _args, _options, callback) => {
@@ -141,17 +141,27 @@ describe('Claude Keychain credentials', () => {
         process.env.USER || process.env.USERNAME || 'user',
         '-w',
         'credentials-json'
-      ],
-      [
-        'add-generic-password',
-        '-U',
-        '-s',
-        'Claude Code-credentials',
-        '-a',
-        process.env.USER || process.env.USERNAME || 'user',
-        '-w',
-        'credentials-json'
       ]
+    ])
+  })
+
+  it('writes system-default host credentials to the legacy service for old Claude Code', async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      invokeExecFileCallback(callback, null, '', '')
+      return null as never
+    })
+
+    await writeActiveClaudeKeychainCredentials('credentials-json')
+
+    expect(execFileMock.mock.calls[0][1]).toEqual([
+      'add-generic-password',
+      '-U',
+      '-s',
+      'Claude Code-credentials',
+      '-a',
+      process.env.USER || process.env.USERNAME || 'user',
+      '-w',
+      'credentials-json'
     ])
   })
 
@@ -206,7 +216,7 @@ describe('Claude Keychain credentials', () => {
     expect(killMock).toHaveBeenCalled()
   })
 
-  it('deletes both scoped and legacy active credentials for config-dir cleanup', async () => {
+  it('deletes only scoped credentials for managed config-dir cleanup', async () => {
     const configDir = '/tmp/orca-claude-login-test'
     const scopedService = serviceForConfigDir(configDir)
     execFileMock.mockImplementation((_file, _args, _options, callback) => {
@@ -223,14 +233,24 @@ describe('Claude Keychain credentials', () => {
         scopedService,
         '-a',
         process.env.USER || process.env.USERNAME || 'user'
-      ],
-      [
-        'delete-generic-password',
-        '-s',
-        'Claude Code-credentials',
-        '-a',
-        process.env.USER || process.env.USERNAME || 'user'
       ]
+    ])
+  })
+
+  it('deletes the legacy service only for system-default host cleanup', async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      invokeExecFileCallback(callback, null, '', '')
+      return null as never
+    })
+
+    await deleteActiveClaudeKeychainCredentials()
+
+    expect(execFileMock.mock.calls[0][1]).toEqual([
+      'delete-generic-password',
+      '-s',
+      'Claude Code-credentials',
+      '-a',
+      process.env.USER || process.env.USERNAME || 'user'
     ])
   })
 })
