@@ -5,6 +5,7 @@ import {
   getLiveClaudeRotationOwnership,
   isManagedClaudeAccountMutating
 } from './live-pty-gate'
+import type { ManagedClaudeAccountMutationOptions } from './managed-claude-account-mutation-policy'
 import {
   fingerprintClaudeRefreshChain,
   type ClaudeRefreshChainFingerprint
@@ -30,13 +31,16 @@ const managedClaudeAccountMutationContext = new AsyncLocalStorage<ReadonlySet<st
 export async function runManagedClaudeAccountMutation<T>(
   accountId: string,
   operation: () => Promise<T>,
-  allowLiveSharedPtys = false
+  options: boolean | ManagedClaudeAccountMutationOptions = {}
 ): Promise<T> {
   const inherited = managedClaudeAccountMutationContext.getStore()
   if (inherited?.has(accountId)) {
     return operation()
   }
-  beginManagedClaudeAccountMutation(accountId, allowLiveSharedPtys)
+  beginManagedClaudeAccountMutation(
+    accountId,
+    typeof options === 'boolean' ? { allowLiveSharedPtys: options } : options
+  )
   try {
     return await managedClaudeAccountMutationContext.run(
       new Set([...(inherited ?? []), accountId]),

@@ -1786,14 +1786,15 @@ describe('registerPtyHandlers', () => {
       expect(livePtyGate.hasLiveInjectedClaudePtysForAccount('account-injected')).toBe(false)
     })
 
-    it('releases shared launch ownership when renderer provider spawn fails', async () => {
-      const reservationId = livePtyGate.reserveSharedClaudeAccountLaunch('account-global')
+    it('releases ownerless shared launch ownership when renderer provider spawn fails', async () => {
+      const reservationId = livePtyGate.reserveSharedClaudeAccountLaunch(null)
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/claude',
         envPatch: {},
         stripAuthEnv: false,
         sharedAccountReservationId: reservationId,
-        provenance: 'managed:account-global'
+        sharedAccountId: null,
+        provenance: 'system'
       }))
       spawnMock.mockImplementation(() => {
         throw new Error('provider spawn failed')
@@ -1808,9 +1809,8 @@ describe('registerPtyHandlers', () => {
         })
       ).rejects.toThrow()
 
-      beginClaudeAuthSwitch()
-      expect(livePtyGate.isClaudeAuthSwitchInProgress()).toBe(true)
-      endClaudeAuthSwitch()
+      livePtyGate.beginManagedClaudeAccountMutation('account-a')
+      livePtyGate.endManagedClaudeAccountMutation('account-a')
     })
 
     it('reattaches with the PTY account even after the worktree is repinned', async () => {

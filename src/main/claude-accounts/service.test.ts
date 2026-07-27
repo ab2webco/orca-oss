@@ -755,6 +755,28 @@ describe('ClaudeAccountService credential capture', () => {
     releaseInjectedClaudeAccountLaunch(reservationId)
   })
 
+  it('allows deleting a noncandidate account during an ownerless shared launch', async () => {
+    const { ClaudeAccountService } = await import('./service')
+    const { releaseSharedClaudeAccountLaunch, reserveSharedClaudeAccountLaunch } =
+      await import('./live-pty-gate')
+    const service = new ClaudeAccountService({} as never, {} as never, {} as never)
+    const result = { accounts: [], activeAccountId: null }
+    ;(service as unknown as Record<string, ReturnType<typeof vi.fn>>).doRemoveAccount = vi.fn(
+      async () => result
+    )
+    ;(service as unknown as Record<string, ReturnType<typeof vi.fn>>).doReauthenticateAccount =
+      vi.fn(async () => result)
+    const reservationId = reserveSharedClaudeAccountLaunch(null)
+    try {
+      await expect(service.removeAccount('account-1')).resolves.toBe(result)
+      await expect(service.reauthenticateAccount('account-1')).rejects.toThrow(
+        'global Claude terminal launch is still starting'
+      )
+    } finally {
+      releaseSharedClaudeAccountLaunch(reservationId)
+    }
+  })
+
   it('excludes pinned launches for the outgoing account throughout selection sync', async () => {
     let settings = {
       claudeManagedAccounts: [
@@ -1468,7 +1490,7 @@ describe('ClaudeAccountService credential capture', () => {
     expect(rateLimits.refreshForClaudeAccountChange).not.toHaveBeenCalled()
   })
 
-  it('removes a WSL account without clearing the Windows active account', async () => {
+  it('removes an inactive WSL account during an unrelated ownerless launch', async () => {
     setPlatform('linux')
     tempDir = '/tmp/orca-claude-service-test'
     rmSync(tempDir, { recursive: true, force: true })
@@ -1511,7 +1533,7 @@ describe('ClaudeAccountService credential capture', () => {
       activeClaudeManagedAccountId: 'host-account',
       activeClaudeManagedAccountIdsByRuntime: {
         host: 'host-account',
-        wsl: { Ubuntu: 'wsl-account' }
+        wsl: { Ubuntu: null }
       }
     }
     const store = {
@@ -1536,13 +1558,20 @@ describe('ClaudeAccountService credential capture', () => {
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
     const { ClaudeAccountService } = await import('./service')
+    const { releaseSharedClaudeAccountLaunch, reserveSharedClaudeAccountLaunch } =
+      await import('./live-pty-gate')
     const service = new ClaudeAccountService(
       store as never,
       rateLimits as never,
       runtimeAuth as never
     )
 
-    await service.removeAccount('wsl-account')
+    const reservationId = reserveSharedClaudeAccountLaunch(null)
+    try {
+      await service.removeAccount('wsl-account')
+    } finally {
+      releaseSharedClaudeAccountLaunch(reservationId)
+    }
 
     expect(settings.activeClaudeManagedAccountId).toBe('host-account')
     expect(settings.activeClaudeManagedAccountIdsByRuntime).toEqual({
@@ -1550,10 +1579,11 @@ describe('ClaudeAccountService credential capture', () => {
       wsl: { Ubuntu: null }
     })
     expect(rateLimits.evictInactiveClaudeCache).toHaveBeenCalledWith('wsl-account')
-    expect(rateLimits.refreshForClaudeAccountChange).toHaveBeenCalledWith('wsl-account', {
+    expect(rateLimits.refreshForClaudeAccountChange).toHaveBeenCalledWith(undefined, {
       runtime: 'wsl',
       wslDistro: 'Ubuntu'
     })
+    expect(runtimeAuth.syncForCurrentSelection).not.toHaveBeenCalled()
   })
 
   it('removes command listeners when Claude sign-in times out', async () => {

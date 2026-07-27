@@ -299,7 +299,9 @@ describe('Claude live PTY gate', () => {
       expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
         'being launched globally'
       )
-      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow('in use')
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow(
+        'global Claude terminal launch is still starting'
+      )
       expect(() => beginClaudeAuthSwitch()).toThrow('global Claude terminal is starting')
 
       markClaudePtySpawned('live-claude-pty', 'account-a', reservationId)
@@ -326,10 +328,38 @@ describe('Claude live PTY gate', () => {
       expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
         'being launched globally'
       )
-      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow('in use')
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow(
+        'global Claude terminal launch is still starting'
+      )
     } finally {
       releaseSharedClaudeAccountLaunch(reservationId)
     }
+  })
+
+  it('lets unrelated account-record mutations pass an ownerless shared reservation', async () => {
+    const reservationId = reserveSharedClaudeAccountLaunch(null)
+    try {
+      await expect(
+        runManagedClaudeAccountMutation('account-a', async () => 'removed', {
+          intent: 'account-record'
+        })
+      ).resolves.toBe('removed')
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow(
+        'global Claude terminal launch is still starting'
+      )
+    } finally {
+      releaseSharedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('expires launch reservations after five minutes as a failed-launch safety net', () => {
+    vi.useFakeTimers()
+    reserveSharedClaudeAccountLaunch(null)
+
+    vi.advanceTimersByTime(300_001)
+
+    expect(() => beginManagedClaudeAccountMutation('account-a')).not.toThrow()
+    endManagedClaudeAccountMutation('account-a')
   })
 
   it('reports live ownership for both shared and pinned Claude terminals', () => {

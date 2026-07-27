@@ -58,11 +58,24 @@ import {
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount
 } from './live-pty-gate'
+import type { ManagedClaudeAccountMutationIntent } from './managed-claude-account-mutation-policy'
 import { runManagedClaudeAccountMutation } from './run-managed-claude-account-mutation'
 import {
-  closeLiveClaudeTerminalsForAccount,
+  closeLiveClaudeTerminalsForAccounts,
   type ClaudePtyTerminator
 } from './close-live-claude-terminals'
+import { buildClaudeAccountWorktreeUsageReport } from './account-worktree-usage-report'
+import { planClaudeWorktreePinReassignment } from './worktree-account-pin-reassignment'
+import {
+  injectedClaudeLaunchReservations,
+  liveInjectedClaudePtyAccounts,
+  liveSharedClaudePtyAccounts,
+  sharedClaudeLaunchReservations
+} from './live-pty-account-state'
+import type {
+  ClaudeAccountWorktreeUsageReport,
+  ClaudeWorktreeAccountReassignment
+} from '../../shared/claude-account-worktree-usage'
 import { findDuplicateClaudeAccount } from './claude-duplicate-account'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
@@ -78,7 +91,6 @@ import {
   setSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
-import { getRepoIdFromWorktreeId } from '../../shared/worktree-id'
 import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
 
 const LOGIN_TIMEOUT_MS = 180_000
@@ -109,6 +121,14 @@ type ManagedClaudeAuthSnapshot = {
 export type ClaudeAccountAddTarget = {
   runtime?: 'host' | 'wsl'
   wslDistro?: string | null
+}
+
+export type ClaudeAccountRemovalOptions = {
+  closeLiveTerminals?: boolean
+  /** Accounts beyond the removed one whose live terminals block the auth sync. */
+  closeLiveTerminalAccountIds?: readonly string[]
+  /** Where pinned worktrees land. Omitted or null means the system default. */
+  reassignPinnedTo?: string | null
 }
 
 export type ClaudeCustomEndpointAccountInput = {
@@ -199,8 +219,10 @@ export class ClaudeAccountService {
     input: ClaudeCustomEndpointAccountUpdateInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.serializeMutation(() =>
-      this.withManagedAccountMutation(input.accountId, () =>
-        this.doUpdateCustomEndpointAccount(input)
+      this.withManagedAccountMutation(
+        input.accountId,
+        () => this.doUpdateCustomEndpointAccount(input),
+        'account-record'
       )
     )
   }
@@ -235,23 +257,111 @@ export class ClaudeAccountService {
 
   async removeAccount(
     accountId: string,
-    options: { closeLiveTerminals?: boolean } = {}
+    options: ClaudeAccountRemovalOptions = {}
   ): Promise<ClaudeRateLimitAccountsState> {
+    const reassignTo = this.resolveReassignmentDestination(accountId, options.reassignPinnedTo)
     return this.serializeMutation(async () => {
       if (options.closeLiveTerminals) {
         // Why: killing live terminals must happen before the managed-mutation lock,
         // which itself refuses to open while the account has live PTYs.
-        await this.closeLiveClaudeTerminalsForAccount(accountId)
+        await this.closeLiveClaudeTerminals([
+          accountId,
+          ...(options.closeLiveTerminalAccountIds ?? [])
+        ])
       }
-      return this.withManagedAccountMutation(accountId, () => this.doRemoveAccount(accountId))
+      return this.withManagedAccountMutation(
+        accountId,
+        () => this.doRemoveAccount(accountId, reassignTo),
+        'account-record'
+      )
     })
   }
 
-  private async closeLiveClaudeTerminalsForAccount(accountId: string): Promise<void> {
+  /** Report which worktrees use an account, which of them are live right now, and
+   *  what else still blocks the change. Powers the reassign dialog in Settings. */
+  getAccountWorktreeUsageReport(accountId: string): ClaudeAccountWorktreeUsageReport {
+    const settings = this.store.getSettings()
+    const account = settings.claudeManagedAccounts.find((entry) => entry.id === accountId)
+    return buildClaudeAccountWorktreeUsageReport({
+      accountId,
+      worktreeMeta: this.store.getAllWorktreeMeta(),
+      liveInjectedPtyAccounts: liveInjectedClaudePtyAccounts,
+      liveSharedPtyAccounts: liveSharedClaudePtyAccounts,
+      injectedLaunchReservations: injectedClaudeLaunchReservations,
+      sharedLaunchReservations: sharedClaudeLaunchReservations,
+      activeAccountId: account
+        ? getSelectedClaudeAccountIdForTarget(
+            settings,
+            getClaudeSelectionTargetForAccount(account)
+          )
+        : settings.activeClaudeManagedAccountId
+    })
+  }
+
+  /** Move every worktree pinned to one account onto another (or the system
+   *  default), optionally closing the live terminals that block the move. */
+  async reassignWorktreeAccountPins(
+    request: ClaudeWorktreeAccountReassignment
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const toAccountId = this.resolveReassignmentDestination(
+      request.fromAccountId,
+      request.toAccountId
+    )
+    return this.serializeMutation(async () => {
+      if (request.closeLiveTerminals) {
+        await this.closeLiveClaudeTerminals([
+          request.fromAccountId,
+          ...(request.closeLiveTerminalAccountIds ?? [])
+        ])
+      }
+      const plan = planClaudeWorktreePinReassignment(
+        this.store.getAllWorktreeMeta(),
+        request.fromAccountId,
+        toAccountId
+      )
+      if (plan.worktreeIds.length > 0) {
+        this.commitClaudeAccountState({}, plan.pins)
+        this.notifyWorktreeAccountPinsChanged(plan.repoIds)
+      }
+      return this.getSnapshot()
+    })
+  }
+
+  /** `undefined` keeps the caller's default (clear the pin); an explicit id must
+   *  name a different account that still exists once the change lands. */
+  private resolveReassignmentDestination(
+    fromAccountId: string,
+    toAccountId: string | null | undefined
+  ): string | null {
+    if (toAccountId === undefined || toAccountId === null) {
+      return null
+    }
+    if (toAccountId === fromAccountId) {
+      throw new Error('Pick a different Claude account to reassign these worktrees to.')
+    }
+    if (!this.store.getSettings().claudeManagedAccounts.some((entry) => entry.id === toAccountId)) {
+      throw new Error('That Claude account no longer exists.')
+    }
+    return toAccountId
+  }
+
+  private notifyWorktreeAccountPinsChanged(repoIds: readonly string[]): void {
+    for (const repoId of repoIds) {
+      try {
+        this.onWorktreeAccountPinsChanged?.(repoId)
+      } catch (error) {
+        // Why: renderer invalidation is best-effort after the durable pin write;
+        // an event delivery failure must not undo the committed reassignment.
+        console.warn('[claude-accounts] Failed to notify reassigned worktree pins:', error)
+      }
+    }
+  }
+
+  private async closeLiveClaudeTerminals(accountIds: readonly string[]): Promise<void> {
     if (!this.terminateLiveClaudePty) {
       throw new Error('Closing live Claude terminals is not supported in this runtime.')
     }
-    await closeLiveClaudeTerminalsForAccount(accountId, this.terminateLiveClaudePty)
+    await closeLiveClaudeTerminalsForAccounts(accountIds, this.terminateLiveClaudePty)
   }
 
   async selectAccount(accountId: string | null): Promise<ClaudeRateLimitAccountsState> {
@@ -285,9 +395,10 @@ export class ClaudeAccountService {
 
   private async withManagedAccountMutation<T>(
     accountId: string,
-    operation: () => Promise<T>
+    operation: () => Promise<T>,
+    intent: ManagedClaudeAccountMutationIntent = 'shared-auth'
   ): Promise<T> {
-    return runManagedClaudeAccountMutation(accountId, operation)
+    return runManagedClaudeAccountMutation(accountId, operation, { intent })
   }
 
   private async doAddAccount(
@@ -712,7 +823,10 @@ export class ClaudeAccountService {
     }
   }
 
-  private async doRemoveAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
+  private async doRemoveAccount(
+    accountId: string,
+    reassignPinnedTo: string | null
+  ): Promise<ClaudeRateLimitAccountsState> {
     this.assertAccountAuthIsIdle(accountId)
     const account = this.requireAccount(accountId)
     const settings = this.store.getSettings()
@@ -744,24 +858,29 @@ export class ClaudeAccountService {
           activeClaudeManagedAccountIdsByRuntime: nextSelection
         })
         await this.syncRuntimeAuthWithLivePtyGate(getClaudeSelectionTargetForAccount(account))
-      } else {
-        await this.syncRuntimeAuthWithLivePtyGate(getClaudeSelectionTargetForAccount(account))
       }
+      // Why: deleting an inactive account changes no shared auth, so an unrelated launch can proceed.
       // Why: worktree creation can finish while account removal awaits auth sync.
       // Snapshot pins at the durable commit boundary so none can escape cleanup.
-      const pinnedWorktreeIds = Object.entries(this.store.getAllWorktreeMeta())
-        .filter(([, meta]) => meta.claudeAccountId === accountId)
-        .map(([worktreeId]) => worktreeId)
-      affectedRepoIds = [...new Set(pinnedWorktreeIds.map(getRepoIdFromWorktreeId))]
-      const clearedPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, null]))
-      restoredPins = Object.fromEntries(pinnedWorktreeIds.map((id) => [id, accountId]))
+      // Why: the destination must still exist after this removal commits, or the
+      // pin would resurrect a dead account id the next launch has to normalize away.
+      const reassignedPinAccountId = nextAccounts.some((entry) => entry.id === reassignPinnedTo)
+        ? reassignPinnedTo
+        : null
+      const plan = planClaudeWorktreePinReassignment(
+        this.store.getAllWorktreeMeta(),
+        accountId,
+        reassignedPinAccountId
+      )
+      affectedRepoIds = plan.repoIds
+      restoredPins = Object.fromEntries(plan.worktreeIds.map((id) => [id, accountId]))
       this.commitClaudeAccountState(
         {
           claudeManagedAccounts: nextAccounts,
           activeClaudeManagedAccountId: nextActiveId,
           activeClaudeManagedAccountIdsByRuntime: nextSelection
         },
-        clearedPins
+        plan.pins
       )
       removalCommitted = true
       this.rateLimits.evictInactiveClaudeCache(accountId)
@@ -776,15 +895,7 @@ export class ClaudeAccountService {
       )
       credentialRemovalStarted = true
       await this.safeRemoveManagedAuth(accountId, account.managedAuthPath, { strict: true })
-      for (const repoId of affectedRepoIds) {
-        try {
-          this.onWorktreeAccountPinsChanged?.(repoId)
-        } catch (error) {
-          // Why: renderer invalidation is best-effort after the durable removal;
-          // an event delivery failure must not resurrect deleted credentials.
-          console.warn('[claude-accounts] Failed to notify cleared worktree pins:', error)
-        }
-      }
+      this.notifyWorktreeAccountPinsChanged(affectedRepoIds)
       return this.getSnapshot()
     } catch (error) {
       if (credentialRemovalStarted) {

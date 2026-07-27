@@ -19,6 +19,15 @@ import {
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount
 } from './live-pty-account-ownership'
+import {
+  clearClaudeLaunchReservationExpiry,
+  scheduleClaudeLaunchReservationExpiry
+} from './claude-launch-reservation-lifetime'
+import {
+  assertSharedLaunchAllowsManagedAccountMutation,
+  type ManagedClaudeAccountMutationOptions
+} from './managed-claude-account-mutation-policy'
+import { isClaudeAuthSwitchInProgress } from './claude-auth-switch-gate'
 const managedClaudeAccountMutations = new Set<string>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
@@ -26,7 +35,6 @@ const managedClaudeAccountMutations = new Set<string>()
 // survived the app restart inside the daemon.
 const seededUnconfirmedPtyIds = new Set<string>()
 const seededUnconfirmedInjectedPtyIds = new Set<string>()
-let switchInProgress = false
 
 export type ClaudeLivePtyPersistence = {
   addClaudeLivePtySessionId(sessionId: string, accountId?: string | null): void
@@ -238,11 +246,12 @@ export function reserveInjectedClaudeAccountLaunch(
   const reservationId = randomUUID()
   injectedClaudeLaunchReservations.set(reservationId, accountId)
   reserveClaudeLaunchRefreshChain(reservationId, accountId)
+  scheduleClaudeLaunchReservationExpiry(reservationId, releaseInjectedClaudeAccountLaunch)
   return reservationId
 }
 
 export function reserveSharedClaudeAccountLaunch(accountId: string | null): string {
-  if (switchInProgress) {
+  if (isClaudeAuthSwitchInProgress()) {
     throw new Error('A Claude account switch is in progress. Try again after it finishes.')
   }
   if (
@@ -264,24 +273,27 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
   const reservationId = randomUUID()
   sharedClaudeLaunchReservations.set(reservationId, accountId)
   reserveClaudeLaunchRefreshChain(reservationId, accountId)
+  scheduleClaudeLaunchReservationExpiry(reservationId, releaseSharedClaudeAccountLaunch)
   return reservationId
 }
 
 export function beginManagedClaudeAccountMutation(
   accountId: string,
-  allowLiveSharedPtys = false
+  options: ManagedClaudeAccountMutationOptions = {}
 ): void {
   if (
     hasLiveInjectedClaudePtysForAccount(accountId) ||
-    (!allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId)) ||
-    [...sharedClaudeLaunchReservations.values()].some(
-      (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId
-    )
+    (!options.allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId))
   ) {
     throw new Error(
       'This Claude account is in use by an assigned worktree. Close its Claude terminal before changing the account.'
     )
   }
+  assertSharedLaunchAllowsManagedAccountMutation(
+    accountId,
+    sharedClaudeLaunchReservations,
+    options.intent
+  )
   if (managedClaudeAccountMutations.has(accountId)) {
     throw new Error('This Claude account is already being changed.')
   }
@@ -302,6 +314,7 @@ export function releaseInjectedClaudeAccountLaunch(reservationId: string | undef
   if (!reservationId) {
     return
   }
+  clearClaudeLaunchReservationExpiry(reservationId)
   injectedClaudeLaunchReservations.delete(reservationId)
   releaseClaudeLaunchRefreshChain(reservationId)
 }
@@ -310,29 +323,11 @@ export function releaseSharedClaudeAccountLaunch(reservationId: string | undefin
   if (!reservationId) {
     return
   }
+  clearClaudeLaunchReservationExpiry(reservationId)
   sharedClaudeLaunchReservations.delete(reservationId)
   releaseClaudeLaunchRefreshChain(reservationId)
 }
 
-export function beginClaudeAuthSwitch(): void {
-  if (switchInProgress) {
-    throw new Error('A Claude account switch is already in progress.')
-  }
-  if (sharedClaudeLaunchReservations.size > 0) {
-    // Why: shared auth must not change after launch preparation but before the
-    // PTY is registered in the durable live-session gate.
-    throw new Error('A global Claude terminal is starting. Try again when it finishes.')
-  }
-  switchInProgress = true
-}
-
-export function endClaudeAuthSwitch(): void {
-  switchInProgress = false
-}
-
-export function isClaudeAuthSwitchInProgress(): boolean {
-  return switchInProgress
-}
-
 export { liveInjectedClaudePtyAccounts, liveSharedClaudePtyAccounts }
+export * from './claude-auth-switch-gate'
 export * from './live-pty-account-ownership'
