@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from './update-check-click-options'
 
 function clickEvent(
-  overrides: Partial<Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>>
+  overrides: Partial<Pick<MouseEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>>
 ) {
   return {
+    altKey: false,
     ctrlKey: false,
     metaKey: false,
     shiftKey: false,
-    altKey: false,
     ...overrides
-  } as Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>
+  } as Pick<MouseEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>
 }
 
 describe('getUpdateCheckClickOptions', () => {
@@ -50,27 +50,36 @@ describe('getUpdateCheckClickOptions', () => {
     })
   })
 
-  it('routes Alt to the lab release-candidate channel on every platform', () => {
-    // Why: lab RCs are hidden from ordinary checks, so this modifier is the only in-app way to
-    // reach one. Alt is platform-neutral, unlike the Cmd/Ctrl split perf uses.
-    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true }), true)).toEqual({
+  it('routes Alt+Shift to the lab release-candidate channel before local builds', () => {
+    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true, shiftKey: true }), true)).toEqual({
       includePrerelease: false,
       includePerfPrerelease: false,
       includeLabRcPrerelease: true
     })
-    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true }), false)).toEqual({
+    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true, shiftKey: true }), false)).toEqual({
       includePrerelease: false,
       includePerfPrerelease: false,
       includeLabRcPrerelease: true
     })
   })
 
+  it('keeps plain Option for local builds on macOS only', () => {
+    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true }), true)).toEqual({
+      localBuild: true
+    })
+    expect(getUpdateCheckClickOptions(clickEvent({ altKey: true }), false)).toEqual({
+      includePrerelease: false,
+      includePerfPrerelease: false,
+      includeLabRcPrerelease: false
+    })
+  })
+
   it('formats the tooltip hint by platform', () => {
     expect(getUpdateCheckHint(true)).toBe(
-      '⇧+click checks the latest RC; ⌘+click checks the latest perf build; ⌥+click checks the latest lab release candidate.'
+      '⇧+click checks the latest RC; ⌘+click checks the latest perf build. ⌥+click chooses a local macOS build; ⌥+⇧+click checks the latest lab release candidate.'
     )
     expect(getUpdateCheckHint(false)).toBe(
-      'Shift+click checks the latest RC; Ctrl+click checks the latest perf build; Alt+click checks the latest lab release candidate.'
+      'Shift+click checks the latest RC; Ctrl+click checks the latest perf build. Alt+Shift+click checks the latest lab release candidate.'
     )
   })
 })

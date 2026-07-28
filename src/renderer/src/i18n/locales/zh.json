@@ -676,6 +676,16 @@
       },
       "pluginCommandKeybindings": {
         "group": "Plugins"
+      },
+      "browser": {
+        "cookie": {
+          "import": {
+            "toast": {
+              "restartFallbackUnavailableNone": "无法加载这 {{value0}} 个 Cookie 中的任何一个，且重启回退机制不可用。此配置文件之前的 Cookie 已被替换。请重试导入。",
+              "restartFallbackUnavailablePartial": "已导入 {{value1}} 个 Cookie 中的 {{value0}} 个。其余 Cookie 无法加载，且重启回退机制不可用。请重试导入。"
+            }
+          }
+        }
       }
     },
     "hooks": {
@@ -1971,7 +1981,12 @@
         "c9ff9b9ec2": "Check official releases",
         "a05992a26b": "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases.",
         "5194358929": "Hide details",
-        "8bc9e17d8f": "Show details"
+        "8bc9e17d8f": "Show details",
+        "8cf17b10af": "Local Build Error",
+        "a4650b0dc4": "Could Not Use Local Build",
+        "b1e390250d": "Could not complete the local build switch.",
+        "d29740d175": "The selected build could not be used.",
+        "37d45c9ec1": "Choose Another Build"
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "移动",
@@ -5005,6 +5020,15 @@
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
+        },
+        "MarkdownImageLightbox": {
+          "close": "关闭",
+          "image": "图像",
+          "expand": "展开图像"
+        },
+        "WorktreeDeveloperMenu": {
+          "developer": "Developer",
+          "parkTerminal": "Park terminal"
         }
       },
       "shared": {
@@ -14230,6 +14254,9 @@
         },
         "ClaudeAccountSwitchList": {
           "empty": "No accounts available"
+        },
+        "useManualTerminalWorktreeParking": {
+          "cannotPark": "These terminals cannot be parked safely."
         }
       },
       "browser-pane": {

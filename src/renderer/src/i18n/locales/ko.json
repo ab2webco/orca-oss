@@ -676,6 +676,16 @@
       },
       "pluginCommandKeybindings": {
         "group": "Plugins"
+      },
+      "browser": {
+        "cookie": {
+          "import": {
+            "toast": {
+              "restartFallbackUnavailableNone": "{{value0}}개의 쿠키를 하나도 불러오지 못했고 재시작 대체 경로도 사용할 수 없었습니다. 이 프로필의 기존 쿠키가 교체되었습니다. 다시 가져오세요.",
+              "restartFallbackUnavailablePartial": "쿠키 {{value1}}개 중 {{value0}}개를 가져왔습니다. 나머지는 불러오지 못했고 재시작 대체 경로도 사용할 수 없었습니다. 다시 가져오세요."
+            }
+          }
+        }
       }
     },
     "hooks": {
@@ -1971,7 +1981,12 @@
         "c9ff9b9ec2": "Check official releases",
         "a05992a26b": "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases.",
         "5194358929": "Hide details",
-        "8bc9e17d8f": "Show details"
+        "8bc9e17d8f": "Show details",
+        "8cf17b10af": "Local Build Error",
+        "a4650b0dc4": "Could Not Use Local Build",
+        "b1e390250d": "Could not complete the local build switch.",
+        "d29740d175": "The selected build could not be used.",
+        "37d45c9ec1": "Choose Another Build"
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "이동",
@@ -5005,6 +5020,15 @@
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
+        },
+        "MarkdownImageLightbox": {
+          "close": "닫기",
+          "image": "이미지",
+          "expand": "이미지 확대"
+        },
+        "WorktreeDeveloperMenu": {
+          "developer": "Developer",
+          "parkTerminal": "Park terminal"
         }
       },
       "shared": {
@@ -14230,6 +14254,9 @@
         },
         "ClaudeAccountSwitchList": {
           "empty": "No accounts available"
+        },
+        "useManualTerminalWorktreeParking": {
+          "cannotPark": "These terminals cannot be parked safely."
         }
       },
       "browser-pane": {

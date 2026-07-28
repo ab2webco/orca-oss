@@ -41,10 +41,10 @@ const GITHUB_URL = 'https://github.com/stablyai/orca'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = {
+  altKey: false,
   ctrlKey: false,
   metaKey: false,
-  shiftKey: false,
-  altKey: false
+  shiftKey: false
 }
 
 function openExternalUrl(url: string): void {
@@ -159,10 +159,10 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   const handleCheckForUpdatesPointerDown = (event: React.PointerEvent): void => {
     updateCheckModifiersRef.current = {
+      altKey: event.altKey,
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
-      shiftKey: event.shiftKey,
-      altKey: event.altKey
+      shiftKey: event.shiftKey
     }
   }
 

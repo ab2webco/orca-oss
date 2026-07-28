@@ -21,7 +21,7 @@ update nudge. It shows up on the repo's releases page like any other release, ba
 
 Two ways to get it onto your machine:
 
-- **From the app** — **Alt+click** (⌥+click) *Check for Updates*. That modifier is the only
+- **From the app** — **Alt+Shift+click** (⌥+⇧+click) *Check for Updates*. That modifier is the only
   in-app route to this channel, and it exercises the real auto-update path.
 - **By hand** — download the installer from the release page and install over your current build.
 
@@ -45,7 +45,7 @@ test, and both installs carried the exclusion.
 | Install | Action | Result |
 | --- | --- | --- |
 | `lab.35` | plain *Check for Updates* | "up to date" — the candidate is never offered |
-| `lab.36.rc` | ⌥+click | offers `1.4.152-lab.37.rc`, installs over the real update path |
+| `lab.36.rc` | ⌥+⇧+click | offers `1.4.152-lab.37.rc`, installs over the real update path |
 
 Two earlier attempts proved nothing and are worth remembering as the shape of a bad test: the
 first was run with ⌥ instead of a plain click, and the second landed while the candidate's assets

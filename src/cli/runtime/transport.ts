@@ -1,6 +1,7 @@
 import { createConnection } from 'node:net'
 import { randomUUID } from 'node:crypto'
 import { findTransport, type RuntimeMetadata } from '../../shared/runtime-bootstrap'
+import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame, RuntimeRpcEnvelopeSchema } from './envelope-schema'
 import { RuntimeClientError, type RuntimeRpcResponse } from './types'
 import { MAX_TIMER_DELAY_MS, isSafeTimerDelayMs } from '../../shared/timer-delay'
@@ -30,7 +31,8 @@ export async function sendRequest<TResult>(
   metadata: RuntimeMetadata,
   method: string,
   params: unknown,
-  timeoutMs: number
+  timeoutMs: number,
+  envelope?: RuntimeOrchestrationEnvelope
 ): Promise<RuntimeRpcResponse<TResult>> {
   if (!isSafeTimerDelayMs(timeoutMs)) {
     throw new RuntimeClientError(
@@ -201,7 +203,10 @@ export async function sendRequest<TResult>(
           id: requestId,
           authToken: metadata.authToken,
           method,
-          params
+          params,
+          orchestrationCapability: envelope?.orchestrationCapability,
+          orchestrationContractVersion: envelope?.orchestrationContractVersion,
+          orchestrationRequestId: envelope?.orchestrationRequestId
         })}\n`
       )
     })

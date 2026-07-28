@@ -174,6 +174,11 @@ describe('registerAppMenu', () => {
     item?.click?.(
       {} as never,
       undefined as never,
+      { altKey: true, shiftKey: true } as Electron.KeyboardEvent
+    )
+    item?.click?.(
+      {} as never,
+      undefined as never,
       {
         triggeredByAccelerator: true,
         shiftKey: true,
@@ -181,7 +186,7 @@ describe('registerAppMenu', () => {
       } as Electron.KeyboardEvent
     )
 
-    // Why: Alt reaches the lab RC channel, which ordinary checks exclude by tag shape.
+    // Plain Option selects a local macOS build; outside macOS, plain Alt is inert.
     item?.click?.({} as never, undefined as never, { altKey: true } as Electron.KeyboardEvent)
 
     expect(options.onCheckForUpdates.mock.calls).toEqual([
@@ -190,8 +195,22 @@ describe('registerAppMenu', () => {
       [{ includePrerelease: true, includePerfPrerelease: true, includeLabRcPrerelease: false }],
       [{ includePrerelease: false, includePerfPrerelease: true, includeLabRcPrerelease: false }],
       [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: false }],
+      [
+        {
+          includePrerelease: false,
+          includePerfPrerelease: false,
+          includeLabRcPrerelease: true
+        }
+      ],
       [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: false }],
-      [{ includePrerelease: false, includePerfPrerelease: false, includeLabRcPrerelease: true }]
+      [
+        {
+          includePrerelease: false,
+          includePerfPrerelease: false,
+          includeLabRcPrerelease: false,
+          ...(isMac ? { localBuild: true } : {})
+        }
+      ]
     ])
   })
 
