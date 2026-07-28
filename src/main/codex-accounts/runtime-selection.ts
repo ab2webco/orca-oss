@@ -3,7 +3,15 @@ import type {
   CodexManagedAccountRuntimeSelection,
   GlobalSettings
 } from '../../shared/types'
+// Why: the renderer's switch-time lane guard has to key panes the same way a
+// launch does, so the lane vocabulary lives in shared rather than in main.
+import {
+  getWslSelectionKey,
+  normalizeCodexAccountSelectionTarget,
+  type CodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
 
+<<<<<<< HEAD
 export type CodexAccountSelectionTarget = {
   runtime?: 'host' | 'wsl'
   wslDistro?: string | null
@@ -32,6 +40,17 @@ export function normalizeCodexAccountSelectionTarget(
   }
   return { runtime: 'host', wslDistro: null }
 }
+=======
+export {
+  getCodexSelectionLaneKey,
+  getWslSelectionKey,
+  normalizeCodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
+export type {
+  CodexAccountSelectionTarget,
+  NormalizedCodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
+>>>>>>> origin/main
 
 export function normalizeCodexRuntimeSelection(
   settings: Pick<
@@ -141,13 +160,4 @@ export function getCodexSelectionTargetForAccount(
     return { runtime: 'wsl', wslDistro: account.wslDistro ?? null }
   }
   return { runtime: 'host' }
-}
-
-export function getWslSelectionKey(wslDistro: string | null | undefined): string {
-  return normalizeWslDistro(wslDistro) ?? '__default__'
-}
-
-function normalizeWslDistro(wslDistro: string | null | undefined): string | null {
-  const trimmed = wslDistro?.trim()
-  return trimmed ? trimmed : null
 }
