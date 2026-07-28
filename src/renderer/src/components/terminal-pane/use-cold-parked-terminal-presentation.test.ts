@@ -48,7 +48,7 @@ describe('useColdParkedTerminalPresentation', () => {
     expect(presentedTargetId(hook.result)).toBe('b')
   })
 
-  it('clears the terminal presentation when an editor becomes active', () => {
+  it('clears the terminal presentation when the group activates non-terminal content', () => {
     const hook = renderPresentationHook({
       desiredTargetId: 'a',
       coldParkedTargetIds: new Set()

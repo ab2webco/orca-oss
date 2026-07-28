@@ -38,13 +38,6 @@
       }
     }
   },
-  "claudeAuth": {
-    "legacySlotUnusable": {
-      "title": "Claude 登录需要修复",
-      "message": "系统级 Claude Code 登录已不可用。",
-      "detail": "由 Orca 管理的 Claude 账户不受影响。要恢复系统级登录，请在 Orca 之外运行 claude 并完成一次 /login。"
-    }
-  },
   "menu": {
     "checkForUpdates": "检查更新...",
     "settings": "设置",
@@ -140,8 +133,8 @@
       "064bd07810": "返回",
       "ce37cf5279": "切换侧边栏 ({{value0}})",
       "e4b9e7dff7": "切换侧边栏",
-      "byAb2WebBadge": "by Ab2Web",
-      "pluginCommandFailed": "无法运行插件命令。"
+      "pluginCommandFailed": "无法运行插件命令。",
+      "byAb2WebBadge": "by Ab2Web"
     },
     "web": {
       "WebConnect": {
@@ -337,12 +330,12 @@
           "0baad2d5d2": "Grok",
           "760bc6883d": "Codex",
           "a5fc0cb622": "OpenClaude",
-          "e585da3bda": "Claude GLM (z.ai)",
           "bf53f09bf8": "Claude Agent Teams",
           "0708ed89f1": "Claude",
           "fc80296033": "Devin",
           "da41abbdd4": "Ante",
-          "mimo_code_label": "MiMo Code"
+          "mimo_code_label": "MiMo Code",
+          "e585da3bda": "Claude GLM (z.ai)"
         },
         "skill": {
           "cli": {
@@ -602,19 +595,6 @@
           }
         }
       },
-      "agentRateLimitAutoSwitchRunner": {
-        "07ff1f8806": "自动切换已禁用。",
-        "7e5d87791a": "由于账户认证位于远程主机上，SSH 终端不支持自动切换。",
-        "d823b157d5": "未找到有可用额度的托管 {{value0}} 账户。",
-        "79751c2c2d": "无法为受限代理会话构建恢复命令。",
-        "13668a6034": "受限代理在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
-        "9553d26436": "切换账户后终端未接受恢复命令。",
-        "13ccffb514": "恢复的代理未能及时接管终端。",
-        "65d1f14b75": "恢复的代理未接受 continue 命令。",
-        "65e8e278a4": "无法检查托管账户：{{value0}}",
-        "a939f58b30": "无法解析恢复平台：{{value0}}",
-        "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。"
-      },
       "linear": {
         "usage": {
           "examples": {
@@ -635,6 +615,40 @@
             "triageFollowupsPrompt": "Use {{value0}} to triage the linked Linear issue — set priority and estimate — and create a parented follow-up ticket for the deferred cleanup."
           }
         }
+      },
+      "codex": {
+        "session": {
+          "restart": {
+            "4bd4a3a9c7": "System default",
+            "9f0b1c2d3e": "Codex account"
+          }
+        }
+      },
+      "browser": {
+        "cookie": {
+          "import": {
+            "toast": {
+              "restartFallbackUnavailableNone": "无法加载这 {{value0}} 个 Cookie 中的任何一个，且重启回退机制不可用。此配置文件之前的 Cookie 已被替换。请重试导入。",
+              "restartFallbackUnavailablePartial": "已导入 {{value1}} 个 Cookie 中的 {{value0}} 个。其余 Cookie 无法加载，且重启回退机制不可用。请重试导入。"
+            }
+          }
+        }
+      },
+      "pluginCommandKeybindings": {
+        "group": "Plugins"
+      },
+      "agentRateLimitAutoSwitchRunner": {
+        "07ff1f8806": "自动切换已禁用。",
+        "7e5d87791a": "由于账户认证位于远程主机上，SSH 终端不支持自动切换。",
+        "d823b157d5": "未找到有可用额度的托管 {{value0}} 账户。",
+        "79751c2c2d": "无法为受限代理会话构建恢复命令。",
+        "13668a6034": "受限代理在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
+        "9553d26436": "切换账户后终端未接受恢复命令。",
+        "13ccffb514": "恢复的代理未能及时接管终端。",
+        "65d1f14b75": "恢复的代理未接受 continue 命令。",
+        "65e8e278a4": "无法检查托管账户：{{value0}}",
+        "a939f58b30": "无法解析恢复平台：{{value0}}",
+        "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。"
       },
       "agentRateLimitFailover": {
         "resumePlanFailed": "无法为故障转移会话构建恢复命令。",
@@ -671,19 +685,6 @@
             "triage": "Triage assignee and priority",
             "triageSummary": "Set the assignee and priority on a Plane work item.",
             "triagePrompt": "Use {{value0}} to assign the Plane work item to me and set its priority to high."
-          }
-        }
-      },
-      "pluginCommandKeybindings": {
-        "group": "Plugins"
-      },
-      "browser": {
-        "cookie": {
-          "import": {
-            "toast": {
-              "restartFallbackUnavailableNone": "无法加载这 {{value0}} 个 Cookie 中的任何一个，且重启回退机制不可用。此配置文件之前的 Cookie 已被替换。请重试导入。",
-              "restartFallbackUnavailablePartial": "已导入 {{value1}} 个 Cookie 中的 {{value0}} 个。其余 Cookie 无法加载，且重启回退机制不可用。请重试导入。"
-            }
           }
         }
       }
@@ -811,10 +812,10 @@
         "projectHostsSummary": "{{value0}} 个主机",
         "linearTitle": "Linear",
         "linearDescription": "Give agents the skill to read and update your linked Linear tickets.",
-        "planeTitle": "Plane",
-        "planeDescription": "Give agents the skill to read and update your Plane work items.",
         "pluginsTitle": "插件",
-        "pluginsDescription": "安装和管理实验性 Orca 插件。"
+        "pluginsDescription": "安装和管理实验性 Orca 插件。",
+        "planeTitle": "Plane",
+        "planeDescription": "Give agents the skill to read and update your Plane work items."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "粘贴内容过大。"
@@ -1331,8 +1332,6 @@
         "perWorkspaceEnvHint": "通过环境模板按需创建环境",
         "branchName": "分支名称",
         "branchNamePlaceholder": "feature/my-branch",
-        "claudeAccount": "账户",
-        "claudeAccountInheritGlobal": "继承全局设置",
         "connectTimedOut": "Connection timed out. It may still be connecting in the background.",
         "connectingHost": "Connecting…",
         "connectHost": "Connect",
@@ -1342,7 +1341,9 @@
         "addSshHostHint": "Use an existing machine over SSH",
         "addRemoteOrcaServer": "Add Remote Orca Server",
         "addRemoteOrcaServerHint": "Pair another Orca runtime",
-        "hostConnectionFailed": "Connection failed"
+        "hostConnectionFailed": "Connection failed",
+        "claudeAccount": "账户",
+        "claudeAccountInheritGlobal": "继承全局设置"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建工作树",
@@ -2830,6 +2831,13 @@
                           "failed": "无法复制终端 ID"
                         }
                       }
+                    },
+                    "pane": {
+                      "id": {
+                        "copy": {
+                          "failed": "Unable to copy pane ID"
+                        }
+                      }
                     }
                   }
                 }
@@ -3463,6 +3471,22 @@
                 "rssDescription": "驻留集大小 (RSS) 的总和。共享页或别名映射页可能会出现在多个进程中。"
               }
             }
+          },
+          "SkillUpdateStatusSegment": {
+            "runningLabel": "Updating skills",
+            "runningOne": "Updating {{value0}}…",
+            "runningMany": "Updating {{value0}} skills…",
+            "runningAria": "Skills updating. Click to open details.",
+            "successLabel": "Skills updated",
+            "successOne": "Updated {{value0}}",
+            "successMany": "Updated {{value0}} skills",
+            "successAria": "Skills updated. Click to open details.",
+            "errorLabel": "Update failed",
+            "errorTooltip": "Skill update failed — click to see details",
+            "errorAria": "Skill update failed. Click to open details.",
+            "stoppingLabel": "Stopping update",
+            "stoppingTooltip": "Stopping the skill update…",
+            "stoppingAria": "Stopping the skill update. Click to open details."
           }
         }
       },
@@ -3873,13 +3897,38 @@
           "updateMany": "可以安全更新 {{value0}} 个技能",
           "success": "所有已安装的 Orca 技能均为最新。",
           "attention": "部分已安装的 Orca 技能无法自动更新。",
-          "attentionDescription": "打开“更新详情”查看为何每一项都无法更新。",
-          "details": "更新详情",
-          "terminalTitle": "更新 Orca 技能",
-          "terminalDescription": "检查预填的命令，然后按 Enter 键运行。",
-          "terminalAria": "Orca 技能更新终端",
           "checkNow": "立即检查",
-          "close": "关闭"
+          "close": "关闭",
+          "blockedOne": "1 skill can't be updated automatically.",
+          "blockedMany": "{{value0}} skills can't be updated automatically.",
+          "runningOne": "Updating 1 skill…",
+          "runningMany": "Updating {{value0}} skills…",
+          "runningDescription": "You can close this window — it keeps running in the background.",
+          "progressAria": "Updating skills",
+          "updatedOne": "Updated 1 skill",
+          "updatedMany": "Updated {{value0}} skills",
+          "updatedPartial": "Updated {{value0}} of {{value1}} skills",
+          "errorTitle": "The update didn't finish",
+          "retry": "Retry",
+          "copyCommand": "Copy command",
+          "copied": "Copied",
+          "showLog": "Show log",
+          "updating": "Updating…",
+          "updateActionOne": "Update 1 skill",
+          "updateActionMany": "Update {{value0}} skills",
+          "done": "Done",
+          "stop": "Stop",
+          "stopping": "Stopping…",
+          "stoppingHeadline": "Stopping the update…",
+          "scanIncomplete": "Orca 无法完成对插件管理技能的检查。",
+          "scanDepthLimit": "在检查此文件夹之前，Orca 已达到插件扫描深度上限。",
+          "scanEntryLimit": "在检查此缓存的其余内容之前，Orca 已达到插件扫描条目数上限。",
+          "scanCandidateLimit": "Orca 发现的同名技能文件夹数量超过了可安全检查的上限。",
+          "scanManifestLimit": "此插件清单超出安全限制，Orca 已将其跳过。",
+          "scanOutsideRoot": "此插件路径指向插件缓存之外，Orca 已将其跳过。",
+          "scanIoErrorWithCode": "Orca 无法读取此插件路径（{{value0}}）。",
+          "scanIoError": "Orca 无法读取此插件路径。",
+          "scanIssueLimit": "被跳过的插件文件夹过多，Orca 无法逐一列出。"
         },
         "SkillFreshnessStatusPill": {
           "updateAvailable": "有可用更新",
@@ -3887,6 +3936,13 @@
           "installed": "已安装",
           "details": "Details",
           "needsAttention": "Needs attention"
+        },
+        "SkillUpdateResultRows": {
+          "stillOutdated": "Still out of date after the update ran."
+        },
+        "SkillUpdateRow": {
+          "oneLocation": "1 location",
+          "manyLocations": "{{value0}} locations"
         }
       },
       "sidebar": {
@@ -5014,21 +5070,21 @@
           "forget": "从 Orca 中移除",
           "reconnectAndDelete": "重新连接并删除"
         },
+        "MarkdownImageLightbox": {
+          "image": "图像",
+          "expand": "展开图像",
+          "close": "关闭"
+        },
+        "WorktreeDeveloperMenu": {
+          "developer": "Developer",
+          "parkTerminal": "Park terminal"
+        },
         "WorktreeCardClaudeAccountChip": {
           "systemDefault": "System default",
           "pinnedEndpoint": "Pinned Claude endpoint: {{value0}}",
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
-        },
-        "MarkdownImageLightbox": {
-          "close": "关闭",
-          "image": "图像",
-          "expand": "展开图像"
-        },
-        "WorktreeDeveloperMenu": {
-          "developer": "Developer",
-          "parkTerminal": "Park terminal"
         }
       },
       "shared": {
@@ -5202,6 +5258,11 @@
           "remoteScopeAuthContext": "每个账户在 {{value0}} 上保留自己的登录上下文。",
           "remoteEmptyClaudeAccounts": "{{value0}} 上没有受管理的 Claude 账户。它使用其系统默认的 Claude 登录；请在该服务器上添加账户。",
           "remoteEmptyCodexAccounts": "{{value0}} 上没有受管理的 Codex 账户。它使用其系统默认的 Codex 登录；请在该服务器上添加账户。",
+          "codexSystemDefaultCustomProvider": "自定义提供商 — 不跟踪使用情况。",
+          "codexSystemDefaultNeedsSignIn": "未找到 {{value0}} 的 Codex 登录信息。",
+          "codexConfigSyncMissingSource": "Codex is still using the settings it last synced because {{value0}} is missing. Restore that file to resume syncing.",
+          "codexConfigSyncBlankSource": "Codex is still using the settings it last synced because {{value0}} is empty. That is expected while a synced folder finishes downloading.",
+          "codexConfigSyncUnreadableSource": "Codex is still using the settings it last synced because {{value0}} could not be read. Check that file's permissions.",
           "b28bb41f63": "自动切换受限代理",
           "7d2634bfa1": "当正在运行的 Claude 或 Codex 会话达到账户限制时，Orca 可以切换到另一个托管账户并恢复同一会话。",
           "5d6a7e20ef": "退出受限的 Claude 或 Codex 代理，选择有可用额度的托管账户，恢复提供商会话，然后发送 continue。",
@@ -5210,8 +5271,6 @@
           "worktreeUsageTitle": "工作树账户用量",
           "worktreeUsageDescription": "显示固定到聚焦工作树的 Claude 账户用量，而不是全局活动账户。",
           "worktreeUsageRowDescription": "当聚焦的工作树固定到托管的 Claude 账户时，状态栏用量指示条会显示该账户并标注其邮箱。关闭后始终显示全局账户。",
-          "codexSystemDefaultCustomProvider": "自定义提供商 — 不跟踪使用情况。",
-          "codexSystemDefaultNeedsSignIn": "未找到 {{value0}} 的 Codex 登录信息。",
           "addCustomEndpoint": "添加自定义端点",
           "customEndpointBaseUrl": "基础 URL",
           "customEndpointBaseUrlPlaceholder": "https://api.z.ai/api/anthropic",
@@ -5257,9 +5316,6 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "codexConfigSyncMissingSource": "Codex is still using the settings it last synced because {{value0}} is missing. Restore that file to resume syncing.",
-          "codexConfigSyncBlankSource": "Codex is still using the settings it last synced because {{value0}} is empty. That is expected while a synced folder finishes downloading.",
-          "codexConfigSyncUnreadableSource": "Codex is still using the settings it last synced because {{value0}} could not be read. Check that file's permissions.",
           "reassignSystemDefault": "System default"
         },
         "AdvancedPane": {
@@ -7051,10 +7107,6 @@
           "53e9aabfc0": "可用时使用 OpenSSH 多路复用。对于有自定义 SSH 限制的主机，请关闭此项。"
         },
         "TasksPane": {
-          "cbcd4247a4": "Customize the first instruction Orca sends to the agent when you start a worktree from a Linear issue.",
-          "8490b38b7e": "Launch prompt template",
-          "6a0d7e542a": "Leave empty to use the default. The issue identifier and URL variables are shown in the field placeholder.",
-          "f37954bf8a": "Linked Linear issue: {{identifier}}\n{{url}}",
           "3a72b9745e": "选择要在“任务”页面和侧边栏快捷键中显示的任务提供商。",
           "f71d8a9dd3": "任务提供者",
           "71644aba56": "选择要在“任务”页面源选择器和侧边栏快捷键中显示的任务提供商。至少需保留一个可见提供商。",
@@ -7067,6 +7119,10 @@
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "在任务源选择器和侧边栏快捷方式中显示 GitHub。",
           "e14063e727": "GitHub",
+          "cbcd4247a4": "Customize the first instruction Orca sends to the agent when you start a worktree from a Linear issue.",
+          "8490b38b7e": "Launch prompt template",
+          "6a0d7e542a": "Leave empty to use the default. The issue identifier and URL variables are shown in the field placeholder.",
+          "f37954bf8a": "Linked Linear issue: {{identifier}}\n{{url}}",
           "plane_description": "Show Plane in the Tasks source picker and sidebar shortcuts.",
           "plane_label": "Plane",
           "plane_launch_prompt_aria": "Plane launch prompt template",
@@ -8032,9 +8088,6 @@
             "27d9b996ba": "codex",
             "5baf51c4d9": "打开 Claude",
             "aea7d2cccb": "openclaude",
-            "6e918a5bcc": "claude glm",
-            "4880297fec": "z.ai",
-            "71bf3d35f5": "glm",
             "95b63edde7": "claude",
             "41c2f9a025": "默认",
             "8ea37a05bc": "智能体",
@@ -8161,7 +8214,10 @@
             "e61157e926": "编辑器自动换行",
             "005be5c699": "在文件编辑器中自动换行长行，而无需水平滚动。",
             "editorFontFamily": "Editor Font Family",
-            "editorFontFamilyDesc": "Font used by file editors and diff views. Leave empty to follow the terminal font."
+            "editorFontFamilyDesc": "Font used by file editors and diff views. Leave empty to follow the terminal font.",
+            "6e918a5bcc": "claude glm",
+            "4880297fec": "z.ai",
+            "71bf3d35f5": "glm"
           }
         },
         "git": {
@@ -8721,15 +8777,6 @@
         },
         "tasks": {
           "search": {
-            "a1f2e3d4c5": "linear",
-            "b2f3e4d5c6": "prompt",
-            "c3f4e5d6b7": "template",
-            "d4f5e6c7b8": "launch",
-            "e5f6d7c8b9": "instruction",
-            "f6a7c8b9d0": "identifier",
-            "a7b8c9d0e1": "url",
-            "9580d17a8c": "Launch prompt template",
-            "4253030e8d": "Leave empty to use the default. The issue identifier and URL variables are shown in the field placeholder.",
             "58cda6f9c0": "隐藏",
             "44083ae418": "展示",
             "604d8e4089": "阿特拉斯语",
@@ -8741,7 +8788,16 @@
             "cf0e3e0c2f": "提供者",
             "2ec54bee51": "任务",
             "765f0c544d": "选择要在“任务”页面和侧边栏快捷键中显示的任务提供商。",
-            "5b8e4aace5": "任务提供者"
+            "5b8e4aace5": "任务提供者",
+            "a1f2e3d4c5": "linear",
+            "b2f3e4d5c6": "prompt",
+            "c3f4e5d6b7": "template",
+            "d4f5e6c7b8": "launch",
+            "e5f6d7c8b9": "instruction",
+            "f6a7c8b9d0": "identifier",
+            "a7b8c9d0e1": "url",
+            "9580d17a8c": "Launch prompt template",
+            "4253030e8d": "Leave empty to use the default. The issue identifier and URL variables are shown in the field placeholder."
           }
         },
         "terminal": {
@@ -9474,7 +9530,7 @@
           "copy": "复制",
           "copied": "已复制",
           "recipes": "环境模板",
-          "recipesHelp": "orca.yaml 和已启用插件中的配方会显示在这里，可用于启动工作区。",
+          "recipesHelp": "智能体添加到 orca.yaml 的环境模板会显示在这里，可用于启动工作区。",
           "refresh": "刷新临时 VM 环境模板",
           "checking": "正在检查环境模板...",
           "none": "还没有找到环境模板。"
@@ -9672,6 +9728,256 @@
           "unpackedHelp": "Development builds must be updated from their source checkout.",
           "legacyHelp": "Update this server manually once to enable remote updates."
         },
+        "PluginConsentDialog": {
+          "workerTrust": "后台工作进程 — 在独立进程中运行",
+          "instructionalTrust": "指令内容 — 稍后以用户或智能体权限运行",
+          "declarativeTrust": "Declarative content — no plugin code",
+          "panelTrust": "面板或主机集成内容 — 无后台工作进程",
+          "trustShortWorker": "Worker",
+          "trustShortInstructional": "Instructional",
+          "trustShortPanel": "Panel",
+          "trustShortDeclarative": "Declarative",
+          "reviewTitle": "Review plugin",
+          "title": "检查权限",
+          "mixedTitle": "检查访问权限和内容",
+          "instructionalTitle": "检查插件内容",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "reconsent": "自你上次检查此插件以来，权限、工作进程信任级别或指令内容已更改。请在运行前重新检查。",
+          "capabilities": "此插件可以",
+          "warning": "这些权限限制插件使用 Orca API 的方式。其工作进程仍作为普通进程在你的计算机上运行，可以完全访问文件、网络和其他进程。",
+          "instructionalWarning": "此插件没有工作进程。但当你或智能体使用其指令内容时，仍可能触发操作。启用前请检查以下指令和命令。",
+          "panelWarning": "这些权限限制插件使用 Orca API 的方式。此插件没有后台工作进程。",
+          "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API.",
+          "keepDisabled": "保持禁用",
+          "enable": "启用插件",
+          "capability": {
+            "workspaceRead": "读取当前工作树的名称、分支和终端列表",
+            "terminalSend": "在可见的指定终端中输入文本",
+            "notificationsShow": "显示带有插件名称的桌面通知",
+            "storage": "在插件自己的存储文件夹中保存数据",
+            "secrets": "在插件自己的加密保管库中保存和读取机密信息",
+            "eventsSubscribe": "在创建或移除工作树以及智能体状态变化时接收通知",
+            "settingsOwn": "读取和更改插件自己的设置"
+          },
+          "decisionFailed": "无法保存权限决定。请重试。"
+        },
+        "PluginConsentProvenance": {
+          "official": "Official",
+          "bundled": "Bundled with Orca",
+          "local": "Local folder",
+          "community": "Community",
+          "source": "Source",
+          "sourceLabel": "Source",
+          "commit": "Pinned commit",
+          "localCommit": "Local folder — no commit",
+          "indexCommit": "Index commit"
+        },
+        "PluginDevelopmentSection": {
+          "saveFailed": "无法保存开发插件路径。",
+          "pathRequired": "请输入插件文件夹路径。",
+          "title": "开发",
+          "help": "开发插件时，可直接从此计算机上的文件夹加载。开发插件仍需检查权限。工作进程在此桌面主机上运行；SSH 工作区操作通过 Orca 路由，因此这里填写桌面端路径。",
+          "remove": "移除",
+          "pathLabel": "开发插件文件夹路径",
+          "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
+          "add": "添加路径"
+        },
+        "PluginInstallDialog": {
+          "localRequired": "请输入插件文件夹路径。",
+          "gitUrlRequired": "请输入仓库 URL。",
+          "gitUrlInvalid": "请使用 HTTPS 或 SSH Git URL。不允许使用可执行的 Git 辅助协议。",
+          "gitRefRequired": "请添加明确的 #ref（标签或提交）以固定安装版本，例如 #v0.1.0。",
+          "title": "安装插件",
+          "description": "安装会将插件复制到 Orca，并显示其权限供你检查。启用插件之前，不会运行任何插件代码。",
+          "source": "安装来源",
+          "localTab": "本地文件夹",
+          "gitTab": "Git URL",
+          "localLabel": "插件文件夹路径",
+          "localPlaceholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
+          "localHelp": "此计算机上包含 orca-plugin.json 的文件夹完整路径。系统会完全按输入内容使用该路径。",
+          "gitLabel": "带 #ref 的仓库 URL",
+          "gitPlaceholder": "https://git.example/acme/orca-notes#v0.1.0",
+          "gitHelp": "附加明确的 #ref（标签或提交）以固定安装版本。适用于 GitHub、GitLab 和任何 Git 主机。",
+          "cancel": "取消",
+          "installing": "正在安装…",
+          "install": "安装",
+          "installFailed": "插件安装失败。请检查来源后重试。"
+        },
+        "PluginKeybindingConsentPreview": {
+          "heading": "键盘快捷键",
+          "worktree": "仅在有活动工作区时运行。",
+          "global": "无需活动工作区即可在应用中运行。",
+          "shadows": "替代：{{value0}}"
+        },
+        "PluginMarketplaceBrowser": {
+          "loadFailed": "无法加载插件市场中的插件。",
+          "refreshFailed": "无法刷新插件市场。仍可使用缓存的列表。",
+          "previewFailed": "无法准备此插件以供审核。请刷新插件市场后重试。",
+          "installFailed": "无法安装此插件。审核过的源可能已更改。",
+          "manageSources": "管理源",
+          "refreshing": "正在刷新…",
+          "refresh": "刷新",
+          "noInstalledTitle": "No plugins installed",
+          "noInstalled": "No plugins installed.",
+          "loading": "正在加载插件市场中的插件…",
+          "tryAgain": "重试",
+          "noSourcesTitle": "No marketplaces configured",
+          "noSources": "添加官方、社区或私有 Git 插件市场以浏览插件。",
+          "addSource": "添加插件市场",
+          "noResultsTitle": "No matching plugins",
+          "noResults": "没有与此搜索匹配的插件市场插件。",
+          "clearSearch": "Clear search",
+          "emptyTitle": "Nothing listed yet",
+          "empty": "已配置的插件市场未列出任何插件。"
+        },
+        "PluginMarketplaceListingRow": {
+          "official": "官方",
+          "installed": "已安装",
+          "noDescription": "No description provided.",
+          "blocked": "已被 Orca 安全列表阻止：{{value0}}",
+          "blockedAction": "已阻止",
+          "checkUpdate": "检查更新",
+          "install": "Install"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1 language pack",
+          "languagePacks": "{{value0}} 个语言包",
+          "commandsOne": "1 command",
+          "commands": "{{value0}} 个命令",
+          "keybindingsOne": "1 keyboard shortcut",
+          "keybindings": "{{value0}} 个键盘快捷键",
+          "vmRecipesOne": "1 VM recipe",
+          "vmRecipes": "{{value0}} 个虚拟机方案",
+          "panelsOne": "1 panel",
+          "panels": "{{value0}} 个面板",
+          "eventsOne": "1 event subscription",
+          "events": "{{value0}} 个事件订阅",
+          "worker": "后台工作进程",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "包含",
+          "noContributions": "仅包含清单元数据",
+          "capabilities": "请求的访问权限",
+          "workerWarning": "权限会限制此插件使用 Orca API 的方式，但其工作进程仍会作为此计算机上的普通进程运行，并可完全访问你的文件、网络和其他进程。",
+          "blocked": "Orca 安全列表已阻止此插件：{{value0}}",
+          "current": "已安装内容完全相同的插件。",
+          "close": "Close",
+          "cancel": "取消",
+          "update": "更新插件",
+          "install": "安装插件"
+        },
+        "PluginMarketplaceSourceDialog": {
+          "addFailed": "无法添加此插件市场。请检查 Git URL、ref 和 Git 凭据。",
+          "refreshFailed": "无法刷新此插件市场。仍可使用上次有效的缓存索引。",
+          "removeFailed": "无法移除此插件市场。",
+          "title": "插件市场源",
+          "description": "插件市场是固定版本的 Git 仓库。对于私有仓库，Orca 会使用现有的系统 Git 凭据。",
+          "urlLabel": "Git URL",
+          "urlDescription": "使用包含 orca-marketplace.json 的仓库 HTTPS 或 SSH URL。",
+          "urlPlaceholder": "https://git.example.com/team/plugins.git",
+          "refLabel": "Git ref",
+          "refDescription": "选择分支、标签或提交。每次获取的索引都会记录到准确的提交。",
+          "adding": "正在添加…",
+          "add": "添加源",
+          "configured": "已配置的源",
+          "empty": "未配置插件市场源。",
+          "official": "官方",
+          "owner": "所有者：{{value0}}",
+          "pinnedCommit": "固定于 {{value0}}",
+          "stale": "刷新失败。正在浏览上次有效的缓存索引。",
+          "refreshLabel": "刷新 {{value0}}",
+          "removeLabel": "移除 {{value0}}",
+          "done": "完成"
+        },
+        "PluginRemoveDialog": {
+          "title": "移除插件？",
+          "description": "这会从此计算机中移除 {{value0}} 及其保存的插件数据。你可以稍后重新安装。",
+          "cancel": "取消",
+          "remove": "移除插件"
+        },
+        "PluginRollbackDialog": {
+          "title": "回滚插件？",
+          "description": "这会停用 {{value0}} 并恢复其上一个不可变版本。如果该版本请求不同的访问权限或指令内容，Orca 将要求再次审核。",
+          "cancel": "取消",
+          "confirm": "回滚插件"
+        },
+        "PluginsSettingsSection": {
+          "systemLabel": "插件系统",
+          "systemDescription": "发现已安装的插件，并允许逐个启用。检查并启用之前不会运行任何内容。工作进程始终在此计算机上运行；SSH 工作区操作通过 Orca 路由。",
+          "featureOff": "开启插件系统以查看和管理已安装的插件。已安装的内容会保留在磁盘上，并在系统关闭时保持禁用。",
+          "loading": "正在加载插件…",
+          "noInstalledResultsTitle": "No matching plugins",
+          "noInstalledResults": "No installed plugins match this search.",
+          "emptyTitle": "No plugins installed yet",
+          "empty": "尚未安装插件。使用“安装插件”从本地文件夹或固定的 Git ref 添加插件。",
+          "loadFailed": "无法加载插件。",
+          "settingsUpdateFailed": "无法保存插件设置。",
+          "install": "安装插件",
+          "title": "插件",
+          "experimental": "实验性",
+          "description": "安装和管理 Orca 插件。即使使用 SSH 工作区，插件也在此计算机上运行。",
+          "logsFailed": "无法加载插件日志。",
+          "rollbackFailed": "无法回滚此插件。可能没有可用的上一不可变版本。"
+        },
+        "PluginSettingsRow": {
+          "blocked": "已阻止",
+          "needsReview": "需要检查",
+          "restarting": "正在重新启动",
+          "invalid": "无效",
+          "error": "错误",
+          "disabled": "已禁用",
+          "running": "正在运行",
+          "enabled": "已启用",
+          "loadingLogs": "正在加载日志…",
+          "noLogs": "没有记录日志行。",
+          "logCount": "最多保留 200 行，显示最近 {{value0}} 行",
+          "reviewAndEnable": "Review & enable",
+          "official": "官方",
+          "dev": "开发",
+          "bundled": "内置",
+          "noDescription": "No description provided.",
+          "killListMessage": "Orca 安全列表已禁用此插件：{{value0}}",
+          "viewAdvisory": "查看公告",
+          "runtimeError": "插件在激活或工作进程出错后停止。",
+          "restartCount": " · 重启 {{value0}} 次",
+          "moreActions": "{{value0}} 的更多操作",
+          "hideLogs": "隐藏日志",
+          "viewLogs": "查看日志",
+          "rollback": "回滚",
+          "remove": "移除",
+          "disableLabel": "停用 {{value0}}",
+          "enableLabel": "启用 {{value0}}",
+          "invalidPluginError": "插件清单或已安装文件无效。请修复插件后刷新。"
+        },
+        "PluginVmRecipeConsentPreview": {
+          "create": "创建",
+          "suspend": "暂停",
+          "resume": "恢复",
+          "destroy": "销毁",
+          "heading": "VM 配方命令",
+          "commandLabel": "{{value0}} · {{value1}}命令"
+        },
+        "pluginError": {
+          "installManifestMissing": "未找到可读取的 orca-plugin.json。请选择插件的根文件夹。",
+          "installManifestInvalid": "orca-plugin.json 无效。请让插件作者修复清单。",
+          "incompatible": "此插件需要其他版本的 Orca。",
+          "installUnsafePath": "插件包含不安全的文件路径或符号链接，因此未安装。",
+          "installLimit": "插件超出 Orca 的安装大小或文件数量限制。",
+          "installGit": "Orca 无法获取固定的 Git 修订。请检查 URL、#ref、访问权限和系统 Git 配置。",
+          "invalidManifestMissing": "插件根目录缺少 orca-plugin.json。请添加后刷新插件。",
+          "invalidManifest": "orca-plugin.json 无效。请修复后刷新插件。",
+          "invalidArtifact": "声明的工作进程或面板文件缺失或不安全。请修复插件文件后刷新。",
+          "consentChanged": "插件在你查看时发生了更改。请关闭此对话框并查看更新后的权限。"
+        },
+        "plugins": {
+          "search": {
+            "title": "插件",
+            "description": "安装和管理实验性 Orca 插件。",
+            "install": "安装插件",
+            "permissions": "插件权限",
+            "logs": "插件日志",
+            "development": "开发插件"
+          }
+        },
         "plane": {
           "board": {
             "selector": {
@@ -9773,285 +10079,6 @@
           "fallbackAccountLabel": "已保存的 Claude 账户",
           "reauthenticate": "重新验证",
           "otherProfileHint": "标记为“其他配置文件”的账户属于本机上另一个 Orca 配置文件，因此不在上方列表中，也无法在此处重新验证。要在那边处理，请打开该配置文件，并在 设置 → 账户 中重新验证该账户。"
-        },
-        "PluginConsentDialog": {
-          "workerTrust": "后台工作进程 — 在独立进程中运行",
-          "panelTrust": "面板或主机集成内容 — 无后台工作进程",
-          "decisionFailed": "无法保存权限决定。请重试。",
-          "title": "检查权限",
-          "mixedTitle": "检查访问权限和内容",
-          "instructionalTitle": "检查插件内容",
-          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
-          "reconsent": "自你上次检查此插件以来，权限、工作进程信任级别或指令内容已更改。请在运行前重新检查。",
-          "source": "来源",
-          "unknownSource": "不可用",
-          "commit": "提交",
-          "localCommit": "不可用（本地文件夹）",
-          "trust": "信任级别",
-          "capabilities": "此插件可以",
-          "warning": "这些权限限制插件使用 Orca API 的方式。其工作进程仍作为普通进程在你的计算机上运行，可以完全访问文件、网络和其他进程。",
-          "enable": "启用插件",
-          "keepDisabled": "保持禁用",
-          "panelWarning": "这些权限限制插件使用 Orca API 的方式。此插件没有后台工作进程。",
-          "instructionalWarning": "此插件没有工作进程。但当你或智能体使用其指令内容时，仍可能触发操作。启用前请检查以下指令和命令。",
-          "capability": {
-            "workspaceRead": "读取当前工作树的名称、分支和终端列表",
-            "terminalSend": "在可见的指定终端中输入文本",
-            "notificationsShow": "显示带有插件名称的桌面通知",
-            "storage": "在插件自己的存储文件夹中保存数据",
-            "secrets": "在插件自己的加密保管库中保存和读取机密信息",
-            "eventsSubscribe": "在创建或移除工作树以及智能体状态变化时接收通知",
-            "settingsOwn": "读取和更改插件自己的设置"
-          },
-          "skillWarning": "此插件会安装包含指令的技能。智能体会读取这些指令，并可能使用你授予智能体的全部权限执行操作。",
-          "instructionalTrust": "指令内容 — 稍后以用户或智能体权限运行",
-          "declarativeTrust": "Declarative content — no plugin code",
-          "reviewTitle": "Review plugin",
-          "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API.",
-          "trustShortWorker": "Worker",
-          "trustShortInstructional": "Instructional",
-          "trustShortPanel": "Panel",
-          "trustShortDeclarative": "Declarative"
-        },
-        "PluginDevelopmentSection": {
-          "pathRequired": "请输入插件文件夹路径。",
-          "title": "开发",
-          "help": "开发插件时，可直接从此计算机上的文件夹加载。开发插件仍需检查权限。工作进程在此桌面主机上运行；SSH 工作区操作通过 Orca 路由，因此这里填写桌面端路径。",
-          "remove": "移除",
-          "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "add": "添加路径",
-          "saveFailed": "无法保存开发插件路径。",
-          "pathLabel": "开发插件文件夹路径"
-        },
-        "PluginInstallDialog": {
-          "localRequired": "请输入插件文件夹路径。",
-          "gitUrlRequired": "请输入仓库 URL。",
-          "gitRefRequired": "请添加明确的 #ref（标签或提交）以固定安装版本，例如 #v0.1.0。",
-          "installFailed": "插件安装失败。请检查来源后重试。",
-          "title": "安装插件",
-          "description": "安装会将插件复制到 Orca，并显示其权限供你检查。启用插件之前，不会运行任何插件代码。",
-          "source": "安装来源",
-          "localTab": "本地文件夹",
-          "gitTab": "Git URL",
-          "localLabel": "插件文件夹路径",
-          "localPlaceholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "localHelp": "此计算机上包含 orca-plugin.json 的文件夹完整路径。系统会完全按输入内容使用该路径。",
-          "gitLabel": "带 #ref 的仓库 URL",
-          "gitPlaceholder": "https://git.example/acme/orca-notes#v0.1.0",
-          "gitHelp": "附加明确的 #ref（标签或提交）以固定安装版本。适用于 GitHub、GitLab 和任何 Git 主机。",
-          "cancel": "取消",
-          "installing": "正在安装…",
-          "install": "安装",
-          "gitUrlInvalid": "请使用 HTTPS 或 SSH Git URL。不允许使用可执行的 Git 辅助协议。"
-        },
-        "PluginRemoveDialog": {
-          "title": "移除插件？",
-          "description": "这会从此计算机中移除 {{value0}} 及其保存的插件数据。你可以稍后重新安装。",
-          "cancel": "取消",
-          "remove": "移除插件"
-        },
-        "PluginSettingsRow": {
-          "needsReview": "需要检查",
-          "invalid": "无效",
-          "error": "错误",
-          "disabled": "已禁用",
-          "running": "正在运行",
-          "enabled": "已启用",
-          "workerTier": "后台工作进程",
-          "panelTier": "仅面板",
-          "loadingLogs": "正在加载日志…",
-          "noLogs": "没有记录日志行。",
-          "logCount": "最多保留 200 行，显示最近 {{value0}} 行",
-          "dev": "开发",
-          "review": "检查权限",
-          "moreActions": "{{value0}} 的更多操作",
-          "hideLogs": "隐藏日志",
-          "viewLogs": "查看日志",
-          "remove": "移除",
-          "enableLabel": "启用 {{value0}}",
-          "restartCount": " · 重启 {{value0}} 次",
-          "restarting": "正在重新启动",
-          "invalidPluginError": "插件清单或已安装文件无效。请修复插件后刷新。",
-          "runtimeError": "插件在激活或工作进程出错后停止。",
-          "disableLabel": "停用 {{value0}}",
-          "blocked": "已阻止",
-          "official": "官方",
-          "bundled": "内置",
-          "killListMessage": "Orca 安全列表已禁用此插件：{{value0}}",
-          "viewAdvisory": "查看公告",
-          "rollback": "回滚",
-          "noDescription": "No description provided.",
-          "reviewAndEnable": "Review & enable"
-        },
-        "PluginsSettingsSection": {
-          "loadFailed": "无法加载插件。",
-          "logsFailed": "无法加载插件日志。",
-          "title": "插件",
-          "experimental": "实验性",
-          "description": "安装和管理 Orca 插件。即使使用 SSH 工作区，插件也在此计算机上运行。",
-          "install": "安装插件",
-          "systemLabel": "插件系统",
-          "systemDescription": "发现已安装的插件，并允许逐个启用。检查并启用之前不会运行任何内容。工作进程始终在此计算机上运行；SSH 工作区操作通过 Orca 路由。",
-          "featureOff": "开启插件系统以查看和管理已安装的插件。已安装的内容会保留在磁盘上，并在系统关闭时保持禁用。",
-          "loading": "正在加载插件…",
-          "installed": "已安装",
-          "refresh": "刷新",
-          "tryAgain": "重试",
-          "empty": "尚未安装插件。使用“安装插件”从本地文件夹或固定的 Git ref 添加插件。",
-          "settingsUpdateFailed": "无法保存插件设置。",
-          "rollbackFailed": "无法回滚此插件。可能没有可用的上一不可变版本。",
-          "noInstalledResults": "No installed plugins match this search.",
-          "noInstalledResultsTitle": "No matching plugins",
-          "emptyTitle": "No plugins installed yet"
-        },
-        "plugins": {
-          "search": {
-            "title": "插件",
-            "description": "安装和管理实验性 Orca 插件。",
-            "install": "安装插件",
-            "permissions": "插件权限",
-            "logs": "插件日志",
-            "development": "开发插件"
-          }
-        },
-        "pluginError": {
-          "installManifestMissing": "未找到可读取的 orca-plugin.json。请选择插件的根文件夹。",
-          "installManifestInvalid": "orca-plugin.json 无效。请让插件作者修复清单。",
-          "incompatible": "此插件需要其他版本的 Orca。",
-          "installUnsafePath": "插件包含不安全的文件路径或符号链接，因此未安装。",
-          "installLimit": "插件超出 Orca 的安装大小或文件数量限制。",
-          "installGit": "Orca 无法获取固定的 Git 修订。请检查 URL、#ref、访问权限和系统 Git 配置。",
-          "invalidManifestMissing": "插件根目录缺少 orca-plugin.json。请添加后刷新插件。",
-          "invalidManifest": "orca-plugin.json 无效。请修复后刷新插件。",
-          "invalidArtifact": "声明的工作进程或面板文件缺失或不安全。请修复插件文件后刷新。",
-          "consentChanged": "插件在你查看时发生了更改。请关闭此对话框并查看更新后的权限。"
-        },
-        "PluginVmRecipeConsentPreview": {
-          "create": "创建",
-          "suspend": "暂停",
-          "resume": "恢复",
-          "destroy": "销毁",
-          "warning": "此插件会安装 VM 配方。当你使用对应的生命周期操作时，Orca 会在本地桌面主机上运行以下命令。",
-          "commandLabel": "{{value0}} · {{value1}}命令",
-          "heading": "VM 配方命令"
-        },
-        "PluginKeybindingConsentPreview": {
-          "warning": "此插件会添加键盘快捷键。插件启用期间，插件快捷键优先于相同的 Orca 快捷键。",
-          "heading": "键盘快捷键",
-          "worktree": "仅在有活动工作区时运行。",
-          "global": "无需活动工作区即可在应用中运行。",
-          "shadows": "替代：{{value0}}"
-        },
-        "PluginMarketplaceBrowser": {
-          "loadFailed": "无法加载插件市场中的插件。",
-          "refreshFailed": "无法刷新插件市场。仍可使用缓存的列表。",
-          "previewFailed": "无法准备此插件以供审核。请刷新插件市场后重试。",
-          "installFailed": "无法安装此插件。审核过的源可能已更改。",
-          "heading": "插件市场",
-          "manageSources": "管理源",
-          "refreshing": "正在刷新…",
-          "refresh": "刷新",
-          "loading": "正在加载插件市场中的插件…",
-          "searchLabel": "搜索插件市场中的插件",
-          "searchPlaceholder": "搜索插件、类别或发布者",
-          "tryAgain": "重试",
-          "noSources": "添加官方、社区或私有 Git 插件市场以浏览插件。",
-          "addSource": "添加插件市场",
-          "noResults": "没有与此搜索匹配的插件市场插件。",
-          "empty": "已配置的插件市场未列出任何插件。",
-          "noInstalled": "No plugins installed.",
-          "noInstalledTitle": "No plugins installed",
-          "noSourcesTitle": "No marketplaces configured",
-          "noResultsTitle": "No matching plugins",
-          "clearSearch": "Clear search",
-          "emptyTitle": "Nothing listed yet"
-        },
-        "PluginMarketplaceListingRow": {
-          "official": "官方",
-          "bundled": "内置",
-          "installed": "已安装",
-          "marketplace": "{{value0}} · {{value1}}",
-          "blocked": "已被 Orca 安全列表阻止：{{value0}}",
-          "blockedAction": "已阻止",
-          "checkUpdate": "检查更新",
-          "installedAction": "已安装",
-          "review": "审核",
-          "noDescription": "No description provided.",
-          "install": "Install"
-        },
-        "PluginMarketplacePreviewDialog": {
-          "languagePacks": "{{value0}} 个语言包",
-          "commands": "{{value0}} 个命令",
-          "keybindings": "{{value0}} 个键盘快捷键",
-          "vmRecipes": "{{value0}} 个虚拟机方案",
-          "panels": "{{value0}} 个面板",
-          "events": "{{value0}} 个事件订阅",
-          "worker": "后台工作进程",
-          "official": "官方",
-          "bundled": "内置",
-          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
-          "source": "插件源",
-          "commit": "固定的提交",
-          "marketplaceCommit": "索引提交",
-          "includes": "包含",
-          "noContributions": "仅包含清单元数据",
-          "capabilities": "请求的访问权限",
-          "workerWarning": "权限会限制此插件使用 Orca API 的方式，但其工作进程仍会作为此计算机上的普通进程运行，并可完全访问你的文件、网络和其他进程。",
-          "blocked": "Orca 安全列表已阻止此插件：{{value0}}",
-          "current": "已安装内容完全相同的插件。",
-          "cancel": "取消",
-          "update": "更新插件",
-          "install": "安装插件",
-          "provenance": "Reviewed source",
-          "close": "Close",
-          "upToDate": "Up to date",
-          "languagePacksOne": "1 language pack",
-          "commandsOne": "1 command",
-          "keybindingsOne": "1 keyboard shortcut",
-          "vmRecipesOne": "1 VM recipe",
-          "panelsOne": "1 panel",
-          "eventsOne": "1 event subscription",
-          "versionLine": "v{{value0}} · {{value1}}"
-        },
-        "PluginMarketplaceSourceDialog": {
-          "addFailed": "无法添加此插件市场。请检查 Git URL、ref 和 Git 凭据。",
-          "refreshFailed": "无法刷新此插件市场。仍可使用上次有效的缓存索引。",
-          "removeFailed": "无法移除此插件市场。",
-          "title": "插件市场源",
-          "description": "插件市场是固定版本的 Git 仓库。对于私有仓库，Orca 会使用现有的系统 Git 凭据。",
-          "urlLabel": "Git URL",
-          "urlDescription": "使用包含 orca-marketplace.json 的仓库 HTTPS 或 SSH URL。",
-          "refLabel": "Git ref",
-          "refDescription": "选择分支、标签或提交。每次获取的索引都会记录到准确的提交。",
-          "adding": "正在添加…",
-          "add": "添加源",
-          "configured": "已配置的源",
-          "empty": "未配置插件市场源。",
-          "owner": "所有者：{{value0}}",
-          "pinnedCommit": "固定于 {{value0}}",
-          "stale": "刷新失败。正在浏览上次有效的缓存索引。",
-          "refreshLabel": "刷新 {{value0}}",
-          "removeLabel": "移除 {{value0}}",
-          "done": "完成",
-          "urlPlaceholder": "https://git.example.com/team/plugins.git",
-          "official": "官方"
-        },
-        "PluginRollbackDialog": {
-          "title": "回滚插件？",
-          "description": "这会停用 {{value0}} 并恢复其上一个不可变版本。如果该版本请求不同的访问权限或指令内容，Orca 将要求再次审核。",
-          "cancel": "取消",
-          "confirm": "回滚插件"
-        },
-        "PluginConsentProvenance": {
-          "official": "Official",
-          "bundled": "Bundled with Orca",
-          "local": "Local folder",
-          "community": "Community",
-          "source": "Source",
-          "sourceLabel": "Source",
-          "commit": "Pinned commit",
-          "localCommit": "Local folder — no commit",
-          "indexCommit": "Index commit"
         }
       },
       "right": {
@@ -11328,10 +11355,10 @@
             }
           },
           "PluginPanel": {
-            "loading": "正在加载插件面板...",
             "unavailable": "此插件面板已不可用。",
-            "loadFailed": "无法加载插件面板。",
-            "unresponsive": "插件面板停止响应，已被暂停。"
+            "loading": "正在加载插件面板...",
+            "unresponsive": "插件面板停止响应，已被暂停。",
+            "loadFailed": "无法加载插件面板。"
           },
           "activityBar": {
             "error": "错误"
@@ -11653,16 +11680,25 @@
             "searchGitLab": "搜索 GitLab MR 和议题",
             "searchBranches": "搜索分支",
             "searchLinear": "搜索 Linear 议题",
-            "workspaceName": "工作区名称"
+            "workspaceName": "工作区名称",
+            "emoji": "Emoji"
           },
           "ProjectHostSetupCombobox": {
             "empty": "此项目没有已就绪的主机。",
             "placeholder": "选择主机"
           },
           "ProjectCombobox": {
-            "search": "搜索项目...",
             "empty": "没有匹配搜索的项目。",
-            "addProject": "Add a new project"
+            "addProject": "Add a new project",
+            "label": "Project",
+            "browse": "Browse projects",
+            "listLabel": "Projects",
+            "noProjects": "No projects yet."
+          },
+          "RunTargetCombobox": {
+            "listLabel": "Run targets",
+            "label": "Run on",
+            "browse": "Browse run targets"
           }
         }
       },
@@ -12247,8 +12283,25 @@
           "agents": {
             "orchestration": {
               "OrchestrationPage": {
-                "30b509a467": "2名儿童",
-                "862605d066": "2 个子工作区"
+                "30b509a467": "2 个子工作区",
+                "862605d066": "2 个子工作区",
+                "coordinatorName": "重新设计身份验证流程",
+                "childPr1Name": "PR 1/2: 迁移 users.sql",
+                "childPr2Name": "PR 2/2: withSession 中间件"
+              },
+              "types": {
+                "coordinatorInitial": "将身份验证重写拆分为 2 个 PR…",
+                "codexInitial": "编写 users 表迁移…",
+                "claudeInitial": "草拟 withSession 中间件…",
+                "codexBeat1": "添加 email_verified 列…",
+                "claudeBeat1": "连接 withSession 中间件…",
+                "coordinatorBeat1": "PR 1/2 就绪",
+                "coordinatorBeat2": "PR 2/2 就绪"
+              },
+              "steps": {
+                "name": "编排",
+                "subtitle": "编排",
+                "description": "让智能体管理和协调 Orca 工作区，以执行更大的任务。"
               },
               "StatusesPage": {
                 "2f549fc0ba": "src/auth/session.test.ts",
@@ -13582,9 +13635,11 @@
           "d90981f766": "时间",
           "6b914c5fbb": "天",
           "233b8c94b6": "节奏",
-          "b08ccb4d06": "每小时",
-          "8cc026fd73": "每周",
-          "c3e39e17cf": "风俗"
+          "55b2ef82a4": "每小时",
+          "f0202f3a89": "每天",
+          "57e83307d0": "工作日",
+          "837d902bba": "每周",
+          "ddba78647e": "自定义 cron"
         },
         "AutomationSessionField": {
           "f3c76dce51": "重复利用",
@@ -14209,7 +14264,51 @@
         "searchAssignee": "筛选负责人…",
         "back": "返回"
       },
+      "browser-pane": {
+        "markup": {
+          "cancel": "取消",
+          "clear": "全部清除",
+          "copiedToast": "已复制标注 — 粘贴到你的智能体（{{value0}}）",
+          "copy": "复制标注",
+          "drawButton": "在截图上绘制",
+          "drawHint": "在页面上绘制，然后复制标记并粘贴到你的智能体。",
+          "drawHintBadge": "新功能",
+          "drawHintDismiss": "知道了",
+          "drawHintTry": "试一试",
+          "errorAttach": "无法附加标注后的截图。",
+          "errorCapture": "无法捕获页面进行绘制。",
+          "errorUnavailable": "此页面无法使用截图标注。",
+          "fontSize": "字号",
+          "hint": "在页面上绘制，然后复制标注以粘贴到你的智能体。",
+          "redo": "重做",
+          "style": "颜色和粗细",
+          "textInput": "标注文字",
+          "tool": {
+            "arrow": "箭头",
+            "ellipse": "椭圆",
+            "highlight": "高亮",
+            "pen": "画笔",
+            "rect": "矩形",
+            "text": "文字"
+          },
+          "undo": "撤销",
+          "widthOption": "{{value0}} px"
+        }
+      },
+      "pluginCatalog": {
+        "PluginCatalogLayout": {
+          "title": "Plugins",
+          "filter": "Plugin filter",
+          "all": "All",
+          "installed": "Installed",
+          "searchLabel": "Search plugins",
+          "searchPlaceholder": "Search plugins, categories, or publishers"
+        }
+      },
       "terminalPane": {
+        "useManualTerminalWorktreeParking": {
+          "cannotPark": "These terminals cannot be parked safely."
+        },
         "TerminalPane": {
           "3200325804": "正在切换托管账户并恢复同一会话。",
           "34f715e07e": "检测到 {{value0}} 账户限制。",
@@ -14254,40 +14353,6 @@
         },
         "ClaudeAccountSwitchList": {
           "empty": "No accounts available"
-        },
-        "useManualTerminalWorktreeParking": {
-          "cannotPark": "These terminals cannot be parked safely."
-        }
-      },
-      "browser-pane": {
-        "markup": {
-          "cancel": "取消",
-          "clear": "全部清除",
-          "copiedToast": "已复制标注 — 粘贴到你的智能体（{{value0}}）",
-          "copy": "复制标注",
-          "drawButton": "在截图上绘制",
-          "drawHint": "在页面上绘制，然后复制标记并粘贴到你的智能体。",
-          "drawHintBadge": "新功能",
-          "drawHintDismiss": "知道了",
-          "drawHintTry": "试一试",
-          "errorAttach": "无法附加标注后的截图。",
-          "errorCapture": "无法捕获页面进行绘制。",
-          "errorUnavailable": "此页面无法使用截图标注。",
-          "fontSize": "字号",
-          "hint": "在页面上绘制，然后复制标注以粘贴到你的智能体。",
-          "redo": "重做",
-          "style": "颜色和粗细",
-          "textInput": "标注文字",
-          "tool": {
-            "arrow": "箭头",
-            "ellipse": "椭圆",
-            "highlight": "高亮",
-            "pen": "画笔",
-            "rect": "矩形",
-            "text": "文字"
-          },
-          "undo": "撤销",
-          "widthOption": "{{value0}} px"
         }
       },
       "PlaneWorkItemWorkspace": {
@@ -14408,17 +14473,6 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
-      },
-      "pluginCatalog": {
-        "PluginCatalogLayout": {
-          "title": "Plugins",
-          "description": "Browse available plugins or manage the ones installed in Orca.",
-          "filter": "Plugin filter",
-          "all": "All",
-          "installed": "Installed",
-          "searchLabel": "Search plugins",
-          "searchPlaceholder": "Search plugins, categories, or publishers"
-        }
       }
     },
     "i18n": {
@@ -14692,6 +14746,13 @@
       "certificateChallengeChanged": "The certificate request changed. Retry the page and review the new warning.",
       "certificateChallengeUnavailable": "This certificate request is no longer available. Retry the page to request a new one.",
       "certificateProceedFailed": "Orca could not approve this certificate request. Retry the page and try again."
+    }
+  },
+  "claudeAuth": {
+    "legacySlotUnusable": {
+      "title": "Claude 登录需要修复",
+      "message": "系统级 Claude Code 登录已不可用。",
+      "detail": "由 Orca 管理的 Claude 账户不受影响。要恢复系统级登录，请在 Orca 之外运行 claude 并完成一次 /login。"
     }
   }
 }

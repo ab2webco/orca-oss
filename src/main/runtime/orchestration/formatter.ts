@@ -1,21 +1,23 @@
 import type { MessageRow } from './types'
+import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 
 const BANNER_WIDTH = 60
 const SEPARATOR = '─'.repeat(BANNER_WIDTH)
 
-// Why: rich message banners help agents (and humans reading terminal output)
-// quickly parse message metadata. Priority indicators surface urgent messages
-// visually. The reply hint reduces friction for agent-to-agent responses
-// (Section 4.8).
 export function formatMessageBanner(msg: MessageRow): string {
   const priorityTag =
     msg.priority === 'urgent' ? ' [URGENT]' : msg.priority === 'high' ? ' [HIGH]' : ''
+  const legacyReadOnly = msg.run_id === ORCHESTRATION_LEGACY_RUN_ID
+  const authorityTag = legacyReadOnly ? ' [LEGACY READ-ONLY]' : ''
   const senderName = msg.from_handle.toUpperCase()
 
-  const header = `──── From: ${senderName} (${msg.from_handle})${priorityTag} (${msg.type}) ────`
+  const header = `──── From: ${senderName} (${msg.from_handle})${priorityTag}${authorityTag} (${msg.type}) ────`
 
   const lines: string[] = [header]
   lines.push(`Subject: ${msg.subject}`)
+  if (legacyReadOnly) {
+    lines.push('[Inspection only: reply and acknowledgment are unavailable.]')
+  }
 
   if (msg.body) {
     lines.push(msg.body)
@@ -25,11 +27,13 @@ export function formatMessageBanner(msg: MessageRow): string {
     lines.push(`[Payload: ${msg.payload}]`)
   }
 
-  // Why: keep --from for shells lacking Orca's terminal env vars — a token-bound pane authenticates
-  // ahead of it, so it can no longer grant an identity it doesn't hold.
-  lines.push(
-    `[Reply: orca orchestration reply --id ${msg.id} --from ${msg.to_handle} --body "..."]`
-  )
+  if (!legacyReadOnly) {
+    // Why: older shells can lack Orca's terminal identity environment. A token-bound pane
+    // authenticates ahead of this flag, so --from cannot grant an identity it does not hold.
+    lines.push(
+      `[Reply: orca orchestration reply --id ${msg.id} --from ${msg.to_handle} --body "..."]`
+    )
+  }
   lines.push(SEPARATOR)
 
   return lines.join('\n')

@@ -1039,7 +1039,7 @@ export class OrcaRuntimeRpcServer {
     })
   }
 
-  /** Runs one ownership check without waiting for the poll interval. */
+  /** Why: test-only seam — runs one ownership check instead of waiting out the poll interval. */
   checkRuntimeMetadataOwnership(): void {
     this.metadataOwnershipWatch?.check()
   }

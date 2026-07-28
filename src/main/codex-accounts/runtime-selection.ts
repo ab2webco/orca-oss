@@ -3,34 +3,29 @@ import type {
   CodexManagedAccountRuntimeSelection,
   GlobalSettings
 } from '../../shared/types'
+// Why: the renderer's switch-time lane guard has to key panes the same way a
+// launch does, so the lane vocabulary lives in shared rather than in main.
+import {
+  getWslSelectionKey,
+  normalizeCodexAccountSelectionTarget,
+  type CodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
 
-export type CodexAccountSelectionTarget = {
-  runtime?: 'host' | 'wsl'
-  wslDistro?: string | null
-}
+export {
+  getCodexSelectionLaneKey,
+  getWslSelectionKey,
+  normalizeCodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
+export type {
+  CodexAccountSelectionTarget,
+  NormalizedCodexAccountSelectionTarget
+} from '../../shared/codex-selection-lane'
 
 /** Selection target plus an optional per-worktree pinned account override.
  *  Launch preparation must honor the override or fail closed — never silently
  *  fall back to the global selection. */
 export type CodexAccountLaunchTarget = CodexAccountSelectionTarget & {
   overrideAccountId?: string
-}
-
-export type NormalizedCodexAccountSelectionTarget = {
-  runtime: 'host' | 'wsl'
-  wslDistro: string | null
-}
-
-export function normalizeCodexAccountSelectionTarget(
-  target?: CodexAccountSelectionTarget | null
-): NormalizedCodexAccountSelectionTarget {
-  if (target?.runtime === 'wsl') {
-    return {
-      runtime: 'wsl',
-      wslDistro: normalizeWslDistro(target.wslDistro)
-    }
-  }
-  return { runtime: 'host', wslDistro: null }
 }
 
 export function normalizeCodexRuntimeSelection(
@@ -141,13 +136,4 @@ export function getCodexSelectionTargetForAccount(
     return { runtime: 'wsl', wslDistro: account.wslDistro ?? null }
   }
   return { runtime: 'host' }
-}
-
-export function getWslSelectionKey(wslDistro: string | null | undefined): string {
-  return normalizeWslDistro(wslDistro) ?? '__default__'
-}
-
-function normalizeWslDistro(wslDistro: string | null | undefined): string | null {
-  const trimmed = wslDistro?.trim()
-  return trimmed ? trimmed : null
 }
