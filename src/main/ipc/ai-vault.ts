@@ -9,7 +9,7 @@ import {
 } from '../ai-vault/cached-session-list'
 import { scanRemoteAiVaultSessions } from '../ai-vault/remote-session-scanner'
 import { listClaudeSubagentSessions } from '../ai-vault/session-scanner-claude-subagents'
-import { claudeProjectsRootDirs } from '../ai-vault/session-scanner-source-discovery'
+import { claudeProjectsRootDirs } from '../ai-vault/session-scanner-claude-paths'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { aiVaultScanIssueResult, mergeAiVaultListResults } from '../ai-vault/session-list-results'
 import type {
@@ -121,21 +121,18 @@ async function scanAiVaultSessionsByHostScope(
   if (executionHostScope === 'all') {
     const runtimeHosts = getActiveRuntimeAiVaultHostInfosResult()
     const runtimeResults = runtimeHosts.issue ? [runtimeHosts.issue] : []
-    return mergeAiVaultListResults(
-      await Promise.all([
-        scanLocalAiVaultSessions(args),
-        ...getActiveSshAiVaultHostInfos().map((hostInfo) =>
-          scanSshAiVaultSessions(hostInfo.targetId, args)
-        ),
-        ...runtimeHosts.hostInfos.map((hostInfo) =>
-          scanRuntimeAiVaultSessions(hostInfo, args, {
-            timeoutMs: AI_VAULT_ALL_HOST_RUNTIME_TIMEOUT_MS
-          })
-        ),
-        ...runtimeResults
-      ]),
-      args?.limit
-    )
+    const scannedResults = await Promise.all([
+      scanLocalAiVaultSessions(args),
+      ...getActiveSshAiVaultHostInfos().map((hostInfo) =>
+        scanSshAiVaultSessions(hostInfo.targetId, args)
+      ),
+      ...runtimeHosts.hostInfos.map((hostInfo) =>
+        scanRuntimeAiVaultSessions(hostInfo, args, {
+          timeoutMs: AI_VAULT_ALL_HOST_RUNTIME_TIMEOUT_MS
+        })
+      )
+    ])
+    return mergeAiVaultListResults([...scannedResults, ...runtimeResults], args?.limit)
   }
 
   const parsed = parseExecutionHostId(executionHostScope)

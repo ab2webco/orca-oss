@@ -4139,6 +4139,128 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(statSync(vaultSettingsPath).mtimeMs).toBe(firstMtimeMs)
   })
 
+  it('joins the shared Claude home to the shared transcript store on a non-pinned launch', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const homeProjects = join(testState.fakeHomeDir, '.claude', 'projects', '-Users-dev-repo')
+    mkdirSync(homeProjects, { recursive: true })
+    writeFileSync(join(homeProjects, 'from-home.jsonl'), '{"m":"home"}\n', 'utf-8')
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch()
+
+    // Why: non-pinned sessions and plain terminals outside Orca read this home, so
+    // leaving it out of the store keeps `/resume` split from every pinned vault.
+    expect(
+      readFileSync(
+        join(
+          testState.userDataDir,
+          'claude-transcripts',
+          'projects',
+          '-Users-dev-repo',
+          'from-home.jsonl'
+        ),
+        'utf-8'
+      )
+    ).toBe('{"m":"home"}\n')
+    expect(lstatSync(join(testState.fakeHomeDir, '.claude', 'projects')).isSymbolicLink()).toBe(
+      true
+    )
+  })
+
+  it('migrates a vault whose only claim on the account is this launch own reservation', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    mkdirSync(join(pinnedAuthPath, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(pinnedAuthPath, 'projects', '-Users-dev-repo', 'past.jsonl'),
+      '{"m":"past"}\n',
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+
+    // reservePtyAccount is how real launches call this: the reservation lands
+    // before instrumentation runs, so a guard counting reservations would read
+    // this very launch as a live CLI and never migrate anything.
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch(
+      { runtime: 'host', overrideAccountId: 'pinned-host-account' },
+      { reservePtyAccount: true }
+    )
+
+    expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(true)
+  })
+
+  it('defers a vault transcript migration while any Claude CLI is live', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const vaultProjects = join(pinnedAuthPath, 'projects', '-Users-dev-repo')
+    mkdirSync(vaultProjects, { recursive: true })
+    writeFileSync(join(vaultProjects, 'live.jsonl'), '{"m":"mid-append"}\n', 'utf-8')
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    // Why a DIFFERENT account's CLI blocks this one: every linked universe shares
+    // one store, so migrating here renames files that CLI may be mid-append on.
+    markClaudePtySpawned('live-elsewhere', 'some-other-account')
+
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    })
+
+    expect(existsSync(join(vaultProjects, 'live.jsonl'))).toBe(true)
+    expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(false)
+    markClaudePtyExited('live-elsewhere')
+  })
+
+  it('defers the shared-home migration while any Claude CLI is live', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const homeProjects = join(testState.fakeHomeDir, '.claude', 'projects', '-Users-dev-repo')
+    mkdirSync(homeProjects, { recursive: true })
+    writeFileSync(join(homeProjects, 'live.jsonl'), '{"m":"mid-append"}\n', 'utf-8')
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    markClaudePtySpawned('live-home', null)
+
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch()
+
+    expect(lstatSync(join(testState.fakeHomeDir, '.claude', 'projects')).isSymbolicLink()).toBe(
+      false
+    )
+    expect(existsSync(join(homeProjects, 'live.jsonl'))).toBe(true)
+    markClaudePtyExited('live-home')
+  })
+
   it('keeps an explicit pin isolated when it matches the global account', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,

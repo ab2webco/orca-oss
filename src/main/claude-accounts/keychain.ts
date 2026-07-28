@@ -164,9 +164,9 @@ function isKeychainNotFoundError(error: unknown): boolean {
       : undefined
   const message =
     error && typeof error === 'object'
-      ? `${(error as { stderr?: unknown }).stderr ?? ''} ${
+      ? `${String((error as { stderr?: unknown }).stderr ?? '')} ${String(
           (error as { message?: unknown }).message ?? ''
-        }`.toLowerCase()
+        )}`.toLowerCase()
       : String(error).toLowerCase()
   return code === 44 || message.includes('could not be found') || message.includes('not be found')
 }

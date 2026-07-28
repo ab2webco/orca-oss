@@ -1,5 +1,5 @@
-import type { AiVaultAgent } from '../../shared/ai-vault-types'
 import type {
+  AiVaultAgent,
   AiVaultScanIssue,
   AiVaultSession,
   AiVaultSessionPreviewMessage
@@ -8,6 +8,7 @@ import type { ExecutionHostId } from '../../shared/execution-host'
 
 export type AiVaultScanOptions = {
   claudeProjectsDir?: string
+  additionalClaudeProjectsDirs?: readonly string[]
   codexSessionsDir?: string
   additionalCodexSessionsDirs?: readonly string[]
   // Why: tests inject a sandbox "real ~/.codex" so real-home attribution

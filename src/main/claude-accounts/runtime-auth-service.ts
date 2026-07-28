@@ -14,7 +14,7 @@ import {
   resolveOwnedClaudeManagedAuthPath,
   writeClaudeManagedAuthFile
 } from './managed-auth-path'
-import { linkAccountTranscriptsToSharedStore } from './shared-transcript-store'
+import { linkClaudeTranscriptsToSharedStore } from './shared-transcript-store'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { resolveLocalAccountRuntimeTarget } from '../../shared/local-account-runtime'
 import {
@@ -30,6 +30,7 @@ import {
   hasLiveClaudePtys,
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount,
+  hasAnyLiveClaudePtys,
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch,
   reserveInjectedClaudeAccountLaunch,
@@ -224,6 +225,15 @@ export class ClaudeRuntimeAuthService {
       )
     }
     try {
+      // Why inside the try: getRuntimeConfigDir() creates the dir and can throw,
+      // and the catch below is what releases the launch reservation.
+      // Why non-pinned sessions need this: they run against the shared home, and a
+      // plain terminal outside Orca reads that same home, so leaving it out keeps
+      // history split. Host only — a WSL or SSH session resolves its own home
+      // there, which this path cannot see.
+      if (effectiveTarget?.runtime !== 'wsl') {
+        this.linkTranscriptsWhenNoClaudeIsLive(this.getRuntimeConfigDir())
+      }
       await this.syncForCurrentSelection(effectiveTarget)
       return {
         ...this.getPreparation(effectiveTarget),
@@ -1091,6 +1101,22 @@ export class ClaudeRuntimeAuthService {
     }
   }
 
+  /**
+   * Join one Claude universe to the shared transcript store, but only while no
+   * Claude CLI is running anywhere.
+   *
+   * Why liveness is asked globally and not per account: every linked universe
+   * shares one store, so this migration renames and parks files that the CLI of
+   * any other account may be mid-append on. Deferring costs nothing — the next
+   * launch retries, and once linked the call short-circuits forever.
+   */
+  private linkTranscriptsWhenNoClaudeIsLive(claudeConfigDir: string): void {
+    if (hasAnyLiveClaudePtys()) {
+      return
+    }
+    linkClaudeTranscriptsToSharedStore(claudeConfigDir)
+  }
+
   // Why: a pinned worktree launches Claude with CLAUDE_CONFIG_DIR set to this account's
   // isolated vault, so the shared ~/.claude hook + statusLine never run — Orca then never
   // learns the session id (account switch / failover / fail-back all break) and usage never
@@ -1103,7 +1129,7 @@ export class ClaudeRuntimeAuthService {
     }
     // Why: `/resume` and `claude -c` read only the launching account's projects/,
     // so without one shared store the user's history is split per account.
-    linkAccountTranscriptsToSharedStore(account.managedAuthPath)
+    this.linkTranscriptsWhenNoClaudeIsLive(account.managedAuthPath)
     try {
       const currentSettingsJson = readClaudeManagedAuthFile(
         account.managedAuthPath,

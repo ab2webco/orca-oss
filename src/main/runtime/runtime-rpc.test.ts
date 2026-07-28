@@ -50,7 +50,7 @@ async function sendRequest(
     let buffer = ''
     socket.setEncoding('utf8')
     socket.once('error', reject)
-    socket.on('data', (chunk) => {
+    socket.on('data', (chunk: string) => {
       buffer += chunk
       const newlineIndex = buffer.indexOf('\n')
       if (newlineIndex === -1) {
@@ -363,6 +363,9 @@ describe('OrcaRuntimeRpcServer', () => {
   })
 
   it('reclaims runtime metadata clobbered by a second instance that has since died', async () => {
+    // Why: #7848 — a launch that slips past the single-instance lock republishes
+    // orca-runtime.json with its own pid, so the CLI reports stale_bootstrap
+    // against this still-serving runtime once that instance exits.
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
     const runtime = new OrcaRuntimeService()
     const server = new OrcaRuntimeRpcServer({ runtime, userDataPath })
@@ -385,7 +388,8 @@ describe('OrcaRuntimeRpcServer', () => {
 
   it('leaves runtime metadata owned by a live sibling runtime untouched', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
-    // Why: process.pid is the portable live-sibling probe.
+    // Why: a synthetic owned pid frees the always-alive process.pid to stand in for
+    // the sibling — Windows never assigns pid 1, so hardcoding it there reads as dead.
     const server = new OrcaRuntimeRpcServer({
       runtime: new OrcaRuntimeService(),
       userDataPath,
@@ -415,7 +419,7 @@ describe('OrcaRuntimeRpcServer', () => {
     if (!watch) {
       throw new Error('start() must arm the metadata ownership watch')
     }
-    // Why: asserting teardown prevents the republish guard from masking a leaked timer.
+    // Why: the republish guard alone would keep this test green, so assert the timer teardown itself.
     const watchStop = vi.spyOn(watch, 'stop')
     await server.stop()
 
@@ -4057,7 +4061,7 @@ describe('OrcaRuntimeRpcServer', () => {
       let buffer = ''
       socket.setEncoding('utf8')
       socket.once('error', reject)
-      socket.on('data', (chunk) => {
+      socket.on('data', (chunk: string) => {
         buffer += chunk
         const newlineIndex = buffer.indexOf('\n')
         if (newlineIndex === -1) {

@@ -35,7 +35,11 @@ import { registerDashboardPopoutHandlers } from './dashboard-popout'
 import { registerTerminalPreviewHandlers } from './terminal-preview'
 import { registerDeveloperPermissionHandlers } from './developer-permissions'
 import { registerComputerUsePermissionHandlers } from './computer-use-permissions'
-import { setTrustedBrowserRendererWebContentsId, setAgentBrowserBridgeRef } from './browser'
+import {
+  setTrustedBrowserRendererWebContentsId,
+  setAgentBrowserBridgeRef,
+  registerBrowserHandlers
+} from './browser'
 import { registerSessionHandlers } from './session'
 import { registerSettingsHandlers } from './settings'
 import { registerDiagnosticsHandlers } from './diagnostics'
@@ -46,7 +50,6 @@ import { registerLocalhostWorktreeLabelHandlers } from './localhost-worktree-lab
 import { registerAutomationHandlers } from './automations'
 import { registerKeybindingHandlers } from './keybindings'
 import { registerTelemetryHandlers } from './telemetry'
-import { registerBrowserHandlers } from './browser'
 import { registerShellHandlers } from './shell'
 import { registerPetHandlers } from './pet'
 import { registerPluginHandlers } from './plugins'
@@ -98,6 +101,7 @@ type CoreHandlerLifecycleOptions = {
   onOrcaProfileAuthMutation?: () => void
   onBeforeOrcaProfileSignOut?: () => void
   getAdditionalAiVaultCodexHomePaths?: () => readonly string[]
+  getAdditionalAiVaultClaudeProjectsPaths?: () => readonly string[]
   prepareAiVaultSessionResume?: (
     args: AiVaultPrepareSessionResumeArgs
   ) => Promise<AiVaultPrepareSessionResumeResult>
@@ -142,7 +146,7 @@ export function registerCoreHandlers(
   registerClaudeUsageHandlers(claudeUsage)
   registerCodexUsageHandlers(codexUsage)
   registerOpenCodeUsageHandlers(openCodeUsage)
-  registerCodexAccountHandlers(codexAccounts)
+  registerCodexAccountHandlers(codexAccounts, () => store.getSettings())
   registerAgentHookHandlers(runtime, { getPtyIdForPaneKey })
   registerCodexConfigSyncHandlers(codexAccounts.runtimeHomeService)
   registerAgentTrustHandlers()
@@ -216,6 +220,7 @@ export function registerCoreHandlers(
   registerEphemeralVmHandlers(store, pluginService)
   registerAiVaultHandlers({
     getAdditionalCodexHomePaths: lifecycleOptions.getAdditionalAiVaultCodexHomePaths,
+    getAdditionalClaudeProjectsPaths: lifecycleOptions.getAdditionalAiVaultClaudeProjectsPaths,
     prepareSessionResume: lifecycleOptions.prepareAiVaultSessionResume,
     getActiveRuntimeAiVaultHostInfos: () =>
       getSavedRuntimeAiVaultHostInfos(app.getPath('userData')),

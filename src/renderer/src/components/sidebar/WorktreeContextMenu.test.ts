@@ -13,7 +13,8 @@ import {
   hasWorktreeParentLink,
   isWorktreeParentPickerDisabled,
   planWorkspaceStatusAssignment,
-  selectMenuScopedMap
+  selectMenuScopedMap,
+  shouldRevealWorktreeDeveloperMenu
 } from './WorktreeContextMenu'
 import type {
   Repo,
@@ -31,6 +32,28 @@ describe('Claude account assignment ownership', () => {
 
     expect(canAssignClaudeAccountsToWorktrees([worktree], repos, false)).toBe(true)
     expect(canAssignClaudeAccountsToWorktrees([worktree], repos, true)).toBe(false)
+  })
+})
+
+describe('shouldRevealWorktreeDeveloperMenu', () => {
+  it('stays hidden for an ordinary right-click', () => {
+    expect(
+      shouldRevealWorktreeDeveloperMenu({ developerMenuRevealed: false, isMultiContext: false })
+    ).toBe(false)
+  })
+
+  it('reveals when Option/Alt was held at open time', () => {
+    expect(
+      shouldRevealWorktreeDeveloperMenu({ developerMenuRevealed: true, isMultiContext: false })
+    ).toBe(true)
+  })
+
+  // Why: the parking action targets one workspace, so it must not appear for a
+  // multi-select context even with the modifier held.
+  it('stays hidden for a multi-workspace selection', () => {
+    expect(
+      shouldRevealWorktreeDeveloperMenu({ developerMenuRevealed: true, isMultiContext: true })
+    ).toBe(false)
   })
 })
 

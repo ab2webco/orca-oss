@@ -15,6 +15,7 @@ const AI_VAULT_CACHE_TTL_MS = 15_000
 // drop managed-Codex sessions from remote/SSH results.
 export type AiVaultSessionSources = {
   getAdditionalCodexHomePaths?: () => readonly string[]
+  getAdditionalClaudeProjectsPaths?: () => readonly string[]
 }
 
 type CachedAiVaultList = {
@@ -51,11 +52,13 @@ export async function listAiVaultSessions(args?: AiVaultListArgs): Promise<AiVau
   inflightKey = key
   const additionalCodexSessionsDirs =
     sources.getAdditionalCodexHomePaths?.().map((homePath) => join(homePath, 'sessions')) ?? []
+  const additionalClaudeProjectsDirs = sources.getAdditionalClaudeProjectsPaths?.() ?? []
   inflightList = (async () =>
     scanAiVaultSessions({
       limit: args?.limit,
       scopePaths: args?.scopePaths,
       additionalCodexSessionsDirs,
+      additionalClaudeProjectsDirs,
       wslHomeDirs: await getAiVaultWslHomeDirs(),
       // Why: this scan is always host-local; callers addressing this host by a
       // runtime id get the result restamped at the RPC edge, never rescanned.

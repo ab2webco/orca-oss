@@ -45,7 +45,8 @@ import { getLocalPreflightContext, localPreflightContextKey } from '@/lib/local-
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import {
   getSettingsFocusedExecutionHostId,
-  parseExecutionHostId
+  parseExecutionHostId,
+  getRepoExecutionHostId
 } from '../../../shared/execution-host'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -177,7 +178,6 @@ import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-con
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
 import { resolvePlaneViewMode } from '@/components/task-page-plane-view-mode'
-import type { PlaneViewMode } from '../../../shared/types'
 import { shouldRefetchPlaneForChange } from '@/components/task-page-plane-change-scope'
 import { findTaskPagePlaneWorkItem } from '@/components/task-page-plane-cache-selectors'
 import { filterPlaneItemsBySearch } from '@/components/plane-work-item-search-filter'
@@ -212,7 +212,6 @@ import {
   readLinearBoardIssueDragData,
   writeLinearBoardIssueDragData
 } from '@/lib/linear-board-drag-payload'
-import { getRepoExecutionHostId } from '../../../shared/execution-host'
 import { projectHostSetupProjectionFromRepos } from '../../../shared/project-host-setup-projection'
 import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import {
@@ -331,7 +330,8 @@ import type {
   LinearWorkflowState,
   Repo,
   TaskProvider,
-  TaskViewPresetId
+  TaskViewPresetId,
+  PlaneViewMode
 } from '../../../shared/types'
 import type {
   PlaneProject,

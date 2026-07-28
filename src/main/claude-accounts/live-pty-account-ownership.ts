@@ -18,6 +18,18 @@ export function getLiveSharedClaudePtyAccountId(ptyId: string): string | null {
   return liveSharedClaudePtyAccounts.get(ptyId) ?? null
 }
 
+/**
+ * Any live Claude CLI at all, pinned or not. Reservations are excluded, so a
+ * caller inside its own launch preparation does not see itself.
+ *
+ * Why the broad question has a use: every universe Orca links shares one
+ * transcript store, so a migration in one of them moves files the CLI of any
+ * other may be mid-append on. Per-account liveness cannot answer that.
+ */
+export function hasAnyLiveClaudePtys(): boolean {
+  return liveClaudePtyIds.size > 0 || liveInjectedClaudePtyAccounts.size > 0
+}
+
 export function hasLiveSharedClaudePtysForAccount(accountId: string): boolean {
   return [...liveSharedClaudePtyAccounts.values()].some(
     (liveAccountId) => liveAccountId === null || liveAccountId === accountId
