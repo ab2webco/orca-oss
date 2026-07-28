@@ -364,6 +364,138 @@ describe('CodexUsageStore', () => {
     expect(breakdown.find((row) => row.key === 'gpt-5.5')?.estimatedCostUsd).toBeCloseTo(50.424)
   })
 
+  it('prices GPT-5.6 sol, terra, and luna with current OpenAI rates', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'].map((model) => ({
+        day: '2026-04-09',
+        model,
+        projectKey: 'worktree:repo-1::/workspace/repo',
+        projectLabel: 'Repo',
+        repoId: 'repo-1',
+        worktreeId: 'repo-1::/workspace/repo',
+        eventCount: 1,
+        inputTokens: 2_000_000,
+        cachedInputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+        reasoningOutputTokens: 100_000,
+        totalTokens: 3_000_000,
+        hasInferredPricing: false
+      }))
+    })
+
+    const summary = await store.getSummary('orca', '30d')
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(summary.estimatedCostUsd).toBeCloseTo(95.2)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-sol')?.estimatedCostUsd).toBeCloseTo(56)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-terra')?.estimatedCostUsd).toBeCloseTo(28)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-luna')?.estimatedCostUsd).toBeCloseTo(11.2)
+  })
+
+  it('normalizes GPT-5.6 reasoning suffixes before pricing', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: ['gpt-5.6-terra-high', 'gpt-5.6-luna(medium)'].map((model) => ({
+        day: '2026-04-09',
+        model,
+        projectKey: 'worktree:repo-1::/workspace/repo',
+        projectLabel: 'Repo',
+        repoId: 'repo-1',
+        worktreeId: 'repo-1::/workspace/repo',
+        eventCount: 1,
+        inputTokens: 100_000,
+        cachedInputTokens: 50_000,
+        outputTokens: 25_000,
+        reasoningOutputTokens: 5_000,
+        totalTokens: 125_000,
+        hasInferredPricing: false
+      }))
+    })
+
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-terra-high')?.estimatedCostUsd).toBeCloseTo(
+      0.5125
+    )
+    expect(
+      breakdown.find((row) => row.key === 'gpt-5.6-luna(medium)')?.estimatedCostUsd
+    ).toBeCloseTo(0.205)
+  })
+
+  it('prices the bare gpt-5.6 alias at Sol rates without shadowing the tier IDs', async () => {
+    const store = createStoreWithState({
+      dailyAggregates: ['gpt-5.6', 'gpt-5.6-luna'].map((model) => ({
+        day: '2026-04-09',
+        model,
+        projectKey: 'worktree:repo-1::/workspace/repo',
+        projectLabel: 'Repo',
+        repoId: 'repo-1',
+        worktreeId: 'repo-1::/workspace/repo',
+        eventCount: 1,
+        inputTokens: 100_000,
+        cachedInputTokens: 50_000,
+        outputTokens: 25_000,
+        reasoningOutputTokens: 5_000,
+        totalTokens: 125_000,
+        hasInferredPricing: false
+      }))
+    })
+
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(breakdown.find((row) => row.key === 'gpt-5.6')?.estimatedCostUsd).toBeCloseTo(1.025)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-luna')?.estimatedCostUsd).toBeCloseTo(0.205)
+  })
+
+  it('reports an unpriced model once, not per aggregate or null model', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const store = createStoreWithState({
+      dailyAggregates: [
+        ...['2026-04-08', '2026-04-09'].map((day) => ({
+          day,
+          model: 'someone-elses-llm-9',
+          projectKey: 'worktree:repo-1::/workspace/repo',
+          projectLabel: 'Repo',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo',
+          eventCount: 1,
+          inputTokens: 1_000_000,
+          cachedInputTokens: 0,
+          outputTokens: 1_000_000,
+          reasoningOutputTokens: 0,
+          totalTokens: 2_000_000,
+          hasInferredPricing: false
+        })),
+        {
+          day: '2026-04-09',
+          model: null,
+          projectKey: 'worktree:repo-1::/workspace/repo',
+          projectLabel: 'Repo',
+          repoId: 'repo-1',
+          worktreeId: 'repo-1::/workspace/repo',
+          eventCount: 1,
+          inputTokens: 1_000_000,
+          cachedInputTokens: 0,
+          outputTokens: 1_000_000,
+          reasoningOutputTokens: 0,
+          totalTokens: 2_000_000,
+          hasInferredPricing: false
+        }
+      ]
+    })
+
+    const summary = await store.getSummary('orca', '30d')
+    const breakdown = await store.getBreakdown('orca', '30d', 'model')
+
+    expect(summary.estimatedCostUsd).toBeNull()
+    expect(breakdown.every((row) => row.estimatedCostUsd === null)).toBe(true)
+    expect(
+      consoleError.mock.calls.filter((call) => String(call[0]).includes('someone-elses-llm-9'))
+    ).toHaveLength(1)
+    expect(consoleError).toHaveBeenCalledTimes(1)
+
+    consoleError.mockRestore()
+  })
+
   it('normalizes Codex model variants and reasoning suffixes before pricing', async () => {
     const store = createStoreWithState({
       dailyAggregates: [
