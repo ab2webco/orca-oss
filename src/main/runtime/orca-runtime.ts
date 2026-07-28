@@ -22462,6 +22462,17 @@ export class OrcaRuntimeService {
       ? this.resolveWorkspaceTerminalStartupCwd(workspace, launchOpts.cwd)
       : launchOpts.cwd
     const requestId = randomUUID()
+    const spawnFailure = new AbortController()
+    const spawnFailureHandler = (
+      event: Electron.IpcMainEvent,
+      failure: { requestId: string; error?: string }
+    ): void => {
+      if (event.sender !== win.webContents || failure.requestId !== requestId) {
+        return
+      }
+      spawnFailure.abort(new Error(failure.error || 'Terminal creation failed'))
+    }
+    ipcMain.on('terminal:tabCreateFailure', spawnFailureHandler)
 
     // Why: terminal creation is a renderer-side Zustand store operation (like
     // browser tab creation). The main process sends a request, the renderer
@@ -22506,19 +22517,26 @@ export class OrcaRuntimeService {
         activate: presentation === 'focused',
         ...(presentation ? { presentation } : {})
       })
+    }).catch((error) => {
+      ipcMain.removeListener('terminal:tabCreateFailure', spawnFailureHandler)
+      throw error
     })
 
-    // Why: the renderer created the tab immediately, but the graph sync that
-    // populates this.leaves may not have arrived yet. Wait for the leaf to
-    // appear so we can return a valid handle the caller can use right away.
-    const handle = await this.waitForTerminalHandle(reply.tabId)
-    return {
-      handle,
-      tabId: reply.tabId,
-      worktreeId: worktreeId ?? '',
-      title: reply.title,
-      ...this.getPtyExecutionHostMetadata(this.handles.get(handle)?.ptyId ?? null),
-      surface: 'visible'
+    try {
+      // Why: the renderer created the tab immediately, but the graph sync that
+      // populates this.leaves may not have arrived yet. Wait for the leaf to
+      // appear so we can return a valid handle the caller can use right away.
+      const handle = await this.waitForTerminalHandle(reply.tabId, 10_000, spawnFailure.signal)
+      return {
+        handle,
+        tabId: reply.tabId,
+        worktreeId: worktreeId ?? '',
+        title: reply.title,
+        ...this.getPtyExecutionHostMetadata(this.handles.get(handle)?.ptyId ?? null),
+        surface: 'visible'
+      }
+    } finally {
+      ipcMain.removeListener('terminal:tabCreateFailure', spawnFailureHandler)
     }
   }
 
@@ -23342,33 +23360,54 @@ export class OrcaRuntimeService {
     )
   }
 
-  private waitForTerminalHandle(tabId: string, timeoutMs = 10_000): Promise<string> {
+  private waitForTerminalHandle(
+    tabId: string,
+    timeoutMs = 10_000,
+    failureSignal?: AbortSignal
+  ): Promise<string> {
     const existing = this.resolveHandleForTab(tabId)
     if (existing) {
       return Promise.resolve(existing)
     }
+    if (failureSignal?.aborted) {
+      return Promise.reject(
+        failureSignal.reason instanceof Error
+          ? failureSignal.reason
+          : new Error('Terminal creation failed')
+      )
+    }
 
     return new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const cleanup = (): void => {
+        clearTimeout(timer)
+        failureSignal?.removeEventListener('abort', onFailure)
         const idx = this.graphSyncCallbacks.indexOf(check)
         if (idx !== -1) {
           this.graphSyncCallbacks.splice(idx, 1)
         }
+      }
+      const timer = setTimeout(() => {
+        cleanup()
         reject(new Error('Timed out waiting for terminal handle after creation'))
       }, timeoutMs)
+      const onFailure = (): void => {
+        cleanup()
+        reject(
+          failureSignal?.reason instanceof Error
+            ? failureSignal.reason
+            : new Error('Terminal creation failed')
+        )
+      }
 
       const check = (): void => {
         const handle = this.resolveHandleForTab(tabId)
         if (handle) {
-          clearTimeout(timer)
-          const idx = this.graphSyncCallbacks.indexOf(check)
-          if (idx !== -1) {
-            this.graphSyncCallbacks.splice(idx, 1)
-          }
+          cleanup()
           resolve(handle)
         }
       }
       this.graphSyncCallbacks.push(check)
+      failureSignal?.addEventListener('abort', onFailure, { once: true })
       // Why: graph sync may have fired between the initial check and registration; re-check to avoid a missed wake-up.
       check()
     })

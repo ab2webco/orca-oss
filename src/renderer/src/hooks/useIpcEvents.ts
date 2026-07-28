@@ -15,6 +15,7 @@ import { createBackgroundSleepingAgentWakeDispatcher } from '@/lib/wake-sleeping
 import { OPEN_WORKSPACE_BOARD_EVENT } from '@/components/sidebar/useWorkspaceBoardPanel'
 import { SPLIT_TERMINAL_PANE_EVENT, CLOSE_TERMINAL_PANE_EVENT } from '@/constants/terminal'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
+import { registerRendererBackedTerminalCreate } from '@/components/terminal-pane/renderer-backed-terminal-create'
 import { planMobileTerminalTabMount } from '@/lib/mobile-terminal-tab-mount'
 import { hasRegisteredRuntimeTerminalTab } from '@/runtime/sync-runtime-graph'
 import type { SplitTerminalPaneDetail, CloseTerminalPaneDetail } from '@/constants/terminal'
@@ -1830,6 +1831,7 @@ export function useIpcEvents(): void {
                 : {})
             })
           }
+          registerRendererBackedTerminalCreate(tab.id, data.requestId)
           window.api.ui.replyTerminalCreate({
             requestId: data.requestId,
             tabId: tab.id,

@@ -12536,6 +12536,48 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('propagates renderer-backed spawn failures instead of timing out for a handle', async () => {
+    vi.useFakeTimers()
+    try {
+      const webContents = { send: vi.fn() }
+      const message =
+        'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
+      webContents.send.mockImplementation((_channel: string, payload: { requestId: string }) => {
+        ipcMain.emit(
+          'terminal:tabCreateReply',
+          { sender: webContents },
+          { requestId: payload.requestId, tabId: 'tab-failed', title: 'Claude' }
+        )
+        queueMicrotask(() => {
+          ipcMain.emit(
+            'terminal:tabCreateFailure',
+            { sender: webContents },
+            { requestId: payload.requestId, tabId: 'tab-failed', error: message }
+          )
+        })
+      })
+      const runtime = new OrcaRuntimeService(store)
+      runtime.attachWindow(1)
+      runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+      electronMocks.BrowserWindow.fromId.mockReturnValue({
+        isDestroyed: () => false,
+        webContents
+      })
+
+      const creation = runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+        agent: 'claude',
+        rendererBacked: true
+      })
+      const rejection = expect(creation).rejects.toThrow(message)
+      await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledOnce())
+      await vi.advanceTimersByTimeAsync(10_001)
+
+      await rejection
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('forwards launch accounts when splitting visible pty-backed terminal sessions', async () => {
     const spawn = vi
       .fn()
