@@ -2,6 +2,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import os from 'node:os'
+import { getManagedClaudeProjectsPathsForSessionDiscovery } from './claude-accounts/managed-projects-session-discovery'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, type Tray } from 'electron'
 import { electronApp, is } from '@electron-toolkit/utils'
 import {
@@ -1235,6 +1236,10 @@ function openMainWindow(): BrowserWindow {
     {
       getAdditionalAiVaultCodexHomePaths: () =>
         codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
+      getAdditionalAiVaultClaudeProjectsPaths: () =>
+        getManagedClaudeProjectsPathsForSessionDiscovery(
+          store?.getSettings().claudeManagedAccounts ?? []
+        ),
       prepareAiVaultSessionResume: (args) =>
         prepareLegacySharedCodexSessionResume(args, {
           isHostSystemDefaultRealHome: () =>
@@ -2230,6 +2235,10 @@ app.whenReady().then(async () => {
     // Why: source codex-home here (runs in window AND serve) so aiVault.listSessions includes managed-Codex sessions; registerCoreHandlers is window-only.
     getAdditionalAiVaultCodexHomePaths: () =>
       codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
+    getAdditionalAiVaultClaudeProjectsPaths: () =>
+      getManagedClaudeProjectsPathsForSessionDiscovery(
+        store?.getSettings().claudeManagedAccounts ?? []
+      ),
     prepareAiVaultSessionResume: (args) =>
       prepareLegacySharedCodexSessionResume(args, {
         isHostSystemDefaultRealHome: () => codexRuntimeHome?.isHostSystemDefaultRealHome() === true,

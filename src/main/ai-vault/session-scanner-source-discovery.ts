@@ -2,6 +2,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { AiVaultScanIssue } from '../../shared/ai-vault-types'
 import { uniqueCodexSessionsDirs } from './session-scanner-codex-paths'
+import { claudeProjectsRootDirs } from './session-scanner-claude-paths'
 import { SUBAGENT_DIR_NAME } from './session-scanner-subagent-transcripts'
 import { discoverFiles, discoverOpenClawFiles } from './session-scanner-discovery'
 import { droidDiscoveries, kimiDiscoveries } from './session-scanner-droid-kimi-sources'
@@ -11,7 +12,6 @@ import { normalizeAgentSessionsDir } from './session-scanner-values'
 import { resolveGrokSessionsDir } from '../../shared/grok-session-paths'
 import { antigravityDiscoveries } from './session-scanner-antigravity-sources'
 
-const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 export const DEFAULT_CODEX_HOME_DIR = join(homedir(), '.codex')
 const CODEX_HOME_DIR = process.env.CODEX_HOME?.trim() || DEFAULT_CODEX_HOME_DIR
 const CODEX_SESSIONS_DIR = join(CODEX_HOME_DIR, 'sessions')
@@ -40,16 +40,6 @@ const DEVIN_TRANSCRIPTS_DIR = join(
 
 // The local host and each WSL distro's `~/.claude/projects`. Callers reading
 // Claude session files by path use these roots to reject arbitrary paths.
-export function claudeProjectsRootDirs(args: {
-  claudeProjectsDir?: string
-  wslHomeDirs?: readonly string[]
-}): string[] {
-  return [
-    args.claudeProjectsDir ?? CLAUDE_PROJECTS_DIR,
-    ...(args.wslHomeDirs ?? []).map((homeDir) => join(homeDir, '.claude', 'projects'))
-  ]
-}
-
 export async function discoverAiVaultSessionSources(args: {
   options: AiVaultScanOptions
   limitPerAgent: number
@@ -90,6 +80,7 @@ function claudeDiscoveries(
 ): Promise<SessionFileDiscovery>[] {
   return claudeProjectsRootDirs({
     claudeProjectsDir: options.claudeProjectsDir,
+    additionalClaudeProjectsDirs: options.additionalClaudeProjectsDirs,
     wslHomeDirs
   }).map((rootDir) =>
     discoverFiles({

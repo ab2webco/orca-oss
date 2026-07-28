@@ -9,7 +9,7 @@ import {
 } from '../ai-vault/cached-session-list'
 import { scanRemoteAiVaultSessions } from '../ai-vault/remote-session-scanner'
 import { listClaudeSubagentSessions } from '../ai-vault/session-scanner-claude-subagents'
-import { claudeProjectsRootDirs } from '../ai-vault/session-scanner-source-discovery'
+import { claudeProjectsRootDirs } from '../ai-vault/session-scanner-claude-paths'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { aiVaultScanIssueResult, mergeAiVaultListResults } from '../ai-vault/session-list-results'
 import type {
