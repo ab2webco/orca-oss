@@ -1,9 +1,17 @@
 # Lab Release Smoke Check
 
-Run this against a release candidate build before promoting it. It exists because a build shipped
-where **files would not open in the editor while a terminal was open** — a break in the most-used
-loop in the app, invisible to 37k passing unit tests, and obvious within thirty seconds of using
-the real thing.
+**Not every release needs a candidate.** Cut one only when the change is critical *and* there is
+something a person can actually exercise by hand — a visible behavior, a flow you can click
+through. A candidate whose fix cannot be reproduced without force-killing the app is a ritual, not
+a gate: it costs a release cycle and returns no information, and a checklist nobody can truly
+execute produces false confidence, which is worse than none. For those changes the evidence is the
+test that fails without the fix, run in both directions.
+
+When you do cut one, run this against it before promoting. It exists because a build shipped where
+**files would not open in the editor while a terminal was open** — a break in the most-used loop in
+the app, invisible to 37k passing unit tests, and obvious within thirty seconds of using the real
+thing. That is the shape of change a candidate catches: user-visible, hand-reachable, and outside
+what unit tests cover.
 
 Every item below is a whole-app interaction across a boundary unit tests do not cross: renderer
 overlays, PTY lifecycle, the runtime socket, the updater. That is the only class of bug this
