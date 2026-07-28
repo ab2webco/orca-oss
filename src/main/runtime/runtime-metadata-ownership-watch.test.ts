@@ -64,6 +64,7 @@ describe('shouldReclaimRuntimeMetadata', () => {
   })
 
   it('reclaims a foreign runtimeId stamped on this pid', () => {
+    // Why: only this process can be this pid, so the record is a recycled-pid leftover.
     expect(
       shouldReclaimRuntimeMetadata(
         record({ runtimeId: 'rt_previous_process' }),

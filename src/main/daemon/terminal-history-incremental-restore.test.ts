@@ -308,6 +308,7 @@ describe('incremental terminal history restore', () => {
     const firstReplay = reader.detectColdRestore(SESSION_ID)
     const secondReplay = reader.detectColdRestore(secondSessionId)
     try {
+      // Drain by yield because awaiting the session that loses the replay-slot race deadlocks.
       await vi.waitFor(() => expect(pendingYields.length).toBeGreaterThanOrEqual(1))
 
       expect((await drainYieldsUntilSettled(firstReplay, pendingYields))?.scrollbackAnsi).toContain(
