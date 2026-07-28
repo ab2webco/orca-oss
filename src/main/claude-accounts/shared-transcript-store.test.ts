@@ -168,17 +168,19 @@ describe('linkClaudeTranscriptsToSharedStore', () => {
     expect(readFileSync(sharedSession('shared-session'), 'utf-8')).toBe(full)
   })
 
-  it('drops a duplicate transcript that the stored one already contains', async () => {
+  it('parks even a duplicate the stored transcript already contains', async () => {
     const { linkClaudeTranscriptsToSharedStore } = await import('./shared-transcript-store')
-    // Found with real data: one id had 11 `.superseded-N` sidecars because every
-    // launch re-parked the same prefix. A strict prefix survives inside the
-    // winner, so keeping a sidecar of it preserves nothing.
+    // Why not delete it: a Claude running outside Orca is in no registry this code
+    // can read, and unlinking a file it holds open for append loses the rest of
+    // that conversation. Redundant-looking is not the same as unreferenced.
     const full = '{"m":"turn 1"}\n{"m":"turn 2"}\n'
     linkClaudeTranscriptsToSharedStore(seedAccount('account-full', 'dup', full))
     linkClaudeTranscriptsToSharedStore(seedAccount('account-b', 'dup', '{"m":"turn 1"}\n'))
 
     expect(readFileSync(sharedSession('dup'), 'utf-8')).toBe(full)
-    expect(readdirSync(sharedProjectDir())).toEqual(['dup.jsonl'])
+    const parked = readdirSync(sharedProjectDir()).filter((e) => e.includes('.superseded'))
+    expect(parked).toHaveLength(1)
+    expect(readFileSync(join(sharedProjectDir(), parked[0]), 'utf-8')).toBe('{"m":"turn 1"}\n')
   })
 
   it('parks a diverged transcript instead of dropping it', async () => {
@@ -216,40 +218,6 @@ describe('linkClaudeTranscriptsToSharedStore', () => {
     const parked = readdirSync(sharedProjectDir()).filter((e) => e.includes('.superseded'))
     expect(parked).toHaveLength(1)
     expect(lstatSync(join(sharedProjectDir(), parked[0])).isSymbolicLink()).toBe(true)
-  })
-
-  it('parks rather than drops a copy whose size no longer matches what was read', async () => {
-    // A Claude running outside Orca is in no live-PTY registry, so the loser can
-    // gain bytes between the prefix read and the delete.
-    const authPath = seedAccount('account-a', 'session-a', '{"m":"1"}\n')
-    mkdirSync(sharedProjectDir(), { recursive: true })
-    writeFileSync(sharedSession('session-a'), '{"m":"1"}\n{"m":"2"}\n', 'utf-8')
-    const losingPath = join(authPath, 'projects', PROJECT_SLUG, 'session-a.jsonl')
-    vi.resetModules()
-    vi.doMock('node:fs', async () => {
-      const actual = await vi.importActual<typeof NodeFs>('node:fs')
-      return {
-        ...actual,
-        readFileSync: ((path: Parameters<typeof actual.readFileSync>[0]) => {
-          const bytes = actual.readFileSync(path)
-          if (String(path) === losingPath) {
-            actual.writeFileSync(losingPath, '{"m":"1"}\n{"m":"appended"}\n', 'utf-8')
-          }
-          return bytes
-        }) as typeof actual.readFileSync
-      }
-    })
-    const { linkClaudeTranscriptsToSharedStore } = await import('./shared-transcript-store')
-
-    linkClaudeTranscriptsToSharedStore(authPath)
-
-    vi.doUnmock('node:fs')
-    vi.resetModules()
-    const parked = readdirSync(sharedProjectDir()).filter((e) => e.includes('.superseded'))
-    expect(parked).toHaveLength(1)
-    expect(readFileSync(join(sharedProjectDir(), parked[0]), 'utf-8')).toBe(
-      '{"m":"1"}\n{"m":"appended"}\n'
-    )
   })
 
   it('is idempotent — a second call leaves the link alone', async () => {

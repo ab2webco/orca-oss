@@ -4,14 +4,11 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
-  readSync,
   readdirSync,
   realpathSync,
   renameSync,
   rmSync,
   rmdirSync,
-  statSync,
   symlinkSync,
   type Stats
 } from 'node:fs'
@@ -38,9 +35,6 @@ const TRANSCRIPT_EXTENSION = '.jsonl'
 /** Claude Code's per-project session cache. Rebuildable — a project with no index
  *  still lists in `/resume`, and stored entries can outlive their `.jsonl`. */
 const SESSIONS_INDEX_FILE_NAME = 'sessions-index.json'
-/** Ceiling for the redundancy read below. Migration runs on the Electron main
- *  thread during a launch, and a real `~/.claude` holds transcripts of 100 MB+. */
-const MAX_REDUNDANCY_CHECK_BYTES = 8 * 1024 * 1024
 
 export function getSharedClaudeTranscriptsRoot(): string {
   return join(app.getPath('userData'), SHARED_TRANSCRIPTS_DIR_NAME, PROJECTS_DIR_NAME)
@@ -225,9 +219,10 @@ function parkAside(fromPath: string, winnerPath: string, fromIsDirectory: boolea
  * later. Everything else in a project (`memory/` notes) is hand-edited and can
  * shrink, so those go by mtime.
  *
- * The loser is parked next to the winner rather than deleted, so nothing is
- * destroyed on a wrong guess — unless it is a strict prefix of the winner, which
- * proves every one of its bytes already survived.
+ * The loser is always parked, never deleted. Dropping a copy whose bytes the
+ * winner already holds looks free, but a Claude running outside Orca is in no
+ * registry this code can read: unlink its file and that CLI's open fd points at
+ * an unreachable inode, losing the rest of a live conversation.
  */
 function resolveFileCollision(
   sourcePath: string,
@@ -237,58 +232,13 @@ function resolveFileCollision(
 ): boolean {
   const isTranscript = targetPath.endsWith(TRANSCRIPT_EXTENSION)
   const sourceWins = isTranscript ? source.size > target.size : source.mtimeMs > target.mtimeMs
-  const [winner, loser] = sourceWins ? [sourcePath, targetPath] : [targetPath, sourcePath]
-  const redundantLoser =
-    isTranscript && isPrefixOf(loser, winner, sourceWins ? target.size : source.size)
-  if (winner === targetPath) {
-    if (redundantLoser) {
-      rmSync(sourcePath)
-      return true
-    }
+  if (!sourceWins) {
     parkAside(sourcePath, targetPath, false)
     return true
   }
-  if (redundantLoser) {
-    rmSync(targetPath)
-  } else {
-    parkAside(targetPath, targetPath, false)
-  }
+  parkAside(targetPath, targetPath, false)
   renameSync(sourcePath, targetPath)
   return true
-}
-
-/**
- * True when `candidate` is byte-identical to the start of `whole`, so keeping
- * `whole` keeps all of it. Reads only `candidate`'s length from `whole`.
- *
- * `expectedSize` is re-checked afterwards: a Claude run outside Orca appears in
- * no live-PTY registry, and bytes it appended mid-read must not be dropped.
- */
-function isPrefixOf(candidate: string, whole: string, expectedSize: number): boolean {
-  let handle: number | null = null
-  try {
-    if (expectedSize > MAX_REDUNDANCY_CHECK_BYTES) {
-      return false
-    }
-    const expected = readFileSync(candidate)
-    if (expected.length !== expectedSize) {
-      return false
-    }
-    if (expected.length === 0) {
-      return true
-    }
-    const head = Buffer.alloc(expected.length)
-    handle = openSync(whole, 'r')
-    const matches =
-      readSync(handle, head, 0, expected.length, 0) === expected.length && head.equals(expected)
-    return matches && statSync(candidate).size === expectedSize
-  } catch {
-    return false
-  } finally {
-    if (handle !== null) {
-      closeSync(handle)
-    }
-  }
 }
 
 /**
