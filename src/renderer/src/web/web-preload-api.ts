@@ -2592,6 +2592,9 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onRequestTerminalCreate: () => noopUnsubscribe,
     onRequestTerminalTabMount: () => noopUnsubscribe,
     replyTerminalCreate: () => {},
+    // Why: the web client has no renderer-backed tab-create handshake to fail, so the failure
+    // reply is a no-op here just like its success sibling above.
+    replyTerminalCreateFailure: () => {},
     onSplitTerminal: () => noopUnsubscribe,
     onRenameTerminal: () => noopUnsubscribe,
     onFocusTerminal: () => noopUnsubscribe,

@@ -3290,6 +3290,11 @@ export type PreloadApi = {
       title?: string
       error?: string
     }) => void
+    replyTerminalCreateFailure: (failure: {
+      requestId: string
+      tabId: string
+      error: string
+    }) => void
     onSplitTerminal: (
       callback: (data: {
         tabId: string

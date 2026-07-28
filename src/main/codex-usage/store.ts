@@ -33,6 +33,12 @@ type CodexModelPricing = {
   input: number
   cachedInput: number
   output: number
+  longContext?: {
+    threshold: number
+    input: number
+    cachedInput: number
+    output: number
+  }
   inputTiers?: TieredPrice[]
   cachedInputTiers?: TieredPrice[]
   outputTiers?: TieredPrice[]
@@ -95,25 +101,34 @@ const MODEL_PRICING: Record<string, CodexModelPricing> = {
     input: 5,
     cachedInput: 0.5,
     output: 30,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 10 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 1 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 45 }]
+    longContext: {
+      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
+      input: 10,
+      cachedInput: 1,
+      output: 45
+    }
   },
   'gpt-5.6-terra': {
     input: 2.5,
     cachedInput: 0.25,
     output: 15,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 5 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 0.5 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 22.5 }]
+    longContext: {
+      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
+      input: 5,
+      cachedInput: 0.5,
+      output: 22.5
+    }
   },
   'gpt-5.6-luna': {
     input: 1,
     cachedInput: 0.1,
     output: 6,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 2 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 0.2 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 9 }]
+    longContext: {
+      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
+      input: 2,
+      cachedInput: 0.2,
+      output: 9
+    }
   }
 }
 
@@ -270,6 +285,23 @@ function normalizeModelForPricing(model: string | null): string | null {
   return null
 }
 
+// Why: unpriced models are excluded from totals, so report each silent gap once.
+const unpricedModelsReported = new Set<string>()
+
+function reportUnpricedModel(model: string | null): void {
+  if (!model) {
+    return
+  }
+  const key = model.toLowerCase().trim()
+  if (unpricedModelsReported.has(key)) {
+    return
+  }
+  unpricedModelsReported.add(key)
+  console.error(
+    `[codex-usage] No pricing entry for model "${model}"; its cost is excluded from the breakdown.`
+  )
+}
+
 function calculateTieredCost(tokens: number, basePrice: number, tiers: TieredPrice[] = []): number {
   let cost = 0
   let lowerBound = 0
@@ -293,18 +325,33 @@ function estimateCostUsd(
 ): number | null {
   const normalized = normalizeModelForPricing(model)
   if (!normalized) {
+    reportUnpricedModel(model)
     return null
   }
   const pricing = MODEL_PRICING[normalized]
+  const longContext =
+    pricing.longContext && inputTokens > pricing.longContext.threshold ? pricing.longContext : null
   const clampedCached = Math.min(cachedInputTokens, inputTokens)
   // Why: Codex cached tokens are part of the input bucket. Charge uncached
   // input on (input-cached) so cached tokens are not billed once at full input
   // price and again at cache-read price.
   const nonCachedInputTokens = Math.max(inputTokens - clampedCached, 0)
   return (
-    (calculateTieredCost(nonCachedInputTokens, pricing.input, pricing.inputTiers) +
-      calculateTieredCost(clampedCached, pricing.cachedInput, pricing.cachedInputTiers) +
-      calculateTieredCost(outputTokens, pricing.output, pricing.outputTiers)) /
+    (calculateTieredCost(
+      nonCachedInputTokens,
+      longContext?.input ?? pricing.input,
+      pricing.inputTiers
+    ) +
+      calculateTieredCost(
+        clampedCached,
+        longContext?.cachedInput ?? pricing.cachedInput,
+        pricing.cachedInputTiers
+      ) +
+      calculateTieredCost(
+        outputTokens,
+        longContext?.output ?? pricing.output,
+        pricing.outputTiers
+      )) /
     1_000_000
   )
 }
@@ -654,7 +701,7 @@ export class CodexUsageStore {
 
     for (const row of rows.values()) {
       row.estimatedCostUsd = estimateCostUsd(
-        kind === 'model' ? row.key : null,
+        kind === 'model' && row.label !== 'Unknown model' ? row.key : null,
         row.inputTokens,
         row.cachedInputTokens,
         row.outputTokens

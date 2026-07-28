@@ -3898,6 +3898,13 @@ const api = {
     }): void => {
       ipcRenderer.send('terminal:tabCreateReply', reply)
     },
+    replyTerminalCreateFailure: (failure: {
+      requestId: string
+      tabId: string
+      error: string
+    }): void => {
+      ipcRenderer.send('terminal:tabCreateFailure', failure)
+    },
     onSplitTerminal: (
       callback: (data: {
         tabId: string

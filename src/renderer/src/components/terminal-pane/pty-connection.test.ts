@@ -210,6 +210,7 @@ type StoreState = {
   markTerminalTabUnread: ReturnType<typeof vi.fn>
   markTerminalPaneUnread: ReturnType<typeof vi.fn>
   markAgentCompletionPaneUnread: ReturnType<typeof vi.fn>
+  closeTab: ReturnType<typeof vi.fn>
 }
 
 type WindowsShiftEnterPaneState = Parameters<typeof resolveWindowsShiftEnterEncodingForPane>[0]
@@ -865,7 +866,8 @@ describe('connectPanePty', () => {
       }),
       markTerminalTabUnread: vi.fn(),
       markTerminalPaneUnread: vi.fn(),
-      markAgentCompletionPaneUnread: vi.fn()
+      markAgentCompletionPaneUnread: vi.fn(),
+      closeTab: vi.fn()
     } as StoreState
     ;(globalThis as unknown as { window: unknown }).window = {
       api: {
@@ -909,6 +911,9 @@ describe('connectPanePty', () => {
         },
         agentStatus: {
           inferInterrupt: vi.fn().mockResolvedValue(false)
+        },
+        ui: {
+          replyTerminalCreateFailure: vi.fn()
         }
       },
       dispatchEvent: vi.fn(),
@@ -1008,6 +1013,35 @@ describe('connectPanePty', () => {
       pane.id,
       expect.stringContaining('Terminal has zero dimensions (0×0)')
     )
+  })
+
+  it('reports renderer-backed create failures and closes the unbound tab', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { registerRendererBackedTerminalCreate } =
+      await import('./renderer-backed-terminal-create')
+    const message = 'managed Claude account is already in use'
+    const transport = createMockTransport()
+    transport.connect.mockImplementation(async (options: { callbacks?: ConnectCallbacks }) => {
+      options.callbacks?.onError?.(message)
+      throw new Error(message)
+    })
+    transportFactoryQueue.push(transport)
+    registerRendererBackedTerminalCreate('tab-create-failed', 'request-1')
+    const deps = createDeps({ tabId: 'tab-create-failed' })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks()
+
+    expect(window.api.ui.replyTerminalCreateFailure).toHaveBeenCalledWith({
+      requestId: 'request-1',
+      tabId: 'tab-create-failed',
+      error: message
+    })
+    expect(mockStoreState.closeTab).toHaveBeenCalledWith('tab-create-failed', {
+      reason: 'cleanup',
+      captureRecentlyClosed: false
+    })
+    expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
   })
 
   // Why: a late exit from a replaced PTY skips onExit's kitty reset, so a fresh spawn must reset the reused per-pane tracker itself or restart-in-place leaks old kitty flags.

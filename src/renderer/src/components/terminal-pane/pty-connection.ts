@@ -212,6 +212,10 @@ import {
 } from './terminal-startup-grid-settle'
 import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
 import { resolveTerminalPasteRuntime } from './terminal-paste-runtime'
+import {
+  completeRendererBackedTerminalCreate,
+  failRendererBackedTerminalCreate
+} from './renderer-backed-terminal-create'
 import { isKnownTuiAgentTerminalStartupCommand } from './terminal-startup-command-classifier'
 import { createCommandCodeOutputStatusDetector } from '../../../../shared/command-code-output-status'
 import type { PtyDataMeta } from './pty-dispatcher'
@@ -4270,6 +4274,17 @@ export function connectPanePty(
       if (disposed) {
         return
       }
+      if (
+        failRendererBackedTerminalCreate(deps.tabId, message, {
+          reply: (failure) => window.api.ui.replyTerminalCreateFailure(failure),
+          closeTab: (tabId) =>
+            useAppStore
+              .getState()
+              .closeTab(tabId, { reason: 'cleanup', captureRecentlyClosed: false })
+        })
+      ) {
+        return
+      }
       if (isWorktreeRemovalFenceError(message)) {
         // Why: main fences a spawn/reattach whose worktree (or an overlapping
         // parent/child root) is being deleted. That is expected teardown, not a
@@ -4919,6 +4934,7 @@ export function connectPanePty(
             })
           }
           if (resolvedPtyId) {
+            completeRendererBackedTerminalCreate(deps.tabId)
             if (
               spawnedPtyId &&
               typeof spawnedPtyId === 'object' &&
