@@ -1,5 +1,8 @@
 /* eslint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+// Why: the fork publishes its own feed; binding the expectation to the constant keeps upstream
+// merges from reintroducing stablyai URLs here.
+import { UPDATE_FEED_LATEST_DOWNLOAD_URL } from './update-feed-target'
 
 const {
   appMock,
@@ -312,7 +315,7 @@ describe('updater', () => {
       expect(autoUpdaterMock.disableDifferentialDownload).toBe(false)
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -355,7 +358,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -395,7 +398,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )

@@ -1,6 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
+// Why: a managed agent pane exports these, and the ask payload carries them, so an ambient value
+// makes an exact-payload assertion pass or fail depending on who runs the suite.
+const originalTerminalHandle = process.env.ORCA_TERMINAL_HANDLE
+const originalPaneKey = process.env.ORCA_PANE_KEY
+const originalLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
 
 vi.mock('../format', () => ({ printResult: vi.fn() }))
 vi.mock('../selectors', () => ({ getTerminalHandle: vi.fn() }))
@@ -21,6 +26,21 @@ describe('orchestration timeout flag validation', () => {
     callMock.mockReset()
     delete process.env.ORCA_TERMINAL_HANDLE
     delete process.env.ORCA_PANE_KEY
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+  })
+
+  afterEach(() => {
+    for (const [name, value] of [
+      ['ORCA_TERMINAL_HANDLE', originalTerminalHandle],
+      ['ORCA_PANE_KEY', originalPaneKey],
+      ['ORCA_AGENT_LAUNCH_TOKEN', originalLaunchToken]
+    ] as const) {
+      if (value === undefined) {
+        delete process.env[name]
+      } else {
+        process.env[name] = value
+      }
+    }
   })
 
   const invokeCheck = (flags: Map<string, string | boolean>) =>
@@ -226,5 +246,28 @@ describe('orchestration timeout flag validation', () => {
       )
     ).rejects.toMatchObject({ code: 'invalid_argument' })
     expect(callMock).not.toHaveBeenCalled()
+  })
+
+  // Why: lab-only case kept when this file superseded orchestration-timeout.test.ts — an omitted
+  // --timeout-ms must stay out of the payload instead of being sent as a default.
+  it('keeps an omitted ask timeout out of the payload while using default headroom', async () => {
+    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    callMock.mockResolvedValue({
+      result: { answer: 'yes', messageId: 'msg_1', threadId: 'thread_1', timedOut: false }
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await invokeAsk(
+      new Map<string, string | boolean>([
+        ['to', 'term_coord'],
+        ['question', 'Proceed?']
+      ])
+    )
+
+    expect(callMock).toHaveBeenCalledWith(
+      'orchestration.ask',
+      expect.objectContaining({ timeoutMs: undefined }),
+      { timeoutMs: 605_000 }
+    )
   })
 })

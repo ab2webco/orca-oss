@@ -42,7 +42,9 @@ describe('orchestration RPC methods', () => {
           }
         }
         const handle = claimedHandle ?? 'unknown'
-        return { handle, paneKey: paneKey ?? runtime.getTerminalPaneKey(handle) ?? undefined }
+        // Why: mirrors the real contract — the runtime's observation of the pane outranks the
+        // caller's claim, which is only the last resort when the runtime cannot resolve it.
+        return { handle, paneKey: runtime.getTerminalPaneKey(handle) ?? paneKey ?? undefined }
       }
     )
     vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
@@ -409,7 +411,10 @@ describe('orchestration RPC methods', () => {
         to: 'term_coord',
         subject: 'Done',
         type: 'worker_done',
-        payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id })
+        // Why: `outcome` is upstream's new lifecycle requirement for every worker_done, orthogonal
+        // to identity. Nothing else in this case may change — it guards that a sender with no
+        // stable pane identity still completes its own dispatch.
+        payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
       })
 
       expect(db.getTask(task.id)?.status).toBe('completed')
@@ -2002,6 +2007,11 @@ describe('orchestration RPC methods', () => {
     it('still injects when the target pane reports no interactive prompt', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
+      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
+      // target needs an observable pane like any real dispatch assignee.
+      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
+        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
       vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
       vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
       const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
@@ -2023,6 +2033,11 @@ describe('orchestration RPC methods', () => {
     it('does not block dispatch when the pane is unreachable', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
+      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
+      // target needs an observable pane like any real dispatch assignee.
+      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
+        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
       vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
       // A gone/exited/stale pane is not evidence of a prompt, so the send path keeps surfacing its
       // own precise error instead of a misleading "blocked on a prompt" one.

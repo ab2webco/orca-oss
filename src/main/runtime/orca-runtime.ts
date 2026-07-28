@@ -13906,7 +13906,9 @@ export class OrcaRuntimeService {
       args.claimedHandle ??
       (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null) ??
       'unknown'
-    return { handle, paneKey: args.paneKey ?? this.getTerminalPaneKey(handle) ?? undefined }
+    // Why: what the runtime observes about the pane outranks what the caller claims about it — a
+    // claim is only the last resort, for panes the runtime cannot resolve at all.
+    return { handle, paneKey: this.getTerminalPaneKey(handle) ?? args.paneKey ?? undefined }
   }
 
   getTerminalProcessIncarnation(handle: string): string | null {

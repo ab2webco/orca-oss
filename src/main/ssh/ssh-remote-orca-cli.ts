@@ -183,8 +183,10 @@ async function dispatchRemoteCli(
           threadId: optionalRemoteCliString(parsed.flags, 'thread-id'),
           payload: getRemoteOrchestrationPayload(parsed.flags),
           // Why: the legacy in-process bridge must preserve the same pane
-           // authority as the full host CLI passthrough.
-          senderPaneKey: env.ORCA_PANE_KEY || undefined,
+          // authority as the full host CLI passthrough.
+          // Why: a remote shell's ORCA_PANE_KEY is an unverifiable claim — the runtime cannot match
+          // it to a local PTY record, and pane keys carry lifecycle ownership. The launch token
+          // stays because it IS checkable against that record.
           senderLaunchToken: env.ORCA_AGENT_LAUNCH_TOKEN || undefined
         },
         {
@@ -208,7 +210,7 @@ async function dispatchRemoteCli(
         id: requiredRemoteCliString(parsed.flags, 'id'),
         body: requiredRemoteCliString(parsed.flags, 'body'),
         from: resolveRemoteCliHandle(parsed.flags, env, 'from'),
-        senderPaneKey: env.ORCA_PANE_KEY || undefined,
+        // Why: see above — a remote pane key is a claim the runtime cannot verify.
         senderLaunchToken: env.ORCA_AGENT_LAUNCH_TOKEN || undefined
       })
     case 'orchestration inbox':

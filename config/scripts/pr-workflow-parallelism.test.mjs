@@ -165,7 +165,10 @@ describe('PR workflow parallelism', () => {
       'git_compatibility',
       'shell_contracts',
       'test',
-      'package'
+      'package',
+      // Why: the lab added Windows CI (nothing ran there before), so verify aggregates one more
+      // job than upstream's workflow does.
+      'verify-windows'
     ])
   })
 })

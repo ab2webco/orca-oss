@@ -295,7 +295,11 @@ describe('SidebarSettingsHelpMenu', () => {
 
     // Why: Alt is the only in-app route to a lab RC, which ordinary checks exclude by tag shape.
     await act(async () => {
-      checkButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, altKey: true }))
+      checkButton.dispatchEvent(
+        // Why: the lab RC channel moved to Alt+Shift so upstream keeps plain Alt for choosing a
+        // local macOS build; plain Alt here would assert the wrong channel.
+        new MouseEvent('pointerdown', { bubbles: true, altKey: true, shiftKey: true })
+      )
       checkButton.click()
     })
 
