@@ -257,6 +257,36 @@ describe('incremental terminal history restore', () => {
     expect(restore!.scrollbackAnsi).toContain('after relaunch')
   })
 
+  // Why: replay yields on elapsed time, so a saturated machine needs more turns than a fixed count.
+  // Resuming exactly one stubbed setImmediate deadlocks the await against a yield nobody resumes —
+  // which is why these cases only ever failed under full-suite load. Drain until it settles, and
+  // keep asserting the admission bound while draining so the concurrency guarantee is not lost.
+  async function drainYieldsUntilSettled<T>(
+    work: Promise<T>,
+    pendingYields: (() => void)[],
+    maxConcurrentYields = 1
+  ): Promise<T> {
+    let settled = false
+    const tracked = work.then(
+      (value) => {
+        settled = true
+        return value
+      },
+      (error: unknown) => {
+        settled = true
+        throw error
+      }
+    )
+    while (!settled) {
+      expect(pendingYields.length).toBeLessThanOrEqual(maxConcurrentYields)
+      pendingYields.shift()?.()
+      await new Promise<void>((resolve) => {
+        process.nextTick(resolve)
+      })
+    }
+    return tracked
+  }
+
   it('bounds large single-batch replay slices and admits only one replay at a time', async () => {
     const secondSessionId = `${SESSION_ID}-second`
     await manager.openSession(secondSessionId, { cwd: '/home/user', cols: 80, rows: 24 })
@@ -278,14 +308,16 @@ describe('incremental terminal history restore', () => {
     const firstReplay = reader.detectColdRestore(SESSION_ID)
     const secondReplay = reader.detectColdRestore(secondSessionId)
     try {
-      await vi.waitFor(() => expect(pendingYields).toHaveLength(1))
+      await vi.waitFor(() => expect(pendingYields.length).toBeGreaterThanOrEqual(1))
 
-      pendingYields.shift()!()
-      expect((await firstReplay)?.scrollbackAnsi).toContain('😀second')
-      await vi.waitFor(() => expect(pendingYields).toHaveLength(1))
+      expect((await drainYieldsUntilSettled(firstReplay, pendingYields))?.scrollbackAnsi).toContain(
+        '😀second'
+      )
+      await vi.waitFor(() => expect(pendingYields.length).toBeGreaterThanOrEqual(1))
 
-      pendingYields.shift()!()
-      expect((await secondReplay)?.scrollbackAnsi).toContain('😀second')
+      expect(
+        (await drainYieldsUntilSettled(secondReplay, pendingYields))?.scrollbackAnsi
+      ).toContain('😀second')
       expect(pendingYields).toHaveLength(0)
     } finally {
       for (const resume of pendingYields.splice(0)) {
@@ -321,9 +353,8 @@ describe('incremental terminal history restore', () => {
       expect(checkpointOnlyRestore?.scrollbackAnsi).toContain('checkpoint only')
       expect(pendingYields).toHaveLength(1)
     } finally {
-      pendingYields.shift()?.()
+      await drainYieldsUntilSettled(replay, pendingYields)
       immediateSpy.mockRestore()
-      await replay
     }
   })
 })
