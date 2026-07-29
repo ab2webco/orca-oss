@@ -3012,7 +3012,7 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     writeAccepted: () => Promise.resolve(false),
     beginClaudeAccountSwitch: () => Promise.resolve({ ok: false, reason: 'unhealthy' }),
     commitClaudeAccountSwitch: () => Promise.resolve(false),
-    cancelClaudeAccountSwitch: () => Promise.resolve(),
+    abortClaudeAccountSwitch: () => Promise.resolve({ ok: false, reason: 'prepare-failed' }),
     resize: () => {},
     claimViewport: () => {},
     reportGeometry: () => {},

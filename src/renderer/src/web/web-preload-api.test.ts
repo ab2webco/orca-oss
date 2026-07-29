@@ -245,8 +245,14 @@ describe('web PTY account switching', () => {
       })
     ).resolves.toBe(false)
     await expect(
-      api.pty.cancelClaudeAccountSwitch({ reservationId: 'reservation-1' })
-    ).resolves.toBeUndefined()
+      api.pty.abortClaudeAccountSwitch({
+        ptyId: 'pty-1',
+        sourceAccountId: 'account-a',
+        reservationId: 'reservation-1',
+        runtime: 'host',
+        wslDistro: null
+      })
+    ).resolves.toEqual({ ok: false, reason: 'prepare-failed' })
   })
 })
 

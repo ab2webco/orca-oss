@@ -699,7 +699,9 @@
         "preparationFailed": "Could not prepare the selected account for this terminal.",
         "resumeInputFailed": "The terminal did not accept the resume command after switching accounts.",
         "resumeTimedOut": "The resumed agent did not take over the terminal in time.",
-        "accountingFailed": "The resumed terminal could not be assigned to the selected account."
+        "accountingFailed": "The resumed terminal could not be assigned to the selected account.",
+        "restoredOnOrigin": "Orca resumed the session on the original account.",
+        "restoreFailed": "Orca could not bring the session back; resume it from this terminal."
       },
       "plane": {
         "usage": {

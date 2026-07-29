@@ -28,6 +28,7 @@ import {
   type CopyClaudeSessionForFailBackArgs,
   type CopyClaudeSessionForFailoverArgs
 } from '../claude-accounts/session-failover'
+import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
 import { reportManagedClaudeRefreshChainAliases } from '../claude-accounts/claude-refresh-chain-alias-registry'
 
@@ -141,7 +142,8 @@ export function registerClaudeAccountHandlers(
     (_event, args: CopyClaudeSessionForFailoverArgs) =>
       copyClaudeSessionForFailover(args, {
         getAccounts: () => store.getSettings().claudeManagedAccounts,
-        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir,
+        getSharedTranscriptsRoot: getSharedClaudeTranscriptsRoot
       })
   )
   ipcMain.handle(
@@ -149,7 +151,8 @@ export function registerClaudeAccountHandlers(
     (_event, args: CopyClaudeSessionForFailBackArgs) =>
       copyClaudeSessionForFailBack(args, {
         getAccounts: () => store.getSettings().claudeManagedAccounts,
-        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir,
+        getSharedTranscriptsRoot: getSharedClaudeTranscriptsRoot
       })
   )
   ipcMain.handle(
@@ -157,7 +160,8 @@ export function registerClaudeAccountHandlers(
     (_event, args: CopyClaudeSessionForAccountSwitchArgs) =>
       copyClaudeSessionForAccountSwitch(args, {
         getAccounts: () => store.getSettings().claudeManagedAccounts,
-        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+        getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir,
+        getSharedTranscriptsRoot: getSharedClaudeTranscriptsRoot
       })
   )
 }

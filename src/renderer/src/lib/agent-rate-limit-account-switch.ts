@@ -16,7 +16,8 @@ import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { buildAgentResumeStartupPlan, type AgentStartupPlan } from '@/lib/tui-agent-startup'
-import { stopForegroundAgent } from '@/lib/agent-rate-limit-terminal-control'
+import { stopForegroundAgent, waitForResumedAgent } from '@/lib/agent-rate-limit-terminal-control'
+import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
 import { deliverLaunchPromptToAgentTab } from '@/lib/agent-launch-prompt-delivery'
 import { appendTabToWorktreeOrder } from '@/lib/sleeping-agent-session-launch'
 import {
@@ -48,6 +49,48 @@ function accountsShareRuntime(
     sourceRuntime === targetRuntime &&
     (sourceRuntime === 'host' || source.wslDistro?.trim() === target.wslDistro?.trim())
   )
+}
+
+/**
+ * Puts the original agent back in the same PTY after a failure that follows the stop.
+ *
+ * Why this is possible: at this point only the CLI process is gone. The PTY still
+ * carries the source account's injected CLAUDE_CONFIG_DIR and main still holds its
+ * live binding — nothing is released until beginClaudeAccountSwitch — so re-running
+ * the very resume command the switch was going to use lands the user back exactly
+ * where they were instead of on a bare shell with the conversation stranded.
+ */
+function describeRestoreOutcome(restored: boolean): string {
+  return restored
+    ? translate(
+        'auto.lib.agentRateLimitAccountSwitch.restoredOnOrigin',
+        'Orca resumed the session on the original account.'
+      )
+    : translate(
+        'auto.lib.agentRateLimitAccountSwitch.restoreFailed',
+        'Orca could not bring the session back; resume it from this terminal.'
+      )
+}
+
+async function restoreStoppedAgentOnSourceAccount(args: {
+  settings: GlobalSettings | null
+  ptyId: string
+  resumePlan: AgentStartupPlan
+}): Promise<boolean> {
+  const sent = await sendRuntimePtyInputVerified(
+    args.settings,
+    args.ptyId,
+    `${args.resumePlan.launchCommand}\r`
+  ).catch(() => false)
+  if (!sent) {
+    return false
+  }
+  return waitForResumedAgent({
+    settings: args.settings,
+    ptyId: args.ptyId,
+    agent: 'claude',
+    expectedProcess: args.resumePlan.expectedProcess
+  }).catch(() => false)
 }
 
 /**
@@ -140,6 +183,30 @@ export async function runManagedAccountSwitchRelaunch(args: {
     }
   }
 
+  /**
+   * Ends a switch that already stopped the agent, putting that agent back first.
+   *
+   * Why: the stop happens before anything else is known to work, so an abort after
+   * it used to leave the terminal sitting at a shell prompt with the conversation
+   * lost — the reported symptom. The pin stays on the source account here, since a
+   * restored source-account CLI under a target-account pin would make the fail-back
+   * watcher describe a switch that never happened.
+   */
+  const abortAfterStop = async (
+    reason: 'resume-failed' | 'pin-failed',
+    message: string
+  ): Promise<AgentRateLimitAccountSwitchResult> => {
+    if (!canAttemptInPlace) {
+      return { ok: false, reason, message }
+    }
+    const restored = await restoreStoppedAgentOnSourceAccount({
+      settings: args.settings,
+      ptyId: args.ptyId,
+      resumePlan
+    })
+    return { ok: false, reason, message: `${message} ${describeRestoreOutcome(restored)}` }
+  }
+
   // Why: a missing worktree path just means the transcript cannot be located; the switch still proceeds fresh.
   const worktreePath = useAppStore.getState().getKnownWorktreeById(args.worktreeId)?.path ?? null
   let copyResult: ClaudeSessionFailoverCopyResult = { ok: false, reason: 'copy-failed' }
@@ -156,6 +223,19 @@ export async function runManagedAccountSwitchRelaunch(args: {
     }
   }
 
+  // Why before the pin: without the transcript the destination has nothing to resume,
+  // so the switch is over — and the worktree must not be left pinned to an account
+  // that never received the session.
+  if (!copyResult.ok) {
+    return abortAfterStop(
+      'resume-failed',
+      translate(
+        'auto.lib.agentRateLimitAccountSwitch.copyFailed',
+        'Could not copy the session transcript into the selected account.'
+      )
+    )
+  }
+
   try {
     // Why: the origin + reset markers let the fail-back watcher offer the return
     // trip once the origin account recovers quota — managed→managed fail-back
@@ -170,26 +250,14 @@ export async function runManagedAccountSwitchRelaunch(args: {
       })
     })
   } catch (error) {
-    return {
-      ok: false,
-      reason: 'pin-failed',
-      message: translate(
+    return abortAfterStop(
+      'pin-failed',
+      translate(
         'auto.lib.agentRateLimitAccountSwitch.pinFailed',
         'Could not assign the selected account to this worktree: {{value0}}',
         { value0: error instanceof Error ? error.message : String(error) }
       )
-    }
-  }
-
-  if (!copyResult.ok) {
-    return {
-      ok: false,
-      reason: 'resume-failed',
-      message: translate(
-        'auto.lib.agentRateLimitAccountSwitch.copyFailed',
-        'Could not copy the session transcript into the selected account.'
-      )
-    }
+    )
   }
 
   if (canAttemptInPlace) {
@@ -203,10 +271,13 @@ export async function runManagedAccountSwitchRelaunch(args: {
       return { ok: true, accountLabel, switched: inPlace.switched }
     }
     if (inPlace.reason !== 'unhealthy') {
+      // Why the abort reports this instead of retrying here: past begin, the PTY's
+      // binding and its exported config dir both belong to the transition, so only
+      // that path can hand them back to the source account.
       return {
         ok: false,
         reason: 'resume-failed',
-        message: inPlace.message
+        message: `${inPlace.message} ${describeRestoreOutcome(inPlace.restored === true)}`
       }
     }
   }

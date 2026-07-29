@@ -56,6 +56,18 @@ function createManagedUniverse(accountId: string): string {
   return authPath
 }
 
+/** Mirrors getSharedClaudeTranscriptsRoot(): the one store a universe's `projects/` may link to. */
+function sharedTranscriptsRoot(): string {
+  return join(testRoot, 'claude-transcripts', 'projects')
+}
+
+/** A universe whose `projects/` is a link into the shared store, as ORCA-97 leaves every vault. */
+function linkProjectsToSharedStore(configDir: string): void {
+  mkdirSync(sharedTranscriptsRoot(), { recursive: true })
+  mkdirSync(configDir, { recursive: true })
+  symlinkSync(sharedTranscriptsRoot(), join(configDir, 'projects'), 'dir')
+}
+
 function createSharedConfigDir(): string {
   const sharedDir = join(testRoot, 'shared-claude')
   mkdirSync(sharedDir, { recursive: true })
@@ -89,7 +101,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -123,7 +139,11 @@ describe('copyClaudeSessionForFailover', () => {
         targetAccountId: target.id,
         sourceAccountId: source.id
       },
-      { getAccounts: () => [target, source], getSharedConfigDir: () => '/nonexistent' }
+      {
+        getAccounts: () => [target, source],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -137,7 +157,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -165,7 +189,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'source-not-found' })
@@ -179,7 +207,11 @@ describe('copyClaudeSessionForFailover', () => {
     for (const sessionId of ['../escape', 'a/../b', 'a/b', 'a\\b', '', '-leading-dash', 'a..b']) {
       const result = copyClaudeSessionForFailover(
         { sessionId, cwd: CWD, targetAccountId: target.id },
-        { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+        {
+          getAccounts: () => [target],
+          getSharedConfigDir: () => sharedDir,
+          getSharedTranscriptsRoot: sharedTranscriptsRoot
+        }
       )
       expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
     }
@@ -198,7 +230,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'source-not-found' })
@@ -212,7 +248,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'target-account-not-found' })
@@ -229,7 +269,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'target-dir-unresolved' })
@@ -241,7 +285,11 @@ describe('copyClaudeSessionForFailover', () => {
 
     const result = copyClaudeSessionForFailover(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => join(testRoot, 'missing') }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => join(testRoot, 'missing'),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'source-dir-unresolved' })
@@ -267,7 +315,11 @@ describe('copyClaudeSessionForFailBack', () => {
 
     const result = copyClaudeSessionForFailBack(
       { sessionId: SESSION_ID, cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: origin.id },
-      { getAccounts: () => [endpoint, origin], getSharedConfigDir: () => createSharedConfigDir() }
+      {
+        getAccounts: () => [endpoint, origin],
+        getSharedConfigDir: () => createSharedConfigDir(),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -295,7 +347,11 @@ describe('copyClaudeSessionForFailBack', () => {
 
     const result = copyClaudeSessionForFailBack(
       { sessionId: SESSION_ID, cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: null },
-      { getAccounts: () => [endpoint], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [endpoint],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -319,7 +375,8 @@ describe('copyClaudeSessionForFailBack', () => {
       },
       {
         getAccounts: () => [oauthSource, origin],
-        getSharedConfigDir: () => createSharedConfigDir()
+        getSharedConfigDir: () => createSharedConfigDir(),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
       }
     )
 
@@ -342,7 +399,8 @@ describe('copyClaudeSessionForFailBack', () => {
       },
       {
         getAccounts: () => [endpoint, otherEndpoint],
-        getSharedConfigDir: () => createSharedConfigDir()
+        getSharedConfigDir: () => createSharedConfigDir(),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
       }
     )
 
@@ -355,7 +413,11 @@ describe('copyClaudeSessionForFailBack', () => {
 
     const result = copyClaudeSessionForFailBack(
       { sessionId: '../escape', cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: null },
-      { getAccounts: () => [endpoint], getSharedConfigDir: () => createSharedConfigDir() }
+      {
+        getAccounts: () => [endpoint],
+        getSharedConfigDir: () => createSharedConfigDir(),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
@@ -381,7 +443,11 @@ describe('copyClaudeSessionForAccountSwitch', () => {
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
-      { getAccounts: () => [source, target], getSharedConfigDir: () => '/nonexistent' }
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -408,7 +474,11 @@ describe('copyClaudeSessionForAccountSwitch', () => {
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
@@ -423,7 +493,11 @@ describe('copyClaudeSessionForAccountSwitch', () => {
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
-      { getAccounts: () => [source, target], getSharedConfigDir: () => '/nonexistent' }
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'target-account-not-found' })
@@ -435,7 +509,11 @@ describe('copyClaudeSessionForAccountSwitch', () => {
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: 'a/../b', cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => createSharedConfigDir() }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => createSharedConfigDir(),
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'invalid-session-id' })
@@ -454,7 +532,239 @@ describe('copyClaudeSessionForAccountSwitch', () => {
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
-      { getAccounts: () => [target], getSharedConfigDir: () => sharedDir }
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'source-not-found' })
+  })
+})
+
+/**
+ * ORCA-97 points every universe's `projects/` at one Orca-owned store, so on a real
+ * machine both sides of a switch are links, not directories. Every case above builds
+ * physical vaults, which is exactly why the copy could ship unable to read a linked one.
+ */
+describe('linked transcript stores', () => {
+  beforeEach(() => {
+    testRoot = mkdtempSync(join(tmpdir(), 'orca-session-linked-'))
+  })
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true })
+  })
+
+  function plantForeignProjectsLink(configDir: string, dirName: string): string {
+    const foreignRoot = join(testRoot, 'planted-store')
+    const projectDir = join(foreignRoot, dirName)
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(join(projectDir, `${SESSION_ID}.jsonl`), '{"type":"planted"}\n', 'utf-8')
+    mkdirSync(configDir, { recursive: true })
+    symlinkSync(foreignRoot, join(configDir, 'projects'), 'dir')
+    return projectDir
+  }
+
+  it('treats a switch between two linked vaults as done — the target already reads the transcript', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    const targetAuthPath = createManagedUniverse(target.id)
+    linkProjectsToSharedStore(sourceAuthPath)
+    linkProjectsToSharedStore(targetAuthPath)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(sourceAuthPath, encoded)
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 0 })
+    // Why byte-for-byte: source and target resolve to the same file, so a copy that
+    // still ran would open the transcript onto itself and truncate the conversation.
+    const stored = join(sharedTranscriptsRoot(), encoded, `${SESSION_ID}.jsonl`)
+    expect(readFileSync(stored, 'utf-8')).toBe('{"type":"summary"}\n')
+    expect(
+      readFileSync(join(targetAuthPath, 'projects', encoded, `${SESSION_ID}.jsonl`), 'utf-8')
+    ).toBe('{"type":"summary"}\n')
+  })
+
+  it('copies out of a linked source vault into a target that owns its projects dir', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    createManagedUniverse(target.id)
+    linkProjectsToSharedStore(sourceAuthPath)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    const projectDir = writeSessionFiles(sourceAuthPath, encoded)
+    // Why: the shared store parks superseded duplicates beside the winner, and they
+    // share the session-id prefix — retired bytes must not ride into a fresh vault.
+    writeFileSync(join(projectDir, `${SESSION_ID}.superseded`), '{"old":true}\n', 'utf-8')
+    writeFileSync(join(projectDir, `${SESSION_ID}.superseded-2`), '{"older":true}\n', 'utf-8')
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+    expect(
+      readFileSync(
+        join(
+          testRoot,
+          'claude-accounts',
+          target.id,
+          'auth',
+          'projects',
+          encoded,
+          `${SESSION_ID}.jsonl`
+        ),
+        'utf-8'
+      )
+    ).toBe('{"type":"summary"}\n')
+  })
+
+  it('copies into a linked target vault so the transcript lands in the shared store', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    const targetAuthPath = createManagedUniverse(target.id)
+    linkProjectsToSharedStore(targetAuthPath)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(sourceAuthPath, encoded)
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+    expect(
+      readFileSync(join(sharedTranscriptsRoot(), encoded, `${SESSION_ID}.jsonl`), 'utf-8')
+    ).toBe('{"type":"summary"}\n')
+  })
+
+  it('returns the fail-back trip through the same store without rewriting the transcript', () => {
+    const endpoint = makeAccount({ id: 'endpoint-account' })
+    const origin = makeAccount({ id: 'origin-account', authMethod: 'subscription-oauth' })
+    const endpointAuthPath = createManagedUniverse(endpoint.id)
+    const originAuthPath = createManagedUniverse(origin.id)
+    linkProjectsToSharedStore(endpointAuthPath)
+    linkProjectsToSharedStore(originAuthPath)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(endpointAuthPath, encoded)
+
+    const result = copyClaudeSessionForFailBack(
+      { sessionId: SESSION_ID, cwd: CWD, sourceAccountId: endpoint.id, targetAccountId: origin.id },
+      {
+        getAccounts: () => [endpoint, origin],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 0 })
+    expect(
+      readFileSync(join(sharedTranscriptsRoot(), encoded, `${SESSION_ID}.jsonl`), 'utf-8')
+    ).toBe('{"type":"summary"}\n')
+  })
+
+  it('reads a linked source universe for the endpoint failover copy too', () => {
+    const target = makeAccount({ id: 'endpoint-account' })
+    createManagedUniverse(target.id)
+    const sharedDir = createSharedConfigDir()
+    linkProjectsToSharedStore(sharedDir)
+    const encoded = encodeClaudeProjectDirName(CWD)
+    writeSessionFiles(sharedDir, encoded)
+
+    const result = copyClaudeSessionForFailover(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id },
+      {
+        getAccounts: () => [target],
+        getSharedConfigDir: () => sharedDir,
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
+  })
+
+  it('refuses a source projects link that points outside Orca’s store', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    createManagedUniverse(target.id)
+    mkdirSync(sharedTranscriptsRoot(), { recursive: true })
+    plantForeignProjectsLink(sourceAuthPath, encodeClaudeProjectDirName(CWD))
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'source-not-found' })
+  })
+
+  it('refuses a target projects link that points outside Orca’s store', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    const targetAuthPath = createManagedUniverse(target.id)
+    mkdirSync(sharedTranscriptsRoot(), { recursive: true })
+    writeSessionFiles(sourceAuthPath, encodeClaudeProjectDirName(CWD))
+    symlinkSync(join(testRoot, 'elsewhere-store'), join(targetAuthPath, 'projects'), 'dir')
+    mkdirSync(join(testRoot, 'elsewhere-store'), { recursive: true })
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'target-dir-unresolved' })
+  })
+
+  it('still refuses a transcript symlinked out of the shared store', () => {
+    const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
+    const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
+    const sourceAuthPath = createManagedUniverse(source.id)
+    createManagedUniverse(target.id)
+    linkProjectsToSharedStore(sourceAuthPath)
+    const projectDir = join(sharedTranscriptsRoot(), encodeClaudeProjectDirName(CWD))
+    mkdirSync(projectDir, { recursive: true })
+    const outsideFile = join(testRoot, 'secret.txt')
+    writeFileSync(outsideFile, 'secret', 'utf-8')
+    symlinkSync(outsideFile, join(projectDir, `${SESSION_ID}.jsonl`))
+
+    const result = copyClaudeSessionForAccountSwitch(
+      { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
+      {
+        getAccounts: () => [source, target],
+        getSharedConfigDir: () => '/nonexistent',
+        getSharedTranscriptsRoot: sharedTranscriptsRoot
+      }
     )
 
     expect(result).toEqual({ ok: false, reason: 'source-not-found' })
