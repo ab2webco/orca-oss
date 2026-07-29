@@ -9,6 +9,7 @@ import {
   injectedClaudeLaunchReservations,
   liveInjectedClaudePtyAccounts
 } from './live-pty-account-state'
+import { notifyClaudePtyReleased } from './live-pty-drain-listeners'
 import { clearClaudeLaunchReservationExpiry } from './claude-launch-reservation-lifetime'
 
 export type InjectedClaudePtyBindingPersistence = {
@@ -33,19 +34,24 @@ export function hasSeededUnconfirmedInjectedClaudePtys(): boolean {
   return seededUnconfirmedInjectedPtyIds.size > 0
 }
 
+/** Returns whether any phantom binding was released, so the caller can signal
+ *  work that waits on a universe quieting. */
 export function confirmSeededInjectedClaudePtyBindings(
   aliveSessionIds: ReadonlySet<string>,
   persistence: InjectedClaudePtyBindingPersistence | null
-): void {
+): boolean {
+  let releasedAny = false
   for (const sessionId of seededUnconfirmedInjectedPtyIds) {
     if (!aliveSessionIds.has(sessionId)) {
       liveInjectedClaudePtyAccounts.delete(sessionId)
       releaseLiveClaudePtyRefreshChain(sessionId)
       ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtyAccountBinding?.(sessionId)
+      releasedAny = true
     }
   }
   seededUnconfirmedInjectedPtyIds.clear()
+  return releasedAny
 }
 
 export function markInjectedClaudePtyBindingSpawned(
@@ -108,6 +114,7 @@ export function markInjectedClaudeCliBindingExited(
   // Why: invalidate a delayed provider-exit observation from the old ownership;
   // the destination commit records a fresh epoch for the same surviving PTY.
   ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
+  notifyClaudePtyReleased()
   return true
 }
 

@@ -54,6 +54,17 @@ function isSamePath(left: string, right: string): boolean {
 
 type LinkOutcome = 'already-linked' | 'linked' | 'migrated-and-linked' | 'skipped'
 
+type LiveTranscriptPathsProvider = () => readonly string[]
+
+/** Transcript paths some live CLI has open right now (the agent-hooks registry).
+ *  Empty until the app wires it — with no registry every same-name collision
+ *  falls back to the size rule below, exactly the pre-registry behavior. */
+let liveTranscriptPathsProvider: LiveTranscriptPathsProvider = () => []
+
+export function registerLiveTranscriptPathsProvider(provider: LiveTranscriptPathsProvider): void {
+  liveTranscriptPathsProvider = provider
+}
+
 /**
  * Point one Claude config dir's `projects/` at the shared store, moving any
  * transcripts it already owns into the store first. Idempotent and best-effort:
@@ -236,9 +247,43 @@ function resolveFileCollision(
     parkAside(sourcePath, targetPath, false)
     return true
   }
+  // Length yields to liveness: a CLI is mid-append on the store copy, and
+  // renaming it away splits that conversation on POSIX (the open fd follows the
+  // parked inode) and fails outright on Windows. The longer newcomer parks
+  // instead — recoverable, while the live side keeps its name and its fd.
+  if (isTranscript && isLiveTranscript(targetPath)) {
+    parkAside(sourcePath, targetPath, false)
+    return true
+  }
   parkAside(targetPath, targetPath, false)
   renameSync(sourcePath, targetPath)
   return true
+}
+
+/** Registry paths are spelled the way each live CLI opened them — usually
+ *  through its own universe's link — so matching resolves both spellings. */
+function isLiveTranscript(targetPath: string): boolean {
+  const livePaths = liveTranscriptPathsProvider()
+  if (livePaths.length === 0) {
+    return false
+  }
+  const canonicalTarget = canonicalPathOrNull(targetPath)
+  if (canonicalTarget === null) {
+    return false
+  }
+  return livePaths.some((livePath) => {
+    const canonicalLive = canonicalPathOrNull(livePath)
+    return canonicalLive !== null && isSamePath(canonicalLive, canonicalTarget)
+  })
+}
+
+/** A registry entry may already be gone — its session ended mid-migration. */
+function canonicalPathOrNull(path: string): string | null {
+  try {
+    return realpathSync(path)
+  } catch {
+    return null
+  }
 }
 
 /**

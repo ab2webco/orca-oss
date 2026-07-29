@@ -52,9 +52,11 @@ beforeEach(() => {
   appMock.userDataPath = userDataDir
 })
 
-afterEach(() => {
+afterEach(async () => {
   rmSync(userDataDir, { recursive: true, force: true })
   vi.restoreAllMocks()
+  const storeModule = await import('./shared-transcript-store')
+  storeModule.registerLiveTranscriptPathsProvider?.(() => [])
 })
 
 describe('linkClaudeTranscriptsToSharedStore', () => {
@@ -166,6 +168,31 @@ describe('linkClaudeTranscriptsToSharedStore', () => {
     linkClaudeTranscriptsToSharedStore(authFull)
 
     expect(readFileSync(sharedSession('shared-session'), 'utf-8')).toBe(full)
+  })
+
+  it('keeps a live store transcript in place even when a longer copy migrates in', async () => {
+    const { linkClaudeTranscriptsToSharedStore, registerLiveTranscriptPathsProvider } =
+      await import('./shared-transcript-store')
+    const liveBody = '{"m":"turn 1"}\n'
+    const staleLonger = '{"m":"turn 1"}\n{"m":"stale 2"}\n{"m":"stale 3"}\n'
+    const authLive = seedAccount('account-live', 'shared-session', liveBody)
+    linkClaudeTranscriptsToSharedStore(authLive)
+    // The registry reports the path the live CLI has open — spelled through its
+    // own universe's link, so matching must resolve it, not compare literally.
+    registerLiveTranscriptPathsProvider(() => [
+      join(authLive, 'projects', PROJECT_SLUG, 'shared-session.jsonl')
+    ])
+    const authStale = seedAccount('account-stale', 'shared-session', staleLonger)
+
+    expect(linkClaudeTranscriptsToSharedStore(authStale)).toBe('migrated-and-linked')
+
+    // Why the longer copy loses here: the store copy is mid-append by a live CLI;
+    // renaming it away splits that conversation (and fails outright on Windows).
+    // The longer copy is parked, never dropped, so it stays recoverable.
+    expect(readFileSync(sharedSession('shared-session'), 'utf-8')).toBe(liveBody)
+    expect(readFileSync(join(sharedProjectDir(), 'shared-session.superseded'), 'utf-8')).toBe(
+      staleLonger
+    )
   })
 
   it('parks even a duplicate the stored transcript already contains', async () => {

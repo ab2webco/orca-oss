@@ -168,6 +168,73 @@ describe('Claude live PTY gate', () => {
     expect(onDrained).not.toHaveBeenCalled()
   })
 
+  // Why a per-release signal exists next to the 1 -> 0 drain: per-universe work
+  // (the transcript link) retries when ONE universe quiets; on a fan-out machine
+  // the global transition may never happen while vaults still free up (ORCA-111).
+  it('notifies a release listener on every shared Claude PTY exit, not only the last', async () => {
+    const { onClaudePtyReleased } = await import('./live-pty-drain-listeners')
+    const released = vi.fn()
+    const unsubscribe = onClaudePtyReleased(released)
+    try {
+      markClaudePtySpawned('live-claude-pty')
+      markClaudePtySpawned('seeded-pty-1')
+
+      markClaudePtyExited('live-claude-pty')
+      expect(released).toHaveBeenCalledTimes(1)
+
+      markClaudePtyExited('seeded-pty-1')
+      expect(released).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('notifies a release listener when an injected Claude CLI exits its shell', async () => {
+    const { onClaudePtyReleased } = await import('./live-pty-drain-listeners')
+    const released = vi.fn()
+    const unsubscribe = onClaudePtyReleased(released)
+    try {
+      markInjectedClaudePtySpawned('injected-pty', 'account-a')
+      expect(released).not.toHaveBeenCalled()
+
+      markInjectedClaudeCliExited('injected-pty', 'account-a')
+      expect(released).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('notifies a release listener when seed reconciliation clears phantom PTYs', async () => {
+    const { onClaudePtyReleased } = await import('./live-pty-drain-listeners')
+    const released = vi.fn()
+    const unsubscribe = onClaudePtyReleased(released)
+    try {
+      seedLiveClaudePtysFromPersistence(['seeded-pty-1'])
+
+      confirmSeededClaudeLivePtys([])
+      expect(released).toHaveBeenCalledTimes(1)
+
+      // Reconciliation with nothing to clear frees no universe.
+      confirmSeededClaudeLivePtys([])
+      expect(released).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('does not notify a release listener for an exit of a PTY that was never live', async () => {
+    const { onClaudePtyReleased } = await import('./live-pty-drain-listeners')
+    const released = vi.fn()
+    const unsubscribe = onClaudePtyReleased(released)
+    try {
+      markClaudePtyExited('never-lived')
+
+      expect(released).not.toHaveBeenCalled()
+    } finally {
+      unsubscribe()
+    }
+  })
+
   it('persists spawns and exits when persistence is attached', () => {
     const addClaudeLivePtySessionId = vi.fn()
     const removeClaudeLivePtySessionId = vi.fn()
