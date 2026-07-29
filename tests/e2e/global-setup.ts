@@ -20,15 +20,48 @@ import { prepareDockerSshRelayImage } from './helpers/docker-ssh-relay-image'
 /** Temp file where the test repo path is stored for the fixture to read. */
 export const TEST_REPO_PATH_FILE = path.join(os.tmpdir(), 'orca-e2e-test-repo-path.txt')
 const ELECTRON_E2E_BUILD_TIMEOUT_MS = 300_000
+const CLI_E2E_BUILD_TIMEOUT_MS = 120_000
 const WEB_E2E_BUILD_TIMEOUT_MS = 300_000
 
 export default function globalSetup(): void {
   const root = process.cwd()
   const outMain = path.join(root, 'out', 'main', 'index.js')
+  const outCli = path.join(root, 'out', 'cli', 'index.js')
   const outWeb = path.join(root, 'out', 'web', 'web-index.html')
 
-  // ── 1. Build the Electron app ──────────────────────────────────────
-  if (process.env.SKIP_BUILD && existsSync(outMain)) {
+  // ── 1. Build the bundled CLI ───────────────────────────────────────
+  // Why the CLI first, and why it forces an Electron rebuild below:
+  // tsconfig.cli.json emits with rootDir ../src and outDir ../out, so tsc writes
+  // out/main/agent-hooks/managed-agent-hook-controls.js — the same path
+  // electron.vite.config.ts declares as a plain-Node entry (deliberately, so it
+  // survives electron-vite dev cleaning). tsc emits only that module's own
+  // exports, while the bundled out/main/index.js imports symbols the vite chunk
+  // re-exports through it, so tsc's copy shrinks that file from ~8700 lines to
+  // ~120 and every one of those imports resolves to undefined. The app then
+  // dies before its first window (getDefaultSettings: CLAUDE_STATUSLINE_ITEM_KEYS
+  // is not iterable) and firstWindow times out. `build:desktop` runs build:cli
+  // before build:electron-vite for exactly this reason.
+  // The invariant this encodes: electron-vite must be the LAST writer of out/main.
+  const cliBuildSkipped = Boolean(process.env.SKIP_BUILD) && existsSync(outCli)
+  if (cliBuildSkipped) {
+    console.error('[e2e] SKIP_BUILD set and out/cli/index.js exists — skipping CLI build')
+  } else {
+    console.error('[e2e] Building bundled CLI...')
+    execSync('pnpm run build:cli', {
+      cwd: root,
+      stdio: 'inherit',
+      timeout: CLI_E2E_BUILD_TIMEOUT_MS
+    })
+    console.error('[e2e] CLI build complete.')
+  }
+
+  // ── 2. Build the Electron app ──────────────────────────────────────
+  // Why `cliBuildSkipped` gates the skip too: a workflow that pre-builds only
+  // electron-vite and then runs with SKIP_BUILD=1 (golden-e2e-experiment.yml)
+  // still has no out/cli, so the CLI build above runs and clobbers out/main.
+  // Honouring SKIP_BUILD for the Electron build there would leave tsc as the
+  // last writer, which is the failure this ordering exists to prevent.
+  if (process.env.SKIP_BUILD && existsSync(outMain) && cliBuildSkipped) {
     console.error('[e2e] SKIP_BUILD set and out/main/index.js exists — skipping build')
   } else {
     // Why: --mode e2e is the build-time signal that exposes window.__store;
@@ -79,7 +112,7 @@ export default function globalSetup(): void {
     prepareDockerSshRelayImage(root)
   }
 
-  // ── 2. Create a seeded test git repo ───────────────────────────────
+  // ── 3. Create a seeded test git repo ───────────────────────────────
   // Why: each test run gets its own git repo so the suite is fully
   // idempotent. No test depends on whatever repos the user has open.
   // Why: realpathSync so the seeded path matches the store's repo.path on

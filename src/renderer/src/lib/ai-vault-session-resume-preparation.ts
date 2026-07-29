@@ -1,6 +1,7 @@
 import type { AiVaultSession } from '../../../shared/ai-vault-types'
 import {
   isLegacySharedCodexHome,
+  isPerAccountManagedCodexHome,
   type AiVaultClaudeResumeUniverse
 } from '../../../shared/ai-vault-resume-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
@@ -28,7 +29,7 @@ export async function prepareAiVaultSessionForResume(
     })
     return result.claudeUniverse ? { session, claudeUniverse: result.claudeUniverse } : { session }
   }
-  if (session.agent !== 'codex' || !isLegacySharedCodexHome(session.codexHome)) {
+  if (!aiVaultSessionNeedsResumePreparation(session)) {
     return { session }
   }
   const result = await window.api.aiVault.prepareSessionResume({
@@ -37,7 +38,30 @@ export async function prepareAiVaultSessionForResume(
     codexHome: session.codexHome,
     executionHostId: session.executionHostId
   })
-  return { session: result.useRealCodexHome ? { ...session, codexHome: null } : session }
+  if (result.useRealCodexHome) {
+    return { session: { ...session, codexHome: null } }
+  }
+  if (result.substituteCodexHome) {
+    return { session: { ...session, codexHome: result.substituteCodexHome } }
+  }
+  return { session }
+}
+
+export function aiVaultSessionNeedsResumePreparation(
+  session: Pick<AiVaultSession, 'agent' | 'codexHome' | 'executionHostId'>
+): boolean {
+  if (session.agent !== 'codex') {
+    return false
+  }
+  if (isLegacySharedCodexHome(session.codexHome)) {
+    return true
+  }
+  // Why: per-account repinning reads the LOCAL account selection, so only
+  // local sessions ask; remote sessions keep their recorded home untouched.
+  return (
+    isPerAccountManagedCodexHome(session.codexHome) &&
+    (!session.executionHostId || session.executionHostId === LOCAL_EXECUTION_HOST_ID)
+  )
 }
 
 /**

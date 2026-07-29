@@ -13,6 +13,7 @@ export const MOBILE_TUI_AGENT_AUTO_PICK_ORDER = [
   'opencode',
   'mimo-code',
   'ante',
+  'trae',
   'pi',
   'omp',
   'gemini',
@@ -40,16 +41,21 @@ export const MOBILE_TUI_AGENT_AUTO_PICK_ORDER = [
   'openclaw'
 ] as const satisfies readonly TuiAgent[]
 
+// Why exhaustive (unlike the auto-pick order): this doubles as the membership
+// test below, so every TuiAgent needs an entry even when it is not an automatic
+// fallback — mirroring TUI_AGENT_CONFIG / isTuiAgent on the desktop side.
 export const MOBILE_TUI_AGENT_LABELS: Record<TuiAgent, string> = {
   claude: 'Claude',
   'claude-agent-teams': 'Claude Agent Teams',
   openclaude: 'OpenClaude',
+  'claude-zai': 'Claude GLM (z.ai)',
   codex: 'Codex',
   grok: 'Grok',
   copilot: 'GitHub Copilot',
   opencode: 'OpenCode',
   'mimo-code': 'MiMo Code',
   ante: 'Ante',
+  trae: 'Trae',
   pi: 'Pi',
   omp: 'OMP',
   gemini: 'Gemini',
@@ -84,6 +90,7 @@ export const MOBILE_TUI_AGENT_FAVICON_DOMAINS: Partial<Record<TuiAgent, string>>
   opencode: 'opencode.ai',
   'mimo-code': 'mimo.xiaomi.com',
   ante: 'antigma.ai',
+  trae: 'www.trae.cn',
   omp: 'omp.sh',
   gemini: 'gemini.google.com',
   antigravity: 'antigravity.google',
@@ -110,7 +117,13 @@ export const MOBILE_TUI_AGENT_FAVICON_DOMAINS: Partial<Record<TuiAgent, string>>
 }
 
 export function isMobileTuiAgent(value: unknown): value is TuiAgent {
-  return MOBILE_TUI_AGENT_AUTO_PICK_ORDER.includes(value as TuiAgent)
+  // Why the label map and not the auto-pick order: the order is the fallback
+  // priority and deliberately omits opt-in wrappers like claude-zai. Testing
+  // against it would make a detected or user-disabled claude-zai unrecognizable.
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(MOBILE_TUI_AGENT_LABELS, value)
+  )
 }
 
 function normalizeDisabledMobileTuiAgents(value: unknown): TuiAgent[] {

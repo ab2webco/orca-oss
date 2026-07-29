@@ -118,7 +118,7 @@ export async function createOrAttachTerminalSession(
       wslDistro
     }),
     shellReadySupported,
-    historySeed: opts.historySeed,
+    historySeedChunks: opts.historySeedChunks,
     ...(opts.startupIngress ? { startupIngress: opts.startupIngress } : {}),
     wslDistro,
     onExit: () => deps.onSessionExit(opts.sessionId, opts.agentSessionGeneration),

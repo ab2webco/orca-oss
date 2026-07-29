@@ -12,18 +12,21 @@ import {
   hasAiVaultSessionDragData,
   readAiVaultSessionDragData
 } from '@/lib/ai-vault-session-drag'
-import { getAiVaultAgentProviderSession } from '@/lib/ai-vault-resume-command'
+import {
+  buildAiVaultDropRepinStartup,
+  getAiVaultAgentProviderSession
+} from '@/lib/ai-vault-resume-command'
 import { launchAiVaultSessionInNewTab } from '@/lib/launch-ai-vault-session'
+import {
+  aiVaultSessionNeedsResumePreparation,
+  claudeResumeLaunchAccountFromUniverse
+} from '@/lib/ai-vault-session-resume-preparation'
 import { useAppStore } from '@/store'
 import { resolveDropZone } from './tab-drop-zone'
 import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
-import {
-  isLegacySharedCodexHome,
-  type AiVaultPrepareSessionResumeResult
-} from '../../../../shared/ai-vault-resume-preparation'
+import type { AiVaultPrepareSessionResumeResult } from '../../../../shared/ai-vault-resume-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
-import { claudeResumeLaunchAccountFromUniverse } from '@/lib/ai-vault-session-resume-preparation'
 
 type PaneDropTarget = {
   groupId: string
@@ -218,12 +221,18 @@ export default function AiVaultSessionDropLayer({
       // so remote (runtime/SSH) sessions skip preparation entirely (fail-safe).
       const shouldResolveClaudeUniverse =
         payload.agent === 'claude' && payload.sessionExecutionHostId === LOCAL_EXECUTION_HOST_ID
-      const shouldMaterializeLegacyCodexHome =
-        payload.agent === 'codex' &&
-        isLegacySharedCodexHome(payload.codexHome ?? null) &&
-        payload.codexHome !== undefined
+      // Why the shared predicate: it covers both the legacy shared home and the
+      // per-account home the host now repins, so this gate cannot drift from it.
+      const shouldPrepareCodexHome =
+        payload.codexHome !== undefined &&
+        payload.sessionExecutionHostId !== undefined &&
+        aiVaultSessionNeedsResumePreparation({
+          agent: payload.agent,
+          codexHome: payload.codexHome,
+          executionHostId: payload.sessionExecutionHostId
+        })
       const preparation: Promise<AiVaultPrepareSessionResumeResult> =
-        (shouldResolveClaudeUniverse || shouldMaterializeLegacyCodexHome) &&
+        (shouldResolveClaudeUniverse || shouldPrepareCodexHome) &&
         payload.sessionFilePath &&
         payload.sessionExecutionHostId
           ? window.api.aiVault.prepareSessionResume({
@@ -232,12 +241,28 @@ export default function AiVaultSessionDropLayer({
               executionHostId: payload.sessionExecutionHostId,
               codexHome: payload.codexHome ?? null
             })
-          : Promise.resolve({ useRealCodexHome: false })
+          : Promise.resolve<AiVaultPrepareSessionResumeResult>({ useRealCodexHome: false })
       void preparation
         .then((result) => {
-          const startup = result.useRealCodexHome ? payload.realHomeStartup : payload
+          const startup = result.useRealCodexHome
+            ? payload.realHomeStartup
+            : result.substituteCodexHome
+              ? buildAiVaultDropRepinStartup({
+                  state: useAppStore.getState(),
+                  payload,
+                  substituteCodexHome: result.substituteCodexHome,
+                  worktreeId
+                })
+              : payload
           if (!startup) {
-            throw new Error('Orca could not prepare this legacy Codex session. Retry resume.')
+            // Why: the host just proved the prebuilt command pins another
+            // account's home, so an unrepinnable payload (older serializer)
+            // must fail loudly rather than silently resume under it.
+            throw new Error(
+              result.substituteCodexHome
+                ? 'This session was dragged from an older Orca window, so Orca cannot retarget it to the selected Codex account. Resume it from the Session History panel instead.'
+                : 'Orca could not prepare this legacy Codex session. Retry resume.'
+            )
           }
           const providerSession = getAiVaultAgentProviderSession({
             agent: payload.agent,

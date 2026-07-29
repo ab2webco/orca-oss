@@ -28,14 +28,25 @@ function parseDesktopConfiguredAgents(): string[] {
   )
 }
 
+// Why an allowlist instead of set equality: desktop keeps recognition/resume
+// plumbing in TUI_AGENT_CONFIG for agents retired from every selection surface,
+// so a configured agent is not automatically a launchable one. claude-zai is
+// retired (z.ai/GLM now runs through the regular claude CLI via a managed
+// custom-endpoint account) but stays configured so pre-existing sessions resume.
+// Listing the exceptions keeps this strict: a NEW omission still fails.
+const DESKTOP_RECOGNITION_ONLY_AGENTS = ['claude-zai']
+
 describe('mobile agent catalog', () => {
   it('stays in the same order as desktop auto-pick and covers every configured TUI agent', () => {
     const desktopAutoPickOrder = parseDesktopAutoPickOrder()
     expect(MOBILE_TUI_AGENT_AUTO_PICK_ORDER).toEqual(desktopAutoPickOrder)
     expect(MOBILE_AGENT_CATALOG.map((agent) => agent.id)).toEqual(desktopAutoPickOrder)
-    expect(new Set(MOBILE_AGENT_CATALOG.map((agent) => agent.id))).toEqual(
-      new Set(parseDesktopConfiguredAgents())
+    const cataloged = new Set(MOBILE_AGENT_CATALOG.map((agent) => agent.id))
+    const configured = parseDesktopConfiguredAgents()
+    expect(configured.filter((agent) => !cataloged.has(agent))).toEqual(
+      DESKTOP_RECOGNITION_ONLY_AGENTS
     )
+    expect([...cataloged].filter((agent) => !configured.includes(agent))).toEqual([])
   })
 
   it('uses the bundled Claude icon path for Claude Agent Teams', () => {

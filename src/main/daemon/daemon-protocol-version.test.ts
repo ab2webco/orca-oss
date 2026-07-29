@@ -4,6 +4,7 @@ import {
   AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION,
   COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION,
   GET_FOREGROUND_PROCESS_PROTOCOL_VERSION,
+  HISTORY_SEED_TRANSFER_PROTOCOL_VERSION,
   MODE_2031_UNSUBSCRIBE_FACT_PROTOCOL_VERSION,
   PREVIOUS_DAEMON_PROTOCOL_VERSIONS,
   PROTOCOL_VERSION,
@@ -12,9 +13,11 @@ import {
 
 describe('daemon protocol version', () => {
   it('sits above both lineages only where the number is ambiguous', () => {
-    expect(PROTOCOL_VERSION).toBe(30)
-    // Both lineages reused 27/28/29 for different feature sets, so only the merged
-    // daemon can prove it carries both.
+    expect(PROTOCOL_VERSION).toBe(31)
+    // Both lineages reused 27 and 30 for different feature sets, so only the merged
+    // daemon can prove it carries both. Seed transfer is upstream-only at 30, and
+    // inspectProcess is answered by both lineages from 30 up.
+    expect(HISTORY_SEED_TRANSFER_PROTOCOL_VERSION).toBe(31)
     expect(COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION).toBe(30)
     // Not bumped: the lab shipped no 29, so a daemon reporting 29 is necessarily
     // upstream-lineage and does emit the fact. Raising it would withhold the fix
@@ -24,7 +27,7 @@ describe('daemon protocol version', () => {
     expect(AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toEqual(
-      Array.from({ length: 29 }, (_, index) => index + 1)
+      Array.from({ length: 30 }, (_, index) => index + 1)
     )
   })
 
@@ -34,7 +37,8 @@ describe('daemon protocol version', () => {
     // it survives an app update — the live hazard is 28 and below.
     expect(supportsMode2031UnsubscribeFact(PROTOCOL_VERSION)).toBe(true)
     expect(supportsMode2031UnsubscribeFact(29)).toBe(true)
-    for (const version of PREVIOUS_DAEMON_PROTOCOL_VERSIONS.filter((v) => v < 29)) {
+    expect(supportsMode2031UnsubscribeFact(28)).toBe(false)
+    for (const version of PREVIOUS_DAEMON_PROTOCOL_VERSIONS.filter((version) => version < 29)) {
       expect(supportsMode2031UnsubscribeFact(version)).toBe(false)
     }
   })

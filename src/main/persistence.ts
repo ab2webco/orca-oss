@@ -198,6 +198,7 @@ import {
   normalizeWorkspaceStatuses
 } from '../shared/workspace-statuses'
 import { clampMarkdownTocPanelWidth } from '../shared/markdown-toc-panel-width'
+import { clampCombinedDiffFileTreeWidth } from '../shared/combined-diff-file-tree-width'
 import { isLegacyRepoForExternalWorktreeVisibility } from '../shared/worktree-ownership'
 import { sanitizeRepoIcon } from '../shared/repo-icon'
 import { normalizeRepoBadgeColor } from '../shared/repo-badge-color'
@@ -5637,6 +5638,9 @@ export class Store {
       osc52ClipboardDefaultOnNoticePending:
         this.state.ui?.osc52ClipboardDefaultOnNoticePending === true,
       markdownTocPanelWidth: clampMarkdownTocPanelWidth(this.state.ui?.markdownTocPanelWidth),
+      combinedDiffFileTreeWidth: clampCombinedDiffFileTreeWidth(
+        this.state.ui?.combinedDiffFileTreeWidth
+      ),
       visibleWorkspaceHostIds: normalizeVisibleExecutionHostIds(
         this.state.ui?.visibleWorkspaceHostIds
       ),
@@ -5736,6 +5740,9 @@ export class Store {
       ),
       markdownTocPanelWidth: clampMarkdownTocPanelWidth(
         sanitizedUpdates.markdownTocPanelWidth ?? this.state.ui?.markdownTocPanelWidth
+      ),
+      combinedDiffFileTreeWidth: clampCombinedDiffFileTreeWidth(
+        sanitizedUpdates.combinedDiffFileTreeWidth ?? this.state.ui?.combinedDiffFileTreeWidth
       ),
       visibleWorkspaceHostIds:
         updates.visibleWorkspaceHostIds !== undefined
@@ -5890,6 +5897,17 @@ export class Store {
       return this.state.workspaceSession ?? getDefaultWorkspaceSession()
     }
     return this.state.workspaceSessionsByHostId?.[resolved] ?? getDefaultWorkspaceSession()
+  }
+
+  getWorkspaceSessionHostIds(): ExecutionHostId[] {
+    const hostIds = new Set<ExecutionHostId>([LOCAL_EXECUTION_HOST_ID])
+    for (const key of Object.keys(this.state.workspaceSessionsByHostId ?? {})) {
+      const hostId = normalizeExecutionHostId(key)
+      if (hostId) {
+        hostIds.add(hostId)
+      }
+    }
+    return [...hostIds]
   }
 
   readTerminalScrollbackSnapshot(ref: string): string | null {
