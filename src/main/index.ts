@@ -44,6 +44,8 @@ import {
   MANAGED_AGENT_HOOK_INSTALLERS,
   removeManagedAgentHooks
 } from './agent-hooks/managed-agent-hook-controls'
+import { claudeHookService } from './claude/hook-service'
+import { configureClaudeStatusLineItemsSource } from './claude/statusline-script'
 import { initCohortClassifier } from './telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-classifier'
 import { resolveConsent } from './telemetry/consent'
@@ -1963,6 +1965,9 @@ void app.whenReady().then(async () => {
   logStartupMilestone('store-loaded')
   // Why: apply initial fallback WSL distro from store settings for global git/CLI calls.
   setDefaultWslDistroOverride(store.getSettings().terminalWindowsWslDistro ?? null)
+  // Why configure before any hook install: the shared statusline script is generated at boot
+  // install and on vault pinning, and both must honor the persisted item choice.
+  configureClaudeStatusLineItemsSource(() => store?.getSettings().claudeStatusLineItems)
   store.onSettingsChanged((updates, settings) => {
     if ('terminalWindowsWslDistro' in updates) {
       // Why: synchronize fallback WSL distro updates to runner.
@@ -1971,6 +1976,15 @@ void app.whenReady().then(async () => {
     if ('showMenuBarIcon' in updates) {
       // Why: Store is the mutation authority for all settings writes, so every macOS toggle updates the native item live.
       syncMacMenuBarIcon(settings.showMenuBarIcon !== false)
+    }
+    if ('claudeStatusLineItems' in updates) {
+      // Why: the toggle must reach the installed shared script now, not on the next relaunch —
+      // every pinned vault's settings.json points at that one file.
+      try {
+        claudeHookService.refreshManagedStatusLineScript()
+      } catch (error) {
+        console.warn('[claude-statusline] failed to refresh managed script:', error)
+      }
     }
   })
   // Why: run before ClaudeRuntimeAuthService's constructor sync — a surviving daemon Claude CLI holds the single-use refresh token; early refresh rotates it out mid-session.

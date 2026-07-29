@@ -31,6 +31,7 @@ import {
   getAgentGeneratedTabTitlesTitle
 } from './agent-generated-tab-title-copy'
 import { getAgentStatusHooksDescription, getAgentStatusHooksTitle } from './agent-status-hooks-copy'
+import { ClaudeStatusLineItemsSetting } from './ClaudeStatusLineItemsSetting'
 import {
   SettingsBadge,
   SettingsSegmentedControl,
@@ -864,6 +865,8 @@ export function AgentsPane({
       />
 
       <AgentStatusHooksSetting settings={settings} updateSettings={updateSettings} />
+
+      <ClaudeStatusLineItemsSetting settings={settings} updateSettings={updateSettings} />
 
       <AgentGeneratedTabTitlesSetting settings={settings} updateSettings={updateSettings} />
 

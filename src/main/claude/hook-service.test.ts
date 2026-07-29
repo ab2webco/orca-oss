@@ -27,6 +27,7 @@ import type * as HookEventVersionsModule from './hook-event-versions'
 import { createManagedCommandMatcher } from '../agent-hooks/installer-utils'
 import { ClaudeHookService } from './hook-service'
 import { OPENCLAUDE_HOOK_SETTINGS } from './hook-settings'
+import { configureClaudeStatusLineItemsSource } from './statusline-script'
 
 const CLAUDE_SCRIPT_FILE_NAME = process.platform === 'win32' ? 'claude-hook.cmd' : 'claude-hook.sh'
 const STATUSLINE_SCRIPT_FILE_NAME =
@@ -220,6 +221,36 @@ describe('ClaudeHookService.install', () => {
         expect(script).toContain('--data-urlencode "payload@-"')
       }
     } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('rewrites the shared statusline script with the configured items on refresh', () => {
+    const tmpHome = mkdtempSync(join(tmpdir(), 'orca-claude-statusline-refresh-'))
+    vi.stubEnv('HOME', tmpHome)
+    vi.stubEnv('USERPROFILE', tmpHome)
+    try {
+      // Freed columns (reset countdown off, project off) must reach the generated bars.
+      configureClaudeStatusLineItemsSource(() => ({ project: false, resetCountdown: false }))
+      new ClaudeHookService().refreshManagedStatusLineScript()
+      const scriptPath = join(tmpHome, '.orca', 'agent-hooks', STATUSLINE_SCRIPT_FILE_NAME)
+      const script = readFileSync(scriptPath, 'utf-8')
+      const eightCellFullBar = process.platform === 'win32' ? '########' : '████████'
+      expect(script).toContain(eightCellFullBar)
+      // Why: refresh writes only the script — it must never (re)wire settings.json.
+      expect(existsSync(join(tmpHome, '.claude', 'settings.json'))).toBe(false)
+
+      // The OpenClaude variant shares the class but has no statusline to manage.
+      rmSync(scriptPath, { force: true })
+      new ClaudeHookService({
+        agent: 'openclaude',
+        displayName: 'OpenClaude',
+        settings: OPENCLAUDE_HOOK_SETTINGS
+      }).refreshManagedStatusLineScript()
+      expect(existsSync(scriptPath)).toBe(false)
+    } finally {
+      configureClaudeStatusLineItemsSource(() => undefined)
       vi.unstubAllEnvs()
       rmSync(tmpHome, { recursive: true, force: true })
     }

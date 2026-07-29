@@ -14,6 +14,11 @@ import {
   getAgentStatusHooksSearchKeywords,
   getAgentStatusHooksTitle
 } from './agent-status-hooks-copy'
+import {
+  getClaudeStatusLineDescription,
+  getClaudeStatusLineSearchKeywords,
+  getClaudeStatusLineTitle
+} from './claude-statusline-items-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
 import { translate } from '@/i18n/i18n'
 import { searchKeywords, translateSearchKeyword, uniqueKeywords } from './settings-search-keywords'
@@ -105,6 +110,11 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
     title: getAgentStatusHooksTitle(),
     description: getAgentStatusHooksDescription(),
     keywords: getAgentStatusHooksSearchKeywords()
+  },
+  {
+    title: getClaudeStatusLineTitle(),
+    description: getClaudeStatusLineDescription(),
+    keywords: getClaudeStatusLineSearchKeywords()
   },
   {
     title: getAgentGeneratedTabTitlesTitle(),
