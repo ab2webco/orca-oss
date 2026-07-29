@@ -9,6 +9,7 @@ import {
 } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
 import { getTerminalHandle } from '../selectors'
+import { resolveAccountSelectorFlags } from '../account-selector'
 import {
   clampOrchestrationAskTimeoutMs,
   resolveOrchestrationAskClientTimeoutMs
@@ -819,6 +820,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
   },
 
   'orchestration worker-start': async ({ flags, client, cwd, json }) => {
+    const accountPins = await resolveAccountSelectorFlags(flags, client)
     const result = await callMutation<{
       runId: string
       taskId: string
@@ -845,7 +847,8 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       timeoutMs: getOptionalPositiveIntegerValueFlag(flags, 'timeout-ms'),
       run: getOptionalStringFlag(flags, 'run'),
       from: await resolveCoordinatorTerminalHandle(flags, cwd, client),
-      devMode: isDevCliInvocation()
+      devMode: isDevCliInvocation(),
+      ...accountPins
     })
     if (result.result.state !== 'ready') {
       process.exitCode = 1

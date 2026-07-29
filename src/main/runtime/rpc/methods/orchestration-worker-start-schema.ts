@@ -15,6 +15,8 @@ export const WorkerStartParams = z.object({
   setup: z.enum(['run', 'skip', 'inherit']).optional(),
   terminal: OptionalString,
   agent: OptionalString,
+  claudeAccountId: OptionalString,
+  codexAccountId: OptionalString,
   retryOf: OptionalString,
   timeoutMs: OptionalFiniteNumber,
   devMode: z.boolean().optional()

@@ -124,6 +124,23 @@ describe('orchestration new-worktree workers', () => {
     }
   }
 
+  it('persists account pins on the created worker worktree', async () => {
+    mockCreatedWorktree()
+
+    const { result } = await startWorker({
+      claudeAccountId: 'acct-claude-1',
+      codexAccountId: 'acct-codex-1'
+    })
+
+    expect(result).toMatchObject({ state: 'ready' })
+    expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claudeAccountId: 'acct-claude-1',
+        codexAccountId: 'acct-codex-1'
+      })
+    )
+  })
+
   it('creates an independent top-level worktree and reuses its agent terminal', async () => {
     mockCreatedWorktree()
 
