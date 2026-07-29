@@ -29,7 +29,29 @@ export default function globalSetup(): void {
   const outCli = path.join(root, 'out', 'cli', 'index.js')
   const outWeb = path.join(root, 'out', 'web', 'web-index.html')
 
-  // ── 1. Build the Electron app ──────────────────────────────────────
+  // ── 1. Build the bundled CLI ───────────────────────────────────────
+  // Why the CLI first: tsconfig.cli.json emits with rootDir ../src and outDir
+  // ../out, so tsc writes out/main/agent-hooks/managed-agent-hook-controls.js —
+  // the same path electron.vite.config.ts declares as a plain-Node entry. tsc
+  // emits only that module's own exports, while out/main/index.js imports
+  // symbols the bundled chunk re-exports through it. Building the CLI last
+  // therefore overwrites the chunk index.js needs and the app dies before its
+  // first window (getDefaultSettings: CLAUDE_STATUSLINE_ITEM_KEYS is not
+  // iterable). `build:desktop` already runs build:cli before electron-vite for
+  // exactly this reason; keep this order identical to it.
+  if (process.env.SKIP_BUILD && existsSync(outCli)) {
+    console.error('[e2e] SKIP_BUILD set and out/cli/index.js exists — skipping CLI build')
+  } else {
+    console.error('[e2e] Building bundled CLI...')
+    execSync('pnpm run build:cli', {
+      cwd: root,
+      stdio: 'inherit',
+      timeout: CLI_E2E_BUILD_TIMEOUT_MS
+    })
+    console.error('[e2e] CLI build complete.')
+  }
+
+  // ── 2. Build the Electron app ──────────────────────────────────────
   if (process.env.SKIP_BUILD && existsSync(outMain)) {
     console.error('[e2e] SKIP_BUILD set and out/main/index.js exists — skipping build')
   } else {
@@ -45,17 +67,6 @@ export default function globalSetup(): void {
       timeout: ELECTRON_E2E_BUILD_TIMEOUT_MS
     })
     console.error('[e2e] Build complete.')
-  }
-  if (process.env.SKIP_BUILD && existsSync(outCli)) {
-    console.error('[e2e] SKIP_BUILD set and out/cli/index.js exists — skipping CLI build')
-  } else {
-    console.error('[e2e] Building bundled CLI...')
-    execSync('pnpm run build:cli', {
-      cwd: root,
-      stdio: 'inherit',
-      timeout: CLI_E2E_BUILD_TIMEOUT_MS
-    })
-    console.error('[e2e] CLI build complete.')
   }
   if (process.env.ORCA_E2E_WEB_CLIENT === '1') {
     if (process.env.SKIP_BUILD && existsSync(outWeb)) {
@@ -92,7 +103,7 @@ export default function globalSetup(): void {
     prepareDockerSshRelayImage(root)
   }
 
-  // ── 2. Create a seeded test git repo ───────────────────────────────
+  // ── 3. Create a seeded test git repo ───────────────────────────────
   // Why: each test run gets its own git repo so the suite is fully
   // idempotent. No test depends on whatever repos the user has open.
   // Why: realpathSync so the seeded path matches the store's repo.path on
