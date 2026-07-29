@@ -30,16 +30,20 @@ export default function globalSetup(): void {
   const outWeb = path.join(root, 'out', 'web', 'web-index.html')
 
   // ── 1. Build the bundled CLI ───────────────────────────────────────
-  // Why the CLI first: tsconfig.cli.json emits with rootDir ../src and outDir
-  // ../out, so tsc writes out/main/agent-hooks/managed-agent-hook-controls.js —
-  // the same path electron.vite.config.ts declares as a plain-Node entry. tsc
-  // emits only that module's own exports, while out/main/index.js imports
-  // symbols the bundled chunk re-exports through it. Building the CLI last
-  // therefore overwrites the chunk index.js needs and the app dies before its
-  // first window (getDefaultSettings: CLAUDE_STATUSLINE_ITEM_KEYS is not
-  // iterable). `build:desktop` already runs build:cli before electron-vite for
-  // exactly this reason; keep this order identical to it.
-  if (process.env.SKIP_BUILD && existsSync(outCli)) {
+  // Why the CLI first, and why it forces an Electron rebuild below:
+  // tsconfig.cli.json emits with rootDir ../src and outDir ../out, so tsc writes
+  // out/main/agent-hooks/managed-agent-hook-controls.js — the same path
+  // electron.vite.config.ts declares as a plain-Node entry (deliberately, so it
+  // survives electron-vite dev cleaning). tsc emits only that module's own
+  // exports, while the bundled out/main/index.js imports symbols the vite chunk
+  // re-exports through it, so tsc's copy shrinks that file from ~8700 lines to
+  // ~120 and every one of those imports resolves to undefined. The app then
+  // dies before its first window (getDefaultSettings: CLAUDE_STATUSLINE_ITEM_KEYS
+  // is not iterable) and firstWindow times out. `build:desktop` runs build:cli
+  // before build:electron-vite for exactly this reason.
+  // The invariant this encodes: electron-vite must be the LAST writer of out/main.
+  const cliBuildSkipped = Boolean(process.env.SKIP_BUILD) && existsSync(outCli)
+  if (cliBuildSkipped) {
     console.error('[e2e] SKIP_BUILD set and out/cli/index.js exists — skipping CLI build')
   } else {
     console.error('[e2e] Building bundled CLI...')
@@ -52,7 +56,12 @@ export default function globalSetup(): void {
   }
 
   // ── 2. Build the Electron app ──────────────────────────────────────
-  if (process.env.SKIP_BUILD && existsSync(outMain)) {
+  // Why `cliBuildSkipped` gates the skip too: a workflow that pre-builds only
+  // electron-vite and then runs with SKIP_BUILD=1 (golden-e2e-experiment.yml)
+  // still has no out/cli, so the CLI build above runs and clobbers out/main.
+  // Honouring SKIP_BUILD for the Electron build there would leave tsc as the
+  // last writer, which is the failure this ordering exists to prevent.
+  if (process.env.SKIP_BUILD && existsSync(outMain) && cliBuildSkipped) {
     console.error('[e2e] SKIP_BUILD set and out/main/index.js exists — skipping build')
   } else {
     // Why: --mode e2e is the build-time signal that exposes window.__store;
