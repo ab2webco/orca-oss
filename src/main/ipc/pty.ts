@@ -159,7 +159,7 @@ import {
 } from '../agent-hooks/migration-unsupported-pty-state'
 import { parseWslPath } from '../wsl'
 import { mergePersistedWindowsPath } from '../pty/windows-environment-path'
-import { addOrcaWslInteropEnv } from '../pty/wsl-orca-env'
+import { addOrcaWslInteropEnv, stampWslOrchestrationCompatibilityHost } from '../pty/wsl-orca-env'
 import { PtyProducerFlowController } from './pty-producer-flow-control'
 import { beginTerminalInstall } from './watcher-removal-gate'
 import {
@@ -1946,6 +1946,11 @@ export function registerPtyHandlers(
         if (preAllocatedHandle) {
           env.ORCA_TERMINAL_HANDLE = preAllocatedHandle
         }
+        stampWslOrchestrationCompatibilityHost(
+          env,
+          runtime?.getOrchestrationCompatibilityHostId?.(),
+          ctx?.isWsl === true ? ctx.wslDistro : null
+        )
         if (ctx?.isWsl === true) {
           addOrcaWslInteropEnv(env)
         }
@@ -3718,10 +3723,49 @@ export function registerPtyHandlers(
             })
           : { shellOverride: undefined, terminalWindowsWslDistro: null }
       const daemonShellOverride = terminalRuntimeOptions.shellOverride
+      const isDaemonHostSpawn =
+        !args.connectionId &&
+        !(provider instanceof LocalPtyProvider) &&
+        !routesFreshSpawnsToLocalProvider(provider)
+      const callerRequestedSessionId = args.sessionId?.trim()
+      const requestedSessionId =
+        callerRequestedSessionId ??
+        (isDaemonHostSpawn && args.agentSessionCreateOperationId
+          ? ptySessionIdForAgentCreateOperation(args.worktreeId, args.agentSessionCreateOperationId)
+          : undefined)
+      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
+      // provider, whose numeric counter ids carry no worktree — mint the same
+      // shape here so attribution survives the fallback. Host-env setup stays
+      // gated on isDaemonHostSpawn; only the id is decoupled from it.
+      const localFallbackSessionId =
+        requestedSessionId === undefined &&
+        !isDaemonHostSpawn &&
+        !args.connectionId &&
+        routesFreshSpawnsToLocalProvider(provider)
+          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
+          : undefined
+      const sessionId =
+        requestedSessionId ??
+        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
+      const effectiveSessionRelayId =
+        sessionId !== undefined ? getRelayPtyId(args.connectionId, sessionId) : undefined
+      const effectiveSessionAppId =
+        sessionId !== undefined ? getAppPtyId(args.connectionId, sessionId) : undefined
+      const isMintedSessionId =
+        callerRequestedSessionId === undefined &&
+        (isDaemonHostSpawn || localFallbackSessionId !== undefined)
+      const expectedWslDistro = !args.connectionId
+        ? (resolveWslSessionContext({
+            cwd,
+            sessionId,
+            shellOverride: terminalRuntimeOptions.shellOverride,
+            terminalWindowsWslDistro: terminalRuntimeOptions.terminalWindowsWslDistro
+          })?.distro ?? null)
+        : null
       const codexSelectionTarget = getCodexSelectionTargetForPty(
         daemonShellOverride,
         cwd,
-        terminalRuntimeOptions.terminalWindowsWslDistro ?? null
+        expectedWslDistro
       )
       let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         codexSelectionTarget,
@@ -3813,45 +3857,6 @@ export function registerPtyHandlers(
         )
       }
 
-      const isDaemonHostSpawn =
-        !args.connectionId &&
-        !(provider instanceof LocalPtyProvider) &&
-        !routesFreshSpawnsToLocalProvider(provider)
-      const callerRequestedSessionId = args.sessionId?.trim()
-      const requestedSessionId =
-        callerRequestedSessionId ??
-        (isDaemonHostSpawn && args.agentSessionCreateOperationId
-          ? ptySessionIdForAgentCreateOperation(args.worktreeId, args.agentSessionCreateOperationId)
-          : undefined)
-      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
-      // provider, whose numeric counter ids carry no worktree — mint the same
-      // shape here so attribution survives the fallback. Host-env setup stays
-      // gated on isDaemonHostSpawn; only the id is decoupled from it.
-      const localFallbackSessionId =
-        requestedSessionId === undefined &&
-        !isDaemonHostSpawn &&
-        !args.connectionId &&
-        routesFreshSpawnsToLocalProvider(provider)
-          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
-          : undefined
-      const sessionId =
-        requestedSessionId ??
-        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
-      const effectiveSessionRelayId =
-        sessionId !== undefined ? getRelayPtyId(args.connectionId, sessionId) : undefined
-      const effectiveSessionAppId =
-        sessionId !== undefined ? getAppPtyId(args.connectionId, sessionId) : undefined
-      const isMintedSessionId =
-        callerRequestedSessionId === undefined &&
-        (isDaemonHostSpawn || localFallbackSessionId !== undefined)
-      const expectedWslDistro = !args.connectionId
-        ? (resolveWslSessionContext({
-            cwd,
-            sessionId,
-            shellOverride: terminalRuntimeOptions.shellOverride,
-            terminalWindowsWslDistro: terminalRuntimeOptions.terminalWindowsWslDistro
-          })?.distro ?? null)
-        : null
       const shouldPersistHostSessionBinding = args.persistHostSessionBinding === true
       let hostSessionBinding: {
         store: NonNullable<typeof store>
@@ -3936,11 +3941,16 @@ export function registerPtyHandlers(
           launchAgent: isTuiAgent(args.launchAgent) ? args.launchAgent : undefined,
           shellPath: daemonShellOverride ?? process.env.COMSPEC,
           isWsl: shouldSkipCodexHomeEnvForWindowsShell(daemonShellOverride, cwd),
-          wslDistro: codexSelectionTarget.runtime === 'wsl' ? codexSelectionTarget.wslDistro : null,
+          wslDistro: codexSelectionTarget.runtime === 'wsl' ? expectedWslDistro : null,
           agentStatusHooksEnabled: isAgentStatusHooksEnabled(getSettings?.()),
           networkProxySettings: getSettings?.(),
           deferGitConfigGuardToDaemon: provider.supportsGitCredentialGuardHost?.(sessionId) === true
         })
+        stampWslOrchestrationCompatibilityHost(
+          env,
+          runtime?.getOrchestrationCompatibilityHostId?.(),
+          codexSelectionTarget.runtime === 'wsl' ? expectedWslDistro : null
+        )
         promoteAgentTeamsShimPath(env, requestedAgentTeamsPath)
       }
 
@@ -4046,8 +4056,7 @@ export function registerPtyHandlers(
       }
       if (process.platform === 'win32' && !args.connectionId) {
         spawnOptions.shellOverride = terminalRuntimeOptions.shellOverride
-        spawnOptions.terminalWindowsWslDistro =
-          terminalRuntimeOptions.terminalWindowsWslDistro ?? null
+        spawnOptions.terminalWindowsWslDistro = expectedWslDistro
         spawnOptions.terminalWindowsPowerShellImplementation = getSettings
           ? (getSettings()?.terminalWindowsPowerShellImplementation ?? 'auto')
           : undefined
@@ -4760,7 +4769,13 @@ export function registerPtyHandlers(
         return null
       }
     },
-    listProcesses: async () => {
+    listProcesses: async (connectionId) => {
+      if (connectionId === null) {
+        return localProvider.listProcesses()
+      }
+      if (connectionId !== undefined) {
+        return getProvider(connectionId).listProcesses()
+      }
       const providerSessions = await Promise.all([
         localProvider.listProcesses(),
         ...Array.from(sshProviders.values(), (provider) => provider.listProcesses())
@@ -4968,10 +4983,49 @@ export function registerPtyHandlers(
             })
           : { shellOverride: args.shellOverride, terminalWindowsWslDistro: null }
       const initialShellOverride = terminalRuntimeOptions.shellOverride
+      const isDaemonHostSpawn =
+        !args.connectionId &&
+        !(provider instanceof LocalPtyProvider) &&
+        !routesFreshSpawnsToLocalProvider(provider)
+      // Why: daemon host-env setup needs a stable id BEFORE provider.spawn so buildPtyHostEnv hooks/Pi cleanup can run; daemon still honors opts.sessionId ?? mint().
+      // Note: sessionId is STABLE across daemon restarts by design — do NOT simplify to a fresh UUID per spawn; that orphans reconnectable state.
+      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
+      // provider, whose numeric counter ids carry no worktree — mint the same
+      // shape here so attribution survives the fallback. Host-env setup stays
+      // gated on isDaemonHostSpawn; only the id is decoupled from it.
+      const localFallbackSessionId =
+        args.sessionId === undefined &&
+        !isDaemonHostSpawn &&
+        !args.connectionId &&
+        routesFreshSpawnsToLocalProvider(provider)
+          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
+          : undefined
+      // Why: only clear ids minted in THIS request on failure — a caller-supplied args.sessionId may name an existing PTY we must not clobber.
+      const isMintedSessionId =
+        args.sessionId === undefined && (isDaemonHostSpawn || localFallbackSessionId !== undefined)
+      const effectiveSessionId =
+        args.sessionId ??
+        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
+      const effectiveSessionAppId =
+        effectiveSessionId !== undefined
+          ? getAppPtyId(args.connectionId, effectiveSessionId)
+          : undefined
+      const effectiveSessionRelayId =
+        effectiveSessionId !== undefined
+          ? getRelayPtyId(args.connectionId, effectiveSessionId)
+          : undefined
+      const expectedWslDistro = !args.connectionId
+        ? (resolveWslSessionContext({
+            cwd,
+            sessionId: effectiveSessionId,
+            shellOverride: terminalRuntimeOptions.shellOverride,
+            terminalWindowsWslDistro: terminalRuntimeOptions.terminalWindowsWslDistro
+          })?.distro ?? null)
+        : null
       const initialSelectionTarget = getCodexSelectionTargetForPty(
         initialShellOverride,
         cwd,
-        terminalRuntimeOptions.terminalWindowsWslDistro ?? null
+        expectedWslDistro
       )
       let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         initialSelectionTarget,
@@ -5041,45 +5095,6 @@ export function registerPtyHandlers(
       }
       // Why: the daemon-backed provider skips LocalPtyProvider's buildSpawnEnv, so assemble the same host-local env here for parity.
       // Safety: skip entirely for SSH — every injection is a loopback secret or a local path that leaks or misleads on the remote host.
-      const isDaemonHostSpawn =
-        !args.connectionId &&
-        !(provider instanceof LocalPtyProvider) &&
-        !routesFreshSpawnsToLocalProvider(provider)
-      // Why: daemon host-env setup needs a stable id BEFORE provider.spawn so buildPtyHostEnv hooks/Pi cleanup can run; daemon still honors opts.sessionId ?? mint().
-      // Note: sessionId is STABLE across daemon restarts by design — do NOT simplify to a fresh UUID per spawn; that orphans reconnectable state.
-      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
-      // provider, whose numeric counter ids carry no worktree — mint the same
-      // shape here so attribution survives the fallback. Host-env setup stays
-      // gated on isDaemonHostSpawn; only the id is decoupled from it.
-      const localFallbackSessionId =
-        args.sessionId === undefined &&
-        !isDaemonHostSpawn &&
-        !args.connectionId &&
-        routesFreshSpawnsToLocalProvider(provider)
-          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
-          : undefined
-      // Why: only clear ids minted in THIS request on failure — a caller-supplied args.sessionId may name an existing PTY we must not clobber.
-      const isMintedSessionId =
-        args.sessionId === undefined && (isDaemonHostSpawn || localFallbackSessionId !== undefined)
-      const effectiveSessionId =
-        args.sessionId ??
-        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
-      const effectiveSessionAppId =
-        effectiveSessionId !== undefined
-          ? getAppPtyId(args.connectionId, effectiveSessionId)
-          : undefined
-      const effectiveSessionRelayId =
-        effectiveSessionId !== undefined
-          ? getRelayPtyId(args.connectionId, effectiveSessionId)
-          : undefined
-      const expectedWslDistro = !args.connectionId
-        ? (resolveWslSessionContext({
-            cwd,
-            sessionId: effectiveSessionId,
-            shellOverride: terminalRuntimeOptions.shellOverride,
-            terminalWindowsWslDistro: terminalRuntimeOptions.terminalWindowsWslDistro
-          })?.distro ?? null)
-        : null
       const startupTerminalColorQueryReplyColors = getStartupTerminalColorQueryReplyColors(args)
       // Why: forward pane env to SSH only when the relay hook path is enabled, or a newer relay could emit statuses this build can't route.
       const sshSourceEnv = stripRemotePaneEnvWhenHooksDisabled(args.connectionId, args.env)
@@ -5200,7 +5215,7 @@ export function registerPtyHandlers(
       const codexSelectionTarget = getCodexSelectionTargetForPty(
         effectiveShellOverride,
         cwd,
-        terminalRuntimeOptions.terminalWindowsWslDistro ?? null
+        expectedWslDistro
       )
       const codexResumePreparation = prepareCodexResumeHome({
         connectionId: args.connectionId,
@@ -5275,13 +5290,17 @@ export function registerPtyHandlers(
             launchAgent: isTuiAgent(args.launchAgent) ? args.launchAgent : undefined,
             shellPath: effectiveShellOverride ?? process.env.COMSPEC,
             isWsl: shouldSkipCodexHomeEnvForWindowsShell(effectiveShellOverride, cwd),
-            wslDistro:
-              codexSelectionTarget.runtime === 'wsl' ? codexSelectionTarget.wslDistro : null,
+            wslDistro: codexSelectionTarget.runtime === 'wsl' ? expectedWslDistro : null,
             agentStatusHooksEnabled: isAgentStatusHooksEnabled(getSettings?.()),
             networkProxySettings: getSettings?.(),
             deferGitConfigGuardToDaemon:
               provider.supportsGitCredentialGuardHost?.(effectiveSessionId) === true
           })
+          stampWslOrchestrationCompatibilityHost(
+            env,
+            runtime?.getOrchestrationCompatibilityHostId?.(),
+            codexSelectionTarget.runtime === 'wsl' ? expectedWslDistro : null
+          )
           promoteAgentTeamsShimPath(env, requestedAgentTeamsPath)
         } catch (err) {
           // Why: buildPtyHostEnv has fs side-effects (Pi/OMP install); clear per-PTY state on throw, but only minted ids — caller ids may name existing PTYs.
@@ -5371,8 +5390,7 @@ export function registerPtyHandlers(
       }
       if (process.platform === 'win32' && !args.connectionId) {
         // Why: the renderer models PowerShell as one shell family; thread the implementation choice so both PTY paths resolve the same executable.
-        spawnOptions.terminalWindowsWslDistro =
-          terminalRuntimeOptions.terminalWindowsWslDistro ?? null
+        spawnOptions.terminalWindowsWslDistro = expectedWslDistro
         spawnOptions.terminalWindowsPowerShellImplementation = getSettings
           ? (getSettings()?.terminalWindowsPowerShellImplementation ?? 'auto')
           : undefined
@@ -5697,6 +5715,11 @@ export function registerPtyHandlers(
                 preferProviderIfExisting: true
               }
             )
+          } else if (typeof result.replay === 'string' && result.replay.length > 0) {
+            // Why: the relay reattach replay is the one restore main never ingests, so without
+            // this seed its model is a mere suffix of what the renderer painted — and a later
+            // park-reveal would outrank the fuller relay replay with that fragment.
+            runtime.seedHeadlessTerminal(result.id, result.replay)
           }
         }
         if (

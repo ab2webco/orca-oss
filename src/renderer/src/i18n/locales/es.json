@@ -334,6 +334,7 @@
           "0708ed89f1": "Claude",
           "fc80296033": "Devin",
           "da41abbdd4": "Ante",
+          "060d152fb5": "Trae",
           "mimo_code_label": "MiMo Code",
           "e585da3bda": "Claude GLM (z.ai)"
         },
@@ -752,6 +753,7 @@
         "60428567b4": "Mostrar terminales locales no está disponible mientras haya un host remoto activo",
         "f8aaf2bde3": "Espacio de trabajo subido",
         "2fe88c2e06": "La sincronización del espacio de trabajo remoto no está disponible",
+        "workspaceChangedOnAnotherDevice": "El espacio de trabajo cambió en otro dispositivo",
         "2ec42e1c52": "Aún no hay espacio de trabajo remoto",
         "88214a785b": "La sincronización del espacio de trabajo esperó a que la sesión local terminara de cargarse y agotó el tiempo de espera",
         "4f78ba5885": "Espacio de trabajo sincronizado",
@@ -843,6 +845,12 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
+      },
+      "useMacosTccPromptNotice": {
+        "title": "Reduce los avisos repetidos de acceso a archivos de macOS",
+        "description": "macOS atribuye a Orca el acceso a archivos realizado por tus agentes y herramientas de terminal. Conceder acceso total al disco reduce estos avisos.",
+        "openSettings": "Abrir ajustes",
+        "dismiss": "No volver a mostrar"
       }
     },
     "components": {
@@ -2796,6 +2804,12 @@
                     "action": "Abrir ajuste"
                   }
                 }
+              },
+              "failed": {
+                "toast": {
+                  "62a0af2cb4": "No se pudo confirmar la copia del portapapeles del terminal",
+                  "fdd3e7e977": "La app del terminal solicitó una copia, pero Orca no pudo confirmar que llegara al portapapeles del sistema."
+                }
               }
             }
           },
@@ -3908,7 +3922,11 @@
           "skippedReasonPluginCache": "A plugin manages this skill, so Orca left it out of the update — update the plugin instead.",
           "skippedReasonExternalLink": "This copy is a shortcut pointing outside Orca’s skill folders, so Orca left it out of the update.",
           "skippedReasonBrokenLink": "This copy is a shortcut to something that no longer exists, so Orca left it out — you can safely delete it.",
-          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one."
+          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one.",
+          "skippedReasonNewer": "This copy is a later version than the one this build of Orca ships, so Orca left it alone rather than roll it back. Updating Orca will bring the two back in line.",
+          "skippedReasonStaleRecord": "The skills updater has no usable record of this copy, so it reports the skill as already up to date and changes nothing. Reinstall it to bring the record back in line: {{value0}}",
+          "chipNewer": "Newer",
+          "tipNewer": "This copy is a later version than the one this build of Orca ships."
         },
         "SkillFreshnessUpdateDialog": {
           "title": "Actualizar skills",
@@ -6304,7 +6322,8 @@
           "6436e56546": "Código QR para emparejamiento móvil",
           "1b1b70279a": "Aún no hay dispositivos emparejados.",
           "1592afcc7a": "Aún no hay dispositivos emparejados. Escanea el código QR con la aplicación móvil de Orca.",
-          "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale. Genera uno nuevo e inténtalo de nuevo."
+          "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale. Genera uno nuevo e inténtalo de nuevo.",
+          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile."
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub Releases",
@@ -7836,6 +7855,12 @@
             "8dd4805991": "archivo",
             "68d1db8929": "markdown",
             "90425d313c": "cambio",
+            "linkRoutingModifier": {
+              "routing": "enrutamiento",
+              "modifier": "modificador",
+              "invert": "invertir",
+              "opposite": "opuesto"
+            },
             "72c58f7792": "vista web",
             "82ba1c80ea": "localhost",
             "bea27bac4b": "enlaces",
@@ -9748,6 +9773,12 @@
           "serviceManagerHelp": "Update Orca through the service manager that starts this server.",
           "unpackedHelp": "Development builds must be updated from their source checkout.",
           "legacyHelp": "Update this server manually once to enable remote updates."
+        },
+        "BrowserLinkRoutingModifierSetting": {
+          "titleSystem": "Hold Shift to open in your web browser",
+          "titleOrca": "Hold Shift to open in Orca",
+          "descriptionSystem": "Links open in Orca, so {{chord}}+click sends one to your system browser instead.",
+          "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca's built-in browser instead."
         },
         "PluginConsentDialog": {
           "workerTrust": "Proceso en segundo plano — se ejecuta en su propio proceso",
@@ -11805,7 +11836,8 @@
             "preview": "Vista previa",
             "stable": "Estable"
           },
-          "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale."
+          "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale.",
+          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile."
         },
         "MobilePage": {
           "e17393c6a3": "Vista previa del teléfono",
@@ -11927,7 +11959,8 @@
           "placeholder": "my-mac.ts.net, home.example.com o 192.168.1.50",
           "hint": "Introduce una dirección IP o un nombre de host (un nombre MagicDNS de Tailscale, un dominio DDNS o un nombre de host de LAN), opcionalmente con :puerto.",
           "cancel": "Cancelar",
-          "use": "Usar dirección"
+          "use": "Usar dirección",
+          "confirmationError": "Esta dirección no pudo generar un código de emparejamiento escaneable. Comprueba la dirección e inténtalo de nuevo."
         },
         "NetworkInterfacePicker": {
           "trigger-label": "Dirección de red para anunciar",
@@ -12645,6 +12678,7 @@
           "4cc7b83ffe": "Filtrar archivos...",
           "21783df79f": "Contraer árbol de archivos",
           "481e63ca52": "Archivos",
+          "resizeFileTree": "Cambiar el tamaño del árbol de archivos",
           "d5ac717d65": "sin commit",
           "39b6b9e4e4": "Commits en la rama"
         },
@@ -13276,6 +13310,9 @@
           "bb7f599ee7": "Abrir configuración",
           "2d5b9fabf9": "Acceso al micrófono denegado. Conceda acceso en la configuración del sistema, luego reinicie Orca.",
           "5d2c3e7ae3": "No se detectó ninguna voz."
+        },
+        "DictationIndicator": {
+          "335e1bc6cb": "Detener dictado"
         }
       },
       "dashboard": {
@@ -14754,7 +14791,8 @@
       "attention": "Needs You",
       "working": "Working",
       "idle": "Idle",
-      "empty": "None"
+      "empty": "None",
+      "done": "Finalizado"
     },
     "title": "Agents",
     "total": "{{count}} total",
@@ -14765,7 +14803,15 @@
         "minutes": "{{count}} min",
         "hours": "{{count}} h",
         "days": "{{count}} d"
-      }
+      },
+      "review": {
+        "open": "Revisión abierta",
+        "draft": "Revisión en borrador",
+        "merged": "Revisión fusionada",
+        "closed": "Revisión cerrada"
+      },
+      "subagents_one": "{{count}} subagente",
+      "subagents_other": "{{count}} subagentes"
     },
     "terminal": {
       "closed": "No live terminal — this agent's pane has closed.",
@@ -14773,8 +14819,36 @@
       "close": "Close"
     },
     "close": "Close dashboard",
-    "settings": "Agent Dashboard settings",
-    "settingsTooltip": "Board settings"
+    "settingsTooltip": "Board settings",
+    "filters": {
+      "remove": "Eliminar filtro {{label}}",
+      "active": "Filtros",
+      "clear": "Limpiar",
+      "review": {
+        "open": "Abierta",
+        "draft": "Borrador",
+        "merged": "Fusionada",
+        "closed": "Cerrada",
+        "none": "Sin revisión"
+      },
+      "reviewChip": "Revisión: {{state}}",
+      "label": "Filtrar",
+      "project": "Proyecto",
+      "workspaceStatus": "Estado del espacio de trabajo",
+      "reviewStatus": "Estado de PR / MR",
+      "clearAll": "Limpiar todos los filtros"
+    },
+    "search": {
+      "placeholder": "Buscar worktree, proyecto o agente…",
+      "label": "Buscar agentes",
+      "clear": "Borrar búsqueda",
+      "results": "{{shown}} de {{total}} mostrados"
+    },
+    "settingsLabel": "Configuración del Panel de agentes",
+    "settings": {
+      "showIdle": "Mostrar agentes inactivos",
+      "showIdleCopy": "Incluye agentes que han permanecido inactivos durante 30 minutos sin informar que finalizaron. Ocultos de forma predeterminada."
+    }
   },
   "dashboard": {
     "sidebar": {
@@ -14802,6 +14876,22 @@
       "certificateChallengeChanged": "The certificate request changed. Retry the page and review the new warning.",
       "certificateChallengeUnavailable": "This certificate request is no longer available. Retry the page to request a new one.",
       "certificateProceedFailed": "Orca could not approve this certificate request. Retry the page and try again."
+    }
+  },
+  "runtimeRpc": {
+    "startupFailure": {
+      "unknownCause": "No additional error details were available.",
+      "continueButton": "Continue without CLI",
+      "title": "Orca CLI unavailable",
+      "message": "Orca couldn't start its local command transport.",
+      "detail": "Orca will continue to work, but commands such as orca status, orca terminal, and orchestration are unavailable for this session.\n\n{{guidance}}\n\nCause: {{cause}}",
+      "guidance": {
+        "permissionDenied": "Orca couldn't write its runtime file. Check permissions on Orca's data folder, then restart.",
+        "storageUnavailable": "Your disk may be full or read-only. Free up space, then restart Orca.",
+        "invalidPath": "Orca's data folder may be missing, moved, or at a path that is too long. Restore it or use a shorter path, then restart Orca.",
+        "addressInUse": "Another process may be holding the port. Restart Orca to try again.",
+        "unknown": "Restart Orca to try again."
+      }
     }
   },
   "claudeAuth": {

@@ -41,6 +41,9 @@ function liveSession(overrides: Partial<NativeChatLiveSession>): NativeChatLiveS
     hasMore: false,
     loadingEarlier: false,
     loadEarlier: () => {},
+    // Why 'ready': these cases assert on a fully-read transcript; this pane's
+    // view state derives from `status`, not the raw read phase.
+    readPhase: 'ready',
     ...overrides
   }
 }

@@ -23,6 +23,7 @@ const WELL_KNOWN_LABELS: Record<string, string> = {
   hermes: 'Hermes',
   devin: 'Devin',
   ante: 'Ante',
+  trae: 'Trae',
   kimi: 'Kimi'
 }
 

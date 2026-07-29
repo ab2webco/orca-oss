@@ -16,8 +16,12 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['orchestration', 'run-use'],
     summary: 'Bind this coordinator terminal to an existing Run',
-    usage: 'orca orchestration run-use --id <run_id> [--from <handle>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'from', 'retry-request']
+    usage:
+      'orca orchestration run-use --id <run_id> [--from <handle>] [--takeover-legacy] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id', 'from', 'takeover-legacy', 'retry-request'],
+    notes: [
+      '--takeover-legacy must run in the live coordinator agent terminal it binds; it preserves existing worker assignments.'
+    ]
   },
   {
     path: ['orchestration', 'run-current'],
@@ -62,12 +66,12 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       'report-path',
       'phase'
     ],
-      notes: [
-        'On Windows PowerShell, quote group addresses such as --to "@all" or --to "@worktree:<id>".',
-       "worker_done and heartbeat are exact-Dispatch signals and cannot target groups; omit --to to use the Dispatch's Run mailbox.",
-       'worker_done requires --outcome succeeded or --outcome failed.',
-       'From an active Dispatch, an omitted recipient defaults to its owning Run mailbox.',
-       'Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca durably relays it to a connected worker server.',
+    notes: [
+      'On Windows PowerShell, quote group addresses such as --to "@all" or --to "@worktree:<id>".',
+      "worker_done and heartbeat are exact-Dispatch signals and cannot target groups; omit --to to use the Dispatch's Run mailbox.",
+      'worker_done requires --outcome succeeded or --outcome failed.',
+      'From an active Dispatch, an omitted recipient defaults to its owning Run mailbox.',
+      'Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca durably relays it to a connected worker server.',
       'Managed agent terminals authenticate the sender pane with their launch token, so --from cannot claim their identity; it still names the sender for panes without one (SSH without remote hooks, reattached or hand-opened shells).',
       'A worker_done with the active task/dispatch IDs completes that task only from the dispatched pane. When stable pane identity is unavailable, the sender handle must exactly match the dispatch assignee; injected preambles include the correct --from value.',
       'Prefer --task-id/--dispatch-id/etc. over raw --payload JSON in worker commands; PowerShell strips JSON quotes easily.'

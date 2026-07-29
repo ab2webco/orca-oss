@@ -19,7 +19,10 @@ describe('orchestration timeout flag validation', () => {
     ['empty', ''],
     ['non-numeric', 'not-a-number'],
     ['zero', '0'],
-    ['negative', '-1']
+    ['negative', '-1'],
+    ['fractional', '1.5'],
+    ['rounded fractional', '9007199254740991.1'],
+    ['unsafe integer', String(Number.MAX_SAFE_INTEGER + 1)]
   ]
 
   beforeEach(() => {
@@ -84,11 +87,13 @@ describe('orchestration timeout flag validation', () => {
     // Why: unread:false makes pre-peek runtimes fall back to non-consuming all mode.
     expect(callMock).toHaveBeenCalledWith('orchestration.check', {
       terminal: 'term_worker',
+      terminalPaneKey: undefined,
       unread: false,
       peek: true,
       all: undefined,
       types: undefined,
       format: undefined,
+      compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
       run: undefined,
       ack: undefined,
       wait: true,
@@ -202,7 +207,9 @@ describe('orchestration timeout flag validation', () => {
         resume: undefined,
         options: undefined,
         timeoutMs: 123,
-        from: 'term_worker'
+        from: 'term_worker',
+        compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
+        compatibilityWindowsCommand: undefined
       },
       { timeoutMs: 5_123, orchestrationCapability: undefined }
     )
@@ -229,7 +236,9 @@ describe('orchestration timeout flag validation', () => {
         resume: 'msg_question',
         options: undefined,
         timeoutMs: undefined,
-        from: 'term_worker'
+        from: 'term_worker',
+        compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
+        compatibilityWindowsCommand: undefined
       },
       { timeoutMs: 605_000, orchestrationCapability: undefined }
     )

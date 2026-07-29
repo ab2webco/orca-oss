@@ -79,9 +79,10 @@ import { getRepositoryPaneSearchEntries } from '@/components/settings/repository
 import { buildSettingsProjectList } from '@/components/settings/settings-project-list'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
-  getWindowsTerminalCapabilityOwnerKey,
+  isWindowsTerminalCapabilityHost,
   useWindowsTerminalCapabilities
 } from '@/lib/windows-terminal-capabilities'
+import { useWindowsTerminalCapabilityOwnerKey } from './useWindowsTerminalCapabilityOwnerKey'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
 import { usePlaneProviderConnected } from '@/hooks/usePlaneProviderConnected'
@@ -117,6 +118,7 @@ function getDevToolsPaneSearchEntries(): SettingsNavSection['searchEntries'] {
 export function buildSettingsNavigationMetadata({
   isMac,
   isWindows,
+  isLocalWindowsHost = isWindows,
   isWindowsTerminalHost = isWindows,
   isWebClient,
   isDev = import.meta.env.DEV,
@@ -126,6 +128,7 @@ export function buildSettingsNavigationMetadata({
 }: {
   isMac: boolean
   isWindows: boolean
+  isLocalWindowsHost?: boolean
   isWindowsTerminalHost?: boolean
   isWebClient: boolean
   isDev?: boolean
@@ -161,7 +164,7 @@ export function buildSettingsNavigationMetadata({
         'Manage AI agents, set a default, and customize commands.'
       ),
       icon: Bot,
-      searchEntries: getAgentsPaneSearchEntries({ includeAgentRuntime: isWindowsTerminalHost }),
+      searchEntries: getAgentsPaneSearchEntries({ includeAgentRuntime: isLocalWindowsHost }),
       group: 'capabilities'
     },
     {
@@ -291,7 +294,7 @@ export function buildSettingsNavigationMetadata({
         'Workspace defaults, app setup, and maintenance.'
       ),
       icon: SlidersHorizontal,
-      searchEntries: getGeneralPaneSearchEntries({ includeProjectRuntime: isWindowsTerminalHost }),
+      searchEntries: getGeneralPaneSearchEntries({ includeProjectRuntime: isLocalWindowsHost }),
       group: 'setup'
     },
     {
@@ -646,17 +649,32 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const isWebClient = isWebClientLocation()
   const isLinearConnected = useLinearProviderConnected()
   const isPlaneConnected = usePlaneProviderConnected()
-  const windowsTerminalCapabilityOwnerKey = getWindowsTerminalCapabilityOwnerKey(
+  const windowsTerminalCapabilityOwnerKey = useWindowsTerminalCapabilityOwnerKey(
     settings?.activeRuntimeEnvironmentId
   )
   const runtimeTarget = getActiveRuntimeTarget(settings)
+  const capabilityLoadTarget = isWebClient ? { kind: 'local' as const } : runtimeTarget
   const windowsTerminalCapabilities = useWindowsTerminalCapabilities(
     isWindows || isWebClient || runtimeTarget.kind === 'environment',
     false,
     windowsTerminalCapabilityOwnerKey,
-    runtimeTarget
+    capabilityLoadTarget
   )
-  const isWindowsTerminalHost = isWindows || windowsTerminalCapabilities.hostPlatform === 'win32'
+  const isLocalWindowsHost = isWindowsTerminalCapabilityHost({
+    isWindowsRenderer: isWindows,
+    isWebClient,
+    target: { kind: 'local' },
+    hostPlatform:
+      isWebClient || runtimeTarget.kind === 'local'
+        ? windowsTerminalCapabilities.hostPlatform
+        : null
+  })
+  const isWindowsTerminalHost = isWindowsTerminalCapabilityHost({
+    isWindowsRenderer: isWindows,
+    isWebClient,
+    target: runtimeTarget,
+    hostPlatform: windowsTerminalCapabilities.hostPlatform
+  })
 
   // Why: Settings and Cmd+J share this metadata so platform/runtime visibility
   // and search entries cannot drift. Keep this hook free of Settings pane UI
@@ -666,6 +684,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
       buildSettingsNavigationMetadata({
         isMac,
         isWindows,
+        isLocalWindowsHost,
         isWindowsTerminalHost,
         isWebClient,
         isDev: import.meta.env.DEV,
@@ -677,6 +696,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
     [
       isMac,
       isWindows,
+      isLocalWindowsHost,
       isWindowsTerminalHost,
       isWebClient,
       isLinearConnected,

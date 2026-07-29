@@ -334,6 +334,7 @@
           "0708ed89f1": "Claude",
           "fc80296033": "Devin",
           "da41abbdd4": "Ante",
+          "060d152fb5": "Trae",
           "mimo_code_label": "MiMo Code",
           "e585da3bda": "Claude GLM (z.ai)"
         },
@@ -752,6 +753,7 @@
         "60428567b4": "リモート ランタイムがアクティブな間はローカル terminal の公開は利用できません",
         "f8aaf2bde3": "ワークスペースがアップロードされました",
         "2fe88c2e06": "リモートワークスペースの同期は利用できません",
+        "workspaceChangedOnAnotherDevice": "ワークスペースが別のデバイスで変更されました",
         "2ec42e1c52": "リモートワークスペースはまだありません",
         "88214a785b": "ワークスペースの同期はローカル セッションのハイドレーションを待機し、タイムアウトになりました",
         "4f78ba5885": "ワークスペースが同期されました",
@@ -843,6 +845,12 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "貼り付け内容が大きすぎます。"
+      },
+      "useMacosTccPromptNotice": {
+        "title": "macOSのファイルアクセス権限の確認を減らす",
+        "description": "エージェントやターミナルツールがファイルにアクセスすると、macOS はそのアクセス元を Orca として扱います。フルディスクアクセスを許可すると、これらの確認を減らせます。",
+        "openSettings": "設定を開く",
+        "dismiss": "今後表示しない"
       }
     },
     "components": {
@@ -2796,6 +2804,12 @@
                     "action": "設定を開く"
                   }
                 }
+              },
+              "failed": {
+                "toast": {
+                  "62a0af2cb4": "ターミナルのクリップボードコピーを確認できませんでした",
+                  "fdd3e7e977": "ターミナルアプリがコピーを要求しましたが、システムクリップボードに反映されたことを Orca で確認できませんでした。"
+                }
               }
             }
           },
@@ -3908,7 +3922,11 @@
           "skippedReasonPluginCache": "A plugin manages this skill, so Orca left it out of the update — update the plugin instead.",
           "skippedReasonExternalLink": "This copy is a shortcut pointing outside Orca’s skill folders, so Orca left it out of the update.",
           "skippedReasonBrokenLink": "This copy is a shortcut to something that no longer exists, so Orca left it out — you can safely delete it.",
-          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one."
+          "skippedReasonDuplicate": "This is a separate copy, so the update won’t reach it — the command only refreshes the main copy. Remove this copy, then reinstall the skill so this location follows the main one.",
+          "skippedReasonNewer": "This copy is a later version than the one this build of Orca ships, so Orca left it alone rather than roll it back. Updating Orca will bring the two back in line.",
+          "skippedReasonStaleRecord": "The skills updater has no usable record of this copy, so it reports the skill as already up to date and changes nothing. Reinstall it to bring the record back in line: {{value0}}",
+          "chipNewer": "Newer",
+          "tipNewer": "This copy is a later version than the one this build of Orca ships."
         },
         "SkillFreshnessUpdateDialog": {
           "title": "スキルを更新",
@@ -6326,7 +6344,8 @@
           "6436e56546": "モバイルペアリング用のQRコード",
           "1b1b70279a": "まだデバイスがペアリングされていません。",
           "1592afcc7a": "まだデバイスがペアリングされていません。 Orca モバイル アプリで QR コードをスキャンします。",
-          "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。再生成してからお試しください。"
+          "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。再生成してからお試しください。",
+          "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。"
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub リリース",
@@ -7858,6 +7877,12 @@
             "8dd4805991": "ファイル",
             "68d1db8929": "markdown",
             "90425d313c": "シフト",
+            "linkRoutingModifier": {
+              "routing": "ルーティング",
+              "modifier": "修飾キー",
+              "invert": "反転",
+              "opposite": "逆"
+            },
             "72c58f7792": "ウェブビュー",
             "82ba1c80ea": "ローカルホスト",
             "bea27bac4b": "リンク",
@@ -9748,6 +9773,12 @@
           "serviceManagerHelp": "Update Orca through the service manager that starts this server.",
           "unpackedHelp": "Development builds must be updated from their source checkout.",
           "legacyHelp": "Update this server manually once to enable remote updates."
+        },
+        "BrowserLinkRoutingModifierSetting": {
+          "titleSystem": "Hold Shift to open in your web browser",
+          "titleOrca": "Hold Shift to open in Orca",
+          "descriptionSystem": "Links open in Orca, so {{chord}}+click sends one to your system browser instead.",
+          "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca's built-in browser instead."
         },
         "PluginConsentDialog": {
           "workerTrust": "バックグラウンドワーカー — 独自のプロセスで実行",
@@ -11805,7 +11836,8 @@
             "preview": "プレビュー",
             "stable": "安定版"
           },
-          "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。"
+          "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。",
+          "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。"
         },
         "MobilePage": {
           "e17393c6a3": "スマートフォンプレビュー",
@@ -11927,7 +11959,8 @@
           "placeholder": "my-mac.ts.net、home.example.com、または 192.168.1.50",
           "hint": "IP アドレスまたはホスト名（Tailscale の MagicDNS 名、DDNS ドメイン、LAN のホスト名など）を入力してください。必要に応じて :ポート を付けられます。",
           "cancel": "キャンセル",
-          "use": "アドレスを使用"
+          "use": "アドレスを使用",
+          "confirmationError": "このアドレスではスキャン可能なペアリングコードを生成できませんでした。アドレスを確認して、もう一度お試しください。"
         },
         "NetworkInterfacePicker": {
           "trigger-label": "通知するネットワークアドレス",
@@ -12645,6 +12678,7 @@
           "4cc7b83ffe": "ファイルをフィルタリング...",
           "21783df79f": "ファイルツリーを折りたたむ",
           "481e63ca52": "ファイル",
+          "resizeFileTree": "ファイルツリーのサイズを変更",
           "d5ac717d65": "commit されていない",
           "39b6b9e4e4": "Committed on Branch"
         },
@@ -13276,6 +13310,9 @@
           "bb7f599ee7": "設定を開く",
           "2d5b9fabf9": "マイクへのアクセスが拒否されました。システム設定でアクセスを許可し、Orca を再起動。",
           "5d2c3e7ae3": "音声が検出されませんでした。"
+        },
+        "DictationIndicator": {
+          "335e1bc6cb": "ディクテーションを停止する"
         }
       },
       "dashboard": {
@@ -14754,7 +14791,8 @@
       "attention": "Needs You",
       "working": "Working",
       "idle": "Idle",
-      "empty": "None"
+      "empty": "None",
+      "done": "完了"
     },
     "title": "Agents",
     "total": "{{count}} total",
@@ -14765,7 +14803,15 @@
         "minutes": "{{count}}分",
         "hours": "{{count}}時間",
         "days": "{{count}}日"
-      }
+      },
+      "review": {
+        "open": "オープン中のレビュー",
+        "draft": "下書きのレビュー",
+        "merged": "マージ済みのレビュー",
+        "closed": "クローズ済みのレビュー"
+      },
+      "subagents_one": "{{count}} 個のサブエージェント",
+      "subagents_other": "{{count}} 個のサブエージェント"
     },
     "terminal": {
       "closed": "No live terminal — this agent's pane has closed.",
@@ -14773,8 +14819,36 @@
       "close": "Close"
     },
     "close": "Close dashboard",
-    "settings": "Agent Dashboard settings",
-    "settingsTooltip": "Board settings"
+    "settingsTooltip": "Board settings",
+    "filters": {
+      "remove": "{{label}} フィルターを削除",
+      "active": "フィルター",
+      "clear": "クリア",
+      "review": {
+        "open": "オープン",
+        "draft": "下書き",
+        "merged": "マージ済み",
+        "closed": "クローズ済み",
+        "none": "レビューなし"
+      },
+      "reviewChip": "レビュー: {{state}}",
+      "label": "フィルター",
+      "project": "プロジェクト",
+      "workspaceStatus": "ワークスペースのステータス",
+      "reviewStatus": "PR / MR ステータス",
+      "clearAll": "すべてのフィルターをクリア"
+    },
+    "search": {
+      "placeholder": "ワークツリー、プロジェクト、エージェントを検索…",
+      "label": "エージェントを検索",
+      "clear": "検索をクリア",
+      "results": "{{total}} 件中 {{shown}} 件を表示"
+    },
+    "settingsLabel": "エージェント ダッシュボード設定",
+    "settings": {
+      "showIdle": "アイドル状態のエージェントを表示",
+      "showIdleCopy": "完了を報告せずに30分間停止しているエージェントを含めます。デフォルトでは非表示です。"
+    }
   },
   "dashboard": {
     "sidebar": {
@@ -14802,6 +14876,22 @@
       "certificateChallengeChanged": "The certificate request changed. Retry the page and review the new warning.",
       "certificateChallengeUnavailable": "This certificate request is no longer available. Retry the page to request a new one.",
       "certificateProceedFailed": "Orca could not approve this certificate request. Retry the page and try again."
+    }
+  },
+  "runtimeRpc": {
+    "startupFailure": {
+      "unknownCause": "No additional error details were available.",
+      "continueButton": "Continue without CLI",
+      "title": "Orca CLI unavailable",
+      "message": "Orca couldn't start its local command transport.",
+      "detail": "Orca will continue to work, but commands such as orca status, orca terminal, and orchestration are unavailable for this session.\n\n{{guidance}}\n\nCause: {{cause}}",
+      "guidance": {
+        "permissionDenied": "Orca couldn't write its runtime file. Check permissions on Orca's data folder, then restart.",
+        "storageUnavailable": "Your disk may be full or read-only. Free up space, then restart Orca.",
+        "invalidPath": "Orca's data folder may be missing, moved, or at a path that is too long. Restore it or use a shorter path, then restart Orca.",
+        "addressInUse": "Another process may be holding the port. Restart Orca to try again.",
+        "unknown": "Restart Orca to try again."
+      }
     }
   },
   "claudeAuth": {
