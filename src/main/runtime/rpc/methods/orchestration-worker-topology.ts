@@ -41,11 +41,15 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   worktreeId: string
   agent: TuiAgent
   taskId: string
+  claudeAccountId?: string
+  codexAccountId?: string
   effects: WorkerEffect[]
 }): Promise<{ handle: string; warning?: string }> {
   const terminal = await args.runtime.createTerminal(`id:${args.worktreeId}`, {
     command: args.agent,
-    title: `worker-${args.taskId}`
+    title: `worker-${args.taskId}`,
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
+    ...(args.codexAccountId ? { codexAccountId: args.codexAccountId } : {})
   })
   args.effects.push({
     kind: 'terminal',
@@ -92,6 +96,8 @@ export async function createWorkerWorktree(args: {
     displayName?: string
     comment?: string
     setup?: 'run' | 'skip' | 'inherit'
+    claudeAccountId?: string
+    codexAccountId?: string
     from: string
   }
   agent: TuiAgent
@@ -110,6 +116,8 @@ export async function createWorkerWorktree(args: {
     baseBranch: params.baseBranch,
     displayName: params.displayName,
     comment: params.comment,
+    ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
+    ...(params.codexAccountId ? { codexAccountId: params.codexAccountId } : {}),
     runHooks: setupDecision === 'run',
     setupDecision,
     awaitTerminalProvisioning: true,

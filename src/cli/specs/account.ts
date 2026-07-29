@@ -9,7 +9,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Lists every managed account (provider, email, id, active selection) with cached session/weekly usage windows. Never prints credentials.',
       'Quota is served from the last snapshot; pass --refresh to force a provider usage fetch first (slower, and it can stall behind broken auth).',
-      'Use the email or id with --claude-account / --codex-account on `terminal create` and `worktree create` to direct a launch at one account.'
+      'Use the email or id with --claude-account / --codex-account on `terminal create`, `worktree create`, and `orchestration worker-start` to direct a launch at one account.'
     ],
     examples: ['orca account list --json', 'orca account list --refresh --json']
   }

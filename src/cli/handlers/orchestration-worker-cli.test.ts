@@ -84,6 +84,47 @@ describe('orchestration worker-start CLI contract', () => {
     expect(process.exitCode).toBeUndefined()
   })
 
+  it('resolves account pins against the roster before dispatching worker-start', async () => {
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.snapshot') {
+        return {
+          result: {
+            claude: { accounts: [{ id: 'claude-acct-1', email: 'dev@example.com' }] },
+            codex: { accounts: [{ id: 'codex-acct-1', email: 'ops@example.com' }] }
+          }
+        }
+      }
+      return {
+        result: {
+          runId: 'run_1',
+          taskId: 'task_1',
+          dispatchId: 'ctx_1',
+          state: 'ready',
+          effects: [],
+          residualResources: []
+        }
+      }
+    })
+
+    await invokeWorkerStart(
+      new Map<string, string | boolean>([
+        ['task', 'task_1'],
+        ['agent', 'claude'],
+        ['from', 'term_coord'],
+        ['claude-account', 'dev@example.com'],
+        ['codex-account', 'codex-acct-1']
+      ])
+    )
+
+    expect(callMock).toHaveBeenCalledWith(
+      'orchestration.workerStart',
+      expect.objectContaining({
+        claudeAccountId: 'claude-acct-1',
+        codexAccountId: 'codex-acct-1'
+      })
+    )
+  })
+
   it('sets an unsuccessful exit code for failed and unknown receipts', async () => {
     callMock.mockResolvedValue({
       result: {

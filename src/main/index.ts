@@ -210,6 +210,7 @@ import { notifyWorktreesChanged } from './ipc/worktree-remote'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import {
   attachClaudeLivePtyPersistence,
+  attachLiveClaudeWorktreeDisplayNames,
   seedLiveClaudePtysFromPersistence,
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
@@ -1974,6 +1975,10 @@ void app.whenReady().then(async () => {
   })
   // Why: run before ClaudeRuntimeAuthService's constructor sync — a surviving daemon Claude CLI holds the single-use refresh token; early refresh rotates it out mid-session.
   attachClaudeLivePtyPersistence(store)
+  const worktreeMetaStore = store
+  attachLiveClaudeWorktreeDisplayNames(
+    (worktreeId) => worktreeMetaStore.getWorktreeMeta(worktreeId)?.displayName ?? null
+  )
   // Why: while a live claude defers the managed OAuth refresh, usage shows
   // "Waiting for Claude session"; refetch when the last live PTY exits so the
   // error clears immediately instead of after the failure backoff.

@@ -28,6 +28,11 @@ import {
   type ManagedClaudeAccountMutationOptions
 } from './managed-claude-account-mutation-policy'
 import { isClaudeAuthSwitchInProgress } from './claude-auth-switch-gate'
+import {
+  createAccountMutationBlockError,
+  createAssignedWorktreeLaunchBlockError,
+  createGlobalTerminalLaunchBlockError
+} from './live-pty-blocker-description'
 const managedClaudeAccountMutations = new Set<string>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
@@ -239,9 +244,7 @@ export function reserveInjectedClaudeAccountLaunch(
     throw new Error('This Claude account is being launched globally. Try again when it finishes.')
   }
   if (!options.allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId)) {
-    throw new Error(
-      'This Claude account is already in use by a global terminal. Close it before launching the assigned account.'
-    )
+    throw createGlobalTerminalLaunchBlockError(accountId)
   }
   const reservationId = randomUUID()
   injectedClaudeLaunchReservations.set(reservationId, accountId)
@@ -266,9 +269,7 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
       ? liveInjectedClaudePtyAccounts.size > 0 || injectedClaudeLaunchReservations.size > 0
       : hasLiveInjectedClaudePtysForAccount(accountId)
   ) {
-    throw new Error(
-      'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
-    )
+    throw createAssignedWorktreeLaunchBlockError(accountId)
   }
   const reservationId = randomUUID()
   sharedClaudeLaunchReservations.set(reservationId, accountId)
@@ -285,9 +286,7 @@ export function beginManagedClaudeAccountMutation(
     hasLiveInjectedClaudePtysForAccount(accountId) ||
     (!options.allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId))
   ) {
-    throw new Error(
-      'This Claude account is in use by an assigned worktree. Close its Claude terminal before changing the account.'
-    )
+    throw createAccountMutationBlockError(accountId, !options.allowLiveSharedPtys)
   }
   assertSharedLaunchAllowsManagedAccountMutation(
     accountId,
@@ -329,5 +328,6 @@ export function releaseSharedClaudeAccountLaunch(reservationId: string | undefin
 }
 
 export { liveInjectedClaudePtyAccounts, liveSharedClaudePtyAccounts }
+export { attachLiveClaudeWorktreeDisplayNames } from './live-pty-blocker-description'
 export * from './claude-auth-switch-gate'
 export * from './live-pty-account-ownership'

@@ -1,4 +1,3 @@
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import type { TuiAgent } from '../../../../shared/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
@@ -6,6 +5,7 @@ import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
 import { WorkerStartParams } from './orchestration-worker-start-schema'
+import { assertComposedWorkerStartParams } from './orchestration-worker-start-validation'
 import {
   createExistingWorktreeWorkerTerminal,
   createWorkerWorktree,
@@ -56,34 +56,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
       const requestedWorktree = params.worktree ?? 'current'
       const createsWorktree =
         requestedWorktree === 'new-child' || requestedWorktree === 'new-top-level'
-      if (params.terminal && params.agent) {
-        throw new OrchestrationError(
-          'invalid_argument',
-          '--terminal reuses an existing agent and cannot combine with --agent.'
-        )
-      }
-      if (createsWorktree && params.terminal) {
-        throw new OrchestrationError(
-          'invalid_argument',
-          '--terminal cannot combine with new-worktree creation.'
-        )
-      }
-      if (createsWorktree && !params.name) {
-        throw new OrchestrationError('invalid_argument', 'New worktrees require --name.')
-      }
-      if (!createsWorktree && (params.name || params.repo || params.baseBranch || params.setup)) {
-        throw new OrchestrationError(
-          'invalid_argument',
-          'Creation and setup options apply only to new-child or new-top-level worktrees.'
-        )
-      }
+      assertComposedWorkerStartParams(params, createsWorktree)
       const agent = params.agent
-      if (!params.terminal && (!agent || !isTuiAgent(agent))) {
-        throw new OrchestrationError(
-          'agent_unconfigured',
-          'A configured --agent is required when worker-start creates a terminal.'
-        )
-      }
       if (agent) {
         runtime.validateOrchestrationAgentLauncher(agent as TuiAgent)
       }
@@ -129,6 +103,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         baseBranch: params.baseBranch ?? null,
         terminal: params.terminal ?? null,
         agent: agent ?? null,
+        claudeAccountId: params.claudeAccountId ?? null,
+        codexAccountId: params.codexAccountId ?? null,
         timeoutMs: params.timeoutMs ?? 60_000,
         setup: createsWorktree ? (params.setup ?? 'run') : 'not_applicable',
         setupSource: createsWorktree
@@ -190,6 +166,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             worktreeId: resolvedWorktree!.id,
             agent: agent as TuiAgent,
             taskId: task.id,
+            claudeAccountId: params.claudeAccountId,
+            codexAccountId: params.codexAccountId,
             effects
           })
           terminalHandle = terminal.handle

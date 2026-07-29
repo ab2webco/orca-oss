@@ -227,6 +227,14 @@ type RemoteStartReceipt = {
 }
 
 function validateRemoteWorkerStart(params: WorkerStartInput, createsWorktree: boolean): void {
+  // Why: account selectors resolve against the local roster; the worker
+  // server has its own accounts, so a locally-resolved id is meaningless there.
+  if (params.claudeAccountId || params.codexAccountId) {
+    throw new OrchestrationError(
+      'invalid_argument',
+      '--claude-account and --codex-account cannot combine with --on; the connected server resolves accounts from its own roster.'
+    )
+  }
   if (createsWorktree && (!params.name || !params.repo)) {
     throw new OrchestrationError(
       'invalid_argument',
