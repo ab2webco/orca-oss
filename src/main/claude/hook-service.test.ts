@@ -275,7 +275,9 @@ describe('ClaudeHookService.install', () => {
       // vault settings.json points at it. Skipping the write because THIS config has a
       // user-owned line froze the script for every pinned vault — so a user with their own
       // status line silently stopped their own pinned accounts from ever getting an updated one.
-      const scriptPath = join(tmpHome, '.orca', 'agent-hooks', 'claude-statusline.sh')
+      // Windows writes claude-statusline.cmd, so a literal .sh here asserts a file that platform
+      // never creates — the constant keeps its own independent spelling instead of asking production.
+      const scriptPath = join(tmpHome, '.orca', 'agent-hooks', STATUSLINE_SCRIPT_FILE_NAME)
       expect(existsSync(scriptPath)).toBe(true)
       expect(readFileSync(scriptPath, 'utf-8')).toContain('statusline/claude')
 
