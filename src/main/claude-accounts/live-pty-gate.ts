@@ -244,11 +244,7 @@ export function reserveSharedClaudeAccountLaunch(accountId: string | null): stri
   ) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
-  if (
-    accountId === null
-      ? liveInjectedClaudePtyAccounts.size > 0 || injectedClaudeLaunchReservations.size > 0
-      : hasLiveInjectedClaudePtysForAccount(accountId)
-  ) {
+  if (accountId !== null && hasLiveInjectedClaudePtysForAccount(accountId)) {
     throw createAssignedWorktreeLaunchBlockError(accountId)
   }
   const reservationId = randomUUID()

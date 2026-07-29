@@ -420,7 +420,7 @@ describe('Claude live PTY gate', () => {
     )
     markInjectedClaudePtySpawned(ptyId, 'account-a')
     try {
-      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
+      expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow(
         'in use by an assigned worktree ("Feature A")'
       )
       expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow(
@@ -436,7 +436,7 @@ describe('Claude live PTY gate', () => {
     const ptyId = 'repo-1::/work/feature-a@@pane-1'
     markInjectedClaudePtySpawned(ptyId, 'account-a')
     try {
-      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
+      expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow(
         'in use by an assigned worktree ("feature-a")'
       )
     } finally {
@@ -444,11 +444,11 @@ describe('Claude live PTY gate', () => {
     }
   })
 
-  it('keeps the exact legacy message when the blocking PTY is not attributable', () => {
+  it('names the PTY id when the blocking PTY has no worktree attribution', () => {
     markInjectedClaudePtySpawned('injected-pty', 'account-a')
 
-    expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
-      'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
+    expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow(
+      'in use by an assigned worktree ("PTY injected-pty")'
     )
   })
 
@@ -483,6 +483,16 @@ describe('Claude live PTY gate', () => {
     } finally {
       releaseInjectedClaudeAccountLaunch(reservationId)
     }
+  })
+
+  it('scopes live injected blockers to the selected managed account', () => {
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+
+    const systemDefaultReservationId = reserveSharedClaudeAccountLaunch(null)
+    releaseSharedClaudeAccountLaunch(systemDefaultReservationId)
+    const otherAccountReservationId = reserveSharedClaudeAccountLaunch('account-b')
+    releaseSharedClaudeAccountLaunch(otherAccountReservationId)
+    expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow('assigned worktree')
   })
 
   it('protects a system-default shared launch even without a managed account id', () => {
@@ -611,10 +621,12 @@ describe('Claude live PTY gate', () => {
     endManagedClaudeAccountMutation('account-a')
   })
 
-  it('prevents unknown shared preparation from racing account-specific ownership', () => {
+  it('lets system-default shared preparation coexist with unrelated injected ownership', () => {
     const reservationId = reserveInjectedClaudeAccountLaunch('account-a')
     try {
-      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow('assigned worktree')
+      const sharedReservationId = reserveSharedClaudeAccountLaunch(null)
+      releaseSharedClaudeAccountLaunch(sharedReservationId)
+      expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow('assigned worktree')
     } finally {
       releaseInjectedClaudeAccountLaunch(reservationId)
     }
