@@ -217,7 +217,7 @@ describe('runManagedAccountSwitchRelaunch', () => {
     )
   })
 
-  it('does not launch a different terminal when the transcript copy fails', async () => {
+  it('puts the original agent back in the same PTY when the transcript copy fails', async () => {
     copySessionForAccountSwitch.mockResolvedValue({ ok: false, reason: 'source-not-found' })
 
     const result = await run()
@@ -226,10 +226,61 @@ describe('runManagedAccountSwitchRelaunch', () => {
     expect(store.claimAutomaticAgentResume).not.toHaveBeenCalled()
     expect(deliverLaunchPromptToAgentTab).not.toHaveBeenCalled()
     expect(store.createTab).not.toHaveBeenCalled()
-    expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
-      'wt-1',
-      expect.objectContaining({ claudeAccountId: TARGET_ACCOUNT.id })
-    )
+    // Why: the stop already killed the CLI, so aborting without this leaves a dead shell.
+    const restore = sendRuntimePtyInputVerified.mock.calls.at(-1)
+    expect(restore?.[2]).toContain('--resume')
+    expect(restore?.[2]).not.toContain('CLAUDE_CONFIG_DIR')
+    expect(waitForResumedAgent).toHaveBeenCalledTimes(1)
+    expect(beginClaudeAccountSwitch).not.toHaveBeenCalled()
+    // Why: a session restored on the origin must not leave the worktree pinned elsewhere.
+    expect(store.updateWorktreeMeta).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      message: expect.stringContaining('resumed the session on the original account')
+    })
+  })
+
+  it('says so when the original agent cannot be brought back', async () => {
+    copySessionForAccountSwitch.mockResolvedValue({ ok: false, reason: 'source-not-found' })
+    sendRuntimePtyInputVerified.mockResolvedValue(false)
+
+    const result = await run()
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'resume-failed',
+      message: expect.stringContaining('could not bring the session back')
+    })
+  })
+
+  it('restores the original agent when the pin update is rejected after the stop', async () => {
+    store.updateWorktreeMeta.mockRejectedValue(new Error('That Claude account no longer exists.'))
+
+    const result = await run()
+
+    expect(result).toMatchObject({ ok: false, reason: 'pin-failed' })
+    expect(sendRuntimePtyInputVerified.mock.calls.at(-1)?.[2]).toContain('--resume')
+    expect(beginClaudeAccountSwitch).not.toHaveBeenCalled()
+  })
+
+  it('does not touch the terminal when a runtime-incompatible switch fails to copy', async () => {
+    const wslTarget = claudeAccount({
+      id: 'wsl-target',
+      managedAuthRuntime: 'wsl',
+      wslDistro: 'Ubuntu'
+    })
+    store.settings = {
+      ...store.settings,
+      claudeManagedAccounts: [claudeAccount({ id: 'origin-1' }), wslTarget]
+    }
+    copySessionForAccountSwitch.mockResolvedValue({ ok: false, reason: 'source-not-found' })
+
+    const result = await run({ targetAccount: wslTarget })
+
+    // Why: nothing was stopped on this path, so there is no agent to restore.
+    expect(result).toMatchObject({ ok: false, reason: 'resume-failed' })
+    expect(stopForegroundAgent).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(store.createTab).not.toHaveBeenCalled()
   })
 
   it('reports "launched" when continue cannot be delivered', async () => {
@@ -327,15 +378,6 @@ describe('runManagedAccountSwitchRelaunch', () => {
 
     expect(result).toMatchObject({ ok: false, reason: 'stop-failed' })
     expect(store.updateWorktreeMeta).not.toHaveBeenCalled()
-    expect(store.createTab).not.toHaveBeenCalled()
-  })
-
-  it('fails without launching when the pin update is rejected', async () => {
-    store.updateWorktreeMeta.mockRejectedValue(new Error('That Claude account no longer exists.'))
-
-    const result = await run()
-
-    expect(result).toMatchObject({ ok: false, reason: 'pin-failed' })
     expect(store.createTab).not.toHaveBeenCalled()
   })
 })
