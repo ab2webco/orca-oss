@@ -18,7 +18,12 @@ import { useAppStore } from '@/store'
 import { resolveDropZone } from './tab-drop-zone'
 import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
-import { isLegacySharedCodexHome } from '../../../../shared/ai-vault-resume-preparation'
+import {
+  isLegacySharedCodexHome,
+  type AiVaultPrepareSessionResumeResult
+} from '../../../../shared/ai-vault-resume-preparation'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import { claudeResumeLaunchAccountFromUniverse } from '@/lib/ai-vault-session-resume-preparation'
 
 type PaneDropTarget = {
   groupId: string
@@ -209,17 +214,23 @@ export default function AiVaultSessionDropLayer({
           )
         )
       }
-      const preparation =
+      // Why: only this host's accounts can satisfy a Claude universe override,
+      // so remote (runtime/SSH) sessions skip preparation entirely (fail-safe).
+      const shouldResolveClaudeUniverse =
+        payload.agent === 'claude' && payload.sessionExecutionHostId === LOCAL_EXECUTION_HOST_ID
+      const shouldMaterializeLegacyCodexHome =
         payload.agent === 'codex' &&
         isLegacySharedCodexHome(payload.codexHome ?? null) &&
-        payload.sessionFilePath &&
-        payload.sessionExecutionHostId &&
         payload.codexHome !== undefined
+      const preparation: Promise<AiVaultPrepareSessionResumeResult> =
+        (shouldResolveClaudeUniverse || shouldMaterializeLegacyCodexHome) &&
+        payload.sessionFilePath &&
+        payload.sessionExecutionHostId
           ? window.api.aiVault.prepareSessionResume({
               agent: payload.agent,
               filePath: payload.sessionFilePath,
               executionHostId: payload.sessionExecutionHostId,
-              codexHome: payload.codexHome
+              codexHome: payload.codexHome ?? null
             })
           : Promise.resolve({ useRealCodexHome: false })
       void preparation
@@ -241,6 +252,9 @@ export default function AiVaultSessionDropLayer({
             ...(startup.envToDelete ? { envToDelete: startup.envToDelete } : {}),
             ...(startup.launchConfig ? { launchConfig: startup.launchConfig } : {}),
             ...(providerSession ? { providerSession } : {}),
+            // Why: resume must launch against the transcript-owning universe;
+            // throws into the catch below when the owning account was removed.
+            ...claudeResumeLaunchAccountFromUniverse(result.claudeUniverse),
             targetGroupId: dropTarget.groupId,
             splitDirection: dropTarget.zone === 'center' ? undefined : dropTarget.zone
           })

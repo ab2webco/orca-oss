@@ -687,6 +687,17 @@
             "triagePrompt": "Use {{value0}} to assign the Plane work item to me and set its priority to high."
           }
         }
+      },
+      "ai": {
+        "vault": {
+          "session": {
+            "resume": {
+              "preparation": {
+                "owningAccountRemoved": "The Claude account that owns this session was removed. Add that account again in Settings to resume it."
+              }
+            }
+          }
+        }
       }
     },
     "hooks": {

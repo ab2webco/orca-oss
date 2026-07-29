@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultSession } from '../../../shared/ai-vault-types'
-import { prepareAiVaultSessionForResume } from './ai-vault-session-resume-preparation'
+import {
+  claudeResumeLaunchAccountFromUniverse,
+  prepareAiVaultSessionForResume
+} from './ai-vault-session-resume-preparation'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -16,7 +19,7 @@ describe('prepareAiVaultSessionForResume', () => {
 
     const prepared = await prepareAiVaultSessionForResume(legacy)
 
-    expect(prepared.codexHome).toBeNull()
+    expect(prepared.session.codexHome).toBeNull()
     expect(prepareSessionResume).toHaveBeenCalledWith({
       agent: 'codex',
       filePath: legacy.filePath,
@@ -40,10 +43,80 @@ describe('prepareAiVaultSessionForResume', () => {
       stubPreparation(prepareSessionResume)
       const current = session({ codexHome })
 
-      await expect(prepareAiVaultSessionForResume(current)).resolves.toBe(current)
+      await expect(prepareAiVaultSessionForResume(current)).resolves.toEqual({ session: current })
       expect(prepareSessionResume).not.toHaveBeenCalled()
     }
   )
+
+  it('resolves the owning Claude universe for a local Claude session', async () => {
+    const prepareSessionResume = vi.fn().mockResolvedValue({
+      useRealCodexHome: false,
+      claudeUniverse: { kind: 'managed-account', accountId: 'account-1' }
+    })
+    stubPreparation(prepareSessionResume)
+    const claude = session({
+      agent: 'claude',
+      filePath:
+        '/Users/ada/Library/Application Support/orca/claude-accounts/account-1/auth/projects/-repo/session-1.jsonl'
+    })
+
+    const prepared = await prepareAiVaultSessionForResume(claude)
+
+    expect(prepared.session).toBe(claude)
+    expect(prepared.claudeUniverse).toEqual({ kind: 'managed-account', accountId: 'account-1' })
+    expect(prepareSessionResume).toHaveBeenCalledWith({
+      agent: 'claude',
+      filePath: claude.filePath,
+      codexHome: null,
+      executionHostId: 'local'
+    })
+  })
+
+  it('leaves the universe unresolved when preparation reports none', async () => {
+    stubPreparation(vi.fn().mockResolvedValue({ useRealCodexHome: false }))
+    const claude = session({ agent: 'claude', filePath: '/tmp/rollout.jsonl' })
+
+    const prepared = await prepareAiVaultSessionForResume(claude)
+
+    expect(prepared.session).toBe(claude)
+    expect(prepared.claudeUniverse).toBeUndefined()
+  })
+
+  it.each(['ssh:conn-1', 'runtime:env-1'] as const)(
+    'skips universe resolution for a Claude session owned by another host: %s',
+    async (executionHostId) => {
+      const prepareSessionResume = vi.fn()
+      stubPreparation(prepareSessionResume)
+      const claude = session({ agent: 'claude', executionHostId })
+
+      await expect(prepareAiVaultSessionForResume(claude)).resolves.toEqual({ session: claude })
+      expect(prepareSessionResume).not.toHaveBeenCalled()
+    }
+  )
+})
+
+describe('claudeResumeLaunchAccountFromUniverse', () => {
+  it('pins the launch to the owning managed account', () => {
+    expect(
+      claudeResumeLaunchAccountFromUniverse({ kind: 'managed-account', accountId: 'account-1' })
+    ).toEqual({ claudeAccountId: 'account-1' })
+  })
+
+  it('forces the shared home for a shared-home transcript', () => {
+    expect(claudeResumeLaunchAccountFromUniverse({ kind: 'shared-home' })).toEqual({
+      claudeAccountId: null
+    })
+  })
+
+  it('leaves the launch untouched without a universe verdict', () => {
+    expect(claudeResumeLaunchAccountFromUniverse(undefined)).toEqual({})
+  })
+
+  it('fails with a clear message when the owning account was removed', () => {
+    expect(() =>
+      claudeResumeLaunchAccountFromUniverse({ kind: 'missing-account', accountId: 'account-1' })
+    ).toThrow(/removed/i)
+  })
 })
 
 function stubPreparation(prepareSessionResume: ReturnType<typeof vi.fn>): void {
