@@ -13,16 +13,65 @@
  * it cannot look right either way.
  */
 
+import type {
+  ClaudeStatusLineItemKey,
+  ClaudeStatusLineItems
+} from '../../shared/claude-statusline-items'
+
 type StatuslineTrendGlyphs = {
   readonly rising: string
   readonly falling: string
   readonly steady: string
 }
 
-// Why 5 cells: measured against the 96-column budget with every field present. The widest
-// realistic line — announce banner, model, a bounded 22-column account and three bars — lands at
-// 95 columns; six cells per bar puts it at 98 and starts dropping the weekly quota.
-export const STATUSLINE_BAR_CELLS = 5
+// Why 5 is the floor: measured against the 96-column budget with every legacy field present.
+// The widest realistic line — announce banner, model, a bounded account and three bars — lands
+// at 95 columns; a sixth cell per bar puts it at 98 and starts dropping the weekly quota.
+export const STATUSLINE_BAR_CELLS_MIN = 5
+// Why 10 is the cap: past ten cells each extra cell resolves less than 5 points, which the
+// percentage printed next to the bar already says better.
+export const STATUSLINE_BAR_CELLS_MAX = 10
+
+// Nominal column cost of each optional field at the 5-cell baseline, separator included —
+// the same counted (never measured) widths the scripts budget with. Disabling a reclaimable
+// field frees its columns; enabling an added field (absent from the legacy line) spends them.
+const RECLAIMABLE_ITEM_COLUMNS: Partial<Record<ClaudeStatusLineItemKey, number>> = {
+  account: 25, // "@" + 21-column bounded local part + " · "
+  fiveHourQuota: 16, // "5h " + 5-cell bar + " 100%" + " · "
+  sevenDayQuota: 16, // "7d " + 5-cell bar + " 100%" + " · "
+  resetCountdown: 11 // mark + " 23h59m" + " · "
+}
+const ADDED_ITEM_COLUMNS: Partial<Record<ClaudeStatusLineItemKey, number>> = {
+  project: 27, // 24-column bounded directory name + " · "
+  cost: 11 // "$9999.99" + " · "
+}
+
+/**
+ * How many cells each bar gets, derived from which items are enabled.
+ *
+ * Why derived and not another constant: every field competes for the same assumed 96 columns,
+ * so the only honest way to grow a bar is to spend columns the user explicitly freed by
+ * turning fields off. Freed columns are split evenly across the enabled bars.
+ */
+export function deriveStatusLineBarCells(items: ClaudeStatusLineItems): number {
+  const bars = [items.context, items.fiveHourQuota, items.sevenDayQuota].filter(Boolean).length
+  if (bars === 0) {
+    return STATUSLINE_BAR_CELLS_MIN
+  }
+  let freed = 0
+  for (const [key, columns] of Object.entries(RECLAIMABLE_ITEM_COLUMNS)) {
+    if (!items[key as ClaudeStatusLineItemKey]) {
+      freed += columns
+    }
+  }
+  for (const [key, columns] of Object.entries(ADDED_ITEM_COLUMNS)) {
+    if (items[key as ClaudeStatusLineItemKey]) {
+      freed -= columns
+    }
+  }
+  const extra = Math.floor(Math.max(0, freed) / bars)
+  return Math.min(STATUSLINE_BAR_CELLS_MAX, STATUSLINE_BAR_CELLS_MIN + extra)
+}
 
 // Why 11 levels over 5 cells: a half-block doubles the resolution to one step per 10 points
 // without spending a sixth column, so 42% and 48% are still distinguishable at a glance.
@@ -68,22 +117,30 @@ export const STATUSLINE_RESET_MARK_UNICODE = '↻'
 export const STATUSLINE_RESET_MARK_ASCII = '>'
 
 /**
- * One bar per level, from empty to full.
+ * One bar per level, from empty to full, scaled to the requested cell count.
  *
  * Why floor and never round up: an overstated bar claims consumption that has not happened, and
- * reserving the all-full bar for a true 100% makes the exhausted state unmistakable.
+ * reserving the all-full bar for a true 100% makes the exhausted state unmistakable. Scaling in
+ * half-cell units keeps a 5-cell bar identical to the legacy table (level = half-cells) while a
+ * wider bar spreads the same 11 levels over more columns.
  */
-function barLevels(full: string, half: string, empty: string): readonly string[] {
+function barLevels(full: string, half: string, empty: string, cells: number): readonly string[] {
   return Array.from({ length: STATUSLINE_BAR_LEVELS }, (_unused, level) => {
-    const fullCells = Math.floor(level / 2)
-    const halfCells = level % 2
-    const emptyCells = STATUSLINE_BAR_CELLS - fullCells - halfCells
+    const scaledHalves = Math.floor((level * cells * 2) / (STATUSLINE_BAR_LEVELS - 1))
+    const fullCells = Math.floor(scaledHalves / 2)
+    const halfCells = scaledHalves % 2
+    const emptyCells = cells - fullCells - halfCells
     return `${full.repeat(fullCells)}${half.repeat(halfCells)}${empty.repeat(emptyCells)}`
   })
 }
 
-export const STATUSLINE_BAR_LEVELS_UNICODE = barLevels('█', '▌', '░')
-export const STATUSLINE_BAR_LEVELS_ASCII = barLevels('#', '=', '.')
+export function statuslineBarLevelsUnicode(cells: number): readonly string[] {
+  return barLevels('█', '▌', '░', cells)
+}
+
+export function statuslineBarLevelsAscii(cells: number): readonly string[] {
+  return barLevels('#', '=', '.', cells)
+}
 
 /**
  * `orca_statusline_gauge <percent>` — sets `orca_statusline_gauge_out` to the bar, or to empty
@@ -93,7 +150,7 @@ export const STATUSLINE_BAR_LEVELS_ASCII = barLevels('#', '=', '.')
  * octal inside `$(( ))` and is FATAL in dash, which would kill the script before it printed —
  * the same class of bug that once wedged the post stamp.
  */
-export function posixGaugeFunctionLines(): readonly string[] {
+export function posixGaugeFunctionLines(cells: number): readonly string[] {
   return [
     'orca_statusline_gauge() {',
     '  orca_statusline_gauge_out=',
@@ -102,7 +159,7 @@ export function posixGaugeFunctionLines(): readonly string[] {
     '  orca_statusline_gauge_level=$(( $1 / 10 ))',
     '  if [ "$orca_statusline_gauge_level" -gt 10 ]; then orca_statusline_gauge_level=10; fi',
     '  case "$orca_statusline_gauge_level" in',
-    ...STATUSLINE_BAR_LEVELS_UNICODE.map(
+    ...statuslineBarLevelsUnicode(cells).map(
       (bar, level) => `    ${level}) orca_statusline_gauge_out='${bar}' ;;`
     ),
     '  esac',
@@ -204,13 +261,14 @@ export function windowsResetCountdownLines(doneLabel: string): readonly string[]
 }
 
 /**
- * The lookup string every cmd bar is sliced out of: all levels concatenated, 5 characters each.
+ * The lookup string every cmd bar is sliced out of: all levels concatenated, `cells` characters
+ * each.
  *
  * Why a slice and not a chain of `if`s: cmd has no `case`, and eleven comparisons per metric
  * would be thirty-three lines of branch for a table that reads better as a table.
  */
-export function windowsGaugeTableLine(variable: string): string {
-  return `set "${variable}=${STATUSLINE_BAR_LEVELS_ASCII.join('')}"`
+export function windowsGaugeTableLine(variable: string, cells: number): string {
+  return `set "${variable}=${statuslineBarLevelsAscii(cells).join('')}"`
 }
 
 /**
@@ -224,9 +282,9 @@ export function windowsGaugeTableLine(variable: string): string {
 export function windowsGaugeLines(
   valueVar: string,
   targetVar: string,
-  tableVar: string
+  tableVar: string,
+  cells: number
 ): readonly string[] {
-  const cells = STATUSLINE_BAR_CELLS
   return [
     `set "${targetVar}="`,
     'set "ORCA_STATUSLINE_LEVEL="',

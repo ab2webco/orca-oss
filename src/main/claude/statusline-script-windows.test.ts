@@ -3,11 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { DEFAULT_CLAUDE_STATUSLINE_ITEMS } from '../../shared/claude-statusline-items'
 import { getWindowsManagedStatusLineScript } from './statusline-script-windows'
 import {
-  STATUSLINE_BAR_CELLS,
-  STATUSLINE_BAR_LEVELS_ASCII,
-  STATUSLINE_BAR_LEVELS_UNICODE,
+  deriveStatusLineBarCells,
+  statuslineBarLevelsAscii,
+  statuslineBarLevelsUnicode,
   STATUSLINE_RESET_MARK_ASCII,
   STATUSLINE_RESET_MAX_CHARS,
   STATUSLINE_TREND_ASCII,
@@ -16,6 +17,7 @@ import {
 
 const script = getWindowsManagedStatusLineScript()
 const lines = script.split('\r\n')
+const DEFAULT_BAR_CELLS = deriveStatusLineBarCells(DEFAULT_CLAUDE_STATUSLINE_ITEMS)
 
 function sliceBetween(start: string, end: string): string {
   const from = script.indexOf(start)
@@ -179,19 +181,21 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     // Why compare the two alphabets and not just the batch: the glyphs diverge because cmd reads
     // this file in the OEM codepage, but the levels must not — a pane that shows three filled
     // cells on macOS has to show three on Windows.
-    expect(STATUSLINE_BAR_LEVELS_ASCII).toHaveLength(STATUSLINE_BAR_LEVELS_UNICODE.length)
-    for (const [level, ascii] of STATUSLINE_BAR_LEVELS_ASCII.entries()) {
-      expect([...ascii]).toHaveLength(STATUSLINE_BAR_CELLS)
+    const asciiLevels = statuslineBarLevelsAscii(DEFAULT_BAR_CELLS)
+    const unicodeLevels = statuslineBarLevelsUnicode(DEFAULT_BAR_CELLS)
+    expect(asciiLevels).toHaveLength(unicodeLevels.length)
+    for (const [level, ascii] of asciiLevels.entries()) {
+      expect([...ascii]).toHaveLength(DEFAULT_BAR_CELLS)
       expect(ascii.replaceAll('#', '█').replaceAll('=', '▌').replaceAll('.', '░')).toBe(
-        STATUSLINE_BAR_LEVELS_UNICODE[level]
+        unicodeLevels[level]
       )
     }
-    expect(script).toContain(`set "ORCA_STATUSLINE_BARS=${STATUSLINE_BAR_LEVELS_ASCII.join('')}"`)
+    expect(script).toContain(`set "ORCA_STATUSLINE_BARS=${asciiLevels.join('')}"`)
     // Why the for-variable offset: a %VAR% offset is expanded at parse time and would still hold
     // the previous tick's value, while a for-variable resolves before delayed expansion.
     for (const target of ['CTX', 'FIVE', 'SEVEN']) {
       expect(script).toContain(
-        `for %%o in (!ORCA_STATUSLINE_OFFSET!) do set "ORCA_STATUSLINE_${target}_BAR=!ORCA_STATUSLINE_BARS:~%%o,${STATUSLINE_BAR_CELLS}!"`
+        `for %%o in (!ORCA_STATUSLINE_OFFSET!) do set "ORCA_STATUSLINE_${target}_BAR=!ORCA_STATUSLINE_BARS:~%%o,${DEFAULT_BAR_CELLS}!"`
       )
       expect(script).toContain(
         `if defined ORCA_STATUSLINE_${target} set /a "ORCA_STATUSLINE_LEVEL=ORCA_STATUSLINE_${target}/10" 2>nul`
@@ -269,7 +273,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     // mojibake through the OEM codepage — the same trade the `…` vs `...` elision makes.
     expect(STATUSLINE_RESET_MARK_ASCII).toBe('>')
     expect(Object.values(STATUSLINE_TREND_ASCII)).not.toContain(STATUSLINE_RESET_MARK_ASCII)
-    expect(STATUSLINE_BAR_LEVELS_ASCII.join('')).not.toContain(STATUSLINE_RESET_MARK_ASCII)
+    expect(statuslineBarLevelsAscii(DEFAULT_BAR_CELLS).join('')).not.toContain(
+      STATUSLINE_RESET_MARK_ASCII
+    )
     // Why it can be a redirection character at all: every line that embeds it keeps it inside a
     // fully quoted `set`, and it reaches stdout through delayed expansion, which cmd does not
     // re-parse for redirection.

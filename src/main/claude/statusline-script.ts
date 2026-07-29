@@ -1,5 +1,18 @@
+import {
+  normalizeClaudeStatusLineItems,
+  type ClaudeStatusLineItems
+} from '../../shared/claude-statusline-items'
+import {
+  percentGuardLines,
+  posixAccountLines,
+  posixContextLines,
+  posixCostLines,
+  posixModelLines,
+  posixProjectLines
+} from './statusline-posix-fields'
 import { getWindowsManagedStatusLineScript } from './statusline-script-windows'
 import {
+  deriveStatusLineBarCells,
   posixContextTrendLines,
   posixGaugeFunctionLines,
   posixResetCountdownLines,
@@ -14,24 +27,31 @@ import {
 // reading the real terminal width needs a subprocess on a path that runs ~3x/sec.
 const STATUSLINE_MAX_WIDTH = 96
 
-// Why a canonical-decimal allow-list rather than a digits test: a leading-zero value is invalid
-// octal inside `$(( ))` and is FATAL in dash, so the trend arithmetic below would kill the script
-// before it printed anything. Anything unexpected renders as absent, never as a false 0%.
-function percentGuardLines(variable: string): readonly string[] {
-  return [
-    `case "$${variable}" in 0|[1-9]|[1-9][0-9]*) ;; *) ${variable}= ;; esac`,
-    `if [ "\${#${variable}}" -gt 3 ]; then ${variable}=; fi`
-  ]
+// Why a module-level source instead of threading the store through every install path: the
+// script is written from boot install, vault pinning, and the Settings toggle alike, and all of
+// them must agree on the persisted choice without each carrying a Store reference.
+type ClaudeStatusLineItemsSource = () => Partial<ClaudeStatusLineItems> | undefined
+let claudeStatusLineItemsSource: ClaudeStatusLineItemsSource = () => undefined
+
+export function configureClaudeStatusLineItemsSource(source: ClaudeStatusLineItemsSource): void {
+  claudeStatusLineItemsSource = source
 }
 
 // Why: Claude Code pipes `rate_limits` to the statusLine command on every turn; forwarding
 // it gives Orca live usage without spending the OAuth usage endpoint's tight budget.
 // stdout IS the user's status line, so every invocation prints model + context usage
 // before any guard — only the POST is debounced; a debounced print would blank the line.
-export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'): string {
+export function getManagedStatusLineScript(
+  target: 'local' | 'posix' = 'local',
+  items?: Partial<ClaudeStatusLineItems>
+): string {
+  const resolved = normalizeClaudeStatusLineItems(items ?? claudeStatusLineItemsSource())
   if (target === 'local' && process.platform === 'win32') {
-    return getWindowsManagedStatusLineScript()
+    return getWindowsManagedStatusLineScript(resolved)
   }
+  const cells = deriveStatusLineBarCells(resolved)
+  const anyQuota = resolved.fiveHourQuota || resolved.sevenDayQuota
+  const anyBar = resolved.context || anyQuota
 
   return [
     '#!/bin/sh',
@@ -44,86 +64,51 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     'if [ -z "$payload" ]; then',
     '  exit 0',
     'fi',
-    // Why: print before every exit path — most ticks carry no rate_limits and throttled ticks
-    // exit early, so a print anywhere later would flicker. Builtins only: this runs ~3x/sec.
-    'orca_statusline_model=',
-    'case "$payload" in',
-    '  *\'"display_name"\'*)',
-    '    orca_statusline_model=${payload#*\'"display_name"\'}',
-    "    orca_statusline_model=${orca_statusline_model#*'\"'}",
-    "    orca_statusline_model=${orca_statusline_model%%'\"'*}",
-    '    ;;',
-    'esac',
-    // Why: mirror parseModelLabel's display_name → model.id fallback so older CLIs still label the line.
-    'if [ -z "$orca_statusline_model" ]; then',
-    '  case "$payload" in',
-    '    *\'"model"\'*)',
-    '      orca_statusline_model=${payload#*\'"model"\'}',
-    '      case "$orca_statusline_model" in',
-    '        *\'"id"\'*)',
-    '          orca_statusline_model=${orca_statusline_model#*\'"id"\'}',
-    "          orca_statusline_model=${orca_statusline_model#*'\"'}",
-    "          orca_statusline_model=${orca_statusline_model%%'\"'*}",
-    '          ;;',
-    '        *) orca_statusline_model= ;;',
-    '      esac',
-    '      ;;',
-    '  esac',
-    'fi',
-    // Why: truncate at rate_limits so its used_percentage can never masquerade as context usage
-    // when a CLI drift drops context_window's own field.
-    'orca_statusline_context=',
-    'case "$payload" in',
-    '  *\'"context_window"\'*)',
-    '    orca_statusline_context=${payload#*\'"context_window"\'}',
-    '    orca_statusline_context=${orca_statusline_context%%\'"rate_limits"\'*}',
-    '    case "$orca_statusline_context" in',
-    '      *\'"used_percentage"\'*)',
-    '        orca_statusline_context=${orca_statusline_context#*\'"used_percentage"\'}',
-    '        orca_statusline_context=${orca_statusline_context#*:}',
-    '        orca_statusline_context=${orca_statusline_context#"${orca_statusline_context%%[![:space:]]*}"}',
-    '        orca_statusline_context=${orca_statusline_context%%[!0-9]*}',
-    '        ;;',
-    '      *) orca_statusline_context= ;;',
-    '    esac',
-    '    ;;',
-    'esac',
-    ...percentGuardLines('orca_statusline_context'),
+    ...(resolved.model ? posixModelLines() : []),
+    ...(resolved.context ? posixContextLines() : []),
+    ...(resolved.project ? posixProjectLines() : []),
+    ...(resolved.cost ? posixCostLines() : []),
     // Why bound each window at its own first `}`: five_hour and seven_day both carry
     // used_percentage, so truncating by sibling key name would break on any key reorder.
-    'orca_statusline_five=',
-    'orca_statusline_seven=',
-    'case "$payload" in',
-    '  *\'"rate_limits"\'*)',
-    '    orca_statusline_limits=${payload#*\'"rate_limits"\'}',
-    '    for orca_statusline_window in five_hour seven_day; do',
-    '      orca_statusline_pct=',
-    '      case "$orca_statusline_limits" in',
-    '        *"\\"${orca_statusline_window}\\""*)',
-    '          orca_statusline_pct=${orca_statusline_limits#*"\\"${orca_statusline_window}\\""}',
-    '          orca_statusline_pct=${orca_statusline_pct%%\\}*}',
-    '          case "$orca_statusline_pct" in',
-    '            *\'"used_percentage"\'*)',
-    '              orca_statusline_pct=${orca_statusline_pct#*\'"used_percentage"\'}',
-    '              orca_statusline_pct=${orca_statusline_pct#*:}',
-    '              orca_statusline_pct=${orca_statusline_pct#"${orca_statusline_pct%%[![:space:]]*}"}',
-    '              orca_statusline_pct=${orca_statusline_pct%%[!0-9]*}',
-    '              ;;',
-    '            *) orca_statusline_pct= ;;',
-    '          esac',
-    '          ;;',
-    '      esac',
-    '      case "$orca_statusline_window" in',
-    '        five_hour) orca_statusline_five=$orca_statusline_pct ;;',
-    '        *) orca_statusline_seven=$orca_statusline_pct ;;',
-    '      esac',
-    '    done',
-    '    ;;',
-    'esac',
-    ...percentGuardLines('orca_statusline_five'),
-    ...percentGuardLines('orca_statusline_seven'),
+    ...(anyQuota
+      ? [
+          'orca_statusline_five=',
+          'orca_statusline_seven=',
+          'case "$payload" in',
+          '  *\'"rate_limits"\'*)',
+          '    orca_statusline_limits=${payload#*\'"rate_limits"\'}',
+          '    for orca_statusline_window in five_hour seven_day; do',
+          '      orca_statusline_pct=',
+          '      case "$orca_statusline_limits" in',
+          '        *"\\"${orca_statusline_window}\\""*)',
+          '          orca_statusline_pct=${orca_statusline_limits#*"\\"${orca_statusline_window}\\""}',
+          '          orca_statusline_pct=${orca_statusline_pct%%\\}*}',
+          '          case "$orca_statusline_pct" in',
+          '            *\'"used_percentage"\'*)',
+          '              orca_statusline_pct=${orca_statusline_pct#*\'"used_percentage"\'}',
+          '              orca_statusline_pct=${orca_statusline_pct#*:}',
+          '              orca_statusline_pct=${orca_statusline_pct#"${orca_statusline_pct%%[![:space:]]*}"}',
+          '              orca_statusline_pct=${orca_statusline_pct%%[!0-9]*}',
+          '              ;;',
+          '            *) orca_statusline_pct= ;;',
+          '          esac',
+          '          ;;',
+          '      esac',
+          '      case "$orca_statusline_window" in',
+          '        five_hour) orca_statusline_five=$orca_statusline_pct ;;',
+          '        *) orca_statusline_seven=$orca_statusline_pct ;;',
+          '      esac',
+          '    done',
+          '    ;;',
+          'esac',
+          ...percentGuardLines('orca_statusline_five'),
+          ...percentGuardLines('orca_statusline_seven')
+        ]
+      : []),
     // Why key the account cache on the config dir's own directory name: it is the account id,
     // so a repinned worktree can never render the previous account's label from a stale cache.
+    // The key derivation always runs — the intro marker and the reset countdown reuse it even
+    // when the account item itself is turned off.
     'orca_statusline_account=',
     'orca_statusline_acct_key=',
     'if [ -n "$CLAUDE_CONFIG_DIR" ]; then',
@@ -134,49 +119,7 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     "    ''|*[!A-Za-z0-9._-]*) orca_statusline_acct_key= ;;",
     '  esac',
     'fi',
-    'if [ -n "$orca_statusline_acct_key" ]; then',
-    '  orca_statusline_acct_cache="${TMPDIR:-/tmp}/orca-claude-statusline-acct-${orca_statusline_acct_key}"',
-    '  if [ -r "$orca_statusline_acct_cache" ]; then',
-    '    IFS= read -r orca_statusline_account <"$orca_statusline_acct_cache" 2>/dev/null || :',
-    '  fi',
-    // Why read the vault file at most once per account: this runs ~3x/sec, so the cache is what
-    // keeps the account label free. A miss costs one small read, never a subprocess.
-    '  if [ -z "$orca_statusline_account" ] && [ -r "${CLAUDE_CONFIG_DIR}/oauth-account.json" ]; then',
-    '    orca_statusline_acct_raw=',
-    '    while IFS= read -r orca_statusline_acct_chunk || [ -n "$orca_statusline_acct_chunk" ]; do',
-    '      orca_statusline_acct_raw="${orca_statusline_acct_raw}${orca_statusline_acct_chunk}"',
-    '    done <"${CLAUDE_CONFIG_DIR}/oauth-account.json"',
-    '    case "$orca_statusline_acct_raw" in',
-    '      *\'"emailAddress"\'*)',
-    '        orca_statusline_account=${orca_statusline_acct_raw#*\'"emailAddress"\'}',
-    "        orca_statusline_account=${orca_statusline_account#*'\"'}",
-    "        orca_statusline_account=${orca_statusline_account%%'\"'*}",
-    '        ;;',
-    '      *) orca_statusline_account= ;;',
-    '    esac',
-    '    if [ -n "$orca_statusline_account" ]; then',
-    '      printf \'%s\' "$orca_statusline_account" >"$orca_statusline_acct_cache" 2>/dev/null || :',
-    '    fi',
-    '  fi',
-    'fi',
-    // Why drop the domain with no trailing @: the local part is what distinguishes several
-    // accounts on one domain, and the rendered field's leading @ is already the account mark \u2014
-    // keeping the elision's @ too printed a double sigil (@user@) on every line.
-    'case "$orca_statusline_account" in',
-    '  *@*) orca_statusline_account=${orca_statusline_account%%@*} ;;',
-    'esac',
-    // Why bound the local part too: an unusually long address would otherwise be the one field
-    // that can blow the whole line, and the ladder below would then drop quota to pay for it.
-    // Why track the width separately from here on: `\u2026` is one column but three bytes, and
-    // `${#}` counts bytes under dash \u2014 measuring the rendered string would over-charge the budget.
-    'orca_statusline_account_w=${#orca_statusline_account}',
-    'if [ "${#orca_statusline_account}" -gt 21 ]; then',
-    '  while [ "${#orca_statusline_account}" -gt 20 ]; do',
-    '    orca_statusline_account=${orca_statusline_account%?}',
-    '  done',
-    '  orca_statusline_account="${orca_statusline_account}\u2026"',
-    '  orca_statusline_account_w=21',
-    'fi',
+    ...(resolved.account ? posixAccountLines() : []),
     // Why announce once per pane: the line is requested ~3x/sec, so a banner on every tick would
     // strobe. Separate stamp from the POST throttle — that one governs the network, not the render.
     'orca_statusline_intro=',
@@ -192,9 +135,9 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     '    : >"$orca_statusline_intro_stamp" 2>/dev/null || :',
     '  fi',
     'fi',
-    ...posixContextTrendLines(),
-    ...posixResetCountdownLines(),
-    ...posixGaugeFunctionLines(),
+    ...(resolved.context ? posixContextTrendLines() : []),
+    ...(resolved.resetCountdown ? posixResetCountdownLines() : []),
+    ...(anyBar ? posixGaugeFunctionLines(cells) : []),
     // Why columns are counted and never measured: a bar cell and the `·` separator are multi-byte,
     // and `${#}` counts bytes under dash — measuring would charge 32 phantom columns for three
     // bars and drop quota that actually fits. Every part's width is known at build time instead.
@@ -221,43 +164,88 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     '  fi',
     '  orca_statusline_append "$2" "$3"',
     '}',
-    'orca_statusline_gauge "$orca_statusline_context"',
-    'orca_statusline_ctx_bar=$orca_statusline_gauge_out',
-    'orca_statusline_gauge "$orca_statusline_five"',
-    'orca_statusline_five_bar=$orca_statusline_gauge_out',
-    'orca_statusline_gauge "$orca_statusline_seven"',
-    'orca_statusline_seven_bar=$orca_statusline_gauge_out',
+    ...(resolved.context
+      ? [
+          'orca_statusline_gauge "$orca_statusline_context"',
+          'orca_statusline_ctx_bar=$orca_statusline_gauge_out'
+        ]
+      : []),
+    ...(resolved.fiveHourQuota
+      ? [
+          'orca_statusline_gauge "$orca_statusline_five"',
+          'orca_statusline_five_bar=$orca_statusline_gauge_out'
+        ]
+      : []),
+    ...(resolved.sevenDayQuota
+      ? [
+          'orca_statusline_gauge "$orca_statusline_seven"',
+          'orca_statusline_seven_bar=$orca_statusline_gauge_out'
+        ]
+      : []),
     'orca_statusline_line=',
     'orca_statusline_width=0',
     'orca_statusline_full=',
-    // Why identity, model and context are the fixed prefix: all three are short and bounded, so
-    // dropping them buys almost no width while costing the two things the line exists to say.
+    // Why identity, project, model and context are the fixed prefix: all four are short and
+    // bounded, so dropping them buys almost no width while costing the things the line exists to
+    // say — and the project never falling is the point: in a narrow pane it was the first thing
+    // the old cascade hid, and it is what the user most misses.
     'orca_statusline_append "$orca_statusline_intro" "${#orca_statusline_intro}"',
-    'orca_statusline_append "$orca_statusline_model" "${#orca_statusline_model}"',
+    ...(resolved.project
+      ? ['orca_statusline_append "$orca_statusline_project" "$orca_statusline_project_w"']
+      : []),
+    ...(resolved.model
+      ? ['orca_statusline_append "$orca_statusline_model" "${#orca_statusline_model}"']
+      : []),
     // Why no word for "used": the bar fills as consumption grows, which says it in every language —
     // this script never reaches translate(), so an English label would clash with a Spanish UI.
-    'if [ -n "$orca_statusline_context" ]; then',
-    '  orca_statusline_ctx_field="ctx ${orca_statusline_ctx_bar:+$orca_statusline_ctx_bar }${orca_statusline_context}%${orca_statusline_trend:+ $orca_statusline_trend}"',
-    '  orca_statusline_ctx_w=$(( ${#orca_statusline_context} + 5 ))',
-    '  if [ -n "$orca_statusline_ctx_bar" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + 6 )); fi',
-    '  if [ -n "$orca_statusline_trend" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + 2 )); fi',
-    '  orca_statusline_append "$orca_statusline_ctx_field" "$orca_statusline_ctx_w"',
-    'fi',
+    ...(resolved.context
+      ? [
+          'if [ -n "$orca_statusline_context" ]; then',
+          '  orca_statusline_ctx_field="ctx ${orca_statusline_ctx_bar:+$orca_statusline_ctx_bar }${orca_statusline_context}%${orca_statusline_trend:+ $orca_statusline_trend}"',
+          '  orca_statusline_ctx_w=$(( ${#orca_statusline_context} + 5 ))',
+          `  if [ -n "$orca_statusline_ctx_bar" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + ${cells + 1} )); fi`,
+          '  if [ -n "$orca_statusline_trend" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + 2 )); fi',
+          '  orca_statusline_append "$orca_statusline_ctx_field" "$orca_statusline_ctx_w"',
+          'fi'
+        ]
+      : []),
     // Priority order, and therefore the order these fall in: the account truncates before it
-    // disappears, then the session quota, then the weekly one. Context never falls.
-    'orca_statusline_try "$orca_statusline_account" "@$orca_statusline_account" \\',
-    '  $(( orca_statusline_account_w + 1 ))',
-    'orca_statusline_try "$orca_statusline_five" \\',
-    '  "5h ${orca_statusline_five_bar:+$orca_statusline_five_bar }${orca_statusline_five}%" \\',
-    '  $(( ${#orca_statusline_five} + 10 ))',
-    'orca_statusline_try "$orca_statusline_seven" \\',
-    '  "7d ${orca_statusline_seven_bar:+$orca_statusline_seven_bar }${orca_statusline_seven}%" \\',
-    '  $(( ${#orca_statusline_seven} + 10 ))',
+    // disappears, then the session quota, then the weekly one, then the cost. Context never falls.
+    ...(resolved.account
+      ? [
+          'orca_statusline_try "$orca_statusline_account" "@$orca_statusline_account" \\',
+          '  $(( orca_statusline_account_w + 1 ))'
+        ]
+      : []),
+    ...(resolved.fiveHourQuota
+      ? [
+          'orca_statusline_try "$orca_statusline_five" \\',
+          '  "5h ${orca_statusline_five_bar:+$orca_statusline_five_bar }${orca_statusline_five}%" \\',
+          `  $(( \${#orca_statusline_five} + ${cells + 5} ))`
+        ]
+      : []),
+    ...(resolved.sevenDayQuota
+      ? [
+          'orca_statusline_try "$orca_statusline_seven" \\',
+          '  "7d ${orca_statusline_seven_bar:+$orca_statusline_seven_bar }${orca_statusline_seven}%" \\',
+          `  $(( \${#orca_statusline_seven} + ${cells + 5} ))`
+        ]
+      : []),
+    ...(resolved.cost
+      ? [
+          // Why the cost is ASCII by construction: its byte length is its column width.
+          'orca_statusline_try "$orca_statusline_cost" "$orca_statusline_cost" "${#orca_statusline_cost}"'
+        ]
+      : []),
     // Why the countdown falls first: level and direction are what the line exists to say, and a
     // reset is context on top of them — never worth the weekly quota it would push off a narrow pane.
-    'orca_statusline_try "$orca_statusline_reset" \\',
-    `  "${STATUSLINE_RESET_MARK_UNICODE} $orca_statusline_reset" \\`,
-    '  $(( ${#orca_statusline_reset} + 2 ))',
+    ...(resolved.resetCountdown
+      ? [
+          'orca_statusline_try "$orca_statusline_reset" \\',
+          `  "${STATUSLINE_RESET_MARK_UNICODE} $orca_statusline_reset" \\`,
+          '  $(( ${#orca_statusline_reset} + 2 ))'
+        ]
+      : []),
     'if [ -n "$orca_statusline_line" ]; then',
     '  printf \'%s\\n\' "$orca_statusline_line"',
     'fi',

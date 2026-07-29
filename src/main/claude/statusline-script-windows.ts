@@ -1,5 +1,19 @@
+import {
+  normalizeClaudeStatusLineItems,
+  type ClaudeStatusLineItems
+} from '../../shared/claude-statusline-items'
 import { WINDOWS_HOOK_STDIN_READER } from '../agent-hooks/hook-stdin-contract'
 import {
+  budgetedFieldLines,
+  quotaWindowLines,
+  STATUSLINE_WINDOWS_EMIT_LABEL,
+  windowsContextLines,
+  windowsCostLines,
+  windowsModelLines,
+  windowsProjectLines
+} from './statusline-windows-fields'
+import {
+  deriveStatusLineBarCells,
   STATUSLINE_RESET_MARK_ASCII,
   windowsContextTrendLines,
   windowsGaugeLines,
@@ -13,64 +27,15 @@ import {
 
 const STATUSLINE_CLEANUP_LABEL = 'orca_statusline_cleanup'
 const STATUSLINE_PROBE_LABEL = 'orca_statusline_probe'
-const STATUSLINE_EMIT_LABEL = 'orca_statusline_emit'
+const STATUSLINE_EMIT_LABEL = STATUSLINE_WINDOWS_EMIT_LABEL
 const STATUSLINE_INTRO_LABEL = 'orca_statusline_intro'
-const STATUSLINE_ACCOUNT_LABEL = 'orca_statusline_account'
+const STATUSLINE_ACCT_KEY_DONE_LABEL = 'orca_statusline_acct_key_done'
 const STATUSLINE_SEVEN_LABEL = 'orca_statusline_quota_seven'
+const STATUSLINE_QUOTA_DONE_LABEL = 'orca_statusline_quota_done'
 const STATUSLINE_TREND_WRITE_LABEL = 'orca_statusline_trend_write'
 const STATUSLINE_TREND_DONE_LABEL = 'orca_statusline_trend_done'
 const STATUSLINE_RESET_DONE_LABEL = 'orca_statusline_reset_done'
-const STATUSLINE_RESET_FIELD_LABEL = 'orca_statusline_field_reset'
 const STATUSLINE_BAR_TABLE_VAR = 'ORCA_STATUSLINE_BARS'
-// Why 96: the POSIX branch's budget, kept identical so a pane renders the same width on either OS.
-// Why a raw substring test still measures it correctly here: this variant is ASCII by contract,
-// so one byte is one column — the POSIX branch has to count columns because its bars are not.
-const STATUSLINE_MAX_WIDTH = 96
-
-/**
- * One `rate_limits` window, bounded at its own first `}`.
- *
- * Why bound before searching: five_hour and seven_day both carry used_percentage, so a window
- * that omits its own would otherwise borrow its sibling's — and any key reorder swaps the two.
- * Quotes become commas first because `for /f` cannot take a quote-bearing string, and the `x`
- * prefix keeps token 1 non-empty so a leading `}` can never shift the split.
- */
-function quotaWindowLines(windowKey: string, targetVar: string, doneLabel: string): string[] {
-  return [
-    `set "ORCA_STATUSLINE_WINDOW=!ORCA_STATUSLINE_LIMITS:*"${windowKey}"=!"`,
-    `if "!ORCA_STATUSLINE_WINDOW!"=="!ORCA_STATUSLINE_LIMITS!" goto :${doneLabel}`,
-    'set "ORCA_STATUSLINE_WINDOW=!ORCA_STATUSLINE_WINDOW:"=,!"',
-    'set "ORCA_STATUSLINE_SCOPE="',
-    'for /f "delims=}" %%w in ("x!ORCA_STATUSLINE_WINDOW!") do set "ORCA_STATUSLINE_SCOPE=%%w"',
-    'set "ORCA_STATUSLINE_PCT=!ORCA_STATUSLINE_SCOPE:*,used_percentage,=!"',
-    `if "!ORCA_STATUSLINE_PCT!"=="!ORCA_STATUSLINE_SCOPE!" goto :${doneLabel}`,
-    'set "ORCA_STATUSLINE_PCT=!ORCA_STATUSLINE_PCT:*:=!"',
-    'set "ORCA_STATUSLINE_PCT=!ORCA_STATUSLINE_PCT:~0,16!"',
-    'set "ORCA_STATUSLINE_PCT=!ORCA_STATUSLINE_PCT: =!"',
-    'set "ORCA_STATUSLINE_VALUE="',
-    'for /f "delims=.," %%p in ("!ORCA_STATUSLINE_PCT!") do if not defined ORCA_STATUSLINE_VALUE set "ORCA_STATUSLINE_VALUE=%%p"',
-    // Why digits-only plus a 3-char cap: a missing value must render nothing, never a false 0%.
-    'for /f "delims=0123456789" %%d in ("!ORCA_STATUSLINE_VALUE!") do set "ORCA_STATUSLINE_VALUE="',
-    'if defined ORCA_STATUSLINE_VALUE if not "!ORCA_STATUSLINE_VALUE:~3!"=="" set "ORCA_STATUSLINE_VALUE="',
-    `set "${targetVar}=!ORCA_STATUSLINE_VALUE!"`
-  ]
-}
-
-/**
- * One optional trailing field, admitted only if the whole line still fits the budget.
- *
- * Why goto-emit instead of skipping to the next field: admitting a shorter field behind one that
- * did not fit inverts the priority order the ladder exists to express.
- */
-function budgetedFieldLines(valueVar: string, rendered: string, nextLabel: string): string[] {
-  return [
-    `if not defined ${valueVar} goto :${nextLabel}`,
-    `set "ORCA_STATUSLINE_NEXT=${rendered}"`,
-    `if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_LINE! | ${rendered}"`,
-    `if not "!ORCA_STATUSLINE_NEXT:~${STATUSLINE_MAX_WIDTH}!"=="" goto :${STATUSLINE_EMIT_LABEL}`,
-    'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_NEXT!"'
-  ]
-}
 
 /**
  * cmd.exe variant of the managed statusline script.
@@ -78,7 +43,61 @@ function budgetedFieldLines(valueVar: string, rendered: string, nextLabel: strin
  * Why its own module: the POSIX and batch generators share nothing but the payload contract,
  * and keeping both in one file pushed it past the line cap.
  */
-export function getWindowsManagedStatusLineScript(): string {
+export function getWindowsManagedStatusLineScript(items?: Partial<ClaudeStatusLineItems>): string {
+  const resolved = normalizeClaudeStatusLineItems(items)
+  const cells = deriveStatusLineBarCells(resolved)
+  const anyQuota = resolved.fiveHourQuota || resolved.sevenDayQuota
+  const anyBar = resolved.context || anyQuota
+
+  // The trailing ladder, in priority order — later entries fall first when columns run out.
+  const ladder: { valueVar: string; rendered: string; label: string | null }[] = []
+  if (resolved.account) {
+    ladder.push({
+      valueVar: 'ORCA_STATUSLINE_ACCOUNT',
+      rendered: '@!ORCA_STATUSLINE_ACCOUNT!',
+      label: null
+    })
+  }
+  if (resolved.fiveHourQuota) {
+    ladder.push({
+      valueVar: 'ORCA_STATUSLINE_FIVE',
+      rendered: '5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%',
+      label: 'orca_statusline_field_five'
+    })
+  }
+  if (resolved.sevenDayQuota) {
+    ladder.push({
+      valueVar: 'ORCA_STATUSLINE_SEVEN',
+      rendered: '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
+      label: 'orca_statusline_field_seven'
+    })
+  }
+  if (resolved.cost) {
+    ladder.push({
+      valueVar: 'ORCA_STATUSLINE_COST',
+      rendered: '!ORCA_STATUSLINE_COST!',
+      label: 'orca_statusline_field_cost'
+    })
+  }
+  if (resolved.resetCountdown) {
+    // Why the countdown is last: it is context on top of the level, never worth the weekly quota.
+    ladder.push({
+      valueVar: 'ORCA_STATUSLINE_RESET',
+      rendered: `${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`,
+      label: 'orca_statusline_field_reset'
+    })
+  }
+  const ladderLines: string[] = []
+  for (const [index, entry] of ladder.entries()) {
+    if (entry.label !== null) {
+      ladderLines.push(`:${entry.label}`)
+    }
+    const next = ladder[index + 1]
+    ladderLines.push(
+      ...budgetedFieldLines(entry.valueVar, entry.rendered, next?.label ?? STATUSLINE_EMIT_LABEL)
+    )
+  }
+
   return [
     '@echo off',
     'setlocal',
@@ -105,54 +124,44 @@ export function getWindowsManagedStatusLineScript(): string {
     'set "ORCA_STATUSLINE_CTX="',
     'set "ORCA_STATUSLINE_LINE="',
     `if not defined ORCA_STATUSLINE_JSON goto :${STATUSLINE_EMIT_LABEL}`,
-    // Why: strip through the value's opening quote, turn remaining quotes into delimiters,
-    // and take token 1 — pure-builtin field extraction with no subprocess per tick.
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_JSON:*"display_name"=!"',
-    'if "!ORCA_STATUSLINE_REST!"=="!ORCA_STATUSLINE_JSON!" goto :orca_statusline_model_id',
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:*"=!"',
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:"=,!"',
-    'if "!ORCA_STATUSLINE_REST:~0,1!"=="," goto :orca_statusline_model_id',
-    'for /f "delims=," %%m in ("!ORCA_STATUSLINE_REST!") do if not defined ORCA_STATUSLINE_MODEL set "ORCA_STATUSLINE_MODEL=%%m"',
-    ':orca_statusline_model_id',
-    // Why: mirror parseModelLabel's display_name → model.id fallback so older CLIs still label the line.
-    'if defined ORCA_STATUSLINE_MODEL goto :orca_statusline_context',
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_JSON:*"model"=!"',
-    'if "!ORCA_STATUSLINE_REST!"=="!ORCA_STATUSLINE_JSON!" goto :orca_statusline_context',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_REST:*"id"=!"',
-    'if "!ORCA_STATUSLINE_NEXT!"=="!ORCA_STATUSLINE_REST!" goto :orca_statusline_context',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT:*"=!"',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT:"=,!"',
-    'if "!ORCA_STATUSLINE_NEXT:~0,1!"=="," goto :orca_statusline_context',
-    'for /f "delims=," %%m in ("!ORCA_STATUSLINE_NEXT!") do if not defined ORCA_STATUSLINE_MODEL set "ORCA_STATUSLINE_MODEL=%%m"',
-    ':orca_statusline_context',
-    // Why: scope the search to context_window so rate_limits' used_percentage (a different
-    // metric) can never masquerade as context usage; cap at 16 chars before tokenizing.
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_JSON:*"context_window"=!"',
-    'if "!ORCA_STATUSLINE_REST!"=="!ORCA_STATUSLINE_JSON!" goto :orca_statusline_quota',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_REST:*"used_percentage"=!"',
-    'if "!ORCA_STATUSLINE_NEXT!"=="!ORCA_STATUSLINE_REST!" goto :orca_statusline_quota',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT:*:=!"',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT:~0,16!"',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT:"=,!"',
-    'set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_NEXT: =!"',
-    'for /f "delims=.,}" %%p in ("!ORCA_STATUSLINE_NEXT!") do if not defined ORCA_STATUSLINE_CTX set "ORCA_STATUSLINE_CTX=%%p"',
-    'for /f "delims=0123456789" %%d in ("!ORCA_STATUSLINE_CTX!") do set "ORCA_STATUSLINE_CTX="',
-    'if defined ORCA_STATUSLINE_CTX if not "!ORCA_STATUSLINE_CTX:~3!"=="" set "ORCA_STATUSLINE_CTX="',
-    ':orca_statusline_quota',
-    'set "ORCA_STATUSLINE_FIVE="',
-    'set "ORCA_STATUSLINE_SEVEN="',
-    'set "ORCA_STATUSLINE_LIMITS=!ORCA_STATUSLINE_JSON:*"rate_limits"=!"',
-    `if "!ORCA_STATUSLINE_LIMITS!"=="!ORCA_STATUSLINE_JSON!" goto :${STATUSLINE_ACCOUNT_LABEL}`,
-    ...quotaWindowLines('five_hour', 'ORCA_STATUSLINE_FIVE', STATUSLINE_SEVEN_LABEL),
-    `:${STATUSLINE_SEVEN_LABEL}`,
-    ...quotaWindowLines('seven_day', 'ORCA_STATUSLINE_SEVEN', STATUSLINE_ACCOUNT_LABEL),
-    `:${STATUSLINE_ACCOUNT_LABEL}`,
+    ...(resolved.model ? windowsModelLines() : []),
+    ...(resolved.context ? windowsContextLines() : []),
+    ...(resolved.project ? windowsProjectLines() : []),
+    ...(resolved.cost ? windowsCostLines() : []),
+    ...(anyQuota
+      ? [
+          'set "ORCA_STATUSLINE_FIVE="',
+          'set "ORCA_STATUSLINE_SEVEN="',
+          'set "ORCA_STATUSLINE_LIMITS=!ORCA_STATUSLINE_JSON:*"rate_limits"=!"',
+          `if "!ORCA_STATUSLINE_LIMITS!"=="!ORCA_STATUSLINE_JSON!" goto :${STATUSLINE_QUOTA_DONE_LABEL}`,
+          ...(resolved.fiveHourQuota
+            ? quotaWindowLines(
+                'five_hour',
+                'ORCA_STATUSLINE_FIVE',
+                resolved.sevenDayQuota ? STATUSLINE_SEVEN_LABEL : STATUSLINE_QUOTA_DONE_LABEL
+              )
+            : []),
+          ...(resolved.sevenDayQuota
+            ? [
+                ...(resolved.fiveHourQuota ? [`:${STATUSLINE_SEVEN_LABEL}`] : []),
+                ...quotaWindowLines(
+                  'seven_day',
+                  'ORCA_STATUSLINE_SEVEN',
+                  STATUSLINE_QUOTA_DONE_LABEL
+                )
+              ]
+            : []),
+          `:${STATUSLINE_QUOTA_DONE_LABEL}`
+        ]
+      : []),
+    // Why key the account cache on the config dir's own directory name: it is the account id, so
+    // a repinned worktree can never render the previous account from a stale cache. The key
+    // derivation always runs — the intro marker and the reset countdown reuse it even when the
+    // account item itself is turned off. The `.` pads the comparison so the literal never ends
+    // in a backslash, which would eat the closing quote.
     'set "ORCA_STATUSLINE_ACCOUNT="',
     'set "ORCA_STATUSLINE_ACCT_KEY="',
-    `if not defined CLAUDE_CONFIG_DIR goto :${STATUSLINE_INTRO_LABEL}`,
-    // Why key the cache on the config dir's own directory name: it is the account id, so a
-    // repinned worktree can never render the previous account from a stale cache. The `.` pads
-    // the comparison so the literal never ends in a backslash, which would eat the closing quote.
+    `if not defined CLAUDE_CONFIG_DIR goto :${STATUSLINE_ACCT_KEY_DONE_LABEL}`,
     'set "ORCA_STATUSLINE_ACCT_DIR=!CLAUDE_CONFIG_DIR!"',
     'if "!ORCA_STATUSLINE_ACCT_DIR:~-1!."=="\\." set "ORCA_STATUSLINE_ACCT_DIR=!ORCA_STATUSLINE_ACCT_DIR:~0,-1!"',
     'if /i "!ORCA_STATUSLINE_ACCT_DIR:~-5!"=="\\auth" set "ORCA_STATUSLINE_ACCT_DIR=!ORCA_STATUSLINE_ACCT_DIR:~0,-5!"',
@@ -160,40 +169,45 @@ export function getWindowsManagedStatusLineScript(): string {
     // Why only a length bound: %%~nx yields one existing directory name, which by construction
     // carries no separator or reserved character, so the temp path stays inside %TEMP%.
     'if defined ORCA_STATUSLINE_ACCT_KEY if not "!ORCA_STATUSLINE_ACCT_KEY:~64!"=="" set "ORCA_STATUSLINE_ACCT_KEY="',
-    `if not defined ORCA_STATUSLINE_ACCT_KEY goto :${STATUSLINE_INTRO_LABEL}`,
-    'set "ORCA_STATUSLINE_ACCT_CACHE=%TEMP%\\orca-claude-statusline-acct-!ORCA_STATUSLINE_ACCT_KEY!.tmp"',
-    'if exist "!ORCA_STATUSLINE_ACCT_CACHE!" set /p ORCA_STATUSLINE_ACCOUNT=<"!ORCA_STATUSLINE_ACCT_CACHE!"',
-    'if defined ORCA_STATUSLINE_ACCOUNT goto :orca_statusline_account_render',
-    // Why read the vault at most once per account: this runs ~3x/sec, so the cache is what keeps
-    // the account label free. A miss costs one small read, never a subprocess.
-    'set "ORCA_STATUSLINE_VAULT=!CLAUDE_CONFIG_DIR!\\oauth-account.json"',
-    `if not exist "!ORCA_STATUSLINE_VAULT!" goto :${STATUSLINE_INTRO_LABEL}`,
-    // Why join every line: the vault ships pretty-printed, so a first-line-only capture would
-    // never see emailAddress.
-    'set "ORCA_STATUSLINE_ACCT_RAW="',
-    'for /f "usebackq delims=" %%a in ("!ORCA_STATUSLINE_VAULT!") do set "ORCA_STATUSLINE_ACCT_RAW=!ORCA_STATUSLINE_ACCT_RAW!%%a"',
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_ACCT_RAW:*"emailAddress"=!"',
-    `if "!ORCA_STATUSLINE_REST!"=="!ORCA_STATUSLINE_ACCT_RAW!" goto :${STATUSLINE_INTRO_LABEL}`,
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:*"=!"',
-    'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:"=,!"',
-    `if "!ORCA_STATUSLINE_REST:~0,1!"=="," goto :${STATUSLINE_INTRO_LABEL}`,
-    'for /f "delims=," %%e in ("!ORCA_STATUSLINE_REST!") do if not defined ORCA_STATUSLINE_ACCOUNT set "ORCA_STATUSLINE_ACCOUNT=%%e"',
-    // Why the defined guard: echoing an empty variable writes "ECHO is off." into the cache, and
-    // that string would then be this account's label on every later tick.
-    'if defined ORCA_STATUSLINE_ACCOUNT (>"!ORCA_STATUSLINE_ACCT_CACHE!" echo !ORCA_STATUSLINE_ACCOUNT!)',
-    ':orca_statusline_account_render',
-    `if not defined ORCA_STATUSLINE_ACCOUNT goto :${STATUSLINE_INTRO_LABEL}`,
-    // Why drop the domain with no trailing @: the rendered field's leading @ is already the
-    // account mark, so the elision's own @ stacked into a double sigil (@user@) on every line.
-    'if "!ORCA_STATUSLINE_ACCOUNT:@=!"=="!ORCA_STATUSLINE_ACCOUNT!" goto :orca_statusline_account_bound',
-    'for /f "delims=@" %%e in ("!ORCA_STATUSLINE_ACCOUNT!") do set "ORCA_STATUSLINE_ACCOUNT=%%e"',
-    ':orca_statusline_account_bound',
-    // Why bound the local part: an unusually long address is the one field that can blow the
-    // line, and the ladder would then drop quota to pay for it. ASCII "..." where POSIX renders
-    // "…" — writeManagedScript emits UTF-8 and cmd reads the file in the OEM codepage, so the
-    // ellipsis would arrive garbled; 18+3 keeps the same 21-character bound as POSIX's 20+1.
-    `if "!ORCA_STATUSLINE_ACCOUNT:~21!"=="" goto :${STATUSLINE_INTRO_LABEL}`,
-    'set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."',
+    `:${STATUSLINE_ACCT_KEY_DONE_LABEL}`,
+    ...(resolved.account
+      ? [
+          `if not defined ORCA_STATUSLINE_ACCT_KEY goto :${STATUSLINE_INTRO_LABEL}`,
+          'set "ORCA_STATUSLINE_ACCT_CACHE=%TEMP%\\orca-claude-statusline-acct-!ORCA_STATUSLINE_ACCT_KEY!.tmp"',
+          'if exist "!ORCA_STATUSLINE_ACCT_CACHE!" set /p ORCA_STATUSLINE_ACCOUNT=<"!ORCA_STATUSLINE_ACCT_CACHE!"',
+          'if defined ORCA_STATUSLINE_ACCOUNT goto :orca_statusline_account_render',
+          // Why read the vault at most once per account: this runs ~3x/sec, so the cache is what keeps
+          // the account label free. A miss costs one small read, never a subprocess.
+          'set "ORCA_STATUSLINE_VAULT=!CLAUDE_CONFIG_DIR!\\oauth-account.json"',
+          `if not exist "!ORCA_STATUSLINE_VAULT!" goto :${STATUSLINE_INTRO_LABEL}`,
+          // Why join every line: the vault ships pretty-printed, so a first-line-only capture would
+          // never see emailAddress.
+          'set "ORCA_STATUSLINE_ACCT_RAW="',
+          'for /f "usebackq delims=" %%a in ("!ORCA_STATUSLINE_VAULT!") do set "ORCA_STATUSLINE_ACCT_RAW=!ORCA_STATUSLINE_ACCT_RAW!%%a"',
+          'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_ACCT_RAW:*"emailAddress"=!"',
+          `if "!ORCA_STATUSLINE_REST!"=="!ORCA_STATUSLINE_ACCT_RAW!" goto :${STATUSLINE_INTRO_LABEL}`,
+          'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:*"=!"',
+          'set "ORCA_STATUSLINE_REST=!ORCA_STATUSLINE_REST:"=,!"',
+          `if "!ORCA_STATUSLINE_REST:~0,1!"=="," goto :${STATUSLINE_INTRO_LABEL}`,
+          'for /f "delims=," %%e in ("!ORCA_STATUSLINE_REST!") do if not defined ORCA_STATUSLINE_ACCOUNT set "ORCA_STATUSLINE_ACCOUNT=%%e"',
+          // Why the defined guard: echoing an empty variable writes "ECHO is off." into the cache, and
+          // that string would then be this account's label on every later tick.
+          'if defined ORCA_STATUSLINE_ACCOUNT (>"!ORCA_STATUSLINE_ACCT_CACHE!" echo !ORCA_STATUSLINE_ACCOUNT!)',
+          ':orca_statusline_account_render',
+          `if not defined ORCA_STATUSLINE_ACCOUNT goto :${STATUSLINE_INTRO_LABEL}`,
+          // Why drop the domain with no trailing @: the rendered field's leading @ is already the
+          // account mark, so the elision's own @ stacked into a double sigil (@user@) on every line.
+          'if "!ORCA_STATUSLINE_ACCOUNT:@=!"=="!ORCA_STATUSLINE_ACCOUNT!" goto :orca_statusline_account_bound',
+          'for /f "delims=@" %%e in ("!ORCA_STATUSLINE_ACCOUNT!") do set "ORCA_STATUSLINE_ACCOUNT=%%e"',
+          ':orca_statusline_account_bound',
+          // Why bound the local part: an unusually long address is the one field that can blow the
+          // line, and the ladder would then drop quota to pay for it. ASCII "..." where POSIX renders
+          // "…" — writeManagedScript emits UTF-8 and cmd reads the file in the OEM codepage, so the
+          // ellipsis would arrive garbled; 18+3 keeps the same 21-character bound as POSIX's 20+1.
+          `if "!ORCA_STATUSLINE_ACCOUNT:~21!"=="" goto :${STATUSLINE_INTRO_LABEL}`,
+          'set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."'
+        ]
+      : []),
     `:${STATUSLINE_INTRO_LABEL}`,
     // Why announce once per pane: the line is requested ~3x/sec, so a banner on every tick would
     // strobe. Separate marker from the POST stamp — that one governs the network, not the render.
@@ -209,65 +223,72 @@ export function getWindowsManagedStatusLineScript(): string {
     // Why break: an internal no-op, so the marker costs a 0-byte file and never a spawn.
     'break>"!ORCA_STATUSLINE_INTRO_STAMP!" 2>nul',
     ':orca_statusline_compose',
-    ...windowsContextTrendLines(STATUSLINE_TREND_DONE_LABEL, STATUSLINE_TREND_WRITE_LABEL),
-    ...windowsResetCountdownLines(STATUSLINE_RESET_DONE_LABEL),
-    windowsGaugeTableLine(STATUSLINE_BAR_TABLE_VAR),
-    ...windowsGaugeLines(
-      'ORCA_STATUSLINE_CTX',
-      'ORCA_STATUSLINE_CTX_BAR',
-      STATUSLINE_BAR_TABLE_VAR
-    ),
-    ...windowsGaugeLines(
-      'ORCA_STATUSLINE_FIVE',
-      'ORCA_STATUSLINE_FIVE_BAR',
-      STATUSLINE_BAR_TABLE_VAR
-    ),
-    ...windowsGaugeLines(
-      'ORCA_STATUSLINE_SEVEN',
-      'ORCA_STATUSLINE_SEVEN_BAR',
-      STATUSLINE_BAR_TABLE_VAR
-    ),
+    ...(resolved.context
+      ? windowsContextTrendLines(STATUSLINE_TREND_DONE_LABEL, STATUSLINE_TREND_WRITE_LABEL)
+      : []),
+    ...(resolved.resetCountdown ? windowsResetCountdownLines(STATUSLINE_RESET_DONE_LABEL) : []),
+    ...(anyBar ? [windowsGaugeTableLine(STATUSLINE_BAR_TABLE_VAR, cells)] : []),
+    ...(resolved.context
+      ? windowsGaugeLines(
+          'ORCA_STATUSLINE_CTX',
+          'ORCA_STATUSLINE_CTX_BAR',
+          STATUSLINE_BAR_TABLE_VAR,
+          cells
+        )
+      : []),
+    ...(resolved.fiveHourQuota
+      ? windowsGaugeLines(
+          'ORCA_STATUSLINE_FIVE',
+          'ORCA_STATUSLINE_FIVE_BAR',
+          STATUSLINE_BAR_TABLE_VAR,
+          cells
+        )
+      : []),
+    ...(resolved.sevenDayQuota
+      ? windowsGaugeLines(
+          'ORCA_STATUSLINE_SEVEN',
+          'ORCA_STATUSLINE_SEVEN_BAR',
+          STATUSLINE_BAR_TABLE_VAR,
+          cells
+        )
+      : []),
     // Why the field is assembled before it is appended: an absent bar or trend must leave no
     // stray space behind, and cmd has no conditional-expansion form to do it inline.
-    'set "ORCA_STATUSLINE_CTX_FIELD="',
-    'if defined ORCA_STATUSLINE_CTX set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX!%%"',
-    'if defined ORCA_STATUSLINE_CTX_BAR set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX_BAR! !ORCA_STATUSLINE_CTX!%%"',
-    'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_TREND set "ORCA_STATUSLINE_CTX_FIELD=!ORCA_STATUSLINE_CTX_FIELD! !ORCA_STATUSLINE_TREND!"',
-    // Why identity, model and context are the fixed prefix: all three are short and bounded, so
-    // dropping them buys almost no width while costing the two things the line exists to say.
+    ...(resolved.context
+      ? [
+          'set "ORCA_STATUSLINE_CTX_FIELD="',
+          'if defined ORCA_STATUSLINE_CTX set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX!%%"',
+          'if defined ORCA_STATUSLINE_CTX_BAR set "ORCA_STATUSLINE_CTX_FIELD=ctx !ORCA_STATUSLINE_CTX_BAR! !ORCA_STATUSLINE_CTX!%%"',
+          'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_TREND set "ORCA_STATUSLINE_CTX_FIELD=!ORCA_STATUSLINE_CTX_FIELD! !ORCA_STATUSLINE_TREND!"'
+        ]
+      : []),
+    // Why identity, project, model and context are the fixed prefix: all four are short and
+    // bounded, so dropping them buys almost no width while costing the things the line exists to
+    // say — and the project never falling is the point: it was the first thing the old cascade
+    // hid in a narrow pane, and it is what the user most misses.
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"',
-    'if defined ORCA_STATUSLINE_MODEL if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_MODEL!"',
-    'if defined ORCA_STATUSLINE_MODEL if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_MODEL!"',
-    'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_CTX_FIELD!"',
-    'if defined ORCA_STATUSLINE_CTX_FIELD if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_CTX_FIELD!"',
+    ...(resolved.project
+      ? [
+          'if defined ORCA_STATUSLINE_PROJECT if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_PROJECT!"',
+          'if defined ORCA_STATUSLINE_PROJECT if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_PROJECT!"'
+        ]
+      : []),
+    ...(resolved.model
+      ? [
+          'if defined ORCA_STATUSLINE_MODEL if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_MODEL!"',
+          'if defined ORCA_STATUSLINE_MODEL if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_MODEL!"'
+        ]
+      : []),
+    ...(resolved.context
+      ? [
+          'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_CTX_FIELD!"',
+          'if defined ORCA_STATUSLINE_CTX_FIELD if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_CTX_FIELD!"'
+        ]
+      : []),
     // Why a length budget instead of reading the terminal width: width needs a subprocess, which
     // is exactly what this path must not do. Appending in priority order makes the ladder fall
     // out of the budget on its own.
-    ...budgetedFieldLines(
-      'ORCA_STATUSLINE_ACCOUNT',
-      '@!ORCA_STATUSLINE_ACCOUNT!',
-      'orca_statusline_field_five'
-    ),
-    ':orca_statusline_field_five',
-    ...budgetedFieldLines(
-      'ORCA_STATUSLINE_FIVE',
-      '5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%',
-      'orca_statusline_field_seven'
-    ),
-    ':orca_statusline_field_seven',
-    ...budgetedFieldLines(
-      'ORCA_STATUSLINE_SEVEN',
-      '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
-      STATUSLINE_RESET_FIELD_LABEL
-    ),
-    `:${STATUSLINE_RESET_FIELD_LABEL}`,
-    // Why last: level and direction are what the line exists to say, and a reset is context on
-    // top of them — never worth the weekly quota it would push off a narrow pane.
-    ...budgetedFieldLines(
-      'ORCA_STATUSLINE_RESET',
-      `${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`,
-      STATUSLINE_EMIT_LABEL
-    ),
+    ...ladderLines,
     `:${STATUSLINE_EMIT_LABEL}`,
     // Why: stdout IS the status line — echo( survives arbitrary expanded content.
     'if defined ORCA_STATUSLINE_LINE echo(!ORCA_STATUSLINE_LINE!',

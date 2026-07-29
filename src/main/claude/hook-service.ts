@@ -217,6 +217,20 @@ export class ClaudeHookService {
     }
   }
 
+  // Why a dedicated refresh: the Settings toggle must reach the installed script immediately —
+  // every pinned vault points at this one shared file, so waiting for the next install() means
+  // waiting for an app relaunch. Rewriting only the script never touches settings.json, so a
+  // user who deleted the managed statusLine entry stays opted out.
+  refreshManagedStatusLineScript(): void {
+    if (this.options.agent !== 'claude') {
+      return
+    }
+    writeManagedScript(
+      getStatusLineScriptPath(this.options.settings),
+      getManagedStatusLineScript('local')
+    )
+  }
+
   // Why: the statusline feed is opportunistic (usage display, not agent status); a user who deleted the
   // managed entry has opted out, and the marker distinguishes that deletion from a first install.
   private installManagedStatusLine(config: HooksConfig): HooksConfig {

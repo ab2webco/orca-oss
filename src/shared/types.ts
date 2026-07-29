@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+import type { ClaudeStatusLineItems } from './claude-statusline-items'
 import type { ExecutionHostId } from './execution-host'
 import type { RemovedSshTargetTombstone, SshRemotePtyLease, SshTarget } from './ssh-types'
 import type { Automation, AutomationExecutionTargetType, AutomationRun } from './automations-types'
@@ -3071,6 +3072,10 @@ export type GlobalSettings = {
   agentYoloDefaultsMigrated?: boolean
   /** Why: disabling must persist so startup doesn't reinstall global agent hook entries the user just removed. */
   agentStatusHooksEnabled: boolean
+  /** Which fields the managed Claude status line renders. Global by design: every pinned
+   *  account's vault points at the same shared script. Optional for older profiles; readers
+   *  normalize with `normalizeClaudeStatusLineItems`. */
+  claudeStatusLineItems?: Partial<ClaudeStatusLineItems>
   /** Dismissed freshness tuples: no write authority, just suppress re-nudging the same official placement/revision. */
   dismissedSkillFreshnessNudges?: string[]
   /** Why: generated tab titles are subjective, so they stay opt-in and manual renames win. */
