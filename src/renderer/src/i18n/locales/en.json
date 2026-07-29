@@ -10102,6 +10102,26 @@
           "fallbackAccountLabel": "Saved Claude account",
           "reauthenticate": "Re-authenticate",
           "otherProfileHint": "An account marked “Another profile” belongs to a different Orca profile on this machine, so it is not in the list above and cannot be re-authenticated from here. To fix it there instead, open that profile and re-authenticate the account in Settings → Accounts."
+        },
+        "claude-statusline-items-copy": {
+          "title": "Claude status line",
+          "description": "Choose which items the managed Claude status line shows. Turning items off frees columns, and the usage bars grow into them. Applies to every Claude account.",
+          "project": "Project",
+          "projectDescription": "The workspace directory name, so a pane always says where it is working.",
+          "model": "Model",
+          "modelDescription": "The active Claude model.",
+          "context": "Context usage",
+          "contextDescription": "Context window consumption as a bar with percentage and trend arrow.",
+          "account": "Account",
+          "accountDescription": "The signed-in Claude account for the pane (@name).",
+          "fiveHour": "5-hour quota",
+          "fiveHourDescription": "The session rate-limit window as a bar with percentage.",
+          "sevenDay": "Weekly quota",
+          "sevenDayDescription": "The 7-day rate-limit window as a bar with percentage.",
+          "cost": "Session cost",
+          "costDescription": "The API cost the session has accumulated, in USD.",
+          "reset": "Reset countdown",
+          "resetDescription": "Time remaining until the quota window resets."
         }
       },
       "right": {

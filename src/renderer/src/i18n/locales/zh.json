@@ -10079,6 +10079,26 @@
           "fallbackAccountLabel": "已保存的 Claude 账户",
           "reauthenticate": "重新验证",
           "otherProfileHint": "标记为“其他配置文件”的账户属于本机上另一个 Orca 配置文件，因此不在上方列表中，也无法在此处重新验证。要在那边处理，请打开该配置文件，并在 设置 → 账户 中重新验证该账户。"
+        },
+        "claude-statusline-items-copy": {
+          "title": "Claude status line",
+          "description": "Choose which items the managed Claude status line shows. Turning items off frees columns, and the usage bars grow into them. Applies to every Claude account.",
+          "project": "Project",
+          "projectDescription": "The workspace directory name, so a pane always says where it is working.",
+          "model": "Model",
+          "modelDescription": "The active Claude model.",
+          "context": "Context usage",
+          "contextDescription": "Context window consumption as a bar with percentage and trend arrow.",
+          "account": "Account",
+          "accountDescription": "The signed-in Claude account for the pane (@name).",
+          "fiveHour": "5-hour quota",
+          "fiveHourDescription": "The session rate-limit window as a bar with percentage.",
+          "sevenDay": "Weekly quota",
+          "sevenDayDescription": "The 7-day rate-limit window as a bar with percentage.",
+          "cost": "Session cost",
+          "costDescription": "The API cost the session has accumulated, in USD.",
+          "reset": "Reset countdown",
+          "resetDescription": "Time remaining until the quota window resets."
         }
       },
       "right": {

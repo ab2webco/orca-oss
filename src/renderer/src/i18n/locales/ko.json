@@ -10079,6 +10079,26 @@
           "fallbackAccountLabel": "저장된 Claude 계정",
           "reauthenticate": "재인증",
           "otherProfileHint": "“다른 프로필”로 표시된 계정은 이 컴퓨터의 다른 Orca 프로필에 속하므로 위 목록에 없고 여기서 재인증할 수 없습니다. 해당 프로필을 열고 설정 → 계정에서 그 계정을 재인증하세요."
+        },
+        "claude-statusline-items-copy": {
+          "title": "Claude status line",
+          "description": "Choose which items the managed Claude status line shows. Turning items off frees columns, and the usage bars grow into them. Applies to every Claude account.",
+          "project": "Project",
+          "projectDescription": "The workspace directory name, so a pane always says where it is working.",
+          "model": "Model",
+          "modelDescription": "The active Claude model.",
+          "context": "Context usage",
+          "contextDescription": "Context window consumption as a bar with percentage and trend arrow.",
+          "account": "Account",
+          "accountDescription": "The signed-in Claude account for the pane (@name).",
+          "fiveHour": "5-hour quota",
+          "fiveHourDescription": "The session rate-limit window as a bar with percentage.",
+          "sevenDay": "Weekly quota",
+          "sevenDayDescription": "The 7-day rate-limit window as a bar with percentage.",
+          "cost": "Session cost",
+          "costDescription": "The API cost the session has accumulated, in USD.",
+          "reset": "Reset countdown",
+          "resetDescription": "Time remaining until the quota window resets."
         }
       },
       "right": {
