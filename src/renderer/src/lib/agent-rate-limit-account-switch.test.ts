@@ -250,6 +250,9 @@ describe('runManagedAccountSwitchRelaunch', () => {
       reason: 'resume-failed',
       message: expect.stringContaining('could not bring the session back')
     })
+    // Why assert the attempt: otherwise this passes just as well if nothing was ever sent.
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
+    expect(sendRuntimePtyInputVerified.mock.calls[0]?.[2]).toContain('--resume')
   })
 
   it('restores the original agent when the pin update is rejected after the stop', async () => {

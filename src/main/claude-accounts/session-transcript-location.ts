@@ -58,6 +58,13 @@ export function isSamePath(left: string, right: string): boolean {
   return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right
 }
 
+/** Duplicates the shared store retires on merge (`<name>.superseded`, `.superseded-2`).
+ *  They keep the session-id prefix, so a prefix match would carry retired bytes into a
+ *  fresh universe — and the CLI ignores them anyway. */
+export function isParkedTranscriptDuplicate(fileName: string): boolean {
+  return /\.superseded(-\d+)?$/.test(fileName)
+}
+
 export type ProjectsDirResolution =
   /** Usable: either the universe's own directory or its link to Orca's store. */
   | { status: 'resolved'; path: string; canonicalRoot: string }

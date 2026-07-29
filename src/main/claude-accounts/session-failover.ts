@@ -5,6 +5,7 @@ import { resolveOwnedClaudeManagedAuthPath } from './managed-auth-path'
 import {
   findSessionProjectDir,
   isInsideRoot,
+  isParkedTranscriptDuplicate,
   isRealFile,
   isSamePath,
   resolveProjectsDir,
@@ -284,7 +285,7 @@ function copySessionFilesBetweenRoots(args: {
     mkdirSync(targetProjectDir, { recursive: true })
     let copiedFileCount = 0
     for (const entry of readdirSync(sourceProject.dirPath)) {
-      if (!entry.startsWith(args.sessionId)) {
+      if (!entry.startsWith(args.sessionId) || isParkedTranscriptDuplicate(entry)) {
         continue
       }
       const sourceFile = join(sourceProject.dirPath, entry)

@@ -603,7 +603,11 @@ describe('linked transcript stores', () => {
     createManagedUniverse(target.id)
     linkProjectsToSharedStore(sourceAuthPath)
     const encoded = encodeClaudeProjectDirName(CWD)
-    writeSessionFiles(sourceAuthPath, encoded)
+    const projectDir = writeSessionFiles(sourceAuthPath, encoded)
+    // Why: the shared store parks superseded duplicates beside the winner, and they
+    // share the session-id prefix — retired bytes must not ride into a fresh vault.
+    writeFileSync(join(projectDir, `${SESSION_ID}.superseded`), '{"old":true}\n', 'utf-8')
+    writeFileSync(join(projectDir, `${SESSION_ID}.superseded-2`), '{"older":true}\n', 'utf-8')
 
     const result = copyClaudeSessionForAccountSwitch(
       { sessionId: SESSION_ID, cwd: CWD, targetAccountId: target.id, sourceAccountId: source.id },
