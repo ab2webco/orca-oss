@@ -14,6 +14,7 @@ import {
   getMigrationUnsupportedPtySnapshot
 } from '../agent-hooks/migration-unsupported-pty-state'
 import { claudeHookService } from '../claude/hook-service'
+import { registerClaudeStatusLineOwnershipIpcHandlers } from './claude-statusline-ownership-ipc'
 import { codexHookService } from '../codex/hook-service'
 import { geminiHookService } from '../gemini/hook-service'
 import { antigravityHookService } from '../antigravity/hook-service'
@@ -152,6 +153,7 @@ export function registerAgentHookHandlers(
       }
     }
   })
+  registerClaudeStatusLineOwnershipIpcHandlers()
   ipcMain.handle('agentHooks:openClaudeStatus', (): AgentHookInstallStatus => {
     try {
       return openClaudeHookService.getStatus()

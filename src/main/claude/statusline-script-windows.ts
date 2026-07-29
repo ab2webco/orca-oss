@@ -1,5 +1,7 @@
 import {
+  normalizeClaudeStatusLineItemOrder,
   normalizeClaudeStatusLineItems,
+  type ClaudeStatusLineItemKey,
   type ClaudeStatusLineItems
 } from '../../shared/claude-statusline-items'
 import { WINDOWS_HOOK_STDIN_READER } from '../agent-hooks/hook-stdin-contract'
@@ -32,6 +34,7 @@ const STATUSLINE_INTRO_LABEL = 'orca_statusline_intro'
 const STATUSLINE_ACCT_KEY_DONE_LABEL = 'orca_statusline_acct_key_done'
 const STATUSLINE_SEVEN_LABEL = 'orca_statusline_quota_seven'
 const STATUSLINE_QUOTA_DONE_LABEL = 'orca_statusline_quota_done'
+const STATUSLINE_ITEM_LABEL_PREFIX = 'orca_statusline_item_'
 const STATUSLINE_TREND_WRITE_LABEL = 'orca_statusline_trend_write'
 const STATUSLINE_TREND_DONE_LABEL = 'orca_statusline_trend_done'
 const STATUSLINE_RESET_DONE_LABEL = 'orca_statusline_reset_done'
@@ -43,60 +46,86 @@ const STATUSLINE_BAR_TABLE_VAR = 'ORCA_STATUSLINE_BARS'
  * Why its own module: the POSIX and batch generators share nothing but the payload contract,
  * and keeping both in one file pushed it past the line cap.
  */
-export function getWindowsManagedStatusLineScript(items?: Partial<ClaudeStatusLineItems>): string {
+export function getWindowsManagedStatusLineScript(
+  items?: Partial<ClaudeStatusLineItems>,
+  order?: readonly ClaudeStatusLineItemKey[]
+): string {
   const resolved = normalizeClaudeStatusLineItems(items)
+  const resolvedOrder = normalizeClaudeStatusLineItemOrder(order)
   const cells = deriveStatusLineBarCells(resolved)
   const anyQuota = resolved.fiveHourQuota || resolved.sevenDayQuota
   const anyBar = resolved.context || anyQuota
 
-  // The trailing ladder, in priority order — later entries fall first when columns run out.
-  const ladder: { valueVar: string; rendered: string; label: string | null }[] = []
+  // Why the field is appended through an always-defined LINE check pair: cmd has no
+  // conditional-expansion form, so an absent field must leave no stray separator behind.
+  const appendLines = (valueVar: string): string[] => [
+    `if defined ${valueVar} if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !${valueVar}!"`,
+    `if defined ${valueVar} if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!${valueVar}!"`
+  ]
+  // The composition block for each enabled item, emitted in the configured order. Identity
+  // fields append unconditionally; budgeted fields fall in configured order when columns run
+  // out — by default the account first, then session quota, weekly quota, cost, countdown.
+  const composeBlocks = new Map<ClaudeStatusLineItemKey, (nextLabel: string) => string[]>()
+  if (resolved.project) {
+    composeBlocks.set('project', () => appendLines('ORCA_STATUSLINE_PROJECT'))
+  }
+  if (resolved.model) {
+    composeBlocks.set('model', () => appendLines('ORCA_STATUSLINE_MODEL'))
+  }
+  if (resolved.context) {
+    composeBlocks.set('context', () => appendLines('ORCA_STATUSLINE_CTX_FIELD'))
+  }
   if (resolved.account) {
-    ladder.push({
-      valueVar: 'ORCA_STATUSLINE_ACCOUNT',
-      rendered: '@!ORCA_STATUSLINE_ACCOUNT!',
-      label: null
-    })
-  }
-  if (resolved.fiveHourQuota) {
-    ladder.push({
-      valueVar: 'ORCA_STATUSLINE_FIVE',
-      rendered: '5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%',
-      label: 'orca_statusline_field_five'
-    })
-  }
-  if (resolved.sevenDayQuota) {
-    ladder.push({
-      valueVar: 'ORCA_STATUSLINE_SEVEN',
-      rendered: '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
-      label: 'orca_statusline_field_seven'
-    })
-  }
-  if (resolved.cost) {
-    ladder.push({
-      valueVar: 'ORCA_STATUSLINE_COST',
-      rendered: '!ORCA_STATUSLINE_COST!',
-      label: 'orca_statusline_field_cost'
-    })
-  }
-  if (resolved.resetCountdown) {
-    // Why the countdown is last: it is context on top of the level, never worth the weekly quota.
-    ladder.push({
-      valueVar: 'ORCA_STATUSLINE_RESET',
-      rendered: `${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`,
-      label: 'orca_statusline_field_reset'
-    })
-  }
-  const ladderLines: string[] = []
-  for (const [index, entry] of ladder.entries()) {
-    if (entry.label !== null) {
-      ladderLines.push(`:${entry.label}`)
-    }
-    const next = ladder[index + 1]
-    ladderLines.push(
-      ...budgetedFieldLines(entry.valueVar, entry.rendered, next?.label ?? STATUSLINE_EMIT_LABEL)
+    composeBlocks.set('account', (nextLabel) =>
+      budgetedFieldLines('ORCA_STATUSLINE_ACCOUNT', '@!ORCA_STATUSLINE_ACCOUNT!', nextLabel)
     )
   }
+  if (resolved.fiveHourQuota) {
+    composeBlocks.set('fiveHourQuota', (nextLabel) =>
+      budgetedFieldLines(
+        'ORCA_STATUSLINE_FIVE',
+        '5h !ORCA_STATUSLINE_FIVE_BAR! !ORCA_STATUSLINE_FIVE!%%',
+        nextLabel
+      )
+    )
+  }
+  if (resolved.sevenDayQuota) {
+    composeBlocks.set('sevenDayQuota', (nextLabel) =>
+      budgetedFieldLines(
+        'ORCA_STATUSLINE_SEVEN',
+        '7d !ORCA_STATUSLINE_SEVEN_BAR! !ORCA_STATUSLINE_SEVEN!%%',
+        nextLabel
+      )
+    )
+  }
+  if (resolved.cost) {
+    composeBlocks.set('cost', (nextLabel) =>
+      budgetedFieldLines('ORCA_STATUSLINE_COST', '!ORCA_STATUSLINE_COST!', nextLabel)
+    )
+  }
+  if (resolved.resetCountdown) {
+    composeBlocks.set('resetCountdown', (nextLabel) =>
+      budgetedFieldLines(
+        'ORCA_STATUSLINE_RESET',
+        `${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!`,
+        nextLabel
+      )
+    )
+  }
+  const orderedBlocks = resolvedOrder
+    .filter((key) => composeBlocks.has(key))
+    .map((key) => composeBlocks.get(key)!)
+  // Why every block is labeled: a budgeted field that overflows or has no value must land on
+  // the block right after it, whichever class that block is — the label is the only jump target
+  // cmd offers.
+  const compositionLines = orderedBlocks.flatMap((block, index) => [
+    `:${STATUSLINE_ITEM_LABEL_PREFIX}${index}`,
+    ...block(
+      index + 1 < orderedBlocks.length
+        ? `${STATUSLINE_ITEM_LABEL_PREFIX}${index + 1}`
+        : STATUSLINE_EMIT_LABEL
+    )
+  ])
 
   return [
     '@echo off',
@@ -262,33 +291,16 @@ export function getWindowsManagedStatusLineScript(items?: Partial<ClaudeStatusLi
           'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_TREND set "ORCA_STATUSLINE_CTX_FIELD=!ORCA_STATUSLINE_CTX_FIELD! !ORCA_STATUSLINE_TREND!"'
         ]
       : []),
-    // Why identity, project, model and context are the fixed prefix: all four are short and
-    // bounded, so dropping them buys almost no width while costing the things the line exists to
-    // say — and the project never falling is the point: it was the first thing the old cascade
-    // hid in a narrow pane, and it is what the user most misses.
+    // Why identity fields (project, model, context) always append: all are short and bounded,
+    // so dropping them buys almost no width while costing the things the line exists to say —
+    // and the project never falling is the point: it was the first thing the old cascade hid in
+    // a narrow pane, and it is what the user most misses.
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"',
-    ...(resolved.project
-      ? [
-          'if defined ORCA_STATUSLINE_PROJECT if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_PROJECT!"',
-          'if defined ORCA_STATUSLINE_PROJECT if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_PROJECT!"'
-        ]
-      : []),
-    ...(resolved.model
-      ? [
-          'if defined ORCA_STATUSLINE_MODEL if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_MODEL!"',
-          'if defined ORCA_STATUSLINE_MODEL if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_MODEL!"'
-        ]
-      : []),
-    ...(resolved.context
-      ? [
-          'if defined ORCA_STATUSLINE_CTX_FIELD if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_LINE! | !ORCA_STATUSLINE_CTX_FIELD!"',
-          'if defined ORCA_STATUSLINE_CTX_FIELD if not defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_CTX_FIELD!"'
-        ]
-      : []),
     // Why a length budget instead of reading the terminal width: width needs a subprocess, which
-    // is exactly what this path must not do. Appending in priority order makes the ladder fall
-    // out of the budget on its own.
-    ...ladderLines,
+    // is exactly what this path must not do. Appending in configured order makes the budgeted
+    // fields fall out of the budget on their own.
+    'set "ORCA_STATUSLINE_FULL="',
+    ...compositionLines,
     `:${STATUSLINE_EMIT_LABEL}`,
     // Why: stdout IS the status line — echo( survives arbitrary expanded content.
     'if defined ORCA_STATUSLINE_LINE echo(!ORCA_STATUSLINE_LINE!',

@@ -1,7 +1,10 @@
 import {
+  normalizeClaudeStatusLineItemOrder,
   normalizeClaudeStatusLineItems,
+  type ClaudeStatusLineItemKey,
   type ClaudeStatusLineItems
 } from '../../shared/claude-statusline-items'
+import { STATUSLINE_MAX_WIDTH } from '../../shared/claude-statusline-line-model'
 import {
   percentGuardLines,
   posixAccountLines,
@@ -23,10 +26,6 @@ import {
   CLAUDE_STATUSLINE_PATHNAME
 } from '../../shared/claude-statusline-rate-limits'
 
-// Why 96: a status line that wraps reads as a broken app, and the width has to be assumed because
-// reading the real terminal width needs a subprocess on a path that runs ~3x/sec.
-const STATUSLINE_MAX_WIDTH = 96
-
 // Why a module-level source instead of threading the store through every install path: the
 // script is written from boot install, vault pinning, and the Settings toggle alike, and all of
 // them must agree on the persisted choice without each carrying a Store reference.
@@ -37,21 +36,76 @@ export function configureClaudeStatusLineItemsSource(source: ClaudeStatusLineIte
   claudeStatusLineItemsSource = source
 }
 
+type ClaudeStatusLineItemOrderSource = () => readonly ClaudeStatusLineItemKey[] | undefined
+let claudeStatusLineItemOrderSource: ClaudeStatusLineItemOrderSource = () => undefined
+
+export function configureClaudeStatusLineItemOrderSource(
+  source: ClaudeStatusLineItemOrderSource
+): void {
+  claudeStatusLineItemOrderSource = source
+}
+
 // Why: Claude Code pipes `rate_limits` to the statusLine command on every turn; forwarding
 // it gives Orca live usage without spending the OAuth usage endpoint's tight budget.
 // stdout IS the user's status line, so every invocation prints model + context usage
 // before any guard — only the POST is debounced; a debounced print would blank the line.
 export function getManagedStatusLineScript(
   target: 'local' | 'posix' = 'local',
-  items?: Partial<ClaudeStatusLineItems>
+  items?: Partial<ClaudeStatusLineItems>,
+  order?: readonly ClaudeStatusLineItemKey[]
 ): string {
   const resolved = normalizeClaudeStatusLineItems(items ?? claudeStatusLineItemsSource())
+  const resolvedOrder = normalizeClaudeStatusLineItemOrder(
+    order ?? claudeStatusLineItemOrderSource()
+  )
   if (target === 'local' && process.platform === 'win32') {
-    return getWindowsManagedStatusLineScript(resolved)
+    return getWindowsManagedStatusLineScript(resolved, resolvedOrder)
   }
   const cells = deriveStatusLineBarCells(resolved)
   const anyQuota = resolved.fiveHourQuota || resolved.sevenDayQuota
   const anyBar = resolved.context || anyQuota
+
+  // The composition block for each item, emitted in the configured order. Identity fields
+  // (project, model, context) use the unconditional `append`; budgeted fields use `try`, so
+  // their configured order is also the order they fall in when columns run out.
+  const composeBlocks: Record<ClaudeStatusLineItemKey, readonly string[]> = {
+    project: ['orca_statusline_append "$orca_statusline_project" "$orca_statusline_project_w"'],
+    model: ['orca_statusline_append "$orca_statusline_model" "${#orca_statusline_model}"'],
+    // Why no word for "used": the bar fills as consumption grows, which says it in every language —
+    // this script never reaches translate(), so an English label would clash with a Spanish UI.
+    context: [
+      'if [ -n "$orca_statusline_context" ]; then',
+      '  orca_statusline_ctx_field="ctx ${orca_statusline_ctx_bar:+$orca_statusline_ctx_bar }${orca_statusline_context}%${orca_statusline_trend:+ $orca_statusline_trend}"',
+      '  orca_statusline_ctx_w=$(( ${#orca_statusline_context} + 5 ))',
+      `  if [ -n "$orca_statusline_ctx_bar" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + ${cells + 1} )); fi`,
+      '  if [ -n "$orca_statusline_trend" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + 2 )); fi',
+      '  orca_statusline_append "$orca_statusline_ctx_field" "$orca_statusline_ctx_w"',
+      'fi'
+    ],
+    account: [
+      'orca_statusline_try "$orca_statusline_account" "@$orca_statusline_account" \\',
+      '  $(( orca_statusline_account_w + 1 ))'
+    ],
+    fiveHourQuota: [
+      'orca_statusline_try "$orca_statusline_five" \\',
+      '  "5h ${orca_statusline_five_bar:+$orca_statusline_five_bar }${orca_statusline_five}%" \\',
+      `  $(( \${#orca_statusline_five} + ${cells + 5} ))`
+    ],
+    sevenDayQuota: [
+      'orca_statusline_try "$orca_statusline_seven" \\',
+      '  "7d ${orca_statusline_seven_bar:+$orca_statusline_seven_bar }${orca_statusline_seven}%" \\',
+      `  $(( \${#orca_statusline_seven} + ${cells + 5} ))`
+    ],
+    cost: [
+      // Why the cost is ASCII by construction: its byte length is its column width.
+      'orca_statusline_try "$orca_statusline_cost" "$orca_statusline_cost" "${#orca_statusline_cost}"'
+    ],
+    resetCountdown: [
+      'orca_statusline_try "$orca_statusline_reset" \\',
+      `  "${STATUSLINE_RESET_MARK_UNICODE} $orca_statusline_reset" \\`,
+      '  $(( ${#orca_statusline_reset} + 2 ))'
+    ]
+  }
 
   return [
     '#!/bin/sh',
@@ -185,67 +239,14 @@ export function getManagedStatusLineScript(
     'orca_statusline_line=',
     'orca_statusline_width=0',
     'orca_statusline_full=',
-    // Why identity, project, model and context are the fixed prefix: all four are short and
-    // bounded, so dropping them buys almost no width while costing the things the line exists to
-    // say — and the project never falling is the point: in a narrow pane it was the first thing
-    // the old cascade hid, and it is what the user most misses.
+    // Why identity fields (project, model, context) always append: all are short and bounded, so
+    // dropping them buys almost no width while costing the things the line exists to say — and
+    // the project never falling is the point: in a narrow pane it was the first thing the old
+    // cascade hid, and it is what the user most misses. Budgeted fields fall in configured
+    // order: by default the account truncates before it disappears, then the session quota,
+    // then the weekly one, then the cost, then the countdown.
     'orca_statusline_append "$orca_statusline_intro" "${#orca_statusline_intro}"',
-    ...(resolved.project
-      ? ['orca_statusline_append "$orca_statusline_project" "$orca_statusline_project_w"']
-      : []),
-    ...(resolved.model
-      ? ['orca_statusline_append "$orca_statusline_model" "${#orca_statusline_model}"']
-      : []),
-    // Why no word for "used": the bar fills as consumption grows, which says it in every language —
-    // this script never reaches translate(), so an English label would clash with a Spanish UI.
-    ...(resolved.context
-      ? [
-          'if [ -n "$orca_statusline_context" ]; then',
-          '  orca_statusline_ctx_field="ctx ${orca_statusline_ctx_bar:+$orca_statusline_ctx_bar }${orca_statusline_context}%${orca_statusline_trend:+ $orca_statusline_trend}"',
-          '  orca_statusline_ctx_w=$(( ${#orca_statusline_context} + 5 ))',
-          `  if [ -n "$orca_statusline_ctx_bar" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + ${cells + 1} )); fi`,
-          '  if [ -n "$orca_statusline_trend" ]; then orca_statusline_ctx_w=$(( orca_statusline_ctx_w + 2 )); fi',
-          '  orca_statusline_append "$orca_statusline_ctx_field" "$orca_statusline_ctx_w"',
-          'fi'
-        ]
-      : []),
-    // Priority order, and therefore the order these fall in: the account truncates before it
-    // disappears, then the session quota, then the weekly one, then the cost. Context never falls.
-    ...(resolved.account
-      ? [
-          'orca_statusline_try "$orca_statusline_account" "@$orca_statusline_account" \\',
-          '  $(( orca_statusline_account_w + 1 ))'
-        ]
-      : []),
-    ...(resolved.fiveHourQuota
-      ? [
-          'orca_statusline_try "$orca_statusline_five" \\',
-          '  "5h ${orca_statusline_five_bar:+$orca_statusline_five_bar }${orca_statusline_five}%" \\',
-          `  $(( \${#orca_statusline_five} + ${cells + 5} ))`
-        ]
-      : []),
-    ...(resolved.sevenDayQuota
-      ? [
-          'orca_statusline_try "$orca_statusline_seven" \\',
-          '  "7d ${orca_statusline_seven_bar:+$orca_statusline_seven_bar }${orca_statusline_seven}%" \\',
-          `  $(( \${#orca_statusline_seven} + ${cells + 5} ))`
-        ]
-      : []),
-    ...(resolved.cost
-      ? [
-          // Why the cost is ASCII by construction: its byte length is its column width.
-          'orca_statusline_try "$orca_statusline_cost" "$orca_statusline_cost" "${#orca_statusline_cost}"'
-        ]
-      : []),
-    // Why the countdown falls first: level and direction are what the line exists to say, and a
-    // reset is context on top of them — never worth the weekly quota it would push off a narrow pane.
-    ...(resolved.resetCountdown
-      ? [
-          'orca_statusline_try "$orca_statusline_reset" \\',
-          `  "${STATUSLINE_RESET_MARK_UNICODE} $orca_statusline_reset" \\`,
-          '  $(( ${#orca_statusline_reset} + 2 ))'
-        ]
-      : []),
+    ...resolvedOrder.flatMap((key) => (resolved[key] ? composeBlocks[key] : [])),
     'if [ -n "$orca_statusline_line" ]; then',
     '  printf \'%s\\n\' "$orca_statusline_line"',
     'fi',

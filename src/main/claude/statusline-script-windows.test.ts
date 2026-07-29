@@ -94,12 +94,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     const clears = script.match(/for \/f "delims=0123456789"/g) ?? []
     // Four percentages plus the trend baseline read back from the per-pane file.
     expect(clears.length).toBe(5)
-    expect(script).toContain(
-      'if not defined ORCA_STATUSLINE_FIVE goto :orca_statusline_field_seven'
-    )
-    expect(script).toContain(
-      'if not defined ORCA_STATUSLINE_SEVEN goto :orca_statusline_field_reset'
-    )
+    // An unparsed value skips its own composition block and lands on the next one.
+    expect(script).toMatch(/if not defined ORCA_STATUSLINE_FIVE goto :orca_statusline_item_\d+/)
+    expect(script).toMatch(/if not defined ORCA_STATUSLINE_SEVEN goto :orca_statusline_item_\d+/)
   })
 
   it('keys the account cache on the config dir name and reads the vault at most once', () => {
@@ -166,15 +163,45 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     expect(fiveIndex).toBeGreaterThan(accountIndex)
     expect(sevenIndex).toBeGreaterThan(fiveIndex)
     expect(resetIndex).toBeGreaterThan(sevenIndex)
-    // Why break, not skip: admitting a shorter field behind one that did not fit inverts priority.
+    // Why a sticky flag, not goto :emit: admitting a shorter field behind one that did not fit
+    // inverts priority, but identity fields ordered after a budgeted one must still print.
     const overflow = script.match(
-      /if not "!ORCA_STATUSLINE_NEXT:~96!"=="" goto :orca_statusline_emit/g
+      /if not "!ORCA_STATUSLINE_NEXT:~96!"=="" set "ORCA_STATUSLINE_FULL=1"/g
     )
     expect(overflow?.length).toBe(4)
+    const fullGuards = script.match(/if defined ORCA_STATUSLINE_FULL goto :/g)
+    expect(fullGuards?.length).toBe(8)
+    expect(script).not.toContain('goto :orca_statusline_emit"')
     // Why no trailing @: the leading sigil in the rendered field already marks the account, and
     // 18 + "..." keeps the same 21-column bound the POSIX branch's 20 + "…" produces.
     expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."')
     expect(script).not.toContain('...@')
+  })
+
+  it('renders the composition in the configured order', () => {
+    const ordered = getWindowsManagedStatusLineScript(undefined, [
+      'model',
+      'project',
+      'context',
+      'resetCountdown',
+      'account',
+      'fiveHourQuota',
+      'sevenDayQuota',
+      'cost'
+    ])
+    const compose = ordered.slice(
+      ordered.indexOf('set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"')
+    )
+    const modelIndex = compose.indexOf('if defined ORCA_STATUSLINE_MODEL')
+    const projectIndex = compose.indexOf('if defined ORCA_STATUSLINE_PROJECT')
+    const resetIndex = compose.indexOf(
+      `set "ORCA_STATUSLINE_NEXT=${STATUSLINE_RESET_MARK_ASCII} !ORCA_STATUSLINE_RESET!"`
+    )
+    const accountIndex = compose.indexOf('set "ORCA_STATUSLINE_NEXT=@!ORCA_STATUSLINE_ACCOUNT!"')
+    expect(modelIndex).toBeGreaterThan(-1)
+    expect(projectIndex).toBeGreaterThan(modelIndex)
+    expect(resetIndex).toBeGreaterThan(projectIndex)
+    expect(accountIndex).toBeGreaterThan(resetIndex)
   })
 
   it('slices every bar out of one table that matches the POSIX one cell for cell', () => {

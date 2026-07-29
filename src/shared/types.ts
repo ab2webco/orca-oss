@@ -1,5 +1,5 @@
 /* eslint-disable max-lines */
-import type { ClaudeStatusLineItems } from './claude-statusline-items'
+import type { ClaudeStatusLineItemKey, ClaudeStatusLineItems } from './claude-statusline-items'
 import type { ExecutionHostId } from './execution-host'
 import type { RemovedSshTargetTombstone, SshRemotePtyLease, SshTarget } from './ssh-types'
 import type { Automation, AutomationExecutionTargetType, AutomationRun } from './automations-types'
@@ -3082,6 +3082,9 @@ export type GlobalSettings = {
    *  account's vault points at the same shared script. Optional for older profiles; readers
    *  normalize with `normalizeClaudeStatusLineItems`. */
   claudeStatusLineItems?: Partial<ClaudeStatusLineItems>
+  /** Display (and drop-priority) order of the status line items. Optional for older profiles;
+   *  readers normalize with `normalizeClaudeStatusLineItemOrder`. */
+  claudeStatusLineItemOrder?: ClaudeStatusLineItemKey[]
   /** Dismissed freshness tuples: no write authority, just suppress re-nudging the same official placement/revision. */
   dismissedSkillFreshnessNudges?: string[]
   /** Why: generated tab titles are subjective, so they stay opt-in and manual renames win. */

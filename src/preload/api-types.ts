@@ -357,7 +357,11 @@ import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { BrowserSetAnnotationViewportBridgeArgs } from '../shared/browser-annotation-viewport-bridge'
 import type { CliInstallStatus } from '../shared/cli-install-types'
 import type { E2EConfig } from '../shared/e2e-config'
-import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
+import type {
+  AgentHookInstallStatus,
+  ClaudeStatusLineOwnership,
+  ClaudeStatusLineReplaceResult
+} from '../shared/agent-hook-types'
 import type { CodexConfigSyncStatus } from '../shared/codex-config-sync-types'
 import type {
   AgentStatusClearIpcPayload,
@@ -2602,6 +2606,8 @@ export type PreloadApi = {
   }
   agentHooks: {
     claudeStatus: () => Promise<AgentHookInstallStatus>
+    claudeStatusLineOwnership: () => Promise<ClaudeStatusLineOwnership>
+    claudeStatusLineReplaceUserOwned: () => Promise<ClaudeStatusLineReplaceResult>
     openClaudeStatus: () => Promise<AgentHookInstallStatus>
     codexStatus: () => Promise<AgentHookInstallStatus>
     geminiStatus: () => Promise<AgentHookInstallStatus>

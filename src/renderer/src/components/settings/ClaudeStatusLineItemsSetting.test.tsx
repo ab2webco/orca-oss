@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import {
   CLAUDE_STATUSLINE_ITEM_KEYS,
-  DEFAULT_CLAUDE_STATUSLINE_ITEMS
+  DEFAULT_CLAUDE_STATUSLINE_ITEMS,
+  type ClaudeStatusLineItemKey
 } from '../../../../shared/claude-statusline-items'
 import { getAgentsPaneSearchEntries } from './AgentsPane'
 import {
@@ -10,6 +11,7 @@ import {
   getClaudeStatusLineTitle
 } from './claude-statusline-items-copy'
 import { ClaudeStatusLineItemsSetting } from './ClaudeStatusLineItemsSetting'
+import { ClaudeStatusLinePreview } from './ClaudeStatusLinePreview'
 import { matchesSettingsSearch } from './settings-search'
 
 type ReactElementLike = {
@@ -88,5 +90,58 @@ describe('ClaudeStatusLineItemsSetting', () => {
     expect(matchesSettingsSearch('quota', getAgentsPaneSearchEntries())).toBe(true)
     const entries = getAgentsPaneSearchEntries()
     expect(entries.some((entry) => entry.title === getClaudeStatusLineTitle())).toBe(true)
+  })
+
+  it('renders the rows in the persisted order and embeds the live preview with it', () => {
+    const order: ClaudeStatusLineItemKey[] = [
+      'model',
+      'project',
+      'context',
+      'resetCountdown',
+      'account',
+      'fiveHourQuota',
+      'sevenDayQuota',
+      'cost'
+    ]
+    const element = ClaudeStatusLineItemsSetting({
+      settings: { ...getDefaultSettings('/tmp'), claudeStatusLineItemOrder: order },
+      updateSettings: vi.fn()
+    })
+    const rowLabels: unknown[] = []
+    let previewProps: Record<string, unknown> | null = null
+    visit(element, (entry) => {
+      if (typeof entry.props.ariaLabel === 'string' && typeof entry.props.checked === 'boolean') {
+        rowLabels.push(entry.props.ariaLabel)
+      }
+      if (entry.type === ClaudeStatusLinePreview) {
+        previewProps = entry.props
+      }
+    })
+    expect(rowLabels).toEqual(order.map((key) => getClaudeStatusLineItemCopy(key).label))
+    expect(previewProps).not.toBeNull()
+    expect(previewProps?.['order']).toEqual(order)
+  })
+
+  it('persists the full normalized order with the moved key swapped', () => {
+    const updateSettings = vi.fn()
+    const element = ClaudeStatusLineItemsSetting({
+      settings: getDefaultSettings('/tmp'),
+      updateSettings
+    })
+    const projectRow = findSwitchRow(element, getClaudeStatusLineItemCopy('project').label)
+    expect(projectRow.props.canMoveUp).toBe(false)
+    ;(projectRow.props.onMoveDown as () => void)()
+    expect(updateSettings).toHaveBeenCalledWith({
+      claudeStatusLineItemOrder: [
+        'model',
+        'project',
+        'context',
+        'account',
+        'fiveHourQuota',
+        'sevenDayQuota',
+        'cost',
+        'resetCountdown'
+      ]
+    })
   })
 })
