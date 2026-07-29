@@ -3487,6 +3487,11 @@ export function connectPanePty(
     ...(paneStartup?.agentArgsOverride !== undefined
       ? { agentArgsOverride: paneStartup.agentArgsOverride }
       : {}),
+    // Why: the override names an account of THIS host — remote-runtime and SSH
+    // spawns resolve accounts on their own host, so it must not ride along.
+    ...(runtimeEnvironmentId === null && !connectionId && paneStartup?.claudeAccountId !== undefined
+      ? { claudeAccountId: paneStartup.claudeAccountId }
+      : {}),
     ...(agentLaunchPreferences ? { agentLaunchPreferences } : {}),
     ...(launchToken ? { launchToken } : {}),
     ...(paneStartup?.launchAgent ? { launchAgent: paneStartup.launchAgent } : {}),

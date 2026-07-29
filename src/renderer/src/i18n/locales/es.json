@@ -687,6 +687,17 @@
             "triagePrompt": "Usa {{value0}} para asignarme el elemento de trabajo de Plane y establecer su prioridad en alta."
           }
         }
+      },
+      "ai": {
+        "vault": {
+          "session": {
+            "resume": {
+              "preparation": {
+                "owningAccountRemoved": "The Claude account that owns this session was removed. Add that account again in Settings to resume it."
+              }
+            }
+          }
+        }
       }
     },
     "hooks": {

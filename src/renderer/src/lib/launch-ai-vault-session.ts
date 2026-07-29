@@ -28,6 +28,11 @@ export function launchAiVaultSessionInNewTab(args: {
   providerSession?: AgentProviderSessionMetadata
   targetGroupId?: string
   splitDirection?: TabSplitDirection
+  /** Launch-scoped Claude account override — the transcript-owning universe on
+   *  resume. Null forces the shared home; undefined keeps the worktree pin.
+   *  Local desktop spawns only: the id names an account of THIS host, so the
+   *  runtime-hosted branch below must never forward it. */
+  claudeAccountId?: string | null
 }): LaunchAiVaultSessionInNewTabResult {
   const store = useAppStore.getState()
   let targetGroupId = args.targetGroupId
@@ -72,6 +77,7 @@ export function launchAiVaultSessionInNewTab(args: {
     ...(args.env ? { env: args.env } : {}),
     ...(args.envToDelete ? { envToDelete: args.envToDelete } : {}),
     ...(args.launchConfig ? { launchConfig: args.launchConfig, launchAgent: args.agent } : {}),
+    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
     telemetry: {
       agent_kind: tuiAgentToAgentKind(args.agent),
       launch_source: 'sidebar',

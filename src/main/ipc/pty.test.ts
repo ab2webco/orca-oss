@@ -2051,6 +2051,71 @@ describe('registerPtyHandlers', () => {
       provenance: `managed:${accountId}:injected`
     })
 
+    it('lets a launch-scoped Claude account beat the worktree pin on the renderer spawn path', async () => {
+      installExitOnKillSpawnMock()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-launch'))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        worktreeId: 'wt-pinned',
+        claudeAccountId: 'account-launch'
+      })) as { id: string }
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-launch' }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    it('forces the shared Claude home when the renderer spawn passes an explicit null launch account', async () => {
+      installExitOnKillSpawnMock()
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/claude',
+        envPatch: {},
+        stripAuthEnv: false,
+        provenance: 'system'
+      }))
+      const store = { getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        worktreeId: 'wt-pinned',
+        claudeAccountId: null
+      })) as { id: string }
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: null }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
     it('lets a launch-scoped Claude account beat the worktree pin on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()

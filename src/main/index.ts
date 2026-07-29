@@ -193,6 +193,7 @@ import { startCodexSessionBackfillInBackground } from './codex/codex-session-bac
 import { startCodexSessionIndexHealInBackground } from './codex/codex-session-index-heal'
 import { createCodexSessionMigrationScheduler } from './codex/codex-session-migration-scheduler'
 import { prepareLegacySharedCodexSessionResume } from './codex/codex-legacy-session-resume'
+import { withClaudeResumeUniverse } from './ai-vault/claude-session-resume-universe'
 import { resolveHostCodexSessionSourceHome } from './codex/codex-session-source-home'
 import type { CodexSessionResumePreparation } from './codex/codex-session-resume-home'
 import { prepareCodexSessionResume } from './codex/codex-session-resume-preparation'
@@ -1240,12 +1241,20 @@ function openMainWindow(): BrowserWindow {
         getManagedClaudeProjectsPathsForSessionDiscovery(
           store?.getSettings().claudeManagedAccounts ?? []
         ),
-      prepareAiVaultSessionResume: (args) =>
-        prepareLegacySharedCodexSessionResume(args, {
-          isHostSystemDefaultRealHome: () =>
-            codexRuntimeHome?.isHostSystemDefaultRealHome() === true,
-          systemCodexHomePath: resolveHostCodexSessionSourceHome(store!.getSettings())
-        }),
+      prepareAiVaultSessionResume: withClaudeResumeUniverse(
+        (args) =>
+          prepareLegacySharedCodexSessionResume(args, {
+            isHostSystemDefaultRealHome: () =>
+              codexRuntimeHome?.isHostSystemDefaultRealHome() === true,
+            systemCodexHomePath: resolveHostCodexSessionSourceHome(store!.getSettings())
+          }),
+        {
+          hasClaudeManagedAccount: (accountId) =>
+            (store?.getSettings().claudeManagedAccounts ?? []).some(
+              (account) => account.id === accountId
+            )
+        }
+      ),
       onBeforeRelaunch: async () => {
         isQuitting = true
         desktopRelayService?.fenceAndCloseNow()
@@ -2239,11 +2248,20 @@ void app.whenReady().then(async () => {
       getManagedClaudeProjectsPathsForSessionDiscovery(
         store?.getSettings().claudeManagedAccounts ?? []
       ),
-    prepareAiVaultSessionResume: (args) =>
-      prepareLegacySharedCodexSessionResume(args, {
-        isHostSystemDefaultRealHome: () => codexRuntimeHome?.isHostSystemDefaultRealHome() === true,
-        systemCodexHomePath: resolveHostCodexSessionSourceHome(store!.getSettings())
-      }),
+    prepareAiVaultSessionResume: withClaudeResumeUniverse(
+      (args) =>
+        prepareLegacySharedCodexSessionResume(args, {
+          isHostSystemDefaultRealHome: () =>
+            codexRuntimeHome?.isHostSystemDefaultRealHome() === true,
+          systemCodexHomePath: resolveHostCodexSessionSourceHome(store!.getSettings())
+        }),
+      {
+        hasClaudeManagedAccount: (accountId) =>
+          (store?.getSettings().claudeManagedAccounts ?? []).some(
+            (account) => account.id === accountId
+          )
+      }
+    ),
     buildAgentHookPtyEnv: () =>
       isAgentStatusHooksEnabled(store?.getSettings()) ? agentHookServer.buildPtyEnv() : {},
     orchestrationEnvironmentTransport

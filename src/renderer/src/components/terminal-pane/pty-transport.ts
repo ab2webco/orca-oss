@@ -484,6 +484,7 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
     launchAgent,
     startupCommandDelivery,
     connectionId,
+    claudeAccountId,
     worktreeId,
     tabId,
     leafId,
@@ -746,6 +747,7 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
             ? { startupCommandDelivery: options.startupCommandDelivery ?? startupCommandDelivery }
             : {}),
           ...(connectionId ? { connectionId } : {}),
+          ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
           ...(admittedSessionId ? { sessionId: admittedSessionId } : {}),
           // Why: hidden-at-spawn mark must reach main before the PTY's first byte — ride the spawn IPC, not the visibility sync (terminal-query-authority.md).
           ...(options.initiallyHidden ? { initiallyHidden: true } : {}),

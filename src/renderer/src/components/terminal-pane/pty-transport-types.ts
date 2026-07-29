@@ -191,6 +191,9 @@ export type IpcPtyTransportOptions = {
   startupCommandDelivery?: StartupCommandDelivery
   connectionId?: string | null
   executionHostId?: ExecutionHostId | null
+  /** Launch-scoped Claude account override (transcript-owning universe on
+   *  resume). Null forces the shared home; undefined keeps the worktree pin. */
+  claudeAccountId?: string | null
   worktreeId?: string
   tabId?: string
   leafId?: string

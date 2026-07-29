@@ -898,6 +898,8 @@ const api = {
       terminalColorQueryReplies?: { foreground?: string; background?: string }
       // Why: marks the PTY hidden before its first byte so the delivery gate + model responder own spawn-time queries (terminal-query-authority.md §races).
       initiallyHidden?: boolean
+      // Launch-scoped Claude account override (transcript-owning universe on resume); null forces the shared home.
+      claudeAccountId?: string | null
       // Why: closes the SIGKILL race (INVESTIGATION.md) — main sync-flushes the (worktreeId, tabId, leafId → ptyId) binding before pty:spawn returns.
       tabId?: string
       leafId?: string
