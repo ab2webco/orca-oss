@@ -6,6 +6,7 @@ import type {
   ClaudeSessionFailoverCopyResult,
   CodexRateLimitAccountsState
 } from '../../../shared/types'
+import type { PreloadApi } from '../../../preload/api-types'
 import type { RateLimitState, ProviderRateLimits } from '../../../shared/rate-limit-types'
 
 const sendRuntimePtyInputVerified = vi.fn<(...args: unknown[]) => Promise<boolean>>(
@@ -18,6 +19,15 @@ const deliverLaunchPromptToAgentTab = vi.fn<(...args: unknown[]) => Promise<bool
   async () => true
 )
 const appendTabToWorktreeOrder = vi.fn<(...args: unknown[]) => void>()
+type BeginClaudeAccountSwitch = PreloadApi['pty']['beginClaudeAccountSwitch']
+const beginClaudeAccountSwitch = vi.fn<BeginClaudeAccountSwitch>(async () => ({
+  ok: true,
+  configDir: '/vaults/spare/auth',
+  reservationId: 'reservation-1',
+  shell: 'posix'
+}))
+const commitClaudeAccountSwitch = vi.fn(async () => true)
+const cancelClaudeAccountSwitch = vi.fn(async () => {})
 
 type StoreStub = {
   settings: Record<string, unknown>
@@ -176,6 +186,11 @@ const api = {
     fetchInactiveClaudeAccounts: vi.fn(async () => {}),
     fetchInactiveCodexAccounts: vi.fn(async () => {}),
     get: vi.fn(async () => rateLimitState())
+  },
+  pty: {
+    beginClaudeAccountSwitch,
+    commitClaudeAccountSwitch,
+    cancelClaudeAccountSwitch
   }
 }
 
@@ -195,7 +210,12 @@ beforeEach(() => {
     autoSwitchRateLimitedAccounts: true,
     rateLimitFailoverAccountId: null,
     agentCmdOverrides: {},
-    activeRuntimeEnvironmentId: null
+    activeRuntimeEnvironmentId: null,
+    claudeManagedAccounts: [
+      claudeAccount({ id: 'active-1' }),
+      claudeAccount({ id: 'spare-1' }),
+      ENDPOINT_ACCOUNT
+    ]
   }
   store.rateLimits = rateLimitState()
   store.getKnownWorktreeById.mockReturnValue({ id: 'wt-1', path: '/Users/dev/demo' })
@@ -218,6 +238,13 @@ beforeEach(() => {
   sendRuntimePtyInputVerified.mockResolvedValue(true)
   stopForegroundAgent.mockResolvedValue(true)
   waitForResumedAgent.mockResolvedValue(true)
+  beginClaudeAccountSwitch.mockResolvedValue({
+    ok: true,
+    configDir: '/vaults/spare/auth',
+    reservationId: 'reservation-1',
+    shell: 'posix'
+  })
+  commitClaudeAccountSwitch.mockResolvedValue(true)
   deliverLaunchPromptToAgentTab.mockResolvedValue(true)
   ;(globalThis as { window?: unknown }).window = { api } as unknown as typeof window
 })
@@ -269,8 +296,8 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
       accountLabel: 'spare-1@example.com',
       relaunch: 'resumed'
     })
-    // Why: the endpoint source transcript is copied into the target OAuth universe
-    // and relaunched in a new tab (the isolated CLAUDE_CONFIG_DIR can't be re-pointed).
+    // Why: the endpoint source transcript is copied before the same PTY resumes
+    // against the target OAuth universe.
     expect(api.claudeAccounts.copySessionForAccountSwitch).toHaveBeenCalledWith({
       sessionId: PROVIDER_SESSION.id,
       cwd: '/Users/dev/demo',
@@ -283,7 +310,8 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
     )
     // Why: a pinned relaunch must stay off the gated global selection + same-PTY resume.
     expect(api.claudeAccounts.select).not.toHaveBeenCalled()
-    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(sendRuntimePtyInputVerified.mock.calls[0]?.[1]).toBe('pty-1')
+    expect(String(sendRuntimePtyInputVerified.mock.calls[0]?.[2])).toContain('--resume')
   })
 
   it('proceeds when the session is backed by a subscription-oauth pin', async () => {
@@ -357,7 +385,7 @@ describe('runAgentRateLimitAutoSwitch — pinned managed session routing', () =>
     )
   })
 
-  it('relaunches an injected (pinned) session on the target OAuth account in a new tab', async () => {
+  it('resumes an injected session on the target OAuth account in the same PTY', async () => {
     api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
       accountId: 'active-1',
       injected: true
@@ -381,12 +409,13 @@ describe('runAgentRateLimitAutoSwitch — pinned managed session routing', () =>
       'wt-1',
       expect.objectContaining({ claudeAccountId: 'spare-1' })
     )
-    expect(store.createTab).toHaveBeenCalledWith('wt-1', undefined, undefined, {
-      launchAgent: 'claude'
-    })
-    // Why: the pinned relaunch must stay off the gated global selection and the same-PTY resume.
+    expect(store.createTab).not.toHaveBeenCalled()
+    expect(beginClaudeAccountSwitch).toHaveBeenCalledWith(
+      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: 'spare-1' })
+    )
+    expect(String(sendRuntimePtyInputVerified.mock.calls[0]?.[2])).toContain('--resume')
+    // Why: a pinned switch must stay off the gated global selection.
     expect(api.claudeAccounts.select).not.toHaveBeenCalled()
-    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
   })
 
   it('keeps the same-PTY flow for a non-injected (global-selection) session', async () => {

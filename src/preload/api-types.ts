@@ -1512,6 +1512,35 @@ export type PreloadApi = {
     }>
     write: (id: string, data: string) => void
     writeAccepted: (id: string, data: string) => Promise<boolean>
+    beginClaudeAccountSwitch: (args: {
+      ptyId: string
+      sourceAccountId: string
+      targetAccountId: string
+      runtime: 'host' | 'wsl'
+      wslDistro: string | null
+    }) => Promise<
+      | {
+          ok: true
+          configDir: string
+          reservationId: string
+          shell: 'posix' | 'powershell' | 'cmd'
+        }
+      | {
+          ok: false
+          reason:
+            | 'unhealthy'
+            | 'source-mismatch'
+            | 'prepare-failed'
+            | 'runtime-mismatch'
+            | 'concurrent'
+        }
+    >
+    commitClaudeAccountSwitch: (args: {
+      ptyId: string
+      targetAccountId: string
+      reservationId: string
+    }) => Promise<boolean>
+    cancelClaudeAccountSwitch: (args: { reservationId: string }) => Promise<void>
     onWriteUnavailable?: (callback: (payload: { id: string }) => void) => () => void
     resize: (id: string, cols: number, rows: number) => void
     claimViewport: (id: string, cols: number, rows: number) => void

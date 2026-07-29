@@ -925,6 +925,36 @@ const api = {
     },
     writeAccepted: (id: string, data: string): Promise<boolean> =>
       ipcRenderer.invoke('pty:writeAccepted', { id, data }),
+    beginClaudeAccountSwitch: (args: {
+      ptyId: string
+      sourceAccountId: string
+      targetAccountId: string
+      runtime: 'host' | 'wsl'
+      wslDistro: string | null
+    }): Promise<
+      | {
+          ok: true
+          configDir: string
+          reservationId: string
+          shell: 'posix' | 'powershell' | 'cmd'
+        }
+      | {
+          ok: false
+          reason:
+            | 'unhealthy'
+            | 'source-mismatch'
+            | 'prepare-failed'
+            | 'runtime-mismatch'
+            | 'concurrent'
+        }
+    > => ipcRenderer.invoke('pty:beginClaudeAccountSwitch', args),
+    commitClaudeAccountSwitch: (args: {
+      ptyId: string
+      targetAccountId: string
+      reservationId: string
+    }): Promise<boolean> => ipcRenderer.invoke('pty:commitClaudeAccountSwitch', args),
+    cancelClaudeAccountSwitch: (args: { reservationId: string }): Promise<void> =>
+      ipcRenderer.invoke('pty:cancelClaudeAccountSwitch', args),
     onWriteUnavailable: (callback: (payload: { id: string }) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: { id: string }): void =>
         callback(payload)
