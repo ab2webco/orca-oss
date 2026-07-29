@@ -96,10 +96,18 @@ import {
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
   markClaudePtySpawned,
+  markInjectedClaudeCliExited,
   markInjectedClaudePtySpawned,
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import {
+  beginInPlaceClaudeAccountSwitch,
+  finishInPlaceClaudeAccountSwitch,
+  finishInPlaceClaudeAccountSwitchByReservation,
+  type InPlaceClaudeAccountSwitchArgs,
+  type InPlaceClaudeAccountSwitchResult
+} from '../claude-accounts/in-place-account-switch'
 import { getLiveClaudePtyOwnershipEpoch } from '../claude-accounts/live-pty-ownership-epoch'
 import {
   applyTerminalAttributionEnv,
@@ -1846,6 +1854,9 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:getForegroundProcess')
   ipcMain.removeHandler('pty:inspectProcess')
   ipcMain.removeHandler('pty:confirmForegroundProcess')
+  ipcMain.removeHandler('pty:beginClaudeAccountSwitch')
+  ipcMain.removeHandler('pty:commitClaudeAccountSwitch')
+  ipcMain.removeHandler('pty:cancelClaudeAccountSwitch')
   ipcMain.removeHandler('pty:getCwd')
   ipcMain.removeHandler('pty:getSize')
   ipcMain.removeAllListeners('pty:getAuthoritativeBufferSnapshotCapabilitiesSync')
@@ -6480,6 +6491,83 @@ export function registerPtyHandlers(
 
   ipcMain.handle('pty:inspectProcess', async (_event, args: { id: string }) =>
     inspectPtyProviderProcess(getProviderForPty(args.id), args.id)
+  )
+
+  ipcMain.handle(
+    'pty:beginClaudeAccountSwitch',
+    async (
+      event,
+      args: InPlaceClaudeAccountSwitchArgs
+    ): Promise<InPlaceClaudeAccountSwitchResult> => {
+      if (
+        !isPtyWriteEventFromMainWindow(event, mainWindow.webContents) ||
+        !prepareClaudeAuth ||
+        typeof args?.ptyId !== 'string' ||
+        typeof args?.sourceAccountId !== 'string' ||
+        typeof args?.targetAccountId !== 'string' ||
+        (args.runtime !== 'host' && args.runtime !== 'wsl')
+      ) {
+        return { ok: false, reason: 'prepare-failed' }
+      }
+      return beginInPlaceClaudeAccountSwitch(args, {
+        getCurrentAccountId: getLiveInjectedClaudePtyAccountId,
+        getAccountRuntime: (accountId) => {
+          const account = getSettings?.().claudeManagedAccounts.find(
+            (candidate) => candidate.id === accountId
+          )
+          return account
+            ? {
+                runtime: account.managedAuthRuntime === 'wsl' ? 'wsl' : 'host',
+                wslDistro: account.wslDistro ?? null
+              }
+            : null
+        },
+        inspectProcess: (ptyId) => inspectPtyProviderProcess(getProviderForPty(ptyId), ptyId),
+        prepareTarget: () =>
+          prepareClaudeAuth({
+            runtime: args.runtime,
+            wslDistro: args.wslDistro,
+            overrideAccountId: args.targetAccountId
+          }),
+        releaseCurrentBinding: markInjectedClaudeCliExited,
+        releaseReservation: releaseInjectedClaudeAccountLaunch
+      })
+    }
+  )
+
+  ipcMain.handle(
+    'pty:commitClaudeAccountSwitch',
+    (event, args: { ptyId: string; targetAccountId: string; reservationId: string }): boolean => {
+      if (
+        !isPtyWriteEventFromMainWindow(event, mainWindow.webContents) ||
+        typeof args?.ptyId !== 'string' ||
+        typeof args?.targetAccountId !== 'string' ||
+        typeof args?.reservationId !== 'string'
+      ) {
+        return false
+      }
+      try {
+        markInjectedClaudePtySpawned(args.ptyId, args.targetAccountId, args.reservationId)
+        finishInPlaceClaudeAccountSwitch(args.ptyId, args.reservationId)
+        return true
+      } catch {
+        finishInPlaceClaudeAccountSwitch(args.ptyId, args.reservationId)
+        return false
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'pty:cancelClaudeAccountSwitch',
+    (event, args: { reservationId: string }): void => {
+      if (
+        isPtyWriteEventFromMainWindow(event, mainWindow.webContents) &&
+        typeof args?.reservationId === 'string'
+      ) {
+        releaseInjectedClaudeAccountLaunch(args.reservationId)
+        finishInPlaceClaudeAccountSwitchByReservation(args.reservationId)
+      }
+    }
   )
 
   ipcMain.handle(

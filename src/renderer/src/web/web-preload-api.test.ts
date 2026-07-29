@@ -224,6 +224,32 @@ describe('web before-unload persistence', () => {
   })
 })
 
+describe('web PTY account switching', () => {
+  it('fails closed without exposing local Claude ownership mutations', async () => {
+    const { api } = await installApi()
+
+    await expect(
+      api.pty.beginClaudeAccountSwitch({
+        ptyId: 'pty-1',
+        sourceAccountId: 'account-a',
+        targetAccountId: 'account-b',
+        runtime: 'host',
+        wslDistro: null
+      })
+    ).resolves.toEqual({ ok: false, reason: 'unhealthy' })
+    await expect(
+      api.pty.commitClaudeAccountSwitch({
+        ptyId: 'pty-1',
+        targetAccountId: 'account-b',
+        reservationId: 'reservation-1'
+      })
+    ).resolves.toBe(false)
+    await expect(
+      api.pty.cancelClaudeAccountSwitch({ reservationId: 'reservation-1' })
+    ).resolves.toBeUndefined()
+  })
+})
+
 describe('web runtime environment identity', () => {
   beforeEach(() => {
     vi.resetModules()

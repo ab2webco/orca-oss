@@ -668,7 +668,12 @@
         "resumePlanFailed": "Could not build a resume command for the switched session.",
         "stopFailed": "The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.",
         "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
-        "launchPlanFailed": "Could not build a launch command for the switched session."
+        "launchPlanFailed": "Could not build a launch command for the switched session.",
+        "copyFailed": "Could not copy the session transcript into the selected account.",
+        "preparationFailed": "Could not prepare the selected account for this terminal.",
+        "resumeInputFailed": "The terminal did not accept the resume command after switching accounts.",
+        "resumeTimedOut": "The resumed agent did not take over the terminal in time.",
+        "accountingFailed": "The resumed terminal could not be assigned to the selected account."
       },
       "plane": {
         "usage": {

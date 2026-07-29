@@ -17,7 +17,7 @@ export type AgentRateLimitAutoSwitchResult =
       accountLabel: string
       /** Present when the session continued on the last-resort custom-endpoint account. */
       failover?: AgentRateLimitFailoverMode
-      /** Present when a pinned managed session was relaunched on another OAuth account in a new tab. */
+      /** Present when a pinned managed session continued on another OAuth account. */
       relaunch?: AgentRateLimitFailoverMode
     }
   | {
@@ -89,12 +89,12 @@ export async function tryLastResortFailover(args: {
 }
 
 /**
- * Relaunches a pinned managed (injected) Claude session on the chosen OAuth
- * account in a new tab, or null when the session is not an injected local pin.
+ * Continues a pinned managed Claude session on the chosen OAuth account in the
+ * same shell PTY, or null when the session is not an injected local pin.
  *
- * Why: a pinned worktree's PTY has an isolated CLAUDE_CONFIG_DIR fixed at spawn,
- * so the global selectAccount + same-PTY resume can never re-point it. It must
- * copy the transcript, re-pin, and relaunch — exactly like the endpoint failover.
+ * Why: main owns the account binding for the surviving PTY, so this path copies
+ * the transcript, re-pins, and performs a guarded foreground-CLI reassignment
+ * instead of bypassing accounting with a renderer-only environment export.
  */
 export async function tryPinnedManagedSwitch(args: {
   worktreeId: string
@@ -105,7 +105,7 @@ export async function tryPinnedManagedSwitch(args: {
   candidate: AutoSwitchAccountCandidate
   livePtyAccount: ClaudeLivePtyAccountInfo | null
 }): Promise<AgentRateLimitAutoSwitchResult | null> {
-  // Why: only an injected pin on a LOCAL worktree can be re-pinned + relaunched;
+  // Why: only an injected pin on a LOCAL workspace can be re-pinned + resumed;
   // the non-injected/global-selection case keeps the same-PTY resume, and remote
   // runtimes have no local pin or tab to relaunch into.
   if (

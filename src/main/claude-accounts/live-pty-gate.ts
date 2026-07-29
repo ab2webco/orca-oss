@@ -33,19 +33,26 @@ import {
   createAssignedWorktreeLaunchBlockError,
   createGlobalTerminalLaunchBlockError
 } from './live-pty-blocker-description'
+import {
+  clearInjectedClaudePtyBinding,
+  confirmSeededInjectedClaudePtyBindings,
+  hasSeededUnconfirmedInjectedClaudePtys,
+  type InjectedClaudePtyBindingPersistence,
+  markInjectedClaudeCliBindingExited,
+  markInjectedClaudePtyBindingSpawned,
+  releaseInjectedClaudeLaunchReservation,
+  seedInjectedClaudePtyBindings
+} from './injected-claude-pty-binding'
 const managedClaudeAccountMutations = new Set<string>()
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
 // cannot rotate the single-use refresh token out from under a Claude CLI that
 // survived the app restart inside the daemon.
 const seededUnconfirmedPtyIds = new Set<string>()
-const seededUnconfirmedInjectedPtyIds = new Set<string>()
 
-export type ClaudeLivePtyPersistence = {
+export type ClaudeLivePtyPersistence = InjectedClaudePtyBindingPersistence & {
   addClaudeLivePtySessionId(sessionId: string, accountId?: string | null): void
   removeClaudeLivePtySessionId(sessionId: string): void
-  addClaudeLivePtyAccountBinding?(sessionId: string, accountId: string): void
-  removeClaudeLivePtyAccountBinding?(sessionId: string): void
 }
 
 let persistence: ClaudeLivePtyPersistence | null = null
@@ -75,16 +82,11 @@ export function seedLiveClaudePtysFromPersistence(
 export function seedLiveInjectedClaudePtysFromPersistence(
   bindings: readonly { sessionId: string; accountId: string }[]
 ): void {
-  for (const { sessionId, accountId } of bindings) {
-    liveInjectedClaudePtyAccounts.set(sessionId, accountId)
-    reserveLiveClaudePtyRefreshChain(sessionId, accountId)
-    ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
-    seededUnconfirmedInjectedPtyIds.add(sessionId)
-  }
+  seedInjectedClaudePtyBindings(bindings)
 }
 
 export function hasSeededUnconfirmedClaudePtys(): boolean {
-  return seededUnconfirmedPtyIds.size > 0 || seededUnconfirmedInjectedPtyIds.size > 0
+  return seededUnconfirmedPtyIds.size > 0 || hasSeededUnconfirmedInjectedClaudePtys()
 }
 
 /**
@@ -105,16 +107,8 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
       persistence?.removeClaudeLivePtySessionId(sessionId)
     }
   }
-  for (const sessionId of seededUnconfirmedInjectedPtyIds) {
-    if (!alive.has(sessionId)) {
-      liveInjectedClaudePtyAccounts.delete(sessionId)
-      releaseLiveClaudePtyRefreshChain(sessionId)
-      ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
-      persistence?.removeClaudeLivePtyAccountBinding?.(sessionId)
-    }
-  }
+  confirmSeededInjectedClaudePtyBindings(alive, persistence)
   seededUnconfirmedPtyIds.clear()
-  seededUnconfirmedInjectedPtyIds.clear()
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
 }
 
@@ -174,42 +168,16 @@ export function markInjectedClaudePtySpawned(
   reservationId?: string,
   options?: { persistenceAlreadyRecorded?: boolean }
 ): void {
-  const existingAccountId = liveInjectedClaudePtyAccounts.get(ptyId)
-  const existingOwnershipEpoch = ownershipEpoch.getLiveClaudePtyOwnershipEpoch(ptyId)
-  const reservedAccountId = reservationId
-    ? injectedClaudeLaunchReservations.get(reservationId)
-    : undefined
-  if (existingAccountId && existingAccountId !== accountId) {
-    throw new Error('A live Claude terminal cannot change its assigned account.')
-  }
-  if (reservationId && reservedAccountId !== accountId) {
-    throw new Error('The Claude account launch reservation is no longer valid.')
-  }
-  try {
-    liveInjectedClaudePtyAccounts.set(ptyId, accountId)
-    try {
-      if (!options?.persistenceAlreadyRecorded) {
-        persistence?.addClaudeLivePtyAccountBinding?.(ptyId, accountId)
-      }
-      seededUnconfirmedInjectedPtyIds.delete(ptyId)
-      ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
-      if (reservationId) {
-        transferClaudeLaunchRefreshChain(reservationId, ptyId)
-      } else if (!existingAccountId) {
-        reserveLiveClaudePtyRefreshChain(ptyId, accountId)
-      }
-    } catch (error) {
-      if (existingAccountId) {
-        liveInjectedClaudePtyAccounts.set(ptyId, existingAccountId)
-      } else {
-        liveInjectedClaudePtyAccounts.delete(ptyId)
-      }
-      ownershipEpoch.restoreLiveClaudePtyOwnershipEpoch(ptyId, existingOwnershipEpoch)
-      throw error
-    }
-  } finally {
-    releaseInjectedClaudeAccountLaunch(reservationId)
-  }
+  markInjectedClaudePtyBindingSpawned(ptyId, accountId, reservationId, persistence, options)
+}
+
+/**
+ * Releases the account owned by a Claude CLI that exited while its shell PTY
+ * stays alive. A mismatched owner fails closed so this cannot become a general
+ * live-terminal reassignment escape hatch.
+ */
+export function markInjectedClaudeCliExited(ptyId: string, accountId: string): boolean {
+  return markInjectedClaudeCliBindingExited(ptyId, accountId, persistence)
 }
 
 export function markClaudePtyExited(ptyId: string): void {
@@ -219,10 +187,8 @@ export function markClaudePtyExited(ptyId: string): void {
   releaseLiveClaudePtyRefreshChain(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtySessionId(ptyId)
-  liveInjectedClaudePtyAccounts.delete(ptyId)
   ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
-  seededUnconfirmedInjectedPtyIds.delete(ptyId)
-  persistence?.removeClaudeLivePtyAccountBinding?.(ptyId)
+  clearInjectedClaudePtyBinding(ptyId, persistence)
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
 }
 
@@ -310,12 +276,7 @@ export function endManagedClaudeAccountMutation(accountId: string): void {
 }
 
 export function releaseInjectedClaudeAccountLaunch(reservationId: string | undefined): void {
-  if (!reservationId) {
-    return
-  }
-  clearClaudeLaunchReservationExpiry(reservationId)
-  injectedClaudeLaunchReservations.delete(reservationId)
-  releaseClaudeLaunchRefreshChain(reservationId)
+  releaseInjectedClaudeLaunchReservation(reservationId)
 }
 
 export function releaseSharedClaudeAccountLaunch(reservationId: string | undefined): void {

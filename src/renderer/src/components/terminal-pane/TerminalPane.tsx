@@ -1086,7 +1086,7 @@ export default function TerminalPane({
               toast.success(
                 translate(
                   'auto.components.terminalPane.TerminalPane.relaunchTitle',
-                  'Switched to {{value0}} and relaunched this worktree.',
+                  'Switched this terminal to {{value0}}.',
                   { value0: result.accountLabel }
                 ),
                 {
@@ -1094,12 +1094,12 @@ export default function TerminalPane({
                     result.relaunch === 'resumed'
                       ? translate(
                           'auto.components.terminalPane.TerminalPane.relaunchResumed',
-                          'The session resumed in a new tab and continue was sent.'
+                          'The session resumed and continue was sent.'
                         )
                       : result.relaunch === 'launched'
                         ? translate(
                             'auto.components.terminalPane.TerminalPane.relaunchLaunched',
-                            'The session resumed in a new tab, but continue was not delivered — send it manually.'
+                            'The session resumed, but continue was not delivered — send it manually.'
                           )
                         : translate(
                             'auto.components.terminalPane.TerminalPane.relaunchFresh',

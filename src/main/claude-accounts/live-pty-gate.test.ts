@@ -15,6 +15,7 @@ import {
   hasLiveClaudePtysUsingAccount,
   isClaudeAuthSwitchInProgress,
   markClaudePtyExited,
+  markInjectedClaudeCliExited,
   markClaudePtySpawned,
   markInjectedClaudePtySpawned,
   releaseInjectedClaudeAccountLaunch,
@@ -202,6 +203,37 @@ describe('Claude live PTY gate', () => {
     markClaudePtyExited('injected-pty')
     expect(hasLiveInjectedClaudePtysForAccount('account-a')).toBe(false)
     expect(removeClaudeLivePtyAccountBinding).toHaveBeenCalledWith('injected-pty')
+  })
+
+  it('releases only the foreground Claude binding before assigning the same PTY to another account', () => {
+    const addClaudeLivePtyAccountBinding = vi.fn()
+    const removeClaudeLivePtyAccountBinding = vi.fn()
+    attachClaudeLivePtyPersistence({
+      addClaudeLivePtySessionId: vi.fn(),
+      removeClaudeLivePtySessionId: vi.fn(),
+      addClaudeLivePtyAccountBinding,
+      removeClaudeLivePtyAccountBinding
+    })
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+
+    expect(markInjectedClaudeCliExited('injected-pty', 'account-a')).toBe(true)
+    expect(getLiveInjectedClaudePtyAccountId('injected-pty')).toBeNull()
+    expect(removeClaudeLivePtyAccountBinding).toHaveBeenCalledWith('injected-pty')
+
+    markInjectedClaudePtySpawned('injected-pty', 'account-b')
+
+    expect(getLiveInjectedClaudePtyAccountId('injected-pty')).toBe('account-b')
+    expect(addClaudeLivePtyAccountBinding).toHaveBeenLastCalledWith('injected-pty', 'account-b')
+  })
+
+  it('does not release an injected binding owned by another account', () => {
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+
+    expect(markInjectedClaudeCliExited('injected-pty', 'account-b')).toBe(false)
+    expect(getLiveInjectedClaudePtyAccountId('injected-pty')).toBe('account-a')
+    expect(() => markInjectedClaudePtySpawned('injected-pty', 'account-b')).toThrow(
+      'A live Claude terminal cannot change its assigned account.'
+    )
   })
 
   it('keeps injected account ownership across restart reconciliation', () => {

@@ -37,12 +37,12 @@ function notifyRelaunch(
         mode === 'resumed'
           ? translate(
               'auto.components.terminalPane.useManualClaudeAccountSwitch.doneResumed',
-              'The session resumed in a new tab and continue was sent.'
+              'The session resumed and continue was sent.'
             )
           : mode === 'launched'
             ? translate(
                 'auto.components.terminalPane.useManualClaudeAccountSwitch.doneLaunched',
-                'The session resumed in a new tab, but continue was not delivered — send it manually.'
+                'The session resumed, but continue was not delivered — send it manually.'
               )
             : translate(
                 'auto.components.terminalPane.useManualClaudeAccountSwitch.doneFresh',
@@ -54,11 +54,9 @@ function notifyRelaunch(
 
 /**
  * User-triggered switch of the CURRENT terminal's Claude account: copies the
- * transcript into the target account's universe, re-pins the worktree, and
- * relaunches in a new tab. Routes a managed OAuth target through the
- * managed-switch relaunch and a custom-endpoint target through the failover
- * relaunch. Neither path touches the gated global selectAccount, so it works
- * even when the global account gate would block a global switch.
+ * transcript into the target account's universe and re-pins the workspace.
+ * Managed OAuth targets resume in place; custom endpoints keep their failover
+ * relaunch. Neither path touches the gated global selectAccount.
  */
 export function useManualClaudeAccountSwitch(args: { worktreeId: string }): {
   switchToAccount: (
