@@ -28,6 +28,7 @@ import { buildEncodedWslBashCommand } from '../wsl-bash-command'
 import {
   getLiveInjectedClaudePtyAccountId,
   hasLiveClaudePtys,
+  hasLiveInjectedClaudePtyBoundToAccount,
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount,
   hasAnyLiveClaudePtys,
@@ -61,6 +62,11 @@ import {
 const execFileAsync = promisify(execFile)
 const OWNED_WSL_AUTH_PATH_SUCCESS_TTL_MS = 30_000
 const OWNED_WSL_AUTH_PATH_FAILURE_TTL_MS = 5_000
+
+/** Windows resolves the same directory under either drive-letter case. */
+function isSameHostPath(left: string, right: string): boolean {
+  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right
+}
 
 export type ClaudeRuntimeAuthPreparation = {
   configDir: string
@@ -232,7 +238,7 @@ export class ClaudeRuntimeAuthService {
       // history split. Host only — a WSL or SSH session resolves its own home
       // there, which this path cannot see.
       if (effectiveTarget?.runtime !== 'wsl') {
-        this.linkTranscriptsWhenNoClaudeIsLive(this.getRuntimeConfigDir())
+        this.linkTranscriptsWhenUniverseQuiet(this.getRuntimeConfigDir())
       }
       await this.syncForCurrentSelection(effectiveTarget)
       return {
@@ -1102,19 +1108,67 @@ export class ClaudeRuntimeAuthService {
   }
 
   /**
-   * Join one Claude universe to the shared transcript store, but only while no
-   * Claude CLI is running anywhere.
+   * Join one Claude universe to the shared transcript store, deferring only
+   * while THAT universe has a live CLI mid-append on its own files.
    *
-   * Why liveness is asked globally and not per account: every linked universe
-   * shares one store, so this migration renames and parks files that the CLI of
-   * any other account may be mid-append on. Deferring costs nothing — the next
-   * launch retries, and once linked the call short-circuits forever.
+   * Why liveness is asked per universe and not globally: on a fan-out machine
+   * some Claude is always live somewhere, so a global guard never opens and an
+   * unlaunched vault stays permanently blind to the shared history (ORCA-111).
+   * Files a live CLI of another universe holds open live in the store, and the
+   * store's collision rule defers to the live-transcript registry for those.
    */
-  private linkTranscriptsWhenNoClaudeIsLive(claudeConfigDir: string): void {
-    if (hasAnyLiveClaudePtys()) {
+  private linkTranscriptsWhenUniverseQuiet(claudeConfigDir: string): void {
+    if (this.hasLiveClaudePtysInUniverse(claudeConfigDir)) {
       return
     }
     linkClaudeTranscriptsToSharedStore(claudeConfigDir)
+  }
+
+  /**
+   * Try to join the shared home and every host vault to the store. Callable at
+   * any moment — each universe defers independently, so a vault that is never
+   * launched still gets linked, exactly the one an account switch needs
+   * populated. WSL vaults resolve their disk inside the distro; this host-side
+   * path cannot see it.
+   */
+  linkTranscriptUniversesWhenQuiet(): void {
+    try {
+      this.linkTranscriptsWhenUniverseQuiet(this.getRuntimeConfigDir())
+    } catch (error) {
+      console.warn('[claude-transcripts] Could not link the shared Claude home:', error)
+    }
+    for (const account of this.store.getSettings().claudeManagedAccounts) {
+      if (account.managedAuthRuntime === 'wsl') {
+        continue
+      }
+      this.linkTranscriptsWhenUniverseQuiet(account.managedAuthPath)
+    }
+  }
+
+  /** Which live CLIs write into this config dir: every shared PTY appends under
+   *  the runtime home (its account id names the credential it holds, not a disk
+   *  universe), while an injected PTY appends inside its account's vault. A dir
+   *  this cannot map falls back to the global question — over-deferring is
+   *  safe, touching a mid-append file is not. */
+  private hasLiveClaudePtysInUniverse(claudeConfigDir: string): boolean {
+    let runtimeConfigDir: string
+    try {
+      runtimeConfigDir = this.getRuntimeConfigDir()
+    } catch {
+      return hasAnyLiveClaudePtys()
+    }
+    if (isSameHostPath(claudeConfigDir, runtimeConfigDir)) {
+      return hasLiveClaudePtys()
+    }
+    const account = this.store
+      .getSettings()
+      .claudeManagedAccounts.find((candidate) =>
+        isSameHostPath(candidate.managedAuthPath, claudeConfigDir)
+      )
+    if (!account) {
+      return hasAnyLiveClaudePtys()
+    }
+    return hasLiveInjectedClaudePtyBoundToAccount(account.id)
   }
 
   // Why: a pinned worktree launches Claude with CLAUDE_CONFIG_DIR set to this account's
@@ -1129,7 +1183,7 @@ export class ClaudeRuntimeAuthService {
     }
     // Why: `/resume` and `claude -c` read only the launching account's projects/,
     // so without one shared store the user's history is split per account.
-    this.linkTranscriptsWhenNoClaudeIsLive(account.managedAuthPath)
+    this.linkTranscriptsWhenUniverseQuiet(account.managedAuthPath)
     try {
       const currentSettingsJson = readClaudeManagedAuthFile(
         account.managedAuthPath,

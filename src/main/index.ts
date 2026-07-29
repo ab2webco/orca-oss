@@ -216,7 +216,11 @@ import {
   seedLiveClaudePtysFromPersistence,
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
-import { onLiveClaudePtysDrained } from './claude-accounts/live-pty-drain-listeners'
+import {
+  onClaudePtyReleased,
+  onLiveClaudePtysDrained
+} from './claude-accounts/live-pty-drain-listeners'
+import { registerLiveTranscriptPathsProvider } from './claude-accounts/shared-transcript-store'
 import { publishStatuslineResetCountdown } from './claude/statusline-reset-countdown'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
@@ -2119,7 +2123,33 @@ void app.whenReady().then(async () => {
   // #8612). Deferred so startup and first PTY spawns never compete with the
   // sessions tree walk.
   codexSessionMigration.scheduleInitialRun()
+  // Why before the auth service exists: the store-side collision rule must see
+  // live transcripts from the very first link attempt, or a same-id migration
+  // could park a file some CLI is mid-append on.
+  registerLiveTranscriptPathsProvider(() =>
+    agentHookServer
+      .getProviderSessionIdentities()
+      .flatMap((identity) => (identity.transcriptPath ? [identity.transcriptPath] : []))
+  )
   claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
+  // Why per release and not only on the 1 -> 0 drain: each universe links the
+  // moment ITS last CLI exits; on a fan-out machine the global count may never
+  // reach zero while individual vaults quiet down all the time (ORCA-111).
+  let claudeTranscriptLinkSweepQueued = false
+  const queueClaudeTranscriptLinkSweep = (): void => {
+    if (claudeTranscriptLinkSweepQueued) {
+      return
+    }
+    claudeTranscriptLinkSweepQueued = true
+    setImmediate(() => {
+      claudeTranscriptLinkSweepQueued = false
+      claudeRuntimeAuth?.linkTranscriptUniversesWhenQuiet()
+    })
+  }
+  onClaudePtyReleased(queueClaudeTranscriptLinkSweep)
+  // Startup sweep: vaults quiet since the last run link now, launch-free. Live
+  // PTYs were already seeded above, so restored CLIs still defer their universe.
+  queueClaudeTranscriptLinkSweep()
   rateLimits.setCodexHomePathResolver((target) =>
     codexRuntimeHome!.prepareForRateLimitFetch(target)
   )

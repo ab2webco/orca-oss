@@ -47,6 +47,13 @@ export function getLiveInjectedClaudePtyAccountId(ptyId: string): string | null 
   return liveInjectedClaudePtyAccounts.get(ptyId) ?? null
 }
 
+/** Bindings only, unlike hasLiveInjectedClaudePtysForAccount: a launch
+ *  reservation has no CLI process yet, so nothing can be mid-append inside that
+ *  vault — counting it would defer the very launch that is preparing it. */
+export function hasLiveInjectedClaudePtyBoundToAccount(accountId: string): boolean {
+  return [...liveInjectedClaudePtyAccounts.values()].includes(accountId)
+}
+
 export function hasLiveClaudePtysUsingAccount(accountId: string): boolean {
   return (
     hasLiveInjectedClaudePtysForAccount(accountId) || hasLiveSharedClaudePtysForAccount(accountId)

@@ -22,3 +22,21 @@ export function notifyLiveClaudePtysDrainedOnTransition(
     listener()
   }
 }
+
+type ClaudePtyReleaseListener = () => void
+
+const releaseListeners = new Set<ClaudePtyReleaseListener>()
+
+/** Fires on every Claude PTY release, unlike the 1 -> 0 drain above: per-universe
+ *  work (the transcript link) retries the moment ONE universe quiets, and on a
+ *  fan-out machine that happens long before the global count reaches zero. */
+export function onClaudePtyReleased(listener: ClaudePtyReleaseListener): () => void {
+  releaseListeners.add(listener)
+  return () => releaseListeners.delete(listener)
+}
+
+export function notifyClaudePtyReleased(): void {
+  for (const listener of releaseListeners) {
+    listener()
+  }
+}

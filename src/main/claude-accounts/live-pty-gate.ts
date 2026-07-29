@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
-import { notifyLiveClaudePtysDrainedOnTransition } from './live-pty-drain-listeners'
+import {
+  notifyClaudePtyReleased,
+  notifyLiveClaudePtysDrainedOnTransition
+} from './live-pty-drain-listeners'
 import {
   releaseClaudeLaunchRefreshChain,
   releaseLiveClaudePtyRefreshChain,
@@ -98,6 +101,7 @@ export function hasSeededUnconfirmedClaudePtys(): boolean {
 export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]): void {
   const hadLivePtys = liveClaudePtyIds.size > 0
   const alive = new Set(aliveSessionIds)
+  let releasedAny = false
   for (const sessionId of seededUnconfirmedPtyIds) {
     if (!alive.has(sessionId)) {
       liveClaudePtyIds.delete(sessionId)
@@ -105,11 +109,15 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
       releaseLiveClaudePtyRefreshChain(sessionId)
       ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
       persistence?.removeClaudeLivePtySessionId(sessionId)
+      releasedAny = true
     }
   }
-  confirmSeededInjectedClaudePtyBindings(alive, persistence)
+  releasedAny = confirmSeededInjectedClaudePtyBindings(alive, persistence) || releasedAny
   seededUnconfirmedPtyIds.clear()
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
+  if (releasedAny) {
+    notifyClaudePtyReleased()
+  }
 }
 
 export function markClaudePtySpawned(
@@ -182,6 +190,9 @@ export function markInjectedClaudeCliExited(ptyId: string, accountId: string): b
 
 export function markClaudePtyExited(ptyId: string): void {
   const hadLivePtys = liveClaudePtyIds.size > 0
+  // Why: teardown is called for ids that were never live; only a real release
+  // can quiet a universe, so only a real release signals the retry work.
+  const wasLive = liveClaudePtyIds.has(ptyId) || liveInjectedClaudePtyAccounts.has(ptyId)
   liveClaudePtyIds.delete(ptyId)
   liveSharedClaudePtyAccounts.delete(ptyId)
   releaseLiveClaudePtyRefreshChain(ptyId)
@@ -190,6 +201,9 @@ export function markClaudePtyExited(ptyId: string): void {
   ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
   clearInjectedClaudePtyBinding(ptyId, persistence)
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
+  if (wasLive) {
+    notifyClaudePtyReleased()
+  }
 }
 
 export function reserveInjectedClaudeAccountLaunch(

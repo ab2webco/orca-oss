@@ -4205,7 +4205,82 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(true)
   })
 
-  it('defers a vault transcript migration while any Claude CLI is live', async () => {
+  it("links a vault while another universe's Claude CLI is live", async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const vaultProjects = join(pinnedAuthPath, 'projects', '-Users-dev-repo')
+    mkdirSync(vaultProjects, { recursive: true })
+    writeFileSync(join(vaultProjects, 'past.jsonl'), '{"m":"past"}\n', 'utf-8')
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    // Why this must not defer: that CLI appends under the shared home, never under
+    // this vault — and on a fan-out machine some CLI is always live somewhere, so
+    // a global guard would leave this vault permanently unlinked (ORCA-111).
+    markClaudePtySpawned('live-elsewhere', 'some-other-account')
+
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    })
+
+    expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(true)
+    expect(
+      readFileSync(
+        join(
+          testState.userDataDir,
+          'claude-transcripts',
+          'projects',
+          '-Users-dev-repo',
+          'past.jsonl'
+        ),
+        'utf-8'
+      )
+    ).toBe('{"m":"past"}\n')
+    markClaudePtyExited('live-elsewhere')
+  })
+
+  it("links a vault while a shared-home CLI pinned to the vault's own account is live", async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    const vaultProjects = join(pinnedAuthPath, 'projects', '-Users-dev-repo')
+    mkdirSync(vaultProjects, { recursive: true })
+    writeFileSync(join(vaultProjects, 'past.jsonl'), '{"m":"past"}\n', 'utf-8')
+    const homeProjects = join(testState.fakeHomeDir, '.claude', 'projects', '-Users-dev-repo')
+    mkdirSync(homeProjects, { recursive: true })
+    writeFileSync(join(homeProjects, 'live.jsonl'), '{"m":"mid-append"}\n', 'utf-8')
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+    })
+    const store = createStore(settings)
+    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    // Why the account id must not be the guard key: a shared PTY's account names
+    // the credential it holds, not the universe it writes — it appends under
+    // ~/.claude, so it cannot be mid-append on anything inside this vault.
+    markClaudePtySpawned('shared-own-account', 'pinned-host-account')
+
+    new ClaudeRuntimeAuthService(store as never).linkTranscriptUniversesWhenQuiet()
+
+    expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(true)
+    // The same PTY defers the universe it actually writes: the shared home.
+    expect(lstatSync(join(testState.fakeHomeDir, '.claude', 'projects')).isSymbolicLink()).toBe(
+      false
+    )
+    expect(existsSync(join(homeProjects, 'live.jsonl'))).toBe(true)
+    markClaudePtyExited('shared-own-account')
+  })
+
+  it("defers a vault while the vault's own universe has a live injected CLI", async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,
       'pinned-host-account',
@@ -4218,11 +4293,10 @@ describe('ClaudeRuntimeAuthService', () => {
       claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
     })
     const store = createStore(settings)
-    const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
+    const { markInjectedClaudeCliExited, markInjectedClaudePtySpawned } =
+      await import('./live-pty-gate')
     const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
-    // Why a DIFFERENT account's CLI blocks this one: every linked universe shares
-    // one store, so migrating here renames files that CLI may be mid-append on.
-    markClaudePtySpawned('live-elsewhere', 'some-other-account')
+    markInjectedClaudePtySpawned('own-injected', 'pinned-host-account')
 
     await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch({
       runtime: 'host',
@@ -4231,7 +4305,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
     expect(existsSync(join(vaultProjects, 'live.jsonl'))).toBe(true)
     expect(lstatSync(join(pinnedAuthPath, 'projects')).isSymbolicLink()).toBe(false)
-    markClaudePtyExited('live-elsewhere')
+    markInjectedClaudeCliExited('own-injected', 'pinned-host-account')
   })
 
   it('defers the shared-home migration while any Claude CLI is live', async () => {
@@ -4259,6 +4333,159 @@ describe('ClaudeRuntimeAuthService', () => {
     )
     expect(existsSync(join(homeProjects, 'live.jsonl'))).toBe(true)
     markClaudePtyExited('live-home')
+  })
+
+  it('joins the shared home while only an injected vault CLI is live', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const homeProjects = join(testState.fakeHomeDir, '.claude', 'projects', '-Users-dev-repo')
+    mkdirSync(homeProjects, { recursive: true })
+    writeFileSync(join(homeProjects, 'from-home.jsonl'), '{"m":"home"}\n', 'utf-8')
+    const { markInjectedClaudeCliExited, markInjectedClaudePtySpawned } =
+      await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    // An injected CLI appends inside its own vault, never under ~/.claude.
+    markInjectedClaudePtySpawned('pinned-elsewhere', 'some-other-account')
+
+    await new ClaudeRuntimeAuthService(store as never).prepareForClaudeLaunch()
+
+    expect(lstatSync(join(testState.fakeHomeDir, '.claude', 'projects')).isSymbolicLink()).toBe(
+      true
+    )
+    markInjectedClaudeCliExited('pinned-elsewhere', 'some-other-account')
+  })
+
+  it('joins the home and every quiet host vault without any launch', async () => {
+    const vaultOne = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    mkdirSync(join(vaultOne, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(vaultOne, 'projects', '-Users-dev-repo', 'one.jsonl'),
+      '{"m":"1"}\n',
+      'utf-8'
+    )
+    const vaultTwo = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-2',
+      createClaudeCredentialsJson('two@example.com', 'token-two')
+    )
+    mkdirSync(join(vaultTwo, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(vaultTwo, 'projects', '-Users-dev-repo', 'two.jsonl'),
+      '{"m":"2"}\n',
+      'utf-8'
+    )
+    const wslVault = join(testState.userDataDir, 'claude-accounts', 'wsl-account', 'auth')
+    mkdirSync(join(wslVault, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(wslVault, 'projects', '-Users-dev-repo', 'wsl.jsonl'),
+      '{"m":"w"}\n',
+      'utf-8'
+    )
+    const homeProjects = join(testState.fakeHomeDir, '.claude', 'projects', '-Users-dev-repo')
+    mkdirSync(homeProjects, { recursive: true })
+    writeFileSync(join(homeProjects, 'home.jsonl'), '{"m":"h"}\n', 'utf-8')
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-1', vaultOne),
+        createClaudeAccount('account-2', vaultTwo),
+        createClaudeAccount('wsl-account', wslVault, { managedAuthRuntime: 'wsl' })
+      ]
+    })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+
+    // Why no launch precedes this: a vault that is never launched is exactly the
+    // one the account switch needs already linked (ORCA-111).
+    new ClaudeRuntimeAuthService(store as never).linkTranscriptUniversesWhenQuiet()
+
+    const sharedDir = join(
+      testState.userDataDir,
+      'claude-transcripts',
+      'projects',
+      '-Users-dev-repo'
+    )
+    expect(lstatSync(join(testState.fakeHomeDir, '.claude', 'projects')).isSymbolicLink()).toBe(
+      true
+    )
+    expect(lstatSync(join(vaultOne, 'projects')).isSymbolicLink()).toBe(true)
+    expect(lstatSync(join(vaultTwo, 'projects')).isSymbolicLink()).toBe(true)
+    // A WSL vault's projects live inside the distro; this host-side dir must stay untouched.
+    expect(lstatSync(join(wslVault, 'projects')).isSymbolicLink()).toBe(false)
+    expect(readFileSync(join(sharedDir, 'one.jsonl'), 'utf-8')).toBe('{"m":"1"}\n')
+    expect(readFileSync(join(sharedDir, 'two.jsonl'), 'utf-8')).toBe('{"m":"2"}\n')
+    expect(readFileSync(join(sharedDir, 'home.jsonl'), 'utf-8')).toBe('{"m":"h"}\n')
+    expect(existsSync(join(sharedDir, 'wsl.jsonl'))).toBe(false)
+  })
+
+  it('defers only the universe with a live CLI and links it once that CLI exits', async () => {
+    const vaultOne = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    mkdirSync(join(vaultOne, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(vaultOne, 'projects', '-Users-dev-repo', 'one.jsonl'),
+      '{"m":"1"}\n',
+      'utf-8'
+    )
+    const vaultTwo = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-2',
+      createClaudeCredentialsJson('two@example.com', 'token-two')
+    )
+    mkdirSync(join(vaultTwo, 'projects', '-Users-dev-repo'), { recursive: true })
+    writeFileSync(
+      join(vaultTwo, 'projects', '-Users-dev-repo', 'two.jsonl'),
+      '{"m":"2"}\n',
+      'utf-8'
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-1', vaultOne),
+        createClaudeAccount('account-2', vaultTwo)
+      ]
+    })
+    const store = createStore(settings)
+    const { markInjectedClaudeCliExited, markInjectedClaudePtySpawned } =
+      await import('./live-pty-gate')
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+    markInjectedClaudePtySpawned('busy-pty', 'account-1')
+
+    service.linkTranscriptUniversesWhenQuiet()
+
+    expect(lstatSync(join(vaultOne, 'projects')).isSymbolicLink()).toBe(false)
+    expect(lstatSync(join(vaultTwo, 'projects')).isSymbolicLink()).toBe(true)
+
+    markInjectedClaudeCliExited('busy-pty', 'account-1')
+    service.linkTranscriptUniversesWhenQuiet()
+
+    expect(lstatSync(join(vaultOne, 'projects')).isSymbolicLink()).toBe(true)
+    expect(
+      readFileSync(
+        join(
+          testState.userDataDir,
+          'claude-transcripts',
+          'projects',
+          '-Users-dev-repo',
+          'one.jsonl'
+        ),
+        'utf-8'
+      )
+    ).toBe('{"m":"1"}\n')
   })
 
   it('keeps an explicit pin isolated when it matches the global account', async () => {
