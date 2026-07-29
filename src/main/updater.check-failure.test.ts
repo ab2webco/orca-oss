@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { publishingIncident } from './updater-prerelease-feed-reproduction.fixture'
+import { UPDATE_FEED_ATOM_URL, UPDATE_FEED_RELEASES_DOWNLOAD_BASE } from './update-feed-target'
 
 const { netFetchMock } = vi.hoisted(() => ({ netFetchMock: vi.fn() }))
 
@@ -120,11 +121,11 @@ function respondWithNotReadyRelease({
   const atom = `<feed>${publishingIncident.atomTags
     .map(
       (tag) =>
-        `<entry><link rel="alternate" type="text/html" href="https://github.com/stablyai/orca/releases/tag/${tag}"/><title>${tag}</title></entry>`
+        `<entry><link rel="alternate" type="text/html" href="${UPDATE_FEED_RELEASES_DOWNLOAD_BASE.replace('/releases/download', '/releases/tag')}/${tag}"/><title>${tag}</title></entry>`
     )
     .join('')}</feed>`
   netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-    if (url === 'https://github.com/stablyai/orca/releases.atom') {
+    if (url === UPDATE_FEED_ATOM_URL) {
       return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(atom) })
     }
     if (init?.method === 'HEAD' && assetStatus !== undefined) {

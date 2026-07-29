@@ -1104,6 +1104,12 @@ export class AgentHookServer {
     ) {
       return previous
     }
+    // Why gated on an actual claim: an OSC ping carries no agentType (or the literal 'unknown'),
+    // so identity resolution legitimately fills one in from the pane — that is not an agent switch
+    // and must not drop the session, which blanks mobile chat while an agent sits idle (#11260).
+    const claimsDifferentAgent =
+      rootContextPreservingPayload.payload.agentType !== undefined &&
+      rootContextPreservingPayload.payload.agentType !== 'unknown'
     const identityResolvedPayload =
       identity.agentType === rootContextPreservingPayload.payload.agentType
         ? rootContextPreservingPayload
@@ -1111,7 +1117,7 @@ export class AgentHookServer {
             ...rootContextPreservingPayload,
             // Why: session provenance belongs to the incoming agent, not the pane identity that
             // replaced it — keeping it pairs a Codex pane with a Claude session id and transcript.
-            providerSession: undefined,
+            ...(claimsDifferentAgent ? { providerSession: undefined } : {}),
             payload: {
               ...rootContextPreservingPayload.payload,
               agentType: identity.agentType

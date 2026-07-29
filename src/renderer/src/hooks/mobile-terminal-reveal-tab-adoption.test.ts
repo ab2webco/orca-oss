@@ -48,6 +48,9 @@ describe('mobile terminal reveal tab adoption', () => {
     expect(storeState.createTab).not.toHaveBeenCalled()
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
+      // Why identity: the store records this leaf->pty binding on the adopted tab,
+      // so the reply can name the exact pane it bound.
+      identity: { worktreeId: WORKTREE_ID, tabId: 'tab-split', leafId: 'leaf-b', ptyId: 'pty-b' },
       tabId: 'tab-split',
       title: 'codex'
     })
@@ -67,6 +70,8 @@ describe('mobile terminal reveal tab adoption', () => {
     revealSplitPaneFromMobile(harness)
 
     expect(storeState.createTab).not.toHaveBeenCalled()
+    // Why no identity: with no hydrated layout there is nothing to prove the
+    // binding against, and the reveal must still succeed (#10486).
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
       tabId: 'tab-split',
@@ -98,6 +103,14 @@ describe('mobile terminal reveal tab adoption', () => {
     expect(storeState.createTab).not.toHaveBeenCalled()
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
+      // Why identity: the store records this leaf->pty binding on the adopted tab,
+      // so the reply can name the exact pane it bound.
+      identity: {
+        worktreeId: WORKTREE_ID,
+        tabId: 'tab-detached',
+        leafId: 'leaf-b',
+        ptyId: 'pty-b'
+      },
       tabId: 'tab-detached',
       title: 'codex'
     })
@@ -198,6 +211,14 @@ describe('mobile terminal reveal tab adoption', () => {
     expect(layoutWrites.map((call) => call[0])).not.toContain('tab-split')
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
+      // Why identity: the store records this leaf->pty binding on the adopted tab,
+      // so the reply can name the exact pane it bound.
+      identity: {
+        worktreeId: WORKTREE_ID,
+        tabId: 'tab-detached',
+        leafId: 'leaf-b',
+        ptyId: 'pty-b'
+      },
       tabId: 'tab-detached',
       title: 'codex'
     })

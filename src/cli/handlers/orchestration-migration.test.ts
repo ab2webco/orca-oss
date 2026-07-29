@@ -1,13 +1,25 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATION_HANDLERS } from './orchestration'
 
+// Why both vars: a managed agent pane exports them and the send payload carries them, so an
+// ambient value makes this exact-payload assertion pass or fail depending on who runs the suite.
 const originalPaneKey = process.env.ORCA_PANE_KEY
+const originalLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
+
+beforeEach(() => {
+  delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+})
 
 afterEach(() => {
-  if (originalPaneKey === undefined) {
-    delete process.env.ORCA_PANE_KEY
-  } else {
-    process.env.ORCA_PANE_KEY = originalPaneKey
+  for (const [name, value] of [
+    ['ORCA_PANE_KEY', originalPaneKey],
+    ['ORCA_AGENT_LAUNCH_TOKEN', originalLaunchToken]
+  ] as const) {
+    if (value === undefined) {
+      delete process.env[name]
+    } else {
+      process.env[name] = value
+    }
   }
 })
 
@@ -38,6 +50,7 @@ describe('orchestration CLI migration recovery', () => {
       threadId: undefined,
       payload: undefined,
       senderPaneKey: 'tab-worker:leaf-worker',
+      senderLaunchToken: undefined,
       devMode: false
     })
   })

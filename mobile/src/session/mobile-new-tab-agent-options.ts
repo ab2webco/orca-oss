@@ -22,7 +22,9 @@ export function orderMobileNewTabAgents(
   disabledAgents?: unknown
 ): TuiAgent[] {
   const detected = new Set([...detectedAgents].filter(isMobileTuiAgent))
-  const enabledDetected = filterEnabledMobileTuiAgents(
+  // Why the widening: the auto-pick order is a narrower const tuple than TuiAgent,
+  // so an opt-in agent like claude-zai could not be compared against it below.
+  const enabledDetected: TuiAgent[] = filterEnabledMobileTuiAgents(
     MOBILE_TUI_AGENT_AUTO_PICK_ORDER,
     disabledAgents
   ).filter((agent) => detected.has(agent))

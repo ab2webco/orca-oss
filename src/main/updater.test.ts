@@ -458,7 +458,7 @@ describe('updater', () => {
       expect(send).toHaveBeenCalledWith('updater:status', { state: 'not-available' })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -504,7 +504,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -2558,7 +2558,7 @@ describe('updater', () => {
     expect(autoUpdaterMock.setFeedURL.mock.calls.slice(feedCallsBeforeCheck)).not.toContainEqual([
       {
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       }
     ])
   })
@@ -2582,7 +2582,7 @@ describe('updater', () => {
     })
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
+      url: UPDATE_FEED_LATEST_DOWNLOAD_URL
     })
     expect(sendMock).not.toHaveBeenCalledWith(
       'updater:status',

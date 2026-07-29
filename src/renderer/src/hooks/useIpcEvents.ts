@@ -103,7 +103,7 @@ import { track } from '@/lib/telemetry'
 import { singlePaneLayoutSnapshot } from '@/store/slices/terminal-helpers'
 import { buildWorkspaceSessionPayload } from '@/lib/workspace-session'
 import { persistWorkspaceSessionByHost } from '@/lib/workspace-session-host-persistence'
-import { verifyTerminalRevealIdentity } from '@/lib/terminal-reveal-identity'
+import { resolveTerminalRevealIdentity } from '@/lib/terminal-reveal-identity'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import type { RuntimeClientEvent } from '../../../shared/runtime-client-events'
 import { applyHostWorktreeTerminalSleepState } from '@/components/terminal-pane/pty-shutdown-exit-deferral'
@@ -1583,14 +1583,22 @@ export function useIpcEvents(): void {
               requestBackgroundTerminalWorktreeMount({ worktreeId, tabIds: [tab.id] })
             }
             if (requestId) {
+              // Why the ADOPTED tab.id and not the requested tabId: a reveal may
+              // legitimately adopt a different tab than the hint names (the pane was
+              // dragged since the PTY's env was baked), and reporting the hint would
+              // name a pane this reply did not bind.
+              // Why resolve-or-omit and not throw (#10486): a reveal that arrives
+              // before layout hydration has nothing to prove the binding against, and
+              // the mobile focus path awaits this reply with no catch. Main still
+              // rejects a missing identity whenever it asked for a specific one.
               const identity =
                 ptyId && tabId && leafId
-                  ? verifyTerminalRevealIdentity(useAppStore.getState(), {
+                  ? (resolveTerminalRevealIdentity(useAppStore.getState(), {
                       worktreeId,
-                      tabId,
+                      tabId: tab.id,
                       leafId,
                       ptyId
-                    })
+                    }) ?? undefined)
                   : undefined
               window.api.ui.replyTerminalCreate({
                 requestId,

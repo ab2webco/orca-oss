@@ -8,16 +8,25 @@ type TerminalRevealState = {
   >
 }
 
-export function verifyTerminalRevealIdentity(
+/** The binding the store can actually prove, or null when it cannot. */
+export function resolveTerminalRevealIdentity(
   state: TerminalRevealState,
   expected: TerminalRevealIdentity
-): TerminalRevealIdentity {
+): TerminalRevealIdentity | null {
   const ownsTab = state.tabsByWorktree[expected.worktreeId]?.some(
     (tab) => tab.id === expected.tabId
   )
   const boundPtyId = state.terminalLayoutsByTabId[expected.tabId]?.ptyIdsByLeafId?.[expected.leafId]
-  if (!ownsTab || boundPtyId !== expected.ptyId) {
+  return ownsTab && boundPtyId === expected.ptyId ? expected : null
+}
+
+export function verifyTerminalRevealIdentity(
+  state: TerminalRevealState,
+  expected: TerminalRevealIdentity
+): TerminalRevealIdentity {
+  const resolved = resolveTerminalRevealIdentity(state, expected)
+  if (!resolved) {
     throw new Error('terminal_reveal_identity_mismatch')
   }
-  return expected
+  return resolved
 }

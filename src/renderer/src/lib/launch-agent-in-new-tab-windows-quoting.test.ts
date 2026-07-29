@@ -64,6 +64,7 @@ const store = {
   closeTab: vi.fn(),
   queueTabStartupCommand: mockQueueTabStartupCommand,
   setActiveTabType: vi.fn(),
+  setActiveTabTypeForWorktree: vi.fn(),
   setTabBarOrder: vi.fn(),
   setAgentStatus: vi.fn(),
   seedNativeChatLaunchPrompt: vi.fn(),
