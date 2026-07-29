@@ -308,7 +308,7 @@ function getClientErrorMessage(err: unknown): string | undefined {
   return typeof message === 'string' ? message : undefined
 }
 
-async function resolveCoordinatorTerminalHandle(
+export async function resolveCoordinatorTerminalHandle(
   flags: Map<string, string | boolean>,
   cwd: string,
   client: Parameters<CommandHandler>[0]['client']
@@ -341,7 +341,7 @@ function throwNoActiveSenderTerminal(): never {
   )
 }
 
-function isDevCliInvocation(): boolean {
+export function isDevCliInvocation(): boolean {
   return (
     process.env.ORCA_DEV_CLI_INVOCATION === '1' ||
     (process.env.ORCA_USER_DATA_PATH?.includes('orca-dev') ?? false)
