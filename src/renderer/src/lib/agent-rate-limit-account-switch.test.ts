@@ -94,7 +94,11 @@ const beginClaudeAccountSwitch = vi.fn<BeginClaudeAccountSwitch>(async () => ({
   shell: 'posix'
 }))
 const commitClaudeAccountSwitch = vi.fn(async () => true)
-const cancelClaudeAccountSwitch = vi.fn(async () => {})
+type AbortClaudeAccountSwitch = PreloadApi['pty']['abortClaudeAccountSwitch']
+const abortClaudeAccountSwitch = vi.fn<AbortClaudeAccountSwitch>(async () => ({
+  ok: true,
+  configDir: '/vaults/origin-1/auth'
+}))
 
 function run(
   overrides: Partial<Parameters<typeof runManagedAccountSwitchRelaunch>[0]> = {}
@@ -132,6 +136,7 @@ beforeEach(() => {
     shell: 'posix'
   })
   commitClaudeAccountSwitch.mockResolvedValue(true)
+  abortClaudeAccountSwitch.mockResolvedValue({ ok: true, configDir: '/vaults/origin-1/auth' })
   deliverLaunchPromptToAgentTab.mockResolvedValue(true)
   copySessionForAccountSwitch.mockResolvedValue({
     ok: true,
@@ -144,7 +149,7 @@ beforeEach(() => {
       pty: {
         beginClaudeAccountSwitch,
         commitClaudeAccountSwitch,
-        cancelClaudeAccountSwitch
+        abortClaudeAccountSwitch
       }
     }
   } as unknown as typeof window
@@ -312,30 +317,69 @@ describe('runManagedAccountSwitchRelaunch', () => {
     expect(commitClaudeAccountSwitch).not.toHaveBeenCalled()
   })
 
-  it('does not open a fallback tab after the resume command was accepted but stayed ambiguous', async () => {
+  it('hands the PTY back to the origin and relaunches it when the resume stays ambiguous', async () => {
     waitForResumedAgent.mockResolvedValueOnce(false)
 
     const result = await run()
 
-    expect(result).toMatchObject({ ok: false, reason: 'resume-failed' })
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'resume-failed',
+      message: expect.stringContaining('resumed the session on the original account')
+    })
     expect(store.createTab).not.toHaveBeenCalled()
     expect(commitClaudeAccountSwitch).not.toHaveBeenCalled()
-    expect(cancelClaudeAccountSwitch).toHaveBeenCalledWith({
-      reservationId: 'reservation-1'
+    expect(abortClaudeAccountSwitch).toHaveBeenCalledWith({
+      ptyId: 'pty-1',
+      sourceAccountId: 'origin-1',
+      reservationId: 'reservation-1',
+      runtime: 'host',
+      wslDistro: null
     })
+    // Why the config dir matters: the failed attempt exported the destination's, and
+    // that export outlives it — a bare resume would reopen the session in the wrong vault.
+    const restore = sendRuntimePtyInputVerified.mock.calls.at(-1)?.[2]
+    expect(restore).toContain("export CLAUDE_CONFIG_DIR='/vaults/origin-1/auth'")
+    expect(restore).toContain('--resume')
   })
 
-  it('stops the confirmed destination CLI and cancels ownership when commit fails', async () => {
+  it('reports the terminal as not restored when main refuses to return the binding', async () => {
+    waitForResumedAgent.mockResolvedValueOnce(false)
+    abortClaudeAccountSwitch.mockResolvedValueOnce({ ok: false, reason: 'foreign-binding' })
+
+    const result = await run()
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'resume-failed',
+      message: expect.stringContaining('could not bring the session back')
+    })
+    // Why nothing is sent: relaunching a CLI main no longer attributes to the origin
+    // would leave a live agent outside the launch gate's accounting.
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops the confirmed destination CLI and restores the origin when commit fails', async () => {
     commitClaudeAccountSwitch.mockResolvedValueOnce(false)
 
     const result = await run()
 
-    expect(result).toMatchObject({ ok: false, reason: 'resume-failed' })
-    expect(waitForResumedAgent).toHaveBeenCalledTimes(1)
-    expect(stopForegroundAgent).toHaveBeenCalledTimes(2)
-    expect(cancelClaudeAccountSwitch).toHaveBeenCalledWith({
-      reservationId: 'reservation-1'
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'resume-failed',
+      message: expect.stringContaining('resumed the session on the original account')
     })
+    expect(stopForegroundAgent).toHaveBeenCalledTimes(2)
+    expect(abortClaudeAccountSwitch).toHaveBeenCalledWith({
+      ptyId: 'pty-1',
+      sourceAccountId: 'origin-1',
+      reservationId: 'reservation-1',
+      runtime: 'host',
+      wslDistro: null
+    })
+    expect(sendRuntimePtyInputVerified.mock.calls.at(-1)?.[2]).toContain(
+      "export CLAUDE_CONFIG_DIR='/vaults/origin-1/auth'"
+    )
   })
 
   it.each([

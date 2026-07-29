@@ -60,6 +60,18 @@ function accountsShareRuntime(
  * the very resume command the switch was going to use lands the user back exactly
  * where they were instead of on a bare shell with the conversation stranded.
  */
+function describeRestoreOutcome(restored: boolean): string {
+  return restored
+    ? translate(
+        'auto.lib.agentRateLimitAccountSwitch.restoredOnOrigin',
+        'Orca resumed the session on the original account.'
+      )
+    : translate(
+        'auto.lib.agentRateLimitAccountSwitch.restoreFailed',
+        'Orca could not bring the session back; resume it from this terminal.'
+      )
+}
+
 async function restoreStoppedAgentOnSourceAccount(args: {
   settings: GlobalSettings | null
   ptyId: string
@@ -192,16 +204,7 @@ export async function runManagedAccountSwitchRelaunch(args: {
       ptyId: args.ptyId,
       resumePlan
     })
-    const outcome = restored
-      ? translate(
-          'auto.lib.agentRateLimitAccountSwitch.restoredOnOrigin',
-          'Orca resumed the session on the original account.'
-        )
-      : translate(
-          'auto.lib.agentRateLimitAccountSwitch.restoreFailed',
-          'Orca could not bring the session back; resume it from this terminal.'
-        )
-    return { ok: false, reason, message: `${message} ${outcome}` }
+    return { ok: false, reason, message: `${message} ${describeRestoreOutcome(restored)}` }
   }
 
   // Why: a missing worktree path just means the transcript cannot be located; the switch still proceeds fresh.
@@ -268,15 +271,13 @@ export async function runManagedAccountSwitchRelaunch(args: {
       return { ok: true, accountLabel, switched: inPlace.switched }
     }
     if (inPlace.reason !== 'unhealthy') {
-      // Why no restore here, unlike the aborts above: beginClaudeAccountSwitch may
-      // already have released this PTY's source binding, and there is no IPC to take
-      // it back. Restoring a CLI main no longer counts against the source account
-      // would corrupt the live-PTY accounting the launch gate depends on. Handing the
-      // binding back needs a main-side change — tracked separately.
+      // Why the abort reports this instead of retrying here: past begin, the PTY's
+      // binding and its exported config dir both belong to the transition, so only
+      // that path can hand them back to the source account.
       return {
         ok: false,
         reason: 'resume-failed',
-        message: inPlace.message
+        message: `${inPlace.message} ${describeRestoreOutcome(inPlace.restored === true)}`
       }
     }
   }

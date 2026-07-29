@@ -27,7 +27,10 @@ const beginClaudeAccountSwitch = vi.fn<BeginClaudeAccountSwitch>(async () => ({
   shell: 'posix'
 }))
 const commitClaudeAccountSwitch = vi.fn(async () => true)
-const cancelClaudeAccountSwitch = vi.fn(async () => {})
+const abortClaudeAccountSwitch = vi.fn(async () => ({
+  ok: true as const,
+  configDir: '/vaults/origin-1/auth'
+}))
 
 type StoreStub = {
   settings: Record<string, unknown>
@@ -196,7 +199,7 @@ const api = {
   pty: {
     beginClaudeAccountSwitch,
     commitClaudeAccountSwitch,
-    cancelClaudeAccountSwitch
+    abortClaudeAccountSwitch
   }
 }
 

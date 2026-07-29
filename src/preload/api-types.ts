@@ -1541,7 +1541,16 @@ export type PreloadApi = {
       targetAccountId: string
       reservationId: string
     }) => Promise<boolean>
-    cancelClaudeAccountSwitch: (args: { reservationId: string }) => Promise<void>
+    /** Ends a switch that could not finish, giving the PTY back to the source account. */
+    abortClaudeAccountSwitch: (args: {
+      ptyId: string
+      sourceAccountId: string
+      reservationId: string
+      runtime: 'host' | 'wsl'
+      wslDistro: string | null
+    }) => Promise<
+      { ok: true; configDir: string } | { ok: false; reason: 'foreign-binding' | 'prepare-failed' }
+    >
     onWriteUnavailable?: (callback: (payload: { id: string }) => void) => () => void
     resize: (id: string, cols: number, rows: number) => void
     claimViewport: (id: string, cols: number, rows: number) => void

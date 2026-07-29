@@ -17,6 +17,18 @@ export type InPlaceClaudeAccountSwitchResult =
       reason: 'unhealthy' | 'source-mismatch' | 'prepare-failed' | 'runtime-mismatch' | 'concurrent'
     }
 
+export type AbortInPlaceClaudeAccountSwitchArgs = {
+  ptyId: string
+  /** Account the PTY belonged to before the switch began. */
+  sourceAccountId: string
+  /** Reservation the aborted switch held on the destination account. */
+  reservationId: string
+}
+
+export type AbortInPlaceClaudeAccountSwitchResult =
+  /** The PTY is attributed to the source account again; relaunch its CLI with this config dir. */
+  { ok: true; configDir: string } | { ok: false; reason: 'foreign-binding' | 'prepare-failed' }
+
 type ProcessInspection = {
   foregroundProcess: string | null
   hasChildProcesses: boolean
@@ -73,6 +85,61 @@ export function finishInPlaceClaudeAccountSwitchByReservation(reservationId: str
       return
     }
   }
+}
+
+/**
+ * Undoes a switch that could not finish, giving the PTY back to the account it
+ * started on.
+ *
+ * Why this exists: `begin` releases the source binding once it is committed to the
+ * transition, so an abort after that point left a live shell attributed to nobody —
+ * the launch gate stopped seeing it, and the renderer had no way to relaunch the
+ * original CLI in the universe it belonged to. Preparing the source again is what
+ * makes the restore real: it yields the config dir to relaunch under and a
+ * reservation the binding is re-established with, exactly as a fresh spawn would.
+ *
+ * Fails closed on a PTY that belongs to some third account: that is not this
+ * switch's to reclaim.
+ */
+export async function abortInPlaceClaudeAccountSwitch(
+  args: AbortInPlaceClaudeAccountSwitchArgs,
+  deps: {
+    getCurrentAccountId(ptyId: string): string | null
+    prepareSource(): Promise<ClaudeRuntimeAuthPreparation>
+    restoreBinding(ptyId: string, accountId: string, reservationId: string): void
+    releaseReservation(reservationId: string | undefined): void
+  }
+): Promise<AbortInPlaceClaudeAccountSwitchResult> {
+  deps.releaseReservation(args.reservationId)
+  const finish = <T>(result: T): T => {
+    finishInPlaceClaudeAccountSwitchByReservation(args.reservationId)
+    return result
+  }
+
+  const current = deps.getCurrentAccountId(args.ptyId)
+  if (current !== null && current !== args.sourceAccountId) {
+    return finish({ ok: false, reason: 'foreign-binding' } as const)
+  }
+
+  let preparation: ClaudeRuntimeAuthPreparation
+  try {
+    preparation = await deps.prepareSource()
+  } catch {
+    return finish({ ok: false, reason: 'prepare-failed' } as const)
+  }
+  const configDir = preparation.envPatch.CLAUDE_CONFIG_DIR
+  const reservationId = preparation.injectedAccountReservationId
+  if (preparation.injectedAccountId !== args.sourceAccountId || !configDir || !reservationId) {
+    deps.releaseReservation(reservationId)
+    return finish({ ok: false, reason: 'prepare-failed' } as const)
+  }
+  try {
+    deps.restoreBinding(args.ptyId, args.sourceAccountId, reservationId)
+  } catch {
+    deps.releaseReservation(reservationId)
+    return finish({ ok: false, reason: 'prepare-failed' } as const)
+  }
+  return finish({ ok: true, configDir } as const)
 }
 
 export async function beginInPlaceClaudeAccountSwitch(

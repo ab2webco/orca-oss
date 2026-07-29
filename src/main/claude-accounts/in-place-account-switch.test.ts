@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  abortInPlaceClaudeAccountSwitch,
   beginInPlaceClaudeAccountSwitch,
   finishInPlaceClaudeAccountSwitch
 } from './in-place-account-switch'
@@ -198,5 +199,144 @@ describe('beginInPlaceClaudeAccountSwitch', () => {
 
     expect(result).toMatchObject({ ok: true, shell })
     finishInPlaceClaudeAccountSwitch(`pty-${shell}`, 'reservation-b')
+  })
+})
+
+function sourcePreparation() {
+  return {
+    ...preparation(),
+    configDir: '/vaults/account-a/auth',
+    envPatch: { CLAUDE_CONFIG_DIR: '/vaults/account-a/auth' },
+    injectedAccountId: 'account-a',
+    injectedAccountReservationId: 'reservation-a',
+    provenance: 'managed:account-a:injected'
+  }
+}
+
+describe('abortInPlaceClaudeAccountSwitch', () => {
+  it('re-attributes the PTY to the source account and returns its config dir', async () => {
+    const restoreBinding = vi.fn()
+    const releaseReservation = vi.fn()
+
+    const result = await abortInPlaceClaudeAccountSwitch(
+      { ptyId: 'pty-abort-1', sourceAccountId: 'account-a', reservationId: 'reservation-b' },
+      {
+        // Why null: begin already released it, which is exactly the state this repairs.
+        getCurrentAccountId: () => null,
+        prepareSource: async () => sourcePreparation(),
+        restoreBinding,
+        releaseReservation
+      }
+    )
+
+    expect(result).toEqual({ ok: true, configDir: '/vaults/account-a/auth' })
+    expect(restoreBinding).toHaveBeenCalledWith('pty-abort-1', 'account-a', 'reservation-a')
+    expect(releaseReservation).toHaveBeenCalledWith('reservation-b')
+  })
+
+  it('still returns the source config dir when the binding was never released', async () => {
+    const restoreBinding = vi.fn()
+
+    const result = await abortInPlaceClaudeAccountSwitch(
+      { ptyId: 'pty-abort-2', sourceAccountId: 'account-a', reservationId: 'reservation-b' },
+      {
+        getCurrentAccountId: () => 'account-a',
+        prepareSource: async () => sourcePreparation(),
+        restoreBinding,
+        releaseReservation: vi.fn()
+      }
+    )
+
+    expect(result).toEqual({ ok: true, configDir: '/vaults/account-a/auth' })
+    // Why re-mark anyway: the exited CLI's refresh-chain claim has to move to the new one.
+    expect(restoreBinding).toHaveBeenCalledWith('pty-abort-2', 'account-a', 'reservation-a')
+  })
+
+  it('refuses a PTY that now belongs to a third account', async () => {
+    const restoreBinding = vi.fn()
+    const prepareSource = vi.fn()
+
+    const result = await abortInPlaceClaudeAccountSwitch(
+      { ptyId: 'pty-abort-3', sourceAccountId: 'account-a', reservationId: 'reservation-b' },
+      {
+        getCurrentAccountId: () => 'account-c',
+        prepareSource,
+        restoreBinding,
+        releaseReservation: vi.fn()
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'foreign-binding' })
+    expect(prepareSource).not.toHaveBeenCalled()
+    expect(restoreBinding).not.toHaveBeenCalled()
+  })
+
+  it('releases the source reservation when the binding cannot be restored', async () => {
+    const releaseReservation = vi.fn()
+
+    const result = await abortInPlaceClaudeAccountSwitch(
+      { ptyId: 'pty-abort-4', sourceAccountId: 'account-a', reservationId: 'reservation-b' },
+      {
+        getCurrentAccountId: () => null,
+        prepareSource: async () => sourcePreparation(),
+        restoreBinding: () => {
+          throw new Error('A live Claude terminal cannot change its assigned account.')
+        },
+        releaseReservation
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'prepare-failed' })
+    expect(releaseReservation).toHaveBeenCalledWith('reservation-a')
+  })
+
+  it('frees the per-PTY switch lock so the terminal can be switched again', async () => {
+    const begun = await beginInPlaceClaudeAccountSwitch(
+      {
+        ptyId: 'pty-abort-5',
+        sourceAccountId: 'account-a',
+        targetAccountId: 'account-b',
+        runtime: 'host',
+        wslDistro: null
+      },
+      {
+        getCurrentAccountId: () => 'account-a',
+        inspectProcess: async () => ({ foregroundProcess: 'zsh', hasChildProcesses: false }),
+        prepareTarget: async () => preparation(),
+        releaseCurrentBinding: () => true,
+        releaseReservation: vi.fn()
+      }
+    )
+    expect(begun).toMatchObject({ ok: true })
+
+    await abortInPlaceClaudeAccountSwitch(
+      { ptyId: 'pty-abort-5', sourceAccountId: 'account-a', reservationId: 'reservation-b' },
+      {
+        getCurrentAccountId: () => null,
+        prepareSource: async () => sourcePreparation(),
+        restoreBinding: vi.fn(),
+        releaseReservation: vi.fn()
+      }
+    )
+
+    const again = await beginInPlaceClaudeAccountSwitch(
+      {
+        ptyId: 'pty-abort-5',
+        sourceAccountId: 'account-a',
+        targetAccountId: 'account-b',
+        runtime: 'host',
+        wslDistro: null
+      },
+      {
+        getCurrentAccountId: () => 'account-a',
+        inspectProcess: async () => ({ foregroundProcess: 'zsh', hasChildProcesses: false }),
+        prepareTarget: async () => preparation(),
+        releaseCurrentBinding: () => true,
+        releaseReservation: vi.fn()
+      }
+    )
+
+    expect(again).toMatchObject({ ok: true })
+    finishInPlaceClaudeAccountSwitch('pty-abort-5', 'reservation-b')
   })
 })

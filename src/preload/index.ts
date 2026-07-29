@@ -953,8 +953,15 @@ const api = {
       targetAccountId: string
       reservationId: string
     }): Promise<boolean> => ipcRenderer.invoke('pty:commitClaudeAccountSwitch', args),
-    cancelClaudeAccountSwitch: (args: { reservationId: string }): Promise<void> =>
-      ipcRenderer.invoke('pty:cancelClaudeAccountSwitch', args),
+    abortClaudeAccountSwitch: (args: {
+      ptyId: string
+      sourceAccountId: string
+      reservationId: string
+      runtime: 'host' | 'wsl'
+      wslDistro: string | null
+    }): Promise<
+      { ok: true; configDir: string } | { ok: false; reason: 'foreign-binding' | 'prepare-failed' }
+    > => ipcRenderer.invoke('pty:abortClaudeAccountSwitch', args),
     onWriteUnavailable: (callback: (payload: { id: string }) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: { id: string }): void =>
         callback(payload)

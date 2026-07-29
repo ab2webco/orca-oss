@@ -102,9 +102,11 @@ import {
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
 import {
+  abortInPlaceClaudeAccountSwitch,
   beginInPlaceClaudeAccountSwitch,
   finishInPlaceClaudeAccountSwitch,
-  finishInPlaceClaudeAccountSwitchByReservation,
+  type AbortInPlaceClaudeAccountSwitchArgs,
+  type AbortInPlaceClaudeAccountSwitchResult,
   type InPlaceClaudeAccountSwitchArgs,
   type InPlaceClaudeAccountSwitchResult
 } from '../claude-accounts/in-place-account-switch'
@@ -1856,7 +1858,7 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:confirmForegroundProcess')
   ipcMain.removeHandler('pty:beginClaudeAccountSwitch')
   ipcMain.removeHandler('pty:commitClaudeAccountSwitch')
-  ipcMain.removeHandler('pty:cancelClaudeAccountSwitch')
+  ipcMain.removeHandler('pty:abortClaudeAccountSwitch')
   ipcMain.removeHandler('pty:getCwd')
   ipcMain.removeHandler('pty:getSize')
   ipcMain.removeAllListeners('pty:getAuthoritativeBufferSnapshotCapabilitiesSync')
@@ -6558,15 +6560,35 @@ export function registerPtyHandlers(
   )
 
   ipcMain.handle(
-    'pty:cancelClaudeAccountSwitch',
-    (event, args: { reservationId: string }): void => {
-      if (
-        isPtyWriteEventFromMainWindow(event, mainWindow.webContents) &&
-        typeof args?.reservationId === 'string'
-      ) {
-        releaseInjectedClaudeAccountLaunch(args.reservationId)
-        finishInPlaceClaudeAccountSwitchByReservation(args.reservationId)
+    'pty:abortClaudeAccountSwitch',
+    async (
+      event,
+      args: AbortInPlaceClaudeAccountSwitchArgs & {
+        runtime: 'host' | 'wsl'
+        wslDistro: string | null
       }
+    ): Promise<AbortInPlaceClaudeAccountSwitchResult> => {
+      if (
+        !isPtyWriteEventFromMainWindow(event, mainWindow.webContents) ||
+        !prepareClaudeAuth ||
+        typeof args?.ptyId !== 'string' ||
+        typeof args?.sourceAccountId !== 'string' ||
+        typeof args?.reservationId !== 'string' ||
+        (args.runtime !== 'host' && args.runtime !== 'wsl')
+      ) {
+        return { ok: false, reason: 'prepare-failed' }
+      }
+      return abortInPlaceClaudeAccountSwitch(args, {
+        getCurrentAccountId: getLiveInjectedClaudePtyAccountId,
+        prepareSource: () =>
+          prepareClaudeAuth({
+            runtime: args.runtime,
+            wslDistro: args.wslDistro,
+            overrideAccountId: args.sourceAccountId
+          }),
+        restoreBinding: markInjectedClaudePtySpawned,
+        releaseReservation: releaseInjectedClaudeAccountLaunch
+      })
     }
   )
 
