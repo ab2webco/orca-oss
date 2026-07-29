@@ -899,9 +899,14 @@ function getClaudeSelectionTargetForPty(
   base: CodexAccountSelectionTarget,
   store: Store | undefined,
   worktreeId: string | undefined,
-  launchAccountId?: string
+  launchAccountId?: string | null
 ): ClaudeAccountSelectionTarget {
   // Precedence: launch account beats the worktree pin, the pin beats the global selection.
+  // An explicit null launch account forces the shared home — how a `~/.claude`
+  // transcript resumes correctly on a worktree pinned to a managed account.
+  if (launchAccountId === null) {
+    return { ...base, overrideAccountId: null }
+  }
   const overrideAccountId =
     launchAccountId ??
     (store && typeof worktreeId === 'string'
@@ -4884,6 +4889,9 @@ export function registerPtyHandlers(
         }
         // Why: hidden-at-spawn declaration (terminal-query-authority.md §races) — main marks hidden before byte zero so the gate owns spawn-time queries.
         initiallyHidden?: boolean
+        // Launch-scoped Claude account override for this spawn only (transcript-owning
+        // universe on resume). Null forces the shared home; undefined keeps the pin.
+        claudeAccountId?: string | null
         // Why: closes the SIGKILL race (INVESTIGATION.md) by letting main sync-flush the binding before pty:spawn returns; only the Ctrl+T daemon-host path threads these.
         tabId?: string
         leafId?: string
@@ -4940,7 +4948,8 @@ export function registerPtyHandlers(
       let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         initialSelectionTarget,
         store,
-        args.worktreeId
+        args.worktreeId,
+        isClaudeLaunch ? args.claudeAccountId : undefined
       )
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)

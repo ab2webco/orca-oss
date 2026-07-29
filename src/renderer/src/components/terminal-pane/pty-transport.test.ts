@@ -147,6 +147,19 @@ describe('createIpcPtyTransport', () => {
     )
   })
 
+  it.each(['account-owner', null] as const)(
+    'forwards a launch-scoped Claude account override to the PTY spawn: %s',
+    async (claudeAccountId) => {
+      const { createIpcPtyTransport } = await import('./pty-transport')
+      const spawn = window.api.pty.spawn as unknown as ReturnType<typeof vi.fn>
+      const transport = createIpcPtyTransport({ claudeAccountId })
+
+      await transport.connect({ url: '', callbacks: {} })
+
+      expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId }))
+    }
+  )
+
   it('forwards automatic resume provenance to the PTY spawn', async () => {
     const { createIpcPtyTransport } = await import('./pty-transport')
     const spawn = window.api.pty.spawn as unknown as ReturnType<typeof vi.fn>

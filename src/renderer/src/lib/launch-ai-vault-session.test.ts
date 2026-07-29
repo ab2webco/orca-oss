@@ -125,6 +125,53 @@ describe('launchAiVaultSessionInNewTab', () => {
     })
   })
 
+  it('threads a launch-scoped Claude account override into the queued startup', () => {
+    launchAiVaultSessionInNewTab({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      command: 'claude --resume session-1',
+      claudeAccountId: 'account-owner'
+    })
+
+    expect(mockQueueTabStartupCommand).toHaveBeenCalledWith(
+      'tab-1',
+      expect.objectContaining({ claudeAccountId: 'account-owner' })
+    )
+  })
+
+  it('threads an explicit shared-home override (null) into the queued startup', () => {
+    launchAiVaultSessionInNewTab({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      command: 'claude --resume session-1',
+      claudeAccountId: null
+    })
+
+    expect(mockQueueTabStartupCommand).toHaveBeenCalledWith(
+      'tab-1',
+      expect.objectContaining({ claudeAccountId: null })
+    )
+  })
+
+  it('keeps runtime-hosted launches free of the local Claude account override', async () => {
+    runtimeMocks.getRuntimeEnvironmentIdForWorktree.mockReturnValue('env-1')
+    runtimeMocks.isWebRuntimeSessionActive.mockReturnValue(true)
+
+    const result = launchAiVaultSessionInNewTab({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      command: 'claude --resume session-1',
+      claudeAccountId: 'account-owner'
+    })
+
+    expect(runtimeMocks.createWebRuntimeSessionTerminal.mock.calls[0]?.[0]).not.toHaveProperty(
+      'claudeAccountId'
+    )
+    if (result.tabId === null) {
+      await result.runtimeLaunch
+    }
+  })
+
   it('creates a split group before launching when a split direction is provided', () => {
     launchAiVaultSessionInNewTab({
       agent: 'codex',

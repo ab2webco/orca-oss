@@ -524,6 +524,9 @@ export type TerminalSlice = {
       launchAgent?: TuiAgent
       /** Explicit CLI override for host-owned agent launches; omission uses host settings. */
       agentArgsOverride?: string | null
+      /** Launch-scoped Claude account override (transcript-owning universe on
+       *  resume). Null forces the shared home; undefined keeps the worktree pin. */
+      claudeAccountId?: string | null
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>
       /** Initial prompt-start status for agents that lack native prompt hooks. */
@@ -678,6 +681,7 @@ export type TerminalSlice = {
       launchToken?: string
       launchAgent?: TuiAgent
       agentArgsOverride?: string | null
+      claudeAccountId?: string | null
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>
       initialAgentStatus?: { agent: TuiAgent; prompt: string }
@@ -698,6 +702,7 @@ export type TerminalSlice = {
     launchToken?: string
     launchAgent?: TuiAgent
     agentArgsOverride?: string | null
+    claudeAccountId?: string | null
     draftPrompt?: string
     sessionOptions?: Record<string, SessionOptionValue>
     initialAgentStatus?: { agent: TuiAgent; prompt: string }

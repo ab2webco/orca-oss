@@ -34,6 +34,9 @@ export type PtyConnectionDeps = {
     launchAgent?: TuiAgent
     /** Explicit CLI override for host-owned agent launches; omission uses host settings. */
     agentArgsOverride?: string | null
+    /** Launch-scoped Claude account override (transcript-owning universe on
+     *  resume). Null forces the shared home; undefined keeps the worktree pin. */
+    claudeAccountId?: string | null
     draftPrompt?: string
     sessionOptions?: Record<string, SessionOptionValue>
     /** Telemetry payload for `agent_started`. Forwarded to `pty:spawn`
