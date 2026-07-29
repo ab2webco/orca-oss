@@ -1,6 +1,6 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
-import type { ClaudeLivePtyAccountInfo } from '../../../shared/types'
+import type { ClaudeLivePtyAccountInfo, ManagedPtyAccountOwner } from '../../../shared/types'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
@@ -9,9 +9,10 @@ import { useAppStore } from '@/store'
 import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
 import { translate } from '@/i18n/i18n'
 import { buildAgentResumeStartupPlan } from './tui-agent-startup'
-import { selectAutoSwitchAccount } from './agent-rate-limit-auto-switch'
+import { assessSourceAccountQuota, selectAutoSwitchAccount } from './agent-rate-limit-auto-switch'
 import {
   loadAccountsSnapshot,
+  loadManagedPtyAccountOwner,
   selectAccount,
   type AccountsSnapshotResult
 } from './agent-rate-limit-account-snapshot'
@@ -39,6 +40,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
   agent: AutoSwitchRateLimitAgent
   providerSession: AgentProviderSessionMetadata
   connectionId: string | null
+  onRelaunchStarting?: () => void
 }): Promise<AgentRateLimitAutoSwitchResult> {
   const settings = useAppStore.getState().settings
   if (settings?.autoSwitchRateLimitedAccounts !== true) {
@@ -63,14 +65,6 @@ export async function runAgentRateLimitAutoSwitch(args: {
   // relaunch path, since the endpoint pin is an injected session). Only when no
   // such candidate exists do we leave it untouched — never Ctrl+C a gateway
   // session with nowhere to go (see the no-candidate branch below).
-  let livePtyAccount: ClaudeLivePtyAccountInfo | null = null
-  let sessionIsCustomEndpoint = false
-  if (args.agent === 'claude') {
-    const backing = await resolveClaudeSessionBackingAccount(args.ptyId)
-    livePtyAccount = backing.info
-    sessionIsCustomEndpoint = backing.isCustomEndpoint
-  }
-
   let snapshot: AccountsSnapshotResult
   try {
     snapshot = await loadAccountsSnapshot({ agent: args.agent, ptyId: args.ptyId })
@@ -84,22 +78,79 @@ export async function runAgentRateLimitAutoSwitch(args: {
       )
     )
   }
+  let owner: ManagedPtyAccountOwner
+  try {
+    owner = await loadManagedPtyAccountOwner({
+      agent: args.agent,
+      ptyId: args.ptyId,
+      snapshot
+    })
+  } catch {
+    return failure(
+      'source-quota-unknown',
+      translate(
+        'auto.lib.agentRateLimitAutoSwitchRunner.sourceOwnerUnknown',
+        'Could not verify which managed account owns this terminal, so Orca left it unchanged.'
+      )
+    )
+  }
+  if (!owner.known) {
+    return failure(
+      'source-quota-unknown',
+      translate(
+        'auto.lib.agentRateLimitAutoSwitchRunner.sourceOwnerUnknown',
+        'Could not verify which managed account owns this terminal, so Orca left it unchanged.'
+      )
+    )
+  }
+
+  let livePtyAccount: ClaudeLivePtyAccountInfo | null = null
+  if (args.agent === 'claude' && snapshot.target.kind === 'local') {
+    livePtyAccount = (await resolveClaudeSessionBackingAccount(args.ptyId)).info
+  }
   const providerTarget =
     args.agent === 'claude'
       ? snapshot.accounts.rateLimits.claudeTarget
       : snapshot.accounts.rateLimits.codexTarget
+  const target =
+    snapshot.target.kind === 'environment'
+      ? { runtime: 'host' as const, wslDistro: null }
+      : providerTarget
+  if (!owner.customEndpoint) {
+    const sourceQuota = assessSourceAccountQuota({
+      agent: args.agent,
+      accounts: snapshot.accounts,
+      target,
+      sourceAccountId: owner.accountId,
+      verifiedAfter: snapshot.quotaRefreshStartedAt
+    })
+    if (sourceQuota !== 'exhausted') {
+      return failure(
+        sourceQuota === 'available' ? 'source-has-quota' : 'source-quota-unknown',
+        sourceQuota === 'available'
+          ? translate(
+              'auto.lib.agentRateLimitAutoSwitchRunner.sourceHasQuota',
+              'The account that owns this terminal still has quota, so Orca ignored the terminal text.'
+            )
+          : translate(
+              'auto.lib.agentRateLimitAutoSwitchRunner.sourceQuotaUnknown',
+              'The owning account quota is unavailable or stale, so Orca left the terminal unchanged.'
+            )
+      )
+    }
+  }
   const candidate = selectAutoSwitchAccount({
     agent: args.agent,
     accounts: snapshot.accounts,
-    target:
-      snapshot.target.kind === 'environment' ? { runtime: 'host', wslDistro: null } : providerTarget
+    target,
+    sourceAccountId: owner.accountId
   })
   if (!candidate) {
     // Why: a custom-endpoint source can only fail over to a Claude OAuth account
     // that has quota; with none available there is nowhere to switch, so leave
     // the gateway session untouched rather than routing to an endpoint failover
     // pin (which would just land on another quota-less custom endpoint).
-    if (sessionIsCustomEndpoint) {
+    if (owner.customEndpoint) {
       return failure(
         'custom-endpoint-session',
         translate(
@@ -129,6 +180,14 @@ export async function runAgentRateLimitAutoSwitch(args: {
     )
   }
 
+  const willAttemptPinnedRelaunch =
+    args.agent === 'claude' &&
+    snapshot.target.kind === 'local' &&
+    livePtyAccount?.injected === true &&
+    snapshot.accounts.claude.accounts.some((account) => account.id === candidate.accountId)
+  if (willAttemptPinnedRelaunch) {
+    args.onRelaunchStarting?.()
+  }
   const pinnedSwitch = await tryPinnedManagedSwitch({
     worktreeId: args.worktreeId,
     ptyId: args.ptyId,
@@ -177,6 +236,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
     )
   }
 
+  args.onRelaunchStarting?.()
   const stopped = await stopForegroundAgent({
     settings,
     ptyId: args.ptyId,

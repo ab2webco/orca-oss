@@ -2580,6 +2580,12 @@ export type ClaudeLivePtyAccountInfo = {
   injected: boolean
 }
 
+export type ManagedPtyAccountOwner = {
+  known: boolean
+  accountId: string | null
+  customEndpoint: boolean
+}
+
 export type ClaudeSessionFailoverCopyFailureReason =
   | 'invalid-session-id'
   | 'target-account-not-found'

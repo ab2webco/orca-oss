@@ -4,7 +4,7 @@ import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
 } from '../../../shared/types'
-import { selectAutoSwitchAccount } from './agent-rate-limit-auto-switch'
+import { assessSourceAccountQuota, selectAutoSwitchAccount } from './agent-rate-limit-auto-switch'
 
 function limits(provider: 'claude' | 'codex', usedPercent: number): ProviderRateLimits {
   return {
@@ -289,6 +289,38 @@ describe('selectAutoSwitchAccount', () => {
   })
 })
 
+describe('assessSourceAccountQuota', () => {
+  it('rejects retained inactive usage that predates the completed refresh', () => {
+    const staleLimits = { ...limits('claude', 4), updatedAt: 10 }
+    const result = assessSourceAccountQuota({
+      agent: 'claude',
+      target: { runtime: 'host', wslDistro: null },
+      sourceAccountId: 'source',
+      verifiedAfter: 20,
+      accounts: {
+        claude: {
+          accounts: [claudeAccount('active'), claudeAccount('source')],
+          activeAccountId: 'active',
+          activeAccountIdsByRuntime: { host: 'active', wsl: {} }
+        },
+        codex: emptyCodex,
+        rateLimits: rateLimitState({
+          inactiveClaudeAccounts: [
+            {
+              accountId: 'source',
+              rateLimits: staleLimits,
+              updatedAt: 10,
+              isFetching: false
+            }
+          ]
+        })
+      }
+    })
+
+    expect(result).toBe('unknown')
+  })
+})
+
 function claudeAccount(id: string): ClaudeRateLimitAccountsState['accounts'][number] {
   return {
     id,
@@ -351,7 +383,7 @@ describe('selectAutoSwitchAccount — accounts whose usage read failed', () => {
     expect(result?.accountId).toBe('spare')
   })
 
-  it('prefers a freshly verified account over one scored from a retained snapshot', () => {
+  it('chooses the largest real margin before using freshness as a tie-breaker', () => {
     const result = selectClaude(
       ['active', 'retained', 'verified'],
       [
@@ -370,9 +402,42 @@ describe('selectAutoSwitchAccount — accounts whose usage read failed', () => {
       ]
     )
 
-    // Why: 'retained' reads lower, but its number may be stale — a verified account
-    // is the safer landing spot.
-    expect(result?.accountId).toBe('verified')
+    expect(result?.accountId).toBe('retained')
+  })
+
+  it('excludes the PTY owner even when the globally active account is different', () => {
+    const result = selectAutoSwitchAccount({
+      agent: 'claude',
+      target: { runtime: 'host', wslDistro: null },
+      sourceAccountId: 'pane-owner',
+      accounts: {
+        claude: {
+          accounts: ['global-active', 'pane-owner', 'spare'].map(claudeAccount),
+          activeAccountId: 'global-active',
+          activeAccountIdsByRuntime: { host: 'global-active', wsl: {} }
+        },
+        codex: emptyCodex,
+        rateLimits: rateLimitState({
+          claude: limits('claude', 10),
+          inactiveClaudeAccounts: [
+            {
+              accountId: 'pane-owner',
+              rateLimits: limits('claude', 1),
+              updatedAt: 1,
+              isFetching: false
+            },
+            {
+              accountId: 'spare',
+              rateLimits: limits('claude', 20),
+              updatedAt: 1,
+              isFetching: false
+            }
+          ]
+        })
+      }
+    })
+
+    expect(result?.accountId).toBe('global-active')
   })
 
   it('never switches to an account with no credentials', () => {

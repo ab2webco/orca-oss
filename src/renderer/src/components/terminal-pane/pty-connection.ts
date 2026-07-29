@@ -279,11 +279,11 @@ import {
   recognizeAgentProcessFromCommandLine
 } from '../../../../shared/agent-process-recognition'
 import type { SetupSplitDirection, TuiAgent } from '../../../../shared/types'
+import { isAutoSwitchRateLimitAgent } from '../../../../shared/agent-rate-limit-detection'
 import {
-  detectAgentRateLimitOutput,
-  isAutoSwitchRateLimitAgent,
-  type AgentRateLimitDetectionState
-} from '../../../../shared/agent-rate-limit-detection'
+  createAgentRateLimitDetectionGate,
+  observeAgentRateLimitOutput
+} from '@/lib/agent-rate-limit-detection-gate'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
 import { createDraftPasteReadyScanner } from '../../../../shared/draft-paste-ready-scanner'
@@ -659,6 +659,7 @@ let inactiveForegroundImmediateBudgetChars = 0
 let inactiveForegroundImmediateBudgetWindowStart = 0
 
 type PanePtyBinding = IDisposable & {
+  suppressAgentRateLimitDetectionForResume: () => void
   syncProcessTracking: () => void
   noteVisibilityResume: () => void
   reassertPtySizeAfterWindowWake: () => void
@@ -1274,9 +1275,16 @@ export function connectPanePty(
     useAppStore.getState().clearAgentLaunchConfig(cacheKey)
   }
   const pendingSpawnKey = cacheKey
-  const rateLimitDetectionState: AgentRateLimitDetectionState = { tail: '' }
+  const rateLimitDetectionGate = createAgentRateLimitDetectionGate()
   let lastRateLimitDetectionKey: string | null = null
   let rateLimitDetectionPtyId: string | null = null
+  const resumeRateLimitDetectionAfterAcceptedInput = (): void => {
+    if (!rateLimitDetectionGate.suppressed) {
+      return
+    }
+    rateLimitDetectionGate.resumeAfterAcceptedInput()
+    lastRateLimitDetectionKey = null
+  }
   const neutralTerminalTitle = (): string => {
     const state = useAppStore.getState()
     const tab = (state.tabsByWorktree[deps.worktreeId] ?? []).find(
@@ -3835,6 +3843,7 @@ export function connectPanePty(
         .then((accepted) => {
           if (accepted) {
             // Why: rejected writes use transport recovery and must not arm a parser probe.
+            resumeRateLimitDetectionAfterAcceptedInput()
             markAcceptedTerminalInputSent()
             observeAcceptedShellCommandInput(data)
             observeAcceptedTerminalInput(data, acknowledgedIntent)
@@ -3855,6 +3864,7 @@ export function connectPanePty(
     if (intent) {
       claimViewportForUserActivity()
       if (transport.sendInput(data)) {
+        resumeRateLimitDetectionAfterAcceptedInput()
         markAcceptedTerminalInputSent()
         observeAcceptedShellCommandInput(data)
         observeAcceptedTerminalInput(data, intent)
@@ -3866,6 +3876,7 @@ export function connectPanePty(
     }
     claimViewportForUserActivity()
     if (transport.sendInput(data)) {
+      resumeRateLimitDetectionAfterAcceptedInput()
       markAcceptedTerminalInputSent()
       observeAcceptedShellCommandInput(data)
       observeAcceptedTerminalInput(data)
@@ -7175,8 +7186,10 @@ export function connectPanePty(
       if (currentPtyId !== rateLimitDetectionPtyId) {
         // Why: pane bindings can swap PTYs; stale split output must not trigger a new session.
         rateLimitDetectionPtyId = currentPtyId
-        rateLimitDetectionState.tail = ''
-        lastRateLimitDetectionKey = null
+        rateLimitDetectionGate.observePtyBoundary()
+        if (!rateLimitDetectionGate.suppressed) {
+          lastRateLimitDetectionKey = null
+        }
       }
       if (
         currentPtyId &&
@@ -7189,19 +7202,26 @@ export function connectPanePty(
         if (
           isAutoSwitchRateLimitAgent(agent) &&
           providerSession &&
-          detectAgentRateLimitOutput(agent, data, rateLimitDetectionState)
+          !rateLimitDetectionGate.suppressed
         ) {
-          const detectionKey = `${currentPtyId}:${agent}:${providerSession.key}:${providerSession.id}`
-          if (lastRateLimitDetectionKey !== detectionKey) {
-            lastRateLimitDetectionKey = detectionKey
-            deps.onAgentRateLimitDetected({
-              paneId: pane.id,
-              paneKey: cacheKey,
-              ptyId: currentPtyId,
-              agent,
-              providerSession
-            })
-          }
+          observeAgentRateLimitOutput({
+            gate: rateLimitDetectionGate,
+            agent,
+            data,
+            detected: () => {
+              const detectionKey = `${currentPtyId}:${agent}:${providerSession.key}:${providerSession.id}`
+              if (lastRateLimitDetectionKey !== detectionKey) {
+                lastRateLimitDetectionKey = detectionKey
+                deps.onAgentRateLimitDetected?.({
+                  paneId: pane.id,
+                  paneKey: cacheKey,
+                  ptyId: currentPtyId,
+                  agent,
+                  providerSession
+                })
+              }
+            }
+          })
         }
       }
       respondToTerminalPixelSizeQueries(data)
@@ -8384,6 +8404,10 @@ export function connectPanePty(
   }
 
   return {
+    suppressAgentRateLimitDetectionForResume() {
+      rateLimitDetectionGate.suppressForResume()
+      lastRateLimitDetectionKey = null
+    },
     syncProcessTracking() {
       agentCompletionCoordinator.startProcessTracking()
       // Why: the hidden-delivery gate must follow every pane visibility flip.

@@ -12,6 +12,26 @@ function method(name: string) {
 }
 
 describe('account RPC methods', () => {
+  it('returns the exact managed owner recorded for a runtime PTY', async () => {
+    const getManagedPtyAccountOwner = vi.fn(() => ({
+      known: true,
+      accountId: 'codex-account',
+      customEndpoint: false
+    }))
+    const runtime = { getManagedPtyAccountOwner } as unknown as OrcaRuntimeService
+    const owner = method('accounts.getPtyOwner')
+    if (isStreamingMethod(owner)) {
+      throw new Error('accounts.getPtyOwner must be a request method')
+    }
+
+    await expect(owner.handler({ ptyId: 'pty-1', agent: 'codex' }, { runtime })).resolves.toEqual({
+      known: true,
+      accountId: 'codex-account',
+      customEndpoint: false
+    })
+    expect(getManagedPtyAccountOwner).toHaveBeenCalledWith('pty-1', 'codex')
+  })
+
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {

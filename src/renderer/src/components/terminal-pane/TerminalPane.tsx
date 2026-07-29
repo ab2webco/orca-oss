@@ -1031,6 +1031,11 @@ export default function TerminalPane({
       }
 
       autoSwitchingPaneKeysRef.current.add(event.paneKey)
+      const rateLimitBinding = panePtyBindingsRef.current.get(event.paneId) as
+        | (IDisposable & {
+            suppressAgentRateLimitDetectionForResume?: () => void
+          })
+        | undefined
       const agentLabel = event.agent === 'claude' ? 'Claude' : 'Codex'
       toast.info(
         translate(
@@ -1051,7 +1056,8 @@ export default function TerminalPane({
         worktreeId,
         agent: event.agent,
         providerSession: event.providerSession,
-        connectionId: getConnectionId(worktreeId) ?? null
+        connectionId: getConnectionId(worktreeId) ?? null,
+        onRelaunchStarting: () => rateLimitBinding?.suppressAgentRateLimitDetectionForResume?.()
       })
         .then((result) => {
           if (result.ok) {
@@ -1131,7 +1137,8 @@ export default function TerminalPane({
           const toastFn =
             result.reason === 'no-account' ||
             result.reason === 'ssh' ||
-            result.reason === 'custom-endpoint-session'
+            result.reason === 'custom-endpoint-session' ||
+            result.reason === 'source-has-quota'
               ? toast.info
               : toast.error
           toastFn(

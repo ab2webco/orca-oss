@@ -1,7 +1,10 @@
 import { ipcMain } from 'electron'
 import type { CodexAccountAddTarget, CodexAccountService } from '../codex-accounts/service'
 import type { CodexAccountSelectionTarget } from '../codex-accounts/runtime-selection'
-import { listRecordedCodexPaneLanes } from '../codex/codex-pane-account-registry'
+import {
+  getCodexPtyAccountOwner,
+  listRecordedCodexPaneLanes
+} from '../codex/codex-pane-account-registry'
 import { forgetStaleCodexPanes, listStaleCodexPanes } from '../codex/codex-stale-pane-accounts'
 import type { GlobalSettings } from '../../shared/types'
 
@@ -9,6 +12,12 @@ export function registerCodexAccountHandlers(
   codexAccounts: CodexAccountService,
   getSettings?: () => GlobalSettings
 ): void {
+  ipcMain.handle('codexAccounts:getLivePtyAccount', (_event, args: { ptyId?: unknown }) => {
+    if (typeof args?.ptyId !== 'string') {
+      return { known: false, accountId: null, customEndpoint: false }
+    }
+    return getCodexPtyAccountOwner(args.ptyId)
+  })
   ipcMain.handle('codexAccounts:listStalePanes', (_event, args: { ptyIds?: unknown }) => {
     const settings = getSettings?.()
     if (!settings || !Array.isArray(args?.ptyIds)) {

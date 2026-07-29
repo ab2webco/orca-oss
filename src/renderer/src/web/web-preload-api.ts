@@ -2943,7 +2943,9 @@ function createAccountsApi(): never {
     // Why empty rather than absent: the same host owns both records, so a web
     // client has no recorded lane to offer and every pane falls to derivation.
     listRecordedPaneLanes: () => Promise.resolve({}),
-    forgetStalePanes: () => Promise.resolve()
+    forgetStalePanes: () => Promise.resolve(),
+    getLivePtyAccount: ({ ptyId }: { ptyId: string }) =>
+      callRuntimeResult('accounts.getPtyOwner', { ptyId, agent: 'codex' })
   } as never
 }
 

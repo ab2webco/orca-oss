@@ -139,6 +139,17 @@ export function getCodexPaneAccount(ptyId: string): CodexPaneAccountRecord | nul
   return readRegistry().panes[ptyId] ?? null
 }
 
+export function getCodexPtyAccountOwner(ptyId: string): {
+  known: boolean
+  accountId: string | null
+  customEndpoint: false
+} {
+  const owner = getCodexPaneAccount(ptyId)
+  return owner
+    ? { known: true, accountId: owner.accountId, customEndpoint: false }
+    : { known: false, accountId: null, customEndpoint: false }
+}
+
 /**
  * Reports the lane each given PTY launched from, omitting panes with no record.
  *

@@ -27,6 +27,8 @@ export type AgentRateLimitAutoSwitchResult =
         | 'ssh'
         | 'no-account'
         | 'custom-endpoint-session'
+        | 'source-has-quota'
+        | 'source-quota-unknown'
         | 'stop-failed'
         | 'resume-failed'
         | 'continue-failed'

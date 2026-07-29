@@ -2141,7 +2141,9 @@ const api = {
     listRecordedPaneLanes: (args: { ptyIds: string[] }): Promise<Record<string, string>> =>
       ipcRenderer.invoke('codexAccounts:listRecordedPaneLanes', args),
     forgetStalePanes: (args: { ptyIds: string[] }): Promise<void> =>
-      ipcRenderer.invoke('codexAccounts:forgetStalePanes', args)
+      ipcRenderer.invoke('codexAccounts:forgetStalePanes', args),
+    getLivePtyAccount: (args: { ptyId: string }): Promise<unknown> =>
+      ipcRenderer.invoke('codexAccounts:getLivePtyAccount', args)
   },
 
   claudeAccounts: {
