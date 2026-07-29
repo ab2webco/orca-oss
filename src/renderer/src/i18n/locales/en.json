@@ -10142,7 +10142,22 @@
           "cost": "Session cost",
           "costDescription": "The API cost the session has accumulated, in USD.",
           "reset": "Reset countdown",
-          "resetDescription": "Time remaining until the quota window resets."
+          "resetDescription": "Time remaining until the quota window resets.",
+          "previewLabel": "Preview",
+          "previewNote": "Rendered with stable example data — your terminals show live values.",
+          "moveUp": "Move {{value0}} earlier in the line",
+          "moveDown": "Move {{value0}} later in the line",
+          "ownershipTitle": "Your custom status line takes precedence",
+          "ownershipHomeBody": "Your own statusLine command in ~/.claude/settings.json wins in terminals without an assigned Claude account, so the items above do not apply there.",
+          "ownershipVaultBody": "{{value0}} account vault(s) still carry a copy of your custom statusLine, which blocks Orca’s status line in terminals pinned to those accounts.",
+          "ownershipAction": "Use Orca’s status line",
+          "ownershipDialogTitle": "Replace your custom statusLine?",
+          "ownershipDialogBody": "Orca removes your statusLine command and installs its managed status line in every location listed below. Everything else in those files is preserved.",
+          "ownershipHomeLocation": "Shared ~/.claude/settings.json",
+          "ownershipVaultLocation": "Account vault: {{value0}}",
+          "ownershipConfirm": "Replace",
+          "ownershipCancel": "Cancel",
+          "ownershipFailure": "{{value0}} location(s) could not be updated — they keep their current statusLine."
         }
       },
       "right": {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CLAUDE_STATUSLINE_ITEM_KEYS,
   DEFAULT_CLAUDE_STATUSLINE_ITEMS,
+  normalizeClaudeStatusLineItemOrder,
   normalizeClaudeStatusLineItems
 } from './claude-statusline-items'
 
@@ -38,5 +39,47 @@ describe('normalizeClaudeStatusLineItems', () => {
     for (const key of CLAUDE_STATUSLINE_ITEM_KEYS) {
       expect(typeof DEFAULT_CLAUDE_STATUSLINE_ITEMS[key]).toBe('boolean')
     }
+  })
+})
+
+describe('normalizeClaudeStatusLineItemOrder', () => {
+  it('returns the declared key order for absent or malformed input', () => {
+    expect(normalizeClaudeStatusLineItemOrder(undefined)).toEqual([...CLAUDE_STATUSLINE_ITEM_KEYS])
+    expect(normalizeClaudeStatusLineItemOrder(null)).toEqual([...CLAUDE_STATUSLINE_ITEM_KEYS])
+    expect(normalizeClaudeStatusLineItemOrder('model')).toEqual([...CLAUDE_STATUSLINE_ITEM_KEYS])
+    expect(normalizeClaudeStatusLineItemOrder({ 0: 'model' })).toEqual([
+      ...CLAUDE_STATUSLINE_ITEM_KEYS
+    ])
+  })
+
+  it('keeps a persisted permutation as-is', () => {
+    const reversed = CLAUDE_STATUSLINE_ITEM_KEYS.toReversed()
+    expect(normalizeClaudeStatusLineItemOrder(reversed)).toEqual(reversed)
+  })
+
+  it('drops unknown entries and duplicates, then appends missing keys in default order', () => {
+    const normalized = normalizeClaudeStatusLineItemOrder([
+      'cost',
+      'branch',
+      'model',
+      'cost',
+      42,
+      'account'
+    ])
+    expect(normalized).toEqual([
+      'cost',
+      'model',
+      'account',
+      'project',
+      'context',
+      'fiveHourQuota',
+      'sevenDayQuota',
+      'resetCountdown'
+    ])
+  })
+
+  it('always returns every declared key exactly once', () => {
+    const normalized = normalizeClaudeStatusLineItemOrder(['sevenDayQuota'])
+    expect([...normalized].sort()).toEqual([...CLAUDE_STATUSLINE_ITEM_KEYS].sort())
   })
 })

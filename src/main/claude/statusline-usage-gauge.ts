@@ -1,10 +1,12 @@
 /**
- * The statusline's usage vocabulary: the progress-bar level table and the context trend glyphs,
- * plus the shell fragments that render them on each platform.
+ * The statusline's usage vocabulary — shell fragments that render the shared line model's
+ * bars, trend and reset countdown on each platform.
  *
  * Why one module for both platforms: POSIX emits a shell `case` and cmd emits a sliced lookup
  * string, but the two must agree on cell count and on what each level looks like — deriving both
- * from one table is what stops a pane from reading differently depending on the OS it runs on.
+ * from the shared table in `src/shared/claude-statusline-line-model.ts` is what stops a pane
+ * from reading differently depending on the OS it runs on. The pure tables live in shared so
+ * the Settings preview consumes the exact same derivation; the shell/cmd fragments stay here.
  *
  * Why the glyphs themselves diverge: `writeManagedScript` emits UTF-8 while cmd reads a .bat in
  * the console's OEM codepage, so a block element would arrive as mojibake on Windows — the same
@@ -13,88 +15,28 @@
  * it cannot look right either way.
  */
 
-import type {
-  ClaudeStatusLineItemKey,
-  ClaudeStatusLineItems
-} from '../../shared/claude-statusline-items'
+import {
+  STATUSLINE_BAR_LEVELS,
+  STATUSLINE_TREND_ASCII,
+  STATUSLINE_TREND_THRESHOLD,
+  STATUSLINE_TREND_UNICODE,
+  statuslineBarLevelsAscii,
+  statuslineBarLevelsUnicode
+} from '../../shared/claude-statusline-line-model'
 
-type StatuslineTrendGlyphs = {
-  readonly rising: string
-  readonly falling: string
-  readonly steady: string
-}
-
-// Why 5 is the floor: measured against the 96-column budget with every legacy field present.
-// The widest realistic line — announce banner, model, a bounded account and three bars — lands
-// at 95 columns; a sixth cell per bar puts it at 98 and starts dropping the weekly quota.
-export const STATUSLINE_BAR_CELLS_MIN = 5
-// Why 10 is the cap: past ten cells each extra cell resolves less than 5 points, which the
-// percentage printed next to the bar already says better.
-export const STATUSLINE_BAR_CELLS_MAX = 10
-
-// Nominal column cost of each optional field at the 5-cell baseline, separator included —
-// the same counted (never measured) widths the scripts budget with. Disabling a reclaimable
-// field frees its columns; enabling an added field (absent from the legacy line) spends them.
-const RECLAIMABLE_ITEM_COLUMNS: Partial<Record<ClaudeStatusLineItemKey, number>> = {
-  account: 25, // "@" + 21-column bounded local part + " · "
-  fiveHourQuota: 16, // "5h " + 5-cell bar + " 100%" + " · "
-  sevenDayQuota: 16, // "7d " + 5-cell bar + " 100%" + " · "
-  resetCountdown: 11 // mark + " 23h59m" + " · "
-}
-const ADDED_ITEM_COLUMNS: Partial<Record<ClaudeStatusLineItemKey, number>> = {
-  project: 27, // 24-column bounded directory name + " · "
-  cost: 11 // "$9999.99" + " · "
-}
-
-/**
- * How many cells each bar gets, derived from which items are enabled.
- *
- * Why derived and not another constant: every field competes for the same assumed 96 columns,
- * so the only honest way to grow a bar is to spend columns the user explicitly freed by
- * turning fields off. Freed columns are split evenly across the enabled bars.
- */
-export function deriveStatusLineBarCells(items: ClaudeStatusLineItems): number {
-  const bars = [items.context, items.fiveHourQuota, items.sevenDayQuota].filter(Boolean).length
-  if (bars === 0) {
-    return STATUSLINE_BAR_CELLS_MIN
-  }
-  let freed = 0
-  for (const [key, columns] of Object.entries(RECLAIMABLE_ITEM_COLUMNS)) {
-    if (!items[key as ClaudeStatusLineItemKey]) {
-      freed += columns
-    }
-  }
-  for (const [key, columns] of Object.entries(ADDED_ITEM_COLUMNS)) {
-    if (items[key as ClaudeStatusLineItemKey]) {
-      freed -= columns
-    }
-  }
-  const extra = Math.floor(Math.max(0, freed) / bars)
-  return Math.min(STATUSLINE_BAR_CELLS_MAX, STATUSLINE_BAR_CELLS_MIN + extra)
-}
-
-// Why 11 levels over 5 cells: a half-block doubles the resolution to one step per 10 points
-// without spending a sixth column, so 42% and 48% are still distinguishable at a glance.
-const STATUSLINE_BAR_LEVELS = 11
-
-// Why 2 points: the percentage is floored to an integer, so a value sitting on a boundary flips
-// one point by itself and an arrow that followed it would strobe on an idle pane. Two points is
-// the smallest move that cannot be quantisation noise.
-export const STATUSLINE_TREND_THRESHOLD = 2
-
-export const STATUSLINE_TREND_UNICODE: StatuslineTrendGlyphs = {
-  rising: '↑',
-  falling: '↓',
-  steady: '→'
-}
-
-// Why `+ - ~` and not `^ v =`: `^` is cmd's escape character and survives quoting only by
-// accident, `v` reads as a letter next to a percentage, and `=` already means half-cell here.
-export const STATUSLINE_TREND_ASCII: StatuslineTrendGlyphs = {
-  rising: '+',
-  falling: '-',
-  steady: '~'
-}
+// Re-exported so main-side consumers keep one import site for the whole vocabulary.
+export {
+  deriveStatusLineBarCells,
+  STATUSLINE_BAR_CELLS_MAX,
+  STATUSLINE_BAR_CELLS_MIN,
+  STATUSLINE_RESET_MARK_ASCII,
+  STATUSLINE_RESET_MARK_UNICODE,
+  STATUSLINE_TREND_ASCII,
+  STATUSLINE_TREND_THRESHOLD,
+  STATUSLINE_TREND_UNICODE,
+  statuslineBarLevelsAscii,
+  statuslineBarLevelsUnicode
+} from '../../shared/claude-statusline-line-model'
 
 /**
  * The reset-countdown file contract, shared with the writer in `statusline-reset-countdown.ts`.
@@ -110,37 +52,6 @@ export const STATUSLINE_RESET_DEFAULT_KEY = 'system-default'
 export const STATUSLINE_RESET_KEY_MAX_CHARS = 64
 // Longest value the writer can emit is "23h59m"; anything longer is a stale or foreign file.
 export const STATUSLINE_RESET_MAX_CHARS = 6
-
-// Why `>` on cmd and not the trend's spare glyphs: `+ - ~` already mean a direction on this line,
-// and `↻` would arrive as mojibake through the OEM codepage — the same trade as `…` vs `...`.
-export const STATUSLINE_RESET_MARK_UNICODE = '↻'
-export const STATUSLINE_RESET_MARK_ASCII = '>'
-
-/**
- * One bar per level, from empty to full, scaled to the requested cell count.
- *
- * Why floor and never round up: an overstated bar claims consumption that has not happened, and
- * reserving the all-full bar for a true 100% makes the exhausted state unmistakable. Scaling in
- * half-cell units keeps a 5-cell bar identical to the legacy table (level = half-cells) while a
- * wider bar spreads the same 11 levels over more columns.
- */
-function barLevels(full: string, half: string, empty: string, cells: number): readonly string[] {
-  return Array.from({ length: STATUSLINE_BAR_LEVELS }, (_unused, level) => {
-    const scaledHalves = Math.floor((level * cells * 2) / (STATUSLINE_BAR_LEVELS - 1))
-    const fullCells = Math.floor(scaledHalves / 2)
-    const halfCells = scaledHalves % 2
-    const emptyCells = cells - fullCells - halfCells
-    return `${full.repeat(fullCells)}${half.repeat(halfCells)}${empty.repeat(emptyCells)}`
-  })
-}
-
-export function statuslineBarLevelsUnicode(cells: number): readonly string[] {
-  return barLevels('█', '▌', '░', cells)
-}
-
-export function statuslineBarLevelsAscii(cells: number): readonly string[] {
-  return barLevels('#', '=', '.', cells)
-}
 
 /**
  * `orca_statusline_gauge <percent>` — sets `orca_statusline_gauge_out` to the bar, or to empty

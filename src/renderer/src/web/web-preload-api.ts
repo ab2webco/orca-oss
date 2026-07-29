@@ -2776,6 +2776,15 @@ function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
     } as const)
   return {
     claudeStatus: () => status('claude'),
+    // Why inert stubs: statusLine ownership lives in the server's home/vault files; the web
+    // client can neither read nor rewrite them, so it reports nothing user-owned.
+    claudeStatusLineOwnership: () =>
+      Promise.resolve({ universes: [], userOwnedHome: false, userOwnedVaultCount: 0 }),
+    claudeStatusLineReplaceUserOwned: () =>
+      Promise.resolve({
+        failedCount: 0,
+        ownership: { universes: [], userOwnedHome: false, userOwnedVaultCount: 0 }
+      }),
     openClaudeStatus: () => status('openclaude'),
     codexStatus: () => status('codex'),
     geminiStatus: () => status('gemini'),

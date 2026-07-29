@@ -45,7 +45,11 @@ import {
   removeManagedAgentHooks
 } from './agent-hooks/managed-agent-hook-controls'
 import { claudeHookService } from './claude/hook-service'
-import { configureClaudeStatusLineItemsSource } from './claude/statusline-script'
+import {
+  configureClaudeStatusLineItemOrderSource,
+  configureClaudeStatusLineItemsSource
+} from './claude/statusline-script'
+import { configureClaudeStatusLineOwnershipAccounts } from './claude/statusline-ownership'
 import { initCohortClassifier } from './telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from './telemetry/onboarding-cohort-classifier'
 import { resolveConsent } from './telemetry/consent'
@@ -1972,6 +1976,10 @@ void app.whenReady().then(async () => {
   // Why configure before any hook install: the shared statusline script is generated at boot
   // install and on vault pinning, and both must honor the persisted item choice.
   configureClaudeStatusLineItemsSource(() => store?.getSettings().claudeStatusLineItems)
+  configureClaudeStatusLineItemOrderSource(() => store?.getSettings().claudeStatusLineItemOrder)
+  // Why: user-owned statusLine detection must see every universe — vault creation clones the
+  // home settings.json, so stale personal statusLines survive inside account vaults.
+  configureClaudeStatusLineOwnershipAccounts(() => store?.getSettings().claudeManagedAccounts ?? [])
   store.onSettingsChanged((updates, settings) => {
     if ('terminalWindowsWslDistro' in updates) {
       // Why: synchronize fallback WSL distro updates to runner.
@@ -1981,7 +1989,7 @@ void app.whenReady().then(async () => {
       // Why: Store is the mutation authority for all settings writes, so every macOS toggle updates the native item live.
       syncMacMenuBarIcon(settings.showMenuBarIcon !== false)
     }
-    if ('claudeStatusLineItems' in updates) {
+    if ('claudeStatusLineItems' in updates || 'claudeStatusLineItemOrder' in updates) {
       // Why: the toggle must reach the installed shared script now, not on the next relaunch —
       // every pinned vault's settings.json points at that one file.
       try {

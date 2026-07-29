@@ -5,7 +5,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { ClaudeStatusLineItems } from '../../shared/claude-statusline-items'
+import type {
+  ClaudeStatusLineItemKey,
+  ClaudeStatusLineItems
+} from '../../shared/claude-statusline-items'
 import { getManagedStatusLineScript } from './statusline-script'
 
 describe.skipIf(process.platform === 'win32')('statusline items (posix behavioral)', () => {
@@ -28,14 +31,17 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
     })
   }
 
-  function makeHarness(items?: Partial<ClaudeStatusLineItems>): {
+  function makeHarness(
+    items?: Partial<ClaudeStatusLineItems>,
+    order?: readonly ClaudeStatusLineItemKey[]
+  ): {
     scriptPath: string
     dir: string
   } {
     const dir = mkdtempSync(join(tmpdir(), 'orca-statusline-items-'))
     dirs.push(dir)
     const scriptPath = join(dir, 'statusline.sh')
-    writeFileSync(scriptPath, getManagedStatusLineScript('posix', items))
+    writeFileSync(scriptPath, getManagedStatusLineScript('posix', items, order))
     return { scriptPath, dir }
   }
 
@@ -207,5 +213,30 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
     )
     expect(stdout).not.toContain('↻')
     expect(stdout).toContain('5h')
+  })
+
+  it('renders the fields in the configured order', async () => {
+    const { scriptPath, dir } = makeHarness({ cost: true }, [
+      'model',
+      'project',
+      'context',
+      'cost',
+      'sevenDayQuota',
+      'fiveHourQuota',
+      'account',
+      'resetCountdown'
+    ])
+    const stdout = await runScript(
+      scriptPath,
+      dir,
+      displayPayload({
+        cost: { total_cost_usd: 1.5, total_duration_ms: 1_000 },
+        rate_limits: { five_hour: { used_percentage: 63 }, seven_day: { used_percentage: 31 } }
+      }),
+      'tab-1:item-order'
+    )
+    expect(stdout.trimEnd()).toBe(
+      'Orca by Ab2Web · Fable · x · ctx ██░░░ 42% · $1.50 · 7d █▌░░░ 31% · 5h ███░░ 63%'
+    )
   })
 })

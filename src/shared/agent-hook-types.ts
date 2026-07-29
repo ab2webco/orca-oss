@@ -31,6 +31,32 @@ export type AgentHookInstallStatus = {
   detail: string | null
 }
 
+/** Slot state of one settings.json universe's statusLine: the shared home or one account
+ *  vault. `unknown` covers universes the host cannot read (WSL vaults, parse failures) —
+ *  detection must never claim a state it did not see. */
+export type ClaudeStatusLineUniverseState = 'managed' | 'user' | 'empty' | 'unknown'
+
+export type ClaudeStatusLineUniverseOwnership = {
+  universe: 'home' | 'vault'
+  accountId: string | null
+  accountEmail: string | null
+  state: ClaudeStatusLineUniverseState
+}
+
+/** Why every universe and not just ~/.claude: vault creation clones the home settings.json,
+ *  so a stale copy of a user's personal statusLine can block the managed line for pinned
+ *  launches while the home slot looks clean. */
+export type ClaudeStatusLineOwnership = {
+  universes: ClaudeStatusLineUniverseOwnership[]
+  userOwnedHome: boolean
+  userOwnedVaultCount: number
+}
+
+export type ClaudeStatusLineReplaceResult = {
+  failedCount: number
+  ownership: ClaudeStatusLineOwnership
+}
+
 // Why: bumped whenever the managed script's request shape changes. The
 // receiver logs a warning when it sees a request from a different version so a
 // stale script installed by an older app build is diagnosable instead of

@@ -113,6 +113,113 @@ export function getClaudeStatusLineItemCopy(
   }
 }
 
+export function getClaudeStatusLinePreviewLabel(): string {
+  return translate('auto.components.settings.claude-statusline-items-copy.previewLabel', 'Preview')
+}
+
+export function getClaudeStatusLinePreviewNote(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.previewNote',
+    'Rendered with stable example data — your terminals show live values.'
+  )
+}
+
+export function getClaudeStatusLineMoveUpLabel(itemLabel: string): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.moveUp',
+    'Move {{value0}} earlier in the line',
+    { value0: itemLabel }
+  )
+}
+
+export function getClaudeStatusLineMoveDownLabel(itemLabel: string): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.moveDown',
+    'Move {{value0}} later in the line',
+    { value0: itemLabel }
+  )
+}
+
+export function getClaudeStatusLineOwnershipTitle(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipTitle',
+    'Your custom status line takes precedence'
+  )
+}
+
+export function getClaudeStatusLineOwnershipHomeBody(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipHomeBody',
+    'Your own statusLine command in ~/.claude/settings.json wins in terminals without an assigned Claude account, so the items above do not apply there.'
+  )
+}
+
+export function getClaudeStatusLineOwnershipVaultBody(count: number): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipVaultBody',
+    '{{value0}} account vault(s) still carry a copy of your custom statusLine, which blocks Orca’s status line in terminals pinned to those accounts.',
+    { value0: String(count) }
+  )
+}
+
+export function getClaudeStatusLineOwnershipAction(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipAction',
+    'Use Orca’s status line'
+  )
+}
+
+export function getClaudeStatusLineOwnershipDialogTitle(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipDialogTitle',
+    'Replace your custom statusLine?'
+  )
+}
+
+export function getClaudeStatusLineOwnershipDialogBody(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipDialogBody',
+    'Orca removes your statusLine command and installs its managed status line in every location listed below. Everything else in those files is preserved.'
+  )
+}
+
+export function getClaudeStatusLineOwnershipHomeLocationLabel(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipHomeLocation',
+    'Shared ~/.claude/settings.json'
+  )
+}
+
+export function getClaudeStatusLineOwnershipVaultLocationLabel(email: string): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipVaultLocation',
+    'Account vault: {{value0}}',
+    { value0: email }
+  )
+}
+
+export function getClaudeStatusLineOwnershipConfirmLabel(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipConfirm',
+    'Replace'
+  )
+}
+
+export function getClaudeStatusLineOwnershipCancelLabel(): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipCancel',
+    'Cancel'
+  )
+}
+
+export function getClaudeStatusLineOwnershipFailureNote(count: number): string {
+  return translate(
+    'auto.components.settings.claude-statusline-items-copy.ownershipFailure',
+    '{{value0}} location(s) could not be updated — they keep their current statusLine.',
+    { value0: String(count) }
+  )
+}
+
 export function getClaudeStatusLineSearchKeywords(): string[] {
   return searchKeywords([
     {
@@ -145,6 +252,14 @@ export function getClaudeStatusLineSearchKeywords(): string[] {
     {
       key: 'auto.components.settings.claude-statusline-items-copy.search.reset',
       fallback: 'reset'
+    },
+    {
+      key: 'auto.components.settings.claude-statusline-items-copy.search.preview',
+      fallback: 'preview'
+    },
+    {
+      key: 'auto.components.settings.claude-statusline-items-copy.search.order',
+      fallback: 'order'
     },
     {
       key: 'auto.components.settings.claude-statusline-items-copy.search.claude',

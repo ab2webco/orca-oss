@@ -3,9 +3,7 @@
  * `getManagedStatusLineScript`. Builtin-only by contract: these run ~3x/sec.
  */
 
-// Why 24: worktree directory names are the project identity here and routinely run long, so the
-// bound keeps a meaningful prefix while capping the one new field that could blow the line.
-export const STATUSLINE_PROJECT_MAX_COLUMNS = 24
+import { STATUSLINE_PROJECT_MAX_COLUMNS } from '../../shared/claude-statusline-line-model'
 
 // Why a canonical-decimal allow-list rather than a digits test: a leading-zero value is invalid
 // octal inside `$(( ))` and is FATAL in dash, so the trend arithmetic would kill the script

@@ -3,12 +3,15 @@
  * `getWindowsManagedStatusLineScript`. Builtin-only by contract: these run ~3x/sec.
  */
 
-// Why 96: the POSIX branch's budget, kept identical so a pane renders the same width on either OS.
-// Why a raw substring test still measures it correctly here: this variant is ASCII by contract,
-// so one byte is one column — the POSIX branch has to count columns because its bars are not.
-export const STATUSLINE_WINDOWS_MAX_WIDTH = 96
-// Why 24: the same bound the POSIX branch puts on the one new field that could blow the line.
-const STATUSLINE_PROJECT_MAX_COLUMNS = 24
+import {
+  STATUSLINE_MAX_WIDTH,
+  STATUSLINE_PROJECT_MAX_COLUMNS
+} from '../../shared/claude-statusline-line-model'
+
+// Why the shared budget still measures correctly with a raw substring test: this variant is
+// ASCII by contract, so one byte is one column — the POSIX branch has to count columns
+// because its bars are not.
+export const STATUSLINE_WINDOWS_MAX_WIDTH = STATUSLINE_MAX_WIDTH
 
 export const STATUSLINE_WINDOWS_EMIT_LABEL = 'orca_statusline_emit'
 
@@ -46,10 +49,13 @@ export function quotaWindowLines(
 }
 
 /**
- * One optional trailing field, admitted only if the whole line still fits the budget.
+ * One optional budgeted field, admitted only if the whole line still fits the budget.
  *
- * Why goto-emit instead of skipping to the next field: admitting a shorter field behind one that
- * did not fit inverts the priority order the ladder exists to express.
+ * Why a sticky full flag instead of goto-emit: admitting a shorter field behind one that did
+ * not fit inverts the priority order the ladder exists to express — but with a configurable
+ * item order an identity field can sit after a budgeted one and must still print, so overflow
+ * skips to the next composition block rather than straight to emit (POSIX `orca_statusline_try`
+ * parity).
  */
 export function budgetedFieldLines(
   valueVar: string,
@@ -57,10 +63,12 @@ export function budgetedFieldLines(
   nextLabel: string
 ): string[] {
   return [
+    `if defined ORCA_STATUSLINE_FULL goto :${nextLabel}`,
     `if not defined ${valueVar} goto :${nextLabel}`,
     `set "ORCA_STATUSLINE_NEXT=${rendered}"`,
     `if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_LINE! | ${rendered}"`,
-    `if not "!ORCA_STATUSLINE_NEXT:~${STATUSLINE_WINDOWS_MAX_WIDTH}!"=="" goto :${STATUSLINE_WINDOWS_EMIT_LABEL}`,
+    `if not "!ORCA_STATUSLINE_NEXT:~${STATUSLINE_WINDOWS_MAX_WIDTH}!"=="" set "ORCA_STATUSLINE_FULL=1"`,
+    `if defined ORCA_STATUSLINE_FULL goto :${nextLabel}`,
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_NEXT!"'
   ]
 }

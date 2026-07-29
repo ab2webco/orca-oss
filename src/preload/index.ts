@@ -14,7 +14,11 @@ import type {
   TerminalPreviewDataPayload
 } from '../shared/terminal-preview'
 import type { CliInstallStatus } from '../shared/cli-install-types'
-import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
+import type {
+  AgentHookInstallStatus,
+  ClaudeStatusLineOwnership,
+  ClaudeStatusLineReplaceResult
+} from '../shared/agent-hook-types'
 import type { CodexConfigSyncStatus } from '../shared/codex-config-sync-types'
 import type { TerminalPaneSplitSource } from '../shared/feature-education-telemetry'
 import type { ProjectExecutionRuntimeResolution } from '../shared/project-execution-runtime'
@@ -2293,6 +2297,10 @@ const api = {
   agentHooks: {
     claudeStatus: (): Promise<AgentHookInstallStatus> =>
       ipcRenderer.invoke('agentHooks:claudeStatus'),
+    claudeStatusLineOwnership: (): Promise<ClaudeStatusLineOwnership> =>
+      ipcRenderer.invoke('agentHooks:claudeStatusLineOwnership'),
+    claudeStatusLineReplaceUserOwned: (): Promise<ClaudeStatusLineReplaceResult> =>
+      ipcRenderer.invoke('agentHooks:claudeStatusLineReplaceUserOwned'),
     openClaudeStatus: (): Promise<AgentHookInstallStatus> =>
       ipcRenderer.invoke('agentHooks:openClaudeStatus'),
     codexStatus: (): Promise<AgentHookInstallStatus> =>

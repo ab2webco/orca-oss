@@ -34,6 +34,29 @@ export const DEFAULT_CLAUDE_STATUSLINE_ITEMS: ClaudeStatusLineItems = {
   resetCountdown: true
 }
 
+// Why the declared key order is also the default display order: the scripts have always
+// rendered fields in this sequence, so an order-less profile keeps its exact legacy line.
+export function normalizeClaudeStatusLineItemOrder(value: unknown): ClaudeStatusLineItemKey[] {
+  const persisted = Array.isArray(value) ? value : []
+  const order: ClaudeStatusLineItemKey[] = []
+  for (const entry of persisted) {
+    if (
+      (CLAUDE_STATUSLINE_ITEM_KEYS as readonly unknown[]).includes(entry) &&
+      !order.includes(entry as ClaudeStatusLineItemKey)
+    ) {
+      order.push(entry as ClaudeStatusLineItemKey)
+    }
+  }
+  // Why append instead of reset: a profile persisted before a key existed keeps its custom
+  // order, and the new key lands where the default order would have put it — never hidden.
+  for (const key of CLAUDE_STATUSLINE_ITEM_KEYS) {
+    if (!order.includes(key)) {
+      order.push(key)
+    }
+  }
+  return order
+}
+
 // Why tolerate partial/unknown input: older profiles persisted nothing, and a foreign or
 // truncated value must degrade to defaults instead of hiding an item nobody chose to hide.
 export function normalizeClaudeStatusLineItems(value: unknown): ClaudeStatusLineItems {
