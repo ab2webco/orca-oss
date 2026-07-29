@@ -31,6 +31,15 @@ describe('isSnapshotBackedTerminalPty', () => {
     expect(isSnapshotBackedTerminalPty('1', 'wt-1')).toBe(false)
   })
 
+  // Why (ORCA-114): degraded-fallback ids name their worktree so account
+  // blockers can, but the PTY still runs on the local provider with no daemon
+  // snapshot — parking one would respawn a fresh shell on reveal.
+  it('rejects degraded-fallback ids despite them naming the worktree', () => {
+    expect(isSnapshotBackedTerminalPty('repo::/worktree@@local-1a2b3c4d', 'repo::/worktree')).toBe(
+      false
+    )
+  })
+
   it('rejects tabs that do not have a PTY yet', () => {
     expect(isSnapshotBackedTerminalPty(null, 'repo::/worktree')).toBe(false)
   })

@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { PTY_SESSION_ID_SEPARATOR } from '../../shared/pty-session-id-format'
+import {
+  LOCAL_FALLBACK_SESSION_ID_MARKER,
+  PTY_SESSION_ID_SEPARATOR
+} from '../../shared/pty-session-id-format'
 
 // Why: re-exported here so main-side callers can keep importing
 // `parsePtySessionId` from this module (next to `mintPtySessionId`). The
@@ -18,10 +21,15 @@ export { parsePtySessionId } from '../../shared/pty-session-id-format'
  * drifted format would break cold-restore mapping and legacy Pi overlay
  * cleanup keying.
  */
-export function mintPtySessionId(worktreeId?: string): string {
-  return worktreeId
-    ? `${worktreeId}${PTY_SESSION_ID_SEPARATOR}${randomUUID().slice(0, 8)}`
-    : randomUUID()
+export function mintPtySessionId(
+  worktreeId?: string,
+  // Why: a degraded-fallback PTY is worktree-attributable but has no daemon
+  // session model, so its id carries a marker (ORCA-114). Minting stays here so
+  // both shapes keep one definition.
+  opts: { localFallback?: boolean } = {}
+): string {
+  const suffix = `${opts.localFallback ? LOCAL_FALLBACK_SESSION_ID_MARKER : ''}${randomUUID().slice(0, 8)}`
+  return worktreeId ? `${worktreeId}${PTY_SESSION_ID_SEPARATOR}${suffix}` : randomUUID()
 }
 
 export function ptySessionIdForAgentCreateOperation(

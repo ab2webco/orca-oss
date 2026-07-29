@@ -83,6 +83,7 @@ import {
   mintPtySessionId,
   ptySessionIdForAgentCreateOperation
 } from '../daemon/pty-session-id'
+import { mintLocalFallbackPtySessionId } from './local-fallback-pty-session-id'
 import { resolveWslSessionContext } from '../daemon/wsl-session-context'
 import { addNodePtyRecoveryHint } from '../daemon/node-pty-error-hints'
 import { recordDaemonStreamBacklogEvent } from '../daemon/daemon-stream-backlog-probe'
@@ -3822,13 +3823,27 @@ export function registerPtyHandlers(
         (isDaemonHostSpawn && args.agentSessionCreateOperationId
           ? ptySessionIdForAgentCreateOperation(args.worktreeId, args.agentSessionCreateOperationId)
           : undefined)
+      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
+      // provider, whose numeric counter ids carry no worktree — mint the same
+      // shape here so attribution survives the fallback. Host-env setup stays
+      // gated on isDaemonHostSpawn; only the id is decoupled from it.
+      const localFallbackSessionId =
+        requestedSessionId === undefined &&
+        !isDaemonHostSpawn &&
+        !args.connectionId &&
+        routesFreshSpawnsToLocalProvider(provider)
+          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
+          : undefined
       const sessionId =
-        requestedSessionId ?? (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : undefined)
+        requestedSessionId ??
+        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
       const effectiveSessionRelayId =
         sessionId !== undefined ? getRelayPtyId(args.connectionId, sessionId) : undefined
       const effectiveSessionAppId =
         sessionId !== undefined ? getAppPtyId(args.connectionId, sessionId) : undefined
-      const isMintedSessionId = callerRequestedSessionId === undefined && isDaemonHostSpawn
+      const isMintedSessionId =
+        callerRequestedSessionId === undefined &&
+        (isDaemonHostSpawn || localFallbackSessionId !== undefined)
       const expectedWslDistro = !args.connectionId
         ? (resolveWslSessionContext({
             cwd,
@@ -5032,10 +5047,23 @@ export function registerPtyHandlers(
         !routesFreshSpawnsToLocalProvider(provider)
       // Why: daemon host-env setup needs a stable id BEFORE provider.spawn so buildPtyHostEnv hooks/Pi cleanup can run; daemon still honors opts.sessionId ?? mint().
       // Note: sessionId is STABLE across daemon restarts by design — do NOT simplify to a fresh UUID per spawn; that orphans reconnectable state.
+      // Why (ORCA-114): the degraded daemon routes fresh spawns to the local
+      // provider, whose numeric counter ids carry no worktree — mint the same
+      // shape here so attribution survives the fallback. Host-env setup stays
+      // gated on isDaemonHostSpawn; only the id is decoupled from it.
+      const localFallbackSessionId =
+        args.sessionId === undefined &&
+        !isDaemonHostSpawn &&
+        !args.connectionId &&
+        routesFreshSpawnsToLocalProvider(provider)
+          ? mintLocalFallbackPtySessionId(args.worktreeId, app.getPath('userData'))
+          : undefined
       // Why: only clear ids minted in THIS request on failure — a caller-supplied args.sessionId may name an existing PTY we must not clobber.
-      const isMintedSessionId = args.sessionId === undefined && isDaemonHostSpawn
+      const isMintedSessionId =
+        args.sessionId === undefined && (isDaemonHostSpawn || localFallbackSessionId !== undefined)
       const effectiveSessionId =
-        args.sessionId ?? (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : undefined)
+        args.sessionId ??
+        (isDaemonHostSpawn ? mintPtySessionId(args.worktreeId) : localFallbackSessionId)
       const effectiveSessionAppId =
         effectiveSessionId !== undefined
           ? getAppPtyId(args.connectionId, effectiveSessionId)

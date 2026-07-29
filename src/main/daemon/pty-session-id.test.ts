@@ -5,6 +5,7 @@ import {
   parsePtySessionId,
   ptySessionIdForAgentCreateOperation
 } from './pty-session-id'
+import { isLocalFallbackPtySessionId } from '../../shared/pty-session-id-format'
 
 const USER_DATA = '/tmp/orca-userdata'
 
@@ -152,5 +153,39 @@ describe('parsePtySessionId', () => {
 
   it('rejects ids with an empty repoId half (`::path@@…`)', () => {
     expect(parsePtySessionId('::path@@deadbeef')).toEqual({ worktreeId: null })
+  })
+})
+
+describe('local-fallback session ids (ORCA-114)', () => {
+  const worktreeId = 'repo-abc::/Users/me/wt/feature'
+
+  it('stays worktree-attributable while flagged as local-fallback', () => {
+    const id = mintPtySessionId(worktreeId, { localFallback: true })
+
+    expect(parsePtySessionId(id)).toEqual({ worktreeId })
+    expect(isLocalFallbackPtySessionId(id)).toBe(true)
+  })
+
+  it('does not flag daemon-minted ids', () => {
+    expect(isLocalFallbackPtySessionId(mintPtySessionId(worktreeId))).toBe(false)
+    expect(isLocalFallbackPtySessionId(mintPtySessionId())).toBe(false)
+    // Why: the marker lives after the separator, so a worktree path that merely
+    // contains it must not be mistaken for a fallback id.
+    expect(isLocalFallbackPtySessionId('repo::/Users/me/local-wt@@deadbeef')).toBe(false)
+  })
+
+  it('does not flag an agent-create id whose digest slice starts with the marker', () => {
+    // Why: agentSessionCreateOperationId is base64url, whose alphabet contains
+    // every character of `local-`; the eight-character suffix budget is what
+    // makes the collision impossible, so pin it.
+    expect(
+      isLocalFallbackPtySessionId(ptySessionIdForAgentCreateOperation(worktreeId, 'local-ab'))
+    ).toBe(false)
+  })
+
+  it('keeps a fallback id a safe filesystem key', () => {
+    expect(
+      isSafePtySessionId(mintPtySessionId(worktreeId, { localFallback: true }), USER_DATA)
+    ).toBe(true)
   })
 })
