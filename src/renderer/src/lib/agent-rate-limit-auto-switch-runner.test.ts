@@ -140,7 +140,7 @@ function usableLimits(usedPercent: number): ProviderRateLimits {
 
 function rateLimitState(overrides: Partial<RateLimitState> = {}): RateLimitState {
   return {
-    claude: null,
+    claude: usableLimits(100),
     codex: null,
     gemini: null,
     opencodeGo: null,
@@ -180,9 +180,15 @@ const api = {
   },
   codexAccounts: {
     list: vi.fn(async () => emptyCodexState),
-    select: vi.fn(async () => ({}))
+    select: vi.fn(async () => ({})),
+    getLivePtyAccount: vi.fn(async () => ({
+      known: true,
+      accountId: 'active-1',
+      customEndpoint: false
+    }))
   },
   rateLimits: {
+    refresh: vi.fn(async () => rateLimitState()),
     fetchInactiveClaudeAccounts: vi.fn(async () => {}),
     fetchInactiveCodexAccounts: vi.fn(async () => {}),
     get: vi.fn(async () => rateLimitState())
@@ -194,13 +200,16 @@ const api = {
   }
 }
 
-function runClaudeAutoSwitch(): ReturnType<typeof runAgentRateLimitAutoSwitch> {
+function runClaudeAutoSwitch(
+  onRelaunchStarting?: () => void
+): ReturnType<typeof runAgentRateLimitAutoSwitch> {
   return runAgentRateLimitAutoSwitch({
     ptyId: 'pty-1',
     worktreeId: 'wt-1',
     agent: 'claude',
     providerSession: PROVIDER_SESSION,
-    connectionId: null
+    connectionId: null,
+    onRelaunchStarting
   })
 }
 
@@ -222,7 +231,10 @@ beforeEach(() => {
   store.createTab.mockReturnValue({ id: 'tab-new' })
   // Why: clearAllMocks keeps per-test rejected implementations; restore the happy default explicitly.
   store.updateWorktreeMeta.mockImplementation(async () => {})
-  api.claudeAccounts.getLivePtyAccount.mockResolvedValue(null)
+  api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+    accountId: 'active-1',
+    injected: false
+  })
   api.claudeAccounts.copySessionForFailover.mockResolvedValue({
     ok: true,
     sessionId: PROVIDER_SESSION.id,
@@ -328,7 +340,84 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
 })
 
 describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
+  it('does not switch when the exact PTY owner still has 96% quota available', async () => {
+    const onRelaunchStarting = vi.fn()
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: false
+    })
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
+    )
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        claude: usableLimits(4),
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+
+    const result = await runClaudeAutoSwitch(onRelaunchStarting)
+
+    expect(result).toMatchObject({ ok: false, reason: 'source-has-quota' })
+    expect(stopForegroundAgent).not.toHaveBeenCalled()
+    expect(api.claudeAccounts.select).not.toHaveBeenCalled()
+    expect(onRelaunchStarting).not.toHaveBeenCalled()
+  })
+
+  it('switches when the exact PTY owner quota is exhausted', async () => {
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: false
+    })
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
+    )
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        claude: usableLimits(100),
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+
+    const result = await runClaudeAutoSwitch()
+
+    expect(result).toEqual({ ok: true, agent: 'claude', accountLabel: 'spare-1@example.com' })
+    expect(stopForegroundAgent).toHaveBeenCalledOnce()
+    expect(api.rateLimits.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('fails closed when the exact PTY owner quota is stale', async () => {
+    const onRelaunchStarting = vi.fn()
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: false
+    })
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
+    )
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        claude: { ...usableLimits(100), status: 'error', error: 'stale snapshot' },
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+
+    const result = await runClaudeAutoSwitch(onRelaunchStarting)
+
+    expect(result).toMatchObject({ ok: false, reason: 'source-quota-unknown' })
+    expect(stopForegroundAgent).not.toHaveBeenCalled()
+    expect(api.claudeAccounts.select).not.toHaveBeenCalled()
+    expect(onRelaunchStarting).not.toHaveBeenCalled()
+  })
+
   it('switches to an Anthropic account with quota and resumes in the same PTY', async () => {
+    const onRelaunchStarting = vi.fn()
     api.claudeAccounts.list.mockResolvedValue(
       claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
     )
@@ -340,7 +429,7 @@ describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
       })
     )
 
-    const result = await runClaudeAutoSwitch()
+    const result = await runClaudeAutoSwitch(onRelaunchStarting)
 
     expect(result).toEqual({ ok: true, agent: 'claude', accountLabel: 'spare-1@example.com' })
     expect(api.claudeAccounts.select).toHaveBeenCalledWith(
@@ -355,6 +444,7 @@ describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
     // Why: a non-injected (global-selection) session keeps the same-PTY resume,
     // never the pinned copy + relaunch.
     expect(api.claudeAccounts.copySessionForAccountSwitch).not.toHaveBeenCalled()
+    expect(onRelaunchStarting).toHaveBeenCalledOnce()
   })
 
   it('keeps the plain no-account outcome when no failover account is configured', async () => {

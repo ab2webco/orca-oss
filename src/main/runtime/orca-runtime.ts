@@ -198,8 +198,15 @@ import type {
   MRListState,
   PRRefreshOutcome,
   ClaudeRateLimitAccountsState,
-  CodexRateLimitAccountsState
+  CodexRateLimitAccountsState,
+  ManagedPtyAccountOwner
 } from '../../shared/types'
+import {
+  getLiveInjectedClaudePtyAccountId,
+  getLiveSharedClaudePtyAccountId,
+  isLiveSharedClaudePty
+} from '../claude-accounts/live-pty-gate'
+import { getCodexPtyAccountOwner } from '../codex/codex-pane-account-registry'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -10745,6 +10752,29 @@ export class OrcaRuntimeService {
       claude: claudeAccounts.listAccounts(),
       codex: codexAccounts.listAccounts(),
       rateLimits: rateLimits.getState()
+    }
+  }
+
+  getManagedPtyAccountOwner(ptyId: string, agent: 'claude' | 'codex'): ManagedPtyAccountOwner {
+    if (agent === 'codex') {
+      return getCodexPtyAccountOwner(ptyId)
+    }
+
+    const injectedAccountId = getLiveInjectedClaudePtyAccountId(ptyId)
+    const shared = isLiveSharedClaudePty(ptyId)
+    if (!injectedAccountId && !shared) {
+      return { known: false, accountId: null, customEndpoint: false }
+    }
+    const accountId = injectedAccountId ?? getLiveSharedClaudePtyAccountId(ptyId)
+    const account = accountId
+      ? this.requireAccountServices()
+          .claudeAccounts.listAccounts()
+          .accounts.find((candidate) => candidate.id === accountId)
+      : null
+    return {
+      known: true,
+      accountId,
+      customEndpoint: account?.authMethod === 'custom-endpoint'
     }
   }
 

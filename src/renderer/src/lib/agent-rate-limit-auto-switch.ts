@@ -24,6 +24,8 @@ export type AutoSwitchAccountCandidate = {
   usedPercent: number
 }
 
+export type SourceQuotaAssessment = 'exhausted' | 'available' | 'unknown'
+
 type ProviderAccount =
   | ClaudeRateLimitAccountsState['accounts'][number]
   | CodexRateLimitAccountsState['accounts'][number]
@@ -144,6 +146,7 @@ export function selectAutoSwitchAccount(args: {
   agent: AutoSwitchRateLimitAgent
   accounts: AutoSwitchAccountsSnapshot
   target: RateLimitRuntimeTarget
+  sourceAccountId?: string | null
 }): AutoSwitchAccountCandidate | null {
   const providerAccounts = args.agent === 'claude' ? args.accounts.claude : args.accounts.codex
   const inactiveUsage =
@@ -152,9 +155,21 @@ export function selectAutoSwitchAccount(args: {
       : args.accounts.rateLimits.inactiveCodexAccounts
   const activeAccountId = getActiveAccountId(providerAccounts, args.target)
   const usageByAccountId = getInactiveUsageByAccountId(inactiveUsage)
+  if (args.sourceAccountId !== undefined && activeAccountId) {
+    const activeScore = getUsageScore(
+      args.agent === 'claude' ? args.accounts.rateLimits.claude : args.accounts.rateLimits.codex
+    )
+    if (activeScore) {
+      usageByAccountId.set(activeAccountId, activeScore)
+    }
+  }
 
   const candidates = providerAccounts.accounts
-    .filter((account) => account.id !== activeAccountId)
+    .filter((account) =>
+      args.sourceAccountId === undefined
+        ? account.id !== activeAccountId
+        : account.id !== args.sourceAccountId
+    )
     // Why: custom-endpoint accounts carry no Anthropic quota and must never become
     // a global switch target; they are reachable only via last-resort failover pins.
     .filter((account) => !('authMethod' in account) || account.authMethod !== 'custom-endpoint')
@@ -177,14 +192,59 @@ export function selectAutoSwitchAccount(args: {
     .filter(
       (entry): entry is { candidate: AutoSwitchAccountCandidate; fresh: boolean } => entry !== null
     )
-    // Why fresh first: an account whose quota was just verified is a safer landing
-    // spot than one scored from a retained snapshot, even if the latter reads lower.
     .sort(
       (left, right) =>
-        Number(right.fresh) - Number(left.fresh) ||
-        left.candidate.usedPercent - right.candidate.usedPercent
+        left.candidate.usedPercent - right.candidate.usedPercent ||
+        Number(right.fresh) - Number(left.fresh)
     )
     .map((entry) => entry.candidate)
 
   return candidates[0] ?? null
+}
+
+function assessKnownQuota(limits: ProviderRateLimits | null | undefined): SourceQuotaAssessment {
+  if (!limits || limits.status !== 'ok') {
+    return 'unknown'
+  }
+  const windows = [
+    limits.session,
+    limits.weekly,
+    limits.monthly ?? null,
+    ...(limits.buckets ?? [])
+  ].filter((window): window is RateLimitWindow => window !== null)
+  if (windows.length === 0) {
+    return 'unknown'
+  }
+  return Math.max(...windows.map((window) => window.usedPercent)) >= 100 ? 'exhausted' : 'available'
+}
+
+/** Validates the quota attached to the exact account that owns the PTY. */
+export function assessSourceAccountQuota(args: {
+  agent: AutoSwitchRateLimitAgent
+  accounts: AutoSwitchAccountsSnapshot
+  target: RateLimitRuntimeTarget
+  sourceAccountId: string | null
+  verifiedAfter?: number
+}): SourceQuotaAssessment {
+  const providerAccounts = args.agent === 'claude' ? args.accounts.claude : args.accounts.codex
+  const activeAccountId = getActiveAccountId(providerAccounts, args.target)
+  if (activeAccountId === args.sourceAccountId) {
+    return assessKnownQuota(
+      args.agent === 'claude' ? args.accounts.rateLimits.claude : args.accounts.rateLimits.codex
+    )
+  }
+  const inactive =
+    args.agent === 'claude'
+      ? args.accounts.rateLimits.inactiveClaudeAccounts
+      : args.accounts.rateLimits.inactiveCodexAccounts
+  const sourceUsage = inactive.find((usage) => usage.accountId === args.sourceAccountId)
+  if (
+    !sourceUsage ||
+    sourceUsage.isFetching ||
+    sourceUsage.updatedAt !== sourceUsage.rateLimits?.updatedAt ||
+    sourceUsage.updatedAt < (args.verifiedAfter ?? Number.NEGATIVE_INFINITY)
+  ) {
+    return 'unknown'
+  }
+  return assessKnownQuota(sourceUsage.rateLimits)
 }

@@ -648,7 +648,10 @@
         "65d1f14b75": "El agente reanudado no aceptó el comando continue.",
         "65e8e278a4": "No se pudieron inspeccionar las cuentas administradas: {{value0}}",
         "a939f58b30": "No se pudo resolver la plataforma de reanudación: {{value0}}",
-        "customEndpointSession": "Esta sesión se ejecuta en una cuenta de endpoint personalizado; sus errores no son límites de cuenta de Anthropic."
+        "customEndpointSession": "Esta sesión se ejecuta en una cuenta de endpoint personalizado; sus errores no son límites de cuenta de Anthropic.",
+        "sourceOwnerUnknown": "No se pudo verificar a qué cuenta administrada pertenece este terminal, así que Orca no hizo ningún cambio.",
+        "sourceHasQuota": "La cuenta a la que pertenece este terminal todavía tiene cuota disponible, así que Orca ignoró el texto del terminal.",
+        "sourceQuotaUnknown": "La cuota de la cuenta a la que pertenece este terminal no está disponible o está desactualizada, así que Orca no hizo ningún cambio."
       },
       "agentRateLimitFailover": {
         "resumePlanFailed": "No se pudo construir un comando de reanudación para la sesión de failover.",

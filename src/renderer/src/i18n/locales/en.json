@@ -671,7 +671,10 @@
         "65d1f14b75": "The resumed agent did not accept the continue command.",
         "65e8e278a4": "Could not inspect managed accounts: {{value0}}",
         "a939f58b30": "Could not resolve the resume platform: {{value0}}",
-        "customEndpointSession": "This session runs on a custom endpoint account; its errors are not Anthropic account limits."
+        "customEndpointSession": "This session runs on a custom endpoint account; its errors are not Anthropic account limits.",
+        "sourceOwnerUnknown": "Could not verify which managed account owns this terminal, so Orca left it unchanged.",
+        "sourceHasQuota": "The account that owns this terminal still has quota, so Orca ignored the terminal text.",
+        "sourceQuotaUnknown": "The owning account quota is unavailable or stale, so Orca left the terminal unchanged."
       },
       "agentRateLimitFailover": {
         "resumePlanFailed": "Could not build a resume command for the failover session.",

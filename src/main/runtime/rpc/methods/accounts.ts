@@ -38,6 +38,13 @@ const RemoveAccountParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })
 
+const GetPtyOwnerParams = z
+  .object({
+    ptyId: z.string().min(1, 'Missing ptyId'),
+    agent: z.enum(['claude', 'codex'])
+  })
+  .strict()
+
 const CodexResetExpectedScope = z
   .object({
     target: CodexResetTarget,
@@ -87,6 +94,12 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     name: 'accounts.snapshot',
     params: null,
     handler: async (_params, { runtime }) => runtime.getAccountsSnapshot()
+  }),
+  defineMethod({
+    name: 'accounts.getPtyOwner',
+    params: GetPtyOwnerParams,
+    handler: async (params, { runtime }) =>
+      runtime.getManagedPtyAccountOwner(params.ptyId, params.agent)
   }),
   defineMethod({
     name: 'accounts.selectClaude',

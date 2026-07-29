@@ -7,6 +7,7 @@ import {
   _internals,
   forgetCodexPaneAccount,
   getCodexPaneAccount,
+  getCodexPtyAccountOwner,
   recordCodexPaneAccount
 } from './codex-pane-account-registry'
 import { forgetStaleCodexPanes, listStaleCodexPanes } from './codex-stale-pane-accounts'
@@ -42,6 +43,21 @@ afterEach(() => {
 })
 
 describe('codex pane account registry', () => {
+  it('distinguishes a recorded system-default owner from an unknown PTY', () => {
+    recordCodexPaneAccount('pty-default', { selectionKey: 'host', accountId: null })
+
+    expect(getCodexPtyAccountOwner('pty-default')).toEqual({
+      known: true,
+      accountId: null,
+      customEndpoint: false
+    })
+    expect(getCodexPtyAccountOwner('pty-missing')).toEqual({
+      known: false,
+      accountId: null,
+      customEndpoint: false
+    })
+  })
+
   it('survives a process restart so a daemon-backed shell stays attributable', () => {
     recordCodexPaneAccount('pty-1', { selectionKey: 'host', accountId: 'account-a' })
 

@@ -123,6 +123,7 @@ import type {
   CustomPet,
   DetectedWorktreeListResult,
   DirEntry,
+  ManagedPtyAccountOwner,
   ForceDeleteWorktreeBranchResult,
   FsChangedPayload,
   GhosttyImportPreview,
@@ -2493,6 +2494,7 @@ export type PreloadApi = {
     listRecordedPaneLanes: (args: { ptyIds: string[] }) => Promise<Record<string, string>>
     /** Drops launch records so a dismissed prompt stays dismissed across restarts. */
     forgetStalePanes: (args: { ptyIds: string[] }) => Promise<void>
+    getLivePtyAccount: (args: { ptyId: string }) => Promise<ManagedPtyAccountOwner>
   }
   claudeAccounts: {
     list: () => Promise<ClaudeRateLimitAccountsState>
