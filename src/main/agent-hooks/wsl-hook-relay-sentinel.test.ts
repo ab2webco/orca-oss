@@ -18,12 +18,12 @@ function fakeChild(): FakeChild {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter
     stderr: EventEmitter
-    stdin: { write: ReturnType<typeof vi.fn> }
+    stdin: EventEmitter & { write: ReturnType<typeof vi.fn> }
     kill: ReturnType<typeof vi.fn>
   }
   child.stdout = new EventEmitter()
   child.stderr = new EventEmitter()
-  child.stdin = { write: vi.fn(() => true) }
+  child.stdin = Object.assign(new EventEmitter(), { write: vi.fn(() => true) })
   child.kill = vi.fn()
   return child as unknown as FakeChild
 }
@@ -62,6 +62,19 @@ describe('waitForWslRelaySentinel', () => {
     const transport = await promise
     expect(typeof transport.write).toBe('function')
     expect(typeof transport.onData).toBe('function')
+  })
+
+  it('swallows an async stdin EPIPE instead of letting it become uncaught', async () => {
+    const child = fakeChild()
+    const promise = waitForWslRelaySentinel(child)
+    emitStdout(child, RELAY_SENTINEL)
+    const transport = await promise
+    transport.write(Buffer.from('frame'))
+    // EventEmitter rethrows 'error' when nothing listens, so an unhandled EPIPE
+    // surfaces here exactly as it does in the live relay run.
+    expect(() =>
+      child.stdin.emit('error', Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+    ).not.toThrow()
   })
 
   it('resolves past leading garbage and hands trailing bytes to onData', async () => {
