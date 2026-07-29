@@ -88,6 +88,11 @@ export function waitForWslRelaySentinel(
     child.on('error', (err) =>
       fail({ kind: 'exit', code: null, stderr: `${stderrOutput}\n${err.message}` })
     )
+    // Why: a write to a dead guest's stdin reports EPIPE as an async 'error'
+    // event, not a throw — unlistened it escapes as an uncaught exception.
+    child.stdin.on('error', () => {
+      // Channel already closing — mux close handling takes over.
+    })
     child.on('exit', (code) => {
       exitCode = code
     })
