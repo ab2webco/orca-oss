@@ -648,7 +648,10 @@
         "65d1f14b75": "恢复的代理未接受 continue 命令。",
         "65e8e278a4": "无法检查托管账户：{{value0}}",
         "a939f58b30": "无法解析恢复平台：{{value0}}",
-        "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。"
+        "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。",
+        "sourceOwnerUnknown": "无法确认此终端属于哪个托管账户，因此 Orca 未作更改。",
+        "sourceHasQuota": "此终端所属的账户仍有可用配额，因此 Orca 忽略了终端文本。",
+        "sourceQuotaUnknown": "此终端所属账户的配额不可用或信息已过期，因此 Orca 未作更改。"
       },
       "agentRateLimitFailover": {
         "resumePlanFailed": "无法为故障转移会话构建恢复命令。",
