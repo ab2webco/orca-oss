@@ -35,6 +35,12 @@ import {
   resolveCreateParentSelector
 } from './worktree-create-parent-selector'
 import { getOptionalLinearIssueLinkFlag } from './worktree-linear-issue-link'
+import {
+  assertStartupAgentTaskFlagsCompatible,
+  attachAgentTerminalToTask,
+  getStartupAgentTerminalHandleForTask,
+  resolveTaskAttachRequest
+} from './agent-terminal-task-attach'
 
 type HookWarningResult = {
   warning?: string
@@ -194,6 +200,8 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     const explicitParentWorktree = explicitParent.parentWorktree
     const explicitParentWorkspace = explicitParent.parentWorkspace
     const startupAgent = getOptionalStartupAgent(flags)
+    assertStartupAgentTaskFlagsCompatible(flags, startupAgent)
+    const taskAttach = await resolveTaskAttachRequest(flags, cwd, client)
     const setupDecision = getOptionalSetupDecision(flags)
     const noParent = flags.get('no-parent') === true
     const envParentWorkspace =
@@ -245,6 +253,22 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
           }
         : {})
     })
+    if (taskAttach) {
+      const agentTerminalHandle = getStartupAgentTerminalHandleForTask(
+        result.result,
+        taskAttach.taskId
+      )
+      const dispatch = await attachAgentTerminalToTask(client, taskAttach, agentTerminalHandle)
+      printHookWarning(result.result, json)
+      printLineageSummary(result.result, json)
+      printResult(
+        { ...result, result: { ...result.result, dispatch } },
+        json,
+        (value) =>
+          `${formatWorktreeShow(value)}\nDispatched ${value.dispatch.task_id} -> ${value.dispatch.id} [${value.dispatch.status}]`
+      )
+      return
+    }
     printHookWarning(result.result, json)
     printLineageSummary(result.result, json)
     printResult(result, json, formatWorktreeShow)

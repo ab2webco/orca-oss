@@ -238,6 +238,13 @@ Recovery is conditional, never a fixed destructive sequence:
 
 Low-level `worktree create`, `terminal create`, and `dispatch --inject` remain valid recipes for custom argv or topology that `worker-start` does not express.
 
+When you place a supervised worker with `terminal create --agent` or `worktree create --agent` instead of `worker-start`, pass `--task <task_id>` so the worker still gets a lifecycle: Orca waits for the agent to become idle, dispatches the task onto that terminal, and injects the same `worker_done` preamble. A supervised agent terminal created without a Task/Dispatch has no completion signal — it finishes and idles silently, leaving the coordinator to poll `terminal read` and guess. Do not pass `--task` for full handoffs; it creates supervised lifecycle obligations.
+
+```bash
+orca orchestration task-create --spec "<worker task>" --json
+orca terminal create --worktree active --agent claude --task <task_id> --json
+```
+
 ## Gates And Legacy Inspection
 
 ```bash

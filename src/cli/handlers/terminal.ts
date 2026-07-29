@@ -35,6 +35,7 @@ import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import type { TuiAgent } from '../../shared/types'
 import { RuntimeClientError } from '../runtime-client'
 import { resolveAccountSelectorFlags } from '../account-selector'
+import { attachAgentTerminalToTask, resolveTaskAttachRequest } from './agent-terminal-task-attach'
 import {
   getBrowserWorktreeSelector,
   getOptionalWorktreeSelector,
@@ -163,6 +164,13 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     }
     const command = getOptionalStringFlag(flags, 'command')
     const agent = getRequestedTuiAgent(flags, command)
+    if (flags.has('task') && agent === undefined) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--task requires --agent; the dispatch preamble can only be injected into a recognized agent CLI. For custom argv, create the terminal and run `orca orchestration dispatch --task <task_id> --to <handle> --inject` once the agent is idle.'
+      )
+    }
+    const taskAttach = await resolveTaskAttachRequest(flags, cwd, client)
     const accountOverrides = await resolveAccountSelectorFlags(flags, client)
     const hasAccountOverride =
       accountOverrides.claudeAccountId !== undefined ||
@@ -189,6 +197,20 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
       ...(useRendererBackedInteractiveTerminal ? { rendererBacked: true, activate: focus } : {}),
       ...accountOverrides
     })
+    if (taskAttach) {
+      const dispatch = await attachAgentTerminalToTask(
+        client,
+        taskAttach,
+        result.result.terminal.handle
+      )
+      printResult(
+        { ...result, result: { ...result.result, dispatch } },
+        json,
+        (value) =>
+          `${formatTerminalCreate(value)}\nDispatched ${value.dispatch.task_id} -> ${value.dispatch.id} [${value.dispatch.status}]`
+      )
+      return
+    }
     printResult(result, json, formatTerminalCreate)
   },
   // `focus` resolves to this canonical path via CommandSpec.aliases before dispatch.
