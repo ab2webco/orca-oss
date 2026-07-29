@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   attachClaudeLivePtyPersistence,
+  attachLiveClaudeWorktreeDisplayNames,
   beginManagedClaudeAccountMutation,
   beginClaudeAuthSwitch,
   confirmSeededClaudeLivePtys,
@@ -309,6 +310,70 @@ describe('Claude live PTY gate', () => {
       expect(isClaudeAuthSwitchInProgress()).toBe(true)
     } finally {
       releaseSharedClaudeAccountLaunch(reservationId)
+    }
+  })
+
+  it('names the blocking assigned worktree when a global launch is gated', () => {
+    const worktreeId = 'repo-1::/work/feature-a'
+    const ptyId = `${worktreeId}@@pane-1`
+    attachLiveClaudeWorktreeDisplayNames((blockingWorktreeId) =>
+      blockingWorktreeId === worktreeId ? 'Feature A' : null
+    )
+    markInjectedClaudePtySpawned(ptyId, 'account-a')
+    try {
+      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
+        'in use by an assigned worktree ("Feature A")'
+      )
+      expect(() => reserveSharedClaudeAccountLaunch('account-a')).toThrow(
+        'launch this terminal with an assigned Claude account'
+      )
+    } finally {
+      markClaudePtyExited(ptyId)
+      attachLiveClaudeWorktreeDisplayNames(null)
+    }
+  })
+
+  it('falls back to the worktree path basename without a display-name source', () => {
+    const ptyId = 'repo-1::/work/feature-a@@pane-1'
+    markInjectedClaudePtySpawned(ptyId, 'account-a')
+    try {
+      expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
+        'in use by an assigned worktree ("feature-a")'
+      )
+    } finally {
+      markClaudePtyExited(ptyId)
+    }
+  })
+
+  it('keeps the exact legacy message when the blocking PTY is not attributable', () => {
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+
+    expect(() => reserveSharedClaudeAccountLaunch(null)).toThrow(
+      'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
+    )
+  })
+
+  it('names the worktree hosting the blocking global terminal for assigned launches', () => {
+    const ptyId = 'repo-1::/work/feature-a@@pane-1'
+    markClaudePtySpawned(ptyId, 'account-a')
+    try {
+      expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
+        'in use by a global terminal (in "feature-a")'
+      )
+    } finally {
+      markClaudePtyExited(ptyId)
+    }
+  })
+
+  it('names the blocking worktree when an account mutation is gated', () => {
+    const ptyId = 'repo-1::/work/feature-a@@pane-1'
+    markInjectedClaudePtySpawned(ptyId, 'account-a')
+    try {
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow(
+        'in use by an assigned worktree ("feature-a")'
+      )
+    } finally {
+      markClaudePtyExited(ptyId)
     }
   })
 
