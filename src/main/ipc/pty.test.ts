@@ -233,6 +233,9 @@ import {
   restorePtyIncarnation,
   type PrepareCodexSessionResume
 } from './pty'
+import { DegradedDaemonPtyProvider } from '../daemon/degraded-daemon-pty-provider'
+import type { DaemonPtyAdapter } from '../daemon/daemon-pty-adapter'
+import { isLocalFallbackPtySessionId, parsePtySessionId } from '../../shared/pty-session-id-format'
 import { resetMacosLoginShellPreflightForTests } from '../providers/macos-tcc-login-shell'
 import {
   _resetHiddenRendererPtyDeliveryGateForTest,
@@ -1028,6 +1031,123 @@ describe('registerPtyHandlers', () => {
     })
     expect(physicalSpawn).toHaveBeenCalledOnce()
     clearProviderPtyState('pty-local-claim')
+  })
+
+  describe('degraded daemon fallback session ids (ORCA-114)', () => {
+    // Why: the degraded provider only needs its daemon adapter for event fan-out
+    // here — fresh spawns must never reach it, which is what these tests pin.
+    function createUnusedDaemonAdapter(): {
+      adapter: DaemonPtyAdapter
+      spawn: ReturnType<typeof vi.fn>
+    } {
+      const spawn = vi.fn()
+      const noopSubscribe = (): (() => void) => () => {}
+      return {
+        adapter: {
+          spawn,
+          hasPty: () => false,
+          listProcesses: async () => [],
+          onData: noopSubscribe,
+          onExit: noopSubscribe,
+          onReplay: noopSubscribe,
+          onWriteUnavailable: noopSubscribe
+        } as unknown as DaemonPtyAdapter,
+        spawn
+      }
+    }
+
+    function installDegradedProvider(): ReturnType<typeof vi.fn> {
+      const { adapter, spawn } = createUnusedDaemonAdapter()
+      setLocalPtyProvider(
+        new DegradedDaemonPtyProvider({
+          current: adapter,
+          legacy: [],
+          fallback: new LocalPtyProvider()
+        }) as never
+      )
+      return spawn
+    }
+
+    it('mints a worktree-attributable id for a fresh degraded renderer spawn', async () => {
+      const daemonSpawn = installDegradedProvider()
+      registerPtyHandlers(mainWindow as never)
+      const worktreeId = '/tmp/worktree-repo::/tmp/worktree-degraded'
+
+      const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp/worktree-degraded',
+        worktreeId
+      })) as { id: string }
+
+      expect(parsePtySessionId(result.id)).toEqual({ worktreeId })
+      // Why: consumers that read `@@` as daemon-backed (hidden-view parking)
+      // must still be able to tell this PTY has no daemon session model.
+      expect(isLocalFallbackPtySessionId(result.id)).toBe(true)
+      // Why: attribution must not come at the cost of routing — the preserved
+      // daemon still cannot create fresh PTYs.
+      expect(daemonSpawn).not.toHaveBeenCalled()
+      expect(spawnMock).toHaveBeenCalled()
+      expect(registerPtyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ ptyId: result.id, worktreeId })
+      )
+      clearProviderPtyState(result.id)
+    })
+
+    it('mints a worktree-attributable id for a fresh degraded runtime-controller spawn', async () => {
+      const daemonSpawn = installDegradedProvider()
+      const runtime = new OrcaRuntimeService()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      const worktreeId = 'repo-controller::/tmp/worktree-controller'
+      const controller = (
+        runtime as unknown as {
+          ptyController: { spawn(args: Record<string, unknown>): Promise<{ id: string }> }
+        }
+      ).ptyController
+
+      const result = await controller.spawn({
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp/worktree-controller',
+        worktreeId
+      })
+
+      expect(parsePtySessionId(result.id)).toEqual({ worktreeId })
+      expect(daemonSpawn).not.toHaveBeenCalled()
+      clearProviderPtyState(result.id)
+    })
+
+    it.each([
+      ['windows worktree path', 'repo-win::C:\\Users\\me\\work\\wt-1'],
+      ['folder workspace instance', 'repo-folder::/tmp/checkout::workspace:11111111-2222']
+    ])('preserves attribution for a %s', async (_label, worktreeId) => {
+      installDegradedProvider()
+      registerPtyHandlers(mainWindow as never)
+
+      const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp/checkout',
+        worktreeId
+      })) as { id: string }
+
+      expect(parsePtySessionId(result.id)).toEqual({ worktreeId })
+      clearProviderPtyState(result.id)
+    })
+
+    it('leaves the provider to allocate its own id when there is no worktree to attribute', async () => {
+      installDegradedProvider()
+      registerPtyHandlers(mainWindow as never)
+
+      const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp/no-worktree'
+      })) as { id: string }
+
+      expect(result.id).toMatch(/^\d+$/)
+      clearProviderPtyState(result.id)
+    })
   })
 
   it('adopts a daemon owner recovered from provider listing before claimed ensure', async () => {

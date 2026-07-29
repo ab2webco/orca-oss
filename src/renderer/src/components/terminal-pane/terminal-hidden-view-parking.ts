@@ -1,5 +1,8 @@
 import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
-import { PTY_SESSION_ID_SEPARATOR } from '../../../../shared/pty-session-id-format'
+import {
+  PTY_SESSION_ID_SEPARATOR,
+  isLocalFallbackPtySessionId
+} from '../../../../shared/pty-session-id-format'
 import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 import type { TerminalTab } from '../../../../shared/types'
 
@@ -63,6 +66,11 @@ export function isSnapshotBackedTerminalPty(ptyId: string | null, worktreeId: st
   // Why: separator-less ids come from the daemon-fail-open LocalPtyProvider;
   // they have no daemon session model, so revealing a parked pane would
   // silently respawn a fresh shell instead of restoring the snapshot.
+  // Degraded-fallback ids (ORCA-114) carry the worktree so blockers can name it,
+  // but the PTY still lives on the local provider — same absent snapshot.
+  if (isLocalFallbackPtySessionId(ptyId)) {
+    return false
+  }
   const separatorIdx = ptyId.lastIndexOf(PTY_SESSION_ID_SEPARATOR)
   return separatorIdx !== -1 && ptyId.slice(0, separatorIdx) === worktreeId
 }

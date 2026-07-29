@@ -15,6 +15,39 @@ export const PTY_SESSION_ID_SEPARATOR = '@@'
 export const WORKTREE_ID_SEPARATOR = '::'
 
 /**
+ * Suffix marker for ids minted for a PTY the degraded daemon routes to the
+ * local provider (ORCA-114). It sits in the half AFTER the separator, so every
+ * consumer that recovers the worktreeId from the prefix is unaffected.
+ *
+ * Why a marker at all: those PTYs are worktree-attributable but have no daemon
+ * session model, so consumers that read `@@` as "daemon-backed" — hidden-view
+ * parking re-hydrates from the daemon buffer snapshot — must still tell them
+ * apart.
+ */
+export const LOCAL_FALLBACK_SESSION_ID_MARKER = 'local-'
+
+/**
+ * Why the whole suffix is matched, not just the marker: the other two minting
+ * sites emit an eight-character suffix (hex from `mintPtySessionId`, a
+ * base64url digest slice from `ptySessionIdForAgentCreateOperation`, whose
+ * alphabet does contain every character of `local-`). Requiring the marker plus
+ * eight hex digits — fourteen characters — makes a collision impossible by
+ * length rather than by luck, so no daemon-backed PTY can lose its parking.
+ */
+const LOCAL_FALLBACK_SESSION_ID_SUFFIX = new RegExp(
+  `^${LOCAL_FALLBACK_SESSION_ID_MARKER}[0-9a-f]{8}$`
+)
+
+/** Whether this id names a degraded-fallback PTY owned by the local provider. */
+export function isLocalFallbackPtySessionId(sessionId: string): boolean {
+  const idx = sessionId.lastIndexOf(PTY_SESSION_ID_SEPARATOR)
+  return (
+    idx > 0 &&
+    LOCAL_FALLBACK_SESSION_ID_SUFFIX.test(sessionId.slice(idx + PTY_SESSION_ID_SEPARATOR.length))
+  )
+}
+
+/**
  * Recover the owning worktreeId from a minted session id.
  *
  * Why stricter than `lastIndexOf('@@')`: callers that drive memory
