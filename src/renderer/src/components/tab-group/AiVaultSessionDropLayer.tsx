@@ -17,14 +17,16 @@ import {
   getAiVaultAgentProviderSession
 } from '@/lib/ai-vault-resume-command'
 import { launchAiVaultSessionInNewTab } from '@/lib/launch-ai-vault-session'
-import { aiVaultSessionNeedsResumePreparation } from '@/lib/ai-vault-session-resume-preparation'
+import {
+  aiVaultSessionNeedsResumePreparation,
+  claudeResumeLaunchAccountFromUniverse
+} from '@/lib/ai-vault-session-resume-preparation'
 import { useAppStore } from '@/store'
 import { resolveDropZone } from './tab-drop-zone'
 import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
 import type { AiVaultPrepareSessionResumeResult } from '../../../../shared/ai-vault-resume-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
-import { claudeResumeLaunchAccountFromUniverse } from '@/lib/ai-vault-session-resume-preparation'
 
 type PaneDropTarget = {
   groupId: string
