@@ -6,6 +6,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { release } from 'node:os'
 import { basename, resolve } from 'node:path'
 
+import { NATIVE_REBUILD_ATTEMPTS, runWithRetries } from './native-rebuild-retry.mjs'
+
 const require = createRequire(import.meta.url)
 const scriptPath = import.meta.filename
 const projectDir = resolve(import.meta.dirname, '../..')
@@ -64,7 +66,7 @@ function ensureNodeRuntime() {
     if (!initial.ok) {
       printCheckError(initial)
     }
-    runPnpm(['rebuild', 'node-pty'])
+    runPnpm(['rebuild', 'node-pty'], { attempts: NATIVE_REBUILD_ATTEMPTS })
     verifyNodeRuntimeAfterRebuild()
     return
   }
@@ -74,7 +76,7 @@ function ensureNodeRuntime() {
     `[native-runtime] ${formatRuntimeLabel('node')} cannot load native modules; rebuilding ${failedModules.join(', ')} for Node.`
   )
   printCheckError(initial)
-  runPnpm(['rebuild', ...failedModules])
+  runPnpm(['rebuild', ...failedModules], { attempts: NATIVE_REBUILD_ATTEMPTS })
   verifyNodeRuntimeAfterRebuild()
 }
 
@@ -107,7 +109,9 @@ function ensureElectronRuntime() {
     )
     printCheckError(initial)
   }
-  runNodeScript(['config/scripts/rebuild-native-deps.mjs'])
+  runNodeScript(['config/scripts/rebuild-native-deps.mjs'], {
+    attempts: NATIVE_REBUILD_ATTEMPTS
+  })
 
   const final = runElectronCheck()
   if (!final.ok) {
@@ -339,36 +343,41 @@ function getWindowsBuildNumber() {
   return match && match.length === 4 ? Number.parseInt(match[3], 10) : 0
 }
 
-function runPnpm(args) {
+function runPnpm(args, { attempts = 1 } = {}) {
   const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const result = spawnSync(command, args, {
-    cwd: projectDir,
-    stdio: 'inherit',
-    shell: process.platform === 'win32'
+  const outcome = runWithRetries({
+    describe: `${command} ${args.join(' ')}`,
+    attempts,
+    spawn: () =>
+      spawnSync(command, args, {
+        cwd: projectDir,
+        stdio: 'inherit',
+        shell: process.platform === 'win32'
+      })
   })
-
-  if (result.error || result.status !== 0) {
-    console.error(`[native-runtime] ${command} ${args.join(' ')} failed.`)
-    if (result.error) {
-      console.error(formatError(result.error))
-    }
-    process.exit(result.status ?? 1)
-  }
+  exitOnFailedRun(outcome, `${command} ${args.join(' ')}`)
 }
 
-function runNodeScript(args) {
-  const result = spawnSync(process.execPath, args, {
-    cwd: projectDir,
-    stdio: 'inherit'
+function runNodeScript(args, { attempts = 1 } = {}) {
+  const describe = `${basename(process.execPath)} ${args.join(' ')}`
+  const outcome = runWithRetries({
+    describe,
+    attempts,
+    spawn: () => spawnSync(process.execPath, args, { cwd: projectDir, stdio: 'inherit' })
   })
+  exitOnFailedRun(outcome, describe)
+}
 
-  if (result.error || result.status !== 0) {
-    console.error(`[native-runtime] ${basename(process.execPath)} ${args.join(' ')} failed.`)
-    if (result.error) {
-      console.error(formatError(result.error))
-    }
-    process.exit(result.status ?? 1)
+function exitOnFailedRun(outcome, describe) {
+  if (outcome.ok) {
+    return
   }
+  const suffix = outcome.attempts > 1 ? ` after ${outcome.attempts} attempts` : ''
+  console.error(`[native-runtime] ${describe} failed${suffix}.`)
+  if (outcome.result.error) {
+    console.error(formatError(outcome.result.error))
+  }
+  process.exit(outcome.result.status ?? 1)
 }
 
 function printCheckError(result) {
