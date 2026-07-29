@@ -20,8 +20,7 @@ export function attachLiveClaudeWorktreeDisplayNames(
 
 /**
  * Names the worktrees hosting live Claude PTYs. Ids not minted with a
- * worktree (bare UUIDs, degraded-daemon counters) are skipped, so callers
- * must expect an empty result and keep a generic message for it.
+ * worktree fall back to their PTY id so the user can still identify them.
  */
 export function describeLiveClaudePtyWorktrees(
   ptyIds: Iterable<string>,
@@ -31,6 +30,7 @@ export function describeLiveClaudePtyWorktrees(
   for (const ptyId of ptyIds) {
     const { worktreeId } = parsePtySessionId(ptyId)
     if (!worktreeId) {
+      names.add(`PTY ${ptyId}`)
       continue
     }
     const name =

@@ -25,13 +25,13 @@ describe('describeLiveClaudePtyWorktrees', () => {
     ])
   })
 
-  it('skips PTY ids that were not minted with a worktree', () => {
+  it('falls back to PTY ids that were not minted with a worktree', () => {
     expect(
       describeLiveClaudePtyWorktrees(
         ['0b7a4c1e-0000-4000-8000-000000000000', '3', `${WORKTREE_B}@@pane-9`],
         null
       )
-    ).toEqual(['feature-b'])
+    ).toEqual(['PTY 0b7a4c1e-0000-4000-8000-000000000000', 'PTY 3', 'feature-b'])
   })
 
   it('deduplicates worktrees hosting several live PTYs', () => {
