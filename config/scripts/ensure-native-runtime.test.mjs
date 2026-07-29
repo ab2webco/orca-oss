@@ -14,6 +14,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const sourceScriptPath = fileURLToPath(new URL('./ensure-native-runtime.mjs', import.meta.url))
+const sourceRetryPath = fileURLToPath(new URL('./native-rebuild-retry.mjs', import.meta.url))
+
+// Why both: the script imports the retry module as a sibling, so a staged copy
+// missing it fails to resolve before any assertion runs.
+function stageRuntimeScripts(projectDir) {
+  const scriptsDir = join(projectDir, 'config', 'scripts')
+  copyFileSync(sourceScriptPath, join(scriptsDir, 'ensure-native-runtime.mjs'))
+  copyFileSync(sourceRetryPath, join(scriptsDir, 'native-rebuild-retry.mjs'))
+}
 
 describe('ensure-native-runtime', () => {
   it('rechecks Node native modules in fresh child processes after rebuilding', () => {
@@ -24,7 +33,7 @@ describe('ensure-native-runtime', () => {
       const logPath = join(projectDir, 'native-runtime.log')
       const markerPath = join(projectDir, 'rebuilt.marker')
       const binDir = join(projectDir, 'bin')
-      copyFileSync(sourceScriptPath, scriptPath)
+      stageRuntimeScripts(projectDir)
       writeFakeNativeModules(projectDir)
       writeFakePnpm(binDir)
 
@@ -59,7 +68,7 @@ describe('ensure-native-runtime', () => {
         const logPath = join(projectDir, 'native-runtime.log')
         const markerPath = join(projectDir, 'rebuilt.marker')
         const binDir = join(projectDir, 'bin')
-        copyFileSync(sourceScriptPath, scriptPath)
+        stageRuntimeScripts(projectDir)
         writeLoadableNativeModules(projectDir)
         writeNodePtyPatchFile(projectDir)
         writeFakePnpm(binDir)
@@ -94,7 +103,7 @@ describe('ensure-native-runtime', () => {
         const logPath = join(projectDir, 'native-runtime.log')
         const markerPath = join(projectDir, 'rebuilt.marker')
         const binDir = join(projectDir, 'bin')
-        copyFileSync(sourceScriptPath, scriptPath)
+        stageRuntimeScripts(projectDir)
         writeLoadableNativeModules(projectDir)
         writeNodePtyPatchFile(projectDir)
         writePatchedNodePtyBuildArtifacts(projectDir)
@@ -128,7 +137,7 @@ describe('ensure-native-runtime', () => {
         const logPath = join(projectDir, 'native-runtime.log')
         const markerPath = join(projectDir, 'rebuilt.marker')
         const binDir = join(projectDir, 'bin')
-        copyFileSync(sourceScriptPath, scriptPath)
+        stageRuntimeScripts(projectDir)
         writeLoadableNativeModules(projectDir, { nativeDir: '../build/Release/' })
         writeNodePtyPatchFile(projectDir)
         writePatchedNodePtyBuildArtifacts(projectDir)
