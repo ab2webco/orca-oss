@@ -510,12 +510,15 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     mkdirSync(configDir, { recursive: true })
     writeFileSync(
       join(configDir, 'oauth-account.json'),
-      JSON.stringify({ emailAddress: 'fabian.altahona@koombea.com', displayName: 'Fabian' })
+      JSON.stringify({ emailAddress: 'sam.rivera@example.com', displayName: 'Sam' })
     )
     const stdout = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
     // Why the local part survives and the domain does not: several accounts share one domain,
     // so the local part is what disambiguates, and the whole line has to fit a narrow pane.
-    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · @fabian.altahona@\n')
+    // Why exactly one @: the leading sigil already marks the field as an account, so a second
+    // trailing @ from the domain elision read as a bug on every user's line.
+    expect(stdout).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42% · @sam.rivera\n')
+    expect(stdout).not.toContain('rivera@')
   })
 
   it('reads the vault once and serves the account from a cache keyed to the config dir', async () => {
@@ -529,7 +532,8 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     // must serve the first one, proving this runs at most once per account rather than per tick.
     writeFileSync(vault, JSON.stringify({ emailAddress: 'second@example.com' }))
     const cached = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
-    expect(cached).toContain('@first@')
+    expect(cached).toContain('@first')
+    expect(cached).not.toContain('first@')
     expect(cached).not.toContain('second')
   })
 
@@ -656,10 +660,10 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     // budget would drop quota that fits. Context is the field that never falls.
     expect(await lineFor('Opus 5', 'a')).toContain('7d ███▌░ 77%')
     expect(await lineFor('Claude Opus 5 (1M context) preview', 'b')).toBe(
-      'Claude Opus 5 (1M context) preview · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…@ · 5h ████░ 88%'
+      'Claude Opus 5 (1M context) preview · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa… · 5h ████░ 88%'
     )
     expect(await lineFor('Claude Opus 5 (1M context) preview build 2026', 'c')).toBe(
-      'Claude Opus 5 (1M context) preview build 2026 · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…@'
+      'Claude Opus 5 (1M context) preview build 2026 · ctx ████▌ 93% → · @aaaaaaaaaaaaaaaaaaaa…'
     )
   })
 

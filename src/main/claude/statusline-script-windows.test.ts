@@ -169,7 +169,10 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
       /if not "!ORCA_STATUSLINE_NEXT:~96!"=="" goto :orca_statusline_emit/g
     )
     expect(overflow?.length).toBe(4)
-    expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!...@"')
+    // Why no trailing @: the leading sigil in the rendered field already marks the account, and
+    // 18 + "..." keeps the same 21-column bound the POSIX branch's 20 + "…" produces.
+    expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."')
+    expect(script).not.toContain('...@')
   })
 
   it('slices every bar out of one table that matches the POSIX one cell for cell', () => {
@@ -372,7 +375,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     // Pretty-printed on purpose: that is how the vault ships on disk.
     writeFileSync(
       join(configDir, 'oauth-account.json'),
-      JSON.stringify({ accountUuid: 'u', emailAddress: email, displayName: 'Fabian' }, null, 2)
+      JSON.stringify({ accountUuid: 'u', emailAddress: email, displayName: 'Sam' }, null, 2)
     )
     return configDir
   }
@@ -385,7 +388,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
 
   it('prints both quota windows alongside the account', async () => {
     const { scriptPath, temp } = makeHarness()
-    const configDir = makeVault('fabian.altahona@koombea.com')
+    const configDir = makeVault('sam.rivera@example.com')
     const stdout = await runScript(
       scriptPath,
       temp,
@@ -394,9 +397,12 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
       }),
       configDir
     )
+    // Why exactly one @: the leading sigil already marks the account; the elision's trailing @
+    // stacked onto it read as a bug (@user@) on every user's line.
     expect(stdout).toBe(
-      'Orca by Ab2Web | Fable | ctx ##... 42% | @fabian.altahona@ | 5h #.... 29% | 7d ####. 81%\r\n'
+      'Orca by Ab2Web | Fable | ctx ##... 42% | @sam.rivera | 5h #.... 29% | 7d ####. 81%\r\n'
     )
+    expect(stdout).not.toContain('rivera@')
   })
 
   it('announces the identity once per pane and keeps printing after', async () => {
@@ -418,7 +424,8 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
       JSON.stringify({ emailAddress: 'second@example.com' }, null, 2)
     )
     const cached = await runScript(scriptPath, temp, displayPayload(), configDir)
-    expect(cached).toContain('@first@')
+    expect(cached).toContain('@first')
+    expect(cached).not.toContain('first@')
     expect(cached).not.toContain('second')
   })
 

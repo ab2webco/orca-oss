@@ -183,17 +183,17 @@ export function getWindowsManagedStatusLineScript(): string {
     'if defined ORCA_STATUSLINE_ACCOUNT (>"!ORCA_STATUSLINE_ACCT_CACHE!" echo !ORCA_STATUSLINE_ACCOUNT!)',
     ':orca_statusline_account_render',
     `if not defined ORCA_STATUSLINE_ACCOUNT goto :${STATUSLINE_INTRO_LABEL}`,
-    // Why drop the domain: the local part is what distinguishes several accounts on one domain,
-    // and the whole line has to survive a narrow pane.
+    // Why drop the domain with no trailing @: the rendered field's leading @ is already the
+    // account mark, so the elision's own @ stacked into a double sigil (@user@) on every line.
     'if "!ORCA_STATUSLINE_ACCOUNT:@=!"=="!ORCA_STATUSLINE_ACCOUNT!" goto :orca_statusline_account_bound',
-    'for /f "delims=@" %%e in ("!ORCA_STATUSLINE_ACCOUNT!") do set "ORCA_STATUSLINE_ACCOUNT=%%e@"',
+    'for /f "delims=@" %%e in ("!ORCA_STATUSLINE_ACCOUNT!") do set "ORCA_STATUSLINE_ACCOUNT=%%e"',
     ':orca_statusline_account_bound',
     // Why bound the local part: an unusually long address is the one field that can blow the
     // line, and the ladder would then drop quota to pay for it. ASCII "..." where POSIX renders
     // "…" — writeManagedScript emits UTF-8 and cmd reads the file in the OEM codepage, so the
-    // ellipsis would arrive garbled; 18+4 keeps the same 22-character bound as POSIX.
+    // ellipsis would arrive garbled; 18+3 keeps the same 21-character bound as POSIX's 20+1.
     `if "!ORCA_STATUSLINE_ACCOUNT:~21!"=="" goto :${STATUSLINE_INTRO_LABEL}`,
-    'set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!...@"',
+    'set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."',
     `:${STATUSLINE_INTRO_LABEL}`,
     // Why announce once per pane: the line is requested ~3x/sec, so a banner on every tick would
     // strobe. Separate marker from the POST stamp — that one governs the network, not the render.

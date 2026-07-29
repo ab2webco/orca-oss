@@ -159,10 +159,11 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     '    fi',
     '  fi',
     'fi',
-    // Why drop the domain: the local part is what distinguishes several accounts on one domain,
-    // and the whole line has to survive a narrow pane.
+    // Why drop the domain with no trailing @: the local part is what distinguishes several
+    // accounts on one domain, and the rendered field's leading @ is already the account mark \u2014
+    // keeping the elision's @ too printed a double sigil (@user@) on every line.
     'case "$orca_statusline_account" in',
-    '  *@*) orca_statusline_account="${orca_statusline_account%%@*}@" ;;',
+    '  *@*) orca_statusline_account=${orca_statusline_account%%@*} ;;',
     'esac',
     // Why bound the local part too: an unusually long address would otherwise be the one field
     // that can blow the whole line, and the ladder below would then drop quota to pay for it.
@@ -170,12 +171,11 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     // `${#}` counts bytes under dash \u2014 measuring the rendered string would over-charge the budget.
     'orca_statusline_account_w=${#orca_statusline_account}',
     'if [ "${#orca_statusline_account}" -gt 21 ]; then',
-    '  orca_statusline_account="${orca_statusline_account%?}"',
     '  while [ "${#orca_statusline_account}" -gt 20 ]; do',
     '    orca_statusline_account=${orca_statusline_account%?}',
     '  done',
-    '  orca_statusline_account="${orca_statusline_account}\u2026@"',
-    '  orca_statusline_account_w=22',
+    '  orca_statusline_account="${orca_statusline_account}\u2026"',
+    '  orca_statusline_account_w=21',
     'fi',
     // Why announce once per pane: the line is requested ~3x/sec, so a banner on every tick would
     // strobe. Separate stamp from the POST throttle — that one governs the network, not the render.
