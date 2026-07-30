@@ -158,19 +158,43 @@ async function openCombinedDiff(page: Page, worktreeId: string, repoPath: string
   )
 }
 
+// Why: teleporting straight to 7000px leaves the jumped-over sections
+// unrendered, so they never get a measured Monaco height. Their later
+// estimated→measured swap can then land after a tab-switch restore has already
+// pinned the anchor, shifting the viewport with nothing left to re-pin it —
+// which reads as a restore miss on slow runners. Descend one viewport at a
+// time and let each band's sections measure so everything above the final
+// position has settled geometry before any anchor is captured.
 async function scrollCombinedDiffDeep(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const container = document.querySelector<HTMLElement>('.combined-diff-scroll-container')
-    if (!container) {
-      throw new Error('combined diff scroll container not found')
+  let previousTop = -1
+  for (;;) {
+    const step = await page.evaluate(() => {
+      const container = document.querySelector<HTMLElement>('.combined-diff-scroll-container')
+      if (!container) {
+        throw new Error('combined diff scroll container not found')
+      }
+      const target = Math.min(
+        7_000,
+        Math.max(0, container.scrollHeight - container.clientHeight - 1)
+      )
+      const next = Math.min(target, container.scrollTop + container.clientHeight)
+      container.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaY: next - container.scrollTop
+        })
+      )
+      container.scrollTop = next
+      container.dispatchEvent(new Event('scroll', { bubbles: true }))
+      return { top: container.scrollTop, target }
+    })
+    await waitForMeasuredContentHeight(page, `descending at ${step.top}px`, 3)
+    if (step.top >= step.target || step.top === previousTop) {
+      return
     }
-    const target = Math.min(7_000, Math.max(0, container.scrollHeight - container.clientHeight - 1))
-    container.dispatchEvent(
-      new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: target })
-    )
-    container.scrollTop = target
-    container.dispatchEvent(new Event('scroll', { bubbles: true }))
-  })
+    previousTop = step.top
+  }
 }
 
 async function readViewportAnchor(page: Page): Promise<ViewportAnchor | null> {
@@ -212,6 +236,49 @@ async function readViewportAnchor(page: Page): Promise<ViewportAnchor | null> {
   })
 }
 
+const CONTENT_HEIGHT_QUIET_SAMPLES = 6
+const CONTENT_HEIGHT_SAMPLE_INTERVAL_MS = 200
+
+// Why: Monaco diff editors swap estimated section heights for measured ones in
+// async passes after (re)mount, so a moving scrollHeight means the layout is
+// still mid-measurement and any anchor read is a transient frame. Holding for
+// a quiet content height pins the anchor comparison to the measured layout
+// instead of a lucky sample window, without loosening the anchor tolerances.
+async function waitForMeasuredContentHeight(
+  page: Page,
+  context: string,
+  requiredQuietSamples = CONTENT_HEIGHT_QUIET_SAMPLES
+): Promise<number> {
+  const startedAt = Date.now()
+  let lastHeight = -1
+  let quietSamples = 0
+  const observedHeights: number[] = []
+
+  while (Date.now() - startedAt < 30_000) {
+    const height = await page.evaluate(() => {
+      const container = document.querySelector<HTMLElement>('.combined-diff-scroll-container')
+      return container ? container.scrollHeight : -1
+    })
+    if (height > 0 && height === lastHeight) {
+      quietSamples += 1
+      if (quietSamples >= requiredQuietSamples) {
+        return height
+      }
+    } else {
+      observedHeights.push(height)
+      quietSamples = 0
+      lastHeight = height
+    }
+    await page.waitForTimeout(CONTENT_HEIGHT_SAMPLE_INTERVAL_MS)
+  }
+
+  throw new Error(
+    `combined diff content height never settled (${context}); observed: ${observedHeights
+      .slice(-20)
+      .join(' -> ')}`
+  )
+}
+
 async function waitForStableViewportAnchor(page: Page): Promise<ViewportAnchor> {
   const startedAt = Date.now()
   let lastSignature = ''
@@ -242,15 +309,17 @@ async function waitForStableViewportAnchor(page: Page): Promise<ViewportAnchor> 
 }
 
 // Why: remounting the diff on tab switch restores scroll in several Monaco
-// layout passes, so the first settled anchor can be a mid-restore frame. Poll
-// until the anchor converges near the pre-switch offset before asserting; a
-// genuine restore miss still surfaces because the last anchor is returned on
-// timeout for the caller's assertion to fail on.
+// layout passes, so the first settled anchor can be a mid-restore frame. Hold
+// for a measured (height-quiet) layout first, then poll until the anchor
+// converges near the pre-switch offset before asserting; a genuine restore
+// miss still surfaces because the last anchor is returned on timeout for the
+// caller's assertion to fail on.
 async function waitForRestoredViewportAnchor(
   page: Page,
   target: ViewportAnchor,
   tolerancePx = 80
 ): Promise<ViewportAnchor> {
+  await waitForMeasuredContentHeight(page, 'after switching back to the diff tab')
   // Why: waitForStableViewportAnchor can take up to 15s; start the restoration
   // poll after it settles so a slow first settle does not skip the 10s window.
   let lastAnchor = await waitForStableViewportAnchor(page)
@@ -408,6 +477,9 @@ test.describe('Combined diff scroll restore', () => {
   test.use({ seedTestRepo: false })
 
   test('keeps the visible section anchored after switching tabs', async ({ orcaPage }) => {
+    // Why: the measured stepped descent adds bounded arrange time on loaded CI
+    // runners; the assertion tolerances are unchanged, only the budget grows.
+    test.slow()
     await waitForSessionReady(orcaPage)
     const fixture = createCombinedDiffScrollRepo()
 
@@ -428,6 +500,10 @@ test.describe('Combined diff scroll restore', () => {
         )}`
       ).toBeLessThan(120)
 
+      // Why: the pre-switch anchor is the comparison target; capturing it while
+      // Monaco is still swapping estimated heights for measured ones would pin
+      // the restore assertion to a frame the viewer itself never persisted.
+      await waitForMeasuredContentHeight(orcaPage, 'before switching tabs')
       const beforeSwitch = await waitForStableViewportAnchor(orcaPage)
       expect(beforeSwitch.index).toBeGreaterThan(0)
 
@@ -445,7 +521,12 @@ test.describe('Combined diff scroll restore', () => {
       const afterSwitch = await waitForRestoredViewportAnchor(orcaPage, beforeSwitch)
 
       expect(afterSwitch.key).toBe(beforeSwitch.key)
-      expect(Math.abs(afterSwitch.top - beforeSwitch.top)).toBeLessThan(80)
+      // Why: this failure is CI-only so far; keep both anchors in the message
+      // so a remote red carries the geometry needed to diagnose it.
+      expect(
+        Math.abs(afterSwitch.top - beforeSwitch.top),
+        `restore drift; before=${JSON.stringify(beforeSwitch)} after=${JSON.stringify(afterSwitch)}`
+      ).toBeLessThan(80)
 
       await clickVisibleDiffLine(orcaPage)
       const afterLineClick = await waitForStableViewportAnchor(orcaPage)
