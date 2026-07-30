@@ -88,6 +88,35 @@ describe('plane-format', () => {
     expect(formatPlaneMembers(members)).toContain('Ada')
   })
 
+  // ORCA-139: without a workspace header a two-workspace answer is
+  // indistinguishable from a one-workspace answer.
+  it('groups the project list under a workspace header when 2+ workspaces answer', () => {
+    const projects: PlaneProject[] = [
+      { id: 'p1', identifier: 'ACME', name: 'Acme Web', workspaceSlug: 'acme', workspaceId: 'w-a' },
+      { id: 'p2', identifier: 'BETA', name: 'Beta App', workspaceSlug: 'beta', workspaceId: 'w-b' },
+      { id: 'p3', identifier: 'BETA2', name: 'Beta Ops', workspaceSlug: 'beta', workspaceId: 'w-b' }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).toContain('Workspace acme (1)')
+    expect(output).toContain('Workspace beta (2)')
+    expect(output.indexOf('Workspace acme')).toBeLessThan(output.indexOf('Workspace beta'))
+    expect(output).toContain('  ACME')
+  })
+
+  it('leaves a single-workspace project list ungrouped', () => {
+    const projects: PlaneProject[] = [
+      { id: 'p1', identifier: 'ACME', name: 'Acme Web', workspaceSlug: 'acme', workspaceId: 'w-a' },
+      { id: 'p2', identifier: 'ACME2', name: 'Acme Ops', workspaceSlug: 'acme', workspaceId: 'w-a' }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).not.toContain('Workspace')
+    expect(output.split('\n')).toHaveLength(2)
+  })
+
   it('reports empty collections with stable copy', () => {
     expect(formatPlaneProjectList([])).toBe('No Plane projects found.')
     expect(formatPlaneStates([])).toBe('No Plane states found.')

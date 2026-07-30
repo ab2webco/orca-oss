@@ -207,8 +207,11 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     printResult(response, json, () => `Deleted comment ${commentId} from ${target.workItemId}.`)
   },
   'plane project list': async ({ flags, client, json }) => {
+    // Why: defaulting to the host's selected workspace made the answer depend on
+    // mutable app state, so identical calls listed a different workspace each
+    // time; 'all' is the deterministic default and stays grouped (ORCA-139).
     const response = await client.call<PlaneProject[]>('plane.listProjects', {
-      workspaceId: getOptionalStringFlag(flags, 'workspace')
+      workspaceId: getOptionalStringFlag(flags, 'workspace') ?? 'all'
     })
     printResult(response, json, formatPlaneProjectList)
   },

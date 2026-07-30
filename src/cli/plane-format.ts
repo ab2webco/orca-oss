@@ -92,13 +92,38 @@ export function formatPlaneSearch(items: PlaneWorkItem[]): string {
   return items.map(formatWorkItemRow).join('\n')
 }
 
+function formatProjectRow(project: PlaneProject): string {
+  return `${project.identifier.padEnd(12)} ${project.name.padEnd(28)} ${project.id}`
+}
+
 export function formatPlaneProjectList(projects: PlaneProject[]): string {
   if (projects.length === 0) {
     return 'No Plane projects found.'
   }
-  return projects
-    .map((project) => `${project.identifier.padEnd(12)} ${project.name.padEnd(28)} ${project.id}`)
-    .join('\n')
+  // Why: a flat list gave a multi-workspace answer no workspace attribution, so
+  // it read as a single-workspace one; group once 2+ workspaces are present and
+  // keep the single-workspace output byte-identical (ORCA-139).
+  const groups = new Map<string, PlaneProject[]>()
+  for (const project of projects) {
+    const key = project.workspaceSlug ?? project.workspaceId ?? ''
+    const group = groups.get(key)
+    if (group) {
+      group.push(project)
+    } else {
+      groups.set(key, [project])
+    }
+  }
+  if (groups.size < 2) {
+    return projects.map(formatProjectRow).join('\n')
+  }
+  return [...groups]
+    .map(([workspace, group]) =>
+      [
+        `Workspace ${workspace || 'unknown'} (${group.length})`,
+        ...group.map((project) => `  ${formatProjectRow(project)}`)
+      ].join('\n')
+    )
+    .join('\n\n')
 }
 
 // Leads with the id: the caller's next command is almost always --project <id>.

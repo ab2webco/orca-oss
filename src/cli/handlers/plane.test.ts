@@ -368,10 +368,25 @@ describe('orca plane CLI handlers', () => {
     expect(process.exitCode).toBe(1)
   })
 
-  it('maps project list to plane.listProjects', async () => {
+  // ORCA-139: no --workspace must mean "every connected workspace", not the
+  // host's mutable UI selection, or repeated calls answer from a different
+  // workspace each time with nothing in the output saying which.
+  it('maps project list without --workspace to an explicit all-workspace read', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'project', 'list', '--json'], '/tmp/repo')
-    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: undefined })
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'all' })
+  })
+
+  it('keeps an explicit --workspace scoped to that workspace', async () => {
+    queueFixtures(callMock, okFixture('req', []))
+    await main(['plane', 'project', 'list', '--workspace', 'ws-1', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'ws-1' })
+  })
+
+  it('passes --workspace all straight through', async () => {
+    queueFixtures(callMock, okFixture('req', []))
+    await main(['plane', 'project', 'list', '--workspace', 'all', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'all' })
   })
 
   it('maps states create to plane.createState', async () => {
