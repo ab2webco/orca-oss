@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Loader2, RefreshCw } from 'lucide-react'
 import {
   buildTargetedSkillUpdateCommand,
@@ -77,11 +77,14 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
   // rows off the last good scan keeps them on screen through that window instead
   // of blanking the dialog at the exact moment the result appears. Eligibility
   // below still reads the live snapshot, so nothing is authorized off stale bytes.
-  const lastInventoryRef = useRef<SkillFreshnessInventory | null>(null)
-  if (state.inventory) {
-    lastInventoryRef.current = state.inventory
+  // State, not a ref: React may discard a render, and a ref write is not rolled back
+  // with it, so a scan that never committed could stay on screen. Adjusting state
+  // during render is re-run before commit, so only a committed scan is ever retained.
+  const [retainedInventory, setRetainedInventory] = useState<SkillFreshnessInventory | null>(null)
+  if (state.inventory && state.inventory !== retainedInventory) {
+    setRetainedInventory(state.inventory)
   }
-  const inventory = state.inventory ?? (state.loading ? lastInventoryRef.current : null)
+  const inventory = state.inventory ?? (state.loading ? retainedInventory : null)
   const eligibleNames = useMemo(() => state.inventory?.eligibleUpdateNames ?? [], [state.inventory])
   // Display only. The action still fires `eligibleNames`, so a re-scan in flight
   // can never authorize work — but the button keeps its place and its label
@@ -153,7 +156,7 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
     // keeps its own, or reopening from the status segment mid-run would land on
     // an empty list while the close's own re-scan is still reading disk.
     if (run.state === 'idle') {
-      lastInventoryRef.current = null
+      setRetainedInventory(null)
     }
     if (showResult) {
       void acknowledgeSkillUpdateRun()
