@@ -1,5 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
@@ -14,6 +13,20 @@ import {
   waitForSessionReady
 } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import {
+  authorityLedgerPath,
+  disposeWorkerRestartFixture,
+  fakeCliDir,
+  hasPersistedResumeRecord,
+  interruptionLedgerPath,
+  isProcessAlive,
+  lifecycleLedgerPath,
+  PROVIDER_SESSION_ID,
+  readLedger,
+  resetWorkerRestartLedgers,
+  spawnLedgerPath,
+  stripLegacyWorkerRendererBinding
+} from './orchestration-worker-restart-fixture'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import Database from '../../src/main/sqlite/sync-database'
 import {
@@ -21,204 +34,7 @@ import {
   LEGACY_CONTRACT_VERSION,
   LEGACY_RUN_ID
 } from '../../src/main/runtime/orchestration/db'
-import { DEFAULT_LOCAL_ORCA_PROFILE_ID } from '../../src/shared/orca-profiles'
 import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
-
-const PROVIDER_SESSION_ID = 'e2e-legacy-orchestration-worker'
-const fakeCliDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-legacy-worker-'))
-const spawnLedgerPath = path.join(fakeCliDir, 'spawn.jsonl')
-const interruptionLedgerPath = path.join(fakeCliDir, 'interruption.jsonl')
-const authorityLedgerPath = path.join(fakeCliDir, 'authority.jsonl')
-const lifecycleLedgerPath = path.join(fakeCliDir, 'lifecycle.jsonl')
-const fakeCodexSource = `
-const { appendFileSync } = require('node:fs')
-const { spawnSync } = require('node:child_process')
-function appendLedger(envName, event) {
-  const ledgerPath = process.env[envName]
-  if (!ledgerPath) return
-  try {
-    appendFileSync(ledgerPath, JSON.stringify({ pid: process.pid, at: Date.now(), ...event }) + '\\n')
-  } catch {}
-}
-async function emitAuthorityHook() {
-  const port = process.env.ORCA_AGENT_HOOK_PORT
-  const token = process.env.ORCA_AGENT_HOOK_TOKEN
-  const launchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
-  if (!port || !token || !launchToken || !process.env.ORCA_PANE_KEY) return
-  try {
-    const response = await fetch('http://127.0.0.1:' + port + '/hook/codex', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Orca-Agent-Hook-Token': token
-      },
-      body: JSON.stringify({
-        paneKey: process.env.ORCA_PANE_KEY,
-        tabId: process.env.ORCA_TAB_ID,
-        worktreeId: process.env.ORCA_WORKTREE_ID,
-        env: process.env.ORCA_AGENT_HOOK_ENV,
-        version: process.env.ORCA_AGENT_HOOK_VERSION,
-        launchToken,
-        payload: {
-          hook_event_name: 'UserPromptSubmit',
-          prompt: 'Respond ACK and remain idle'
-        }
-      })
-    })
-    appendLedger('ORCA_E2E_AUTHORITY_LEDGER', { event: 'authority-hook', status: response.status })
-  } catch (error) {
-    appendLedger('ORCA_E2E_AUTHORITY_LEDGER', {
-      event: 'authority-hook-error',
-      error: error instanceof Error ? error.message : String(error)
-    })
-  }
-}
-if (process.argv.slice(2).includes('app-server')) {
-  process.stderr.write("error: unrecognized subcommand 'app-server'\\n")
-  process.exit(2)
-}
-appendLedger('ORCA_E2E_SPAWN_LEDGER', { event: 'spawn', argv: process.argv.slice(2) })
-process.stdout.write('\\u001b]0;Codex Ready\\u0007OpenAI Codex\\nmodel: e2e\\ndirectory: e2e\\n')
-void emitAuthorityHook()
-let acknowledged = false
-let lifecycleSent = false
-process.stdin.on('data', (chunk) => {
-  const input = chunk.toString()
-  if (input.includes('\\x03')) {
-    appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'stdin-ctrl-c' })
-  }
-  if (!acknowledged && input.includes('\\r')) {
-    acknowledged = true
-    process.stdout.write('ACK\\n')
-  }
-  const legacyCompletion = input.match(/ORCA_E2E_RUN_LEGACY_DONE:([A-Za-z0-9+/=]+)/)
-  if (!lifecycleSent && legacyCompletion) {
-    lifecycleSent = true
-    const identity = JSON.parse(Buffer.from(legacyCompletion[1], 'base64').toString('utf8'))
-    const cliEntry = process.env.ORCA_E2E_CLI_ENTRY
-    const args = [
-      'orchestration',
-      'send',
-      '--to',
-      identity.coordinatorHandle,
-      '--type',
-      'worker_done',
-      '--subject',
-      'Completed',
-      '--body',
-      'E2E retained legacy completion',
-      '--payload',
-      JSON.stringify({
-        taskId: identity.taskId,
-        dispatchId: identity.dispatchId,
-        filesModified: []
-      }),
-      '--json'
-    ]
-    const result = cliEntry
-      ? spawnSync(process.execPath, [cliEntry, ...args], {
-          env: process.env,
-          encoding: 'utf8'
-        })
-      : { status: 127, stdout: '', stderr: 'ORCA_E2E_CLI_ENTRY missing' }
-    appendLedger('ORCA_E2E_LIFECYCLE_LEDGER', {
-      event: 'legacy-command',
-      argv: args,
-      status: result.status,
-      stdout: result.stdout,
-      stderr: result.stderr
-    })
-    process.stdout.write(String(result.stdout || '') + String(result.stderr || ''))
-  }
-})
-for (const signal of ['SIGINT', 'SIGHUP', 'SIGTERM']) {
-  process.on(signal, () => {
-    appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'signal', signal })
-    process.exit(0)
-  })
-}
-process.stdin.resume()
-setInterval(() => {}, 60_000)
-`
-
-if (process.platform === 'win32') {
-  writeFileSync(path.join(fakeCliDir, 'fake-codex.js'), fakeCodexSource)
-  writeFileSync(
-    path.join(fakeCliDir, 'codex.cmd'),
-    '@echo off\r\nnode "%~dp0\\fake-codex.js" %*\r\n'
-  )
-} else {
-  const executable = path.join(fakeCliDir, 'codex')
-  writeFileSync(executable, `#!/usr/bin/env node\n${fakeCodexSource}`)
-  chmodSync(executable, 0o755)
-}
-
-type LedgerEvent = {
-  pid: number
-  event: string
-  argv?: string[]
-  signal?: string
-  status?: number
-  stdout?: string
-  stderr?: string
-  error?: string
-}
-
-type PersistedWorkspaceSession = {
-  activeTabId?: string | null
-  activeTabIdByWorktree?: Record<string, string | null>
-  tabsByWorktree?: Record<string, { id: string }[]>
-  terminalLayoutsByTabId?: Record<string, unknown>
-  unifiedTabs?: Record<string, { id: string; entityId: string }[]>
-  tabGroups?: Record<
-    string,
-    { activeTabId: string | null; tabOrder: string[]; recentTabIds?: string[] }[]
-  >
-  sleepingAgentSessionsByPaneKey?: Record<
-    string,
-    { providerSession?: { id?: unknown }; automaticResumeBlockedBy?: string }
-  >
-  terminalPtyIncarnationsByPaneKey?: Record<string, string>
-  terminalSurfaceTombstonesByPaneKey?: Record<string, unknown>
-}
-
-type PersistedData = {
-  workspaceSession?: PersistedWorkspaceSession
-}
-
-function readLedger(ledgerPath: string): LedgerEvent[] {
-  if (!existsSync(ledgerPath)) {
-    return []
-  }
-  return readFileSync(ledgerPath, 'utf8')
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as LedgerEvent)
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function persistedDataPath(userDataDir: string): string {
-  return path.join(userDataDir, 'profiles', DEFAULT_LOCAL_ORCA_PROFILE_ID, 'orca-data.json')
-}
-
-function readPersistedData(userDataDir: string): PersistedData {
-  return JSON.parse(readFileSync(persistedDataPath(userDataDir), 'utf8')) as PersistedData
-}
-
-function hasPersistedResumeRecord(userDataDir: string, paneKey: string): boolean {
-  return (
-    readPersistedData(userDataDir).workspaceSession?.sleepingAgentSessionsByPaneKey?.[paneKey]
-      ?.providerSession?.id === PROVIDER_SESSION_ID
-  )
-}
 
 async function readRendererRecoveryState(
   page: Page,
@@ -236,53 +52,6 @@ async function readRendererRecoveryState(
     },
     { workerPaneKey: paneKey, workerTabId: tabId }
   )
-}
-
-function stripLegacyWorkerRendererBinding(
-  userDataDir: string,
-  input: {
-    worktreeId: string
-    coordinatorTabId: string
-    workerTabId: string
-    workerPaneKey: string
-  }
-): void {
-  const data = readPersistedData(userDataDir)
-  const session = data.workspaceSession
-  if (!session) {
-    throw new Error('Expected a persisted workspace session')
-  }
-  const sleeping = session.sleepingAgentSessionsByPaneKey?.[input.workerPaneKey]
-  if (sleeping?.providerSession?.id !== PROVIDER_SESSION_ID) {
-    throw new Error('Expected the legacy worker resume record before removing its tab binding')
-  }
-  session.tabsByWorktree = {
-    ...session.tabsByWorktree,
-    [input.worktreeId]: (session.tabsByWorktree?.[input.worktreeId] ?? []).filter(
-      (tab) => tab.id !== input.workerTabId
-    )
-  }
-  delete session.terminalLayoutsByTabId?.[input.workerTabId]
-  if (session.unifiedTabs?.[input.worktreeId]) {
-    session.unifiedTabs[input.worktreeId] = session.unifiedTabs[input.worktreeId].filter(
-      (tab) => tab.id !== input.workerTabId && tab.entityId !== input.workerTabId
-    )
-  }
-  for (const group of session.tabGroups?.[input.worktreeId] ?? []) {
-    group.tabOrder = group.tabOrder.filter((tabId) => tabId !== input.workerTabId)
-    group.recentTabIds = group.recentTabIds?.filter((tabId) => tabId !== input.workerTabId)
-    if (group.activeTabId === input.workerTabId) {
-      group.activeTabId = input.coordinatorTabId
-    }
-  }
-  session.activeTabId = input.coordinatorTabId
-  session.activeTabIdByWorktree = {
-    ...session.activeTabIdByWorktree,
-    [input.worktreeId]: input.coordinatorTabId
-  }
-  delete session.terminalPtyIncarnationsByPaneKey?.[input.workerPaneKey]
-  delete session.terminalSurfaceTombstonesByPaneKey?.[input.workerPaneKey]
-  writeFileSync(persistedDataPath(userDataDir), `${JSON.stringify(data, null, 2)}\n`, 'utf8')
 }
 
 function assertDispatchRemainsCurrent(
@@ -380,7 +149,7 @@ function markAssignmentAsPreUpdateLegacy(
 test.describe.configure({ mode: 'serial' })
 
 test.afterAll(() => {
-  rmSync(fakeCliDir, { recursive: true, force: true })
+  disposeWorkerRestartFixture()
 })
 
 for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION]) {
@@ -388,10 +157,7 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
   test(`adopts one live ${contractLabel} worker after restart without replaying resume`, async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both Electron launches and intentionally opts out of the default app fixture.
   {}, testInfo) => {
     test.setTimeout(300_000)
-    rmSync(spawnLedgerPath, { force: true })
-    rmSync(interruptionLedgerPath, { force: true })
-    rmSync(authorityLedgerPath, { force: true })
-    rmSync(lifecycleLedgerPath, { force: true })
+    resetWorkerRestartLedgers()
     const repoPath = existsSync(TEST_REPO_PATH_FILE)
       ? readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
       : ''
@@ -739,7 +505,68 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
         expect(readLedger(spawnLedgerPath)).toEqual([initialSpawn])
         expect(isProcessAlive(initialSpawn.pid)).toBe(true)
       } else {
-        expect(readLedger(lifecycleLedgerPath)).toEqual([])
+        const currentCompletion = Buffer.from(
+          JSON.stringify({
+            terminalHandle: dispatchHandle,
+            taskId: task.result.task.id,
+            dispatchId: initialDispatch.result.dispatch!.id
+          })
+        ).toString('base64')
+        await secondClient.call('terminal.send', {
+          terminal: recovered!.handle,
+          text: `ORCA_E2E_RUN_CURRENT_DONE:${currentCompletion}`,
+          enter: true
+        })
+        await expect
+          .poll(() => readLedger(lifecycleLedgerPath), { timeout: 30_000 })
+          .toEqual([
+            expect.objectContaining({
+              event: 'current-command',
+              pid: initialSpawn.pid,
+              status: 0,
+              stderr: ''
+            })
+          ])
+        await expect
+          .poll(async () => {
+            const dispatch = await secondClient.call<{
+              dispatch: { id: string; status: string } | null
+            }>('orchestration.dispatchShow', { task: task.result.task.id })
+            const listedTasks = await secondClient.call<{
+              tasks: { id: string; status: string }[]
+            }>('orchestration.taskList', { run: assignmentRunId })
+            return {
+              dispatch: dispatch.result.dispatch?.status,
+              task: listedTasks.result.tasks.find(
+                (candidate) => candidate.id === task.result.task.id
+              )?.status
+            }
+          })
+          .toEqual({ dispatch: 'completed', task: 'completed' })
+
+        const checked = await secondClient.call<{
+          messages: {
+            type: string
+            subject: string
+            body: string | null
+            payload: string | null
+          }[]
+        }>('orchestration.check', {
+          run: run.result.run.id,
+          terminal: coordinator.result.terminal.handle,
+          terminalPaneKey: coordinatorPane.paneKey,
+          types: ['worker_done']
+        })
+        expect(checked.result.messages).toEqual([
+          expect.objectContaining({
+            type: 'worker_done',
+            subject: 'Completed',
+            body: 'E2E retained current completion',
+            payload: expect.stringContaining(initialDispatch.result.dispatch!.id)
+          })
+        ])
+        expect(readLedger(spawnLedgerPath)).toEqual([initialSpawn])
+        expect(isProcessAlive(initialSpawn.pid)).toBe(true)
       }
 
       const otherWorktreeId = await switchToOtherWorktree(second.page, worktreeId)
