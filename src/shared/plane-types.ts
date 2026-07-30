@@ -210,6 +210,38 @@ export type PlaneDeleteWorkItemArgs = {
   workspaceId?: PlaneWorkspaceSelection | null
 }
 
+// Project create/update/archive. `workspace` accepts a saved workspace id OR a
+// workspace slug: `listProjects` only ever surfaced the slug, so id-only would
+// be undiscoverable from the CLI.
+export type PlaneCreateProjectArgs = {
+  name: string
+  identifier: string
+  // Plain text, not HTML: Plane's project description is not a rich-text field
+  // like work-item/comment bodies.
+  description?: string
+  workspace?: string
+}
+
+export type PlaneUpdateProjectArgs = {
+  projectId: string
+  name?: string
+  identifier?: string
+  description?: string
+  workspace?: string
+}
+
+export type PlaneArchiveProjectArgs = {
+  projectId: string
+  archived: boolean
+  workspace?: string
+}
+
+// Create/update return the resulting project so a caller can chain straight
+// into project-scoped commands with the new id.
+export type PlaneProjectMutationResult =
+  | { ok: true; project: PlaneProject }
+  | { ok: false; error: string }
+
 // Plane's relation_type set (list_work_item_relations groups results by these);
 // the CLI exposes a friendlier alias set that maps onto these verbatim.
 export type PlaneRelationType =
