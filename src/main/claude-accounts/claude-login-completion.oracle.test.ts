@@ -16,7 +16,18 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../codex-cli/command', () => ({
-  resolveClaudeCommand: () => 'claude.exe'
+  resolveClaudeCommand: () => 'claude.exe',
+  // Why: the fork's resolveHostClaudeCommand takes this branch off Windows, so the
+  // non-Windows oracle cases need it resolved rather than falling through to null.
+  resolveCliCommandOrNull: () => 'claude'
+}))
+
+// Why: the fork resolves the non-Windows Claude binary through a PATH hydration that
+// spawns a real login shell. Unmocked it only ends at the 30s test timeout, and the
+// oracle is about child-process completion, not PATH discovery.
+vi.mock('../startup/hydrate-shell-path', () => ({
+  hydrateShellPath: async () => ({ ok: true, segments: [] }),
+  mergePathSegments: () => []
 }))
 
 vi.mock('./keychain', () => ({
@@ -78,6 +89,16 @@ async function flushPromiseCallbacks(): Promise<void> {
   await Promise.resolve()
 }
 
+// Why: the fork awaits command resolution before spawning, so the child under test
+// does not exist yet after a fixed number of microtask ticks. Drain until the spawn
+// actually lands instead of guessing a tick count.
+async function flushUntilSpawned(): Promise<void> {
+  for (let attempt = 0; attempt < 50 && processMocks.spawn.mock.calls.length === 0; attempt += 1) {
+    await Promise.resolve()
+  }
+  await flushPromiseCallbacks()
+}
+
 describe('native Windows Claude login completion oracle', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -113,6 +134,7 @@ describe('native Windows Claude login completion oracle', () => {
         completions += 1
       })
 
+    await flushUntilSpawned()
     child.emit('exit', 0)
     await flushPromiseCallbacks()
 
@@ -176,6 +198,7 @@ describe('native Windows Claude login completion oracle', () => {
       completions += 1
     })
 
+    await flushUntilSpawned()
     child.emit('exit', 0)
     await flushPromiseCallbacks()
 
