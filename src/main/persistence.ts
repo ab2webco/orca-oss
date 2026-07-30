@@ -68,6 +68,7 @@ import type {
   WorkspaceSessionState,
   ClaudeLivePtyAccountBinding,
   ClaudeLiveSharedPtyAccountBinding,
+  CodexDirectedPtyAccountBinding,
   PlaneViewMode,
   RateLimitFailBackMode
 } from '../shared/types'
@@ -2239,6 +2240,15 @@ function normalizeClaudeLivePtyAccountBindings(value: unknown): ClaudeLivePtyAcc
   return bindings.toReversed()
 }
 
+function normalizeCodexDirectedPtyAccountBindings(
+  value: unknown
+): CodexDirectedPtyAccountBinding[] {
+  // Why the same shape as the Claude one: both answer "does a surviving daemon
+  // session belong to a pinned account", and both are read at startup before
+  // any pane restores.
+  return normalizeClaudeLivePtyAccountBindings(value)
+}
+
 function normalizeClaudeLiveSharedPtyAccountBindings(
   value: unknown
 ): ClaudeLiveSharedPtyAccountBinding[] {
@@ -3539,6 +3549,9 @@ export class Store {
           ),
           claudeLivePtyAccountBindings: normalizeClaudeLivePtyAccountBindings(
             parsed.claudeLivePtyAccountBindings
+          ),
+          codexDirectedPtyAccountBindings: normalizeCodexDirectedPtyAccountBindings(
+            parsed.codexDirectedPtyAccountBindings
           ),
           migrationUnsupportedPtyEntries: normalizeMigrationUnsupportedPtyEntries(
             parsed.migrationUnsupportedPtyEntries
@@ -6314,6 +6327,8 @@ export class Store {
       startupCwd?: string
       claudeAccountId?: string
       claudeSharedAccountId?: string | null
+      /** Set only by an explicit `--codex-account` launch (ORCA-130). */
+      codexDirectedAccountId?: string
     },
     hostId?: string | null
   ): boolean {
@@ -6329,6 +6344,7 @@ export class Store {
     const claudeBindingsBefore = this.state.claudeLivePtyAccountBindings ?? []
     const sharedClaudeIdsBefore = this.state.claudeLivePtySessionIds ?? []
     const sharedClaudeBindingsBefore = this.state.claudeLiveSharedPtyAccountBindings ?? []
+    const codexDirectedBindingsBefore = this.state.codexDirectedPtyAccountBindings ?? []
     const paneKey = `${args.tabId}:${args.leafId}`
     let terminalMembershipChanged = false
     const advanceTopologyAfterMembershipChange = (): void => {
@@ -6426,6 +6442,18 @@ export class Store {
         { sessionId: args.ptyId, accountId: args.claudeSharedAccountId ?? null }
       ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
     }
+    const shouldPersistCodexDirectedBinding =
+      typeof args.codexDirectedAccountId === 'string' &&
+      args.codexDirectedAccountId.length > 0 &&
+      args.codexDirectedAccountId.length <= 512 &&
+      args.ptyId.length > 0 &&
+      args.ptyId.length <= 512
+    if (shouldPersistCodexDirectedBinding) {
+      this.state.codexDirectedPtyAccountBindings = [
+        ...codexDirectedBindingsBefore.filter((entry) => entry.sessionId !== args.ptyId),
+        { sessionId: args.ptyId, accountId: args.codexDirectedAccountId! }
+      ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
+    }
     if (!isTerminalLeafId(args.leafId)) {
       // Why: keep legacy renderer-local pane ids out of durable leaf-keyed layout state after the UUID migration.
       advanceTopologyAfterMembershipChange()
@@ -6436,6 +6464,7 @@ export class Store {
         this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
         this.state.claudeLivePtySessionIds = sharedClaudeIdsBefore
         this.state.claudeLiveSharedPtyAccountBindings = sharedClaudeBindingsBefore
+        this.state.codexDirectedPtyAccountBindings = codexDirectedBindingsBefore
         // Why: flushOrThrow canceled the prior debounce; unrelated pending
         // state still needs a retry after this binding transaction rolls back.
         this.scheduleSave()
@@ -6490,10 +6519,60 @@ export class Store {
       this.state.claudeLivePtyAccountBindings = claudeBindingsBefore
       this.state.claudeLivePtySessionIds = sharedClaudeIdsBefore
       this.state.claudeLiveSharedPtyAccountBindings = sharedClaudeBindingsBefore
+      this.state.codexDirectedPtyAccountBindings = codexDirectedBindingsBefore
       this.scheduleSave()
       throw err
     }
     return shouldPersistClaudeBinding || shouldPersistSharedClaudeBinding
+  }
+
+  getCodexDirectedPtyAccountBindings(): CodexDirectedPtyAccountBinding[] {
+    return (this.state.codexDirectedPtyAccountBindings ?? []).map((binding) => ({ ...binding }))
+  }
+
+  addCodexDirectedPtyAccountBinding(sessionId: string, accountId: string): void {
+    if (
+      sessionId.length === 0 ||
+      sessionId.length > 512 ||
+      accountId.length === 0 ||
+      accountId.length > 512
+    ) {
+      throw new Error('Invalid directed Codex PTY account binding.')
+    }
+    const currentBindings = this.state.codexDirectedPtyAccountBindings ?? []
+    if (
+      currentBindings.some(
+        (entry) => entry.sessionId === sessionId && entry.accountId === accountId
+      )
+    ) {
+      return
+    }
+    const bindings = currentBindings.filter((entry) => entry.sessionId !== sessionId)
+    this.state.codexDirectedPtyAccountBindings = [...bindings, { sessionId, accountId }].slice(
+      -MAX_CLAUDE_LIVE_PTY_SESSION_IDS
+    )
+    // Why sync: a daemon Codex CLI can outlive a force-quit, and only this fact
+    // tells the next launch to reattach instead of minting an empty session.
+    try {
+      this.flushOrThrow()
+    } catch (error) {
+      this.state.codexDirectedPtyAccountBindings = currentBindings
+      // Why: flushOrThrow cancels the prior debounce before writing. Re-arm it
+      // so unrelated state that was pending before this failed binding retries.
+      this.scheduleSave()
+      throw error
+    }
+  }
+
+  removeCodexDirectedPtyAccountBinding(sessionId: string): void {
+    const bindings = this.state.codexDirectedPtyAccountBindings ?? []
+    if (!bindings.some((entry) => entry.sessionId === sessionId)) {
+      return
+    }
+    this.state.codexDirectedPtyAccountBindings = bindings.filter(
+      (entry) => entry.sessionId !== sessionId
+    )
+    this.scheduleSave()
   }
 
   // ── SSH Targets ────────────────────────────────────────────────────

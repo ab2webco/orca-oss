@@ -2594,6 +2594,12 @@ export type ClaudeLivePtyAccountBinding = {
   accountId: string
 }
 
+/** A PTY whose CODEX_HOME was pinned by an explicit `--codex-account` launch. */
+export type CodexDirectedPtyAccountBinding = {
+  sessionId: string
+  accountId: string
+}
+
 /** Managed account backing a live Claude PTY, from main's live-pty gate.
  *  injected = per-worktree pinned universe; shared = global ~/.claude auth. */
 export type ClaudeLivePtyAccountInfo = {
@@ -3755,6 +3761,10 @@ export type PersistedState = {
   /** Account ownership for live injected Claude daemon sessions. This keeps
    *  account-specific auth immutable across app restarts until the CLI exits. */
   claudeLivePtyAccountBindings?: ClaudeLivePtyAccountBinding[]
+  /** Account ownership for account-directed (`--codex-account`) Codex daemon
+   *  sessions. Restoring one must reattach to the daemon that still hosts it
+   *  rather than mint an empty session under the same id (ORCA-130). */
+  codexDirectedPtyAccountBindings?: CodexDirectedPtyAccountBinding[]
   migrationUnsupportedPtyEntries: MigrationUnsupportedPtyEntry[]
   legacyPaneKeyAliasEntries: LegacyPaneKeyAliasEntry[]
   automations: Automation[]

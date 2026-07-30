@@ -249,6 +249,7 @@ import {
   markClaudePtySpawned
 } from '../claude-accounts/live-pty-gate'
 import * as livePtyGate from '../claude-accounts/live-pty-gate'
+import * as directedCodexPtyBinding from '../codex/directed-codex-pty-binding'
 import {
   SSH_PTY_IDENTITY_MISMATCH_ERROR,
   SSH_SESSION_EXPIRED_ERROR
@@ -2044,6 +2045,56 @@ describe('registerPtyHandlers', () => {
       expect(
         livePtyGate.getLiveInjectedClaudePtyAccountId('unreachable-injected-session')
       ).toBeNull()
+    })
+
+    // Why (ORCA-130): `--codex-account` takes the same background path, so the
+    // same crossing left a blank pane and an orphaned CLI — Codex just had no
+    // liveness fact for the requirement to read.
+    it('refuses to mint a fresh session for a directed Codex pane whose process is gone', async () => {
+      installExitOnKillSpawnMock()
+      classifyErrorMock.mockReturnValue({ error_class: 'unknown' })
+      directedCodexPtyBinding.markDirectedCodexPtySpawned(
+        'unreachable-codex-session',
+        'codex-account-a'
+      )
+      registerPtyHandlers(mainWindow as never)
+
+      await expect(
+        handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'codex',
+          worktreeId: 'wt-codex-directed',
+          sessionId: 'unreachable-codex-session'
+        })
+      ).rejects.toThrow('PTY_REQUIRED_REATTACH_UNAVAILABLE')
+      expect(spawnMock).not.toHaveBeenCalled()
+      // Why: a retained binding would demand reattach forever, so the pane could
+      // never open again — worse than the blank pane this replaced.
+      expect(
+        directedCodexPtyBinding.getDirectedCodexPtyAccountId('unreachable-codex-session')
+      ).toBeNull()
+    })
+
+    it('leaves a Codex pane that only inherited the account selection on the normal restore path', async () => {
+      installExitOnKillSpawnMock()
+      await getLocalPtyProvider().spawn({
+        cols: 80,
+        rows: 24,
+        sessionId: 'inherited-codex-session'
+      })
+      spawnMock.mockClear()
+      registerPtyHandlers(mainWindow as never)
+
+      const result = await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-inherited',
+        sessionId: 'inherited-codex-session'
+      })
+      expect(result.id).toBe('inherited-codex-session')
+      await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
     it.each(['live gate', 'restart seed'] as const)(
