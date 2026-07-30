@@ -92,8 +92,9 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
   it('never renders a percentage it could not parse', () => {
     // Why: a false 0% reads as real data. Both quota fields and ctx clear on any non-digit.
     const clears = script.match(/for \/f "delims=0123456789"/g) ?? []
-    // Four percentages plus the trend baseline read back from the per-pane file.
-    expect(clears.length).toBe(5)
+    // Four percentages, the trend baseline read back from the per-pane file, and the
+    // COLUMNS width-budget guard.
+    expect(clears.length).toBe(6)
     // An unparsed value skips its own composition block and lands on the next one.
     expect(script).toMatch(/if not defined ORCA_STATUSLINE_FIVE goto :orca_statusline_item_\d+/)
     expect(script).toMatch(/if not defined ORCA_STATUSLINE_SEVEN goto :orca_statusline_item_\d+/)
@@ -166,7 +167,7 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     // Why a sticky flag, not goto :emit: admitting a shorter field behind one that did not fit
     // inverts priority, but identity fields ordered after a budgeted one must still print.
     const overflow = script.match(
-      /if not "!ORCA_STATUSLINE_NEXT:~96!"=="" set "ORCA_STATUSLINE_FULL=1"/g
+      /for \/f %%w in \("!ORCA_STATUSLINE_BUDGET!"\) do if not "!ORCA_STATUSLINE_NEXT:~%%w!"=="" set "ORCA_STATUSLINE_FULL=1"/g
     )
     expect(overflow?.length).toBe(4)
     const fullGuards = script.match(/if defined ORCA_STATUSLINE_FULL goto :/g)
@@ -176,6 +177,30 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
     // 18 + "..." keeps the same 21-column bound the POSIX branch's 20 + "…" produces.
     expect(script).toContain('set "ORCA_STATUSLINE_ACCOUNT=!ORCA_STATUSLINE_ACCOUNT:~0,18!..."')
     expect(script).not.toContain('...@')
+  })
+
+  it('resolves the width budget from COLUMNS before the composition runs', () => {
+    // Why the leading-zero rejection: cmd's numeric IF parses it as octal ("08" even falls back
+    // to string comparison), so the grammar drops it and keeps the assumed 96 (POSIX parity).
+    const budgetIndex = script.indexOf('set "ORCA_STATUSLINE_BUDGET=96"')
+    expect(budgetIndex).toBeGreaterThan(-1)
+    expect(script).toContain('if defined COLUMNS set "ORCA_STATUSLINE_COLS=!COLUMNS!"')
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_COLS for /f "delims=0123456789" %%d in ("!ORCA_STATUSLINE_COLS!") do set "ORCA_STATUSLINE_COLS="'
+    )
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_COLS if "!ORCA_STATUSLINE_COLS:~0,1!"=="0" set "ORCA_STATUSLINE_COLS="'
+    )
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_COLS if not "!ORCA_STATUSLINE_COLS:~4!"=="" set "ORCA_STATUSLINE_COLS="'
+    )
+    expect(script).toContain(
+      'if defined ORCA_STATUSLINE_COLS if !ORCA_STATUSLINE_COLS! LSS 96 set "ORCA_STATUSLINE_BUDGET=!ORCA_STATUSLINE_COLS!"'
+    )
+    const composeIndex = script.indexOf('set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"')
+    expect(budgetIndex).toBeLessThan(composeIndex)
+    // No baked-in overflow test survives: every budget check reads the runtime variable.
+    expect(script).not.toContain(':~96!')
   })
 
   it('renders the composition in the configured order', () => {
@@ -364,7 +389,8 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     scriptPath: string,
     temp: string,
     payload: string,
-    configDir?: string
+    configDir?: string,
+    columns?: string
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(process.env.ComSpec ?? 'cmd.exe', ['/c', scriptPath], {
@@ -375,7 +401,8 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
           TEMP: temp,
           TMP: temp,
           ORCA_PANE_KEY: PANE_KEY,
-          ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {})
+          ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {}),
+          ...(columns === undefined ? {} : { COLUMNS: columns })
         },
         stdio: ['pipe', 'pipe', 'pipe']
       })
@@ -516,5 +543,30 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     expect(stdout).toContain('5h =.... 12%')
     expect(stdout).toContain('7d ##... 45%')
     expect(stdout).not.toContain('a'.repeat(30))
+  })
+
+  it('budgets against COLUMNS on a narrow viewport: identity stays, the ladder falls', async () => {
+    const { scriptPath, temp } = makeHarness()
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+    })
+    // banner(14) + " | Fable"(8) + " | ctx ##... 42%"(16) = 38 fits 40; every quota bar falls.
+    const narrow = await runScript(scriptPath, temp, payload, undefined, '40')
+    expect(narrow).toBe('Orca by Ab2Web | Fable | ctx ##... 42%\r\n')
+    expect(narrow.trimEnd().length).toBeLessThanOrEqual(40)
+  })
+
+  it('treats a malformed or huge COLUMNS as the assumed 96-column budget', async () => {
+    const { scriptPath, temp } = makeHarness()
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+    })
+    // Prime the pane: the banner shows once and the trend baseline exists from here on.
+    await runScript(scriptPath, temp, payload)
+    // "040" is the octal trap in cmd numeric IF; "200" must clamp to the 96 ceiling.
+    for (const columns of ['040', '40x', '0', '200']) {
+      const stdout = await runScript(scriptPath, temp, payload, undefined, columns)
+      expect(stdout).toBe('Fable | ctx ##... 42% ~ | 5h =.... 12% | 7d ##... 45%\r\n')
+    }
   })
 })

@@ -3,15 +3,7 @@
  * `getWindowsManagedStatusLineScript`. Builtin-only by contract: these run ~3x/sec.
  */
 
-import {
-  STATUSLINE_MAX_WIDTH,
-  STATUSLINE_PROJECT_MAX_COLUMNS
-} from '../../shared/claude-statusline-line-model'
-
-// Why the shared budget still measures correctly with a raw substring test: this variant is
-// ASCII by contract, so one byte is one column — the POSIX branch has to count columns
-// because its bars are not.
-export const STATUSLINE_WINDOWS_MAX_WIDTH = STATUSLINE_MAX_WIDTH
+import { STATUSLINE_PROJECT_MAX_COLUMNS } from '../../shared/claude-statusline-line-model'
 
 export const STATUSLINE_WINDOWS_EMIT_LABEL = 'orca_statusline_emit'
 
@@ -56,6 +48,11 @@ export function quotaWindowLines(
  * item order an identity field can sit after a budgeted one and must still print, so overflow
  * skips to the next composition block rather than straight to emit (POSIX `orca_statusline_try`
  * parity).
+ *
+ * Why the overflow test measures with a raw substring at the runtime budget: this variant is
+ * ASCII by contract, so one byte is one column — the POSIX branch has to count columns because
+ * its bars are not. The for-var carries the budget because cmd substrings take no nested
+ * delayed expansion; %%w substitutes before !ORCA_STATUSLINE_NEXT:~%%w! is evaluated.
  */
 export function budgetedFieldLines(
   valueVar: string,
@@ -67,7 +64,7 @@ export function budgetedFieldLines(
     `if not defined ${valueVar} goto :${nextLabel}`,
     `set "ORCA_STATUSLINE_NEXT=${rendered}"`,
     `if defined ORCA_STATUSLINE_LINE set "ORCA_STATUSLINE_NEXT=!ORCA_STATUSLINE_LINE! | ${rendered}"`,
-    `if not "!ORCA_STATUSLINE_NEXT:~${STATUSLINE_WINDOWS_MAX_WIDTH}!"=="" set "ORCA_STATUSLINE_FULL=1"`,
+    'for /f %%w in ("!ORCA_STATUSLINE_BUDGET!") do if not "!ORCA_STATUSLINE_NEXT:~%%w!"=="" set "ORCA_STATUSLINE_FULL=1"',
     `if defined ORCA_STATUSLINE_FULL goto :${nextLabel}`,
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_NEXT!"'
   ]

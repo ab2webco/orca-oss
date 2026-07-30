@@ -17,6 +17,7 @@ import {
   CLAUDE_STATUSLINE_PREVIEW_SAMPLE,
   composeStatusLine,
   deriveStatusLineBarCells,
+  resolveStatusLineWidthBudget,
   statuslineBarLevelsAscii
 } from '../../shared/claude-statusline-line-model'
 import { getManagedStatusLineScript } from './statusline-script'
@@ -74,14 +75,20 @@ describe.skipIf(process.platform === 'win32')('statusline preview parity (posix)
     return { scriptPath, dir, configDir }
   }
 
-  function runScript(scriptPath: string, dir: string, configDir: string): Promise<string> {
+  function runScript(
+    scriptPath: string,
+    dir: string,
+    configDir: string,
+    columns?: string
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn('sh', [scriptPath], {
         env: {
           PATH: process.env.PATH ?? '',
           TMPDIR: dir,
           ORCA_PANE_KEY: PANE_KEY,
-          CLAUDE_CONFIG_DIR: configDir
+          CLAUDE_CONFIG_DIR: configDir,
+          ...(columns === undefined ? {} : { COLUMNS: columns })
         },
         stdio: ['pipe', 'pipe', 'pipe']
       })
@@ -108,16 +115,20 @@ describe.skipIf(process.platform === 'win32')('statusline preview parity (posix)
 
   async function expectParity(
     items?: Partial<ClaudeStatusLineItems>,
-    order?: readonly ClaudeStatusLineItemKey[]
-  ): Promise<void> {
+    order?: readonly ClaudeStatusLineItemKey[],
+    columns?: string
+  ): Promise<string> {
     const { scriptPath, dir, configDir } = makeSteadyStateHarness(items, order)
-    const stdout = await runScript(scriptPath, dir, configDir)
+    const stdout = await runScript(scriptPath, dir, configDir, columns)
     const composed = composeStatusLine(
       normalizeClaudeStatusLineItems(items),
       normalizeClaudeStatusLineItemOrder(order),
-      'posix'
+      'posix',
+      CLAUDE_STATUSLINE_PREVIEW_SAMPLE,
+      resolveStatusLineWidthBudget(columns)
     )
     expect(stdout.trimEnd()).toBe(composed)
+    return stdout.trimEnd()
   }
 
   it('matches the script for the default items and order', async () => {
@@ -143,6 +154,40 @@ describe.skipIf(process.platform === 'win32')('statusline preview parity (posix)
       'fiveHourQuota',
       'account'
     ])
+  })
+
+  // The width cases are differential in both directions: each width byte-compares script vs
+  // model independently, and the narrow lines are then checked against the wide one so a
+  // budget that silently stopped dropping (or dropping too much) cannot pass as parity.
+  it('matches the script at a narrow mobile width and drops the ladder tail', async () => {
+    const wide = await expectParity()
+    const narrow = await expectParity(undefined, undefined, '44')
+    expect(narrow).not.toBe(wide)
+    // 44 columns fit project · model · ctx · account, then the quota bars and countdown fall.
+    expect(narrow).toContain('@alex')
+    expect(narrow).not.toContain('5h')
+    expect(narrow).not.toContain('7d')
+    expect(wide).toContain('5h')
+  })
+
+  it('matches the script at a width where only the ladder tail falls', async () => {
+    const mid = await expectParity(undefined, undefined, '60')
+    expect(mid).toContain('5h')
+    expect(mid).not.toContain('7d')
+  })
+
+  it('treats COLUMNS at or above the ceiling as the assumed width', async () => {
+    const wide = await expectParity()
+    expect(await expectParity(undefined, undefined, '96')).toBe(wide)
+    expect(await expectParity(undefined, undefined, '200')).toBe(wide)
+  })
+
+  it('falls back to the assumed width on malformed COLUMNS', async () => {
+    const wide = await expectParity()
+    // Leading zeros are the octal trap on cmd; the grammar rejects them everywhere.
+    for (const malformed of ['0', '040', '40x', 'abc', '']) {
+      expect(await expectParity(undefined, undefined, malformed)).toBe(wide)
+    }
   })
 })
 

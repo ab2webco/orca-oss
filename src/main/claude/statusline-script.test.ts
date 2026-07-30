@@ -41,6 +41,19 @@ describe('getManagedStatusLineScript (posix)', () => {
     expect(script).not.toContain('curl.exe')
   })
 
+  it('budgets against COLUMNS with the assumed width as fallback and ceiling', () => {
+    stubPlatform('darwin')
+    const script = getManagedStatusLineScript('local')
+    // Why the grammar rejects leading zeros: parity with cmd, where they read as octal.
+    expect(script).toContain('orca_statusline_budget=96')
+    expect(script).toContain('  [1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])')
+    expect(script).toContain('    if [ "$COLUMNS" -lt 96 ]; then')
+    expect(script).toContain('      orca_statusline_budget=$COLUMNS')
+    // The ladder compares against the resolved budget, never a baked-in width.
+    expect(script).toContain('  if [ "$orca_statusline_next" -gt "$orca_statusline_budget" ]; then')
+    expect(script).not.toContain('-gt 96')
+  })
+
   it('prints before the rate_limits guard and the throttle so the render never flickers', () => {
     stubPlatform('darwin')
     const script = getManagedStatusLineScript('local')

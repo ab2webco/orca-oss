@@ -118,6 +118,19 @@ export function getManagedStatusLineScript(
     'if [ -z "$payload" ]; then',
     '  exit 0',
     'fi',
+    // Why the budget resolves per tick instead of baking 96 in: the same PTY is viewed from
+    // desktop and mobile, and the viewport refit rewrites cols between ticks. Claude Code
+    // injects COLUMNS into this env on every invocation (v2.1.153+), so reading it is free.
+    // The no-leading-zero grammar matches the cmd variant, where a leading zero would flip the
+    // numeric comparison into octal; anything else falls back to the assumed ceiling.
+    `orca_statusline_budget=${STATUSLINE_MAX_WIDTH}`,
+    'case "${COLUMNS:-}" in',
+    '  [1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])',
+    `    if [ "$COLUMNS" -lt ${STATUSLINE_MAX_WIDTH} ]; then`,
+    '      orca_statusline_budget=$COLUMNS',
+    '    fi',
+    '    ;;',
+    'esac',
     ...(resolved.model ? posixModelLines() : []),
     ...(resolved.context ? posixContextLines() : []),
     ...(resolved.project ? posixProjectLines() : []),
@@ -212,7 +225,7 @@ export function getManagedStatusLineScript(
     '  if [ -n "$orca_statusline_line" ]; then',
     '    orca_statusline_next=$(( orca_statusline_next + 3 ))',
     '  fi',
-    `  if [ "$orca_statusline_next" -gt ${STATUSLINE_MAX_WIDTH} ]; then`,
+    '  if [ "$orca_statusline_next" -gt "$orca_statusline_budget" ]; then',
     '    orca_statusline_full=1',
     '    return 0',
     '  fi',
