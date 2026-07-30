@@ -95,12 +95,24 @@ vi.mock('@/lib/agent-background-session-timeout-toast', () => ({
 }))
 
 import {
+  canUseIssueCommandForLinkedItemProvider,
   ensureAgentStartupInTerminal,
   getSetupConfig,
   getWorkspaceSeedName,
   isGitLabIssueUrl
 } from './new-workspace'
 import { resetAgentStartupDelayedDeliveryForTests } from './agent-startup-delayed-delivery'
+
+describe('linked-item issue commands', () => {
+  it('keeps Jira, Linear, and Plane starts out of repository issue templates', () => {
+    expect(canUseIssueCommandForLinkedItemProvider('github')).toBe(true)
+    expect(canUseIssueCommandForLinkedItemProvider('gitlab')).toBe(true)
+    expect(canUseIssueCommandForLinkedItemProvider('jira')).toBe(false)
+    expect(canUseIssueCommandForLinkedItemProvider('linear')).toBe(false)
+    // Why: Plane starts carry their own launch template (planeLaunchPromptTemplate).
+    expect(canUseIssueCommandForLinkedItemProvider('plane')).toBe(false)
+  })
+})
 
 describe('getWorkspaceSeedName', () => {
   it('prefers an explicit name', () => {

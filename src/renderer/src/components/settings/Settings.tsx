@@ -125,6 +125,7 @@ import {
   buildRepoIdToRepresentative,
   buildSettingsProjectList,
   getSettingsProjectHostRepo,
+  getSettingsTargetHostSelection,
   removeSettingsProjectFromAllHosts,
   resolveSettingsTargetRepoId
 } from './settings-project-list'
@@ -185,7 +186,7 @@ function getSettingsSectionId(
   pane: SettingsNavTarget,
   repoId: string | null,
   repoIdToRepresentative: Map<string, string>
-): string {
+) {
   if (pane === 'repo' && repoId) {
     // Why: Settings renders one collapsed pane per project, so resolve a repoId target to its project's representative section.
     return `repo-${repoIdToRepresentative.get(repoId) ?? repoId}`
@@ -642,7 +643,7 @@ function Settings(): React.JSX.Element {
     }
 
     const paneSectionId = getSettingsSectionId(
-      settingsNavigationTarget.pane as SettingsNavTarget,
+      settingsNavigationTarget.pane,
       settingsNavigationTarget.repoId,
       repoIdToRepresentative
     )
@@ -652,9 +653,21 @@ function Settings(): React.JSX.Element {
       repoIdToHostSelection.keys()
     )
     if (targetRepoId) {
-      const hostSelection = repoIdToHostSelection.get(targetRepoId)
+      const hostSelection = settingsNavigationTarget.hostId
+        ? getSettingsTargetHostSelection(
+            settingsProjectList,
+            targetRepoId,
+            settingsNavigationTarget.hostId
+          )
+        : repoIdToHostSelection.get(targetRepoId)
       if (hostSelection) {
-        setSettingsProjectHostSelection(hostSelection.projectId, hostSelection.hostId)
+        setSettingsProjectHostSelection(
+          hostSelection.projectId,
+          hostSelection.hostId,
+          'setupId' in hostSelection && typeof hostSelection.setupId === 'string'
+            ? hostSelection.setupId
+            : undefined
+        )
       }
     }
     pendingNavSectionRef.current = paneSectionId
@@ -688,6 +701,7 @@ function Settings(): React.JSX.Element {
     repoIdToRepresentative,
     setSettingsProjectHostSelection,
     settings,
+    settingsProjectList,
     settingsNavigationTarget
   ])
 

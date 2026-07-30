@@ -46,6 +46,12 @@ import { initTelemetry, shutdownTelemetry, trackAppOpenedOnce, track } from './t
 import { classifyError } from './telemetry/classify-error'
 import { runManagedHookInstallers } from './agent-hooks/install-telemetry'
 import {
+  indexPersistedPaneKeyPtyIds,
+  isLocalExecutionHost,
+  resolveAgentWorkspaceExecutionHostId,
+  sweepRestoredSubagentsWithoutLiveAgent
+} from './agent-hooks/restored-subagent-liveness-sweep'
+import {
   isAgentStatusHooksEnabled,
   MANAGED_AGENT_HOOK_INSTALLERS,
   removeManagedAgentHooks
@@ -81,6 +87,7 @@ import { DesktopRelayService } from './runtime/relay/desktop-relay-service'
 import type { RelayBrokerStatus } from './runtime/relay/relay-session-broker'
 import { awaitRuntimeFileWatcherUnsubscribes } from './runtime/orca-runtime-files'
 import { clearRuntimeMetadataIfOwned } from './runtime/runtime-metadata'
+import { scheduleAllPendingHistoryTreeRemovals } from './terminal-history-deletion'
 import { ensureMainI18n, setMainPluginLanguagePacks, setMainUiLanguage } from './i18n/main-i18n'
 import {
   getNextDefaultOnAppearanceSettingValue,
@@ -793,6 +800,46 @@ ipcMain.handle(
   }
 )
 
+/** A PTY that dies while Orca is down never runs the teardown that clears pane
+ *  state, so hydrate can rebuild a Claude subagent roster that no later hook can
+ *  retire — pinning the pane 'working' and locking its agent out of hibernation
+ *  for good. Once provider and hook hydration settle, targeted PTY liveness can
+ *  retire only rows whose local owner is proven gone. */
+async function reapRestoredSubagentsWithoutLiveAgent(): Promise<void> {
+  const currentStore = store
+  if (!currentStore) {
+    return
+  }
+  const provider = getDaemonProvider()
+  if (!provider) {
+    return
+  }
+  const persistedPtyIdByPaneKey = indexPersistedPaneKeyPtyIds(
+    currentStore.getWorkspaceSession().terminalLayoutsByTabId ?? {}
+  )
+  await sweepRestoredSubagentsWithoutLiveAgent({
+    probeLiveLocalPty: (ptyId) => provider.probePtyLiveness(ptyId),
+    isLocalExecutionHost: (worktreeId) =>
+      isLocalExecutionHost(
+        resolveAgentWorkspaceExecutionHostId(worktreeId, {
+          getRepo: (repoId) => currentStore.getRepo(repoId),
+          getWorktreeMeta: (resolvedWorktreeId) => currentStore.getWorktreeMeta(resolvedWorktreeId),
+          getFolderWorkspace: (folderWorkspaceId) =>
+            currentStore.getFolderWorkspace(folderWorkspaceId),
+          getProjectGroups: () => currentStore.getProjectGroups()
+        })
+      ),
+    getBoundPtyIdForPaneKey: getPtyIdForPaneKey,
+    getPersistedPtyIdForPaneKey: (paneKey) => persistedPtyIdByPaneKey.get(paneKey),
+    reap: (isLocalHost, isLocalPaneAgentLive, isLocalPaneLivenessEvidenceCurrent) =>
+      agentHookServer.reapRestoredClaudeSubagentsWithoutLiveAgent(
+        isLocalHost,
+        isLocalPaneAgentLive,
+        isLocalPaneLivenessEvidenceCurrent
+      )
+  })
+}
+
 function startTerminalRuntimeStartupServices(): Promise<void> {
   logStartupMilestone('first-window-startup-services-start')
   const startupServices = startFirstWindowStartupServices({
@@ -841,6 +888,9 @@ function startTerminalRuntimeStartupServices(): Promise<void> {
   })
   void localPtyStartupReady.then(() => {
     logStartupMilestone('local-pty-startup-ready')
+    void reapRestoredSubagentsWithoutLiveAgent().catch((error) => {
+      console.warn('[agent-hooks] restored-subagent liveness probe failed:', error)
+    })
   })
   return firstWindowStartupServicesReady
 }
@@ -2895,6 +2945,9 @@ void app.whenReady().then(async () => {
     }
     // Why: headless serve never opens a renderer, so arm scheduled automation dispatch here.
     automations.start()
+    // Why: serve deletes worktrees too, and the history GC that normally drains delete tombstones is
+    // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
+    scheduleAllPendingHistoryTreeRemovals()
     await printServeReady(serveOptions)
     return
   }
@@ -3021,6 +3074,13 @@ app.on('will-quit', (e) => {
   killAllPty()
   const watcherShutdown = shutdownWatchersOnce()
   store?.flush()
+  // Why: usage-cache writes are queued off the main thread, so a quit right after setEnabled or a
+  // scan completion would drop the final snapshot. Captured before any await; joins the barrier below.
+  const usageCacheFlush = Promise.all([
+    claudeUsage?.flush(),
+    codexUsage?.flush(),
+    openCodeUsage?.flush()
+  ]).then(() => {})
 
   // Why: preventDefault to await disconnectDaemon's async checkpoint writes (else data lost); guard prevents an infinite quit loop on the re-fired will-quit.
   if (!daemonDisconnectDone) {
@@ -3054,7 +3114,8 @@ app.on('will-quit', (e) => {
       { name: 'runtime-rpc', promise: rpcStopAndClear },
       { name: 'watchers', promise: watcherShutdown },
       { name: 'emulator', promise: emulatorShutdown },
-      { name: 'plugin-hosts', promise: pluginHostShutdown }
+      { name: 'plugin-hosts', promise: pluginHostShutdown },
+      { name: 'usage-cache', promise: usageCacheFlush }
     ])
       .then((pendingTeardowns) => {
         if (pendingTeardowns.length > 0) {

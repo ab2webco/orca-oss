@@ -133,7 +133,8 @@ export async function createWorkerWorktree(args: {
     comment: params.comment,
     ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
     ...(params.codexAccountId ? { codexAccountId: params.codexAccountId } : {}),
-    runHooks: setupDecision === 'run',
+    // setupDecision runs setup without the legacy runHooks activation side effect.
+    runHooks: false,
     setupDecision,
     awaitTerminalProvisioning: true,
     observeSetupCompletion: true,

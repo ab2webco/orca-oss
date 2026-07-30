@@ -15,8 +15,8 @@ import {
   classifyCodexRateLimitWindows,
   CODEX_SESSION_WINDOW_MINUTES,
   CODEX_WEEKLY_WINDOW_MINUTES,
-  type CodexRpcRateLimits,
-  type CodexRpcRateWindow
+  type CodexRateLimitWindowsSnapshot,
+  type CodexRateWindowSnapshot
 } from './codex-rate-limit-window-classification'
 import { resolveCodexCommand } from '../codex-cli/command'
 import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnostic'
@@ -83,7 +83,7 @@ type RateLimitResetCredits = {
 
 // Why: the Codex app-server wraps rate limit data as { rateLimits: { primary, secondary, ... } }.
 type RpcRateLimitsResponse = {
-  rateLimits?: CodexRpcRateLimits | null
+  rateLimits?: CodexRateLimitWindowsSnapshot | null
   rateLimitResetCredits?: {
     availableCount?: number
     totalEarnedCount?: number
@@ -292,6 +292,12 @@ function mapBackendRateLimitResetCredits(
   }
 }
 
+function hasCompleteRateLimitResetCredits(
+  credits: RateLimitResetCredits | null | undefined
+): boolean {
+  return Boolean(credits && (credits.availableCount === 0 || credits.nextExpiresAt != null))
+}
+
 function createBackendRequestSignal(
   callerSignal?: AbortSignal,
   timeoutMs = BACKEND_TIMEOUT_MS
@@ -392,8 +398,7 @@ async function withBackendRateLimitResetCredits(
   if (
     options?.signal?.aborted ||
     limits.provider !== 'codex' ||
-    (limits.rateLimitResetCredits?.nextExpiresAt !== undefined &&
-      limits.rateLimitResetCredits.nextExpiresAt !== null)
+    hasCompleteRateLimitResetCredits(limits.rateLimitResetCredits)
   ) {
     return limits
   }
@@ -454,7 +459,7 @@ export async function consumeCodexRateLimitResetCredit(options: {
 }
 
 function mapRpcWindow(
-  raw: CodexRpcRateWindow | null | undefined,
+  raw: CodexRateWindowSnapshot | null | undefined,
   expectedWindowMinutes: number
 ): RateLimitWindow | null {
   if (!raw || typeof raw.usedPercent !== 'number' || !Number.isFinite(raw.usedPercent)) {
@@ -489,53 +494,30 @@ function mapRpcWindow(
   }
 }
 
-// Codex does not guarantee which slot (primary/secondary) carries which window;
-// a plus plan can return only a weekly window in `primary`. Classify by real
-// duration instead of slot: a window shorter than a day is the rolling "session"
-// limit, anything a day or longer is the "weekly" limit. Prevents a weekly
-// window from being mislabeled as the 5h session with a multi-day reset (#9969).
-const SESSION_WINDOW_MAX_MINUTES = 1440
-
-function classifyCodexWindows(windows: (RateLimitWindow | null)[]): {
-  session: RateLimitWindow | null
-  weekly: RateLimitWindow | null
-} {
-  let session: RateLimitWindow | null = null
-  let weekly: RateLimitWindow | null = null
-  for (const window of windows) {
-    if (!window) {
-      continue
-    }
-    if (window.windowMinutes < SESSION_WINDOW_MAX_MINUTES) {
-      session ??= window
-    } else {
-      weekly ??= window
-    }
+function backendWindowToSnapshot(
+  raw: BackendRateLimitWindow | null | undefined
+): CodexRateWindowSnapshot | null {
+  if (!raw) {
+    return null
   }
-  return { session, weekly }
-}
-
-function mapBackendUsageWindow(
-  raw: BackendRateLimitWindow | null | undefined,
-  fallbackWindowMinutes: number
-): RateLimitWindow | null {
-  const limitWindowSeconds = raw?.limit_window_seconds
-  // Why: match Codex backend-client's window_minutes_from_seconds — actual bucket duration, rounding partial minutes up.
-  const windowMinutes =
+  const limitWindowSeconds = raw.limit_window_seconds
+  const windowDurationMins =
     typeof limitWindowSeconds === 'number' &&
     Number.isFinite(limitWindowSeconds) &&
     limitWindowSeconds > 0
       ? Math.ceil(limitWindowSeconds / 60)
-      : fallbackWindowMinutes
-  return mapRpcWindow(
-    raw
-      ? {
-          usedPercent: raw.used_percent,
-          resetsAt: raw.reset_at
-        }
-      : undefined,
-    windowMinutes
-  )
+      : undefined
+  return { usedPercent: raw.used_percent, windowDurationMins, resetsAt: raw.reset_at }
+}
+
+function snapshotWindowMinutes(
+  snapshot: CodexRateWindowSnapshot | null,
+  fallbackWindowMinutes: number
+): number {
+  const duration = snapshot?.windowDurationMins
+  return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+    ? duration
+    : fallbackWindowMinutes
 }
 
 async function fetchViaBackend(
@@ -560,14 +542,20 @@ async function fetchViaBackend(
   if (typeof payload.plan_type !== 'string') {
     return null
   }
-  const { session, weekly } = classifyCodexWindows([
-    mapBackendUsageWindow(payload.rate_limit?.primary_window, 300),
-    mapBackendUsageWindow(payload.rate_limit?.secondary_window, 10080)
-  ])
+  const classified = classifyCodexRateLimitWindows({
+    primary: backendWindowToSnapshot(payload.rate_limit?.primary_window),
+    secondary: backendWindowToSnapshot(payload.rate_limit?.secondary_window)
+  })
   return {
     provider: 'codex',
-    session,
-    weekly,
+    session: mapRpcWindow(
+      classified.session,
+      snapshotWindowMinutes(classified.session, CODEX_SESSION_WINDOW_MINUTES)
+    ),
+    weekly: mapRpcWindow(
+      classified.weekly,
+      snapshotWindowMinutes(classified.weekly, CODEX_WEEKLY_WINDOW_MINUTES)
+    ),
     // Surfaced for the status-bar Usage row (e.g. "Codex · Plus").
     planType: payload.plan_type,
     ...(payload.rate_limit_reset_credits !== undefined
@@ -579,6 +567,37 @@ async function fetchViaBackend(
     updatedAt: Date.now(),
     error: null,
     status: 'ok'
+  }
+}
+
+async function withBackendSessionWindow(
+  limits: ProviderRateLimits,
+  options?: FetchCodexRateLimitsOptions
+): Promise<ProviderRateLimits> {
+  if (options?.signal?.aborted || limits.session || !limits.weekly) {
+    return limits
+  }
+  try {
+    const backend = await fetchViaBackend(options)
+    if (!backend) {
+      return limits
+    }
+    const rateLimitResetCredits = backend.rateLimitResetCredits ?? limits.rateLimitResetCredits
+    if (!backend.session) {
+      return rateLimitResetCredits === limits.rateLimitResetCredits
+        ? limits
+        : { ...limits, rateLimitResetCredits }
+    }
+    return {
+      ...limits,
+      session: backend.session,
+      weekly: backend.weekly ?? limits.weekly,
+      planType: backend.planType ?? limits.planType,
+      ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {}),
+      updatedAt: backend.updatedAt
+    }
+  } catch {
+    return limits
   }
 }
 
@@ -1163,7 +1182,8 @@ export async function fetchCodexRateLimits(
       return abortedCodexRateLimitResult()
     }
     if (rpcResult.status === 'ok' || rpcResult.status === 'unavailable') {
-      const withResetCredits = await withBackendRateLimitResetCredits(rpcResult, options)
+      const withSession = await withBackendSessionWindow(rpcResult, options)
+      const withResetCredits = await withBackendRateLimitResetCredits(withSession, options)
       return options?.signal?.aborted ? abortedCodexRateLimitResult() : withResetCredits
     }
     if (isCodexAuthError(rpcResult.error)) {
@@ -1199,7 +1219,8 @@ export async function fetchCodexRateLimits(
     if (options?.signal?.aborted) {
       return abortedCodexRateLimitResult()
     }
-    const withResetCredits = await withBackendRateLimitResetCredits(ptyResult, options)
+    const withSession = await withBackendSessionWindow(ptyResult, options)
+    const withResetCredits = await withBackendRateLimitResetCredits(withSession, options)
     return options?.signal?.aborted ? abortedCodexRateLimitResult() : withResetCredits
   } catch (err) {
     if (options?.signal?.aborted) {
