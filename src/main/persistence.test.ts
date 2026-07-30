@@ -10679,6 +10679,56 @@ describe('Store', () => {
       ])
     })
 
+    // Why (ORCA-130): every other test for the directed Codex gate seeds it in
+    // memory, so a hydration that silently dropped the rows would look green.
+    it('round-trips a directed Codex binding through the data file', async () => {
+      const store = await createStore()
+      store.addCodexDirectedPtyAccountBinding('codex-session-1', 'codex-account-a')
+
+      const reloaded = await createStore()
+      expect(reloaded.getCodexDirectedPtyAccountBindings()).toEqual([
+        { sessionId: 'codex-session-1', accountId: 'codex-account-a' }
+      ])
+
+      reloaded.removeCodexDirectedPtyAccountBinding('codex-session-1')
+      reloaded.flush()
+      expect((await createStore()).getCodexDirectedPtyAccountBindings()).toEqual([])
+    })
+
+    it('carries a directed Codex binding on the pane binding transaction', async () => {
+      const store = await createStore()
+      const flush = vi.spyOn(store as unknown as { flushOrThrow(): void }, 'flushOrThrow')
+
+      store.persistPtyBinding({
+        worktreeId: 'repo-1::/tmp/worktree',
+        tabId: 'tab-1',
+        leafId: TEST_LEAF_1,
+        ptyId: 'codex-session-1',
+        codexDirectedAccountId: 'codex-account-a'
+      })
+
+      expect(flush).toHaveBeenCalledTimes(1)
+      expect(store.getCodexDirectedPtyAccountBindings()).toEqual([
+        { sessionId: 'codex-session-1', accountId: 'codex-account-a' }
+      ])
+    })
+
+    it('drops malformed directed Codex bindings on hydration', async () => {
+      writeDataFile({
+        schemaVersion: 1,
+        codexDirectedPtyAccountBindings: [
+          { sessionId: 'same', accountId: 'old' },
+          null,
+          { sessionId: '', accountId: 'invalid' },
+          { sessionId: 'same', accountId: 'new' }
+        ]
+      })
+
+      expect((await createStore()).getCodexDirectedPtyAccountBindings()).toEqual([
+        { sessionId: 'same', accountId: 'new' }
+      ])
+    })
+
     it('coalesces workspace and injected-account binding into one durable flush', async () => {
       const store = await createStore()
       const flush = vi.spyOn(store as unknown as { flushOrThrow(): void }, 'flushOrThrow')

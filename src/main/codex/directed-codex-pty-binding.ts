@@ -95,11 +95,11 @@ export function markDirectedCodexPtySpawned(
  * every later restore to reattach to a process no daemon can produce.
  */
 export function releaseDirectedCodexPtyBinding(ptyId: string): void {
-  const hadBinding = liveDirectedCodexPtyAccounts.delete(ptyId)
+  liveDirectedCodexPtyAccounts.delete(ptyId)
   seededUnconfirmedDirectedCodexPtyIds.delete(ptyId)
-  if (hadBinding) {
-    persistence?.removeCodexDirectedPtyAccountBinding(ptyId)
-  }
+  // Why unconditional: an in-memory release that already happened must not leave
+  // a disk row behind for the next launch to re-seed.
+  persistence?.removeCodexDirectedPtyAccountBinding(ptyId)
 }
 
 export function getDirectedCodexPtyAccountId(ptyId: string): string | null {
