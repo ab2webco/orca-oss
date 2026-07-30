@@ -199,7 +199,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['24', '26']
+        # Why the owner ternary: upstream supports both Node majors, but in the fork
+        # the doubled matrix doubles every PR's CI cost while the product ships on
+        # engines.node 24 — node 26 coverage returns with each upstream sync (ORCA-127).
+        node: ${{ github.repository_owner == 'stablyai' && fromJSON('["24", "26"]') || fromJSON('["24"]') }}
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         shard_total: [16]
 
