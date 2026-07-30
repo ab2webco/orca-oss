@@ -33,7 +33,10 @@ describe('requiresLiveCodexPtyReattach', () => {
   // Why: the reconciled-away case is exactly cold restore; forcing reattach
   // there would turn every restored Codex pane into a spawn failure.
   it('does not require reattach once no daemon hosts the session', () => {
-    const persistence = { removeCodexDirectedPtyAccountBinding: vi.fn() }
+    const persistence = {
+      addCodexDirectedPtyAccountBinding: vi.fn(),
+      removeCodexDirectedPtyAccountBinding: vi.fn()
+    }
     attachDirectedCodexPtyPersistence(persistence)
     seedDirectedCodexPtyBindingsFromPersistence([
       { sessionId: SESSION_ID, accountId: ACCOUNT_ID }
@@ -55,7 +58,10 @@ describe('requiresLiveCodexPtyReattach', () => {
   })
 
   it('stops requiring reattach once the binding is released', () => {
-    const persistence = { removeCodexDirectedPtyAccountBinding: vi.fn() }
+    const persistence = {
+      addCodexDirectedPtyAccountBinding: vi.fn(),
+      removeCodexDirectedPtyAccountBinding: vi.fn()
+    }
     attachDirectedCodexPtyPersistence(persistence)
     markDirectedCodexPtySpawned(SESSION_ID, ACCOUNT_ID)
     releaseDirectedCodexPtyBinding(SESSION_ID)

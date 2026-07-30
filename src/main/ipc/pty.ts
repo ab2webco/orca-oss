@@ -4285,8 +4285,10 @@ export function registerPtyHandlers(
       // to that account, and only on a Codex launch command does the override
       // reach getCodexLaunchTargetForPty at all. An inherited selection is not an
       // ownership claim, so it must never gate reattach.
+      // Why not gated on isDaemonHostSpawn: the degraded daemon routes fresh
+      // spawns to the local provider, and that pane is just as account-directed.
       const codexDirectedAccountId =
-        isDaemonHostSpawn && args.codexAccountId && isCodexLaunchCommand(args.command)
+        !args.connectionId && args.codexAccountId && isCodexLaunchCommand(args.command)
           ? args.codexAccountId
           : undefined
       const startupTerminalColorQueryReplyColors = getStartupTerminalColorQueryReplyColors(args)
@@ -4690,6 +4692,7 @@ export function registerPtyHandlers(
           settings: getSettings?.()
         })
         let didPersistClaudeBinding = false
+        let didPersistCodexDirectedBinding = false
         if (hostSessionBinding) {
           try {
             const binding = {
@@ -4717,11 +4720,7 @@ export function registerPtyHandlers(
                   toSshExecutionHostId(args.connectionId)
                 )
               : hostSessionBinding.store.persistPtyBinding(binding)
-            if (codexDirectedAccountId) {
-              // Why after the sync flush: the in-memory fact must never outlive a
-              // crash the persisted binding did not survive.
-              markDirectedCodexPtySpawned(result.id, codexDirectedAccountId)
-            }
+            didPersistCodexDirectedBinding = Boolean(codexDirectedAccountId)
           } catch (err) {
             console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
             deletePtyOwnership(result.id)
@@ -4768,6 +4767,15 @@ export function registerPtyHandlers(
         }
         // Why: arms main's per-PTY Command Code output detector from the launch command (renderer startupCommand parity).
         runtime?.noteTerminalSpawnCommand?.(result.id, launchCommand ?? null)
+        if (codexDirectedAccountId) {
+          // Why here and not inside the binding transaction: an account-directed
+          // create only persists a host session binding when no window is
+          // available, so hanging the fact off that branch would leave the common
+          // case — workers spawned while the app runs — ungated (ORCA-130).
+          markDirectedCodexPtySpawned(result.id, codexDirectedAccountId, {
+            persistenceAlreadyRecorded: didPersistCodexDirectedBinding
+          })
+        }
         // Why: the global live-PTY gate protects shared ~/.claude only; an
         // injected PTY owns its account-specific config dir instead.
         if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {

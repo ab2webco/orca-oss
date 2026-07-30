@@ -250,6 +250,7 @@ import {
 } from '../claude-accounts/live-pty-gate'
 import * as livePtyGate from '../claude-accounts/live-pty-gate'
 import * as directedCodexPtyBinding from '../codex/directed-codex-pty-binding'
+import { requiresLiveCodexPtyReattach } from '../codex/live-codex-pty-reattach-requirement'
 import {
   SSH_PTY_IDENTITY_MISMATCH_ERROR,
   SSH_SESSION_EXPIRED_ERROR
@@ -2086,13 +2087,13 @@ describe('registerPtyHandlers', () => {
       spawnMock.mockClear()
       registerPtyHandlers(mainWindow as never)
 
-      const result = await handlers.get('pty:spawn')!(null, {
+      const result = (await handlers.get('pty:spawn')!(null, {
         cols: 80,
         rows: 24,
         command: 'codex',
         worktreeId: 'wt-codex-inherited',
         sessionId: 'inherited-codex-session'
-      })
+      })) as { id: string }
       expect(result.id).toBe('inherited-codex-session')
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
@@ -2478,6 +2479,46 @@ describe('registerPtyHandlers', () => {
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
+    // Why (ORCA-130): the spawn is the only moment the launch account exists —
+    // the restore that must reattach comes back through the renderer handler,
+    // which never carries it, so the fact has to be recorded here or nowhere.
+    it('records a directed Codex binding for a daemon-hosted --codex-account launch', async () => {
+      installDaemonTestProvider()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-directed-launch',
+        codexAccountId: 'codex-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBe('codex-launch')
+      expect(requiresLiveCodexPtyReattach(result.id)).toBe(true)
+      directedCodexPtyBinding.releaseDirectedCodexPtyBinding(result.id)
+    })
+
+    // Why: the narrow half of the gate — a Codex pane that merely inherited the
+    // current selection was never account-directed, and demanding reattach for it
+    // would turn its cold restore into a spawn failure.
+    it('records no directed binding for a daemon-hosted Codex launch without an override', async () => {
+      installDaemonTestProvider()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-inherited-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBeNull()
+      expect(requiresLiveCodexPtyReattach(result.id)).toBe(false)
+    })
+
     it('keeps the Codex worktree pin when no launch account is passed on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()
@@ -2504,6 +2545,25 @@ describe('registerPtyHandlers', () => {
         expect.anything(),
         expect.anything()
       )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
+    // Why this lane too: the degraded daemon routes fresh spawns to the local
+    // provider, and a pane that lands there is just as account-directed.
+    it('binds a launch-scoped Codex account on the local-provider lane', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-directed',
+        codexAccountId: 'codex-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBe('codex-launch')
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 

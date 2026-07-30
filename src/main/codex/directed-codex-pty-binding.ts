@@ -8,10 +8,11 @@
  * needs both — the directedness, and the ownership proof that keeps a cold
  * restore from turning into a spawn failure.
  *
- * The binding is written to disk inside the same sync-flushed transaction as
- * the pane's PTY binding, seeded here at startup, then reconciled against every
- * daemon adapter before any pane restores: a binding that survives that pass is
- * hosted by some daemon.
+ * The binding rides the pane's own sync-flushed PTY-binding transaction when
+ * there is one, and is written here otherwise — a CLI create against a running
+ * app persists no host session binding. Either way it is seeded at startup and
+ * reconciled against every daemon adapter before any pane restores, so a
+ * binding that survives that pass is hosted by some daemon.
  */
 
 export type DirectedCodexPtyPersistence = {
@@ -61,10 +62,32 @@ export function confirmSeededDirectedCodexPtyBindings(
   seededUnconfirmedDirectedCodexPtyIds.clear()
 }
 
-/** Called once the directed spawn returned, so the id is live by construction. */
-export function markDirectedCodexPtySpawned(ptyId: string, accountId: string): void {
+/**
+ * Called once the directed spawn returned, so the id is live by construction.
+ *
+ * Why a failed write does not undo the fact or stop the terminal: unlike a
+ * Claude account binding, this one guards nothing but the next restore. Losing
+ * it only degrades that pane back to the pre-fix behavior on the NEXT launch,
+ * while killing a freshly spawned agent over a disk hiccup loses real work.
+ */
+export function markDirectedCodexPtySpawned(
+  ptyId: string,
+  accountId: string,
+  options?: { persistenceAlreadyRecorded?: boolean }
+): void {
   liveDirectedCodexPtyAccounts.set(ptyId, accountId)
   seededUnconfirmedDirectedCodexPtyIds.delete(ptyId)
+  if (options?.persistenceAlreadyRecorded) {
+    return
+  }
+  try {
+    persistence?.addCodexDirectedPtyAccountBinding(ptyId, accountId)
+  } catch (error) {
+    console.warn(
+      '[codex-directed-pty] Failed to persist the directed account binding; this pane loses its reattach gate after a restart:',
+      error
+    )
+  }
 }
 
 /**
