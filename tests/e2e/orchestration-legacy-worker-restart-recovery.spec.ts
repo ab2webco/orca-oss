@@ -35,6 +35,7 @@ import {
   LEGACY_RUN_ID
 } from '../../src/main/runtime/orchestration/db'
 import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
+import { listAllOrchestrationRuns } from './orchestration-run-pages'
 
 async function readRendererRecoveryState(
   page: Page,
@@ -388,10 +389,8 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
 
       let assignmentRunId = run.result.run.id
       if (contractVersion === LEGACY_CONTRACT_VERSION) {
-        const runs = await secondClient.call<{
-          runs: { id: string; objective: string }[]
-        }>('orchestration.runList')
-        assignmentRunId = runs.result.runs.find(
+        const runs = await listAllOrchestrationRuns(secondClient)
+        assignmentRunId = runs.find(
           (candidate) =>
             candidate.objective === 'Recovered orchestration work from a contract update'
         )!.id

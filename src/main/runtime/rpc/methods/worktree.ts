@@ -20,7 +20,8 @@ import {
   WorktreeSelector,
   WorktreeSet,
   WorktreeSetBatch,
-  WorktreeSortOrder
+  WorktreeSortOrder,
+  WorktreeTeardownMissingTerminalsParams
 } from './worktree-schemas'
 
 export const WORKTREE_METHODS: RpcMethod[] = [
@@ -38,6 +39,16 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     name: 'worktree.detectedList',
     params: WorktreeDetectedListParams,
     handler: async (params, { runtime }) => runtime.listDetectedManagedWorktrees(params.repo)
+  }),
+  defineMethod({
+    name: 'worktree.teardownMissingTerminals',
+    params: WorktreeTeardownMissingTerminalsParams,
+    handler: async (params, { runtime }) =>
+      runtime.teardownMissingManagedWorktreeTerminals(
+        params.repo,
+        params.worktreeIds,
+        params.connectionId
+      )
   }),
   defineMethod({
     name: 'worktree.lineageList',
