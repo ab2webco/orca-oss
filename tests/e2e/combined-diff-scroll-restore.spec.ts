@@ -212,6 +212,45 @@ async function readViewportAnchor(page: Page): Promise<ViewportAnchor | null> {
   })
 }
 
+const CONTENT_HEIGHT_QUIET_SAMPLES = 6
+const CONTENT_HEIGHT_SAMPLE_INTERVAL_MS = 200
+
+// Why: Monaco diff editors swap estimated section heights for measured ones in
+// async passes after (re)mount, so a moving scrollHeight means the layout is
+// still mid-measurement and any anchor read is a transient frame. Holding for
+// a quiet content height pins the anchor comparison to the measured layout
+// instead of a lucky sample window, without loosening the anchor tolerances.
+async function waitForMeasuredContentHeight(page: Page, context: string): Promise<number> {
+  const startedAt = Date.now()
+  let lastHeight = -1
+  let quietSamples = 0
+  const observedHeights: number[] = []
+
+  while (Date.now() - startedAt < 30_000) {
+    const height = await page.evaluate(() => {
+      const container = document.querySelector<HTMLElement>('.combined-diff-scroll-container')
+      return container ? container.scrollHeight : -1
+    })
+    if (height > 0 && height === lastHeight) {
+      quietSamples += 1
+      if (quietSamples >= CONTENT_HEIGHT_QUIET_SAMPLES) {
+        return height
+      }
+    } else {
+      observedHeights.push(height)
+      quietSamples = 0
+      lastHeight = height
+    }
+    await page.waitForTimeout(CONTENT_HEIGHT_SAMPLE_INTERVAL_MS)
+  }
+
+  throw new Error(
+    `combined diff content height never settled (${context}); observed: ${observedHeights
+      .slice(-20)
+      .join(' -> ')}`
+  )
+}
+
 async function waitForStableViewportAnchor(page: Page): Promise<ViewportAnchor> {
   const startedAt = Date.now()
   let lastSignature = ''
@@ -242,15 +281,17 @@ async function waitForStableViewportAnchor(page: Page): Promise<ViewportAnchor> 
 }
 
 // Why: remounting the diff on tab switch restores scroll in several Monaco
-// layout passes, so the first settled anchor can be a mid-restore frame. Poll
-// until the anchor converges near the pre-switch offset before asserting; a
-// genuine restore miss still surfaces because the last anchor is returned on
-// timeout for the caller's assertion to fail on.
+// layout passes, so the first settled anchor can be a mid-restore frame. Hold
+// for a measured (height-quiet) layout first, then poll until the anchor
+// converges near the pre-switch offset before asserting; a genuine restore
+// miss still surfaces because the last anchor is returned on timeout for the
+// caller's assertion to fail on.
 async function waitForRestoredViewportAnchor(
   page: Page,
   target: ViewportAnchor,
   tolerancePx = 80
 ): Promise<ViewportAnchor> {
+  await waitForMeasuredContentHeight(page, 'after switching back to the diff tab')
   // Why: waitForStableViewportAnchor can take up to 15s; start the restoration
   // poll after it settles so a slow first settle does not skip the 10s window.
   let lastAnchor = await waitForStableViewportAnchor(page)
@@ -428,6 +469,10 @@ test.describe('Combined diff scroll restore', () => {
         )}`
       ).toBeLessThan(120)
 
+      // Why: the pre-switch anchor is the comparison target; capturing it while
+      // Monaco is still swapping estimated heights for measured ones would pin
+      // the restore assertion to a frame the viewer itself never persisted.
+      await waitForMeasuredContentHeight(orcaPage, 'before switching tabs')
       const beforeSwitch = await waitForStableViewportAnchor(orcaPage)
       expect(beforeSwitch.index).toBeGreaterThan(0)
 
