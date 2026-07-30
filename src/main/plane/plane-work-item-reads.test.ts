@@ -98,6 +98,91 @@ describe('listProjects', () => {
     expect(await listProjects(null)).toEqual([])
     expect(planeRequestMock).not.toHaveBeenCalled()
   })
+
+  // ORCA-139: an aggregate read must stay grouped and attributed, otherwise a
+  // multi-workspace answer is indistinguishable from a single-workspace one.
+  it('aggregates every connected workspace, grouped by workspace then name', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('zeta'), client('acme')])
+    planeRequestMock
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-z2', identifier: 'ZULU', name: 'Zulu' },
+          { id: 'p-z1', identifier: 'ALPHA', name: 'Alpha' }
+        ])
+      )
+      .mockResolvedValueOnce(page([{ id: 'p-a1', identifier: 'BETA', name: 'Beta' }]))
+
+    const projects = await listProjects('all')
+
+    expect(projects).toEqual([
+      {
+        id: 'p-a1',
+        identifier: 'BETA',
+        name: 'Beta',
+        workspaceSlug: 'acme',
+        workspaceId: expect.any(String)
+      },
+      {
+        id: 'p-z1',
+        identifier: 'ALPHA',
+        name: 'Alpha',
+        workspaceSlug: 'zeta',
+        workspaceId: expect.any(String)
+      },
+      {
+        id: 'p-z2',
+        identifier: 'ZULU',
+        name: 'Zulu',
+        workspaceSlug: 'zeta',
+        workspaceId: expect.any(String)
+      }
+    ])
+  })
+
+  it('gives each workspace a distinct workspaceId so consumers can group by it', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme'), client('beta')])
+    planeRequestMock
+      .mockResolvedValueOnce(page([{ id: 'p-a', identifier: 'A', name: 'A' }]))
+      .mockResolvedValueOnce(page([{ id: 'p-b', identifier: 'B', name: 'B' }]))
+
+    const projects = await listProjects('all')
+    const workspaceIds = projects.map((project) => project.workspaceId)
+
+    expect(workspaceIds.filter(Boolean)).toHaveLength(2)
+    expect(new Set(workspaceIds).size).toBe(2)
+  })
+
+  it('tolerates one failing workspace and still returns the healthy results', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme'), client('beta')])
+    planeRequestMock
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(page([{ id: 'p-b', identifier: 'BETA', name: 'Beta' }]))
+
+    const projects = await listProjects('all')
+
+    expect(projects.map((project) => project.id)).toEqual(['p-b'])
+    expect(projects[0].workspaceSlug).toBe('beta')
+  })
+
+  it('keeps a single-workspace read attributed to that workspace', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce(
+      page([
+        { id: 'p-2', identifier: 'BETA', name: 'Beta' },
+        { id: 'p-1', identifier: 'ALPHA', name: 'Alpha' }
+      ])
+    )
+
+    const projects = await listProjects('ws-acme')
+
+    expect(projects.map((project) => project.identifier)).toEqual(['ALPHA', 'BETA'])
+    expect(projects.every((project) => project.workspaceSlug === 'acme')).toBe(true)
+    expect(new Set(projects.map((project) => project.workspaceId)).size).toBe(1)
+  })
 })
 
 describe('listStates', () => {
