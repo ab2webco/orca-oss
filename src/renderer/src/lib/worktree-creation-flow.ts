@@ -9,7 +9,6 @@ import {
 } from '@/lib/worktree-activation'
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import {
   attachEphemeralVmRuntimeToWorkspace,
   cleanupEphemeralVmRuntimeForFailedCreate,
@@ -20,13 +19,16 @@ import {
   getWorkspaceCreateErrorToastMessage
 } from '@/lib/workspace-create-error-format'
 import type { CreateWorktreeResult } from '../../../shared/types'
-import type {
-  WorktreeCreationPhase,
-  WorktreeCreationRequest
-} from '@/lib/pending-worktree-creation'
+import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { seedAgentTabStateAfterWorktreeCreate } from '@/lib/worktree-creation-agent-seeds'
 import { resolveBackendDraftStartup } from '@/lib/worktree-draft-startup-view-mode'
+
+import {
+  getInitialWorktreeCreationPhase,
+  isPendingCreationSurfaceVisible,
+  revealPendingCreation
+} from './pending-worktree-creation-surface'
 
 type ContinueBackgroundWorktreeCreationOptions = {
   revealCreationSurface?: boolean
@@ -60,48 +62,6 @@ function buildStartupOpt(
       : {}),
     ...(request.quickTelemetry ? { telemetry: request.quickTelemetry } : {})
   }
-}
-
-function getWorktreeCreationIndeterminate(request: WorktreeCreationRequest): boolean {
-  if (request.worktreeCreateProgressMode) {
-    return request.worktreeCreateProgressMode === 'indeterminate'
-  }
-  return getActiveRuntimeTarget(useAppStore.getState().settings).kind !== 'local'
-}
-
-function getInitialWorktreeCreationPhase(request: WorktreeCreationRequest): WorktreeCreationPhase {
-  return request.ephemeralVmRecipe && !request.ephemeralVmRuntimeId ? 'provisioning-vm' : 'fetching'
-}
-
-// Why: activePendingCreationId can outlive the terminal route when the user
-// switches app views; only the terminal route renders the creation panel.
-function isPendingCreationSurfaceVisible(creationId: string): boolean {
-  const state = useAppStore.getState()
-  return state.activeView === 'terminal' && state.activePendingCreationId === creationId
-}
-
-function revealPendingCreation(
-  creationId: string,
-  request: WorktreeCreationRequest,
-  phase: WorktreeCreationPhase
-): void {
-  const store = useAppStore.getState()
-  const indeterminate = getWorktreeCreationIndeterminate(request)
-  store.beginPendingWorktreeCreation({
-    creationId,
-    phase,
-    status: 'creating',
-    startedAt: Date.now(),
-    indeterminate,
-    // Why: the creation surface owns the tab strip immediately. Delaying this
-    // caused the real workspace tab bar to flash out when the debounce elapsed.
-    loaderVisible: true,
-    request
-  })
-  // Why: the creation panel only renders under the terminal view (App content
-  // router), so force it active so the panel is what fills the content area.
-  store.setActiveView('terminal')
-  store.setSidebarOpen(true)
 }
 
 async function preflightAgentTrust(
