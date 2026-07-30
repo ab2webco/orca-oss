@@ -6,6 +6,12 @@
  * leaving only the derived name in the smart field. GitHub/GitLab sources
  * are repo-scoped and must still clear on a project switch.
  *
+ * Why the Jira case binds a source context: #11296 made an unbound Jira item
+ * non-linkable — the composer drops a Jira item whose task source context does
+ * not match it, and TaskPage refuses up front rather than create an unlinked
+ * workspace. So the realistic fixture is a bound context, the same one
+ * bindTaskPageJiraItemSourceContext produces.
+ *
  * Why E2E: the preservation logic lives in useComposerState behind the real
  * ProjectCombobox interaction and main-process repo resolution — a store
  * slice unit test cannot reach the combobox → handleProjectChange → smart
@@ -20,6 +26,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import type { LinkedWorkItemSummary } from '../../src/renderer/src/lib/new-workspace'
+import type { TaskSourceContext } from '../../src/shared/task-source-context'
 
 const SECOND_PROJECT_NAME = 'linked-item-second-project'
 
@@ -53,17 +60,22 @@ async function addSecondProject(page: Page, repoPath: string): Promise<void> {
 async function openComposerWithLinkedWorkItem(
   page: Page,
   linkedWorkItem: LinkedWorkItemSummary,
-  prefilledName: string
+  prefilledName: string,
+  taskSourceContext: TaskSourceContext | null = null
 ): Promise<void> {
   await page.evaluate(
-    ({ linkedWorkItem, prefilledName }) => {
+    ({ linkedWorkItem, prefilledName, taskSourceContext }) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
       }
-      store.getState().openModal('new-workspace-composer', { linkedWorkItem, prefilledName })
+      store.getState().openModal('new-workspace-composer', {
+        linkedWorkItem,
+        prefilledName,
+        ...(taskSourceContext ? { taskSourceContext } : {})
+      })
     },
-    { linkedWorkItem, prefilledName }
+    { linkedWorkItem, prefilledName, taskSourceContext }
   )
 }
 
@@ -104,7 +116,19 @@ test.describe('New workspace composer linked item across project switches', () =
         url: 'https://example.atlassian.net/browse/RDG-344',
         jiraIdentifier: 'RDG-344'
       },
-      'rdg-344-nuxtjs-nextjs'
+      'rdg-344-nuxtjs-nextjs',
+      {
+        kind: 'task-source',
+        provider: 'jira',
+        projectId: 'RDG',
+        hostId: 'local',
+        providerIdentity: {
+          provider: 'jira',
+          siteId: 'site-e2e',
+          siteUrl: 'https://example.atlassian.net',
+          projectKey: 'RDG'
+        }
+      }
     )
 
     const composer = orcaPage.getByRole('dialog')
