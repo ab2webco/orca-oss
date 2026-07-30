@@ -395,6 +395,33 @@ describe('orchestration skill agent coverage', () => {
     ).toBe(true)
   })
 
+  // Why: claude-zai runs Claude Code under an isolated CLAUDE_CONFIG_DIR, so it never
+  // reads ~/.claude/skills — only the agent-agnostic ~/.agents install counts as
+  // coverage. It must stay out of the claude-owner mapping that Agent Teams and
+  // OpenClaude get; a claude-owned root granting it coverage is the silent failure.
+  it('does not credit claude-zai with a claude-owned ~/.claude/skills install', () => {
+    const claudeHomeInstall = [
+      skill({
+        providers: ['claude'],
+        sourceKind: 'home',
+        rootPath: '/Users/test/.claude/skills',
+        directoryPath: '/Users/test/.claude/skills/orchestration'
+      })
+    ]
+
+    expect(
+      agentHasOrchestrationSkill('claude-zai', claudeHomeInstall, [
+        source('/Users/test/.claude/skills', 'claude')
+      ])
+    ).toBe(false)
+
+    expect(
+      agentHasOrchestrationSkill('claude-zai', [skill({})], [
+        source('/Users/test/.agents/skills', null)
+      ])
+    ).toBe(true)
+  })
+
   it('marks Windows skill paths', () => {
     expect(
       agentHasOrchestrationSkill(
