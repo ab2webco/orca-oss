@@ -53,6 +53,10 @@ import {
   confirmSeededClaudeLivePtys,
   hasSeededUnconfirmedClaudePtys
 } from '../claude-accounts/live-pty-gate'
+import {
+  confirmSeededDirectedCodexPtyBindings,
+  hasSeededUnconfirmedDirectedCodexPtys
+} from '../codex/directed-codex-pty-binding'
 
 // Why: daemon init runs concurrent with window load, so an in-process t timestamp (not harness stderr timing) measures cold-start.
 function logDaemonMilestone(event: string, details: Record<string, unknown> = {}): void {
@@ -797,7 +801,7 @@ export async function initDaemonPtyProvider(
   // Why: the first window may register PTY listeners before daemon init finishes; rebind so daemon PTYs still fan out events.
   rebindLocalProviderListeners()
   logDaemonMilestone('daemon-init-done', { legacyAdapters: legacyAdapters.length })
-  await reconcileSeededClaudeLivePtys(routedAdapter)
+  await reconcileSeededAgentLivePtys(routedAdapter)
 }
 
 /**
@@ -818,8 +822,8 @@ export async function initDaemonPtyProvider(
 const SEEDED_CLAUDE_GATE_LIST_ATTEMPTS = 3
 const SEEDED_CLAUDE_GATE_RETRY_DELAY_MS = 500
 
-async function reconcileSeededClaudeLivePtys(provider: DaemonProvider): Promise<void> {
-  if (!hasSeededUnconfirmedClaudePtys()) {
+async function reconcileSeededAgentLivePtys(provider: DaemonProvider): Promise<void> {
+  if (!hasSeededUnconfirmedClaudePtys() && !hasSeededUnconfirmedDirectedCodexPtys()) {
     return
   }
   try {
@@ -857,9 +861,14 @@ async function reconcileSeededClaudeLivePtys(provider: DaemonProvider): Promise<
       )
     }
     confirmSeededClaudeLivePtys(aliveSessionIds)
+    // Why the same unreachable-adapter verdict: a directed Codex binding that no
+    // daemon can even see would force reattach on every later restore of that id
+    // and fail the spawn outright — a permanently unopenable pane. Releasing it
+    // degrades to a normal restore instead.
+    confirmSeededDirectedCodexPtyBindings(aliveSessionIds)
   } catch (error) {
     // Why: gate bookkeeping must never fail daemon init.
-    console.warn('[daemon] Failed to reconcile seeded Claude live-PTY gate:', error)
+    console.warn('[daemon] Failed to reconcile seeded agent live-PTY gates:', error)
   }
 }
 

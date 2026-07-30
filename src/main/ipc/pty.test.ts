@@ -249,6 +249,8 @@ import {
   markClaudePtySpawned
 } from '../claude-accounts/live-pty-gate'
 import * as livePtyGate from '../claude-accounts/live-pty-gate'
+import * as directedCodexPtyBinding from '../codex/directed-codex-pty-binding'
+import { requiresLiveCodexPtyReattach } from '../codex/live-codex-pty-reattach-requirement'
 import {
   SSH_PTY_IDENTITY_MISMATCH_ERROR,
   SSH_SESSION_EXPIRED_ERROR
@@ -2046,6 +2048,56 @@ describe('registerPtyHandlers', () => {
       ).toBeNull()
     })
 
+    // Why (ORCA-130): `--codex-account` takes the same background path, so the
+    // same crossing left a blank pane and an orphaned CLI — Codex just had no
+    // liveness fact for the requirement to read.
+    it('refuses to mint a fresh session for a directed Codex pane whose process is gone', async () => {
+      installExitOnKillSpawnMock()
+      classifyErrorMock.mockReturnValue({ error_class: 'unknown' })
+      directedCodexPtyBinding.markDirectedCodexPtySpawned(
+        'unreachable-codex-session',
+        'codex-account-a'
+      )
+      registerPtyHandlers(mainWindow as never)
+
+      await expect(
+        handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'codex',
+          worktreeId: 'wt-codex-directed',
+          sessionId: 'unreachable-codex-session'
+        })
+      ).rejects.toThrow('PTY_REQUIRED_REATTACH_UNAVAILABLE')
+      expect(spawnMock).not.toHaveBeenCalled()
+      // Why: a retained binding would demand reattach forever, so the pane could
+      // never open again — worse than the blank pane this replaced.
+      expect(
+        directedCodexPtyBinding.getDirectedCodexPtyAccountId('unreachable-codex-session')
+      ).toBeNull()
+    })
+
+    it('leaves a Codex pane that only inherited the account selection on the normal restore path', async () => {
+      installExitOnKillSpawnMock()
+      await getLocalPtyProvider().spawn({
+        cols: 80,
+        rows: 24,
+        sessionId: 'inherited-codex-session'
+      })
+      spawnMock.mockClear()
+      registerPtyHandlers(mainWindow as never)
+
+      const result = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-inherited',
+        sessionId: 'inherited-codex-session'
+      })) as { id: string }
+      expect(result.id).toBe('inherited-codex-session')
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
     it.each(['live gate', 'restart seed'] as const)(
       'keeps a shared reattach shared after repinning via the %s',
       async (ownershipSource) => {
@@ -2427,6 +2479,46 @@ describe('registerPtyHandlers', () => {
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
+    // Why (ORCA-130): the spawn is the only moment the launch account exists —
+    // the restore that must reattach comes back through the renderer handler,
+    // which never carries it, so the fact has to be recorded here or nowhere.
+    it('records a directed Codex binding for a daemon-hosted --codex-account launch', async () => {
+      installDaemonTestProvider()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-directed-launch',
+        codexAccountId: 'codex-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBe('codex-launch')
+      expect(requiresLiveCodexPtyReattach(result.id)).toBe(true)
+      directedCodexPtyBinding.releaseDirectedCodexPtyBinding(result.id)
+    })
+
+    // Why: the narrow half of the gate — a Codex pane that merely inherited the
+    // current selection was never account-directed, and demanding reattach for it
+    // would turn its cold restore into a spawn failure.
+    it('records no directed binding for a daemon-hosted Codex launch without an override', async () => {
+      installDaemonTestProvider()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-inherited-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBeNull()
+      expect(requiresLiveCodexPtyReattach(result.id)).toBe(false)
+    })
+
     it('keeps the Codex worktree pin when no launch account is passed on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()
@@ -2453,6 +2545,26 @@ describe('registerPtyHandlers', () => {
         expect.anything(),
         expect.anything()
       )
+      await handlers.get('pty:kill')!(null, { id: result.id })
+    })
+
+    // Why the local lane must stay unbound: that PTY dies with the app, so it can
+    // never be the surviving process a restore reattaches to — a binding there
+    // would only be a phantom no daemon can ever confirm away.
+    it('records no directed binding for a --codex-account launch on the local-provider lane', async () => {
+      installExitOnKillSpawnMock()
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
+
+      const result = await getController().spawn({
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-directed',
+        codexAccountId: 'codex-launch'
+      })
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBeNull()
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 

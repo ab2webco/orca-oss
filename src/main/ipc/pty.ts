@@ -207,6 +207,11 @@ import {
   forgetCodexPaneAccount,
   recordCodexPaneAccount
 } from '../codex/codex-pane-account-registry'
+import {
+  markDirectedCodexPtySpawned,
+  releaseDirectedCodexPtyBinding
+} from '../codex/directed-codex-pty-binding'
+import { requiresLiveCodexPtyReattach } from '../codex/live-codex-pty-reattach-requirement'
 import { resolveCodexPaneLaunchAccount } from '../codex/codex-pane-launch-account'
 import { getSystemCodexHomePath } from '../codex/codex-home-paths'
 import { isCodexSystemDefaultRealHomeEnabled } from '../codex/codex-real-home-flag'
@@ -1493,6 +1498,9 @@ export function clearProviderPtyState(
     // may drop it — a disconnect that can reconnect is not a death, and a reused
     // id must never inherit a dead pane's Codex account.
     forgetCodexPaneAccount(id)
+    // Why alongside it: a retained directed binding would demand reattach to a
+    // process this teardown just proved is gone (ORCA-130).
+    releaseDirectedCodexPtyBinding(id)
   }
   // Why: OpenCode and Pi both allocate PTY-scoped runtime state outside the
   // node-pty process table. Centralizing provider cleanup avoids drift where a
@@ -4085,6 +4093,7 @@ export function registerPtyHandlers(
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
       const requiresClaudeReattach = requiresLiveClaudePtyReattach(args.sessionId)
+      const requiresCodexReattach = requiresLiveCodexPtyReattach(args.sessionId)
       if (existingInjectedAccountId) {
         // Why: reattach must retain the account that the surviving CLI started
         // with even if the worktree was repinned while the app was away.
@@ -4272,6 +4281,19 @@ export function registerPtyHandlers(
       if (!args.connectionId && args.codexAccountId) {
         spawnOptions.codexLaunchAccountId = args.codexAccountId
       }
+      // Why (ORCA-130): only an explicit `--codex-account` launch pins CODEX_HOME
+      // to that account, and only on a Codex launch command does the override
+      // reach getCodexLaunchTargetForPty at all. An inherited selection is not an
+      // ownership claim, so it must never gate reattach.
+      // Why daemon-hosted only: the bug is DaemonPtyRouter.adapterFor's
+      // `?? this.current` fallback. A local-provider PTY dies with the app, so it
+      // can never be the surviving process a restore must find — binding it would
+      // only persist a fact no adapter can ever confirm, and an unconfirmed
+      // binding forces reattach forever: a pane that never opens again.
+      const codexDirectedAccountId =
+        isDaemonHostSpawn && args.codexAccountId && isCodexLaunchCommand(args.command)
+          ? args.codexAccountId
+          : undefined
       const startupTerminalColorQueryReplyColors = getStartupTerminalColorQueryReplyColors(args)
       if (startupTerminalColorQueryReplyColors) {
         spawnOptions.startupIngress = {
@@ -4334,7 +4356,7 @@ export function registerPtyHandlers(
         spawnOptions.sessionId = sessionId
         ptySizes.set(effectiveSessionAppId ?? sessionId, { cols: args.cols, rows: args.rows })
       }
-      if (requiresClaudeReattach) {
+      if (requiresClaudeReattach || requiresCodexReattach) {
         spawnOptions.requireReattach = true
       }
       const materializedPaneKey = hostSessionBinding
@@ -4589,6 +4611,14 @@ export function registerPtyHandlers(
             // retaining its binding would block safe account mutations forever.
             markClaudePtyExited(args.sessionId)
           }
+          if (
+            requiresCodexReattach &&
+            args.sessionId &&
+            (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
+              rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
+          ) {
+            releaseDirectedCodexPtyBinding(args.sessionId)
+          }
           if (isMintedSessionId && sessionId !== undefined) {
             clearProviderPtyState(sessionId)
           }
@@ -4665,6 +4695,7 @@ export function registerPtyHandlers(
           settings: getSettings?.()
         })
         let didPersistClaudeBinding = false
+        let didPersistCodexDirectedBinding = false
         if (hostSessionBinding) {
           try {
             const binding = {
@@ -4683,7 +4714,8 @@ export function registerPtyHandlers(
                       ? existingSharedAccountId
                       : (claudeAuth?.sharedAccountId ?? null)
                   }
-                : {})
+                : {}),
+              ...(codexDirectedAccountId ? { codexDirectedAccountId } : {})
             }
             didPersistClaudeBinding = args.connectionId
               ? hostSessionBinding.store.persistPtyBinding(
@@ -4691,6 +4723,7 @@ export function registerPtyHandlers(
                   toSshExecutionHostId(args.connectionId)
                 )
               : hostSessionBinding.store.persistPtyBinding(binding)
+            didPersistCodexDirectedBinding = Boolean(codexDirectedAccountId)
           } catch (err) {
             console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
             deletePtyOwnership(result.id)
@@ -4737,6 +4770,15 @@ export function registerPtyHandlers(
         }
         // Why: arms main's per-PTY Command Code output detector from the launch command (renderer startupCommand parity).
         runtime?.noteTerminalSpawnCommand?.(result.id, launchCommand ?? null)
+        if (codexDirectedAccountId) {
+          // Why here and not inside the binding transaction: an account-directed
+          // create only persists a host session binding when no window is
+          // available, so hanging the fact off that branch would leave the common
+          // case — workers spawned while the app runs — ungated (ORCA-130).
+          markDirectedCodexPtySpawned(result.id, codexDirectedAccountId, {
+            persistenceAlreadyRecorded: didPersistCodexDirectedBinding
+          })
+        }
         // Why: the global live-PTY gate protects shared ~/.claude only; an
         // injected PTY owns its account-specific config dir instead.
         if (isClaudeLaunch && !didPrepareInjectedClaudeAuth) {
@@ -5346,6 +5388,10 @@ export function registerPtyHandlers(
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
       const requiresClaudeReattach = requiresLiveClaudePtyReattach(args.sessionId)
+      // Why here too: a background-path pane restores through this renderer
+      // handler, which never carries the launch account — the persisted binding
+      // is the only thing left that knows the pane was account-directed.
+      const requiresCodexReattach = requiresLiveCodexPtyReattach(args.sessionId)
       if (existingInjectedAccountId) {
         claudeSelectionTarget = {
           ...claudeSelectionTarget,
@@ -5673,7 +5719,7 @@ export function registerPtyHandlers(
       if (effectiveSessionId !== undefined) {
         spawnOptions.sessionId = effectiveSessionId
       }
-      if (requiresClaudeReattach) {
+      if (requiresClaudeReattach || requiresCodexReattach) {
         spawnOptions.requireReattach = true
       }
       // Why: without this, the Windows daemon path ignores the user's Default Shell preference (LocalPtyProvider already honors it via getWindowsShell()).
@@ -5837,6 +5883,14 @@ export function registerPtyHandlers(
             // Why: the provider atomically proved the preserved process is gone;
             // retaining its binding would block safe account mutations forever.
             markClaudePtyExited(args.sessionId)
+          }
+          if (
+            requiresCodexReattach &&
+            args.sessionId &&
+            (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
+              rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
+          ) {
+            releaseDirectedCodexPtyBinding(args.sessionId)
           }
           // Why: provider state buildPtyHostEnv materialized for this minted id leaks if spawn failed.
           if (isMintedSessionId && effectiveSessionId !== undefined) {

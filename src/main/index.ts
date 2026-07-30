@@ -239,6 +239,10 @@ import {
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
 import {
+  attachDirectedCodexPtyPersistence,
+  seedDirectedCodexPtyBindingsFromPersistence
+} from './codex/directed-codex-pty-binding'
+import {
   onClaudePtyReleased,
   onLiveClaudePtysDrained
 } from './claude-accounts/live-pty-drain-listeners'
@@ -2112,6 +2116,8 @@ void app.whenReady().then(async () => {
   seedLiveClaudePtysFromPersistence(persistedClaudePtyIds, persistedSharedClaudePtys)
   const persistedInjectedClaudePtys = store.getClaudeLivePtyAccountBindings()
   seedLiveInjectedClaudePtysFromPersistence(persistedInjectedClaudePtys)
+  attachDirectedCodexPtyPersistence(store)
+  seedDirectedCodexPtyBindingsFromPersistence(store.getCodexDirectedPtyAccountBindings())
   if (persistedClaudePtyIds.length > 0 || persistedInjectedClaudePtys.length > 0) {
     console.log(
       `[claude-live-pty] Seeded ${persistedClaudePtyIds.length} shared and ${persistedInjectedClaudePtys.length} injected Claude session id(s) into the refresh gate`
