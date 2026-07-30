@@ -82,8 +82,13 @@ process.stdout.write('\\u001b]0;Codex Ready\\u0007OpenAI Codex\\nmodel: e2e\\ndi
 void emitAuthorityHook()
 let acknowledged = false
 let lifecycleSent = false
+let receivedInput = ''
+let dispatchCapability = null
 process.stdin.on('data', (chunk) => {
   const input = chunk.toString()
+  receivedInput = (receivedInput + input).slice(-16_384)
+  dispatchCapability =
+    receivedInput.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1] ?? dispatchCapability
   if (input.includes('\\x03')) {
     appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'stdin-ctrl-c' })
   }
@@ -123,6 +128,49 @@ process.stdin.on('data', (chunk) => {
       : { status: 127, stdout: '', stderr: 'ORCA_E2E_CLI_ENTRY missing' }
     appendLedger('ORCA_E2E_LIFECYCLE_LEDGER', {
       event: 'legacy-command',
+      argv: args,
+      status: result.status,
+      stdout: result.stdout,
+      stderr: result.stderr
+    })
+    process.stdout.write(String(result.stdout || '') + String(result.stderr || ''))
+  }
+  const currentCompletion = input.match(/ORCA_E2E_RUN_CURRENT_DONE:([A-Za-z0-9+/=]+)/)
+  if (!lifecycleSent && currentCompletion && dispatchCapability) {
+    lifecycleSent = true
+    const identity = JSON.parse(Buffer.from(currentCompletion[1], 'base64').toString('utf8'))
+    const cliEntry = process.env.ORCA_E2E_CLI_ENTRY
+    const args = [
+      'orchestration',
+      'send',
+      '--from',
+      identity.terminalHandle,
+      '--dispatch-capability',
+      dispatchCapability,
+      '--type',
+      'worker_done',
+      '--subject',
+      'Completed',
+      '--body',
+      'E2E retained current completion',
+      '--task-id',
+      identity.taskId,
+      '--dispatch-id',
+      identity.dispatchId,
+      '--outcome',
+      'succeeded',
+      '--files-modified',
+      '',
+      '--json'
+    ]
+    const result = cliEntry
+      ? spawnSync(process.execPath, [cliEntry, ...args], {
+          env: process.env,
+          encoding: 'utf8'
+        })
+      : { status: 127, stdout: '', stderr: 'ORCA_E2E_CLI_ENTRY missing' }
+    appendLedger('ORCA_E2E_LIFECYCLE_LEDGER', {
+      event: 'current-command',
       argv: args,
       status: result.status,
       stdout: result.stdout,
@@ -739,7 +787,68 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
         expect(readLedger(spawnLedgerPath)).toEqual([initialSpawn])
         expect(isProcessAlive(initialSpawn.pid)).toBe(true)
       } else {
-        expect(readLedger(lifecycleLedgerPath)).toEqual([])
+        const currentCompletion = Buffer.from(
+          JSON.stringify({
+            terminalHandle: dispatchHandle,
+            taskId: task.result.task.id,
+            dispatchId: initialDispatch.result.dispatch!.id
+          })
+        ).toString('base64')
+        await secondClient.call('terminal.send', {
+          terminal: recovered!.handle,
+          text: `ORCA_E2E_RUN_CURRENT_DONE:${currentCompletion}`,
+          enter: true
+        })
+        await expect
+          .poll(() => readLedger(lifecycleLedgerPath), { timeout: 30_000 })
+          .toEqual([
+            expect.objectContaining({
+              event: 'current-command',
+              pid: initialSpawn.pid,
+              status: 0,
+              stderr: ''
+            })
+          ])
+        await expect
+          .poll(async () => {
+            const dispatch = await secondClient.call<{
+              dispatch: { id: string; status: string } | null
+            }>('orchestration.dispatchShow', { task: task.result.task.id })
+            const listedTasks = await secondClient.call<{
+              tasks: { id: string; status: string }[]
+            }>('orchestration.taskList', { run: assignmentRunId })
+            return {
+              dispatch: dispatch.result.dispatch?.status,
+              task: listedTasks.result.tasks.find(
+                (candidate) => candidate.id === task.result.task.id
+              )?.status
+            }
+          })
+          .toEqual({ dispatch: 'completed', task: 'completed' })
+
+        const checked = await secondClient.call<{
+          messages: {
+            type: string
+            subject: string
+            body: string | null
+            payload: string | null
+          }[]
+        }>('orchestration.check', {
+          run: run.result.run.id,
+          terminal: coordinator.result.terminal.handle,
+          terminalPaneKey: coordinatorPane.paneKey,
+          types: ['worker_done']
+        })
+        expect(checked.result.messages).toEqual([
+          expect.objectContaining({
+            type: 'worker_done',
+            subject: 'Completed',
+            body: 'E2E retained current completion',
+            payload: expect.stringContaining(initialDispatch.result.dispatch!.id)
+          })
+        ])
+        expect(readLedger(spawnLedgerPath)).toEqual([initialSpawn])
+        expect(isProcessAlive(initialSpawn.pid)).toBe(true)
       }
 
       const otherWorktreeId = await switchToOtherWorktree(second.page, worktreeId)
