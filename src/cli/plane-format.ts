@@ -102,10 +102,12 @@ export function formatPlaneProjectList(projects: PlaneProject[]): string {
   }
   // Why: a flat list gave a multi-workspace answer no workspace attribution, so
   // it read as a single-workspace one; group once 2+ workspaces are present and
-  // keep the single-workspace output byte-identical (ORCA-139).
+  // keep the single-workspace output byte-identical. Keyed on workspaceId, not
+  // the slug — identity is (baseUrl, slug), so two hosts can share a slug and
+  // must not collapse into one header (ORCA-139).
   const groups = new Map<string, PlaneProject[]>()
   for (const project of projects) {
-    const key = project.workspaceSlug ?? project.workspaceId ?? ''
+    const key = project.workspaceId ?? project.workspaceSlug ?? ''
     const group = groups.get(key)
     if (group) {
       group.push(project)
@@ -117,9 +119,9 @@ export function formatPlaneProjectList(projects: PlaneProject[]): string {
     return projects.map(formatProjectRow).join('\n')
   }
   return [...groups]
-    .map(([workspace, group]) =>
+    .map(([workspaceId, group]) =>
       [
-        `Workspace ${workspace || 'unknown'} (${group.length})`,
+        `Workspace ${group[0].workspaceSlug ?? 'unknown'} ${workspaceId} (${group.length})`,
         ...group.map((project) => `  ${formatProjectRow(project)}`)
       ].join('\n')
     )

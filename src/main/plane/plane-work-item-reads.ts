@@ -100,12 +100,16 @@ export async function listProjects(
     )
   }
   // Why: workspace-then-name keeps a cross-workspace read grouped instead of
-  // interleaving two workspaces' projects into one anonymous list (ORCA-139).
+  // interleaving two workspaces' projects into one anonymous list. workspaceId
+  // breaks the slug tie because identity is (baseUrl, slug) — a self-hosted and
+  // a cloud workspace can share a slug (ORCA-139).
   return fanout.results
     .flat()
     .sort(
       (a, b) =>
-        (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') || a.name.localeCompare(b.name)
+        (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') ||
+        (a.workspaceId ?? '').localeCompare(b.workspaceId ?? '') ||
+        a.name.localeCompare(b.name)
     )
 }
 

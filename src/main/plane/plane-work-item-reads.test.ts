@@ -23,9 +23,9 @@ vi.mock('./client', () => ({
   clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
 }))
 
-function client(workspaceSlug: string): PlaneClientForWorkspace {
+function client(workspaceSlug: string, baseUrl = 'https://api.plane.so'): PlaneClientForWorkspace {
   return {
-    baseUrl: 'https://api.plane.so',
+    baseUrl,
     workspaceSlug,
     headers: { 'x-api-key': `key-${workspaceSlug}`, 'x-workspace-slug': workspaceSlug }
   }
@@ -165,6 +165,38 @@ describe('listProjects', () => {
 
     expect(projects.map((project) => project.id)).toEqual(['p-b'])
     expect(projects[0].workspaceSlug).toBe('beta')
+  })
+
+  // Workspace identity is (baseUrl, workspaceSlug), so a self-hosted and a
+  // cloud workspace can share a slug; sorting on the slug alone would
+  // interleave them back into one anonymous list.
+  it('keeps same-slug workspaces on different hosts apart', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([
+      client('acme', 'https://plane.self-hosted.test'),
+      client('acme', 'https://api.plane.so')
+    ])
+    planeRequestMock
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-self-a', identifier: 'ALPHA', name: 'Alpha' },
+          { id: 'p-self-z', identifier: 'ZULU', name: 'Zulu' }
+        ])
+      )
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-cloud-b', identifier: 'BETA', name: 'Beta' },
+          { id: 'p-cloud-y', identifier: 'YANKEE', name: 'Yankee' }
+        ])
+      )
+
+    const projects = await listProjects('all')
+    const workspaceIds = projects.map((project) => project.workspaceId)
+
+    expect(new Set(workspaceIds).size).toBe(2)
+    // Contiguous runs, not Alpha/Beta/Yankee/Zulu — a name-only sort interleaves.
+    const runs = workspaceIds.filter((id, index) => id !== workspaceIds[index - 1]).length
+    expect(runs).toBe(2)
   })
 
   it('keeps a single-workspace read attributed to that workspace', async () => {

@@ -309,7 +309,7 @@ orca plane label remove PROJ-12 --label <labelId> --project <projectId> --json
 
 `--workspace all` fans out across every connected Plane workspace for reads (`list`, `search`, `project list`). It is rejected on any write; pass a concrete workspace id returned by `project list` or work item reads instead.
 
-`project list` defaults to `all`: with no `--workspace` it lists every connected workspace, grouped under a `Workspace <slug> (<count>)` header, and each project carries `workspaceId` and `workspaceSlug` in `--json`. Its result never depends on which workspace is selected in the app, so it is the reliable way to see everything that is connected. `list` and `search` still default to the app's selected workspace — pass `--workspace all` explicitly there when you want a cross-workspace read.
+`project list` defaults to `all`: with no `--workspace` it lists every connected workspace, grouped under a `Workspace <slug> <workspaceId> (<count>)` header, and each project carries `workspaceId` and `workspaceSlug` in `--json`. Groups are keyed on `workspaceId`, so two workspaces that share a slug on different hosts stay separate. Its result never depends on which workspace is selected in the app, so it is the reliable way to see everything that is connected. `list` and `search` still default to the app's selected workspace — pass `--workspace all` explicitly there when you want a cross-workspace read.
 
 ## Completion Flow
 

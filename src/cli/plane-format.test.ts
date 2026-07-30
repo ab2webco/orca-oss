@@ -99,10 +99,36 @@ describe('plane-format', () => {
 
     const output = formatPlaneProjectList(projects)
 
-    expect(output).toContain('Workspace acme (1)')
-    expect(output).toContain('Workspace beta (2)')
+    expect(output).toContain('Workspace acme w-a (1)')
+    expect(output).toContain('Workspace beta w-b (2)')
     expect(output.indexOf('Workspace acme')).toBeLessThan(output.indexOf('Workspace beta'))
     expect(output).toContain('  ACME')
+  })
+
+  // Identity is (baseUrl, slug): a self-hosted and a cloud workspace can share
+  // a slug, and collapsing them into one header re-creates the ORCA-139 defect.
+  it('keeps same-slug workspaces on different hosts in separate groups', () => {
+    const projects: PlaneProject[] = [
+      {
+        id: 'p1',
+        identifier: 'SELF',
+        name: 'Self Hosted',
+        workspaceSlug: 'acme',
+        workspaceId: 'w-self'
+      },
+      {
+        id: 'p2',
+        identifier: 'CLOUD',
+        name: 'Cloud',
+        workspaceSlug: 'acme',
+        workspaceId: 'w-cloud'
+      }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).toContain('Workspace acme w-self (1)')
+    expect(output).toContain('Workspace acme w-cloud (1)')
   })
 
   it('leaves a single-workspace project list ungrouped', () => {
