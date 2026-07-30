@@ -83,11 +83,9 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
   ): Promise<void> {
     adoptNotificationEpoch(session, hostId, event.notificationEpoch)
     const epochAtDelivery = session.lastDeliveredEpoch
-    if (type === 'notification') {
-      await showLocalNotification(event as NotificationEvent, hostId)
-    } else {
-      await dismissLocalNotification(event as DismissNotificationEvent, hostId)
-    }
+    await (type === 'notification'
+      ? showLocalNotification(event as NotificationEvent, hostId)
+      : dismissLocalNotification(event as DismissNotificationEvent, hostId))
     // Why after the await, exactly like the watermark below: `seen` asserts this event
     // reached the user (#8129). Marked before, a rejected show leaves the key behind and
     // every later replay is dropped as a duplicate — loss the quarantine cannot recover,
