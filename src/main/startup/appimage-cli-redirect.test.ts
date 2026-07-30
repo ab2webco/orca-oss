@@ -2,9 +2,18 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { APPIMAGE_CLI_COMMAND_ROOTS } from '../../shared/appimage-cli-command-roots'
 import { getAppImageCliArgs, maybeRedirectAppImageCliLaunch } from './appimage-cli-redirect'
 
 const commandNames = ['serve', 'status', 'terminal']
+
+// Why: the shipped allow-list, not the trimmed one above — these cases assert
+// what a real AppImage launch does.
+const realListOptions = {
+  platform: 'linux',
+  isPackaged: true,
+  commandNames: APPIMAGE_CLI_COMMAND_ROOTS
+} as const
 
 describe('AppImage CLI redirect', () => {
   it('detects direct AppImage CLI commands', () => {
@@ -79,6 +88,73 @@ describe('AppImage CLI redirect', () => {
         }
       )
     ).toEqual(['serve', '--help'])
+  })
+
+  // Why (ORCA-138): this exact argv booted the GUI, hit EADDRINUSE on the
+  // ws-transport port, handed off to the live window, and exited with no output.
+  it('redirects the reported `plane` invocation instead of booting the GUI', () => {
+    expect(
+      getAppImageCliArgs(
+        ['orca-linux.AppImage', 'plane', 'project', 'list', '--json'],
+        { APPIMAGE: '/opt/orca/orca-linux.AppImage' },
+        realListOptions
+      )
+    ).toEqual(['plane', 'project', 'list', '--json'])
+  })
+
+  it('redirects every allow-listed root command', () => {
+    const notRedirected = APPIMAGE_CLI_COMMAND_ROOTS.filter(
+      (root) =>
+        getAppImageCliArgs(
+          ['orca-linux.AppImage', root, '--json'],
+          { APPIMAGE: '/opt/orca/orca-linux.AppImage' },
+          realListOptions
+        ) === null
+    )
+    expect(notRedirected).toEqual([])
+  })
+
+  // Why: widening the allow-list must not turn a desktop file/URL launch into a
+  // CLI run — the AppImage still has to boot the GUI for those.
+  it('still boots the GUI for desktop launches and unknown positionals', () => {
+    for (const argv of [
+      ['AppRun', '--no-sandbox', 'file:///tmp/example.txt'],
+      ['AppRun', 'orca://pair?payload=abc'],
+      ['AppRun', 'definitely-not-a-command']
+    ]) {
+      expect(
+        getAppImageCliArgs(argv, { APPIMAGE: '/opt/orca/orca-linux.AppImage' }, realListOptions)
+      ).toBeNull()
+    }
+  })
+
+  // Why (ORCA-138): every other case injects `commandNames`, so none of them pin
+  // the SHIPPED DEFAULT — `options.commandNames ?? APPIMAGE_CLI_COMMAND_ROOTS`.
+  // Without this, a future stale inline fallback would ship green. No override
+  // here on purpose: this is the packaged code path the Linux user actually hit.
+  it('redirects the reported invocation through the default allow-list', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-appimage-cli-redirect-'))
+    const cliEntryPath = join(root, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+    await mkdir(join(root, 'app.asar.unpacked', 'out', 'cli'), { recursive: true })
+    await writeFile(cliEntryPath, '', 'utf8')
+    const spawn = vi.fn((..._args: unknown[]) => ({ status: 0 }))
+
+    const result = maybeRedirectAppImageCliLaunch({
+      argv: ['orca-linux.AppImage', 'plane', 'project', 'list', '--json'],
+      env: { APPIMAGE: '/opt/orca/orca-linux.AppImage' },
+      platform: 'linux',
+      isPackaged: true,
+      resourcesPath: root,
+      execPath: '/opt/orca/orca-ide',
+      spawn: spawn as never
+    })
+
+    expect(result).toEqual({ redirected: true, status: 0 })
+    expect(spawn).toHaveBeenCalledWith(
+      '/opt/orca/orca-ide',
+      [cliEntryPath, 'plane', 'project', 'list', '--json'],
+      expect.objectContaining({ stdio: 'inherit' })
+    )
   })
 
   it('spawns the unpacked CLI entrypoint with Electron node mode', async () => {

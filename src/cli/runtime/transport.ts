@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { findTransport, type RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import { isKeepaliveFrame, RuntimeRpcEnvelopeSchema } from './envelope-schema'
+import { localAttachRecoveryData } from './local-attach-recovery'
 import { RuntimeClientError, type RuntimeRpcResponse } from './types'
 import { MAX_TIMER_DELAY_MS, isSafeTimerDelayMs } from '../../shared/timer-delay'
 
@@ -16,7 +17,8 @@ export function classifyRuntimeConnectionError(error: unknown): RuntimeClientErr
   }
   return new RuntimeClientError(
     'runtime_unavailable',
-    'Could not connect to the running Orca app. Restart Orca and try again.'
+    'Could not connect to the Orca runtime transport from this shell.',
+    localAttachRecoveryData()
   )
 }
 
@@ -46,7 +48,8 @@ export async function sendRequest<TResult>(
       reject(
         new RuntimeClientError(
           'runtime_unavailable',
-          'No compatible transport found in Orca runtime metadata.'
+          'No compatible transport found in Orca runtime metadata.',
+          localAttachRecoveryData()
         )
       )
       return
