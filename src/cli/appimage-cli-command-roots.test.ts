@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   APPIMAGE_CLI_COMMAND_ROOTS,
@@ -33,6 +35,18 @@ describe('AppImage CLI command roots', () => {
       (root) => !APPIMAGE_CLI_COMMAND_ROOTS.includes(root)
     )
     expect(missing).toEqual([])
+  })
+
+  // Why: the assertion above only compares two arrays in the same file. The real
+  // drift source is a new `argv[0] === '<root>'` short-circuit added to main(),
+  // which has no CommandSpec for the derived check to catch — so read the source
+  // and require every such literal to be allow-listed.
+  it('covers every argv[0] short-circuit in main()', () => {
+    const source = readFileSync(join(__dirname, 'index.ts'), 'utf8')
+    const shortCircuits = [...source.matchAll(/argv\[0\] === '([^']+)'/g)].map((match) => match[1])
+
+    expect(shortCircuits.length).toBeGreaterThan(0)
+    expect(shortCircuits.filter((root) => !APPIMAGE_CLI_COMMAND_ROOTS.includes(root))).toEqual([])
   })
 
   it('lists no command the CLI does not expose', () => {

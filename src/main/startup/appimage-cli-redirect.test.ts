@@ -128,6 +128,35 @@ describe('AppImage CLI redirect', () => {
     }
   })
 
+  // Why (ORCA-138): every other case injects `commandNames`, so none of them pin
+  // the SHIPPED DEFAULT — `options.commandNames ?? APPIMAGE_CLI_COMMAND_ROOTS`.
+  // Without this, a future stale inline fallback would ship green. No override
+  // here on purpose: this is the packaged code path the Linux user actually hit.
+  it('redirects the reported invocation through the default allow-list', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-appimage-cli-redirect-'))
+    const cliEntryPath = join(root, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+    await mkdir(join(root, 'app.asar.unpacked', 'out', 'cli'), { recursive: true })
+    await writeFile(cliEntryPath, '', 'utf8')
+    const spawn = vi.fn((..._args: unknown[]) => ({ status: 0 }))
+
+    const result = maybeRedirectAppImageCliLaunch({
+      argv: ['orca-linux.AppImage', 'plane', 'project', 'list', '--json'],
+      env: { APPIMAGE: '/opt/orca/orca-linux.AppImage' },
+      platform: 'linux',
+      isPackaged: true,
+      resourcesPath: root,
+      execPath: '/opt/orca/orca-ide',
+      spawn: spawn as never
+    })
+
+    expect(result).toEqual({ redirected: true, status: 0 })
+    expect(spawn).toHaveBeenCalledWith(
+      '/opt/orca/orca-ide',
+      [cliEntryPath, 'plane', 'project', 'list', '--json'],
+      expect.objectContaining({ stdio: 'inherit' })
+    )
+  })
+
   it('spawns the unpacked CLI entrypoint with Electron node mode', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-appimage-cli-redirect-'))
     const cliEntryPath = join(root, 'app.asar.unpacked', 'out', 'cli', 'index.js')
