@@ -240,6 +240,7 @@ import {
 } from './claude-accounts/live-pty-gate'
 import {
   attachDirectedCodexPtyPersistence,
+  confirmSeededDirectedCodexPtyBindings,
   seedDirectedCodexPtyBindingsFromPersistence
 } from './codex/directed-codex-pty-binding'
 import {
@@ -872,6 +873,12 @@ function startTerminalRuntimeStartupServices(): Promise<void> {
       logStartupMilestone('startup-service-done', { service: 'agent-hook-server' })
     },
     onDaemonError: (error) => {
+      // Why (ORCA-130): the reconciliation that clears seeded directed Codex
+      // bindings lives at the end of daemon init, so a failed or timed-out start
+      // would leave them asserted with no adapter that can ever confirm them —
+      // and an asserted binding demands a reattach the fallback provider cannot
+      // serve. No daemon means no surviving daemon session: release them all.
+      confirmSeededDirectedCodexPtyBindings([])
       // Why: daemon failure silently falls back to non-persistent local PTYs; log + telemetry so a fleet-wide outage is observable (was invisible in v1.4.129-rc.1).
       const reason = error instanceof Error ? error.message : String(error)
       console.error(
