@@ -38,7 +38,13 @@ describe('PR workflow parallelism', () => {
   })
 
   it('shards the general test suite across Node 24 and Node 26', () => {
-    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24', '26'])
+    // Why an expression and not a literal list: the fork runs one Node major to halve
+    // CI cost while upstream keeps both — the owner ternary must preserve exactly
+    // that split, or a sync could silently drop a major on either side (ORCA-127).
+    const nodeMatrix = workflow.jobs.test.strategy.matrix.node
+    expect(nodeMatrix).toContain("github.repository_owner == 'stablyai'")
+    expect(nodeMatrix).toContain('fromJSON(\'["24", "26"]\')')
+    expect(nodeMatrix).toContain('fromJSON(\'["24"]\')')
     expect(workflow.jobs.test.strategy.matrix.shard).toEqual(
       Array.from({ length: 16 }, (_, index) => index + 1)
     )
