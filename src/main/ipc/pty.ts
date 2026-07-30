@@ -4285,10 +4285,13 @@ export function registerPtyHandlers(
       // to that account, and only on a Codex launch command does the override
       // reach getCodexLaunchTargetForPty at all. An inherited selection is not an
       // ownership claim, so it must never gate reattach.
-      // Why not gated on isDaemonHostSpawn: the degraded daemon routes fresh
-      // spawns to the local provider, and that pane is just as account-directed.
+      // Why daemon-hosted only: the bug is DaemonPtyRouter.adapterFor's
+      // `?? this.current` fallback. A local-provider PTY dies with the app, so it
+      // can never be the surviving process a restore must find — binding it would
+      // only persist a fact no adapter can ever confirm, and an unconfirmed
+      // binding forces reattach forever: a pane that never opens again.
       const codexDirectedAccountId =
-        !args.connectionId && args.codexAccountId && isCodexLaunchCommand(args.command)
+        isDaemonHostSpawn && args.codexAccountId && isCodexLaunchCommand(args.command)
           ? args.codexAccountId
           : undefined
       const startupTerminalColorQueryReplyColors = getStartupTerminalColorQueryReplyColors(args)

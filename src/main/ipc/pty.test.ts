@@ -2548,9 +2548,10 @@ describe('registerPtyHandlers', () => {
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
-    // Why this lane too: the degraded daemon routes fresh spawns to the local
-    // provider, and a pane that lands there is just as account-directed.
-    it('binds a launch-scoped Codex account on the local-provider lane', async () => {
+    // Why the local lane must stay unbound: that PTY dies with the app, so it can
+    // never be the surviving process a restore reattaches to — a binding there
+    // would only be a phantom no daemon can ever confirm away.
+    it('records no directed binding for a --codex-account launch on the local-provider lane', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()
       registerPtyHandlers(mainWindow as never, runtime as never, vi.fn(() => null) as never)
@@ -2563,7 +2564,7 @@ describe('registerPtyHandlers', () => {
         codexAccountId: 'codex-launch'
       })
 
-      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBe('codex-launch')
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(result.id)).toBeNull()
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
