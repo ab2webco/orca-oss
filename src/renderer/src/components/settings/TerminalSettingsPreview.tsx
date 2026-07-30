@@ -98,7 +98,7 @@ export function TerminalSettingsPreview({
 
   // Why: list composeActiveTerminalTheme inputs explicitly so font/cursor changes don't trigger a buffer rewrite.
   const composedTheme = useMemo(
-    () => composeActiveTerminalTheme(appearance.theme, settings),
+    () => composeActiveTerminalTheme(appearance.theme, settings, appearance.mode),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [
       appearance,
