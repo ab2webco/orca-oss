@@ -793,6 +793,11 @@ import {
 } from '../plane/plane-work-item-links'
 import { createLabel as createPlaneLabel } from '../plane/plane-label'
 import {
+  createProject as createPlaneProject,
+  setProjectArchived as setPlaneProjectArchived,
+  updateProject as updatePlaneProject
+} from '../plane/plane-project-write'
+import {
   addPlanningWorkItems as addPlanePlanningWorkItems,
   listPlanningContainers as listPlanePlanningContainers,
   listPlanningWorkItems as listPlanePlanningWorkItems
@@ -809,7 +814,9 @@ import type {
   PlaneAddPlanningWorkItemsArgs,
   PlaneAddRelationArgs,
   PlaneConnectArgs,
+  PlaneArchiveProjectArgs,
   PlaneCreateLabelArgs,
+  PlaneCreateProjectArgs,
   PlaneCreateStateArgs,
   PlaneCreateWorkItemArgs,
   PlaneCurrentWorkItem,
@@ -821,6 +828,7 @@ import type {
   PlanePlanningContainerArgs,
   PlanePlanningWorkItemsArgs,
   PlaneUnlinkCurrentWorkItemResult,
+  PlaneUpdateProjectArgs,
   PlaneUpdateStateArgs,
   PlaneWorkItemFilter,
   PlaneWorkItemUpdate,
@@ -33138,6 +33146,20 @@ export class OrcaRuntimeService {
 
   planeCreateLabel(args: PlaneCreateLabelArgs): ReturnType<typeof createPlaneLabel> {
     return createPlaneLabel(args)
+  }
+
+  planeCreateProject(args: PlaneCreateProjectArgs): ReturnType<typeof createPlaneProject> {
+    return createPlaneProject(args)
+  }
+
+  planeUpdateProject(args: PlaneUpdateProjectArgs): ReturnType<typeof updatePlaneProject> {
+    return updatePlaneProject(args)
+  }
+
+  planeSetProjectArchived(
+    args: PlaneArchiveProjectArgs
+  ): ReturnType<typeof setPlaneProjectArchived> {
+    return setPlaneProjectArchived(args)
   }
 
   planeListPlanningContainers(
