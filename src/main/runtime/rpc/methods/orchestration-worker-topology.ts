@@ -64,7 +64,10 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     command: args.agent,
     title: `worker-${args.taskId}`,
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
-    ...(args.codexAccountId ? { codexAccountId: args.codexAccountId } : {})
+    ...(args.codexAccountId ? { codexAccountId: args.codexAccountId } : {}),
+    // Why: dispatching a worker is background work; it must not pull the sidebar
+    // to the worker's workspace while the user is reading somewhere else.
+    surfaceOwner: false
   })
   args.effects.push({
     kind: 'terminal',

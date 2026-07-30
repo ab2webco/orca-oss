@@ -72,11 +72,38 @@ async function openComposerWithLinkedWorkItem(
       store.getState().openModal('new-workspace-composer', {
         linkedWorkItem,
         prefilledName,
-        ...(taskSourceContext ? { taskSourceContext } : {})
+        taskSourceContext
       })
     },
     { linkedWorkItem, prefilledName, taskSourceContext }
   )
+}
+
+async function getJiraSourceContext(page: Page): Promise<TaskSourceContext> {
+  return page.evaluate(() => {
+    const state = window.__store?.getState()
+    const activeWorktreeId = state?.activeWorktreeId
+    const setup = state?.projectHostSetups.find((candidate) =>
+      state.worktreesByRepo[candidate.repoId]?.some((worktree) => worktree.id === activeWorktreeId)
+    )
+    if (!setup) {
+      throw new Error('Active project host setup is unavailable')
+    }
+    return {
+      kind: 'task-source',
+      provider: 'jira',
+      projectId: setup.projectId,
+      hostId: setup.hostId,
+      projectHostSetupId: setup.id,
+      repoId: setup.repoId,
+      providerIdentity: {
+        provider: 'jira',
+        siteId: 'e2e-jira-site',
+        siteUrl: 'https://example.atlassian.net',
+        projectKey: 'RDG'
+      }
+    }
+  })
 }
 
 async function switchComposerProject(page: Page, projectName: string): Promise<void> {
@@ -106,6 +133,7 @@ test.describe('New workspace composer linked item across project switches', () =
   })
 
   test('keeps a Jira issue linked when the project changes', async ({ orcaPage }) => {
+    const jiraSourceContext = await getJiraSourceContext(orcaPage)
     await openComposerWithLinkedWorkItem(
       orcaPage,
       {
@@ -117,18 +145,7 @@ test.describe('New workspace composer linked item across project switches', () =
         jiraIdentifier: 'RDG-344'
       },
       'rdg-344-nuxtjs-nextjs',
-      {
-        kind: 'task-source',
-        provider: 'jira',
-        projectId: 'RDG',
-        hostId: 'local',
-        providerIdentity: {
-          provider: 'jira',
-          siteId: 'site-e2e',
-          siteUrl: 'https://example.atlassian.net',
-          projectKey: 'RDG'
-        }
-      }
+      jiraSourceContext
     )
 
     const composer = orcaPage.getByRole('dialog')

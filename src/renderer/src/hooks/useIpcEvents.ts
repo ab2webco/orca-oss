@@ -1417,6 +1417,7 @@ export function useIpcEvents(): void {
           activate,
           focus,
           presentation,
+          surfaceOwner,
           tabId,
           leafId,
           splitFromLeafId,
@@ -1431,7 +1432,8 @@ export function useIpcEvents(): void {
               focus
             })
             const shouldActivate = terminalPresentation === 'focused'
-            const shouldSurfaceOwner = terminalPresentation !== 'background'
+            const shouldSurfaceOwner =
+              terminalPresentation !== 'background' && surfaceOwner !== false
             if (shouldActivate) {
               activateTerminalInitiatedWorktree(store, worktreeId)
             }
@@ -1691,7 +1693,8 @@ export function useIpcEvents(): void {
           }
           const terminalPresentation = resolveTerminalPresentation(data)
           const shouldActivate = terminalPresentation === 'focused'
-          const shouldSurfaceOwner = terminalPresentation !== 'background'
+          const shouldSurfaceOwner =
+            terminalPresentation !== 'background' && data.surfaceOwner !== false
           if (shouldActivate) {
             activateTerminalInitiatedWorktree(store, worktreeId)
           }
