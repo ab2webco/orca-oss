@@ -50,7 +50,8 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
     dir: string,
     payload: string,
     paneKey = PANE_KEY,
-    configDir?: string
+    configDir?: string,
+    columns?: string
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn('sh', [scriptPath], {
@@ -58,7 +59,8 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
           PATH: process.env.PATH ?? '',
           TMPDIR: dir,
           ORCA_PANE_KEY: paneKey,
-          ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {})
+          ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {}),
+          ...(columns === undefined ? {} : { COLUMNS: columns })
         },
         stdio: ['pipe', 'pipe', 'pipe']
       })
@@ -213,6 +215,54 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
     )
     expect(stdout).not.toContain('↻')
     expect(stdout).toContain('5h')
+  })
+
+  it('budgets against COLUMNS on a narrow viewport: identity stays, the ladder falls', async () => {
+    // The mobile refit leaves the PTY at ~40-60 cols and Claude Code re-injects COLUMNS on
+    // every tick — the ladder must pay with quota fields there, never by wrapping identity.
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+    })
+    const { scriptPath, dir } = makeHarness()
+    const narrow = await runScript(scriptPath, dir, payload, 'tab-1:cols-40', undefined, '40')
+    expect(narrow.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42%')
+    // The same script on the same PTY, next tick refit wide again: the full ladder returns.
+    const wide = await runScript(scriptPath, dir, payload, 'tab-1:cols-96', undefined, '96')
+    expect(wide.trimEnd()).toBe(
+      'Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
+    )
+  })
+
+  it('drops budgeted fields in the ORCA-118 priority order as the width shrinks', async () => {
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+    })
+    const { scriptPath, dir } = makeHarness()
+    // 62 columns: banner(14) + x(1) + Fable(5) + ctx(13) + separators fit 5h (+15) but not 7d.
+    const mid = await runScript(scriptPath, dir, payload, 'tab-1:cols-62', undefined, '62')
+    expect(mid.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%')
+    expect(columns(mid)).toBeLessThanOrEqual(62)
+  })
+
+  it('treats a malformed COLUMNS as the assumed 96-column budget', async () => {
+    const payload = displayPayload({
+      rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
+    })
+    const { scriptPath, dir } = makeHarness()
+    // "040" is the octal trap on cmd; both variants reject leading zeros for parity.
+    for (const [index, malformed] of ['040', '40x', '0'].entries()) {
+      const stdout = await runScript(
+        scriptPath,
+        dir,
+        payload,
+        `tab-1:cols-bad-${index}`,
+        undefined,
+        malformed
+      )
+      expect(stdout.trimEnd()).toBe(
+        'Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
+      )
+    }
   })
 
   it('renders the fields in the configured order', async () => {

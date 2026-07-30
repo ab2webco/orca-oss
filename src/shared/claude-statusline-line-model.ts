@@ -11,9 +11,23 @@
 
 import type { ClaudeStatusLineItemKey, ClaudeStatusLineItems } from './claude-statusline-items'
 
-// Why 96: a status line that wraps reads as a broken app, and the width has to be assumed
-// because reading the real terminal width needs a subprocess on a path that runs ~3x/sec.
+// Why 96 is now the ceiling and the fallback, not the assumption: a status line that wraps
+// reads as a broken app. The scripts budget each tick against the COLUMNS env Claude Code
+// injects per statusLine invocation (v2.1.153+; measured on 2.1.220 — it tracks the mobile
+// viewport refit, so the same PTY budgets correctly from whichever device looks at it).
+// Clamped here because the field bounds were tuned for 96, and assumed here when COLUMNS is
+// absent or malformed — reading the width any other way needs a subprocess on a ~3x/sec path.
 export const STATUSLINE_MAX_WIDTH = 96
+
+// Why a shared resolver: both script generators and the parity suite must trust the exact same
+// COLUMNS grammar. No leading zeros — cmd's numeric IF parses them as octal — and four digits
+// at most, mirroring the guards the generated scripts apply before arithmetic ever runs.
+export function resolveStatusLineWidthBudget(columns: string | undefined): number {
+  if (columns === undefined || !/^[1-9][0-9]{0,3}$/.test(columns)) {
+    return STATUSLINE_MAX_WIDTH
+  }
+  return Math.min(Number(columns), STATUSLINE_MAX_WIDTH)
+}
 
 // Why 24: worktree directory names are the project identity here and routinely run long, so the
 // bound keeps a meaningful prefix while capping the one new field that could blow the line.
@@ -313,14 +327,15 @@ function composeField(
  * Width fidelity note: the scripts count bytes for plain-text spans while this counts
  * characters; the two agree exactly for ASCII field values, which the preview sample
  * guarantees. Budget semantics mirror the scripts: identity fields always append, budgeted
- * fields fall stickily — once one misses the 96-column budget, no later budgeted field is
- * admitted behind it.
+ * fields fall stickily — once one misses the width budget (the resolved terminal width,
+ * assumed 96 when unknown), no later budgeted field is admitted behind it.
  */
 export function composeStatusLine(
   items: ClaudeStatusLineItems,
   order: readonly ClaudeStatusLineItemKey[],
   variant: ClaudeStatusLineVariant,
-  fields: ClaudeStatusLineSampleFields = CLAUDE_STATUSLINE_PREVIEW_SAMPLE
+  fields: ClaudeStatusLineSampleFields = CLAUDE_STATUSLINE_PREVIEW_SAMPLE,
+  maxWidth: number = STATUSLINE_MAX_WIDTH
 ): string {
   const cells = deriveStatusLineBarCells(items)
   const vocabulary = vocabularyFor(variant, cells)
@@ -340,7 +355,7 @@ export function composeStatusLine(
       if (full) {
         continue
       }
-      if (width + separatorWidth + field.width > STATUSLINE_MAX_WIDTH) {
+      if (width + separatorWidth + field.width > maxWidth) {
         full = true
         continue
       }

@@ -4,6 +4,7 @@ import {
   type ClaudeStatusLineItemKey,
   type ClaudeStatusLineItems
 } from '../../shared/claude-statusline-items'
+import { STATUSLINE_MAX_WIDTH } from '../../shared/claude-statusline-line-model'
 import { WINDOWS_HOOK_STDIN_READER } from '../agent-hooks/hook-stdin-contract'
 import {
   budgetedFieldLines,
@@ -295,10 +296,21 @@ export function getWindowsManagedStatusLineScript(
     // so dropping them buys almost no width while costing the things the line exists to say —
     // and the project never falling is the point: it was the first thing the old cascade hid in
     // a narrow pane, and it is what the user most misses.
+    // Why the budget resolves per tick instead of baking 96 in: the same PTY is viewed from
+    // desktop and mobile, and the viewport refit rewrites cols between ticks. Claude Code
+    // injects COLUMNS into this env on every invocation (v2.1.153+), so reading it is free —
+    // measuring the width any other way needs a subprocess, which this path must not spawn.
+    // Why reject a leading zero outright: cmd's numeric IF parses it as octal (and "08" falls
+    // back to string comparison); the POSIX variant enforces the same grammar for parity.
+    `set "ORCA_STATUSLINE_BUDGET=${STATUSLINE_MAX_WIDTH}"`,
+    'set "ORCA_STATUSLINE_COLS="',
+    'if defined COLUMNS set "ORCA_STATUSLINE_COLS=!COLUMNS!"',
+    'if defined ORCA_STATUSLINE_COLS for /f "delims=0123456789" %%d in ("!ORCA_STATUSLINE_COLS!") do set "ORCA_STATUSLINE_COLS="',
+    'if defined ORCA_STATUSLINE_COLS if "!ORCA_STATUSLINE_COLS:~0,1!"=="0" set "ORCA_STATUSLINE_COLS="',
+    'if defined ORCA_STATUSLINE_COLS if not "!ORCA_STATUSLINE_COLS:~4!"=="" set "ORCA_STATUSLINE_COLS="',
+    `if defined ORCA_STATUSLINE_COLS if !ORCA_STATUSLINE_COLS! LSS ${STATUSLINE_MAX_WIDTH} set "ORCA_STATUSLINE_BUDGET=!ORCA_STATUSLINE_COLS!"`,
     'set "ORCA_STATUSLINE_LINE=!ORCA_STATUSLINE_INTRO!"',
-    // Why a length budget instead of reading the terminal width: width needs a subprocess, which
-    // is exactly what this path must not do. Appending in configured order makes the budgeted
-    // fields fall out of the budget on their own.
+    // Appending in configured order makes the budgeted fields fall out of the budget on their own.
     'set "ORCA_STATUSLINE_FULL="',
     ...compositionLines,
     `:${STATUSLINE_EMIT_LABEL}`,
