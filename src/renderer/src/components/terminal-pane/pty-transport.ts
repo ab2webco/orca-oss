@@ -11,6 +11,7 @@ import {
   iterateTerminalInputChunks
 } from '../../../../shared/terminal-input'
 import { isRuntimeOwnedSshTargetId } from '../../../../shared/execution-host'
+import { getPtyReattachUnavailableNotice } from './pty-reattach-unavailable-notice'
 import {
   ptyDataHandlers,
   ptyReplayHandlers,
@@ -896,6 +897,11 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
         }
         // Why: re-spawning a Kill-All'd session throws TerminalKilledError; swallow it (pane still shows "Process exited"), don't toast (src/main/daemon/daemon-pty-adapter.ts).
         if (msg.includes('was explicitly killed')) {
+          return undefined
+        }
+        const reattachUnavailableNotice = getPtyReattachUnavailableNotice(msg)
+        if (reattachUnavailableNotice) {
+          storedCallbacks.onError?.(reattachUnavailableNotice)
           return undefined
         }
         // Why: on cold start the SSH provider isn't registered yet, so pty:spawn throws a raw IPC error; replace with a friendly message.

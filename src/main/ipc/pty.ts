@@ -102,6 +102,7 @@ import {
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import { requiresLiveClaudePtyReattach } from '../claude-accounts/live-claude-pty-reattach-requirement'
 import {
   abortInPlaceClaudeAccountSwitch,
   beginInPlaceClaudeAccountSwitch,
@@ -4083,6 +4084,10 @@ export function registerPtyHandlers(
         args.sessionId && isExistingSharedClaudeSession
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
+      const requiresClaudeReattach = requiresLiveClaudePtyReattach({
+        isExistingSharedClaudeSession,
+        existingInjectedAccountId
+      })
       if (existingInjectedAccountId) {
         // Why: reattach must retain the account that the surviving CLI started
         // with even if the worktree was repinned while the app was away.
@@ -4332,7 +4337,7 @@ export function registerPtyHandlers(
         spawnOptions.sessionId = sessionId
         ptySizes.set(effectiveSessionAppId ?? sessionId, { cols: args.cols, rows: args.rows })
       }
-      if (isExistingSharedClaudeSession) {
+      if (requiresClaudeReattach) {
         spawnOptions.requireReattach = true
       }
       const materializedPaneKey = hostSessionBinding
@@ -4578,7 +4583,7 @@ export function registerPtyHandlers(
             }
           }
           if (
-            isExistingSharedClaudeSession &&
+            requiresClaudeReattach &&
             args.sessionId &&
             (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
               rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
@@ -5343,6 +5348,10 @@ export function registerPtyHandlers(
         args.sessionId && isExistingSharedClaudeSession
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
+      const requiresClaudeReattach = requiresLiveClaudePtyReattach({
+        isExistingSharedClaudeSession,
+        existingInjectedAccountId
+      })
       if (existingInjectedAccountId) {
         claudeSelectionTarget = {
           ...claudeSelectionTarget,
@@ -5670,7 +5679,7 @@ export function registerPtyHandlers(
       if (effectiveSessionId !== undefined) {
         spawnOptions.sessionId = effectiveSessionId
       }
-      if (isExistingSharedClaudeSession) {
+      if (requiresClaudeReattach) {
         spawnOptions.requireReattach = true
       }
       // Why: without this, the Windows daemon path ignores the user's Default Shell preference (LocalPtyProvider already honors it via getWindowsShell()).
@@ -5826,7 +5835,7 @@ export function registerPtyHandlers(
             }
           }
           if (
-            isExistingSharedClaudeSession &&
+            requiresClaudeReattach &&
             args.sessionId &&
             (spawnError.message.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE) ||
               rawMessage.includes(REQUIRED_PTY_REATTACH_UNAVAILABLE))
