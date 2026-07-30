@@ -24,6 +24,7 @@ import { publishTerminalViewAttributes } from './terminal-view-attributes-publis
 import { normalizeTerminalLineHeight } from '../../../../shared/terminal-line-height-settings'
 import { maybePushMode2031Flip } from './terminal-mode-2031-replies'
 import { resolveTerminalMinimumContrastRatio } from '@/lib/terminal-contrast-correction'
+import { isTerminalBackgroundLight } from '@/lib/terminal-title-contrast'
 
 export function hexToRgba(hex: string, alpha: number): string {
   let clean = hex.replace('#', '')
@@ -43,24 +44,53 @@ export function isHexColor(value: string): boolean {
   return HEX_COLOR_RE.test(value)
 }
 
+// Why two ramps: a single gray cannot clear ~3:1 against both a near-black and a white
+// terminal, and xterm's own default (~0.2 alpha) misses on either. Alphas are the lowest
+// that keep a 7px bar legible once composited over the terminal background (ORCA-133).
+const SLIDER_CHANNELS_ON_DARK_BACKGROUND = '180, 180, 185'
+const SLIDER_CHANNELS_ON_LIGHT_BACKGROUND = '60, 60, 66'
+const SLIDER_ALPHA = { rest: 0.55, hover: 0.75, active: 0.9 } as const
+
+type ScrollbarSliderTheme = Required<
+  Pick<
+    ITheme,
+    | 'scrollbarSliderBackground'
+    | 'scrollbarSliderHoverBackground'
+    | 'scrollbarSliderActiveBackground'
+  >
+>
+
+function resolveScrollbarSliderTheme(
+  background: string | undefined,
+  appSurface: 'dark' | 'light'
+): ScrollbarSliderTheme {
+  // Why the composed background, not appSurface alone: either theme slot can hold either kind
+  // of theme, and a translucent background composites against the app surface (#7934).
+  const channels = isTerminalBackgroundLight(background, { appSurface })
+    ? SLIDER_CHANNELS_ON_LIGHT_BACKGROUND
+    : SLIDER_CHANNELS_ON_DARK_BACKGROUND
+  return {
+    scrollbarSliderBackground: `rgba(${channels}, ${SLIDER_ALPHA.rest})`,
+    scrollbarSliderHoverBackground: `rgba(${channels}, ${SLIDER_ALPHA.hover})`,
+    scrollbarSliderActiveBackground: `rgba(${channels}, ${SLIDER_ALPHA.active})`
+  }
+}
+
 // Why extracted: lets the settings preview compose the same theme without depending on PaneManager. Keep pure.
 export function composeActiveTerminalTheme(
   baseTheme: ITheme | null,
   settings: Pick<
     GlobalSettings,
     'terminalColorOverrides' | 'terminalBackgroundOpacity' | 'terminalCursorOpacity'
-  >
+  >,
+  appSurface: 'dark' | 'light' = 'dark'
 ): ITheme | null {
   if (!baseTheme) {
     return null
   }
   // Why transparent ruler border: scrollbar.width enables xterm's overview ruler, whose border would paint a bright line.
-  // Why raised slider alpha: xterm's default (~0.2) is nearly invisible on dark bg. Before the spread so explicit theme wins.
   let theme: ITheme = {
     overviewRulerBorder: 'transparent',
-    scrollbarSliderBackground: 'rgba(180, 180, 185, 0.4)',
-    scrollbarSliderHoverBackground: 'rgba(180, 180, 185, 0.6)',
-    scrollbarSliderActiveBackground: 'rgba(180, 180, 185, 0.8)',
     ...baseTheme
   }
   // Why: merge Ghostty color overrides atop the base theme so individual colors can be tweaked without losing the rest.
@@ -81,7 +111,9 @@ export function composeActiveTerminalTheme(
       cursor: hexToRgba(theme.cursor, settings.terminalCursorOpacity)
     }
   }
-  return theme
+  // Why last: the slider ramp is picked from the fully composed background, so it has to see
+  // color overrides and the opacity rewrite — and it must outrank whatever the base theme said.
+  return { ...theme, ...resolveScrollbarSliderTheme(theme.background, appSurface) }
 }
 
 /** Publishes composed terminal appearance at app start so hidden-at-launch PTYs can query OSC 10/11
@@ -96,7 +128,7 @@ export function publishTerminalViewAttributesAtAppStart(
   }
   const appearance = resolveEffectiveTerminalAppearance(settings, systemPrefersDark)
   const baseTheme: ITheme | null = appearance.theme ?? getBuiltinTheme(appearance.themeName)
-  const theme = composeActiveTerminalTheme(baseTheme, settings)
+  const theme = composeActiveTerminalTheme(baseTheme, settings, appearance.mode)
   return send !== undefined
     ? publishTerminalViewAttributes(theme, appearance.mode, settings, send)
     : publishTerminalViewAttributes(theme, appearance.mode, settings)
@@ -140,7 +172,7 @@ export function applyTerminalAppearance(
   const appearance = resolveEffectiveTerminalAppearance(settings, systemPrefersDark)
   const paneStyles = resolvePaneStyleOptions(settings)
   const baseTheme: ITheme | null = appearance.theme ?? getBuiltinTheme(appearance.themeName)
-  const theme = composeActiveTerminalTheme(baseTheme, settings)
+  const theme = composeActiveTerminalTheme(baseTheme, settings, appearance.mode)
   // Publish composed appearance to main's hidden-PTY query responder — the only point it exists; deduped in the publisher.
   publishTerminalViewAttributes(theme, appearance.mode, settings)
   const paneBackground = theme?.background ?? '#000000'

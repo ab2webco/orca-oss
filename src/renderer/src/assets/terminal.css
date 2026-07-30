@@ -48,6 +48,22 @@
   border-radius: 4px;
 }
 
+/* xterm hides the slider 500ms after the last scroll (stock VS Code
+   ScrollableElement, hardcoded to ScrollbarVisibility.Auto), but scrollbar.width
+   in pane-terminal-options.ts already pays for the gutter permanently — so the
+   bar must stay there to grab (#5051, ORCA-133). `xterm-fade` marks a bar that
+   is needed and merely timed out; one that is genuinely not needed carries
+   `xterm-invisible` alone and stays hidden. Vertical only: the horizontal bar
+   has no reserved gutter and would overlap content. */
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical.xterm-invisible.xterm-fade {
+  opacity: 1;
+  pointer-events: auto;
+  /* xterm's fade rule still applies its 800ms opacity transition here. Entering this state from
+     a hidden bar (mouse leaves before the 100ms reveal finishes) would ramp 0 → 1 over 800ms
+     instead of just staying put — a persistent bar has nothing to animate. */
+  transition: none;
+}
+
 /* xterm.css sets position:absolute;top:0 on .xterm-helpers but omits left,
    leaving left:auto. In Electron's Blink, left:auto can resolve to a non-zero
    value and offset the IME candidate window away from the cursor. Anchoring it
