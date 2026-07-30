@@ -81,7 +81,7 @@ test.describe('cold worktree activation deferral', () => {
     // Why a child worktree: deferral (like per-tab parking) requires
     // snapshot-backed daemon PTYs, whose session ids embed `repoId::path` —
     // primary-worktree tabs are conservatively never deferred.
-    const worktreeId = await page.evaluate(async (name) => {
+    const { worktreeId, originalWorktreeId } = await page.evaluate(async (name) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is unavailable')
@@ -97,7 +97,7 @@ test.describe('cold worktree activation deferral', () => {
       const result = await state.createWorktree(activeWorktree.repoId, name)
       await state.fetchWorktrees(activeWorktree.repoId)
       state.setActiveWorktree(result.worktree.id)
-      return result.worktree.id
+      return { worktreeId: result.worktree.id, originalWorktreeId: activeWorktreeId }
     }, `e2e-cold-defer-${Date.now()}`)
     await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(worktreeId)
 
@@ -115,7 +115,14 @@ test.describe('cold worktree activation deferral', () => {
       )
       .toBe(TAB_COUNT)
     const tabIds = (await getTerminalTabSnapshots(page, worktreeId)).map((tab) => tab.id)
+    const ptyIds = (await getTerminalTabSnapshots(page, worktreeId)).flatMap((tab) =>
+      tab.ptyId ? [tab.ptyId] : []
+    )
     const lastActiveTabId = await getActiveTabId(page)
+
+    // Keep the target cold across reload so authority can settle before its one-time activation plan.
+    await page.evaluate((id) => window.__store?.getState().setActiveWorktree(id), originalWorktreeId)
+    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(originalWorktreeId)
 
     // Why: trigger the production synchronous shutdown flush and verify its
     // persisted result instead of sleeping through the debounce.
@@ -144,13 +151,41 @@ test.describe('cold worktree activation deferral', () => {
     // and the activation must defer them instead of mounting all at once.
     await page.reload()
     await waitForSessionReady(page)
-    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(worktreeId)
+    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(originalWorktreeId)
     await expect
       .poll(async () => (await getTerminalTabSnapshots(page, worktreeId)).length, {
         timeout: 15_000,
         message: 'persisted terminal tabs did not survive the reload'
       })
       .toBe(TAB_COUNT)
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            ({ id, ptyIds, expectedCount }) => {
+              const state = window.__store?.getState()
+              const worktree = Object.values(state?.worktreesByRepo ?? {})
+                .flat()
+                .find((candidate) => candidate.id === id)
+              const capabilities =
+                window.api.pty.getAuthoritativeBufferSnapshotCapabilities?.(ptyIds) ?? []
+              return (
+                worktree?.hostId === 'local' &&
+                ptyIds.length === expectedCount &&
+                capabilities.length === ptyIds.length &&
+                capabilities.every((capability) => capability.authoritative === true)
+              )
+            },
+            { id: worktreeId, ptyIds, expectedCount: TAB_COUNT }
+          ),
+        {
+          timeout: 30_000,
+          message: 'cold worktree did not resolve local authoritative snapshot coverage'
+        }
+      )
+      .toBe(true)
+    await page.evaluate((id) => window.__store?.getState().setActiveWorktree(id), worktreeId)
+    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(worktreeId)
 
     // The visible tab mounts immediately.
     await waitForActiveTerminalManager(page, 30_000)
