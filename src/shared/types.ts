@@ -45,6 +45,7 @@ import type { UsagePercentageDisplay } from './usage-percentage-display'
 import type { StatusBarUsageMode } from './status-bar-usage-mode'
 import type { PersistedNativeChatSessionOptions } from './native-chat-session-options'
 import type { CodexResetCreditAttemptLedger } from './codex-reset-credit-attempt-ledger'
+import type { TaskSourceContext } from './task-source-context'
 
 // Re-exported for backward compat with renderer call sites that import
 // `WorkspaceCreateTelemetrySource` from '../../../shared/types'.
@@ -164,6 +165,7 @@ export type ProjectHostSetup = {
 
 export type ProjectHostSetupExistingFolderArgs = {
   projectId: string
+  projectProviderIdentity?: ProjectProviderIdentity
   hostId: ExecutionHostId
   path: string
   kind?: RepoKind
@@ -186,6 +188,7 @@ export type ProjectHostSetupCreateArgs = {
 
 export type ProjectHostSetupCloneArgs = {
   projectId: string
+  projectProviderIdentity?: ProjectProviderIdentity
   hostId: ExecutionHostId
   url: string
   destination: string
@@ -325,7 +328,8 @@ export type FolderWorkspace = {
   folderPath: string
   /** SSH target ID for folder workspaces whose folder path lives remotely. */
   connectionId?: string | null
-  linkedTask: FolderWorkspaceLinkedTask | null
+  linkedTask: WorkspaceLinkedItem | null
+  linkedTaskSourceContext?: TaskSourceContext | null
   comment: string
   isArchived: boolean
   isUnread: boolean
@@ -342,7 +346,7 @@ export type FolderWorkspace = {
   updatedAt: number
 }
 
-export type FolderWorkspaceLinkedTask = {
+export type WorkspaceLinkedItem = {
   provider: 'github' | 'gitlab' | 'linear' | 'jira' | 'plane'
   type: 'issue' | 'pr' | 'mr'
   number: number
@@ -365,6 +369,8 @@ export type LinkedPlaneWorkItem = {
   workspaceId?: string
   url?: string
 }
+
+export type FolderWorkspaceLinkedTask = WorkspaceLinkedItem
 
 export type NestedRepoScanOptions = {
   maxDepth?: number
@@ -513,6 +519,8 @@ export type Worktree = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedWorkItem?: WorkspaceLinkedItem | null
+  linkedTaskSourceContext?: TaskSourceContext | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -661,6 +669,8 @@ export type WorktreeMeta = {
   linkedAzureDevOpsPR?: number | null
   /** Optional for backward compatibility — see Worktree.linkedGiteaPR. */
   linkedGiteaPR?: number | null
+  linkedWorkItem?: WorkspaceLinkedItem | null
+  linkedTaskSourceContext?: TaskSourceContext | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -2224,6 +2234,7 @@ export type WorktreeStartupLaunch = {
   launchConfig?: SleepingAgentLaunchConfig
   launchToken?: string
   launchAgent?: TuiAgent
+  viewMode?: 'terminal' | 'chat'
   startupCommandDelivery?: StartupCommandDelivery
   telemetry?: { agent_kind: AgentKind; launch_source: LaunchSource; request_kind: RequestKind }
 }
@@ -2291,6 +2302,8 @@ export type CreateWorktreeArgs = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedWorkItem?: WorkspaceLinkedItem | null
+  linkedTaskSourceContext?: TaskSourceContext | null
   pushTarget?: GitPushTarget
   workspaceStatus?: WorkspaceStatus
   /** Claude managed account to pin this worktree to at creation. Omitted/null =
@@ -3368,6 +3381,7 @@ export type WorktreeCardProperty =
   // Task metadata on workspace cards; provider-specific persisted values kept for older profiles.
   | 'issue'
   | 'linear-issue'
+  | 'jira-issue'
   | 'pr'
   | 'automation'
   // Badge marking workspaces created through `orca worktree create`.

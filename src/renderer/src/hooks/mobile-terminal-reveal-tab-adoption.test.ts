@@ -7,6 +7,10 @@ import {
 
 const WORKTREE_ID = 'wt-1'
 
+function revealIdentity(tabId: string) {
+  return { worktreeId: WORKTREE_ID, tabId, leafId: 'leaf-b', ptyId: 'pty-b' }
+}
+
 function revealSplitPaneFromMobile(harness: {
   createTerminal: (request: {
     requestId?: string
@@ -50,9 +54,9 @@ describe('mobile terminal reveal tab adoption', () => {
       requestId: 'mobile-reveal',
       // Why identity: the store records this leaf->pty binding on the adopted tab,
       // so the reply can name the exact pane it bound.
-      identity: { worktreeId: WORKTREE_ID, tabId: 'tab-split', leafId: 'leaf-b', ptyId: 'pty-b' },
       tabId: 'tab-split',
-      title: 'codex'
+      title: 'codex',
+      identity: revealIdentity('tab-split')
     })
   })
 
@@ -70,12 +74,13 @@ describe('mobile terminal reveal tab adoption', () => {
     revealSplitPaneFromMobile(harness)
 
     expect(storeState.createTab).not.toHaveBeenCalled()
-    // Why no identity: with no hydrated layout there is nothing to prove the
-    // binding against, and the reveal must still succeed (#10486).
+    // Why an identity even here (#10486): the reveal must still succeed with no
+    // hydrated layout, and the live pty->tab map alone now proves the binding.
     expect(harness.replyTerminalCreate).toHaveBeenCalledWith({
       requestId: 'mobile-reveal',
       tabId: 'tab-split',
-      title: 'codex'
+      title: 'codex',
+      identity: revealIdentity('tab-split')
     })
   })
 
@@ -105,14 +110,9 @@ describe('mobile terminal reveal tab adoption', () => {
       requestId: 'mobile-reveal',
       // Why identity: the store records this leaf->pty binding on the adopted tab,
       // so the reply can name the exact pane it bound.
-      identity: {
-        worktreeId: WORKTREE_ID,
-        tabId: 'tab-detached',
-        leafId: 'leaf-b',
-        ptyId: 'pty-b'
-      },
       tabId: 'tab-detached',
-      title: 'codex'
+      title: 'codex',
+      identity: revealIdentity('tab-detached')
     })
   })
 
@@ -213,14 +213,9 @@ describe('mobile terminal reveal tab adoption', () => {
       requestId: 'mobile-reveal',
       // Why identity: the store records this leaf->pty binding on the adopted tab,
       // so the reply can name the exact pane it bound.
-      identity: {
-        worktreeId: WORKTREE_ID,
-        tabId: 'tab-detached',
-        leafId: 'leaf-b',
-        ptyId: 'pty-b'
-      },
       tabId: 'tab-detached',
-      title: 'codex'
+      title: 'codex',
+      identity: revealIdentity('tab-detached')
     })
   })
 

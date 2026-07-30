@@ -2671,9 +2671,10 @@ describe('orchestration RPC methods', () => {
         expect.objectContaining({
           repoSelector: 'repo',
           name: 'child-worker',
-          runHooks: true,
+          runHooks: false,
           setupDecision: 'run',
           startupAgent: 'codex',
+          activate: false,
           lineage: expect.objectContaining({ parentWorktree: 'repo::parent', noParent: false })
         })
       )
