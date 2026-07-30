@@ -4084,10 +4084,7 @@ export function registerPtyHandlers(
         args.sessionId && isExistingSharedClaudeSession
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
-      const requiresClaudeReattach = requiresLiveClaudePtyReattach({
-        isExistingSharedClaudeSession,
-        existingInjectedAccountId
-      })
+      const requiresClaudeReattach = requiresLiveClaudePtyReattach(args.sessionId)
       if (existingInjectedAccountId) {
         // Why: reattach must retain the account that the surviving CLI started
         // with even if the worktree was repinned while the app was away.
@@ -5348,10 +5345,7 @@ export function registerPtyHandlers(
         args.sessionId && isExistingSharedClaudeSession
           ? getLiveSharedClaudePtyAccountId(args.sessionId)
           : null
-      const requiresClaudeReattach = requiresLiveClaudePtyReattach({
-        isExistingSharedClaudeSession,
-        existingInjectedAccountId
-      })
+      const requiresClaudeReattach = requiresLiveClaudePtyReattach(args.sessionId)
       if (existingInjectedAccountId) {
         claudeSelectionTarget = {
           ...claudeSelectionTarget,

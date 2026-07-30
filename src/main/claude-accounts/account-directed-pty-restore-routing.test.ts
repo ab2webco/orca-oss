@@ -12,10 +12,6 @@ import {
   clearInjectedClaudePtyBinding,
   seedInjectedClaudePtyBindings
 } from './injected-claude-pty-binding'
-import {
-  getLiveInjectedClaudePtyAccountId,
-  isLiveSharedClaudePty
-} from './live-pty-account-ownership'
 
 const WORKER_SESSION_ID = 'repo1::/w/worker@@0a1b2c3d'
 const WORKER_ACCOUNT_ID = 'acct_worker'
@@ -62,12 +58,7 @@ afterEach(() => {
 describe('restoring an account-directed Claude terminal across a daemon protocol crossing', () => {
   it('recognizes the seeded injected binding as a live session that must reattach', () => {
     seedInjectedClaudePtyBindings([{ sessionId: WORKER_SESSION_ID, accountId: WORKER_ACCOUNT_ID }])
-    expect(
-      requiresLiveClaudePtyReattach({
-        isExistingSharedClaudeSession: isLiveSharedClaudePty(WORKER_SESSION_ID),
-        existingInjectedAccountId: getLiveInjectedClaudePtyAccountId(WORKER_SESSION_ID)
-      })
-    ).toBe(true)
+    expect(requiresLiveClaudePtyReattach(WORKER_SESSION_ID)).toBe(true)
   })
 
   it('reattaches to the legacy daemon that still owns the worker PTY', async () => {
