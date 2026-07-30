@@ -1957,6 +1957,14 @@ describe('registerPtyHandlers', () => {
 
     it('reattaches with the PTY account even after the worktree is repinned', async () => {
       installExitOnKillSpawnMock()
+      // Why: an injected binding asserts a surviving process, and the restore now
+      // requires reattaching to it rather than minting a fresh session (ORCA-124).
+      await getLocalPtyProvider().spawn({
+        cols: 80,
+        rows: 24,
+        sessionId: 'surviving-session'
+      })
+      spawnMock.mockClear()
       livePtyGate.markInjectedClaudePtySpawned('surviving-session', 'account-a')
       const prepareClaudeAuth = vi.fn(async () => ({
         configDir: '/tmp/account-a',
@@ -1991,9 +1999,51 @@ describe('registerPtyHandlers', () => {
         // can exempt it from the shared-PTY fork gate.
         { reattachLiveInjectedPtyId: 'surviving-session' }
       )
+      expect(spawnMock).not.toHaveBeenCalled()
       expect(livePtyGate.getLiveInjectedClaudePtyAccountId('surviving-session')).toBe('account-a')
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })
       livePtyGate.markClaudePtyExited('surviving-session')
+    })
+
+    // Why (ORCA-124): without the reattach requirement this spawn quietly minted a
+    // fresh session under the surviving id — the empty pane, with the real CLI left
+    // running out of reach in the daemon generation the update replaced.
+    it('refuses to mint a fresh session for an account-directed pane whose process is gone', async () => {
+      installExitOnKillSpawnMock()
+      classifyErrorMock.mockReturnValue({ error_class: 'unknown' })
+      livePtyGate.markInjectedClaudePtySpawned('unreachable-injected-session', 'account-a')
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/account-a',
+        envPatch: { CLAUDE_CONFIG_DIR: '/tmp/account-a' },
+        stripAuthEnv: true,
+        injectedAccountId: 'account-a',
+        provenance: 'managed:account-a:injected'
+      }))
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        undefined,
+        undefined,
+        () => true
+      )
+
+      await expect(
+        handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: 'claude',
+          worktreeId: 'wt-injected',
+          sessionId: 'unreachable-injected-session'
+        })
+      ).rejects.toThrow('PTY_REQUIRED_REATTACH_UNAVAILABLE')
+      expect(spawnMock).not.toHaveBeenCalled()
+      // Why: a retained binding would block every managed-account mutation forever.
+      expect(
+        livePtyGate.getLiveInjectedClaudePtyAccountId('unreachable-injected-session')
+      ).toBeNull()
     })
 
     it.each(['live gate', 'restart seed'] as const)(
@@ -2305,6 +2355,12 @@ describe('registerPtyHandlers', () => {
 
     it('keeps a surviving injected session on its own account even when a launch account is passed', async () => {
       installExitOnKillSpawnMock()
+      await getLocalPtyProvider().spawn({
+        cols: 80,
+        rows: 24,
+        sessionId: 'surviving-launch-session'
+      })
+      spawnMock.mockClear()
       livePtyGate.markInjectedClaudePtySpawned('surviving-launch-session', 'account-a')
       const { runtime, getController } = makeRuntimeControllerHarness()
       const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-a'))
@@ -2334,6 +2390,7 @@ describe('registerPtyHandlers', () => {
           expect.objectContaining({ overrideAccountId: 'account-a' }),
           { reattachLiveInjectedPtyId: 'surviving-launch-session' }
         )
+        expect(spawnMock).not.toHaveBeenCalled()
         await handlers.get('pty:kill')!(null, { id: result.id })
       } finally {
         livePtyGate.markClaudePtyExited('surviving-launch-session')

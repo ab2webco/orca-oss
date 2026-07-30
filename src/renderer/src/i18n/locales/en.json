@@ -2945,6 +2945,9 @@
             "retryingBody": "Orca will retry for up to one minute. This terminal will resume if the connection returns.",
             "disconnectedBody": "Automatic retries stopped. Reconnect to resume this terminal session.",
             "reconnectButton": "Reconnect"
+          },
+          "pty": {
+            "reattachUnavailable": "This session requires relaunching the agent: its process could not be reattached after the update. Committed work and transcripts are safe — start the agent again to resume."
           }
         }
       },
