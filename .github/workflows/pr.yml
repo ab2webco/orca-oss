@@ -104,6 +104,9 @@ jobs:
   git_compatibility:
     name: Git compatibility
     runs-on: ubuntu-latest
+    # Why: looser than the other test jobs because this one builds Git 2.25.5
+    # from source and pulls container images; healthy runs stay under 2 minutes.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -154,6 +157,9 @@ jobs:
   shell_contracts:
     name: shell contracts
     runs-on: ubuntu-latest
+    # Why: these specs drive real shells and PTYs, so a wedged child hangs the
+    # job; healthy runs stay under 3 minutes.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -181,6 +187,10 @@ jobs:
   test:
     name: tests ${{ matrix.shard }}/${{ strategy.job-total }}
     runs-on: ubuntu-latest
+    # Why: a healthy shard finishes in under 5 minutes, but a wedged worker holds
+    # the run for the 6h default — one shard hung 72 minutes and blocked
+    # re-running any other shard (ORCA-119). Cap so a hang reports as a failure.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
