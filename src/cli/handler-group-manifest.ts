@@ -53,6 +53,16 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/plane-delete-archive.js')).PLANE_DELETE_ARCHIVE_HANDLERS
   },
   {
+    name: 'plane-project',
+    keys: [
+      'plane project create',
+      'plane project update',
+      'plane project archive',
+      'plane project unarchive'
+    ],
+    load: async () => (await import('./handlers/plane-project.js')).PLANE_PROJECT_HANDLERS
+  },
+  {
     name: 'plane-relation',
     keys: ['plane relation add', 'plane relation list'],
     load: async () => (await import('./handlers/plane-relation.js')).PLANE_RELATION_HANDLERS

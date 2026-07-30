@@ -64,7 +64,10 @@ export async function listProjectsForClient(
     budget,
     INTEGRATION_PAGINATION_MAX_PAGES
   )
-  return raws.map((raw) => mapPlaneProject(raw, client.workspaceSlug))
+  // workspaceId as well as the slug: `project list --json` is the only place a
+  // caller can learn the saved workspace id that --workspace takes.
+  const workspaceId = getPlaneWorkspaceId(client.baseUrl, client.workspaceSlug)
+  return raws.map((raw) => mapPlaneProject(raw, client.workspaceSlug, workspaceId))
 }
 
 export async function listProjects(

@@ -514,7 +514,9 @@ export function formatFlagHelp(flag: string): string {
     app: '--app <app>            App name, bundle ID, or pid:N',
     direction:
       '--direction <dir>      Direction: up|down|left|right for scroll, horizontal|vertical for split',
+    description: '--description <text>   Description text for the item being written',
     'display-name': '--display-name <name>  Override the Orca display name',
+    identifier: '--identifier <ID>      Short project identifier used as the work-item prefix',
     'element-index': '--element-index <n>   Element index from get-app-state',
     title: '--title <text>         Custom title for the terminal tab (omit to reset)',
     enter: '--enter                Append Enter after sending text',

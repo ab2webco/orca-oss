@@ -101,6 +101,12 @@ export function formatPlaneProjectList(projects: PlaneProject[]): string {
     .join('\n')
 }
 
+// Leads with the id: the caller's next command is almost always --project <id>.
+export function formatPlaneProjectMutation(project: PlaneProject): string {
+  const workspace = project.workspaceSlug ? ` in ${project.workspaceSlug}` : ''
+  return `${project.id}  ${project.identifier}  ${project.name}${workspace}`
+}
+
 export function formatPlaneStates(states: PlaneState[]): string {
   if (states.length === 0) {
     return 'No Plane states found.'
