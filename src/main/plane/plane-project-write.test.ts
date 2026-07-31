@@ -105,7 +105,14 @@ describe('createProject', () => {
     })
     expect(result).toEqual({
       ok: true,
-      project: { id: 'proj-1', identifier: 'MP', name: 'My Project', workspaceSlug: 'acme' }
+      project: {
+        id: 'proj-1',
+        identifier: 'MP',
+        name: 'My Project',
+        workspaceSlug: 'acme',
+        // A freshly created project is never archived (ORCA-140).
+        archived: false
+      }
     })
   })
 
@@ -204,7 +211,13 @@ describe('updateProject', () => {
     expect(captured.body).toEqual({ name: 'Renamed' })
     expect(result).toEqual({
       ok: true,
-      project: { id: 'proj-1', identifier: 'MP', name: 'Renamed', workspaceSlug: 'acme' }
+      project: {
+        id: 'proj-1',
+        identifier: 'MP',
+        name: 'Renamed',
+        workspaceSlug: 'acme',
+        archived: false
+      }
     })
   })
 
