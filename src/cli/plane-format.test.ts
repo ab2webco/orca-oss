@@ -88,6 +88,61 @@ describe('plane-format', () => {
     expect(formatPlaneMembers(members)).toContain('Ada')
   })
 
+  // ORCA-139: without a workspace header a two-workspace answer is
+  // indistinguishable from a one-workspace answer.
+  it('groups the project list under a workspace header when 2+ workspaces answer', () => {
+    const projects: PlaneProject[] = [
+      { id: 'p1', identifier: 'ACME', name: 'Acme Web', workspaceSlug: 'acme', workspaceId: 'w-a' },
+      { id: 'p2', identifier: 'BETA', name: 'Beta App', workspaceSlug: 'beta', workspaceId: 'w-b' },
+      { id: 'p3', identifier: 'BETA2', name: 'Beta Ops', workspaceSlug: 'beta', workspaceId: 'w-b' }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).toContain('Workspace acme w-a (1)')
+    expect(output).toContain('Workspace beta w-b (2)')
+    expect(output.indexOf('Workspace acme')).toBeLessThan(output.indexOf('Workspace beta'))
+    expect(output).toContain('  ACME')
+  })
+
+  // Identity is (baseUrl, slug): a self-hosted and a cloud workspace can share
+  // a slug, and collapsing them into one header re-creates the ORCA-139 defect.
+  it('keeps same-slug workspaces on different hosts in separate groups', () => {
+    const projects: PlaneProject[] = [
+      {
+        id: 'p1',
+        identifier: 'SELF',
+        name: 'Self Hosted',
+        workspaceSlug: 'acme',
+        workspaceId: 'w-self'
+      },
+      {
+        id: 'p2',
+        identifier: 'CLOUD',
+        name: 'Cloud',
+        workspaceSlug: 'acme',
+        workspaceId: 'w-cloud'
+      }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).toContain('Workspace acme w-self (1)')
+    expect(output).toContain('Workspace acme w-cloud (1)')
+  })
+
+  it('leaves a single-workspace project list ungrouped', () => {
+    const projects: PlaneProject[] = [
+      { id: 'p1', identifier: 'ACME', name: 'Acme Web', workspaceSlug: 'acme', workspaceId: 'w-a' },
+      { id: 'p2', identifier: 'ACME2', name: 'Acme Ops', workspaceSlug: 'acme', workspaceId: 'w-a' }
+    ]
+
+    const output = formatPlaneProjectList(projects)
+
+    expect(output).not.toContain('Workspace')
+    expect(output.split('\n')).toHaveLength(2)
+  })
+
   it('reports empty collections with stable copy', () => {
     expect(formatPlaneProjectList([])).toBe('No Plane projects found.')
     expect(formatPlaneStates([])).toBe('No Plane states found.')

@@ -23,9 +23,9 @@ vi.mock('./client', () => ({
   clearWorkspaceTokenOnAuthError: clearWorkspaceTokenOnAuthErrorMock
 }))
 
-function client(workspaceSlug: string): PlaneClientForWorkspace {
+function client(workspaceSlug: string, baseUrl = 'https://api.plane.so'): PlaneClientForWorkspace {
   return {
-    baseUrl: 'https://api.plane.so',
+    baseUrl,
     workspaceSlug,
     headers: { 'x-api-key': `key-${workspaceSlug}`, 'x-workspace-slug': workspaceSlug }
   }
@@ -97,6 +97,123 @@ describe('listProjects', () => {
     getClientsMock.mockReturnValue([])
     expect(await listProjects(null)).toEqual([])
     expect(planeRequestMock).not.toHaveBeenCalled()
+  })
+
+  // ORCA-139: an aggregate read must stay grouped and attributed, otherwise a
+  // multi-workspace answer is indistinguishable from a single-workspace one.
+  it('aggregates every connected workspace, grouped by workspace then name', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('zeta'), client('acme')])
+    planeRequestMock
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-z2', identifier: 'ZULU', name: 'Zulu' },
+          { id: 'p-z1', identifier: 'ALPHA', name: 'Alpha' }
+        ])
+      )
+      .mockResolvedValueOnce(page([{ id: 'p-a1', identifier: 'BETA', name: 'Beta' }]))
+
+    const projects = await listProjects('all')
+
+    expect(projects).toEqual([
+      {
+        id: 'p-a1',
+        identifier: 'BETA',
+        name: 'Beta',
+        workspaceSlug: 'acme',
+        workspaceId: expect.any(String)
+      },
+      {
+        id: 'p-z1',
+        identifier: 'ALPHA',
+        name: 'Alpha',
+        workspaceSlug: 'zeta',
+        workspaceId: expect.any(String)
+      },
+      {
+        id: 'p-z2',
+        identifier: 'ZULU',
+        name: 'Zulu',
+        workspaceSlug: 'zeta',
+        workspaceId: expect.any(String)
+      }
+    ])
+  })
+
+  it('gives each workspace a distinct workspaceId so consumers can group by it', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme'), client('beta')])
+    planeRequestMock
+      .mockResolvedValueOnce(page([{ id: 'p-a', identifier: 'A', name: 'A' }]))
+      .mockResolvedValueOnce(page([{ id: 'p-b', identifier: 'B', name: 'B' }]))
+
+    const projects = await listProjects('all')
+    const workspaceIds = projects.map((project) => project.workspaceId)
+
+    expect(workspaceIds.filter(Boolean)).toHaveLength(2)
+    expect(new Set(workspaceIds).size).toBe(2)
+  })
+
+  it('tolerates one failing workspace and still returns the healthy results', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme'), client('beta')])
+    planeRequestMock
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(page([{ id: 'p-b', identifier: 'BETA', name: 'Beta' }]))
+
+    const projects = await listProjects('all')
+
+    expect(projects.map((project) => project.id)).toEqual(['p-b'])
+    expect(projects[0].workspaceSlug).toBe('beta')
+  })
+
+  // Workspace identity is (baseUrl, workspaceSlug), so a self-hosted and a
+  // cloud workspace can share a slug; sorting on the slug alone would
+  // interleave them back into one anonymous list.
+  it('keeps same-slug workspaces on different hosts apart', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([
+      client('acme', 'https://plane.self-hosted.test'),
+      client('acme', 'https://api.plane.so')
+    ])
+    planeRequestMock
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-self-a', identifier: 'ALPHA', name: 'Alpha' },
+          { id: 'p-self-z', identifier: 'ZULU', name: 'Zulu' }
+        ])
+      )
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-cloud-b', identifier: 'BETA', name: 'Beta' },
+          { id: 'p-cloud-y', identifier: 'YANKEE', name: 'Yankee' }
+        ])
+      )
+
+    const projects = await listProjects('all')
+    const workspaceIds = projects.map((project) => project.workspaceId)
+
+    expect(new Set(workspaceIds).size).toBe(2)
+    // Contiguous runs, not Alpha/Beta/Yankee/Zulu — a name-only sort interleaves.
+    const runs = workspaceIds.filter((id, index) => id !== workspaceIds[index - 1]).length
+    expect(runs).toBe(2)
+  })
+
+  it('keeps a single-workspace read attributed to that workspace', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce(
+      page([
+        { id: 'p-2', identifier: 'BETA', name: 'Beta' },
+        { id: 'p-1', identifier: 'ALPHA', name: 'Alpha' }
+      ])
+    )
+
+    const projects = await listProjects('ws-acme')
+
+    expect(projects.map((project) => project.identifier)).toEqual(['ALPHA', 'BETA'])
+    expect(projects.every((project) => project.workspaceSlug === 'acme')).toBe(true)
+    expect(new Set(projects.map((project) => project.workspaceId)).size).toBe(1)
   })
 })
 

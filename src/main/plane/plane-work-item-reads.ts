@@ -65,7 +65,8 @@ export async function listProjectsForClient(
     INTEGRATION_PAGINATION_MAX_PAGES
   )
   // workspaceId as well as the slug: `project list --json` is the only place a
-  // caller can learn the saved workspace id that --workspace takes.
+  // caller can learn the saved workspace id that --workspace takes, and it is
+  // what tells two same-slug workspaces apart on an aggregate read (ORCA-139).
   const workspaceId = getPlaneWorkspaceId(client.baseUrl, client.workspaceSlug)
   return raws.map((raw) => mapPlaneProject(raw, client.workspaceSlug, workspaceId))
 }
@@ -98,7 +99,18 @@ export async function listProjects(
       '[plane] Cross-workspace projects exceeded their aggregate result budget; truncating.'
     )
   }
-  return fanout.results.flat().sort((a, b) => a.name.localeCompare(b.name))
+  // Why: workspace-then-name keeps a cross-workspace read grouped instead of
+  // interleaving two workspaces' projects into one anonymous list. workspaceId
+  // breaks the slug tie because identity is (baseUrl, slug) — a self-hosted and
+  // a cloud workspace can share a slug (ORCA-139).
+  return fanout.results
+    .flat()
+    .sort(
+      (a, b) =>
+        (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') ||
+        (a.workspaceId ?? '').localeCompare(b.workspaceId ?? '') ||
+        a.name.localeCompare(b.name)
+    )
 }
 
 // Resolves the connected viewer (users/me) for the selected workspace so the
