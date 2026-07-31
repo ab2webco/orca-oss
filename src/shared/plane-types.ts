@@ -34,6 +34,9 @@ export type PlaneProject = {
   name: string
   workspaceSlug?: string
   workspaceId?: string
+  /** Plane's GET /projects/ returns archived projects too (archived_at set), so
+   *  callers need this to tell them apart (ORCA-140). */
+  archived?: boolean
 }
 
 export type PlaneState = {

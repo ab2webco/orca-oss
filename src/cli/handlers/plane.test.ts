@@ -374,19 +374,51 @@ describe('orca plane CLI handlers', () => {
   it('maps project list without --workspace to an explicit all-workspace read', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'project', 'list', '--json'], '/tmp/repo')
-    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'all' })
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', {
+      workspaceId: 'all',
+      includeArchived: false
+    })
   })
 
   it('keeps an explicit --workspace scoped to that workspace', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'project', 'list', '--workspace', 'ws-1', '--json'], '/tmp/repo')
-    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'ws-1' })
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', {
+      workspaceId: 'ws-1',
+      includeArchived: false
+    })
   })
 
   it('passes --workspace all straight through', async () => {
     queueFixtures(callMock, okFixture('req', []))
     await main(['plane', 'project', 'list', '--workspace', 'all', '--json'], '/tmp/repo')
-    expect(callMock).toHaveBeenCalledWith('plane.listProjects', { workspaceId: 'all' })
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', {
+      workspaceId: 'all',
+      includeArchived: false
+    })
+  })
+
+  // ORCA-140: archived projects stayed in the list and there was no way to ask
+  // for them either.
+  it('asks for archived projects only when --archived is passed', async () => {
+    queueFixtures(callMock, okFixture('req', []))
+    await main(['plane', 'project', 'list', '--archived', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', {
+      workspaceId: 'all',
+      includeArchived: true
+    })
+  })
+
+  it('treats --archived as a boolean flag that does not swallow the next flag', async () => {
+    queueFixtures(callMock, okFixture('req', []))
+    await main(
+      ['plane', 'project', 'list', '--archived', '--workspace', 'ws-9', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenCalledWith('plane.listProjects', {
+      workspaceId: 'ws-9',
+      includeArchived: true
+    })
   })
 
   it('maps states create to plane.createState', async () => {

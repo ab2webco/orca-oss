@@ -71,8 +71,14 @@ export async function listProjectsForClient(
   return raws.map((raw) => mapPlaneProject(raw, client.workspaceSlug, workspaceId))
 }
 
+// `includeArchived` defaults to true so existing callers (the app's project
+// pickers) keep seeing what they saw; the CLI's `project list` opts out
+// explicitly unless --archived is passed (ORCA-140). Deliberately not applied
+// in listProjectsForClient: that path resolves the project a work item belongs
+// to, and an item in an archived project must still map to its project.
 export async function listProjects(
-  workspaceId?: PlaneWorkspaceSelection | null
+  workspaceId?: PlaneWorkspaceSelection | null,
+  options?: { includeArchived?: boolean }
 ): Promise<PlaneProject[]> {
   const entries = getClients(workspaceId)
   if (entries.length === 0) {
@@ -103,14 +109,14 @@ export async function listProjects(
   // interleaving two workspaces' projects into one anonymous list. workspaceId
   // breaks the slug tie because identity is (baseUrl, slug) — a self-hosted and
   // a cloud workspace can share a slug (ORCA-139).
-  return fanout.results
-    .flat()
-    .sort(
-      (a, b) =>
-        (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') ||
-        (a.workspaceId ?? '').localeCompare(b.workspaceId ?? '') ||
-        a.name.localeCompare(b.name)
-    )
+  const all = fanout.results.flat()
+  const projects = (options?.includeArchived ?? true) ? all : all.filter((p) => !p.archived)
+  return projects.sort(
+    (a, b) =>
+      (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') ||
+      (a.workspaceId ?? '').localeCompare(b.workspaceId ?? '') ||
+      a.name.localeCompare(b.name)
+  )
 }
 
 // Resolves the connected viewer (users/me) for the selected workspace so the

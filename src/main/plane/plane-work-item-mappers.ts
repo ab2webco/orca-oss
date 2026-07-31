@@ -62,7 +62,10 @@ export function mapPlaneProject(
     identifier,
     name: asString(project.name, identifier || 'Untitled project'),
     workspaceSlug,
-    workspaceId
+    workspaceId,
+    // Always a boolean, never the raw timestamp: consumers only branch on
+    // archived-or-not, and an absent key reads as "unknown" (ORCA-140).
+    archived: asString(project.archived_at).length > 0
   }
 }
 

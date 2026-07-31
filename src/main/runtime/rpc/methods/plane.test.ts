@@ -225,9 +225,29 @@ describe('plane RPC methods', () => {
     )
     await dispatcher.dispatch(makeRequest('plane.listMembers', { workspaceId: 'ws-1' }))
 
-    expect(runtime.planeListProjects).toHaveBeenCalledWith('ws-1')
+    expect(runtime.planeListProjects).toHaveBeenCalledWith('ws-1', { includeArchived: undefined })
     expect(runtime.planeListStates).toHaveBeenCalledWith('proj-1', 'ws-1')
     expect(runtime.planeListLabels).toHaveBeenCalledWith('proj-1', 'ws-1')
     expect(runtime.planeListMembers).toHaveBeenCalledWith('ws-1', undefined)
+  })
+
+  // ORCA-140: the CLI decides whether archived projects are in scope, so the
+  // choice has to survive the RPC boundary instead of being dropped there.
+  it('threads includeArchived through plane.listProjects', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      planeListProjects: vi.fn().mockResolvedValue([])
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+
+    await dispatcher.dispatch(
+      makeRequest('plane.listProjects', { workspaceId: 'all', includeArchived: false })
+    )
+    await dispatcher.dispatch(
+      makeRequest('plane.listProjects', { workspaceId: 'all', includeArchived: true })
+    )
+
+    expect(runtime.planeListProjects).toHaveBeenNthCalledWith(1, 'all', { includeArchived: false })
+    expect(runtime.planeListProjects).toHaveBeenNthCalledWith(2, 'all', { includeArchived: true })
   })
 })

@@ -199,15 +199,17 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['plane', 'project', 'list'],
     summary: 'List connected Plane projects across every connected workspace',
-    usage: 'orca plane project list [--workspace <id>|all] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'workspace'],
+    usage: 'orca plane project list [--archived] [--workspace <id>|all] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'archived', 'workspace'],
     examples: [
       'orca plane project list --json',
+      'orca plane project list --archived --json',
       'orca plane project list --workspace <workspaceId> --json'
     ],
     notes: [
       'With no --workspace, lists every connected workspace grouped by workspace (same as --workspace all) — the result never depends on which workspace is selected in the app.',
-      'Pass --workspace <id> to scope the list to one workspace. Each project carries its workspaceId and workspaceSlug in --json.'
+      'Pass --workspace <id> to scope the list to one workspace. Each project carries its workspaceId and workspaceSlug in --json.',
+      'Archived projects are hidden by default. Pass --archived to include them: they print with an "archived" marker and carry "archived": true in --json.'
     ]
   },
   {

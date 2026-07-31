@@ -15,6 +15,7 @@ import {
   MAX_INTEGRATION_ACCOUNT_URL_BYTES
 } from '../integration-account-persistence-limits'
 import { boundedIntegrationErrorMessage } from '../integration-error-message'
+import { extractPlaneErrorDetail } from './plane-error-detail'
 import { PlaneRateLimiter, parsePlaneRetryAfterMs } from './plane-rate-limiter'
 import {
   assertWorkspaceFileBounds,
@@ -177,14 +178,11 @@ async function planeFetchWithRetry(
 
 export async function readPlaneError(response: Response): Promise<string> {
   try {
-    const data = await readFetchResponseJsonWithinLimit<{
-      error?: string
-      detail?: string
-      message?: string
-    }>(response)
-    const message = data.error || data.detail || data.message
-    if (message) {
-      return message
+    const detail = extractPlaneErrorDetail(
+      await readFetchResponseJsonWithinLimit<unknown>(response)
+    )
+    if (detail) {
+      return detail
     }
   } catch {
     // Fall through to status text.
