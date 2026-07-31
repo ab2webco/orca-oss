@@ -71,11 +71,13 @@ export async function listProjectsForClient(
   return raws.map((raw) => mapPlaneProject(raw, client.workspaceSlug, workspaceId))
 }
 
-// `includeArchived` defaults to true so existing callers (the app's project
-// pickers) keep seeing what they saw; the CLI's `project list` opts out
-// explicitly unless --archived is passed (ORCA-140). Deliberately not applied
-// in listProjectsForClient: that path resolves the project a work item belongs
-// to, and an item in an archived project must still map to its project.
+// `includeArchived` defaults to false: every caller that lists projects for a
+// human to pick from (app project switcher, settings board selector, CLI
+// `project list`) must hide archived ones, so absent-means-include kept the app
+// picker showing them after ORCA-140 fixed only the CLI (ORCA-142). Opting in
+// is explicit. Deliberately not applied in listProjectsForClient: that path
+// resolves the project a work item belongs to, and an item in an archived
+// project must still map to its project.
 export async function listProjects(
   workspaceId?: PlaneWorkspaceSelection | null,
   options?: { includeArchived?: boolean }
@@ -110,7 +112,7 @@ export async function listProjects(
   // breaks the slug tie because identity is (baseUrl, slug) — a self-hosted and
   // a cloud workspace can share a slug (ORCA-139).
   const all = fanout.results.flat()
-  const projects = (options?.includeArchived ?? true) ? all : all.filter((p) => !p.archived)
+  const projects = (options?.includeArchived ?? false) ? all : all.filter((p) => !p.archived)
   return projects.sort(
     (a, b) =>
       (a.workspaceSlug ?? '').localeCompare(b.workspaceSlug ?? '') ||

@@ -178,18 +178,49 @@ describe('listProjects', () => {
     ])
   })
 
-  // The app's project pickers call this with no options; changing what they see
-  // is outside the CLI-scoped fix.
-  it('includes archived projects when no option is passed', async () => {
+  // ORCA-142: the app's project pickers call this with no options, so
+  // absent-means-include kept archived projects in the app picker after
+  // ORCA-140 fixed only the CLI. Absent now means exclude.
+  it('excludes archived projects when no option is passed', async () => {
     const { listProjects } = await import('./plane-work-item-reads')
     getClientsMock.mockReturnValue([client('acme')])
     planeRequestMock.mockResolvedValueOnce(
       page([
+        { id: 'p-live', identifier: 'LIVE', name: 'Live' },
         { id: 'p-gone', identifier: 'ZZSMK', name: 'Smoke', archived_at: '2026-07-30T22:00:00Z' }
       ])
     )
 
-    expect((await listProjects('acme')).map((project) => project.id)).toEqual(['p-gone'])
+    expect((await listProjects('acme')).map((project) => project.id)).toEqual(['p-live'])
+  })
+
+  // The app IPC handler passes only a workspace (src/main/ipc/plane.ts), and an
+  // aggregate read must not leak an archived project from any workspace.
+  it('excludes archived projects across an aggregate no-options read', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme'), client('zeta')])
+    planeRequestMock
+      .mockResolvedValueOnce(
+        page([
+          { id: 'p-a-live', identifier: 'ALIVE', name: 'Alpha' },
+          { id: 'p-a-gone', identifier: 'AGONE', name: 'Aged', archived_at: '2026-07-30T22:00:00Z' }
+        ])
+      )
+      .mockResolvedValueOnce(
+        page([
+          {
+            id: 'p-z-gone',
+            identifier: 'ZGONE',
+            name: 'Zombie',
+            archived_at: '2026-07-29T10:00:00Z'
+          },
+          { id: 'p-z-live', identifier: 'ZLIVE', name: 'Zulu' }
+        ])
+      )
+
+    const projects = await listProjects('all')
+
+    expect(projects.map((project) => project.id)).toEqual(['p-a-live', 'p-z-live'])
   })
 
   it('gives each workspace a distinct workspaceId so consumers can group by it', async () => {
