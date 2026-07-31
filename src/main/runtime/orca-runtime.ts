@@ -33085,8 +33085,11 @@ export class OrcaRuntimeService {
     return deletePlaneBoardState(args)
   }
 
-  planeListProjects(workspaceId?: PlaneWorkspaceSelection): ReturnType<typeof listPlaneProjects> {
-    return listPlaneProjects(workspaceId)
+  planeListProjects(
+    workspaceId?: PlaneWorkspaceSelection,
+    options?: { includeArchived?: boolean }
+  ): ReturnType<typeof listPlaneProjects> {
+    return listPlaneProjects(workspaceId, options)
   }
 
   planeListStates(

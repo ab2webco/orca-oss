@@ -9,6 +9,7 @@ import {
   GetWorkItem,
   LinkCurrentWorkItem,
   ListMembers,
+  ListProjects,
   ListWorkItems,
   PlaneCurrentWorkItemContext,
   ProjectScoped,
@@ -210,8 +211,11 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'plane.listProjects',
-    params: WorkspaceSelection,
-    handler: async (params, { runtime }) => runtime.planeListProjects(params?.workspaceId)
+    params: ListProjects,
+    handler: async (params, { runtime }) =>
+      runtime.planeListProjects(params?.workspaceId, {
+        includeArchived: params?.includeArchived
+      })
   }),
   defineMethod({
     name: 'plane.listStates',

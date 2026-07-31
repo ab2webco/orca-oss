@@ -15,6 +15,16 @@ export const WorkspaceSelection = z
   })
   .optional()
 
+// Archived projects come back from Plane's project list, so callers say
+// whether they want them. Absent = include, which keeps the app's pickers on
+// their pre-ORCA-140 behavior; the CLI passes false explicitly.
+export const ListProjects = z
+  .object({
+    workspaceId: OptionalString,
+    includeArchived: z.boolean().optional()
+  })
+  .optional()
+
 export const Connect = z.object({
   baseUrl: requiredString('Base URL is required'),
   workspaceSlug: requiredString('Workspace slug is required'),

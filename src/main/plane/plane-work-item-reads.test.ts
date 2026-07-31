@@ -121,23 +121,75 @@ describe('listProjects', () => {
         identifier: 'BETA',
         name: 'Beta',
         workspaceSlug: 'acme',
-        workspaceId: expect.any(String)
+        workspaceId: expect.any(String),
+        archived: false
       },
       {
         id: 'p-z1',
         identifier: 'ALPHA',
         name: 'Alpha',
         workspaceSlug: 'zeta',
-        workspaceId: expect.any(String)
+        workspaceId: expect.any(String),
+        archived: false
       },
       {
         id: 'p-z2',
         identifier: 'ZULU',
         name: 'Zulu',
         workspaceSlug: 'zeta',
-        workspaceId: expect.any(String)
+        workspaceId: expect.any(String),
+        archived: false
       }
     ])
+  })
+
+  // ORCA-140: Plane's GET /projects/ includes archived projects, so an
+  // unfiltered list contradicted both Plane's own UI and the archive help text.
+  it('drops archived projects when includeArchived is false', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce(
+      page([
+        { id: 'p-live', identifier: 'LIVE', name: 'Live' },
+        { id: 'p-gone', identifier: 'ZZSMK', name: 'Smoke', archived_at: '2026-07-30T22:00:00Z' }
+      ])
+    )
+
+    const projects = await listProjects('acme', { includeArchived: false })
+
+    expect(projects.map((project) => project.id)).toEqual(['p-live'])
+  })
+
+  it('keeps archived projects, flagged, when includeArchived is true', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce(
+      page([
+        { id: 'p-live', identifier: 'LIVE', name: 'Live' },
+        { id: 'p-gone', identifier: 'ZZSMK', name: 'Smoke', archived_at: '2026-07-30T22:00:00Z' }
+      ])
+    )
+
+    const projects = await listProjects('acme', { includeArchived: true })
+
+    expect(projects.map((project) => [project.id, project.archived])).toEqual([
+      ['p-live', false],
+      ['p-gone', true]
+    ])
+  })
+
+  // The app's project pickers call this with no options; changing what they see
+  // is outside the CLI-scoped fix.
+  it('includes archived projects when no option is passed', async () => {
+    const { listProjects } = await import('./plane-work-item-reads')
+    getClientsMock.mockReturnValue([client('acme')])
+    planeRequestMock.mockResolvedValueOnce(
+      page([
+        { id: 'p-gone', identifier: 'ZZSMK', name: 'Smoke', archived_at: '2026-07-30T22:00:00Z' }
+      ])
+    )
+
+    expect((await listProjects('acme')).map((project) => project.id)).toEqual(['p-gone'])
   })
 
   it('gives each workspace a distinct workspaceId so consumers can group by it', async () => {

@@ -210,8 +210,12 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     // Why: defaulting to the host's selected workspace made the answer depend on
     // mutable app state, so identical calls listed a different workspace each
     // time; 'all' is the deterministic default and stays grouped (ORCA-139).
+    // Archived projects are hidden unless --archived: Plane's GET /projects/
+    // returns them, and listing them by default contradicted both Plane's own
+    // UI and the archive help text (ORCA-140).
     const response = await client.call<PlaneProject[]>('plane.listProjects', {
-      workspaceId: getOptionalStringFlag(flags, 'workspace') ?? 'all'
+      workspaceId: getOptionalStringFlag(flags, 'workspace') ?? 'all',
+      includeArchived: flags.get('archived') === true
     })
     printResult(response, json, formatPlaneProjectList)
   },

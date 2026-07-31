@@ -51,7 +51,7 @@ export const PLANE_PROJECT_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca plane project archive --project <projectId> --json'],
     notes: [
       'Archiving hides the project; work items, cycles, and modules are preserved.',
-      'Archived projects drop out of project list, so record the project id before archiving — unarchive needs it.'
+      'Archived projects drop out of project list unless you pass --archived, so record the project id before archiving — unarchive needs it.'
     ]
   },
   {
@@ -61,7 +61,7 @@ export const PLANE_PROJECT_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace'],
     examples: ['orca plane project unarchive --project <projectId> --json'],
     notes: [
-      'Takes the project id an archived project had; project list does not show archived projects.'
+      'Takes the project id an archived project had; find it again with orca plane project list --archived.'
     ]
   }
 ]

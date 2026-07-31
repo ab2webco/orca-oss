@@ -88,6 +88,20 @@ describe('plane-format', () => {
     expect(formatPlaneMembers(members)).toContain('Ada')
   })
 
+  // ORCA-140: with --archived the text output has to say which rows are
+  // archived, otherwise it reads as a plain (and wrong) project list.
+  it('marks archived projects and leaves live rows untouched', () => {
+    const live: PlaneProject = { id: 'p1', identifier: 'PROJ', name: 'Platform', archived: false }
+    const archived: PlaneProject = { id: 'p2', identifier: 'ZZSMK', name: 'Smoke', archived: true }
+
+    const output = formatPlaneProjectList([live, archived])
+    const [liveRow, archivedRow] = output.split('\n')
+
+    expect(archivedRow).toMatch(/ZZSMK\s+Smoke\s+p2\s+archived$/)
+    expect(liveRow).not.toContain('archived')
+    expect(liveRow.trimEnd()).toBe(liveRow)
+  })
+
   // ORCA-139: without a workspace header a two-workspace answer is
   // indistinguishable from a one-workspace answer.
   it('groups the project list under a workspace header when 2+ workspaces answer', () => {

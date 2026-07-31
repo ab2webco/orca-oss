@@ -93,7 +93,10 @@ export function formatPlaneSearch(items: PlaneWorkItem[]): string {
 }
 
 function formatProjectRow(project: PlaneProject): string {
-  return `${project.identifier.padEnd(12)} ${project.name.padEnd(28)} ${project.id}`
+  // Trailing marker, not a fixed column: only --archived can surface these, and
+  // an always-present column would shift every existing row (ORCA-140).
+  const archived = project.archived ? '  archived' : ''
+  return `${project.identifier.padEnd(12)} ${project.name.padEnd(28)} ${project.id}${archived}`
 }
 
 export function formatPlaneProjectList(projects: PlaneProject[]): string {

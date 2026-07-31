@@ -383,3 +383,27 @@ describe('planeFetch (exported transport)', () => {
     expect(new Headers(init.headers).has('x-api-key')).toBe(false)
   })
 })
+
+// ORCA-140: Plane's 400 on an invalid project name carries the reason in a
+// DRF field-error body; collapsing that to the status line left the caller with
+// nothing to act on.
+describe('readPlaneError', () => {
+  it('relays a DRF field error from the response body', async () => {
+    const { readPlaneError } = await loadClientModule()
+
+    const message = await readPlaneError(
+      jsonResponse({ name: ['Special characters are not allowed.'] }, 400)
+    )
+
+    expect(message).toBe('name: Special characters are not allowed.')
+  })
+
+  it('falls back to the status line only when the body says nothing', async () => {
+    const { readPlaneError } = await loadClientModule()
+
+    expect(await readPlaneError(new Response('', { status: 400 }))).toBe(
+      'Plane request failed (400)'
+    )
+    expect(await readPlaneError(jsonResponse({}, 400))).toBe('Plane request failed (400)')
+  })
+})

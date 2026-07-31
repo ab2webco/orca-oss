@@ -29,7 +29,30 @@ describe('mapPlaneProject', () => {
       identifier: 'ALPHA',
       name: 'Alpha',
       workspaceSlug: 'acme',
-      workspaceId: 'ws-1'
+      workspaceId: 'ws-1',
+      archived: false
+    })
+  })
+
+  // ORCA-140: Plane's project list returns archived projects too, and dropping
+  // archived_at left callers with no way to tell them apart.
+  it('maps archived_at to archived: true', () => {
+    expect(
+      mapPlaneProject({
+        id: 'p-2',
+        identifier: 'ZZSMK',
+        name: 'Smoke',
+        archived_at: '2026-07-30T22:00:00Z'
+      })
+    ).toMatchObject({ id: 'p-2', archived: true })
+  })
+
+  it('maps a null or absent archived_at to archived: false', () => {
+    expect(
+      mapPlaneProject({ id: 'p-3', identifier: 'A', name: 'A', archived_at: null })
+    ).toMatchObject({ archived: false })
+    expect(mapPlaneProject({ id: 'p-4', identifier: 'B', name: 'B' })).toMatchObject({
+      archived: false
     })
   })
 })
