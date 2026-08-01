@@ -1,3 +1,4 @@
+import { cmdEscape, shellEscape } from './ssh-remote-command-encoding'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { Duplex } from 'node:stream'
 import type { Socket as NetSocket } from 'node:net'
@@ -5,13 +6,21 @@ import type { ConnectConfig } from 'ssh2'
 import type { SshTarget, SshConnectionState } from '../../shared/ssh-types'
 import type { SshResolvedConfig } from './ssh-config-parser'
 import {
+  findEncryptedPrivateKeyPath,
   resolveAgentConfigValue,
   resolveAgentSocket,
-  resolvePrivateKey,
-  resolveUnencryptedExplicitPrivateKey
+  resolvePrivateKeys,
+  resolveUnencryptedExplicitPrivateKeys
 } from './ssh-auth-resolution'
+import { configurePrivateKeyAuthentication } from './ssh-private-key-authentication'
+import { isOpenSshConfigBackedTarget } from './system-ssh-args'
 
 export { findDefaultKeyFile, resolveAgentSocket } from './ssh-auth-resolution'
+export {
+  cmdEscape,
+  shellEscape,
+  wrapRemoteCommandForPosixShell
+} from './ssh-remote-command-encoding'
 
 export type SshCredentialKind = 'passphrase' | 'password'
 
@@ -106,63 +115,17 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-export function shellEscape(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
-}
-
-const REMOTE_COMMAND_CHUNK_MAX_BYTES = 1_024
-const REMOTE_COMMAND_PRINTF_ESCAPED_BYTES = new Set([0x21, 0x27, 0x5c])
-
-function encodeRemoteCommandForPrintf(command: string): string[] {
-  const chunks: string[] = []
-  let chunk = ''
-  let chunkBytes = 0
-  for (const character of command) {
-    const codePoint = character.codePointAt(0)!
-    const isSafePrintableAscii =
-      codePoint >= 0x20 && codePoint <= 0x7e && !REMOTE_COMMAND_PRINTF_ESCAPED_BYTES.has(codePoint)
-    const encodedCharacter =
-      codePoint > 0x7f || isSafePrintableAscii
-        ? character
-        : `\\0${codePoint.toString(8).padStart(3, '0')}`
-    const encodedBytes = codePoint > 0x7f ? Buffer.byteLength(character) : encodedCharacter.length
-    if (chunkBytes + encodedBytes > REMOTE_COMMAND_CHUNK_MAX_BYTES) {
-      chunks.push(chunk)
-      chunk = ''
-      chunkBytes = 0
-    }
-    chunk += encodedCharacter
-    chunkBytes += encodedBytes
-  }
-  chunks.push(chunk)
-  return chunks
-}
-
-/** Wrap a POSIX snippet into one line that non-POSIX SSH login shells can forward. */
-export function wrapRemoteCommandForPosixShell(command: string): string {
-  // Why: csh/tcsh split multiline SSH exec strings before /bin/sh sees them.
-  // POSIX printf rebuilds bounded argument chunks without consuming relay stdin.
-  const encodedChunks = encodeRemoteCommandForPrintf(command)
-  const decodeAndRun =
-    'decoded=$(printf %b "$@" && printf _) || exit $?; ' +
-    'decoded=${decoded%_}; exec /bin/sh -c "$decoded"'
-  const chunkArguments = encodedChunks.map(shellEscape).join(' ')
-  return `exec /bin/sh -c ${shellEscape(decodeAndRun)} orca-command ${chunkArguments}`
-}
-
 export type SshExecOptions = {
   wrapCommand?: boolean
   signal?: AbortSignal
 }
 
 export function createSshOperationAbortError(): Error & { name: string } {
-  const error = new Error('SSH operation was cancelled') as Error & { name: string }
+  const error = new Error('SSH operation was cancelled') as Error & {
+    name: string
+  }
   error.name = 'AbortError'
   return error
-}
-
-function cmdEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`
 }
 
 type BuildConnectConfigOptions = {
@@ -180,7 +143,10 @@ export function buildConnectConfig(
 ): ConnectConfig {
   const effectiveHost = resolveEffectiveHost(target, resolved)
   const effectivePort = resolveEffectivePort(target, resolved)
-  const effectiveUser = target.username || resolved?.user || ''
+  const effectiveUser =
+    isOpenSshConfigBackedTarget(target) && resolved
+      ? (resolved.user ?? target.username)
+      : target.username || resolved?.user || ''
 
   const config: Record<string, unknown> = {
     host: effectiveHost,
@@ -202,18 +168,23 @@ export function buildConnectConfig(
     config.agentForward = true
   }
 
-  const key =
+  const keys =
     (options.includePrivateKey ?? !agent)
-      ? resolvePrivateKey(target, resolved)
-      : resolveUnencryptedExplicitPrivateKey(target, resolved)
-  if (key) {
-    config.privateKey = key.contents
-  }
+      ? resolvePrivateKeys(target, resolved)
+      : resolveUnencryptedExplicitPrivateKeys(target, resolved)
+  configurePrivateKeyAuthentication(
+    config as ConnectConfig,
+    keys,
+    findEncryptedPrivateKeyPath(keys)
+  )
 
   return config as ConnectConfig
 }
 
 function resolveEffectiveHost(target: SshTarget, resolved: SshResolvedConfig | null): string {
+  if (isOpenSshConfigBackedTarget(target) && resolved?.hostname) {
+    return resolved.hostname
+  }
   if (shouldUseResolvedEndpoint(target, resolved)) {
     return resolved!.hostname
   }
@@ -221,6 +192,9 @@ function resolveEffectiveHost(target: SshTarget, resolved: SshResolvedConfig | n
 }
 
 function resolveEffectivePort(target: SshTarget, resolved: SshResolvedConfig | null): number {
+  if (isOpenSshConfigBackedTarget(target) && resolved) {
+    return resolved.port || target.port || 22
+  }
   // Why: imported config aliases store 22 as the schema default even when an
   // included/wildcard OpenSSH rule later resolves a different effective Port.
   if (target.configHost && target.port === 22 && resolved?.port) {
@@ -249,6 +223,12 @@ export function resolveEffectiveProxy(
   target: SshTarget,
   resolved: SshResolvedConfig | null
 ): EffectiveProxy | undefined {
+  if (isOpenSshConfigBackedTarget(target) && resolved) {
+    if (resolved.proxyCommand) {
+      return { kind: 'proxy-command', command: resolved.proxyCommand }
+    }
+    return resolved.proxyJump ? { kind: 'jump-host', jumpHost: resolved.proxyJump } : undefined
+  }
   if (target.proxyCommand) {
     return { kind: 'proxy-command', command: target.proxyCommand }
   }
@@ -266,7 +246,10 @@ export function resolveEffectiveProxy(
 // specifies one (e.g. `cloudflared access ssh --hostname %h`), we spawn
 // the command and bridge its stdin/stdout into a Duplex stream that ssh2
 // uses as its transport socket via `config.sock`.
-function getShellSpawnConfig(command: string): { file: string; args: string[] } {
+function getShellSpawnConfig(command: string): {
+  file: string
+  args: string[]
+} {
   if (process.platform === 'win32') {
     const comspec = process.env.ComSpec || 'cmd.exe'
     return { file: comspec, args: ['/d', '/s', '/c', command] }

@@ -19,6 +19,42 @@ const {
   verifyPackagedMainRuntimeDeps
 } = require('../packaged-runtime-node-modules.cjs')
 
+const MUTABLE_BUILD_ENV = [
+  'ORCA_MAC_HOURLY',
+  'ORCA_MAC_RELEASE',
+  'ORCA_HOURLY_BUILD_VERSION',
+  'ORCA_LOCAL_BUILD_VERSION',
+  // Why: listed so withEnv clears and restores it too — otherwise a set value
+  // leaks into every later case and silently turns releases into prereleases.
+  'ORCA_LAB_RELEASE_CANDIDATE'
+]
+
+/** Re-requires the config under a temporary env, then restores env and module cache. */
+function withEnv(env, assert) {
+  const configPath = require.resolve('../electron-builder.config.cjs')
+  const original = Object.fromEntries(MUTABLE_BUILD_ENV.map((key) => [key, process.env[key]]))
+  try {
+    for (const key of MUTABLE_BUILD_ENV) {
+      delete process.env[key]
+    }
+    Object.assign(process.env, env)
+    delete require.cache[configPath]
+    assert(require('../electron-builder.config.cjs'))
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+    delete require.cache[configPath]
+    require('../electron-builder.config.cjs')
+  }
+}
+
+const withHourlyEnv = (assert) => withEnv({ ORCA_MAC_HOURLY: '1' }, assert)
+
 describe('electron-builder config', () => {
   it('keeps the packaged app identity aligned with local-build validation', () => {
     expect(electronBuilderConfig.appId).toBe(
@@ -154,7 +190,12 @@ describe('electron-builder config', () => {
 
   it('unpacks the compiled CommonJS boundary with CLI runtime files', () => {
     expect(electronBuilderConfig.asarUnpack).toEqual(
-      expect.arrayContaining(['out/package.json', 'out/cli/**', 'out/shared/**'])
+      expect.arrayContaining([
+        'out/package.json',
+        'out/cli/**',
+        'out/shared/**',
+        'out/main/claude-accounts/keychain.js'
+      ])
     )
   })
 
@@ -166,11 +207,9 @@ describe('electron-builder config', () => {
     )
   })
 
-  // Why: the watchdog only arms in packaged builds, and its ELECTRON_RUN_AS_NODE
-  // fork resolves the entry from app.asar.unpacked — inside the asar it never runs.
-  it('unpacks the forked main-thread hang-watchdog entry', () => {
-    expect(electronBuilderConfig.asarUnpack).toEqual(
-      expect.arrayContaining(['out/main/main-thread-hang-watchdog-entry.js'])
+  it('keeps the worker-thread hang watchdog inside app.asar', () => {
+    expect(electronBuilderConfig.asarUnpack).not.toContain(
+      'out/main/main-thread-hang-watchdog-entry.js'
     )
   })
 
@@ -262,6 +301,74 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       require('../electron-builder.config.cjs')
     }
+  })
+
+  // Why: Squirrel.Mac swaps the .app in place only when the replacement carries the
+  // same bundle id and a valid Developer ID signature. A hourly built on the local
+  // (com.stablyai.orca.local, ad-hoc) identity would be un-installable over a real
+  // Orca — the whole point of the channel.
+  it('builds hourly artifacts with the release signing identity', () => {
+    withHourlyEnv((config) => {
+      expect(config.mac.appId).toBeUndefined()
+      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.mac.hardenedRuntime).toBe(true)
+      expect(config.forceCodeSigning).toBe(true)
+    })
+  })
+
+  // Why: notarization is the one release step hourly skips; in-place updates never
+  // check it, and 24 notary round trips a day is the cost being avoided.
+  it('skips notarization only for hourly builds', () => {
+    withHourlyEnv((config) => {
+      expect(config.mac.notarize).toBe(false)
+    })
+    withEnv({ ORCA_MAC_RELEASE: '1' }, (config) => {
+      expect(config.mac.notarize).toBe(true)
+    })
+  })
+
+  // Why: this fork publishes its own `-lab.N` releases, so the publish target must
+  // stay ab2webco/orca-oss — pointing it at upstream would both fail to publish and
+  // let a fork build resolve upstream's higher stable semver. Keep in sync with
+  // src/main/update-feed-target.ts and src/shared/release-channel.ts.
+  // Upstream isolates hourly tags in a second repo because the main repo's releases
+  // atom feed exposes only its 10 newest entries; the fork publishes no hourly tags,
+  // so hourly stays in the one repo and is downgraded to a prerelease instead.
+  it('publishes to the fork and keeps hourly builds out of the Latest pointer', () => {
+    withHourlyEnv((config) => {
+      expect(config.publish).toMatchObject({
+        owner: 'ab2webco',
+        repo: 'orca-oss',
+        releaseType: 'prerelease'
+      })
+    })
+    expect(electronBuilderConfig.publish).toMatchObject({
+      owner: 'ab2webco',
+      repo: 'orca-oss',
+      releaseType: 'release'
+    })
+  })
+
+  // Why: a release candidate must be born a prerelease — finalize's --prerelease
+  // lands only after every platform job, and until then a full release would hold
+  // GitHub's Latest pointer for installs that were never meant to see it.
+  it('publishes a lab release candidate as a prerelease', () => {
+    withEnv({ ORCA_LAB_RELEASE_CANDIDATE: '1' }, (config) => {
+      expect(config.publish).toMatchObject({
+        owner: 'ab2webco',
+        repo: 'orca-oss',
+        releaseType: 'prerelease'
+      })
+    })
+  })
+
+  it('stamps hourly packages with the hourly version', () => {
+    withEnv(
+      { ORCA_MAC_HOURLY: '1', ORCA_HOURLY_BUILD_VERSION: '1.4.160-hourly.202607281400' },
+      (config) => {
+        expect(config.extraMetadata).toEqual({ version: '1.4.160-hourly.202607281400' })
+      }
+    )
   })
 
   it('uses Orca native rebuild hook instead of electron-builder default rebuild', () => {
@@ -477,6 +584,20 @@ describe('electron-builder config', () => {
     }
   })
 
+  it('fails when the packaged resources directory is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
+    try {
+      await expect(
+        electronBuilderConfig.afterPack({
+          appOutDir: root,
+          electronPlatformName: 'win32'
+        })
+      ).rejects.toThrow(/Missing packaged resources directory/)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it.skipIf(process.platform === 'win32')(
     'marks packaged Unix CLI launchers executable',
     async () => {
@@ -498,6 +619,19 @@ describe('electron-builder config', () => {
         await writeFile(
           join(unpackedMainDir, 'daemon-entry.js'),
           'console.error("Usage: daemon-entry <socket>"); process.exit(1)\n',
+          'utf8'
+        )
+        const unpackedCliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
+        await mkdir(join(unpackedCliDir, 'handlers'), { recursive: true })
+        await writeFile(join(unpackedCliDir, 'handlers', 'skills.js'), '', 'utf8')
+        await writeFile(
+          join(unpackedCliDir, 'index.js'),
+          [
+            'const args = process.argv.slice(2)',
+            "if (args[1] === 'list') console.log(JSON.stringify({ topics: [{ name: 'orca-cli' }, { name: 'computer-use' }] }))",
+            "else if (args[1] === 'get') console.log(`---\\nname: ${args[2]}\\n---`)",
+            'else console.log(JSON.stringify({ executed: false }))'
+          ].join('\n'),
           'utf8'
         )
         await writeFile(launcherPath, '#!/usr/bin/env bash\n', { encoding: 'utf8', mode: 0o644 })

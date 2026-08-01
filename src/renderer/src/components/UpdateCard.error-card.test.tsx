@@ -98,6 +98,30 @@ describe('UpdateCard Windows signature failures', () => {
   })
 })
 
+describe('UpdateCard hourly builds', () => {
+  // Why: the lab's tags live only in the fork, so an upstream release-notes link 404s.
+  it('links a pinned hourly build to the fork tag, not a 404 upstream tag', () => {
+    useAppStore.setState({
+      updateStatus: {
+        state: 'available',
+        version: '1.4.160-hourly.202607281400',
+        changelog: null,
+        source: 'hourly'
+      },
+      updateChangelog: null,
+      dismissedUpdateVersion: null,
+      updateCardCollapsed: false,
+      updateReassuranceSeen: true
+    })
+    render(<UpdateCard />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Release notes' }))
+    expect(openUrl).toHaveBeenCalledWith(
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-hourly.202607281400'
+    )
+  })
+})
+
 describe('UpdateCard local builds', () => {
   it('does not link local versions to GitHub release downloads', () => {
     useAppStore.setState({

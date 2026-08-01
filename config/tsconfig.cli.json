@@ -23,6 +23,7 @@
     "../src/main/claude/statusline-script-windows.ts",
     "../src/main/claude/statusline-usage-gauge.ts",
     "../src/main/claude/statusline-windows-fields.ts",
+    "../src/main/claude-accounts/keychain.ts",
     "../src/main/codex/codex-app-server-capability-cache.ts",
     "../src/main/codex/codex-app-server-capability-signal.ts",
     "../src/main/codex/codex-app-server-client.ts",

@@ -108,7 +108,8 @@ export class RpcDispatcher {
           legacyCoordinatorAuthority: legacyCoordinator?.authority,
           revalidateLegacyCoordinator: legacyCoordinator?.revalidate,
           orchestrationCompatibilityCallerAuthority:
-            compatibility.orchestrationCompatibilityCallerAuthority
+            compatibility.orchestrationCompatibilityCallerAuthority,
+          orchestrationCompatibilityEvidence: request.orchestrationCompatibilityEvidence
         })
       }
       const result = await this.orchestrationMutations.run(
@@ -204,7 +205,8 @@ export class RpcDispatcher {
             legacyCoordinatorAuthority: legacyCoordinator?.authority,
             revalidateLegacyCoordinator: legacyCoordinator?.revalidate,
             orchestrationCompatibilityCallerAuthority:
-              compatibility.orchestrationCompatibilityCallerAuthority
+              compatibility.orchestrationCompatibilityCallerAuthority,
+            orchestrationCompatibilityEvidence: request.orchestrationCompatibilityEvidence
           })
         }
         const result = await this.orchestrationMutations.run(

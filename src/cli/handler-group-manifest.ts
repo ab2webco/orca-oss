@@ -12,14 +12,9 @@ export type HandlerGroup = {
 // Why: `keys` mirrors each group's exported record and is verified against the
 // real exports by handler-group-manifest.test.ts, so drift fails CI, not dispatch.
 export const HANDLER_GROUPS: readonly HandlerGroup[] = [
-  // Why these are listed here too: lab-only groups (Plane, managed-account
-  // selection) route through the same lazy manifest, so a CLI invocation that
-  // never touches them never loads their module graph either.
-  {
-    name: 'account',
-    keys: ['account list'],
-    load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
-  },
+  // Why these are listed here too: lab-only groups (Plane) route through the same
+  // lazy manifest, so a CLI invocation that never touches them never loads their
+  // module graph either.
   {
     name: 'plane',
     keys: [
@@ -98,6 +93,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'core',
     keys: ['claude-teams', 'open', 'serve', 'status'],
     load: async () => (await import('./handlers/core.js')).CORE_HANDLERS
+  },
+  {
+    name: 'account',
+    keys: ['account add', 'account list'],
+    load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
   },
   {
     name: 'automations',
@@ -300,7 +300,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'skills',
-    keys: ['skills list', 'skills get'],
+    keys: ['skills list', 'skills get', 'skills install', 'skills update'],
     load: async () => (await import('./handlers/skills.js')).SKILL_HANDLERS
   }
 ]
