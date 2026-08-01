@@ -52,6 +52,34 @@ describe('worktree card title display', () => {
     ).toBe('feature/local-branch')
   })
 
+  it('uses a fetched Plane work-item title instead of the branch-derived title', () => {
+    expect(
+      getWorktreeCardTitleDisplay({
+        storedDisplayName: 'fabolivark/orca-149-plane-card-chip',
+        branchName: 'fabolivark/orca-149-plane-card-chip',
+        planeWorkItemTitle: 'Plane work-item chip on workspace cards'
+      })
+    ).toBe('Plane work-item chip on workspace cards')
+  })
+
+  it('ignores Plane loading and unavailable sentinel copy for the card title', () => {
+    expect(
+      getWorktreeCardTitleDisplay({
+        storedDisplayName: 'fabolivark/orca-149-plane-card-chip',
+        branchName: 'fabolivark/orca-149-plane-card-chip',
+        planeWorkItemTitle: 'Loading Plane work item...'
+      })
+    ).toBe('fabolivark/orca-149-plane-card-chip')
+
+    expect(
+      getWorktreeCardTitleDisplay({
+        storedDisplayName: 'fabolivark/orca-149-plane-card-chip',
+        branchName: 'fabolivark/orca-149-plane-card-chip',
+        planeWorkItemTitle: 'Plane work item details unavailable'
+      })
+    ).toBe('fabolivark/orca-149-plane-card-chip')
+  })
+
   it('does not replace a branch-like workspace name with the repository name', () => {
     expect(
       getWorktreeCardTitleDisplay({

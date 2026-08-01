@@ -4521,7 +4521,9 @@
           "65a9820bd1": "Agent statuses",
           "219ebf1961": "Branch name",
           "folderPathIdentity": "Branch / folder path",
-          "cli": "Orca CLI"
+          "cli": "Orca CLI",
+          "planeWorkItems": "Plane work items",
+          "planeWorkItem": "Plane work item"
         },
         "SshDisconnectedDialog": {
           "ca4a7892af": "Connecting...",
@@ -4651,7 +4653,10 @@
           "cliCreated": "Created by Orca CLI",
           "jiraIssue": "Jira {{value0}}",
           "viewOnJira": "View on Jira",
-          "linkedJira": "Linked Jira {{value0}}"
+          "linkedJira": "Linked Jira {{value0}}",
+          "linkedPlane": "Linked Plane {{value0}}",
+          "planeWorkItem": "Plane {{value0}}",
+          "viewOnPlane": "View on Plane"
         },
         "WorktreeCardMetadataStatusBadges": {
           "fe188062a1": "State: Open",

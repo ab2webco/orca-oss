@@ -21,6 +21,7 @@ import type {
   WorktreeCardIssueDisplay,
   WorktreeCardJiraIssueDisplay,
   WorktreeCardLinearIssueDisplay,
+  WorktreeCardPlaneWorkItemDisplay,
   WorktreeCardMetaBadgesProps,
   WorktreeCardMetaBadgesRootProps,
   WorktreeCardDetailsHoverProps
@@ -30,12 +31,14 @@ import { WorktreeCardReviewDetailSection } from './WorktreeCardReviewDetailSecti
 import { WorktreeCardAutomationDetailSection } from './WorktreeCardAutomationDetailSection'
 import { WorktreeCardCliDetailSection } from './WorktreeCardCliDetailSection'
 import { WorktreeCardIssueDetailSection } from './WorktreeCardIssueDetailSection'
+import { WorktreeCardPlaneWorkItemDetailSection } from './WorktreeCardPlaneWorkItemDetailSection'
 import { WorktreeCardHoverIdentityHeader } from './WorktreeCardHoverIdentityHeader'
 
 export type {
   WorktreeCardIssueDisplay,
   WorktreeCardJiraIssueDisplay,
   WorktreeCardLinearIssueDisplay,
+  WorktreeCardPlaneWorkItemDisplay,
   WorktreeCardMetaBadgesProps,
   WorktreeCardMetaBadgesRootProps,
   WorktreeCardDetailsHoverProps
@@ -53,6 +56,7 @@ export function WorktreeCardDetailsHover({
   issue,
   linearIssue,
   jiraIssue,
+  planeWorkItem,
   review,
   comment,
   automationProvenance,
@@ -72,6 +76,7 @@ export function WorktreeCardDetailsHover({
   onEditComment,
   onOpenGitHubIssueInOrca,
   onOpenLinearIssueInOrca,
+  onOpenPlaneWorkItemInOrca,
   onOpenReviewInOrca,
   onUnlinkReview,
   onOpenAutomation,
@@ -165,6 +170,7 @@ export function WorktreeCardDetailsHover({
       issue,
       linearIssue,
       jiraIssue,
+      planeWorkItem,
       review,
       comment,
       automationProvenance,
@@ -300,6 +306,13 @@ export function WorktreeCardDetailsHover({
               </WorktreeCardDetailSectionContent>
             </WorktreeCardDetailSection>
           )}
+
+          <WorktreeCardPlaneWorkItemDetailSection
+            planeWorkItem={planeWorkItem}
+            onOpenPlaneWorkItemInOrca={
+              onOpenPlaneWorkItemInOrca ? dismissAndRun(onOpenPlaneWorkItemInOrca) : undefined
+            }
+          />
 
           <WorktreeCardReviewDetailSection
             review={review}
