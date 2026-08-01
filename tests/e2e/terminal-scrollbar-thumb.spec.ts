@@ -1,4 +1,5 @@
 import type { Page } from '@stablyai/playwright-test'
+import { PNG } from 'pngjs'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
@@ -96,6 +97,64 @@ async function settleIntoPersistentScrollbar(page: Page): Promise<ScrollbarProbe
   return probe!
 }
 
+/** Mean RGB of the rows between two fractions of a single-column screenshot. */
+function meanRowColor(
+  image: PNG,
+  fromFraction: number,
+  toFraction: number
+): [number, number, number] {
+  const from = Math.floor(image.height * fromFraction)
+  const to = Math.ceil(image.height * toFraction)
+  let r = 0
+  let g = 0
+  let b = 0
+  let samples = 0
+  for (let y = from; y < to; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const index = (image.width * y + x) << 2
+      r += image.data[index]
+      g += image.data[index + 1]
+      b += image.data[index + 2]
+      samples += 1
+    }
+  }
+  return samples === 0 ? [0, 0, 0] : [r / samples, g / samples, b / samples]
+}
+
+/**
+ * Contrast between the thumb and the empty track, measured in rendered pixels.
+ *
+ * Why pixels and not `getComputedStyle(slider).backgroundColor`: the computed value is
+ * identical whether or not the thumb reaches the screen, so it cannot see the failure
+ * this guards — the overview-ruler canvas shares the gutter at z-index 8 and paints over
+ * a bar left at `z-index: auto` (docs/reference/agent-verification-traps.md).
+ */
+async function measureThumbContrast(page: Page, probe: ScrollbarProbe): Promise<number> {
+  const image = PNG.sync.read(
+    await page.screenshot({
+      clip: {
+        x: Math.round(probe.sliderLeft),
+        y: Math.round(probe.trackTop),
+        width: Math.max(1, Math.round(probe.sliderWidth)),
+        height: Math.round(probe.trackHeight)
+      }
+    })
+  )
+  const sliderStartFraction = (probe.sliderTop - probe.trackTop) / probe.trackHeight
+  const sliderEndFraction = sliderStartFraction + probe.sliderHeight / probe.trackHeight
+  // Inset both bands so anti-aliased thumb edges never leak into either sample.
+  const thumb = meanRowColor(
+    image,
+    sliderStartFraction + 0.02,
+    Math.min(1, sliderEndFraction - 0.02)
+  )
+  const emptyTrack =
+    sliderStartFraction > 0.2
+      ? meanRowColor(image, 0.02, sliderStartFraction - 0.02)
+      : meanRowColor(image, Math.min(1, sliderEndFraction + 0.02), 0.98)
+  return Math.max(...thumb.map((channel, index) => Math.abs(channel - emptyTrack[index])))
+}
+
 /** Polls until the buffer genuinely overflows, so the assertions never run against a
  *  scrollbar xterm has correctly decided is unnecessary (slider spanning the whole track). */
 async function waitForScrollableBuffer(page: Page): Promise<void> {
@@ -187,15 +246,20 @@ test.describe('terminal scrollbar thumb', () => {
       await page.waitForTimeout(1000)
       await waitForScrollableBuffer(page)
 
-      const probe = await probeVerticalScrollbar(page)
-      expect(probe, `${mode}: vertical scrollbar missing`).not.toBeNull()
+      // Settle first: the reported symptom is a *persistent* bar with no visible thumb, so
+      // the pixels that matter are the ones left after xterm's auto-hide has fired.
+      const probe = await settleIntoPersistentScrollbar(page)
       const alpha = Number.parseFloat(
-        probe!.sliderBackground.match(/rgba?\([^)]*?,\s*([\d.]+)\)$/)?.[1] ?? '1'
+        probe.sliderBackground.match(/rgba?\([^)]*?,\s*([\d.]+)\)$/)?.[1] ?? '1'
       )
       expect(alpha, `${mode}: slider alpha too low to see over a 7px bar`).toBeGreaterThanOrEqual(
         0.5
       )
-      expect(probe!.sliderWidth, `${mode}: slider has no width`).toBeGreaterThan(0)
+      expect(probe.sliderWidth, `${mode}: slider has no width`).toBeGreaterThan(0)
+      expect(
+        await measureThumbContrast(page, probe),
+        `${mode}: thumb is indistinguishable from the empty track on screen`
+      ).toBeGreaterThan(12)
     }
   })
 
