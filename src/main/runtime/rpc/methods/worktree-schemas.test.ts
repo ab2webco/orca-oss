@@ -102,6 +102,62 @@ describe('worktree RPC schemas', () => {
     ).not.toThrow()
   })
 
+  it('normalizes durable Plane linked-item metadata and keeps rejecting unknown providers', () => {
+    const linkedWorkItem = {
+      provider: 'plane',
+      type: 'issue',
+      number: 0,
+      title: ' ORCA-151 Link Plane ',
+      url: ' https://plane.example.com/acme/browse/ORCA-151/ ',
+      planeIdentifier: ' ORCA-151 '
+    }
+    const linkedTaskSourceContext = {
+      kind: 'task-source',
+      provider: 'plane',
+      projectId: ' project-1 ',
+      hostId: 'runtime:env-1',
+      providerIdentity: {
+        provider: 'plane',
+        workspaceSlug: 'acme',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1'
+      }
+    }
+    const parsed = WorktreeCreate.parse({
+      repo: 'repo-1',
+      name: 'plane-link',
+      linkedWorkItem,
+      linkedTaskSourceContext
+    })
+
+    expect(parsed.linkedWorkItem).toMatchObject({
+      provider: 'plane',
+      title: 'ORCA-151 Link Plane',
+      url: 'https://plane.example.com/acme/browse/ORCA-151/',
+      planeIdentifier: 'ORCA-151'
+    })
+    expect(parsed.linkedTaskSourceContext).toMatchObject({
+      provider: 'plane',
+      projectId: 'project-1',
+      hostId: 'runtime:env-1'
+    })
+    expect(
+      WorktreeCreate.safeParse({
+        repo: 'repo-1',
+        name: 'unknown-provider',
+        linkedWorkItem: { ...linkedWorkItem, provider: 'asana' }
+      }).success
+    ).toBe(false)
+    expect(
+      WorktreeCreate.safeParse({
+        repo: 'repo-1',
+        name: 'mismatch',
+        linkedWorkItem,
+        linkedTaskSourceContext: { ...linkedTaskSourceContext, provider: 'linear' }
+      }).success
+    ).toBe(false)
+  })
+
   it('keeps a blanked display name on remote hosts instead of dropping the clear', () => {
     // Blanking sends displayName:'' meaning "fall back to the branch/folder name".
     // Coercing it to undefined made updateManagedWorktreeMeta's omitUndefinedProperties

@@ -12,6 +12,16 @@ const item: WorkspaceLinkedItem = {
   repoId: 'repo-1'
 }
 
+const planeItem: WorkspaceLinkedItem = {
+  provider: 'plane',
+  type: 'issue',
+  number: 0,
+  title: 'ORCA-151 Link Plane',
+  url: 'https://plane.example.com/acme/browse/ORCA-151/',
+  planeIdentifier: 'ORCA-151',
+  repoId: 'repo-1'
+}
+
 describe('areWorkspaceLinkedItemsEqual', () => {
   it('ignores key order and absent-vs-undefined optional fields', () => {
     expect(
@@ -43,5 +53,25 @@ describe('areWorkspaceLinkedItemsEqual', () => {
       false
     )
     expect(areWorkspaceLinkedItemsEqual(item, { ...item, repoId: 'repo-2' })).toBe(false)
+  })
+
+  it('observes planeIdentifier in both operand orders', () => {
+    const renamed: WorkspaceLinkedItem = { ...planeItem, planeIdentifier: 'ORCA-152' }
+
+    expect(areWorkspaceLinkedItemsEqual(planeItem, { ...planeItem })).toBe(true)
+    expect(areWorkspaceLinkedItemsEqual(planeItem, renamed)).toBe(false)
+    expect(areWorkspaceLinkedItemsEqual(renamed, planeItem)).toBe(false)
+  })
+
+  it('treats an absent planeIdentifier as different from a set one but equal to undefined', () => {
+    const { planeIdentifier: _omitted, ...withoutIdentifier } = planeItem
+
+    expect(areWorkspaceLinkedItemsEqual(withoutIdentifier, { ...planeItem })).toBe(false)
+    expect(
+      areWorkspaceLinkedItemsEqual(withoutIdentifier, {
+        ...withoutIdentifier,
+        planeIdentifier: undefined
+      })
+    ).toBe(true)
   })
 })
