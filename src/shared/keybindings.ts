@@ -338,7 +338,7 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     title: 'Open Tasks',
     group: 'Global',
     scope: 'global',
-    searchKeywords: ['shortcut', 'tasks', 'github issues', 'linear'],
+    searchKeywords: ['shortcut', 'tasks', 'github issues', 'linear', 'plane'],
     defaultBindings: platformBindings([])
   },
   {

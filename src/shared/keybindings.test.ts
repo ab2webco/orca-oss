@@ -689,6 +689,14 @@ describe('keybindings', () => {
     ).toBe(true)
   })
 
+  it('finds the Tasks shortcut by Plane alongside the other task providers', () => {
+    const definition = getKeybindingDefinition('view.tasks')
+
+    expect(definition?.searchKeywords).toEqual(
+      expect.arrayContaining(['tasks', 'github issues', 'linear', 'plane'])
+    )
+  })
+
   it('names terminal title shortcuts after pane menu actions', () => {
     const setTitle = getKeybindingDefinition('terminal.setTitle')
     const clearTitle = getKeybindingDefinition('terminal.clearPaneTitle')
