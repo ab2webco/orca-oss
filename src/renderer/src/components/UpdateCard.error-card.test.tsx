@@ -99,7 +99,8 @@ describe('UpdateCard Windows signature failures', () => {
 })
 
 describe('UpdateCard hourly builds', () => {
-  it('links a pinned hourly build to its own repo instead of a 404 main-repo tag', () => {
+  // Why: the lab's tags live only in the fork, so an upstream release-notes link 404s.
+  it('links a pinned hourly build to the fork tag, not a 404 upstream tag', () => {
     useAppStore.setState({
       updateStatus: {
         state: 'available',
@@ -116,7 +117,7 @@ describe('UpdateCard hourly builds', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Release notes' }))
     expect(openUrl).toHaveBeenCalledWith(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-hourly.202607281400'
     )
   })
 })

@@ -2502,10 +2502,12 @@ describe('registerPtyHandlers', () => {
         codexAccountId: 'codex-launch'
       })
 
-      expect(getSelectedCodexHomePath).toHaveBeenCalledWith(
-        expect.objectContaining({ overrideAccountId: 'codex-launch' }),
-        expect.anything(),
-        expect.anything()
+      // Why the first argument alone: #11731 widened this resolve from isDaemonHostSpawn
+      // to !args.connectionId, so a local spawn reaches it too — and a local spawn that
+      // passes no env/cwd legitimately resolves them to undefined. The account the
+      // launch target carries is the contract here; the env is not.
+      expect(getSelectedCodexHomePath.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ overrideAccountId: 'codex-launch' })
       )
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
@@ -2571,10 +2573,12 @@ describe('registerPtyHandlers', () => {
         worktreeId: 'wt-codex'
       })
 
-      expect(getSelectedCodexHomePath).toHaveBeenCalledWith(
-        expect.objectContaining({ overrideAccountId: 'codex-pinned' }),
-        expect.anything(),
-        expect.anything()
+      // Why the first argument alone: #11731 widened this resolve from isDaemonHostSpawn
+      // to !args.connectionId, so a local spawn reaches it too — and a local spawn that
+      // passes no env/cwd legitimately resolves them to undefined. The account the
+      // launch target carries is the contract here; the env is not.
+      expect(getSelectedCodexHomePath.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ overrideAccountId: 'codex-pinned' })
       )
       await handlers.get('pty:kill')!(null, { id: result.id })
     })

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION } from './types'
 
-
 // Why: reconcileSeededClaudeLivePtys is only reachable through initDaemonPtyProvider, so these
 // tests reuse the same adapter/spawner fake shape as daemon-init.test.ts. The single addition is
 // listSessionsControl, which lets each test drive the retry path (fail-always, fail-then-succeed,
@@ -196,7 +195,12 @@ vi.mock('fs', () => ({
   writeFileSync: writeFileSyncMock
 }))
 
-vi.mock('child_process', () => ({ fork: forkMock }))
+// Why: daemon-init now reaches daemon-ready-identity, which promisifies execFile at
+// module load. Mirror daemon-init.test.ts and override only fork. (#11606)
+vi.mock('child_process', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fork: forkMock
+}))
 
 vi.mock('net', () => ({ connect: netConnectMock }))
 

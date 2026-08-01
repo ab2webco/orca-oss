@@ -591,7 +591,7 @@ describe('ClaudeAccountService credential capture', () => {
 
   it('durably restores account state before credentials are touched when removal refresh fails', async () => {
     setPlatform('linux')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
     const managedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
     mkdirSync(managedAuthPath, { recursive: true })
@@ -671,7 +671,7 @@ describe('ClaudeAccountService credential capture', () => {
 
   it('does not delete managed files when scoped Keychain cleanup fails', async () => {
     setPlatform('darwin')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
     const managedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
     mkdirSync(managedAuthPath, { recursive: true })
@@ -2203,7 +2203,7 @@ describe('ClaudeAccountService credential capture', () => {
 
   it('rejects reauthentication when the browser session returns a different identity', async () => {
     setPlatform('linux')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
     const managedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
     mkdirSync(managedAuthPath, { recursive: true })
@@ -2274,7 +2274,7 @@ describe('ClaudeAccountService credential capture', () => {
 
   it('rejects adding a managed account that duplicates an existing identity on the same runtime', async () => {
     setPlatform('linux')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
     const hostAuthPath = join(tempDir, 'claude-accounts', 'host-account', 'auth')
     mkdirSync(hostAuthPath, { recursive: true })
@@ -2349,7 +2349,7 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
 
   beforeEach(() => {
     setPlatform('linux')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
   })
 
@@ -2739,7 +2739,7 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
 
   it('rejects reauthentication when the browser session returns a different identity', async () => {
     setPlatform('linux')
-    tempDir = '/tmp/orca-claude-service-test'
+    tempDir = CLAUDE_SERVICE_TEST_ROOT
     rmSync(tempDir, { recursive: true, force: true })
     const managedAuthPath = join(tempDir, 'claude-accounts', 'account-1', 'auth')
     mkdirSync(managedAuthPath, { recursive: true })

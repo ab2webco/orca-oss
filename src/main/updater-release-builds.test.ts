@@ -26,7 +26,7 @@ describe('listReleaseBuilds', () => {
     fetchMock.mockReset()
   })
 
-  it('lists hourly builds from the dedicated repo, newest first', async () => {
+  it('lists hourly builds from the fork repo, newest first', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
         release('v1.4.160-hourly.202607280900'),
@@ -37,7 +37,9 @@ describe('listReleaseBuilds', () => {
 
     const builds = await listReleaseBuilds('hourly')
 
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-hourly')
+    // Why the fork repo for every channel: resolveTargetBuild pins the updater at the
+    // listed repo's assets, so upstream here would install an upstream build over a lab one.
+    expect(fetchMock.mock.calls[0][0]).toContain('ab2webco/orca-oss')
     expect(builds.map((build) => build.version)).toEqual([
       '1.4.160-hourly.202607281400',
       '1.4.160-hourly.202607281000',
@@ -115,18 +117,19 @@ describe('listReleaseBuilds', () => {
 })
 
 describe('resolveTargetBuild', () => {
-  it('pins an hourly tag at the hourly repo download path', () => {
+  it('pins an hourly tag at the fork repo download path', () => {
     expect(resolveTargetBuild('hourly', 'v1.4.160-hourly.202607281400')).toEqual({
       tag: 'v1.4.160-hourly.202607281400',
       version: '1.4.160-hourly.202607281400',
-      feedUrl:
-        'https://github.com/stablyai/orca-hourly/releases/download/v1.4.160-hourly.202607281400'
+      feedUrl: 'https://github.com/ab2webco/orca-oss/releases/download/v1.4.160-hourly.202607281400'
     })
   })
 
-  it('pins a stable tag at the main repo download path', () => {
+  // Why this is the load-bearing one: this feed URL is what the updater is pinned to,
+  // so an upstream repo here means a lab install downloads an upstream build.
+  it('pins a stable tag at the fork repo download path', () => {
     expect(resolveTargetBuild('stable', 'v1.4.159').feedUrl).toBe(
-      'https://github.com/stablyai/orca/releases/download/v1.4.159'
+      'https://github.com/ab2webco/orca-oss/releases/download/v1.4.159'
     )
   })
 

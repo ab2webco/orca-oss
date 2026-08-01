@@ -23,7 +23,10 @@ const MUTABLE_BUILD_ENV = [
   'ORCA_MAC_HOURLY',
   'ORCA_MAC_RELEASE',
   'ORCA_HOURLY_BUILD_VERSION',
-  'ORCA_LOCAL_BUILD_VERSION'
+  'ORCA_LOCAL_BUILD_VERSION',
+  // Why: listed so withEnv clears and restores it too — otherwise a set value
+  // leaks into every later case and silently turns releases into prereleases.
+  'ORCA_LAB_RELEASE_CANDIDATE'
 ]
 
 /** Re-requires the config under a temporary env, then restores env and module cache. */
@@ -324,16 +327,38 @@ describe('electron-builder config', () => {
     })
   })
 
-  // Why: the main repo's releases atom feed exposes only its 10 newest entries.
-  // Publishing 24 hourly tags a day there would evict every stable/RC entry and
-  // break update checks for every real user.
-  it('publishes hourly builds to the separate hourly repo', () => {
+  // Why: this fork publishes its own `-lab.N` releases, so the publish target must
+  // stay ab2webco/orca-oss — pointing it at upstream would both fail to publish and
+  // let a fork build resolve upstream's higher stable semver. Keep in sync with
+  // src/main/update-feed-target.ts and src/shared/release-channel.ts.
+  // Upstream isolates hourly tags in a second repo because the main repo's releases
+  // atom feed exposes only its 10 newest entries; the fork publishes no hourly tags,
+  // so hourly stays in the one repo and is downgraded to a prerelease instead.
+  it('publishes to the fork and keeps hourly builds out of the Latest pointer', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toMatchObject({ repo: 'orca-hourly', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({
+        owner: 'ab2webco',
+        repo: 'orca-oss',
+        releaseType: 'prerelease'
+      })
     })
     expect(electronBuilderConfig.publish).toMatchObject({
-      repo: 'orca',
+      owner: 'ab2webco',
+      repo: 'orca-oss',
       releaseType: 'release'
+    })
+  })
+
+  // Why: a release candidate must be born a prerelease — finalize's --prerelease
+  // lands only after every platform job, and until then a full release would hold
+  // GitHub's Latest pointer for installs that were never meant to see it.
+  it('publishes a lab release candidate as a prerelease', () => {
+    withEnv({ ORCA_LAB_RELEASE_CANDIDATE: '1' }, (config) => {
+      expect(config.publish).toMatchObject({
+        owner: 'ab2webco',
+        repo: 'orca-oss',
+        releaseType: 'prerelease'
+      })
     })
   })
 

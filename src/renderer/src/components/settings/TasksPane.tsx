@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Github, Gitlab } from 'lucide-react'
 import type { GlobalSettings, TaskProvider } from '../../../../shared/types'
 import {
@@ -10,11 +10,11 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useAppStore } from '@/store'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { CodeHostSetupSteps, JiraSetupSteps } from './TaskSourceSimpleSetup'
+import { LinearLaunchPromptSection, PlaneTaskWriteSection } from './TaskLaunchPromptSections'
 import { TaskSourceLinearSetup } from './TaskSourceLinearSetup'
 import { TaskSourceProviderCard } from './TaskSourceProviderCard'
 import {
@@ -107,36 +107,6 @@ const PROVIDER_META: Record<
 
 export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.JSX.Element {
   const visibleProviders = normalizeVisibleTaskProviders(settings.visibleTaskProviders)
-
-  const [linearTemplateDraft, setLinearTemplateDraft] = useState(
-    settings.linearLaunchPromptTemplate ?? ''
-  )
-  // Keep the draft in sync when the persisted value changes elsewhere.
-  useEffect(() => {
-    setLinearTemplateDraft(settings.linearLaunchPromptTemplate ?? '')
-  }, [settings.linearLaunchPromptTemplate])
-
-  const commitLinearTemplate = (): void => {
-    if ((settings.linearLaunchPromptTemplate ?? '') === linearTemplateDraft) {
-      return
-    }
-    updateSettings({ linearLaunchPromptTemplate: linearTemplateDraft })
-  }
-
-  const [planeTemplateDraft, setPlaneTemplateDraft] = useState(
-    settings.planeLaunchPromptTemplate ?? ''
-  )
-  // Keep the draft in sync when the persisted value changes elsewhere.
-  useEffect(() => {
-    setPlaneTemplateDraft(settings.planeLaunchPromptTemplate ?? '')
-  }, [settings.planeLaunchPromptTemplate])
-
-  const commitPlaneTemplate = (): void => {
-    if ((settings.planeLaunchPromptTemplate ?? '') === planeTemplateDraft) {
-      return
-    }
-    updateSettings({ planeLaunchPromptTemplate: planeTemplateDraft })
-  }
 
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
@@ -310,120 +280,9 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
         </p>
       </section>
 
-      <section className="space-y-3">
-        <SettingsSubsectionHeader
-          title={translate('auto.components.settings.TasksPane.09ae2d7c51', 'Linear')}
-          description={translate(
-            'auto.components.settings.TasksPane.cbcd4247a4',
-            'Customize the first instruction Orca sends to the agent when you start a worktree from a Linear issue.'
-          )}
-        />
-        <SearchableSetting
-          title={translate(
-            'auto.components.settings.TasksPane.8490b38b7e',
-            'Launch prompt template'
-          )}
-          description={translate(
-            'auto.components.settings.TasksPane.6a0d7e542a',
-            'Leave empty to use the default. The issue identifier and URL variables are shown in the field placeholder.'
-          )}
-          keywords={['linear', 'prompt', 'template', 'launch', 'instruction', 'identifier', 'url']}
-          className="space-y-2 py-2"
-        >
-          <textarea
-            aria-label={translate(
-              'auto.components.settings.TasksPane.linear_launch_prompt_aria',
-              'Linear launch prompt template'
-            )}
-            value={linearTemplateDraft}
-            rows={3}
-            spellCheck={false}
-            placeholder={translate(
-              'auto.components.settings.TasksPane.f37954bf8a',
-              'Linked Linear issue: {{identifier}}\n{{url}}',
-              { identifier: '{{identifier}}', url: '{{url}}' }
-            )}
-            onChange={(event) => setLinearTemplateDraft(event.target.value)}
-            onBlur={commitLinearTemplate}
-            className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </SearchableSetting>
-      </section>
+      <LinearLaunchPromptSection settings={settings} updateSettings={updateSettings} />
 
-      <section className="space-y-3">
-        <SettingsSubsectionHeader
-          title={translate('auto.components.settings.TasksPane.plane_section_title', 'Plane')}
-          description={translate(
-            'auto.components.settings.TasksPane.plane_section_description',
-            'Customize the first instruction Orca sends to the agent when you start a worktree from a Plane work item.'
-          )}
-        />
-        <SearchableSetting
-          title={translate(
-            'auto.components.settings.TasksPane.plane_launch_prompt_title',
-            'Launch prompt template'
-          )}
-          description={translate(
-            'auto.components.settings.TasksPane.plane_launch_prompt_description',
-            'Leave empty to use the default. The work item identifier and URL variables are shown in the field placeholder.'
-          )}
-          keywords={['plane', 'prompt', 'template', 'launch', 'instruction', 'identifier', 'url']}
-          className="space-y-2 py-2"
-        >
-          <textarea
-            aria-label={translate(
-              'auto.components.settings.TasksPane.plane_launch_prompt_aria',
-              'Plane launch prompt template'
-            )}
-            value={planeTemplateDraft}
-            rows={3}
-            spellCheck={false}
-            placeholder={translate(
-              'auto.components.settings.TasksPane.plane_launch_prompt_placeholder',
-              'Linked Plane work item: {{identifier}}\n{{url}}',
-              { identifier: '{{identifier}}', url: '{{url}}' }
-            )}
-            onChange={(event) => setPlaneTemplateDraft(event.target.value)}
-            onBlur={commitPlaneTemplate}
-            className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </SearchableSetting>
-        <SearchableSetting
-          title={translate(
-            'auto.components.settings.TasksPane.plane_strip_attribution_title',
-            'Hide AI attribution on work items'
-          )}
-          description={translate(
-            'auto.components.settings.TasksPane.plane_strip_attribution_description',
-            'Remove agent-authored provenance footers (e.g. "Planned with Claude Code", "Refined with Codex") from descriptions and comments before they are written to Plane.'
-          )}
-          keywords={[
-            'plane',
-            'ai',
-            'attribution',
-            'provenance',
-            'claude',
-            'codex',
-            'footer',
-            'signature',
-            'ticket'
-          ]}
-          className="py-2"
-        >
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <Checkbox
-              checked={settings.stripAiAttributionFromTickets !== false}
-              onCheckedChange={(value) =>
-                updateSettings({ stripAiAttributionFromTickets: value === true })
-              }
-            />
-            {translate(
-              'auto.components.settings.TasksPane.plane_strip_attribution_toggle',
-              'Strip AI attribution before writing'
-            )}
-          </label>
-        </SearchableSetting>
-      </section>
+      <PlaneTaskWriteSection settings={settings} updateSettings={updateSettings} />
     </div>
   )
 }

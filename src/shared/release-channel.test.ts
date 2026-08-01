@@ -22,28 +22,32 @@ describe('release channel', () => {
     expect(getVersionChannel('not-a-version')).toBeNull()
   })
 
-  // Why: hourly tags must never resolve to the main repo — the releases atom feed
-  // exposes only 10 entries, so 24 hourly tags a day would evict every stable/RC
-  // entry and leave real users with nothing to update to.
-  it('keeps hourly builds out of the main release repo', () => {
-    expect(getReleaseRepoForChannel('hourly')).toBe('stablyai/orca-hourly')
-    expect(getReleaseRepoForChannel('stable')).toBe('stablyai/orca')
-    expect(getReleaseRepoForChannel('rc')).toBe('stablyai/orca')
+  // Why upstream split hourly into its own repo: the releases atom feed exposes only
+  // 10 entries, so 24 hourly tags a day would evict every stable/RC entry. This fork
+  // publishes no hourly tags at all (no mac-hourly workflow), so the split buys it
+  // nothing — and pointing hourly at upstream's repo would let the dev build picker
+  // pin the updater at upstream assets and install an upstream build over a lab one.
+  // The fork's replacement guarantee is the prerelease downgrade, pinned in
+  // config/scripts/electron-builder-config.test.mjs.
+  it('resolves every channel inside the fork that publishes them', () => {
+    expect(getReleaseRepoForChannel('hourly')).toBe('ab2webco/orca-oss')
+    expect(getReleaseRepoForChannel('stable')).toBe('ab2webco/orca-oss')
+    expect(getReleaseRepoForChannel('rc')).toBe('ab2webco/orca-oss')
   })
 
-  // Why: an hourly tag linked against the main repo 404s — the tag only exists
-  // in the hourly repo.
-  it('builds release-notes links against the repo that published the version', () => {
+  // Why: a release-notes link against upstream 404s — these `-lab.N`/rc tags only
+  // exist in the fork.
+  it('builds release-notes links against the fork that published the version', () => {
     expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBe(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-hourly.202607281400'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160')).toBe(
-      'https://github.com/stablyai/orca/releases/tag/v1.4.160'
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160'
     )
     expect(getReleaseNotesUrlForVersion('v1.4.160-rc.3')).toBe(
-      'https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.3'
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-rc.3'
     )
-    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/stablyai/orca/releases')
+    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/ab2webco/orca-oss/releases')
   })
 
   it('round-trips an hourly version stamp as UTC', () => {
