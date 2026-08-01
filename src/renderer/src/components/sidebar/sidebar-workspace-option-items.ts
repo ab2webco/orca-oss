@@ -170,6 +170,16 @@ const ISSUE_WORKTREE_CARD_PROPERTY_OPTIONS: WorktreeCardPropertyOption[] = [
         'Jira issues'
       )
     }
+  },
+  {
+    id: 'plane-issue',
+    properties: ['plane-issue'],
+    get label() {
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.planeWorkItems',
+        'Plane work items'
+      )
+    }
   }
 ]
 

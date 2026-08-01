@@ -159,6 +159,45 @@ describe('WorktreeCardDisplayMenuSection', () => {
     expect(setWorktreeCardMode).toHaveBeenCalledWith('Compact')
   })
 
+  it('toggles the Plane work-item property from the legacy individual control', () => {
+    renderMenu()
+
+    const planeButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Plane work item'
+    )
+    expect(planeButton).not.toBeUndefined()
+    // Why: the fixture profile has no 'plane-issue', so the control must start unchecked and add it.
+    expect(planeButton?.dataset.checked).toBe('false')
+
+    act(() => {
+      planeButton?.click()
+    })
+
+    const [nextProperties] = setWorktreeCardProperties.mock.calls[0] as [string[]]
+    expect(nextProperties).toContain('plane-issue')
+    expect(nextProperties).toContain('jira-issue')
+  })
+
+  it('toggles the Plane work-item property from the new-card-style split control', () => {
+    settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: true }
+
+    renderMenu()
+
+    const planeButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Plane work items'
+    )
+    expect(planeButton).not.toBeUndefined()
+    expect(planeButton?.dataset.checked).toBe('false')
+
+    act(() => {
+      planeButton?.click()
+    })
+
+    const [nextProperties] = setWorktreeCardProperties.mock.calls[0] as [string[]]
+    expect(nextProperties).toContain('plane-issue')
+    expect(nextProperties).toContain('jira-issue')
+  })
+
   it('keeps branch-only copy when project groups are unavailable', () => {
     settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: true }
 

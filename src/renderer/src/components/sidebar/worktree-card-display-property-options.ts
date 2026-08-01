@@ -30,6 +30,15 @@ export const PROPERTY_OPTIONS: { id: WorktreeCardProperty; label: string }[] = [
     }
   },
   {
+    id: 'plane-issue',
+    get label() {
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.planeWorkItem',
+        'Plane work item'
+      )
+    }
+  },
+  {
     id: 'pr',
     get label() {
       return translate(
