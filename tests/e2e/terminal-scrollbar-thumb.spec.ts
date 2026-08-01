@@ -1,4 +1,5 @@
 import type { Page } from '@stablyai/playwright-test'
+import { PNG } from 'pngjs'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
@@ -17,10 +18,18 @@ type ScrollbarProbe = {
   scrollbarClassName: string
   scrollbarOpacity: string
   scrollbarPointerEvents: string
+  scrollbarZIndex: string
+  trackTop: number
   trackHeight: number
+  sliderTop: number
+  sliderLeft: number
   sliderHeight: number
   sliderWidth: number
   sliderBackground: string
+  /** z-index of xterm's overview-ruler canvas, which shares the scrollbar gutter. */
+  overviewRulerZIndex: string | null
+  /** buffer.active.viewportY of the active pane — the only proof a drag actually scrolled. */
+  viewportY: number
 }
 
 async function probeVerticalScrollbar(page: Page): Promise<ScrollbarProbe | null> {
@@ -34,16 +43,116 @@ async function probeVerticalScrollbar(page: Page): Promise<ScrollbarProbe | null
     }
     const scrollbarStyle = getComputedStyle(scrollbar)
     const sliderStyle = getComputedStyle(slider)
+    const ruler = document.querySelector('.xterm .xterm-decoration-overview-ruler')
+    const scrollbarRect = scrollbar.getBoundingClientRect()
+    const sliderRect = slider.getBoundingClientRect()
+    let viewportY = -1
+    for (const manager of window.__paneManagers?.values() ?? []) {
+      const terminal = (
+        manager.getActivePane?.() as unknown as
+          | { terminal?: { buffer: { active: { viewportY: number } } } }
+          | null
+          | undefined
+      )?.terminal
+      if (terminal) {
+        viewportY = terminal.buffer.active.viewportY
+      }
+    }
     return {
       scrollbarClassName: scrollbar.className,
       scrollbarOpacity: scrollbarStyle.opacity,
       scrollbarPointerEvents: scrollbarStyle.pointerEvents,
-      trackHeight: scrollbar.getBoundingClientRect().height,
-      sliderHeight: slider.getBoundingClientRect().height,
-      sliderWidth: slider.getBoundingClientRect().width,
-      sliderBackground: sliderStyle.backgroundColor
+      scrollbarZIndex: scrollbarStyle.zIndex,
+      trackTop: scrollbarRect.top,
+      trackHeight: scrollbarRect.height,
+      sliderTop: sliderRect.top,
+      sliderLeft: sliderRect.left,
+      sliderHeight: sliderRect.height,
+      sliderWidth: sliderRect.width,
+      sliderBackground: sliderStyle.backgroundColor,
+      overviewRulerZIndex: ruler ? getComputedStyle(ruler).zIndex : null,
+      viewportY
     }
   })
+}
+
+/** Reaches the state the ORCA-133 rescue exists for: buffer scrollable, pointer parked
+ *  outside the terminal, xterm's 500ms auto-hide already fired. */
+async function settleIntoPersistentScrollbar(page: Page): Promise<ScrollbarProbe> {
+  await page.mouse.move(0, 0)
+  await expect
+    .poll(
+      async () => {
+        const sample = await probeVerticalScrollbar(page)
+        return sample?.scrollbarClassName.includes('xterm-fade') ?? false
+      },
+      {
+        timeout: SCROLLBAR_AUTO_HIDE_SETTLE_MS,
+        message: 'scrollbar never reached the hidden state'
+      }
+    )
+    .toBe(true)
+  const probe = await probeVerticalScrollbar(page)
+  expect(probe).not.toBeNull()
+  return probe!
+}
+
+/** Mean RGB of the rows between two fractions of a single-column screenshot. */
+function meanRowColor(
+  image: PNG,
+  fromFraction: number,
+  toFraction: number
+): [number, number, number] {
+  const from = Math.floor(image.height * fromFraction)
+  const to = Math.ceil(image.height * toFraction)
+  let r = 0
+  let g = 0
+  let b = 0
+  let samples = 0
+  for (let y = from; y < to; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const index = (image.width * y + x) << 2
+      r += image.data[index]
+      g += image.data[index + 1]
+      b += image.data[index + 2]
+      samples += 1
+    }
+  }
+  return samples === 0 ? [0, 0, 0] : [r / samples, g / samples, b / samples]
+}
+
+/**
+ * Contrast between the thumb and the empty track, measured in rendered pixels.
+ *
+ * Why pixels and not `getComputedStyle(slider).backgroundColor`: the computed value is
+ * identical whether or not the thumb reaches the screen, so it cannot see the failure
+ * this guards — the overview-ruler canvas shares the gutter at z-index 8 and paints over
+ * a bar left at `z-index: auto` (docs/reference/agent-verification-traps.md).
+ */
+async function measureThumbContrast(page: Page, probe: ScrollbarProbe): Promise<number> {
+  const image = PNG.sync.read(
+    await page.screenshot({
+      clip: {
+        x: Math.round(probe.sliderLeft),
+        y: Math.round(probe.trackTop),
+        width: Math.max(1, Math.round(probe.sliderWidth)),
+        height: Math.round(probe.trackHeight)
+      }
+    })
+  )
+  const sliderStartFraction = (probe.sliderTop - probe.trackTop) / probe.trackHeight
+  const sliderEndFraction = sliderStartFraction + probe.sliderHeight / probe.trackHeight
+  // Inset both bands so anti-aliased thumb edges never leak into either sample.
+  const thumb = meanRowColor(
+    image,
+    sliderStartFraction + 0.02,
+    Math.min(1, sliderEndFraction - 0.02)
+  )
+  const emptyTrack =
+    sliderStartFraction > 0.2
+      ? meanRowColor(image, 0.02, sliderStartFraction - 0.02)
+      : meanRowColor(image, Math.min(1, sliderEndFraction + 0.02), 0.98)
+  return Math.max(...thumb.map((channel, index) => Math.abs(channel - emptyTrack[index])))
 }
 
 /** Polls until the buffer genuinely overflows, so the assertions never run against a
@@ -137,15 +246,130 @@ test.describe('terminal scrollbar thumb', () => {
       await page.waitForTimeout(1000)
       await waitForScrollableBuffer(page)
 
-      const probe = await probeVerticalScrollbar(page)
-      expect(probe, `${mode}: vertical scrollbar missing`).not.toBeNull()
+      // Settle first: the reported symptom is a *persistent* bar with no visible thumb, so
+      // the pixels that matter are the ones left after xterm's auto-hide has fired.
+      const probe = await settleIntoPersistentScrollbar(page)
       const alpha = Number.parseFloat(
-        probe!.sliderBackground.match(/rgba?\([^)]*?,\s*([\d.]+)\)$/)?.[1] ?? '1'
+        probe.sliderBackground.match(/rgba?\([^)]*?,\s*([\d.]+)\)$/)?.[1] ?? '1'
       )
       expect(alpha, `${mode}: slider alpha too low to see over a 7px bar`).toBeGreaterThanOrEqual(
         0.5
       )
-      expect(probe!.sliderWidth, `${mode}: slider has no width`).toBeGreaterThan(0)
+      expect(probe.sliderWidth, `${mode}: slider has no width`).toBeGreaterThan(0)
+      expect(
+        await measureThumbContrast(page, probe),
+        `${mode}: thumb is indistinguishable from the empty track on screen`
+      ).toBeGreaterThan(12)
     }
+  })
+
+  test('scrolls the viewport when the persistent thumb is dragged', async ({ orcaPage: page }) => {
+    await waitForSessionReady(page)
+    await waitForActiveWorktree(page)
+    await ensureTerminalVisible(page)
+    await waitForActiveTerminalManager(page)
+    const ptyId = await waitForActivePanePtyId(page)
+
+    await execInTerminal(page, ptyId, 'seq 1 500')
+    await waitForTerminalOutput(page, '500', 30_000)
+    await waitForScrollableBuffer(page)
+    const settled = await settleIntoPersistentScrollbar(page)
+    expect(settled.viewportY, 'buffer is not scrolled to the bottom').toBeGreaterThan(0)
+
+    // Grab the thumb cold — the pointer enters the gutter from outside, which is the only
+    // way a user reaches a bar that xterm has already auto-hidden.
+    const x = settled.sliderLeft + settled.sliderWidth / 2
+    await page.mouse.move(x, settled.sliderTop + settled.sliderHeight / 2)
+    await page.mouse.down()
+    await page.mouse.move(x, settled.trackTop + 2, { steps: 12 })
+
+    // viewportY, not `.xterm-active`: the class flip only proves pointerdown landed. If the
+    // pointer-capture move loop never runs, the class assertion still passes and nothing scrolls.
+    await expect
+      .poll(async () => (await probeVerticalScrollbar(page))?.viewportY ?? -1, {
+        timeout: 5_000,
+        message: 'dragging the thumb did not scroll the viewport'
+      })
+      .toBe(0)
+    await page.mouse.up()
+  })
+
+  test('stacks the persistent bar above the overview ruler sharing its gutter', async ({
+    orcaPage: page
+  }) => {
+    await waitForSessionReady(page)
+    await waitForActiveWorktree(page)
+    await ensureTerminalVisible(page)
+    await waitForActiveTerminalManager(page)
+    const ptyId = await waitForActivePanePtyId(page)
+
+    await execInTerminal(page, ptyId, 'seq 1 500')
+    await waitForTerminalOutput(page, '500', 30_000)
+    await waitForScrollableBuffer(page)
+    const settled = await settleIntoPersistentScrollbar(page)
+
+    // scrollbar.width also enables xterm's overview ruler, a canvas pinned to the same
+    // gutter at z-index 8 (TerminalSearch paints match marks on it). xterm's own
+    // `.xterm-visible` rule lifts the bar to 11 for exactly this reason; a bar kept
+    // painted at `z-index: auto` renders *under* the ruler.
+    expect(settled.overviewRulerZIndex, 'overview ruler canvas missing').not.toBeNull()
+    expect(Number.parseInt(settled.scrollbarZIndex, 10)).toBeGreaterThanOrEqual(
+      Number.parseInt(settled.overviewRulerZIndex!, 10)
+    )
+  })
+
+  test('stops painting the bar once a relay snapshot leaves nothing to scroll', async ({
+    orcaPage: page
+  }) => {
+    await waitForSessionReady(page)
+    await waitForActiveWorktree(page)
+    await ensureTerminalVisible(page)
+    await waitForActiveTerminalManager(page)
+    const ptyId = await waitForActivePanePtyId(page)
+
+    await execInTerminal(page, ptyId, 'seq 1 500')
+    await waitForTerminalOutput(page, '500', 30_000)
+    await waitForScrollableBuffer(page)
+    await settleIntoPersistentScrollbar(page)
+
+    // The exact payload remote-runtime-terminal-multiplexer.ts wraps every relay snapshot in:
+    // ED 3 drops the scrollback, so an SSH/relay pane repaints into a buffer that no longer
+    // overflows. xterm's own hide is a no-op here (its controller skips the class write when
+    // the bar is already hidden), so the bar keeps whatever class it timed out with.
+    await page.evaluate(() => {
+      for (const manager of window.__paneManagers?.values() ?? []) {
+        const terminal = (
+          manager.getActivePane?.() as unknown as
+            | { terminal?: { write(data: string): void } }
+            | null
+            | undefined
+        )?.terminal
+        terminal?.write('\x1b[2J\x1b[3J\x1b[Hrelay snapshot\r\n')
+      }
+    })
+    await page.mouse.move(0, 0)
+
+    await expect
+      .poll(
+        async () => {
+          const sample = await probeVerticalScrollbar(page)
+          if (!sample) {
+            return 'no-scrollbar'
+          }
+          if (sample.sliderHeight < sample.trackHeight) {
+            return `still-scrollable (slider ${sample.sliderHeight}/${sample.trackHeight})`
+          }
+          return Number.parseFloat(sample.scrollbarOpacity) === 0
+            ? 'hidden'
+            : `full-track strip painted (opacity ${sample.scrollbarOpacity})`
+        },
+        { timeout: SCROLLBAR_AUTO_HIDE_SETTLE_MS }
+      )
+      .toBe('hidden')
+
+    // A bar with nothing to scroll must also stop swallowing clicks: xterm's drag handler
+    // early-returns when the scrollbar is not needed, so a grabbable one is a dead target.
+    const probe = await probeVerticalScrollbar(page)
+    expect(probe!.scrollbarPointerEvents).toBe('none')
   })
 })

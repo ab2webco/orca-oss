@@ -51,13 +51,21 @@
 /* xterm hides the slider 500ms after the last scroll (stock VS Code
    ScrollableElement, hardcoded to ScrollbarVisibility.Auto), but scrollbar.width
    in pane-terminal-options.ts already pays for the gutter permanently — so the
-   bar must stay there to grab (#5051, ORCA-133). `xterm-fade` marks a bar that
-   is needed and merely timed out; one that is genuinely not needed carries
-   `xterm-invisible` alone and stays hidden. Vertical only: the horizontal bar
+   bar must stay there to grab (#5051, ORCA-133). The discriminator is Orca's own
+   "buffer overflows" attribute, published by terminal-scrollbar-persistence.ts:
+   xterm's `xterm-fade` only records that the bar was revealed once, so keying on
+   it kept a no-longer-needed bar painted as a full-track strip — a filled gutter
+   with no thumb, inert to dragging (ORCA-162). Vertical only: the horizontal bar
    has no reserved gutter and would overlap content. */
-.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical.xterm-invisible.xterm-fade {
+.xterm[data-terminal-scrollable='true']
+  .xterm-scrollable-element
+  > .xterm-scrollbar.xterm-vertical.xterm-invisible {
   opacity: 1;
   pointer-events: auto;
+  /* Match xterm's own `.xterm-visible` stacking: the overview ruler canvas that
+     scrollbar.width enables sits in the same gutter at z-index 8, and TerminalSearch
+     paints match marks on it. At `auto` the persistent bar renders underneath. */
+  z-index: 11;
   /* xterm's fade rule still applies its 800ms opacity transition here. Entering this state from
      a hidden bar (mouse leaves before the 100ms reveal finishes) would ramp 0 → 1 over 800ms
      instead of just staying put — a persistent bar has nothing to animate. */
