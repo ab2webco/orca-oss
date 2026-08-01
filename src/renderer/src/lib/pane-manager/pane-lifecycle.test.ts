@@ -615,7 +615,9 @@ describe('openTerminal — addon and provider wiring', () => {
     openTerminal(pane)
     const disposable = pane.linkifierHoverResetDisposable
     expect(disposable?.dispose).toBeTypeOf('function')
-    expect(pane.terminal.onWriteParsed).toHaveBeenCalledTimes(1)
+    // Two consumers subscribe here: this reset and the scrollbar-persistence sync, which
+    // needs the write signal to notice an ED 3 that drops the scrollback (ORCA-162).
+    expect(pane.terminal.onWriteParsed).toHaveBeenCalledTimes(2)
 
     const disposeSpy = vi.spyOn(disposable!, 'dispose')
     disposePane(pane, new Map([[pane.id, pane]]))

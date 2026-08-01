@@ -169,6 +169,9 @@ export type ManagedPaneInternal = {
   focusClassSyncCleanup?: (() => void) | null
   // Stored so disposePane() can remove user-scroll intent listeners.
   terminalScrollIntentDisposable?: IDisposable | null
+  // Stored so disposePane() can stop publishing the buffer-overflows attribute
+  // that keeps the scrollbar painted (ORCA-162).
+  scrollbarPersistenceDisposable?: IDisposable | null
   // Stored so disposePane() can detach the streamed-output hover-cache reset
   // that keeps freshly printed links linkifiable without a scroll.
   linkifierHoverResetDisposable?: IDisposable | null

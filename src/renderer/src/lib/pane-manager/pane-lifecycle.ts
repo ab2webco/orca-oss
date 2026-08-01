@@ -16,6 +16,7 @@ import { attachWebgl, cancelPendingWebglRefresh, disposeWebgl } from './pane-web
 import { configureLazyArabicShapingJoiner } from './terminal-arabic-shaping-joiner'
 import { TerminalLigaturesAddon } from './terminal-ligatures-addon'
 import { installTerminalImeCandidateAnchor } from './terminal-ime-candidate-anchor'
+import { attachTerminalScrollbarPersistence } from './terminal-scrollbar-persistence'
 
 // ---------------------------------------------------------------------------
 // Pane creation, terminal open/close, addon management
@@ -88,6 +89,8 @@ export function openTerminal(pane: ManagedPaneInternal): void {
   pane.compositionHandler = installTerminalImeCandidateAnchor(terminal)
 
   pane.focusClassSyncCleanup = attachDomRendererFocusClassSync(terminal.element)
+
+  pane.scrollbarPersistenceDisposable = attachTerminalScrollbarPersistence(terminal)
 
   if (pane.gpuRenderingEnabled) {
     attachWebgl(pane)
@@ -183,6 +186,8 @@ export function disposePane(
   pane.focusClassSyncCleanup = null
   pane.terminalScrollIntentDisposable?.dispose()
   pane.terminalScrollIntentDisposable = null
+  pane.scrollbarPersistenceDisposable?.dispose()
+  pane.scrollbarPersistenceDisposable = null
   pane.linkifierHoverResetDisposable?.dispose()
   pane.linkifierHoverResetDisposable = null
   pane.linkifierMouseLeaveResetDisposable?.dispose()
