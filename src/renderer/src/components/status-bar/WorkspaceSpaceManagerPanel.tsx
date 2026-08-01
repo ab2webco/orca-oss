@@ -42,6 +42,11 @@ import { useAppStore } from '../../store'
 import { getRepoMapFromState, getWorktreeMapFromState } from '../../store/selectors'
 import { getHostedReviewCacheKey } from '../../store/slices/hosted-review'
 import { issueCacheKey as getIssueCacheKey } from '../../store/slices/github'
+import {
+  getSelectedPlaneWorkspaceId,
+  planeWorkItemCacheKey
+} from '../../store/slices/plane-cache-guards'
+import type { PlaneConnectionStatus } from '../../../../shared/plane-types'
 import { refreshGitStatusForWorktree } from '../right-sidebar/git-status-refresh'
 import { runWorktreeBatchDelete } from '../sidebar/delete-worktree-flow'
 import { prepareActiveWorktreeFocusAfterDelete } from '../sidebar/active-worktree-focus-after-delete'
@@ -122,6 +127,7 @@ type WorkspaceDecisionDetails = {
   reviewLabel: string | null
   issueLabel: string | null
   linearIssueLabel: string | null
+  planeWorkItemLabel: string | null
 }
 
 type WorkspaceDecisionInputs = {
@@ -147,6 +153,11 @@ type WorkspaceDecisionInputs = {
     string,
     { data?: { identifier: string; title: string; state?: { name: string } } | null }
   >
+  planeWorkItemCache: Record<
+    string,
+    { data?: { identifier: string; title: string; state?: { name: string } } | null }
+  >
+  planeStatus: PlaneConnectionStatus
   settings: Parameters<typeof getHostedReviewCacheKey>[2]
   activeWorktreeId: string | null
   now: number
@@ -252,6 +263,22 @@ export function getWorkspaceDecisionDetails(
         }: ${linearIssue.title}`
       : linkedLinearIssue
     : null
+  const linkedPlaneWorkItem = workspaceRecord?.linkedPlaneWorkItem ?? null
+  const planeWorkItem = linkedPlaneWorkItem
+    ? inputs.planeWorkItemCache[
+        planeWorkItemCacheKey(
+          linkedPlaneWorkItem.workspaceId ?? getSelectedPlaneWorkspaceId(inputs.planeStatus),
+          linkedPlaneWorkItem.identifier
+        )
+      ]?.data
+    : null
+  const planeWorkItemLabel = linkedPlaneWorkItem
+    ? planeWorkItem
+      ? `${planeWorkItem.identifier}${
+          planeWorkItem.state?.name ? ` ${planeWorkItem.state.name}` : ''
+        }: ${planeWorkItem.title}`
+      : linkedPlaneWorkItem.identifier
+    : null
 
   return {
     isActive: inputs.activeWorktreeId === worktree.worktreeId,
@@ -277,7 +304,8 @@ export function getWorkspaceDecisionDetails(
     branchStatus: getBranchStatus(inputs.remoteStatusesByWorktree[worktree.worktreeId]),
     reviewLabel,
     issueLabel,
-    linearIssueLabel
+    linearIssueLabel,
+    planeWorkItemLabel
   }
 }
 
@@ -506,7 +534,8 @@ function StatusBadge({
   if (
     decisionDetails?.reviewLabel ||
     decisionDetails?.issueLabel ||
-    decisionDetails?.linearIssueLabel
+    decisionDetails?.linearIssueLabel ||
+    decisionDetails?.planeWorkItemLabel
   ) {
     return (
       <Badge variant="outline">
@@ -644,7 +673,9 @@ function WorkspaceDecisionHoverCard({
 }): React.JSX.Element {
   const deleteDecision = getDeleteDecisionLabel(worktree, details)
   const issueLabel =
-    [details.issueLabel, details.linearIssueLabel].filter(Boolean).join(' · ') || 'No linked issue'
+    [details.issueLabel, details.linearIssueLabel, details.planeWorkItemLabel]
+      .filter(Boolean)
+      .join(' · ') || 'No linked issue'
   return (
     <HoverCardContent
       align="end"
@@ -1247,6 +1278,8 @@ export function WorkspaceSpaceManagerPanel(): React.JSX.Element {
   const hostedReviewCache = useAppStore((state) => state.hostedReviewCache)
   const issueCache = useAppStore((state) => state.issueCache)
   const linearIssueCache = useAppStore((state) => state.linearIssueCache)
+  const planeWorkItemCache = useAppStore((state) => state.planeWorkItemCache)
+  const planeStatus = useAppStore((state) => state.planeStatus)
   const settings = useAppStore((state) => state.settings)
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
   const setGitStatus = useAppStore((state) => state.setGitStatus)
@@ -1302,6 +1335,8 @@ export function WorkspaceSpaceManagerPanel(): React.JSX.Element {
           hostedReviewCache,
           issueCache,
           linearIssueCache,
+          planeWorkItemCache,
+          planeStatus,
           settings,
           activeWorktreeId,
           now
@@ -1319,6 +1354,8 @@ export function WorkspaceSpaceManagerPanel(): React.JSX.Element {
     hostedReviewCache,
     issueCache,
     linearIssueCache,
+    planeWorkItemCache,
+    planeStatus,
     openFiles,
     ptyIdsByTabId,
     repoMap,
@@ -2045,6 +2082,8 @@ export function WorkspaceSpaceManagerPanel(): React.JSX.Element {
                         hostedReviewCache,
                         issueCache,
                         linearIssueCache,
+                        planeWorkItemCache,
+                        planeStatus,
                         settings,
                         activeWorktreeId,
                         now: Date.now()

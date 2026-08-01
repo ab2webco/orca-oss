@@ -34,6 +34,7 @@ export type WorkspaceSpaceDeleteReadiness = {
   reviewLabel: string | null
   issueLabel: string | null
   linearIssueLabel: string | null
+  planeWorkItemLabel: string | null
 }
 
 export type WorkspaceSpaceAgentActivityInputs = {
@@ -250,7 +251,8 @@ export function isWorkspaceSpaceRowReadyToDelete(
     readiness.browserTabCount === 0 &&
     !readiness.reviewLabel &&
     !readiness.issueLabel &&
-    !readiness.linearIssueLabel
+    !readiness.linearIssueLabel &&
+    !readiness.planeWorkItemLabel
   )
 }
 
