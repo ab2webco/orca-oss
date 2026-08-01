@@ -2483,7 +2483,10 @@ describe('registerPtyHandlers', () => {
     it('lets a launch-scoped Codex account beat the worktree pin on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()
-      const getSelectedCodexHomePath = vi.fn(() => null)
+      // Params declared so mock.calls is a typed tuple the assertion below can index.
+      const getSelectedCodexHomePath = vi.fn(
+        (_target: unknown, _launchEnv?: unknown, _context?: unknown) => null
+      )
       const store = { getWorktreeMeta: vi.fn(() => ({ codexAccountId: 'codex-pinned' })) }
       registerPtyHandlers(
         mainWindow as never,
@@ -2555,7 +2558,10 @@ describe('registerPtyHandlers', () => {
     it('keeps the Codex worktree pin when no launch account is passed on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()
-      const getSelectedCodexHomePath = vi.fn(() => null)
+      // Params declared so mock.calls is a typed tuple the assertion below can index.
+      const getSelectedCodexHomePath = vi.fn(
+        (_target: unknown, _launchEnv?: unknown, _context?: unknown) => null
+      )
       const store = { getWorktreeMeta: vi.fn(() => ({ codexAccountId: 'codex-pinned' })) }
       registerPtyHandlers(
         mainWindow as never,

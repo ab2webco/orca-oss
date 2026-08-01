@@ -23,11 +23,12 @@ describe('release channel', () => {
   })
 
   // Why upstream split hourly into its own repo: the releases atom feed exposes only
-  // 10 entries, so 24 hourly tags a day would evict every stable/RC entry. This fork
-  // publishes no hourly tags at all (no mac-hourly workflow), so the split buys it
-  // nothing — and pointing hourly at upstream's repo would let the dev build picker
-  // pin the updater at upstream assets and install an upstream build over a lab one.
-  // The fork's replacement guarantee is the prerelease downgrade, pinned in
+  // 10 entries, so 24 hourly tags a day would evict every stable/RC entry. The fork
+  // never publishes hourly tags — hourly-mac-build.yml is gated on
+  // `github.repository == 'stablyai/orca'` — so the split buys it nothing, and
+  // pointing hourly at upstream's repo would let the dev build picker pin the updater
+  // at upstream assets and install an upstream build over a lab one. The fork's
+  // remaining guarantee is the prerelease downgrade, pinned in
   // config/scripts/electron-builder-config.test.mjs.
   it('resolves every channel inside the fork that publishes them', () => {
     expect(getReleaseRepoForChannel('hourly')).toBe('ab2webco/orca-oss')

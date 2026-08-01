@@ -11,8 +11,12 @@ export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc', 'hou
  *  updater at its assets would install an upstream build over a lab install.
  *  Keep in sync with src/main/update-feed-target.ts (shared/ cannot import main/).
  *  Upstream isolates hourly tags in a second repo so they never evict stable/RC
- *  entries from the 10-entry atom feed; the fork publishes no hourly tags, so
- *  hourly resolves here too and simply lists none. */
+ *  entries from the 10-entry atom feed. That split buys the fork nothing:
+ *  .github/workflows/hourly-mac-build.yml is gated `github.repository ==
+ *  'stablyai/orca'`, so it never runs here and no ab2webco hourly repo exists.
+ *  Hourly therefore resolves to this repo and simply lists no hourly builds.
+ *  If the fork ever ungates that workflow, give hourly its own repo again
+ *  rather than letting 24 tags a day evict this feed's stable/RC entries. */
 export const HOURLY_RELEASE_REPO = 'ab2webco/orca-oss'
 export const MAIN_RELEASE_REPO = 'ab2webco/orca-oss'
 

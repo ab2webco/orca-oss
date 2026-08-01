@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SearchableSetting } from './SearchableSetting'
@@ -18,16 +18,22 @@ function useTemplateDraft(
   persisted: string | undefined,
   commit: (value: string) => void
 ): { draft: string; setDraft: (value: string) => void; onBlur: () => void } {
-  const [draft, setDraft] = useState(persisted ?? '')
-  // Keep the draft in sync when the persisted value changes elsewhere.
-  useEffect(() => {
-    setDraft(persisted ?? '')
-  }, [persisted])
+  const current = persisted ?? ''
+  const [draft, setDraft] = useState(current)
+  // Why guarded setState during render, not an effect: the draft is not derivable
+  // (the user's in-progress edit must survive re-renders), but re-syncing it in an
+  // effect costs an extra committed render and trips react-doctor's
+  // no-derived-state-effect. Mirrors TasksPane's own auto-expand claim.
+  const [lastPersisted, setLastPersisted] = useState(current)
+  if (lastPersisted !== current) {
+    setLastPersisted(current)
+    setDraft(current)
+  }
   return {
     draft,
     setDraft,
     onBlur: () => {
-      if ((persisted ?? '') !== draft) {
+      if (current !== draft) {
         commit(draft)
       }
     }
