@@ -1,10 +1,53 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import type { Page } from '@stablyai/playwright-test'
 
 const SEEDED_WORKSPACE_COUNT = 300
 const MARQUEE_WORKSPACE_COUNT = 102
 const MANY_LANE_COUNT = 21
 const CARDS_PER_LANE = 100
+
+/**
+ * Why: the board sheet reveals with a `clip-path: inset(0 100% 0 0)` animation.
+ * Linux software compositing hit-tests that clip, so a press inside the sheet's
+ * box lands on the pane behind the board until the reveal finishes — and
+ * `boundingBox()` is blind to `clip-path`, so measured geometry looks valid the
+ * whole time. Every pointer-driven assertion here must wait for the reveal.
+ */
+async function openWorkspaceBoard(orcaPage: Page): Promise<void> {
+  await orcaPage.getByRole('button', { name: 'Workspace board' }).click()
+  await orcaPage
+    .locator('[data-workspace-board-sheet]')
+    .evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished.catch(() => undefined))
+      )
+    )
+}
+
+/**
+ * Why: a marquee that starts on a non-interactive point selects nothing, which
+ * reads as a selection regression instead of a board that is not pressable yet.
+ * Assert the precondition so the failure names its own cause.
+ */
+async function expectBoardPressableAt(orcaPage: Page, x: number, y: number): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        orcaPage.evaluate(
+          ({ pointerX, pointerY }) => {
+            const surface = document.querySelector('[data-workspace-board-selection-surface]')
+            return Boolean(surface?.contains(document.elementFromPoint(pointerX, pointerY)))
+          },
+          { pointerX: x, pointerY: y }
+        ),
+      {
+        message: `Expected (${x}, ${y}) to hit the board selection surface before pressing`,
+        timeout: 15_000
+      }
+    )
+    .toBe(true)
+}
 
 /**
  * Why: the board used to mount every workspace card in every lane in one
@@ -67,7 +110,7 @@ test.describe('Workspace board lane virtualization', () => {
       })
     }, SEEDED_WORKSPACE_COUNT)
 
-    await orcaPage.getByRole('button', { name: 'Workspace board' }).click()
+    await openWorkspaceBoard(orcaPage)
 
     const cards = orcaPage.locator('[data-workspace-board-card-id]')
     // Why: an empty window would also satisfy "fewer than seeded"; the point of
@@ -127,7 +170,7 @@ test.describe('Workspace board lane virtualization', () => {
       })
     }, SEEDED_WORKSPACE_COUNT)
 
-    await orcaPage.getByRole('button', { name: 'Workspace board' }).click()
+    await openWorkspaceBoard(orcaPage)
 
     const cards = orcaPage.locator('[data-workspace-board-card-id]')
     await expect.poll(() => cards.count(), { timeout: 15_000 }).toBeGreaterThan(3)
@@ -221,7 +264,7 @@ test.describe('Workspace board lane virtualization', () => {
       { cardsPerLane: CARDS_PER_LANE, ids: statusIds }
     )
 
-    await orcaPage.getByRole('button', { name: 'Workspace board' }).click()
+    await openWorkspaceBoard(orcaPage)
 
     const board = orcaPage.locator('[data-workspace-board-selection-surface]')
     const scroller = board.locator('[data-workspace-board-lane-grid]').locator('..')
@@ -372,7 +415,7 @@ test.describe('Workspace board lane virtualization', () => {
       { count: MARQUEE_WORKSPACE_COUNT, status: statusId }
     )
 
-    await orcaPage.getByRole('button', { name: 'Workspace board' }).click()
+    await openWorkspaceBoard(orcaPage)
 
     const lane = orcaPage.locator(`[data-workspace-status="${statusId}"]`)
     await expect(lane.getByText(String(MARQUEE_WORKSPACE_COUNT), { exact: true })).toBeVisible()
@@ -386,7 +429,11 @@ test.describe('Workspace board lane virtualization', () => {
       throw new Error('Expected the marquee lane and selection surface to have bounding boxes')
     }
 
-    await orcaPage.mouse.move(selectionBox.x + 4, box.y + 12)
+    const anchorX = selectionBox.x + 4
+    const anchorY = box.y + 12
+    await expectBoardPressableAt(orcaPage, anchorX, anchorY)
+
+    await orcaPage.mouse.move(anchorX, anchorY)
     await orcaPage.mouse.down()
     await orcaPage.mouse.move(box.x + box.width - 18, box.y + 80, { steps: 4 })
     await expect
