@@ -7491,6 +7491,7 @@ describe('Store', () => {
       'ci',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports',
@@ -7527,6 +7528,7 @@ describe('Store', () => {
       'ci',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports',
@@ -7555,6 +7557,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'automation',
       'cli',
@@ -7587,6 +7590,7 @@ describe('Store', () => {
       'ci',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr',
       'ports',
       'inline-agents'
@@ -7675,12 +7679,111 @@ describe('Store', () => {
       'unread',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports'
     ])
     expect(store.getUI().worktreeCardProperties).not.toContain('branch')
     expect(store.getUI().worktreeCardProperties).not.toContain('inline-agents')
+  })
+
+  it('backfills the Plane card property for an upgraded task-enabled profile', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: { compactWorktreeCards: false },
+      ui: {
+        worktreeCardProperties: ['status', 'unread', 'issue', 'linear-issue', 'jira-issue', 'pr'],
+        _inlineAgentsDefaultedForAllUsers: true,
+        _expandedWorktreeCardPropertiesDefaulted: true
+      },
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    const store = await createStore()
+
+    expect(store.getUI().worktreeCardProperties).toEqual([
+      'status',
+      'unread',
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue',
+      'pr'
+    ])
+    expect(store.getUI()._planeIssueCardPropertyDefaulted).toBe(true)
+  })
+
+  it('stamps the Plane marker without adding Plane to a defaulted Compact preset', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: { compactWorktreeCards: true },
+      ui: {
+        worktreeCardProperties: ['status', 'unread'],
+        _worktreeCardModeDefaulted: true,
+        _inlineAgentsDefaultedForAllUsers: true,
+        _expandedWorktreeCardPropertiesDefaulted: true
+      },
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    const store = await createStore()
+
+    expect(store.getUI().worktreeCardProperties).toEqual(['status', 'unread'])
+    expect(store.getUI().worktreeCardProperties).not.toContain('plane-issue')
+    expect(store.getUI()._planeIssueCardPropertyDefaulted).toBe(true)
+  })
+
+  it('leaves Plane off for a profile with every task property disabled', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: { compactWorktreeCards: false },
+      ui: {
+        worktreeCardProperties: ['status', 'unread', 'pr', 'comment', 'ports', 'inline-agents'],
+        _inlineAgentsDefaultedForAllUsers: true,
+        _expandedWorktreeCardPropertiesDefaulted: true
+      },
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    const store = await createStore()
+
+    expect(store.getUI().worktreeCardProperties).not.toContain('plane-issue')
+    expect(store.getUI()._planeIssueCardPropertyDefaulted).toBe(true)
+  })
+
+  it('preserves a deliberate Plane opt-out once the marker is stamped', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: { compactWorktreeCards: false },
+      ui: {
+        worktreeCardProperties: ['status', 'unread', 'issue', 'linear-issue', 'jira-issue', 'pr'],
+        _inlineAgentsDefaultedForAllUsers: true,
+        _expandedWorktreeCardPropertiesDefaulted: true,
+        _planeIssueCardPropertyDefaulted: true
+      },
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    const store = await createStore()
+
+    expect(store.getUI().worktreeCardProperties).toEqual([
+      'status',
+      'unread',
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'pr'
+    ])
+    expect(store.getUI().worktreeCardProperties).not.toContain('plane-issue')
   })
 
   it('uses the compact preset when card properties are missing in compact mode', async () => {
