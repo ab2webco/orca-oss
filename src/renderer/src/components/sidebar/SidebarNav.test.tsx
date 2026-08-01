@@ -412,6 +412,31 @@ describe('SidebarNav', () => {
     expect(shortcuts?.className).toContain('group-focus-within:flex')
   })
 
+  it('opens the Plane list from the Tasks row shortcut without triggering the row', async () => {
+    setSidebarState({
+      settings: {
+        ...getDefaultSettings('/tmp'),
+        visibleTaskProviders: ['plane'],
+        defaultTaskSource: 'plane'
+      }
+    })
+    const container = await renderSidebarNav()
+
+    const tasksButton = getButtonByText(container, 'Tasks')
+    const planeShortcut = tasksButton.querySelector<HTMLElement>('[aria-label="Open Plane tasks"]')
+
+    expect(planeShortcut).not.toBeNull()
+    expect(tasksButton.querySelector('[aria-label="Open GitHub tasks"]')).toBeNull()
+
+    await act(async () => {
+      planeShortcut?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // Why: a second call would mean stopPropagation let the row's bare openTaskPage() fire.
+    expect(mocks.openTaskPage).toHaveBeenCalledTimes(1)
+    expect(mocks.openTaskPage).toHaveBeenCalledWith({ taskSource: 'plane' })
+  })
+
   it('hides available Tasks from its sidebar context menu', async () => {
     const container = await renderSidebarNav()
 
