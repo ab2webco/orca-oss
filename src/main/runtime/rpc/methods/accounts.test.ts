@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { isStreamingMethod } from '../core'
 import { ACCOUNT_METHODS } from './accounts'
@@ -32,6 +34,63 @@ describe('account RPC methods', () => {
     expect(getManagedPtyAccountOwner).toHaveBeenCalledWith('pty-1', 'codex')
   })
 
+  it.each([
+    {
+      methodName: 'accounts.addClaudeFromConfigDir',
+      params: {
+        configDir: join(tmpdir(), 'claude-login'),
+        previousLegacyCredentialsSha256: 'a'.repeat(64)
+      },
+      runtimeMethod: 'addClaudeAccountFromConfigDir',
+      expectedSource: join(tmpdir(), 'claude-login'),
+      expectedOptions: {
+        runtime: undefined,
+        wslDistro: null,
+        previousLegacyCredentialsSha256: 'a'.repeat(64)
+      }
+    },
+    {
+      methodName: 'accounts.addCodexFromHome',
+      params: { sourceHome: join(tmpdir(), 'codex-login') },
+      runtimeMethod: 'addCodexAccountFromHome',
+      expectedSource: join(tmpdir(), 'codex-login'),
+      expectedOptions: { runtime: undefined, wslDistro: null }
+    }
+  ])('allows local-socket $methodName calls', async (testCase) => {
+    const add = vi.fn().mockResolvedValue({ accounts: [] })
+    const runtime = { [testCase.runtimeMethod]: add } as unknown as OrcaRuntimeService
+    const addMethod = method(testCase.methodName)
+    if (isStreamingMethod(addMethod)) {
+      throw new Error(`${testCase.methodName} must be a request method`)
+    }
+
+    await addMethod.handler(testCase.params, { runtime })
+
+    expect(add).toHaveBeenCalledWith(testCase.expectedSource, testCase.expectedOptions)
+  })
+
+  it.each([
+    ['accounts.addClaudeFromConfigDir', { configDir: join(tmpdir(), 'claude-login') }],
+    ['accounts.addCodexFromHome', { sourceHome: join(tmpdir(), 'codex-login') }]
+  ])('rejects paired-device calls to %s', async (methodName, params) => {
+    const runtime = {
+      addClaudeAccountFromConfigDir: vi.fn(),
+      addCodexAccountFromHome: vi.fn()
+    } as unknown as OrcaRuntimeService
+    const addMethod = method(methodName)
+    if (isStreamingMethod(addMethod)) {
+      throw new Error(`${methodName} must be a request method`)
+    }
+
+    for (const clientKind of ['mobile', 'runtime'] as const) {
+      await expect(addMethod.handler(params, { runtime, clientKind })).rejects.toThrow(
+        /only available on the Orca host runtime/
+      )
+    }
+    expect(runtime.addClaudeAccountFromConfigDir).not.toHaveBeenCalled()
+    expect(runtime.addCodexAccountFromHome).not.toHaveBeenCalled()
+  })
+
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {
@@ -43,7 +102,8 @@ describe('account RPC methods', () => {
       throw new Error('accounts.list must be a request method')
     }
 
-    await expect(list.handler(undefined, { runtime })).resolves.toBe(snapshot)
+    // Why: clients that send no params (mobile, web) must keep the forced lane.
+    await expect(list.handler(list.params?.parse({}), { runtime })).resolves.toBe(snapshot)
     expect(runtime.refreshAccountsForMobile).toHaveBeenCalledOnce()
   })
 
@@ -59,6 +119,23 @@ describe('account RPC methods', () => {
     }
 
     await expect(snapshotMethod.handler(undefined, { runtime })).resolves.toBe(snapshot)
+    expect(runtime.refreshAccountsForMobile).not.toHaveBeenCalled()
+  })
+
+  it('skips the forced provider refresh when the caller opts out', async () => {
+    const snapshot = { claude: null, codex: null }
+    const runtime = {
+      refreshAccountsForMobile: vi.fn().mockResolvedValue(undefined),
+      getAccountsSnapshot: vi.fn(() => snapshot)
+    } as unknown as OrcaRuntimeService
+    const list = method('accounts.list')
+    if (isStreamingMethod(list)) {
+      throw new Error('accounts.list must be a request method')
+    }
+
+    await expect(
+      list.handler(list.params?.parse({ refreshUsage: false }), { runtime })
+    ).resolves.toBe(snapshot)
     expect(runtime.refreshAccountsForMobile).not.toHaveBeenCalled()
   })
 
