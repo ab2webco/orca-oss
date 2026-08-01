@@ -29,6 +29,7 @@ describe('worktree card properties', () => {
     expect(props).not.toContain('issue')
     expect(props).not.toContain('linear-issue')
     expect(props).not.toContain('jira-issue')
+    expect(props).not.toContain('plane-issue')
     expect(props).not.toContain('comment')
     expect(props).not.toContain('ports')
     expect(props).not.toContain('branch')
@@ -45,7 +46,29 @@ describe('worktree card properties', () => {
     expect(getWorktreeCardModeProperties('Default')).toEqual(
       expect.arrayContaining(TASK_WORKTREE_CARD_PROPERTIES)
     )
-    expect(TASK_WORKTREE_CARD_PROPERTIES).toEqual(['issue', 'linear-issue', 'jira-issue'])
+    expect(TASK_WORKTREE_CARD_PROPERTIES).toEqual([
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue'
+    ])
+  })
+
+  it('includes the Plane work-item property in the Default preset only', () => {
+    expect(getWorktreeCardModeProperties('Default')).toContain('plane-issue')
+    expect(DEFAULT_WORKTREE_CARD_PROPERTIES).toContain('plane-issue')
+    expect(getWorktreeCardModeProperties('Compact')).not.toContain('plane-issue')
+    expect(COMPACT_WORKTREE_CARD_PROPERTIES).not.toContain('plane-issue')
+  })
+
+  it('keeps the Plane property in canonical render order after Jira', () => {
+    expect(normalizeWorktreeCardProperties(['plane-issue', 'jira-issue', 'linear-issue'])).toEqual([
+      'status',
+      'unread',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue'
+    ])
   })
 
   it('normalizes fixed and legacy properties while preserving selected properties', () => {

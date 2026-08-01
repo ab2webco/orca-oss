@@ -129,6 +129,7 @@ import {
   normalizeAgentActivityDisplayMode,
   normalizeWorktreeCardProperties,
   ONBOARDING_FLOW_VERSION,
+  TASK_WORKTREE_CARD_PROPERTIES,
   ONBOARDING_FINAL_STEP
 } from '../shared/constants'
 import { parseWorkspaceSession } from '../shared/workspace-session-schema'
@@ -3396,6 +3397,7 @@ export class Store {
             const inlineAgentsMigrated = parsed.ui?._inlineAgentsDefaultedForAllUsers === true
             const expandedCardPropsMigrated =
               parsed.ui?._expandedWorktreeCardPropertiesDefaulted === true
+            const planeCardPropMigrated = parsed.ui?._planeIssueCardPropertyDefaulted === true
             const hadExperimentOn = readDeprecatedExperimentFlag(parsed)
             const deliberateUncheck =
               hadExperimentOn &&
@@ -3434,7 +3436,20 @@ export class Store {
                 }
                 return next
               })()
-              const normalized = normalizeWorktreeCardProperties(expandedCandidate)
+              const planeCandidate = (() => {
+                if (planeCardPropMigrated || expandedCandidate.includes('plane-issue')) {
+                  return expandedCandidate
+                }
+                // Why: only backfill Plane for profiles that still show some task metadata; a user who
+                // turned every task property off must not have one silently reinstated.
+                const showsAnyTaskProperty = TASK_WORKTREE_CARD_PROPERTIES.some((property) =>
+                  expandedCandidate.includes(property)
+                )
+                return showsAnyTaskProperty
+                  ? [...expandedCandidate, 'plane-issue' as const]
+                  : expandedCandidate
+              })()
+              const normalized = normalizeWorktreeCardProperties(planeCandidate)
               const changed =
                 normalized.length !== rawCardProps.length ||
                 normalized.some((property, index) => property !== rawCardProps[index])
@@ -3443,7 +3458,8 @@ export class Store {
             if (
               migratedCardProps !== undefined ||
               !inlineAgentsMigrated ||
-              !expandedCardPropsMigrated
+              !expandedCardPropsMigrated ||
+              !planeCardPropMigrated
             ) {
               this.loadNeedsSave = true
             }
@@ -3511,7 +3527,8 @@ export class Store {
               // Why: keep stamping the legacy flag for rollback forward-compat; the new flag actually gates the migration.
               _inlineAgentsDefaultedForExperiment: true,
               _inlineAgentsDefaultedForAllUsers: true,
-              _expandedWorktreeCardPropertiesDefaulted: true
+              _expandedWorktreeCardPropertiesDefaulted: true,
+              _planeIssueCardPropertyDefaulted: true
             }
           })(),
           // Why: volatile schema; zod-validate workspaceSession at read so a bad payload falls to defaults, not a renderer crash.

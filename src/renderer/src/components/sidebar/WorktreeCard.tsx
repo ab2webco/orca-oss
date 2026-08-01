@@ -41,6 +41,11 @@ import type {
   IssueInfo,
   LinearIssue
 } from '../../../../shared/types'
+import type { PlaneConnectionStatus, PlaneWorkItem } from '../../../../shared/plane-types'
+import {
+  getSelectedPlaneWorkspaceId,
+  planeWorkItemCacheKey
+} from '../../store/slices/plane-cache-guards'
 import { CONFLICT_OPERATION_LABELS } from './WorktreeCardHelpers'
 import {
   WorktreeCardDetailsHover,
@@ -49,6 +54,7 @@ import {
   type WorktreeCardIssueDisplay
 } from './WorktreeCardMeta'
 import { getWorktreeCardJiraIssueDisplay } from './worktree-card-jira-issue-display'
+import type { WorktreeCardPlaneWorkItemDisplay } from './worktree-card-meta-types'
 import { WorktreeCardPortsDetails, WorktreeCardPortsTrigger } from './WorktreeCardPorts'
 import { writeWorkspaceDragData } from './workspace-status'
 import {
@@ -253,6 +259,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const settings = useAppStore((s) => s.settings)
   const fetchIssue = useAppStore((s) => s.fetchIssue)
   const fetchLinearIssue = useAppStore((s) => s.fetchLinearIssue)
+  const fetchPlaneWorkItem = useAppStore((s) => s.fetchPlaneWorkItem)
   const cardProps = useAppStore((s) => s.worktreeCardProperties)
   const agentActivityDisplayMode =
     useAppStore((s) => s.agentActivityDisplayMode) ?? DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE
@@ -470,6 +477,19 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const linearIssueFallbackEntry = useAppStore((s) =>
     worktree.linkedLinearIssue ? s.linearIssueCache[worktree.linkedLinearIssue] : undefined
   )
+  const planeStatus: PlaneConnectionStatus | undefined = useAppStore((s) => s.planeStatus)
+  const linkedPlaneWorkItem = worktree.linkedPlaneWorkItem ?? null
+  // Why: a linked item can live in a different Plane workspace than the selected one, so prefer its own scope.
+  const planeWorkItemScopeId =
+    linkedPlaneWorkItem?.workspaceId ??
+    (planeStatus ? getSelectedPlaneWorkspaceId(planeStatus) : null)
+  const planeWorkItemEntry = useAppStore((s) =>
+    linkedPlaneWorkItem
+      ? s.planeWorkItemCache[
+          planeWorkItemCacheKey(planeWorkItemScopeId, linkedPlaneWorkItem.identifier)
+        ]
+      : undefined
+  )
 
   const hostedReview: HostedReviewInfo | null | undefined =
     hostedReviewEntry !== undefined ? hostedReviewEntry.data : undefined
@@ -621,11 +641,35 @@ const WorktreeCard = React.memo(function WorktreeCard({
         }
     : null
   const jiraIssueDisplay = getWorktreeCardJiraIssueDisplay(worktree)
+  const planeWorkItem: PlaneWorkItem | null | undefined = linkedPlaneWorkItem
+    ? planeWorkItemEntry?.data
+    : null
+  const planeWorkItemDisplay: WorktreeCardPlaneWorkItemDisplay | null = linkedPlaneWorkItem
+    ? planeWorkItem
+      ? {
+          identifier: planeWorkItem.identifier,
+          title: planeWorkItem.title,
+          url: planeWorkItem.url,
+          stateName: planeWorkItem.state?.name,
+          labels: planeWorkItem.labels
+        }
+      : {
+          // Why: the durable link persists immediately while Plane details load async, so show the identifier
+          // and persisted URL instead of an unlinked-looking card. Sentinel copy stays English so the card
+          // title filter in worktree-card-title-display keeps rejecting it (same as Linear/GitHub).
+          identifier: linkedPlaneWorkItem.identifier,
+          title: planeWorkItemEntry
+            ? 'Plane work item details unavailable'
+            : 'Loading Plane work item...',
+          url: linkedPlaneWorkItem.url
+        }
+    : null
   const cardTitleDisplay = getWorktreeCardTitleDisplay({
     storedDisplayName: worktree.displayName,
     branchName: branch,
     linearIssueTitle: linearIssueDisplay?.title,
     jiraIssueTitle: jiraIssueDisplay?.title,
+    planeWorkItemTitle: planeWorkItemDisplay?.title,
     issueTitle: issueDisplay?.title,
     reviewTitle: prDisplay?.title
   })
@@ -642,6 +686,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const showIssue = cardProps.includes('issue')
   const showLinearIssue = cardProps.includes('linear-issue')
   const showJiraIssue = cardProps.includes('jira-issue')
+  const showPlaneWorkItem = cardProps.includes('plane-issue')
   const showPR = cardProps.includes('pr')
   const showAutomation = cardProps.includes('automation')
   const showCli = cardProps.includes('cli')
@@ -831,6 +876,45 @@ const WorktreeCard = React.memo(function WorktreeCard({
     showLinearIssue,
     worktree.linkedLinearIssue,
     fetchLinearIssue
+  ])
+
+  useEffect(() => {
+    if (!linkedPlaneWorkItem || !showPlaneWorkItem) {
+      return
+    }
+    const { identifier, projectId } = linkedPlaneWorkItem
+    const workspaceId = planeWorkItemScopeId
+    const refreshPlaneWorkItemIfVisible = (): void => {
+      if (!isWindowVisible()) {
+        return
+      }
+      void fetchPlaneWorkItem(identifier, projectId, workspaceId)
+    }
+    refreshPlaneWorkItemIfVisible()
+    window.addEventListener('focus', refreshPlaneWorkItemIfVisible)
+    document.addEventListener('visibilitychange', refreshPlaneWorkItemIfVisible)
+    return () => {
+      window.removeEventListener('focus', refreshPlaneWorkItemIfVisible)
+      document.removeEventListener('visibilitychange', refreshPlaneWorkItemIfVisible)
+    }
+  }, [linkedPlaneWorkItem, planeWorkItemScopeId, fetchPlaneWorkItem, showPlaneWorkItem])
+
+  useEffect(() => {
+    if (!newCardStyle || !hoverDetailsOpen || showPlaneWorkItem || !linkedPlaneWorkItem) {
+      return
+    }
+    void fetchPlaneWorkItem(
+      linkedPlaneWorkItem.identifier,
+      linkedPlaneWorkItem.projectId,
+      planeWorkItemScopeId
+    )
+  }, [
+    newCardStyle,
+    hoverDetailsOpen,
+    showPlaneWorkItem,
+    linkedPlaneWorkItem,
+    planeWorkItemScopeId,
+    fetchPlaneWorkItem
   ])
 
   // Stable click handler – ignore clicks that are really text selections.
@@ -1055,12 +1139,14 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const hoverIssue = issueDisplay
   const hoverLinearIssue = linearIssueDisplay
   const hoverJiraIssue = jiraIssueDisplay
+  const hoverPlaneWorkItem = planeWorkItemDisplay
   const hoverReview = prDisplay
   const statusLaneReview = statusPrDisplay ?? hoverReview
   const hoverComment = worktree.comment
   const metaIssue = showIssue ? hoverIssue : null
   const metaLinearIssue = showLinearIssue ? hoverLinearIssue : null
   const metaJiraIssue = showJiraIssue ? hoverJiraIssue : null
+  const metaPlaneWorkItem = showPlaneWorkItem ? hoverPlaneWorkItem : null
   const metaReview = showPR ? hoverReview : null
   const metaAutomationProvenance = showAutomation ? worktree.automationProvenance : null
   const metaCliProvenance = showCli ? worktree.cliProvenance : null
@@ -1160,10 +1246,21 @@ const WorktreeCard = React.memo(function WorktreeCard({
     },
     [linearIssue, openTaskPage]
   )
+  const handleOpenPlaneWorkItemInOrca = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!planeWorkItem) {
+        return
+      }
+      openTaskPage({ taskSource: 'plane', openPlaneWorkItem: planeWorkItem })
+    },
+    [planeWorkItem, openTaskPage]
+  )
   const hasDetails = hasWorktreeCardDetails({
     issue: metaIssue,
     linearIssue: metaLinearIssue,
     jiraIssue: metaJiraIssue,
+    planeWorkItem: metaPlaneWorkItem,
     review: newCardStyle ? null : metaReview,
     comment: metaComment,
     automationProvenance: metaAutomationProvenance,
@@ -1238,6 +1335,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
       issue: hoverIssue,
       linearIssue: hoverLinearIssue,
       jiraIssue: hoverJiraIssue,
+      planeWorkItem: hoverPlaneWorkItem,
       review: hoverReview,
       comment: hoverComment,
       automationProvenance: metaAutomationProvenance,
@@ -1256,6 +1354,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
             issue={metaIssue}
             linearIssue={metaLinearIssue}
             jiraIssue={metaJiraIssue}
+            planeWorkItem={metaPlaneWorkItem}
             review={metaReview}
             comment={metaComment}
             automationProvenance={metaAutomationProvenance}
@@ -1276,6 +1375,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
                 : undefined
             }
             onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
+            onOpenPlaneWorkItemInOrca={planeWorkItem ? handleOpenPlaneWorkItemInOrca : undefined}
             onOpenReviewInOrca={
               metaReview?.url && metaReview.provider === 'github'
                 ? handleOpenReviewInOrca
@@ -1313,6 +1413,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
             issue={metaIssue}
             linearIssue={metaLinearIssue}
             jiraIssue={metaJiraIssue}
+            planeWorkItem={metaPlaneWorkItem}
             review={newCardStyle ? null : metaReview}
             comment={metaComment}
             automationProvenance={metaAutomationProvenance}
@@ -1328,6 +1429,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         issue={metaIssue}
         linearIssue={metaLinearIssue}
         jiraIssue={metaJiraIssue}
+        planeWorkItem={metaPlaneWorkItem}
         review={metaReview}
         comment={metaComment}
         automationProvenance={metaAutomationProvenance}
@@ -1341,6 +1443,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
           metaIssue && 'url' in metaIssue && metaIssue.url ? handleOpenGitHubIssueInOrca : undefined
         }
         onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
+        onOpenPlaneWorkItemInOrca={planeWorkItem ? handleOpenPlaneWorkItemInOrca : undefined}
         onOpenReviewInOrca={
           metaReview?.url && metaReview.provider === 'github' ? handleOpenReviewInOrca : undefined
         }
@@ -1825,6 +1928,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         issue={hoverIssue}
         linearIssue={hoverLinearIssue}
         jiraIssue={hoverJiraIssue}
+        planeWorkItem={hoverPlaneWorkItem}
         review={hoverReview}
         comment={hoverComment}
         automationProvenance={metaAutomationProvenance}
@@ -1847,6 +1951,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
             : undefined
         }
         onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
+        onOpenPlaneWorkItemInOrca={planeWorkItem ? handleOpenPlaneWorkItemInOrca : undefined}
         onOpenReviewInOrca={
           hoverReview?.url && hoverReview.provider === 'github' ? handleOpenReviewInOrca : undefined
         }

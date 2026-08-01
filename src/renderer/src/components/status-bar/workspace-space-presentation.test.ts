@@ -60,6 +60,7 @@ function ready(
     reviewLabel: null,
     issueLabel: null,
     linearIssueLabel: null,
+    planeWorkItemLabel: null,
     ...overrides
   }
 }
@@ -132,6 +133,8 @@ function decisionInputs(
     hostedReviewCache: {},
     issueCache: {},
     linearIssueCache: {},
+    planeWorkItemCache: {},
+    planeStatus: { connected: false, viewer: null },
     settings: null,
     activeWorktreeId: null,
     now: 1_000,
@@ -332,6 +335,70 @@ describe('workspace space presentation helpers', () => {
 
     expect(details.reviewLabel).toBe('PR #12 Open, success')
     expect(details.issueLabel).toBe('#123 open: Local owner issue')
+  })
+
+  it('surfaces a durable Plane link before its cache is warm', () => {
+    const details = getWorkspaceDecisionDetails(
+      row({}),
+      decisionInputs({
+        worktreeMap: new Map([
+          [
+            'wt',
+            worktreeRecord({
+              linkedPlaneWorkItem: {
+                identifier: 'ORCA-149',
+                projectId: 'project-1',
+                workspaceId: 'workspace-1'
+              }
+            })
+          ]
+        ])
+      })
+    )
+
+    expect(details.planeWorkItemLabel).toBe('ORCA-149')
+  })
+
+  it('reads Plane identifier, state and title from the workspace-scoped cache entry', () => {
+    const details = getWorkspaceDecisionDetails(
+      row({}),
+      decisionInputs({
+        planeWorkItemCache: {
+          'workspace-1::item::ORCA-149': {
+            data: {
+              identifier: 'ORCA-149',
+              title: 'Plane work-item chip on workspace cards',
+              state: { name: 'In Progress' }
+            }
+          }
+        },
+        worktreeMap: new Map([
+          [
+            'wt',
+            worktreeRecord({
+              linkedPlaneWorkItem: {
+                identifier: 'ORCA-149',
+                projectId: 'project-1',
+                workspaceId: 'workspace-1'
+              }
+            })
+          ]
+        ])
+      })
+    )
+
+    expect(details.planeWorkItemLabel).toBe(
+      'ORCA-149 In Progress: Plane work-item chip on workspace cards'
+    )
+  })
+
+  it('treats a linked Plane work item as a reason to keep the workspace', () => {
+    const workspace = row({ worktreeId: 'plane-linked', canDelete: true, status: 'ok' })
+
+    expect(isWorkspaceSpaceRowReadyToDelete(workspace, ready())).toBe(true)
+    expect(
+      isWorkspaceSpaceRowReadyToDelete(workspace, ready({ planeWorkItemLabel: 'ORCA-149' }))
+    ).toBe(false)
   })
 
   it('counts migration-unsupported agent entries by worktree id', () => {

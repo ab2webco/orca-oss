@@ -11,6 +11,7 @@ type MainOwnedUIState =
   | 'trayMinimizeNoticeShown'
   | 'dashboardPopoutBounds'
   | '_expandedWorktreeCardPropertiesDefaulted'
+  | '_planeIssueCardPropertyDefaulted'
   | 'starNagBaselineAgents'
   | 'starNagAppVersion'
   | 'starNagNextThreshold'

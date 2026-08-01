@@ -20,6 +20,7 @@ describe('worktree card property options', () => {
     expect(options.map((option) => option.label)).toContain('Automation')
     expect(options.map((option) => option.label)).not.toContain('GitHub issues')
     expect(options.map((option) => option.label)).not.toContain('Linear issues')
+    expect(options.map((option) => option.label)).not.toContain('Plane work items')
   })
 
   it('splits issue providers only when new card style is on', () => {
@@ -32,10 +33,14 @@ describe('worktree card property options', () => {
       'linear-issue'
     ])
     expect(options.find((option) => option.id === 'jira-issue')?.properties).toEqual(['jira-issue'])
+    expect(options.find((option) => option.id === 'plane-issue')?.properties).toEqual([
+      'plane-issue'
+    ])
     expect(options.find((option) => option.id === 'automation')?.properties).toEqual(['automation'])
     expect(options.map((option) => option.label)).toContain('GitHub issues')
     expect(options.map((option) => option.label)).toContain('Linear issues')
     expect(options.map((option) => option.label)).toContain('Jira issues')
+    expect(options.map((option) => option.label)).toContain('Plane work items')
     expect(options.map((option) => option.label)).toContain('Automation')
   })
 

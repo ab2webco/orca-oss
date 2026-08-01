@@ -275,6 +275,69 @@ describe('WorktreeCardDetailsHover', () => {
     expect(hoverMarkup).toContain('https://company.atlassian.net/browse/KAN-1')
   })
 
+  it('shows the Plane icon badge and linked work-item details', () => {
+    const planeWorkItem = {
+      identifier: 'ORCA-149',
+      title: 'Plane work-item chip on workspace cards',
+      url: 'https://plane.example.com/ab2web/browse/ORCA-149/',
+      stateName: 'In Progress',
+      labels: ['ui', 'plane']
+    }
+    const badgeMarkup = renderToStaticMarkup(
+      <WorktreeCardMetaBadges
+        issue={null}
+        linearIssue={null}
+        planeWorkItem={planeWorkItem}
+        review={null}
+        comment={null}
+      />
+    )
+    const hoverMarkup = renderToStaticMarkup(
+      <WorktreeCardDetailsHover
+        issue={null}
+        linearIssue={null}
+        planeWorkItem={planeWorkItem}
+        review={null}
+        comment={null}
+        onOpenPlaneWorkItemInOrca={vi.fn()}
+      >
+        <span>ORCA-149</span>
+      </WorktreeCardDetailsHover>
+    )
+
+    expect(badgeMarkup).toContain('<svg')
+    expect(badgeMarkup).toContain('Linked Plane ORCA-149')
+    expect(hoverMarkup).toContain('Plane ORCA-149')
+    expect(hoverMarkup).toContain('Plane work-item chip on workspace cards')
+    expect(hoverMarkup).toContain('In Progress')
+    expect(hoverMarkup).toContain('plane')
+    expect(hoverMarkup).toContain('View on Plane')
+    expect(hoverMarkup).toContain('https://plane.example.com/ab2web/browse/ORCA-149/')
+    expect(hoverMarkup).toContain('Open in Orca')
+  })
+
+  it('omits Open in Orca for a Plane work item that has no cached detail yet', () => {
+    const markup = renderToStaticMarkup(
+      <WorktreeCardDetailsHover
+        issue={null}
+        linearIssue={null}
+        planeWorkItem={{
+          identifier: 'ORCA-149',
+          title: 'Loading Plane work item...',
+          url: 'https://plane.example.com/ab2web/browse/ORCA-149/'
+        }}
+        review={null}
+        comment={null}
+      >
+        <span>ORCA-149</span>
+      </WorktreeCardDetailsHover>
+    )
+
+    expect(markup).toContain('Plane ORCA-149')
+    expect(markup).toContain('View on Plane')
+    expect(markup).not.toContain('Open in Orca')
+  })
+
   it('shows identifier when Linear issue URL is unavailable', () => {
     const markup = renderToStaticMarkup(
       <WorktreeCardDetailsHover

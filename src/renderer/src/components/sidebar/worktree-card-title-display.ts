@@ -3,6 +3,7 @@ type WorktreeCardTitleDisplayInput = {
   branchName: string | null | undefined
   linearIssueTitle?: string | null
   jiraIssueTitle?: string | null
+  planeWorkItemTitle?: string | null
   issueTitle?: string | null
   reviewTitle?: string | null
 }
@@ -41,6 +42,7 @@ export function getWorktreeCardTitleDisplay({
   branchName,
   linearIssueTitle,
   jiraIssueTitle,
+  planeWorkItemTitle,
   issueTitle,
   reviewTitle
 }: WorktreeCardTitleDisplayInput): string {
@@ -64,6 +66,7 @@ export function getWorktreeCardTitleDisplay({
   return (
     normalizeTitle(linearIssueTitle) ??
     normalizeTitle(jiraIssueTitle) ??
+    normalizeTitle(planeWorkItemTitle) ??
     normalizeTitle(issueTitle) ??
     normalizeTitle(reviewTitle) ??
     (normalizedStoredDisplayName ? visibleStoredDisplayName : '')
