@@ -107,19 +107,38 @@ test.describe('ORCA-159 diagnostic', () => {
           log.push(`mousedown target=${describe(event.target as Element)}`)
         })
         const anchor = document.elementFromPoint(ax, ay)
-        const chain: string[] = []
-        let node = anchor
-        while (node && chain.length < 6) {
-          chain.push(describe(node))
-          node = node.parentElement
-        }
+        const sheet = document.querySelector<HTMLElement>('[data-slot="sheet-content"]')
+        const sheetStyle = sheet ? getComputedStyle(sheet) : null
+        const surfaceStyle = surface ? getComputedStyle(surface) : null
+        const pick = (style: CSSStyleDeclaration | null): Record<string, string> =>
+          style
+            ? {
+                pointerEvents: style.pointerEvents,
+                clipPath: style.clipPath,
+                visibility: style.visibility,
+                opacity: style.opacity,
+                zIndex: style.zIndex,
+                transform: style.transform,
+                animationName: style.animationName,
+                display: style.display,
+                contentVisibility: style.contentVisibility
+              }
+            : {}
         return {
           anchor: describe(anchor),
           anchorInSurface: Boolean(anchor && surface?.contains(anchor)),
-          anchorChain: chain,
+          anchorStack: document.elementsFromPoint(ax, ay).slice(0, 8).map(describe),
+          sheetStyle: pick(sheetStyle),
+          surfaceStyle: pick(surfaceStyle),
+          sheetAnimations: sheet
+            ?.getAnimations()
+            .map(
+              (animation) =>
+                `${animation.constructor.name} state=${animation.playState} time=${String(animation.currentTime)}`
+            ),
+          bodyPointerEvents: getComputedStyle(document.body).pointerEvents,
           cardCount: document.querySelectorAll('[data-workspace-board-card-id]').length,
           surfaceRect: surface?.getBoundingClientRect().toJSON(),
-          devicePixelRatio: window.devicePixelRatio,
           viewport: { w: window.innerWidth, h: window.innerHeight }
         }
       },
@@ -130,6 +149,24 @@ test.describe('ORCA-159 diagnostic', () => {
     console.log('[ORCA159] selectionBox=', JSON.stringify(selectionBox))
     console.log('[ORCA159] anchor=', anchorX, anchorY, 'end=', endX, endY)
     console.log('[ORCA159] probe=', JSON.stringify(probe, null, 2))
+
+    const settle = await orcaPage.evaluate(
+      async ({ ax, ay }) => {
+        const surface = document.querySelector('[data-workspace-board-selection-surface]')
+        const started = performance.now()
+        for (let attempt = 0; attempt < 400; attempt++) {
+          if (surface?.contains(document.elementFromPoint(ax, ay))) {
+            return { hitAfterMs: Math.round(performance.now() - started), attempts: attempt }
+          }
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 25)
+          })
+        }
+        return { hitAfterMs: -1, attempts: 400 }
+      },
+      { ax: anchorX, ay: anchorY }
+    )
+    console.log('[ORCA159] anchorBecameHittable=', JSON.stringify(settle))
 
     await orcaPage.mouse.move(anchorX, anchorY)
     await orcaPage.mouse.down()
