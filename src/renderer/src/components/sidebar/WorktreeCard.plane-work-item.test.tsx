@@ -45,7 +45,10 @@ vi.mock('@/store', () => ({
       sshTargetLabels: new Map(),
       updateWorktreeMeta,
       workspacePortScan: null,
-      worktreeCardProperties
+      worktreeCardProperties,
+      claudeAccountRoster: null,
+      tabsByWorktree: {},
+      agentStatusByPaneKey: {}
     })
 }))
 
@@ -107,6 +110,20 @@ const LINKED_PLANE_WORK_ITEM = {
   projectId: 'project-1',
   workspaceId: 'item-workspace',
   url: 'https://plane.example.com/ab2web/browse/ORCA-149/'
+}
+
+// Why: `orca plane link` persists only identifier/projectId/url, so the card has to
+// carry the chip on link data alone and scope the fetch to the selected workspace.
+const CLI_LINKED_PLANE_WORK_ITEM = {
+  identifier: 'ORCA-149',
+  projectId: 'project-1',
+  url: 'https://plane.example.com/ab2web/browse/ORCA-149/'
+}
+
+function planeIdentifierChipText(): string | null {
+  return (
+    container?.querySelector('[data-worktree-card-identifier-chip="plane"]')?.textContent ?? null
+  )
 }
 
 function makeRepo(): Repo {
@@ -270,6 +287,35 @@ describe('WorktreeCard Plane work item', () => {
     // Why: the durable link still renders a chip, but the mismatched scope must not supply details.
     expect(container?.innerHTML).toContain('Linked Plane ORCA-149')
     expect(container?.textContent).not.toContain('Plane work-item chip on workspace cards')
+  })
+
+  // Why ORCA-160: the shipped badge was an unlabelled 14px glyph, so a linked card read as
+  // unlinked even though the link, the fetch and the hover card were all correct.
+  it('shows the work item identifier as visible chip text on a CLI-shaped link', async () => {
+    newCardStyle = true
+    worktreeCardProperties = [
+      'status',
+      'unread',
+      'branch',
+      'plane-issue',
+      'pr',
+      'comment',
+      'ports',
+      'inline-agents'
+    ]
+    planeWorkItemCache = {
+      'selected-workspace::item::ORCA-149': { data: makePlaneWorkItem(), fetchedAt: Date.now() }
+    }
+
+    await renderCard(makeWorktree({ linkedPlaneWorkItem: CLI_LINKED_PLANE_WORK_ITEM }))
+
+    expect(planeIdentifierChipText()).toContain('ORCA-149')
+  })
+
+  it('shows the identifier chip from link data before the work item details arrive', async () => {
+    await renderCard(makeWorktree({ linkedPlaneWorkItem: CLI_LINKED_PLANE_WORK_ITEM }))
+
+    expect(planeIdentifierChipText()).toContain('ORCA-149')
   })
 
   it('routes Open in Orca to the exact cached work item', async () => {

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { PlaneIcon } from '@/components/icons/PlaneIcon'
-import { MetaIconBadge } from './WorktreeCardMetadataControls'
+import { MetaIconBadge, MetaIdentifierChip } from './WorktreeCardMetadataControls'
 import { getReviewLabel, ReviewIcon } from './worktree-review-helpers'
 import type {
   WorktreeCardMetaBadgesProps,
@@ -77,7 +77,9 @@ export const WorktreeCardMetaBadges = React.forwardRef<
     <div
       ref={ref}
       {...props}
-      className={cn('ml-auto flex shrink-0 items-center gap-1 pr-1.5', className)}
+      // Why: the identifier chip has to be able to ellipsize, so the group shrinks while
+      // every icon badge inside it stays at its fixed size.
+      className={cn('ml-auto flex min-w-0 shrink items-center gap-1 pr-1.5', className)}
       aria-label={translate(
         'auto.components.sidebar.WorktreeCardMeta.3e65e11cc6',
         'Workspace metadata'
@@ -147,15 +149,16 @@ export const WorktreeCardMetaBadges = React.forwardRef<
         </MetaIconBadge>
       )}
       {planeWorkItem && (
-        <MetaIconBadge
+        <MetaIdentifierChip
+          provider="plane"
           label={translate(
             'auto.components.sidebar.WorktreeCardMeta.linkedPlane',
             'Linked Plane {{value0}}',
             { value0: planeWorkItem.identifier }
           )}
-        >
-          <PlaneIcon className="text-muted-foreground" />
-        </MetaIconBadge>
+          identifier={planeWorkItem.identifier}
+          icon={<PlaneIcon className="shrink-0" />}
+        />
       )}
       {review && (
         <MetaIconBadge

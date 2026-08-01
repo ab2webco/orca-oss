@@ -1,5 +1,40 @@
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+/** Task-tracker badge that names the linked item instead of relying on a bare
+ *  provider glyph. Shrinks and ellipsizes so a narrow card truncates the
+ *  identifier rather than pushing the chip outside the card. */
+export function MetaIdentifierChip({
+  provider,
+  label,
+  identifier,
+  icon
+}: {
+  provider: string
+  label: string
+  identifier: string
+  icon: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant="outline"
+          className="h-[16px] min-w-0 max-w-[7rem] shrink gap-1 rounded border-border/60 bg-transparent px-1.5 text-[10px] font-medium leading-none text-muted-foreground"
+          aria-label={label}
+          data-worktree-card-identifier-chip={provider}
+        >
+          {icon}
+          <span className="truncate">{identifier}</span>
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 export function MetaIconBadge({
   label,
