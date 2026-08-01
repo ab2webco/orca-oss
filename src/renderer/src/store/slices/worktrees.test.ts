@@ -616,6 +616,43 @@ describe('fetchWorktrees', () => {
     expect(store.getState().sortEpoch).toBe(8)
   })
 
+  it('updates the repo entry when only the linked Plane identifier changes', async () => {
+    const makePlaneRow = (planeIdentifier: string): Worktree =>
+      makeWorktree({
+        id: 'repo1::/path/plane-link',
+        repoId: 'repo1',
+        path: '/path/plane-link',
+        linkedWorkItem: {
+          provider: 'plane',
+          type: 'issue',
+          number: 0,
+          title: 'ORCA-151 Link Plane',
+          url: 'https://plane.example.com/acme/browse/ORCA-151/',
+          planeIdentifier
+        }
+      })
+
+    // Both directions: renderer dedup must not become identifier-order dependent.
+    for (const [from, to, epoch] of [
+      ['ORCA-151', 'ORCA-152', 8],
+      ['ORCA-152', 'ORCA-151', 8]
+    ] as const) {
+      const store = createTestStore()
+      const refreshed = makePlaneRow(to)
+
+      mockApi.worktrees.list.mockResolvedValue([refreshed])
+      store.setState({
+        worktreesByRepo: { repo1: [makePlaneRow(from)] },
+        sortEpoch: 7
+      } as Partial<AppState>)
+
+      await store.getState().fetchWorktrees('repo1')
+
+      expect(store.getState().worktreesByRepo.repo1).toEqual([refreshed])
+      expect(store.getState().sortEpoch).toBe(epoch)
+    }
+  })
+
   it('keeps the last known worktree list when a refresh transiently returns empty', async () => {
     const store = createTestStore()
     const existing = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })

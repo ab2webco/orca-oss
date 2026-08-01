@@ -5024,6 +5024,74 @@ describe('Store', () => {
     ).toBeNull()
   })
 
+  it('repairs persisted Plane worktree metadata and keeps it across a reopen', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {
+        // Only planeIdentifier needs repair: the load rewrite is gated on
+        // areWorkspaceLinkedItemsEqual, so a comparator blind to the field skips it.
+        'wt-plane': {
+          linkedWorkItem: {
+            provider: 'plane',
+            type: 'issue',
+            number: 0,
+            title: 'ORCA-151 Link Plane',
+            url: 'https://plane.example.com/acme/browse/ORCA-151/',
+            planeIdentifier: ' ORCA-151 '
+          }
+        }
+      }
+    })
+
+    const store = await createStore()
+
+    expect(store.getWorktreeMeta('wt-plane')?.linkedWorkItem).toMatchObject({
+      provider: 'plane',
+      title: 'ORCA-151 Link Plane',
+      url: 'https://plane.example.com/acme/browse/ORCA-151/',
+      planeIdentifier: 'ORCA-151'
+    })
+
+    store.flush()
+    const restored = await createStore()
+
+    expect(restored.getWorktreeMeta('wt-plane')?.linkedWorkItem?.planeIdentifier).toBe('ORCA-151')
+  })
+
+  it('round-trips a Plane linked item written through setWorktreeMeta', async () => {
+    const store = await createStore()
+    const linkedWorkItem = {
+      provider: 'plane' as const,
+      type: 'issue' as const,
+      number: 0,
+      title: 'ORCA-151 Link Plane',
+      url: 'https://plane.example.com/acme/browse/ORCA-151/',
+      planeIdentifier: 'ORCA-151'
+    }
+    const linkedTaskSourceContext = {
+      kind: 'task-source' as const,
+      provider: 'plane' as const,
+      projectId: 'project-1',
+      hostId: 'runtime:env-1' as const,
+      providerIdentity: {
+        provider: 'plane' as const,
+        workspaceSlug: 'acme',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1'
+      }
+    }
+
+    store.setWorktreeMeta('wt-plane', { linkedWorkItem, linkedTaskSourceContext })
+    store.flush()
+    const restored = await createStore()
+
+    expect(restored.getWorktreeMeta('wt-plane')).toMatchObject({
+      linkedWorkItem,
+      linkedTaskSourceContext
+    })
+  })
+
   it('discards malformed persisted task-source metadata without aborting store load', async () => {
     writeDataFile({
       schemaVersion: 1,
@@ -5147,6 +5215,102 @@ describe('Store', () => {
         linkedTaskSourceContext: expect.objectContaining(linkedTaskSourceContext)
       })
     )
+  })
+
+  it('round-trips a Plane linked task through folder workspace create and update', async () => {
+    const store = await createStore()
+    const group = store.createProjectGroup({
+      name: 'Platform',
+      parentPath: '/workspace/platform',
+      createdFrom: 'folder-scan'
+    })
+    const linkedTask = {
+      provider: 'plane' as const,
+      type: 'issue' as const,
+      number: 0,
+      title: 'ORCA-151 Link Plane',
+      url: 'https://plane.example.com/acme/browse/ORCA-151/',
+      planeIdentifier: 'ORCA-151'
+    }
+
+    const workspace = store.createFolderWorkspace({ projectGroupId: group.id, linkedTask })
+    // Snapshot: updateFolderWorkspace mutates the live record this reference points at.
+    const created = { ...workspace.linkedTask }
+    const updated = store.updateFolderWorkspace(workspace.id, {
+      linkedTask: { ...linkedTask, planeIdentifier: 'ORCA-152' }
+    })
+    store.flush()
+    const restored = await createStore()
+
+    expect(created).toMatchObject({ provider: 'plane', planeIdentifier: 'ORCA-151' })
+    expect(updated?.linkedTask?.planeIdentifier).toBe('ORCA-152')
+    expect(restored.getFolderWorkspaces()).toContainEqual(
+      expect.objectContaining({
+        id: workspace.id,
+        linkedTask: { ...linkedTask, planeIdentifier: 'ORCA-152' }
+      })
+    )
+  })
+
+  it('preserves a persisted Plane linked task when normalizing folder workspaces', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {},
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      projectGroups: [
+        {
+          id: 'root',
+          name: 'Platform',
+          parentPath: '/workspace/platform',
+          parentGroupId: null,
+          createdFrom: 'folder-scan',
+          tabOrder: 0,
+          isCollapsed: false,
+          color: null,
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ],
+      folderWorkspaces: [
+        {
+          id: 'fw-plane',
+          projectGroupId: 'root',
+          name: 'Plane link',
+          folderPath: '/workspace/platform',
+          linkedTask: {
+            provider: 'plane',
+            type: 'issue',
+            number: 0,
+            title: ' ORCA-151 Link Plane ',
+            url: ' https://plane.example.com/acme/browse/ORCA-151/ ',
+            planeIdentifier: ' ORCA-151 '
+          }
+        }
+      ]
+    })
+
+    const store = await createStore()
+    store.flush()
+    const restored = await createStore()
+
+    for (const instance of [store, restored]) {
+      expect(instance.getFolderWorkspaces()).toContainEqual(
+        expect.objectContaining({
+          id: 'fw-plane',
+          linkedTask: {
+            provider: 'plane',
+            type: 'issue',
+            number: 0,
+            title: 'ORCA-151 Link Plane',
+            url: 'https://plane.example.com/acme/browse/ORCA-151/',
+            planeIdentifier: 'ORCA-151'
+          }
+        })
+      )
+    }
   })
 
   it('rejects folder workspace creation for non-folder-backed project groups', async () => {
