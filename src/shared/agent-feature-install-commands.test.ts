@@ -12,7 +12,9 @@ import {
   ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND,
   ORCA_CLI_SKILL_UPDATE_COMMAND,
   ORCHESTRATION_SKILL_UPDATE_COMMAND,
-  ORCA_PLANE_SKILL_INSTALL_COMMAND
+  ORCA_PLANE_SKILL_INSTALL_COMMAND,
+  SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND,
+  SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND
 } from './agent-feature-install-commands'
 
 describe('agent feature skill commands', () => {
@@ -136,5 +138,12 @@ describe('agent feature skill commands', () => {
     expect(ORCA_PLANE_SKILL_INSTALL_COMMAND).toBe(
       'npx skills add https://github.com/ab2webco/orca-oss --skill orca-plane --global'
     )
+  })
+
+  it('installs and updates switch-account from the lab fork that owns the switch', () => {
+    expect(SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
+    )
+    expect(SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND).toBe('npx skills update switch-account --global')
   })
 })

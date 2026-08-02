@@ -22,7 +22,16 @@ const COMMON_COMMANDS: readonly SlashCommandSuggestion[] = [
   { name: 'help', description: 'Show available commands' }
 ]
 
+// Why listed for every agent: `switch-account` is an Orca-installed skill, so it
+// is discoverable in the `/` menu the same way on Claude and Codex. This is
+// suggestion only — the installed skill is what runs the CLI.
+const SWITCH_ACCOUNT_COMMAND: SlashCommandSuggestion = {
+  name: 'switch-account',
+  description: 'Switch this terminal to another Claude account'
+}
+
 const CLAUDE_COMMANDS: readonly SlashCommandSuggestion[] = [
+  SWITCH_ACCOUNT_COMMAND,
   { name: 'clear', description: 'Clear conversation history' },
   { name: 'compact', description: 'Summarize and compact the conversation' },
   { name: 'init', description: 'Initialize a CLAUDE.md' },
@@ -31,6 +40,7 @@ const CLAUDE_COMMANDS: readonly SlashCommandSuggestion[] = [
 ]
 
 const CODEX_COMMANDS: readonly SlashCommandSuggestion[] = [
+  SWITCH_ACCOUNT_COMMAND,
   { name: 'model', description: 'Choose the model and reasoning effort' },
   { name: 'ide', description: 'Include IDE context' },
   { name: 'permissions', description: 'Choose what Codex is allowed to do' },

@@ -769,6 +769,21 @@
         "lan": "Private LAN address",
         "public": "Public address",
         "custom": "Custom hostname"
+      },
+      "accountSwitch": {
+        "usage": {
+          "examples": {
+            "listAccounts": "See the accounts",
+            "listAccountsSummary": "List the managed Claude accounts with their cached quota before choosing one.",
+            "listAccountsPrompt": "Run {{value0}} with no account to list my Claude accounts and their remaining quota.",
+            "switchNow": "Switch this terminal",
+            "switchNowSummary": "Swap the account in place; the same conversation resumes on the new one.",
+            "switchNowPrompt": "Use {{value0}} to switch this terminal to my other Claude account and keep going.",
+            "outOfQuota": "Move off a used-up account",
+            "outOfQuotaSummary": "Hand the rest of the work to an account that still has quota.",
+            "outOfQuotaPrompt": "This session is out of quota — use {{value0}} to move it to the account with the most left, then continue."
+          }
+        }
       }
     },
     "hooks": {
@@ -899,7 +914,9 @@
         "pluginsDescription": "Install and manage experimental Orca plugins.",
         "tasksDescription": "Connect providers, install the Linear skill, and choose what appears in Tasks.",
         "planeTitle": "Plane",
-        "planeDescription": "Give agents the skill to read and update your Plane work items."
+        "planeDescription": "Give agents the skill to read and update your Plane work items.",
+        "accountSwitchTitle": "Account switching",
+        "accountSwitchDescription": "Let agents switch this terminal to another Claude account without losing the conversation."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "Paste is too large."
@@ -7108,7 +7125,9 @@
           "linearDescription": "How Linear works in Orca, setup checklist, agent skill, and example prompts.",
           "tasksDescription": "Connect providers, install the Linear skill, and choose what appears in Tasks.",
           "planeTitle": "Plane",
-          "planeDescription": "Give agents the skill to read and update your Plane work items."
+          "planeDescription": "Give agents the skill to read and update your Plane work items.",
+          "accountSwitchTitle": "Account switching",
+          "accountSwitchDescription": "Let agents switch this terminal to another Claude account without losing the conversation."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No matching fonts.",
@@ -10461,6 +10480,27 @@
           "webUnavailable": "Switching builds is only available in the desktop app.",
           "hourlyMacOnlyAria": "Hourly (macOS only)",
           "hourlyMacOnly": "Hourly builds are produced only for macOS. Linux and Windows stay on Stable or RC."
+        },
+        "AccountSwitchAgentSkillPane": {
+          "title": "Account switching",
+          "description": "Let agents switch this terminal to another Claude account without losing the conversation.",
+          "skillTitle": "Account switch skill",
+          "skillDescription": "Enables agents to list your Claude accounts and swap the one their terminal runs on, resuming the same session.",
+          "terminalTitle": "Account switch skill setup",
+          "terminalAriaLabel": "Account switch skill install terminal",
+          "howToUse": "How to use it",
+          "howToUseDescription": "Ask the agent in a terminal to list your accounts, or to move that terminal to another one.",
+          "runtimeHint": "The switch runs in the terminal that asked for it: the account is swapped in place, the same session is resumed, and no tab or pane is created or lost. WSL and SSH terminals are not supported yet."
+        },
+        "accountSwitch": {
+          "agent": {
+            "skill": {
+              "search": {
+                "title": "Account switching",
+                "description": "Let agents switch this terminal to another Claude account without losing the conversation."
+              }
+            }
+          }
         }
       },
       "right": {

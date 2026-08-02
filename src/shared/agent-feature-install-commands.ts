@@ -14,6 +14,8 @@ export const LINEAR_TICKETS_SKILL_NAME = 'linear-tickets'
 export const LINEAR_AGENT_SKILL_NAMES = [ORCA_LINEAR_SKILL_NAME, LINEAR_TICKETS_SKILL_NAME] as const
 export const ORCA_PLANE_SKILL_NAME = 'orca-plane'
 export const PLANE_AGENT_SKILL_NAMES = [ORCA_PLANE_SKILL_NAME] as const
+export const SWITCH_ACCOUNT_SKILL_NAME = 'switch-account'
+export const SWITCH_ACCOUNT_AGENT_SKILL_NAMES = [SWITCH_ACCOUNT_SKILL_NAME] as const
 
 // Why: `yes` and `agents` default off so every Settings/onboarding string a human
 // pastes keeps its interactive prompts and the CLI's own agent detection. Only an
@@ -151,3 +153,13 @@ export const ORCA_PLANE_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCom
 
 export const ORCA_PLANE_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(ORCA_PLANE_SKILL_NAME)
+
+// Why the fork URL: the in-place account switch this skill drives ships only in
+// this lab fork, so the official Orca repo has no such skill to install.
+export const SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand(
+  [SWITCH_ACCOUNT_SKILL_NAME],
+  { repositoryUrl: ORCA_LAB_SKILLS_REPOSITORY_URL }
+)
+
+export const SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND =
+  buildAgentFeatureSkillUpdateCommand(SWITCH_ACCOUNT_SKILL_NAME)
