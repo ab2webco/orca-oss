@@ -12,6 +12,7 @@ import {
   seedCommitMessageComposer,
   seedCreatePrComposer
 } from './helpers/source-control-ai-generation'
+import { publishBranchToScratchRemote } from './helpers/scratch-branch-upstream'
 import { expectUncommittedSourceControlEntry } from './helpers/source-control-uncommitted-entries'
 import {
   installReleaseGatedCommitMessageGenerator,
@@ -152,13 +153,33 @@ test.describe('Source Control AI PR generation worktree switching', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('keeps checks-panel PR generation running after switching worktrees', async ({
-    orcaPage
+    orcaPage,
+    registerPostElectronShutdownCleanup
   }, testInfo) => {
     await waitForSessionReady(orcaPage)
     await waitForActiveWorktree(orcaPage)
     const { primaryWorktreeId, prWorktreeId, prWorktreePath, primaryBranch } =
       await seedCreatePrComposer(orcaPage)
     createBranchCommit(prWorktreePath)
+    // Why: unlike Source Control, the Checks panel resolves the upstream from
+    // its own Git probe rather than the seeded store, so without a real remote
+    // it renders "No upstream configured" and never opens the create composer.
+    const removeScratchRemote = publishBranchToScratchRemote(prWorktreePath, primaryBranch)
+    registerPostElectronShutdownCleanup(async () => {
+      removeScratchRemote()
+    })
+    // Why: the panel's GitHub refresh coordinator asks the runner's real `gh`
+    // credentials. A machine without them records a sticky `auth` hard error
+    // that suppresses the create composer, so the Generate button reads as
+    // missing — the test would pass or fail on ambient login state. Pin the
+    // refresh state so it measures generation across a switch instead.
+    await orcaPage.evaluate(() => {
+      const store = window.__store
+      if (!store) {
+        throw new Error('window.__store is not available')
+      }
+      store.setState({ getEffectiveGitHubPRRefreshState: () => undefined })
+    })
 
     const screenshotDir = path.join(
       process.cwd(),
