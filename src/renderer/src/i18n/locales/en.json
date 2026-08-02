@@ -724,12 +724,10 @@
         "pinFailed": "Could not assign the selected account to this worktree: {{value0}}",
         "launchPlanFailed": "Could not build a launch command for the switched session.",
         "copyFailed": "Could not copy the session transcript into the selected account.",
-        "preparationFailed": "Could not prepare the selected account for this terminal.",
-        "resumeInputFailed": "The terminal did not accept the resume command after switching accounts.",
-        "resumeTimedOut": "The resumed agent did not take over the terminal in time.",
-        "accountingFailed": "The resumed terminal could not be assigned to the selected account.",
         "restoredOnOrigin": "Orca resumed the session on the original account.",
-        "restoreFailed": "Orca could not bring the session back; resume it from this terminal."
+        "restoreFailed": "Orca could not bring the session back; resume it from this terminal.",
+        "switchRequestFailed": "Orca could not reach the runtime that owns this terminal to switch accounts.",
+        "switchUnfinished": "The account switch did not finish; check this terminal before continuing."
       },
       "plane": {
         "usage": {

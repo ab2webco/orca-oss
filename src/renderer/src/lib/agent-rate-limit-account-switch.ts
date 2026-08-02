@@ -16,8 +16,6 @@ import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { buildAgentResumeStartupPlan, type AgentStartupPlan } from '@/lib/tui-agent-startup'
-import { stopForegroundAgent, waitForResumedAgent } from '@/lib/agent-rate-limit-terminal-control'
-import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
 import { deliverLaunchPromptToAgentTab } from '@/lib/agent-launch-prompt-delivery'
 import { appendTabToWorktreeOrder } from '@/lib/sleeping-agent-session-launch'
 import {
@@ -52,13 +50,9 @@ function accountsShareRuntime(
 }
 
 /**
- * Puts the original agent back in the same PTY after a failure that follows the stop.
- *
- * Why this is possible: at this point only the CLI process is gone. The PTY still
- * carries the source account's injected CLAUDE_CONFIG_DIR and main still holds its
- * live binding — nothing is released until beginClaudeAccountSwitch — so re-running
- * the very resume command the switch was going to use lands the user back exactly
- * where they were instead of on a bare shell with the conversation stranded.
+ * Renders what the runtime reported about the source session after a failed
+ * switch. The rollback itself happens there — it is the only side that can
+ * re-prepare the source binding and re-verify the same provider session id.
  */
 function describeRestoreOutcome(restored: boolean): string {
   return restored
@@ -72,25 +66,24 @@ function describeRestoreOutcome(restored: boolean): string {
       )
 }
 
-async function restoreStoppedAgentOnSourceAccount(args: {
-  settings: GlobalSettings | null
-  ptyId: string
-  resumePlan: AgentStartupPlan
-}): Promise<boolean> {
-  const sent = await sendRuntimePtyInputVerified(
-    args.settings,
-    args.ptyId,
-    `${args.resumePlan.launchCommand}\r`
-  ).catch(() => false)
-  if (!sent) {
-    return false
-  }
-  return waitForResumedAgent({
-    settings: args.settings,
-    ptyId: args.ptyId,
-    agent: 'claude',
-    expectedProcess: args.resumePlan.expectedProcess
-  }).catch(() => false)
+/**
+ * Records the switch on the worktree so the fail-back watcher can offer the
+ * return trip once the origin account recovers quota.
+ */
+async function pinWorktreeToTargetAccount(args: {
+  worktreeId: string
+  targetAccount: ClaudeManagedAccountSummary
+  sourceAccountId: string | null
+}): Promise<void> {
+  await useAppStore.getState().updateWorktreeMeta(args.worktreeId, {
+    claudeAccountId: args.targetAccount.id,
+    claudeFailoverOriginAccountId: args.sourceAccountId ?? CLAUDE_FAILOVER_ORIGIN_SHARED,
+    claudeFailoverResetsAt: resolveFailoverOriginResetsAt({
+      rateLimits: useAppStore.getState().rateLimits,
+      sourceAccountId: args.sourceAccountId,
+      now: Date.now()
+    })
+  })
 }
 
 /**
@@ -165,49 +158,42 @@ export async function runManagedAccountSwitchRelaunch(args: {
   const canAttemptInPlace = accountsShareRuntime(sourceAccount, args.targetAccount)
 
   if (canAttemptInPlace) {
-    const stopped = await stopForegroundAgent({
-      settings: args.settings,
+    // Why nothing is stopped or copied here first: the runtime that owns the PTY
+    // performs the whole transaction, and it must prove target auth, transcript
+    // reachability and a trusted launch command BEFORE it touches the terminal.
+    const inPlace = await runInPlaceManagedClaudeAccountSwitch({
       ptyId: args.ptyId,
-      agent: 'claude',
-      expectedProcess: resumePlan.expectedProcess
+      targetAccount: args.targetAccount
     })
-    if (!stopped) {
+    if (inPlace.ok) {
+      // Why after success: the pin drives fail-back offers and is read by sibling
+      // panes, so it must never describe a switch that did not happen. The switch
+      // itself is already committed, so a rejected pin is not a failed switch.
+      await pinWorktreeToTargetAccount(args).catch(() => {})
+      return { ok: true, accountLabel, switched: inPlace.switched }
+    }
+    if (inPlace.reason === 'stop-failed') {
+      return { ok: false, reason: 'stop-failed', message: inPlace.message }
+    }
+    if (inPlace.reason !== 'unhealthy') {
       return {
         ok: false,
-        reason: 'stop-failed',
-        message: translate(
-          'auto.lib.agentRateLimitAccountSwitch.stopFailed',
-          'The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.'
-        )
+        reason: 'resume-failed',
+        // Why conditional: `restored` is absent when the runtime never reported a
+        // terminal state (a dropped socket), and the operation may still be
+        // running detached — claiming either outcome there would be a guess.
+        message:
+          inPlace.restored === undefined
+            ? inPlace.message
+            : `${inPlace.message} ${describeRestoreOutcome(inPlace.restored)}`
       }
     }
   }
 
-  /**
-   * Ends a switch that already stopped the agent, putting that agent back first.
-   *
-   * Why: the stop happens before anything else is known to work, so an abort after
-   * it used to leave the terminal sitting at a shell prompt with the conversation
-   * lost — the reported symptom. The pin stays on the source account here, since a
-   * restored source-account CLI under a target-account pin would make the fail-back
-   * watcher describe a switch that never happened.
-   */
-  const abortAfterStop = async (
-    reason: 'resume-failed' | 'pin-failed',
-    message: string
-  ): Promise<AgentRateLimitAccountSwitchResult> => {
-    if (!canAttemptInPlace) {
-      return { ok: false, reason, message }
-    }
-    const restored = await restoreStoppedAgentOnSourceAccount({
-      settings: args.settings,
-      ptyId: args.ptyId,
-      resumePlan
-    })
-    return { ok: false, reason, message: `${message} ${describeRestoreOutcome(restored)}` }
-  }
-
-  // Why: a missing worktree path just means the transcript cannot be located; the switch still proceeds fresh.
+  // Fallback: this pane cannot host the switch (no trusted launch config, an
+  // unsupported runtime, a stopped session). A fresh tab needs the transcript in
+  // the target universe and the pin updated before it resumes.
+  // Why a missing worktree path just means the transcript cannot be located: the switch still proceeds fresh.
   const worktreePath = useAppStore.getState().getKnownWorktreeById(args.worktreeId)?.path ?? null
   let copyResult: ClaudeSessionFailoverCopyResult = { ok: false, reason: 'copy-failed' }
   if (worktreePath) {
@@ -222,63 +208,27 @@ export async function runManagedAccountSwitchRelaunch(args: {
       copyResult = { ok: false, reason: 'copy-failed' }
     }
   }
-
-  // Why before the pin: without the transcript the destination has nothing to resume,
-  // so the switch is over — and the worktree must not be left pinned to an account
-  // that never received the session.
   if (!copyResult.ok) {
-    return abortAfterStop(
-      'resume-failed',
-      translate(
+    return {
+      ok: false,
+      reason: 'resume-failed',
+      message: translate(
         'auto.lib.agentRateLimitAccountSwitch.copyFailed',
         'Could not copy the session transcript into the selected account.'
       )
-    )
+    }
   }
-
   try {
-    // Why: the origin + reset markers let the fail-back watcher offer the return
-    // trip once the origin account recovers quota — managed→managed fail-back
-    // reuses copySessionForAccountSwitch in reverse to return the transcript home.
-    await useAppStore.getState().updateWorktreeMeta(args.worktreeId, {
-      claudeAccountId: args.targetAccount.id,
-      claudeFailoverOriginAccountId: args.sourceAccountId ?? CLAUDE_FAILOVER_ORIGIN_SHARED,
-      claudeFailoverResetsAt: resolveFailoverOriginResetsAt({
-        rateLimits: useAppStore.getState().rateLimits,
-        sourceAccountId: args.sourceAccountId,
-        now: Date.now()
-      })
-    })
+    await pinWorktreeToTargetAccount(args)
   } catch (error) {
-    return abortAfterStop(
-      'pin-failed',
-      translate(
+    return {
+      ok: false,
+      reason: 'pin-failed',
+      message: translate(
         'auto.lib.agentRateLimitAccountSwitch.pinFailed',
         'Could not assign the selected account to this worktree: {{value0}}',
         { value0: error instanceof Error ? error.message : String(error) }
       )
-    )
-  }
-
-  if (canAttemptInPlace) {
-    const inPlace = await runInPlaceManagedClaudeAccountSwitch({
-      ptyId: args.ptyId,
-      sourceAccountId: args.sourceAccountId,
-      targetAccount: args.targetAccount,
-      buildResumePlan
-    })
-    if (inPlace.ok) {
-      return { ok: true, accountLabel, switched: inPlace.switched }
-    }
-    if (inPlace.reason !== 'unhealthy') {
-      // Why the abort reports this instead of retrying here: past begin, the PTY's
-      // binding and its exported config dir both belong to the transition, so only
-      // that path can hand them back to the source account.
-      return {
-        ok: false,
-        reason: 'resume-failed',
-        message: `${inPlace.message} ${describeRestoreOutcome(inPlace.restored === true)}`
-      }
     }
   }
 

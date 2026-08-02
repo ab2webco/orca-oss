@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../core'
+import { CLAUDE_TERMINAL_SWITCH_METHODS } from './accounts-claude-terminal-switch'
 
 // Why: monotonically increasing per-process counter avoids the Date.now()
 // collision that fired when two near-simultaneous accounts.subscribe calls
@@ -231,6 +232,7 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
       })
     }
   }),
+  ...CLAUDE_TERMINAL_SWITCH_METHODS,
   defineMethod({
     name: 'accounts.unsubscribe',
     params: AccountsUnsubscribeParams,
