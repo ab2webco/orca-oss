@@ -316,15 +316,18 @@ describe('electron-builder config', () => {
     })
   })
 
-  // Why: notarization is the one release step hourly skips; in-place updates never
-  // check it, and 24 notary round trips a day is the cost being avoided.
-  it('skips notarization only for hourly builds', () => {
+  // Why hourly must notarize despite the round trip: TCC anchors a notarized
+  // Developer ID app's grants on identifier + team, not on its cdhash, so they
+  // survive an update. An unnotarized hourly reads as a new client every build
+  // and loses file access under Documents/Desktop/Downloads with no re-prompt.
+  it('notarizes hourly builds like releases, and neither locally', () => {
     withHourlyEnv((config) => {
-      expect(config.mac.notarize).toBe(false)
+      expect(config.mac.notarize).toBe(true)
     })
     withEnv({ ORCA_MAC_RELEASE: '1' }, (config) => {
       expect(config.mac.notarize).toBe(true)
     })
+    expect(electronBuilderConfig.mac.notarize).toBe(false)
   })
 
   // Why: this fork publishes its own `-lab.N` releases, so the publish target must

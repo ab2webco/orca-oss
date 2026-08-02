@@ -215,7 +215,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 function normalizeClaudeConfigDir(dir: string | null | undefined): string | null {
-  // Why: the same dir can arrive with mixed separators (Windows env vs statusline JSON); unify them so attribution compares paths, not spellings. Case is left alone — Linux paths are case-sensitive.
+  // Why: normalize mixed Windows separators for path attribution; preserve Linux case sensitivity.
   const trimmed = dir?.trim().replace(/\\/g, '/').replace(/\/+$/, '')
   return trimmed || null
 }

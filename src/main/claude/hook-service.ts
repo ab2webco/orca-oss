@@ -98,7 +98,7 @@ export class ClaudeHookService {
       }
     }
 
-    // Why: report `partial` when only some events are registered so the sidebar shows a degraded install, not a false-positive `installed`.
+    // Why: report partial registration instead of a false installed state.
     const command = getManagedCommand(scriptPath)
     const missing: string[] = []
     let presentCount = 0
@@ -262,11 +262,11 @@ export class ClaudeHookService {
 
   // Why: install the Claude hook on the remote box (via SFTP); POSIX-only by design (Windows-remote deferred).
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
-    // Why: remote-Windows is out of scope; ship POSIX paths. process.platform here is the local box, not the remote, so it can't gate this.
+    // Why: remote Windows is unsupported; local process.platform cannot identify the remote OS.
     const remoteConfigPath = getRemoteConfigPath(remoteHome, this.options.settings)
     const remoteScriptFileName = getPosixManagedScriptFileName(this.options.settings)
     const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/${remoteScriptFileName}`
-    // Why: SFTP I/O fails often (network/EACCES/disk); wrap install so transient failures surface as structured state:'error' rather than an unhandled rejection.
+    // Why: surface fallible SFTP installs as structured errors.
     try {
       const config = await readHooksJsonRemote(sftp, remoteConfigPath)
       if (!config) {
@@ -291,8 +291,8 @@ export class ClaudeHookService {
         resolveRemoteEligibleEvents(this.options.versionGated)
       )
 
-      // Why: write script before settings — a mid-install failure then leaves a harmless orphan script, not settings.json pointing at a missing one.
-      // Why: SSH remotes use POSIX `.sh` paths even when Orca runs on Windows; never derive remote script syntax from the local OS.
+      // Why: write scripts before settings to avoid settings pointing to missing scripts.
+      // Why: SSH scripts always use POSIX .sh paths, regardless of the local OS.
       await writeManagedScriptRemote(
         sftp,
         remoteScriptPath,

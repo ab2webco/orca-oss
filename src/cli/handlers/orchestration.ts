@@ -528,6 +528,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       throwNoActiveSenderTerminal()
     }
 
+    // Why: lifecycle senders preserve ORCA_TERMINAL_HANDLE across restarts for older runtimes.
     const from = await resolveOrchestrationTerminalHandle(flags, cwd, client, 'from')
     const sendParams = {
       from,
@@ -1130,7 +1131,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
 
   'orchestration gate-list': async ({ flags, client, cwd, json }) => {
     const run = getOptionalStringFlag(flags, 'run')
-    // Why: same read posture as task-list — an explicitly named Run stays inspectable without a bound pane, so identity is only resolved for the implicit "my own Run" case.
+    // Why: named runs remain inspectable without a pane; only implicit runs resolve identity.
     const from = run ? undefined : await resolveCoordinatorTerminalHandle(flags, cwd, client)
     const result = await client.call<{
       gates: { id: string; task_id: string; question: string; status: string }[]
