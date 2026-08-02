@@ -144,8 +144,13 @@ export const CLAUDE_TERMINAL_SWITCH_METHODS: readonly RpcAnyMethod[] = [
     // instead of re-running a transaction that is already in flight.
     name: 'accounts.claudeTerminalSwitchStatus',
     params: ClaudeTerminalSwitchStatusParams,
-    handler: async (params) => ({
-      result: getClaudeTerminalAccountSwitchStatus(params.operationId)
-    })
+    handler: async (params, { clientKind }) => {
+      // Why the same gate as the switch itself: operation ids are sequential, and
+      // a record names the account ids, session id, terminal handle and PTY.
+      if (clientKind === 'mobile') {
+        throw new Error('Claude terminal account switches are not visible to a paired device.')
+      }
+      return { result: getClaudeTerminalAccountSwitchStatus(params.operationId) }
+    }
   })
 ]

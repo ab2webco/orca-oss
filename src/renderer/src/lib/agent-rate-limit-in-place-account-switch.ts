@@ -1,163 +1,123 @@
 import type { ClaudeManagedAccountSummary } from '../../../shared/types'
-import type { AgentStartupPlan } from '../../../shared/tui-agent-startup'
-import { buildClaudeInPlaceResumeCommand } from '../../../shared/claude-in-place-resume-command'
-import { translate } from '@/i18n/i18n'
-import { useAppStore } from '@/store'
 import {
-  stopForegroundAgent,
-  waitForAgentReadyInput,
-  waitForResumedAgent
-} from '@/lib/agent-rate-limit-terminal-control'
-import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
+  describeClaudeTerminalAccountSwitchFailure,
+  type ClaudeTerminalAccountSwitchFailureReason,
+  type ClaudeTerminalAccountSwitchResult
+} from '../../../shared/claude-terminal-account-switch'
+import { translate } from '@/i18n/i18n'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 import type { AgentRateLimitFailoverMode } from '@/lib/agent-rate-limit-failover'
 
 export type InPlaceManagedClaudeSwitchResult =
   | { ok: true; switched: AgentRateLimitFailoverMode }
   /** `restored` reports whether the original agent is running again; absent when nothing was stopped. */
-  | { ok: false; reason: 'unhealthy' | 'failed'; message: string; restored?: boolean }
+  | {
+      ok: false
+      reason: 'unhealthy' | 'stop-failed' | 'failed'
+      message: string
+      restored?: boolean
+    }
 
+/** Prompt injected once after the target session is verified, so the truncated turn continues. */
+const CONTINUATION_PROMPT = 'continue'
+
+// Why: the runtime holds the response open for the terminal result, so this must
+// outlast the switch's own verification window rather than racing it.
+const SWITCH_AWAIT_MS = 150_000
+const SWITCH_RPC_TIMEOUT_MS = 180_000
+
+/**
+ * Refusals that mean "this pane cannot be switched in place at all" — not that
+ * the switch was attempted and failed. The caller falls back to a fresh tab for
+ * these, exactly as it did when main could not prove a healthy idle shell.
+ */
+const NOT_SWITCHABLE_IN_PLACE: ReadonlySet<ClaudeTerminalAccountSwitchFailureReason> = new Set([
+  'runtime-unavailable',
+  'terminal-not-found',
+  'unsupported-runtime',
+  'source-unknown',
+  'missing-launch-config',
+  'missing-session',
+  'concurrent'
+])
+
+type SwitchResponse = {
+  accepted: boolean
+  result: ClaudeTerminalAccountSwitchResult
+}
+
+/**
+ * Asks the runtime that owns the PTY to switch this terminal's Claude account.
+ *
+ * Everything that used to live here — Ctrl+C, the CLAUDE_CONFIG_DIR export, the
+ * resume write, the "is claude in the foreground" check, the binding commit and
+ * the rollback — now runs inside that runtime as one transaction. It is the only
+ * side that can verify the resumed provider session id is the SAME one, rebuild
+ * the exact recorded argv, and keep going after this caller goes away.
+ */
 export async function runInPlaceManagedClaudeAccountSwitch(args: {
   ptyId: string
-  sourceAccountId: string | null
   targetAccount: ClaudeManagedAccountSummary
-  buildResumePlan(shell: 'posix' | 'powershell' | 'cmd'): AgentStartupPlan | null
 }): Promise<InPlaceManagedClaudeSwitchResult> {
-  const runtime = args.targetAccount.managedAuthRuntime === 'wsl' ? 'wsl' : 'host'
-  const wslDistro = args.targetAccount.wslDistro ?? null
-  const transition =
-    typeof args.sourceAccountId === 'string'
-      ? await window.api.pty.beginClaudeAccountSwitch({
-          ptyId: args.ptyId,
-          sourceAccountId: args.sourceAccountId,
-          targetAccountId: args.targetAccount.id,
-          runtime,
-          wslDistro
-        })
-      : ({ ok: false, reason: 'unhealthy' } as const)
+  const environmentId = getRemoteRuntimePtyEnvironmentId(args.ptyId)
+  // Why the PTY's own runtime: auth vaults, transcripts and hook rows all live
+  // where the shell runs; driving it from here would touch the wrong host.
+  const target = environmentId
+    ? ({ kind: 'environment', environmentId } as const)
+    : ({ kind: 'local' } as const)
 
-  if (!transition.ok) {
-    return transition.reason === 'unhealthy' || transition.reason === 'runtime-mismatch'
-      ? { ok: false, reason: 'unhealthy', message: '' }
-      : {
-          ok: false,
-          reason: 'failed',
-          message: translate(
-            'auto.lib.agentRateLimitAccountSwitch.preparationFailed',
-            'Could not prepare the selected account for this terminal.'
-          )
-        }
-  }
-
-  /**
-   * Ends the switch and puts the source account's CLI back in this PTY.
-   *
-   * Why the config dir has to come from main: the transition command exported
-   * CLAUDE_CONFIG_DIR for the destination, and that export outlives the failed
-   * attempt — a bare resume here would boot the original session into the wrong
-   * universe. Main re-prepares the source, hands its binding back, and returns the
-   * dir to point the shell at.
-   */
-  const abortAndRestore = async (message: string): Promise<InPlaceManagedClaudeSwitchResult> => {
-    const aborted = await window.api.pty
-      .abortClaudeAccountSwitch({
+  let response: SwitchResponse
+  try {
+    response = await callRuntimeRpc<SwitchResponse>(
+      target,
+      'accounts.switchClaudeTerminal',
+      {
         ptyId: args.ptyId,
-        // Why non-null: a null source never reaches begin, so there is no transition to abort.
-        sourceAccountId: args.sourceAccountId ?? '',
-        reservationId: transition.reservationId,
-        runtime,
-        wslDistro
-      })
-      .catch(() => ({ ok: false, reason: 'prepare-failed' }) as const)
-    const sourcePlan = args.buildResumePlan(transition.shell)
-    if (!aborted.ok || !sourcePlan) {
-      return { ok: false, reason: 'failed', message, restored: false }
+        targetAccountId: args.targetAccount.id,
+        continuationPrompt: CONTINUATION_PROMPT,
+        awaitMs: SWITCH_AWAIT_MS
+      },
+      { timeoutMs: SWITCH_RPC_TIMEOUT_MS }
+    )
+  } catch {
+    // A transport failure says nothing about the operation, which may already be
+    // running detached — so never claim the original agent was restored.
+    return {
+      ok: false,
+      reason: 'failed',
+      message: translate(
+        'auto.lib.agentRateLimitAccountSwitch.switchRequestFailed',
+        'Orca could not reach the runtime that owns this terminal to switch accounts.'
+      )
     }
-    const settings = useAppStore.getState().settings
-    const restoreCommand = buildClaudeInPlaceResumeCommand({
-      configDir: aborted.configDir,
-      resumeCommand: sourcePlan.launchCommand,
-      shell: transition.shell
-    })
-    const sent = await sendRuntimePtyInputVerified(settings, args.ptyId, `${restoreCommand}\r`)
-    if (!sent) {
-      return { ok: false, reason: 'failed', message, restored: false }
+  }
+
+  const { result } = response
+  if (result.state === 'committed' && !result.failure) {
+    return { ok: true, switched: result.continuationDelivered ? 'resumed' : 'launched' }
+  }
+  if (result.failure && NOT_SWITCHABLE_IN_PLACE.has(result.failure.reason)) {
+    return { ok: false, reason: 'unhealthy', message: '' }
+  }
+  if (result.failure?.reason === 'source-stop-failed') {
+    // Why its own reason: the agent is still running and owns the terminal, so
+    // the auto-switch runner must back off rather than describe a lost session.
+    return {
+      ok: false,
+      reason: 'stop-failed',
+      message: describeClaudeTerminalAccountSwitchFailure(result.failure)
     }
-    const restored = await waitForResumedAgent({
-      settings,
-      ptyId: args.ptyId,
-      agent: 'claude',
-      expectedProcess: sourcePlan.expectedProcess
-    })
-    return { ok: false, reason: 'failed', message, restored }
   }
-
-  const resumePlan = args.buildResumePlan(transition.shell)
-  if (!resumePlan) {
-    return abortAndRestore(
-      translate(
-        'auto.lib.agentRateLimitAccountSwitch.resumePlanFailed',
-        'Could not build a resume command for the switched session.'
-      )
-    )
+  return {
+    ok: false,
+    reason: 'failed',
+    message: result.failure
+      ? describeClaudeTerminalAccountSwitchFailure(result.failure)
+      : translate(
+          'auto.lib.agentRateLimitAccountSwitch.switchUnfinished',
+          'The account switch did not finish; check this terminal before continuing.'
+        ),
+    restored: result.state === 'rolled-back'
   }
-  const command = buildClaudeInPlaceResumeCommand({
-    configDir: transition.configDir,
-    resumeCommand: resumePlan.launchCommand,
-    shell: transition.shell
-  })
-  const settings = useAppStore.getState().settings
-  const launched = await sendRuntimePtyInputVerified(settings, args.ptyId, `${command}\r`)
-  if (!launched) {
-    return abortAndRestore(
-      translate(
-        'auto.lib.agentRateLimitAccountSwitch.resumeInputFailed',
-        'The terminal did not accept the resume command after switching accounts.'
-      )
-    )
-  }
-
-  const resumed = await waitForResumedAgent({
-    settings,
-    ptyId: args.ptyId,
-    agent: 'claude',
-    expectedProcess: resumePlan.expectedProcess
-  })
-  if (!resumed) {
-    await stopForegroundAgent({
-      settings,
-      ptyId: args.ptyId,
-      agent: 'claude',
-      expectedProcess: resumePlan.expectedProcess
-    })
-    return abortAndRestore(
-      translate(
-        'auto.lib.agentRateLimitAccountSwitch.resumeTimedOut',
-        'The resumed agent did not take over the terminal in time.'
-      )
-    )
-  }
-
-  const committed = await window.api.pty.commitClaudeAccountSwitch({
-    ptyId: args.ptyId,
-    targetAccountId: args.targetAccount.id,
-    reservationId: transition.reservationId
-  })
-  if (!committed) {
-    await stopForegroundAgent({
-      settings,
-      ptyId: args.ptyId,
-      agent: 'claude',
-      expectedProcess: resumePlan.expectedProcess
-    })
-    return abortAndRestore(
-      translate(
-        'auto.lib.agentRateLimitAccountSwitch.accountingFailed',
-        'The resumed terminal could not be assigned to the selected account.'
-      )
-    )
-  }
-
-  await waitForAgentReadyInput()
-  const continued = await sendRuntimePtyInputVerified(settings, args.ptyId, 'continue\r')
-  return { ok: true, switched: continued ? 'resumed' : 'launched' }
 }

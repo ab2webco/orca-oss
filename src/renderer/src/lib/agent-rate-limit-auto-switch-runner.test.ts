@@ -27,6 +27,9 @@ const beginClaudeAccountSwitch = vi.fn<BeginClaudeAccountSwitch>(async () => ({
   shell: 'posix'
 }))
 const commitClaudeAccountSwitch = vi.fn(async () => true)
+// Why: the per-terminal Claude account switch now runs entirely inside the
+// runtime that owns the PTY, so this RPC is the whole in-place path.
+const callRuntimeRpc = vi.fn<(...args: unknown[]) => Promise<unknown>>()
 const abortClaudeAccountSwitch = vi.fn(async () => ({
   ok: true as const,
   configDir: '/vaults/origin-1/auth'
@@ -66,7 +69,7 @@ vi.mock('@/runtime/runtime-terminal-stream', () => ({
   getRemoteRuntimePtyEnvironmentId: () => null
 }))
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: vi.fn(async () => ({}))
+  callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
 }))
 vi.mock('@/lib/agent-rate-limit-terminal-control', () => ({
   stopForegroundAgent: (...args: unknown[]) => stopForegroundAgent(...args),
@@ -260,6 +263,21 @@ beforeEach(() => {
     shell: 'posix'
   })
   commitClaudeAccountSwitch.mockResolvedValue(true)
+  callRuntimeRpc.mockImplementation(async (_target, _method, params) => ({
+    accepted: true,
+    acceptance: { operationId: 'op-1' },
+    result: {
+      operationId: 'op-1',
+      state: 'committed',
+      terminal: 'orca-terminal-1',
+      ptyId: 'pty-1',
+      sourceAccountId: 'active-1',
+      targetAccountId: (params as { targetAccountId: string }).targetAccountId,
+      sessionId: PROVIDER_SESSION.id,
+      continuationDelivered: true,
+      transcriptCopiedFileCount: 1
+    }
+  }))
   deliverLaunchPromptToAgentTab.mockResolvedValue(true)
   ;(globalThis as { window?: unknown }).window = { api } as unknown as typeof window
 })
@@ -311,9 +329,15 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
       accountLabel: 'spare-1@example.com',
       relaunch: 'resumed'
     })
-    // Why: the endpoint source transcript is copied before the same PTY resumes
-    // against the target OAuth universe.
-    expect(api.claudeAccounts.copySessionForAccountSwitch).toHaveBeenCalledWith({
+    // Why: the runtime that owns the PTY prepares the transcript itself now, as
+    // part of the same transaction that verifies the resumed session.
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'accounts.switchClaudeTerminal',
+      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: 'spare-1' }),
+      expect.anything()
+    )
+    expect(api.claudeAccounts.copySessionForAccountSwitch).not.toHaveBeenCalledWith({
       sessionId: PROVIDER_SESSION.id,
       cwd: '/Users/dev/demo',
       targetAccountId: 'spare-1',
@@ -325,8 +349,9 @@ describe('runAgentRateLimitAutoSwitch — custom-endpoint session guard', () => 
     )
     // Why: a pinned relaunch must stay off the gated global selection + same-PTY resume.
     expect(api.claudeAccounts.select).not.toHaveBeenCalled()
-    expect(sendRuntimePtyInputVerified.mock.calls[0]?.[1]).toBe('pty-1')
-    expect(String(sendRuntimePtyInputVerified.mock.calls[0]?.[2])).toContain('--resume')
+    // Why: the resume command is written by the PTY-owning runtime now, so a
+    // renderer-side write here would mean two agents racing for the same pane.
+    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
   })
 
   it('proceeds when the session is backed by a subscription-oauth pin', async () => {
@@ -492,21 +517,25 @@ describe('runAgentRateLimitAutoSwitch — pinned managed session routing', () =>
       accountLabel: 'spare-1@example.com',
       relaunch: 'resumed'
     })
-    expect(api.claudeAccounts.copySessionForAccountSwitch).toHaveBeenCalledWith({
-      sessionId: PROVIDER_SESSION.id,
-      cwd: '/Users/dev/demo',
-      targetAccountId: 'spare-1',
-      sourceAccountId: 'active-1'
-    })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'accounts.switchClaudeTerminal',
+      expect.objectContaining({
+        ptyId: 'pty-1',
+        targetAccountId: 'spare-1',
+        continuationPrompt: 'continue'
+      }),
+      expect.anything()
+    )
     expect(store.updateWorktreeMeta).toHaveBeenCalledWith(
       'wt-1',
       expect.objectContaining({ claudeAccountId: 'spare-1' })
     )
     expect(store.createTab).not.toHaveBeenCalled()
-    expect(beginClaudeAccountSwitch).toHaveBeenCalledWith(
-      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: 'spare-1' })
-    )
-    expect(String(sendRuntimePtyInputVerified.mock.calls[0]?.[2])).toContain('--resume')
+    // Why: the renderer no longer writes the resume command or copies the
+    // transcript — doing both here is what used to strand the conversation.
+    expect(sendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(api.claudeAccounts.copySessionForAccountSwitch).not.toHaveBeenCalled()
     // Why: a pinned switch must stay off the gated global selection.
     expect(api.claudeAccounts.select).not.toHaveBeenCalled()
   })

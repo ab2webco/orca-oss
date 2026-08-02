@@ -80,8 +80,10 @@ export async function startClaudeTerminalAccountSwitch(
   if (snapshot.isWsl || snapshot.remoteConnectionId) {
     throw new ClaudeTerminalAccountSwitchRefusal('unsupported-runtime')
   }
+  // Why its own reason: the cwd is what files the transcript, so without it the
+  // target universe could never resolve the session — that is not a missing pane.
   if (!snapshot.cwd) {
-    throw new ClaudeTerminalAccountSwitchRefusal('terminal-not-found')
+    throw new ClaudeTerminalAccountSwitchRefusal('transcript-unavailable')
   }
   const sourceAccountId = resolvePtyClaudeAccountId(attached, snapshot.ptyId)
   if (!sourceAccountId) {
