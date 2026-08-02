@@ -1412,7 +1412,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const cardStyle = cardPaddingLeft ? { paddingLeft: cardPaddingLeft } : undefined
   const detailsAndPortsContent =
     hasDetails || hasPorts ? (
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex min-w-0 shrink items-center gap-1">
         {hasPorts && <WorktreeCardPortsTrigger ports={workspacePorts} />}
         {hasDetails && (
           <WorktreeCardMetaBadges
@@ -1466,7 +1466,9 @@ const WorktreeCard = React.memo(function WorktreeCard({
       detailsAndPortsContent
     )
   const titleRowIndicators = showTitleRowIndicators ? (
-    <div className="ml-auto flex shrink-0 items-center gap-1 pr-1.5">{detailsAndPorts}</div>
+    // Why: the sidebar list clips with overflow-x-hidden, so this lane has to be able to
+    // compress; a shrink-0 lane pushes the chips past the visible edge instead.
+    <div className="ml-auto flex min-w-0 shrink items-center gap-1 pr-1.5">{detailsAndPorts}</div>
   ) : null
   const hasSecondaryCardContent =
     hasMetaRow || !!remoteBranchConflict || showInlineAgentList || showLineageChildChip

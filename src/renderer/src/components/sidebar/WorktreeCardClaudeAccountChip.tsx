@@ -70,7 +70,10 @@ export function WorktreeCardClaudeAccountChip({
         <Badge
           variant="outline"
           className={cn(
-            'h-[16px] max-w-[8rem] shrink-0 gap-1 rounded px-1.5 text-[10px] font-medium leading-none',
+            // Why: the account label is the row's least identifying text, so it gives way
+            // first (shrink-[2]) and ellipsizes rather than pushing identifier chips out of
+            // the clipped sidebar. Never shrink-0 here: that is what spilled the email.
+            'h-[16px] min-w-0 max-w-[8rem] shrink-[2] gap-1 rounded px-1.5 text-[10px] font-medium leading-none',
             model.inherited
               ? 'text-muted-foreground border-border/60 bg-transparent'
               : 'text-foreground/80 border-foreground/20 bg-foreground/[0.06]'
