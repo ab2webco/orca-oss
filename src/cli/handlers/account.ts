@@ -11,6 +11,8 @@ import {
 } from '../account-format'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
+import { rejectRemoteSelectionFlags } from './account-runtime-scope'
+import { switchClaudeTerminalAccount } from './account-switch'
 import { stripElectronRunAsNode } from '../runtime/launch'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -251,24 +253,6 @@ async function addCodexAccount({ client, json }: HandlerContext): Promise<void> 
   printResult(result, json, (state) => formatAccountsBlock('Codex', state))
 }
 
-/**
- * Rejects the runtime-selector flags instead of ignoring them. shouldIgnoreRemoteSelection
- * pins account commands to the local runtime, so honoring `--environment homelab`
- * silently would target the laptop rather than the host the user named — the exact
- * mistake this feature exists to avoid. A `--help` note does not reach someone who
- * already typed the flag.
- */
-function rejectRemoteSelectionFlags(ctx: HandlerContext, command: string): void {
-  for (const flag of ['environment', 'pairing-code']) {
-    if (ctx.flags.has(flag)) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `\`--${flag}\` does not retarget \`${command}\`. Run it on the host whose accounts you want to manage.`
-      )
-    }
-  }
-}
-
 async function assertAccountImportSupported({ client }: HandlerContext): Promise<void> {
   const status = await client.call<RuntimeStatus>('status.get')
   if (!status.result.capabilities?.includes(ACCOUNT_IMPORT_RUNTIME_CAPABILITY)) {
@@ -279,7 +263,7 @@ async function assertAccountImportSupported({ client }: HandlerContext): Promise
   }
 }
 
-/** CLI handlers for `orca account add [--agent claude|codex]` and `orca account list`. */
+/** CLI handlers for `orca account add [--agent claude|codex]`, `orca account list` and `orca account switch`. */
 export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   'account add': async (ctx) => {
     const agentFlag = ctx.flags.get('agent')
@@ -316,5 +300,9 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
       json,
       formatAccountList
     )
+  },
+  'account switch': async (ctx) => {
+    rejectRemoteSelectionFlags(ctx, 'orca account switch')
+    await switchClaudeTerminalAccount(ctx)
   }
 }

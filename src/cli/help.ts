@@ -21,6 +21,7 @@ Agent Discovery:
 Accounts:
   account add               Add a managed Claude or Codex account on this Orca host
   account list              List managed Claude and Codex accounts on this Orca host
+  account switch            Switch one terminal to another Claude account and resume the session
 
 Skills:
   skills list               List version-matched skill guides bundled with this Orca CLI
@@ -223,6 +224,7 @@ Common Commands:
   orca agent-context [--json]
   orca account add [--agent claude|codex] [--json]
   orca account list [--refresh] [--json]
+  orca account switch --to <email|id> [--terminal <handle>] [--json]
   orca environment add --name <name> --pairing-code <code> [--json]
   orca environment list [--json]
   orca environment show --environment <selector> [--json]
@@ -502,6 +504,12 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   }
   // Why: the shared --agent help describes launching a TUI agent in a terminal,
   // which is the wrong meaning here — this selects the account provider.
+  if (command === 'account switch' && flag === 'terminal') {
+    return '--terminal <handle>    Terminal to switch; defaults to the terminal this command runs in'
+  }
+  if (command === 'account switch' && flag === 'to') {
+    return '--to <email|id>        Managed Claude account to switch this terminal to'
+  }
   if (command === 'account add' && flag === 'agent') {
     return '--agent <id>           Account provider: claude or codex (default claude)'
   }

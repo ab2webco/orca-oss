@@ -31,5 +31,22 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'Use the email or id with --claude-account / --codex-account on `terminal create`, `worktree create`, and `orchestration worker-start` to direct a launch at one account.'
     ],
     examples: ['orca account list --json', 'orca account list --refresh --json']
+  },
+  {
+    path: ['account', 'switch'],
+    summary: 'Switch one terminal to another managed Claude account and resume the same session',
+    usage: 'orca account switch --to <email|id> [--terminal <handle>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'to', 'terminal'],
+    notes: [
+      'The runtime that owns the terminal performs the whole swap: stop the agent, point that PTY at the target vault, relaunch the SAME command with `--resume <session>`, and verify the resumed session id before committing.',
+      'Same pane, same tab: nothing is focused, split, or created. A verification failure rolls the terminal back to the account it started on.',
+      '--to takes an email or account id from `orca account list`; custom-endpoint accounts are rejected (they use the failover path).',
+      'Omitting --terminal targets the terminal this command runs in, proven by ORCA_TERMINAL_HANDLE / ORCA_PANE_KEY. There is no focused-pane fallback.',
+      'The runtime accepts the operation before it stops anything, so losing this CLI process does not cancel a switch that is already underway.'
+    ],
+    examples: [
+      'orca account switch --to other@example.com',
+      'orca account switch --to acct_123 --terminal orca-terminal-4 --json'
+    ]
   }
 ]
