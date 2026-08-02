@@ -62,6 +62,10 @@ function buildPorts(overrides: PortOverrides = {}): {
       calls.push('prepareTranscript')
       return { ok: true, copiedFileCount: 1 }
     },
+    verifyResumeObservability: async () => {
+      calls.push('verifyResumeObservability')
+      return true
+    },
     awaitSourceForeground: async () => {
       calls.push('awaitSourceForeground')
       return true
@@ -128,14 +132,47 @@ describe('runAtomicClaudeTerminalAccountSwitch preflight atomicity', () => {
       'capture',
       'validateTarget',
       'prepareTranscript',
+      'verifyResumeObservability',
       'stopSource',
       'begin',
+      'verifyResumeObservability',
       'writeLaunchCommand',
       'awaitExactSession',
       'commit',
       'deliverContinuation'
     ])
     expect(writes[0]).toContain(`'--resume' '${SESSION_ID}'`)
+  })
+
+  it('refuses before the interrupt when the source universe cannot report a resume', async () => {
+    // ORCA-168: without the managed SessionStart hook, `awaitExactSession` can
+    // only time out — including the rollback's own re-verification. Refusing
+    // here keeps the invariant that a switch Orca cannot verify never stops the
+    // agent, instead of burning the session for 90 s and reporting a false
+    // rollback-failed on a healthy terminal.
+    const { ports, calls } = buildPorts({ verifyResumeObservability: async () => false })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(result.state).toBe('preflighting')
+    expect(result.failure?.reason).toBe('resume-verification-unavailable')
+    expect(calls).toEqual(['capture', 'validateTarget', 'prepareTranscript'])
+  })
+
+  it('rolls back without launching the target when its prepared vault cannot report a resume', async () => {
+    let checked = 0
+    const { ports, calls, writes } = buildPorts({
+      verifyResumeObservability: async () => {
+        checked += 1
+        return checked === 1
+      }
+    })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(result.state).toBe('rolled-back')
+    expect(result.failure?.reason).toBe('resume-verification-unavailable')
+    // Nothing ran in the target universe, so the only write is the source's own
+    // resume and there is no destination agent to interrupt.
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toContain('/vault/account-source/auth')
+    expect(calls).not.toContain('stopDestination')
   })
 
   it('treats a linked shared transcript store as success with zero copies', async () => {
@@ -424,9 +461,11 @@ describe('runAtomicClaudeTerminalAccountSwitch agent self-switch', () => {
       'capture',
       'validateTarget',
       'prepareTranscript',
+      'verifyResumeObservability',
       'awaitSourceForeground',
       'stopSource',
       'begin',
+      'verifyResumeObservability',
       'writeLaunchCommand',
       'awaitExactSession',
       'commit',

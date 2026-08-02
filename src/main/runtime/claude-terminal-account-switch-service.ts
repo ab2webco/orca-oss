@@ -132,7 +132,8 @@ export async function startClaudeTerminalAccountSwitch(
     ptyId: capture.ptyId,
     sourceAccountId: capture.sourceAccountId,
     targetAccountId: capture.targetAccountId,
-    sessionId: capture.sessionId
+    sessionId: capture.sessionId,
+    selfSwitch: request.selfSwitch === true
   }
   const initial: ClaudeTerminalAccountSwitchResult = {
     operationId: capture.operationId,

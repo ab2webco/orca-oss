@@ -132,7 +132,10 @@ import type {
 } from './orchestration/environment-transport'
 import { syncFederatedDispatch } from './orchestration/federation-sync'
 import { formatMessagesForInjection } from './orchestration/formatter'
-import { selectExactWorkerProviderSession } from './orchestration/worker-provider-session'
+import {
+  selectExactWorkerProviderSession,
+  selectExactWorkerProviderSessionIdentity
+} from './orchestration/worker-provider-session'
 import type {
   Automation,
   AutomationCreateInput,
@@ -15847,10 +15850,16 @@ export class OrcaRuntimeService {
     return `${this.runtimeId}:${record.ptyId}:${record.ptyGeneration}`
   }
 
-  getExactWorkerProviderSession(
+  private buildExactWorkerProviderSessionQuery(
     handle: string,
     observedAfter: number
-  ): ExactWorkerProviderSession | null {
+  ): {
+    paneKey: string
+    processIncarnation: string
+    connectionId: string | null | undefined
+    launchToken: string | null | undefined
+    observedAfter: number
+  } | null {
     const paneKey = this.getTerminalPaneKey(handle)
     const processIncarnation = this.getTerminalProcessIncarnation(handle)
     if (!paneKey || !processIncarnation) {
@@ -15868,14 +15877,39 @@ export class OrcaRuntimeService {
       connectionId = undefined
       launchToken = undefined
     }
-    return selectExactWorkerProviderSession({
-      paneKey,
-      processIncarnation,
-      connectionId,
-      launchToken,
-      observedAfter,
-      statuses: this.getAgentStatusSnapshotFn?.() ?? []
-    })
+    return { paneKey, processIncarnation, connectionId, launchToken, observedAfter }
+  }
+
+  getExactWorkerProviderSession(
+    handle: string,
+    observedAfter: number
+  ): ExactWorkerProviderSession | null {
+    const query = this.buildExactWorkerProviderSessionQuery(handle, observedAfter)
+    return query
+      ? selectExactWorkerProviderSession({
+          ...query,
+          statuses: this.getAgentStatusSnapshotFn?.() ?? []
+        })
+      : null
+  }
+
+  /**
+   * The same fences, but answering "which session is live in this pane" — so a
+   * just-resumed idle agent's identity row counts. The account switch verifies
+   * its own relaunch with this; the live-agent snapshot hides those rows on
+   * purpose, and waiting for one there can only time out (ORCA-168).
+   */
+  getExactWorkerProviderSessionIdentity(
+    handle: string,
+    observedAfter: number
+  ): ExactWorkerProviderSession | null {
+    const query = this.buildExactWorkerProviderSessionQuery(handle, observedAfter)
+    return query
+      ? selectExactWorkerProviderSessionIdentity({
+          ...query,
+          statuses: this.getAgentProviderSessionSnapshotFn?.() ?? []
+        })
+      : null
   }
 
   /**
@@ -15906,7 +15940,9 @@ export class OrcaRuntimeService {
     const cwd = worktreeId
       ? ((await this.getResolvedWorktreeMap()).get(worktreeId)?.path ?? null)
       : null
-    const observed = this.getExactWorkerProviderSession(handle, 0)
+    // Why the identity read: a pane whose Claude has been idle since it resumed
+    // still has a session to carry across the switch.
+    const observed = this.getExactWorkerProviderSessionIdentity(handle, 0)
     return {
       ok: true,
       terminal: handle,
@@ -29900,7 +29936,8 @@ export class OrcaRuntimeService {
       if (
         entry.agentType &&
         (entry.providerSessionOnly !== true ||
-          (entry.agentType === 'pi' && entry.providerSession != null)) &&
+          ((entry.agentType === 'pi' || entry.agentType === 'claude') &&
+            entry.providerSession != null)) &&
         entry.receivedAt >= agentTypeFreshAfter &&
         (!agent || entry.receivedAt > agent.receivedAt)
       ) {

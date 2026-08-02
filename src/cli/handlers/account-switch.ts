@@ -14,8 +14,35 @@ import {
 
 type ClaudeTerminalSwitchResponse = {
   accepted: boolean
-  acceptance: { operationId: string } | null
+  acceptance: { operationId: string; selfSwitch?: boolean } | null
   result: ClaudeTerminalAccountSwitchResult
+}
+
+// Why poll instead of holding the socket: a real switch runs far longer than any
+// idle timer the transport is willing to keep open, and the operation outlives
+// this process anyway. The ceiling covers a verify timeout (90 s) plus the
+// rollback's own re-verification, with slack (ORCA-168).
+const SWITCH_POLL_INTERVAL_MS = 1_000
+const SWITCH_POLL_CEILING_MS = 300_000
+
+async function pollClaudeTerminalSwitch(
+  client: HandlerContext['client'],
+  operationId: string,
+  current: ClaudeTerminalAccountSwitchResult
+): Promise<ClaudeTerminalAccountSwitchResult> {
+  const deadline = Date.now() + SWITCH_POLL_CEILING_MS
+  let latest = current
+  while (!isTerminalClaudeAccountSwitchState(latest.state) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, SWITCH_POLL_INTERVAL_MS))
+    const status = await client.call<{ result: ClaudeTerminalAccountSwitchResult | null }>(
+      'accounts.claudeTerminalSwitchStatus',
+      { operationId }
+    )
+    // Why keep the last known result: the runtime prunes old operations, and a
+    // dropped record must not erase what the caller already knows.
+    latest = status.result.result ?? latest
+  }
+  return latest
 }
 
 function formatClaudeTerminalSwitch(response: ClaudeTerminalSwitchResponse): string {
@@ -75,10 +102,21 @@ export async function switchClaudeTerminalAccount(ctx: HandlerContext): Promise<
       terminal: identity.terminal,
       ...(identity.paneKey ? { paneKey: identity.paneKey } : {}),
       ...(identity.launchToken ? { launchToken: identity.launchToken } : {}),
-      targetAccountId
+      targetAccountId,
+      // Why 0: the runtime answers as soon as it owns the transaction, and the
+      // outcome is polled below. Holding the response is what cost the last
+      // release its operation id when the socket died mid-switch.
+      awaitMs: 0
     }
   )
-  const { result } = response.result
+  const accepted = response.result
+  // Why not polled: this command is the tool call the runtime is waiting to see
+  // exit before it interrupts the agent, so staying alive here would deadlock
+  // the very switch it is reporting.
+  const result =
+    accepted.acceptance && !accepted.acceptance.selfSwitch
+      ? await pollClaudeTerminalSwitch(client, accepted.acceptance.operationId, accepted.result)
+      : accepted.result
   if (result.failure) {
     // Why not printResult first: a second write would corrupt the JSON envelope.
     // The error carries the operation id so a detached switch stays traceable,
@@ -90,5 +128,5 @@ export async function switchClaudeTerminalAccount(ctx: HandlerContext): Promise<
       }${result.recovery ? `. ${describeClaudeTerminalAccountSwitchRecovery(result.recovery)}` : ''}`
     )
   }
-  printResult(response, json, formatClaudeTerminalSwitch)
+  printResult({ ...response, result: { ...accepted, result } }, json, formatClaudeTerminalSwitch)
 }

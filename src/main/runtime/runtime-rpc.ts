@@ -446,6 +446,12 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
   if (request.method === 'orchestration.ask') {
     return 'ask'
   }
+  // Why: the switch holds its response for the whole transaction (verify alone
+  // budgets 90 s), so without keepalive frames the 30 s socket idle timer tears
+  // the connection down and the caller never learns the operation id (ORCA-168).
+  if (request.method === 'accounts.switchClaudeTerminal') {
+    return 'wait'
+  }
   if (request.method === 'orchestration.check') {
     const params = request.params as { wait?: unknown } | undefined
     return params?.wait === true ? 'wait' : null

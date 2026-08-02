@@ -7340,13 +7340,44 @@ describe('AgentHookServer ingestRemote', () => {
           id: 'pi-session-1',
           transcriptPath: '/tmp/pi-session-1.jsonl'
         },
-        payload: { state: 'done', prompt: '', agentType: 'claude' }
+        // Why codex: only agents that report a resumable session while idle may
+        // hold a pane's identity without a turn (pi's session_start, Claude's
+        // SessionStart); every other agent's metadata-only row is malformed.
+        payload: { state: 'done', prompt: '', agentType: 'codex' }
       },
       'conn-1'
     )
 
     expect(listener).not.toHaveBeenCalled()
     expect(server.getStatusSnapshot()).toEqual([])
+  })
+
+  it('keeps a relayed Claude resume-identity envelope without fabricating a turn', () => {
+    // ORCA-168: a resumed Claude is idle until something prompts it, so its
+    // SessionStart identity row is the only thing an account switch can verify
+    // against — over the relay as well as locally.
+    const server = new AgentHookServer()
+
+    server.ingestRemote(
+      {
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        providerSessionOnly: true,
+        providerSession: { key: 'session_id', id: 'claude-session-1' },
+        payload: { state: 'done', prompt: '', agentType: 'claude' }
+      },
+      'conn-1'
+    )
+
+    expect(server.getStatusSnapshot()).toEqual([
+      expect.objectContaining({
+        paneKey: PANE,
+        agentType: 'claude',
+        providerSessionOnly: true,
+        providerSession: { key: 'session_id', id: 'claude-session-1' }
+      })
+    ])
   })
 
   it('stamps connectionId and forwards a valid relay envelope to the listener', () => {

@@ -83,6 +83,15 @@ export type AtomicClaudeTerminalAccountSwitchPorts = {
     { ok: true; copiedFileCount: number } | { ok: false; reason: 'transcript-unavailable' }
   >
   /**
+   * True when a Claude launched against `configDir` (null = the source universe)
+   * would report its session id on resume. Without it `awaitExactSession` can
+   * only time out, so the switch must refuse rather than stop the agent.
+   */
+  verifyResumeObservability(args: {
+    capture: ClaudeTerminalSwitchCapture
+    configDir: string | null
+  }): Promise<boolean>
+  /**
    * Self-switch only: waits until the agent — not the tool subprocess it spawned
    * to ask for the switch — owns the terminal's foreground again.
    */
@@ -209,6 +218,13 @@ export async function runAtomicClaudeTerminalAccountSwitch(
   if (!transcript.ok) {
     return refuse(transcript.reason)
   }
+  // Why before the stop: the rollback re-verifies the source the same way, so a
+  // universe that cannot report a resume makes BOTH directions unverifiable —
+  // refusing here is the difference between an untouched terminal and a
+  // 90-second timeout that ends in a false rollback-failed.
+  if (!(await ports.verifyResumeObservability({ capture, configDir: null }))) {
+    return refuse('resume-verification-unavailable')
+  }
 
   /**
    * Puts the captured source session back in the same PTY and re-verifies it.
@@ -285,12 +301,19 @@ export async function runAtomicClaudeTerminalAccountSwitch(
     return base('rolled-back', { failure: cause })
   }
 
-  /** Compensating transaction for every failure past `begin`. */
+  /**
+   * Compensating transaction for every failure past `begin`. `launched` is false
+   * before the target's launch line is written: there is no destination agent to
+   * interrupt, and sending the chord anyway would hit the idle shell.
+   */
   const rollback = async (
-    cause: ClaudeTerminalAccountSwitchFailure
+    cause: ClaudeTerminalAccountSwitchFailure,
+    options: { launched?: boolean } = {}
   ): Promise<ClaudeTerminalAccountSwitchResult> => {
     transition('rolling-back')
-    await ports.stopDestination(capture!)
+    if (options.launched !== false) {
+      await ports.stopDestination(capture!)
+    }
     const aborted = await ports.abort({ capture: capture!, reservationId: begun.reservationId })
     if (!aborted.ok) {
       return rollbackFailed(cause)
@@ -302,6 +325,13 @@ export async function runAtomicClaudeTerminalAccountSwitch(
     return base('rolled-back', { failure: cause })
   }
 
+  // Why here and not only in preflight: `begin` is what prepares the target
+  // vault, so this is the first moment its instrumentation is knowable — and the
+  // last one before the destination Claude exists.
+  if (!(await ports.verifyResumeObservability({ capture, configDir: begun.configDir }))) {
+    return rollback(failure('resume-verification-unavailable'), { launched: false })
+  }
+
   transition('launching-target')
   const launch = buildClaudeTerminalSwitchLaunchCommand({
     sessionId: capture.sessionId,
@@ -311,7 +341,7 @@ export async function runAtomicClaudeTerminalAccountSwitch(
     configDir: begun.configDir
   })
   if (!launch.ok) {
-    return rollback(failure(launch.reason))
+    return rollback(failure(launch.reason), { launched: false })
   }
   const observedAfter = ports.now()
   if (!(await ports.writeLaunchCommand({ capture, command: launch.command }))) {

@@ -61,7 +61,13 @@ async function waitForSwitchResult(args: {
 }): Promise<ClaudeTerminalAccountSwitchResult> {
   const current = (): ClaudeTerminalAccountSwitchResult =>
     getClaudeTerminalAccountSwitchStatus(args.operationId) ?? args.fallback
-  if (args.awaitMs <= 0 && !args.pastPreflight) {
+  // Why unconditional: leaving preflight is bounded and is the only thing a
+  // self-switching caller can still be told, so `awaitMs: 0` must not skip it.
+  if (args.pastPreflight) {
+    await args.pastPreflight
+    return current()
+  }
+  if (args.awaitMs <= 0) {
     return args.fallback
   }
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -70,7 +76,7 @@ async function waitForSwitchResult(args: {
     timer.unref?.()
   })
   try {
-    await Promise.race([args.settled, ...(args.pastPreflight ? [args.pastPreflight] : []), timeout])
+    await Promise.race([args.settled, timeout])
     return current()
   } finally {
     if (timer) {

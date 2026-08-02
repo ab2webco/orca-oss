@@ -20,6 +20,8 @@ import {
   releaseInjectedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
 import { copyClaudeSessionForAccountSwitch } from '../claude-accounts/session-failover'
+import { claudeUniverseReportsResumedSession } from '../claude-accounts/claude-resume-observability'
+import { resolveOwnedClaudeManagedAuthPath } from '../claude-accounts/managed-auth-path'
 import { isManagedClaudeVaultAuthenticated } from '../claude-accounts/managed-vault-authentication'
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
 import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
@@ -128,6 +130,21 @@ export function buildClaudeTerminalAccountSwitchPorts(
         ? { ok: true, copiedFileCount: copied.copiedFileCount }
         : { ok: false, reason: 'transcript-unavailable' }
     },
+    verifyResumeObservability: async ({ configDir }) => {
+      const universe =
+        configDir ??
+        (() => {
+          const account = attached
+            .getSettings()
+            .claudeManagedAccounts.find((candidate) => candidate.id === capture.sourceAccountId)
+          return account
+            ? resolveOwnedClaudeManagedAuthPath(account.id, account.managedAuthPath)
+            : null
+        })()
+      // Why not a refusal: an unpinned source runs in the shared universe, whose
+      // instrumentation the app owns and repairs on every launch.
+      return universe === null ? true : claudeUniverseReportsResumedSession(universe)
+    },
     awaitSourceForeground: () => awaitClaudeTerminalSourceForeground(runtime, capture),
     stopSource: () => stopClaudeTerminalForegroundAgent(runtime, capture),
     begin: async () => {
@@ -192,7 +209,13 @@ export function buildClaudeTerminalAccountSwitchPorts(
       const deadline = Date.now() + SESSION_OBSERVATION_TIMEOUT_MS
       let observedSessionId: string | undefined
       for (;;) {
-        const observed = runtime.getExactWorkerProviderSession(capture.terminal, observedAfter)
+        // Why the identity read: a resumed Claude is idle until the continuation
+        // prompt lands, and the live-agent snapshot deliberately hides the row
+        // that says so — waiting for it there can only time out (ORCA-168).
+        const observed = runtime.getExactWorkerProviderSessionIdentity(
+          capture.terminal,
+          observedAfter
+        )
         if (observed?.agent === 'claude' && observed.providerSession?.id) {
           if (observed.providerSession.id === capture.sessionId) {
             return { ok: true }

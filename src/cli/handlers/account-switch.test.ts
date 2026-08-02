@@ -34,13 +34,40 @@ describe('orca account switch', () => {
 
   type SwitchResultOverrides = Record<string, unknown>
 
-  function buildSwitchClient(options: { switchResult?: SwitchResultOverrides } = {}): {
+  function buildSwitchClient(
+    options: {
+      switchResult?: SwitchResultOverrides
+      acceptance?: Record<string, unknown>
+      /** Consumed one per `accounts.claudeTerminalSwitchStatus` poll. */
+      statusResults?: SwitchResultOverrides[]
+    } = {}
+  ): {
     client: RuntimeClient
     calls: { method: string; params?: unknown }[]
   } {
     const calls: { method: string; params?: unknown }[] = []
+    const pendingStatuses = [...(options.statusResults ?? [])]
     const call = vi.fn(async (method: string, params?: unknown) => {
       calls.push({ method, params })
+      if (method === 'accounts.claudeTerminalSwitchStatus') {
+        const next = pendingStatuses.shift()
+        if (!next) {
+          throw new RuntimeClientError('invalid_argument', 'unexpected status poll')
+        }
+        return {
+          result: {
+            result: {
+              operationId: 'op-7',
+              terminal: 'orca-terminal-5',
+              ptyId: 'pty-5',
+              sourceAccountId: 'acct-1',
+              targetAccountId: 'acct-2',
+              sessionId: 'session-5',
+              ...next
+            }
+          }
+        }
+      }
       if (method === 'accounts.snapshot') {
         return {
           result: {
@@ -61,7 +88,7 @@ describe('orca account switch', () => {
         return {
           result: {
             accepted: true,
-            acceptance: { operationId: 'op-7' },
+            acceptance: { operationId: 'op-7', selfSwitch: false, ...options.acceptance },
             result: {
               operationId: 'op-7',
               state: 'committed',
@@ -103,7 +130,8 @@ describe('orca account switch', () => {
     ])
     expect(calls[1]?.params).toEqual({
       terminal: 'orca-terminal-5',
-      targetAccountId: 'acct-2'
+      targetAccountId: 'acct-2',
+      awaitMs: 0
     })
     expect(logSpy.mock.calls.flat().join('\n')).toContain('State:     committed')
   })
@@ -156,7 +184,8 @@ describe('orca account switch', () => {
       terminal: 'orca-terminal-5',
       paneKey: 'tab-1:leaf-1',
       launchToken: 'token-1',
-      targetAccountId: 'acct-2'
+      targetAccountId: 'acct-2',
+      awaitMs: 0
     })
   })
 
@@ -218,10 +247,13 @@ describe('orca account switch', () => {
     })
   })
 
-  it('reports an accepted switch that has not finished instead of waiting for it', async () => {
+  it('reports an accepted self-switch instead of polling its own dying terminal', async () => {
     // A self-switching agent is told the outcome before the interrupt reaches
-    // its own tool call, so a non-terminal state is a success, not a failure.
-    const { client } = buildSwitchClient({
+    // its own tool call, so a non-terminal state is a success, not a failure —
+    // and polling here would hold the foreground the runtime is waiting to get
+    // back, turning the switch into `source-busy`.
+    const { client, calls } = buildSwitchClient({
+      acceptance: { selfSwitch: true },
       switchResult: { state: 'stopping-source', transcriptCopiedFileCount: undefined }
     })
     await ACCOUNT_HANDLERS['account switch']!(
@@ -234,6 +266,56 @@ describe('orca account switch', () => {
     expect(printed).toContain('State:     stopping-source')
     expect(printed).toContain('Operation: op-7')
     expect(printed).toMatch(/keeps running in this terminal/i)
+    expect(calls.map((entry) => entry.method)).not.toContain('accounts.claudeTerminalSwitchStatus')
+  })
+
+  it('polls the accepted operation to its terminal state instead of holding the socket', async () => {
+    // ORCA-168: the runtime held the response for the whole transaction, so a
+    // real switch outlived the socket and the CLI never learned the operation
+    // id. Acceptance now comes back immediately and the result is polled.
+    const { client, calls } = buildSwitchClient({
+      switchResult: { state: 'preflighting', transcriptCopiedFileCount: undefined },
+      statusResults: [
+        { state: 'verifying' },
+        { state: 'committed', transcriptCopiedFileCount: 0, continuationDelivered: true }
+      ]
+    })
+    await ACCOUNT_HANDLERS['account switch']!(
+      switchContext(client, [
+        ['to', 'acct-2'],
+        ['terminal', 'orca-terminal-5']
+      ])
+    )
+    expect(calls.filter((entry) => entry.method === 'accounts.claudeTerminalSwitchStatus')).toEqual(
+      [
+        { method: 'accounts.claudeTerminalSwitchStatus', params: { operationId: 'op-7' } },
+        { method: 'accounts.claudeTerminalSwitchStatus', params: { operationId: 'op-7' } }
+      ]
+    )
+    expect(logSpy.mock.calls.flat().join('\n')).toContain('State:     committed')
+  })
+
+  it('fails the command on a polled rollback and still names the operation', async () => {
+    const { client } = buildSwitchClient({
+      switchResult: { state: 'preflighting', transcriptCopiedFileCount: undefined },
+      statusResults: [
+        {
+          state: 'rolled-back',
+          failure: { reason: 'foreground-timeout', message: 'The resumed agent did not take over.' }
+        }
+      ]
+    })
+    await expect(
+      ACCOUNT_HANDLERS['account switch']!(
+        switchContext(client, [
+          ['to', 'acct-2'],
+          ['terminal', 'orca-terminal-5']
+        ])
+      )
+    ).rejects.toMatchObject({
+      code: 'claude_terminal_switch_foreground_timeout',
+      message: expect.stringContaining('operation op-7')
+    })
   })
 
   it('targets the terminal named on the command line while still proving the caller', async () => {
@@ -251,7 +333,8 @@ describe('orca account switch', () => {
       terminal: 'orca-terminal-9',
       paneKey: 'tab-1:leaf-1',
       launchToken: 'token-1',
-      targetAccountId: 'acct-2'
+      targetAccountId: 'acct-2',
+      awaitMs: 0
     })
   })
 
