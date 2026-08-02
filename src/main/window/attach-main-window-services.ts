@@ -165,7 +165,7 @@ export function attachMainWindowServices(
         try {
           await options?.onBeforeUpdateQuit?.()
         } finally {
-          store.flush()
+          await store.flushPendingAsync()
         }
       },
       setLastUpdateCheckAt: (timestamp) => {

@@ -19,6 +19,7 @@ import { loadHosts } from '../src/transport/host-store'
 import { navigateToMobileHostEdit } from '../src/transport/host-edit-navigation'
 import { removeHostAndCloseClient } from '../src/transport/host-removal-lifecycle'
 import { pickResumeWorktree } from '../src/worktree/resume-worktree'
+import { WORKTREE_PS_FULL_LIMIT } from '../src/worktree/worktree-catalog-snapshot-client'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { sendSingleFlightRequest } from '../src/transport/request-single-flight'
 import {
@@ -49,7 +50,9 @@ import {
   normalizeVisibleTaskProviders,
   type TaskProvider
 } from '../src/tasks/mobile-task-providers'
+import { useOpenMobileTasks } from '../src/tasks/use-open-mobile-tasks'
 import { useResponsiveLayout } from '../src/layout/responsive-layout'
+import { createMobileSessionHref } from '../src/session/mobile-session-route'
 
 function endpointLabel(endpoint: string): string {
   try {
@@ -176,8 +179,7 @@ function fetchWorktreeInfo(
     })
   }
 
-  // Why: worktree.ps defaults to 200 and silently truncates; request all so counts are accurate.
-  sendSingleFlightRequest(client, hostId, 'worktree.ps', { limit: 10000 })
+  sendSingleFlightRequest(client, hostId, 'worktree.ps', { limit: WORKTREE_PS_FULL_LIMIT })
     .then((response) => {
       if (disposed()) {
         return
@@ -285,6 +287,7 @@ function repoColor(name: string): string {
 
 export default function HomeScreen() {
   const router = useRouter()
+  const openMobileTasks = useOpenMobileTasks()
   const insets = useSafeAreaInsets()
   // Why: cap/center content on wide/tablet canvases so cards don't stretch edge-to-edge on iPad.
   const { isWideLayout, contentMaxWidth } = useResponsiveLayout()
@@ -600,10 +603,9 @@ export default function HomeScreen() {
       if (!primaryConnectedHost) {
         return
       }
-      const suffix = provider ? `?taskSource=${provider}` : ''
-      router.push(`/h/${primaryConnectedHost.id}/tasks${suffix}`)
+      openMobileTasks(primaryConnectedHost.id, provider)
     },
-    [primaryConnectedHost, router]
+    [openMobileTasks, primaryConnectedHost]
   )
   const renderTaskHomeCard = () => (
     <Pressable
@@ -807,7 +809,11 @@ export default function HomeScreen() {
                     style={({ pressed }) => [styles.resumeCard, pressed && styles.hostCardPressed]}
                     onPress={() =>
                       router.push(
-                        `/h/${resumeWorktree.hostId}/session/${encodeURIComponent(resumeWorktree.worktree.worktreeId)}`
+                        createMobileSessionHref({
+                          hostId: resumeWorktree.hostId,
+                          worktreeId: resumeWorktree.worktree.worktreeId,
+                          name: resumeWorktree.worktree.displayName || resumeWorktree.worktree.repo
+                        })
                       )
                     }
                   >

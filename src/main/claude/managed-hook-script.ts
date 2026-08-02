@@ -23,10 +23,10 @@ export function getManagedScript(
             `if not "%DEVIN_PROJECT_DIR%"=="" goto :${WINDOWS_HOOK_STDIN_DRAIN_LABEL}`
           ]
         : []),
-      // Why: call the endpoint file to refresh port/token — a PTY that survived an Orca restart carries stale env; falls through to PTY env if missing.
+      // Why: refresh endpoint coordinates for PTYs surviving an Orca restart.
       'if defined ORCA_AGENT_HOOK_ENDPOINT if exist "%ORCA_AGENT_HOOK_ENDPOINT%" call "%ORCA_AGENT_HOOK_ENDPOINT%" 2>nul',
       ...buildWindowsHookEnvironmentGuardLines(),
-      // Why: post via curl.exe, not PowerShell — Claude's launcher is already encoded PowerShell, so a PS post would double interpreter startups per hook.
+      // Why: use curl.exe to avoid an extra PowerShell startup per hook.
       buildWindowsAgentHookCurlPostCommand('claude'),
       'exit /b 0',
       ...buildWindowsHookStdinDrainEpilogue(),
@@ -45,16 +45,16 @@ export function getManagedScript(
           'fi'
         ]
       : []),
-    // Why: source the endpoint file to refresh port/token — a PTY that survived an Orca restart carries stale env; falls back to PTY env if missing.
-    // Why: suppress stderr / || : so a stray parse error (TOCTOU or CRLF) can't leak into hook output or trip an outer set -e.
+    // Why: refresh endpoint coordinates for PTYs surviving an Orca restart.
+    // Why: suppress parse errors so they neither leak nor trip outer set -e.
     'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
     '  . "$ORCA_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
     'fi',
     'if [ -z "$ORCA_AGENT_HOOK_PORT" ] || [ -z "$ORCA_AGENT_HOOK_TOKEN" ] || [ -z "$ORCA_PANE_KEY" ]; then',
     '  exit 0',
     'fi',
-    // Why: paths can hold quotes/newlines, so hand-building JSON in shell is unsafe; post the raw payload + metadata as form fields for the receiver to parse.
-    // Why: pipe payload to curl stdin (`payload@-`), not an inline arg, so large tool output stays off the command line (EDR false positives).
+    // Why: post form fields because path-bearing payloads are unsafe in hand-built JSON.
+    // Why: pipe payload to curl stdin to keep large output off the command line.
     'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${ORCA_AGENT_HOOK_PORT}/hook/claude" \\',
     '  --connect-timeout 0.5 --max-time 1.5 \\',
     '  -H "Content-Type: application/x-www-form-urlencoded" \\',

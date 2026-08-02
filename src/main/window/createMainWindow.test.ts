@@ -74,6 +74,8 @@ import {
 } from './createMainWindow'
 import { ipcMain } from 'electron'
 import { shouldRecoverRendererAfterProcessGone } from '../crash-reporting/process-gone-classification'
+import { BROWSER_WINDOW_CLOSE_ALLOWED_PRELOAD } from '../../shared/browser-window-close-policy'
+import { fileURLToPath } from 'node:url'
 
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   const original = process.platform
@@ -143,6 +145,12 @@ describe('createMainWindow', () => {
 
     expect(browserWindowInstance.loadFile).toHaveBeenCalledTimes(1)
     expect(browserWindowInstance.loadURL).not.toHaveBeenCalled()
+  })
+
+  it('keeps the browser close-policy marker absolute under Windows URL rules', () => {
+    expect(fileURLToPath(BROWSER_WINDOW_CLOSE_ALLOWED_PRELOAD, { windows: true })).toBe(
+      'C:\\__orca_window_close_allowed__'
+    )
   })
 
   it('enables renderer sandboxing and opens external links safely', () => {
@@ -248,6 +256,7 @@ describe('createMainWindow', () => {
     expect(allowBlankPrefs).toMatchObject({
       disableHtmlFullscreenWindowResize: true,
       partition: 'persist:orca-browser',
+      preload: expect.stringMatching(/browser-window-close-preload\.js$/),
       sandbox: true
     })
 
@@ -262,6 +271,36 @@ describe('createMainWindow', () => {
     const guest = { marker: 'guest' }
     windowHandlers['did-attach-webview']({} as never, guest as never)
     expect(attachGuestPoliciesMock).toHaveBeenCalledWith(guest)
+
+    const allowWindowCloseEvent = { preventDefault: vi.fn() }
+    const allowWindowCloseParams = {
+      src: 'data:text/html,',
+      preload: BROWSER_WINDOW_CLOSE_ALLOWED_PRELOAD
+    }
+    const allowWindowClosePrefs = { partition: 'persist:orca-browser' }
+    windowHandlers['will-attach-webview'](
+      allowWindowCloseEvent as never,
+      allowWindowClosePrefs as never,
+      allowWindowCloseParams as never
+    )
+    expect(allowWindowCloseEvent.preventDefault).not.toHaveBeenCalled()
+    expect(allowWindowCloseParams.preload).toBeUndefined()
+    expect(allowWindowClosePrefs).not.toHaveProperty('preload')
+
+    const allowWindowClosePathPrefs = {
+      partition: 'persist:orca-browser',
+      preload: fileURLToPath(BROWSER_WINDOW_CLOSE_ALLOWED_PRELOAD)
+    }
+    windowHandlers['will-attach-webview'](
+      { preventDefault: vi.fn() } as never,
+      allowWindowClosePathPrefs as never,
+      { src: 'data:text/html,', preload: '' } as never
+    )
+    expect(allowWindowClosePathPrefs).not.toHaveProperty('preload')
+
+    const cliGuest = { marker: 'cli-guest' }
+    windowHandlers['did-attach-webview']({} as never, cliGuest as never)
+    expect(attachGuestPoliciesMock).toHaveBeenLastCalledWith(cliGuest)
   })
 
   it('sets platform-specific titlebar and frame options for every desktop platform', () => {

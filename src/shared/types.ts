@@ -1,7 +1,12 @@
 /* eslint-disable max-lines */
 import type { ClaudeStatusLineItemKey, ClaudeStatusLineItems } from './claude-statusline-items'
 import type { ExecutionHostId } from './execution-host'
-import type { RemovedSshTargetTombstone, SshRemotePtyLease, SshTarget } from './ssh-types'
+import type {
+  RemovedSshTargetTombstone,
+  SshPtyConsumerRecovery,
+  SshRemotePtyLease,
+  SshTarget
+} from './ssh-types'
 import type { Automation, AutomationExecutionTargetType, AutomationRun } from './automations-types'
 import type { WorkspaceSource } from './workspace-source'
 import type { ReleaseBuild, ReleaseChannel } from './release-channel'
@@ -1026,6 +1031,8 @@ export type BrowserPage = {
   canGoForward: boolean
   loadError: BrowserLoadError | null
   createdAt: number
+  // Why: CLI-created pages retain Chromium's native window.close behavior; ordinary embedded pages are guarded.
+  allowWindowClose?: boolean
   // Why: remote-owned worktrees can still host client-local fallback browser
   // pages until headless remote runtimes support real browser panes.
   browserRuntimeEnvironmentId?: string | null
@@ -3782,6 +3789,8 @@ export type PersistedState = {
   /** Identity records for removed SSH targets so a re-added host can re-adopt workspaces orphaned on the old target id. */
   removedSshTargetTombstones?: RemovedSshTargetTombstone[]
   sshRemotePtyLeases: SshRemotePtyLease[]
+  /** Main-owned authenticated relay recovery records; never expose through renderer settings APIs. */
+  sshPtyConsumerRecoveries?: SshPtyConsumerRecovery[]
   /** Live local Claude daemon session ids; seeds the live-PTY gate so early OAuth refresh can't rotate the single-use refresh token out from under a running daemon. */
   claudeLivePtySessionIds?: string[]
   /** Launch-account ownership for shared Claude daemon sessions. A null
