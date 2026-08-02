@@ -51,48 +51,84 @@ export function writeLinkedIssueEchoGenerator(scriptPath: string, emitPayload: s
   )
 }
 
-export async function installDelayedPrGenerator(
+export type ReleaseGatedGenerator = {
+  /** Lets the installed generator emit its payload and exit. */
+  release: () => void
+}
+
+const RELEASE_POLL_INTERVAL_MS = 25
+const RELEASE_TIMEOUT_MS = 60_000
+
+/**
+ * Why: a fixed `setTimeout` turns "generation is still pending" into a
+ * wall-clock race. On a loaded runner the arrange steps before the worktree
+ * switch can outlast the timer, so the switch happens after the generation
+ * already finished and the test silently stops covering the pending path.
+ * Gating the emit on a file the test writes makes the pending window measured:
+ * it stays open until the caller releases it, and the generator fails loudly
+ * instead of hanging if a test forgets.
+ */
+function buildReleaseGatedGeneratorScript(
+  callLogPath: string,
+  releasePath: string,
+  emitLines: string[]
+): string {
+  return [
+    "const fs = require('fs')",
+    `fs.appendFileSync(${JSON.stringify(callLogPath)}, 'start\\n')`,
+    'const startedAt = Date.now()',
+    'const waitForRelease = () => {',
+    `  if (fs.existsSync(${JSON.stringify(releasePath)})) {`,
+    ...emitLines.map((line) => `    ${line}`),
+    `    fs.appendFileSync(${JSON.stringify(callLogPath)}, 'finish\\n')`,
+    '    return',
+    '  }',
+    `  if (Date.now() - startedAt > ${RELEASE_TIMEOUT_MS}) {`,
+    `    fs.appendFileSync(${JSON.stringify(callLogPath)}, 'release-timeout\\n')`,
+    '    process.exit(1)',
+    '  }',
+    `  setTimeout(waitForRelease, ${RELEASE_POLL_INTERVAL_MS})`,
+    '}',
+    'waitForRelease()'
+  ].join('\n')
+}
+
+export async function installReleaseGatedPrGenerator(
   page: Page,
   generatorScriptPath: string,
   callLogPath: string,
+  releasePath: string,
   base: string
-): Promise<void> {
+): Promise<ReleaseGatedGenerator> {
   writeFileSync(
     generatorScriptPath,
-    [
-      "const fs = require('fs')",
-      `fs.appendFileSync(${JSON.stringify(callLogPath)}, 'start\\n')`,
-      'setTimeout(() => {',
-      '  console.log(JSON.stringify({',
-      `    base: ${JSON.stringify(base)},`,
-      "    title: 'Generated PR title after switch',",
-      "    body: 'Generated PR body after switch',",
-      '    draft: false',
-      '  }))',
-      `  fs.appendFileSync(${JSON.stringify(callLogPath)}, 'finish\\n')`,
-      '}, 1500)'
-    ].join('\n')
+    buildReleaseGatedGeneratorScript(callLogPath, releasePath, [
+      'console.log(JSON.stringify({',
+      `  base: ${JSON.stringify(base)},`,
+      "  title: 'Generated PR title after switch',",
+      "  body: 'Generated PR body after switch',",
+      '  draft: false',
+      '}))'
+    ])
   )
   await setCustomGenerator(page, generatorScriptPath)
+  return { release: () => writeFileSync(releasePath, 'release\n') }
 }
 
-export async function installDelayedCommitMessageGenerator(
+export async function installReleaseGatedCommitMessageGenerator(
   page: Page,
   generatorScriptPath: string,
-  callLogPath: string
-): Promise<void> {
+  callLogPath: string,
+  releasePath: string
+): Promise<ReleaseGatedGenerator> {
   writeFileSync(
     generatorScriptPath,
-    [
-      "const fs = require('fs')",
-      `fs.appendFileSync(${JSON.stringify(callLogPath)}, 'start\\n')`,
-      'setTimeout(() => {',
-      "  console.log('Generated commit message after switch')",
-      "  console.log('')",
-      "  console.log('Generated from staged e2e-commit-message-generation.txt after switching worktrees')",
-      `  fs.appendFileSync(${JSON.stringify(callLogPath)}, 'finish\\n')`,
-      '}, 1500)'
-    ].join('\n')
+    buildReleaseGatedGeneratorScript(callLogPath, releasePath, [
+      "console.log('Generated commit message after switch')",
+      "console.log('')",
+      "console.log('Generated from staged e2e-commit-message-generation.txt after switching worktrees')"
+    ])
   )
   await setCustomGenerator(page, generatorScriptPath)
+  return { release: () => writeFileSync(releasePath, 'release\n') }
 }

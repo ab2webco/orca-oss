@@ -12,9 +12,11 @@ import {
   seedCommitMessageComposer,
   seedCreatePrComposer
 } from './helpers/source-control-ai-generation'
+import { publishBranchToScratchRemote } from './helpers/scratch-branch-upstream'
+import { expectUncommittedSourceControlEntry } from './helpers/source-control-uncommitted-entries'
 import {
-  installDelayedCommitMessageGenerator,
-  installDelayedPrGenerator
+  installReleaseGatedCommitMessageGenerator,
+  installReleaseGatedPrGenerator
 } from './helpers/source-control-ai-generators'
 
 function readLog(pathname: string): string {
@@ -151,13 +153,33 @@ test.describe('Source Control AI PR generation worktree switching', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('keeps checks-panel PR generation running after switching worktrees', async ({
-    orcaPage
+    orcaPage,
+    registerPostElectronShutdownCleanup
   }, testInfo) => {
     await waitForSessionReady(orcaPage)
     await waitForActiveWorktree(orcaPage)
     const { primaryWorktreeId, prWorktreeId, prWorktreePath, primaryBranch } =
       await seedCreatePrComposer(orcaPage)
     createBranchCommit(prWorktreePath)
+    // Why: unlike Source Control, the Checks panel resolves the upstream from
+    // its own Git probe rather than the seeded store, so without a real remote
+    // it renders "No upstream configured" and never opens the create composer.
+    const removeScratchRemote = publishBranchToScratchRemote(prWorktreePath, primaryBranch)
+    registerPostElectronShutdownCleanup(async () => {
+      removeScratchRemote()
+    })
+    // Why: the panel's GitHub refresh coordinator asks the runner's real `gh`
+    // credentials. A machine without them records a sticky `auth` hard error
+    // that suppresses the create composer, so the Generate button reads as
+    // missing — the test would pass or fail on ambient login state. Pin the
+    // refresh state so it measures generation across a switch instead.
+    await orcaPage.evaluate(() => {
+      const store = window.__store
+      if (!store) {
+        throw new Error('window.__store is not available')
+      }
+      store.setState({ getEffectiveGitHubPRRefreshState: () => undefined })
+    })
 
     const screenshotDir = path.join(
       process.cwd(),
@@ -171,7 +193,14 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     })
     const generatorScriptPath = path.join(screenshotDir, 'delayed-checks-pr-generator.cjs')
     const callLogPath = path.join(screenshotDir, 'delayed-checks-pr-generator.log')
-    await installDelayedPrGenerator(orcaPage, generatorScriptPath, callLogPath, primaryBranch)
+    const releasePath = path.join(screenshotDir, 'delayed-checks-pr-generator.release')
+    const generator = await installReleaseGatedPrGenerator(
+      orcaPage,
+      generatorScriptPath,
+      callLogPath,
+      releasePath,
+      primaryBranch
+    )
 
     await openChecks(orcaPage, prWorktreeId)
     const generate = orcaPage.getByRole('button', {
@@ -194,6 +223,10 @@ test.describe('Source Control AI PR generation worktree switching', () => {
       path: path.join(screenshotDir, '02-checks-switched-to-b-no-generated-fields.png')
     })
 
+    // Why: the generation must still be pending across the switch for this test
+    // to cover anything; the release gate is what keeps that window open.
+    expect(readLog(callLogPath)).not.toContain('finish')
+    generator.release()
     await expect.poll(() => readLog(callLogPath), { timeout: 10_000 }).toContain('finish')
     await openChecks(orcaPage, prWorktreeId)
     await expect(orcaPage.getByRole('textbox', { name: 'Pull request title' })).toHaveValue(
@@ -234,7 +267,14 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     })
     const generatorScriptPath = path.join(screenshotDir, 'delayed-pr-generator.cjs')
     const callLogPath = path.join(screenshotDir, 'delayed-pr-generator.log')
-    await installDelayedPrGenerator(orcaPage, generatorScriptPath, callLogPath, primaryBranch)
+    const releasePath = path.join(screenshotDir, 'delayed-pr-generator.release')
+    const generator = await installReleaseGatedPrGenerator(
+      orcaPage,
+      generatorScriptPath,
+      callLogPath,
+      releasePath,
+      primaryBranch
+    )
 
     await openSourceControl(orcaPage, prWorktreeId)
     const generate = orcaPage.getByRole('button', {
@@ -277,6 +317,10 @@ test.describe('Source Control AI PR generation worktree switching', () => {
       path: path.join(screenshotDir, '02-switched-to-b-no-generated-fields.png')
     })
 
+    // Why: the generation must still be pending across the switch for this test
+    // to cover anything; the release gate is what keeps that window open.
+    expect(readLog(callLogPath)).not.toContain('finish')
+    generator.release()
     await expect
       .poll(() => readFileSync(callLogPath, 'utf8'), { timeout: 10_000 })
       .toContain('finish')
@@ -334,7 +378,14 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     })
     const generatorScriptPath = path.join(screenshotDir, 'delayed-pr-generator.cjs')
     const callLogPath = path.join(screenshotDir, 'delayed-pr-generator.log')
-    await installDelayedPrGenerator(orcaPage, generatorScriptPath, callLogPath, primaryBranch)
+    const releasePath = path.join(screenshotDir, 'delayed-pr-generator.release')
+    const generator = await installReleaseGatedPrGenerator(
+      orcaPage,
+      generatorScriptPath,
+      callLogPath,
+      releasePath,
+      primaryBranch
+    )
 
     await openSourceControl(orcaPage, prWorktreeId)
     const generate = orcaPage.getByRole('button', {
@@ -354,6 +405,10 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     await expect(
       orcaPage.getByRole('button', { name: 'Stop generating pull request details' })
     ).toHaveCount(0)
+    // Why: the generation must still be pending across the remount for this
+    // test to cover anything; the release gate is what keeps that window open.
+    expect(readLog(callLogPath)).not.toContain('finish')
+    generator.release()
     await expect
       .poll(() => readFileSync(callLogPath, 'utf8'), { timeout: 10_000 })
       .toContain('finish')
@@ -398,12 +453,20 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     })
     const generatorScriptPath = path.join(screenshotDir, 'delayed-commit-generator.cjs')
     const callLogPath = path.join(screenshotDir, 'delayed-commit-generator.log')
-    await installDelayedCommitMessageGenerator(orcaPage, generatorScriptPath, callLogPath)
+    const releasePath = path.join(screenshotDir, 'delayed-commit-generator.release')
+    const generator = await installReleaseGatedCommitMessageGenerator(
+      orcaPage,
+      generatorScriptPath,
+      callLogPath,
+      releasePath
+    )
 
     await openSourceControl(orcaPage, commitWorktreeId)
-    await expect(orcaPage.getByText('e2e-commit-message-generation.txt')).toBeVisible({
-      timeout: 10_000
-    })
+    await expectUncommittedSourceControlEntry(
+      orcaPage,
+      commitWorktreeId,
+      'e2e-commit-message-generation.txt'
+    )
     const generate = orcaPage.getByRole('button', {
       name: 'Generate commit message with AI'
     })
@@ -449,6 +512,10 @@ test.describe('Source Control AI PR generation worktree switching', () => {
       path: path.join(screenshotDir, '02-switched-to-b-no-generated-commit-message.png')
     })
 
+    // Why: the generation must still be pending across the switch for this test
+    // to cover anything; the release gate is what keeps that window open.
+    expect(readLog(callLogPath)).not.toContain('finish')
+    generator.release()
     await expect
       .poll(() => readFileSync(callLogPath, 'utf8'), { timeout: 10_000 })
       .toContain('finish')
@@ -501,7 +568,13 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     })
     const generatorScriptPath = path.join(screenshotDir, 'delayed-commit-generator.cjs')
     const callLogPath = path.join(screenshotDir, 'delayed-commit-generator.log')
-    await installDelayedCommitMessageGenerator(orcaPage, generatorScriptPath, callLogPath)
+    const releasePath = path.join(screenshotDir, 'delayed-commit-generator.release')
+    const generator = await installReleaseGatedCommitMessageGenerator(
+      orcaPage,
+      generatorScriptPath,
+      callLogPath,
+      releasePath
+    )
 
     await openSourceControl(orcaPage, commitWorktreeId)
     const generate = orcaPage.getByRole('button', {
@@ -521,6 +594,10 @@ test.describe('Source Control AI PR generation worktree switching', () => {
     await expect(
       orcaPage.getByRole('button', { name: 'Stop generating commit message' })
     ).toHaveCount(0)
+    // Why: the generation must still be pending across the remount for this
+    // test to cover anything; the release gate is what keeps that window open.
+    expect(readLog(callLogPath)).not.toContain('finish')
+    generator.release()
     await expect
       .poll(() => readFileSync(callLogPath, 'utf8'), { timeout: 10_000 })
       .toContain('finish')

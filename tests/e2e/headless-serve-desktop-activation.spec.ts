@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { _electron as electron, type ElectronApplication } from '@stablyai/playwright-test'
 import { test, expect, forwardElectronProcessLogs } from './helpers/orca-app'
 import { TEST_REPO_PATH_FILE } from './global-setup'
@@ -97,6 +98,41 @@ function readPersistedPromotionBinding(
   } catch {
     return null
   }
+}
+
+const RUNTIME_TRANSPORT_RETRY_INTERVAL_MS = 200
+const RUNTIME_TRANSPORT_RETRY_TIMEOUT_MS = 30_000
+
+/**
+ * Why: promoting the headless owner to a desktop window re-binds the CLI
+ * runtime transport, so a call issued inside that window can hit a closed
+ * socket and fail with `runtime_unavailable` before the promotion has done
+ * anything wrong — that is the failure CI captured. The spec already tolerates
+ * this error class while the owner starts; the tolerance has to span the
+ * promotion too. Only the connection is retried: the caller still asserts on
+ * the first successful read, so a genuinely replaced runtime still fails, and
+ * a transport that never returns fails here under its own name instead of
+ * reading as a status regression.
+ */
+async function readRuntimeStatusAcrossPromotion(client: RuntimeClient): Promise<RuntimeStatus> {
+  const startedAt = Date.now()
+  let lastError: RuntimeClientError | null = null
+
+  while (Date.now() - startedAt < RUNTIME_TRANSPORT_RETRY_TIMEOUT_MS) {
+    try {
+      return (await client.call<RuntimeStatus>('status.get')).result
+    } catch (error) {
+      if (!(error instanceof RuntimeClientError) || error.code !== 'runtime_unavailable') {
+        throw error
+      }
+      lastError = error
+      await delay(RUNTIME_TRANSPORT_RETRY_INTERVAL_MS)
+    }
+  }
+
+  throw new Error(
+    `Runtime transport never came back after desktop promotion: ${lastError?.message ?? 'no error recorded'}`
+  )
 }
 
 async function waitForProcessExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
@@ -203,6 +239,31 @@ test('promotes the headless owner without replacing its daemon terminal', async 
       )
       .toContain(beforeMarker)
 
+    // Why: the promotion adopts the headless terminal from the persisted
+    // session, so starting the second instance before that binding reaches disk
+    // races the write — the promoted window then mounts a PTY of its own and
+    // the strict promotedPtyId assert below reads as a product regression. Wait
+    // for the exact record the promotion is going to consume.
+    await expect
+      .poll(
+        () =>
+          readPersistedPromotionBinding(
+            userDataDir,
+            terminal.worktreeId,
+            originalTabId,
+            paneIdentity.leafId
+          ),
+        {
+          timeout: 15_000,
+          message: 'headless terminal binding was not persisted before desktop promotion'
+        }
+      )
+      .toEqual({
+        tabId: originalTabId,
+        leafId: paneIdentity.leafId,
+        ptyId: originalPtyId
+      })
+
     const forwardAppLogs = process.env.ORCA_E2E_FORWARD_APP_LOGS === '1'
     activatingProcess = spawn(electronPath, getOrcaElectronLaunchArgs(mainPath, false), {
       env,
@@ -254,10 +315,10 @@ test('promotes the headless owner without replacing its daemon terminal', async 
     await waitForPaneCount(page, 1, 30_000)
 
     const promotedPtyId = await discoverActivePtyId(page)
-    const afterStatus = await client.call<RuntimeStatus>('status.get')
+    const afterStatus = await readRuntimeStatusAcrossPromotion(client)
     expect(serveApp.process().pid).toBe(ownerPid)
-    expect(afterStatus.result.runtimeId).toBe(beforeStatus.result.runtimeId)
-    expect(afterStatus.result.desktopWindowStatus).toBe('available')
+    expect(afterStatus.runtimeId).toBe(beforeStatus.result.runtimeId)
+    expect(afterStatus.desktopWindowStatus).toBe('available')
     expect(promotedPtyId).toBe(terminal.ptyId)
     expect(readDaemonPid(userDataDir)).toBe(daemonPidBefore)
     expect(await waitForProcessExit(activatingProcess, 10_000)).toBe(true)

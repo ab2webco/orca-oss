@@ -10,6 +10,7 @@ import {
   openSourceControl,
   seedCreatePrComposer
 } from './helpers/source-control-ai-generation'
+import { expectUncommittedSourceControlEntry } from './helpers/source-control-uncommitted-entries'
 
 async function writeEvidence(
   testInfo: TestInfo,
@@ -318,9 +319,11 @@ test.describe('Source Control Create PR intent worktree switching', () => {
     )
 
     await openSourceControl(orcaPage, prWorktreeId)
-    await expect(orcaPage.getByText('e2e-commit-message-generation.txt')).toBeVisible({
-      timeout: 10_000
-    })
+    await expectUncommittedSourceControlEntry(
+      orcaPage,
+      prWorktreeId,
+      'e2e-commit-message-generation.txt'
+    )
     await orcaPage
       .getByRole('textbox', { name: 'Commit message' })
       .fill('Exercise unavailable Create PR intent')
