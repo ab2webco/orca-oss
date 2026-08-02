@@ -174,7 +174,7 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
   'transcript-unavailable':
     'The session transcript could not be made readable from the selected account.',
   'resume-verification-unavailable':
-    'Orca cannot observe a resumed Claude session in this terminal, so it will not stop the agent for a switch it could never verify. Relaunch the agent from Orca and retry.',
+    'Orca cannot observe a resumed Claude session in this terminal — the managed SessionStart hook is missing from the account’s Claude vault, so neither the switch nor its rollback could be verified. Relaunch the agent from Orca to reinstall it; if this keeps happening, that vault’s settings.json is not writable.',
   concurrent: 'Another account switch is already running for this terminal.',
   'prepare-failed': 'Could not prepare the selected account for this terminal.',
   'source-busy':
