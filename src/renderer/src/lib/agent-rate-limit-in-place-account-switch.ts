@@ -19,9 +19,6 @@ export type InPlaceManagedClaudeSwitchResult =
       restored?: boolean
     }
 
-/** Prompt injected once after the target session is verified, so the truncated turn continues. */
-const CONTINUATION_PROMPT = 'continue'
-
 // Why: the runtime holds the response open for the terminal result, so this must
 // outlast the switch's own verification window rather than racing it.
 const SWITCH_AWAIT_MS = 150_000
@@ -75,7 +72,6 @@ export async function runInPlaceManagedClaudeAccountSwitch(args: {
       {
         ptyId: args.ptyId,
         targetAccountId: args.targetAccount.id,
-        continuationPrompt: CONTINUATION_PROMPT,
         awaitMs: SWITCH_AWAIT_MS
       },
       { timeoutMs: SWITCH_RPC_TIMEOUT_MS }

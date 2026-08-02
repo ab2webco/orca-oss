@@ -21,6 +21,11 @@ const SwitchClaudeTerminalParams = z
     paneKey: z.string().trim().min(1).max(512).optional(),
     launchToken: z.string().trim().min(1).max(512).optional(),
     targetAccountId: z.string().trim().min(1).max(512),
+    /**
+     * Accepted and ignored: older adapters passed their own resume nudge, which
+     * the runtime now owns. Rejecting it would fail the whole switch on version
+     * skew between a desktop and a remote runtime.
+     */
     continuationPrompt: z.string().trim().min(1).max(4_096).optional(),
     /** How long to hold the response open for the terminal result; the operation outlives it. */
     awaitMs: z.number().int().min(0).max(600_000).optional()
@@ -37,21 +42,36 @@ const ClaudeTerminalSwitchStatusParams = z
 
 const DEFAULT_SWITCH_AWAIT_MS = 180_000
 
-async function waitForSwitchResult(
-  settled: Promise<ClaudeTerminalAccountSwitchResult>,
-  fallback: ClaudeTerminalAccountSwitchResult,
+/**
+ * Holds the response open for the terminal result, or — for a self-switch —
+ * only until the transaction leaves preflight.
+ *
+ * A self-switching agent is the caller AND the terminal being stopped: the
+ * interrupt reaches its own tool subprocess, and the runtime deliberately waits
+ * for that subprocess to exit first. Waiting here for the terminal result would
+ * therefore deadlock the very operation it is waiting on, so the caller is
+ * released as soon as it knows the switch was not refused.
+ */
+async function waitForSwitchResult(args: {
+  settled: Promise<ClaudeTerminalAccountSwitchResult>
+  pastPreflight?: Promise<void>
+  operationId: string
+  fallback: ClaudeTerminalAccountSwitchResult
   awaitMs: number
-): Promise<ClaudeTerminalAccountSwitchResult> {
-  if (awaitMs <= 0) {
-    return fallback
+}): Promise<ClaudeTerminalAccountSwitchResult> {
+  const current = (): ClaudeTerminalAccountSwitchResult =>
+    getClaudeTerminalAccountSwitchStatus(args.operationId) ?? args.fallback
+  if (args.awaitMs <= 0 && !args.pastPreflight) {
+    return args.fallback
   }
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<ClaudeTerminalAccountSwitchResult>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), awaitMs)
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, Math.max(args.awaitMs, 0))
     timer.unref?.()
   })
   try {
-    return await Promise.race([settled, timeout])
+    await Promise.race([args.settled, ...(args.pastPreflight ? [args.pastPreflight] : []), timeout])
+    return current()
   } finally {
     if (timer) {
       clearTimeout(timer)
@@ -77,27 +97,35 @@ export const CLAUDE_TERMINAL_SWITCH_METHODS: readonly RpcAnyMethod[] = [
           'Switching a terminal’s Claude account is not available from a paired device.'
         )
       }
-      // Why: what the runtime can prove about the pane outranks the handle the
-      // caller claims. A pane that holds a launch token on record must present
-      // it, which is what stops one agent from switching another's account.
-      const provenHandle =
+      // Why the pane key never names the target: it identifies the CALLER. A
+      // pane that holds a launch token on record must present it, which is what
+      // stops one agent from switching another's account — but an explicitly
+      // named terminal is still the one that gets switched, or an agent asking
+      // to stop a sibling pane would silently stop itself instead.
+      const callerHandle =
         params.paneKey !== undefined
           ? runtime.authenticateOrchestrationSender({
-              ...(params.terminal !== undefined ? { claimedHandle: params.terminal } : {}),
               paneKey: params.paneKey,
               ...(params.launchToken !== undefined ? { launchToken: params.launchToken } : {})
             }).handle
-          : params.terminal
+          : undefined
+      const targetHandle = params.terminal ?? callerHandle
       const target =
-        provenHandle !== undefined
-          ? ({ kind: 'handle', terminal: provenHandle } as const)
+        targetHandle !== undefined
+          ? ({ kind: 'handle', terminal: targetHandle } as const)
           : ({ kind: 'pty', ptyId: params.ptyId! } as const)
+      // The caller is the agent being switched, so the runtime — not the claim —
+      // decides that this is a self-switch.
+      const selfSwitch = callerHandle !== undefined && targetHandle === callerHandle
       try {
-        const { acceptance, settled } = await startClaudeTerminalAccountSwitch(runtime, {
-          target,
-          targetAccountId: params.targetAccountId,
-          ...(params.continuationPrompt ? { continuationPrompt: params.continuationPrompt } : {})
-        })
+        const { acceptance, settled, pastPreflight } = await startClaudeTerminalAccountSwitch(
+          runtime,
+          {
+            target,
+            targetAccountId: params.targetAccountId,
+            ...(selfSwitch ? { selfSwitch: true } : {})
+          }
+        )
         const pending: ClaudeTerminalAccountSwitchResult = {
           operationId: acceptance.operationId,
           state: acceptance.state,
@@ -107,11 +135,13 @@ export const CLAUDE_TERMINAL_SWITCH_METHODS: readonly RpcAnyMethod[] = [
           targetAccountId: acceptance.targetAccountId,
           sessionId: acceptance.sessionId
         }
-        const result = await waitForSwitchResult(
+        const result = await waitForSwitchResult({
           settled,
-          pending,
-          params.awaitMs ?? DEFAULT_SWITCH_AWAIT_MS
-        )
+          ...(selfSwitch ? { pastPreflight } : {}),
+          operationId: acceptance.operationId,
+          fallback: pending,
+          awaitMs: params.awaitMs ?? DEFAULT_SWITCH_AWAIT_MS
+        })
         return { accepted: true, acceptance, result }
       } catch (error) {
         if (!(error instanceof ClaudeTerminalAccountSwitchRefusal)) {

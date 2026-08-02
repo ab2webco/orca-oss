@@ -38,6 +38,14 @@ type OperationRecord = {
   settled: Promise<ClaudeTerminalAccountSwitchResult>
 }
 
+/**
+ * Resolves as soon as the transaction leaves preflight — everything after that
+ * point is destructive and no longer needs the caller. A self-switching agent
+ * waits for exactly this: it must learn whether its switch was refused, then
+ * exit so the interrupt does not land on its own tool subprocess.
+ */
+export type ClaudeTerminalAccountSwitchPastPreflight = Promise<void>
+
 const operations = new Map<string, OperationRecord>()
 
 export class ClaudeTerminalAccountSwitchRefusal extends Error {
@@ -68,6 +76,7 @@ export async function startClaudeTerminalAccountSwitch(
 ): Promise<{
   acceptance: ClaudeTerminalAccountSwitchAcceptance
   settled: Promise<ClaudeTerminalAccountSwitchResult>
+  pastPreflight: ClaudeTerminalAccountSwitchPastPreflight
 }> {
   const attached = services
   if (!attached) {
@@ -143,8 +152,15 @@ export async function startClaudeTerminalAccountSwitch(
   operations.set(capture.operationId, record)
   pruneOperations()
 
+  let leavePreflight = (): void => {}
+  const pastPreflight = new Promise<void>((resolve) => {
+    leavePreflight = resolve
+  })
   const ports = buildClaudeTerminalAccountSwitchPorts(runtime, attached, capture, (state) => {
     record.result = { ...record.result, state }
+    if (state !== 'preflighting') {
+      leavePreflight()
+    }
   })
   record.settled = runAtomicClaudeTerminalAccountSwitch(request, ports)
     .then((result) => {
@@ -172,8 +188,10 @@ export async function startClaudeTerminalAccountSwitch(
   // Why: the operation owns its own lifetime; an unobserved rejection here would
   // otherwise surface as an unhandled rejection when the caller walks away.
   void record.settled
+  // A refusal that never left preflight still has to release the caller.
+  void record.settled.then(leavePreflight)
 
-  return { acceptance, settled: record.settled }
+  return { acceptance, settled: record.settled, pastPreflight }
 }
 
 export function getClaudeTerminalAccountSwitchStatus(
