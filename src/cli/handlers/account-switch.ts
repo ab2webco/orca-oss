@@ -7,6 +7,8 @@ import { resolveManagedAccountSelector } from '../account-selector'
 import { resolveCallerTerminalIdentity } from '../caller-terminal-identity'
 import {
   describeClaudeTerminalAccountSwitchFailure,
+  describeClaudeTerminalAccountSwitchRecovery,
+  isTerminalClaudeAccountSwitchState,
   type ClaudeTerminalAccountSwitchResult
 } from '../../shared/claude-terminal-account-switch'
 
@@ -35,12 +37,16 @@ function formatClaudeTerminalSwitch(response: ClaudeTerminalSwitchResponse): str
     )
   }
   if (result.recovery) {
-    lines.push(
-      `Recovery:  relaunch account ${result.recovery.accountId} in ${result.recovery.terminal} and resume ${result.recovery.sessionId}`
-    )
+    lines.push(describeClaudeTerminalAccountSwitchRecovery(result.recovery))
   }
   if (result.failure) {
     lines.push(describeClaudeTerminalAccountSwitchFailure(result.failure))
+  }
+  if (!isTerminalClaudeAccountSwitchState(result.state)) {
+    // Why not an error: the runtime accepted the transaction and owns it from
+    // here. A self-switching agent is answered before its own terminal is
+    // interrupted, so the CLI exiting is part of the sequence, not a timeout.
+    lines.push('Accepted: the switch keeps running in this terminal after this command exits.')
   }
   return lines.join('\n')
 }
@@ -75,12 +81,13 @@ export async function switchClaudeTerminalAccount(ctx: HandlerContext): Promise<
   const { result } = response.result
   if (result.failure) {
     // Why not printResult first: a second write would corrupt the JSON envelope.
-    // The error carries the operation id so a detached switch stays traceable.
+    // The error carries the operation id so a detached switch stays traceable,
+    // and the recovery context so it survives a caller that is already dying.
     throw new RuntimeClientError(
       `claude_terminal_switch_${result.failure.reason.replaceAll('-', '_')}`,
       `${describeClaudeTerminalAccountSwitchFailure(result.failure)}${
         result.operationId ? ` (operation ${result.operationId}, state ${result.state})` : ''
-      }`
+      }${result.recovery ? `. ${describeClaudeTerminalAccountSwitchRecovery(result.recovery)}` : ''}`
     )
   }
   printResult(response, json, formatClaudeTerminalSwitch)

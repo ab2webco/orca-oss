@@ -1,7 +1,6 @@
 import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
-import { buildClaudeInPlaceResumeCommand } from '../../shared/claude-in-place-resume-command'
-import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-startup'
 import type { AgentStartupShell } from '../../shared/tui-agent-startup-shell'
+import { buildClaudeTerminalSwitchLaunchCommand } from './claude-terminal-switch-resume-command'
 import type {
   ClaudeTerminalAccountSwitchFailure,
   ClaudeTerminalAccountSwitchFailureReason,
@@ -9,7 +8,10 @@ import type {
   ClaudeTerminalAccountSwitchResult,
   ClaudeTerminalAccountSwitchState
 } from '../../shared/claude-terminal-account-switch'
-import { claudeTerminalAccountSwitchFailureMessage } from '../../shared/claude-terminal-account-switch'
+import {
+  buildClaudeAccountSwitchContinuationPrompt,
+  claudeTerminalAccountSwitchFailureMessage
+} from '../../shared/claude-terminal-account-switch'
 
 /**
  * Immutable snapshot taken before anything is mutated. Every later step —
@@ -64,16 +66,27 @@ export type AtomicClaudeTerminalAccountSwitchPorts = {
   now(): number
   /** Reads runtime/PTY state; must not mutate bindings, reservations or the terminal. */
   capture(request: ClaudeTerminalAccountSwitchRequest): Promise<ClaudeTerminalSwitchCaptureOutcome>
-  /** Proves the target vault exists and is authenticated without the legacy machine keychain. */
+  /**
+   * Proves the target vault exists and is authenticated without the legacy
+   * machine keychain. `label` is the proven account name the continuation
+   * prompt uses, so no adapter has to pass one in.
+   */
   validateTarget(
     capture: ClaudeTerminalSwitchCapture
-  ): Promise<{ ok: true } | { ok: false; reason: ClaudeTerminalAccountSwitchFailureReason }>
+  ): Promise<
+    { ok: true; label?: string } | { ok: false; reason: ClaudeTerminalAccountSwitchFailureReason }
+  >
   /** A linked shared transcript store is success with zero copies. */
   prepareTranscript(
     capture: ClaudeTerminalSwitchCapture
   ): Promise<
     { ok: true; copiedFileCount: number } | { ok: false; reason: 'transcript-unavailable' }
   >
+  /**
+   * Self-switch only: waits until the agent — not the tool subprocess it spawned
+   * to ask for the switch — owns the terminal's foreground again.
+   */
+  awaitSourceForeground(capture: ClaudeTerminalSwitchCapture): Promise<boolean>
   /** Ctrl+C the source Claude and wait for the shell to own the foreground again. */
   stopSource(capture: ClaudeTerminalSwitchCapture): Promise<boolean>
   /** Serializes this PTY, reserves the target account and releases the source binding. */
@@ -103,56 +116,6 @@ export type AtomicClaudeTerminalAccountSwitchPorts = {
     state: ClaudeTerminalAccountSwitchState
     capture?: ClaudeTerminalSwitchCapture
   }): void
-}
-
-export type BuildClaudeTerminalSwitchLaunchCommandResult =
-  | { ok: true; command: string }
-  | { ok: false; reason: 'missing-launch-config' | 'launch-command-unbuildable' }
-
-/**
- * Rebuilds the launch line from the captured configuration only. No settings
- * defaults and no `cmdOverrides` are consulted: `launchConfig.agentCommand`
- * already carries the user's flags (including
- * `--dangerously-skip-permissions`), so reintroducing either source would
- * duplicate them or silently drop a custom command.
- *
- * `configDir` prefixes a CLAUDE_CONFIG_DIR export for the destination universe;
- * pass null when the shell already exports the universe being relaunched.
- */
-export function buildClaudeTerminalSwitchLaunchCommand(args: {
-  sessionId: string
-  launchConfig: SleepingAgentLaunchConfig
-  shell: AgentStartupShell
-  platform: NodeJS.Platform
-  configDir: string | null
-}): BuildClaudeTerminalSwitchLaunchCommandResult {
-  const agentCommand = args.launchConfig.agentCommand?.trim()
-  if (!agentCommand) {
-    return { ok: false, reason: 'missing-launch-config' }
-  }
-  const plan = buildAgentResumeStartupPlan({
-    agent: 'claude',
-    providerSession: { key: 'session_id', id: args.sessionId },
-    cmdOverrides: {},
-    platform: args.platform,
-    shell: args.shell,
-    agentCommand,
-    agentArgs: args.launchConfig.agentArgs,
-    agentEnv: args.launchConfig.agentEnv
-  })
-  if (!plan) {
-    return { ok: false, reason: 'launch-command-unbuildable' }
-  }
-  return {
-    ok: true,
-    command: args.configDir
-      ? buildClaudeInPlaceResumeCommand({
-          configDir: args.configDir,
-          resumeCommand: plan.launchCommand,
-          shell: args.shell
-        })
-      : plan.launchCommand
-  }
 }
 
 function failure(
@@ -236,6 +199,7 @@ export async function runAtomicClaudeTerminalAccountSwitch(
   if (!target.ok) {
     return refuse(target.reason)
   }
+  const targetLabel = target.label?.trim() || capture.targetAccountId
   // Why here: refusing an untrusted launch configuration must happen before the
   // Ctrl+C, not after — otherwise the agent is dead and argv has to be guessed.
   if (!capture.launchConfig.agentCommand?.trim()) {
@@ -291,6 +255,14 @@ export async function runAtomicClaudeTerminalAccountSwitch(
   }
 
   transition('stopping-source')
+  // Why before the interrupt: on a self-switch the caller is a tool subprocess in
+  // the agent's own foreground group, so a Ctrl+C now would kill the very tool
+  // call that is reporting the operation — and might only cancel that tool
+  // instead of ending the turn. The state change above is what releases the
+  // accepted response, so the caller can exit while this waits.
+  if (request.selfSwitch && !(await ports.awaitSourceForeground(capture))) {
+    return base('stopping-source', { failure: failure('source-busy') })
+  }
   if (!(await ports.stopSource(capture))) {
     // Nothing was released or reserved yet, so the source agent still owns the PTY.
     return base('stopping-source', { failure: failure('source-stop-failed') })
@@ -362,9 +334,13 @@ export async function runAtomicClaudeTerminalAccountSwitch(
   }
 
   transition('committed')
-  const continuationDelivered = request.continuationPrompt
-    ? await ports.deliverContinuation({ capture, prompt: request.continuationPrompt })
-    : false
+  // Why unconditional: every switch truncates whatever turn the stopped agent
+  // was on, so the resumed session always needs exactly one nudge — and the
+  // wording belongs here, not in whichever adapter asked for the switch.
+  const continuationDelivered = await ports.deliverContinuation({
+    capture,
+    prompt: buildClaudeAccountSwitchContinuationPrompt(targetLabel)
+  })
   return base('committed', {
     transcriptCopiedFileCount: transcript.copiedFileCount,
     continuationDelivered

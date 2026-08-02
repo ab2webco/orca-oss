@@ -3,10 +3,7 @@ import type {
   AtomicClaudeTerminalAccountSwitchPorts,
   ClaudeTerminalSwitchCapture
 } from './atomic-terminal-account-switch'
-import {
-  buildClaudeTerminalSwitchLaunchCommand,
-  runAtomicClaudeTerminalAccountSwitch
-} from './atomic-terminal-account-switch'
+import { runAtomicClaudeTerminalAccountSwitch } from './atomic-terminal-account-switch'
 import type { ClaudeTerminalAccountSwitchRequest } from '../../shared/claude-terminal-account-switch'
 
 const SESSION_ID = '11111111-2222-4333-8444-555555555555'
@@ -43,10 +40,12 @@ function buildPorts(overrides: PortOverrides = {}): {
   ports: AtomicClaudeTerminalAccountSwitchPorts
   calls: string[]
   writes: string[]
+  prompts: string[]
   states: string[]
 } {
   const calls: string[] = []
   const writes: string[] = []
+  const prompts: string[] = []
   const states: string[] = []
   let clock = 5_000
   const ports: AtomicClaudeTerminalAccountSwitchPorts = {
@@ -57,11 +56,15 @@ function buildPorts(overrides: PortOverrides = {}): {
     },
     validateTarget: async () => {
       calls.push('validateTarget')
-      return { ok: true }
+      return { ok: true, label: 'target@example.com' }
     },
     prepareTranscript: async () => {
       calls.push('prepareTranscript')
       return { ok: true, copiedFileCount: 1 }
+    },
+    awaitSourceForeground: async () => {
+      calls.push('awaitSourceForeground')
+      return true
     },
     stopSource: async () => {
       calls.push('stopSource')
@@ -96,8 +99,9 @@ function buildPorts(overrides: PortOverrides = {}): {
       calls.push('abort')
       return { ok: true, configDir: '/vault/account-source/auth' }
     },
-    deliverContinuation: async () => {
+    deliverContinuation: async ({ prompt }) => {
       calls.push('deliverContinuation')
+      prompts.push(prompt)
       return true
     },
     onState: (event) => {
@@ -105,56 +109,13 @@ function buildPorts(overrides: PortOverrides = {}): {
     },
     ...overrides
   }
-  return { ports, calls, writes, states }
+  return { ports, calls, writes, prompts, states }
 }
 
 const REQUEST: ClaudeTerminalAccountSwitchRequest = {
   target: { kind: 'handle', terminal: 'orca-terminal-1' },
   targetAccountId: 'account-target'
 }
-
-describe('buildClaudeTerminalSwitchLaunchCommand', () => {
-  it('preserves the captured argv, including --dangerously-skip-permissions, exactly once', () => {
-    const built = buildClaudeTerminalSwitchLaunchCommand({
-      sessionId: SESSION_ID,
-      launchConfig: {
-        agentCommand: 'claude --dangerously-skip-permissions',
-        agentArgs: '--dangerously-skip-permissions',
-        agentEnv: {}
-      },
-      shell: 'posix',
-      platform: 'darwin',
-      configDir: '/vault/account-target/auth'
-    })
-    expect(built.ok).toBe(true)
-    const command = built.ok ? built.command : ''
-    expect(command.match(/--dangerously-skip-permissions/g)).toHaveLength(1)
-    expect(command).toContain(`'--resume' '${SESSION_ID}'`)
-    expect(command).toContain("export CLAUDE_CONFIG_DIR='/vault/account-target/auth'")
-  })
-
-  it('refuses a launch configuration with no recorded agent command instead of guessing defaults', () => {
-    const built = buildClaudeTerminalSwitchLaunchCommand({
-      sessionId: SESSION_ID,
-      launchConfig: { agentArgs: '', agentEnv: {} },
-      shell: 'posix',
-      platform: 'darwin',
-      configDir: '/vault/account-target/auth'
-    })
-    expect(built).toEqual({ ok: false, reason: 'missing-launch-config' })
-  })
-
-  it('omits the config-dir export when the shell already exports the universe', () => {
-    const built = buildClaudeTerminalSwitchLaunchCommand({
-      sessionId: SESSION_ID,
-      launchConfig: { agentCommand: 'claude', agentArgs: '', agentEnv: {} },
-      shell: 'posix',
-      platform: 'darwin',
-      configDir: null
-    })
-    expect(built.ok && built.command).toBe(`claude '--resume' '${SESSION_ID}'`)
-  })
-})
 
 describe('runAtomicClaudeTerminalAccountSwitch preflight atomicity', () => {
   it('commits and reports the transcript copy count on the happy path', async () => {
@@ -171,7 +132,8 @@ describe('runAtomicClaudeTerminalAccountSwitch preflight atomicity', () => {
       'begin',
       'writeLaunchCommand',
       'awaitExactSession',
-      'commit'
+      'commit',
+      'deliverContinuation'
     ])
     expect(writes[0]).toContain(`'--resume' '${SESSION_ID}'`)
   })
@@ -388,35 +350,163 @@ describe('runAtomicClaudeTerminalAccountSwitch rollback', () => {
 })
 
 describe('runAtomicClaudeTerminalAccountSwitch continuation', () => {
-  it('injects the continuation prompt once, only after a verified commit', async () => {
-    const deliver = vi.fn().mockResolvedValue(true)
-    const { ports } = buildPorts({ deliverContinuation: deliver })
-    const result = await runAtomicClaudeTerminalAccountSwitch(
-      {
-        ...REQUEST,
-        continuationPrompt: 'Account switched to target; continue where you left off.'
-      },
-      ports
-    )
+  it('injects exactly one continuation prompt naming the target, only after a verified commit', async () => {
+    const { ports, calls, prompts } = buildPorts()
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
     expect(result.state).toBe('committed')
     expect(result.continuationDelivered).toBe(true)
-    expect(deliver).toHaveBeenCalledTimes(1)
-    expect(deliver.mock.calls[0]?.[0].prompt).toBe(
-      'Account switched to target; continue where you left off.'
-    )
+    expect(prompts).toEqual([
+      'Account switched to target@example.com; continue where you left off.'
+    ])
+    // The truncated turn is only nudged once the resumed session is the same one.
+    expect(calls.indexOf('deliverContinuation')).toBeGreaterThan(calls.indexOf('awaitExactSession'))
+    expect(calls.indexOf('deliverContinuation')).toBeGreaterThan(calls.indexOf('commit'))
+  })
+
+  it('names the account id when the target account has no label', async () => {
+    const { ports, prompts } = buildPorts({ validateTarget: async () => ({ ok: true }) })
+    await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(prompts).toEqual(['Account switched to account-target; continue where you left off.'])
+  })
+
+  it('reports a continuation the terminal refused without failing the committed switch', async () => {
+    const { ports } = buildPorts({ deliverContinuation: async () => false })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(result.state).toBe('committed')
+    expect(result.failure).toBeUndefined()
+    expect(result.continuationDelivered).toBe(false)
   })
 
   it('never injects a continuation prompt on a rolled-back switch', async () => {
-    const deliver = vi.fn().mockResolvedValue(true)
-    const { ports } = buildPorts({
-      deliverContinuation: deliver,
-      commit: async () => false
-    })
-    const result = await runAtomicClaudeTerminalAccountSwitch(
-      { ...REQUEST, continuationPrompt: 'continue' },
-      ports
-    )
+    const { ports, calls, prompts } = buildPorts({ commit: async () => false })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
     expect(result.state).toBe('rolled-back')
-    expect(deliver).not.toHaveBeenCalled()
+    expect(calls).not.toContain('deliverContinuation')
+    expect(prompts).toEqual([])
+  })
+})
+
+describe('runAtomicClaudeTerminalAccountSwitch agent self-switch', () => {
+  const SELF_REQUEST: ClaudeTerminalAccountSwitchRequest = { ...REQUEST, selfSwitch: true }
+
+  it('lets the caller tool exit and the agent reclaim the foreground before interrupting it', async () => {
+    const { ports, calls } = buildPorts()
+    const result = await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(result.state).toBe('committed')
+    // The Ctrl+C reaches the agent's whole foreground group, so it must not fire
+    // while the invoking tool subprocess is still in it.
+    expect(calls.indexOf('awaitSourceForeground')).toBeGreaterThan(
+      calls.indexOf('prepareTranscript')
+    )
+    expect(calls.indexOf('awaitSourceForeground')).toBeLessThan(calls.indexOf('stopSource'))
+  })
+
+  it('leaves the terminal untouched when the caller never releases the agent', async () => {
+    const { ports, calls, writes } = buildPorts({ awaitSourceForeground: async () => false })
+    const result = await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(result.failure?.reason).toBe('source-busy')
+    expect(result.state).toBe('stopping-source')
+    expect(calls).not.toContain('stopSource')
+    expect(calls).not.toContain('begin')
+    expect(writes).toEqual([])
+  })
+
+  it('does not wait on the foreground when the caller is not the switched terminal', async () => {
+    const { ports, calls } = buildPorts()
+    await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(calls).not.toContain('awaitSourceForeground')
+  })
+
+  it('truncates the in-flight turn and resumes the same session with one continuation', async () => {
+    const { ports, calls, writes, prompts } = buildPorts()
+    const result = await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(calls).toEqual([
+      'capture',
+      'validateTarget',
+      'prepareTranscript',
+      'awaitSourceForeground',
+      'stopSource',
+      'begin',
+      'writeLaunchCommand',
+      'awaitExactSession',
+      'commit',
+      'deliverContinuation'
+    ])
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toContain(`'--resume' '${SESSION_ID}'`)
+    expect(prompts).toEqual([
+      'Account switched to target@example.com; continue where you left off.'
+    ])
+    expect(result.continuationDelivered).toBe(true)
+  })
+
+  it.each([
+    ['a different session id', { observedSessionId: 'other-session' } as const],
+    ['no session at all', {} as const]
+  ])('rolls back to the original account when the resume reports %s', async (_label, extra) => {
+    const { ports, calls, writes } = buildPorts({
+      awaitSourceForeground: async () => true,
+      awaitExactSession: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, reason: 'session-mismatch', ...extra })
+        .mockResolvedValue({ ok: true })
+    })
+    const result = await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(result.state).toBe('rolled-back')
+    expect(result.sourceAccountId).toBe('account-source')
+    expect(calls).not.toContain('commit')
+    expect(calls).not.toContain('deliverContinuation')
+    expect(writes.at(-1)).toContain("export CLAUDE_CONFIG_DIR='/vault/account-source/auth'")
+  })
+
+  it('preserves --dangerously-skip-permissions exactly once in the destination and the rollback', async () => {
+    const { ports, writes } = buildPorts({
+      awaitExactSession: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, reason: 'session-mismatch' })
+        .mockResolvedValue({ ok: true })
+    })
+    await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(writes).toHaveLength(2)
+    for (const command of writes) {
+      expect(command.match(/--dangerously-skip-permissions/g)).toHaveLength(1)
+      expect(command).toContain(`'--resume' '${SESSION_ID}'`)
+    }
+  })
+
+  // The invoking tool is dead from the Ctrl+C onwards: every one of these must
+  // still land on a terminal state, and a failed rollback must say how to recover.
+  it.each([
+    [
+      'a launch the terminal refuses',
+      'rolled-back',
+      { writeLaunchCommand: vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true) }
+    ],
+    ['a binding commit that fails', 'rolled-back', { commit: async () => false }],
+    [
+      'a session that never comes back',
+      'rollback-failed',
+      { awaitExactSession: async () => ({ ok: false, reason: 'foreground-timeout' as const }) }
+    ],
+    [
+      'a source that cannot be re-prepared',
+      'rollback-failed',
+      { commit: async () => false, abort: async () => ({ ok: false as const }) }
+    ]
+  ])('ends %s as %s without the caller', async (_label, expected, overrides) => {
+    const { ports } = buildPorts(overrides as PortOverrides)
+    const result = await runAtomicClaudeTerminalAccountSwitch(SELF_REQUEST, ports)
+    expect(result.state).toBe(expected)
+    expect(result.failure).toBeDefined()
+    if (expected === 'rollback-failed') {
+      expect(result.recovery).toMatchObject({
+        accountId: 'account-source',
+        sessionId: SESSION_ID,
+        terminal: 'orca-terminal-1',
+        ptyId: 'pty-1'
+      })
+    } else {
+      expect(result.recovery).toBeUndefined()
+    }
   })
 })

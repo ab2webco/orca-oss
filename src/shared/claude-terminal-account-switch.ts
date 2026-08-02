@@ -56,6 +56,8 @@ export type ClaudeTerminalAccountSwitchFailureReason =
   | 'transcript-unavailable'
   | 'concurrent'
   | 'prepare-failed'
+  /** Self-switch only: the invoking tool never gave the agent its foreground back. */
+  | 'source-busy'
   | 'source-stop-failed'
   | 'launch-command-unbuildable'
   | 'launch-write-failed'
@@ -72,10 +74,21 @@ export type ClaudeTerminalAccountSwitchRequest = {
   target: ClaudeTerminalAccountSwitchTarget
   targetAccountId: string
   /**
-   * Injected once after the target session is verified. Slice 3 (agent
-   * self-switch) sets it so a truncated turn continues without user action.
+   * The agent running in this very terminal asked for the switch, so its own
+   * tool subprocess sits in the foreground process group the interrupt will
+   * hit. The runtime waits for that subprocess to exit before stopping the
+   * agent; every other adapter drives a terminal it is not running inside.
    */
-  continuationPrompt?: string
+  selfSwitch?: boolean
+}
+
+/**
+ * The one prompt the runtime injects after a verified resume. Stopping the
+ * source agent truncates whatever turn it was on, so the resumed session is
+ * nudged exactly once — no adapter writes its own wording.
+ */
+export function buildClaudeAccountSwitchContinuationPrompt(target: string): string {
+  return `Account switched to ${target}; continue where you left off.`
 }
 
 /** Returned before any destructive work so a dying caller cannot cancel the operation. */
@@ -149,6 +162,8 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
     'The session transcript could not be made readable from the selected account.',
   concurrent: 'Another account switch is already running for this terminal.',
   'prepare-failed': 'Could not prepare the selected account for this terminal.',
+  'source-busy':
+    'The tool call that asked for the switch is still holding this terminal, so Orca did not interrupt the agent.',
   'source-stop-failed': 'The running agent did not exit, so Orca left the terminal untouched.',
   'launch-command-unbuildable': 'Could not build a resume command for the switched session.',
   'launch-write-failed': 'The terminal did not accept the resume command after switching accounts.',
@@ -169,6 +184,16 @@ export function describeClaudeTerminalAccountSwitchFailure(
     return `${base} (held by ${failure.blockingTerminal})`
   }
   return base
+}
+
+/** Manual steps for a `rollback-failed` terminal, in one line an agent can act on. */
+export function describeClaudeTerminalAccountSwitchRecovery(
+  recovery: ClaudeTerminalAccountSwitchRecovery
+): string {
+  return (
+    `Recovery: relaunch account ${recovery.accountId} in ${recovery.terminal} and resume session ` +
+    `${recovery.sessionId}${recovery.configDir ? ` with CLAUDE_CONFIG_DIR=${recovery.configDir}` : ''}`
+  )
 }
 
 export function claudeTerminalAccountSwitchFailureMessage(

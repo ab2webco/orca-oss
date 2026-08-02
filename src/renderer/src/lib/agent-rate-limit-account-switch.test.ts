@@ -157,11 +157,9 @@ describe('runManagedAccountSwitchRelaunch', () => {
     ]
     expect(target).toEqual({ kind: 'local' })
     expect(method).toBe('accounts.switchClaudeTerminal')
-    expect(params).toMatchObject({
-      ptyId: 'pty-1',
-      targetAccountId: TARGET_ACCOUNT.id,
-      continuationPrompt: 'continue'
-    })
+    // The runtime owns the resume nudge's wording now, so no adapter sends one.
+    expect(params).toMatchObject({ ptyId: 'pty-1', targetAccountId: TARGET_ACCOUNT.id })
+    expect(params).not.toHaveProperty('continuationPrompt')
     // Why: the runtime owns the stop, the transcript and the resume write now —
     // duplicating them here is what used to strand sessions on a bare shell.
     expect(copySessionForAccountSwitch).not.toHaveBeenCalled()

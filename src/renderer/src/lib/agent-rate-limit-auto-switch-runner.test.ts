@@ -520,11 +520,7 @@ describe('runAgentRateLimitAutoSwitch — pinned managed session routing', () =>
     expect(callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'local' },
       'accounts.switchClaudeTerminal',
-      expect.objectContaining({
-        ptyId: 'pty-1',
-        targetAccountId: 'spare-1',
-        continuationPrompt: 'continue'
-      }),
+      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: 'spare-1' }),
       expect.anything()
     )
     expect(store.updateWorktreeMeta).toHaveBeenCalledWith(

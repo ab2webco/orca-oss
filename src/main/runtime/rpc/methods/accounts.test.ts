@@ -9,6 +9,16 @@ import {
   resetClaudeTerminalAccountSwitchOperations
 } from '../../claude-terminal-account-switch-service'
 
+// Why mocked: the switch preflight reads a real vault and a real transcript
+// store; both are covered where they live, and stubbing them is what lets this
+// file follow an accepted operation up to the interrupt it must not fire yet.
+vi.mock('../../../claude-accounts/managed-vault-authentication', () => ({
+  isManagedClaudeVaultAuthenticated: vi.fn(async () => true)
+}))
+vi.mock('../../../claude-accounts/session-failover', () => ({
+  copyClaudeSessionForAccountSwitch: vi.fn(() => ({ ok: true, copiedFileCount: 0 }))
+}))
+
 function method(name: string) {
   const found = ACCOUNT_METHODS.find((candidate) => candidate.name === name)
   if (!found) {
@@ -417,6 +427,76 @@ describe('accounts.switchClaudeTerminal', () => {
     await vi.waitFor(async () => {
       expect((await readStatus())?.failure?.reason).toBe('target-not-found')
     })
+    expect(runtime.sendTerminal).not.toHaveBeenCalled()
+  })
+
+  it('switches the terminal the caller named, not the pane it is calling from', async () => {
+    attachFakeServices()
+    const runtime = buildRuntime({
+      authenticateOrchestrationSender: vi.fn(() => ({ handle: 'orca-terminal-caller' })),
+      snapshotClaudeTerminalSwitchTarget: vi.fn().mockResolvedValue({ ok: false })
+    })
+    await requestMethod('accounts.switchClaudeTerminal').handler(
+      {
+        terminal: 'orca-terminal-9',
+        paneKey: 'tab-1:leaf-1',
+        launchToken: 'token-1',
+        targetAccountId: 'account-target',
+        awaitMs: 0
+      },
+      { runtime }
+    )
+    // The pane key proves who is calling; it must never retarget a named terminal.
+    expect(runtime.snapshotClaudeTerminalSwitchTarget).toHaveBeenCalledWith({
+      kind: 'handle',
+      terminal: 'orca-terminal-9'
+    })
+    expect(runtime.authenticateOrchestrationSender).toHaveBeenCalledWith({
+      paneKey: 'tab-1:leaf-1',
+      launchToken: 'token-1'
+    })
+  })
+
+  it('resolves a self-switch through the proven pane and returns before the interrupt', async () => {
+    attachFakeServices({
+      prepareClaudeAuth: vi.fn().mockResolvedValue({ configDir: '/vault/account-target/auth' })
+    })
+    const runtime = buildRuntime({
+      authenticateOrchestrationSender: vi.fn(() => ({ handle: 'orca-terminal-1' })),
+      // Why unresolved: the response must land while the switch is still waiting
+      // for this very caller to exit, so the caller cannot be what unblocks it.
+      inspectTerminalProcess: vi.fn(() => new Promise(() => {}))
+    })
+    const accepted = (await requestMethod('accounts.switchClaudeTerminal').handler(
+      {
+        terminal: 'orca-terminal-1',
+        paneKey: 'tab-1:leaf-1',
+        launchToken: 'token-1',
+        targetAccountId: 'account-target'
+      },
+      { runtime }
+    )) as { accepted: boolean; result: { state: string; failure?: { reason: string } } }
+    expect(accepted.accepted).toBe(true)
+    expect(accepted.result.state).toBe('stopping-source')
+    expect(accepted.result.failure).toBeUndefined()
+    expect(runtime.sendTerminal).not.toHaveBeenCalled()
+  })
+
+  it('still reports a preflight refusal to a self-switching caller', async () => {
+    attachFakeServices()
+    const runtime = buildRuntime({
+      authenticateOrchestrationSender: vi.fn(() => ({ handle: 'orca-terminal-1' }))
+    })
+    const refused = (await requestMethod('accounts.switchClaudeTerminal').handler(
+      {
+        terminal: 'orca-terminal-1',
+        paneKey: 'tab-1:leaf-1',
+        launchToken: 'token-1',
+        targetAccountId: 'account-unknown'
+      },
+      { runtime }
+    )) as { accepted: boolean; result: { state: string; failure?: { reason: string } } }
+    expect(refused.result.failure?.reason).toBe('target-not-found')
     expect(runtime.sendTerminal).not.toHaveBeenCalled()
   })
 

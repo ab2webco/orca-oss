@@ -24,7 +24,10 @@ import { isManagedClaudeVaultAuthenticated } from '../claude-accounts/managed-va
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
 import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
-import { stopClaudeTerminalForegroundAgent } from './claude-terminal-foreground-control'
+import {
+  awaitClaudeTerminalSourceForeground,
+  stopClaudeTerminalForegroundAgent
+} from './claude-terminal-foreground-control'
 import type { OrcaRuntimeService } from './orca-runtime'
 
 const SESSION_OBSERVATION_TIMEOUT_MS = 90_000
@@ -104,7 +107,7 @@ export function buildClaudeTerminalAccountSwitchPorts(
         return { ok: false, reason: 'unsupported-runtime' }
       }
       return (await isManagedClaudeVaultAuthenticated(account))
-        ? { ok: true }
+        ? { ok: true, label: account.email }
         : { ok: false, reason: 'target-auth-invalid' }
     },
     prepareTranscript: async () => {
@@ -125,6 +128,7 @@ export function buildClaudeTerminalAccountSwitchPorts(
         ? { ok: true, copiedFileCount: copied.copiedFileCount }
         : { ok: false, reason: 'transcript-unavailable' }
     },
+    awaitSourceForeground: () => awaitClaudeTerminalSourceForeground(runtime, capture),
     stopSource: () => stopClaudeTerminalForegroundAgent(runtime, capture),
     begin: async () => {
       const begun = await beginInPlaceClaudeAccountSwitch(
