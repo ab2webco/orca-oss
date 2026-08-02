@@ -221,11 +221,30 @@ function dropHydratedIdleClaudeSubagents(
 }
 
 // Why: the sole gate for keeping a providerSessionOnly row; shared so hydrate and relay-ingest can't drift.
-function isValidPiProviderSessionOnly(
+// Pi's session_start and Claude's SessionStart are the two events that report a resumable
+// session while the TUI sits idle, so both may hold a pane's identity without a turn.
+const PROVIDER_SESSION_ONLY_AGENTS = ['pi', 'claude'] as const
+
+type ProviderSessionOnlyAgent = (typeof PROVIDER_SESSION_ONLY_AGENTS)[number]
+
+function isProviderSessionOnlyAgent(
+  agentType: AgentType | undefined
+): agentType is ProviderSessionOnlyAgent {
+  return (
+    agentType !== undefined &&
+    (PROVIDER_SESSION_ONLY_AGENTS as readonly string[]).includes(agentType)
+  )
+}
+
+function isValidProviderSessionOnly(
   providerSession: AgentProviderSessionMetadata | undefined,
   agentType: AgentType | undefined
 ): boolean {
-  return Boolean(providerSession && agentType === 'pi' && getAgentResumeArgv('pi', providerSession))
+  return Boolean(
+    providerSession &&
+    isProviderSessionOnlyAgent(agentType) &&
+    getAgentResumeArgv(agentType, providerSession)
+  )
 }
 
 function sanitizeHydratedEntry(
@@ -283,7 +302,7 @@ function sanitizeHydratedEntry(
   }
   const providerSession = normalizeAgentProviderSession(record.providerSession) ?? undefined
   const providerSessionOnly = record.providerSessionOnly === true
-  if (providerSessionOnly && !isValidPiProviderSessionOnly(providerSession, payload.agentType)) {
+  if (providerSessionOnly && !isValidProviderSessionOnly(providerSession, payload.agentType)) {
     return null
   }
   return {
@@ -1819,7 +1838,7 @@ export class AgentHookServer {
     )
     if (
       envelope.providerSessionOnly === true &&
-      !isValidPiProviderSessionOnly(providerSession, normalizedPayload.agentType)
+      !isValidProviderSessionOnly(providerSession, normalizedPayload.agentType)
     ) {
       return
     }

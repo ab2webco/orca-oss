@@ -3189,12 +3189,17 @@ export function useIpcEvents(): void {
         return 'dropped'
       }
       if (data.providerSessionOnly) {
-        if (!data.providerSession || data.agentType !== 'pi') {
+        // Claude's SessionStart carries the resumed session while the TUI is
+        // still idle; dropping it would leave the pane's resume identity on the
+        // session an account switch just replaced (ORCA-168).
+        const identityAgent: 'pi' | 'claude' | null =
+          data.agentType === 'pi' ? 'pi' : data.agentType === 'claude' ? 'claude' : null
+        if (!data.providerSession || !identityAgent) {
           return 'dropped'
         }
         store.recordAgentProviderSession(
           paneKey,
-          'pi',
+          identityAgent,
           data.providerSession,
           { updatedAt: data.receivedAt },
           {

@@ -101,6 +101,16 @@ export const CLAUDE_EVENTS: readonly ClaudeHookEventSpec[] = [
     eventName: 'PermissionRequest',
     minVersion: '2.0.45',
     definition: { matcher: '*', hooks: [{ type: 'command', command: '' }] }
+  },
+  // Why: every other event needs a turn to happen first, so a Claude that just
+  // resumed and is waiting for input reports nothing at all — which is what left
+  // the account switch unable to verify its own relaunch (ORCA-168). The matcher
+  // is pinned to the process-start sources: `clear`/`compact` fire mid-session
+  // and would replace a live turn row with a resume-identity placeholder.
+  {
+    eventName: 'SessionStart',
+    minVersion: '1.0.66',
+    definition: { matcher: 'startup|resume', hooks: [{ type: 'command', command: '' }] }
   }
 ]
 

@@ -54,6 +54,12 @@ export type ClaudeTerminalAccountSwitchFailureReason =
   /** No Claude provider session id observed for this pane, so nothing to resume. */
   | 'missing-session'
   | 'transcript-unavailable'
+  /**
+   * A universe involved in the switch has no managed hook that reports a resumed
+   * session, so Orca could only ever time out waiting for its own relaunch —
+   * including the rollback's re-verification (ORCA-168).
+   */
+  | 'resume-verification-unavailable'
   | 'concurrent'
   | 'prepare-failed'
   /** Self-switch only: the invoking tool never gave the agent its foreground back. */
@@ -100,6 +106,13 @@ export type ClaudeTerminalAccountSwitchAcceptance = {
   sourceAccountId: string
   targetAccountId: string
   sessionId: string
+  /**
+   * The runtime — not the caller's claim — decided this switch stops the very
+   * terminal that asked for it. An adapter running inside that terminal must
+   * exit rather than poll: holding the foreground is what makes the switch
+   * report `source-busy`.
+   */
+  selfSwitch: boolean
 }
 
 export type ClaudeTerminalAccountSwitchFailure = {
@@ -160,6 +173,8 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
     'No Claude session was observed in this terminal, so there is nothing to resume.',
   'transcript-unavailable':
     'The session transcript could not be made readable from the selected account.',
+  'resume-verification-unavailable':
+    'Orca cannot observe a resumed Claude session in this terminal, so it will not stop the agent for a switch it could never verify. Relaunch the agent from Orca and retry.',
   concurrent: 'Another account switch is already running for this terminal.',
   'prepare-failed': 'Could not prepare the selected account for this terminal.',
   'source-busy':

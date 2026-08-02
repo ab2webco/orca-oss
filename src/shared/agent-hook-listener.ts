@@ -4052,13 +4052,21 @@ export function normalizeHookPayload(
     source === 'codex' && readString(hookPayloadRecord, 'agent_id')
       ? null
       : extractAgentProviderSession(source, hookPayloadRecord)
+  // Why: Pi session_start and Claude SessionStart both carry resume identity while the
+  // TUI is idle; providerSessionOnly makes receivers keep the identity and discard the
+  // placeholder row, so neither fabricates a turn nobody started.
   const providerSessionOnly =
-    source === 'pi' && eventName === 'session_start' && providerSession !== null
-  // Why: Pi session_start carries resume identity while idle; providerSessionOnly makes receivers discard the placeholder row.
+    providerSession !== null &&
+    ((source === 'pi' && eventName === 'session_start') ||
+      (source === 'claude' && eventName === 'SessionStart'))
   const transportPayload =
     payload ??
     (providerSessionOnly
-      ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: 'pi' })
+      ? normalizeAgentStatusPayload({
+          state: 'done',
+          prompt: '',
+          agentType: source === 'claude' ? 'claude' : 'pi'
+        })
       : null)
   return transportPayload
     ? {
