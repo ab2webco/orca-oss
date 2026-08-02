@@ -244,6 +244,7 @@ import type {
   SleepingAgentLaunchConfig
 } from '../../shared/agent-session-resume'
 import type { ExactWorkerProviderSession } from '../../shared/orchestration-worker-output'
+import type { ClaudeTerminalAccountSwitchTarget } from '../../shared/claude-terminal-account-switch'
 import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 import { toRuntimeActivateWorktreeEvent } from '../../shared/runtime-client-events'
 import {
@@ -1347,6 +1348,22 @@ type RuntimePtyWorktreeRecord = {
   waitBlockedAt: number | null
   // Why: memoized wait scan of the current retained tail (see RuntimeLeafRecord).
   tailWaitState?: TerminalTailWaitState
+}
+
+/** Immutable runtime facts the atomic Claude account switch captures up front. */
+export type RuntimeClaudeTerminalSwitchSnapshot = {
+  ok: true
+  terminal: string
+  ptyId: string
+  paneKey: string | null
+  worktreeId: string | null
+  cwd: string | null
+  launchConfig: SleepingAgentLaunchConfig | null
+  isWsl: boolean
+  wslDistro: string | null
+  /** Non-null for SSH/remote-owned PTYs, whose auth and transcripts live elsewhere. */
+  remoteConnectionId: string | null
+  providerSession: { agent: 'claude'; id: string } | null
 }
 
 type TerminalCreateOptions = {
@@ -15859,6 +15876,53 @@ export class OrcaRuntimeService {
       observedAfter,
       statuses: this.getAgentStatusSnapshotFn?.() ?? []
     })
+  }
+
+  /**
+   * One read-only snapshot of everything the atomic Claude account switch must
+   * capture before it mutates anything. The transaction itself lives in
+   * `claude-terminal-account-switch-service.ts`; this only reports runtime facts
+   * so the facade stays out of the state machine.
+   */
+  async snapshotClaudeTerminalSwitchTarget(
+    target: ClaudeTerminalAccountSwitchTarget
+  ): Promise<RuntimeClaudeTerminalSwitchSnapshot | { ok: false; reason: 'terminal-not-found' }> {
+    const notFound = { ok: false, reason: 'terminal-not-found' } as const
+    let handle: string | null = null
+    let pty: RuntimePtyWorktreeRecord | null = null
+    if (target.kind === 'pty') {
+      pty = this.ptysById.get(target.ptyId) ?? null
+      handle = pty?.paneKey ? this.getTerminalHandleForPaneKey(pty.paneKey) : null
+    } else {
+      handle = target.terminal
+      const leaf = this.resolveLiveLeafForHandle(handle)
+      const ptyId = leaf?.ptyId ?? this.getLivePtyForHandle(handle)?.pty.ptyId ?? null
+      pty = ptyId ? (this.ptysById.get(ptyId) ?? null) : null
+    }
+    if (!handle || !pty || !pty.connected) {
+      return notFound
+    }
+    const worktreeId = pty.worktreeId || null
+    const cwd = worktreeId
+      ? ((await this.getResolvedWorktreeMap()).get(worktreeId)?.path ?? null)
+      : null
+    const observed = this.getExactWorkerProviderSession(handle, 0)
+    return {
+      ok: true,
+      terminal: handle,
+      ptyId: pty.ptyId,
+      paneKey: pty.paneKey,
+      worktreeId,
+      cwd,
+      launchConfig: pty.launchConfig,
+      isWsl: pty.isWsl === true,
+      wslDistro: pty.wslDistro,
+      remoteConnectionId: pty.connectionId,
+      providerSession:
+        observed?.agent === 'claude' && observed.providerSession?.id
+          ? { agent: 'claude', id: observed.providerSession.id }
+          : null
+    }
   }
 
   validateOrchestrationAgentLauncher(agent: TuiAgent): void {

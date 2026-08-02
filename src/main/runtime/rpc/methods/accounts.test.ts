@@ -1,9 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { isStreamingMethod } from '../core'
 import { ACCOUNT_METHODS } from './accounts'
+import {
+  attachClaudeTerminalAccountSwitchServices,
+  resetClaudeTerminalAccountSwitchOperations
+} from '../../claude-terminal-account-switch-service'
 
 function method(name: string) {
   const found = ACCOUNT_METHODS.find((candidate) => candidate.name === name)
@@ -256,5 +260,171 @@ describe('account RPC methods', () => {
     expect(emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ready', snapshot }))
     cleanup?.()
     await running
+  })
+})
+
+describe('accounts.switchClaudeTerminal', () => {
+  afterEach(() => {
+    attachClaudeTerminalAccountSwitchServices(null)
+    resetClaudeTerminalAccountSwitchOperations()
+  })
+
+  function requestMethod(name: string) {
+    const found = method(name)
+    if (isStreamingMethod(found)) {
+      throw new Error(`${name} must be a request method`)
+    }
+    return found
+  }
+
+  function buildRuntime(overrides: Record<string, unknown> = {}): OrcaRuntimeService {
+    return {
+      snapshotClaudeTerminalSwitchTarget: vi.fn().mockResolvedValue({
+        ok: true,
+        terminal: 'orca-terminal-1',
+        ptyId: 'pty-1',
+        paneKey: 'tab-1:leaf-1',
+        worktreeId: 'worktree-1',
+        cwd: '/repo/worktree',
+        launchConfig: {
+          agentCommand: 'claude --dangerously-skip-permissions',
+          agentArgs: '--dangerously-skip-permissions',
+          agentEnv: {}
+        },
+        isWsl: false,
+        wslDistro: null,
+        remoteConnectionId: null,
+        providerSession: { agent: 'claude', id: 'session-1' }
+      }),
+      inspectTerminalProcess: vi
+        .fn()
+        .mockResolvedValue({ foregroundProcess: 'zsh', hasChildProcesses: false }),
+      sendTerminal: vi.fn().mockResolvedValue({ accepted: true, bytesWritten: 1 }),
+      sendTerminalAgentPrompt: vi.fn().mockResolvedValue({ accepted: true, bytesWritten: 1 }),
+      getExactWorkerProviderSession: vi.fn(() => null),
+      ...overrides
+    } as unknown as OrcaRuntimeService
+  }
+
+  function attachFakeServices(overrides: Record<string, unknown> = {}): void {
+    attachClaudeTerminalAccountSwitchServices({
+      getSettings: () => ({
+        claudeManagedAccounts: [
+          {
+            id: 'account-target',
+            email: 'target@example.com',
+            managedAuthPath: '/vault/account-target',
+            authMethod: 'oauth',
+            createdAt: 0,
+            updatedAt: 0,
+            lastAuthenticatedAt: 0
+          }
+        ]
+      }),
+      prepareClaudeAuth: vi.fn().mockRejectedValue(new Error('prepare unavailable')),
+      getPtyClaudeAccountId: () => 'account-source',
+      ...overrides
+    } as never)
+  }
+
+  it('refuses a paired device before touching the runtime', async () => {
+    const runtime = buildRuntime()
+    const handler = requestMethod('accounts.switchClaudeTerminal').handler
+    await expect(
+      handler(
+        { terminal: 'orca-terminal-1', targetAccountId: 'account-target' },
+        { runtime, clientKind: 'mobile' }
+      )
+    ).rejects.toThrow(/paired device/)
+    expect(runtime.snapshotClaudeTerminalSwitchTarget).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [{ targetAccountId: 'account-target' }],
+    [{ terminal: 'orca-terminal-1', ptyId: 'pty-1', targetAccountId: 'account-target' }]
+  ])('rejects an ambiguous or missing terminal selector: %j', (params) => {
+    const parsed = requestMethod('accounts.switchClaudeTerminal').params?.safeParse(params)
+    expect(parsed?.success).toBe(false)
+  })
+
+  it('refuses with runtime-unavailable when no account services are attached', async () => {
+    const runtime = buildRuntime()
+    const result = (await requestMethod('accounts.switchClaudeTerminal').handler(
+      { terminal: 'orca-terminal-1', targetAccountId: 'account-target' },
+      { runtime }
+    )) as { accepted: boolean; result: { failure?: { reason: string } } }
+    expect(result.accepted).toBe(false)
+    expect(result.result.failure?.reason).toBe('runtime-unavailable')
+    expect(runtime.snapshotClaudeTerminalSwitchTarget).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['unsupported-runtime', { isWsl: true }],
+    ['unsupported-runtime', { remoteConnectionId: 'ssh-1' }],
+    ['missing-session', { providerSession: null }],
+    ['missing-launch-config', { launchConfig: null }]
+  ])('refuses %s before any terminal write', async (reason, snapshotOverride) => {
+    attachFakeServices()
+    const runtime = buildRuntime()
+    const snapshot = await (
+      runtime.snapshotClaudeTerminalSwitchTarget as unknown as () => Promise<object>
+    )()
+    const patched = buildRuntime({
+      snapshotClaudeTerminalSwitchTarget: vi
+        .fn()
+        .mockResolvedValue({ ...snapshot, ...snapshotOverride })
+    })
+    const result = (await requestMethod('accounts.switchClaudeTerminal').handler(
+      { terminal: 'orca-terminal-1', targetAccountId: 'account-target' },
+      { runtime: patched }
+    )) as { accepted: boolean; result: { failure?: { reason: string } } }
+    expect(result.accepted).toBe(false)
+    expect(result.result.failure?.reason).toBe(reason)
+    expect(patched.sendTerminal).not.toHaveBeenCalled()
+  })
+
+  it('accepts before destructive work and exposes the operation by id', async () => {
+    attachFakeServices()
+    const runtime = buildRuntime()
+    const accepted = (await requestMethod('accounts.switchClaudeTerminal').handler(
+      { terminal: 'orca-terminal-1', targetAccountId: 'account-unknown', awaitMs: 0 },
+      { runtime }
+    )) as {
+      accepted: boolean
+      acceptance: { operationId: string; sessionId: string }
+      result: { state: string }
+    }
+    expect(accepted.accepted).toBe(true)
+    expect(accepted.result.state).toBe('preflighting')
+    expect(accepted.acceptance.sessionId).toBe('session-1')
+
+    const readStatus = async (): Promise<{
+      operationId: string
+      state: string
+      failure?: { reason: string }
+    } | null> =>
+      (
+        (await requestMethod('accounts.claudeTerminalSwitchStatus').handler(
+          { operationId: accepted.acceptance.operationId },
+          { runtime }
+        )) as {
+          result: { operationId: string; state: string; failure?: { reason: string } } | null
+        }
+      ).result
+    expect((await readStatus())?.operationId).toBe(accepted.acceptance.operationId)
+    // The detached operation finishes without the caller, and an unresolvable
+    // target is refused before any Ctrl+C or PTY write.
+    await vi.waitFor(async () => {
+      expect((await readStatus())?.failure?.reason).toBe('target-not-found')
+    })
+    expect(runtime.sendTerminal).not.toHaveBeenCalled()
+  })
+
+  it('reports no status for an unknown operation id', async () => {
+    const status = (await requestMethod('accounts.claudeTerminalSwitchStatus').handler(
+      { operationId: 'missing' },
+      { runtime: buildRuntime() }
+    )) as { result: unknown }
+    expect(status.result).toBeNull()
   })
 })
