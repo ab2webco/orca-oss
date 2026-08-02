@@ -22,6 +22,23 @@ describe('getAgentSlashCommands', () => {
     expect(names).not.toContain('model')
   })
 
+  it.each(['claude', 'openclaude', 'claude-zai', 'codex'] as const)(
+    'offers /switch-account on %s',
+    (agent) => {
+      expect(getAgentSlashCommands(agent).map((command) => command.name)).toContain(
+        'switch-account'
+      )
+    }
+  )
+
+  it('completes /switch-account with a trailing space so a selector can follow', () => {
+    const command = getAgentSlashCommands('claude').find(
+      (candidate) => candidate.name === 'switch-account'
+    )!
+    expect(applySlashSuggestion(command)).toBe('/switch-account ')
+    expect(filterSlashCommands(getAgentSlashCommands('claude'), 'switch')).toEqual([command])
+  })
+
   it('falls back to a small common set for an unknown agent (never empty)', () => {
     const names = getAgentSlashCommands('some-other-agent').map((c) => c.name)
     expect(names).toEqual(['clear', 'help'])

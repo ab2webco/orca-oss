@@ -56,6 +56,7 @@ import { AgentsPane } from './AgentsPane'
 import { OrchestrationPane } from './OrchestrationPane'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
 import { PlaneAgentSkillPane } from './PlaneAgentSkillPane'
+import { AccountSwitchAgentSkillPane } from './AccountSwitchAgentSkillPane'
 import { AccountsPane } from './AccountsPane'
 import { StatsPane } from '../stats/StatsPane'
 import { IntegrationsPane } from './IntegrationsPane'
@@ -1349,6 +1350,21 @@ function Settings(): React.JSX.Element {
 
                 {showDesktopOnlySettings ? (
                   <>
+                    <SettingsSection
+                      id="account-switch"
+                      title={translate(
+                        'auto.components.settings.Settings.accountSwitchTitle',
+                        'Account switching'
+                      )}
+                      description={translate(
+                        'auto.components.settings.Settings.accountSwitchDescription',
+                        'Let agents switch this terminal to another Claude account without losing the conversation.'
+                      )}
+                      searchEntries={getSectionSearchEntries('account-switch')}
+                    >
+                      {isSectionMounted('account-switch') ? <AccountSwitchAgentSkillPane /> : null}
+                    </SettingsSection>
+
                     <SettingsSection
                       id="computer-use"
                       title={translate(

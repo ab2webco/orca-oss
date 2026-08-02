@@ -31,6 +31,7 @@ import {
   SquareTerminal,
   TextCursorInput,
   UserCog,
+  Users,
   Wrench
 } from 'lucide-react'
 import { OrcaLogoSettingsIcon } from '@/components/settings/orca-logo-settings-icon'
@@ -59,6 +60,7 @@ import { getNotificationsPaneSearchEntries } from '@/components/settings/notific
 import { getOrchestrationPaneSearchEntries } from '@/components/settings/orchestration-search'
 import { getLinearAgentSkillPaneSearchEntries } from '@/components/settings/linear-agent-skill-search'
 import { getPlaneAgentSkillPaneSearchEntries } from '@/components/settings/plane-agent-skill-search'
+import { getAccountSwitchAgentSkillPaneSearchEntries } from '@/components/settings/account-switch-agent-skill-search'
 import {
   getRuntimeEnvironmentsSearchEntry,
   getWebRuntimeEnvironmentsSearchEntry
@@ -229,6 +231,20 @@ export function buildSettingsNavigationMetadata({
       : []),
     ...(showDesktopOnlySettings
       ? [
+          {
+            id: 'account-switch',
+            title: translate(
+              'auto.hooks.useSettingsNavigationMetadata.accountSwitchTitle',
+              'Account switching'
+            ),
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.accountSwitchDescription',
+              'Let agents switch this terminal to another Claude account without losing the conversation.'
+            ),
+            icon: Users,
+            searchEntries: getAccountSwitchAgentSkillPaneSearchEntries(),
+            group: 'capabilities'
+          },
           {
             id: 'computer-use',
             title: translate('auto.hooks.useSettingsNavigationMetadata.b35e92364b', 'Computer Use'),

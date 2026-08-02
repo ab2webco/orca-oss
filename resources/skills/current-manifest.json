@@ -162,6 +162,24 @@
           "identitySha256": "9ca228137b9a442b98c761aa07adecc2265708132ab175ad7e22b163fdc0bd7f"
         }
       ]
+    },
+    {
+      "name": "switch-account",
+      "sourcePath": "skills/switch-account",
+      "releaseRevision": 1,
+      "packageDigest": "9cb4939ba074416fffe0a8a6a0310f9151280c336cd8bdcaca1d5797334ab4f6",
+      "gitTreeSha": "bc4a47f0c3117a9bc5275573ad74246e921604d8",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3677,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23",
+          "textNormalizedSha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23",
+          "identitySha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23"
+        }
+      ]
     }
   ]
 }

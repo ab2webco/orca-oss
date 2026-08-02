@@ -58,6 +58,10 @@ const updateCapableCallers = new Map<string, readonly string[]>([
     ['ORCA_PLANE_SKILL_UPDATE_COMMAND', 'installedCommand={updateCommand}']
   ],
   [
+    'src/renderer/src/components/settings/AccountSwitchAgentSkillPane.tsx',
+    ['SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND', 'installedCommand={updateCommand}']
+  ],
+  [
     'src/renderer/src/components/settings/CliSection.tsx',
     ['ORCA_CLI_SKILL_UPDATE_COMMAND', 'installedCommand={cliSkillUpdateCommand}']
   ],
