@@ -390,3 +390,10 @@ export function parseAgentStatusPayload(json: string): ParsedAgentStatusPayload 
     return null
   }
 }
+
+/**
+ * Why a pane's hook authority is being retired. `pane-closed` also silences later posts
+ * for that pane; `agent-exited` leaves the live pane observable so a relaunch in it can
+ * report a session again (ORCA-169).
+ */
+export type AgentHookPaneRetirementReason = 'pane-closed' | 'agent-exited'

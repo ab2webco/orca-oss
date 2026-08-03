@@ -2464,8 +2464,8 @@ void app.whenReady().then(async () => {
       agentHookServer.getStatusSnapshotForPane(paneKey),
     attestAgentHookCompatibilityAuthority: (candidate) =>
       agentHookServer.attestCompatibilityAuthority(candidate),
-    retireAgentHookCompatibilityAuthority: (paneKey) =>
-      agentHookServer.retirePaneAuthority(paneKey),
+    retireAgentHookCompatibilityAuthority: (paneKey, reason) =>
+      agentHookServer.retirePaneAuthority(paneKey, reason),
     canRecoverPersistentLocalPtys: () => getDaemonProvider() !== null,
     // Why: source codex-home here (runs in window AND serve) so aiVault.listSessions includes managed-Codex sessions; registerCoreHandlers is window-only.
     getAdditionalAiVaultCodexHomePaths: () =>

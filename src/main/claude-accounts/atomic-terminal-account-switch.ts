@@ -110,8 +110,11 @@ export type AtomicClaudeTerminalAccountSwitchPorts = {
     observedAfter: number
   }): Promise<ClaudeTerminalSwitchSessionOutcome>
   commit(args: { capture: ClaudeTerminalSwitchCapture; reservationId: string }): Promise<boolean>
-  /** Best-effort teardown of a destination Claude that must not keep the pane. */
-  stopDestination(capture: ClaudeTerminalSwitchCapture): Promise<void>
+  /**
+   * Tears down a destination Claude that must not keep the pane. False means the pane's
+   * foreground is unproven, so no launch line may be written into it.
+   */
+  stopDestination(capture: ClaudeTerminalSwitchCapture): Promise<boolean>
   abort(args: {
     capture: ClaudeTerminalSwitchCapture
     reservationId: string
@@ -311,12 +314,19 @@ export async function runAtomicClaudeTerminalAccountSwitch(
     options: { launched?: boolean } = {}
   ): Promise<ClaudeTerminalAccountSwitchResult> => {
     transition('rolling-back')
-    if (options.launched !== false) {
-      await ports.stopDestination(capture!)
-    }
+    // Why the result matters: writing the source's launch line into a foreground still
+    // owned by the destination agent types it at a TUI instead of a shell, which is how a
+    // rollback ends up on a fresh session with no transcript (ORCA-169).
+    const destinationStopped =
+      options.launched === false ? true : await ports.stopDestination(capture!)
     const aborted = await ports.abort({ capture: capture!, reservationId: begun.reservationId })
     if (!aborted.ok) {
       return rollbackFailed(cause)
+    }
+    // Why refusing beats relaunching: leaving the captured session unresumed is recoverable
+    // from the recovery payload; losing its binding to a fresh session is not.
+    if (!destinationStopped) {
+      return rollbackFailed(cause, aborted.configDir)
     }
     if (!(await restoreSource({ configDir: aborted.configDir, shell: begun.shell }))) {
       return rollbackFailed(cause, aborted.configDir)
