@@ -38,6 +38,7 @@ import { TerminalKittyKeyboardModeTracker } from '../../shared/terminal-kitty-ke
 import {
   AGENT_STATUS_STALE_AFTER_MS,
   isFreshNonDoneAgentStatus,
+  type AgentHookPaneRetirementReason,
   type AgentStatusIpcPayload,
   type ParsedAgentStatusPayload,
   type AgentStatusOrchestrationContext,
@@ -3274,7 +3275,9 @@ export class OrcaRuntimeService {
         terminalProvenance: 'current_runtime' | 'restored'
       }) => AgentHookAuthorityAttestation | null)
     | null
-  private readonly retireAgentHookCompatibilityAuthorityFn: ((paneKey: string) => void) | null
+  private readonly retireAgentHookCompatibilityAuthorityFn:
+    | ((paneKey: string, reason: AgentHookPaneRetirementReason) => void)
+    | null
   private readonly canRecoverPersistentLocalPtysFn: () => boolean
   private readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
   private readonly getDesktopWindowStatusFn: () => RuntimeDesktopWindowStatus
@@ -3347,7 +3350,10 @@ export class OrcaRuntimeService {
         connectionId: string | null
         terminalProvenance: 'current_runtime' | 'restored'
       }) => AgentHookAuthorityAttestation | null
-      retireAgentHookCompatibilityAuthority?: (paneKey: string) => void
+      retireAgentHookCompatibilityAuthority?: (
+        paneKey: string,
+        reason: AgentHookPaneRetirementReason
+      ) => void
       canRecoverPersistentLocalPtys?: () => boolean
       // Why: codex-home paths for the Agent Session History scan must be sourced
       // here, not via the window-only registerCoreHandlers path — that path never
@@ -9705,7 +9711,7 @@ export class OrcaRuntimeService {
         this.recordTerminalSideEffectFact(ptyId, { kind: 'bell' })
         return
       case 'command-finished':
-        this.retirePtyAgentLaunchAuthority(ptyId)
+        this.retirePtyAgentLaunchAuthority(ptyId, 'agent-exited')
         this.recordTerminalSideEffectFact(ptyId, {
           kind: 'command-finished',
           exitCode: fact.exitCode
@@ -9949,7 +9955,7 @@ export class OrcaRuntimeService {
           this.recordTerminalSideEffectFact(ptyId, { kind: 'agent-exited' })
         },
         onCommandFinished: (exitCode: number | null) => {
-          this.retirePtyAgentLaunchAuthority(ptyId)
+          this.retirePtyAgentLaunchAuthority(ptyId, 'agent-exited')
           this.recordTerminalSideEffectFact(ptyId, { kind: 'command-finished', exitCode })
         },
         onBell: () => {
@@ -11832,7 +11838,10 @@ export class OrcaRuntimeService {
     }
   }
 
-  private retirePtyAgentLaunchAuthority(ptyId: string): void {
+  private retirePtyAgentLaunchAuthority(
+    ptyId: string,
+    reason: AgentHookPaneRetirementReason = 'pane-closed'
+  ): void {
     const pty = this.ptysById.get(ptyId)
     if (!pty) {
       return
@@ -11856,7 +11865,7 @@ export class OrcaRuntimeService {
       }
     }
     for (const paneKey of paneKeys) {
-      this.retireAgentHookCompatibilityAuthorityFn?.(paneKey)
+      this.retireAgentHookCompatibilityAuthorityFn?.(paneKey, reason)
     }
   }
 

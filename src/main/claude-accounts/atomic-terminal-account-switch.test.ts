@@ -98,6 +98,7 @@ function buildPorts(overrides: PortOverrides = {}): {
     },
     stopDestination: async () => {
       calls.push('stopDestination')
+      return true
     },
     abort: async () => {
       calls.push('abort')
@@ -366,6 +367,28 @@ describe('runAtomicClaudeTerminalAccountSwitch rollback', () => {
       sessionId: SESSION_ID,
       terminal: 'orca-terminal-1',
       ptyId: 'pty-1'
+    })
+  })
+
+  it('refuses to relaunch the source when the destination agent could not be stopped', async () => {
+    const { ports, calls, writes } = buildPorts({
+      awaitExactSession: async () => ({ ok: false, reason: 'foreground-timeout' }),
+      stopDestination: async () => false
+    })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+
+    expect(result.state).toBe('rollback-failed')
+    expect(result.failure?.reason).toBe('foreground-timeout')
+    // Why: an unproven foreground would take the launch line as TUI input, and whatever
+    // Claude eventually starts there owns the pane on a session nobody captured.
+    expect(writes).toHaveLength(1)
+    expect(calls.filter((call) => call === 'writeLaunchCommand')).toHaveLength(1)
+    expect(result.recovery).toEqual({
+      accountId: 'account-source',
+      sessionId: SESSION_ID,
+      terminal: 'orca-terminal-1',
+      ptyId: 'pty-1',
+      configDir: '/vault/account-source/auth'
     })
   })
 

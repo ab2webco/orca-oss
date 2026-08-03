@@ -11835,7 +11835,8 @@ describe('OrcaRuntimeService', () => {
 
     runtime.onPtyData('pty-authority', '\x1b]133;D;0\x07', 100)
 
-    expect(retireAuthority).toHaveBeenCalledWith(spawnEnv.ORCA_PANE_KEY)
+    // Why the reason: the pane outlives the command, so retiring must not silence it (ORCA-169).
+    expect(retireAuthority).toHaveBeenCalledWith(spawnEnv.ORCA_PANE_KEY, 'agent-exited')
     expect(runtime.verifyOrchestrationCompatibilityCaller(evidence)).toBeNull()
     expect(
       runtime.getAgentStatusLaunchConfigForPaneKey(spawnEnv.ORCA_PANE_KEY, {
@@ -11897,8 +11898,9 @@ describe('OrcaRuntimeService', () => {
     runtime.onPtyExit('pty-restored-exit', 0, 'restored-exit')
     runtime.onPtyExit('pty-ordinary-shell', 0, 'ordinary-shell')
 
-    expect(retireAuthority).toHaveBeenCalledWith(firstPane)
-    expect(retireAuthority).toHaveBeenCalledWith(secondPane)
+    expect(retireAuthority).toHaveBeenCalledWith(firstPane, 'agent-exited')
+    // Why still closed: the PTY is gone, so nothing can relaunch into that pane.
+    expect(retireAuthority).toHaveBeenCalledWith(secondPane, 'pane-closed')
     expect(retireAuthority).toHaveBeenCalledTimes(2)
   })
 

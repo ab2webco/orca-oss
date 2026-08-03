@@ -243,9 +243,8 @@ export function buildClaudeTerminalAccountSwitchPorts(
         finishInPlaceClaudeAccountSwitch(capture.ptyId, reservationId)
       }
     },
-    stopDestination: async () => {
-      await stopClaudeTerminalForegroundAgent(runtime, capture).catch(() => false)
-    },
+    stopDestination: async () =>
+      stopClaudeTerminalForegroundAgent(runtime, capture).catch(() => false),
     abort: async ({ reservationId }) => {
       const aborted = await abortInPlaceClaudeAccountSwitch(
         {

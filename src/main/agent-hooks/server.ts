@@ -49,6 +49,7 @@ import {
 } from '../../shared/claude-statusline-rate-limits'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
+  type AgentHookPaneRetirementReason,
   type AgentStatusClearIpcPayload,
   type AgentStatusIpcPayload,
   type AgentType,
@@ -1531,7 +1532,16 @@ export class AgentHookServer {
     }
   }
 
-  retirePaneAuthority(paneKey: string): void {
+  /**
+   * `agent-exited` revokes the launch authority of an agent that ended while its pane
+   * stays live, so a relaunch in that same pane can still report a session. Marking the
+   * pane closed there silences it permanently and an in-place account switch can only
+   * time out waiting for its own relaunch (ORCA-169).
+   */
+  retirePaneAuthority(
+    paneKey: string,
+    reason: AgentHookPaneRetirementReason = 'pane-closed'
+  ): void {
     const ownerPaneKey = this.resolvePaneKeyAlias(paneKey)
     const paneKeys = new Set([paneKey, ownerPaneKey])
     let aliasChanged = false
@@ -1546,7 +1556,9 @@ export class AgentHookServer {
     const authorityChanged = this.revokeHydratedAuthorityForPaneKeys(paneKeys)
     const hadStatus = [...paneKeys].some((key) => this.state.lastStatusByPaneKey.has(key))
     for (const key of paneKeys) {
-      this.markPaneClosedForAgentStatus(key)
+      if (reason === 'pane-closed') {
+        this.markPaneClosedForAgentStatus(key)
+      }
       this.clearAssistantMessageRetry(key)
       this.clearCodexSubagentPoll(key)
       clearPaneCacheState(this.state, key)
