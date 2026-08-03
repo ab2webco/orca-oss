@@ -741,13 +741,20 @@ orca skills install                                      # list installable skil
 orca skills install --skill orca-cli --skill orchestration # install globally (default)
 orca skills install --skill orca-cli --local              # install into the current project only
 orca skills install --all                                 # install every bundled skill
-orca skills install --all --dry-run                       # print the npx command without running it
+orca skills install --all --dry-run                       # print the npx commands without running them
 ```
 
 This resolves the same `npx skills add <repo> --skill <name> ...` command
 Settings would show you (adding `--global` unless `--local` is passed), then
 runs it and forwards its output and exit code. It requires `node`/`npx` on the
 host; it does not need a running Orca runtime.
+
+Each skill is fetched from the repository that ships it, and `skills add` clones
+one repository per run. A selection spanning more than one — `--all`, or an
+Orca Lab skill such as `switch-account` asked for alongside an upstream one —
+therefore resolves to one `skills add` per repository. `--dry-run` prints all of
+them, a real run executes all of them in turn, and the exit code is the first
+non-zero one.
 
 Unlike the command Settings shows, the spawned one adds `npx --yes` and `-y`.
 Without them the `skills` CLI opens an interactive agent picker and blocks
@@ -779,6 +786,10 @@ selection flags (`--skill`, `--all`, `--local`, `--dry-run`) and resolves to
 orca skills update --all                                  # update every bundled skill globally
 orca skills update --skill orca-cli --dry-run             # print the npx command without running it
 ```
+
+`skills update` takes no repository, so it never needs the split above: it
+re-fetches each skill from the source its own lock recorded when the skill was
+installed, which is how an Orca Lab skill keeps converging from the fork.
 
 `orca skills update` only refreshes skills that are already installed — it exits
 0 without doing anything for a skill that is missing, so install it first. More

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAgentFeatureSkillInstallArgs,
+  buildAgentFeatureSkillInstallArgsByRepository,
   buildAgentFeatureSkillInstallCommand,
+  groupAgentFeatureSkillNamesByRepository,
+  resolveAgentFeatureSkillRepositoryUrl,
   ORCA_CLI_SKILL_INSTALL_COMMAND,
   buildAgentFeatureSkillUpdateArgs,
   buildAgentFeatureSkillUpdateCommand,
@@ -145,5 +148,71 @@ describe('agent feature skill commands', () => {
       'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
     )
     expect(SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND).toBe('npx skills update switch-account --global')
+  })
+
+  it('routes a bare fork-only name to the fork and everything else upstream', () => {
+    // Why: callers that build from a name they were handed (skill freshness,
+    // the Windows reinstall fallback) never pass repositoryUrl of their own.
+    expect(resolveAgentFeatureSkillRepositoryUrl('switch-account')).toBe(
+      'https://github.com/ab2webco/orca-oss'
+    )
+    expect(resolveAgentFeatureSkillRepositoryUrl('orca-plane')).toBe(
+      'https://github.com/ab2webco/orca-oss'
+    )
+    for (const upstream of [
+      'orca-cli',
+      'computer-use',
+      'orchestration',
+      'orca-per-workspace-env',
+      'orca-linear',
+      'linear-tickets',
+      'orca-emulator',
+      'orca-emulator-android'
+    ]) {
+      expect(resolveAgentFeatureSkillRepositoryUrl(upstream)).toBe(
+        'https://github.com/stablyai/orca'
+      )
+    }
+    expect(buildAgentFeatureSkillInstallCommand(['switch-account'])).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
+    )
+  })
+
+  it('groups a mixed request into one command per repository, in first-seen order', () => {
+    expect(
+      groupAgentFeatureSkillNamesByRepository(['switch-account', 'orca-cli', 'orca-plane'])
+    ).toEqual([
+      {
+        repositoryUrl: 'https://github.com/ab2webco/orca-oss',
+        skillNames: ['switch-account', 'orca-plane']
+      },
+      { repositoryUrl: 'https://github.com/stablyai/orca', skillNames: ['orca-cli'] }
+    ])
+    expect(
+      buildAgentFeatureSkillInstallArgsByRepository(['orca-cli', 'switch-account'], {
+        yes: true,
+        agents: ['claude-code']
+      }).map((args) => args.join(' '))
+    ).toEqual([
+      'skills add https://github.com/stablyai/orca --skill orca-cli --global --agent claude-code -y',
+      'skills add https://github.com/ab2webco/orca-oss --skill switch-account --global --agent claude-code -y'
+    ])
+  })
+
+  it('refuses to fold a mixed request into one command instead of dropping a skill', () => {
+    expect(() => buildAgentFeatureSkillInstallCommand(['orca-cli', 'switch-account'])).toThrow(
+      'Skills from more than one repository cannot share one install command.'
+    )
+    // An explicit repositoryUrl stays authoritative: Settings passes its own.
+    expect(
+      buildAgentFeatureSkillInstallCommand(['orca-cli', 'switch-account'], {
+        repositoryUrl: 'https://github.com/ab2webco/orca-oss'
+      })
+    ).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill switch-account --global'
+    )
+    expect(() => buildAgentFeatureSkillInstallArgsByRepository([])).toThrow(
+      'At least one skill name is required.'
+    )
   })
 })

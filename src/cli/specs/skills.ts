@@ -39,6 +39,9 @@ export const SKILL_COMMAND_SPECS: CommandSpec[] = [
       'Resolves to the same `npx skills add <repo> --skill <name> ...` command used by ' +
         'Orca Settings, plus the non-interactive flags an unattended host needs ' +
         '(`npx --yes` and `-y`), then runs it and forwards its output and exit code.',
+      'Each skill is fetched from the repository that ships it, so a request mixing ' +
+        'upstream and Orca Lab skills resolves to one `skills add` per repository and ' +
+        'runs them in turn, reporting the first non-zero exit code.',
       'Installs globally (all projects, adds --global) by default. Use --local to install ' +
         'into the current project instead.',
       'Targets the coding agents Orca detects on this host, plus the shared ' +
@@ -48,7 +51,7 @@ export const SKILL_COMMAND_SPECS: CommandSpec[] = [
       'Use --agent <name>[,<name>...] to choose targets yourself, or --agent universal ' +
         'for the shared directory alone. Required when Orca detects no agent.',
       'Use --dry-run to print the resolved command without running it.',
-      'With --json, the skill listing and --dry-run emit JSON; a real install streams ' +
+      'With --json, the skill listing and --dry-run emit JSON (--dry-run emits a commands array); a real install streams ' +
         "npx's own non-JSON output live and rejects --json.",
       'Omit --skill and --all to list installable skill names.',
       'Intended for headless hosts (SSH, containers, CI) with no desktop Settings UI to copy the install command from.'
@@ -74,9 +77,11 @@ export const SKILL_COMMAND_SPECS: CommandSpec[] = [
       'Updates the global install (all projects, adds --global) by default. Use --local to ' +
         'update the current project instead.',
       'Only refreshes skills that are already installed; use `orca skills install` first.',
+      'Takes no repository: the skills CLI re-fetches each skill from the source its own ' +
+        'lock recorded at install time, so Orca Lab skills keep updating from the fork.',
       'Use --dry-run to print the resolved command without running it.',
-      'With --json, the skill listing and --dry-run emit JSON; a real update streams ' +
-        "npx's own non-JSON output live and rejects --json.",
+      'With --json, the skill listing and --dry-run emit JSON (--dry-run emits a commands ' +
+        "array); a real update streams npx's own non-JSON output live and rejects --json.",
       'Omit --skill and --all to list updatable skill names.',
       'Intended for headless hosts (SSH, containers, CI) with no desktop Settings UI to copy the update command from.'
     ],

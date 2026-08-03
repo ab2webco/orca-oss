@@ -351,8 +351,9 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command:
-            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y',
+          commands: [
+            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --global --agent claude-code --agent universal -y'
+          ],
           skills: ['alpha'],
           global: true,
           executed: false
@@ -382,8 +383,9 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command:
-            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --agent claude-code --agent universal -y',
+          commands: [
+            'npx --yes skills add https://github.com/stablyai/orca --skill alpha --agent claude-code --agent universal -y'
+          ],
           skills: ['alpha'],
           global: false,
           executed: false
@@ -601,7 +603,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command: 'npx --yes skills update alpha --project -y',
+          commands: ['npx --yes skills update alpha --project -y'],
           skills: ['alpha'],
           global: false,
           executed: false

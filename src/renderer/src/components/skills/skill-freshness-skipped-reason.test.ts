@@ -86,6 +86,17 @@ describe('skippedReason', () => {
     )
   })
 
+  it('hands over a reinstall command that points at the repository shipping the skill', () => {
+    // Why: this sentence is the only way out of an unusable lock record, so a
+    // fork-only skill needs the fork here — upstream has no such skill to reinstall.
+    expect(skippedReason([row('current')], 'switch-account')).toContain(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
+    )
+    expect(skippedReason([row('current')], 'orchestration')).toContain(
+      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+    )
+  })
+
   it('falls back to the generic sentence when no skill name is available', () => {
     expect(skippedReason([row('current')])).toContain('left this skill out of the update')
     expect(skippedReason([])).toContain('left this skill out of the update')
