@@ -15923,6 +15923,54 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('prefers the renderer screen over a polluted Codex redraw transcript for preview reads', async () => {
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: [
+        '\x1b[?1049h\x1b[2J\x1b[H >_ OpenAI Codex (v0.132.0)\r\n',
+        '› ORCA-171 verify snapshot\r\n',
+        'gpt-5.6-sol high\r\n'
+      ].join(''),
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'codex',
+      launchAgent: 'codex'
+    })
+
+    const pollutedTranscript = [
+      'Starting MCP servers (0/2): codex_apps, computer-use',
+      '• You have 1 usage limit reset available. Run /usage to use one.SStaSta2 (0s • esc to intrrupt)StaStarStartStartiSt'
+    ]
+    runtime.onPtyData('pty-1', `${pollutedTranscript.join('\n')}\n`, 100)
+
+    const preview = await runtime.readTerminal(handle)
+    const serializerCallsAfterPreview = serializeBuffer.mock.calls.length
+    const cursorRead = await runtime.readTerminal(handle, { cursor: 0 })
+
+    expect(preview.tail).toEqual([
+      ' >_ OpenAI Codex (v0.132.0)',
+      '› ORCA-171 verify snapshot',
+      'gpt-5.6-sol high'
+    ])
+    expect(cursorRead.tail).toEqual(pollutedTranscript)
+    expect(serializerCallsAfterPreview).toBeGreaterThan(0)
+    expect(serializeBuffer).toHaveBeenCalledTimes(serializerCallsAfterPreview)
+    expect(serializeBuffer).toHaveBeenCalledWith('pty-1', {
+      scrollbackRows: 0,
+      altScreenForcesZeroRows: false
+    })
+  })
+
   it('reads and shows the runtime-owned alternate-screen grid without serialization', async () => {
     const serializeBuffer = vi.fn()
     const serializeProviderBuffer = vi.fn()

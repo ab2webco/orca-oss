@@ -11312,6 +11312,12 @@ export class OrcaRuntimeService {
     if (typeof opts.cursor === 'number') {
       return read
     }
+    if (this.getKnownPtyAgent(ptyId) === 'codex') {
+      const rendererLines = await this.readRendererVisibleSnapshotLines(ptyId)
+      if (rendererLines.length > 0) {
+        return buildVisibleSnapshotReadFallback(read, rendererLines, opts.limit)
+      }
+    }
     const blankFallback = shouldFallbackToVisibleTerminalSnapshot(read, opts)
     const recoveredWorkerFallback =
       read.tail.length === 0 && this.legacyWorkerRecoveredPtys.has(ptyId)
@@ -30879,6 +30885,11 @@ export class OrcaRuntimeService {
         this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, 'tui-idle', pty))
       }
     }
+  }
+
+  private getKnownPtyAgent(ptyId: string): TuiAgent | null {
+    const pty = this.ptysById.get(ptyId)
+    return pty?.launchAgent ?? pty?.foregroundAgent ?? null
   }
 
   // Why: the primary OSC-title signal can't fire for daemon-hosted terminals (no PTY data through the runtime), so this fallback polls the renderer-synced tab title + foreground-process quiescence; self-cancels when the OSC path fires.
