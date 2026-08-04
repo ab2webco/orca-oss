@@ -2426,10 +2426,12 @@ describe('orchestration RPC methods', () => {
       })) as { state: string }
 
       expect(result).toMatchObject({ state: 'ready' })
+      // Why startupAgent, not command: worker-start launches the configured agent CLI rather
+      // than the raw agent id (#12148); the account pins still ride the same create.
       expect(runtime.createTerminal).toHaveBeenCalledWith(
         'id:repo::worktree',
         expect.objectContaining({
-          command: 'claude',
+          startupAgent: 'claude',
           claudeAccountId: 'acct-claude-1',
           codexAccountId: 'acct-codex-1'
         })

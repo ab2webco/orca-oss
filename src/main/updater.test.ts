@@ -1757,6 +1757,9 @@ describe('updater', () => {
 
   it('recovers quit-for-update state on sync quitAndInstall error event without killing PTYs', async () => {
     vi.useFakeTimers()
+    // Why pin the platform: since #12183 the pre-commit copy differs on macOS (quitting does
+    // re-stage a Squirrel update there), so the assertion below only holds off-darwin.
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
 
     autoUpdaterMock.quitAndInstall.mockImplementation(() => {
       // Why: BaseUpdater dispatches 'error' synchronously inside install() for the common "no staged update filepath" path.
@@ -1787,6 +1790,7 @@ describe('updater', () => {
         message: 'Could not start the update installer. Orca remains open.'
       })
     )
+    platformSpy.mockRestore()
   })
 
   it('does not recover quit-for-update state from late errors after install commit', async () => {

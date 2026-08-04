@@ -7,6 +7,7 @@ import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version
 import Database from '../../sqlite/sync-database'
 import { OrcaRuntimeService } from '../orca-runtime'
 import { OrchestrationDb } from '../orchestration/db'
+import { SUCCESS_ENVELOPE } from '../orchestration/worker-done-envelope-fixture'
 import type { RpcRequest, RpcResponse } from './core'
 import { RpcDispatcher } from './dispatcher'
 import { ORCHESTRATION_METHODS } from './methods/orchestration'
@@ -225,7 +226,10 @@ describe('orchestration runtime update settlement', () => {
           taskId: harness.taskId,
           dispatchId: harness.dispatchId,
           outcome: 'succeeded',
-          filesModified: ['worker-result.txt']
+          filesModified: ['worker-result.txt'],
+          // Why the envelope: createDispatchContext briefs the typed worker_done contract
+          // (ORCA-178), so a prose report would be rejected instead of settling the task.
+          envelope: SUCCESS_ENVELOPE
         })
       },
       'worker',

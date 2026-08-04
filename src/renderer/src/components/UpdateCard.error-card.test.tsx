@@ -247,7 +247,11 @@ describe('UpdateCard Linux package-install recovery', () => {
     await flushActions()
 
     fireEvent.click(screen.getByRole('button', { name: 'Download Manually' }))
-    expect(openUrl).toHaveBeenCalledWith('https://github.com/stablyai/orca/releases/tag/v1.4.200')
+    // Why the fork repo: the manual-download fallback resolves through the same release-channel
+    // constants as every other update surface, which publish at ab2webco/orca-oss.
+    expect(openUrl).toHaveBeenCalledWith(
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.200'
+    )
   })
 
   it('keeps generic errors on the generic card when no recovery is attached', () => {

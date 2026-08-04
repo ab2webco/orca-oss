@@ -4804,7 +4804,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     }
 
     const refreshAfterFailure = (worktreeIds: readonly string[], err: unknown): void => {
-      console.error('Failed to update worktree meta:', err)
+      // Why quiet on a selector miss: the row moved or vanished, so refetching is the fix, not an
+      // error — same contract the single-row path keeps.
+      if (!isRuntimeSelectorNotFoundError(err)) {
+        console.error('Failed to update worktree meta:', err)
+      }
       for (const repoId of new Set(worktreeIds.map(getRepoIdFromWorktreeId))) {
         void get().fetchWorktrees(repoId)
       }

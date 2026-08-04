@@ -10165,6 +10165,7 @@ describe('registerPtyHandlers', () => {
         projectGroupId: 'folder-group'
       }
       const store = {
+        getWorktreeMeta: vi.fn(() => null),
         persistPtyBinding: vi.fn(),
         getFolderWorkspace: vi.fn(() => folderWorkspace),
         getFolderWorkspaces: vi.fn(() => [folderWorkspace]),
@@ -10394,6 +10395,7 @@ describe('registerPtyHandlers', () => {
       onPtyExit: vi.fn()
     }
     const store = {
+      getWorktreeMeta: vi.fn(() => null),
       getWorkspaceSession: vi.fn(() => ({
         tabsByWorktree: {
           [worktreeId]: [{ id: tabId, worktreeId, ptyId: 'pty-persisted-owner' }]
@@ -10521,6 +10523,7 @@ describe('registerPtyHandlers', () => {
         terminalPtyIncarnationsByPaneKey: { [paneKey]: 'inc-dead-persisted-owner' }
       }
       const store = {
+        getWorktreeMeta: vi.fn(() => null),
         getWorkspaceSession: vi.fn(() => session),
         setWorkspaceSession: vi.fn((next) => {
           session = next
@@ -10681,6 +10684,7 @@ describe('registerPtyHandlers', () => {
       terminalPtyIncarnationsByPaneKey: { [paneKey]: 'inc-dead-ssh-owner' }
     }
     const store = {
+      getWorktreeMeta: vi.fn(() => null),
       getWorkspaceSession: vi.fn((requestedHostId?: string) => {
         expect(requestedHostId).toBe(hostId)
         return session

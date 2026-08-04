@@ -6915,26 +6915,30 @@ describe('worktree remote runtime mutations', () => {
     [
       'updateWorktreeMeta',
       (store: ReturnType<typeof createTestStore>, worktreeId: string) =>
-        store.getState().updateWorktreeMeta(worktreeId, { isUnread: true })
+        store.getState().updateWorktreeMeta(worktreeId, { isUnread: true }),
+      'updateMeta' as const
     ],
     [
+      // Why this one asserts updateMetaBatch: the bulk path sends every local row in one IPC.
       'updateWorktreesMeta',
       (store: ReturnType<typeof createTestStore>, worktreeId: string) =>
-        store.getState().updateWorktreesMeta(new Map([[worktreeId, { isUnread: true }]]))
+        store.getState().updateWorktreesMeta(new Map([[worktreeId, { isUnread: true }]])),
+      'updateMetaBatch' as const
     ],
     [
       'markWorktreeUnread',
       async (store: ReturnType<typeof createTestStore>, worktreeId: string) => {
         store.getState().markWorktreeUnread(worktreeId)
         await new Promise((resolve) => setTimeout(resolve, 0))
-      }
+      },
+      'updateMeta' as const
     ]
-  ])('swallows a transport-wrapped selector miss in %s', async (_name, run) => {
+  ])('swallows a transport-wrapped selector miss in %s', async (_name, run, api) => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const store = createTestStore()
     const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
-    mockApi.worktrees.updateMeta.mockRejectedValue(
-      new Error("Error invoking remote method 'worktrees:updateMeta': Error: selector_not_found")
+    mockApi.worktrees[api].mockRejectedValue(
+      new Error(`Error invoking remote method 'worktrees:${api}': Error: selector_not_found`)
     )
     store.setState({ worktreesByRepo: { repo1: [wt] } } as Partial<AppState>)
 
@@ -6942,11 +6946,11 @@ describe('worktree remote runtime mutations', () => {
       await run(store, wt.id)
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      expect(mockApi.worktrees.updateMeta).toHaveBeenCalled()
+      expect(mockApi.worktrees[api]).toHaveBeenCalled()
       expect(errorSpy).not.toHaveBeenCalled()
     } finally {
       errorSpy.mockRestore()
-      mockApi.worktrees.updateMeta.mockReset().mockResolvedValue({})
+      mockApi.worktrees[api].mockReset().mockResolvedValue({})
     }
   })
 

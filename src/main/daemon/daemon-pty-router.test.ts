@@ -343,11 +343,14 @@ describe('DaemonPtyRouter', () => {
 
   it('reports snapshot capability for the adapter that owns each session', async () => {
     const current = createAdapter('current', ['current-session'], undefined, PROTOCOL_VERSION)
+    // Why one below the fidelity gate, not the attach-only constant: the lab's merged
+    // daemon sits above both lineages, so attach-only is no longer the version just
+    // under fidelity — only the boundary itself proves the gate.
     const legacy = createAdapter(
       'legacy',
       ['legacy-session'],
       undefined,
-      STABLE_PANE_ATTACH_ONLY_DAEMON_PROTOCOL_VERSION
+      SNAPSHOT_SERIALIZER_FIDELITY_DAEMON_PROTOCOL_VERSION - 1
     )
     const router = new DaemonPtyRouter({ current, legacy: [legacy] })
     await router.discoverLegacySessions()
