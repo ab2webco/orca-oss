@@ -17,6 +17,56 @@ export const PLANE_AGENT_SKILL_NAMES = [ORCA_PLANE_SKILL_NAME] as const
 export const SWITCH_ACCOUNT_SKILL_NAME = 'switch-account'
 export const SWITCH_ACCOUNT_AGENT_SKILL_NAMES = [SWITCH_ACCOUNT_SKILL_NAME] as const
 
+// Why: `skills add` resolves names against the repo it is given, so a fork-only
+// skill asked for from upstream comes back "No matching skills found" — every
+// caller that builds a command from a bare name has to route by name to get here.
+const FORK_ONLY_SKILL_NAMES: ReadonlySet<string> = new Set<string>([
+  ORCA_PLANE_SKILL_NAME,
+  SWITCH_ACCOUNT_SKILL_NAME
+])
+
+export function resolveAgentFeatureSkillRepositoryUrl(skillName: string): string {
+  return FORK_ONLY_SKILL_NAMES.has(skillName)
+    ? ORCA_LAB_SKILLS_REPOSITORY_URL
+    : ORCA_SKILLS_REPOSITORY_URL
+}
+
+export type AgentFeatureSkillRepositoryGroup = {
+  repositoryUrl: string
+  skillNames: string[]
+}
+
+/** Groups names by source repo, in first-seen order; `skills add` takes one repo. */
+export function groupAgentFeatureSkillNamesByRepository(
+  skillNames: readonly string[]
+): AgentFeatureSkillRepositoryGroup[] {
+  const groups = new Map<string, AgentFeatureSkillRepositoryGroup>()
+  for (const skillName of skillNames) {
+    const repositoryUrl = resolveAgentFeatureSkillRepositoryUrl(skillName)
+    const group = groups.get(repositoryUrl)
+    if (!group) {
+      groups.set(repositoryUrl, { repositoryUrl, skillNames: [skillName] })
+    } else if (!group.skillNames.includes(skillName)) {
+      group.skillNames.push(skillName)
+    }
+  }
+  return [...groups.values()]
+}
+
+// Why: dropping the odd one out or sending both to one URL are the two silent
+// failures here, so a caller that has not grouped is refused rather than guessed at.
+function resolveSoleRepositoryUrl(skillNames: readonly string[]): string {
+  const groups = groupAgentFeatureSkillNamesByRepository(skillNames)
+  const [sole] = groups
+  if (!sole || groups.length > 1) {
+    throw new Error(
+      'Skills from more than one repository cannot share one install command. ' +
+        'Use buildAgentFeatureSkillInstallArgsByRepository instead.'
+    )
+  }
+  return sole.repositoryUrl
+}
+
 // Why: `yes` and `agents` default off so every Settings/onboarding string a human
 // pastes keeps its interactive prompts and the CLI's own agent detection. Only an
 // unattended spawn, which nothing can answer, opts in.
@@ -53,7 +103,7 @@ export function buildAgentFeatureSkillInstallArgs(
   return [
     'skills',
     'add',
-    options.repositoryUrl ?? ORCA_SKILLS_REPOSITORY_URL,
+    options.repositoryUrl ?? resolveSoleRepositoryUrl(skillNames),
     ...skillArgs,
     ...(global ? ['--global'] : []),
     // Why: an explicit --agent stops `skills add` calling its own detection, whose
@@ -64,6 +114,25 @@ export function buildAgentFeatureSkillInstallArgs(
     // forever on any TTY, which is every ssh session.
     ...(options.yes ? ['-y'] : [])
   ]
+}
+
+/** One argv per source repo, so a mixed request installs from both rather than one. */
+export function buildAgentFeatureSkillInstallArgsByRepository(
+  skillNames: readonly string[],
+  options: AgentFeatureSkillCommandOptions = {}
+): string[][] {
+  if (skillNames.length === 0) {
+    throw new Error('At least one skill name is required.')
+  }
+  if (options.repositoryUrl !== undefined) {
+    return [buildAgentFeatureSkillInstallArgs(skillNames, options)]
+  }
+  return groupAgentFeatureSkillNamesByRepository(skillNames).map((group) =>
+    buildAgentFeatureSkillInstallArgs(group.skillNames, {
+      ...options,
+      repositoryUrl: group.repositoryUrl
+    })
+  )
 }
 
 export function buildAgentFeatureSkillInstallCommand(

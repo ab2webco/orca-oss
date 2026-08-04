@@ -17,7 +17,7 @@ import {
 } from '../../shared/windows-batch-spawn'
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
 import {
-  buildAgentFeatureSkillInstallArgs,
+  buildAgentFeatureSkillInstallArgsByRepository,
   buildAgentFeatureSkillUpdateArgs
 } from '../../shared/agent-feature-install-commands'
 
@@ -227,19 +227,24 @@ function resolveInstallAgentKeys(flags: Map<string, string | boolean>): string[]
   )
 }
 
+/**
+ * One argv per `skills` invocation: install splits by source repo, update never
+ * does — `skills update` takes no repo and re-fetches each skill from the source
+ * its own lock recorded at install time.
+ */
 function buildNpxSkillsArgs(
   verb: SkillMutationVerb,
   skillNames: string[],
   global: boolean,
   agents: string[]
-): string[] {
+): string[][] {
   const skillArgs =
     verb === 'install'
-      ? buildAgentFeatureSkillInstallArgs(skillNames, { global, yes: true, agents })
-      : buildAgentFeatureSkillUpdateArgs(skillNames, { global, yes: true })
+      ? buildAgentFeatureSkillInstallArgsByRepository(skillNames, { global, yes: true, agents })
+      : [buildAgentFeatureSkillUpdateArgs(skillNames, { global, yes: true })]
   // Why: a cold package cache makes bare `npx` prompt before it will fetch
   // `skills`, which strands an unattended host just like the picker does.
-  return ['--yes', ...skillArgs]
+  return skillArgs.map((args) => ['--yes', ...args])
 }
 
 /** Render the exact argv a real run spawns, so --dry-run can never drift from it. */
@@ -290,14 +295,14 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
     // Why: install scopes its targets; update only refreshes what is already placed.
     const agents = verb === 'install' ? resolveInstallAgentKeys(flags) : []
     const npxArgs = buildNpxSkillsArgs(verb, skillNames, global, agents)
-    const command = formatNpxCommand(npxArgs)
+    const commands = npxArgs.map(formatNpxCommand)
     const dryRun = flags.get('dry-run') === true
 
     if (dryRun) {
       writeStdout(
         json
-          ? JSON.stringify({ command, skills: skillNames, global, executed: false }, null, 2)
-          : `${command}\n\nRerun without --dry-run to ${verb} now.`
+          ? JSON.stringify({ commands, skills: skillNames, global, executed: false }, null, 2)
+          : `${commands.join('\n')}\n\nRerun without --dry-run to ${verb} now.`
       )
       return
     }
@@ -312,10 +317,19 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
       )
     }
 
-    // Why: stdio is inherited for the child below, so this status line must go to
-    // stderr — stdout is npx's own output, not this command's JSON channel.
-    process.stderr.write(`Running: ${command}\n`)
-    process.exitCode = await runNpxSkills(npxArgs)
+    // Why: every command --dry-run promised has to run, or the two surfaces stop
+    // agreeing; the first failure is reported without cancelling the other repo.
+    let failure = 0
+    for (const [index, args] of npxArgs.entries()) {
+      // Why: stdio is inherited for the child below, so this status line must go to
+      // stderr — stdout is npx's own output, not this command's JSON channel.
+      process.stderr.write(`Running: ${commands[index]}\n`)
+      const code = await runNpxSkills(args)
+      if (code !== 0 && failure === 0) {
+        failure = code
+      }
+    }
+    process.exitCode = failure
   }
 }
 
