@@ -121,8 +121,13 @@ test.describe('cold worktree activation deferral', () => {
     const lastActiveTabId = await getActiveTabId(page)
 
     // Keep the target cold across reload so authority can settle before its one-time activation plan.
-    await page.evaluate((id) => window.__store?.getState().setActiveWorktree(id), originalWorktreeId)
-    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(originalWorktreeId)
+    await page.evaluate(
+      (id) => window.__store?.getState().setActiveWorktree(id),
+      originalWorktreeId
+    )
+    await expect
+      .poll(() => waitForActiveWorktree(page), { timeout: 30_000 })
+      .toBe(originalWorktreeId)
 
     // Why: trigger the production synchronous shutdown flush and verify its
     // persisted result instead of sleeping through the debounce.
@@ -151,7 +156,9 @@ test.describe('cold worktree activation deferral', () => {
     // and the activation must defer them instead of mounting all at once.
     await page.reload()
     await waitForSessionReady(page)
-    await expect.poll(() => waitForActiveWorktree(page), { timeout: 30_000 }).toBe(originalWorktreeId)
+    await expect
+      .poll(() => waitForActiveWorktree(page), { timeout: 30_000 })
+      .toBe(originalWorktreeId)
     await expect
       .poll(async () => (await getTerminalTabSnapshots(page, worktreeId)).length, {
         timeout: 15_000,
@@ -162,13 +169,16 @@ test.describe('cold worktree activation deferral', () => {
       .poll(
         () =>
           page.evaluate(
-            ({ id, ptyIds, expectedCount }) => {
+            // Why await: the capability lookup is a Promise (api-types.ts). Read
+            // synchronously it yields one, whose `.length` is undefined, so the
+            // predicate is permanently false and `?? []` never fires (ORCA-184).
+            async ({ id, ptyIds, expectedCount }) => {
               const state = window.__store?.getState()
               const worktree = Object.values(state?.worktreesByRepo ?? {})
                 .flat()
                 .find((candidate) => candidate.id === id)
               const capabilities =
-                window.api.pty.getAuthoritativeBufferSnapshotCapabilities?.(ptyIds) ?? []
+                (await window.api.pty.getAuthoritativeBufferSnapshotCapabilities?.(ptyIds)) ?? []
               return (
                 worktree?.hostId === 'local' &&
                 ptyIds.length === expectedCount &&
