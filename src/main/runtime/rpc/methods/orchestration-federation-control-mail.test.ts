@@ -8,6 +8,7 @@ import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { authenticatedCallerFingerprint } from '../orchestration-mutation-executor'
 import { ORCHESTRATION_METHODS } from './orchestration'
+import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 describe('orchestration federation control mail', () => {
   const homeToken = 'run-home-device-token'
@@ -246,6 +247,7 @@ describe('orchestration federation control mail', () => {
           taskId,
           dispatchId,
           outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE,
           filesModified: []
         })
       }),

@@ -33,17 +33,58 @@ export function resolveRemoteOrchestrationSender(
   return explicit ?? envHandle ?? 'unknown'
 }
 
+function readRemoteEnvelope(flags: RemoteFlags): unknown {
+  if (optionalString(flags, 'envelope-file') !== undefined) {
+    // Why: this fallback runs on the Orca host, so a worker-side path is not
+    // readable here; inline JSON is the only form that survives the hop.
+    throw new RemoteCliArgumentError(
+      'invalid_argument',
+      '--envelope-file is not available over the remote CLI fallback. Pass the same JSON with --envelope.'
+    )
+  }
+  const inline = optionalString(flags, 'envelope')
+  if (inline === undefined) {
+    return undefined
+  }
+  try {
+    return JSON.parse(inline)
+  } catch {
+    throw new RemoteCliArgumentError(
+      'invalid_argument',
+      'The worker_done envelope must be valid JSON.'
+    )
+  }
+}
+
+function deriveRemoteOutcome(envelope: unknown): string | undefined {
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    return undefined
+  }
+  const status = (envelope as { status?: unknown }).status
+  if (status === 'success') {
+    return 'succeeded'
+  }
+  return status === 'blocked' || status === 'failed' ? 'failed' : undefined
+}
+
 export function getRemoteOrchestrationPayload(flags: RemoteFlags): string | undefined {
   const rawPayload = optionalString(flags, 'payload')
   const taskId = optionalString(flags, 'task-id')
   const dispatchId = optionalString(flags, 'dispatch-id')
-  const outcome = optionalString(flags, 'outcome')
+  const envelope = readRemoteEnvelope(flags)
+  const outcome = optionalString(flags, 'outcome') ?? deriveRemoteOutcome(envelope)
   const filesModified = optionalString(flags, 'files-modified')
   const reportPath = optionalString(flags, 'report-path')
   const phase = optionalString(flags, 'phase')
-  const hasStructuredPayload = [taskId, dispatchId, outcome, filesModified, reportPath, phase].some(
-    (value) => value !== undefined
-  )
+  const hasStructuredPayload = [
+    taskId,
+    dispatchId,
+    outcome,
+    filesModified,
+    reportPath,
+    phase,
+    envelope
+  ].some((value) => value !== undefined)
   if (!hasStructuredPayload) {
     return rawPayload
   }
@@ -56,7 +97,10 @@ export function getRemoteOrchestrationPayload(flags: RemoteFlags): string | unde
 
   // Why: the fallback receives the same preamble commands as the full CLI;
   // preserving these flags keeps lifecycle payloads valid over broken installs.
-  const payload: Record<string, string | string[]> = {}
+  const payload: Record<string, unknown> = {}
+  if (envelope !== undefined) {
+    payload.envelope = envelope
+  }
   if (taskId) {
     payload.taskId = taskId
   }

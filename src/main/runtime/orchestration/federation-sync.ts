@@ -1,11 +1,13 @@
 import {
   MESSAGE_TYPES,
+  type DispatchContextRow,
   type MessagePriority,
   type MessageType,
   type WorkerReportOutcome
 } from './types'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import { OrchestrationError } from './orchestration-error'
+import { parseWorkerDoneEnvelope, type WorkerDoneEnvelope } from './worker-done-envelope'
 
 const MESSAGE_TYPE_SET = new Set<MessageType>(MESSAGE_TYPES)
 
@@ -88,7 +90,7 @@ export async function syncFederatedDispatch(
         threadId: message.threadId ?? undefined,
         payload: message.payload ?? undefined
       },
-      lifecycle: parseFederatedLifecycle(message, item.message_id, dispatchId, dispatch.task_id)
+      lifecycle: parseFederatedLifecycle(dispatch, message, item.message_id)
     })
     cursor = item.sequence
     runtime.notifyMessageArrived(stored.message.to_handle, stored.message.type)
@@ -160,10 +162,9 @@ export function parseRelayedMessage(payload: string): RelayedMessage {
 }
 
 function parseFederatedLifecycle(
+  dispatch: DispatchContextRow,
   message: RelayedMessage,
-  messageId: string,
-  dispatchId: string,
-  taskId: string
+  messageId: string
 ):
   | { kind: 'none' }
   | { kind: 'heartbeat'; at: string }
@@ -190,7 +191,8 @@ function parseFederatedLifecycle(
       reason: error instanceof Error ? error.message : String(error)
     }
   }
-  if (payload.dispatchId !== dispatchId || payload.taskId !== taskId) {
+  const dispatchId = dispatch.id
+  if (payload.dispatchId !== dispatchId || payload.taskId !== dispatch.task_id) {
     return {
       kind: 'rejected',
       code: 'task_dispatch_mismatch',
@@ -207,6 +209,7 @@ function parseFederatedLifecycle(
     completedBy: `dispatch:${dispatchId}`,
     filesModified: payload.filesModified,
     reportPath: payload.reportPath,
+    envelope: readFederatedEnvelope(payload.envelope),
     completedAt: new Date().toISOString()
   })
   return {
@@ -217,12 +220,22 @@ function parseFederatedLifecycle(
   }
 }
 
+// Why: a federated worker settles its own relay attachment as it reports, so a
+// home-side rejection could never be corrected in that session. Record the
+// envelope when it is valid and leave enforcement to the local contract until
+// the worker-side correction round exists (ORCA-178 follow-up).
+function readFederatedEnvelope(rawEnvelope: unknown): WorkerDoneEnvelope | null {
+  const parsed = parseWorkerDoneEnvelope(rawEnvelope)
+  return parsed.ok ? parsed.envelope : null
+}
+
 function parseWorkerReportPayload(payload: string | null): {
   taskId: string
   dispatchId: string
   outcome: WorkerReportOutcome
   filesModified: string[]
   reportPath: string | null
+  envelope: unknown
 } {
   let parsed: unknown
   try {
@@ -248,6 +261,7 @@ function parseWorkerReportPayload(payload: string | null): {
     filesModified: Array.isArray(report.filesModified)
       ? report.filesModified.filter((file): file is string => typeof file === 'string')
       : [],
-    reportPath: typeof report.reportPath === 'string' ? report.reportPath : null
+    reportPath: typeof report.reportPath === 'string' ? report.reportPath : null,
+    envelope: report.envelope
   }
 }

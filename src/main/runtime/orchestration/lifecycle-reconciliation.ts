@@ -1,6 +1,16 @@
 import type { OrchestrationDb } from './db'
 import type { MessageRow, WorkerReportOutcome } from './types'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
+import {
+  noopLifecycleLog,
+  rejectLifecycleMessage,
+  type LifecycleLogFn,
+  type LifecycleRejectionCode,
+  type LifecycleRejectionResult
+} from './lifecycle-rejection'
+import { enforceEnvelopeContract } from './worker-done-envelope-contract'
+
+export type { LifecycleRejectionCode, LifecycleRejectionResult }
 
 // Why: the tab half can change on pane break-out, while opaque legacy keys
 // have no safe equivalence beyond exact equality.
@@ -37,29 +47,6 @@ export type LifecycleReconciliationResult =
   | { action: 'completed'; taskId: string; dispatchId: string }
   | { action: 'failed'; taskId: string; dispatchId: string }
   | { action: 'heartbeat_recorded'; dispatchId: string }
-
-export type LifecycleRejectionCode =
-  | 'sender_not_assignee'
-  | 'dispatch_capability_invalid'
-  | 'invalid_payload'
-  | 'missing_task_id'
-  | 'missing_dispatch_id'
-  | 'invalid_outcome'
-  | 'unknown_task'
-  | 'unknown_dispatch'
-  | 'task_dispatch_mismatch'
-  | 'inactive_dispatch'
-  | 'stale_dispatch'
-
-export type LifecycleRejectionResult = {
-  action: 'rejected'
-  code: LifecycleRejectionCode
-  reason: string
-}
-
-type LogFn = (msg: string) => void
-
-const noopLog: LogFn = () => {}
 
 function parseObjectPayload(msg: MessageRow, onInvalidJson: () => void): Record<string, unknown> {
   if (!msg.payload) {
@@ -103,7 +90,7 @@ function getPersistedLifecycleRejection(
 export function reconcileLifecycleMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn = noopLog
+  onLog: LifecycleLogFn = noopLifecycleLog
 ): LifecycleReconciliationResult {
   switch (msg.type) {
     case 'worker_done':
@@ -124,7 +111,7 @@ export function reconcileLifecycleMessage(
 function reconcileHeartbeatMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn
+  onLog: LifecycleLogFn
 ): LifecycleReconciliationResult {
   if (!msg.payload) {
     onLog(`Heartbeat from ${msg.from_handle} missing payload; ignored`)
@@ -174,7 +161,7 @@ function reconcileHeartbeatMessage(
 function reconcileWorkerDoneMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn
+  onLog: LifecycleLogFn
 ): LifecycleReconciliationResult {
   onLog(`Worker done: ${msg.from_handle} — ${msg.subject}`)
 
@@ -265,6 +252,11 @@ function reconcileWorkerDoneMessage(
     db.convertLifecycleMessageToRejection(msg.id, 'sender_not_assignee', reason)
     return { action: 'rejected', code: 'sender_not_assignee', reason }
   }
+  const envelopeCheck = enforceEnvelopeContract(db, msg, dispatch, outcome, payload.envelope, onLog)
+  if (envelopeCheck.action === 'rejected') {
+    return envelopeCheck
+  }
+
   // Why: `orchestration.send` can release the DB lock before waking the
   // coordinator; the later coordinator read still needs to observe completion.
   const filesModified =
@@ -283,6 +275,9 @@ function reconcileWorkerDoneMessage(
     completedBy: msg.from_handle,
     filesModified,
     reportPath: typeof payload.reportPath === 'string' ? payload.reportPath : null,
+    // Why: the coordinator reads the settled task, not the worker's screen —
+    // the validated envelope has to travel with the result.
+    envelope: envelopeCheck.envelope,
     completedAt: new Date().toISOString()
   })
   const settlement = db.settleWorkerReport({
@@ -302,18 +297,6 @@ function reconcileWorkerDoneMessage(
   }
   onLog(`Task ${taskId} completed by worker report`)
   return { action: 'completed', taskId, dispatchId }
-}
-
-function rejectLifecycleMessage(
-  db: OrchestrationDb,
-  msg: MessageRow,
-  code: LifecycleRejectionCode,
-  reason: string,
-  onLog: LogFn
-): LifecycleRejectionResult {
-  onLog(`Warning: ${msg.type} rejected: ${reason}`)
-  db.convertLifecycleMessageToRejection(msg.id, code, reason)
-  return { action: 'rejected', code, reason }
 }
 
 function buildLifecycleAuthorityRejectionReason(

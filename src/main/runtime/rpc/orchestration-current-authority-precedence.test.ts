@@ -132,7 +132,18 @@ describe('current orchestration authority precedence', () => {
       const payload = JSON.stringify({
         taskId,
         dispatchId,
-        ...(outcome ? { outcome } : {})
+        ...(outcome
+          ? {
+              outcome,
+              envelope: {
+                status: 'success',
+                summary: 'Did the requested work.',
+                verification: [
+                  { claim: 'suite passes', evidence: 'npm test: 0 failures', level: 'unit' }
+                ]
+              }
+            }
+          : {})
       })
       const response = await harness.dispatcher.dispatch({
         ...request(

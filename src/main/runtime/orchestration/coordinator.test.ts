@@ -7,6 +7,7 @@ import {
   parseAllowStaleBaseFromSpec,
   type CoordinatorRuntime
 } from './coordinator'
+import { SUCCESS_ENVELOPE } from './worker-done-envelope-fixture'
 
 type DriftResult = {
   base: string
@@ -99,6 +100,7 @@ function insertWorkerDone(
       taskId: params.taskId,
       dispatchId,
       outcome: 'succeeded',
+      envelope: SUCCESS_ENVELOPE,
       ...(params.filesModified ? { filesModified: params.filesModified } : {})
     }),
     senderPaneKey:
@@ -193,7 +195,12 @@ describe('Coordinator', () => {
       to: 'coord',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      })
     })
 
     reconcileLifecycleMessage(db, msg)
@@ -218,7 +225,8 @@ describe('Coordinator', () => {
     const payload = JSON.stringify({
       taskId: task.id,
       dispatchId: dispatch.id,
-      outcome: 'succeeded'
+      outcome: 'succeeded',
+      envelope: SUCCESS_ENVELOPE
     })
     const first = db.insertMessage({
       from: 'term_a',
@@ -577,7 +585,8 @@ describe('Coordinator', () => {
       payload: JSON.stringify({
         taskId: task.id,
         dispatchId: staleCtx.id,
-        outcome: 'succeeded'
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
       })
     })
 
@@ -630,7 +639,12 @@ describe('Coordinator', () => {
       to: 'coord',
       subject: 'Done after restart',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: ctx.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: ctx.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: `tab_after:${leafId}`
     })
 

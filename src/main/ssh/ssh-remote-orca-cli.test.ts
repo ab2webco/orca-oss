@@ -15,6 +15,7 @@ import { OrchestrationDb } from '../runtime/orchestration/db'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HostCliPassthroughOptions } from './ssh-remote-cli-host-passthrough'
 import { runRemoteOrcaCli } from './ssh-remote-orca-cli'
+import { SUCCESS_ENVELOPE } from '../runtime/orchestration/worker-done-envelope-fixture'
 
 // Why: pointing the passthrough at a missing CLI entry forces the legacy
 // in-process fallback, which is what these dispatch tests exercise.
@@ -281,6 +282,8 @@ describe('runRemoteOrcaCli', () => {
             dispatch.id,
             '--outcome',
             'succeeded',
+            '--envelope',
+            JSON.stringify(SUCCESS_ENVELOPE),
             '--files-modified',
             'src/a.ts, src/b.ts',
             '--json'
@@ -347,6 +350,8 @@ describe('runRemoteOrcaCli', () => {
             started.dispatch.id,
             '--outcome',
             'succeeded',
+            '--envelope',
+            JSON.stringify(SUCCESS_ENVELOPE),
             '--dispatch-capability',
             capability,
             '--json'

@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
@@ -89,6 +92,84 @@ describe('orchestration send structured payload flags', () => {
       senderLaunchToken: undefined,
       devMode: false
     })
+  })
+
+  it('reads the envelope from a file and derives the outcome from its status', async () => {
+    const envelopePath = join(mkdtempSync(join(tmpdir(), 'orca-envelope-')), 'envelope.json')
+    const envelope = {
+      status: 'blocked',
+      summary: 'Staging host unreachable.',
+      verification: [{ claim: 'deploy path', evidence: '', level: 'none' }]
+    }
+    writeFileSync(envelopePath, JSON.stringify(envelope), 'utf8')
+
+    await invokeSend(
+      new Map<string, string | boolean>([
+        ['from', 'term_worker'],
+        ['subject', 'blocked'],
+        ['type', 'worker_done'],
+        ['task-id', 'task_1'],
+        ['dispatch-id', 'ctx_1'],
+        ['envelope-file', envelopePath]
+      ])
+    )
+
+    expect(callMock).toHaveBeenCalledWith(
+      'orchestration.send',
+      expect.objectContaining({
+        payload: JSON.stringify({
+          envelope,
+          taskId: 'task_1',
+          dispatchId: 'ctx_1',
+          outcome: 'failed'
+        })
+      })
+    )
+  })
+
+  it('keeps an explicit outcome that contradicts the envelope so the runtime can reject it', async () => {
+    await invokeSend(
+      new Map<string, string | boolean>([
+        ['from', 'term_worker'],
+        ['subject', 'done'],
+        ['type', 'worker_done'],
+        ['task-id', 'task_1'],
+        ['dispatch-id', 'ctx_1'],
+        ['outcome', 'succeeded'],
+        ['envelope', JSON.stringify({ status: 'failed', summary: 'nope' })]
+      ])
+    )
+
+    const lastCall = callMock.mock.calls.at(-1) as [string, { payload: string }]
+    const payload = JSON.parse(lastCall[1].payload) as { outcome: string }
+    expect(payload.outcome).toBe('succeeded')
+  })
+
+  it('rejects an envelope on a non-worker_done message', async () => {
+    await expect(
+      invokeSend(
+        new Map<string, string | boolean>([
+          ['from', 'term_worker'],
+          ['subject', 'status'],
+          ['type', 'status'],
+          ['envelope', '{"status":"success"}']
+        ])
+      )
+    ).rejects.toThrow(/only valid with --type worker_done/)
+    expect(callMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects an envelope that is not valid JSON', async () => {
+    await expect(
+      invokeSend(
+        new Map<string, string | boolean>([
+          ['from', 'term_worker'],
+          ['subject', 'done'],
+          ['type', 'worker_done'],
+          ['envelope', '{status: success}']
+        ])
+      )
+    ).rejects.toThrow(/must be valid JSON/)
   })
 
   it('forwards multiline message bodies without normalization', async () => {

@@ -13,6 +13,40 @@ describe('remote orchestration send compatibility', () => {
     expect(hasRemoteLifecycleRejection(null)).toBe(false)
   })
 
+  it('forwards the worker_done envelope and derives the outcome from its status', () => {
+    const envelope = {
+      status: 'blocked',
+      summary: 'Remote host lost its checkout.'
+    }
+    const payload = getRemoteOrchestrationPayload(
+      new Map([
+        ['task-id', 'task_1'],
+        ['dispatch-id', 'ctx_1'],
+        ['envelope', JSON.stringify(envelope)]
+      ])
+    )
+
+    expect(JSON.parse(payload ?? '{}')).toEqual({
+      envelope,
+      taskId: 'task_1',
+      dispatchId: 'ctx_1',
+      outcome: 'failed'
+    })
+  })
+
+  // Why: this fallback runs on the Orca host, so a worker-side envelope path
+  // would silently read the wrong file or nothing at all.
+  it('rejects --envelope-file over the remote fallback with the inline alternative', () => {
+    expect(() =>
+      getRemoteOrchestrationPayload(
+        new Map([
+          ['task-id', 'task_1'],
+          ['envelope-file', '/home/alice/envelope.json']
+        ])
+      )
+    ).toThrow(/Pass the same JSON with --envelope/)
+  })
+
   it('prefers an explicit sender over the remote terminal environment', () => {
     expect(
       resolveRemoteOrchestrationSender(
