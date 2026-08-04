@@ -51,6 +51,7 @@ import {
 } from '../shared/pty-startup-ingress'
 import { resolvePtyOwnerBackend, type PtyOwnerBackend } from '../shared/pty-owner-backend'
 import { RecentPtyOutputBuffer } from '../main/runtime/recent-pty-output-buffer'
+import { expandWindowsPathEnvironmentVariables } from '../shared/windows-environment-expansion'
 import {
   agentSessionOwnerBindingsEqual,
   ClaimedAgentPtyOwnerRegistry
@@ -264,6 +265,10 @@ const ALLOWED_WINDOWS_SHELL_OVERRIDES = new Set([
   'cmd',
   'wsl.exe',
   'wsl',
+  // Why: both spellings classify as a POSIX startup family, so rejecting them here made the relay
+  // the one host that hard-failed a setting the local and daemon PTYs accept.
+  'bash.exe',
+  'bash',
   WINDOWS_GIT_BASH_SHELL
 ])
 
@@ -610,6 +615,7 @@ export class PtyHandler {
     if (!result.TERM) {
       result.TERM = 'xterm-256color'
     }
+    expandWindowsPathEnvironmentVariables(result)
     return result
   }
 

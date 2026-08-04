@@ -393,7 +393,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: SendParams,
     handler: async (
       params,
-      { runtime, orchestrationCapability, legacyCoordinatorRunId, revalidateLegacyCoordinator }
+      {
+        runtime,
+        orchestrationCapability,
+        legacyCoordinatorRunId,
+        revalidateLegacyCoordinator,
+        orchestrationCompatibilityCallerAuthority
+      }
     ) => {
       const db = runtime.getOrchestrationDb()
       // Why: lifecycle authority starts with proof of the local sender pane, never its claimed handle.
@@ -403,13 +409,21 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         launchToken: params.senderLaunchToken
       })
       const from = sender.handle
-      const senderPaneKey = sender.paneKey
+      // Why keep the attested caller as well: hook identity survives a graph remount, where the
+      // runtime can no longer resolve the pane from the handle alone. It is matched against the
+      // authenticated handle, never a claimed one.
+      const attestedCaller =
+        orchestrationCompatibilityCallerAuthority?.terminalHandle === from
+          ? orchestrationCompatibilityCallerAuthority
+          : undefined
+      const senderPaneKey = sender.paneKey ?? attestedCaller?.paneKey
       const remoteAttachment = senderPaneKey
         ? db.findActiveRemoteAttachmentForPane(senderPaneKey)
         : undefined
       if (remoteAttachment) {
         rejectFederatedExplicitTarget(params)
-        const processIncarnation = runtime.getTerminalProcessIncarnation(from)
+        const processIncarnation =
+          attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from)
         if (
           !db.verifyRemoteAttachmentAuthority({
             dispatchId: remoteAttachment.dispatch_id,
@@ -593,7 +607,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             dispatchId: dispatch.id,
             capability: orchestrationCapability,
             paneKey: senderPaneKey,
-            processIncarnation: runtime.getTerminalProcessIncarnation(from) ?? undefined
+            processIncarnation:
+              attestedCaller?.processIncarnation ??
+              runtime.getTerminalProcessIncarnation(from) ??
+              undefined
           })
           if (!authority.valid) {
             const rejection =

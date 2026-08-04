@@ -1960,7 +1960,10 @@
         "planeViewModeLabel": "Modo de vista",
         "planeWorkItemsHeading": "Elementos de Plane",
         "planeWorkspaceSwitchFailed": "No se pudo cambiar el espacio de trabajo de Plane.",
-        "planeWorkspaceSwitcherLabel": "Espacio de trabajo de Plane"
+        "planeWorkspaceSwitcherLabel": "Espacio de trabajo de Plane",
+        "loadPageUnreachable": "La página {{value0}} está más allá de lo que la búsqueda de GitHub puede devolver.",
+        "loadPageFailed": "No se pudo cargar la página {{value0}} desde GitHub.",
+        "loadPageNoMoreResults": "No hay más resultados en la página {{value0}}."
       },
       "Terminal": {
         "73768427cf": "Cerrar",
@@ -5053,7 +5056,8 @@
           "failedSetParent": "No se pudo establecer el worktree padre",
           "current": "Actual",
           "searchPlaceholder": "Buscar worktrees...",
-          "empty": "No hay worktrees elegibles que coincidan."
+          "empty": "No hay worktrees elegibles que coincidan.",
+          "setParentFor": "Establecer padre para"
         },
         "WorktreeCardStatusSlot": {
           "branchIdentity": "Rama"
@@ -5121,8 +5125,6 @@
           "sshImportAlreadySynced": "~/.ssh/config ya está sincronizado.",
           "sshImportSynced": "Se sincronizó {{value0}} host{{value1}}.",
           "sshImportFailed": "No se pudo importar la configuración SSH.",
-          "importing": "Importando...",
-          "importSshConfig": "Importar ~/.ssh/config",
           "sshPersistenceDefault": "Los terminales remotos en este host seguirán activos hasta que los cierres o restablezcas el relay.",
           "advanced": "Advanced",
           "linkDestination": "Destino del enlace",
@@ -7234,7 +7236,12 @@
           "4a342f44c1": "Conexión avanzada",
           "e9609ddca6": "Proxy, host de salto y reutilización de conexión",
           "8c922dffba": "Reutilizar la conexión SSH para una configuración más rápida",
-          "53e9aabfc0": "Usa multiplexación de OpenSSH cuando está disponible. Desactívalo para hosts con restricciones SSH personalizadas."
+          "53e9aabfc0": "Usa la multiplexación de OpenSSH cuando esté disponible. Desactiva esta opción para hosts con restricciones SSH personalizadas.",
+          "editTitle": "Editar host SSH",
+          "addTitle": "Agregar host SSH",
+          "editDescription": "Actualiza los detalles de conexión de esta máquina. Los cambios se aplican en la próxima conexión.",
+          "addDescription": "Agrega una máquina persistente en la que puedas iniciar sesión por SSH.",
+          "editingPrefix": "Editando"
         },
         "TasksPane": {
           "f71d8a9dd3": "Proveedores de tareas",
@@ -9415,7 +9422,8 @@
           }
         },
         "computerUseSummary": {
-          "permissionsRequired": "Requiere {{value0}} permiso{{value1}} antes de que los agentes puedan operar ventanas de apps.",
+          "permissionsRequired_one": "Se requiere 1 permiso antes de que los agentes puedan operar ventanas de apps.",
+          "permissionsRequired_other": "Se requieren {{value0}} permisos antes de que los agentes puedan operar ventanas de apps.",
           "checkingTitle": "Comprobando el acceso a Computer Use.",
           "checkingDescription": "Orca está comprobando los permisos de privacidad de macOS para el helper de Computer Use.",
           "unavailableTitle": "Computer Use no está disponible.",
@@ -10420,10 +10428,10 @@
             "653c105ecc": "Más acciones de PR",
             "f316a8ca2b": "No hay comentarios sin resolver seleccionados.",
             "d00ebdc402": "Resolver comentarios de {{value0}} con IA",
-            "ed3f79c031": "Revisa el prompt antes de iniciar un agente. Los hilos seleccionados se marcarán como resueltos después del inicio.",
-            "f273f2271c": "Agente iniciado. Marcados como resueltos: {{value0}}; omitidos: {{value1}}; con error: {{value2}}.",
-            "aa95b81a3a": "Agente iniciado. Marcados como resueltos: {{value0}}; omitidos: {{value1}}; con error: {{value2}}.",
-            "495b2f8c4b": "Agente iniciado, pero no se pudieron marcar los comentarios seleccionados como resueltos.",
+            "ed3f79c031": "Revisa el prompt antes de iniciar un agente. Una vez entregado el prompt, Orca responde a los comentarios seleccionados y resuelve los hilos en el host cuando es posible.",
+            "f273f2271c": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.{{value4}}",
+            "aa95b81a3a": "Agente iniciado. Marcados como resueltos: {{value0}}; respondidos: {{value1}}; omitidos: {{value2}}; con error: {{value3}}.",
+            "495b2f8c4b": "Agente iniciado, pero no se pudieron resolver ni responder los comentarios seleccionados.",
             "3c3ad3a1d2": "Agente iniciado. No se puede marcar ningún comentario seleccionado como resuelto en el host.",
             "review": {
               "auto_retry": "Orca reintentará a las {{time}}.",
@@ -10433,7 +10441,8 @@
             "sync": {
               "pending": "Syncing…",
               "branch": "Sync Branch"
-            }
+            },
+            "7e4b2a19c0": "No se pudo resolver el PR de GitHub para responder."
           },
           "CreatePullRequestDialog": {
             "2bc1b4345e": "Cancelar",
@@ -11441,6 +11450,7 @@
             "transcriptsSkipped": "{{count}} transcripciones omitidas",
             "noAgentSessionsFound": "No se encontraron sesiones de agentes",
             "noSessionsMatchFilters": "Ninguna sesión coincide con los filtros actuales",
+            "noAgentsSelected": "Ningún agente seleccionado",
             "sessionId": "ID de sesión",
             "logPath": "Ruta del log",
             "agents": "Agentes",
@@ -11466,6 +11476,8 @@
             "viewOptionsAriaLabel": "Opciones de vista del historial de sesiones",
             "viewOptions": "Opciones de vista",
             "agents": "Agentes",
+            "selectAllAgents": "Seleccionar todo",
+            "clearAgents": "Limpiar",
             "sort": "Ordenar",
             "lastUpdated": "Última actualización",
             "created": "Creado",
@@ -11540,9 +11552,14 @@
             "emptyConversationDetail": "Esta sesión no tiene conversación guardada y no se puede reanudar.",
             "queuedMessages": "{{value0}} mensaje(s) en cola",
             "subagentTranscripts": "{{value0}} transcripción(es) de subagente",
+            "prompt": "Prompt",
             "firstPrompt": "Primer prompt",
+            "recentPrompt": "Prompt reciente",
             "firstPromptCopied": "Primer prompt copiado",
+            "recentPromptCopied": "Prompt reciente copiado",
             "copyFirstPrompt": "Copiar primer prompt",
+            "copyRecentPrompt": "Copiar prompt reciente",
+            "copyPrompt": "Copiar prompt",
             "copied": "Copiado",
             "copy": "Copiar",
             "noFirstPromptAvailable": "No hay primer prompt disponible",
@@ -11667,6 +11684,14 @@
           },
           "activityBar": {
             "error": "Error"
+          },
+          "AiVaultSessionLimitMenu": {
+            "historyDepth": "Profundidad del historial: {{value0}}",
+            "performanceWarning": "Los historiales más extensos pueden ralentizar toda la aplicación, especialmente en hosts remotos. Sin límite escanea todo el historial disponible.",
+            "recommended": "Recomendado",
+            "mayBeSlower": "Puede ser más lento",
+            "slowest": "Más lento",
+            "unlimited": "Sin límite"
           }
         }
       },

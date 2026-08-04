@@ -825,6 +825,9 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
           return spawnResult
         }
 
+        if (spawnResult.isReattach && !admittedSessionId) {
+          storedCallbacks.onReattachDetermined?.()
+        }
         ptyId = spawnResult.id
         connected = true
 

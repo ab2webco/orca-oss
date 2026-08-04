@@ -124,6 +124,8 @@ import {
   shouldPersistWorkspaceSession
 } from './lib/workspace-session'
 import { createSessionWriteSubscriber } from './lib/session-write-subscriber'
+import { sweepRestoredCodexPanesForStaleAccounts } from './lib/codex-stale-pane-sweep'
+import { installCodexDetachedPaneRestartExecutor } from '@/components/terminal-pane/codex-detached-pane-restart-scheduler'
 import { buildActiveViewUnloadPatch } from './lib/active-view-persist'
 import {
   buildWorkspaceSessionHostSnapshots,
@@ -214,7 +216,7 @@ import {
 } from './components/terminal/background-terminal-worktree-mount'
 import {
   collectTerminalProviderSnapshotPtyIds,
-  synchronizeTerminalProviderSnapshotCapabilities
+  refreshTerminalProviderSnapshotCapabilities
 } from './components/terminal/terminal-provider-snapshot-capability'
 import { useRemoteRuntimeRecoveryTriggers } from './runtime/use-remote-runtime-recovery-triggers'
 
@@ -1082,7 +1084,7 @@ function App(): React.JSX.Element {
             window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
           )
           await timeRendererStartupStep('terminal-provider-snapshot-capabilities', () => {
-            return synchronizeTerminalProviderSnapshotCapabilities(
+            return refreshTerminalProviderSnapshotCapabilities(
               collectTerminalProviderSnapshotPtyIds(useAppStore.getState())
             )
           })
@@ -1093,6 +1095,9 @@ function App(): React.JSX.Element {
           await timeRendererStartupStep('recover-legacy-worker-terminals-post-reconnect', () =>
             window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
           )
+          // Why here: reconnect just published restored PTY ids; sweeping them now
+          // re-offers stale Codex panes whose tabs never mount this session.
+          sweepRestoredCodexPanesForStaleAccounts(useAppStore.getState())
           syncZoomCSSVar()
           // Why (issue #1158): unlock the session writer only after hydration and all dependent steps succeeded, so a mid-startup throw can't serialize partially-mutated state to disk.
           actions.setHydrationSucceeded(true)
@@ -1168,6 +1173,9 @@ function App(): React.JSX.Element {
             try {
               await window.api.app.awaitFirstWindowStartupServices()
               await window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
+              await refreshTerminalProviderSnapshotCapabilities(
+                collectTerminalProviderSnapshotPtyIds(useAppStore.getState())
+              )
               await actions.reconnectPersistedTerminals(abortController.signal)
               await window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
             } catch (reconnectErr) {
@@ -1212,6 +1220,8 @@ function App(): React.JSX.Element {
       setRuntimeGraphStoreStateGetter(null)
     }
   }, [])
+
+  useEffect(() => installCodexDetachedPaneRestartExecutor(), [])
 
   useEffect(() => {
     let previousKey = getRuntimeMobileSessionSyncKey(useAppStore.getState())

@@ -16,14 +16,25 @@ const { writeMacBuildCompatibility } = require('./scripts/mac-build-compatibilit
 const { verifyPackagedPluginResources } = require('./scripts/verify-packaged-plugin-resources.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
 
-// Why: hourly dev builds must carry the *release* identity — same bundle id,
+// Why: dev-channel builds must carry the *release* identity — same bundle id,
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
 // swap them over an installed Orca and macOS treats each build as a new app.
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
-const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly
+const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
+const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion = isMacRelease ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
-const hourlyBuildVersion = isMacHourly ? process.env.ORCA_HOURLY_BUILD_VERSION : undefined
+const devChannelBuildVersion = isMacHourly
+  ? process.env.ORCA_HOURLY_BUILD_VERSION
+  : isMacAdhoc
+    ? process.env.ORCA_ADHOC_BUILD_VERSION
+    : undefined
+// Why each dev channel gets its own repo rather than tagging into the main one:
+// the releases atom feed exposes only the 10 newest entries, so 24 hourly tags a
+// day would evict every stable/RC entry and strand users on a feed with nothing
+// to install. Keeping adhoc separate from hourly too means a branch build cannot
+// be picked up by someone who only meant to ride main.
+const devChannelRepo = isMacHourly ? 'orca-hourly' : isMacAdhoc ? 'orca-adhoc' : null
 const appId = 'com.stablyai.orca'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
@@ -70,8 +81,8 @@ const winSpeechNativeResource = {
 module.exports = {
   appId,
   productName: 'Orca',
-  ...(hourlyBuildVersion
-    ? { extraMetadata: { version: hourlyBuildVersion } }
+  ...(devChannelBuildVersion
+    ? { extraMetadata: { version: devChannelBuildVersion } }
     : localBuildVersion
       ? { extraMetadata: { version: localBuildVersion } }
       : {}),
@@ -330,10 +341,10 @@ module.exports = {
     // explicit release path so production artifacts remain strict while dev
     // artifacts do not fail with broken ad-hoc launch behavior.
     hardenedRuntime: isMacRelease,
-    // Why hourly builds notarize too, despite the ~10min notary round trip: TCC
+    // Why dev builds notarize too, despite the ~10min notary round trip: TCC
     // anchors a notarized Developer ID app's permission grants on identifier +
     // team, which is cdhash-independent and so survives an update. Without a
-    // ticket there is no such stable identity, so every hourly reads as a
+    // ticket there is no such stable identity, so every build reads as a
     // different client — the grant row stays but stops matching, and file access
     // under Documents/Desktop/Downloads fails with EPERM and no re-prompt. At 24
     // builds a day that revokes the user's grants faster than they can re-grant.
@@ -483,11 +494,11 @@ module.exports = {
     repo: 'orca-oss',
     // Why: the release must be born a prerelease. finalize's --prerelease lands only after every
     // platform job, and until then a full release holds GitHub's Latest pointer — which is how a
-    // release candidate reached installs that were never meant to see it. Hourly mac builds are
-    // prereleases for the same reason (upstream isolates them in a separate repo; the lab does not
-    // publish hourly tags, so the flag only downgrades the release type here).
+    // release candidate reached installs that were never meant to see it. Dev-channel mac builds
+    // are prereleases for the same reason (upstream isolates each in its own repo; the lab
+    // publishes no hourly/adhoc tags, so devChannelRepo only downgrades the release type here).
     releaseType:
-      process.env.ORCA_LAB_RELEASE_CANDIDATE === '1' || isMacHourly ? 'prerelease' : 'release'
+      process.env.ORCA_LAB_RELEASE_CANDIDATE === '1' || devChannelRepo ? 'prerelease' : 'release'
   }
 }
 

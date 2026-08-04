@@ -34,10 +34,15 @@ import {
   type DaemonEvent,
   type GetSnapshotResult,
   type ListSessionsResult,
+  SessionNotFoundError,
   type SessionInfo,
   type TakePendingOutputResult
 } from './types'
-import { HISTORY_SEED_TRANSFER_PROTOCOL_VERSION } from './daemon-protocol-version'
+import {
+  HISTORY_SEED_TRANSFER_PROTOCOL_VERSION,
+  SNAPSHOT_SERIALIZER_FIDELITY_DAEMON_PROTOCOL_VERSION,
+  STABLE_PANE_ATTACH_ONLY_DAEMON_PROTOCOL_VERSION
+} from './daemon-protocol-version'
 import {
   isAgentSessionClaimedSpawnResult,
   isAgentSessionOwnerBinding,
@@ -274,7 +279,8 @@ export class DaemonPtyAdapter implements IPtyProvider {
     this.supportsCheckpoints = this.protocolVersion >= 4
     this.supportsIncrementalCheckpoints = this.protocolVersion >= 13
     this.supportsProducerFlowControl = this.protocolVersion >= 19
-    this.supportsAuthoritativeBufferSnapshots = this.protocolVersion >= 20
+    this.supportsAuthoritativeBufferSnapshots =
+      this.protocolVersion >= SNAPSHOT_SERIALIZER_FIDELITY_DAEMON_PROTOCOL_VERSION
     this.supportsStartupIngress = supportsPtyStartupIngress(this.protocolVersion)
     this.client.onDisconnected(() => {
       if (!this.respawnAdoptionClosed) {
@@ -378,6 +384,10 @@ export class DaemonPtyAdapter implements IPtyProvider {
       throw new Error('agent_session_claim_unavailable')
     }
     const requestedSessionId = opts.sessionId!
+    // Why: v30 daemons survive upgrades; reject their accidental create result before publication.
+    const attachOnly = opts.attachOnly === true
+    const emulateLegacyAttachOnly =
+      attachOnly && this.protocolVersion < STABLE_PANE_ATTACH_ONLY_DAEMON_PROTOCOL_VERSION
     let sessionId = requestedSessionId
     let wslDistro = resolveWslSessionContext({
       cwd: opts.cwd,
@@ -461,10 +471,13 @@ export class DaemonPtyAdapter implements IPtyProvider {
     // Why probe aliveness first: detectColdRestore replays up to ~5MB on the main process, but a live session's snapshot supersedes disk, so the replay would be wasted.
     let restoreInfo: ColdRestoreInfo | null = null
     let restoreSkippedForLiveSession = false
-    // Why short-circuit before probing: hasRestorableHistory is the same predicate as
-    // probeRestorableHistory().status !== 'none', but a reattach-only mount must not
-    // touch history at all — the disk read would be wasted and the replay unwanted.
-    if (!opts.requireReattach && this.historyReader?.hasRestorableHistory(sessionId)) {
+    // Why requireReattach short-circuits too: like attachOnly, it must not touch history at all —
+    // the disk read would be wasted and the replay unwanted.
+    const historyProbe =
+      opts.attachOnly || opts.requireReattach
+        ? undefined
+        : this.historyReader?.probeRestorableHistory(sessionId)
+    if (historyProbe && historyProbe.status !== 'none') {
       if ((await this.getAppliedSize(sessionId)) !== null) {
         restoreSkippedForLiveSession = true
         if (this.historyManager && !this.historyManager.hasWriter(sessionId)) {
@@ -505,24 +518,29 @@ export class DaemonPtyAdapter implements IPtyProvider {
         ...(opts.requireReattach ? { requireReattach: true } : {}),
         cols: effectiveCols,
         rows: effectiveRows,
-        cwd: effectiveCwd,
-        env: opts.env,
-        envToDelete: opts.envToDelete,
-        command: opts.command,
-        startupCommandDelivery: opts.startupCommandDelivery,
-        launchAgent: opts.launchAgent,
+        cwd: attachOnly ? undefined : effectiveCwd,
+        env: attachOnly ? undefined : opts.env,
+        envToDelete: attachOnly ? undefined : opts.envToDelete,
+        command: attachOnly ? undefined : opts.command,
+        startupCommandDelivery: attachOnly ? undefined : opts.startupCommandDelivery,
+        launchAgent: attachOnly ? undefined : opts.launchAgent,
+        ...(attachOnly && !emulateLegacyAttachOnly ? { attachOnly: true } : {}),
         // Why: without forwarding the override, the daemon falls back to cmd.exe/PowerShell, ignoring the shell the renderer chose; this matches LocalPtyProvider.
-        shellOverride: opts.shellOverride,
-        terminalWindowsWslDistro: opts.terminalWindowsWslDistro,
-        terminalWindowsPowerShellImplementation: opts.terminalWindowsPowerShellImplementation,
-        shellReadySupported,
-        ...(shellReadyTimeoutMs !== undefined ? { shellReadyTimeoutMs } : {}),
+        shellOverride: attachOnly ? undefined : opts.shellOverride,
+        terminalWindowsWslDistro: attachOnly ? undefined : opts.terminalWindowsWslDistro,
+        terminalWindowsPowerShellImplementation: attachOnly
+          ? undefined
+          : opts.terminalWindowsPowerShellImplementation,
+        shellReadySupported: attachOnly ? false : shellReadySupported,
+        ...(!attachOnly && shellReadyTimeoutMs !== undefined ? { shellReadyTimeoutMs } : {}),
         ...(historySeed ? { historySeed } : {}),
         ...(historySeedTransferId ? { historySeedTransferId } : {}),
-        ...(this.supportsStartupIngress && opts.startupIngress
+        ...(this.supportsStartupIngress && !attachOnly && opts.startupIngress
           ? { startupIngress: opts.startupIngress }
           : {}),
-        ...(opts.agentSessionEnsure ? { agentSessionEnsure: opts.agentSessionEnsure } : {})
+        ...(!attachOnly && opts.agentSessionEnsure
+          ? { agentSessionEnsure: opts.agentSessionEnsure }
+          : {})
       })
     }
 
@@ -610,6 +628,11 @@ export class DaemonPtyAdapter implements IPtyProvider {
       historySeedSegments = null
     }
     let result = await createOrAttach(historySeedSegments)
+    if (emulateLegacyAttachOnly && result.isNew) {
+      operation.ignoreNextExit = true
+      await this.client.request('kill', { sessionId: requestedSessionId, immediate: true })
+      throw new SessionNotFoundError(requestedSessionId)
+    }
     await adoptSpawnResultSession(result)
     // Both ids: adoptSpawnResultSession may have rewritten sessionId to the claim owner.
     this.clearSessionAwaitingDaemonRecovery(requestedSessionId)
@@ -954,7 +977,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
     if (!this.supportsProducerFlowControl) {
       return
     }
-    // Why: preserved v19 daemons can thin but can't return the absolute snapshot sequence to recover a gap; clear their stale hint too.
+    // Why: preserved daemons without a sequence-safe, faithful serializer cannot heal a thinned stream.
     // Why also gate on 2031 (#9993): backgrounding is what hands transient-fact scan
     // authority to the daemon. A pre-v29 daemon can announce a 2031 subscribe but never
     // retract it, so a TUI exiting while hidden would strand the subscription and the

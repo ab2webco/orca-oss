@@ -56,7 +56,11 @@ import { forgetAgentHibernationTabOutput } from '@/lib/agent-hibernation-output-
 import { forgetForegroundTerminalTabs } from '@/lib/foreground-terminal-tabs'
 import { forgetAgentStartupDeliveriesForTabs } from '@/lib/agent-startup-delivery-guards'
 import { clearTransientTerminalState, emptyLayoutSnapshot } from './terminal-helpers'
-import { pushClosedTerminalTabSnapshot, pushRecentlyClosedTabKind } from './recently-closed-tabs'
+import {
+  getRecentlyClosedTabPosition,
+  pushClosedTerminalTabSnapshot,
+  pushRecentlyClosedTabKind
+} from './recently-closed-tabs'
 import { isClaudeAgent } from '@/lib/agent-status'
 import { recordTerminalInputActivity } from '@/lib/terminal-input-activity-coalescing'
 import { classifyTitleActivity } from '@/lib/pane-agent-evidence'
@@ -720,6 +724,8 @@ export type TerminalSlice = {
       shutdownReason?: AgentStatusWorktreeShutdownReason
       sleepingPaneKeys?: string[]
       expectedRuntimePtyIds?: string[]
+      /** Opt-in for callers that already tore the workspace down backend-side; omitting it keeps the runtime stop. */
+      backendOwnsPtyTeardown?: boolean
     }
   ) => Promise<void>
   shutdownCompletedAgentPaneForHibernation: (
@@ -749,6 +755,11 @@ export type TerminalSlice = {
   ) => string[]
   clearCodexRestartNotice: (ptyId: string) => void
   dismissCodexRestartNotices: (ptyIds: string[]) => void
+  /** Puts an accepted-but-unexecuted restart back to the unanswered prompt, so a
+   *  failed execution never leaves a pane input-blocked with nothing visible. */
+  reopenCodexRestartPrompt: (ptyId: string) => void
+  /** Rebinds one layout leaf to a replacement PTY without a mounted pane. */
+  replaceTerminalLayoutPanePtyId: (tabId: string, leafId: string, ptyId: string) => void
   setTabPaneExpanded: (tabId: string, expanded: boolean) => void
   setTabCanExpandPane: (tabId: string, canExpand: boolean) => void
   setTabLayout: (tabId: string, layout: TerminalLayoutSnapshot | null) => void
@@ -1653,6 +1664,10 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         }
       }
       // Why: only explicit user closes feed the Cmd+Shift+T reopen stack; cleanup/PTY-exit closes must not pollute undo history.
+      const closedPosition =
+        closedWorktreeId && closedTab
+          ? getRecentlyClosedTabPosition(s, closedWorktreeId, closedTab.id)
+          : undefined
       const capturedSnapshot =
         closeReason === 'user' &&
         opts?.captureRecentlyClosed !== false &&
@@ -1662,7 +1677,8 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
               ...(closedTab.startupCwd ? { startupCwd: closedTab.startupCwd } : {}),
               ...(closedTab.shellOverride ? { shellOverride: closedTab.shellOverride } : {}),
               ...(closedTab.customTitle ? { customTitle: closedTab.customTitle } : {}),
-              ...(closedTab.color ? { color: closedTab.color } : {})
+              ...(closedTab.color ? { color: closedTab.color } : {}),
+              ...(closedPosition ? { position: closedPosition } : {})
             }
           : null
       const nextExpanded = { ...s.expandedPaneByTabId }
@@ -3154,7 +3170,8 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       markShutdownPending()
       handlerSnapshots = unregisterPtyDataHandlers(rendererShutdownPtyIds) ?? []
       try {
-        if (runtimeEnvironmentId) {
+        // Why an opt-in, not the reason: defaulting to the stop keeps callers without backend teardown from leaking remote PTYs.
+        if (runtimeEnvironmentId && opts?.backendOwnsPtyTeardown !== true) {
           await (shutdownReason === 'manual-sleep'
             ? requestRemoteWorktreeSleep({
                 environmentId: runtimeEnvironmentId,
@@ -3182,6 +3199,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       }
     }
 
+    // Exact-stop callers own physical teardown and must not use the remove-worktree reason.
     if (expectedRuntimePtyIds.length > 0) {
       if (!runtimeEnvironmentId) {
         throw new Error('missing_runtime_for_exact_terminal_stop')
@@ -3587,6 +3605,40 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       return {
         codexRestartNoticeByPtyId: next,
         pendingCodexPaneRestartIds: nextPendingCodexPaneRestartIds
+      }
+    })
+  },
+
+  reopenCodexRestartPrompt: (ptyId) => {
+    set((s) => {
+      const notice = s.codexRestartNoticeByPtyId[ptyId]
+      if (!notice?.restartRequested) {
+        return {}
+      }
+      const { restartRequested: _restartRequested, ...kept } = notice
+      const nextPendingCodexPaneRestartIds = { ...s.pendingCodexPaneRestartIds }
+      delete nextPendingCodexPaneRestartIds[ptyId]
+      return {
+        codexRestartNoticeByPtyId: { ...s.codexRestartNoticeByPtyId, [ptyId]: kept },
+        pendingCodexPaneRestartIds: nextPendingCodexPaneRestartIds
+      }
+    })
+  },
+
+  replaceTerminalLayoutPanePtyId: (tabId, leafId, ptyId) => {
+    set((s) => {
+      const layout = s.terminalLayoutsByTabId[tabId]
+      if (!layout || layout.ptyIdsByLeafId?.[leafId] === ptyId) {
+        return {}
+      }
+      return {
+        terminalLayoutsByTabId: {
+          ...s.terminalLayoutsByTabId,
+          [tabId]: {
+            ...layout,
+            ptyIdsByLeafId: { ...layout.ptyIdsByLeafId, [leafId]: ptyId }
+          }
+        }
       }
     })
   },

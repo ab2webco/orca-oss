@@ -121,6 +121,10 @@ export const WorktreeSetBatch = z.object({
 
 export const WorktreeRemove = WorktreeSelector.extend({
   force: OptionalBoolean,
+  // Why (#11960): the CLI's --force is an unambiguous force affordance, but the
+  // desktop sets `force` for an ordinary confirmed delete too, so the PTY-stop
+  // waiver travels on its own field.
+  allowUnverifiedPtyStop: OptionalBoolean,
   runHooks: OptionalBoolean
 })
 

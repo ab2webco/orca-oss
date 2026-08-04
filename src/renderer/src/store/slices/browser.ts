@@ -24,7 +24,12 @@ import {
 } from '../../../../shared/workspace-session-browser-history'
 import { pickNeighbor } from './tab-group-state'
 import { destroyWorkspaceWebviews } from './browser-webview-cleanup'
-import { pushRecentlyClosedTabKind } from './recently-closed-tabs'
+import {
+  getRecentlyClosedTabPosition,
+  restoreRecentlyClosedTabPosition,
+  pushRecentlyClosedTabKind
+} from './recently-closed-tabs'
+import type { RecentlyClosedTabPosition } from './recently-closed-tabs'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import type {
@@ -57,7 +62,6 @@ import { buildValidWorktreeIdsForSessionHydration } from './degraded-repo-worktr
 type CreateBrowserTabOptions = {
   activate?: boolean
   title?: string
-  allowWindowClose?: boolean
   sessionProfileId?: string | null
   sessionPartition?: string | null
   // Place the new tab in a specific group (e.g. "Open Preview to the Side"); defaults to the worktree's active group.
@@ -70,7 +74,6 @@ type CreateBrowserTabOptions = {
 type CreateBrowserPageOptions = {
   activate?: boolean
   title?: string
-  allowWindowClose?: boolean
   browserRuntimeEnvironmentId?: string | null
 }
 
@@ -83,9 +86,14 @@ type BrowserTabPageState = {
   loadError?: BrowserLoadError | null
 }
 
+type SetBrowserPageUrlOptions = {
+  preserveLoadError?: boolean
+}
+
 type ClosedBrowserWorkspaceSnapshot = {
   workspace: BrowserWorkspace
   pages: BrowserPage[]
+  position?: RecentlyClosedTabPosition
 }
 
 function sanitizeBrowserPageAnnotation(annotation: BrowserPageAnnotation): BrowserPageAnnotation {
@@ -152,7 +160,7 @@ export type BrowserSlice = {
     failure: BrowserCertificateFailure | null
   ) => void
   setBrowserTabUrl: (pageId: string, url: string) => void
-  setBrowserPageUrl: (pageId: string, url: string) => void
+  setBrowserPageUrl: (pageId: string, url: string, options?: SetBrowserPageUrlOptions) => void
   setRemoteBrowserPageHandle: (pageId: string, handle: RemoteBrowserPageHandle) => void
   removeRemoteBrowserPageHandle: (
     pageId: string,
@@ -343,8 +351,7 @@ function buildBrowserPage(
   worktreeId: string,
   url: string,
   title?: string,
-  browserRuntimeEnvironmentId?: string | null,
-  allowWindowClose?: boolean
+  browserRuntimeEnvironmentId?: string | null
 ): BrowserPage {
   const normalizedUrl = normalizeUrl(url)
   return {
@@ -360,7 +367,6 @@ function buildBrowserPage(
     canGoForward: false,
     loadError: null,
     createdAt: Date.now(),
-    ...(allowWindowClose !== undefined ? { allowWindowClose } : {}),
     ...(browserRuntimeEnvironmentId !== undefined ? { browserRuntimeEnvironmentId } : {})
   }
 }
@@ -558,8 +564,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
       worktreeId,
       url,
       options?.title,
-      options?.browserRuntimeEnvironmentId,
-      options?.allowWindowClose
+      options?.browserRuntimeEnvironmentId
     )
     // Why: with no explicit profile, inherit the user's default so a Settings preference applies to new tabs.
     const sessionProfileId =
@@ -776,8 +781,13 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
 
       const nextRecentlyClosedBrowserTabsByWorktree = { ...s.recentlyClosedBrowserTabsByWorktree }
       const existingSnapshots = nextRecentlyClosedBrowserTabsByWorktree[owningWorktreeId] ?? []
+      const position = getRecentlyClosedTabPosition(s, owningWorktreeId, tabId)
       nextRecentlyClosedBrowserTabsByWorktree[owningWorktreeId] = [
-        { workspace: closedWorkspace, pages: closedPages },
+        {
+          workspace: closedWorkspace,
+          pages: closedPages,
+          ...(position ? { position } : {})
+        },
         ...existingSnapshots.filter((entry) => entry.workspace.id !== closedWorkspace.id)
       ].slice(0, 10)
       const nextRecentlyClosedTabKindsByWorktree = pushRecentlyClosedTabKind(
@@ -895,8 +905,10 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
         title: snap.title,
         activate: true,
         sessionProfileId,
-        sessionPartition
+        sessionPartition,
+        targetGroupId: entryToRestore.position?.groupId
       })
+      restoreRecentlyClosedTabPosition(get, worktreeId, restored.id, entryToRestore.position)
       return get().browserTabsByWorktree[worktreeId]?.find((tab) => tab.id === restored.id) ?? null
     }
 
@@ -907,15 +919,14 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
       activate: true,
       sessionProfileId,
       sessionPartition,
-      browserRuntimeEnvironmentId: firstPage.browserRuntimeEnvironmentId,
-      allowWindowClose: firstPage.allowWindowClose
+      targetGroupId: entryToRestore.position?.groupId,
+      browserRuntimeEnvironmentId: firstPage.browserRuntimeEnvironmentId
     })
 
     for (const p of restPages) {
       get().createBrowserPage(restored.id, p.url, {
         activate: false,
         title: p.title,
-        allowWindowClose: p.allowWindowClose,
         browserRuntimeEnvironmentId: p.browserRuntimeEnvironmentId
       })
     }
@@ -930,6 +941,8 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
         get().setActiveBrowserPage(restored.id, targetPage.id)
       }
     }
+
+    restoreRecentlyClosedTabPosition(get, worktreeId, restored.id, entryToRestore.position)
 
     return get().browserTabsByWorktree[worktreeId]?.find((tab) => tab.id === restored.id) ?? null
   },
@@ -994,8 +1007,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
       workspace.worktreeId,
       url,
       options?.title,
-      options?.browserRuntimeEnvironmentId,
-      options?.allowWindowClose
+      options?.browserRuntimeEnvironmentId
     )
 
     set((s) => {
@@ -1177,7 +1189,6 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
     return get().createBrowserPage(workspaceId, pageToRestore.url, {
       title: pageToRestore.title,
       activate: true,
-      allowWindowClose: pageToRestore.allowWindowClose,
       browserRuntimeEnvironmentId: pageToRestore.browserRuntimeEnvironmentId
     })
   },
@@ -1445,7 +1456,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
 
   setBrowserTabUrl: (pageId, url) => get().setBrowserPageUrl(pageId, url),
 
-  setBrowserPageUrl: (pageId, url) => {
+  setBrowserPageUrl: (pageId, url, options) => {
     const nextUrl = normalizeUrl(url)
     if (nextUrl !== 'about:blank' && nextUrl !== ORCA_BROWSER_BLANK_URL) {
       const currentPage = findPage(get().browserPagesByWorkspace, pageId)
@@ -1471,7 +1482,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
               url: nextUrl,
               title: normalizeBrowserTitle(entry.title, nextUrl),
               loading: true,
-              loadError: null
+              loadError: options?.preserveLoadError ? entry.loadError : null
             }
           : entry
       )
@@ -1653,14 +1664,21 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
               createdAt: tab.createdAt
             } satisfies BrowserPage
           ]
-          const nextPages = persistedPages.map((page) => ({
-            ...page,
-            workspaceId: tab.id,
-            worktreeId,
-            url: normalizeUrl(page.url),
-            loading: false,
-            loadError: page.loadError ?? null
-          }))
+          const nextPages = persistedPages.map((page) => {
+            // Why: in-memory hydration callers can bypass the persistence schema's unknown-key stripping.
+            const { allowWindowClose: _legacyAllowWindowClose, ...persistedPage } =
+              page as typeof page & {
+                allowWindowClose?: boolean
+              }
+            return {
+              ...persistedPage,
+              workspaceId: tab.id,
+              worktreeId,
+              url: normalizeUrl(page.url),
+              loading: false,
+              loadError: page.loadError ?? null
+            }
+          })
           browserPagesByWorkspace[tab.id] = nextPages
           hydratedTabs.push(
             mirrorWorkspaceFromActivePage(
