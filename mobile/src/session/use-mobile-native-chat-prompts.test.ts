@@ -55,7 +55,7 @@ describe('useMobileNativeChatPrompts approval-envelope state gate', () => {
       state: 'waiting',
       interactivePrompt: APPROVAL,
       lastAssistantMessage: 'Allow this Bash command?\n1. Yes\n2. No'
-    }) as { options: Array<{ label: string }> } | null
+    }) as { options: { label: string }[] } | null
     expect(permission).toMatchObject({ title: 'Permission requested' })
     expect(permission?.options.map((o) => o.label)).toEqual(['Yes', 'No'])
   })

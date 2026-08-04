@@ -79,7 +79,7 @@ const sockets: MockWebSocket[] = []
 const originalWebSocket = globalThis.WebSocket
 
 function latest(): MockWebSocket {
-  const socket = sockets[sockets.length - 1]
+  const socket = sockets.at(-1)
   if (!socket) {
     throw new Error('no socket opened')
   }

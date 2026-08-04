@@ -274,8 +274,12 @@ export function DictationController() {
   }, [finishDictationSession, setDictationState, stopCapture])
 
   // Why: capture-loss fires from a stream opened before stopDictation exists;
-  // route through a ref so the two callbacks do not depend on each other.
-  stopDictationRef.current = () => void stopDictation()
+  // route through a ref so the two callbacks do not depend on each other. Assigned in an
+  // effect because render must stay pure — the ref is only read from async capture-loss
+  // callbacks, which cannot run before this commit.
+  useEffect(() => {
+    stopDictationRef.current = () => void stopDictation()
+  }, [stopDictation])
 
   // Toggle mode: use IPC from main process (before-input-event intercepts
   // the keyDown so Cmd+E doesn't reach xterm or trigger system shortcuts).
