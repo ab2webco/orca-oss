@@ -148,7 +148,9 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
     await expect(
       configHostRow(reopened, hosts.bravo).getByText('In Orca', { exact: true })
     ).toBeVisible()
-    await expect(reopened.getByRole('button', { name: 'All hosts already in Orca' })).toBeDisabled()
+    // Why this label: the remainder can be already-in-Orca or merely tombstoned, so the button
+    // does not claim either one (see AddRemoteHostSshConfigPicker's sshConfigPickerNoNewHosts).
+    await expect(reopened.getByRole('button', { name: 'No new hosts to add' })).toBeDisabled()
   })
 
   // ── P7 ─────────────────────────────────────────────────────────────
@@ -164,13 +166,18 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
     )
 
     const picker = await openSshConfigHostPicker(orcaPage)
-    // Suppressed aliases are omitted from the picker entirely.
-    await expect(configHostRow(picker, hosts.alpha)).toHaveCount(0)
+    // Why the suppressed alias is still listed: tombstones only block passive bulk import, so
+    // deleting one Orca target must not make ~/.ssh/config look empty. It is badged instead,
+    // and it is excluded from the "Add all" count below.
+    await expect(configHostRow(picker, hosts.alpha)).toBeVisible()
+    await expect(
+      configHostRow(picker, hosts.alpha).getByText('Removed from Orca', { exact: true })
+    ).toBeVisible()
     await expect(configHostRow(picker, hosts.bravo)).toBeVisible()
     await expect(
       configHostRow(picker, hosts.bravo).getByText('In Orca', { exact: true })
     ).toBeVisible()
-    await expect(picker.getByRole('button', { name: 'All hosts already in Orca' })).toBeDisabled()
+    await expect(picker.getByRole('button', { name: 'No new hosts to add' })).toBeDisabled()
     await expect(picker.getByRole('button', { name: /Add all \d+ to Orca/ })).toHaveCount(0)
 
     await returnToAppShell(orcaPage)

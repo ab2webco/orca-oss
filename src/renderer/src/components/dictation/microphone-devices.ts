@@ -258,3 +258,18 @@ export function buildVoiceMicrophoneSelectOptions(args: {
   )
   return { options, selectedValue: preferredDeviceId }
 }
+
+/**
+ * Subscribes to the input track ending and returns its release.
+ *
+ * Why it lives here and not in the capture hook: the track only exists after the async
+ * getUserMedia + audio-graph build, so the subscription cannot ride a React effect. Pairing
+ * it with its own release in one call keeps that release impossible to forget.
+ */
+export function subscribeTrackEnded(track: MediaStreamTrack, onEnded: () => void): () => void {
+  track.addEventListener('ended', onEnded)
+  return () => {
+    track.removeEventListener('ended', onEnded)
+  }
+}
+

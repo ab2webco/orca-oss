@@ -1,5 +1,8 @@
-import { useRef, useCallback } from 'react'
-import { openMicrophoneCaptureStream } from '@/components/dictation/microphone-devices'
+import { useCallback, useEffect, useRef } from 'react'
+import {
+  openMicrophoneCaptureStream,
+  subscribeTrackEnded
+} from '@/components/dictation/microphone-devices'
 
 type BufferedAudioChunk = {
   samples: Float32Array
@@ -207,10 +210,8 @@ export function useAudioCapture() {
             }
             onCaptureLost()
           }
-          audioTrack.addEventListener('ended', handleTrackEnded)
-          trackLostCleanupRef.current = () => {
-            audioTrack.removeEventListener('ended', handleTrackEnded)
-          }
+          // cleanupCaptureResources runs this release on stop(), on a failed start, and on unmount.
+          trackLostCleanupRef.current = subscribeTrackEnded(audioTrack, handleTrackEnded)
         }
         return { fellBackToDefaultMicrophone }
       } catch (err) {
@@ -287,6 +288,17 @@ export function useAudioCapture() {
       cleanupCaptureResources()
     },
     [cleanupCaptureResources, resetBufferedAudio]
+  )
+
+  // Why: without this, unmounting mid-dictation leaves the AudioContext open and the
+  // input track's 'ended' listener attached — stop() is the only other release path.
+  useEffect(
+    () => () => {
+      startRequestRef.current += 1
+      isCapturingRef.current = false
+      cleanupCaptureResources()
+    },
+    [cleanupCaptureResources]
   )
 
   return {
