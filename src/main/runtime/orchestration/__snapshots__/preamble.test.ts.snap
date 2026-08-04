@@ -18,15 +18,40 @@ Slack, GitHub comments, or any other channel to reach a human during the run.
   # If you produced a long-form artifact, include its path as
   # payload.reportPath so the coordinator can find it without a file search.
   #
-  # RULE: send worker_done exactly once. Use --outcome succeeded when the
-  # requested work is done, or replace it with --outcome failed when it is not.
-  # Never encode failure only in prose and never silently exit.
-  # Include BOTH taskId and dispatchId in the payload so a late completion
-  # from a failed retry cannot complete the current dispatch.
+  # RULE: send worker_done exactly once, with --outcome succeeded when the work
+  # is done or --outcome failed when it is not. Never encode failure only in
+  # prose and never silently exit. Include BOTH taskId and dispatchId so a late
+  # completion from a failed retry cannot complete the current dispatch.
+  #
+  # RULE: worker_done carries a typed envelope. Write it to a JSON file with
+  # your own file-writing tool first — never inline it in the shell, which
+  # mangles quotes. The runtime validates it and rejects a malformed or
+  # incomplete one with the exact field errors; you may correct and resend it
+  # 2 times in this session, after which the
+  # coordinator restarts the work in a fresh one.
+  #
+  # RULE: every verification claim carries its own level. "live" means you ran
+  # the real thing and observed it; "unit" means tests only; "none" means you
+  # did not verify it. status "success" cannot carry a "none" claim — say
+  # status "blocked" instead of claiming green you did not see.
+  #
+  # Envelope file contents (status is one of success|blocked|failed; artifact
+  # kind is one of pr|commit|file|report):
+  # {
+  #   "status": "success",
+  #   "summary": "<what you did, what you found, what's left>",
+  #   "artifacts": [{ "kind": "pr", "ref": "<pr url, sha, or path>" }],
+  #   "verification": [
+  #     { "claim": "<what you assert works>", "evidence": "<command output, PR check, file path>", "level": "live" }
+  #   ],
+  #   "outOfScopeWrites": ["<paths you wrote outside your brief, if any>"],
+  #   "notesForNextAgent": "<what the next agent needs and must not redo>"
+  # }
   orca orchestration send --from term_WORKER \\
     --type worker_done --subject "<short status>" \\
     --body "<3-sentence summary: what you did, what you found, what's left>" \\
     --task-id task_SNAP --dispatch-id ctx_SNAP --outcome succeeded \\
+    --envelope-file "<path to the envelope JSON you just wrote>" \\
     --files-modified "path/a,path/b" \\
     --report-path "<optional: path to the full artifact>"
 

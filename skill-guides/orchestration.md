@@ -150,7 +150,7 @@ Rules:
 - Message types include `status`, `dispatch`, `worker_done`, `merge_ready`, `escalation`, `handoff`, `question`, `decision_gate` (legacy/gates), and `heartbeat`.
 - Use group addresses only for messages that are genuinely useful to many terminals, such as `status` broadcasts or intentional fan-out questions. Do not send dispatch lifecycle messages to groups.
 - `worker_done` belongs to the active Dispatch and defaults to its Run mailbox; never target a group.
-- A valid `worker_done` for the active `taskId` + `dispatchId` marks the task and dispatch completed automatically. Do not follow it with `task-update --status completed`; reserve manual updates for explicit recovery or overrides.
+- A valid `worker_done` for the active `taskId` + `dispatchId` **and a valid envelope** marks the task and dispatch completed automatically. Do not follow it with `task-update --status completed`; reserve manual updates for explicit recovery or overrides.
 - `heartbeat` is also Dispatch-scoped. Include both IDs and omit `--to` so Orca uses the owning Run; use `status` for broad progress updates.
 
 ## Tasks And Dispatch
@@ -231,9 +231,28 @@ orca orchestration check --ack <delivery_id> --wait --types worker_done,escalati
 Workers report exactly once using the IDs and capability injected by Orca; they do not supply Run/server/terminal identity:
 
 ```bash
-orca orchestration send --type worker_done --subject "<status>" --body "<what changed, findings, and what remains>" --task-id <task_id> --dispatch-id <dispatch_id> --outcome succeeded --files-modified "path/a,path/b" --json
-# On failure, use --outcome failed; never encode failure only in prose.
+# Write the typed envelope to a JSON file first — never inline it in the shell.
+orca orchestration send --type worker_done --subject "<status>" --body "<what changed, findings, and what remains>" --task-id <task_id> --dispatch-id <dispatch_id> --envelope-file <path> --files-modified "path/a,path/b" --json
+# --outcome follows the envelope status when omitted; never encode failure only in prose.
 ```
+
+The envelope is validated at the runtime boundary and is how a coordinator learns what a worker did without reading its terminal:
+
+```json
+{
+  "status": "success | blocked | failed",
+  "summary": "what you did, what you found, what's left",
+  "artifacts": [{ "kind": "pr | commit | file | report", "ref": "<url, sha, or path>" }],
+  "verification": [
+    { "claim": "what you assert works", "evidence": "command output, PR check, file path", "level": "live | unit | none" }
+  ],
+  "outOfScopeWrites": ["<paths written outside the brief>"],
+  "notesForNextAgent": "what the next agent needs and must not redo"
+}
+```
+
+- `level` is per claim: `live` means the real thing was run and observed, `unit` means tests only, `none` means unverified. A `success` envelope cannot carry a `none` claim — report `blocked` instead.
+- A malformed or incomplete envelope is rejected with the exact field errors and does **not** settle the task. The worker may correct and resend twice in the same session; after that the rejection is terminal and the coordinator restarts the work in a fresh session with the failure appended to the brief.
 
 A worker question defaults to its owning Run. Timeout leaves it pending:
 

@@ -274,8 +274,8 @@ type RunListCursor = {
   id: string
 }
 
-// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup.
-const SCHEMA_VERSION = 22
+// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts.
+const SCHEMA_VERSION = 23
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
   if (dbPath === ':memory:' || process.platform === 'win32') {
@@ -513,7 +513,11 @@ export class OrchestrationDb {
         dispatched_at       TEXT,
         completed_at        TEXT,
         created_at          TEXT NOT NULL DEFAULT (datetime('now')),
-        last_heartbeat_at   TEXT
+        last_heartbeat_at   TEXT,
+        -- Why: only dispatches whose preamble briefed the typed envelope are held to it;
+        -- rows written by an older runtime stay on the prose contract (default 0).
+        envelope_contract   INTEGER NOT NULL DEFAULT 0,
+        envelope_correction_attempts INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE INDEX IF NOT EXISTS idx_dispatch_task ON dispatch_contexts(task_id);
@@ -906,6 +910,18 @@ export class OrchestrationDb {
           CREATE INDEX IF NOT EXISTS idx_dispatch_assignee_handle
             ON dispatch_contexts(assignee_handle);
         `)
+      }
+      if (current < 23) {
+        if (!this.hasColumn('dispatch_contexts', 'envelope_contract')) {
+          this.db.exec(
+            'ALTER TABLE dispatch_contexts ADD COLUMN envelope_contract INTEGER NOT NULL DEFAULT 0'
+          )
+        }
+        if (!this.hasColumn('dispatch_contexts', 'envelope_correction_attempts')) {
+          this.db.exec(
+            'ALTER TABLE dispatch_contexts ADD COLUMN envelope_correction_attempts INTEGER NOT NULL DEFAULT 0'
+          )
+        }
       }
       this.createUndeliveredInboxIndexIfPossible()
 
@@ -3949,8 +3965,9 @@ export class OrchestrationDb {
       this.db
         .prepare(
           `INSERT INTO dispatch_contexts (
-             id, run_id, task_id, contract_version, launch_token_hash, status, dispatched_at
-           ) VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'))`
+             id, run_id, task_id, contract_version, launch_token_hash, status, dispatched_at,
+             envelope_contract
+           ) VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'), 1)`
         )
         .run(id, task.run_id, task.id, CURRENT_CONTRACT_VERSION, params.launchTokenHash ?? null)
       this.db
@@ -5471,8 +5488,9 @@ export class OrchestrationDb {
       .prepare(
         `INSERT INTO dispatch_contexts (
            id, run_id, task_id, contract_version, launch_token_hash,
-           assignee_handle, assignee_pane_key, status, failure_count, dispatched_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'dispatched', ?, datetime('now'))`
+           assignee_handle, assignee_pane_key, status, failure_count, dispatched_at,
+           envelope_contract
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'dispatched', ?, datetime('now'), 1)`
       )
       .run(
         id,
@@ -5497,6 +5515,21 @@ export class OrchestrationDb {
     return this.db
       .prepare('SELECT * FROM dispatch_contexts WHERE task_id = ? ORDER BY rowid DESC LIMIT 1')
       .get(taskId) as DispatchContextRow | undefined
+  }
+
+  /** Returns the attempt number this rejection consumed, starting at 1. */
+  recordEnvelopeCorrectionAttempt(dispatchId: string): number {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET envelope_correction_attempts = envelope_correction_attempts + 1
+         WHERE id = ?`
+      )
+      .run(dispatchId)
+    const row = this.db
+      .prepare('SELECT envelope_correction_attempts AS attempts FROM dispatch_contexts WHERE id = ?')
+      .get(dispatchId) as { attempts: number } | undefined
+    return row?.attempts ?? 0
   }
 
   getDispatchContextById(dispatchId: string): DispatchContextRow | undefined {

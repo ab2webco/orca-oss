@@ -45,7 +45,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['orchestration', 'send'],
     summary: 'Send an inter-agent message',
     usage:
-      'orca orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--run <run_id>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--task-id <id>] [--dispatch-id <id>] [--outcome <succeeded|failed>] [--files-modified <csv>] [--report-path <path>] [--phase <text>] [--json]',
+      'orca orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--run <run_id>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--task-id <id>] [--dispatch-id <id>] [--outcome <succeeded|failed>] [--files-modified <csv>] [--report-path <path>] [--envelope-file <path>] [--envelope <json>] [--phase <text>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'to',
@@ -64,12 +64,15 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       'outcome',
       'files-modified',
       'report-path',
+      'envelope',
+      'envelope-file',
       'phase'
     ],
     notes: [
       'On Windows PowerShell, quote group addresses such as --to "@all" or --to "@worktree:<id>".',
       "worker_done and heartbeat are exact-Dispatch signals and cannot target groups; omit --to to use the Dispatch's Run mailbox.",
-      'worker_done requires --outcome succeeded or --outcome failed.',
+      'worker_done requires --outcome succeeded or --outcome failed; with an envelope, --outcome follows its status when omitted.',
+      'worker_done from a dispatch created by this runtime requires a typed envelope: --envelope-file <path> (preferred) or --envelope <json>, with status, summary, artifacts, verification, outOfScopeWrites and notesForNextAgent. A rejected envelope is returned with the exact field errors and can be corrected and resent up to twice in the same session.',
       'From an active Dispatch, an omitted recipient defaults to its owning Run mailbox.',
       'Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca durably relays it to a connected worker server.',
       'Managed agent terminals authenticate the sender pane with their launch token, so --from cannot claim their identity; it still names the sender for panes without one (SSH without remote hooks, reattached or hand-opened shells).',

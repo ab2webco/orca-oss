@@ -10,6 +10,7 @@ import type { OrchestrationEnvironmentTransport } from '../../orchestration/envi
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import { ORCHESTRATION_METHODS } from './orchestration'
+import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 describe('orchestration federation', () => {
   const databases: OrchestrationDb[] = []
@@ -353,7 +354,7 @@ describe('orchestration federation', () => {
           taskId: task.id,
           dispatchId: dispatch.id,
           outcome: 'succeeded',
-          filesModified: []
+          envelope: SUCCESS_ENVELOPE
         })
       }
     })

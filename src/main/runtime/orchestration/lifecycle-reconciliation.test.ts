@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { OrchestrationDb } from './db'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
+import { SUCCESS_ENVELOPE, FAILED_ENVELOPE } from './worker-done-envelope-fixture'
 
 describe('lifecycle reconciliation', () => {
   let db: OrchestrationDb
@@ -17,7 +18,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      })
     })
 
     expect(reconcileLifecycleMessage(db, message, (line) => logs.push(line))).toMatchObject({
@@ -43,7 +49,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: `tab_w:${LEAF_A}`
     })
 
@@ -65,6 +76,7 @@ describe('lifecycle reconciliation', () => {
         taskId: task.id,
         dispatchId: dispatch.id,
         outcome: 'failed',
+        envelope: FAILED_ENVELOPE,
         filesModified: []
       }),
       senderPaneKey: `tab_w:${LEAF_A}`
@@ -97,7 +109,8 @@ describe('lifecycle reconciliation', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })
 
@@ -111,11 +124,19 @@ describe('lifecycle reconciliation', () => {
     { payload: undefined, code: 'invalid_payload' },
     { payload: '{', code: 'invalid_payload' },
     {
-      payload: JSON.stringify({ dispatchId: 'ctx_1', outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        dispatchId: 'ctx_1',
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       code: 'missing_task_id'
     },
     {
-      payload: JSON.stringify({ taskId: 'task_1', outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: 'task_1',
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       code: 'missing_dispatch_id'
     },
     {
@@ -150,7 +171,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: `tab_old:${LEAF_A}`
     })
 
@@ -167,7 +193,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: 'tab_w:42'
     })
 
@@ -184,7 +215,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: `tab_w2:${LEAF_B}`
     })
 
@@ -231,6 +267,7 @@ describe('lifecycle reconciliation', () => {
         taskId: task.id,
         dispatchId: dispatch.id,
         outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE,
         _orcaLifecycleRejection: {
           code: 'sender_not_assignee',
           reason: 'caller supplied'
@@ -256,7 +293,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      })
     })
 
     expect(reconcileLifecycleMessage(db, message)).toMatchObject({
@@ -278,7 +320,8 @@ describe('lifecycle reconciliation', () => {
       payload: JSON.stringify({
         taskId: acceptedTask.id,
         dispatchId: acceptedDispatch.id,
-        outcome: 'succeeded'
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
       })
     })
     expect(reconcileLifecycleMessage(db, accepted).action).toBe('completed')
@@ -293,7 +336,8 @@ describe('lifecycle reconciliation', () => {
       payload: JSON.stringify({
         taskId: rejectedTask.id,
         dispatchId: rejectedDispatch.id,
-        outcome: 'succeeded'
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
       })
     })
     expect(reconcileLifecycleMessage(db, rejected)).toMatchObject({
@@ -311,7 +355,8 @@ describe('lifecycle reconciliation', () => {
     const payload = JSON.stringify({
       taskId: parent.id,
       dispatchId: dispatch.id,
-      outcome: 'succeeded'
+      outcome: 'succeeded',
+      envelope: SUCCESS_ENVELOPE
     })
 
     const foreign = db.insertMessage({
@@ -347,7 +392,8 @@ describe('lifecycle reconciliation', () => {
     const payload = JSON.stringify({
       taskId: task.id,
       dispatchId: dispatch.id,
-      outcome: 'succeeded'
+      outcome: 'succeeded',
+      envelope: SUCCESS_ENVELOPE
     })
     const owner = db.insertMessage({
       from: 'term_worker',
@@ -385,7 +431,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }),
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
       senderPaneKey: `tab_w2:${LEAF_B}`
     })
 
@@ -495,7 +546,12 @@ describe('lifecycle reconciliation', () => {
       to: 'term_coordinator',
       subject: 'Done',
       type: 'worker_done',
-      payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+      payload: JSON.stringify({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      })
     })
 
     reconcileLifecycleMessage(db, done)

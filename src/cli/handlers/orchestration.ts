@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: orchestration CLI handlers share flag-parsing helpers and dispatch/preamble logic; splitting by verb would fragment the RuntimeClient call shape without reducing complexity. */
+import { readFileSync } from 'node:fs'
 import type { CommandHandler } from '../dispatch'
 import type { RuntimeClient } from '../runtime-client'
 import { printResult } from '../format'
@@ -134,22 +135,73 @@ async function flushStdout(): Promise<void> {
   })
 }
 
+function deriveOutcomeFromEnvelopeStatus(envelope: unknown): string | undefined {
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    return undefined
+  }
+  const status = (envelope as { status?: unknown }).status
+  if (status === 'success') {
+    return 'succeeded'
+  }
+  // Why: leave an unknown status alone so the runtime reports the real schema
+  // error instead of a derived outcome the worker never wrote.
+  return status === 'blocked' || status === 'failed' ? 'failed' : undefined
+}
+
+function readWorkerEnvelopeFlags(flags: Map<string, string | boolean>): unknown {
+  const inline = getOptionalStringFlag(flags, 'envelope')
+  const file = getOptionalStringFlag(flags, 'envelope-file')
+  if (inline !== undefined && file !== undefined) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Use either --envelope or --envelope-file, not both.'
+    )
+  }
+  if (inline === undefined && file === undefined) {
+    return undefined
+  }
+  let text = inline
+  if (file !== undefined) {
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch (error) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `Could not read --envelope-file ${file}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  }
+  try {
+    return JSON.parse(text ?? '')
+  } catch {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'The worker_done envelope must be valid JSON. Prefer --envelope-file to avoid shell quoting.'
+    )
+  }
+}
+
 function getOptionalStructuredMessagePayload(
   flags: Map<string, string | boolean>
 ): string | undefined {
   const rawPayload = getOptionalStringFlag(flags, 'payload')
   const taskId = getOptionalStringFlag(flags, 'task-id')
   const dispatchId = getOptionalStringFlag(flags, 'dispatch-id')
-  const outcome = getOptionalStringFlag(flags, 'outcome')
   const filesModified = getOptionalStringFlag(flags, 'files-modified')
   const reportPath = getOptionalStringFlag(flags, 'report-path')
   const phase = getOptionalStringFlag(flags, 'phase')
+  const envelope = readWorkerEnvelopeFlags(flags)
+  // Why: status is the worker's own verdict, so an omitted --outcome follows it
+  // instead of asking the worker to keep two fields in sync by hand.
+  const outcome =
+    getOptionalStringFlag(flags, 'outcome') ?? deriveOutcomeFromEnvelopeStatus(envelope)
   const hasStructuredPayload =
     taskId !== undefined ||
     dispatchId !== undefined ||
     outcome !== undefined ||
     filesModified !== undefined ||
     reportPath !== undefined ||
+    envelope !== undefined ||
     phase !== undefined
   if (!hasStructuredPayload) {
     return rawPayload
@@ -161,7 +213,10 @@ function getOptionalStructuredMessagePayload(
     )
   }
   // Why: raw JSON args are fragile in Windows PowerShell; these flags avoid shell-specific quoting.
-  const payload: Record<string, string | string[]> = {}
+  const payload: Record<string, unknown> = {}
+  if (envelope !== undefined) {
+    payload.envelope = envelope
+  }
   if (taskId) {
     payload.taskId = taskId
   }
@@ -516,6 +571,15 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       throw new RuntimeClientError(
         'invalid_argument',
         '--outcome is only valid with --type worker_done.'
+      )
+    }
+    if (
+      type !== 'worker_done' &&
+      (flags.has('envelope') || flags.has('envelope-file'))
+    ) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--envelope and --envelope-file are only valid with --type worker_done.'
       )
     }
 

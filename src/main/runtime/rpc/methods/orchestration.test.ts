@@ -9,6 +9,7 @@ import { OrcaRuntimeService } from '../../orca-runtime'
 import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
 import { ORCHESTRATION_ASK_MAX_TIMEOUT_MS } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
+import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages belong to one exact Dispatch and cannot target a group address.`
@@ -450,7 +451,12 @@ describe('orchestration RPC methods', () => {
         // Why: `outcome` is upstream's new lifecycle requirement for every worker_done, orthogonal
         // to identity. Nothing else in this case may change — it guards that a sender with no
         // stable pane identity still completes its own dispatch.
-        payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        })
       })
 
       expect(db.getTask(task.id)?.status).toBe('completed')
@@ -475,7 +481,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })
 
@@ -500,7 +507,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as {
         message: { id: string; type: string; subject: string }
@@ -534,7 +542,8 @@ describe('orchestration RPC methods', () => {
       const payload = JSON.stringify({
         taskId: task.id,
         dispatchId: dispatch.id,
-        outcome: 'succeeded'
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
       })
 
       const rejected = (await call('orchestration.send', {
@@ -815,14 +824,20 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as { message: { to_handle: string; type: string; payload: string | null } }
 
       expect(result.message.to_handle).toBe(`run:${activeRunId}`)
       expect(result.message.type).toBe('worker_done')
       expect(result.message.payload).toBe(
-        JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+        JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        })
       )
     })
 
@@ -967,7 +982,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as { message: { type: string } }
 
@@ -998,6 +1014,60 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
       expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBeTruthy()
       expect(db.getActiveDispatchForTerminal('term_worker')).toBeDefined()
+    })
+
+    // Why: black-box through the RPC — an unvalidated runtime accepts the extra
+    // payload key and completes the task, so this discriminates behavior, not
+    // the existence of a schema module.
+    it('rejects a malformed envelope at the send boundary instead of completing', async () => {
+      setup()
+      const task = db.createTask({ spec: 'envelope work' })
+      const dispatch = db.createDispatchContext(task.id, 'term_worker')
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+
+      const result = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'Done',
+        type: 'worker_done',
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: { status: 'banana', summary: '', verification: 'green enough' }
+        })
+      })) as { lifecycle?: { action: string; code?: string; reason?: string } }
+
+      expect(result.lifecycle).toMatchObject({ action: 'rejected', code: 'invalid_envelope' })
+      expect(result.lifecycle?.reason).toContain('correction 1 of 2')
+      expect(db.getTask(task.id)?.status).toBe('dispatched')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+    })
+
+    it('accepts a valid envelope at the send boundary and settles the dispatch', async () => {
+      setup()
+      const task = db.createTask({ spec: 'envelope work' })
+      const dispatch = db.createDispatchContext(task.id, 'term_worker')
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+
+      const result = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'Done',
+        type: 'worker_done',
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        })
+      })) as { lifecycle?: { action: string } }
+
+      expect(result.lifecycle).toBeUndefined()
+      expect(db.getTask(task.id)?.status).toBe('completed')
+      expect(JSON.parse(db.getTask(task.id)?.result ?? '{}').envelope).toMatchObject({
+        status: 'success'
+      })
     })
 
     it('does not release dispatch lock for non-lifecycle sends', async () => {
@@ -1042,6 +1112,7 @@ describe('orchestration RPC methods', () => {
         payload.dispatchId = params.dispatchId
       }
       payload.outcome = 'succeeded'
+      payload.envelope = SUCCESS_ENVELOPE
       if (params.filesModified !== undefined) {
         payload.filesModified = params.filesModified
       }
