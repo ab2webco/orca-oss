@@ -70,6 +70,11 @@ export async function closeSettingsPage(page: Page): Promise<void> {
     .catch(() => undefined)
 }
 
+// Why: bounds both the click and the settle poll below. The click must fail well under
+// Playwright's 30s action default, or one bad attempt spends the whole budget and the
+// remaining attempts never run.
+const DIALOG_CLOSE_ATTEMPT_TIMEOUT_MS = 3_000
+
 export async function closeOpenDialogs(page: Page): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const dialogCount = await page.getByRole('dialog').count()
@@ -78,14 +83,22 @@ export async function closeOpenDialogs(page: Page): Promise<void> {
     }
     const dialog = page.getByRole('dialog').last()
     const cancelOrBack = dialog.getByRole('button', { name: /^(Cancel|Back)$/ })
+    // Why: a dialog mid-close under load leaves this button unstable and then detached
+    // (CI run 30963258559) — every other step here already tolerates that, so let a failed
+    // click fall through to the next attempt instead of throwing out of teardown.
     await ((await cancelOrBack
       .first()
       .isVisible()
       .catch(() => false))
-      ? cancelOrBack.first().click()
+      ? cancelOrBack
+          .first()
+          .click({ timeout: DIALOG_CLOSE_ATTEMPT_TIMEOUT_MS })
+          .catch(() => undefined)
       : page.keyboard.press('Escape'))
     await expect
-      .poll(async () => page.getByRole('dialog').count(), { timeout: 3_000 })
+      .poll(async () => page.getByRole('dialog').count(), {
+        timeout: DIALOG_CLOSE_ATTEMPT_TIMEOUT_MS
+      })
       .toBeLessThan(dialogCount)
       .catch(() => undefined)
   }
