@@ -140,6 +140,8 @@ process.stdin.on('data', (chunk) => {
       'succeeded',
       '--files-modified',
       '',
+      // Why: envelope_contract = 1 on a dispatch this runtime created, so a report without a typed envelope is rejected and the task never settles.
+      '--envelope', JSON.stringify({ status: 'success', summary: 'E2E retained current completion', verification: [{ claim: 'the retained worker settled its dispatch after the restart', evidence: 'e2e fixture completion path', level: 'unit' }] }),
       '--json'
     ]
     const result = cliEntry
