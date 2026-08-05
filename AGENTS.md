@@ -17,6 +17,15 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
 
+# Proceso de trabajo
+
+El board de Plane (proyecto Orca Lab) es la fuente de las tareas. Si el trabajo no está en el board,
+creá el ticket antes de empezar. El ciclo completo, las guardas del harness en `.claude/` y la falla
+real que originó cada una están en [`docs/reference/working-process.md`](./docs/reference/working-process.md).
+
+Dos que valen antes de reportar algo como verde: el exit code de `npm test` miente — leé la línea
+`Tests …`; y un test que pasa igual contra el código viejo no prueba nada.
+
 # Verification
 
 **Everything in your run is yours.** A failure you did not cause is still a failure you own: never dismiss one as flaky, pre-existing, or someone else's and move on. Explaining a failure is not the same as closing it — if you cannot fix it in scope, say so plainly and leave it tracked with the evidence you gathered. The same applies to anything handed to you: a delegated worker's report, an upstream PR, another agent's "verified". Review it before you build on it or contradict it.
