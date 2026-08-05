@@ -15,6 +15,7 @@ import type { SshPtyRecoveryActivationLease } from '../providers/ssh-pty-notific
 import { isSshPtyIdentityMismatchError, isSshPtyNotFoundError } from '../providers/ssh-pty-errors'
 import { toAppSshPtyId, toRelaySshPtyId } from '../providers/ssh-pty-id'
 import { SshFilesystemProvider } from '../providers/ssh-filesystem-provider'
+import { isMethodNotFoundError } from './ssh-filesystem-stream-reader'
 import { SshGitProvider } from '../providers/ssh-git-provider'
 import { agentHookServer } from '../agent-hooks/server'
 import { isAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
@@ -86,6 +87,11 @@ import {
   parseRemoteOrcaCliPostOutput
 } from './ssh-remote-orchestration-post-output'
 import { toSshExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
+import {
+  SSH_AI_VAULT_LIST_SESSIONS_METHOD,
+  SSH_AI_VAULT_LIST_SESSIONS_TIMEOUT_MS,
+  type SshAiVaultRelayListParams
+} from '../../shared/ssh-ai-vault-relay'
 import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
@@ -233,6 +239,27 @@ function normalizeRelayGracePeriodSeconds(graceTimeSeconds: number | undefined):
       )
 }
 
+// Why: teardown barriers are independent, so one failing store write must not hide the others —
+// settle them all and aggregate, rather than rethrowing only whichever rejected first.
+async function settleSshSessionTeardown(
+  barriers: (Promise<void> | null | undefined)[]
+): Promise<void> {
+  const results = await Promise.allSettled(barriers.map((barrier) => barrier ?? Promise.resolve()))
+  const errors = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  )
+  if (errors.length === 1) {
+    throw errors[0]
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'SSH relay session teardown failed')
+  }
+}
+
+// Why: dispose is strictly more destructive than detach, so the mode records which teardown a
+// session has already committed to and lets dispose supersede an in-flight detach.
+type SshRelaySessionTeardownMode = 'detach' | 'dispose'
+
 export class SshRelaySession {
   private _state: RelaySessionState = 'idle'
   private mux: SshChannelMultiplexer | null = null
@@ -251,11 +278,18 @@ export class SshRelaySession {
   private currentConnection: SshConnection | null = null
   private hostPlatform: RemoteHostPlatform | null = null
   private remoteCliBridgeEnv: RemoteCliBridgeEnv | null = null
+  private aiVaultListMethodSupported: boolean | null = null
   private pendingPtyReattaches = new Map<string, PendingPtyReattach>()
   private readonly ptyRecoveryRetention = new SshPtyRecoveryRetentionBudget()
   private activePtyProviderGeneration: number | null = null
   private sourceAckPublisherCleanup: (() => void) | null = null
   private sourceCancellationPublisherCleanup: (() => void) | null = null
+  private teardownMode: SshRelaySessionTeardownMode | null = null
+  private teardownCompletion: Promise<void> | null = null
+  // Why: detach's in-memory half is one-shot but its lease write is retryable, so they are tracked
+  // apart — a rejected write can be re-issued without re-running provider teardown.
+  private detachedInMemory = false
+  private detachFlushRejected = false
   private ptyRecoveryNotificationCleanups: (() => void)[] = []
   private readonly sourceIdentityByRelayPtyId = new Map<
     string,
@@ -350,6 +384,33 @@ export class SshRelaySession {
     }
   }
 
+  async requestAiVaultSessionList(
+    params: SshAiVaultRelayListParams,
+    options: { signal?: AbortSignal; timeoutMs?: number } = {}
+  ): Promise<unknown | null> {
+    if (this.aiVaultListMethodSupported === false) {
+      return null
+    }
+    const mux = this.mux
+    if (!mux || mux.isDisposed() || this._state !== 'ready') {
+      throw new Error('SSH relay is not ready')
+    }
+    try {
+      const result = await mux.request(SSH_AI_VAULT_LIST_SESSIONS_METHOD, params, {
+        signal: options.signal,
+        timeoutMs: options.timeoutMs ?? SSH_AI_VAULT_LIST_SESSIONS_TIMEOUT_MS
+      })
+      this.aiVaultListMethodSupported = true
+      return result
+    } catch (error) {
+      if (isMethodNotFoundError(error)) {
+        this.aiVaultListMethodSupported = false
+        return null
+      }
+      throw error
+    }
+  }
+
   getPortScanner(): PortScanner | null {
     return this.portScanner
   }
@@ -368,6 +429,7 @@ export class SshRelaySession {
       throw new Error(`Cannot establish relay session in state: ${this._state}`)
     }
     this._state = 'deploying'
+    this.aiVaultListMethodSupported = null
     this.currentConnection = conn
 
     try {
@@ -405,10 +467,27 @@ export class SshRelaySession {
 
       const mux = new SshChannelMultiplexer(transport)
       this.mux = mux
-      const ownsAttempt = (): boolean => this.mux === mux && !this.isDisposed()
+      const ownsAttempt = (): boolean => this.mux === mux && !mux.isDisposed() && !this.isDisposed()
 
-      this.ptyConsumerSessionState = await this.openPtyConsumerSession(mux, serverBuildId)
-      this.rememberPtyConsumerRecovery(serverBuildId)
+      const ptyConsumerSessionState = await this.openPtyConsumerSession(
+        mux,
+        serverBuildId,
+        ownsAttempt
+      )
+      if (!ownsAttempt()) {
+        if (!mux.isDisposed()) {
+          mux.dispose()
+        }
+        throw new Error('Session disposed during establish')
+      }
+      this.ptyConsumerSessionState = ptyConsumerSessionState
+      await this.rememberPtyConsumerRecovery(serverBuildId)
+      if (!ownsAttempt()) {
+        if (!mux.isDisposed()) {
+          mux.dispose()
+        }
+        throw new Error('Session disposed during establish')
+      }
 
       await mux.request('session.resolveHome', { path: '~' })
       if (!ownsAttempt()) {
@@ -484,6 +563,7 @@ export class SshRelaySession {
     this.abortController = abortController
 
     this._state = 'reconnecting'
+    this.aiVaultListMethodSupported = null
     this.currentConnection = conn
 
     // Why: stop scanning before teardownProviders so the poll timer can't fire against a disposed multiplexer.
@@ -529,12 +609,25 @@ export class SshRelaySession {
       this.mux = mux
 
       const ownsAttempt = (): boolean =>
+        this.mux === mux &&
+        !mux.isDisposed() &&
         this.abortController === abortController &&
         !abortController.signal.aborted &&
         !this.isDisposed()
 
-      this.ptyConsumerSessionState = await this.openPtyConsumerSession(mux, serverBuildId)
-      this.rememberPtyConsumerRecovery(serverBuildId)
+      const ptyConsumerSessionState = await this.openPtyConsumerSession(
+        mux,
+        serverBuildId,
+        ownsAttempt
+      )
+      if (!ownsAttempt()) {
+        if (!mux.isDisposed()) {
+          mux.dispose()
+        }
+        return
+      }
+      this.ptyConsumerSessionState = ptyConsumerSessionState
+      await this.rememberPtyConsumerRecovery(serverBuildId)
       if (!ownsAttempt()) {
         if (!mux.isDisposed()) {
           mux.dispose()
@@ -620,35 +713,126 @@ export class SshRelaySession {
     }
   }
 
+  /** Fire-and-forget disposal; prefer {@link disposeAndPersist} when the caller can await durability. */
   dispose(): void {
-    if (this._state === 'disposed') {
-      return
-    }
-    this.abortController?.abort()
-    this.stopPortScanning()
-    // Why: fire-and-forget — nothing rebinds after dispose, so no need to await port release.
-    void this.portForwardManager.removeAllForwards(this.targetId)
-    this.broadcastEmptyLists()
-    this.teardownProviders('shutdown')
-    this.store.markSshRemotePtyLeases(this.targetId, 'terminated')
-    this.currentConnection = null
-    this._state = 'disposed'
-    forgetSshPtyConsumerRecovery(this.targetId, this.ptyConsumerClientInstanceId, this.store)
+    void this.disposeAndPersist().catch((error) => {
+      console.warn(
+        `[ssh-relay-session] Failed to persist disposal for ${this.targetId}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    })
   }
 
-  detach(): void {
-    if (this._state === 'disposed') {
-      return
+  /**
+   * Destructive teardown: forgets the consumer recovery record and terminates the leases.
+   * Repeat calls share one completion, and a dispose requested after a detach supersedes it —
+   * the destructive half re-runs so detach-then-dispose still forgets recovery and terminates
+   * leases. (The reverse, detach after dispose, is a no-op.)
+   */
+  disposeAndPersist(): Promise<void> {
+    if (this.teardownMode === 'dispose') {
+      return this.teardownCompletion ?? Promise.resolve()
     }
+    const pendingDetach = this.teardownCompletion
+    this.teardownMode = 'dispose'
+    try {
+      this.teardownCompletion = this.runDisposal(pendingDetach)
+    } catch (error) {
+      // Why: a synchronous failure in the in-memory half must ride the completion promise, or a later
+      // disposeAndPersist reports success on a null completion and detachAndPersist re-runs runDetach.
+      this.teardownCompletion = Promise.reject(error)
+    }
+    return this.teardownCompletion
+  }
+
+  private runDisposal(pendingDetach: Promise<void> | null): Promise<void> {
+    // Why: the whole in-memory half runs before any await so a concurrent connect can never observe
+    // a half-torn session; only the durability barriers below are deferred onto the returned promise.
     this.abortController?.abort()
     this.stopPortScanning()
     this.broadcastEmptyLists()
-    // Why: window disconnect is non-destructive — unregister local providers but keep PTY ownership so reattach works (relay owns the grace timer).
-    this.teardownProviders('connection_lost')
-    this.store.markSshRemotePtyLeases(this.targetId, 'detached')
+    this.teardownProviders('shutdown')
     this.currentConnection = null
     this._state = 'disposed'
-    detachSshPtyConsumerRecovery(this.targetId, this.ptyConsumerClientInstanceId)
+    const recoveryRemoval = forgetSshPtyConsumerRecovery(
+      this.targetId,
+      this.ptyConsumerClientInstanceId,
+      this.store
+    )
+    const leaseTermination = this.store.markSshRemotePtyLeasesAsync(this.targetId, 'terminated')
+    return settleSshSessionTeardown([
+      // Why: a superseded detach keeps its own rejection for its own caller; swallow it here so a
+      // failed detach write cannot fail the disposal that replaced it.
+      pendingDetach?.catch(() => undefined),
+      // Why: nothing rebinds after dispose, but direct callers (no IPC-side teardown) still need
+      // this session's local listeners released.
+      this.portForwardManager.removeAllForwards(this.targetId),
+      recoveryRemoval,
+      leaseTermination
+    ])
+  }
+
+  /** Fire-and-forget detach; prefer {@link detachAndPersist} when the caller can await durability. */
+  detach(): void {
+    void this.detachAndPersist().catch((error) => {
+      console.warn(
+        `[ssh-relay-session] Failed to persist detach for ${this.targetId}: ${error instanceof Error ? error.message : String(error)}`
+      )
+    })
+  }
+
+  /**
+   * Non-destructive teardown: keeps PTY ownership so a later connect reclaims this consumer
+   * identity. Once dispose has been requested this is a no-op — see {@link disposeAndPersist}.
+   */
+  async detachAndPersist(): Promise<void> {
+    // Why: a rejected lease write must not latch forever — re-issue just the write so the caller can
+    // retry. Never under 'dispose': that supersedes detach for good and re-issuing would resurrect
+    // the 'detached' state the disposal already replaced with 'terminated'.
+    if (!this.teardownCompletion || (this.teardownMode === 'detach' && this.detachFlushRejected)) {
+      this.teardownCompletion = this.runDetach()
+    }
+    this.teardownMode ??= 'detach'
+    let completion = this.teardownCompletion
+    while (completion) {
+      try {
+        await completion
+      } catch (error) {
+        if (completion === this.teardownCompletion) {
+          throw error
+        }
+      }
+      if (completion === this.teardownCompletion) {
+        return
+      }
+      completion = this.teardownCompletion
+    }
+  }
+
+  private runDetach(): Promise<void> {
+    if (!this.detachedInMemory) {
+      if (this._state === 'disposed') {
+        return Promise.resolve()
+      }
+      // Why first: same synchronous-half-first rule as runDisposal, and this is the highest-value
+      // step — a fast reconnect must reclaim this identity instead of minting one, even if a
+      // teardown call below throws unexpectedly.
+      detachSshPtyConsumerRecovery(this.targetId, this.ptyConsumerClientInstanceId)
+      this.abortController?.abort()
+      this.stopPortScanning()
+      this.broadcastEmptyLists()
+      // Why: disconnect keeps PTY ownership so a later manual connect can reattach.
+      this.teardownProviders('connection_lost')
+      this.currentConnection = null
+      this._state = 'disposed'
+      this.detachedInMemory = true
+    }
+    this.detachFlushRejected = false
+    return settleSshSessionTeardown([
+      this.store.markSshRemotePtyLeasesAsync(this.targetId, 'detached')
+    ]).catch((error: unknown) => {
+      this.detachFlushRejected = true
+      throw error
+    })
   }
 
   // ── Private ───────────────────────────────────────────────────────
@@ -832,7 +1016,8 @@ export class SshRelaySession {
 
   private async openPtyConsumerSession(
     mux: SshChannelMultiplexer,
-    serverBuildId: string | undefined
+    serverBuildId: string | undefined,
+    ownsAttempt: () => boolean
   ): Promise<SshPtyConsumerSessionState> {
     const previousOwner = this.recoverablePtyConsumerOwner(serverBuildId)
     const options = {
@@ -876,18 +1061,25 @@ export class SshRelaySession {
           )
         }
       }
-      removeSshPtyConsumerOwnerRecovery(this.targetId, this.ptyConsumerClientInstanceId, this.store)
+      await removeSshPtyConsumerOwnerRecovery(
+        this.targetId,
+        this.ptyConsumerClientInstanceId,
+        this.store
+      )
+      if (!ownsAttempt()) {
+        throw new Error('Session disposed during establish')
+      }
       this.ptyConsumerSessionState = null
       return openSshPtyConsumerSession(mux, options)
     }
   }
 
-  private rememberPtyConsumerRecovery(serverBuildId: string | undefined): void {
+  private async rememberPtyConsumerRecovery(serverBuildId: string | undefined): Promise<void> {
     const owner = this.activePtyConsumerOwner()
     if (!owner || !serverBuildId) {
       return
     }
-    rememberSshPtyConsumerRecovery({
+    await rememberSshPtyConsumerRecovery({
       targetId: this.targetId,
       clientInstanceId: this.ptyConsumerClientInstanceId,
       serverBuildId,
@@ -1139,6 +1331,7 @@ export class SshRelaySession {
         providerSession?: unknown
         providerSessionOnly?: unknown
         shedFields?: unknown
+        claudeRunningNonAgentTask?: unknown
         payload?: unknown
       }
       if (typeof envelope.paneKey !== 'string') {
@@ -1169,6 +1362,10 @@ export class SshRelaySession {
           providerSessionOnly: envelope.providerSessionOnly === true ? true : undefined,
           // Why: names the fields the relay dropped to fit the frame; ingestRemote restores them.
           shedFields: envelope.shedFields,
+          claudeRunningNonAgentTask:
+            typeof envelope.claudeRunningNonAgentTask === 'boolean'
+              ? envelope.claudeRunningNonAgentTask
+              : undefined,
           payload: envelope.payload
         },
         this.targetId
@@ -1702,6 +1899,7 @@ export class SshRelaySession {
         })
         .filter((entry): entry is [string, ExpectedPtyIdentity] => entry !== null)
     )
+    const attachedLeaseIds = new Set<string>()
     // Why: after app restart ptyOwnership is empty, but durable SSH leases still describe grace-window survivors.
     const ptyIds = Array.from(
       new Set([
@@ -1729,6 +1927,7 @@ export class SshRelaySession {
             ptyId,
             activeLeaseByPtyId,
             expectedIdentityByPtyId,
+            attachedLeaseIds,
             mux,
             providerGeneration,
             shouldContinue
@@ -1748,6 +1947,12 @@ export class SshRelaySession {
     await Promise.all(
       Array.from({ length: Math.min(SSH_PTY_REATTACH_MAX_CONCURRENCY, ptyIds.length) }, worker)
     )
+    if (attachedLeaseIds.size > 0 && shouldContinue()) {
+      await this.store.markSshRemotePtyLeasesAttachedAsync(
+        this.targetId,
+        Array.from(attachedLeaseIds)
+      )
+    }
   }
 
   private async reattachKnownPty(args: {
@@ -1755,6 +1960,7 @@ export class SshRelaySession {
     ptyId: string
     activeLeaseByPtyId: Map<string, SshPtyLease>
     expectedIdentityByPtyId: Map<string, ExpectedPtyIdentity>
+    attachedLeaseIds: Set<string>
     mux: SshChannelMultiplexer
     providerGeneration: number
     shouldContinue: () => boolean
@@ -1764,6 +1970,7 @@ export class SshRelaySession {
       ptyId,
       activeLeaseByPtyId,
       expectedIdentityByPtyId,
+      attachedLeaseIds,
       mux,
       providerGeneration,
       shouldContinue
@@ -1879,7 +2086,7 @@ export class SshRelaySession {
           activeLeaseByPtyId.get(ptyId)
         )
       }
-      this.store.markSshRemotePtyLease(this.targetId, ptyId, 'attached')
+      attachedLeaseIds.add(ptyId)
       pendingReattach.activated = true
       recoveryActivationLease?.commit()
       recoveryActivationLease = undefined

@@ -142,7 +142,11 @@ describe('orchestration RPC methods', () => {
 
   it('registers all expected methods', () => {
     const registry = buildRegistry(ORCHESTRATION_METHODS)
-    expect(registry.size).toBe(34)
+    expect(registry.size).toBe(38)
+    expect(registry.has('orchestration.workerRelease')).toBe(true)
+    expect(registry.has('orchestration.workerRetain')).toBe(true)
+    expect(registry.has('orchestration.workerList')).toBe(true)
+    expect(registry.has('orchestration.workerTerminalUserInput')).toBe(true)
     expect(registry.has('orchestration.runCreate')).toBe(true)
     expect(registry.has('orchestration.runUse')).toBe(true)
     expect(registry.has('orchestration.runCurrent')).toBe(true)
@@ -2398,7 +2402,7 @@ describe('orchestration RPC methods', () => {
       // Why: dispatching a worker is background work — surfaceOwner:false adopts
       // the tab without scrolling the sidebar to the worker's workspace.
       expect(runtime.createTerminal).toHaveBeenCalledWith('id:repo::worktree', {
-        command: 'codex',
+        startupAgent: 'codex',
         title: `worker-${task.id}`,
         surfaceOwner: false
       })
@@ -2422,10 +2426,12 @@ describe('orchestration RPC methods', () => {
       })) as { state: string }
 
       expect(result).toMatchObject({ state: 'ready' })
+      // Why startupAgent, not command: worker-start launches the configured agent CLI rather
+      // than the raw agent id (#12148); the account pins still ride the same create.
       expect(runtime.createTerminal).toHaveBeenCalledWith(
         'id:repo::worktree',
         expect.objectContaining({
-          command: 'claude',
+          startupAgent: 'claude',
           claudeAccountId: 'acct-claude-1',
           codexAccountId: 'acct-codex-1'
         })
@@ -2478,6 +2484,29 @@ describe('orchestration RPC methods', () => {
           } as never
         )
       ).rejects.toThrow('--claude-account')
+    })
+
+    // Why: `cursor` on PATH is the Cursor desktop app; passing the agent id as a
+    // shell command opened the IDE and left a blank shell (issue #11926).
+    it('never passes the agent id to the worker terminal as a shell command', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'start a cursor worker' })
+
+      await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'cursor'
+      })
+
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({ startupAgent: 'cursor' })
+      )
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.not.objectContaining({ command: expect.anything() })
+      )
     })
 
     it('commits the launched worker token with its durable authority', async () => {
@@ -2573,7 +2602,7 @@ describe('orchestration RPC methods', () => {
         'id:repo::other',
         // Why: starting a worker in an existing worktree must not pull the sidebar
         // away from whatever the user is looking at.
-        expect.objectContaining({ command: 'codex', surfaceOwner: false })
+        expect.objectContaining({ startupAgent: 'codex', surfaceOwner: false })
       )
       expect(createWorktree).not.toHaveBeenCalled()
     })

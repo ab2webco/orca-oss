@@ -193,12 +193,6 @@ export function buildWorkspaceRunContext(args: {
   }
 }
 
-export function getWorkspaceRunRuntimeSettings(
-  context: Pick<WorkspaceRunContext, 'hostId'> | null | undefined
-): Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> {
-  return getTaskSourceRuntimeSettings(context ? { hostId: context.hostId } : null)
-}
-
 function getRepoHostId(repo: Pick<Repo, 'connectionId' | 'executionHostId'>): ExecutionHostId {
   const explicit = normalizeExecutionHostId(repo.executionHostId)
   if (explicit) {

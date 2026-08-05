@@ -19,7 +19,8 @@ vi.mock('@/store', () => ({
 }))
 vi.mock('sonner', () => ({ toast: toastMocks }))
 
-import { ConfirmationDialogProvider, useConfirmationDialog } from './confirmation-dialog'
+import { ConfirmationDialogProvider } from './confirmation-dialog'
+import { useConfirmationDialog } from './confirmation-dialog-context'
 import { PlaneBoardCard } from './plane-board-card'
 import { confirmAndDeletePlaneWorkItem } from './plane-board-card-delete'
 import type { PlaneWorkItem } from '../../../shared/plane-types'

@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 
 import { useAppStore } from '../store'
 import { translate } from '@/i18n/i18n'
-import { useConfirmationDialog } from './confirmation-dialog'
+import { useConfirmationDialog } from './confirmation-dialog-context'
 import {
   planeCreateWorkItem,
   planeDeleteState,

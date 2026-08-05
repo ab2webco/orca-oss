@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 
 import { translate } from '@/i18n/i18n'
 import { planeDeleteWorkItem, type RuntimePlaneSettings } from '@/runtime/runtime-plane-client'
-import type { useConfirmationDialog } from '@/components/confirmation-dialog'
+import type { useConfirmationDialog } from '@/components/confirmation-dialog-context'
 import { getPlaneMutationErrorMessage } from './plane-mutation-error-message'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 

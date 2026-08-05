@@ -723,6 +723,7 @@ export class DaemonServer {
         }
         this.createOrAttachInFlight++
         const p = request.payload
+        const attachOnly = p.attachOnly === true
         let routedSessionId = p.sessionId
         let result: Awaited<ReturnType<TerminalHost['createOrAttach']>>
         try {
@@ -733,7 +734,9 @@ export class DaemonServer {
           ) {
             throw new Error('agent_session_identity_required')
           }
-          await this.preparePtySpawnUnlessCanceled(p.sessionId, clientId)
+          if (!attachOnly) {
+            await this.preparePtySpawnUnlessCanceled(p.sessionId, clientId)
+          }
           if (p.historySeed !== undefined && p.historySeedTransferId !== undefined) {
             throw new Error('Multiple terminal history seed sources')
           }
@@ -753,6 +756,7 @@ export class DaemonServer {
             envToDelete: p.envToDelete,
             command: p.command,
             startupCommandDelivery: p.startupCommandDelivery,
+            ...(attachOnly ? { attachOnly: true } : {}),
             // Why: RPC payloads are untrusted JSON; persist only the allowlisted routing enum, never arbitrary identity.
             ...(isTuiAgent(p.launchAgent) ? { launchAgent: p.launchAgent } : {}),
             shellOverride: p.shellOverride,

@@ -22,7 +22,7 @@ const { confirmationMocks, runtimeMocks, storeMocks, toastMocks } = vi.hoisted((
   toastMocks: { error: vi.fn() }
 }))
 
-vi.mock('@/components/confirmation-dialog', () => ({
+vi.mock('@/components/confirmation-dialog-context', () => ({
   useConfirmationDialog: () => confirmationMocks.confirm
 }))
 vi.mock('@/runtime/runtime-plane-client', () => runtimeMocks)
