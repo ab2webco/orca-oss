@@ -137,8 +137,11 @@ test.describe('SSH config host picker', () => {
     ).toBeVisible({ timeout: 5_000 })
 
     await form.getByRole('button', { name: 'Save' }).click()
+    // Why: the toast lives 4s, and both it and the dialog close land in the same commit —
+    // waiting for the dialog first spends that budget on expect polling (up to ~4.85s) and
+    // reads a toast that is already gone. Same order as ssh-config-host-import.spec.ts.
+    await expect(orcaPage.getByText('SSH host added.')).toBeVisible({ timeout: 15_000 })
     await expect(form).toBeHidden({ timeout: 10_000 })
-    await expect(orcaPage.getByText('SSH host added.')).toBeVisible({ timeout: 5_000 })
 
     const sshSection = await openSshHostSettings(orcaPage)
     await expectSshHostListedInSettings(sshSection, prod)
