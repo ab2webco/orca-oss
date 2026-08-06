@@ -95,11 +95,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('clears the pins when the destination is the system default', async () => {
     const { store, worktreeMeta } = createStore()
-    const service = buildService(
-      store,
-      () => {},
-      async () => true
-    )
+    const service = buildService(store, () => {}, async () => true)
 
     await service.reassignWorktreeAccountPins({
       fromAccountId: 'account-a',
@@ -127,11 +123,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('refuses a destination that does not exist', async () => {
     const { store } = createStore()
-    const service = buildService(
-      store,
-      () => {},
-      async () => true
-    )
+    const service = buildService(store, () => {}, async () => true)
 
     await expect(
       service.reassignWorktreeAccountPins({
@@ -144,11 +136,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('refuses reassigning an account onto itself', async () => {
     const { store } = createStore()
-    const service = buildService(
-      store,
-      () => {},
-      async () => true
-    )
+    const service = buildService(store, () => {}, async () => true)
 
     await expect(
       service.reassignWorktreeAccountPins({
@@ -161,11 +149,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('keeps a live injected session on its original account after the pin moves', async () => {
     const { store } = createStore()
-    const service = buildService(
-      store,
-      () => {},
-      async () => true
-    )
+    const service = buildService(store, () => {}, async () => true)
     markInjectedClaudePtySpawned(PTY_A, 'account-a')
 
     await service.reassignWorktreeAccountPins({
@@ -183,11 +167,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('reports which worktrees hold the account and which are live', () => {
     const { store } = createStore()
-    const service = buildService(
-      store,
-      () => {},
-      async () => true
-    )
+    const service = buildService(store, () => {}, async () => true)
     markInjectedClaudePtySpawned(PTY_A, 'account-a')
 
     const report = service.getAccountWorktreeUsageReport('account-a')

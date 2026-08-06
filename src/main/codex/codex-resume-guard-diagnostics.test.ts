@@ -71,7 +71,8 @@ describe('collectCodexResumeFallbackDiagnostics', () => {
         repair: {
           sessionId: SESSION_ID,
           recordedTranscriptPath: '/managed/stale/home/sessions/2026/07/26/rollout-stale.jsonl',
-          resolvedTranscriptPath: '/managed/current/home/sessions/2026/07/26/rollout-current.jsonl'
+          resolvedTranscriptPath:
+            '/managed/current/home/sessions/2026/07/26/rollout-current.jsonl'
         }
       })
     ).toEqual({

@@ -6193,9 +6193,7 @@ export class OrchestrationDb {
       )
       .run(dispatchId)
     const row = this.db
-      .prepare(
-        'SELECT envelope_correction_attempts AS attempts FROM dispatch_contexts WHERE id = ?'
-      )
+      .prepare('SELECT envelope_correction_attempts AS attempts FROM dispatch_contexts WHERE id = ?')
       .get(dispatchId) as { attempts: number } | undefined
     return row?.attempts ?? 0
   }

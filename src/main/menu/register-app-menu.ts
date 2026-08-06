@@ -96,7 +96,8 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
     event
   ) => {
     const modifierClick = !event.triggeredByAccelerator
-    const includeLabRcPrerelease = modifierClick && event.altKey === true && event.shiftKey === true
+    const includeLabRcPrerelease =
+      modifierClick && event.altKey === true && event.shiftKey === true
     if (includeLabRcPrerelease) {
       onCheckForUpdates({
         includePrerelease: false,
