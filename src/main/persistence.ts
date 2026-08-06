@@ -6892,7 +6892,15 @@ export class Store {
       ).slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
       this.state.claudeLiveSharedPtyAccountBindings = [
         ...sharedClaudeBindingsBefore.filter((entry) => entry.sessionId !== args.ptyId),
-        { sessionId: args.ptyId, accountId: args.claudeSharedAccountId ?? null }
+        {
+          sessionId: args.ptyId,
+          accountId: args.claudeSharedAccountId ?? null,
+          // Why: this is the spawning launch recording its own selection, so a null
+          // here means "no managed account", not unknown ownership. Without the marker
+          // the row reads as a legacy unknown after a restart and locks every account
+          // until a probe clears it (ORCA-190).
+          accountResolved: true
+        }
       ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
     }
     const shouldPersistCodexDirectedBinding =
