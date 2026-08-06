@@ -13,10 +13,19 @@ export type SharedClaudePtyOwner =
   | { kind: 'unmanaged' }
   | { kind: 'unknown'; reason: string }
 
+/** A managed account as the owner resolution sees it. `forksOauthChain` is false for
+ *  custom-endpoint accounts: they read a static token from their own settings.json, so
+ *  they have no single-use chain to compare and none to fork. */
+export type SharedClaudePtyOwnerCandidate = {
+  id: string
+  managedAuthPath: string
+  forksOauthChain: boolean
+}
+
 export type SharedClaudePtyOwnerProbe = {
   /** null when the process is gone or its environment is unreadable here. */
   readClaudeConfigDirEnv: (pid: number) => Promise<LiveProcessEnvironmentValue | null>
-  managedAccounts: () => readonly { id: string; managedAuthPath: string }[]
+  managedAccounts: () => readonly SharedClaudePtyOwnerCandidate[]
   /** Credentials in the shared runtime config dir; outer null means the read
    *  failed, inner null means the dir holds none. */
   readSharedRuntimeCredentials: () => Promise<{ credentialsJson: string | null } | null>
@@ -84,6 +93,13 @@ async function resolveOwnerFromSharedRuntimeChain(
   }
   let hasUncomparableAccount = false
   for (const account of probe.managedAccounts()) {
+    // Why skipped rather than counted uncomparable: a custom-endpoint account has no
+    // OAuth chain to read, so it can never be this PTY's owner — and letting its
+    // unreadable credentials force "unknown" kept the wildcard asserted on a machine
+    // that merely had one endpoint account configured (ORCA-190).
+    if (!account.forksOauthChain) {
+      continue
+    }
     const credentialsJson = await probe.readManagedCredentials(account.id)
     const fingerprint = credentialsJson ? fingerprintClaudeRefreshChain(credentialsJson) : null
     if (!fingerprint) {

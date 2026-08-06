@@ -97,7 +97,9 @@ describe('a seeded shared Claude PTY with no recorded ownership', () => {
     seedLiveClaudePtysFromPersistence(['seeded-legacy'])
     const probe: SharedClaudePtyOwnerProbe = {
       readClaudeConfigDirEnv: async () => ({ value: null }),
-      managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+      managedAccounts: () => [
+        { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+      ],
       readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('own-login') }),
       readManagedCredentials: async () => credentials('managed-a'),
       platform: 'darwin'
@@ -117,8 +119,8 @@ describe('a seeded shared Claude PTY with no recorded ownership', () => {
     const probe: SharedClaudePtyOwnerProbe = {
       readClaudeConfigDirEnv: async () => ({ value: null }),
       managedAccounts: () => [
-        { id: 'account-a', managedAuthPath: '/vaults/account-a/auth' },
-        { id: 'account-b', managedAuthPath: '/vaults/account-b/auth' }
+        { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true },
+        { id: 'account-b', managedAuthPath: '/vaults/account-b/auth', forksOauthChain: true }
       ],
       readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('token-a') }),
       readManagedCredentials: async (accountId) =>
@@ -136,7 +138,9 @@ describe('a seeded shared Claude PTY with no recorded ownership', () => {
     seedLiveClaudePtysFromPersistence(['seeded-legacy'])
     const probe: SharedClaudePtyOwnerProbe = {
       readClaudeConfigDirEnv: async () => null,
-      managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+      managedAccounts: () => [
+        { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+      ],
       readSharedRuntimeCredentials: async () => null,
       readManagedCredentials: async () => null,
       platform: 'win32'
@@ -161,7 +165,9 @@ describe('a seeded shared Claude PTY with no recorded ownership', () => {
     seedLiveClaudePtysFromPersistence(['seeded-legacy'])
     const probe: SharedClaudePtyOwnerProbe = {
       readClaudeConfigDirEnv: async () => null,
-      managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+      managedAccounts: () => [
+        { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+      ],
       readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('some-chain') }),
       readManagedCredentials: async () => null,
       platform: 'darwin'

@@ -316,14 +316,15 @@ export class ClaudeRuntimeAuthService {
       // Why both paths per WSL account: the injected env carries the Linux path
       // while managedAuthPath is its Windows UNC view of the same dir.
       managedAccounts: () =>
-        this.store
-          .getSettings()
-          .claudeManagedAccounts.flatMap((account) => [
-            { id: account.id, managedAuthPath: account.managedAuthPath },
+        this.store.getSettings().claudeManagedAccounts.flatMap((account) => {
+          const forksOauthChain = account.authMethod !== 'custom-endpoint'
+          return [
+            { id: account.id, managedAuthPath: account.managedAuthPath, forksOauthChain },
             ...(account.wslLinuxAuthPath
-              ? [{ id: account.id, managedAuthPath: account.wslLinuxAuthPath }]
+              ? [{ id: account.id, managedAuthPath: account.wslLinuxAuthPath, forksOauthChain }]
               : [])
-          ]),
+          ]
+        }),
       readSharedRuntimeCredentials: () => this.readSharedRuntimeCredentialsForOwnerProbe(),
       readManagedCredentials: (accountId) => readManagedClaudeRefreshCredentials(accountId)
     }

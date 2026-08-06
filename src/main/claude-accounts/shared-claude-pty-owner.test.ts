@@ -26,8 +26,8 @@ describe('resolveSharedClaudePtyOwner', () => {
       probe({
         readClaudeConfigDirEnv: async () => ({ value: '/vaults/account-b/auth/' }),
         managedAccounts: () => [
-          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth' },
-          { id: 'account-b', managedAuthPath: '/vaults/account-b/auth' }
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true },
+          { id: 'account-b', managedAuthPath: '/vaults/account-b/auth', forksOauthChain: true }
         ]
       })
     )
@@ -40,7 +40,9 @@ describe('resolveSharedClaudePtyOwner', () => {
       4321,
       probe({
         readClaudeConfigDirEnv: async () => ({ value: '/somewhere/else' }),
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }]
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+        ]
       })
     )
 
@@ -51,7 +53,9 @@ describe('resolveSharedClaudePtyOwner', () => {
     const owner = await resolveSharedClaudePtyOwner(
       4321,
       probe({
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+        ],
         readSharedRuntimeCredentials: async () => ({ credentialsJson: null })
       })
     )
@@ -63,7 +67,9 @@ describe('resolveSharedClaudePtyOwner', () => {
     const owner = await resolveSharedClaudePtyOwner(
       4321,
       probe({
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+        ],
         readSharedRuntimeCredentials: async () => ({
           credentialsJson: credentials('the-users-own-login')
         }),
@@ -79,8 +85,8 @@ describe('resolveSharedClaudePtyOwner', () => {
       4321,
       probe({
         managedAccounts: () => [
-          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth' },
-          { id: 'account-b', managedAuthPath: '/vaults/account-b/auth' }
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true },
+          { id: 'account-b', managedAuthPath: '/vaults/account-b/auth', forksOauthChain: true }
         ],
         readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('token-b') }),
         readManagedCredentials: async (accountId) =>
@@ -91,11 +97,37 @@ describe('resolveSharedClaudePtyOwner', () => {
     expect(owner).toEqual({ kind: 'managed', accountId: 'account-b' })
   })
 
+  it('ignores a custom-endpoint account, which has no chain to fork', async () => {
+    // Why this case matters: one endpoint account with no readable OAuth credentials
+    // used to force `unknown`, which kept every launch blocked on a machine that had
+    // simply configured a z.ai/GLM account (ORCA-190).
+    const owner = await resolveSharedClaudePtyOwner(
+      4321,
+      probe({
+        managedAccounts: () => [
+          {
+            id: 'endpoint-account',
+            managedAuthPath: '/vaults/endpoint/auth',
+            forksOauthChain: false
+          },
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+        ],
+        readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('own-login') }),
+        readManagedCredentials: async (accountId) =>
+          accountId === 'account-a' ? credentials('managed-a') : null
+      })
+    )
+
+    expect(owner).toEqual({ kind: 'unmanaged' })
+  })
+
   it('stays unknown when a managed credential cannot be compared', async () => {
     const owner = await resolveSharedClaudePtyOwner(
       4321,
       probe({
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: '/vaults/account-a/auth' }],
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: '/vaults/account-a/auth', forksOauthChain: true }
+        ],
         readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('unknown') }),
         readManagedCredentials: async () => null
       })
@@ -123,7 +155,9 @@ describe('resolveSharedClaudePtyOwner', () => {
       probe({
         readClaudeConfigDirEnv,
         platform: 'win32',
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: 'c:\\vaults\\a' }],
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: 'c:\\vaults\\a', forksOauthChain: true }
+        ],
         readSharedRuntimeCredentials: async () => ({ credentialsJson: credentials('token-a') }),
         readManagedCredentials: async () => credentials('token-a')
       })
@@ -147,7 +181,9 @@ describe('resolveSharedClaudePtyOwner', () => {
       probe({
         platform: 'win32',
         readClaudeConfigDirEnv: async () => ({ value: 'C:\\Vaults\\Account-A\\Auth' }),
-        managedAccounts: () => [{ id: 'account-a', managedAuthPath: 'c:\\vaults\\account-a\\auth' }]
+        managedAccounts: () => [
+          { id: 'account-a', managedAuthPath: 'c:\\vaults\\account-a\\auth', forksOauthChain: true }
+        ]
       })
     )
 

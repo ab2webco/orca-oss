@@ -3936,6 +3936,115 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('fails a create whose requested agent was refused instead of reporting success', async () => {
+    // Why: `worktree create --agent` folded a refused agent launch into `warning`
+    // and still answered ok, so a dispatch blocked by the Claude live-PTY gate left
+    // a workspace of bare shells and no agent (ORCA-190).
+    const folderRepo = {
+      id: 'folder-repo',
+      path: '/workspace/folder',
+      displayName: 'Folder',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'folder' as const
+    }
+    const metaById: Record<string, WorktreeMeta> = {
+      'folder-repo::/workspace/folder': makeWorktreeMeta({ instanceId: 'root-instance' })
+    }
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [folderRepo],
+      getRepo: (id: string) => (id === folderRepo.id ? folderRepo : undefined),
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      },
+      removeWorktreeMeta: (worktreeId: string) => {
+        delete metaById[worktreeId]
+      }
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setPtyController({
+      spawn: vi.fn(),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    vi.spyOn(runtime, 'createTerminal').mockRejectedValue(
+      new Error(
+        'This Claude account is already in use by a global terminal (terminal t3 "zsh" in "bot_multitenant"). Close it before launching the assigned account.'
+      )
+    )
+    runtime.setNotifier({ worktreesChanged: vi.fn() } as never)
+
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: 'id:folder-repo',
+        name: 'refused-session',
+        createdWithAgent: 'claude',
+        startup: { command: 'claude' }
+      })
+    ).rejects.toThrow(/claude agent could not start/)
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: 'id:folder-repo',
+        name: 'refused-session-2',
+        createdWithAgent: 'claude',
+        startup: { command: 'claude' }
+      })
+      // Why both: the refusal must survive, and the caller needs the workspace it
+      // can adopt so a retry does not create a duplicate.
+    ).rejects.toThrow(/already in use by a global terminal[\s\S]*still exists \(id:folder-repo::/)
+  })
+
+  it('still reports a create whose startup command has no agent as a warning', async () => {
+    const folderRepo = {
+      id: 'folder-repo',
+      path: '/workspace/folder',
+      displayName: 'Folder',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'folder' as const
+    }
+    const metaById: Record<string, WorktreeMeta> = {
+      'folder-repo::/workspace/folder': makeWorktreeMeta({ instanceId: 'root-instance' })
+    }
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [folderRepo],
+      getRepo: (id: string) => (id === folderRepo.id ? folderRepo : undefined),
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      },
+      removeWorktreeMeta: (worktreeId: string) => {
+        delete metaById[worktreeId]
+      }
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setPtyController({
+      spawn: vi.fn(),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    vi.spyOn(runtime, 'createTerminal').mockRejectedValue(new Error('pty unavailable'))
+    runtime.setNotifier({ worktreesChanged: vi.fn() } as never)
+
+    const result = await runtime.createManagedWorktree({
+      repoSelector: 'id:folder-repo',
+      name: 'plain-session',
+      startup: { command: 'npm run dev' }
+    })
+
+    expect(result.warning).toContain('pty unavailable')
+    expect(result.startupTerminal).toBeUndefined()
+  })
+
   it('creates additional workspace metadata for folder-mode repos through runtime create', async () => {
     const folderRepo = {
       id: 'folder-repo',
