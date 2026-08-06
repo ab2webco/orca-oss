@@ -2688,6 +2688,11 @@ export type ClaudeSessionFailoverCopyResult =
 export type ClaudeLiveSharedPtyAccountBinding = {
   sessionId: string
   accountId: string | null
+  /** Only meaningful when accountId is null: true when the launch recorded that
+   *  null itself (no managed account was selected). Absent in rows written before
+   *  ORCA-190, whose null is genuinely unknown ownership and must keep blocking
+   *  every account until the live process resolves it. */
+  accountResolved?: boolean
 }
 
 export type ClaudeRateLimitAccountsState = {

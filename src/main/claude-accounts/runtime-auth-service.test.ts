@@ -4582,13 +4582,15 @@ describe('ClaudeRuntimeAuthService', () => {
     })
     const store = createStore(settings)
     const { markClaudePtyExited, markClaudePtySpawned } = await import('./live-pty-gate')
-    markClaudePtySpawned('global-pty')
+    // Why the account argument: the global CLI runs THIS account's chain, and the
+    // gate now blocks the account it can name instead of every account (ORCA-190).
+    markClaudePtySpawned('global-pty', 'account-1')
     try {
       const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
       const service = new ClaudeRuntimeAuthService(store as never)
       await expect(
         service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-1' })
-      ).rejects.toThrow('running global Claude terminal')
+      ).rejects.toThrow('already in use by a global terminal')
     } finally {
       markClaudePtyExited('global-pty')
     }
@@ -4649,7 +4651,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
     // Sanity: without the exemption, the low-level gate still blocks a normal
     // (OAuth) reservation while that global terminal is live.
-    markClaudePtySpawned('global-pty-2')
+    markClaudePtySpawned('global-pty-2', 'some-oauth-account')
     try {
       expect(() => reserveInjectedClaudeAccountLaunch('some-oauth-account')).toThrow(
         'already in use by a global terminal'
@@ -4677,9 +4679,9 @@ describe('ClaudeRuntimeAuthService', () => {
     const store = createStore(settings)
     const { markClaudePtyExited, markClaudePtySpawned, markInjectedClaudePtySpawned } =
       await import('./live-pty-gate')
-    // The exact stuck state from the field: a null-bound global terminal plus
-    // the pinned session's own live CLI.
-    markClaudePtySpawned('global-pty')
+    // The exact stuck state from the field: a global terminal on this same account
+    // plus the pinned session's own live CLI.
+    markClaudePtySpawned('global-pty', 'account-1')
     markInjectedClaudePtySpawned('injected-session', 'account-1')
     try {
       const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
@@ -4700,10 +4702,10 @@ describe('ClaudeRuntimeAuthService', () => {
           { runtime: 'host', overrideAccountId: 'account-1' },
           { reattachLiveInjectedPtyId: 'some-other-session' }
         )
-      ).rejects.toThrow('running global Claude terminal')
+      ).rejects.toThrow('already in use by a global terminal')
       await expect(
         service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-1' })
-      ).rejects.toThrow('running global Claude terminal')
+      ).rejects.toThrow('already in use by a global terminal')
     } finally {
       markClaudePtyExited('global-pty')
       markClaudePtyExited('injected-session')
@@ -4737,7 +4739,7 @@ describe('ClaudeRuntimeAuthService', () => {
 
       await expect(
         service.prepareForClaudeLaunch({ runtime: 'host', overrideAccountId: 'account-a' })
-      ).rejects.toThrow('running global Claude terminal')
+      ).rejects.toThrow('already in use by a global terminal')
     } finally {
       markClaudePtyExited('global-a-pty')
     }

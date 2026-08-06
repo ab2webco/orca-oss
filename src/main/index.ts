@@ -242,10 +242,12 @@ import { notifyWorktreesChanged } from './ipc/worktree-remote'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import {
   attachClaudeLivePtyPersistence,
+  attachLiveClaudeTerminalDescriptions,
   attachLiveClaudeWorktreeDisplayNames,
   seedLiveClaudePtysFromPersistence,
   seedLiveInjectedClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
+import { attachSharedClaudePtyOwnerProbe } from './claude-accounts/unknown-shared-claude-pty-owner-resolution'
 import {
   attachDirectedCodexPtyPersistence,
   confirmSeededDirectedCodexPtyBindings,
@@ -2159,6 +2161,9 @@ void app.whenReady().then(async () => {
   attachLiveClaudeWorktreeDisplayNames(
     (worktreeId) => worktreeMetaStore.getWorktreeMeta(worktreeId)?.displayName ?? null
   )
+  // Why read `runtime` lazily: the gate can refuse before the runtime exists, and
+  // a refusal without a handle is still better than none.
+  attachLiveClaudeTerminalDescriptions((ptyId) => runtime?.describeTerminalForPtyId(ptyId) ?? null)
   // Why: while a live claude defers the managed OAuth refresh, usage shows
   // "Waiting for Claude session"; refetch when the last live PTY exits so the
   // error clears immediately instead of after the failure backoff.
@@ -2306,6 +2311,10 @@ void app.whenReady().then(async () => {
       .flatMap((identity) => (identity.transcriptPath ? [identity.transcriptPath] : []))
   )
   claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
+  // Why here and not at seed time: resolving a seeded PTY's owner needs the managed
+  // accounts and the shared runtime credentials, which only exist once this service
+  // does. Attaching kicks the pass, so daemon startup order does not matter.
+  attachSharedClaudePtyOwnerProbe(claudeRuntimeAuth.createSharedClaudePtyOwnerProbe())
   // Why per release and not only on the 1 -> 0 drain: each universe links the
   // moment ITS last CLI exits; on a fan-out machine the global count may never
   // reach zero while individual vaults quiet down all the time (ORCA-111).

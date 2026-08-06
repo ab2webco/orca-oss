@@ -70,7 +70,8 @@ import {
   injectedClaudeLaunchReservations,
   liveInjectedClaudePtyAccounts,
   liveSharedClaudePtyAccounts,
-  sharedClaudeLaunchReservations
+  sharedClaudeLaunchReservations,
+  unknownOwnerSharedClaudePtyIds
 } from './live-pty-account-state'
 import type {
   ClaudeAccountWorktreeUsageReport,
@@ -306,13 +307,11 @@ export class ClaudeAccountService {
       worktreeMeta: this.store.getAllWorktreeMeta(),
       liveInjectedPtyAccounts: liveInjectedClaudePtyAccounts,
       liveSharedPtyAccounts: liveSharedClaudePtyAccounts,
+      unknownOwnerSharedPtyIds: unknownOwnerSharedClaudePtyIds,
       injectedLaunchReservations: injectedClaudeLaunchReservations,
       sharedLaunchReservations: sharedClaudeLaunchReservations,
       activeAccountId: account
-        ? getSelectedClaudeAccountIdForTarget(
-            settings,
-            getClaudeSelectionTargetForAccount(account)
-          )
+        ? getSelectedClaudeAccountIdForTarget(settings, getClaudeSelectionTargetForAccount(account))
         : settings.activeClaudeManagedAccountId
     })
   }

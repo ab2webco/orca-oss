@@ -8,10 +8,17 @@ import {
   hasLiveSharedClaudePtysForAccount,
   markClaudePtyExited,
   markClaudePtySpawned,
-  markInjectedClaudePtySpawned
+  markInjectedClaudePtySpawned,
+  seedLiveClaudePtysFromPersistence
 } from './live-pty-gate'
 
-const PTY_IDS = ['injected-a', 'injected-other', 'shared-a', 'shared-null'] as const
+const PTY_IDS = [
+  'injected-a',
+  'injected-other',
+  'shared-a',
+  'shared-null',
+  'shared-unknown'
+] as const
 
 describe('closeLiveClaudeTerminalsForAccount', () => {
   afterEach(() => {
@@ -24,13 +31,19 @@ describe('closeLiveClaudeTerminalsForAccount', () => {
     markInjectedClaudePtySpawned('injected-a', 'account-a')
     markInjectedClaudePtySpawned('injected-other', 'account-b')
     markClaudePtySpawned('shared-a', 'account-a')
+    // Why seeded rather than spawned: only a row with no recorded ownership is
+    // unknown; a spawn that passes null recorded "owns no managed account".
+    seedLiveClaudePtysFromPersistence(['shared-unknown'])
     markClaudePtySpawned('shared-null', null)
 
     const terminate = vi.fn(async (_ptyId: string) => true)
     await closeLiveClaudeTerminalsForAccount('account-a', terminate)
 
     const killed = terminate.mock.calls.map((call) => call[0]).sort()
-    expect(killed).toEqual(['injected-a', 'shared-a', 'shared-null'])
+    expect(killed).toEqual(['injected-a', 'shared-a', 'shared-unknown'])
+    // Why: it owns no managed account, so closing it would cost the user a
+    // terminal the gate no longer counts (ORCA-190).
+    expect(terminate).not.toHaveBeenCalledWith('shared-null')
     expect(terminate).not.toHaveBeenCalledWith('injected-other')
     expect(hasLiveInjectedClaudePtysForAccount('account-a')).toBe(false)
     expect(hasLiveSharedClaudePtysForAccount('account-a')).toBe(false)
@@ -67,17 +80,18 @@ describe('getLiveClaudePtyIdsForAccount', () => {
   it('lists injected + account/unknown-owned shared PTYs, never another account', () => {
     markInjectedClaudePtySpawned('injected-a', 'account-a')
     markClaudePtySpawned('shared-a', 'account-a')
+    seedLiveClaudePtysFromPersistence(['shared-unknown'])
     markClaudePtySpawned('shared-null', null)
     markInjectedClaudePtySpawned('injected-other', 'account-b')
 
     expect(getLiveClaudePtyIdsForAccount('account-a').sort()).toEqual([
       'injected-a',
       'shared-a',
-      'shared-null'
+      'shared-unknown'
     ])
     expect(getLiveClaudePtyIdsForAccount('account-b').sort()).toEqual([
       'injected-other',
-      'shared-null'
+      'shared-unknown'
     ])
   })
 })

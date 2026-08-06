@@ -20,6 +20,7 @@ function inputs(overrides: Partial<ClaudeAccountUsageInputs> = {}): ClaudeAccoun
     liveSharedPtyAccounts: new Map(),
     injectedLaunchReservations: new Map(),
     sharedLaunchReservations: new Map(),
+    unknownOwnerSharedPtyIds: new Set(),
     activeAccountId: null,
     ...overrides
   }
@@ -59,12 +60,25 @@ describe('buildClaudeAccountWorktreeUsageReport', () => {
         liveSharedPtyAccounts: new Map([
           [`${WORKTREE_A}@@pane-1`, null],
           [`${WORKTREE_C}@@pane-1`, 'account-b']
-        ])
+        ]),
+        unknownOwnerSharedPtyIds: new Set([`${WORKTREE_A}@@pane-1`])
       })
     )
 
     expect(report.liveTerminalCount).toBe(1)
     expect(report.worktrees.find((w) => w.worktreeId === WORKTREE_A)?.hasLiveTerminal).toBe(true)
+  })
+
+  it('ignores a shared PTY known to own no managed account', () => {
+    const report = buildClaudeAccountWorktreeUsageReport(
+      inputs({
+        liveSharedPtyAccounts: new Map([[`${WORKTREE_A}@@pane-1`, null]]),
+        unknownOwnerSharedPtyIds: new Set()
+      })
+    )
+
+    expect(report.liveTerminalCount).toBe(0)
+    expect(report.worktrees.find((w) => w.worktreeId === WORKTREE_A)?.hasLiveTerminal).toBe(false)
   })
 
   it('reports launch reservations the live-terminal count cannot see', () => {

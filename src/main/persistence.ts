@@ -2367,7 +2367,14 @@ function normalizeClaudeLiveSharedPtyAccountBindings(
     ) {
       continue
     }
-    bindings.push({ sessionId: candidate.sessionId, accountId: candidate.accountId ?? null })
+    const accountId = candidate.accountId ?? null
+    // Why a non-null accountId is always resolved: only null is ambiguous.
+    const accountResolved = accountId !== null || candidate.accountResolved === true
+    bindings.push({
+      sessionId: candidate.sessionId,
+      accountId,
+      ...(accountResolved ? { accountResolved: true } : {})
+    })
     if (bindings.length >= MAX_CLAUDE_LIVE_PTY_SESSION_IDS) {
       break
     }
@@ -7100,18 +7107,27 @@ export class Store {
     }
   }
 
-  addClaudeLivePtySessionId(sessionId: string, accountId: string | null = null): void {
+  addClaudeLivePtySessionId(
+    sessionId: string,
+    accountId: string | null = null,
+    // Why: a null accountId the launch itself recorded means "no managed account
+    // owns this PTY"; a null with no marker is unknown ownership and keeps the
+    // conservative every-account block after a restart (ORCA-190).
+    options: { accountResolved?: boolean } = {}
+  ): void {
     if (sessionId.length === 0 || sessionId.length > 512) {
       return
     }
+    const accountResolved = accountId !== null || options.accountResolved === true
     const ids = this.state.claudeLivePtySessionIds ?? []
     const currentBindings = this.state.claudeLiveSharedPtyAccountBindings ?? []
     const existingBinding = currentBindings.find((binding) => binding.sessionId === sessionId)
-    if (
-      ids.includes(sessionId) &&
-      existingBinding &&
-      (existingBinding.accountId === accountId || accountId === null)
-    ) {
+    // Why an unresolved write is satisfied by ANY existing row: it carries no
+    // ownership news, so it may create a row but never overwrite one.
+    const existingAlreadyRecordsThis = accountResolved
+      ? existingBinding?.accountId === accountId && existingBinding.accountResolved === true
+      : Boolean(existingBinding)
+    if (ids.includes(sessionId) && existingAlreadyRecordsThis) {
       return
     }
     // Why: drop oldest at the cap — stale ids get pruned against the daemon at startup, so only recency matters.
@@ -7120,7 +7136,13 @@ export class Store {
     )
     this.state.claudeLiveSharedPtyAccountBindings = [
       ...currentBindings.filter((binding) => binding.sessionId !== sessionId),
-      { sessionId, accountId }
+      {
+        sessionId,
+        // Why an unresolved write keeps the existing owner: a reattach carries the
+        // CURRENT global selection, not what the surviving process actually owns.
+        accountId: accountResolved ? accountId : (existingBinding?.accountId ?? null),
+        ...(accountResolved || existingBinding?.accountResolved ? { accountResolved: true } : {})
+      }
     ].slice(-MAX_CLAUDE_LIVE_PTY_SESSION_IDS)
     try {
       // Why: a force-quit right after spawn must retain both shared mode and

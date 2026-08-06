@@ -15902,6 +15902,55 @@ export class OrcaRuntimeService {
     return this.getPaneKeyForTerminalHandle(handle)
   }
 
+  /**
+   * Fails a workspace create whose requested agent never started.
+   *
+   * Why not a warning: `worktree create` folded the refusal into `warning` and still
+   * answered ok, so a dispatch refused by the Claude live-PTY gate produced a
+   * workspace of bare shells whose emptiness only surfaced when someone noticed the
+   * branch had no commits (ORCA-190). The workspace is real and is named here so a
+   * caller adopts it instead of creating a duplicate.
+   */
+  private assertStartupAgentSpawned(args: {
+    requestedAgent: TuiAgent | null | undefined
+    didSpawnStartup: boolean
+    failure: unknown
+    worktreeId: string
+    worktreePath: string
+  }): void {
+    if (!args.requestedAgent || args.didSpawnStartup) {
+      return
+    }
+    const message = args.failure instanceof Error ? args.failure.message : String(args.failure)
+    throw Object.assign(
+      new Error(
+        `The ${args.requestedAgent} agent could not start in the new workspace at ${args.worktreePath}: ${message} The workspace was created and still exists (id:${args.worktreeId}) — reuse it instead of creating another.`
+      ),
+      {
+        worktreeId: args.worktreeId,
+        worktreePath: args.worktreePath,
+        startupAgent: args.requestedAgent
+      }
+    )
+  }
+
+  /** Synchronous handle + title for a live PTY, so a live-PTY gate refusal can name
+   *  the terminal the user has to find (ORCA-190). Null fields where the runtime
+   *  has not learned one yet — a partial answer still beats "some terminal". */
+  describeTerminalForPtyId(ptyId: string): { handle: string | null; title: string | null } | null {
+    const pty = this.ptysById.get(ptyId)
+    const handle =
+      this.handleByPtyId.get(ptyId) ??
+      this.getLeavesForPty(ptyId)
+        .filter((leaf) => leaf.connected)
+        .map((leaf) => this.issueHandle(leaf))
+        .at(0) ??
+      null
+    const title =
+      pty?.title ?? pty?.lastOscTitle ?? pty?.controllerTitle ?? pty?.managementTitle ?? null
+    return handle === null && title === null ? null : { handle, title }
+  }
+
   getTerminalWorktreeIdForPaneKey(paneKey: string): string | null {
     const parsed = parsePaneKey(paneKey)
     const leaf = parsed ? this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId)) : null
@@ -21338,6 +21387,13 @@ export class OrcaRuntimeService {
           const message = err instanceof Error ? err.message : String(err)
           warning = `Failed to create the startup terminal for ${worktree.path}: ${message}`
           console.warn(`[worktree-create] ${warning}`)
+          this.assertStartupAgentSpawned({
+            requestedAgent: effectiveCreatedWithAgent,
+            didSpawnStartup,
+            failure: err,
+            worktreeId: worktree.id,
+            worktreePath: worktree.path
+          })
         }
       }
       if (shouldActivate) {
@@ -22096,6 +22152,13 @@ export class OrcaRuntimeService {
           ? `${warning} Also failed to create the startup terminal for ${worktreePath}: ${message}`
           : `Failed to create the startup terminal for ${worktreePath}: ${message}`
         console.warn(`[worktree-create] ${warning}`)
+        this.assertStartupAgentSpawned({
+          requestedAgent: effectiveCreatedWithAgent,
+          didSpawnStartup,
+          failure: err,
+          worktreeId: worktree.id,
+          worktreePath
+        })
       }
     }
     if (shouldActivate) {
@@ -22450,6 +22513,13 @@ export class OrcaRuntimeService {
         warning = warning
           ? `${warning} Also failed to create the startup terminal for ${result.worktree.path}: ${message}`
           : `Failed to create the startup terminal for ${result.worktree.path}: ${message}`
+        this.assertStartupAgentSpawned({
+          requestedAgent: args.createdWithAgent,
+          didSpawnStartup,
+          failure: err,
+          worktreeId: result.worktree.id,
+          worktreePath: result.worktree.path
+        })
       }
     }
 

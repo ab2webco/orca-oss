@@ -80,9 +80,8 @@ describe('live Claude refresh-chain claims', () => {
 
   it('stops re-resolving a released claim', async () => {
     readManagedClaudeRefreshCredentials.mockResolvedValueOnce(credentialsFor('chain-one'))
-    const { reserveLiveClaudeRefreshChain, releaseLiveClaudeRefreshChain } = await import(
-      './live-claude-refresh-chain-claims'
-    )
+    const { reserveLiveClaudeRefreshChain, releaseLiveClaudeRefreshChain } =
+      await import('./live-claude-refresh-chain-claims')
 
     reserveLiveClaudeRefreshChain('gate-1', 'account-1')
     await settle()
