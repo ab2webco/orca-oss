@@ -13,9 +13,7 @@ vi.mock('../plane/work-items', async (importActual) => ({
 import { OrcaRuntimeService } from './orca-runtime'
 
 type ResolverInternals = {
-  resolveWorktreeForContainedPath: (
-    cwd: string
-  ) => Promise<{
+  resolveWorktreeForContainedPath: (cwd: string) => Promise<{
     id: string
     path: string
     linkedPlaneWorkItem?: LinkedPlaneWorkItem | null

@@ -11,6 +11,8 @@ import {
   recordResolvedSharedClaudePtyOwner,
   reserveInjectedClaudeAccountLaunch,
   releaseInjectedClaudeAccountLaunch,
+  releaseSharedClaudeAccountLaunch,
+  reserveSharedClaudeAccountLaunch,
   seedLiveClaudePtysFromPersistence
 } from './live-pty-gate'
 import { getLiveClaudeRotationOwnership } from './live-pty-account-ownership'
@@ -71,6 +73,22 @@ describe('a shared Claude PTY that owns no managed account', () => {
     markClaudePtySpawned('global-unmanaged', null)
 
     expect(getLiveClaudeRotationOwnership().hasUnknownAccount).toBe(true)
+  })
+})
+
+describe('a global Claude launch reservation for no managed account', () => {
+  it('still refuses a pinned launch, unlike a live shared PTY that owns no account', () => {
+    // Why deliberately NOT narrowed with the PTY gate: a reservation is the window in
+    // which the shared runtime is materialized, and that read-back can reach the
+    // machine-wide legacy Keychain item regardless of the selection. Expiry-bounded.
+    const reservationId = reserveSharedClaudeAccountLaunch(null)
+    try {
+      expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
+        'being launched globally'
+      )
+    } finally {
+      releaseSharedClaudeAccountLaunch(reservationId)
+    }
   })
 })
 

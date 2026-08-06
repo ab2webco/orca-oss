@@ -18,9 +18,7 @@ afterEach(() => {
 
 describe('requiresLiveCodexPtyReattach', () => {
   it('requires reattach for a directed session a daemon still hosts', () => {
-    seedDirectedCodexPtyBindingsFromPersistence([
-      { sessionId: SESSION_ID, accountId: ACCOUNT_ID }
-    ])
+    seedDirectedCodexPtyBindingsFromPersistence([{ sessionId: SESSION_ID, accountId: ACCOUNT_ID }])
     confirmSeededDirectedCodexPtyBindings([SESSION_ID])
     expect(requiresLiveCodexPtyReattach(SESSION_ID)).toBe(true)
   })
@@ -38,9 +36,7 @@ describe('requiresLiveCodexPtyReattach', () => {
       removeCodexDirectedPtyAccountBinding: vi.fn()
     }
     attachDirectedCodexPtyPersistence(persistence)
-    seedDirectedCodexPtyBindingsFromPersistence([
-      { sessionId: SESSION_ID, accountId: ACCOUNT_ID }
-    ])
+    seedDirectedCodexPtyBindingsFromPersistence([{ sessionId: SESSION_ID, accountId: ACCOUNT_ID }])
     confirmSeededDirectedCodexPtyBindings([])
     expect(requiresLiveCodexPtyReattach(SESSION_ID)).toBe(false)
     // Why: a phantom left on disk would re-assert itself on the next launch.

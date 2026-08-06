@@ -234,6 +234,12 @@ export function reserveInjectedClaudeAccountLaunch(
   if (managedClaudeAccountMutations.has(accountId)) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
+  // Why a null reservation still matches every account, unlike a live shared PTY's
+  // null (ORCA-190): a reservation is the window in which the shared runtime is being
+  // materialized, and that read-back can reach the machine-wide legacy Keychain item
+  // whatever the selection was. beginClaudeAuthSwitch and the managed-account mutation
+  // gate refuse on the same null for the same reason. It is expiry-bounded, not a
+  // lockout.
   if (
     [...sharedClaudeLaunchReservations.values()].some(
       (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId

@@ -49,9 +49,7 @@ export function hasSeededUnconfirmedDirectedCodexPtys(): boolean {
  * an asserted-but-dead session would force reattach on a cold restore, which
  * fails the spawn outright instead of opening the pane.
  */
-export function confirmSeededDirectedCodexPtyBindings(
-  aliveSessionIds: readonly string[]
-): void {
+export function confirmSeededDirectedCodexPtyBindings(aliveSessionIds: readonly string[]): void {
   const alive = new Set(aliveSessionIds)
   for (const sessionId of seededUnconfirmedDirectedCodexPtyIds) {
     if (!alive.has(sessionId)) {

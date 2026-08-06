@@ -133,9 +133,9 @@ import { getWorktreeSharedLinkPaths } from '../git/worktree-shared-directories'
 import { track } from '../telemetry/client'
 import { getCohortAtEmit } from '../telemetry/cohort-classifier'
 import { workspaceSourceSchema, type WorkspaceSource } from '../../shared/telemetry-events'
+import { settleAutomationWorkspaceProvenanceRequestOnFailure } from '../automations/settle-workspace-provenance-on-failure'
 import {
   finishAutomationWorkspaceProvenanceRequest,
-  releaseAutomationWorkspaceProvenanceRequest,
   resolveAutomationWorkspaceProvenance
 } from '../automations/workspace-provenance'
 import { shouldEmitBoundedWarning } from './bounded-warning-dedupe'
@@ -2144,7 +2144,10 @@ export function registerWorktreeHandlers(
               ? await createRemoteWorktree(createArgs, repo, store, mainWindow)
               : await createLocalWorktree(createArgs, repo, store, mainWindow, runtime)
         } catch (error) {
-          releaseAutomationWorkspaceProvenanceRequest(args.automationProvenanceRequest)
+          settleAutomationWorkspaceProvenanceRequestOnFailure(
+            args.automationProvenanceRequest,
+            error
+          )
           track('workspace_create_failed', {
             source,
             error_class: classifyWorkspaceCreateError(error),

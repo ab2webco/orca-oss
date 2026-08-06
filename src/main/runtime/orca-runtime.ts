@@ -145,6 +145,7 @@ import type {
   AutomationUpdateInput,
   AutomationWorkspaceMode
 } from '../../shared/automations-types'
+import { createStartupAgentRefusedError } from './startup-agent-refused-error'
 import type {
   AutomationWorkspaceProvenance,
   CliWorkspaceProvenance,
@@ -15913,25 +15914,19 @@ export class OrcaRuntimeService {
    */
   private assertStartupAgentSpawned(args: {
     requestedAgent: TuiAgent | null | undefined
-    didSpawnStartup: boolean
-    failure: unknown
+    startupFailure: unknown
     worktreeId: string
     worktreePath: string
   }): void {
-    if (!args.requestedAgent || args.didSpawnStartup) {
+    if (!args.requestedAgent || args.startupFailure === undefined) {
       return
     }
-    const message = args.failure instanceof Error ? args.failure.message : String(args.failure)
-    throw Object.assign(
-      new Error(
-        `The ${args.requestedAgent} agent could not start in the new workspace at ${args.worktreePath}: ${message} The workspace was created and still exists (id:${args.worktreeId}) — reuse it instead of creating another.`
-      ),
-      {
-        worktreeId: args.worktreeId,
-        worktreePath: args.worktreePath,
-        startupAgent: args.requestedAgent
-      }
-    )
+    throw createStartupAgentRefusedError({
+      startupAgent: args.requestedAgent,
+      worktreeId: args.worktreeId,
+      worktreePath: args.worktreePath,
+      failure: args.startupFailure
+    })
   }
 
   /** Synchronous handle + title for a live PTY, so a live-PTY gate refusal can name
@@ -21349,6 +21344,9 @@ export class OrcaRuntimeService {
       const shouldActivate = args.activate === true || args.runHooks === true
       let warning: string | undefined
       let didSpawnStartup = false
+      // Why held rather than thrown at the catch: the workspace must still be
+      // activated and provisioned so the caller can adopt it; only the agent failed.
+      let startupAgentFailure: unknown
       let startupTerminal: CreateWorktreeResult['startupTerminal']
       if (effectiveStartup && this.ptyController?.spawn) {
         try {
@@ -21387,13 +21385,7 @@ export class OrcaRuntimeService {
           const message = err instanceof Error ? err.message : String(err)
           warning = `Failed to create the startup terminal for ${worktree.path}: ${message}`
           console.warn(`[worktree-create] ${warning}`)
-          this.assertStartupAgentSpawned({
-            requestedAgent: effectiveCreatedWithAgent,
-            didSpawnStartup,
-            failure: err,
-            worktreeId: worktree.id,
-            worktreePath: worktree.path
-          })
+          startupAgentFailure = err
         }
       }
       if (shouldActivate) {
@@ -21413,6 +21405,12 @@ export class OrcaRuntimeService {
           console.warn(`[worktree-create] ${warning}`)
         }
       }
+      this.assertStartupAgentSpawned({
+        requestedAgent: effectiveCreatedWithAgent,
+        startupFailure: startupAgentFailure,
+        worktreeId: worktree.id,
+        worktreePath: worktree.path
+      })
       return {
         worktree: {
           ...worktree,
@@ -22089,6 +22087,9 @@ export class OrcaRuntimeService {
     let startupTerminalTabId: string | null = null
     let startupTerminalPaneKey: string | null = null
     let startupTerminalPtyId: string | null = null
+    // Why held rather than thrown at the catch: the workspace must still be activated
+    // and provisioned so the caller can adopt it; only the agent failed.
+    let startupAgentFailure: unknown
 
     let sequencedStartup = effectiveStartup
     let wrappedSetupCommandStr: string | undefined
@@ -22152,13 +22153,7 @@ export class OrcaRuntimeService {
           ? `${warning} Also failed to create the startup terminal for ${worktreePath}: ${message}`
           : `Failed to create the startup terminal for ${worktreePath}: ${message}`
         console.warn(`[worktree-create] ${warning}`)
-        this.assertStartupAgentSpawned({
-          requestedAgent: effectiveCreatedWithAgent,
-          didSpawnStartup,
-          failure: err,
-          worktreeId: worktree.id,
-          worktreePath
-        })
+        startupAgentFailure = err
       }
     }
     if (shouldActivate) {
@@ -22259,6 +22254,12 @@ export class OrcaRuntimeService {
         console.warn(`[worktree-create] ${warning}`)
       }
     }
+    this.assertStartupAgentSpawned({
+      requestedAgent: effectiveCreatedWithAgent,
+      startupFailure: startupAgentFailure,
+      worktreeId: worktree.id,
+      worktreePath
+    })
     const returnedSetup = didSpawnSetup
       ? undefined
       : setup
@@ -22455,6 +22456,9 @@ export class OrcaRuntimeService {
     let startupTerminalTabId: string | null = null
     let startupTerminalPaneKey: string | null = null
     let startupTerminalPtyId: string | null = null
+    // Why held rather than thrown at the catch: the workspace must still be activated
+    // and provisioned so the caller can adopt it; only the agent failed.
+    let startupAgentFailure: unknown
 
     let sequencedStartup = args.startup
     let wrappedSetupCommandStr: string | undefined
@@ -22513,13 +22517,7 @@ export class OrcaRuntimeService {
         warning = warning
           ? `${warning} Also failed to create the startup terminal for ${result.worktree.path}: ${message}`
           : `Failed to create the startup terminal for ${result.worktree.path}: ${message}`
-        this.assertStartupAgentSpawned({
-          requestedAgent: args.createdWithAgent,
-          didSpawnStartup,
-          failure: err,
-          worktreeId: result.worktree.id,
-          worktreePath: result.worktree.path
-        })
+        startupAgentFailure = err
       }
     }
 
@@ -22622,6 +22620,12 @@ export class OrcaRuntimeService {
       }
     }
 
+    this.assertStartupAgentSpawned({
+      requestedAgent: args.createdWithAgent,
+      startupFailure: startupAgentFailure,
+      worktreeId: result.worktree.id,
+      worktreePath: result.worktree.path
+    })
     const returnedSetup = didSpawnSetup
       ? undefined
       : result.setup
