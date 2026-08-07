@@ -108,6 +108,8 @@ import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
+import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
+import { ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS } from './orchestration/dispatch-lifecycle-deadline'
 import { OrchestrationError } from './orchestration/orchestration-error'
 import {
   planLegacyWorkerTerminalRecovery,
@@ -2842,6 +2844,7 @@ export class OrcaRuntimeService {
   private managedHookReconciliationTail: Promise<void> = Promise.resolve()
   private readonly orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport | null
   private readonly orchestrationFederationTimers = new Map<string, ReturnType<typeof setInterval>>()
+  private orchestrationDeadlineTimer: ReturnType<typeof setInterval> | null = null
   private readonly orchestrationFederationSyncs = new Map<string, Promise<void>>()
   private readonly orchestrationFederationWarnings = new Set<string>()
   private rendererGraphEpoch = 0
@@ -4803,6 +4806,53 @@ export class OrcaRuntimeService {
     }
     this.orchestrationFederationTimers.clear()
     this.orchestrationFederationWarnings.clear()
+  }
+
+  /**
+   * Scans armed first-signal deadlines (ORCA-191). Idempotent: safe to call at
+   * every arming point and on startup, which is also how the deadline survives
+   * a runtime restart — the armed rows are in the DB, not in this timer.
+   */
+  ensureOrchestrationDispatchDeadlineMonitor(): void {
+    // Why: `orchestration.check` calls this on every poll — once the timer owns
+    // the scan there is nothing to do, so the hot path costs one field read.
+    if (this.orchestrationDeadlineTimer) {
+      return
+    }
+    this.runOrchestrationDispatchDeadlineScan()
+    if (this.getOrchestrationDb().countArmedDispatchDeadlines() === 0) {
+      return
+    }
+    const timer = setInterval(() => {
+      this.runOrchestrationDispatchDeadlineScan()
+      if (this.getOrchestrationDb().countArmedDispatchDeadlines() === 0) {
+        this.stopOrchestrationDispatchDeadlineMonitor()
+      }
+    }, ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS)
+    timer.unref?.()
+    this.orchestrationDeadlineTimer = timer
+  }
+
+  private runOrchestrationDispatchDeadlineScan(): void {
+    try {
+      const expired = expireDueDispatchDeadlines(this.getOrchestrationDb(), this)
+      for (const entry of expired) {
+        console.warn('[orchestration] dispatch failed with no lifecycle signal', {
+          dispatchId: entry.dispatchId,
+          taskId: entry.taskId,
+          runId: entry.runId
+        })
+      }
+    } catch (error) {
+      console.warn('[orchestration] dispatch deadline scan failed', { error })
+    }
+  }
+
+  stopOrchestrationDispatchDeadlineMonitor(): void {
+    if (this.orchestrationDeadlineTimer) {
+      clearInterval(this.orchestrationDeadlineTimer)
+      this.orchestrationDeadlineTimer = null
+    }
   }
 
   getStartedAt(): number {

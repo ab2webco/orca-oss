@@ -1,5 +1,6 @@
 import type { OrchestrationCliCommand } from './cli-command'
 import { MAX_ENVELOPE_CORRECTION_ATTEMPTS } from './worker-done-envelope'
+import { DISPATCH_HEARTBEAT_INTERVAL_MIN } from './dispatch-lifecycle-deadline'
 
 export type PreambleParams = {
   taskId: string
@@ -33,12 +34,6 @@ export type PreambleParams = {
   // shells have no agent prompt for Orca to reuse.
   workerKind?: 'prompt-returning-agent' | 'bare-shell'
 }
-
-// Why: 5 minutes is frequent enough that the coordinator's stale-heartbeat
-// check (threshold 10 min) catches a hung worker within one tick, and
-// infrequent enough to avoid inbox spam on long tasks. One constant so
-// cadence tuning is a single-line change (Q1 in DESIGN_DOC_PREAMBLE_FIX.md).
-const HEARTBEAT_INTERVAL_MIN = 5
 
 // Why: the dispatch preamble teaches agents about Orca's CLI commands for
 // structured communication. Behavioral rules (body summary, heartbeat cadence,
@@ -112,7 +107,7 @@ Slack, GitHub comments, or any other channel to reach a human during the run.
     --files-modified "path/a,path/b" \\
     --report-path "<optional: path to the full artifact>"
 
-  # BEHAVIOR RULE: send a heartbeat every ${HEARTBEAT_INTERVAL_MIN} minutes
+  # BEHAVIOR RULE: send a heartbeat every ${DISPATCH_HEARTBEAT_INTERVAL_MIN} minutes
   # while actively working on the task. The coordinator uses this to
   # distinguish "still thinking" from "hung / crashed." Skip heartbeats only
   # while blocked inside \`check --wait\` or \`ask\` — those calls are

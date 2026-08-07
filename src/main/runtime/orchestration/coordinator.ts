@@ -3,6 +3,7 @@ import type { OrchestrationDb } from './db'
 import type { MessageRow, TaskRow, CoordinatorStatus } from './types'
 import { buildDispatchPreamble } from './preamble'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
+import { DISPATCH_STALE_THRESHOLD_MS } from './dispatch-lifecycle-deadline'
 
 export type CoordinatorRuntime = {
   sendTerminalAgentPrompt(handle: string, prompt: string): Promise<unknown>
@@ -71,8 +72,8 @@ type CoordinatorState = {
 const DEFAULT_POLL_MS = 2000
 const MAX_CONCURRENT_DEFAULT = 4
 
-// Why: 10 min = documented heartbeat cadence (5 min) × 2, so one missed heartbeat is the earliest a dispatch can look stale.
-const HUNG_THRESHOLD_MS = 10 * 60 * 1000
+// Why: shared with the first-signal deadline so the two staleness contracts cannot drift.
+const HUNG_THRESHOLD_MS = DISPATCH_STALE_THRESHOLD_MS
 
 export class Coordinator {
   private db: OrchestrationDb

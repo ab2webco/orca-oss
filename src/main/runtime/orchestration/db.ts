@@ -51,6 +51,10 @@ import {
   type WorkerTerminalOwnershipState,
   type WorkerTerminalRetainedReason
 } from './worker-terminal-ownership'
+import {
+  DISPATCH_FIRST_SIGNAL_DEADLINE_MS,
+  type DispatchDeadlinePlacement
+} from './dispatch-lifecycle-deadline'
 import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../../shared/orchestration-run-pagination'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
 
@@ -283,10 +287,10 @@ type RunListCursor = {
   id: string
 }
 
-// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership.
+// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership, v25 dispatch first-signal deadline.
 // Why v24 rather than reusing 23 for upstream's terminal-ownership migration: it also
 // shipped as v23, so a lab DB already stamped 23 by the envelope migration would skip it.
-const SCHEMA_VERSION = 24
+const SCHEMA_VERSION = 25
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
   if (dbPath === ':memory:' || process.platform === 'win32') {
@@ -573,7 +577,12 @@ export class OrchestrationDb {
         -- Why: only dispatches whose preamble briefed the typed envelope are held to it;
         -- rows written by an older runtime stay on the prose contract (default 0).
         envelope_contract   INTEGER NOT NULL DEFAULT 0,
-        envelope_correction_attempts INTEGER NOT NULL DEFAULT 0
+        envelope_correction_attempts INTEGER NOT NULL DEFAULT 0,
+        -- Why (ORCA-191): NULL means "not monitored". Only a capability-bearing
+        -- injection arms a deadline, so legacy rows and non-inject tracking
+        -- dispatches are grandfathered by having no value at all.
+        monitor_deadline_at TEXT,
+        first_lifecycle_signal_at TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_dispatch_task ON dispatch_contexts(task_id);
@@ -981,6 +990,21 @@ export class OrchestrationDb {
       }
       if (current < 24) {
         this.backfillWorkerTerminalResources()
+      }
+      if (current < 25) {
+        // Why (ORCA-191): no backfill — deriving a deadline from historical
+        // dispatched_at would immediately fail legitimate old NULL-heartbeat rows.
+        if (!this.hasColumn('dispatch_contexts', 'monitor_deadline_at')) {
+          this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN monitor_deadline_at TEXT')
+        }
+        if (!this.hasColumn('dispatch_contexts', 'first_lifecycle_signal_at')) {
+          this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN first_lifecycle_signal_at TEXT')
+        }
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_dispatch_monitor_deadline
+            ON dispatch_contexts(monitor_deadline_at)
+            WHERE monitor_deadline_at IS NOT NULL;
+        `)
       }
       this.createUndeliveredInboxIndexIfPossible()
 
@@ -3662,6 +3686,9 @@ export class OrchestrationDb {
            ) VALUES (?, ?, ?, ?)`
         )
         .run(message.id, params.runId, params.dispatchId, params.askerHandle)
+      // Why (ORCA-191): a dispatch-scoped question proves the preamble arrived —
+      // the worker could not have addressed this Dispatch without it.
+      this.recordDispatchLifecycleSignal(params.dispatchId, new Date().toISOString())
       const question = this.getQuestionRaw(message.id) as QuestionRow
       const storedMessage = this.getMessageById(message.id) as MessageRow
       this.db.exec('COMMIT')
@@ -4281,6 +4308,9 @@ export class OrchestrationDb {
            WHERE dispatch_id = ?`
         )
         .run(effects ? JSON.stringify(effects) : null, dispatchId)
+      // Why (ORCA-191): input_accepted is this path's confirmation point — the
+      // capability-bearing preamble is in, so the first-signal clock starts.
+      this.armDispatchLifecycleDeadline(dispatchId)
       this.db.exec('COMMIT')
       return this.getWorkerDispatch(dispatchId) as WorkerDispatchRow
     } catch (error) {
@@ -4406,6 +4436,7 @@ export class OrchestrationDb {
             "UPDATE dispatch_contexts SET status = 'dispatched' WHERE id = ? AND status = 'pending'"
           )
           .run(params.dispatchId)
+        this.armDispatchLifecycleDeadline(params.dispatchId)
         this.db
           .prepare(
             "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = ? AND status = 'blocked'"
@@ -5183,6 +5214,10 @@ export class OrchestrationDb {
           runId: params.message.runId,
           dispatchId: params.dispatchId
         })
+        this.recordDispatchLifecycleSignal(params.dispatchId, new Date().toISOString())
+      }
+      if (message.type === 'escalation') {
+        this.recordDispatchLifecycleSignal(params.dispatchId, new Date().toISOString())
       }
       if (params.lifecycle.kind === 'heartbeat') {
         this.recordHeartbeat(params.dispatchId, params.lifecycle.at)
@@ -6193,7 +6228,9 @@ export class OrchestrationDb {
       )
       .run(dispatchId)
     const row = this.db
-      .prepare('SELECT envelope_correction_attempts AS attempts FROM dispatch_contexts WHERE id = ?')
+      .prepare(
+        'SELECT envelope_correction_attempts AS attempts FROM dispatch_contexts WHERE id = ?'
+      )
       .get(dispatchId) as { attempts: number } | undefined
     return row?.attempts ?? 0
   }
@@ -6512,6 +6549,170 @@ export class OrchestrationDb {
         "UPDATE dispatch_contexts SET last_heartbeat_at = ? WHERE id = ? AND status = 'dispatched'"
       )
       .run(at, dispatchId)
+    this.recordDispatchLifecycleSignal(dispatchId, at)
+  }
+
+  /**
+   * Arms the first-signal deadline (ORCA-191). No-ops unless the attempt is
+   * already `dispatched` behind a live capability: a `pending` worker topology
+   * has not been briefed yet, and a non-`--inject` tracking dispatch never
+   * receives a lifecycle preamble, so neither is monitored.
+   */
+  armDispatchLifecycleDeadline(
+    dispatchId: string,
+    deadlineMs: number = DISPATCH_FIRST_SIGNAL_DEADLINE_MS
+  ): boolean {
+    const seconds = Math.round(deadlineMs / 1000)
+    const result = this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET monitor_deadline_at = datetime('now', ?)
+         WHERE id = ?
+           AND status = 'dispatched'
+           AND capability_hash IS NOT NULL
+           AND capability_revoked_at IS NULL
+           AND monitor_deadline_at IS NULL
+           AND first_lifecycle_signal_at IS NULL`
+      )
+      .run(`+${seconds} seconds`, dispatchId)
+    return result.changes === 1
+  }
+
+  // Why: the deadline keys on first *authenticated lifecycle signal*, not first
+  // heartbeat — a worker that asked a question before its first periodic beat
+  // has demonstrably received the preamble. status='dispatched' keeps a late or
+  // zombie signal from resurrecting an already-expired attempt.
+  recordDispatchLifecycleSignal(dispatchId: string, at: string): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET first_lifecycle_signal_at = COALESCE(first_lifecycle_signal_at, ?)
+         WHERE id = ? AND status = 'dispatched'`
+      )
+      .run(at, dispatchId)
+  }
+
+  countArmedDispatchDeadlines(): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS armed FROM dispatch_contexts
+         WHERE status = 'dispatched'
+           AND monitor_deadline_at IS NOT NULL
+           AND first_lifecycle_signal_at IS NULL`
+      )
+      .get() as { armed: number }
+    return row.armed
+  }
+
+  // Why: julianday() on both sides — datetime('now') writes space-format while
+  // ISO input carries a 'T', and a raw TEXT compare misreads the two (#8452).
+  listExpiredDispatchDeadlines(nowIso: string): DispatchContextRow[] {
+    return this.db
+      .prepare(
+        `SELECT * FROM dispatch_contexts
+         WHERE status = 'dispatched'
+           AND monitor_deadline_at IS NOT NULL
+           AND first_lifecycle_signal_at IS NULL
+           AND last_heartbeat_at IS NULL
+           AND julianday(monitor_deadline_at) <= julianday(?)
+         ORDER BY rowid`
+      )
+      .all(nowIso) as DispatchContextRow[]
+  }
+
+  getDispatchDeadlinePlacement(dispatchId: string): DispatchDeadlinePlacement {
+    const dispatch = this.getDispatchContextById(dispatchId)
+    const resource = this.getWorkerTerminalResourceByOwner(dispatchId)
+    const worker = this.getWorkerDispatch(dispatchId)
+    const federated = this.getFederatedDispatch(dispatchId)
+    return {
+      assigneeHandle: dispatch?.assignee_handle ?? null,
+      assigneePaneKey: dispatch?.assignee_pane_key ?? null,
+      terminalHandle: worker?.agent_terminal_handle ?? dispatch?.assignee_handle ?? null,
+      hostScope: resource?.host_scope ?? null,
+      environmentName: federated?.environment_name ?? null
+    }
+  }
+
+  /**
+   * Fails one expired attempt (ORCA-191). Deliberately not `failDispatch()`:
+   * below its circuit breaker that returns the Task to `ready`, inviting
+   * automatic redelivery into a composer whose state is exactly what we cannot
+   * trust. The Task goes to `blocked` instead — visible, retryable via
+   * `--retry-of`, never auto-redelivered. failure_count is left alone so an
+   * ambiguous delivery does not burn the circuit-breaker budget.
+   */
+  expireDispatchLifecycleDeadline(params: {
+    dispatchId: string
+    nowIso: string
+    reason: string
+    subject: string
+  }): { expired: false } | { expired: true; dispatch: DispatchContextRow; message: MessageRow } {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const still = this.db
+        .prepare(
+          `SELECT * FROM dispatch_contexts
+           WHERE id = ?
+             AND status = 'dispatched'
+             AND monitor_deadline_at IS NOT NULL
+             AND first_lifecycle_signal_at IS NULL
+             AND last_heartbeat_at IS NULL
+             AND julianday(monitor_deadline_at) <= julianday(?)`
+        )
+        .get(params.dispatchId, params.nowIso) as DispatchContextRow | undefined
+      if (!still) {
+        this.db.exec('COMMIT')
+        return { expired: false }
+      }
+
+      this.db
+        .prepare(
+          `UPDATE dispatch_contexts
+           SET status = 'failed', last_failure = ?, completed_at = datetime('now'),
+               capability_revoked_at = COALESCE(capability_revoked_at, datetime('now'))
+           WHERE id = ? AND status = 'dispatched'`
+        )
+        .run(params.reason, params.dispatchId)
+      // Why: settling the worker row detaches the federated relay too — its
+      // timer only ticks for starting/ready/stopping states.
+      this.db
+        .prepare(
+          `UPDATE worker_dispatches
+           SET state = 'failed', stage = 'first_signal_deadline_expired', last_error = ?,
+               updated_at = datetime('now')
+           WHERE dispatch_id = ? AND state IN ('starting', 'ready', 'start_unknown')`
+        )
+        .run(params.reason, params.dispatchId)
+      this.db
+        .prepare("UPDATE tasks SET status = 'blocked' WHERE id = ? AND status = 'dispatched'")
+        .run(still.task_id)
+      this.closeQuestionsForDispatch(params.dispatchId)
+
+      const message = this.insertMessage({
+        from: `dispatch:${params.dispatchId}`,
+        to: `run:${still.run_id}`,
+        subject: params.subject,
+        body: params.reason,
+        type: 'status',
+        priority: 'high',
+        payload: JSON.stringify({
+          taskId: still.task_id,
+          dispatchId: params.dispatchId,
+          reason: 'first_signal_deadline_expired'
+        }),
+        runId: still.run_id
+      })
+      this.db.exec('COMMIT')
+      return {
+        expired: true,
+        dispatch: this.getDispatchContextById(params.dispatchId) as DispatchContextRow,
+        message
+      }
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
   }
 
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).

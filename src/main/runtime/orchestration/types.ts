@@ -278,6 +278,12 @@ export type DispatchContextRow = {
   // rows written by an older runtime keep completing on the prose contract.
   envelope_contract: number
   envelope_correction_attempts: number
+  // Why (ORCA-191): NULL = unmonitored. Armed only when a capability-bearing
+  // injection reached its confirmation point and the attempt became dispatched.
+  monitor_deadline_at: string | null
+  // First authenticated lifecycle signal — heartbeat, dispatch-scoped question,
+  // or escalation. A question before the first periodic beat still counts.
+  first_lifecycle_signal_at: string | null
 }
 
 export type DecisionGateRow = {

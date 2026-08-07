@@ -2507,6 +2507,8 @@ void app.whenReady().then(async () => {
   })
   runtime = runtimeService
   runtimeService.prepareLegacyWorkerTerminalRecovery()
+  // Why (ORCA-191): armed deadlines live in the DB, so a restart re-arms the scan here.
+  runtimeService.ensureOrchestrationDispatchDeadlineMonitor()
   claudeAccounts = new ClaudeAccountService(
     store,
     rateLimits,
