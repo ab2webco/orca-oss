@@ -12,7 +12,10 @@ import { MESSAGE_TYPES } from '../../orchestration/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { formatMessageBanner } from '../../orchestration/formatter'
 import { isGroupAddress, resolveGroupAddress } from '../../orchestration/groups'
-import { reconcileLifecycleMessage } from '../../orchestration/lifecycle-reconciliation'
+import {
+  hasLifecycleAuthority,
+  reconcileLifecycleMessage
+} from '../../orchestration/lifecycle-reconciliation'
 import { abbreviateOrchestrationTasks } from '../../../../shared/orchestration-task-summary'
 import {
   ORCHESTRATION_LEGACY_RUN_ID,
@@ -602,6 +605,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         const dispatch = routing.dispatchId
           ? db.getDispatchContextById(routing.dispatchId)
           : undefined
+        // Why (ORCA-191): an escalation from the assignee pane already proves the
+        // preamble arrived, so it disarms the first-signal deadline the same way
+        // a heartbeat does — otherwise a worker that escalated first would be
+        // failed for never having sent a periodic beat.
+        if (msg.type === 'escalation' && dispatch && hasLifecycleAuthority(dispatch, msg)) {
+          db.recordDispatchLifecycleSignal(dispatch.id, msg.created_at)
+        }
         if ((msg.type === 'worker_done' || msg.type === 'heartbeat') && dispatch?.capability_hash) {
           const authority = db.verifyDispatchCapability({
             dispatchId: dispatch.id,
@@ -719,6 +729,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         const generation = run.consumer_generation
         const address = `run:${run.id}`
         runtime.ensureOrchestrationFederationRelay(run.id)
+        // Why (ORCA-191): re-arms the scan after a runtime restart — the first
+        // consumer poll rebuilds the timer from the armed rows in the DB.
+        runtime.ensureOrchestrationDispatchDeadlineMonitor()
 
         const acknowledged = params.ack
           ? db.acknowledgeRunDelivery({
@@ -1350,6 +1363,11 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
           throw err
         }
+        // Why (ORCA-191): only a capability-bearing injection that reached its
+        // confirmation point is monitored — a tracking dispatch without --inject
+        // never receives a preamble and must never be failed for its silence.
+        db.armDispatchLifecycleDeadline(ctx.id)
+        runtime.ensureOrchestrationDispatchDeadlineMonitor()
       }
 
       // Why: returnPreamble is opt-in because the preamble is several hundred bytes most callers don't need in the response.

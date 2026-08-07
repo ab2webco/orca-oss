@@ -244,6 +244,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           state: 'accepted'
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
+        runtime.ensureOrchestrationDispatchDeadlineMonitor()
         monitorWorkerSetup({
           runtime,
           db,

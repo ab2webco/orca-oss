@@ -152,6 +152,7 @@ export async function startFederatedWorker(args: {
       })
       const readyWorker = db.markWorkerDispatchReady(started.dispatch.id)
       runtime.ensureOrchestrationFederationRelay(runId)
+      runtime.ensureOrchestrationDispatchDeadlineMonitor()
       return {
         runId,
         taskId: task.id,
