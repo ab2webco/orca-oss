@@ -53,6 +53,7 @@ import {
   confirmSeededClaudeLivePtys,
   hasSeededUnconfirmedClaudePtys
 } from '../claude-accounts/live-pty-gate'
+import { attachLiveSharedClaudePtySessionLister } from '../claude-accounts/unknown-shared-claude-pty-owner-resolution'
 import {
   confirmSeededDirectedCodexPtyBindings,
   hasSeededUnconfirmedDirectedCodexPtys
@@ -862,6 +863,10 @@ async function reconcileSeededAgentLivePtys(provider: DaemonProvider): Promise<v
       )
     }
     confirmSeededClaudeLivePtys(aliveSessionIds)
+    // Why after confirm: dead seeds are gone by now, so ownership resolution only
+    // probes processes that really exist. The lister stays installed so a pid the
+    // daemon had not reported yet gets a later attempt (ORCA-190).
+    attachLiveSharedClaudePtySessionLister(() => listLiveDaemonPtySessions())
     // Why the same unreachable-adapter verdict: a directed Codex binding that no
     // daemon can even see would force reattach on every later restore of that id
     // and fail the spawn outright — a permanently unopenable pane. Releasing it
@@ -876,6 +881,29 @@ async function reconcileSeededAgentLivePtys(provider: DaemonProvider): Promise<v
 // Why: a narrow getter (not a raw export) keeps the "swap on restart" invariant in one place (replaceDaemonProvider).
 export function getDaemonProvider(): DaemonProvider | null {
   return adapter
+}
+
+/** Live daemon sessions with the pid that hosts each one, for owner resolution.
+ *  Null when no provider is bound yet; a listing failure yields the sessions the
+ *  reachable daemons did report, since a missing one hosts nothing to probe. */
+export async function listLiveDaemonPtySessions(): Promise<
+  { sessionId: string; pid: number | null }[] | null
+> {
+  if (!adapter) {
+    return null
+  }
+  const adapters =
+    adapter instanceof DaemonPtyRouter || adapter instanceof DegradedDaemonPtyProvider
+      ? adapter.getAllAdapters()
+      : [adapter]
+  const listings = await Promise.allSettled(
+    adapters.map((daemonAdapter) => daemonAdapter.listSessions())
+  )
+  return listings.flatMap((listing) =>
+    listing.status === 'fulfilled'
+      ? listing.value.map((session) => ({ sessionId: session.sessionId, pid: session.pid }))
+      : []
+  )
 }
 
 /** Returns null unless every daemon generation supplied an authoritative inventory. */

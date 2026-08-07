@@ -76,10 +76,10 @@ describe('live PTY gate block messages', () => {
   })
 
   it('names the worktree hosting the blocking global terminal', () => {
-    const message = buildGlobalTerminalLaunchBlockMessage(['feature-a'])
+    const message = buildGlobalTerminalLaunchBlockMessage(['in "feature-a"'])
 
     expect(message).toContain('in use by a global terminal')
-    expect(message).toContain('"feature-a"')
+    expect(message).toContain('in "feature-a"')
   })
 
   it('names the blocking worktree for gated account mutations', () => {

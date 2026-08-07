@@ -18,6 +18,9 @@ export type ClaudeAccountUsageInputs = {
   liveSharedPtyAccounts: ReadonlyMap<string, string | null>
   injectedLaunchReservations: ReadonlyMap<string, string>
   sharedLaunchReservations: ReadonlyMap<string, string | null>
+  /** Shared PTYs whose owner is still unknown — the only ones a `null` in
+   *  liveSharedPtyAccounts attributes to every account (ORCA-190). */
+  unknownOwnerSharedPtyIds: ReadonlySet<string>
   /** Account the runtime-auth sync will materialize; its live pinned CLIs guard
    *  the sync even when the user is changing an entirely different account. */
   activeAccountId: string | null
@@ -44,7 +47,7 @@ function collectAttributedPtyIds(inputs: ClaudeAccountUsageInputs): string[] {
     }
   }
   for (const [ptyId, liveAccountId] of inputs.liveSharedPtyAccounts) {
-    if (liveAccountId === null || liveAccountId === inputs.accountId) {
+    if (liveAccountId === inputs.accountId || inputs.unknownOwnerSharedPtyIds.has(ptyId)) {
       ptyIds.add(ptyId)
     }
   }

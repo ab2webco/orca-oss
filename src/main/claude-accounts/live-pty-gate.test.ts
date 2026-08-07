@@ -244,7 +244,11 @@ describe('Claude live PTY gate', () => {
     })
 
     markClaudePtySpawned('live-claude-pty')
-    expect(addClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty', null)
+    // Why accountResolved: a first spawn's null is authoritative — the launch used
+    // no managed account — so it must not read as unknown ownership on restart.
+    expect(addClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty', null, {
+      accountResolved: true
+    })
 
     markClaudePtyExited('live-claude-pty')
     expect(removeClaudeLivePtySessionId).toHaveBeenCalledWith('live-claude-pty')

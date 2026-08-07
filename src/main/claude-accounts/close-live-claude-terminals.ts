@@ -1,6 +1,7 @@
 import {
   hasLiveInjectedClaudePtysForAccount,
   hasLiveSharedClaudePtysForAccount,
+  isUnknownOwnerLiveSharedClaudePty,
   liveInjectedClaudePtyAccounts,
   liveSharedClaudePtyAccounts,
   markClaudePtyExited
@@ -11,8 +12,10 @@ export type ClaudePtyTerminator = (ptyId: string) => Promise<boolean>
 
 /**
  * Live PTY ids the idle gate treats as owning this account: injected PTYs bound
- * to it, plus shared PTYs bound to it OR to a still-unknown owner (null). Launch
- * reservations have no PTY to kill, so they are intentionally excluded.
+ * to it, plus shared PTYs bound to it OR whose owner is still unknown. A shared
+ * PTY known to own no managed account is left alone — the gate no longer counts
+ * it, so killing it would close a terminal for nothing. Launch reservations have
+ * no PTY to kill, so they are intentionally excluded.
  */
 export function getLiveClaudePtyIdsForAccount(accountId: string): string[] {
   const injected: ReadonlyMap<string, string> = liveInjectedClaudePtyAccounts
@@ -24,7 +27,7 @@ export function getLiveClaudePtyIdsForAccount(accountId: string): string[] {
     }
   }
   for (const [ptyId, liveAccountId] of shared) {
-    if (liveAccountId === null || liveAccountId === accountId) {
+    if (liveAccountId === accountId || isUnknownOwnerLiveSharedClaudePty(ptyId)) {
       ptyIds.add(ptyId)
     }
   }

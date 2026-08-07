@@ -11185,7 +11185,9 @@ describe('Store', () => {
         'claude-session-2'
       ])
       expect(reloaded.getClaudeLiveSharedPtyAccountBindings()).toEqual([
-        { sessionId: 'claude-session-1', accountId: 'account-a' },
+        // Why accountResolved on the named account and not on the null: only a null is
+        // ambiguous, and this one was written before ownership was recorded (ORCA-190).
+        { sessionId: 'claude-session-1', accountId: 'account-a', accountResolved: true },
         { sessionId: 'claude-session-2', accountId: null }
       ])
 
@@ -11196,6 +11198,27 @@ describe('Store', () => {
       expect(reloadedAgain.getClaudeLivePtySessionIds()).toEqual(['claude-session-2'])
       expect(reloadedAgain.getClaudeLiveSharedPtyAccountBindings()).toEqual([
         { sessionId: 'claude-session-2', accountId: null }
+      ])
+    })
+
+    it('records a shared launch that chose no managed account as resolved', async () => {
+      const store = await createStore()
+      store.persistPtyBinding({
+        worktreeId: 'repo-1::/tmp/worktree',
+        tabId: 'tab-1',
+        leafId: TEST_LEAF_1,
+        ptyId: 'shared-no-account',
+        claudeSharedAccountId: null
+      })
+      store.flush()
+
+      const reloaded = await createStore()
+
+      // Why this marker decides everything: without it a restart cannot tell "the
+      // launch used no managed account" from a legacy row of unknown ownership, and
+      // the unknown blocks every assigned-account launch (ORCA-190).
+      expect(reloaded.getClaudeLiveSharedPtyAccountBindings()).toEqual([
+        { sessionId: 'shared-no-account', accountId: null, accountResolved: true }
       ])
     })
 
@@ -11215,7 +11238,8 @@ describe('Store', () => {
 
       expect(store.getClaudeLivePtySessionIds()).toEqual(['valid-id'])
       expect(store.getClaudeLiveSharedPtyAccountBindings()).toEqual([
-        { sessionId: 'valid-id', accountId: 'account-a' },
+        { sessionId: 'valid-id', accountId: 'account-a', accountResolved: true },
+        // Why no marker: a legacy row's null is unknown ownership, not "no account".
         { sessionId: 'unknown-id', accountId: null }
       ])
     })
@@ -11403,7 +11427,9 @@ describe('Store', () => {
 
       expect(flush).toHaveBeenCalledTimes(1)
       expect(store.getClaudeLiveSharedPtyAccountBindings()).toEqual([
-        { sessionId: 'claude-session-1', accountId: 'account-a' }
+        // Why accountResolved: the spawning launch recorded its own selection here, so
+        // this row is never re-read as unknown ownership after a restart (ORCA-190).
+        { sessionId: 'claude-session-1', accountId: 'account-a', accountResolved: true }
       ])
     })
 

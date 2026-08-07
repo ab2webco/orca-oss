@@ -37,9 +37,15 @@ import {
   reserveInjectedClaudeAccountLaunch,
   reserveSharedClaudeAccountLaunch
 } from './live-pty-gate'
+import { createGlobalTerminalLaunchBlockError } from './live-pty-blocker-description'
+import { readLiveProcessEnvironmentValue } from './live-process-environment'
+import type { SharedClaudePtyOwnerProbe } from './shared-claude-pty-owner'
 import { isOauthTokenExpiring, refreshClaudeOauthCredentials } from './oauth-refresh'
 import { tryRunManagedClaudeAccountBackgroundRotation } from './run-managed-claude-account-mutation'
-import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
+import {
+  configureManagedClaudeRefreshAccounts,
+  readManagedClaudeRefreshCredentials
+} from './claude-managed-refresh-chain'
 import { ClaudeRuntimePathResolver } from './runtime-paths'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -191,9 +197,9 @@ export class ClaudeRuntimeAuthService {
     ) {
       // Why: the shared CLI already owns this account's refresh chain. Starting
       // an isolated pinned copy before it exits would fork the one-use token.
-      throw new Error(
-        'Close the running global Claude terminal before launching this assigned account.'
-      )
+      // Why the shared builder: it names the blocking terminal by handle and
+      // title, which the bare sentence never did (ORCA-190).
+      throw createGlobalTerminalLaunchBlockError(injectedCandidate.id)
     }
     const reservationId =
       injectedCandidate && options?.reservePtyAccount
@@ -299,6 +305,56 @@ export class ClaudeRuntimeAuthService {
 
   getRuntimeConfigDir(): string {
     return this.pathResolver.getRuntimePaths().configDir
+  }
+
+  /** The account/credential view the shared-PTY owner resolver needs to turn a
+   *  live process's config dir into the managed account whose refresh chain it
+   *  actually holds (ORCA-190). */
+  createSharedClaudePtyOwnerProbe(): SharedClaudePtyOwnerProbe {
+    return {
+      readClaudeConfigDirEnv: (pid) => readLiveProcessEnvironmentValue(pid, 'CLAUDE_CONFIG_DIR'),
+      // Why both paths per WSL account: the injected env carries the Linux path
+      // while managedAuthPath is its Windows UNC view of the same dir.
+      managedAccounts: () =>
+        this.store.getSettings().claudeManagedAccounts.flatMap((account) => {
+          const forksOauthChain = account.authMethod !== 'custom-endpoint'
+          return [
+            { id: account.id, managedAuthPath: account.managedAuthPath, forksOauthChain },
+            ...(account.wslLinuxAuthPath
+              ? [{ id: account.id, managedAuthPath: account.wslLinuxAuthPath, forksOauthChain }]
+              : [])
+          ]
+        }),
+      readSharedRuntimeCredentials: () => this.readSharedRuntimeCredentialsForOwnerProbe(),
+      readManagedCredentials: (accountId) => readManagedClaudeRefreshCredentials(accountId)
+    }
+  }
+
+  private async readSharedRuntimeCredentialsForOwnerProbe(): Promise<{
+    credentialsJson: string | null
+  } | null> {
+    try {
+      const paths = this.pathResolver.getRuntimePaths()
+      if (process.platform === 'darwin') {
+        // Why strict, not best-effort: a Keychain read that fails must resolve to
+        // "unknown" and keep blocking, not to "no chain here".
+        const keychainCredentials = await readActiveClaudeKeychainCredentialsStrict(paths.configDir)
+        if (keychainCredentials) {
+          return { credentialsJson: keychainCredentials }
+        }
+      }
+      return {
+        credentialsJson: existsSync(paths.credentialsPath)
+          ? readFileSync(paths.credentialsPath, 'utf-8')
+          : null
+      }
+    } catch (error) {
+      console.warn(
+        '[claude-runtime-auth] Failed to read shared runtime credentials for PTY ownership:',
+        error
+      )
+      return null
+    }
   }
 
   // Synchronous candidate check for the PTY switch gate. Ownership is verified

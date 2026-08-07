@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import type { ClaudeLiveSharedPtyAccountBinding } from '../../shared/types'
+import { getClaudeLivePtyPersistence } from './claude-live-pty-persistence'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
 import {
   notifyClaudePtyReleased,
@@ -16,7 +18,8 @@ import {
   liveClaudePtyIds,
   liveInjectedClaudePtyAccounts,
   liveSharedClaudePtyAccounts,
-  sharedClaudeLaunchReservations
+  sharedClaudeLaunchReservations,
+  unknownOwnerSharedClaudePtyIds
 } from './live-pty-account-state'
 import {
   hasLiveInjectedClaudePtysForAccount,
@@ -40,7 +43,6 @@ import {
   clearInjectedClaudePtyBinding,
   confirmSeededInjectedClaudePtyBindings,
   hasSeededUnconfirmedInjectedClaudePtys,
-  type InjectedClaudePtyBindingPersistence,
   markInjectedClaudeCliBindingExited,
   markInjectedClaudePtyBindingSpawned,
   releaseInjectedClaudeLaunchReservation,
@@ -53,30 +55,23 @@ const managedClaudeAccountMutations = new Set<string>()
 // survived the app restart inside the daemon.
 const seededUnconfirmedPtyIds = new Set<string>()
 
-export type ClaudeLivePtyPersistence = InjectedClaudePtyBindingPersistence & {
-  addClaudeLivePtySessionId(sessionId: string, accountId?: string | null): void
-  removeClaudeLivePtySessionId(sessionId: string): void
-}
-
-let persistence: ClaudeLivePtyPersistence | null = null
-
-export function attachClaudeLivePtyPersistence(target: ClaudeLivePtyPersistence | null): void {
-  persistence = target
-}
-
 export function seedLiveClaudePtysFromPersistence(
   sessionIds: readonly string[],
-  bindings: readonly { sessionId: string; accountId: string | null }[] = []
+  bindings: readonly ClaudeLiveSharedPtyAccountBinding[] = []
 ): void {
-  const accountBySessionId = new Map(
-    bindings.map((binding) => [binding.sessionId, binding.accountId])
-  )
+  const bindingBySessionId = new Map(bindings.map((binding) => [binding.sessionId, binding]))
   for (const sessionId of sessionIds) {
+    const binding = bindingBySessionId.get(sessionId)
+    const accountId = binding?.accountId ?? null
     liveClaudePtyIds.add(sessionId)
-    // Why: pre-binding releases have unknown ownership; block them
-    // conservatively instead of assuming the current global account.
-    liveSharedClaudePtyAccounts.set(sessionId, accountBySessionId.get(sessionId) ?? null)
-    reserveLiveClaudePtyRefreshChain(sessionId, accountBySessionId.get(sessionId) ?? null)
+    liveSharedClaudePtyAccounts.set(sessionId, accountId)
+    // Why: a row from a pre-binding release records no ownership, so its null is
+    // unknown rather than "no managed account" — block every account until the
+    // live process resolves it (resolveUnknownSharedClaudePtyOwners).
+    if (accountId === null && binding?.accountResolved !== true) {
+      unknownOwnerSharedClaudePtyIds.add(sessionId)
+    }
+    reserveLiveClaudePtyRefreshChain(sessionId, accountId)
     ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(sessionId)
     seededUnconfirmedPtyIds.add(sessionId)
   }
@@ -106,13 +101,15 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
     if (!alive.has(sessionId)) {
       liveClaudePtyIds.delete(sessionId)
       liveSharedClaudePtyAccounts.delete(sessionId)
+      unknownOwnerSharedClaudePtyIds.delete(sessionId)
       releaseLiveClaudePtyRefreshChain(sessionId)
       ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(sessionId)
-      persistence?.removeClaudeLivePtySessionId(sessionId)
+      getClaudeLivePtyPersistence()?.removeClaudeLivePtySessionId(sessionId)
       releasedAny = true
     }
   }
-  releasedAny = confirmSeededInjectedClaudePtyBindings(alive, persistence) || releasedAny
+  releasedAny =
+    confirmSeededInjectedClaudePtyBindings(alive, getClaudeLivePtyPersistence()) || releasedAny
   seededUnconfirmedPtyIds.clear()
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
   if (releasedAny) {
@@ -135,15 +132,26 @@ export function markClaudePtySpawned(
   }
   const wasLive = liveClaudePtyIds.has(ptyId)
   const hadExistingAccount = liveSharedClaudePtyAccounts.has(ptyId)
+  const hadUnknownOwner = unknownOwnerSharedClaudePtyIds.has(ptyId)
   const existingAccountId = liveSharedClaudePtyAccounts.get(ptyId) ?? null
   const existingOwnershipEpoch = ownershipEpoch.getLiveClaudePtyOwnershipEpoch(ptyId)
   const bindingAccountId = hadExistingAccount ? existingAccountId : accountId
+  // Why only a first spawn resolves ownership: a reattach to a surviving process
+  // carries the CURRENT global selection, which says nothing about what that
+  // process has owned since before the restart. Clearing the unknown there would
+  // silently declare a legacy PTY unmanaged (ORCA-190).
+  const resolvesOwnership = !hadExistingAccount
   try {
     liveClaudePtyIds.add(ptyId)
     liveSharedClaudePtyAccounts.set(ptyId, bindingAccountId)
+    if (resolvesOwnership) {
+      unknownOwnerSharedClaudePtyIds.delete(ptyId)
+    }
     try {
       if (!options?.persistenceAlreadyRecorded) {
-        persistence?.addClaudeLivePtySessionId(ptyId, bindingAccountId)
+        getClaudeLivePtyPersistence()?.addClaudeLivePtySessionId(ptyId, bindingAccountId, {
+          accountResolved: resolvesOwnership
+        })
       }
       seededUnconfirmedPtyIds.delete(ptyId)
       ownershipEpoch.recordLiveClaudePtyOwnershipEpoch(ptyId)
@@ -162,6 +170,9 @@ export function markClaudePtySpawned(
       } else {
         liveSharedClaudePtyAccounts.delete(ptyId)
       }
+      if (resolvesOwnership && hadUnknownOwner) {
+        unknownOwnerSharedClaudePtyIds.add(ptyId)
+      }
       ownershipEpoch.restoreLiveClaudePtyOwnershipEpoch(ptyId, existingOwnershipEpoch)
       throw error
     }
@@ -176,7 +187,13 @@ export function markInjectedClaudePtySpawned(
   reservationId?: string,
   options?: { persistenceAlreadyRecorded?: boolean }
 ): void {
-  markInjectedClaudePtyBindingSpawned(ptyId, accountId, reservationId, persistence, options)
+  markInjectedClaudePtyBindingSpawned(
+    ptyId,
+    accountId,
+    reservationId,
+    getClaudeLivePtyPersistence(),
+    options
+  )
 }
 
 /**
@@ -185,7 +202,7 @@ export function markInjectedClaudePtySpawned(
  * live-terminal reassignment escape hatch.
  */
 export function markInjectedClaudeCliExited(ptyId: string, accountId: string): boolean {
-  return markInjectedClaudeCliBindingExited(ptyId, accountId, persistence)
+  return markInjectedClaudeCliBindingExited(ptyId, accountId, getClaudeLivePtyPersistence())
 }
 
 export function markClaudePtyExited(ptyId: string): void {
@@ -195,11 +212,12 @@ export function markClaudePtyExited(ptyId: string): void {
   const wasLive = liveClaudePtyIds.has(ptyId) || liveInjectedClaudePtyAccounts.has(ptyId)
   liveClaudePtyIds.delete(ptyId)
   liveSharedClaudePtyAccounts.delete(ptyId)
+  unknownOwnerSharedClaudePtyIds.delete(ptyId)
   releaseLiveClaudePtyRefreshChain(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
-  persistence?.removeClaudeLivePtySessionId(ptyId)
+  getClaudeLivePtyPersistence()?.removeClaudeLivePtySessionId(ptyId)
   ownershipEpoch.clearLiveClaudePtyOwnershipEpoch(ptyId)
-  clearInjectedClaudePtyBinding(ptyId, persistence)
+  clearInjectedClaudePtyBinding(ptyId, getClaudeLivePtyPersistence())
   notifyLiveClaudePtysDrainedOnTransition(hadLivePtys, liveClaudePtyIds.size)
   if (wasLive) {
     notifyClaudePtyReleased()
@@ -216,6 +234,12 @@ export function reserveInjectedClaudeAccountLaunch(
   if (managedClaudeAccountMutations.has(accountId)) {
     throw new Error('This Claude account is being changed. Try again when the change finishes.')
   }
+  // Why a null reservation still matches every account, unlike a live shared PTY's
+  // null (ORCA-190): a reservation is the window in which the shared runtime is being
+  // materialized, and that read-back can reach the machine-wide legacy Keychain item
+  // whatever the selection was. beginClaudeAuthSwitch and the managed-account mutation
+  // gate refuse on the same null for the same reason. It is expiry-bounded, not a
+  // lockout.
   if (
     [...sharedClaudeLaunchReservations.values()].some(
       (reservedAccountId) => reservedAccountId === null || reservedAccountId === accountId
@@ -299,6 +323,14 @@ export function releaseSharedClaudeAccountLaunch(reservationId: string | undefin
 }
 
 export { liveInjectedClaudePtyAccounts, liveSharedClaudePtyAccounts }
-export { attachLiveClaudeWorktreeDisplayNames } from './live-pty-blocker-description'
+export {
+  attachLiveClaudeTerminalDescriptions,
+  attachLiveClaudeWorktreeDisplayNames
+} from './live-pty-blocker-description'
+export {
+  attachClaudeLivePtyPersistence,
+  type ClaudeLivePtyPersistence
+} from './claude-live-pty-persistence'
+export { recordResolvedSharedClaudePtyOwner } from './resolved-shared-claude-pty-owner'
 export * from './claude-auth-switch-gate'
 export * from './live-pty-account-ownership'

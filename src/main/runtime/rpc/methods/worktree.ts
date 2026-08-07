@@ -1,6 +1,6 @@
+import { settleAutomationWorkspaceProvenanceRequestOnFailure } from '../../../automations/settle-workspace-provenance-on-failure'
 import {
   finishAutomationWorkspaceProvenanceRequest,
-  releaseAutomationWorkspaceProvenanceRequest,
   resolveAutomationWorkspaceProvenance
 } from '../../../automations/workspace-provenance'
 import { buildCliWorkspaceProvenance } from '../../../../shared/cli-workspace-provenance'
@@ -181,7 +181,10 @@ export const WORKTREE_METHODS: RpcMethod[] = [
             ? { ...result, agentTerminalHandle: result.startupTerminal.handle }
             : result
         } catch (error) {
-          releaseAutomationWorkspaceProvenanceRequest(params.automationProvenanceRequest)
+          settleAutomationWorkspaceProvenanceRequestOnFailure(
+            params.automationProvenanceRequest,
+            error
+          )
           throw error
         }
       })
