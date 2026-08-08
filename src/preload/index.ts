@@ -287,8 +287,8 @@ import type {
 import type {
   CrashReportBreadcrumbData,
   CrashReportCopyDiagnosticsArgs,
-  CrashReportSubmitArgs,
-  CrashReportSubmitResult,
+  CrashReportGitHubReportArgs,
+  CrashReportGitHubReportResult,
   ReactErrorBoundaryReportArgs,
   ReactErrorBoundaryReportResult
 } from '../shared/crash-reporting'
@@ -1307,15 +1307,10 @@ const api = {
   },
 
   feedback: {
-    submit: (args: {
+    composeIssue: (args: {
       feedback: string
-      submitAnonymously?: boolean
-      githubLogin: string | null
-      githubEmail: string | null
-      images?: { contentType: string; data: Uint8Array }[]
-    }): Promise<
-      { ok: true; imagesDelivered?: boolean } | { ok: false; status: number | null; error: string }
-    > => ipcRenderer.invoke('feedback:submit', args)
+    }): Promise<{ url: string; body: string; bodyInUrl: boolean }> =>
+      ipcRenderer.invoke('feedback:composeIssue', args)
   },
 
   crashReports: {
@@ -1328,8 +1323,8 @@ const api = {
       ipcRenderer.invoke('crashReports:recordRendererError', args),
     recordBreadcrumb: (args: { name: string; data?: CrashReportBreadcrumbData }): void =>
       ipcRenderer.send('crashReports:recordBreadcrumb', args),
-    submit: (args: CrashReportSubmitArgs): Promise<CrashReportSubmitResult> =>
-      ipcRenderer.invoke('crashReports:submit', args),
+    reportOnGitHub: (args: CrashReportGitHubReportArgs): Promise<CrashReportGitHubReportResult> =>
+      ipcRenderer.invoke('crashReports:reportOnGitHub', args),
     copyLatestDiagnostics: (args?: CrashReportCopyDiagnosticsArgs) =>
       ipcRenderer.invoke('crashReports:copyLatestDiagnostics', args),
     readHeapStatistics: (): RendererHeapStatistics | null => readRendererHeapStatistics()

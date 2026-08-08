@@ -4420,7 +4420,13 @@
           "69969ba364": "Sending…",
           "imageReadFailed": "Could not read the attached images. Try attaching them again.",
           "attachWhileSending": "Wait for the current feedback to finish sending before attaching more images.",
-          "imagesNotDelivered": "Feedback sent, but image delivery could not be confirmed."
+          "imagesNotDelivered": "Feedback sent, but image delivery could not be confirmed.",
+          "issueComposerOpened": "Opened a GitHub issue with your report. Add screenshots there and submit it.",
+          "issueBodyCopied": "Your report was too long to prefill — it is on your clipboard. Paste it into the GitHub issue.",
+          "issueComposerFailed": "Could not open the GitHub issue form. Try again, or use the GitHub issues link above.",
+          "opensPublicIssue": "Continue opens a public issue in github.com/ab2webco/orca-oss, prefilled with your message and this build. Attach screenshots there before you submit it.",
+          "openingIssue": "Opening…",
+          "continueOnGitHub": "Continue on GitHub"
         },
         "SidebarFilter": {
           "e3b3898218": "Add project",
@@ -13849,7 +13855,13 @@
             "b2e36f53a1": "Failed to send crash report. Diagnostic ticket {{value0}} was uploaded but not linked.",
             "ead6fc0510": "No automatic crash report was captured. You can still send details and include recent diagnostic logs when available.",
             "b082f27490": "Attach recent diagnostic logs",
-            "e59f0b9427": "Sends a capped redacted log bundle with the report."
+            "e59f0b9427": "Sends a capped redacted log bundle with the report.",
+            "githubReportFailed": "Crash report wasn't handed to GitHub",
+            "githubReportOpened": "Opened a GitHub issue with the crash details. Review it before submitting.",
+            "githubReportCopied": "Crash details copied. Paste them into the GitHub issue before submitting.",
+            "githubReportRetry": "Try again, or copy the details and open an issue yourself.",
+            "notNow": "Not now",
+            "reportOnGitHub": "Report on GitHub"
           },
           "submit": {
             "notice": {

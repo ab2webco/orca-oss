@@ -1,10 +1,3 @@
-import {
-  appendDiagnosticBundleLines,
-  type CrashReportDiagnosticBundle
-} from './crash-reporting-diagnostic-bundle'
-
-export type { CrashReportDiagnosticBundle } from './crash-reporting-diagnostic-bundle'
-
 export type CrashReportStatus = 'pending' | 'sent' | 'dismissed'
 export type CrashReportSource = 'renderer' | 'child'
 
@@ -90,36 +83,20 @@ export type ReactErrorBoundaryReportResult =
   | { ok: true; report: CrashReportRecord | null; deduped: boolean }
   | { ok: false; error: string }
 
-export type CrashReportSubmitArgs = {
+export type CrashReportGitHubReportArgs = {
   reportId?: string
   notes?: string
-  includeDiagnosticLogs?: boolean
-  submitAnonymously?: boolean
-  githubLogin: string | null
-  githubEmail: string | null
 }
 
-export type CrashReportSubmitResult =
-  | { ok: true; report: CrashReportRecord | null; diagnosticBundle?: CrashReportDiagnosticBundle }
-  | {
-      ok: false
-      status: number | null
-      error: string
-      report?: CrashReportRecord | null
-      diagnosticBundle?: CrashReportDiagnosticBundle
-    }
-
-export type CrashReportCopySubmissionFailure = {
-  error: string
-  diagnosticContext?:
-    | { status: 'uploaded'; ticketId: string }
-    | { status: 'not_uploaded'; reason: string }
-}
+/** Why no transport status: the report is handed to GitHub's issue form, so the
+ *  only failures left are local — an unreadable store or an oversized clipboard. */
+export type CrashReportGitHubReportResult =
+  | { ok: true; report: CrashReportRecord | null; url: string; bodyInUrl: boolean }
+  | { ok: false; error: string; report: CrashReportRecord | null }
 
 export type CrashReportCopyDiagnosticsArgs = {
   reportId?: string
   notes?: string
-  submissionFailure?: CrashReportCopySubmissionFailure
 }
 
 const MAX_STRING_DETAIL_LENGTH = 240
@@ -230,11 +207,7 @@ export function sanitizeCrashReportBreadcrumbs(
   return sanitized.length > 0 ? sanitized : undefined
 }
 
-export function formatCrashReportText(
-  report: CrashReportRecord,
-  notes?: string,
-  diagnosticBundle?: CrashReportDiagnosticBundle
-): string {
+export function formatCrashReportText(report: CrashReportRecord, notes?: string): string {
   const lines = [
     '[Crash Report]',
     '',
@@ -250,8 +223,6 @@ export function formatCrashReportText(
     `Electron: ${report.electronVersion}`,
     `Chrome: ${report.chromeVersion}`
   ]
-
-  appendDiagnosticBundleLines(lines, diagnosticBundle, sanitizeCrashReportString)
 
   const details = Object.entries(report.details)
   if (details.length > 0) {
@@ -283,8 +254,7 @@ export function formatCrashReportText(
 
 export function formatUncapturedCrashReportText(
   context: UncapturedCrashReportContext,
-  notes?: string,
-  diagnosticBundle?: CrashReportDiagnosticBundle
+  notes?: string
 ): string {
   const lines = [
     '[Crash Report]',
@@ -305,8 +275,6 @@ export function formatUncapturedCrashReportText(
     '- captured_crash_report: false',
     '- report_source: help_menu'
   ]
-
-  appendDiagnosticBundleLines(lines, diagnosticBundle, sanitizeCrashReportString)
 
   const trimmedNotes = notes?.trim()
   if (trimmedNotes) {

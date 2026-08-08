@@ -113,20 +113,11 @@ describe('crash-reporting shared helpers', () => {
       ]
     }
 
-    const text = formatCrashReportText(report, 'saw /Users/me/project', {
-      status: 'uploaded',
-      ticketId: 'ticketabcdefghijklmnop',
-      bundleSubmissionId: 'bundleabcdefghijklmnop',
-      bytes: 1024,
-      spanCount: 12
-    })
+    const text = formatCrashReportText(report, 'saw /Users/me/project')
 
     expect(text).toContain('[Crash Report]')
     expect(text).toContain('Recent activity:')
     expect(text).toContain('agent_state_changed')
-    expect(text).toContain('Diagnostic log:')
-    expect(text).toContain('ticketabcdefghijklmnop')
-    expect(text.indexOf('Diagnostic log:')).toBeLessThan(text.indexOf('Details:'))
     expect(text).toContain('User notes:')
     expect(text).toContain('[redacted-path]')
     expect(text).not.toContain('Route:')
@@ -160,7 +151,7 @@ describe('crash-reporting shared helpers', () => {
     expect(text).toContain('[Crash report truncated to fit feedback endpoint limits.]')
   })
 
-  it('formats uncaptured crash reports so users can still submit from Help', () => {
+  it('formats uncaptured crash reports so users can still report from Help', () => {
     const text = formatUncapturedCrashReportText(
       {
         createdAt: '2026-05-16T01:00:00.000Z',
@@ -171,20 +162,11 @@ describe('crash-reporting shared helpers', () => {
         electronVersion: '41.0.0',
         chromeVersion: '141.0.0'
       },
-      'happened after opening /Users/me/project',
-      {
-        status: 'not_uploaded',
-        reason: 'diagnostic upload endpoint is not configured for this build',
-        bundleSubmissionId: 'bundleabcdefghijklmnop',
-        bytes: 2048,
-        spanCount: 3
-      }
+      'happened after opening /Users/me/project'
     )
 
     expect(text).toContain('Report ID: not captured')
     expect(text).toContain('Reason: no captured crash report')
-    expect(text).toContain('Diagnostic log:')
-    expect(text).toContain('Status: not uploaded')
     expect(text).toContain('[redacted-path]')
   })
 })

@@ -3,10 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
-import type {
-  CrashReportCopySubmissionFailure,
-  CrashReportRecord
-} from '../../../../shared/crash-reporting'
+import type { CrashReportRecord } from '../../../../shared/crash-reporting'
 import { CRASH_REPORT_COPY_FAILURE_TOAST_ID, useCrashReportCopy } from './use-crash-report-copy'
 
 const copyLatestDiagnostics = vi.fn()
@@ -53,23 +50,18 @@ afterEach(() => {
 })
 
 describe('useCrashReportCopy', () => {
-  it('uses the latest edited notes from an older failure-toast action', async () => {
-    const failure: CrashReportCopySubmissionFailure = {
-      error: 'report request timed out',
-      diagnosticContext: { status: 'not_uploaded', reason: 'logs timed out' }
-    }
+  it('uses the latest edited notes from an older copy action', async () => {
     const { result, rerender } = renderHook(({ notes }) => useCrashReportCopy(report(), notes), {
-      initialProps: { notes: 'notes at submit' }
+      initialProps: { notes: 'notes at open' }
     })
-    const failureToastCopyAction = result.current
+    const staleCopyAction = result.current
 
     rerender({ notes: 'notes edited while waiting' })
-    await act(async () => failureToastCopyAction(failure))
+    await act(async () => staleCopyAction())
 
     expect(copyLatestDiagnostics).toHaveBeenCalledWith({
       reportId: 'crash-1',
-      notes: 'notes edited while waiting',
-      submissionFailure: failure
+      notes: 'notes edited while waiting'
     })
   })
 
