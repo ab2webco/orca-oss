@@ -34,10 +34,10 @@ import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository-url'
 
 const DOCS_URL = 'https://www.onorca.dev/docs'
 const CHANGELOG_URL = 'https://onorca.dev/changelog'
-const GITHUB_URL = 'https://github.com/stablyai/orca'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = {
@@ -289,7 +289,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
                 'GitHub'
               )}
-              url={GITHUB_URL}
+              url={ORCA_REPOSITORY_URL}
               icon={<Github className="size-3.5" />}
             />
             <DropdownMenuItem onSelect={() => openExternalUrl(DISCORD_URL)}>

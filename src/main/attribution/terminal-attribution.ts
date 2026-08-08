@@ -5,11 +5,13 @@ instead of scattering generated shell fragments across files. */
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, win32 as pathWin32 } from 'node:path'
 import { ORCA_GIT_COMMIT_TRAILER } from '../../shared/orca-attribution'
+import { ORCA_REPOSITORY_URL } from '../../shared/orca-repository-url'
 
 const ATTRIBUTION_ROOT_DIR = 'orca-terminal-attribution'
-const ATTRIBUTION_SHIM_VERSION = '6'
-const ORCA_PRODUCT_URL = 'https://github.com/stablyai/orca'
-const ORCA_GH_FOOTER = `Made with [Orca](${ORCA_PRODUCT_URL}) 🐋`
+// Why: bumped with the footer repoint — installs holding shim 6 have upstream's
+// URL baked into the generated wrappers and must regenerate.
+const ATTRIBUTION_SHIM_VERSION = '7'
+const ORCA_GH_FOOTER = `Made with [Orca](${ORCA_REPOSITORY_URL}) 🐋`
 const SHELL_DOLLAR = '$'
 const POWERSHELL_TICK = '`'
 const ATTRIBUTION_ENV_KEYS = [
@@ -566,7 +568,7 @@ if [[ "\${ORCA_ENABLE_GIT_ATTRIBUTION:-0}" != "1" || "\${ORCA_ATTRIBUTION_BYPASS
 fi
 
 if [[ "\${1:-}" == "pr" && "\${2:-}" == "create" ]]; then
-  footer="\${ORCA_GH_PR_FOOTER:-Made with [Orca](https://github.com/stablyai/orca) 🐋}"
+  footer="\${ORCA_GH_PR_FOOTER:-${ORCA_GH_FOOTER}}"
   if has_passthrough_create_args "$@"; then
     PATH="$real_path" exec "$real_gh" "$@"
   fi
@@ -600,7 +602,7 @@ if [[ "\${1:-}" == "pr" && "\${2:-}" == "create" ]]; then
 fi
 
 if [[ "\${1:-}" == "issue" && "\${2:-}" == "create" ]]; then
-  footer="\${ORCA_GH_ISSUE_FOOTER:-Made with [Orca](https://github.com/stablyai/orca) 🐋}"
+  footer="\${ORCA_GH_ISSUE_FOOTER:-${ORCA_GH_FOOTER}}"
   if has_passthrough_create_args "$@"; then
     PATH="$real_path" exec "$real_gh" "$@"
   fi
@@ -975,7 +977,7 @@ if ($isPrCreate) {
     if ($LASTEXITCODE -ne 0) {
       $body = $null
     }
-    $footer = if ($env:ORCA_GH_PR_FOOTER) { $env:ORCA_GH_PR_FOOTER } else { 'Made with [Orca](https://github.com/stablyai/orca) 🐋' }
+    $footer = if ($env:ORCA_GH_PR_FOOTER) { $env:ORCA_GH_PR_FOOTER } else { '${ORCA_GH_FOOTER}' }
     if ($null -ne $body -and $body -notmatch [Regex]::Escape($footer)) {
       $tmpFile = [System.IO.Path]::GetTempFileName()
       try {
@@ -1006,7 +1008,7 @@ if ($isIssueCreate) {
     if ($LASTEXITCODE -ne 0) {
       $body = $null
     }
-    $footer = if ($env:ORCA_GH_ISSUE_FOOTER) { $env:ORCA_GH_ISSUE_FOOTER } else { 'Made with [Orca](https://github.com/stablyai/orca) 🐋' }
+    $footer = if ($env:ORCA_GH_ISSUE_FOOTER) { $env:ORCA_GH_ISSUE_FOOTER } else { '${ORCA_GH_FOOTER}' }
     if ($null -ne $body -and $body -notmatch [Regex]::Escape($footer)) {
       $tmpFile = [System.IO.Path]::GetTempFileName()
       try {
