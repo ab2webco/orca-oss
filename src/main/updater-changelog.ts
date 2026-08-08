@@ -22,6 +22,12 @@ const CHANGES_HEADING = /^##\s+Cambios desde\b/
 const NEXT_HEADING = /^#{1,6}\s/
 const BULLET = /^[-*]\s+(.+)$/
 
+// Why: the version bump and the nudge announcement are the release's own
+// bookkeeping, and `git log` puts the bump first — unfiltered, a routine
+// release card reads "chore(release): bump version to 1.4.160-lab.30", which
+// describes nothing the user gained.
+const RELEASE_MECHANICS_BULLET = /^chore\(release\)[!:]/i
+
 type GitHubRelease = {
   name?: unknown
   body?: unknown
@@ -47,6 +53,9 @@ function truncate(text: string): string {
  * change bullets when the notes carry them, otherwise the release's own lead
  * paragraph. Returns '' when neither is present, which leaves the card plain
  * rather than showing a heading or the install boilerplate.
+ *
+ * A release whose only changes are its own bookkeeping also returns '' — a
+ * plain card that links the tag beats a card announcing a version bump.
  */
 export function summarizeReleaseBody(body: string): string {
   const lines = body.split('\n')
@@ -59,15 +68,16 @@ export function summarizeReleaseBody(body: string): string {
         break
       }
       const bullet = trimmed.match(BULLET)
-      if (bullet) {
+      if (bullet && !RELEASE_MECHANICS_BULLET.test(bullet[1].trim())) {
         bullets.push(bullet[1].trim())
       }
     }
-    if (bullets.length > 0) {
-      const shown = bullets.slice(0, MAX_DESCRIPTION_BULLETS)
-      const joined = shown.join(' · ')
-      return truncate(bullets.length > shown.length ? `${joined} …` : joined)
+    if (bullets.length === 0) {
+      return ''
     }
+    const shown = bullets.slice(0, MAX_DESCRIPTION_BULLETS)
+    const joined = shown.join(' · ')
+    return truncate(bullets.length > shown.length ? `${joined} …` : joined)
   }
 
   // Why skip headings and blockquotes: the lead is `# <title>` followed by a
