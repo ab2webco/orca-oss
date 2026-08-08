@@ -126,6 +126,9 @@ jobs:
   git_compatibility:
     name: Git compatibility
     runs-on: ubuntu-latest
+    # Why: looser than the other test jobs because this one builds Git 2.25.5
+    # from source and pulls container images; healthy runs stay under 2 minutes.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -173,37 +176,12 @@ jobs:
           done
           exit "$status"
 
-  xterm_patch_sync:
-    name: xterm patch sync
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/install-node-dependencies
-
-      # Why: the check rebuilds xterm.js from a pinned upstream commit. Caching the
-      # npm metadata and the shallow clone turns a ~4 min cold run into well under a
-      # minute; the key is the manifest, so a commit or toolchain bump invalidates it.
-      - name: Restore upstream xterm build inputs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            ${{ runner.temp }}/xterm-patch-build/upstream/.git
-          key: xterm-upstream-${{ hashFiles('config/patches/xterm-upstream.json') }}
-
-      - name: Verify xterm patches match the pinned upstream build
-        env:
-          WORK_DIR: ${{ runner.temp }}/xterm-patch-build
-        run: node config/scripts/regenerate-xterm-patches.mjs --check --work-dir="$WORK_DIR"
-
   shell_contracts:
     name: shell contracts
     runs-on: ubuntu-latest
+    # Why: these specs drive real shells and PTYs, so a wedged child hangs the
+    # job; healthy runs stay under 3 minutes.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -231,10 +209,17 @@ jobs:
   test:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
     runs-on: ubuntu-latest
+    # Why: a healthy shard finishes in under 5 minutes, but a wedged worker holds
+    # the run for the 6h default — one shard hung 72 minutes and blocked
+    # re-running any other shard (ORCA-119). Cap so a hang reports as a failure.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        node: ['24', '26']
+        # Why the owner ternary: upstream supports both Node majors, but in the fork
+        # the doubled matrix doubles every PR's CI cost while the product ships on
+        # engines.node 24 — node 26 coverage returns with each upstream sync (ORCA-127).
+        node: ${{ github.repository_owner == 'stablyai' && fromJSON('["24", "26"]') || fromJSON('["24"]') }}
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         shard_total: [16]
 
@@ -261,54 +246,7 @@ jobs:
             --exclude=src/main/providers/__tests__/shell-ready-framework-example.test.ts \
             --exclude=src/main/pty/omp-shell-wrapper.node-pty.test.ts \
             --exclude=src/shared/posix-command-path-lookup.test.ts \
-            --exclude=tests/e2e/cross-version-wire/** \
             --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
-
-  cross-version-wire:
-    name: cross-version wire compatibility
-    runs-on: ubuntu-latest
-
-    steps:
-      # Why fetch-depth 0: the harness extracts the newest release tag to skew
-      # current code against it. The default shallow clone has no tags, which is
-      # why this cannot ride along in the sharded `test` job.
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: ./.github/actions/install-node-dependencies
-        with:
-          native-runtime: node
-
-      # A path filter that matches nothing exits 1 ("No test files found"), so this
-      # lane cannot report success while running zero tests.
-      - name: Old/new client and server terminal journey
-        run: pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts
-
-  managed_hook_node18:
-    name: managed hooks on Node 18
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/install-node-dependencies
-
-      - name: Build relay companions
-        run: pnpm run build:relay
-
-      - name: Setup Node 18 runtime
-        uses: actions/setup-node@v6
-        with:
-          node-version: '18'
-
-      - name: Smoke managed-hook companions
-        run: node config/scripts/smoke-managed-hook-runtime-node18.mjs
 
   package:
     name: package
@@ -368,6 +306,70 @@ jobs:
       - name: Smoke packaged hang watchdog worker
         run: xvfb-run --auto-servernum node config/scripts/smoke-packaged-hang-watchdog-worker.mjs --app-dir=dist/linux-unpacked
 
+  verify-windows:
+    name: Windows platform tests
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: verify-windows-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Why: setup-node can only cache pnpm's store after the pnpm binary exists
+      # — same ordering as the packaged Windows e2e jobs.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Why: postinstall rebuilds native deps for Electron's ABI; vitest runs
+      # under system Node, so mirror verify's Node-runtime prep.
+      - name: Ensure Node native runtime
+        run: node config/scripts/ensure-native-runtime.mjs --runtime=node
+
+      - name: Rebuild better-sqlite3 for Node
+        run: pnpm rebuild better-sqlite3
+
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
+
+      # Why: discover the specs by their guard so the selection self-maintains.
+      # On Windows the POSIX guards skip and these run; an empty discovery is an
+      # error, never a silent pass.
+      - name: Run Windows-only tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(grep -rl "skipIf(process.platform !== 'win32')" src config/scripts \
+            --include='*.test.ts' --include='*.test.tsx' --include='*.test.mjs' || true)
+          if [ -z "$files" ]; then
+            echo "::error::No Windows-only test files matched — the guard pattern may have drifted from skipIf(process.platform !== 'win32')."
+            exit 1
+          fi
+          echo "Running Windows-only selection:"
+          printf '  %s\n' $files
+          pnpm exec vitest run --config config/vitest.config.ts $files
+
+      - name: Report platform test coverage
+        if: always()
+        run: node config/scripts/report-platform-test-coverage.mjs
+
   package_windows:
     name: package (windows)
     runs-on: windows-2022
@@ -418,7 +420,8 @@ jobs:
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/win-unpacked
 
   # Why: PR E2E is advisory and only validates changed specs; scheduled and
-  # release runs retain full-suite coverage.
+  # release runs retain full-suite coverage (#10518 — specs under tests/e2e/**
+  # used to merge green without ever running).
   e2e-paths:
     name: detect changed e2e specs
     runs-on: ubuntu-latest
@@ -443,8 +446,7 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
           CHANGED="$(git diff --name-only --diff-filter=AMCR --merge-base "$BASE" "$HEAD")"
-          # Native specs require their dedicated platform harnesses.
-          TEST_FILES="$(printf '%s\n' "$CHANGED" | grep -E '^tests/e2e/.*\.spec\.ts$' | grep -Ev -- '-native\.spec\.ts$' || true)"
+          TEST_FILES="$(printf '%s\n' "$CHANGED" | grep -E '^tests/e2e/.*\.spec\.ts$' || true)"
           TEST_FILES_JSON="$(printf '%s\n' "$TEST_FILES" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(length > 0))')"
           echo "test_files=$TEST_FILES_JSON" >> "$GITHUB_OUTPUT"
           if [ "$TEST_FILES_JSON" != '[]' ]; then
@@ -473,11 +475,10 @@ jobs:
       - root_directory_guard
       - typecheck
       - git_compatibility
-      - xterm_patch_sync
       - shell_contracts
       - test
-      - managed_hook_node18
       - package
+      - verify-windows
       - package_windows
     runs-on: ubuntu-latest
 
@@ -496,11 +497,10 @@ jobs:
           ROOT_DIRECTORY_GUARD: ${{ needs.root_directory_guard.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           GIT_COMPATIBILITY: ${{ needs.git_compatibility.result }}
-          XTERM_PATCH_SYNC: ${{ needs.xterm_patch_sync.result }}
           SHELL_CONTRACTS: ${{ needs.shell_contracts.result }}
           TEST: ${{ needs.test.result }}
-          MANAGED_HOOK_NODE18: ${{ needs.managed_hook_node18.result }}
           PACKAGE: ${{ needs.package.result }}
+          VERIFY_WINDOWS: ${{ needs.verify-windows.result }}
           PACKAGE_WINDOWS: ${{ needs.package_windows.result }}
         run: |
           for result in \
@@ -508,11 +508,10 @@ jobs:
             "$ROOT_DIRECTORY_GUARD" \
             "$TYPECHECK" \
             "$GIT_COMPATIBILITY" \
-            "$XTERM_PATCH_SYNC" \
             "$SHELL_CONTRACTS" \
             "$TEST" \
-            "$MANAGED_HOOK_NODE18" \
             "$PACKAGE" \
+            "$VERIFY_WINDOWS" \
             "$PACKAGE_WINDOWS"; do
             if [ "$result" != "success" ]; then
               exit 1

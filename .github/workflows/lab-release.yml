@@ -1,0 +1,386 @@
+name: Lab Release
+
+# Why: one-click Orca Lab release from the fork. Computes the next
+# `<upstream-base>.lab.N` version (a bare -lab.N would sort BELOW -rc.N in
+# semver and the updater would never offer it), builds signed+notarized macOS
+# on real runs (x64 + arm64; unsigned only on dry runs) and Linux x64 artifacts,
+# and lets electron-builder publish them with
+# the auto-update manifests (latest-mac.yml / latest-linux.yml) attached —
+# the two things the hand-rolled lab.1 release got wrong.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Explicit version override (e.g. 1.4.151-rc.2.lab.1). Empty = auto-increment .lab.N.
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: Build both platforms without tagging or publishing
+        required: false
+        type: boolean
+        default: false
+      release_candidate:
+        description: >-
+          Publish as a lab RC (X.Y.Z-lab.N.rc). Downloadable, but excluded from
+          ordinary update checks and announced to nobody. Promote by re-running
+          without this flag.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lab-release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    # Why: gate to the fork so this workflow no-ops if the file ever reaches
+    # upstream or another fork (mirrors release-cut.yml's canonical-repo guard).
+    if: github.repository == 'ab2webco/orca-oss'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      title: ${{ steps.next.outputs.title }}
+      build_ref: ${{ steps.push.outputs.build_ref }}
+      prev: ${{ steps.push.outputs.prev }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next lab version
+        id: next
+        run: |
+          current="$(node -p "require('./package.json').version")"
+          override="${{ inputs.version }}"
+          # Why: clean `X.Y.Z-lab.N` scheme (no upstream `-rc.X` noise). A bare
+          # `X.Y.Z-lab.N` sorts BELOW `X.Y.Z-rc.…` in semver, so migrating off the
+          # old `-rc.X.lab.N` tags bumps the patch to stay above installed labs and
+          # keep auto-update flowing. Once on the clean scheme, just increment N.
+          rc="${{ inputs.release_candidate }}"
+          # Why: an RC carries `.rc` on the number it is a candidate FOR, and promoting takes the
+          # NEXT number — `lab.36.rc` outranks `lab.36` in semver, so reusing 36 would leave every
+          # RC tester unable to update to the very build they validated.
+          if [[ -n "$override" ]]; then
+            next="$override"
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)\.rc$ ]]; then
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)$ ]]; then
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
+          else
+            numeric="${current%%-*}"
+            IFS=. read -r MAJ MIN PAT <<<"$numeric"
+            next="${MAJ}.${MIN}.$(( PAT + 1 ))-lab.1"
+          fi
+          # Why: a reused or regressing version silently breaks auto-update for
+          # installed labs, so refuse same-version and already-tagged cuts.
+          if [[ "$next" == "$current" ]]; then
+            echo "Version $next equals current $current" >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "Tag v$next already exists" >&2
+            exit 1
+          fi
+          # Human title: 1.4.152-lab.1 -> Orca Lab v1.4.152-lab.1
+          base="${next%%-*}"
+          lab_n="${next##*-lab.}"
+          echo "version=$next" >>"$GITHUB_OUTPUT"
+          echo "tag=v$next" >>"$GITHUB_OUTPUT"
+          if [[ "$rc" == "true" ]]; then
+            echo "title=Orca Lab v${base}-lab.${lab_n} (release candidate)" >>"$GITHUB_OUTPUT"
+          else
+            echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"
+          fi
+          echo "Next lab version: $next"
+
+      - name: Bump, commit, tag and push
+        id: push
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "Dry run — skipping bump/tag; building from main tip."
+            echo "build_ref=main" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          next="${{ steps.next.outputs.version }}"
+          tag="${{ steps.next.outputs.tag }}"
+          # Capture the version being superseded so finalize's nudge only re-checks
+          # installs at-or-below it (the just-released $next stays out of range).
+          prev="$(node -p "require('./package.json').version")"
+          node -e "
+            const fs = require('fs')
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+            pkg.version = '$next'
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+          "
+          git add package.json
+          git commit -m "chore(release): bump version to $next"
+          git tag "$tag"
+          git push origin HEAD:main "$tag"
+          echo "build_ref=$tag" >>"$GITHUB_OUTPUT"
+          echo "prev=$prev" >>"$GITHUB_OUTPUT"
+
+  mac:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 90
+    # Why: real releases sign + notarize with the ANTAKARANA Developer ID (repo
+    # secrets); dry runs resolve these to empty so they stay unsigned and fast.
+    # ORCA_MAC_RELEASE=1 flips hardenedRuntime + notarize on in the builder config.
+    env:
+      ORCA_MAC_RELEASE: ${{ !inputs.dry_run && '1' || '' }}
+      ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+      CSC_LINK: ${{ !inputs.dry_run && secrets.CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ !inputs.dry_run && secrets.CSC_KEY_PASSWORD || '' }}
+      APPLE_ID: ${{ !inputs.dry_run && secrets.APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ !inputs.dry_run && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ !inputs.dry_run && secrets.APPLE_TEAM_ID || '' }}
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Build macOS native helpers
+        run: pnpm build:computer-macos && pnpm build:notification-status-macos
+
+      - name: Package and publish macOS artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Why: --publish always uploads dmg/zip/blockmaps AND latest-mac.yml to
+        # the tag's release; dry runs package with --publish never instead.
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$publish"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Package and publish Linux artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb --publish "$publish"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      # Why: packaging embeds native/windows-cli-launcher/.build/orca.exe,
+      # which build:native compiles with the inbox .NET Framework csc.exe.
+      - name: Build Windows native helpers
+        run: pnpm build:native
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Package and publish Windows artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+        # Why: unsigned lab build — installable past SmartScreen, but Windows
+        # auto-update will NOT apply it (electron-updater's Authenticode check
+        # rejects unsigned installers and must never be disabled). Windows lab
+        # users update manually until the fork gets SignPath/Authenticode signing.
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish "$publish"
+
+  finalize:
+    needs: [version, mac, linux, windows]
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set title, notes and Latest marker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          title="${{ needs.version.outputs.title }}"
+          prev_tag="$(git tag --list 'v*lab*' --sort=-creatordate | grep -v "^${tag}$" | head -n 1)"
+          {
+            echo "# ${title}"
+            echo
+            echo "Build del laboratorio de Ab2Web basado en Orca (upstream stablyai/orca) más las funcionalidades propias del lab. Se distingue por el distintivo \"by Ab2Web\" en la barra de título."
+            echo
+            echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
+            echo
+            if [[ -n "$prev_tag" ]]; then
+              echo "## Cambios desde ${prev_tag}"
+              echo
+              git log --no-merges --pretty='- %s' "${prev_tag}..${tag}" | head -50
+              echo
+            fi
+            echo "## Instalación en macOS"
+            echo "El build de macOS va firmado y notarizado con Developer ID, así que Gatekeeper lo abre sin pasos extra. Descarga el \`.dmg\` o deja que Orca se auto-actualice."
+            echo
+            echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
+            if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+              echo
+              echo "## Release candidate"
+              echo "No se anuncia ni llega por auto-update: los chequeos normales excluyen los tags \`-lab.N.rc\`. Descargá el instalador a mano para validarlo. Una vez validado, se promueve con un release normal, que sale con el número siguiente."
+            fi
+          } > /tmp/notes.md
+          if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+            # Why: --prerelease keeps it off the repo's Latest pointer, but the real gate is the
+            # tag shape — src/main/updater-prerelease-feed.ts excludes X.Y.Z-lab.N.rc from ordinary
+            # checks. Installs older than that exclusion still resolve it, so never cut an RC until
+            # a normal lab release carrying the exclusion has shipped.
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease --draft=false
+            echo "Release $tag published as a release candidate (not Latest, no nudge)."
+          else
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
+            echo "Release $tag published as Latest."
+          fi
+
+      - name: Publish update nudge
+        # Why: an RC announces to nobody — the nudge is what makes installs check early.
+        if: inputs.release_candidate != true
+        # Why: written here (after mac/linux/windows assets are confirmed published)
+        # instead of in the version job, so installs polling the nudge never see a
+        # release announced before its latest-*.yml/zip/dmg assets exist — that race
+        # made the auto-updater resolve 'not-available' and permanently dismiss the
+        # campaign. See src/main/update-feed-target.ts UPDATE_NUDGE_URL.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          tag="${{ needs.version.outputs.tag }}"
+          prev="${{ needs.version.outputs.prev }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node -e "
+            const fs = require('fs')
+            // Why: a fresh id each release re-nudges older installs to check;
+            // maxVersion=prev keeps the newest build from nudging itself.
+            fs.mkdirSync('whats-new', { recursive: true })
+            fs.writeFileSync('whats-new/nudge.json', JSON.stringify({
+              id: 'orca-lab-$version',
+              minVersion: '1.0.0',
+              maxVersion: '$prev'
+            }, null, 2) + '\n')
+          "
+          git add whats-new/nudge.json
+          git commit -m "chore(release): announce $tag via update nudge"
+          # Why: the version job already pushed the bump commit to main; retry
+          # once with a rebase in case main moved between checkout and push.
+          push_nudge() {
+            git push origin HEAD:main
+          }
+          if ! push_nudge; then
+            git fetch origin main
+            git rebase origin/main
+            push_nudge
+          fi
