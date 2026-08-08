@@ -213,9 +213,11 @@ export function CardFooter(props: {
             marginLeft: 5
           }}
         >
+          {/* Inline literal, not ORCA_REPOSITORY_LABEL: the extractor reads this
+              default statically. */}
           {translate(
             'auto.components.stats.share.card.utils.19f4b4dc75',
-            'github.com/stablyai/orca'
+            'github.com/ab2webco/orca-oss'
           )}
         </span>
       </div>

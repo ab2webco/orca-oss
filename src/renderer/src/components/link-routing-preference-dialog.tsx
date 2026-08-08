@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { ORCA_REPOSITORY_URL } from '../../../shared/orca-repository-url'
 
 type LinkRoutingPreferenceDialogOptions = {
   url?: string
@@ -101,7 +102,7 @@ export function LinkRoutingPreferenceDialogProvider({
     void requestPreference({
       openLinksInAppDefault: previewDefault === 'orca',
       preview: true,
-      url: 'https://github.com/stablyai/orca/pull/1234'
+      url: `${ORCA_REPOSITORY_URL}/pull/1234`
     })
   }, [requestPreference])
 
