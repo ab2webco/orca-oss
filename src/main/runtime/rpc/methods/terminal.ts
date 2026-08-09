@@ -896,9 +896,10 @@ const TerminalViewport = z.object({
 })
 
 const TerminalWait = TerminalHandle.extend({
-  for: z.custom<'exit' | 'tui-idle'>((value) => value === 'exit' || value === 'tui-idle', {
-    message: 'Invalid --for value. Supported: exit, tui-idle'
-  }),
+  for: z.custom<'exit' | 'tui-idle' | 'composer-ready'>(
+    (value) => value === 'exit' || value === 'tui-idle' || value === 'composer-ready',
+    { message: 'Invalid --for value. Supported: exit, tui-idle, composer-ready' }
+  ),
   timeoutMs: OptionalFiniteNumber
 })
 

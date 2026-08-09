@@ -28,7 +28,9 @@ import { ORCHESTRATION_RUN_METHODS } from './orchestration-runs'
 import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
 import { ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
@@ -1356,8 +1358,19 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       let injected = false
       if (params.inject) {
+        // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+        // known-ready preview, or foreground quiescence — for Codex all three
+        // land ~1-4 s before the composer accepts input, so the preamble is
+        // typed into a redraw and swallowed. Hold the write until the agent's
+        // own marker says the composer mounted. This never refuses: a missing
+        // marker is not evidence of unreadiness, so expiry proceeds and records
+        // `proven`. It also only ever waits while a marker is pending — see
+        // `AgentComposerReadinessTracker.wait`.
+        const composerReady = await runtime.waitForAgentComposerReady(to)
+        let pendingAcceptance: Promise<AgentTurnAcceptance>
         try {
-          await runtime.sendTerminalAgentPrompt(to, preamble)
+          const sent = await runtime.sendTerminalAgentPromptObservingTurn(to, preamble)
+          pendingAcceptance = sent.turnAcceptance
           injected = true
         } catch (err) {
           db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
@@ -1367,7 +1380,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // confirmation point is monitored — a tracking dispatch without --inject
         // never receives a preamble and must never be failed for its silence.
         db.armDispatchLifecycleDeadline(ctx.id)
+        db.recordDispatchComposerReadiness(ctx.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
+        // Why: not awaited. Turn acceptance changes nothing about this dispatch
+        // — no refusal, no resend — so holding the RPC open for it would only
+        // add latency. It lands on the dispatch row, where `dispatch show`
+        // reads it and the deadline's failure reason uses it.
+        recordTurnAcceptanceInBackground(db, ctx.id, pendingAcceptance)
       }
 
       // Why: returnPreamble is opt-in because the preamble is several hundred bytes most callers don't need in the response.

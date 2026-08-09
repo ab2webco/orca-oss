@@ -5,6 +5,7 @@ import type {
   AgentStatusState,
   AgentType
 } from './agent-status-types'
+import type { ComposerReadyState } from './composer-ready-observation'
 import type {
   BaseRefSearchResult,
   BrowserCookieImportResult,
@@ -734,7 +735,7 @@ export type RuntimeTerminalClose = {
   ptyKilled: boolean
 }
 
-export type RuntimeTerminalWaitCondition = 'exit' | 'tui-idle'
+export type RuntimeTerminalWaitCondition = 'exit' | 'tui-idle' | 'composer-ready'
 export type RuntimeTerminalWaitBlockedReason =
   | 'codex-update-prompt'
   | 'codex-trust-workspace'
@@ -750,6 +751,11 @@ export type RuntimeTerminalWait = {
   status: RuntimeTerminalState
   exitCode: number | null
   blockedReason?: RuntimeTerminalWaitBlockedReason
+  /** Only on `composer-ready`: which of the three facts the wait ended on.
+   *  `unobserved` is the absence of evidence, not evidence of unreadiness. */
+  composerReadyState?: ComposerReadyState
+  /** Only on `composer-ready`: ms spent waiting, for timing the signal. */
+  waitedMs?: number
 }
 
 /** One agent's live status as carried to mobile in a worktree.ps summary.

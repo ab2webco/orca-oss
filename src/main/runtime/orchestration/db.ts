@@ -290,7 +290,7 @@ type RunListCursor = {
 // Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership, v25 dispatch first-signal deadline.
 // Why v24 rather than reusing 23 for upstream's terminal-ownership migration: it also
 // shipped as v23, so a lab DB already stamped 23 by the envelope migration would skip it.
-const SCHEMA_VERSION = 25
+const SCHEMA_VERSION = 27
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
   if (dbPath === ':memory:' || process.platform === 'win32') {
@@ -582,7 +582,14 @@ export class OrchestrationDb {
         -- injection arms a deadline, so legacy rows and non-inject tracking
         -- dispatches are grandfathered by having no value at all.
         monitor_deadline_at TEXT,
-        first_lifecycle_signal_at TEXT
+        first_lifecycle_signal_at TEXT,
+        -- Why (ORCA-191): the agent started a turn after the submit. Turn
+        -- acceptance, not content integrity — see agent-turn-acceptance-scanner.
+        turn_accepted_at TEXT,
+        -- Why (ORCA-191): 1 when the agent's composer marker was observed before
+        -- the write, 0 when the injector proceeded without proof. Only ever
+        -- diagnosis — readiness is never a reason to refuse a dispatch.
+        composer_ready_proven INTEGER
       );
 
       CREATE INDEX IF NOT EXISTS idx_dispatch_task ON dispatch_contexts(task_id);
@@ -1005,6 +1012,20 @@ export class OrchestrationDb {
             ON dispatch_contexts(monitor_deadline_at)
             WHERE monitor_deadline_at IS NOT NULL;
         `)
+      }
+      if (current < 26) {
+        // Why (ORCA-191): NULL on legacy rows means "never observed", which is
+        // exactly what it means on a new row whose agent started no turn.
+        if (!this.hasColumn('dispatch_contexts', 'turn_accepted_at')) {
+          this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN turn_accepted_at TEXT')
+        }
+      }
+      if (current < 27) {
+        // Why (ORCA-191): NULL means "this runtime never recorded it", which is
+        // true of every legacy row and must not read as "readiness failed".
+        if (!this.hasColumn('dispatch_contexts', 'composer_ready_proven')) {
+          this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN composer_ready_proven INTEGER')
+        }
       }
       this.createUndeliveredInboxIndexIfPossible()
 
@@ -6590,6 +6611,41 @@ export class OrchestrationDb {
          WHERE id = ? AND status = 'dispatched'`
       )
       .run(at, dispatchId)
+  }
+
+  /**
+   * Records that the agent started a turn after the submit (ORCA-191).
+   *
+   * Deliberately NOT `recordDispatchLifecycleSignal`: a screen/title transition
+   * is turn acceptance, not an authenticated lifecycle signal from the worker,
+   * so it must never disarm the first-signal deadline. It only sharpens the
+   * eventual failure reason — "never started a turn" and "started a turn and
+   * then went silent" are different incidents with different next steps.
+   */
+  recordDispatchTurnAcceptance(dispatchId: string, at: string = new Date().toISOString()): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET turn_accepted_at = COALESCE(turn_accepted_at, ?)
+         WHERE id = ? AND status = 'dispatched'`
+      )
+      .run(at, dispatchId)
+  }
+
+  /**
+   * Records whether the agent's composer marker was observed before the write
+   * (ORCA-191). Diagnosis only: a dispatch is never refused for want of proof,
+   * so this exists to tell a later first-signal failure whether readiness was
+   * ever established for that pane.
+   */
+  recordDispatchComposerReadiness(dispatchId: string, proven: boolean): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET composer_ready_proven = ?
+         WHERE id = ? AND status = 'dispatched'`
+      )
+      .run(proven ? 1 : 0, dispatchId)
   }
 
   countArmedDispatchDeadlines(): number {

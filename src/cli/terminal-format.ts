@@ -205,5 +205,11 @@ export function formatTerminalWait(result: { wait: RuntimeTerminalWait }): strin
   if (result.wait.blockedReason) {
     lines.push(`blockedReason: ${result.wait.blockedReason}`)
   }
+  if (result.wait.composerReadyState) {
+    lines.push(`composerReadyState: ${result.wait.composerReadyState}`)
+  }
+  if (typeof result.wait.waitedMs === 'number') {
+    lines.push(`waitedMs: ${result.wait.waitedMs}`)
+  }
   return lines.join('\n')
 }

@@ -1,6 +1,8 @@
 import type { TuiAgent } from '../../../../shared/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
+import { AGENT_COMPOSER_READY_TIMEOUT_MS } from '../../agent-composer-readiness'
 import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
@@ -199,9 +201,15 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         persistWorkerReadinessStage(setupStage)
 
         failedStage = 'agent_readiness'
+        // Why (ORCA-191): readiness has two stages now, and both must fit the
+        // one budget the caller asked for — the CLI's transport timeout is
+        // sized from it, so spending a separate budget on the second stage
+        // would time the caller out on a start the runtime still completes.
+        const readinessBudgetMs = params.timeoutMs ?? 60_000
+        const readinessDeadline = Date.now() + readinessBudgetMs
         const wait = await runtime.waitForTerminal(terminalHandle, {
           condition: 'tui-idle',
-          timeoutMs: params.timeoutMs ?? 60_000
+          timeoutMs: readinessBudgetMs
         })
         persistWorkerSetupWaitOutcome({ ...setupStage, wait })
         if (!wait.satisfied) {
@@ -214,6 +222,22 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
               : `Agent did not become ready (${wait.status}).`
           )
         }
+        // Why (ORCA-191): this is the path the incident ran through. `tui-idle`
+        // is satisfied for Codex before the composer accepts input, so the
+        // preamble lands in a redraw and the run sits `dispatched` forever.
+        // Hold the write until the agent's own marker says the composer
+        // mounted. This never fails the start: a missing marker is not evidence
+        // of unreadiness, so expiry proceeds and records `proven` instead.
+        //
+        // Why min(): expiry is benign, so spending the caller's whole remaining
+        // budget on a wait that is already failing is pure latency — and it is
+        // latency paid by exactly the panes that will never mark ready.
+        const composerReady = await runtime.waitForAgentComposerReady(terminalHandle, {
+          timeoutMs: Math.max(
+            0,
+            Math.min(AGENT_COMPOSER_READY_TIMEOUT_MS, readinessDeadline - Date.now())
+          )
+        })
         const terminalAuthority = requireWorkerAuthority(runtime, terminalHandle)
         const capability = db.prepareStartingWorkerAuthority({
           dispatchId: started.dispatch.id,
@@ -236,7 +260,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           devMode: params.devMode,
           cliCommand: runtime.getTerminalOrchestrationCliCommand(terminalHandle)
         })
-        await runtime.sendTerminalAgentPrompt(terminalHandle, preamble)
+        const sent = await runtime.sendTerminalAgentPromptObservingTurn(terminalHandle, preamble)
         effects.push({
           kind: 'dispatch_input',
           role: 'agent',
@@ -244,7 +268,13 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           state: 'accepted'
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
+        db.recordDispatchComposerReadiness(started.dispatch.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
+        // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
+        // refuses and never resends — so it must not spend the caller's budget.
+        // It lands on the dispatch row for `dispatch show` and the deadline's
+        // failure reason.
+        recordTurnAcceptanceInBackground(db, started.dispatch.id, sent.turnAcceptance)
         monitorWorkerSetup({
           runtime,
           db,

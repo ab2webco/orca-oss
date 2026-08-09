@@ -39,17 +39,40 @@ export function buildDispatchDeadlineFailureReason(params: {
   taskId: string
   placement: DispatchDeadlinePlacement
   deadlineMs: number
+  /** ORCA-191 slice 2: whether the agent visibly started a turn after submit. */
+  turnAccepted?: boolean
+  /** ORCA-191 slice 2: whether the composer marker was observed before the
+   *  write. False means the injector proceeded without proof of readiness. */
+  composerReadyProven?: boolean | null
 }): string {
   const minutes = Math.round(params.deadlineMs / 60000)
   const pane = params.placement.assigneePaneKey ?? '<no stable pane>'
   const terminal =
     params.placement.terminalHandle ?? params.placement.assigneeHandle ?? '<unknown terminal>'
   const host = params.placement.environmentName ?? params.placement.hostScope ?? 'local'
+  // Why: the two incidents need different next steps. No observed turn points at
+  // delivery — the pane, its startup, the composer. An observed turn points at
+  // the worker — it read something and then stopped reporting.
+  const delivery = params.turnAccepted
+    ? 'The agent started a turn after the submit, then reported nothing — so it received a turn, ' +
+      'though not provably this preamble intact (turn acceptance is not content integrity). ' +
+      'Check the pane transcript before retrying.'
+    : 'The preamble was accepted by the PTY and the agent never visibly started a turn, ' +
+      'so it most likely never reached the agent.'
+  // Why: the injector proceeds even when the composer marker never arrived, so
+  // a failure here should say whether readiness was ever established — that is
+  // the difference between "delivered into a pane we knew was ready" and
+  // "delivered blind".
+  const readiness =
+    params.composerReadyProven === false
+      ? ' The agent never showed its composer-ready marker before the write, so readiness was ' +
+        'never proven for this pane.'
+      : ''
   return (
     `Dispatch ${params.dispatchId} for task ${params.taskId} sent no lifecycle signal within ` +
     `${minutes} min of injection: terminal ${terminal}, pane ${pane}, host ${host}. ` +
-    'The preamble was accepted by the PTY but never reached the agent. Orca did not resend it — ' +
-    'the submit outcome is ambiguous. Inspect the pane, then retry explicitly.'
+    `${delivery}${readiness} Orca did not resend it — the submit outcome is ambiguous. ` +
+    'Inspect the pane, then retry explicitly.'
   )
 }
 

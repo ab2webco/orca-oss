@@ -440,6 +440,75 @@ describe('orchestration new-worktree workers', () => {
     expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
   })
 
+  // Why (E2E regression): a missing composer marker is not proof of unreadiness
+  // — an interactive shell emits the same bracketed-paste handshake, and a
+  // wrapper or shim can present as a known agent and never mount a composer.
+  // Failing the start there left three E2E specs on a bare shell prompt.
+  it('starts the worker unproven when the composer marker never arrived', async () => {
+    mockCreatedWorktree()
+    vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+      ready: true,
+      proven: false,
+      state: 'awaiting-composer',
+      signal: 'codex-composer-prompt',
+      waitedMs: 10_000
+    })
+
+    const { result, task } = await startWorker()
+
+    expect(result).toMatchObject({ state: 'ready' })
+    expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledTimes(1)
+    expect(db.getTask(task.id)?.status).toBe('dispatched')
+    // The lost failure becomes a recorded fact the deadline can cite later.
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(0)
+  })
+
+  it('waits for composer readiness after tui-idle and before the write', async () => {
+    mockCreatedWorktree()
+    const composerReady = vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+      ready: true,
+      proven: true,
+      state: 'ready',
+      signal: 'codex-composer-prompt',
+      waitedMs: 1_091
+    })
+
+    const { task } = await startWorker()
+
+    expect(vi.mocked(runtime.waitForTerminal).mock.invocationCallOrder[0]!).toBeLessThan(
+      composerReady.mock.invocationCallOrder[0]!
+    )
+    expect(composerReady.mock.invocationCallOrder[0]!).toBeLessThan(
+      vi.mocked(runtime.sendTerminalAgentPrompt).mock.invocationCallOrder[0]!
+    )
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(1)
+  })
+
+  it('records turn acceptance without disarming the first-signal deadline', async () => {
+    mockCreatedWorktree()
+    vi.spyOn(runtime, 'sendTerminalAgentPromptObservingTurn').mockResolvedValue({
+      send: { handle: 'term_worker', accepted: true, bytesWritten: 1 },
+      turnAcceptance: Promise.resolve({
+        accepted: true,
+        evidence: 'working-title',
+        waitedMs: 61
+      })
+    })
+
+    const { result, task } = await startWorker()
+
+    expect(result).toMatchObject({ state: 'ready' })
+    // Why: recorded off the request path, so worker-start's own timeout budget
+    // is never spent on an observation that cannot change its outcome.
+    await vi.waitFor(() => {
+      expect(db.getDispatchContext(task.id)?.turn_accepted_at).not.toBeNull()
+    })
+    // A screen transition is not an authenticated lifecycle signal, so the
+    // deadline that catches a silent worker must stay armed.
+    expect(db.getDispatchContext(task.id)?.first_lifecycle_signal_at).toBeNull()
+    expect(db.countArmedDispatchDeadlines()).toBe(1)
+  })
+
   it('distinguishes no-effect failure, unknown acceptance, and durable residual effects', async () => {
     vi.spyOn(runtime, 'createManagedWorktree').mockRejectedValueOnce(
       new Error('repository validation failed before creation')

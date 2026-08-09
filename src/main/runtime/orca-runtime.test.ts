@@ -15763,6 +15763,150 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+  // known-ready preview, or foreground quiescence, all of which Codex reaches
+  // before its composer accepts input — measured on ORCA-171 at 5,482 ms
+  // satisfied / 8,211 ms ready, and 10,506 / 14,598. `composer-ready` reports
+  // the agent's own marker instead, and reports honestly when it never came:
+  // this surface is satisfied by the marker only. The dispatch injector's
+  // never-refuse policy lives at its call sites, not here.
+  describe('composer-ready wait (ORCA-191)', () => {
+    async function createCodexPane(): Promise<{
+      runtime: OrcaRuntimeService
+      handle: string
+      ptyId: string
+    }> {
+      const ptyId = 'pty-codex'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        launchAgent: 'codex'
+      })
+      return { runtime, handle, ptyId }
+    }
+
+    it('reports the marker as proof once the composer prompt renders', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
+
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({
+        condition: 'composer-ready',
+        satisfied: true,
+        composerReadyState: 'ready'
+      })
+    })
+
+    // Why: this is the window `tui-idle` hands the injector — bracketed paste is
+    // enabled, the composer is not mounted, and a write here is the one the
+    // startup redraw swallows. The wait must say no, so that an operator asking
+    // `terminal wait --for composer-ready` gets an answer and not a rubber stamp.
+    it('is unsatisfied while the composer is still mounting', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b]0;Codex Ready\x07OpenAI Codex\n', 100)
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({ satisfied: false, composerReadyState: 'awaiting-composer' })
+    })
+
+    // Why: this is the defect the live rig caught, and only a live run could —
+    // `launchAgent` is recorded only for token-bound spawns and `foregroundAgent`
+    // is refreshed lazily, so a plain `terminal create --agent codex` pane
+    // reached the gate with no recorded identity and never waited at all.
+    it('identifies the agent from the foreground process when none was recorded', async () => {
+      const ptyId = 'pty-codex-unrecorded'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
+
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({ composerReadyState: 'ready' })
+    })
+
+    it('reports unobserved for a pane it never watched from spawn', async () => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      // A leaf synced from the renderer for a PTY this runtime never registered
+      // is the restored/adopted case: nothing was watching its handshake, so
+      // there is nothing to wait for and no proof to report either way.
+      syncSinglePty(runtime)
+      const [terminal] = (await runtime.listTerminals()).terminals
+
+      const budgetMs = 5_000
+      const wait = await runtime.waitForTerminal(terminal.handle, {
+        condition: 'composer-ready',
+        timeoutMs: budgetMs
+      })
+
+      expect(wait).toMatchObject({ satisfied: false, composerReadyState: 'unobserved' })
+      // Why: it must not sleep out the budget — `dispatch --inject` rescues a
+      // stalled run through exactly this pane and cannot pay for a wait that
+      // can never resolve. Compared against the budget, not against a tight
+      // absolute, so a stalled event loop on a loaded runner cannot fail it.
+      expect(wait.waitedMs).toBeLessThan(budgetMs / 2)
+    })
+
+    it('observes turn acceptance from output that follows the write', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 5_000
+      })
+      runtime.onPtyData(ptyId, '\r\nWorking (0s • esc to interrupt)', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: true,
+        evidence: 'interrupt-affordance'
+      })
+      expect(sent.send.accepted).toBe(true)
+    })
+
+    it('reports an unaccepted turn instead of resending', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 20
+      })
+      // Why: Codex collapses a long paste into a placeholder, so the payload is
+      // never on screen. Treating that as failure and resending is what
+      // interleaved six copies into one composer.
+      runtime.onPtyData(ptyId, '\r\n› [Pasted Content 1206 chars]', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: false,
+        evidence: null
+      })
+    })
+  })
+
   it('chunks large agent prompt paste frames before delayed submit', async () => {
     vi.useFakeTimers()
     try {
