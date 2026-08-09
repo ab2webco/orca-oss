@@ -144,6 +144,57 @@ describe('`account list` per-terminal Claude account', () => {
     expect(printed()).not.toContain('<- this terminal')
   })
 
+  // ORCA-187: a pane that outlived a restart could lose the launch config the
+  // switch relaunches from, and the only signal was the switch itself failing.
+  it('says a pane is not switchable, and why, before anyone asks for a switch', async () => {
+    respondWith({
+      terminal: PANE_HANDLE,
+      ptyId: 'pty-9',
+      ownership: {
+        state: 'account',
+        accountId: 'account-fabiana',
+        email: 'fabiana@example.com',
+        pinned: true
+      },
+      switchReadiness: { state: 'unavailable', reason: 'missing-launch-config' }
+    })
+
+    await ACCOUNT_HANDLERS['account list'](context())
+
+    const output = printed()
+    expect(output).toContain('not switchable:')
+    expect(output).toContain('no longer holds the command this pane was launched with')
+    expect(output).toContain('(missing-launch-config)')
+    // The account itself survived the restart and must still be named.
+    expect(output).toContain('this terminal: fabiana@example.com  id account-fabiana')
+  })
+
+  it('stays quiet about switchability when the pane can be switched', async () => {
+    respondWith({
+      terminal: PANE_HANDLE,
+      ptyId: 'pty-9',
+      ownership: {
+        state: 'account',
+        accountId: 'account-fabiana',
+        email: 'fabiana@example.com',
+        pinned: true
+      },
+      switchReadiness: { state: 'ready' }
+    })
+
+    await ACCOUNT_HANDLERS['account list'](context())
+
+    expect(printed()).not.toContain('not switchable')
+  })
+
+  it('says nothing about switchability when the runtime is too old to answer', async () => {
+    respondWith({ terminal: PANE_HANDLE, ptyId: 'pty-9', ownership: { state: 'none' } })
+
+    await ACCOUNT_HANDLERS['account list'](context())
+
+    expect(printed()).not.toContain('not switchable')
+  })
+
   it('still prints the roster when the pane lookup fails', async () => {
     // Why: `account list` is the safe cached path for scripted callers. A pane it
     // cannot read must not take the roster down with it.

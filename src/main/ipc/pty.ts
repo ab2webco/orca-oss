@@ -185,6 +185,7 @@ import {
   shouldDropHiddenRendererPtyData,
   unmarkHiddenRendererPty
 } from './pty-hidden-delivery-gate'
+import { resolveRegisteredPtyLaunchBinding } from './pty-launch-binding'
 import { PtyPendingDataDrainQueue, type PendingPtyData } from './pty-pending-data-drain-queue'
 import {
   appendPendingProjectionAdmission,
@@ -6978,14 +6979,14 @@ export function registerPtyHandlers(
                   leafId: metadataLeafId,
                   ...(result.incarnationId ? { incarnationId: result.incarnationId } : {}),
                   // Why: hand the verified launch credential back to main so orchestration messages
-                  // from this pane can be authenticated; a reattach reuses an existing PTY record.
-                  ...(!result.isReattach && effectiveLaunchConfig && trustedLaunchToken
-                    ? {
-                        launchConfig: effectiveLaunchConfig,
-                        launchToken: trustedLaunchToken,
-                        ...(isTuiAgent(args.launchAgent) ? { launchAgent: args.launchAgent } : {})
-                      }
-                    : {})
+                  // from this pane can be authenticated. A reattach passes the launch description
+                  // without a token — see resolveRegisteredPtyLaunchBinding.
+                  ...resolveRegisteredPtyLaunchBinding({
+                    isReattach: result.isReattach === true,
+                    ...(effectiveLaunchConfig ? { launchConfig: effectiveLaunchConfig } : {}),
+                    ...(trustedLaunchToken ? { trustedLaunchToken } : {}),
+                    ...(isTuiAgent(args.launchAgent) ? { launchAgent: args.launchAgent } : {})
+                  })
                 }
               : undefined,
             !args.connectionId

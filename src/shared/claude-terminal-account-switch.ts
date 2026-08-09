@@ -76,6 +76,15 @@ export type ClaudeTerminalAccountSwitchTarget =
   | { kind: 'handle'; terminal: string }
   | { kind: 'pty'; ptyId: string }
 
+/**
+ * Whether a pane could be account-switched right now, decided by the switch's
+ * own preflight rather than a second copy of it. Reported before anyone asks
+ * for a switch, so a pane that lost a prerequisite says which one (ORCA-187).
+ */
+export type ClaudeTerminalSwitchReadiness =
+  | { state: 'ready' }
+  | { state: 'unavailable'; reason: ClaudeTerminalAccountSwitchFailureReason }
+
 export type ClaudeTerminalAccountSwitchRequest = {
   target: ClaudeTerminalAccountSwitchTarget
   targetAccountId: string

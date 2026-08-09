@@ -39,6 +39,7 @@ import type { StartupCommandDelivery } from './codex-startup-delivery'
 import type { AgentKind, LaunchSource, RequestKind } from './telemetry-events'
 import type { SleepingAgentLaunchConfig, SleepingAgentSessionRecord } from './agent-session-resume'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
+import type { ClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { UiLanguage } from './ui-language'
 import type { ForkSyncMode } from './git-fork-sync'
@@ -2694,6 +2695,9 @@ export type ClaudeTerminalAccountReport = {
   terminal: string | null
   ptyId: string | null
   ownership: ClaudeTerminalAccountOwnership
+  /** Whether this pane could be account-switched right now, from the switch's own
+   *  preflight. Absent from runtimes older than ORCA-187, which could not answer. */
+  switchReadiness?: ClaudeTerminalSwitchReadiness
 }
 
 export type ManagedPtyAccountOwner = {
