@@ -49,15 +49,29 @@ async function callRuntime<TResult>(page: Page, method: string, params: unknown)
   ) as Promise<TResult>
 }
 
+/**
+ * How long the renderer takes to service one queued task.
+ *
+ * Why not requestAnimationFrame: the E2E window is never shown, so Chromium
+ * produces no compositor frames for it and rAF fires at ~1Hz or not at all.
+ * A double-rAF probe then reports ~2000ms of "freeze" on a perfectly
+ * responsive renderer — measured at 1914ms and 2012ms against this spec's
+ * 2000ms threshold, which is what made it flake. MessagePort tasks carry no
+ * frame or timer-throttling dependency, so this measures the main thread.
+ */
 async function measureRendererInteractionMs(page: Page): Promise<number> {
   return page.evaluate(async () => {
     const started = performance.now()
     if (!window.__store) {
       throw new Error('store unavailable for interaction probe')
     }
-    // A blocked renderer cannot service the input task or paint the following frames.
     await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      const channel = new MessageChannel()
+      channel.port1.onmessage = () => {
+        channel.port1.close()
+        resolve()
+      }
+      channel.port2.postMessage(0)
     })
     return performance.now() - started
   })

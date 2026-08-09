@@ -24,6 +24,7 @@
  */
 
 import { expect, type ElectronApplication, type Page } from '@stablyai/playwright-test'
+import type { PaneBindingDiagnostics } from './terminal-pane-pty-binding'
 import { sendToTerminal, waitForTerminalOutput } from './terminal'
 import { buildSettledShellProbeInputSequence } from '../terminal-probe-input-sequence'
 
@@ -282,10 +283,13 @@ export function buildFrozenPaneReport(
     revivedByOwnershipRebuild: boolean
     ownershipRebuildAttempted?: boolean
     readinessAlive?: boolean
+    probePtyId?: string | null
     ptyIds: string[]
+    binding?: PaneBindingDiagnostics
     terminalTail: string
   }
 ): string {
+  const binding = probes.binding
   return [
     `REPRODUCED frozen terminal (${context}):`,
     ...(probes.readinessAlive === undefined
@@ -295,7 +299,16 @@ export function buildFrozenPaneReport(
     `  renderer input-path probe alive: ${probes.transportAlive} (false with direct alive ⇒ replay, focus, or renderer binding failure)`,
     `  ownership rebuild attempted: ${probes.ownershipRebuildAttempted ?? true}`,
     `  revived by pty:listSessions ownership rebuild: ${probes.revivedByOwnershipRebuild}`,
-    `  pane ptyIds: ${JSON.stringify(probes.ptyIds)}`,
+    ...(probes.probePtyId === undefined
+      ? []
+      : [`  probed ptyId (pane binding): ${JSON.stringify(probes.probePtyId)}`]),
+    `  pane ptyIds (store): ${JSON.stringify(probes.ptyIds)}`,
+    ...(binding
+      ? [
+          `  pane ptyIds (pane DOM): ${JSON.stringify(binding.paneDomPtyIds)}`,
+          `  live session ids (main): ${binding.liveSessionIds === null ? 'listing failed' : JSON.stringify(binding.liveSessionIds)}`
+        ]
+      : []),
     `  terminal tail:\n${probes.terminalTail.slice(-600)}`
   ].join('\n')
 }
