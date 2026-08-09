@@ -6,6 +6,16 @@ export const PLUGIN_MARKETPLACE_FILENAME = 'orca-marketplace.json'
 export const PLUGIN_MARKETPLACE_ENTRY_LIMIT = 2_048
 export const PLUGIN_MARKETPLACE_CATEGORY_LIMIT = 16
 
+// Why these stay `stablyai` in this fork (ORCA-192 tier 2, reviewed and kept):
+// they are not a link to upstream, they are a namespace guard. They stop a
+// random repo publishing `stablyai.orca-git` and having it read as official
+// inside our build, and they gate the three bundled plugins we ship — which
+// carry `stablyai.orca-*` identities and would fail their own install trust
+// check the moment this name changed. The fork publishes nothing in its own
+// namespace and still installs from `stablyai/orca-plugins`, so repointing
+// these would loosen a supply-chain check and buy nothing. If the fork ever
+// ships plugins of its own, the change is to *add* a trusted publisher here,
+// never to replace this one.
 export const OFFICIAL_PLUGIN_PUBLISHER = 'stablyai'
 export const OFFICIAL_PLUGIN_ID_PREFIX = 'orca-'
 export const OFFICIAL_MARKETPLACE_OWNER = 'stablyai'
