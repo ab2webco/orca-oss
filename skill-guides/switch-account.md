@@ -42,6 +42,34 @@ This reads Orca's cached roster and quota — it never forces a provider refresh
 cannot stall behind another account's broken auth. Show the user the accounts with their
 remaining quota and ask which one to switch to. Add `--json` when you need to parse it.
 
+## Which account is this terminal on
+
+Never answer this from `active`. `active` is the account Orca selects for *new* launches on the
+whole machine; a pane can run on a different one, and both readings are internally consistent —
+which is exactly how an agent came to tell a user their terminal was still on the old account
+while it had already been switched.
+
+The answer is the `terminal` block of the same `orca account list` output. Run it with no
+`--terminal` so it resolves the pane you are in, proven from the environment Orca exports there:
+
+```bash
+orca account list --json
+```
+
+- `terminal.ownership.state: "account"` — this terminal runs on that `accountId` / `email`. That is the answer.
+- `"none"` — this terminal owns no managed account; it runs on the login in Orca's shared runtime.
+- `"unknown"` — the runtime cannot prove this pane's account. Report exactly that, with the `reason`.
+
+An `unknown` is never a licence to fall back to `active`. Do not substitute
+`CLAUDE_CONFIG_DIR`, and do not answer from `/status`: its `Email` field is unreliable for a
+managed vault — a fresh pane on one vault reported a different account's email while its own
+`/usage` matched the vault it was bound to.
+
+Pass `--terminal <handle>` only to ask about a pane the user named.
+
+If this Orca is too old to print a `terminal` block, the pane's account cannot be determined
+from the CLI. Say that, and do not name an account instead.
+
 ## With a selector: switch this terminal
 
 ```bash

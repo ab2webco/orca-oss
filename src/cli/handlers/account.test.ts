@@ -88,6 +88,13 @@ describe('account CLI handlers', () => {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!
   const originalElectronRunAsNode = process.env.ELECTRON_RUN_AS_NODE
   const originalPathAlias = process.env.Path
+  // Why cleared: `account list` now resolves the caller's own pane, so a test run
+  // launched from inside an Orca terminal would otherwise inherit a real handle.
+  const originalPaneEnv = {
+    ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE,
+    ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
+    ORCA_AGENT_LAUNCH_TOKEN: process.env.ORCA_AGENT_LAUNCH_TOKEN
+  }
   const callMock = vi.fn()
   const client = { call: callMock } as unknown as RuntimeClient
   let logSpy: ReturnType<typeof vi.spyOn>
@@ -123,6 +130,9 @@ describe('account CLI handlers', () => {
     )
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     process.env.ELECTRON_RUN_AS_NODE = '1'
+    for (const name of Object.keys(originalPaneEnv)) {
+      delete process.env[name]
+    }
   })
 
   afterEach(() => {
@@ -137,6 +147,13 @@ describe('account CLI handlers', () => {
       delete process.env.Path
     } else {
       process.env.Path = originalPathAlias
+    }
+    for (const [name, value] of Object.entries(originalPaneEnv)) {
+      if (value === undefined) {
+        delete process.env[name]
+      } else {
+        process.env[name] = value
+      }
     }
   })
 

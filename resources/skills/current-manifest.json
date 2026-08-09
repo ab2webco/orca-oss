@@ -167,17 +167,17 @@
       "name": "switch-account",
       "sourcePath": "skills/switch-account",
       "releaseRevision": 1,
-      "packageDigest": "9cb4939ba074416fffe0a8a6a0310f9151280c336cd8bdcaca1d5797334ab4f6",
-      "gitTreeSha": "bc4a47f0c3117a9bc5275573ad74246e921604d8",
+      "packageDigest": "d3d8a5f56ba3785067c19dfd7293a733bc682eadf83516259562bef6d5d7ce7a",
+      "gitTreeSha": "4a5c0b837f7e1ef65166fd645adf0505ab9ac478",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3677,
+          "size": 4310,
           "executable": false,
           "classification": "text",
-          "exactSha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23",
-          "textNormalizedSha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23",
-          "identitySha256": "97e906bf85d2c31503d481d5e588879ec41e8506475fd4677867d1edd3440b23"
+          "exactSha256": "a20a5627acdd3ebb0cb490a5eb5d8cb1dcad612bd0b65b5eb44007cf2356da55",
+          "textNormalizedSha256": "a20a5627acdd3ebb0cb490a5eb5d8cb1dcad612bd0b65b5eb44007cf2356da55",
+          "identitySha256": "a20a5627acdd3ebb0cb490a5eb5d8cb1dcad612bd0b65b5eb44007cf2356da55"
         }
       ]
     }

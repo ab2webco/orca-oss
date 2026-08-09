@@ -46,6 +46,10 @@ const GetPtyOwnerParams = z
   })
   .strict()
 
+const TerminalClaudeAccountParams = z
+  .object({ terminal: z.string().trim().min(1, 'Missing terminal').max(512) })
+  .strict()
+
 const CodexResetExpectedScope = z
   .object({
     target: CodexResetTarget,
@@ -130,6 +134,14 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     params: GetPtyOwnerParams,
     handler: async (params, { runtime }) =>
       runtime.getManagedPtyAccountOwner(params.ptyId, params.agent)
+  }),
+  defineMethod({
+    // Why a terminal handle and not a ptyId: the caller asking "which account is
+    // this pane on" can prove a handle, and answering from the global `active`
+    // selection instead is the ORCA-175 defect this method exists to remove.
+    name: 'accounts.terminalClaudeAccount',
+    params: TerminalClaudeAccountParams,
+    handler: async (params, { runtime }) => runtime.getTerminalClaudeAccount(params.terminal)
   }),
   defineMethod({
     name: 'accounts.selectClaude',
