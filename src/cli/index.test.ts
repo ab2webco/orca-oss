@@ -4336,6 +4336,35 @@ describe('orca cli worktree awareness', () => {
     process.exitCode = priorExitCode
   })
 
+  it('forwards terminal wait --for writable without a destructive send probe', async () => {
+    callMock.mockResolvedValueOnce({
+      id: 'req_terminal_writable',
+      ok: true,
+      result: {
+        wait: {
+          handle: 'term_starting',
+          condition: 'writable',
+          satisfied: true,
+          status: 'running',
+          exitCode: null
+        }
+      },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      ['terminal', 'wait', '--terminal', 'term_starting', '--for', 'writable'],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenCalledWith(
+      'terminal.wait',
+      { terminal: 'term_starting', for: 'writable', timeoutMs: undefined },
+      { timeoutMs: 300000 }
+    )
+  })
+
   it('does not force remote Codex terminal creates through a local renderer path', async () => {
     queueFixtures(
       callMock,

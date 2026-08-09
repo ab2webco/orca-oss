@@ -119,7 +119,11 @@ describe('executePluginHostCall mutation auditing', () => {
   })
 })
 
-function createTerminalHarness(terminalHandles: string[]): {
+type TerminalHarnessEntry =
+  | string
+  | { handle: string; liveness: 'starting' | 'running' | 'sleeping' | 'gone'; writable: boolean }
+
+function createTerminalHarness(terminalHandles: TerminalHarnessEntry[]): {
   delegate: PluginRuntimeDelegate
   services: PluginHostServices
 } {
@@ -131,7 +135,12 @@ function createTerminalHarness(terminalHandles: string[]): {
       displayName: 'Repo'
     }),
     listTerminals: vi.fn().mockResolvedValue({
-      terminals: terminalHandles.map((handle) => ({ handle, title: null }))
+      terminals: terminalHandles.map((terminal) => ({
+        handle: typeof terminal === 'string' ? terminal : terminal.handle,
+        title: null,
+        liveness: typeof terminal === 'string' ? 'running' : terminal.liveness,
+        writable: typeof terminal === 'string' ? true : terminal.writable
+      }))
     }),
     sendTerminal: vi.fn().mockResolvedValue({ accepted: true }),
     dispatchPluginNotification: vi.fn().mockResolvedValue({ delivered: true })
@@ -162,6 +171,18 @@ async function sendTerminalText(
 }
 
 describe('terminal.sendText explicit worktree routing', () => {
+  it('does not expose starting or sleeping terminals as sendable plugin ids', async () => {
+    const { services } = createTerminalHarness([
+      { handle: 'terminal:starting', liveness: 'starting', writable: false },
+      { handle: 'terminal:sleeping', liveness: 'sleeping', writable: false },
+      { handle: 'terminal:running', liveness: 'running', writable: true }
+    ])
+
+    await expect(services.listWorktreeTerminals('worktree-1')).resolves.toEqual([
+      { id: 'terminal:running' }
+    ])
+  })
+
   it('performs one bounded list and zero sends when the terminal is outside the worktree', async () => {
     const { delegate, services } = createTerminalHarness(['terminal:local:other'])
 

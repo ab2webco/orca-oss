@@ -154,13 +154,146 @@ describe('terminal.list liveness for sleeping workers', () => {
     })
   })
 
-  it('keeps hiding an unbound pane that is binding a transport rather than sleeping', async () => {
+  it('reports an exited pane gone while an unrelated sibling remains live', async () => {
     const runtime = makeRuntime({})
     syncWorkerAsleepBesideLiveShell(runtime)
+    runtime['leaves'].get(`${WORKER_TAB_ID}::${WORKER_LEAF_ID}`)!.lastExitCode = 7
 
     const { terminals } = await runtime.listTerminals(WORKTREE_SELECTOR)
+    const worker = terminals.find((terminal) => terminal.leafId === WORKER_LEAF_ID)
 
-    expect(terminals.map((terminal) => terminal.leafId)).toEqual([SHELL_LEAF_ID])
+    expect(worker).toMatchObject({
+      liveness: 'gone',
+      connected: false,
+      writable: false,
+      ptyId: null
+    })
+  })
+
+  it('waits on observable binding state until a starting pane becomes writable', async () => {
+    const runtime = makeRuntime({})
+    syncWorkerAsleepBesideLiveShell(runtime)
+    const ptyId = 'ssh:ssh-1@@pty-worker'
+    runtime.registerPty(ptyId, WORKTREE_ID, 'ssh-1', {
+      tabId: WORKER_TAB_ID,
+      leafId: WORKER_LEAF_ID
+    })
+    runtime.onPtyExit(ptyId, -1)
+    const worker = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals.find(
+      (terminal) => terminal.leafId === WORKER_LEAF_ID
+    )!
+
+    const waiting = runtime.waitForTerminal(worker.handle, {
+      condition: 'writable',
+      timeoutMs: 1_000
+    })
+    runtime.onPtySpawned(ptyId)
+    runtime.registerPty('pty-worker', WORKTREE_ID)
+    runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          title: 'Worker',
+          activeLeafId: WORKER_LEAF_ID,
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          leafId: WORKER_LEAF_ID,
+          paneRuntimeId: 1,
+          ptyId: 'pty-worker'
+        }
+      ]
+    })
+
+    await expect(waiting).resolves.toMatchObject({
+      handle: worker.handle,
+      condition: 'writable',
+      satisfied: true,
+      status: 'running'
+    })
+  })
+
+  it('expires abnormal SSH starting state after the recovery grace', async () => {
+    vi.useFakeTimers()
+    const runtime = makeRuntime({})
+    syncWorkerAsleepBesideLiveShell(runtime)
+    const ptyId = 'ssh:ssh-1@@pty-worker-expiring'
+    runtime.registerPty(ptyId, WORKTREE_ID, 'ssh-1', {
+      tabId: WORKER_TAB_ID,
+      leafId: WORKER_LEAF_ID
+    })
+    runtime.onPtyExit(ptyId, -1)
+    const worker = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals.find(
+      (terminal) => terminal.leafId === WORKER_LEAF_ID
+    )!
+
+    const waiting = runtime.waitForTerminal(worker.handle, {
+      condition: 'writable',
+      timeoutMs: 60_000
+    })
+    await vi.advanceTimersByTimeAsync(30_001)
+
+    expect(
+      (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals.find(
+        (terminal) => terminal.leafId === WORKER_LEAF_ID
+      )?.liveness
+    ).toBe('gone')
+    await expect(waiting).resolves.toMatchObject({
+      handle: worker.handle,
+      condition: 'writable',
+      satisfied: false
+    })
+    vi.useRealTimers()
+  })
+
+  it('drains a pending writable wait when controller inventory proves its exact PTY gone', async () => {
+    const runtime = makeRuntime({})
+    syncWorkerAsleepBesideLiveShell(runtime)
+    const worker = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals.find(
+      (terminal) => terminal.leafId === WORKER_LEAF_ID
+    )!
+    runtime.registerPty('pty-worker-missing', WORKTREE_ID, null, {
+      tabId: WORKER_TAB_ID,
+      leafId: WORKER_LEAF_ID
+    })
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null,
+      listProcesses: async () => [
+        { id: 'pty-shell', worktreeId: WORKTREE_ID, cwd: '/repo', title: 'Shell' }
+      ]
+    })
+    const waiting = runtime.waitForTerminal(worker.handle, {
+      condition: 'writable',
+      timeoutMs: 1_000
+    })
+
+    await runtime.listTerminals(WORKTREE_SELECTOR)
+
+    await expect(waiting).resolves.toMatchObject({ condition: 'writable', satisfied: false })
+  })
+
+  it('resolves writable immediately for a connected terminal', async () => {
+    const runtime = makeRuntime({})
+    syncWorkerAsleepBesideLiveShell(runtime)
+    const shell = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals.find(
+      (terminal) => terminal.leafId === SHELL_LEAF_ID
+    )!
+
+    await expect(
+      runtime.waitForTerminal(shell.handle, { condition: 'writable', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle: shell.handle,
+      condition: 'writable',
+      satisfied: true,
+      status: 'running'
+    })
   })
 
   it('separates a sleeping pane from a stranded one when both report connected: false', async () => {

@@ -437,19 +437,20 @@ export type RuntimeFileReadChunkResult = {
   eof: boolean
 }
 
-/** Whether the process behind a listed terminal is running, asleep but
- *  resumable, or gone for good.
+/** Whether a listed terminal is starting, running, asleep but resumable, or
+ *  gone for good.
  *
+ *  `starting` — the pane exists and a live transport is still binding.
  *  `running` — a live PTY; writable.
  *  `sleeping` — no PTY, but a provider-session resume record still holds this
  *    pane's identity, so the agent can be woken and its conversation continues.
  *  `gone` — the pane exists with no PTY and nothing to resume from.
  *
- *  `connected` collapses the last two into one value, and absence from
- *  `terminal.list` used to collapse `sleeping` into nothing at all. Either
+ *  `connected` collapses starting, sleeping, and gone into one value, and
+ *  absence from `terminal.list` used to collapse `sleeping` into nothing. Either
  *  reading makes a coordinator dispatch a second agent onto a branch that
  *  already has a live worker (ORCA-186). */
-export type RuntimeTerminalLiveness = 'running' | 'sleeping' | 'gone'
+export type RuntimeTerminalLiveness = 'starting' | 'running' | 'sleeping' | 'gone'
 
 export type RuntimeTerminalSummary = {
   handle: string
@@ -687,6 +688,10 @@ export type RuntimeTerminalCreate = {
   ptyId?: string | null
   worktreeId: string
   title: string | null
+  /** Spawn-time readiness; absent only on older runtimes. */
+  connected?: boolean
+  writable?: boolean
+  liveness?: RuntimeTerminalLiveness
   /** Spawn-time execution identity; paired clients must not infer nested SSH from their own graph. */
   executionHostId?: ExecutionHostId
   hostPlatform?: NodeJS.Platform
@@ -735,7 +740,7 @@ export type RuntimeTerminalClose = {
   ptyKilled: boolean
 }
 
-export type RuntimeTerminalWaitCondition = 'exit' | 'tui-idle' | 'composer-ready'
+export type RuntimeTerminalWaitCondition = 'exit' | 'tui-idle' | 'composer-ready' | 'writable'
 export type RuntimeTerminalWaitBlockedReason =
   | 'codex-update-prompt'
   | 'codex-trust-workspace'

@@ -73,6 +73,20 @@ describe('resolveGroupAddress', () => {
       const result = resolveGroupAddress('@all', 'term_a', terminals, noStatus)
       expect(result).toEqual(['term_c'])
     })
+
+    it.each(['@all', '@worktree:wt_default'])('skips starting terminals for %s', (group) => {
+      const terminals = [
+        makeSummary('term_a'),
+        makeSummary('term_starting', {
+          connected: false,
+          writable: false,
+          liveness: 'starting'
+        }),
+        makeSummary('term_running')
+      ]
+
+      expect(resolveGroupAddress(group, 'term_a', terminals, noStatus)).toEqual(['term_running'])
+    })
   })
 
   describe('@idle', () => {
