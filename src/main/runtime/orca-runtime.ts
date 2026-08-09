@@ -9324,8 +9324,9 @@ export class OrcaRuntimeService {
   ): void {
     this.assertPtyDidNotExitBeforeRegistration(ptyId, binding?.incarnationId)
     // Why (ORCA-191): start watching before the first byte. Registration is
-    // this runtime's own spawn, which is exactly the provenance that lets a
-    // missing composer marker mean "not ready yet" instead of "never saw it".
+    // this runtime's own spawn, and that provenance is what decides there is a
+    // marker worth waiting for — a pane restored or adopted after a restart
+    // handshook where nothing was listening, so its wait must resolve at once.
     this.composerReadiness.beginObserving(ptyId)
     // Why: record the renderer pane identity at spawn time so a stalled graph
     // sync can't hide that a live PTY already backs a pending mobile create.
@@ -16723,15 +16724,17 @@ export class OrcaRuntimeService {
   }
 
   /**
-   * Waits until the agent's own composer-ready marker has fired on this pane
-   * (ORCA-191). Unlike `tui-idle`, an `awaiting-composer` result is positive
-   * evidence that the TUI is still booting and will swallow a write.
+   * Waits, bounded, for the agent's own composer-ready marker on this pane
+   * (ORCA-191), and reports whether it ever fired. Unlike `tui-idle`, it cannot
+   * be satisfied by stored state or quiescence — only by the marker.
    *
-   * Resolves immediately — never sleeps — when the runtime has no way to prove
-   * readiness for this pane: an agent without a marker signal, or a PTY whose
-   * bracketed-paste enable this runtime never observed (adopted after a restart,
-   * gapped byte stream). Callers get `ready: true, proven: false` there and must
-   * fall through to their existing checks rather than refuse.
+   * Never refuses: `ready` is always true and `proven` carries the difference,
+   * because nothing before the marker separates a TUI mid-boot from a process
+   * that will never mount a composer. See `AgentComposerReadinessTracker.wait`.
+   *
+   * Resolves immediately — never sleeps — when there is nothing to wait for: an
+   * agent with no marker signal, or a PTY this runtime never watched from spawn
+   * (adopted after a restart, gapped byte stream).
    */
   async waitForAgentComposerReady(
     handle: string,
@@ -17473,7 +17476,13 @@ export class OrcaRuntimeService {
   }
 
   /** `wait --for composer-ready`: the agent's own ready-for-input marker, which
-   *  `tui-idle` cannot see. Unsatisfied only for `awaiting-composer`. */
+   *  `tui-idle` cannot see.
+   *
+   *  Satisfied only by the marker. Never-refuse is a policy of the dispatch
+   *  injector, not of an inspection surface: reporting `satisfied: true` for a
+   *  pane whose marker never came would make this wait unable to answer the one
+   *  question it exists for, and it is how the readiness timings were measured.
+   *  `composerReadyState` says which kind of no it is. */
   private async waitForComposerReadyCondition(
     handle: string,
     timeoutMs?: number,
@@ -17493,7 +17502,7 @@ export class OrcaRuntimeService {
     return {
       handle,
       condition: 'composer-ready',
-      satisfied: readiness.ready,
+      satisfied: readiness.proven,
       status,
       exitCode,
       composerReadyState: readiness.state,

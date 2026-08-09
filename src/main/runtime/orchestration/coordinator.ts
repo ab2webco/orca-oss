@@ -12,7 +12,7 @@ export type CoordinatorRuntime = {
   // Why (ORCA-191): optional so lightweight runtime fakes keep compiling. When
   // absent the loop keeps its pre-slice-2 behaviour: no readiness gate, no
   // capability, and therefore no first-signal deadline.
-  waitForAgentComposerReady?(handle: string): Promise<{ ready: boolean; waitedMs: number }>
+  waitForAgentComposerReady?(handle: string): Promise<{ proven: boolean; waitedMs: number }>
   sendTerminalAgentPromptObservingTurn?(
     handle: string,
     prompt: string
@@ -436,21 +436,10 @@ export class Coordinator {
       }
     }
 
-    // Why (ORCA-191): same gate as the dispatch RPC — refuse before
-    // createDispatchContext so no row exists, the task stays `ready`, and the
-    // next tick retries. Only positive evidence that the TUI is mid-boot skips;
-    // a pane whose readiness cannot be observed proceeds as before.
-    if (this.runtime.waitForAgentComposerReady) {
-      const composerReady = await this.runtime.waitForAgentComposerReady(targetHandle)
-      if (!composerReady.ready) {
-        this.opts.onLog(
-          `Skipping dispatch of ${task.id}: ${targetHandle} enabled bracketed paste but its ` +
-            `composer never became ready within ${Math.round(composerReady.waitedMs / 1000)}s. ` +
-            `Task remains in 'ready'; coordinator will retry on the next tick.`
-        )
-        return
-      }
-    }
+    // Why (ORCA-191): same wait as the dispatch RPC — hold the write until the
+    // agent's own composer marker. It never skips the dispatch; expiry proceeds
+    // unproven, because a missing marker is not evidence of unreadiness.
+    const composerReady = await this.runtime.waitForAgentComposerReady?.(targetHandle)
 
     const authority = this.runtime.getOrchestrationDispatchAuthority?.(targetHandle) ?? null
     const dispatch = this.db.createDispatchContext(
@@ -524,6 +513,7 @@ export class Coordinator {
     // grandfathering slice 1 established.
     if (dispatchCapability) {
       this.db.armDispatchLifecycleDeadline(dispatch.id)
+      this.db.recordDispatchComposerReadiness(dispatch.id, composerReady?.proven ?? false)
       this.runtime.ensureOrchestrationDispatchDeadlineMonitor?.()
     }
     if (pendingAcceptance) {

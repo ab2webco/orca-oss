@@ -238,6 +238,41 @@ describe('dispatch first-signal deadline (ORCA-191)', () => {
     expect(expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())).toHaveLength(1)
   })
 
+  // Why: the gate no longer refuses an unproven pane, so the failure that
+  // eventually fires has to carry what the refusal used to assert — otherwise
+  // dropping it would be a silent downgrade rather than a trade.
+  it('says readiness was never proven when the composer marker never arrived', () => {
+    const d = createDb()
+    const run = createRun(d)
+    const { dispatchId } = startReadyWorker(d, { runId: run.id })
+    d.recordDispatchComposerReadiness(dispatchId, false)
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).toContain('never showed its composer-ready marker')
+  })
+
+  it('stays silent about readiness when it was proven', () => {
+    const d = createDb()
+    const run = createRun(d)
+    const { dispatchId } = startReadyWorker(d, { runId: run.id })
+    d.recordDispatchComposerReadiness(dispatchId, true)
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).not.toContain('never showed its composer-ready marker')
+  })
+
+  it('stays silent about readiness on a legacy row that never recorded it', () => {
+    const d = createDb()
+    const run = createRun(d)
+    startReadyWorker(d, { runId: run.id })
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).not.toContain('never showed its composer-ready marker')
+  })
+
   it('names the SSH host scope in the failure reason', () => {
     const d = createDb()
     const run = createRun(d)

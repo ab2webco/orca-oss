@@ -15763,10 +15763,13 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  // Why (ORCA-191): `tui-idle` is satisfied for Codex ~3-4 s before its composer
-  // accepts input (measured on ORCA-171: satisfied 5,482 ms / ready 8,211 ms,
-  // then 10,506 / 14,598). `composer-ready` is the agent's own marker, so it
-  // cannot resolve inside that window.
+  // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+  // known-ready preview, or foreground quiescence, all of which Codex reaches
+  // before its composer accepts input — measured on ORCA-171 at 5,482 ms
+  // satisfied / 8,211 ms ready, and 10,506 / 14,598. `composer-ready` reports
+  // the agent's own marker instead, and reports honestly when it never came:
+  // this surface is satisfied by the marker only. The dispatch injector's
+  // never-refuse policy lives at its call sites, not here.
   describe('composer-ready wait (ORCA-191)', () => {
     async function createCodexPane(): Promise<{
       runtime: OrcaRuntimeService
@@ -15787,20 +15790,7 @@ describe('OrcaRuntimeService', () => {
       return { runtime, handle, ptyId }
     }
 
-    it('is unsatisfied while the composer is still mounting', async () => {
-      const { runtime, handle, ptyId } = await createCodexPane()
-      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
-
-      await expect(
-        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
-      ).resolves.toMatchObject({
-        condition: 'composer-ready',
-        satisfied: false,
-        composerReadyState: 'awaiting-composer'
-      })
-    })
-
-    it('resolves on the composer prompt glyph', async () => {
+    it('reports the marker as proof once the composer prompt renders', async () => {
       const { runtime, handle, ptyId } = await createCodexPane()
       runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
       const wait = runtime.waitForTerminal(handle, {
@@ -15817,12 +15807,13 @@ describe('OrcaRuntimeService', () => {
       })
     })
 
-    it('is unsatisfied before the pane has even enabled bracketed paste', async () => {
+    // Why: this is the window `tui-idle` hands the injector — bracketed paste is
+    // enabled, the composer is not mounted, and a write here is the one the
+    // startup redraw swallows. The wait must say no, so that an operator asking
+    // `terminal wait --for composer-ready` gets an answer and not a rubber stamp.
+    it('is unsatisfied while the composer is still mounting', async () => {
       const { runtime, handle, ptyId } = await createCodexPane()
-      // Why: this is where tui-idle fires. Codex is repainting its boot screen
-      // and has not started its bracketed-paste handshake, so "no handshake
-      // yet" on a pane watched from spawn has to read as not ready.
-      runtime.onPtyData(ptyId, '\x1b[2J\x1b[H  Starting MCP server', 100)
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b]0;Codex Ready\x07OpenAI Codex\n', 100)
 
       await expect(
         runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
@@ -15832,8 +15823,7 @@ describe('OrcaRuntimeService', () => {
     // Why: this is the defect the live rig caught, and only a live run could —
     // `launchAgent` is recorded only for token-bound spawns and `foregroundAgent`
     // is refreshed lazily, so a plain `terminal create --agent codex` pane
-    // reached the gate with no recorded identity and every fresh Codex pane
-    // silently degraded to `unobserved`, i.e. to the pre-fix behaviour.
+    // reached the gate with no recorded identity and never waited at all.
     it('identifies the agent from the foreground process when none was recorded', async () => {
       const ptyId = 'pty-codex-unrecorded'
       const runtime = new OrcaRuntimeService(store)
@@ -15845,28 +15835,39 @@ describe('OrcaRuntimeService', () => {
       })
       const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
       runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
 
-      await expect(
-        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
-      ).resolves.toMatchObject({ satisfied: false, composerReadyState: 'awaiting-composer' })
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({ composerReadyState: 'ready' })
     })
 
-    it('is satisfied — not blocked — for a pane it never watched from spawn', async () => {
+    it('reports unobserved for a pane it never watched from spawn', async () => {
       const runtime = new OrcaRuntimeService(store)
       runtime.setPtyController({
         write: () => true,
         kill: () => true,
         getForegroundProcess: async () => 'codex'
       })
-      // Why: a leaf synced from the renderer for a PTY this runtime never
-      // registered is the restored/adopted case. Absence of evidence must not
-      // become a refusal, or `dispatch --inject` stops rescuing stalled runs.
+      // A leaf synced from the renderer for a PTY this runtime never registered
+      // is the restored/adopted case: nothing was watching its handshake, so
+      // there is nothing to wait for and no proof to report either way.
       syncSinglePty(runtime)
       const [terminal] = (await runtime.listTerminals()).terminals
 
-      await expect(
-        runtime.waitForTerminal(terminal.handle, { condition: 'composer-ready', timeoutMs: 20 })
-      ).resolves.toMatchObject({ satisfied: true, composerReadyState: 'unobserved' })
+      const wait = await runtime.waitForTerminal(terminal.handle, {
+        condition: 'composer-ready',
+        timeoutMs: 20
+      })
+
+      expect(wait).toMatchObject({ satisfied: false, composerReadyState: 'unobserved' })
+      // Why: it must not sleep out the budget — `dispatch --inject` rescues a
+      // stalled run through exactly this pane and cannot pay for a wait that
+      // can never resolve.
+      expect(wait.waitedMs).toBeLessThan(20)
     })
 
     it('observes turn acceptance from output that follows the write', async () => {

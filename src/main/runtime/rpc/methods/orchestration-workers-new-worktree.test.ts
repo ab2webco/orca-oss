@@ -440,28 +440,27 @@ describe('orchestration new-worktree workers', () => {
     expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
   })
 
-  // Why (ORCA-191): this is the path the incident ran through. `tui-idle` was
-  // satisfied while the Codex composer was still mounting, so the preamble went
-  // into a redraw and the run sat `dispatched` for 50 min with no heartbeat.
-  it('does not inject when the agent enabled bracketed paste and has no composer yet', async () => {
+  // Why (E2E regression): a missing composer marker is not proof of unreadiness
+  // — an interactive shell emits the same bracketed-paste handshake, and a
+  // wrapper or shim can present as a known agent and never mount a composer.
+  // Failing the start there left three E2E specs on a bare shell prompt.
+  it('starts the worker unproven when the composer marker never arrived', async () => {
     mockCreatedWorktree()
     vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
-      ready: false,
+      ready: true,
       proven: false,
       state: 'awaiting-composer',
       signal: 'codex-composer-prompt',
-      waitedMs: 30_000
+      waitedMs: 10_000
     })
 
     const { result, task } = await startWorker()
 
-    expect(result).toMatchObject({
-      state: 'failed',
-      failedStage: 'agent_readiness'
-    })
-    expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
-    expect(db.getTask(task.id)?.status).toBe('failed')
-    expect(db.countArmedDispatchDeadlines()).toBe(0)
+    expect(result).toMatchObject({ state: 'ready' })
+    expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledTimes(1)
+    expect(db.getTask(task.id)?.status).toBe('dispatched')
+    // The lost failure becomes a recorded fact the deadline can cite later.
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(0)
   })
 
   it('waits for composer readiness after tui-idle and before the write', async () => {
@@ -471,10 +470,10 @@ describe('orchestration new-worktree workers', () => {
       proven: true,
       state: 'ready',
       signal: 'codex-composer-prompt',
-      waitedMs: 2_729
+      waitedMs: 1_091
     })
 
-    await startWorker()
+    const { task } = await startWorker()
 
     expect(vi.mocked(runtime.waitForTerminal).mock.invocationCallOrder[0]!).toBeLessThan(
       composerReady.mock.invocationCallOrder[0]!
@@ -482,6 +481,7 @@ describe('orchestration new-worktree workers', () => {
     expect(composerReady.mock.invocationCallOrder[0]!).toBeLessThan(
       vi.mocked(runtime.sendTerminalAgentPrompt).mock.invocationCallOrder[0]!
     )
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(1)
   })
 
   it('records turn acceptance without disarming the first-signal deadline', async () => {

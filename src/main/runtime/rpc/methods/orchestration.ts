@@ -1313,24 +1313,6 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               'then dispatch again — or dispatch without --inject and send the prompt manually.'
           )
         }
-        // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
-        // known-ready preview, or foreground quiescence — for Codex all three
-        // land ~3-4 s before the composer accepts input, so the preamble is
-        // typed into a redraw and swallowed. Refuse before createDispatchContext
-        // so no dispatch row exists and the Task stays `ready` for a retry.
-        // Only `awaiting-composer` refuses; a pane whose readiness this runtime
-        // cannot observe proceeds, which is what keeps the `--inject` rescue
-        // path working on a long-established pane.
-        const composerReady = await runtime.waitForAgentComposerReady(to)
-        if (!composerReady.ready) {
-          throw new OrchestrationError(
-            'agent_composer_not_ready',
-            `Cannot dispatch --inject to terminal ${to}: the agent enabled bracketed paste but its ` +
-              `composer never became ready within ${Math.round(composerReady.waitedMs / 1000)}s. ` +
-              'The TUI is still starting up and would swallow the preamble instead of receiving it. ' +
-              'Wait for the pane to show its prompt, then dispatch again.'
-          )
-        }
       }
 
       const dispatchAuthority = runtime.getOrchestrationDispatchAuthority(to)
@@ -1376,6 +1358,14 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       let injected = false
       if (params.inject) {
+        // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+        // known-ready preview, or foreground quiescence — for Codex all three
+        // land ~1-4 s before the composer accepts input, so the preamble is
+        // typed into a redraw and swallowed. Hold the write until the agent's
+        // own marker says the composer mounted. This never refuses: nothing in
+        // the byte stream separates a TUI mid-boot from a process that will
+        // never mount a composer, so expiry proceeds and records `proven`.
+        const composerReady = await runtime.waitForAgentComposerReady(to)
         let pendingAcceptance: Promise<AgentTurnAcceptance>
         try {
           const sent = await runtime.sendTerminalAgentPromptObservingTurn(to, preamble)
@@ -1389,6 +1379,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // confirmation point is monitored — a tracking dispatch without --inject
         // never receives a preamble and must never be failed for its silence.
         db.armDispatchLifecycleDeadline(ctx.id)
+        db.recordDispatchComposerReadiness(ctx.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
         // Why: not awaited. Turn acceptance changes nothing about this dispatch
         // — no refusal, no resend — so holding the RPC open for it would only

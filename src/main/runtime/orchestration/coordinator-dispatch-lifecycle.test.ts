@@ -24,7 +24,7 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
 
   type Runtime = CoordinatorRuntime & {
     sent: { handle: string; text: string }[]
-    composerReady: { ready: boolean; waitedMs: number }
+    composerReady: { proven: boolean; waitedMs: number }
     turnAccepted: boolean
     authority: {
       paneKey: string | null
@@ -37,7 +37,7 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
   function createRuntime(overrides: Partial<Runtime> = {}): Runtime {
     const runtime: Runtime = {
       sent: [],
-      composerReady: { ready: true, waitedMs: 0 },
+      composerReady: { proven: true, waitedMs: 0 },
       turnAccepted: true,
       authority: {
         paneKey: WORKER_PANE,
@@ -143,17 +143,28 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
     expect(runtime.sent[0]?.text).not.toContain('--dispatch-capability')
   })
 
-  it('skips a dispatch into a TUI that has no composer yet, leaving the task ready', async () => {
+  // Why (E2E regression): a pane whose composer marker never arrives is not
+  // proof of unreadiness — an interactive shell emits the same bracketed-paste
+  // handshake a TUI does, and a wrapper or shim can present as a known agent
+  // and never mount a composer. Skipping those stalls the Run forever.
+  it('still dispatches when the composer marker never arrived, recording it unproven', async () => {
     db = new OrchestrationDb(':memory:')
-    const runtime = createRuntime({ composerReady: { ready: false, waitedMs: 30_000 } })
+    const runtime = createRuntime({ composerReady: { proven: false, waitedMs: 10_000 } })
 
     const { taskId } = await dispatchOnce(runtime, db)
 
-    expect(runtime.sent).toHaveLength(0)
-    // Why: silent-return like the stale-base guard — failDispatch here would
-    // burn circuit-breaker budget for a pane that is merely still booting.
-    expect(db.getTask(taskId)?.status).toBe('ready')
-    expect(db.getDispatchContext(taskId)).toBeUndefined()
+    expect(runtime.sent).toHaveLength(1)
+    expect(db.getTask(taskId)?.status).toBe('dispatched')
+    expect(db.getDispatchContext(taskId)?.composer_ready_proven).toBe(0)
+  })
+
+  it('records readiness as proven when the marker arrived before the write', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runtime = createRuntime()
+
+    const { taskId } = await dispatchOnce(runtime, db)
+
+    expect(db.getDispatchContext(taskId)?.composer_ready_proven).toBe(1)
   })
 
   it('records turn acceptance without disarming the deadline', async () => {

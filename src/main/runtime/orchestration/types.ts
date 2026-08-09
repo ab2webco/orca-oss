@@ -288,6 +288,10 @@ export type DispatchContextRow = {
   // acceptance only — it never disarms the deadline, it just tells the eventual
   // failure whether the preamble reached a turn at all.
   turn_accepted_at: string | null
+  // Why (ORCA-191): 1 when the composer marker was observed before the write,
+  // 0 when the injector proceeded unproven, NULL when never recorded. Diagnosis
+  // only — a missing marker never refuses a dispatch.
+  composer_ready_proven: number | null
 }
 
 export type DecisionGateRow = {

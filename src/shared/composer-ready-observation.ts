@@ -6,13 +6,16 @@ import { createDraftPasteReadyScanner } from './draft-paste-ready-scanner'
  *
  *   - `ready`: the agent's own composer-ready marker fired after it enabled
  *     bracketed paste. Positive evidence that the composer accepts input.
- *   - `awaiting-composer`: bracketed paste was enabled but the marker has not
- *     fired. Positive evidence that the TUI is mid-boot — the exact window in
- *     which an injected preamble is swallowed by the redraw.
- *   - `unobserved`: neither has been seen since this observation started. NOT
- *     evidence of anything: a pane adopted after a runtime restart, an agent
- *     that never enables bracketed paste, and a gapped byte stream all land
- *     here. Callers must fall through to their existing checks.
+ *   - `awaiting-composer`: bracketed paste was enabled and the marker has not
+ *     fired. This is the window in which an injected preamble is swallowed by
+ *     the startup redraw — but it is not proof of one, see below.
+ *   - `unobserved`: not even a bracketed-paste enable seen.
+ *
+ * Neither negative state is evidence the pane is unready, so neither may refuse
+ * a dispatch. Measured 2026-08-09: an interactive shell emits DECSET 2004 for
+ * its own prompt, a real Codex pane emits it twice (shell, then TUI), and a
+ * `codex`-named process that is not the TUI emits it zero times. The handshake
+ * therefore separates nothing on its own, and only `ready` is positive.
  *
  * `tui-idle` cannot tell `ready` from `awaiting-composer`: it is satisfied by
  * stored idle/title state, a known-ready preview, or foreground quiescence, all

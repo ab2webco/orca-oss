@@ -9,12 +9,22 @@ import { createAgentTurnAcceptanceScanner } from '../../shared/agent-turn-accept
 import type { AgentTurnAcceptanceEvidence } from '../../shared/agent-turn-acceptance-scanner'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 
-// Why (ORCA-171): Codex was measured reaching composer-ready 8.2 s and 14.6 s
-// after spawn across two runs. The startup draft path's 8 s budget would have
-// expired on the second one, so the dispatch gate gets its own, wider budget —
-// this is a boot race, and a budget under the observed worst case reintroduces
-// it.
-export const AGENT_COMPOSER_READY_TIMEOUT_MS = 30_000
+// Why: how long the injector holds for proof the composer mounted. Sized over
+// the measured gap between tui-idle and composer-ready, because that gap is the
+// race: live Codex runs put the marker 1.0-1.2 s after tui-idle, and ORCA-171's
+// worst measured gap was 4.1 s on a cold start. 10 s is ~2.4x that worst case.
+//
+// Sized generously on purpose, because the two failure directions are not
+// symmetric now that expiry no longer refuses. Too small and the injector
+// writes into a composer that was still mounting — ORCA-191's own defect,
+// merely visible at the 11-minute deadline instead of silent. Too large costs
+// latency only, and only for panes that will never mark ready (a wrapper, a
+// shim, a test double); agents with no provable marker never enter the wait.
+// Measured 2026-08-09 on this machine: the three orchestration E2E specs this
+// gate broke pass at both 5 s and 10 s, so the E2E does not pick the number.
+// (An earlier note here claimed 8 s and 13 s failed those specs on delay alone.
+// Not reproduced — 10 s passes; do not restore that claim without new runs.)
+export const AGENT_COMPOSER_READY_TIMEOUT_MS = 10_000
 
 // Why: turn acceptance is the agent's first repaint after the submit CR, which
 // lands well under a second on every agent observed. Bounded short because the
@@ -73,13 +83,16 @@ const PROVABLE_SIGNALS = [
  * are therefore scanned for every observed PTY, and `state(ptyId, agent)`
  * answers with the one that agent actually emits.
  *
- * Provenance is what separates the two meanings of "no marker seen".
+ * Provenance is one half of what separates the meanings of "no marker seen".
  * Observation starts at `beginObserving`, which the runtime calls when it
- * registers a PTY it is spawning — so for those panes a missing marker means
- * *not yet*, which is the whole defect. A pane this runtime never registered
+ * registers a PTY it is spawning. A pane this runtime never registered
  * (restored or adopted after a restart) is never observed and always answers
- * `unobserved`: the absence of evidence, which callers must not treat as a
- * refusal, and which is what keeps `dispatch --inject` usable on a stalled run.
+ * `unobserved` — absence of evidence, never a refusal, which is what keeps
+ * `dispatch --inject` usable on a stalled run.
+ *
+ * Only the marker itself proves readiness. See `wait` for the measurements
+ * showing why no precursor — not the bracketed-paste handshake, not alt-screen,
+ * not the agent's name — can stand in for it.
  */
 export class AgentComposerReadinessTracker {
   private observations = new Map<
@@ -122,14 +135,23 @@ export class AgentComposerReadinessTracker {
   }
 
   state(ptyId: string, agent: TuiAgent | null): ComposerReadyState {
+    return this.observationFor(ptyId, agent)?.state() ?? 'unobserved'
+  }
+
+  /** True when this runtime watched the pane from its own spawn AND the agent
+   *  has a marker to watch for. `state()` alone cannot say: a watched pane that
+   *  has not handshaken yet and an unwatched pane both read `unobserved`, and
+   *  only the first is worth waiting on. */
+  private isWatched(ptyId: string, agent: TuiAgent | null): boolean {
+    return this.observationFor(ptyId, agent) !== undefined
+  }
+
+  private observationFor(
+    ptyId: string,
+    agent: TuiAgent | null
+  ): ReturnType<typeof createComposerReadyObservation> | undefined {
     const signal = composerReadySignalFor(agent)
-    const observation = signal ? this.observations.get(ptyId)?.get(signal) : undefined
-    if (!observation) {
-      return 'unobserved'
-    }
-    // Why: the observation's own `unobserved` means "no bracketed-paste
-    // handshake yet", which on a pane watched from spawn is still "not ready".
-    return observation.state() === 'ready' ? 'ready' : 'awaiting-composer'
+    return signal ? this.observations.get(ptyId)?.get(signal) : undefined
   }
 
   readyAt(ptyId: string, agent: TuiAgent | null): number | null {
@@ -145,14 +167,32 @@ export class AgentComposerReadinessTracker {
   }
 
   /**
-   * Resolves as soon as the composer-ready marker fires, and otherwise
-   * classifies why it did not.
+   * Waits for the agent's own composer-ready marker, bounded, and reports
+   * whether it ever arrived. **It never refuses.**
    *
-   * A pane this runtime watched from spawn gets the full budget: while its
-   * marker is missing the composer is genuinely not up yet, and that is the
-   * window `tui-idle` hands the injector today. A pane it never watched
-   * resolves `unobserved` immediately — waiting on evidence that could not
-   * exist would be a sleep wearing a signal's clothes.
+   * The wait is the fix: for any agent that signals composer mount — Codex,
+   * the agent in the incident — the injector no longer writes during the boot
+   * window that `tui-idle` hands it.
+   *
+   * Expiry proceeds unproven, because nothing in the byte stream distinguishes
+   * "a TUI whose composer has not mounted" from "a process that will never
+   * mount one". Measured 2026-08-09 on this machine:
+   *
+   *   interactive shell alone   DECSET 2004 x1, alt-screen x0, marker x0
+   *   real Codex TUI            DECSET 2004 x2, alt-screen x0, marker x1+
+   *   `codex`-named non-TUI     DECSET 2004 x0, alt-screen x0, marker x0
+   *
+   * The shell emits the handshake for its own prompt, so 2004 is not a TUI
+   * signal; Codex uses no alt-screen, so that is not one either; and matching
+   * an agent's name says nothing, since a wrapper, a shim, an older build or a
+   * test double all present as `codex`. Refusing on a missing marker therefore
+   * denies delivery on absence of evidence — it broke three orchestration E2E
+   * specs, each leaving a bare shell prompt and no dispatch row.
+   *
+   * What replaces the refusal is a recorded fact: `proven` rides to the caller
+   * and onto the dispatch row, so if the preamble really was swallowed, slice
+   * 1's first-signal deadline says readiness was never proven for this pane
+   * instead of failing mute.
    */
   async wait(
     ptyId: string,
@@ -164,15 +204,18 @@ export class AgentComposerReadinessTracker {
     const startedAt = now()
     const signal = composerReadySignalFor(agent)
     const settle = (state: ComposerReadyState): AgentComposerReadiness => ({
-      ready: state !== 'awaiting-composer',
+      // Why: always ready. `proven` carries the difference; see the note above.
+      ready: true,
       proven: state === 'ready',
       state,
       signal,
       waitedMs: now() - startedAt
     })
-    const initial = this.state(ptyId, agent)
-    if (initial !== 'awaiting-composer') {
-      return settle(initial)
+    if (!this.isWatched(ptyId, agent)) {
+      return settle('unobserved')
+    }
+    if (this.state(ptyId, agent) === 'ready') {
+      return settle('ready')
     }
     return await new Promise<AgentComposerReadiness>((resolve) => {
       let unsubscribe: (() => void) | null = null

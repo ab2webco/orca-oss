@@ -2,6 +2,7 @@ import type { TuiAgent } from '../../../../shared/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
+import { AGENT_COMPOSER_READY_TIMEOUT_MS } from '../../agent-composer-readiness'
 import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
@@ -222,20 +223,22 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           )
         }
         // Why (ORCA-191): this is the path the incident ran through. `tui-idle`
-        // is satisfied for Codex ~3-4 s before the composer accepts input, so
-        // the preamble lands in a redraw and the run sits `dispatched` forever.
-        // Only positive evidence that the TUI is mid-boot fails the start; a
-        // pane whose readiness cannot be observed proceeds as before.
+        // is satisfied for Codex before the composer accepts input, so the
+        // preamble lands in a redraw and the run sits `dispatched` forever.
+        // Hold the write until the agent's own marker says the composer
+        // mounted. This never fails the start: nothing in the byte stream
+        // separates a TUI mid-boot from a process that will never mount a
+        // composer, so expiry proceeds and records `proven` instead.
+        //
+        // Why min(): expiry is benign, so spending the caller's whole remaining
+        // budget on a wait that is already failing is pure latency — and it is
+        // latency paid by exactly the panes that will never mark ready.
         const composerReady = await runtime.waitForAgentComposerReady(terminalHandle, {
-          timeoutMs: Math.max(0, readinessDeadline - Date.now())
-        })
-        if (!composerReady.ready) {
-          throw new Error(
-            `Agent enabled bracketed paste but its composer never became ready within ` +
-              `${Math.round(composerReady.waitedMs / 1000)}s; the preamble would be swallowed by ` +
-              'the startup redraw.'
+          timeoutMs: Math.max(
+            0,
+            Math.min(AGENT_COMPOSER_READY_TIMEOUT_MS, readinessDeadline - Date.now())
           )
-        }
+        })
         const terminalAuthority = requireWorkerAuthority(runtime, terminalHandle)
         const capability = db.prepareStartingWorkerAuthority({
           dispatchId: started.dispatch.id,
@@ -266,6 +269,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           state: 'accepted'
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
+        db.recordDispatchComposerReadiness(started.dispatch.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
         // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
         // refuses and never resends — so it must not spend the caller's budget.

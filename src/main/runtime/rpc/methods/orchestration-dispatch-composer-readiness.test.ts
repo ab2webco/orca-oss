@@ -52,8 +52,10 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
     ctx = { runtime }
   }
 
-  function mockComposerReadiness(readiness: Partial<AgentComposerReadiness>): void {
-    vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+  function mockComposerReadiness(
+    readiness: Partial<AgentComposerReadiness>
+  ): ReturnType<typeof vi.spyOn> {
+    return vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
       ready: true,
       proven: false,
       state: 'unobserved',
@@ -79,27 +81,43 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
     return await method.handler({ run: runId, from: 'term_coord', ...params }, ctx)
   }
 
-  it('refuses to inject into a TUI that enabled bracketed paste and has no composer yet', async () => {
+  // Why (E2E regression): a missing composer marker is not proof of unreadiness.
+  // An interactive shell emits the same bracketed-paste handshake a TUI does,
+  // and a wrapper, shim or test double can present as a known agent and never
+  // mount a composer — refusing those left three E2E specs on a bare shell
+  // prompt with no dispatch row at all.
+  it('injects unproven when the composer marker never arrived', async () => {
     setup()
     const task = db.createTask({ spec: 'work', runId })
-    mockComposerReadiness({ ready: false, state: 'awaiting-composer', waitedMs: 30_000 })
+    mockComposerReadiness({ proven: false, state: 'awaiting-composer', waitedMs: 10_000 })
     const send = mockSend({ accepted: false, evidence: null, waitedMs: 0 })
 
-    await expect(dispatch({ task: task.id, to: WORKER, inject: true })).rejects.toThrow(
-      'composer never became ready'
-    )
+    const result = (await dispatch({ task: task.id, to: WORKER, inject: true })) as {
+      injected: boolean
+    }
 
-    // Nothing reached the pane, and the refusal landed before createDispatchContext
-    // so the Task is still retryable rather than parked as `dispatched` forever.
-    expect(send).not.toHaveBeenCalled()
-    expect(db.getTask(task.id)?.status).toBe('ready')
-    expect(db.getActiveDispatchForTerminal(WORKER)).toBeUndefined()
+    expect(result.injected).toBe(true)
+    expect(send).toHaveBeenCalledTimes(1)
+    // The lost refusal becomes a recorded fact instead of nothing.
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(0)
+  })
+
+  it('waits for the marker before writing, and records the proof', async () => {
+    setup()
+    const task = db.createTask({ spec: 'work', runId })
+    const readiness = mockComposerReadiness({ proven: true, state: 'ready', waitedMs: 1_100 })
+    const send = mockSend({ accepted: true, evidence: 'working-title', waitedMs: 40 })
+
+    await dispatch({ task: task.id, to: WORKER, inject: true })
+
+    expect(readiness.mock.invocationCallOrder[0]!).toBeLessThan(send.mock.invocationCallOrder[0]!)
+    expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(1)
   })
 
   it('injects when the composer marker already fired on this pane', async () => {
     setup()
     const task = db.createTask({ spec: 'work', runId })
-    mockComposerReadiness({ ready: true, proven: true, state: 'ready', waitedMs: 3 })
+    mockComposerReadiness({ proven: true, state: 'ready', waitedMs: 3 })
     const send = mockSend({ accepted: true, evidence: 'working-title', waitedMs: 40 })
 
     const result = (await dispatch({ task: task.id, to: WORKER, inject: true })) as {
@@ -117,7 +135,7 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
   it('injects into a pane whose readiness cannot be observed', async () => {
     setup()
     const task = db.createTask({ spec: 'work', runId })
-    mockComposerReadiness({ ready: true, proven: false, state: 'unobserved' })
+    mockComposerReadiness({ proven: false, state: 'unobserved' })
     const send = mockSend({ accepted: false, evidence: null, waitedMs: 5_000 })
 
     const result = (await dispatch({ task: task.id, to: WORKER, inject: true })) as {
@@ -142,7 +160,7 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
   it('arms the first-signal deadline on the write, not on turn acceptance', async () => {
     setup()
     const task = db.createTask({ spec: 'work', runId })
-    mockComposerReadiness({ ready: true, proven: true, state: 'ready' })
+    mockComposerReadiness({ proven: true, state: 'ready' })
     // Why: the deadline must not depend on an observation that is advisory by
     // construction — an unconfirmed turn still gets a monitored dispatch.
     mockSend({ accepted: false, evidence: null, waitedMs: 5_000 })
@@ -155,7 +173,7 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
   it('records turn acceptance without disarming the deadline', async () => {
     setup()
     const task = db.createTask({ spec: 'work', runId })
-    mockComposerReadiness({ ready: true, proven: true, state: 'ready' })
+    mockComposerReadiness({ proven: true, state: 'ready' })
     mockSend({ accepted: true, evidence: 'interrupt-affordance', waitedMs: 120 })
 
     await dispatch({ task: task.id, to: WORKER, inject: true })

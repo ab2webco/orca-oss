@@ -105,7 +105,7 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
     const bus = createPtyBus()
     const tracker = watchedTracker(bus)
     tracker.observe(PTY, '\x1b[2J\x1b[H Starting MCP server')
-    expect(tracker.state(PTY, 'codex')).toBe('awaiting-composer')
+    expect(tracker.state(PTY, 'codex')).toBe('unobserved')
     tracker.observe(PTY, BRACKETED_PASTE_ON)
     expect(tracker.state(PTY, 'codex')).toBe('awaiting-composer')
     tracker.observe(PTY, '\r\n› ')
@@ -172,17 +172,60 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
       expect(bus.listenerCount(PTY)).toBe(1)
     })
 
-    it('refuses when the composer never arrives inside the budget', async () => {
+    // Why: the budget bounds the wait, it does not authorise a refusal. A
+    // dispatch that waited and never got proof still goes out — slice 1's
+    // first-signal deadline is what catches a preamble that went nowhere.
+    it('bounds the wait and still proceeds when the budget expires', async () => {
       const bus = createPtyBus()
       const tracker = watchedTracker(bus)
       tracker.observe(PTY, BRACKETED_PASTE_ON)
       const readiness = await tracker.wait(PTY, 'codex', 5)
       expect(readiness).toMatchObject({
-        ready: false,
+        ready: true,
         proven: false,
         state: 'awaiting-composer'
       })
+      expect(readiness.waitedMs).toBeGreaterThanOrEqual(0)
       expect(bus.listenerCount(PTY)).toBe(0)
+    })
+
+    // Why (E2E regression): three orchestration E2E specs died with a bare
+    // shell prompt and no dispatch row because the gate refused a pane whose
+    // marker was never coming. Measured on 2026-08-09: an interactive shell
+    // emits DECSET 2004 for its own prompt, real Codex emits it twice, and a
+    // `codex`-named non-TUI emits it zero times — so nothing before the marker
+    // separates "mid-boot" from "will never mount a composer".
+    it('proceeds unproven when the marker never arrives', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      // The shell's own handshake, then a process that is not the TUI.
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
+      tracker.observe(PTY, '\x1b]0;Codex Ready\x07OpenAI Codex\nmodel: e2e\n')
+
+      await expect(tracker.wait(PTY, 'codex', 20)).resolves.toMatchObject({
+        ready: true,
+        proven: false,
+        state: 'awaiting-composer'
+      })
+      expect(bus.listenerCount(PTY)).toBe(1)
+    })
+
+    it('proceeds proven when the marker arrives inside the budget', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      const pending = tracker.wait(PTY, 'codex', 60_000)
+      bus.emit(PTY, BRACKETED_PASTE_ON)
+      bus.emit(PTY, '\x1b[2J\x1b[H Starting MCP server')
+      bus.emit(PTY, '\r\n› ')
+
+      await expect(pending).resolves.toMatchObject({
+        ready: true,
+        proven: true,
+        state: 'ready'
+      })
+      expect(bus.listenerCount(PTY)).toBe(1)
     })
 
     it('stops waiting when the request is aborted', async () => {
@@ -191,7 +234,7 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
       const abort = new AbortController()
       const pending = tracker.wait(PTY, 'codex', 60_000, { abortSignal: abort.signal })
       abort.abort()
-      await expect(pending).resolves.toMatchObject({ state: 'awaiting-composer' })
+      await expect(pending).resolves.toMatchObject({ state: 'unobserved' })
       expect(bus.listenerCount(PTY)).toBe(0)
     })
   })
