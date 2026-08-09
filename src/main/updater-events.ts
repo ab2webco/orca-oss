@@ -193,14 +193,15 @@ export function registerAutoUpdaterHandlers({
     // momentarily resolves an older tag must not destroy a still-valid recovery path.
     clearTrackedLinuxPackageArtifactForOtherVersion(info.version)
 
-    // Why: fetch the changelog in main to avoid renderer-side CORS on onorca.dev.
+    // Why: fetch the changelog in main so the release lookup is not subject to
+    // the renderer's file:// origin CORS rules.
     markUpdateAvailableEventPending(attemptId)
     void (async () => {
       try {
         const changelog =
           isLocalBuildCheck() || isPinnedBuildCheck()
             ? null
-            : await fetchChangelog(info.version, app.getVersion()).catch(() => null)
+            : await fetchChangelog(info.version).catch(() => null)
 
         // Why: async fetch may take seconds; bail if a newer event superseded this attempt to avoid a stale 'available' broadcast.
         if (!isActiveUpdateCheckAttempt(attemptId)) {

@@ -709,10 +709,10 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       dismiss: () => Promise.resolve(null),
       recordRendererError: () => Promise.resolve({ ok: true, report: null, deduped: true }),
       recordBreadcrumb: () => {},
-      submit: () =>
+      reportOnGitHub: () =>
         Promise.resolve({
-          ok: false,
-          status: null,
+          ok: false as const,
+          report: null,
           error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
         }),
       copyLatestDiagnostics: () =>
