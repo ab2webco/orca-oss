@@ -48,6 +48,30 @@ describe('account RPC methods', () => {
     expect(getManagedPtyAccountOwner).toHaveBeenCalledWith('pty-1', 'codex')
   })
 
+  it('answers which account a named terminal runs on, keyed by the handle', async () => {
+    const report = {
+      terminal: 'orca-terminal-4',
+      ptyId: 'pty-4',
+      ownership: {
+        state: 'account' as const,
+        accountId: 'account-fabiana',
+        email: 'fabiana@example.com',
+        pinned: true
+      }
+    }
+    const getTerminalClaudeAccount = vi.fn(() => report)
+    const runtime = { getTerminalClaudeAccount } as unknown as OrcaRuntimeService
+    const terminalAccount = method('accounts.terminalClaudeAccount')
+    if (isStreamingMethod(terminalAccount)) {
+      throw new Error('accounts.terminalClaudeAccount must be a request method')
+    }
+
+    await expect(
+      terminalAccount.handler({ terminal: 'orca-terminal-4' }, { runtime })
+    ).resolves.toEqual(report)
+    expect(getTerminalClaudeAccount).toHaveBeenCalledWith('orca-terminal-4')
+  })
+
   it.each([
     {
       methodName: 'accounts.addClaudeFromConfigDir',

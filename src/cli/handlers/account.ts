@@ -10,6 +10,7 @@ import {
   type RuntimeAccountsSnapshot
 } from '../account-format'
 import { printResult } from '../format'
+import { readTerminalClaudeAccount } from '../terminal-claude-account'
 import { RuntimeClientError } from '../runtime-client'
 import { rejectRemoteSelectionFlags } from './account-runtime-scope'
 import { switchClaudeTerminalAccount } from './account-switch'
@@ -295,8 +296,9 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     // broken auth; the cached snapshot is the safe default for scripted callers.
     const method = flags.get('refresh') === true ? 'accounts.list' : 'accounts.snapshot'
     const response = await client.call<RuntimeAccountsSnapshot>(method)
+    const terminal = await readTerminalClaudeAccount({ flags, client })
     printResult(
-      { ...response, result: buildAccountListReport(response.result) },
+      { ...response, result: buildAccountListReport(response.result, terminal) },
       json,
       formatAccountList
     )

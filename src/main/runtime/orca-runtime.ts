@@ -229,13 +229,16 @@ import type {
   PRRefreshOutcome,
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState,
+  ClaudeTerminalAccountReport,
   ManagedPtyAccountOwner
 } from '../../shared/types'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
-  isLiveSharedClaudePty
+  isLiveSharedClaudePty,
+  isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
+import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
 import { getCodexPtyAccountOwner } from '../codex/codex-pane-account-registry'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
@@ -12774,6 +12777,47 @@ export class OrcaRuntimeService {
       known: true,
       accountId,
       customEndpoint: account?.authMethod === 'custom-endpoint'
+    }
+  }
+
+  /**
+   * Which managed Claude account one terminal runs on, sourced from the binding
+   * the switch's `commit` writes. Answers `unknown` wherever it cannot prove an
+   * owner; the global selection is never a fallback (ORCA-175).
+   */
+  getTerminalClaudeAccount(handle: string): ClaudeTerminalAccountReport {
+    const pty = this.resolveClaudeAccountPtyRecordForHandle(handle)
+    const claudeAccounts = this.accountServices?.claudeAccounts
+    return resolveClaudeTerminalAccountReport({
+      terminal: handle,
+      pane: pty
+        ? {
+            ptyId: pty.ptyId,
+            connected: pty.connected,
+            remote: Boolean(pty.connectionId) || pty.isWsl === true
+          }
+        : null,
+      reader: {
+        getInjectedAccountId: getLiveInjectedClaudePtyAccountId,
+        isSharedPty: isLiveSharedClaudePty,
+        isUnknownOwnerSharedPty: isUnknownOwnerLiveSharedClaudePty,
+        getSharedAccountId: getLiveSharedClaudePtyAccountId,
+        findAccountEmail: (accountId) =>
+          claudeAccounts?.listAccounts().accounts.find((candidate) => candidate.id === accountId)
+            ?.email ?? null
+      }
+    })
+  }
+
+  private resolveClaudeAccountPtyRecordForHandle(handle: string): RuntimePtyWorktreeRecord | null {
+    try {
+      const ptyId =
+        this.resolveLiveLeafForHandle(handle)?.ptyId ??
+        this.getLivePtyForHandle(handle)?.pty.ptyId ??
+        null
+      return ptyId ? (this.ptysById.get(ptyId) ?? null) : null
+    } catch {
+      return null
     }
   }
 

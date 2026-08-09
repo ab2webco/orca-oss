@@ -54,6 +54,14 @@ command you need.
 Don't guess subcommands or flags from memory or from a cached copy of this stub. They
 change between Orca releases, and this file deliberately no longer lists them.
 
+## Never answer "which account am I on" from `active`
+
+`active` is the account Orca selects for *new* launches on the whole machine. It does not say
+which account this terminal runs on, and reporting it as if it did is how an agent told a user
+their pane was still on the old account after it had already been switched. The full guide names
+the per-terminal signal to read instead; until you have read it, say the pane's account cannot be
+determined rather than naming one.
+
 ## Never hand-roll the swap
 
 Whatever the guide says, one rule holds: do not change accounts by exporting
@@ -73,6 +81,9 @@ ORCA status --json
 ORCA account --help
 ORCA account list --json
 ```
+
+If that `account list` output carries no per-terminal block, this binary cannot tell you which
+account the pane runs on. Say so; `active` is not the answer.
 
 Then tell the user that updating Orca restores the full, version-matched guide via
 `ORCA skills get switch-account`. Beyond these commands, ask the user rather than guessing a

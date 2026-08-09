@@ -1,6 +1,8 @@
 import type {
   ClaudeManagedAccountAuthMethod,
   ClaudeRateLimitAccountsState,
+  ClaudeTerminalAccountReport,
+  ClaudeTerminalAccountUnknownReason,
   CodexRateLimitAccountsState
 } from '../shared/types'
 import type {
@@ -47,6 +49,9 @@ export type AccountListEntry = {
 
 export type AccountListReport = {
   accounts: AccountListEntry[]
+  /** Which account the pane runs on. `active` is the GLOBAL selection and never
+   *  answers that question — reading it there is the ORCA-175 defect. */
+  terminal: ClaudeTerminalAccountReport
 }
 
 // Why: strip usageMetadata/buckets/credits — quota windows are what a caller
@@ -91,7 +96,10 @@ function findQuota(
   return active ? toQuota(activeLimits) : null
 }
 
-export function buildAccountListReport(snapshot: RuntimeAccountsSnapshot): AccountListReport {
+export function buildAccountListReport(
+  snapshot: RuntimeAccountsSnapshot,
+  terminal: ClaudeTerminalAccountReport
+): AccountListReport {
   const claude = snapshot.claude.accounts.map((account): AccountListEntry => {
     const active = isActiveAccountId(account.id, snapshot.claude)
     return {
@@ -130,7 +138,7 @@ export function buildAccountListReport(snapshot: RuntimeAccountsSnapshot): Accou
       )
     }
   })
-  return { accounts: [...claude, ...codex] }
+  return { accounts: [...claude, ...codex], terminal }
 }
 
 function formatWindow(label: string, window: RateLimitWindow | null | undefined): string | null {
@@ -157,17 +165,50 @@ function formatQuota(quota: AccountQuota | null): string {
   return windows.join(' · ')
 }
 
-export function formatAccountList(report: AccountListReport): string {
-  if (report.accounts.length === 0) {
-    return 'No managed accounts.'
+const UNKNOWN_TERMINAL_ACCOUNT_REASONS: Record<ClaudeTerminalAccountUnknownReason, string> = {
+  'pane-unresolved': 'no live pane resolved for that handle (closed, asleep, or reminted)',
+  'no-claude-binding': 'Orca holds no Claude account binding for this pane',
+  'ownership-unresolved': 'this pane outlived a restart and its owner is not resolved yet',
+  'remote-host': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
+  'no-caller-terminal':
+    'this command is not running inside an Orca-managed terminal; pass --terminal <handle>',
+  'lookup-failed': 'the runtime could not answer (it may be older than this CLI)'
+}
+
+// Why this leads the output: `active` is the global selection, and reading it as
+// the answer to "which account is this terminal on" is the defect (ORCA-175).
+function formatTerminalAccount(report: ClaudeTerminalAccountReport): string {
+  const pane = report.terminal ? ` [${report.terminal}]` : ''
+  const caution = '(`active` below is the global selection, not this terminal’s account.)'
+  const { ownership } = report
+  if (ownership.state === 'account') {
+    const label = ownership.email ?? `id ${ownership.accountId}`
+    const binding = ownership.pinned ? 'pinned to this pane' : "Orca's shared runtime auth"
+    return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}\n${caution}`
   }
-  return report.accounts
+  if (ownership.state === 'none') {
+    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}\n${caution}`
+  }
+  return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}\n${caution}`
+}
+
+export function formatAccountList(report: AccountListReport): string {
+  const terminal = formatTerminalAccount(report.terminal)
+  if (report.accounts.length === 0) {
+    return `${terminal}\n\nNo managed accounts.`
+  }
+  const paneAccountId =
+    report.terminal.ownership.state === 'account' ? report.terminal.ownership.accountId : null
+  const accounts = report.accounts
     .map((entry) => {
       const kind = entry.authMethod === 'custom-endpoint' ? ' custom-endpoint' : ''
       const endpoint = entry.endpointLabel ? ` [${entry.endpointLabel}]` : ''
       const wsl = entry.runtime === 'wsl' ? ` wsl:${entry.wslDistro ?? 'default'}` : ''
       const active = entry.active ? '  active' : ''
-      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}\n  ${formatQuota(entry.quota)}`
+      const pane =
+        entry.provider === 'claude' && entry.id === paneAccountId ? '  <- this terminal' : ''
+      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}${pane}\n  ${formatQuota(entry.quota)}`
     })
     .join('\n')
+  return `${terminal}\n\n${accounts}`
 }

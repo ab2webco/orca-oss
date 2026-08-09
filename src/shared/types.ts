@@ -2664,6 +2664,38 @@ export type ClaudeLivePtyAccountInfo = {
   injected: boolean
 }
 
+/** Why unknown is never spelled as a null accountId: "runs on this account",
+ *  "owns no managed account" and "the runtime does not know" are three different
+ *  answers, and collapsing the last two is what let an agent report the global
+ *  `active` selection as its own pane's account (ORCA-175, ORCA-190). */
+export type ClaudeTerminalAccountUnknownReason =
+  /** No live pane resolved from the handle — stale, closed, or asleep (ORCA-186). */
+  | 'pane-unresolved'
+  /** The pane resolved, but this runtime holds no Claude binding for its PTY. */
+  | 'no-claude-binding'
+  /** A shared PTY restored from persistence whose owner is still unresolved. */
+  | 'ownership-unresolved'
+  /** WSL or SSH pane with no binding here: its Claude authenticates on that host. */
+  | 'remote-host'
+  /** CLI-side: the caller proved no pane of its own, so there is nothing to read. */
+  | 'no-caller-terminal'
+  /** CLI-side: the runtime could not be asked, or answered a shape this build
+   *  does not recognize — typically a runtime older than this CLI. */
+  | 'lookup-failed'
+
+export type ClaudeTerminalAccountOwnership =
+  | { state: 'account'; accountId: string; email: string | null; pinned: boolean }
+  | { state: 'none' }
+  | { state: 'unknown'; reason: ClaudeTerminalAccountUnknownReason }
+
+/** Which managed Claude account one terminal runs on, from the same binding the
+ *  switch's `commit` writes — so it cannot drift from the status-line chip. */
+export type ClaudeTerminalAccountReport = {
+  terminal: string | null
+  ptyId: string | null
+  ownership: ClaudeTerminalAccountOwnership
+}
+
 export type ManagedPtyAccountOwner = {
   known: boolean
   accountId: string | null

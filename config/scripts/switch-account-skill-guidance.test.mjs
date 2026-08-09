@@ -27,6 +27,26 @@ describe('switch-account skill guidance', () => {
     expect(guide).toContain('stops somebody else')
   })
 
+  it('never answers "which account am I on" from the global active flag', () => {
+    // Why asserted in both: reading `active` as the pane's account is the defect
+    // (ORCA-175), and a stale fat install reads only the stub.
+    const guide = readFileSync(guidePath, 'utf8')
+    const stub = readFileSync(stubPath, 'utf8').replace(/\s+/g, ' ')
+
+    expect(guide).toContain('Which account is this terminal on')
+    expect(guide).toContain('Never answer this from `active`')
+    expect(guide).toContain('terminal.ownership.state')
+    expect(guide).toContain('never a licence to fall back to `active`')
+    // The three states must stay distinguishable, and /status must stay excluded.
+    expect(guide).toContain('"none"')
+    expect(guide).toContain('"unknown"')
+    expect(guide).toContain('do not answer from `/status`')
+    expect(guide).toContain('cannot be determined')
+
+    expect(stub).toContain('Never answer "which account am I on" from `active`')
+    expect(stub).toContain('cannot be determined rather than naming one')
+  })
+
   it('tells the agent the switch is accepted before its turn is stopped', () => {
     const guide = readFileSync(guidePath, 'utf8')
 
