@@ -2,17 +2,20 @@ import type {
   ClaudeTerminalAccountSwitchAcceptance,
   ClaudeTerminalAccountSwitchFailureReason,
   ClaudeTerminalAccountSwitchRequest,
-  ClaudeTerminalAccountSwitchResult
+  ClaudeTerminalAccountSwitchResult,
+  ClaudeTerminalSwitchReadiness
 } from '../../shared/claude-terminal-account-switch'
+import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
 import type { ClaudeTerminalSwitchCapture } from '../claude-accounts/atomic-terminal-account-switch'
 import { runAtomicClaudeTerminalAccountSwitch } from '../claude-accounts/atomic-terminal-account-switch'
+import { resolveClaudeTerminalSwitchReadiness } from '../claude-accounts/claude-terminal-switch-readiness'
 import {
   buildClaudeTerminalAccountSwitchPorts,
   resolveClaudeTerminalSwitchShell,
   resolvePtyClaudeAccountId,
   type ClaudeTerminalAccountSwitchServices
 } from './claude-terminal-account-switch-ports'
-import type { OrcaRuntimeService } from './orca-runtime'
+import type { OrcaRuntimeService, RuntimeClaudeTerminalSwitchSnapshot } from './orca-runtime'
 
 export type { ClaudeTerminalAccountSwitchServices }
 
@@ -65,6 +68,83 @@ function pruneOperations(): void {
   }
 }
 
+type ClaudeTerminalSwitchTargetSnapshot =
+  | RuntimeClaudeTerminalSwitchSnapshot
+  | { ok: false; reason: 'terminal-not-found' }
+  | null
+
+type ClaudeTerminalSwitchPreflightOutcome =
+  | {
+      state: 'ready'
+      services: ClaudeTerminalAccountSwitchServices
+      target: RuntimeClaudeTerminalSwitchSnapshot
+      sourceAccountId: string
+      sessionId: string
+      cwd: string
+      launchConfig: SleepingAgentLaunchConfig
+    }
+  | { state: 'unavailable'; reason: ClaudeTerminalAccountSwitchFailureReason }
+
+/**
+ * The one place the switch's admission rules live. It both refuses a switch and
+ * answers "could this pane be switched" for the account report, so the report
+ * can never call a pane ready that the switch would then turn away.
+ */
+function runClaudeTerminalSwitchPreflight(
+  attached: ClaudeTerminalAccountSwitchServices | null,
+  snapshot: ClaudeTerminalSwitchTargetSnapshot
+): ClaudeTerminalSwitchPreflightOutcome {
+  const target = snapshot?.ok === true ? snapshot : null
+  const sourceAccountId =
+    attached && target ? resolvePtyClaudeAccountId(attached, target.ptyId) : null
+  const readiness = resolveClaudeTerminalSwitchReadiness({
+    servicesAttached: attached !== null,
+    paneResolved: target !== null,
+    isWsl: target?.isWsl === true,
+    remoteConnectionId: target?.remoteConnectionId ?? null,
+    cwd: target?.cwd ?? null,
+    sourceAccountId,
+    providerSessionId: target?.providerSession?.id ?? null,
+    launchConfig: target?.launchConfig
+  })
+  if (readiness.state === 'unavailable') {
+    return { state: 'unavailable', reason: readiness.reason }
+  }
+  if (
+    !attached ||
+    !target ||
+    !sourceAccountId ||
+    !target.cwd ||
+    !target.providerSession ||
+    !target.launchConfig
+  ) {
+    // Why unreachable-but-present: readiness answers a question, it does not narrow
+    // types. This keeps the capture's non-null reads honest without a cast.
+    return { state: 'unavailable', reason: 'terminal-not-found' }
+  }
+  return {
+    state: 'ready',
+    services: attached,
+    target,
+    sourceAccountId,
+    sessionId: target.providerSession.id,
+    cwd: target.cwd,
+    launchConfig: target.launchConfig
+  }
+}
+
+/**
+ * Reads whether a pane could be account-switched right now, without touching it.
+ * Reported by `orca account list` so a pane that lost a prerequisite to a restart
+ * says so before anyone asks for a switch (ORCA-187).
+ */
+export function readClaudeTerminalSwitchReadiness(
+  snapshot: ClaudeTerminalSwitchTargetSnapshot
+): ClaudeTerminalSwitchReadiness {
+  const preflight = runClaudeTerminalSwitchPreflight(services, snapshot)
+  return preflight.state === 'ready' ? { state: 'ready' } : preflight
+}
+
 /**
  * Captures the terminal, registers the operation, and returns acceptance BEFORE
  * any destructive work. The transaction then runs detached, so a self-switching
@@ -79,48 +159,31 @@ export async function startClaudeTerminalAccountSwitch(
   pastPreflight: ClaudeTerminalAccountSwitchPastPreflight
 }> {
   const attached = services
-  if (!attached) {
-    throw new ClaudeTerminalAccountSwitchRefusal('runtime-unavailable')
+  const snapshot = attached
+    ? await runtime.snapshotClaudeTerminalSwitchTarget(request.target)
+    : null
+  const preflight = runClaudeTerminalSwitchPreflight(attached, snapshot)
+  if (preflight.state === 'unavailable') {
+    throw new ClaudeTerminalAccountSwitchRefusal(preflight.reason)
   }
-  const snapshot = await runtime.snapshotClaudeTerminalSwitchTarget(request.target)
-  if (!snapshot.ok) {
-    throw new ClaudeTerminalAccountSwitchRefusal('terminal-not-found')
-  }
-  if (snapshot.isWsl || snapshot.remoteConnectionId) {
-    throw new ClaudeTerminalAccountSwitchRefusal('unsupported-runtime')
-  }
-  // Why its own reason: the cwd is what files the transcript, so without it the
-  // target universe could never resolve the session — that is not a missing pane.
-  if (!snapshot.cwd) {
-    throw new ClaudeTerminalAccountSwitchRefusal('transcript-unavailable')
-  }
-  const sourceAccountId = resolvePtyClaudeAccountId(attached, snapshot.ptyId)
-  if (!sourceAccountId) {
-    throw new ClaudeTerminalAccountSwitchRefusal('source-unknown')
-  }
-  if (!snapshot.providerSession) {
-    throw new ClaudeTerminalAccountSwitchRefusal('missing-session')
-  }
-  if (!snapshot.launchConfig?.agentCommand?.trim()) {
-    throw new ClaudeTerminalAccountSwitchRefusal('missing-launch-config')
-  }
+  const { services: ready, target, sourceAccountId, sessionId, cwd, launchConfig } = preflight
 
   const capture: ClaudeTerminalSwitchCapture = {
     operationId: `claude-switch-${++operationSeq}-${Date.now()}`,
-    terminal: snapshot.terminal,
-    ptyId: snapshot.ptyId,
-    paneKey: snapshot.paneKey,
+    terminal: target.terminal,
+    ptyId: target.ptyId,
+    paneKey: target.paneKey,
     sourceAccountId,
     targetAccountId: request.targetAccountId,
     runtime: 'host',
     wslDistro: null,
-    cwd: snapshot.cwd,
-    sessionId: snapshot.providerSession.id,
-    launchConfig: snapshot.launchConfig,
+    cwd,
+    sessionId,
+    launchConfig,
     platform: process.platform,
     shell: resolveClaudeTerminalSwitchShell({
-      isWsl: snapshot.isWsl,
-      terminalWindowsShell: attached.getSettings().terminalWindowsShell
+      isWsl: target.isWsl,
+      terminalWindowsShell: ready.getSettings().terminalWindowsShell
     }),
     capturedAt: Date.now()
   }
@@ -157,7 +220,7 @@ export async function startClaudeTerminalAccountSwitch(
   const pastPreflight = new Promise<void>((resolve) => {
     leavePreflight = resolve
   })
-  const ports = buildClaudeTerminalAccountSwitchPorts(runtime, attached, capture, (state) => {
+  const ports = buildClaudeTerminalAccountSwitchPorts(runtime, ready, capture, (state) => {
     record.result = { ...record.result, state }
     if (state !== 'preflighting') {
       leavePreflight()

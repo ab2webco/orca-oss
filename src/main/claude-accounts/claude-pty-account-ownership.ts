@@ -1,3 +1,4 @@
+import type { ClaudeTerminalSwitchReadiness } from '../../shared/claude-terminal-account-switch'
 import type {
   ClaudeTerminalAccountOwnership,
   ClaudeTerminalAccountReport
@@ -55,12 +56,16 @@ export function resolveClaudeTerminalAccountReport(args: {
   terminal: string
   pane: ClaudeTerminalPane | null
   reader: ClaudePtyAccountBindingReader
+  /** Decided by the switch's own preflight; this module never re-derives it. */
+  switchReadiness?: ClaudeTerminalSwitchReadiness
 }): ClaudeTerminalAccountReport {
+  const readiness = args.switchReadiness ? { switchReadiness: args.switchReadiness } : {}
   if (!args.pane?.connected) {
     return {
       terminal: args.terminal,
       ptyId: args.pane?.ptyId ?? null,
-      ownership: { state: 'unknown', reason: 'pane-unresolved' }
+      ownership: { state: 'unknown', reason: 'pane-unresolved' },
+      ...readiness
     }
   }
   const ownership = resolveClaudePtyAccountOwnership(args.pane.ptyId, args.reader)
@@ -70,7 +75,8 @@ export function resolveClaudeTerminalAccountReport(args: {
   return {
     terminal: args.terminal,
     ptyId: args.pane.ptyId,
-    ownership: remoteUnknown ? { state: 'unknown', reason: 'remote-host' } : ownership
+    ownership: remoteUnknown ? { state: 'unknown', reason: 'remote-host' } : ownership,
+    ...readiness
   }
 }
 

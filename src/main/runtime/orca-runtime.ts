@@ -239,6 +239,7 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
+import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
 import { getCodexPtyAccountOwner } from '../codex/codex-pane-account-registry'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
@@ -9350,6 +9351,14 @@ export class OrcaRuntimeService {
       pty.launchConfig = copySleepingAgentLaunchConfig(binding.launchConfig)
       pty.launchToken = binding.launchToken
       pty.launchAgent = binding.launchAgent ?? null
+    } else if (binding?.launchConfig && paneKey) {
+      // Why a launch description with no token: a reattach can prove how the pane was launched but
+      // not what token its already-running child holds. The account switch needs only the former, so
+      // withholding the token must not also cost the pane its argv (ORCA-187).
+      // Why fill-only: a record that already has a description got it from the launch that really
+      // ran; a reattach's is rebuilt from a resume plan and must not outrank it.
+      pty.launchConfig ??= copySleepingAgentLaunchConfig(binding.launchConfig)
+      pty.launchAgent ??= binding.launchAgent ?? null
     }
     const pendingIncarnation = this.pendingPtyRegistrationIncarnations.get(ptyId)
     if (
@@ -12829,11 +12838,17 @@ export class OrcaRuntimeService {
    * the switch's `commit` writes. Answers `unknown` wherever it cannot prove an
    * owner; the global selection is never a fallback (ORCA-175).
    */
-  getTerminalClaudeAccount(handle: string): ClaudeTerminalAccountReport {
+  async getTerminalClaudeAccount(handle: string): Promise<ClaudeTerminalAccountReport> {
     const pty = this.resolveClaudeAccountPtyRecordForHandle(handle)
     const claudeAccounts = this.accountServices?.claudeAccounts
+    // Why the switch's own snapshot: readiness must be decided from the same
+    // facts the switch reads, not from a second look at this record (ORCA-187).
+    const switchReadiness = readClaudeTerminalSwitchReadiness(
+      await this.snapshotClaudeTerminalSwitchTarget({ kind: 'handle', terminal: handle })
+    )
     return resolveClaudeTerminalAccountReport({
       terminal: handle,
+      switchReadiness,
       pane: pty
         ? {
             ptyId: pty.ptyId,

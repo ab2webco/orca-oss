@@ -5,6 +5,7 @@ import type {
   ClaudeTerminalAccountUnknownReason,
   CodexRateLimitAccountsState
 } from '../shared/types'
+import type { ClaudeTerminalAccountSwitchFailureReason } from '../shared/claude-terminal-account-switch'
 import type {
   InactiveAccountUsage,
   ProviderRateLimits,
@@ -175,21 +176,46 @@ const UNKNOWN_TERMINAL_ACCOUNT_REASONS: Record<ClaudeTerminalAccountUnknownReaso
   'lookup-failed': 'the runtime could not answer (it may be older than this CLI)'
 }
 
+const UNSWITCHABLE_TERMINAL_REASONS: Partial<
+  Record<ClaudeTerminalAccountSwitchFailureReason, string>
+> = {
+  'missing-launch-config': 'Orca no longer holds the command this pane was launched with',
+  'missing-session': 'no Claude session has been observed in this pane yet',
+  'source-unknown': 'no managed Claude account is bound to this pane',
+  'transcript-unavailable': 'this pane has no resolved working directory to file the transcript in',
+  'unsupported-runtime': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
+  'terminal-not-found': 'no live pane resolved for that handle',
+  'runtime-unavailable': 'this runtime has no account services attached'
+}
+
+// Why this is reported unasked: until ORCA-187 the only signal that a pane could
+// not be switched was the switch failing, and a pane that outlived a restart is
+// the common way to get there.
+function formatSwitchReadiness(report: ClaudeTerminalAccountReport): string {
+  const readiness = report.switchReadiness
+  if (!readiness || readiness.state === 'ready') {
+    return ''
+  }
+  const explanation = UNSWITCHABLE_TERMINAL_REASONS[readiness.reason]
+  return `\nnot switchable: ${explanation ?? 'the switch would be refused'} (${readiness.reason})`
+}
+
 // Why this leads the output: `active` is the global selection, and reading it as
 // the answer to "which account is this terminal on" is the defect (ORCA-175).
 function formatTerminalAccount(report: ClaudeTerminalAccountReport): string {
   const pane = report.terminal ? ` [${report.terminal}]` : ''
   const caution = '(`active` below is the global selection, not this terminal’s account.)'
+  const switchable = formatSwitchReadiness(report)
   const { ownership } = report
   if (ownership.state === 'account') {
     const label = ownership.email ?? `id ${ownership.accountId}`
     const binding = ownership.pinned ? 'pinned to this pane' : "Orca's shared runtime auth"
-    return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}\n${caution}`
+    return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}${switchable}\n${caution}`
   }
   if (ownership.state === 'none') {
-    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}\n${caution}`
+    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}${switchable}\n${caution}`
   }
-  return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}\n${caution}`
+  return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}${switchable}\n${caution}`
 }
 
 export function formatAccountList(report: AccountListReport): string {
