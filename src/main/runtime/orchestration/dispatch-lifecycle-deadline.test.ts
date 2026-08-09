@@ -200,6 +200,44 @@ describe('dispatch first-signal deadline (ORCA-191)', () => {
     expect(delivery?.messages.map((message) => message.id)).toContain(mail?.id)
   })
 
+  // Why (ORCA-191 slice 2): the two incidents need different next steps. No
+  // observed turn points at delivery — the pane, its startup, the composer. An
+  // observed turn points at the worker, which read something and stopped
+  // reporting. One reason string for both wastes the distinction.
+  it('says the agent never started a turn when none was observed', () => {
+    const d = createDb()
+    const run = createRun(d)
+    startReadyWorker(d, { runId: run.id })
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).toContain('never visibly started a turn')
+    expect(expired.reason).not.toContain('started a turn after the submit')
+  })
+
+  it('says the agent started a turn when acceptance was observed', () => {
+    const d = createDb()
+    const run = createRun(d)
+    const { dispatchId } = startReadyWorker(d, { runId: run.id })
+    d.recordDispatchTurnAcceptance(dispatchId)
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).toContain('started a turn after the submit')
+    // Turn acceptance is not content integrity; the reason must not claim it is.
+    expect(expired.reason).toContain('not provably this preamble intact')
+  })
+
+  it('does not let turn acceptance disarm the deadline', () => {
+    const d = createDb()
+    const run = createRun(d)
+    const { dispatchId } = startReadyWorker(d, { runId: run.id })
+    d.recordDispatchTurnAcceptance(dispatchId)
+
+    expect(d.countArmedDispatchDeadlines()).toBe(1)
+    expect(expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())).toHaveLength(1)
+  })
+
   it('names the SSH host scope in the failure reason', () => {
     const d = createDb()
     const run = createRun(d)

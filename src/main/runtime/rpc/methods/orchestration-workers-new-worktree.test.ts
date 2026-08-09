@@ -440,6 +440,75 @@ describe('orchestration new-worktree workers', () => {
     expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
   })
 
+  // Why (ORCA-191): this is the path the incident ran through. `tui-idle` was
+  // satisfied while the Codex composer was still mounting, so the preamble went
+  // into a redraw and the run sat `dispatched` for 50 min with no heartbeat.
+  it('does not inject when the agent enabled bracketed paste and has no composer yet', async () => {
+    mockCreatedWorktree()
+    vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+      ready: false,
+      proven: false,
+      state: 'awaiting-composer',
+      signal: 'codex-composer-prompt',
+      waitedMs: 30_000
+    })
+
+    const { result, task } = await startWorker()
+
+    expect(result).toMatchObject({
+      state: 'failed',
+      failedStage: 'agent_readiness'
+    })
+    expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
+    expect(db.getTask(task.id)?.status).toBe('failed')
+    expect(db.countArmedDispatchDeadlines()).toBe(0)
+  })
+
+  it('waits for composer readiness after tui-idle and before the write', async () => {
+    mockCreatedWorktree()
+    const composerReady = vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+      ready: true,
+      proven: true,
+      state: 'ready',
+      signal: 'codex-composer-prompt',
+      waitedMs: 2_729
+    })
+
+    await startWorker()
+
+    expect(vi.mocked(runtime.waitForTerminal).mock.invocationCallOrder[0]!).toBeLessThan(
+      composerReady.mock.invocationCallOrder[0]!
+    )
+    expect(composerReady.mock.invocationCallOrder[0]!).toBeLessThan(
+      vi.mocked(runtime.sendTerminalAgentPrompt).mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('records turn acceptance without disarming the first-signal deadline', async () => {
+    mockCreatedWorktree()
+    vi.spyOn(runtime, 'sendTerminalAgentPromptObservingTurn').mockResolvedValue({
+      send: { handle: 'term_worker', accepted: true, bytesWritten: 1 },
+      turnAcceptance: Promise.resolve({
+        accepted: true,
+        evidence: 'working-title',
+        waitedMs: 61
+      })
+    })
+
+    const { result, task } = await startWorker()
+
+    expect(result).toMatchObject({
+      state: 'ready',
+      turnAcceptance: { accepted: true, evidence: 'working-title' }
+    })
+    const ctx = db.getDispatchContext(task.id)
+    expect(ctx?.turn_accepted_at).not.toBeNull()
+    // A screen transition is not an authenticated lifecycle signal, so the
+    // deadline that catches a silent worker must stay armed.
+    expect(ctx?.first_lifecycle_signal_at).toBeNull()
+    expect(db.countArmedDispatchDeadlines()).toBe(1)
+  })
+
   it('distinguishes no-effect failure, unknown acceptance, and durable residual effects', async () => {
     vi.spyOn(runtime, 'createManagedWorktree').mockRejectedValueOnce(
       new Error('repository validation failed before creation')

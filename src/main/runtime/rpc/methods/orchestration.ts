@@ -29,6 +29,7 @@ import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
 import { ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
@@ -1311,6 +1312,24 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               'then dispatch again — or dispatch without --inject and send the prompt manually.'
           )
         }
+        // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+        // known-ready preview, or foreground quiescence — for Codex all three
+        // land ~3-4 s before the composer accepts input, so the preamble is
+        // typed into a redraw and swallowed. Refuse before createDispatchContext
+        // so no dispatch row exists and the Task stays `ready` for a retry.
+        // Only `awaiting-composer` refuses; a pane whose readiness this runtime
+        // cannot observe proceeds, which is what keeps the `--inject` rescue
+        // path working on a long-established pane.
+        const composerReady = await runtime.waitForAgentComposerReady(to)
+        if (!composerReady.ready) {
+          throw new OrchestrationError(
+            'agent_composer_not_ready',
+            `Cannot dispatch --inject to terminal ${to}: the agent enabled bracketed paste but its ` +
+              `composer never became ready within ${Math.round(composerReady.waitedMs / 1000)}s. ` +
+              'The TUI is still starting up and would swallow the preamble instead of receiving it. ' +
+              'Wait for the pane to show its prompt, then dispatch again.'
+          )
+        }
       }
 
       const dispatchAuthority = runtime.getOrchestrationDispatchAuthority(to)
@@ -1355,9 +1374,12 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       })
 
       let injected = false
+      let turnAcceptance: AgentTurnAcceptance | undefined
       if (params.inject) {
+        let pendingAcceptance: Promise<AgentTurnAcceptance>
         try {
-          await runtime.sendTerminalAgentPrompt(to, preamble)
+          const sent = await runtime.sendTerminalAgentPromptObservingTurn(to, preamble)
+          pendingAcceptance = sent.turnAcceptance
           injected = true
         } catch (err) {
           db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
@@ -1366,15 +1388,21 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // Why (ORCA-191): only a capability-bearing injection that reached its
         // confirmation point is monitored — a tracking dispatch without --inject
         // never receives a preamble and must never be failed for its silence.
+        // Armed before the acceptance observation resolves: the deadline covers
+        // the write, not the watching.
         db.armDispatchLifecycleDeadline(ctx.id)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
+        turnAcceptance = await pendingAcceptance
+        if (turnAcceptance.accepted) {
+          db.recordDispatchTurnAcceptance(ctx.id)
+        }
       }
 
       // Why: returnPreamble is opt-in because the preamble is several hundred bytes most callers don't need in the response.
       if (params.returnPreamble) {
-        return { dispatch: ctx, injected, preamble }
+        return { dispatch: ctx, injected, preamble, ...(turnAcceptance ? { turnAcceptance } : {}) }
       }
-      return { dispatch: ctx, injected }
+      return { dispatch: ctx, injected, ...(turnAcceptance ? { turnAcceptance } : {}) }
     }
   }),
 

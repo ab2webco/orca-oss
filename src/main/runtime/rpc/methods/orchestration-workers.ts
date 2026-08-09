@@ -214,6 +214,19 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
               : `Agent did not become ready (${wait.status}).`
           )
         }
+        // Why (ORCA-191): this is the path the incident ran through. `tui-idle`
+        // is satisfied for Codex ~3-4 s before the composer accepts input, so
+        // the preamble lands in a redraw and the run sits `dispatched` forever.
+        // Only positive evidence that the TUI is mid-boot fails the start; a
+        // pane whose readiness cannot be observed proceeds as before.
+        const composerReady = await runtime.waitForAgentComposerReady(terminalHandle)
+        if (!composerReady.ready) {
+          throw new Error(
+            `Agent enabled bracketed paste but its composer never became ready within ` +
+              `${Math.round(composerReady.waitedMs / 1000)}s; the preamble would be swallowed by ` +
+              'the startup redraw.'
+          )
+        }
         const terminalAuthority = requireWorkerAuthority(runtime, terminalHandle)
         const capability = db.prepareStartingWorkerAuthority({
           dispatchId: started.dispatch.id,
@@ -236,15 +249,21 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           devMode: params.devMode,
           cliCommand: runtime.getTerminalOrchestrationCliCommand(terminalHandle)
         })
-        await runtime.sendTerminalAgentPrompt(terminalHandle, preamble)
+        const sent = await runtime.sendTerminalAgentPromptObservingTurn(terminalHandle, preamble)
         effects.push({
           kind: 'dispatch_input',
           role: 'agent',
           id: terminalHandle,
           state: 'accepted'
         })
+        // Why (ORCA-191): armed before the acceptance observation resolves — the
+        // deadline covers the write, not the watching.
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
+        const turnAcceptance = await sent.turnAcceptance
+        if (turnAcceptance.accepted) {
+          db.recordDispatchTurnAcceptance(started.dispatch.id)
+        }
         monitorWorkerSetup({
           runtime,
           db,
@@ -263,6 +282,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           timeoutMs: params.timeoutMs ?? 60_000,
           effects,
           residualResources: [],
+          turnAcceptance,
           ...(terminalRevealWarning ? { warning: terminalRevealWarning } : {})
         }
       } catch (error) {

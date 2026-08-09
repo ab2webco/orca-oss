@@ -34,7 +34,8 @@ export function expireDueDispatchDeadlines(
       dispatchId: candidate.id,
       taskId: candidate.task_id,
       placement: db.getDispatchDeadlinePlacement(candidate.id),
-      deadlineMs: DISPATCH_FIRST_SIGNAL_DEADLINE_MS
+      deadlineMs: DISPATCH_FIRST_SIGNAL_DEADLINE_MS,
+      turnAccepted: candidate.turn_accepted_at !== null
     })
     const outcome = db.expireDispatchLifecycleDeadline({
       dispatchId: candidate.id,
