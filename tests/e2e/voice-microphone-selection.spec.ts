@@ -92,6 +92,31 @@ async function prepareVoiceSettings(
   await expect(page.getByRole('heading', { name: 'Voice', exact: true })).toBeVisible()
 }
 
+/**
+ * Why not `getByRole('combobox')`: Radix marks everything outside an open
+ * Select popup `aria-hidden`, so the role locator stops resolving the trigger
+ * until the popup finishes its exit animation. That animation needs compositor
+ * frames, which the never-shown E2E window does not reliably get — the trigger
+ * then reads as "element(s) not found" for the whole assertion timeout while
+ * the DOM holds the correct value. Match the attributes instead.
+ */
+function microphoneTrigger(page: Parameters<typeof waitForSessionReady>[0]) {
+  return page.locator('[data-slot="select-trigger"][aria-label="Microphone"]')
+}
+
+/**
+ * Escape, then wait for the popup to actually unmount.
+ *
+ * Why: the shadcn SelectContent has an exit animation, so Radix's Presence
+ * waits for `animationend` before unmounting. That needs compositor frames.
+ * Without this wait a stuck popup surfaces further down as a confusing
+ * "option not visible" on the NEXT open, instead of naming what stalled.
+ */
+async function closeSelectPopup(page: Parameters<typeof waitForSessionReady>[0]): Promise<void> {
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('listbox'), 'select popup did not close').toHaveCount(0)
+}
+
 async function readMicrophoneSettings(
   page: Parameters<typeof waitForSessionReady>[0]
 ): Promise<{ deviceId: string | null; label: string | null }> {
@@ -115,7 +140,7 @@ test.describe('Voice microphone selection', () => {
     await waitForSessionReady(orcaPage)
     await prepareVoiceSettings(orcaPage, null, null)
 
-    const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
+    const microphone = microphoneTrigger(orcaPage)
     await expect(microphone).toHaveText('System default')
     await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'USB Microphone' })).toBeVisible()
@@ -134,9 +159,7 @@ test.describe('Voice microphone selection', () => {
     await orcaPage.reload({ waitUntil: 'domcontentloaded' })
     await waitForSessionReady(orcaPage)
     await prepareVoiceSettings(orcaPage, 'usb-mic', 'USB Microphone')
-    await expect(orcaPage.getByRole('combobox', { name: 'Microphone' })).toHaveText(
-      'USB Microphone'
-    )
+    await expect(microphoneTrigger(orcaPage)).toHaveText('USB Microphone')
   })
 
   test('marks an unplugged device unavailable and follows a relabeled device', async ({
@@ -150,10 +173,10 @@ test.describe('Voice microphone selection', () => {
     await waitForSessionReady(orcaPage)
     await prepareVoiceSettings(orcaPage, 'stale-airpods-id', 'AirPods')
 
-    const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
+    const microphone = microphoneTrigger(orcaPage)
     await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'AirPods (unavailable)' })).toBeVisible()
-    await orcaPage.keyboard.press('Escape')
+    await closeSelectPopup(orcaPage)
 
     await orcaPage.evaluate(() => {
       const state = (window as Window & { __orcaE2EFakeMicrophone?: FakeMicrophoneState })
@@ -172,7 +195,7 @@ test.describe('Voice microphone selection', () => {
     await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'AirPods' })).toBeVisible()
     await expect(orcaPage.getByRole('option', { name: 'AirPods (unavailable)' })).toHaveCount(0)
-    await orcaPage.keyboard.press('Escape')
+    await closeSelectPopup(orcaPage)
     await expect(readMicrophoneSettings(orcaPage)).resolves.toEqual({
       deviceId: 'stale-airpods-id',
       label: 'AirPods'
