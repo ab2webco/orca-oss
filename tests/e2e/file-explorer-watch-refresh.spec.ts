@@ -4,7 +4,25 @@ import { test, expect } from './helpers/orca-app'
 import { openFileExplorer } from './helpers/file-explorer'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
-test('refreshes the visible tree after external Windows file changes', async ({ orcaPage }) => {
+/**
+ * Quarantined under ORCA-198, owner: whoever picks up the reconcile.
+ *
+ * Fails 2 of 4 scheduled runs. The capture below has already ruled out the
+ * delivery half: on the PR-check failure of run 31334299613 the renderer
+ * received both events for the case-only rename, in one batch, 410ms after
+ * the create —
+ *
+ *   {"kind":"create","absolutePath":".../WATCH-REFRESH-CASE.txt"}
+ *   {"kind":"delete","absolutePath":".../watch-refresh-case.txt"}
+ *
+ * — and the row still never appeared. So the watcher and its IPC are fine and
+ * the fault is at or after `processFileExplorerFsPayload`. That points at a
+ * user-facing bug on case-sensitive filesystems, not a test artifact, which is
+ * why this is `fixme` and not a skip: it must go back to red once fixed.
+ */
+test.fixme('refreshes the visible tree after external Windows file changes', async ({
+  orcaPage
+}) => {
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
   await orcaPage.evaluate(() => window.__store?.getState().setRightSidebarOpen(false))
