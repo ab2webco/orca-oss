@@ -43,9 +43,12 @@ test('refreshes the visible tree after external Windows file changes', async ({ 
     await expect(row('README.md')).toBeVisible({ timeout: 10_000 })
     await orcaPage.waitForTimeout(2_000)
 
-    // TEMPORARY (ORCA-197): record the watcher payloads the renderer actually
-    // receives, so a missing row can be attributed to a dropped event vs a
-    // reconcile that saw the event and still did not re-read the directory.
+    // Why: this spec fails intermittently on CI (ORCA-198) and a bare "row not
+    // found" cannot say which half broke. Recording the payloads the renderer
+    // actually received splits it: payloads present ⇒ the reconcile saw the
+    // event and still did not re-read the directory; none ⇒ the watcher never
+    // delivered, or the renderer's debounce timer was throttled while hidden.
+    // Registered here, so events before the README.md wait are not captured.
     await orcaPage.evaluate(() => {
       const sink = (window as Window & { __orcaE2eFsChanged?: unknown[] }).__orcaE2eFsChanged ?? []
       ;(window as Window & { __orcaE2eFsChanged?: unknown[] }).__orcaE2eFsChanged = sink
