@@ -94,3 +94,32 @@ export async function clickWithoutFrameDependency(
     throw new Error(`${error instanceof Error ? error.message : String(error)}\n\n${report}`)
   }
 }
+
+/**
+ * Remove CSS animations and transitions for every document this page loads.
+ *
+ * Why: Radix unmounts a closing popup through `Presence`, which waits for
+ * `animationend` whenever the node has an animation — and shadcn's
+ * SelectContent carries `data-[state=closed]:animate-out`. With no compositor
+ * frames the animation never starts, so `animationend` never fires and the
+ * popup stays mounted forever: run 31331695775 held the listbox for the full
+ * 10s after Escape. `Presence` unmounts synchronously when the computed
+ * animation is `none`, so removing the animation removes the frame dependency.
+ *
+ * Survives reloads — the style is reinstalled on every document.
+ */
+export async function disableCssAnimations(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const install = (): void => {
+      const style = document.createElement('style')
+      style.textContent =
+        '*, *::before, *::after { animation: none !important; transition: none !important; }'
+      document.head.append(style)
+    }
+    if (document.head) {
+      install()
+      return
+    }
+    document.addEventListener('DOMContentLoaded', install, { once: true })
+  })
+}

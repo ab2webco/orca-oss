@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { clickWithoutFrameDependency } from './helpers/frame-independent-click'
+import { clickWithoutFrameDependency, disableCssAnimations } from './helpers/frame-independent-ui'
 
 type FakeMicrophoneDevice = {
   deviceId: string
@@ -114,7 +114,11 @@ function microphoneTrigger(page: Parameters<typeof waitForSessionReady>[0]) {
  */
 async function closeSelectPopup(page: Parameters<typeof waitForSessionReady>[0]): Promise<void> {
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('listbox'), 'select popup did not close').toHaveCount(0)
+  // Why 2s, not the 10s default: with animations off the unmount is
+  // synchronous, so a slow close means the frame dependency came back.
+  await expect(page.getByRole('listbox'), 'select popup did not close').toHaveCount(0, {
+    timeout: 2_000
+  })
 }
 
 async function readMicrophoneSettings(
@@ -132,6 +136,7 @@ async function readMicrophoneSettings(
 test.describe('Voice microphone selection', () => {
   test('lists devices, persists a selected microphone, and restores it', async ({ orcaPage }) => {
     await waitForSessionReady(orcaPage)
+    await disableCssAnimations(orcaPage)
     await installFakeMicrophoneDevices(orcaPage, [
       { deviceId: 'built-in', label: 'Built-in Microphone' },
       { deviceId: 'usb-mic', label: 'USB Microphone' }
@@ -166,6 +171,7 @@ test.describe('Voice microphone selection', () => {
     orcaPage
   }) => {
     await waitForSessionReady(orcaPage)
+    await disableCssAnimations(orcaPage)
     await installFakeMicrophoneDevices(orcaPage, [
       { deviceId: 'built-in', label: 'Built-in Microphone' }
     ])
