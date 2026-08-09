@@ -15763,6 +15763,105 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  // Why (ORCA-191): `tui-idle` is satisfied for Codex ~3-4 s before its composer
+  // accepts input (measured on ORCA-171: satisfied 5,482 ms / ready 8,211 ms,
+  // then 10,506 / 14,598). `composer-ready` is the agent's own marker, so it
+  // cannot resolve inside that window.
+  describe('composer-ready wait (ORCA-191)', () => {
+    async function createCodexPane(): Promise<{
+      runtime: OrcaRuntimeService
+      handle: string
+      ptyId: string
+    }> {
+      const ptyId = 'pty-codex'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        launchAgent: 'codex'
+      })
+      return { runtime, handle, ptyId }
+    }
+
+    it('is unsatisfied while the composer is still mounting', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({
+        condition: 'composer-ready',
+        satisfied: false,
+        composerReadyState: 'awaiting-composer'
+      })
+    })
+
+    it('resolves on the composer prompt glyph', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
+
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({
+        condition: 'composer-ready',
+        satisfied: true,
+        composerReadyState: 'ready'
+      })
+    })
+
+    it('is satisfied — not blocked — for a pane it cannot observe', async () => {
+      const { runtime, handle } = await createCodexPane()
+
+      // Why: absence of evidence must not become a refusal, or the
+      // `dispatch --inject` rescue path stops working on an adopted pane.
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({ satisfied: true, composerReadyState: 'unobserved' })
+    })
+
+    it('observes turn acceptance from output that follows the write', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 5_000
+      })
+      runtime.onPtyData(ptyId, '\r\nWorking (0s • esc to interrupt)', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: true,
+        evidence: 'interrupt-affordance'
+      })
+      expect(sent.send.accepted).toBe(true)
+    })
+
+    it('reports an unaccepted turn instead of resending', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 20
+      })
+      // Why: Codex collapses a long paste into a placeholder, so the payload is
+      // never on screen. Treating that as failure and resending is what
+      // interleaved six copies into one composer.
+      runtime.onPtyData(ptyId, '\r\n› [Pasted Content 1206 chars]', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: false,
+        evidence: null
+      })
+    })
+  })
+
   it('chunks large agent prompt paste frames before delayed submit', async () => {
     vi.useFakeTimers()
     try {

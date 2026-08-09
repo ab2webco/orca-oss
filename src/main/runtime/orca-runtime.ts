@@ -432,6 +432,12 @@ import {
   TUI_AGENT_CONFIG
 } from '../../shared/tui-agent-config'
 import { createDraftPasteReadyScanner } from '../../shared/draft-paste-ready-scanner'
+import {
+  AgentComposerReadinessTracker,
+  AGENT_COMPOSER_READY_TIMEOUT_MS,
+  AGENT_TURN_ACCEPTANCE_TIMEOUT_MS
+} from './agent-composer-readiness'
+import type { AgentComposerReadiness, AgentTurnAcceptance } from './agent-composer-readiness'
 import { detectInstalledAgentsWithShellPathHydration, detectRemoteAgents } from '../ipc/preflight'
 import {
   markCodexProjectTrusted,
@@ -3024,6 +3030,12 @@ export class OrcaRuntimeService {
   // Why: startup draft paste can subscribe after the agent already emitted its
   // ready marker. Keep a bounded raw buffer so fast startup output is replayed.
   private recentPtyOutputById = new Map<string, RecentPtyOutputBuffer>()
+  // Why (ORCA-191): a dispatch must know whether a pane's composer ever became
+  // ready, which only a PTY-lifetime observation can answer. See the tracker's
+  // own doc comment for why it is not armed per send.
+  private composerReadiness = new AgentComposerReadinessTracker((ptyId, listener) =>
+    this.subscribeToTerminalData(ptyId, listener)
+  )
   private setupCompletionTokenByPtyId = new Map<string, string>()
   // Why: mobile clients need to know when the desktop restores a terminal
   // from mobile-fit so they can update their UI. These listeners are
@@ -9565,6 +9577,7 @@ export class OrcaRuntimeService {
     captureModelReceipt?.(modelCompletion)
 
     const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
+    this.composerReadiness.observe(ptyId, pty?.launchAgent ?? pty?.foregroundAgent ?? null, data)
     const ptyTailBefore = pty
       ? {
           lines: pty.tailBuffer,
@@ -13368,6 +13381,7 @@ export class OrcaRuntimeService {
     this.resizeListeners.delete(ptyId)
     this.lastRendererSizes.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
+    this.composerReadiness.forget(ptyId)
     this.setupCompletionTokenByPtyId.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
@@ -16664,6 +16678,96 @@ export class OrcaRuntimeService {
     return { handle, accepted: true, bytesWritten }
   }
 
+  /** ptyId + the agent identity the composer-ready signal is chosen from, or
+   *  null when the handle has no live PTY this runtime observes. */
+  private resolveComposerReadinessTarget(
+    handle: string
+  ): { ptyId: string; agent: TuiAgent | null } | null {
+    let ptyId: string | null = null
+    try {
+      ptyId =
+        this.getLivePtyForHandle(handle)?.pty.ptyId ??
+        this.getLiveLeafForHandle(handle).leaf.ptyId ??
+        null
+    } catch {
+      return null
+    }
+    if (!ptyId) {
+      return null
+    }
+    const pty = this.ptysById.get(ptyId)
+    return { ptyId, agent: pty?.launchAgent ?? pty?.foregroundAgent ?? null }
+  }
+
+  /**
+   * Waits until the agent's own composer-ready marker has fired on this pane
+   * (ORCA-191). Unlike `tui-idle`, an `awaiting-composer` result is positive
+   * evidence that the TUI is still booting and will swallow a write.
+   *
+   * Resolves immediately — never sleeps — when the runtime has no way to prove
+   * readiness for this pane: an agent without a marker signal, or a PTY whose
+   * bracketed-paste enable this runtime never observed (adopted after a restart,
+   * gapped byte stream). Callers get `ready: true, proven: false` there and must
+   * fall through to their existing checks rather than refuse.
+   */
+  async waitForAgentComposerReady(
+    handle: string,
+    options: { timeoutMs?: number } = {}
+  ): Promise<AgentComposerReadiness> {
+    const target = this.resolveComposerReadinessTarget(handle)
+    if (!target) {
+      return {
+        ready: true,
+        proven: false,
+        state: 'unobserved',
+        signal: null,
+        waitedMs: 0
+      }
+    }
+    return await this.composerReadiness.wait(
+      target.ptyId,
+      target.agent,
+      options.timeoutMs ?? AGENT_COMPOSER_READY_TIMEOUT_MS
+    )
+  }
+
+  /**
+   * Sends an agent prompt and observes whether the agent started a turn.
+   *
+   * The acceptance observer subscribes BEFORE the write and only counts chunks
+   * fed after it resolves, so its evidence is causally later than the submit.
+   * It reports **turn acceptance, not content integrity** — see
+   * `agent-turn-acceptance-scanner.ts`. The returned promise is deliberately
+   * separate from the send so callers can arm the first-signal deadline the
+   * moment the bytes are in, instead of behind an observation window.
+   */
+  async sendTerminalAgentPromptObservingTurn(
+    handle: string,
+    prompt: string,
+    options: { acceptanceTimeoutMs?: number } = {}
+  ): Promise<{ send: RuntimeTerminalSend; turnAcceptance: Promise<AgentTurnAcceptance> }> {
+    const target = this.resolveComposerReadinessTarget(handle)
+    if (!target) {
+      const send = await this.sendTerminalAgentPrompt(handle, prompt)
+      return {
+        send,
+        turnAcceptance: Promise.resolve({ accepted: false, evidence: null, waitedMs: 0 })
+      }
+    }
+    const observer = this.composerReadiness.observeTurnAcceptance(
+      target.ptyId,
+      options.acceptanceTimeoutMs ?? AGENT_TURN_ACCEPTANCE_TIMEOUT_MS
+    )
+    let send: RuntimeTerminalSend
+    try {
+      send = await this.sendTerminalAgentPrompt(handle, prompt)
+    } catch (error) {
+      observer.cancel()
+      throw error
+    }
+    return { send, turnAcceptance: observer.arm() }
+  }
+
   async getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
     const ptyId = this.getTerminalAgentStatusPtyId(handle)
     const terminal = this.getTerminalAgentStatusSnapshot(handle, ptyId)
@@ -17137,6 +17241,9 @@ export class OrcaRuntimeService {
     }
   ): Promise<RuntimeTerminalWait> {
     const condition = options?.condition ?? 'exit'
+    if (condition === 'composer-ready') {
+      return await this.waitForComposerReadyCondition(handle, options?.timeoutMs)
+    }
     const pty = this.getLivePtyForHandle(handle)
     if (pty) {
       if (condition === 'exit' && !pty.pty.connected) {
@@ -17339,6 +17446,33 @@ export class OrcaRuntimeService {
         reject(error instanceof Error ? error : new Error(String(error)))
       }
     })
+  }
+
+  /** `wait --for composer-ready`: the agent's own ready-for-input marker, which
+   *  `tui-idle` cannot see. Unsatisfied only for `awaiting-composer`. */
+  private async waitForComposerReadyCondition(
+    handle: string,
+    timeoutMs?: number
+  ): Promise<RuntimeTerminalWait> {
+    const readiness = await this.waitForAgentComposerReady(handle, {
+      ...(typeof timeoutMs === 'number' && timeoutMs > 0 ? { timeoutMs } : {})
+    })
+    const pty = this.getLivePtyForHandle(handle)
+    const status = pty
+      ? getPtyTerminalState(pty.pty)
+      : getTerminalState(this.getLiveLeafForHandle(handle).leaf)
+    const exitCode = pty
+      ? pty.pty.lastExitCode
+      : this.getLiveLeafForHandle(handle).leaf.lastExitCode
+    return {
+      handle,
+      condition: 'composer-ready',
+      satisfied: readiness.ready,
+      status,
+      exitCode,
+      composerReadyState: readiness.state,
+      waitedMs: readiness.waitedMs
+    }
   }
 
   async waitForSetupTerminalCompletion(handle: string): Promise<{ exitCode: number | null }> {
@@ -29767,6 +29901,7 @@ export class OrcaRuntimeService {
     this.pairedRendererSessionOwnedPtyIds.delete(ptyId)
     this.ptysById.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
+    this.composerReadiness.forget(ptyId)
     this.setupCompletionTokenByPtyId.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
