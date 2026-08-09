@@ -3,7 +3,10 @@ import type { DraftPasteReadySignal } from './tui-agent-config'
 // Why: agents enable bracketed paste (DECSET 2004) before their composer is
 // actually mounted/focused. These markers let the scanner detect the real
 // "input is ready" moment per agent instead of guessing from output silence.
-const DECSET_BRACKETED_PASTE = '\x1b[?2004h'
+export const DECSET_BRACKETED_PASTE = '\x1b[?2004h'
+/** DECRST 2004: the program holding the pane gave bracketed paste back — a
+ *  shell emits it before running a foreground command. */
+export const DECRST_BRACKETED_PASTE = '\x1b[?2004l'
 const CODEX_COMPOSER_PROMPT = '›'
 // Why: opencode emits the DECTCEM show-cursor only once the composer row is
 // mounted and the text cursor is placed in it — a "composer ready" signal,

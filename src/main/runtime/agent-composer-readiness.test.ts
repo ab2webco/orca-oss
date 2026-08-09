@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { AgentComposerReadinessTracker, composerReadySignalFor } from './agent-composer-readiness'
 
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
+const BRACKETED_PASTE_OFF = '\x1b[?2004l'
 const SHOW_CURSOR = '\x1b[?25h'
 const PTY = 'pty_1'
 
@@ -151,15 +152,75 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
       expect(readiness).toMatchObject({ ready: true, proven: true, state: 'ready' })
     })
 
-    // Why: this is the incident's window. `tui-idle` was satisfied here, while
-    // Codex was still repainting its boot screen and had not yet enabled
-    // bracketed paste — the gate has to keep waiting through all of it.
-    it('waits from before the handshake and resolves on the marker', async () => {
+    // Why: this is the incident's window. The agent enables bracketed paste
+    // ~120 ms after launch (measured 2026-08-09) and only then repaints its
+    // boot screen for seconds — `tui-idle` is satisfied inside that repaint,
+    // and the gate has to keep waiting through all of it.
+    it('waits through the boot repaint and resolves on the marker', async () => {
       const bus = createPtyBus()
       const tracker = watchedTracker(bus)
       bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
       const pending = tracker.wait(PTY, 'codex', 60_000)
       expect(bus.listenerCount(PTY)).toBe(2)
+      bus.emit(PTY, '\x1b[2J\x1b[H Starting MCP server')
+      bus.emit(PTY, '\r\n› ')
+      await expect(pending).resolves.toMatchObject({
+        ready: true,
+        proven: true,
+        state: 'ready'
+      })
+      // Why: a waiter that outlives its wait leaks a listener on every dispatch.
+      expect(bus.listenerCount(PTY)).toBe(1)
+    })
+
+    // Why (E2E regression): the handshake is the marker's own precondition, so
+    // a pane that is not holding it has no marker pending and nothing to wait
+    // for. Measured 2026-08-09: an interactive shell enables bracketed paste
+    // for its own prompt and gives it back (DECRST 2004) when it runs a
+    // command; codex and opencode re-enable it ~120 ms later, a `codex`-named
+    // non-TUI never does. Holding the budget for the second case is what made
+    // three orchestration E2E specs miss their own assertion window.
+    it('does not spend the budget when no marker is pending', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
+      tracker.observe(PTY, `codex\r\n${BRACKETED_PASTE_OFF}`)
+      tracker.observe(PTY, '\x1b]0;Codex Ready\x07OpenAI Codex\nmodel: e2e\n')
+
+      const readiness = await tracker.wait(PTY, 'codex', 60_000)
+      expect(readiness).toMatchObject({ ready: true, proven: false, state: 'unobserved' })
+      expect(readiness.waitedMs).toBeLessThan(1_000)
+      expect(bus.listenerCount(PTY)).toBe(1)
+    })
+
+    // Why: the pane the agent is booting in gives the handshake back only when
+    // its program hands the terminal on, so a wait that outlives that event is
+    // waiting for a marker that has lost its precondition.
+    it('stops waiting when the pane gives the handshake back', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
+      const pending = tracker.wait(PTY, 'codex', 60_000)
+      bus.emit(PTY, BRACKETED_PASTE_OFF)
+      await expect(pending).resolves.toMatchObject({
+        ready: true,
+        proven: false,
+        state: 'unobserved'
+      })
+      expect(bus.listenerCount(PTY)).toBe(1)
+    })
+
+    // Why: `wait --for composer-ready` asked to be told when the pane becomes
+    // ready, so it may spend its own budget on a pane that has not started
+    // mounting yet. The injector may not — that is the line above.
+    it('holds for the inspection surface until the marker arrives', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      const pending = tracker.wait(PTY, 'codex', 60_000, { holdWithoutPendingMarker: true })
       bus.emit(PTY, '\x1b[2J\x1b[H Starting MCP server')
       bus.emit(PTY, BRACKETED_PASTE_ON)
       bus.emit(PTY, '\r\n› ')
@@ -168,7 +229,6 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
         proven: true,
         state: 'ready'
       })
-      // Why: a waiter that outlives its wait leaks a listener on every dispatch.
       expect(bus.listenerCount(PTY)).toBe(1)
     })
 
@@ -191,10 +251,8 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
 
     // Why (E2E regression): three orchestration E2E specs died with a bare
     // shell prompt and no dispatch row because the gate refused a pane whose
-    // marker was never coming. Measured on 2026-08-09: an interactive shell
-    // emits DECSET 2004 for its own prompt, real Codex emits it twice, and a
-    // `codex`-named non-TUI emits it zero times — so nothing before the marker
-    // separates "mid-boot" from "will never mount a composer".
+    // marker was never coming. Nothing before the marker proves a pane holding
+    // the handshake will ever mount a composer, so expiry proceeds unproven.
     it('proceeds unproven when the marker never arrives', async () => {
       const bus = createPtyBus()
       const tracker = watchedTracker(bus)
@@ -215,8 +273,8 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
       const bus = createPtyBus()
       const tracker = watchedTracker(bus)
       bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
       const pending = tracker.wait(PTY, 'codex', 60_000)
-      bus.emit(PTY, BRACKETED_PASTE_ON)
       bus.emit(PTY, '\x1b[2J\x1b[H Starting MCP server')
       bus.emit(PTY, '\r\n› ')
 

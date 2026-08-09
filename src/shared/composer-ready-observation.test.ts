@@ -5,6 +5,7 @@ import {
 } from './composer-ready-observation'
 
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
+const BRACKETED_PASTE_OFF = '\x1b[?2004l'
 const SHOW_CURSOR = '\x1b[?25h'
 
 describe('createComposerReadyObservation (ORCA-191)', () => {
@@ -50,6 +51,43 @@ describe('createComposerReadyObservation (ORCA-191)', () => {
       clock = 9_999
       observation.observe('›')
       expect(observation.readyAt()).toBe(100)
+      expect(observation.state()).toBe('ready')
+    })
+
+    // Why: the shell enables bracketed paste for its own prompt, so a latch
+    // reads every shell pane as mid-boot. Only the live toggle separates a
+    // booting agent from a shell that already handed the pane to a child.
+    it('drops back to unobserved when the pane gives the handshake back', () => {
+      const observation = createComposerReadyObservation('codex-composer-prompt')
+      observation.observe(BRACKETED_PASTE_ON)
+      expect(observation.state()).toBe('awaiting-composer')
+      observation.observe(`codex\r\n${BRACKETED_PASTE_OFF}`)
+      expect(observation.state()).toBe('unobserved')
+      // The agent's own handshake, ~120 ms later (measured 2026-08-09).
+      observation.observe(BRACKETED_PASTE_ON)
+      expect(observation.state()).toBe('awaiting-composer')
+    })
+
+    it('takes the last toggle when one chunk carries both', () => {
+      const observation = createComposerReadyObservation('codex-composer-prompt')
+      observation.observe(`${BRACKETED_PASTE_OFF}boot${BRACKETED_PASTE_ON}`)
+      expect(observation.state()).toBe('awaiting-composer')
+      observation.observe(`${BRACKETED_PASTE_ON}redraw${BRACKETED_PASTE_OFF}`)
+      expect(observation.state()).toBe('unobserved')
+    })
+
+    it('sees a disable split across chunk boundaries', () => {
+      const observation = createComposerReadyObservation('codex-composer-prompt')
+      observation.observe(BRACKETED_PASTE_ON)
+      observation.observe('\x1b[?2004')
+      observation.observe('l')
+      expect(observation.state()).toBe('unobserved')
+    })
+
+    it('stays ready once latched even after the handshake goes back', () => {
+      const observation = createComposerReadyObservation('codex-composer-prompt')
+      observation.observe(`${BRACKETED_PASTE_ON}› `)
+      observation.observe(BRACKETED_PASTE_OFF)
       expect(observation.state()).toBe('ready')
     })
 

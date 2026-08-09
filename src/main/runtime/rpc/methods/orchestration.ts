@@ -1362,9 +1362,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // known-ready preview, or foreground quiescence — for Codex all three
         // land ~1-4 s before the composer accepts input, so the preamble is
         // typed into a redraw and swallowed. Hold the write until the agent's
-        // own marker says the composer mounted. This never refuses: nothing in
-        // the byte stream separates a TUI mid-boot from a process that will
-        // never mount a composer, so expiry proceeds and records `proven`.
+        // own marker says the composer mounted. This never refuses: a missing
+        // marker is not evidence of unreadiness, so expiry proceeds and records
+        // `proven`. It also only ever waits while a marker is pending — see
+        // `AgentComposerReadinessTracker.wait`.
         const composerReady = await runtime.waitForAgentComposerReady(to)
         let pendingAcceptance: Promise<AgentTurnAcceptance>
         try {

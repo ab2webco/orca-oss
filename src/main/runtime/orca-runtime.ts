@@ -16738,7 +16738,11 @@ export class OrcaRuntimeService {
    */
   async waitForAgentComposerReady(
     handle: string,
-    options: { timeoutMs?: number; signal?: AbortSignal } = {}
+    options: {
+      timeoutMs?: number
+      signal?: AbortSignal
+      holdWithoutPendingMarker?: boolean
+    } = {}
   ): Promise<AgentComposerReadiness> {
     const target = await this.resolveComposerReadinessTarget(handle)
     if (!target) {
@@ -16754,7 +16758,10 @@ export class OrcaRuntimeService {
       target.ptyId,
       target.agent,
       options.timeoutMs ?? AGENT_COMPOSER_READY_TIMEOUT_MS,
-      options.signal ? { abortSignal: options.signal } : {}
+      {
+        ...(options.signal ? { abortSignal: options.signal } : {}),
+        ...(options.holdWithoutPendingMarker ? { holdWithoutPendingMarker: true } : {})
+      }
     )
   }
 
@@ -17482,13 +17489,19 @@ export class OrcaRuntimeService {
    *  injector, not of an inspection surface: reporting `satisfied: true` for a
    *  pane whose marker never came would make this wait unable to answer the one
    *  question it exists for, and it is how the readiness timings were measured.
-   *  `composerReadyState` says which kind of no it is. */
+   *  `composerReadyState` says which kind of no it is.
+   *
+   *  It also holds its whole budget on a pane that has not started mounting a
+   *  composer yet, which the injector deliberately does not: this caller asked
+   *  to be told when the pane becomes ready, so answering "nothing is pending"
+   *  the instant it is called would make it useless right after a spawn. */
   private async waitForComposerReadyCondition(
     handle: string,
     timeoutMs?: number,
     signal?: AbortSignal
   ): Promise<RuntimeTerminalWait> {
     const readiness = await this.waitForAgentComposerReady(handle, {
+      holdWithoutPendingMarker: true,
       ...(typeof timeoutMs === 'number' && timeoutMs > 0 ? { timeoutMs } : {}),
       ...(signal ? { signal } : {})
     })

@@ -226,9 +226,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         // is satisfied for Codex before the composer accepts input, so the
         // preamble lands in a redraw and the run sits `dispatched` forever.
         // Hold the write until the agent's own marker says the composer
-        // mounted. This never fails the start: nothing in the byte stream
-        // separates a TUI mid-boot from a process that will never mount a
-        // composer, so expiry proceeds and records `proven` instead.
+        // mounted. This never fails the start: a missing marker is not evidence
+        // of unreadiness, so expiry proceeds and records `proven` instead.
         //
         // Why min(): expiry is benign, so spending the caller's whole remaining
         // budget on a wait that is already failing is pure latency — and it is

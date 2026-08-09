@@ -83,16 +83,17 @@ const PROVABLE_SIGNALS = [
  * are therefore scanned for every observed PTY, and `state(ptyId, agent)`
  * answers with the one that agent actually emits.
  *
- * Provenance is one half of what separates the meanings of "no marker seen".
  * Observation starts at `beginObserving`, which the runtime calls when it
  * registers a PTY it is spawning. A pane this runtime never registered
  * (restored or adopted after a restart) is never observed and always answers
  * `unobserved` — absence of evidence, never a refusal, which is what keeps
  * `dispatch --inject` usable on a stalled run.
  *
- * Only the marker itself proves readiness. See `wait` for the measurements
- * showing why no precursor — not the bracketed-paste handshake, not alt-screen,
- * not the agent's name — can stand in for it.
+ * Only the marker itself proves readiness: no precursor — not the handshake,
+ * not alt-screen, not the agent's name — can stand in for it. The live DECSET/
+ * DECRST 2004 state is not used as a stand-in but as the marker's own
+ * precondition, and that is all it decides: whether a marker is pending and so
+ * whether `wait` has anything to wait for. See `wait` for the measurements.
  */
 export class AgentComposerReadinessTracker {
   private observations = new Map<
@@ -138,14 +139,6 @@ export class AgentComposerReadinessTracker {
     return this.observationFor(ptyId, agent)?.state() ?? 'unobserved'
   }
 
-  /** True when this runtime watched the pane from its own spawn AND the agent
-   *  has a marker to watch for. `state()` alone cannot say: a watched pane that
-   *  has not handshaken yet and an unwatched pane both read `unobserved`, and
-   *  only the first is worth waiting on. */
-  private isWatched(ptyId: string, agent: TuiAgent | null): boolean {
-    return this.observationFor(ptyId, agent) !== undefined
-  }
-
   private observationFor(
     ptyId: string,
     agent: TuiAgent | null
@@ -174,20 +167,35 @@ export class AgentComposerReadinessTracker {
    * the agent in the incident — the injector no longer writes during the boot
    * window that `tui-idle` hands it.
    *
-   * Expiry proceeds unproven, because nothing in the byte stream distinguishes
-   * "a TUI whose composer has not mounted" from "a process that will never
-   * mount one". Measured 2026-08-09 on this machine:
+   * Expiry proceeds unproven, because nothing in the byte stream proves a TUI
+   * whose composer has not mounted will ever mount one. What the stream does
+   * carry is the marker's own precondition, and that is what bounds the wait:
+   * the scanner cannot fire before DECSET 2004, so the wait happens only while
+   * the pane is holding the handshake. `unobserved` is not "the marker has not
+   * come yet" — it is "no marker is pending", and it resolves at once.
    *
-   *   interactive shell alone   DECSET 2004 x1, alt-screen x0, marker x0
-   *   real Codex TUI            DECSET 2004 x2, alt-screen x0, marker x1+
-   *   `codex`-named non-TUI     DECSET 2004 x0, alt-screen x0, marker x0
+   * Measured on this machine 2026-08-09, t0 = the agent launch submitted into
+   * an interactive zsh: the shell's own DECSET 2004 at -280 ms, its DECRST at
+   * +35 ms as it hands the pane over, and the agent's own DECSET at +120 ms
+   * (codex 116-128 ms, opencode 117 ms). A `codex`-named process that is not
+   * the TUI never emits that third event. Injection happens after `tui-idle`,
+   * i.e. no earlier than ~1.7 s in, by which point a booting agent has held the
+   * handshake for well over a second and a non-TUI child has not held it at
+   * all. Residual window: a pane whose `tui-idle` were satisfied inside the
+   * ~85 ms between the shell's DECRST and the agent's DECSET would inject
+   * unproven, which is the pre-fix behaviour and is what the deadline catches.
    *
-   * The shell emits the handshake for its own prompt, so 2004 is not a TUI
-   * signal; Codex uses no alt-screen, so that is not one either; and matching
-   * an agent's name says nothing, since a wrapper, a shim, an older build or a
-   * test double all present as `codex`. Refusing on a missing marker therefore
-   * denies delivery on absence of evidence — it broke three orchestration E2E
-   * specs, each leaving a bare shell prompt and no dispatch row.
+   * Not evidence, and deliberately not used: matching an agent's name says
+   * nothing, since a wrapper, a shim, an older build or a test double all
+   * present as `codex`; Codex uses no alt-screen; and a latched handshake says
+   * only that *something*, usually the shell, once enabled bracketed paste.
+   * Refusing on a missing marker denies delivery on absence of evidence — it
+   * broke three orchestration E2E specs, each leaving a bare shell prompt and
+   * no dispatch row.
+   *
+   * Honest limit: a pane parked at a shell prompt with no agent in it holds the
+   * handshake, so a dispatch aimed there pays the full budget. That costs
+   * latency, never a refusal.
    *
    * What replaces the refusal is a recorded fact: `proven` rides to the caller
    * and onto the dispatch row, so if the preamble really was swallowed, slice
@@ -198,7 +206,19 @@ export class AgentComposerReadinessTracker {
     ptyId: string,
     agent: TuiAgent | null,
     timeoutMs: number,
-    options: { abortSignal?: AbortSignal; now?: () => number } = {}
+    options: {
+      abortSignal?: AbortSignal
+      now?: () => number
+      /**
+       * Hold the whole budget even with no marker pending. Only the `wait --for
+       * composer-ready` inspection surface sets it: a caller who asked to be
+       * told when a pane becomes ready may spend its own budget on a pane that
+       * has not started mounting yet. The dispatch injector may not — the wait
+       * it does not spend is latency on every dispatch into a pane that holds
+       * no composer, and that latency is what broke three E2E specs.
+       */
+      holdWithoutPendingMarker?: boolean
+    } = {}
   ): Promise<AgentComposerReadiness> {
     const now = options.now ?? Date.now
     const startedAt = now()
@@ -211,11 +231,15 @@ export class AgentComposerReadinessTracker {
       signal,
       waitedMs: now() - startedAt
     })
-    if (!this.isWatched(ptyId, agent)) {
-      return settle('unobserved')
+    // Why: `ready` needs no wait, and `unobserved` — no observation at all, or
+    // a pane not holding the handshake the marker needs — has none pending.
+    const observed = this.state(ptyId, agent)
+    const canPend = this.observationFor(ptyId, agent) !== undefined
+    if (observed === 'ready' || !canPend) {
+      return settle(observed)
     }
-    if (this.state(ptyId, agent) === 'ready') {
-      return settle('ready')
+    if (observed === 'unobserved' && !options.holdWithoutPendingMarker) {
+      return settle(observed)
     }
     return await new Promise<AgentComposerReadiness>((resolve) => {
       let unsubscribe: (() => void) | null = null
@@ -233,14 +257,19 @@ export class AgentComposerReadinessTracker {
         unsubscribe?.()
         resolve(settle(this.state(ptyId, agent)))
       }
+      // Why: the marker fired, or — for the injector — the pane gave the
+      // handshake back and nothing is mounting a composer any more.
+      const settled = (): boolean =>
+        this.state(ptyId, agent) === 'ready' ||
+        (!options.holdWithoutPendingMarker && this.state(ptyId, agent) === 'unobserved')
       // Why: subscribe before re-reading the state so a marker landing between
       // the read and the subscription cannot be missed.
       unsubscribe = this.subscribe(ptyId, () => {
-        if (this.state(ptyId, agent) === 'ready') {
+        if (settled()) {
           finish()
         }
       })
-      if (this.state(ptyId, agent) === 'ready') {
+      if (settled()) {
         finish()
         return
       }
