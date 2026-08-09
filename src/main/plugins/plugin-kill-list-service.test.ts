@@ -24,6 +24,9 @@ function killList(date = '2026-07-12T20:00:00Z'): PluginKillList {
 
 afterEach(async () => {
   vi.useRealTimers()
+  // Why: vi.spyOn on an already-spied console method reuses the existing spy,
+  // so without this the console assertions below see the prior test's calls.
+  vi.restoreAllMocks()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -139,6 +142,94 @@ describe('PluginKillListService', () => {
   })
 })
 
+describe('PluginKillListService fork exemptions', () => {
+  const exemptions = new Set(['community.unsafe'])
+
+  it('keeps an exempted plugin running when a refresh revokes it', async () => {
+    const service = new PluginKillListService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () => killList(),
+      exemptions
+    })
+
+    await expect(service.refresh()).resolves.toMatchObject({ plugins: [] })
+    expect(service.find('community.unsafe')).toBeNull()
+    expect(service.reason('community.unsafe')).toBeNull()
+  })
+
+  it('applies the exemption to a cache written before it shipped', async () => {
+    const root = await tempRoot()
+    const published = new PluginKillListService({
+      pluginsDataDir: root,
+      fetcher: async () => killList()
+    })
+    await published.refresh()
+
+    const restarted = new PluginKillListService({ pluginsDataDir: root, exemptions })
+    await restarted.initialize()
+
+    expect(restarted.find('community.unsafe')).toBeNull()
+  })
+
+  it('caches what upstream published, so dropping the exemption restores the revocation', async () => {
+    const root = await tempRoot()
+    const exempted = new PluginKillListService({
+      pluginsDataDir: root,
+      fetcher: async () => killList(),
+      exemptions
+    })
+    await exempted.refresh()
+
+    // No fetcher: the revocation can only come back from the cache on disk.
+    const withoutExemption = new PluginKillListService({ pluginsDataDir: root })
+    await withoutExemption.initialize()
+
+    expect(withoutExemption.reason('community.unsafe')).toBe('Malware advisory')
+  })
+
+  it('changes nothing while an exemption outlives the entry it overrode', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const service = new PluginKillListService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () => killList(),
+      // The steady state after upstream withdraws its advisory: the exemption
+      // is still shipped, matches nothing, and must be inert rather than noisy.
+      exemptions: new Set(['community.something-else'])
+    })
+
+    await expect(service.refresh()).resolves.toEqual(killList())
+    expect(service.reason('community.unsafe')).toBe('Malware advisory')
+    expect(info).not.toHaveBeenCalledWith(expect.stringContaining('exempts'))
+  })
+
+  it('records the keys a refresh newly revokes and the ones this fork overrode', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const revoking = new PluginKillListService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () => killList()
+    })
+    await revoking.refresh()
+    // A second refresh of the same list is not news and must stay silent.
+    await revoking.refresh().catch(() => undefined)
+
+    expect(info.mock.calls).toEqual([
+      ['[plugins] upstream safety list newly revokes: community.unsafe']
+    ])
+
+    info.mockClear()
+    const overriding = new PluginKillListService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () => killList(),
+      exemptions
+    })
+    await overriding.refresh()
+
+    expect(info).toHaveBeenCalledWith(
+      '[plugins] this fork exempts from the safety list: community.unsafe'
+    )
+  })
+})
+
 describe('fetchPluginKillList', () => {
   it('validates a bounded HTTPS response body', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
@@ -151,8 +242,13 @@ describe('fetchPluginKillList', () => {
     await expect(fetchPluginKillList(fetcher)).resolves.toEqual(killList())
   })
 
-  it('rejects non-success responses', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('no', { status: 503 }))
+  it('rejects non-success responses without leaving the body unread', async () => {
+    const response = new Response('no', { status: 503 })
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response)
+
     await expect(fetchPluginKillList(fetcher)).rejects.toThrow('HTTP 503')
+
+    // An abandoned body can crash the process from inside undici (orca#8695).
+    expect(response.bodyUsed).toBe(true)
   })
 })

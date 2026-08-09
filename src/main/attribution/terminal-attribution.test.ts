@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { ORCA_GIT_COMMIT_TRAILER } from '../../shared/orca-attribution'
 import { applyTerminalAttributionEnv, resolveAttributionShellFamily } from './terminal-attribution'
 
 describe('applyTerminalAttributionEnv', () => {
@@ -110,9 +111,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-m', 'second'], attributionEnv)
     expect(runGit(repo, ['rev-parse', 'HEAD']).trim()).not.toBe(beforeHead)
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('still adds the trailer when git commit uses --no-verify shorthand', () => {
@@ -133,9 +132,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-n', '-m', 'initial'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('adds the trailer when git commit uses combined -am shorthand', () => {
@@ -158,9 +155,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-am', 'combined message'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('adds the trailer when git commit follows global git config args', () => {
@@ -181,9 +176,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['-c', 'core.quotePath=false', 'commit', '-m', 'initial'], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('adds the trailer to commit message files before git runs', () => {
@@ -206,9 +199,7 @@ describe('applyTerminalAttributionEnv', () => {
 
     runGit(repo, ['commit', '-F', messagePath], attributionEnv)
 
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
     expect(readFileSync(messagePath, 'utf8')).toBe('initial from file\n')
   })
 
@@ -318,7 +309,7 @@ if [[ -f "${hookCounterPath}" ]]; then
   count="$(cat "${hookCounterPath}")"
 fi
 printf '%s\\n' "$((count + 1))" >"${hookCounterPath}"
-grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
+grep -Fq '${ORCA_GIT_COMMIT_TRAILER}' "$1"
 `,
       'utf8'
     )
@@ -335,9 +326,7 @@ grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
     runGit(repo, ['commit', '-m', 'initial'], attributionEnv)
 
     expect(readFileSync(hookCounterPath, 'utf8').trim()).toBe('1')
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
-    )
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('adds git attribution to the original commit command without amending', () => {
@@ -385,7 +374,7 @@ exit 1
 
     expect(existsSync(commitPath)).toBe(true)
     expect(existsSync(amendPath)).toBe(false)
-    expect(readFileSync(argsPath, 'utf8')).toContain('Co-authored-by: Orca <help@stably.ai>')
+    expect(readFileSync(argsPath, 'utf8')).toContain(ORCA_GIT_COMMIT_TRAILER)
   })
 
   posixSubprocessIt('passes editor-based commits through without attribution', () => {
@@ -820,5 +809,8 @@ exit 1
     expect(ghWrapper).toContain('"`r`n`r`n"')
     expect(gitWrapper).not.toContain('"\\`r"')
     expect(ghWrapper).not.toContain('"\\`r"')
+    // The env var normally supplies the trailer; this fallback is what a shim
+    // bakes in, and it is the one path no POSIX test can reach (ORCA-192).
+    expect(gitWrapper).toContain(`'${ORCA_GIT_COMMIT_TRAILER}'`)
   })
 })
