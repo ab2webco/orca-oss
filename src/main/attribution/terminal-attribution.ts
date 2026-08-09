@@ -8,9 +8,10 @@ import { ORCA_GIT_COMMIT_TRAILER } from '../../shared/orca-attribution'
 import { ORCA_REPOSITORY_URL } from '../../shared/orca-repository-url'
 
 const ATTRIBUTION_ROOT_DIR = 'orca-terminal-attribution'
-// Why: bumped with the footer repoint — installs holding shim 6 have upstream's
-// URL baked into the generated wrappers and must regenerate.
-const ATTRIBUTION_SHIM_VERSION = '7'
+// Why: bumped with the trailer repoint — installs holding shim 7 have
+// upstream's contact address baked into the generated wrappers and must
+// regenerate.
+const ATTRIBUTION_SHIM_VERSION = '8'
 const ORCA_GH_FOOTER = `Made with [Orca](${ORCA_REPOSITORY_URL}) 🐋`
 const SHELL_DOLLAR = '$'
 const POWERSHELL_TICK = '`'
@@ -284,7 +285,7 @@ for arg in "$@"; do
   esac
 done
 
-trailer="\${ORCA_GIT_COMMIT_TRAILER:-Co-authored-by: Orca <help@stably.ai>}"
+trailer="\${ORCA_GIT_COMMIT_TRAILER:-${ORCA_GIT_COMMIT_TRAILER}}"
 
 has_explicit_commit_message() {
   local arg
@@ -702,7 +703,7 @@ exit /b %ERRORLEVEL%
 
 const WIN32_GIT_PS_WRAPPER = String.raw`$ErrorActionPreference = 'Stop'
 $realGit = if ($env:ORCA_REAL_GIT) { $env:ORCA_REAL_GIT } else { 'git' }
-$trailer = if ($env:ORCA_GIT_COMMIT_TRAILER) { $env:ORCA_GIT_COMMIT_TRAILER } else { 'Co-authored-by: Orca <help@stably.ai>' }
+$trailer = if ($env:ORCA_GIT_COMMIT_TRAILER) { $env:ORCA_GIT_COMMIT_TRAILER } else { '${ORCA_GIT_COMMIT_TRAILER}' }
 
 if ($args -contains '--dry-run') {
   & $realGit @args

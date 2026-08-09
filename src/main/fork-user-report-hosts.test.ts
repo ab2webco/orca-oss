@@ -15,6 +15,17 @@ const FORK_OWNED_SURFACES = [
 
 const UPSTREAM_HOST = /onorca\.dev/
 
+// Why the second list: the commit trailer is the same failure in another shape
+// (ORCA-192 tier 2). Every agent commit made in this fork carried upstream's
+// support mailbox, and an upstream sync reintroducing it would be just as
+// invisible in a diff and just as silent at runtime as a repointed host.
+const FORK_OWNED_ATTRIBUTION = [
+  'shared/orca-attribution.ts',
+  'main/attribution/terminal-attribution.ts'
+]
+
+const UPSTREAM_CONTACT_DOMAIN = /stably\.ai/
+
 describe('fork-owned user report and What’s New surfaces', () => {
   it('never names an upstream host', () => {
     const srcRoot = join(import.meta.dirname, '..')
@@ -23,5 +34,14 @@ describe('fork-owned user report and What’s New surfaces', () => {
     )
 
     expect(offenders, 'These surfaces must resolve to this fork, not upstream').toEqual([])
+  })
+
+  it('never attributes a commit to an upstream address', () => {
+    const srcRoot = join(import.meta.dirname, '..')
+    const offenders = FORK_OWNED_ATTRIBUTION.filter((file) =>
+      UPSTREAM_CONTACT_DOMAIN.test(readFileSync(join(srcRoot, file), 'utf8'))
+    )
+
+    expect(offenders, 'Commits made in this fork must not name upstream’s mailbox').toEqual([])
   })
 })
