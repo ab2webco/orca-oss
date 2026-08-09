@@ -138,10 +138,18 @@ function runClaudeTerminalSwitchPreflight(
  * Reported by `orca account list` so a pane that lost a prerequisite to a restart
  * says so before anyone asks for a switch (ORCA-187).
  */
-export function readClaudeTerminalSwitchReadiness(
-  snapshot: ClaudeTerminalSwitchTargetSnapshot
-): ClaudeTerminalSwitchReadiness {
-  const preflight = runClaudeTerminalSwitchPreflight(services, snapshot)
+export async function readClaudeTerminalSwitchReadiness(
+  // Why lazy: snapshotting resolves the worktree map, and a headless runtime with
+  // no account services can only answer `runtime-unavailable` — it must not pay
+  // for a worktree scan to say so. The switch skips the same snapshot for the
+  // same reason, which is what keeps the two answers in step.
+  loadSnapshot: () => Promise<ClaudeTerminalSwitchTargetSnapshot>
+): Promise<ClaudeTerminalSwitchReadiness> {
+  const attached = services
+  const preflight = runClaudeTerminalSwitchPreflight(
+    attached,
+    attached ? await loadSnapshot() : null
+  )
   return preflight.state === 'ready' ? { state: 'ready' } : preflight
 }
 

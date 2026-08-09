@@ -12843,8 +12843,8 @@ export class OrcaRuntimeService {
     const claudeAccounts = this.accountServices?.claudeAccounts
     // Why the switch's own snapshot: readiness must be decided from the same
     // facts the switch reads, not from a second look at this record (ORCA-187).
-    const switchReadiness = readClaudeTerminalSwitchReadiness(
-      await this.snapshotClaudeTerminalSwitchTarget({ kind: 'handle', terminal: handle })
+    const switchReadiness = await readClaudeTerminalSwitchReadiness(() =>
+      this.snapshotClaudeTerminalSwitchTarget({ kind: 'handle', terminal: handle })
     )
     return resolveClaudeTerminalAccountReport({
       terminal: handle,

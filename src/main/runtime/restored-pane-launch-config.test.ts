@@ -170,8 +170,8 @@ describe('a Claude pane restored after an app restart', () => {
       launchAgent: 'claude'
     })
 
-    const readiness = readClaudeTerminalSwitchReadiness(
-      await runtime.snapshotClaudeTerminalSwitchTarget({ kind: 'pty', ptyId: PTY_ID })
+    const readiness = await readClaudeTerminalSwitchReadiness(() =>
+      runtime.snapshotClaudeTerminalSwitchTarget({ kind: 'pty', ptyId: PTY_ID })
     )
 
     expect(readiness).toEqual({ state: 'ready' })
@@ -187,11 +187,24 @@ describe('a Claude pane restored after an app restart', () => {
     // an honest refusal that names it beats a silent loss of capability.
     runtime.registerPty(PTY_ID, WORKTREE_ID, null, { tabId: TAB_ID, leafId: LEAF_ID })
 
-    const readiness = readClaudeTerminalSwitchReadiness(
-      await runtime.snapshotClaudeTerminalSwitchTarget({ kind: 'pty', ptyId: PTY_ID })
+    const readiness = await readClaudeTerminalSwitchReadiness(() =>
+      runtime.snapshotClaudeTerminalSwitchTarget({ kind: 'pty', ptyId: PTY_ID })
     )
 
     expect(readiness).toEqual({ state: 'unavailable', reason: 'missing-launch-config' })
+  })
+
+  it('answers a headless runtime without snapshotting the pane at all', async () => {
+    // `orca account list` is the safe cached path for scripted callers; a runtime
+    // that can only answer `runtime-unavailable` must not resolve worktrees to say so.
+    const runtime = makeRuntime()
+    syncAgentPane(runtime)
+    const snapshot = vi.fn()
+
+    const readiness = await readClaudeTerminalSwitchReadiness(snapshot as never)
+
+    expect(readiness).toEqual({ state: 'unavailable', reason: 'runtime-unavailable' })
+    expect(snapshot).not.toHaveBeenCalled()
   })
 
   it('keeps the launch description that really ran when a reattach re-registers', async () => {
