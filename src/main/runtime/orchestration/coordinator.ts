@@ -7,6 +7,20 @@ import { DISPATCH_STALE_THRESHOLD_MS } from './dispatch-lifecycle-deadline'
 
 export type CoordinatorRuntime = {
   sendTerminalAgentPrompt(handle: string, prompt: string): Promise<unknown>
+  // Why (ORCA-191): optional so lightweight runtime fakes keep compiling. When
+  // absent the loop keeps its pre-slice-2 behaviour: no readiness gate, no
+  // capability, and therefore no first-signal deadline.
+  waitForAgentComposerReady?(handle: string): Promise<{ ready: boolean; waitedMs: number }>
+  sendTerminalAgentPromptObservingTurn?(
+    handle: string,
+    prompt: string
+  ): Promise<{ turnAcceptance: Promise<{ accepted: boolean }> }>
+  getOrchestrationDispatchAuthority?(handle: string): {
+    paneKey: string | null
+    processIncarnation: string | null
+    launchTokenHash: string | null
+  } | null
+  ensureOrchestrationDispatchDeadlineMonitor?(): void
   listTerminals(
     worktreeSelector?: string,
     limit?: number
@@ -420,16 +434,47 @@ export class Coordinator {
       }
     }
 
+    // Why (ORCA-191): same gate as the dispatch RPC — refuse before
+    // createDispatchContext so no row exists, the task stays `ready`, and the
+    // next tick retries. Only positive evidence that the TUI is mid-boot skips;
+    // a pane whose readiness cannot be observed proceeds as before.
+    if (this.runtime.waitForAgentComposerReady) {
+      const composerReady = await this.runtime.waitForAgentComposerReady(targetHandle)
+      if (!composerReady.ready) {
+        this.opts.onLog(
+          `Skipping dispatch of ${task.id}: ${targetHandle} enabled bracketed paste but its ` +
+            `composer never became ready within ${Math.round(composerReady.waitedMs / 1000)}s. ` +
+            `Task remains in 'ready'; coordinator will retry on the next tick.`
+        )
+        return
+      }
+    }
+
+    const authority = this.runtime.getOrchestrationDispatchAuthority?.(targetHandle) ?? null
     const dispatch = this.db.createDispatchContext(
       task.id,
       targetHandle,
-      this.runtime.getTerminalPaneKey?.(targetHandle) ?? undefined
+      authority?.paneKey ?? this.runtime.getTerminalPaneKey?.(targetHandle) ?? undefined,
+      authority?.launchTokenHash ?? undefined
     )
+    // Why (ORCA-191): the loop minted no capability, so slice 1's deadline —
+    // which is armed only behind a live capability — could never cover it. The
+    // capability travels in the preamble below; without both, worker_done would
+    // be rejected for a dispatch the worker can no longer settle.
+    const dispatchCapability =
+      authority?.paneKey && authority.processIncarnation
+        ? this.db.mintDispatchCapability({
+            dispatchId: dispatch.id,
+            paneKey: authority.paneKey,
+            processIncarnation: authority.processIncarnation
+          })
+        : undefined
 
     // Why: dispatched agents use orca-dev in dev mode to reach the dev runtime's socket, not production (Section 6.4).
     const preamble = buildDispatchPreamble({
       taskId: task.id,
       dispatchId: dispatch.id,
+      ...(dispatchCapability ? { dispatchCapability } : {}),
       // Why (§3.4): strippedSpec drops the allow-stale-base line so the worker doesn't read the infra flag as an instruction.
       taskSpec: strippedSpec,
       coordinatorHandle: this.opts.coordinatorHandle,
@@ -450,8 +495,17 @@ export class Coordinator {
       gateContext = `\n\n--- DECISION GATE RESOLVED ---\nQuestion: ${latest.question}\nResolution: ${latest.resolution}\n---\n`
     }
 
+    let pendingAcceptance: Promise<{ accepted: boolean }> | null = null
     try {
-      await this.runtime.sendTerminalAgentPrompt(targetHandle, preamble + gateContext)
+      if (this.runtime.sendTerminalAgentPromptObservingTurn) {
+        const sent = await this.runtime.sendTerminalAgentPromptObservingTurn(
+          targetHandle,
+          preamble + gateContext
+        )
+        pendingAcceptance = sent.turnAcceptance
+      } else {
+        await this.runtime.sendTerminalAgentPrompt(targetHandle, preamble + gateContext)
+      }
     } catch (err) {
       const updated = this.db.failDispatch(
         dispatch.id,
@@ -461,6 +515,17 @@ export class Coordinator {
         this.state.failedTasks.push(task.id)
       }
       throw err
+    }
+
+    // Why (ORCA-191): armed on the write, not on the acceptance observation —
+    // and only when the dispatch actually carries a capability, matching the
+    // grandfathering slice 1 established.
+    if (dispatchCapability) {
+      this.db.armDispatchLifecycleDeadline(dispatch.id)
+      this.runtime.ensureOrchestrationDispatchDeadlineMonitor?.()
+    }
+    if (pendingAcceptance && (await pendingAcceptance).accepted) {
+      this.db.recordDispatchTurnAcceptance(dispatch.id)
     }
 
     this.opts.onLog(`Dispatched task ${task.id} to ${targetHandle}`)
