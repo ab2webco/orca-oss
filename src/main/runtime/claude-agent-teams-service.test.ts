@@ -55,6 +55,7 @@ function createServiceWithLeader(): {
       title: null,
       connected: true,
       writable: true,
+      liveness: 'running' as const,
       lastOutputAt: null,
       preview: '',
       paneRuntimeId: -1,

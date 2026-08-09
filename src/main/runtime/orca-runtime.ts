@@ -249,7 +249,8 @@ import {
 import { getRegisteredSshState } from '../ipc/ssh'
 import type {
   AgentProviderSessionMetadata,
-  SleepingAgentLaunchConfig
+  SleepingAgentLaunchConfig,
+  SleepingAgentSessionRecord
 } from '../../shared/agent-session-resume'
 import type { ExactWorkerProviderSession } from '../../shared/orchestration-worker-output'
 import type { ClaudeTerminalAccountSwitchTarget } from '../../shared/claude-terminal-account-switch'
@@ -319,6 +320,7 @@ import {
   type RuntimeSpeechModelSummary,
   type RuntimeSpeechSetupState,
   type RuntimeTerminalShow,
+  type RuntimeTerminalSleepingAgent,
   type RuntimeTerminalSummary,
   type RuntimeTerminalVisualGroupNode,
   type RuntimeTerminalVisualLayout,
@@ -1308,6 +1310,25 @@ type RuntimeLeafRecord = RuntimeSyncedLeaf & {
   lastOscTitle: string | null
   lastOscTitleAt: number | null
   paneTitleUpdatedAt: number | null
+}
+
+/** makePaneKey throws on runtime-synthesized ids (`pty:<id>` tabs, numeric
+ *  leaves); listing must skip those rows, not fail the whole call. */
+function tryMakePaneKey(tabId: string, leafId: string): string | null {
+  if (!tabId || tabId.includes(':') || !isTerminalLeafId(leafId)) {
+    return null
+  }
+  return makePaneKey(tabId, leafId)
+}
+
+function describeSleepingAgent(record: SleepingAgentSessionRecord): RuntimeTerminalSleepingAgent {
+  return {
+    agent: record.agent,
+    paneKey: record.paneKey,
+    stateAtSleep: record.state,
+    capturedAt: record.capturedAt,
+    ...(record.interrupted ? { interrupted: true } : {})
+  }
 }
 
 function isCursorAgentOrchestrationTarget(
@@ -2948,6 +2969,11 @@ export class OrcaRuntimeService {
   private handleByLeafKey = new Map<string, string>()
   private handleByPtyId = new Map<string, string>()
   private syntheticTerminalHandles = new Set<string>()
+  // Why: handles for sleeping panes that have no graph leaf. Kept apart from
+  // `handles` so a write against one fails as `terminal_asleep` (wake it first)
+  // instead of `terminal_handle_stale`, which reads as "the pane is gone".
+  private sleepingHandlesByPaneKey = new Map<string, string>()
+  private sleepingHandleRecords = new Map<string, SleepingAgentSessionRecord>()
   private detachedPreAllocatedLeaves = new Map<string, RuntimeLeafRecord>()
   private graphSyncCallbacks: (() => void)[] = []
   private waitersByHandle = new Map<string, Set<TerminalWaiter>>()
@@ -15115,8 +15141,20 @@ export class OrcaRuntimeService {
       }
     }
 
+    // Why: a hibernated agent pane keeps its identity in the workspace session
+    // after its PTY is killed. Without this, the pane is either dropped by the
+    // unbound-leaf filter below or reported as an indistinguishable
+    // `connected: false` corpse — both read as "abandoned" to a coordinator,
+    // which then dispatches a second agent onto the same branch (ORCA-186).
+    // requireFreshPtyLiveness callers asked for PTY-verified liveness only, so
+    // they never see a sleeping row.
+    const sleepingAgentsByPaneKey = opts.requireFreshPtyLiveness
+      ? new Map<string, SleepingAgentSessionRecord>()
+      : this.collectSleepingAgentSessions(resolvedWorktrees, targetWorktreeId)
+
     const terminals: RuntimeTerminalSummary[] = []
     const ptyIdsFromLeaves = new Set<string>()
+    const listedPaneKeys = new Set<string>()
     if (graphEpoch !== null) {
       for (const leaf of this.leaves.values()) {
         if (targetWorktreeId && leaf.worktreeId !== targetWorktreeId) {
@@ -15128,13 +15166,26 @@ export class OrcaRuntimeService {
         ) {
           continue
         }
-        if (!leaf.ptyId && livePtyWorktreeIds.has(leaf.worktreeId)) {
+        const paneKey = tryMakePaneKey(leaf.tabId, leaf.leafId)
+        // Why: an unbound leaf in a worktree that has live PTYs is a pane still
+        // binding its transport — listing it would duplicate the PTY row that
+        // already represents it. A sleeping pane is not mid-bind: its PTY was
+        // deliberately killed and will not come back on its own, so it carries
+        // the filter's reason as an explicit state instead of vanishing.
+        if (
+          !leaf.ptyId &&
+          livePtyWorktreeIds.has(leaf.worktreeId) &&
+          !(paneKey && sleepingAgentsByPaneKey.has(paneKey))
+        ) {
           continue
         }
         if (leaf.ptyId) {
           ptyIdsFromLeaves.add(leaf.ptyId)
         }
-        terminals.push(this.buildTerminalSummary(leaf, worktreesById))
+        if (paneKey) {
+          listedPaneKeys.add(paneKey)
+        }
+        terminals.push(this.buildTerminalSummary(leaf, worktreesById, sleepingAgentsByPaneKey))
       }
     }
 
@@ -15151,7 +15202,25 @@ export class OrcaRuntimeService {
       if (targetWorktreeId && pty.worktreeId !== targetWorktreeId) {
         continue
       }
+      if (pty.paneKey) {
+        listedPaneKeys.add(pty.paneKey)
+      }
       terminals.push(this.buildPtyTerminalSummary(pty, worktreesById))
+    }
+
+    // Why: a background worktree publishes no graph leaf for a pane with no live
+    // PTY, so a sleeping worker there has neither a leaf row nor a PTY row. The
+    // session record is the only thing that still knows the pane exists, so the
+    // row is built from it rather than left as silence.
+    for (const [paneKey, record] of sleepingAgentsByPaneKey) {
+      if (listedPaneKeys.has(paneKey)) {
+        continue
+      }
+      const summary = this.buildSleepingTerminalSummary(record, worktreesById)
+      if (summary) {
+        listedPaneKeys.add(paneKey)
+        terminals.push(summary)
+      }
     }
 
     const requestedHandles = opts.handles ? new Set(opts.handles) : null
@@ -15177,6 +15246,87 @@ export class OrcaRuntimeService {
       totalCount: matchingTerminals.length,
       truncated: matchingTerminals.length > limit
     }
+  }
+
+  /** Provider-session resume records for the worktrees in listing scope, keyed
+   *  by paneKey. One record means one pane whose agent is asleep but wakeable. */
+  private collectSleepingAgentSessions(
+    resolvedWorktrees: readonly ResolvedWorktree[],
+    targetWorktreeId: string | null
+  ): Map<string, SleepingAgentSessionRecord> {
+    const byPaneKey = new Map<string, SleepingAgentSessionRecord>()
+    const worktreeIdsInScope = new Set(resolvedWorktrees.map((worktree) => worktree.id))
+    if (targetWorktreeId) {
+      worktreeIdsInScope.add(targetWorktreeId)
+    }
+    // Why: one session per execution host holds records for all of that host's
+    // worktrees, so scan each distinct session once instead of per worktree.
+    const scannedSessions = new Set<WorkspaceSessionState>()
+    for (const worktreeId of worktreeIdsInScope) {
+      const session = this.getWorkspaceSessionForWorktree(worktreeId)
+      if (!session || scannedSessions.has(session)) {
+        continue
+      }
+      scannedSessions.add(session)
+      for (const [paneKey, record] of Object.entries(
+        session.sleepingAgentSessionsByPaneKey ?? {}
+      )) {
+        if (!worktreeIdsInScope.has(record.worktreeId) || !parsePaneKey(paneKey)) {
+          continue
+        }
+        byPaneKey.set(paneKey, record)
+      }
+    }
+    // Why: a pane that woke drops its record, and its sleeping handle must stop
+    // resolving with it — otherwise a caller holding that handle keeps addressing
+    // a pane that is now running under a different handle.
+    for (const [paneKey, handle] of this.sleepingHandlesByPaneKey) {
+      const worktreeId = this.sleepingHandleRecords.get(handle)?.worktreeId
+      if (worktreeId && worktreeIdsInScope.has(worktreeId) && !byPaneKey.has(paneKey)) {
+        this.sleepingHandlesByPaneKey.delete(paneKey)
+        this.sleepingHandleRecords.delete(handle)
+      }
+    }
+    return byPaneKey
+  }
+
+  private buildSleepingTerminalSummary(
+    record: SleepingAgentSessionRecord,
+    worktreesById: Map<string, ResolvedWorktree>
+  ): RuntimeTerminalSummary | null {
+    const pane = parsePaneKey(record.paneKey)
+    if (!pane) {
+      return null
+    }
+    const worktree = worktreesById.get(record.worktreeId)
+    return {
+      handle: this.issueSleepingHandle(record),
+      ptyId: null,
+      incarnationId: null,
+      orphaned: false,
+      worktreeId: record.worktreeId,
+      worktreePath: worktree?.path ?? '',
+      branch: worktree?.branch ?? '',
+      tabId: record.tabId ?? pane.tabId,
+      leafId: pane.leafId,
+      title: record.terminalTitle ?? null,
+      connected: false,
+      writable: false,
+      liveness: 'sleeping',
+      lastOutputAt: record.updatedAt,
+      preview: record.lastAssistantMessage ?? '',
+      sleepingAgent: describeSleepingAgent(record)
+    }
+  }
+
+  private issueSleepingHandle(record: SleepingAgentSessionRecord): string {
+    const existing = this.sleepingHandlesByPaneKey.get(record.paneKey)
+    const handle = existing ?? `term_${randomUUID()}`
+    if (!existing) {
+      this.sleepingHandlesByPaneKey.set(record.paneKey, handle)
+    }
+    this.sleepingHandleRecords.set(handle, record)
+    return handle
   }
 
   private getTerminalTopologyRevision(worktreeId: string): number {
@@ -15908,7 +16058,9 @@ export class OrcaRuntimeService {
         }
       }
       const listed = await this.listTerminals(worktreeSelector)
-      const first = listed.terminals[0]?.handle
+      // Why: a sleeping pane is listed but cannot accept the caller's next
+      // command, so it must never become the implicit default terminal.
+      const first = listed.terminals.find((terminal) => terminal.liveness !== 'sleeping')?.handle
       if (first) {
         return first
       }
@@ -16308,6 +16460,17 @@ export class OrcaRuntimeService {
   }
 
   async showTerminal(handle: string): Promise<RuntimeTerminalShow> {
+    // Why: `terminal.show` is read-only, so a sleeping pane answers it rather
+    // than failing — that is how a caller confirms the worker is asleep, not gone.
+    const sleepingRecord = this.sleepingHandleRecords.get(handle)
+    if (sleepingRecord) {
+      const worktreesById = await this.getResolvedWorktreeMap()
+      const summary = this.buildSleepingTerminalSummary(sleepingRecord, worktreesById)
+      if (!summary) {
+        throw new Error('terminal_handle_stale')
+      }
+      return { ...summary, paneRuntimeId: -1, rendererGraphEpoch: this.rendererGraphEpoch }
+    }
     const pty = this.getLivePtyForHandle(handle)
     if (pty) {
       const worktreesById = await this.getResolvedWorktreeMap()
@@ -29652,12 +29815,15 @@ export class OrcaRuntimeService {
 
   private buildTerminalSummary(
     leaf: RuntimeLeafRecord,
-    worktreesById: Map<string, ResolvedWorktree>
+    worktreesById: Map<string, ResolvedWorktree>,
+    sleepingAgentsByPaneKey?: ReadonlyMap<string, SleepingAgentSessionRecord>
   ): RuntimeTerminalSummary {
     const worktree = worktreesById.get(leaf.worktreeId)
     const tab = this.tabs.get(leaf.tabId) ?? null
 
     const pty = leaf.ptyId ? this.ptysById.get(leaf.ptyId) : undefined
+    const paneKey = tryMakePaneKey(leaf.tabId, leaf.leafId)
+    const sleeping = !leaf.connected && paneKey ? sleepingAgentsByPaneKey?.get(paneKey) : undefined
     return {
       handle: this.issueHandle(leaf),
       ptyId: leaf.ptyId,
@@ -29671,8 +29837,10 @@ export class OrcaRuntimeService {
       title: getLatestLeafTitle(leaf, tab?.title ?? null),
       connected: leaf.connected,
       writable: leaf.writable,
+      liveness: leaf.connected ? 'running' : sleeping ? 'sleeping' : 'gone',
       lastOutputAt: leaf.lastOutputAt,
-      preview: leaf.preview
+      preview: leaf.preview,
+      ...(sleeping ? { sleepingAgent: describeSleepingAgent(sleeping) } : {})
     }
   }
 
@@ -31249,6 +31417,7 @@ export class OrcaRuntimeService {
       title: getLatestPtyTitle(pty),
       connected: pty.connected,
       writable: pty.connected,
+      liveness: pty.connected ? 'running' : 'gone',
       lastOutputAt: pty.lastOutputAt,
       preview: pty.preview
     }
@@ -31258,6 +31427,12 @@ export class OrcaRuntimeService {
     record: TerminalHandleRecord
     leaf: RuntimeLeafRecord
   } {
+    // Why: `terminal_handle_stale` would tell the caller the pane is gone. A
+    // sleeping pane is addressable again after a wake, and saying so is the
+    // whole point of listing it (ORCA-186).
+    if (this.sleepingHandleRecords.has(handle)) {
+      throw new Error('terminal_asleep')
+    }
     this.assertGraphReady()
     const record = this.handles.get(handle)
     if (!record || record.runtimeId !== this.runtimeId) {
