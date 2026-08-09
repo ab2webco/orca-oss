@@ -201,6 +201,8 @@ Terminal rules:
 - Use `terminal create --worktree active --command "<agent>"` for a fresh agent in the current worktree. Use `worktree create --agent <agent>` only for a separate checkout (agent in the first terminal — do not also `terminal create` the same agent).
 - Use `terminal wait --for tui-idle` for agent CLIs such as Claude Code, Gemini, Codex, OMP, Pi, and Grok; always pass `--timeout-ms`.
 - Terminal handles are runtime-scoped. Use `startupTerminal.handle` as the sole agent handle when `worktree create --agent` returns it; if Orca restarts, omits the handle, or returns `terminal_handle_stale`, reacquire with `terminal list` and continue with the replacement only.
+- Every `terminal list` / `terminal show` row carries `liveness`: `running`, `sleeping` (a hibernated agent, session intact, wakeable), or `gone`. Judge whether an agent is still working from that field — never from a row's absence and never from `connected`, which reads the same for `sleeping` and `gone`.
+- A `sleeping` row has no PTY: `terminal send`, `terminal wait`, and `terminal close` refuse it with `terminal_asleep`. Wake the pane in the Orca app and re-list to get its running handle; do not launch a second agent in its place.
 - For long output, use cursor reads. After a limited tail preview, page from `oldestCursor`; after a cursor read, continue with `nextCursor` while `limited` is true and `nextCursor !== latestCursor`.
 - `--direction horizontal` splits left/right. `--direction vertical` splits top/bottom.
 

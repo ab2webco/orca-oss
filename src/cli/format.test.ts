@@ -244,6 +244,7 @@ describe('formatTerminalList', () => {
           title: 'Left',
           connected: true,
           writable: true,
+          liveness: 'running',
           lastOutputAt: null,
           preview: ''
         },
@@ -258,6 +259,7 @@ describe('formatTerminalList', () => {
           title: 'Right top',
           connected: true,
           writable: true,
+          liveness: 'running',
           lastOutputAt: null,
           preview: ''
         },
@@ -272,6 +274,7 @@ describe('formatTerminalList', () => {
           title: 'Right bottom',
           connected: true,
           writable: true,
+          liveness: 'running',
           lastOutputAt: null,
           preview: ''
         }

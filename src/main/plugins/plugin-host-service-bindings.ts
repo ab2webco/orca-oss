@@ -1,4 +1,5 @@
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import type { RuntimeTerminalLiveness } from '../../shared/runtime-types'
 import { PLUGIN_WORKSPACE_TERMINAL_LIMIT } from '../../shared/plugins/plugin-host-api'
 import type { PluginHostServices } from './plugin-host-methods'
 import { PluginSecretsStore } from './plugin-secrets-store'
@@ -15,7 +16,13 @@ export type PluginRuntimeDelegate = {
   listTerminals(
     worktreeSelector?: string,
     limit?: number
-  ): Promise<{ terminals: { handle: string; title: string | null }[] }>
+  ): Promise<{
+    terminals: {
+      handle: string
+      title: string | null
+      liveness: RuntimeTerminalLiveness
+    }[]
+  }>
   sendTerminal(
     handle: string,
     action: { text?: string; enter?: boolean }
@@ -52,9 +59,14 @@ export function bindPluginHostServices(input: {
         `id:${worktreeId}`,
         PLUGIN_WORKSPACE_TERMINAL_LIMIT
       )
-      return result.terminals
-        .slice(0, PLUGIN_WORKSPACE_TERMINAL_LIMIT)
-        .map((terminal) => ({ id: terminal.handle }))
+      return (
+        result.terminals
+          // Why: plugins only get ids they can send text to; a sleeping pane has
+          // no PTY behind it and must be woken from the app first.
+          .filter((terminal) => terminal.liveness !== 'sleeping')
+          .slice(0, PLUGIN_WORKSPACE_TERMINAL_LIMIT)
+          .map((terminal) => ({ id: terminal.handle }))
+      )
     },
     sendTerminalText: async (terminalId, action) => {
       const result = await delegate.sendTerminal(terminalId, action)

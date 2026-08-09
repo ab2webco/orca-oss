@@ -12,17 +12,32 @@ import type {
   RuntimeTerminalSend,
   RuntimeTerminalShow,
   RuntimeTerminalSplit,
+  RuntimeTerminalSummary,
   RuntimeTerminalWait
 } from '../shared/runtime-types'
 
+/** Human-readable liveness. `connected`/`disconnected` cannot separate a
+ *  sleeping agent from a dead pane, and the human output must not force the
+ *  reader into the same wrong inference the JSON output now prevents. */
+function formatTerminalLiveness(terminal: RuntimeTerminalSummary): string {
+  switch (terminal.liveness) {
+    case 'running':
+      return 'running'
+    case 'sleeping':
+      return `sleeping (${terminal.sleepingAgent?.agent ?? 'agent'}, wake to resume)`
+    case 'gone':
+      return 'gone'
+  }
+}
+
 export function formatTerminalList(result: RuntimeTerminalListResult): string {
   if (result.terminals.length === 0) {
-    return 'No live terminals.'
+    return 'No terminals.'
   }
   const body = result.terminals
     .map(
       (terminal) =>
-        `${terminal.handle}  ${terminal.title ?? '(untitled)'}  ${terminal.connected ? 'connected' : 'disconnected'}  ${terminal.worktreePath}\n${terminal.preview ? `preview: ${terminal.preview}` : 'preview: <empty>'}`
+        `${terminal.handle}  ${terminal.title ?? '(untitled)'}  ${formatTerminalLiveness(terminal)}  ${terminal.worktreePath}\n${terminal.preview ? `preview: ${terminal.preview}` : 'preview: <empty>'}`
     )
     .join('\n\n')
   const visualLayout = formatTerminalVisualLayouts(result.visualLayouts)
@@ -95,6 +110,7 @@ export function formatTerminalShow(result: { terminal: RuntimeTerminalShow }): s
     `branch: ${terminal.branch}`,
     `leaf: ${terminal.leafId}`,
     `ptyId: ${terminal.ptyId ?? 'none'}`,
+    `liveness: ${formatTerminalLiveness(terminal)}`,
     `connected: ${terminal.connected}`,
     `writable: ${terminal.writable}`,
     `preview: ${terminal.preview || '<empty>'}`

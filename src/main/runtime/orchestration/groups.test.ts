@@ -17,6 +17,7 @@ function makeSummary(
     title: opts.title ?? null,
     connected: opts.connected ?? true,
     writable: opts.writable ?? true,
+    liveness: opts.liveness ?? ((opts.connected ?? true) ? 'running' : 'gone'),
     lastOutputAt: opts.lastOutputAt ?? null,
     preview: opts.preview ?? ''
   }
@@ -59,6 +60,18 @@ describe('resolveGroupAddress', () => {
       const terminals = [makeSummary('term_a')]
       const result = resolveGroupAddress('@all', 'term_a', terminals, noStatus)
       expect(result).toEqual([])
+    })
+
+    // Why: sleeping panes are listed now, but a message addressed to a sleeping
+    // handle is lost — the pane wakes under a different handle.
+    it('skips sleeping terminals', () => {
+      const terminals = [
+        makeSummary('term_a'),
+        makeSummary('term_asleep', { connected: false, liveness: 'sleeping' }),
+        makeSummary('term_c')
+      ]
+      const result = resolveGroupAddress('@all', 'term_a', terminals, noStatus)
+      expect(result).toEqual(['term_c'])
     })
   })
 

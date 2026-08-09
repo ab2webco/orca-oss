@@ -436,6 +436,20 @@ export type RuntimeFileReadChunkResult = {
   eof: boolean
 }
 
+/** Whether the process behind a listed terminal is running, asleep but
+ *  resumable, or gone for good.
+ *
+ *  `running` — a live PTY; writable.
+ *  `sleeping` — no PTY, but a provider-session resume record still holds this
+ *    pane's identity, so the agent can be woken and its conversation continues.
+ *  `gone` — the pane exists with no PTY and nothing to resume from.
+ *
+ *  `connected` collapses the last two into one value, and absence from
+ *  `terminal.list` used to collapse `sleeping` into nothing at all. Either
+ *  reading makes a coordinator dispatch a second agent onto a branch that
+ *  already has a live worker (ORCA-186). */
+export type RuntimeTerminalLiveness = 'running' | 'sleeping' | 'gone'
+
 export type RuntimeTerminalSummary = {
   handle: string
   ptyId: string | null
@@ -449,8 +463,21 @@ export type RuntimeTerminalSummary = {
   title: string | null
   connected: boolean
   writable: boolean
+  liveness: RuntimeTerminalLiveness
   lastOutputAt: number | null
   preview: string
+  /** Set on `sleeping` rows: how to address the agent once it is awake. */
+  sleepingAgent?: RuntimeTerminalSleepingAgent
+}
+
+export type RuntimeTerminalSleepingAgent = {
+  agent: string
+  paneKey: string
+  /** Agent status captured at the moment the pane was put to sleep. */
+  stateAtSleep: string
+  capturedAt: number
+  /** Whether the sleeping session was interrupted mid-turn rather than idle. */
+  interrupted?: boolean
 }
 
 export type RuntimeTerminalVisualTerminalNode = {
