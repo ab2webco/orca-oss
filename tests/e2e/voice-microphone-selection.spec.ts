@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { clickWithBlockerReport } from './helpers/click-actionability-report'
+import { clickWithoutFrameDependency } from './helpers/frame-independent-click'
 
 type FakeMicrophoneDevice = {
   deviceId: string
@@ -87,7 +87,7 @@ async function prepareVoiceSettings(
   await expect(page.getByPlaceholder('Search settings')).toBeVisible()
   const featureTipDialog = page.getByRole('dialog', { name: 'Voice Dictation is here' })
   if (await featureTipDialog.isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: 'Maybe Later' }).click()
+    await clickWithoutFrameDependency(page.getByRole('button', { name: 'Maybe Later' }), page)
   }
   await expect(page.getByRole('heading', { name: 'Voice', exact: true })).toBeVisible()
 }
@@ -117,9 +117,12 @@ test.describe('Voice microphone selection', () => {
 
     const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
     await expect(microphone).toHaveText('System default')
-    await clickWithBlockerReport(microphone, orcaPage)
+    await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'USB Microphone' })).toBeVisible()
-    await orcaPage.getByRole('option', { name: 'USB Microphone' }).click()
+    await clickWithoutFrameDependency(
+      orcaPage.getByRole('option', { name: 'USB Microphone' }),
+      orcaPage
+    )
 
     await expect
       .poll(() => readMicrophoneSettings(orcaPage), {
@@ -148,7 +151,7 @@ test.describe('Voice microphone selection', () => {
     await prepareVoiceSettings(orcaPage, 'stale-airpods-id', 'AirPods')
 
     const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
-    await clickWithBlockerReport(microphone, orcaPage)
+    await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'AirPods (unavailable)' })).toBeVisible()
     await orcaPage.keyboard.press('Escape')
 
@@ -166,7 +169,7 @@ test.describe('Voice microphone selection', () => {
     })
 
     await expect(microphone).toHaveText('AirPods')
-    await microphone.click()
+    await clickWithoutFrameDependency(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'AirPods' })).toBeVisible()
     await expect(orcaPage.getByRole('option', { name: 'AirPods (unavailable)' })).toHaveCount(0)
     await orcaPage.keyboard.press('Escape')

@@ -1,16 +1,24 @@
 /**
- * TEMPORARY diagnostic for ORCA-197: a `locator.click()` that hangs in
- * "waiting for element to be visible, enabled and stable" says nothing about
- * WHICH of the three gates never opened. Playwright's stability gate samples
- * the bounding box across consecutive animation frames, so a renderer whose
- * `requestAnimationFrame` never fires stalls forever on a page that screenshots
- * perfectly. This reports the frame cadence, the sampled boxes and the
- * element's own disabled/visibility state so the failure can be classified.
+ * Clicking a control whose Playwright stability gate can never close.
  *
- * Delete once ORCA-197 has the answer.
+ * `locator.click()` waits for the element to be visible, enabled AND stable,
+ * and the stability check is a pure `requestAnimationFrame` loop with no
+ * timeout fallback (playwright-core injectedScriptSource). The E2E window is
+ * never shown, so Chromium produces no compositor frames for it and rAF never
+ * fires — the click then burns its full timeout on a control that screenshots
+ * perfectly. Measured on a settings pane in run 31328287420:
+ *
+ *   animation frames in 1000ms: 0
+ *   element: {"disabled":false,"pointerEvents":"auto","opacity":"1", ...}
+ *   bounding boxes across frames: []
+ *
+ * So assert the gates that carry meaning — visible and enabled — in the test,
+ * and drop only the frame-dependent one. A control covered by an overlay still
+ * fails, because the forced click lands on the overlay and whatever the click
+ * was supposed to open never appears.
  */
 
-import type { Locator, Page } from '@stablyai/playwright-test'
+import { expect, type Locator, type Page } from '@stablyai/playwright-test'
 
 const SAMPLE_WINDOW_MS = 1_000
 const SAMPLE_ABORT_MS = 3_000
@@ -38,6 +46,7 @@ async function countAnimationFrames(page: Page): Promise<number> {
   )
 }
 
+/** Frame cadence and the element's own state — why a click could not proceed. */
 export async function describeClickBlocker(locator: Locator, page: Page): Promise<string> {
   const frames = await countAnimationFrames(page).catch(() => -1)
   const visibilityState = await page.evaluate(() => document.visibilityState).catch(() => 'unknown')
@@ -56,44 +65,28 @@ export async function describeClickBlocker(locator: Locator, page: Page): Promis
       }
     })
     .catch((error: unknown) => ({ error: String(error) }))
-  const boxes = await locator
-    .evaluate(
-      (el, abortMs) =>
-        new Promise<string[]>((resolve) => {
-          const samples: string[] = []
-          const abort = setTimeout(() => resolve(samples), abortMs)
-          const tick = (): void => {
-            const rect = el.getBoundingClientRect()
-            samples.push(`${rect.x},${rect.y},${rect.width},${rect.height}`)
-            if (samples.length >= 6) {
-              clearTimeout(abort)
-              resolve(samples)
-              return
-            }
-            requestAnimationFrame(tick)
-          }
-          requestAnimationFrame(tick)
-        }),
-      SAMPLE_ABORT_MS
-    )
-    .catch(() => [])
   return [
     `click blocker report:`,
-    `  animation frames in ${SAMPLE_WINDOW_MS}ms: ${frames} (0 ⇒ rAF starved: Playwright's stability gate can never close)`,
+    `  animation frames in ${SAMPLE_WINDOW_MS}ms: ${frames} (0 ⇒ rAF starved: the stability gate can never close)`,
     `  document.visibilityState: ${visibilityState}`,
-    `  element: ${JSON.stringify(element)}`,
-    `  bounding boxes across frames: ${JSON.stringify(boxes)}`
+    `  element: ${JSON.stringify(element)}`
   ].join('\n')
 }
 
-/** Click, and on failure attach the blocker report to the thrown error. */
-export async function clickWithBlockerReport(
+/**
+ * Assert the meaningful actionability gates, then click past the frame-bound
+ * one. Use for controls on a static pane, where nothing invalidates the
+ * compositor and rAF therefore never runs.
+ */
+export async function clickWithoutFrameDependency(
   locator: Locator,
   page: Page,
   timeoutMs = 15_000
 ): Promise<void> {
+  await expect(locator).toBeVisible({ timeout: timeoutMs })
+  await expect(locator).toBeEnabled({ timeout: timeoutMs })
   try {
-    await locator.click({ timeout: timeoutMs })
+    await locator.click({ force: true, timeout: timeoutMs })
   } catch (error) {
     const report = await describeClickBlocker(locator, page).catch(
       (reportError: unknown) => `click blocker report unavailable: ${String(reportError)}`
