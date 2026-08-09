@@ -58,7 +58,10 @@ export function resolveGroupAddress(
   // Why: listed starting/sleeping panes are not receive-capable; broadcasting
   // to them turns observability into a destructive not-writable probe.
   const terminals = allTerminals.filter((terminal) => {
-    return terminal.liveness === 'running' && terminal.writable
+    return (
+      (terminal.liveness === undefined || terminal.liveness === 'running') &&
+      terminal.writable !== false
+    )
   })
 
   if (group === '@all') {

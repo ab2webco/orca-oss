@@ -87,6 +87,17 @@ describe('resolveGroupAddress', () => {
 
       expect(resolveGroupAddress(group, 'term_a', terminals, noStatus)).toEqual(['term_running'])
     })
+
+    it('keeps legacy summaries without readiness while rejecting explicit non-writable rows', () => {
+      const legacy = { handle: 'term_legacy', worktreeId: 'wt_default' }
+      const terminals = [
+        makeSummary('term_a'),
+        legacy,
+        makeSummary('term_not_writable', { writable: false, liveness: 'running' })
+      ] as RuntimeTerminalSummary[]
+
+      expect(resolveGroupAddress('@all', 'term_a', terminals, noStatus)).toEqual(['term_legacy'])
+    })
   })
 
   describe('@idle', () => {
