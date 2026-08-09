@@ -16712,7 +16712,7 @@ export class OrcaRuntimeService {
    */
   async waitForAgentComposerReady(
     handle: string,
-    options: { timeoutMs?: number } = {}
+    options: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<AgentComposerReadiness> {
     const target = this.resolveComposerReadinessTarget(handle)
     if (!target) {
@@ -16727,7 +16727,8 @@ export class OrcaRuntimeService {
     return await this.composerReadiness.wait(
       target.ptyId,
       target.agent,
-      options.timeoutMs ?? AGENT_COMPOSER_READY_TIMEOUT_MS
+      options.timeoutMs ?? AGENT_COMPOSER_READY_TIMEOUT_MS,
+      options.signal ? { abortSignal: options.signal } : {}
     )
   }
 
@@ -17242,7 +17243,7 @@ export class OrcaRuntimeService {
   ): Promise<RuntimeTerminalWait> {
     const condition = options?.condition ?? 'exit'
     if (condition === 'composer-ready') {
-      return await this.waitForComposerReadyCondition(handle, options?.timeoutMs)
+      return await this.waitForComposerReadyCondition(handle, options?.timeoutMs, options?.signal)
     }
     const pty = this.getLivePtyForHandle(handle)
     if (pty) {
@@ -17452,10 +17453,12 @@ export class OrcaRuntimeService {
    *  `tui-idle` cannot see. Unsatisfied only for `awaiting-composer`. */
   private async waitForComposerReadyCondition(
     handle: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<RuntimeTerminalWait> {
     const readiness = await this.waitForAgentComposerReady(handle, {
-      ...(typeof timeoutMs === 'number' && timeoutMs > 0 ? { timeoutMs } : {})
+      ...(typeof timeoutMs === 'number' && timeoutMs > 0 ? { timeoutMs } : {}),
+      ...(signal ? { signal } : {})
     })
     const pty = this.getLivePtyForHandle(handle)
     const status = pty

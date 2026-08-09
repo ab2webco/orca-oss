@@ -1,6 +1,7 @@
 import type { TuiAgent } from '../../../../shared/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
@@ -199,9 +200,15 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         persistWorkerReadinessStage(setupStage)
 
         failedStage = 'agent_readiness'
+        // Why (ORCA-191): readiness has two stages now, and both must fit the
+        // one budget the caller asked for — the CLI's transport timeout is
+        // sized from it, so spending a separate budget on the second stage
+        // would time the caller out on a start the runtime still completes.
+        const readinessBudgetMs = params.timeoutMs ?? 60_000
+        const readinessDeadline = Date.now() + readinessBudgetMs
         const wait = await runtime.waitForTerminal(terminalHandle, {
           condition: 'tui-idle',
-          timeoutMs: params.timeoutMs ?? 60_000
+          timeoutMs: readinessBudgetMs
         })
         persistWorkerSetupWaitOutcome({ ...setupStage, wait })
         if (!wait.satisfied) {
@@ -219,7 +226,9 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         // the preamble lands in a redraw and the run sits `dispatched` forever.
         // Only positive evidence that the TUI is mid-boot fails the start; a
         // pane whose readiness cannot be observed proceeds as before.
-        const composerReady = await runtime.waitForAgentComposerReady(terminalHandle)
+        const composerReady = await runtime.waitForAgentComposerReady(terminalHandle, {
+          timeoutMs: Math.max(0, readinessDeadline - Date.now())
+        })
         if (!composerReady.ready) {
           throw new Error(
             `Agent enabled bracketed paste but its composer never became ready within ` +
@@ -256,14 +265,13 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           id: terminalHandle,
           state: 'accepted'
         })
-        // Why (ORCA-191): armed before the acceptance observation resolves — the
-        // deadline covers the write, not the watching.
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
-        const turnAcceptance = await sent.turnAcceptance
-        if (turnAcceptance.accepted) {
-          db.recordDispatchTurnAcceptance(started.dispatch.id)
-        }
+        // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
+        // refuses and never resends — so it must not spend the caller's budget.
+        // It lands on the dispatch row for `dispatch show` and the deadline's
+        // failure reason.
+        recordTurnAcceptanceInBackground(db, started.dispatch.id, sent.turnAcceptance)
         monitorWorkerSetup({
           runtime,
           db,
@@ -282,7 +290,6 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           timeoutMs: params.timeoutMs ?? 60_000,
           effects,
           residualResources: [],
-          turnAcceptance,
           ...(terminalRevealWarning ? { warning: terminalRevealWarning } : {})
         }
       } catch (error) {

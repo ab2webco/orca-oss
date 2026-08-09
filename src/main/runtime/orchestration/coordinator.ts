@@ -1,9 +1,11 @@
 /* eslint-disable max-lines -- Why: the coordinator keeps message processing, task dispatch, gate handling, escalation, and convergence checking in one class so the polling loop can make atomic decisions across all these concerns without split-brain behavior. */
 import type { OrchestrationDb } from './db'
 import type { MessageRow, TaskRow, CoordinatorStatus } from './types'
+import type { AgentTurnAcceptance } from '../agent-composer-readiness'
 import { buildDispatchPreamble } from './preamble'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 import { DISPATCH_STALE_THRESHOLD_MS } from './dispatch-lifecycle-deadline'
+import { recordTurnAcceptanceInBackground } from './dispatch-turn-acceptance'
 
 export type CoordinatorRuntime = {
   sendTerminalAgentPrompt(handle: string, prompt: string): Promise<unknown>
@@ -14,7 +16,7 @@ export type CoordinatorRuntime = {
   sendTerminalAgentPromptObservingTurn?(
     handle: string,
     prompt: string
-  ): Promise<{ turnAcceptance: Promise<{ accepted: boolean }> }>
+  ): Promise<{ turnAcceptance: Promise<AgentTurnAcceptance> }>
   getOrchestrationDispatchAuthority?(handle: string): {
     paneKey: string | null
     processIncarnation: string | null
@@ -495,7 +497,7 @@ export class Coordinator {
       gateContext = `\n\n--- DECISION GATE RESOLVED ---\nQuestion: ${latest.question}\nResolution: ${latest.resolution}\n---\n`
     }
 
-    let pendingAcceptance: Promise<{ accepted: boolean }> | null = null
+    let pendingAcceptance: Promise<AgentTurnAcceptance> | null = null
     try {
       if (this.runtime.sendTerminalAgentPromptObservingTurn) {
         const sent = await this.runtime.sendTerminalAgentPromptObservingTurn(
@@ -524,8 +526,8 @@ export class Coordinator {
       this.db.armDispatchLifecycleDeadline(dispatch.id)
       this.runtime.ensureOrchestrationDispatchDeadlineMonitor?.()
     }
-    if (pendingAcceptance && (await pendingAcceptance).accepted) {
-      this.db.recordDispatchTurnAcceptance(dispatch.id)
+    if (pendingAcceptance) {
+      void recordTurnAcceptanceInBackground(this.db, dispatch.id, pendingAcceptance)
     }
 
     this.opts.onLog(`Dispatched task ${task.id} to ${targetHandle}`)

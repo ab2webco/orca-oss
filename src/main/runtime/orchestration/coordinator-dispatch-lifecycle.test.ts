@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrchestrationDb } from './db'
 import { Coordinator, type CoordinatorRuntime } from './coordinator'
 
@@ -51,7 +51,13 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
       },
       async sendTerminalAgentPromptObservingTurn(handle: string, prompt: string) {
         runtime.sent.push({ handle, text: prompt })
-        return { turnAcceptance: Promise.resolve({ accepted: runtime.turnAccepted }) }
+        return {
+          turnAcceptance: Promise.resolve({
+            accepted: runtime.turnAccepted,
+            evidence: runtime.turnAccepted ? ('working-title' as const) : null,
+            waitedMs: 12
+          })
+        }
       },
       async waitForAgentComposerReady() {
         return runtime.composerReady
@@ -156,9 +162,12 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
 
     const { taskId } = await dispatchOnce(runtime, db)
 
-    const ctx = db.getDispatchContext(taskId)
-    expect(ctx?.turn_accepted_at).not.toBeNull()
-    expect(ctx?.first_lifecycle_signal_at).toBeNull()
+    // Why: recorded off the request path, so the dispatch returns before it
+    // lands — the observation must never spend the caller's budget.
+    await vi.waitFor(() => {
+      expect(db!.getDispatchContext(taskId)?.turn_accepted_at).not.toBeNull()
+    })
+    expect(db.getDispatchContext(taskId)?.first_lifecycle_signal_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
   })
 

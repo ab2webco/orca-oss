@@ -119,8 +119,9 @@ export class AgentComposerReadinessTracker {
     ptyId: string,
     agent: TuiAgent | null,
     timeoutMs: number,
-    now: () => number = Date.now
+    options: { abortSignal?: AbortSignal; now?: () => number } = {}
   ): Promise<AgentComposerReadiness> {
+    const now = options.now ?? Date.now
     const startedAt = now()
     const signal = composerReadySignalFor(agent)
     const settle = (state: ComposerReadyState): AgentComposerReadiness => ({
@@ -149,6 +150,7 @@ export class AgentComposerReadinessTracker {
         if (timer) {
           clearTimeout(timer)
         }
+        options.abortSignal?.removeEventListener('abort', finish)
         unsubscribe?.()
         resolve(settle(this.state(ptyId)))
       }
@@ -163,6 +165,8 @@ export class AgentComposerReadinessTracker {
         finish()
         return
       }
+      // Why: an aborted RPC must not leave a 30 s observation subscribed.
+      options.abortSignal?.addEventListener('abort', finish, { once: true })
       timer = setTimeout(finish, timeoutMs)
     })
   }
@@ -178,6 +182,10 @@ export class AgentComposerReadinessTracker {
     timeoutMs: number,
     now: () => number = Date.now
   ): { arm: () => Promise<AgentTurnAcceptance>; cancel: () => void } {
+    // Why: the caller never blocks on this. The result changes nothing Orca
+    // does — it is not a refusal and never a resend — so making an RPC wait on
+    // it would buy latency with no decision (and, on worker-start, could push
+    // the handler past the caller's own budget).
     const scanner = createAgentTurnAcceptanceScanner()
     let armed = false
     let armedAt = 0

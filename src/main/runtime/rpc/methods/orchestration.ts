@@ -28,6 +28,7 @@ import { ORCHESTRATION_RUN_METHODS } from './orchestration-runs'
 import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { RunRow } from '../../orchestration/types'
@@ -1374,7 +1375,6 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       })
 
       let injected = false
-      let turnAcceptance: AgentTurnAcceptance | undefined
       if (params.inject) {
         let pendingAcceptance: Promise<AgentTurnAcceptance>
         try {
@@ -1388,21 +1388,20 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // Why (ORCA-191): only a capability-bearing injection that reached its
         // confirmation point is monitored — a tracking dispatch without --inject
         // never receives a preamble and must never be failed for its silence.
-        // Armed before the acceptance observation resolves: the deadline covers
-        // the write, not the watching.
         db.armDispatchLifecycleDeadline(ctx.id)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
-        turnAcceptance = await pendingAcceptance
-        if (turnAcceptance.accepted) {
-          db.recordDispatchTurnAcceptance(ctx.id)
-        }
+        // Why: not awaited. Turn acceptance changes nothing about this dispatch
+        // — no refusal, no resend — so holding the RPC open for it would only
+        // add latency. It lands on the dispatch row, where `dispatch show`
+        // reads it and the deadline's failure reason uses it.
+        recordTurnAcceptanceInBackground(db, ctx.id, pendingAcceptance)
       }
 
       // Why: returnPreamble is opt-in because the preamble is several hundred bytes most callers don't need in the response.
       if (params.returnPreamble) {
-        return { dispatch: ctx, injected, preamble, ...(turnAcceptance ? { turnAcceptance } : {}) }
+        return { dispatch: ctx, injected, preamble }
       }
-      return { dispatch: ctx, injected, ...(turnAcceptance ? { turnAcceptance } : {}) }
+      return { dispatch: ctx, injected }
     }
   }),
 

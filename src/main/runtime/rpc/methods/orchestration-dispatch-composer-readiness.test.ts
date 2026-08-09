@@ -104,12 +104,10 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
 
     const result = (await dispatch({ task: task.id, to: WORKER, inject: true })) as {
       injected: boolean
-      turnAcceptance: AgentTurnAcceptance
     }
 
     expect(result.injected).toBe(true)
     expect(send).toHaveBeenCalledTimes(1)
-    expect(result.turnAcceptance).toMatchObject({ accepted: true, evidence: 'working-title' })
   })
 
   // Why: `dispatch --inject` is how a stalled run is rescued today, and it
@@ -162,11 +160,14 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
 
     await dispatch({ task: task.id, to: WORKER, inject: true })
 
-    const ctxRow = db.getDispatchContext(task.id)
-    expect(ctxRow?.turn_accepted_at).not.toBeNull()
+    // Why: recorded off the request path — the dispatch RPC must not hold the
+    // caller open for an observation that changes nothing about the dispatch.
+    await vi.waitFor(() => {
+      expect(db.getDispatchContext(task.id)?.turn_accepted_at).not.toBeNull()
+    })
     // A screen transition is not an authenticated lifecycle signal from the
     // worker, so it must leave the deadline armed.
-    expect(ctxRow?.first_lifecycle_signal_at).toBeNull()
+    expect(db.getDispatchContext(task.id)?.first_lifecycle_signal_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
   })
 })

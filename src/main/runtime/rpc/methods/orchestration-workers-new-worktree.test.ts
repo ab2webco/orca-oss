@@ -497,15 +497,15 @@ describe('orchestration new-worktree workers', () => {
 
     const { result, task } = await startWorker()
 
-    expect(result).toMatchObject({
-      state: 'ready',
-      turnAcceptance: { accepted: true, evidence: 'working-title' }
+    expect(result).toMatchObject({ state: 'ready' })
+    // Why: recorded off the request path, so worker-start's own timeout budget
+    // is never spent on an observation that cannot change its outcome.
+    await vi.waitFor(() => {
+      expect(db.getDispatchContext(task.id)?.turn_accepted_at).not.toBeNull()
     })
-    const ctx = db.getDispatchContext(task.id)
-    expect(ctx?.turn_accepted_at).not.toBeNull()
     // A screen transition is not an authenticated lifecycle signal, so the
     // deadline that catches a silent worker must stay armed.
-    expect(ctx?.first_lifecycle_signal_at).toBeNull()
+    expect(db.getDispatchContext(task.id)?.first_lifecycle_signal_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
   })
 
