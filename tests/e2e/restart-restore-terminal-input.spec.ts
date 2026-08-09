@@ -38,6 +38,7 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import {
   buildFrozenPaneReport,
+  collectPaneBindingDiagnostics,
   getStorePtyIds,
   probeDirectWrite,
   probeKeyboardType,
@@ -172,6 +173,7 @@ async function expectRestoredPaneAcceptsInput(page: Page, context: string): Prom
         ownershipRebuildAttempted,
         readinessAlive,
         ptyIds,
+        binding: await collectPaneBindingDiagnostics(page),
         terminalTail: await getTerminalContent(page)
       })
     )

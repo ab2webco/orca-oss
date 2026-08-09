@@ -1,5 +1,6 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { clickWithBlockerReport } from './helpers/click-actionability-report'
 
 type FakeMicrophoneDevice = {
   deviceId: string
@@ -116,7 +117,7 @@ test.describe('Voice microphone selection', () => {
 
     const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
     await expect(microphone).toHaveText('System default')
-    await microphone.click()
+    await clickWithBlockerReport(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'USB Microphone' })).toBeVisible()
     await orcaPage.getByRole('option', { name: 'USB Microphone' }).click()
 
@@ -147,7 +148,7 @@ test.describe('Voice microphone selection', () => {
     await prepareVoiceSettings(orcaPage, 'stale-airpods-id', 'AirPods')
 
     const microphone = orcaPage.getByRole('combobox', { name: 'Microphone' })
-    await microphone.click()
+    await clickWithBlockerReport(microphone, orcaPage)
     await expect(orcaPage.getByRole('option', { name: 'AirPods (unavailable)' })).toBeVisible()
     await orcaPage.keyboard.press('Escape')
 
