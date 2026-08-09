@@ -48,29 +48,43 @@ export function composerReadySignalFor(agent: TuiAgent | null): DraftPasteReadyS
 
 type PtySubscribe = (ptyId: string, listener: (data: string) => void) => () => void
 
+// Why: observation runs before the agent is identifiable, so it cannot pick one
+// signal up front. Both provable signals are scanned; the query picks.
+const PROVABLE_SIGNALS = [
+  'codex-composer-prompt',
+  'render-cursor-after-bracketed-paste'
+] as const satisfies readonly DraftPasteReadySignal[]
+
 /**
  * Owns one composer-ready observation per PTY, for the PTY's whole life
  * (ORCA-191).
  *
- * Lifetime-scoped on purpose. The question at inject time is "has this
- * composer ever been ready", and an observation armed at inject time cannot
- * answer it for a pane that booted an hour ago: its bracketed-paste enable is
- * long out of any replay window, so every established pane would look
- * unready and the `dispatch --inject` rescue path would refuse to run.
+ * Lifetime-scoped on purpose. The question at inject time is "has this composer
+ * ever been ready", and an observation armed at inject time cannot answer it
+ * for a pane that booted an hour ago: its bracketed-paste enable is long out of
+ * any replay window, so every established pane would look unready and the
+ * `dispatch --inject` rescue path would refuse to run.
  *
- * Only agents whose readiness this runtime can actually prove are tracked
- * (Codex's composer glyph, opencode/mimo's show-cursor). Everything else —
- * shells, agents on the marker-less quiet-window signal, PTYs whose bytes this
- * runtime never sees — is never allocated and always answers `unobserved`,
- * which callers must treat as no evidence rather than as a refusal.
+ * Signal-agnostic while observing, agent-specific when queried. The agent
+ * identity is not reliably known while a pane boots — `launchAgent` is only
+ * recorded for token-bound spawns, and the foreground process is not resolved
+ * until something asks — so gating observation on it would miss the bracketed-
+ * paste enable of exactly the panes this fix is about. Both provable markers
+ * are therefore scanned for every observed PTY, and `state(ptyId, agent)`
+ * answers with the one that agent actually emits.
+ *
+ * Provenance is what separates the two meanings of "no marker seen".
+ * Observation starts at `beginObserving`, which the runtime calls when it
+ * registers a PTY it is spawning — so for those panes a missing marker means
+ * *not yet*, which is the whole defect. A pane this runtime never registered
+ * (restored or adopted after a restart) is never observed and always answers
+ * `unobserved`: the absence of evidence, which callers must not treat as a
+ * refusal, and which is what keeps `dispatch --inject` usable on a stalled run.
  */
 export class AgentComposerReadinessTracker {
   private observations = new Map<
     string,
-    {
-      signal: DraftPasteReadySignal
-      observation: ReturnType<typeof createComposerReadyObservation>
-    }
+    Map<DraftPasteReadySignal, ReturnType<typeof createComposerReadyObservation>>
   >()
   private subscribe: PtySubscribe
 
@@ -78,31 +92,52 @@ export class AgentComposerReadinessTracker {
     this.subscribe = subscribe
   }
 
-  /** Called for every PTY chunk. Cheap by construction: one map lookup for an
-   *  untracked PTY, and nothing at all once the marker has fired. */
-  observe(ptyId: string, agent: TuiAgent | null, data: string): void {
-    const existing = this.observations.get(ptyId)
-    if (existing) {
-      if (!existing.observation.settled()) {
-        existing.observation.observe(data)
-      }
+  /** Starts watching a PTY this runtime is spawning, before its first byte. */
+  beginObserving(ptyId: string): void {
+    if (this.observations.has(ptyId)) {
       return
     }
+    const bySignal = new Map<
+      DraftPasteReadySignal,
+      ReturnType<typeof createComposerReadyObservation>
+    >()
+    for (const signal of PROVABLE_SIGNALS) {
+      bySignal.set(signal, createComposerReadyObservation(signal))
+    }
+    this.observations.set(ptyId, bySignal)
+  }
+
+  /** Called for every PTY chunk. A PTY that was never begun is ignored, and
+   *  each observation latches, so a settled or unwatched pane costs one lookup. */
+  observe(ptyId: string, data: string): void {
+    const bySignal = this.observations.get(ptyId)
+    if (bySignal === undefined) {
+      return
+    }
+    for (const observation of bySignal.values()) {
+      if (!observation.settled()) {
+        observation.observe(data)
+      }
+    }
+  }
+
+  state(ptyId: string, agent: TuiAgent | null): ComposerReadyState {
+    const signal = composerReadySignalFor(agent)
+    const observation = signal ? this.observations.get(ptyId)?.get(signal) : undefined
+    if (!observation) {
+      return 'unobserved'
+    }
+    // Why: the observation's own `unobserved` means "no bracketed-paste
+    // handshake yet", which on a pane watched from spawn is still "not ready".
+    return observation.state() === 'ready' ? 'ready' : 'awaiting-composer'
+  }
+
+  readyAt(ptyId: string, agent: TuiAgent | null): number | null {
     const signal = composerReadySignalFor(agent)
     if (!signal) {
-      return
+      return null
     }
-    const observation = createComposerReadyObservation(signal)
-    this.observations.set(ptyId, { signal, observation })
-    observation.observe(data)
-  }
-
-  state(ptyId: string): ComposerReadyState {
-    return this.observations.get(ptyId)?.observation.state() ?? 'unobserved'
-  }
-
-  readyAt(ptyId: string): number | null {
-    return this.observations.get(ptyId)?.observation.readyAt() ?? null
+    return this.observations.get(ptyId)?.get(signal)?.readyAt() ?? null
   }
 
   forget(ptyId: string): void {
@@ -110,10 +145,14 @@ export class AgentComposerReadinessTracker {
   }
 
   /**
-   * Resolves as soon as the composer-ready marker fires, or when the budget
-   * expires. An `unobserved` PTY resolves immediately — waiting on a signal
-   * this runtime has no way to see is a disguised sleep, and the brief for this
-   * fix rules that out explicitly.
+   * Resolves as soon as the composer-ready marker fires, and otherwise
+   * classifies why it did not.
+   *
+   * A pane this runtime watched from spawn gets the full budget: while its
+   * marker is missing the composer is genuinely not up yet, and that is the
+   * window `tui-idle` hands the injector today. A pane it never watched
+   * resolves `unobserved` immediately — waiting on evidence that could not
+   * exist would be a sleep wearing a signal's clothes.
    */
   async wait(
     ptyId: string,
@@ -131,10 +170,7 @@ export class AgentComposerReadinessTracker {
       signal,
       waitedMs: now() - startedAt
     })
-    if (!signal) {
-      return settle(this.state(ptyId))
-    }
-    const initial = this.state(ptyId)
+    const initial = this.state(ptyId, agent)
     if (initial !== 'awaiting-composer') {
       return settle(initial)
     }
@@ -152,20 +188,20 @@ export class AgentComposerReadinessTracker {
         }
         options.abortSignal?.removeEventListener('abort', finish)
         unsubscribe?.()
-        resolve(settle(this.state(ptyId)))
+        resolve(settle(this.state(ptyId, agent)))
       }
       // Why: subscribe before re-reading the state so a marker landing between
       // the read and the subscription cannot be missed.
       unsubscribe = this.subscribe(ptyId, () => {
-        if (this.state(ptyId) === 'ready') {
+        if (this.state(ptyId, agent) === 'ready') {
           finish()
         }
       })
-      if (this.state(ptyId) === 'ready') {
+      if (this.state(ptyId, agent) === 'ready') {
         finish()
         return
       }
-      // Why: an aborted RPC must not leave a 30 s observation subscribed.
+      // Why: an aborted RPC must not leave a long observation subscribed.
       options.abortSignal?.addEventListener('abort', finish, { once: true })
       timer = setTimeout(finish, timeoutMs)
     })

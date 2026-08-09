@@ -9323,6 +9323,10 @@ export class OrcaRuntimeService {
     isWsl?: boolean
   ): void {
     this.assertPtyDidNotExitBeforeRegistration(ptyId, binding?.incarnationId)
+    // Why (ORCA-191): start watching before the first byte. Registration is
+    // this runtime's own spawn, which is exactly the provenance that lets a
+    // missing composer marker mean "not ready yet" instead of "never saw it".
+    this.composerReadiness.beginObserving(ptyId)
     // Why: record the renderer pane identity at spawn time so a stalled graph
     // sync can't hide that a live PTY already backs a pending mobile create.
     const paneKey =
@@ -9577,7 +9581,7 @@ export class OrcaRuntimeService {
     captureModelReceipt?.(modelCompletion)
 
     const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
-    this.composerReadiness.observe(ptyId, pty?.launchAgent ?? pty?.foregroundAgent ?? null, data)
+    this.composerReadiness.observe(ptyId, data)
     const ptyTailBefore = pty
       ? {
           lines: pty.tailBuffer,
@@ -16679,10 +16683,17 @@ export class OrcaRuntimeService {
   }
 
   /** ptyId + the agent identity the composer-ready signal is chosen from, or
-   *  null when the handle has no live PTY this runtime observes. */
-  private resolveComposerReadinessTarget(
+   *  null when the handle has no live PTY this runtime observes.
+   *
+   * Why the foreground-process fallback: `launchAgent` is only recorded for
+   * token-bound spawns, and `foregroundAgent` is only refreshed when a title
+   * check happens to ask, so a plain `terminal create --agent codex` pane can
+   * reach the dispatch gate with no recorded identity at all. Resolving it here
+   * is what keeps the gate from silently degrading to `unobserved` on exactly
+   * the panes the incident happened on. */
+  private async resolveComposerReadinessTarget(
     handle: string
-  ): { ptyId: string; agent: TuiAgent | null } | null {
+  ): Promise<{ ptyId: string; agent: TuiAgent | null } | null> {
     let ptyId: string | null = null
     try {
       ptyId =
@@ -16696,7 +16707,19 @@ export class OrcaRuntimeService {
       return null
     }
     const pty = this.ptysById.get(ptyId)
-    return { ptyId, agent: pty?.launchAgent ?? pty?.foregroundAgent ?? null }
+    const recorded = pty?.launchAgent ?? pty?.foregroundAgent ?? null
+    if (recorded) {
+      return { ptyId, agent: recorded }
+    }
+    try {
+      const foreground = await this.ptyController?.getForegroundProcess(ptyId)
+      return {
+        ptyId,
+        agent: foreground ? (recognizeAgentProcess(foreground)?.agent ?? null) : null
+      }
+    } catch {
+      return { ptyId, agent: null }
+    }
   }
 
   /**
@@ -16714,7 +16737,7 @@ export class OrcaRuntimeService {
     handle: string,
     options: { timeoutMs?: number; signal?: AbortSignal } = {}
   ): Promise<AgentComposerReadiness> {
-    const target = this.resolveComposerReadinessTarget(handle)
+    const target = await this.resolveComposerReadinessTarget(handle)
     if (!target) {
       return {
         ready: true,
@@ -16747,7 +16770,7 @@ export class OrcaRuntimeService {
     prompt: string,
     options: { acceptanceTimeoutMs?: number } = {}
   ): Promise<{ send: RuntimeTerminalSend; turnAcceptance: Promise<AgentTurnAcceptance> }> {
-    const target = this.resolveComposerReadinessTarget(handle)
+    const target = await this.resolveComposerReadinessTarget(handle)
     if (!target) {
       const send = await this.sendTerminalAgentPrompt(handle, prompt)
       return {

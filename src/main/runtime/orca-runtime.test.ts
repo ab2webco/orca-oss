@@ -15817,13 +15817,55 @@ describe('OrcaRuntimeService', () => {
       })
     })
 
-    it('is satisfied — not blocked — for a pane it cannot observe', async () => {
-      const { runtime, handle } = await createCodexPane()
+    it('is unsatisfied before the pane has even enabled bracketed paste', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      // Why: this is where tui-idle fires. Codex is repainting its boot screen
+      // and has not started its bracketed-paste handshake, so "no handshake
+      // yet" on a pane watched from spawn has to read as not ready.
+      runtime.onPtyData(ptyId, '\x1b[2J\x1b[H  Starting MCP server', 100)
 
-      // Why: absence of evidence must not become a refusal, or the
-      // `dispatch --inject` rescue path stops working on an adopted pane.
       await expect(
         runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({ satisfied: false, composerReadyState: 'awaiting-composer' })
+    })
+
+    // Why: this is the defect the live rig caught, and only a live run could —
+    // `launchAgent` is recorded only for token-bound spawns and `foregroundAgent`
+    // is refreshed lazily, so a plain `terminal create --agent codex` pane
+    // reached the gate with no recorded identity and every fresh Codex pane
+    // silently degraded to `unobserved`, i.e. to the pre-fix behaviour.
+    it('identifies the agent from the foreground process when none was recorded', async () => {
+      const ptyId = 'pty-codex-unrecorded'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({ satisfied: false, composerReadyState: 'awaiting-composer' })
+    })
+
+    it('is satisfied — not blocked — for a pane it never watched from spawn', async () => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      // Why: a leaf synced from the renderer for a PTY this runtime never
+      // registered is the restored/adopted case. Absence of evidence must not
+      // become a refusal, or `dispatch --inject` stops rescuing stalled runs.
+      syncSinglePty(runtime)
+      const [terminal] = (await runtime.listTerminals()).terminals
+
+      await expect(
+        runtime.waitForTerminal(terminal.handle, { condition: 'composer-ready', timeoutMs: 20 })
       ).resolves.toMatchObject({ satisfied: true, composerReadyState: 'unobserved' })
     })
 

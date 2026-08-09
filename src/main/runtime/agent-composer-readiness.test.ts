@@ -50,74 +50,118 @@ describe('composerReadySignalFor', () => {
 })
 
 describe('AgentComposerReadinessTracker (ORCA-191)', () => {
-  it('never allocates for an agent whose readiness it cannot prove', () => {
+  function watchedTracker(bus: ReturnType<typeof createPtyBus>) {
+    const tracker = new AgentComposerReadinessTracker(bus.subscribe)
+    tracker.beginObserving(PTY)
+    return tracker
+  }
+
+  it('answers unobserved for an agent whose readiness it cannot prove', () => {
+    const bus = createPtyBus()
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, `${BRACKETED_PASTE_ON}› `)
+    // Claude has no marker in the byte stream; the same bytes that prove Codex
+    // ready prove nothing about it.
+    expect(tracker.state(PTY, 'claude')).toBe('unobserved')
+  })
+
+  // Why: this is the bug the live rig found. `launchAgent` is only recorded for
+  // token-bound spawns and `foregroundAgent` is refreshed lazily, so a booting
+  // pane is usually unidentifiable at the moment its bracketed-paste enable
+  // arrives. Observation must not depend on knowing the agent yet.
+  it('observes a pane whose agent is not identifiable until after it booted', () => {
+    const bus = createPtyBus()
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, BRACKETED_PASTE_ON)
+    tracker.observe(PTY, '\r\n› ')
+    expect(tracker.state(PTY, 'codex')).toBe('ready')
+  })
+
+  // Why: a pane this runtime never registered was restored or adopted after a
+  // restart. Its handshake happened where nothing was watching, so refusing
+  // there would break `dispatch --inject`, the rescue path for a stalled run.
+  it('answers unobserved for a pane it never began watching', () => {
     const bus = createPtyBus()
     const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-    tracker.observe(PTY, 'claude', `${BRACKETED_PASTE_ON}› `)
-    expect(tracker.state(PTY)).toBe('unobserved')
+    tracker.observe(PTY, `${BRACKETED_PASTE_ON}› `)
+    expect(tracker.state(PTY, 'codex')).toBe('unobserved')
   })
 
   it('tracks an opencode pane on its own show-cursor marker', () => {
     const bus = createPtyBus()
-    const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-    tracker.observe(PTY, 'opencode', BRACKETED_PASTE_ON)
-    expect(tracker.state(PTY)).toBe('awaiting-composer')
-    // Why: opencode stays silent ~1.5-2 s between enabling bracketed paste and
-    // mounting its composer, which is why a quiet window cannot stand in here.
-    tracker.observe(PTY, 'opencode', SHOW_CURSOR)
-    expect(tracker.state(PTY)).toBe('ready')
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, BRACKETED_PASTE_ON)
+    expect(tracker.state(PTY, 'opencode')).toBe('awaiting-composer')
+    tracker.observe(PTY, SHOW_CURSOR)
+    expect(tracker.state(PTY, 'opencode')).toBe('ready')
+    // The same stream leaves Codex unready — one observation, per-agent answers.
+    expect(tracker.state(PTY, 'codex')).toBe('awaiting-composer')
   })
 
-  it('tracks a codex pane from bracketed paste to composer prompt', () => {
+  // Why: this is the incident's window. `tui-idle` is satisfied while Codex is
+  // still repainting its boot screen — before it has even enabled bracketed
+  // paste — so "no handshake yet" on a watched pane must read as not ready.
+  it('tracks a codex pane from before its handshake to its composer prompt', () => {
     const bus = createPtyBus()
-    const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-    tracker.observe(PTY, 'codex', 'starting')
-    expect(tracker.state(PTY)).toBe('unobserved')
-    tracker.observe(PTY, 'codex', BRACKETED_PASTE_ON)
-    expect(tracker.state(PTY)).toBe('awaiting-composer')
-    tracker.observe(PTY, 'codex', '\r\n› ')
-    expect(tracker.state(PTY)).toBe('ready')
-    expect(tracker.readyAt(PTY)).not.toBeNull()
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, '\x1b[2J\x1b[H Starting MCP server')
+    expect(tracker.state(PTY, 'codex')).toBe('awaiting-composer')
+    tracker.observe(PTY, BRACKETED_PASTE_ON)
+    expect(tracker.state(PTY, 'codex')).toBe('awaiting-composer')
+    tracker.observe(PTY, '\r\n› ')
+    expect(tracker.state(PTY, 'codex')).toBe('ready')
+    expect(tracker.readyAt(PTY, 'codex')).not.toBeNull()
   })
 
   it('forgets a PTY so a reused id cannot inherit a stale ready latch', () => {
     const bus = createPtyBus()
-    const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-    tracker.observe(PTY, 'codex', `${BRACKETED_PASTE_ON}› `)
-    expect(tracker.state(PTY)).toBe('ready')
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, `${BRACKETED_PASTE_ON}› `)
+    expect(tracker.state(PTY, 'codex')).toBe('ready')
     tracker.forget(PTY)
-    expect(tracker.state(PTY)).toBe('unobserved')
+    expect(tracker.state(PTY, 'codex')).toBe('unobserved')
   })
 
   describe('wait', () => {
-    it('resolves immediately for an untracked pane instead of sleeping', async () => {
+    it('resolves immediately for an agent with no provable marker', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      const readiness = await tracker.wait(PTY, 'claude', 60_000)
+      expect(readiness).toMatchObject({ ready: true, proven: false, state: 'unobserved' })
+      expect(bus.listenerCount(PTY)).toBe(0)
+    })
+
+    // Why: `dispatch --inject` is the rescue path for an already-stalled run and
+    // it targets a pane this runtime may have adopted after a restart. Waiting
+    // there would block on evidence that cannot exist; refusing would remove the
+    // only way out of the state the ticket is about.
+    it('resolves immediately for a pane it never began watching', async () => {
       const bus = createPtyBus()
       const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-      const readiness = await tracker.wait(PTY, 'claude', 60_000)
+      const readiness = await tracker.wait(PTY, 'codex', 60_000)
       expect(readiness).toMatchObject({ ready: true, proven: false, state: 'unobserved' })
       expect(bus.listenerCount(PTY)).toBe(0)
     })
 
     it('resolves immediately for a pane whose composer became ready earlier', async () => {
       const bus = createPtyBus()
-      const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-      // Why: the `dispatch --inject` rescue path targets a long-established
-      // pane. Its bracketed-paste enable is far out of any replay window, so a
-      // per-send scanner would time out and refuse the one path that rescues a
-      // stalled run.
-      tracker.observe(PTY, 'codex', `${BRACKETED_PASTE_ON}› `)
+      const tracker = watchedTracker(bus)
+      tracker.observe(PTY, `${BRACKETED_PASTE_ON}› `)
       const readiness = await tracker.wait(PTY, 'codex', 60_000)
       expect(readiness).toMatchObject({ ready: true, proven: true, state: 'ready' })
     })
 
-    it('waits through the boot window and resolves on the marker', async () => {
+    // Why: this is the incident's window. `tui-idle` was satisfied here, while
+    // Codex was still repainting its boot screen and had not yet enabled
+    // bracketed paste — the gate has to keep waiting through all of it.
+    it('waits from before the handshake and resolves on the marker', async () => {
       const bus = createPtyBus()
-      const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-      bus.subscribe(PTY, (data) => tracker.observe(PTY, 'codex', data))
-      tracker.observe(PTY, 'codex', BRACKETED_PASTE_ON)
+      const tracker = watchedTracker(bus)
+      bus.subscribe(PTY, (data) => tracker.observe(PTY, data))
       const pending = tracker.wait(PTY, 'codex', 60_000)
       expect(bus.listenerCount(PTY)).toBe(2)
-      bus.emit(PTY, '\x1b[2J still booting')
+      bus.emit(PTY, '\x1b[2J\x1b[H Starting MCP server')
+      bus.emit(PTY, BRACKETED_PASTE_ON)
       bus.emit(PTY, '\r\n› ')
       await expect(pending).resolves.toMatchObject({
         ready: true,
@@ -130,14 +174,24 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
 
     it('refuses when the composer never arrives inside the budget', async () => {
       const bus = createPtyBus()
-      const tracker = new AgentComposerReadinessTracker(bus.subscribe)
-      tracker.observe(PTY, 'codex', BRACKETED_PASTE_ON)
+      const tracker = watchedTracker(bus)
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
       const readiness = await tracker.wait(PTY, 'codex', 5)
       expect(readiness).toMatchObject({
         ready: false,
         proven: false,
         state: 'awaiting-composer'
       })
+      expect(bus.listenerCount(PTY)).toBe(0)
+    })
+
+    it('stops waiting when the request is aborted', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      const abort = new AbortController()
+      const pending = tracker.wait(PTY, 'codex', 60_000, { abortSignal: abort.signal })
+      abort.abort()
+      await expect(pending).resolves.toMatchObject({ state: 'awaiting-composer' })
       expect(bus.listenerCount(PTY)).toBe(0)
     })
   })
