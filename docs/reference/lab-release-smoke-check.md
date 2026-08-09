@@ -75,9 +75,18 @@ build you already had.
 | 6 | `orca status --json` from a terminal inside the app | `Orca is not running` while it plainly is |
 | 7 | Open the editor on a large file, scroll, and edit | Freeze, or the scroll position jumps |
 | 8 | Quit and relaunch; confirm tabs and terminals come back | Lost session, orphaned PTYs |
+| 9 | Open **Feedback**, type a line, submit | It posts silently instead of opening `github.com/ab2webco/orca-oss/issues/new` prefilled — or the composer opens empty (ORCA-192) |
+| 10 | Read the **What's New** card after the update lands | It describes a version we never shipped, or reads `chore(release): bump version to …` (ORCA-192) |
+| 11 | Pin an agent to an account (`--claude-account`) while an unpinned Claude is live elsewhere | Refused with "Close the running global Claude terminal" — the refusal must name the blocking pane, and a *different* account must be allowed (ORCA-190) |
+| 12 | Dispatch a task to a freshly created agent pane | The preamble is swallowed and the run sits `dispatched` with no heartbeat; it must either arrive or fail visibly within the deadline (ORCA-191) |
 
 Checks 2 and 4 are the ones that would have caught the shipped bug. Do not skip them because they
 feel trivial — that is precisely why nothing else covered them.
+
+Checks 9 to 12 exist because each one shipped broken once. 9 and 10 sent users to upstream; 11
+locked every managed account behind an unrelated terminal; 12 left a worker silently dead for 50
+minutes while the coordinator reported it as working. None of the four is covered by any automated
+suite — they are all runtime behaviour against a real build, which is why they belong here.
 
 ## Promote
 
