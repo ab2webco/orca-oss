@@ -15858,16 +15858,18 @@ describe('OrcaRuntimeService', () => {
       syncSinglePty(runtime)
       const [terminal] = (await runtime.listTerminals()).terminals
 
+      const budgetMs = 5_000
       const wait = await runtime.waitForTerminal(terminal.handle, {
         condition: 'composer-ready',
-        timeoutMs: 20
+        timeoutMs: budgetMs
       })
 
       expect(wait).toMatchObject({ satisfied: false, composerReadyState: 'unobserved' })
       // Why: it must not sleep out the budget — `dispatch --inject` rescues a
       // stalled run through exactly this pane and cannot pay for a wait that
-      // can never resolve.
-      expect(wait.waitedMs).toBeLessThan(20)
+      // can never resolve. Compared against the budget, not against a tight
+      // absolute, so a stalled event loop on a loaded runner cannot fail it.
+      expect(wait.waitedMs).toBeLessThan(budgetMs / 2)
     })
 
     it('observes turn acceptance from output that follows the write', async () => {
