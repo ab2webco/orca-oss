@@ -154,6 +154,22 @@ export function isClaudeTerminalAccountSwitchCommitted(
   return result.state === 'committed' && result.failure === undefined
 }
 
+/**
+ * The operation has an outcome and will never change again.
+ *
+ * Why not the state alone: a refusal keeps the state it was refused in —
+ * `preflighting` for everything proven before the Ctrl+C, `stopping-source` for
+ * a stop that never happened — and neither is in the terminal-state list. A
+ * poller that waits only for a terminal state therefore spins until its own
+ * ceiling on an answer the runtime already produced in milliseconds (ORCA-172).
+ * A `failure` is only ever attached to a settled result.
+ */
+export function isSettledClaudeTerminalAccountSwitchResult(
+  result: ClaudeTerminalAccountSwitchResult
+): boolean {
+  return isTerminalClaudeAccountSwitchState(result.state) || result.failure !== undefined
+}
+
 const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string> = {
   'runtime-unavailable': 'This Orca runtime cannot switch Claude accounts for a terminal.',
   'terminal-not-found': 'That terminal is not live on this runtime.',

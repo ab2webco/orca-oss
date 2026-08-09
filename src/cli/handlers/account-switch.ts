@@ -8,6 +8,7 @@ import { resolveCallerTerminalIdentity } from '../caller-terminal-identity'
 import {
   describeClaudeTerminalAccountSwitchFailure,
   describeClaudeTerminalAccountSwitchRecovery,
+  isSettledClaudeTerminalAccountSwitchResult,
   isTerminalClaudeAccountSwitchState,
   type ClaudeTerminalAccountSwitchResult
 } from '../../shared/claude-terminal-account-switch'
@@ -32,7 +33,11 @@ async function pollClaudeTerminalSwitch(
 ): Promise<ClaudeTerminalAccountSwitchResult> {
   const deadline = Date.now() + SWITCH_POLL_CEILING_MS
   let latest = current
-  while (!isTerminalClaudeAccountSwitchState(latest.state) && Date.now() < deadline) {
+  // Why settled and not terminal-state: a refusal never leaves `preflighting`
+  // (or `stopping-source`), so waiting for a terminal state turned an answer the
+  // runtime had in milliseconds into the full ceiling — five minutes of silence
+  // before printing `transcript-unavailable` (ORCA-172).
+  while (!isSettledClaudeTerminalAccountSwitchResult(latest) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, SWITCH_POLL_INTERVAL_MS))
     const status = await client.call<{ result: ClaudeTerminalAccountSwitchResult | null }>(
       'accounts.claudeTerminalSwitchStatus',

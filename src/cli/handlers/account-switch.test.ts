@@ -318,6 +318,129 @@ describe('orca account switch', () => {
     })
   })
 
+  /**
+   * ORCA-172: a refusal keeps the state it was refused in, and neither
+   * `preflighting` nor `stopping-source` is a terminal state — so the poll loop
+   * kept asking for five more minutes about an answer it already had. The
+   * assertions are on poll count and elapsed virtual time on purpose: the reason
+   * and the message are identical before and after the fix.
+   */
+  describe('a refusal that never reaches a terminal state', () => {
+    const POLL_CEILING_MS = 300_000
+    const POLL_INTERVAL_MS = 1_000
+
+    function buildRefusalClient(refusal: SwitchResultOverrides): {
+      client: RuntimeClient
+      pollOffsets: number[]
+    } {
+      const startedAt = Date.now()
+      const pollOffsets: number[] = []
+      const call = vi.fn(async (method: string) => {
+        if (method === 'accounts.snapshot') {
+          return {
+            result: {
+              claude: { accounts: [{ id: 'acct-2', email: 'two@example.com' }] },
+              codex: { accounts: [], activeAccountId: null }
+            }
+          }
+        }
+        if (method === 'accounts.switchClaudeTerminal') {
+          return {
+            result: {
+              accepted: true,
+              acceptance: { operationId: 'op-172', selfSwitch: false },
+              // awaitMs is 0, so acceptance answers before the refusal exists.
+              result: {
+                operationId: 'op-172',
+                state: 'preflighting',
+                terminal: 'orca-terminal-5',
+                ptyId: 'pty-5',
+                sourceAccountId: 'acct-1',
+                targetAccountId: 'acct-2',
+                sessionId: 'session-5'
+              }
+            }
+          }
+        }
+        if (method === 'accounts.claudeTerminalSwitchStatus') {
+          pollOffsets.push(Date.now() - startedAt)
+          // The runtime settled in milliseconds; every poll sees the same answer.
+          return {
+            result: {
+              result: {
+                operationId: 'op-172',
+                terminal: 'orca-terminal-5',
+                ptyId: 'pty-5',
+                sourceAccountId: 'acct-1',
+                targetAccountId: 'acct-2',
+                sessionId: 'session-5',
+                ...refusal
+              }
+            }
+          }
+        }
+        throw new RuntimeClientError('method_not_found', method)
+      })
+      return { client: { call } as unknown as RuntimeClient, pollOffsets }
+    }
+
+    /** Drives the whole command on virtual time and reports every poll's offset. */
+    async function pollUntilDone(
+      status: SwitchResultOverrides
+    ): Promise<{ pollOffsets: number[]; error: unknown }> {
+      vi.useFakeTimers()
+      try {
+        const { client, pollOffsets } = buildRefusalClient(status)
+        let error: unknown = null
+        const running = ACCOUNT_HANDLERS['account switch']!(
+          switchContext(client, [
+            ['to', 'acct-2'],
+            ['terminal', 'orca-terminal-5']
+          ])
+        ).catch((caught: unknown) => {
+          error = caught
+        })
+        await vi.advanceTimersByTimeAsync(POLL_CEILING_MS + POLL_INTERVAL_MS)
+        await running
+        return { pollOffsets, error }
+      } finally {
+        vi.useRealTimers()
+      }
+    }
+
+    it('stops polling the moment a preflight refusal is readable', async () => {
+      const { pollOffsets, error } = await pollUntilDone({
+        state: 'preflighting',
+        failure: {
+          reason: 'transcript-unavailable',
+          message: 'Orca could not make the session transcript readable.'
+        }
+      })
+      // Before the fix: 300 polls, the last one at 300_000 ms — same reason, same
+      // message, five minutes later.
+      expect(pollOffsets).toEqual([POLL_INTERVAL_MS])
+      expect(error).toMatchObject({ code: 'claude_terminal_switch_transcript_unavailable' })
+    })
+
+    it('stops polling on a refusal that failed while stopping the source', async () => {
+      const { pollOffsets, error } = await pollUntilDone({
+        state: 'stopping-source',
+        failure: { reason: 'source-busy', message: 'The source agent did not yield the terminal.' }
+      })
+      expect(pollOffsets).toEqual([POLL_INTERVAL_MS])
+      expect(error).toMatchObject({ code: 'claude_terminal_switch_source_busy' })
+    })
+
+    it('keeps waiting on a live operation that has no outcome yet', async () => {
+      // The early exit must key on an outcome, not on leaving `preflighting`:
+      // a switch that is still running has to keep the ceiling it was given.
+      const { pollOffsets, error } = await pollUntilDone({ state: 'verifying' })
+      expect(pollOffsets.at(0)).toBe(POLL_INTERVAL_MS)
+      expect(pollOffsets.at(-1)).toBe(POLL_CEILING_MS)
+      expect(error).toBeNull()
+    })
+  })
+
   it('targets the terminal named on the command line while still proving the caller', async () => {
     process.env.ORCA_TERMINAL_HANDLE = 'orca-terminal-5'
     process.env.ORCA_PANE_KEY = 'tab-1:leaf-1'
