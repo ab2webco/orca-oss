@@ -24,6 +24,7 @@
  */
 
 import { expect, type ElectronApplication, type Page } from '@stablyai/playwright-test'
+import type { PaneBindingDiagnostics } from './terminal-pane-pty-binding'
 import { sendToTerminal, waitForTerminalOutput } from './terminal'
 import { buildSettledShellProbeInputSequence } from '../terminal-probe-input-sequence'
 
@@ -84,40 +85,6 @@ export async function getStorePtyIds(page: Page): Promise<string[]> {
     }
     return Object.values(store.getState().ptyIdsByTabId).flat()
   })
-}
-
-export type PaneBindingDiagnostics = {
-  /** `data-pty-id` on every mounted pane container — the id the renderer actually writes to. */
-  paneDomPtyIds: string[]
-  /** Session ids main reports as live, or null when the listing itself failed. */
-  liveSessionIds: string[] | null
-}
-
-/**
- * Why: every probe in this module keys off the STORE's ptyId. When a report
- * shows all three probes dead, that is ambiguous between "the pane is frozen"
- * and "the pane rebound to a different id and the probes addressed a corpse".
- * The pane's own `data-pty-id` plus main's live listing separate the two.
- */
-export async function collectPaneBindingDiagnostics(page: Page): Promise<PaneBindingDiagnostics> {
-  const paneDomPtyIds = await page
-    .evaluate(() => {
-      const ids: string[] = []
-      for (const manager of window.__paneManagers?.values() ?? []) {
-        for (const pane of manager.getPanes?.() ?? []) {
-          const id = (pane.container as HTMLElement | undefined)?.dataset?.ptyId
-          if (id) {
-            ids.push(id)
-          }
-        }
-      }
-      return ids
-    })
-    .catch(() => [])
-  const liveSessionIds = await page
-    .evaluate(async () => (await window.api.pty.listSessions()).map((session) => session.id))
-    .catch(() => null)
-  return { paneDomPtyIds, liveSessionIds }
 }
 
 // ─── Main-process-based probes (post-renderer-crash) ────────────────
@@ -316,6 +283,7 @@ export function buildFrozenPaneReport(
     revivedByOwnershipRebuild: boolean
     ownershipRebuildAttempted?: boolean
     readinessAlive?: boolean
+    probePtyId?: string | null
     ptyIds: string[]
     binding?: PaneBindingDiagnostics
     terminalTail: string
@@ -331,6 +299,9 @@ export function buildFrozenPaneReport(
     `  renderer input-path probe alive: ${probes.transportAlive} (false with direct alive ⇒ replay, focus, or renderer binding failure)`,
     `  ownership rebuild attempted: ${probes.ownershipRebuildAttempted ?? true}`,
     `  revived by pty:listSessions ownership rebuild: ${probes.revivedByOwnershipRebuild}`,
+    ...(probes.probePtyId === undefined
+      ? []
+      : [`  probed ptyId (pane binding): ${JSON.stringify(probes.probePtyId)}`]),
     `  pane ptyIds (store): ${JSON.stringify(probes.ptyIds)}`,
     ...(binding
       ? [

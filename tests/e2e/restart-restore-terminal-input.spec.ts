@@ -38,12 +38,15 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import {
   buildFrozenPaneReport,
-  collectPaneBindingDiagnostics,
   getStorePtyIds,
   probeDirectWrite,
   probeKeyboardType,
   probeOwnershipRebuildRevival
 } from './helpers/terminal-input-probes'
+import {
+  collectPaneBindingDiagnostics,
+  waitForLiveBoundPanePtyId
+} from './helpers/terminal-pane-pty-binding'
 import { waitForRestoredTerminalInputReady } from './helpers/restored-terminal-input-readiness'
 import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
 import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
@@ -154,17 +157,24 @@ async function settleRestoredLaunch(page: Page): Promise<void> {
  * discrimination when it doesn't.
  */
 async function expectRestoredPaneAcceptsInput(page: Page, context: string): Promise<void> {
-  const ptyIds = await getStorePtyIds(page)
+  // Why: the probe target is the pane's OWN binding, not a one-shot store
+  // snapshot. A cold restore re-spawns the session, so the store id read before
+  // the rebind names a corpse and every probe against it reports a false
+  // freeze — the shape this spec failed with on CI for 4 consecutive runs.
+  const probePtyId = await waitForLiveBoundPanePtyId(page, 30_000)
   const readinessAlive =
-    ptyIds.length > 0 && (await waitForRestoredTerminalInputReady(page, ptyIds[0], 15_000))
-  const kbAlive = readinessAlive && (await probeKeyboardType(page, 'KB_RESTORED_OK', 15_000))
+    probePtyId !== null && (await waitForRestoredTerminalInputReady(page, probePtyId, 15_000))
+  // Why: type unconditionally. Gating this on readiness printed `transport
+  // dead` without ever typing, so one stale target read as three dead layers.
+  const kbAlive = await probeKeyboardType(page, 'KB_RESTORED_OK', 15_000)
   const directAlive =
-    ptyIds.length > 0 && (await probeDirectWrite(page, ptyIds[0], 'DIRECT_RESTORED_OK', 15_000))
+    probePtyId !== null && (await probeDirectWrite(page, probePtyId, 'DIRECT_RESTORED_OK', 15_000))
+  const ptyIds = await getStorePtyIds(page)
   if (!readinessAlive || !kbAlive || !directAlive) {
-    const ownershipRebuildAttempted = !directAlive && ptyIds.length > 0
+    const ownershipRebuildAttempted = !directAlive && probePtyId !== null
     const revived =
       ownershipRebuildAttempted &&
-      (await probeOwnershipRebuildRevival(page, ptyIds[0], 'REVIVED_RESTORED_OK'))
+      (await probeOwnershipRebuildRevival(page, probePtyId, 'REVIVED_RESTORED_OK'))
     throw new Error(
       buildFrozenPaneReport(context, {
         directAlive,
@@ -172,12 +182,17 @@ async function expectRestoredPaneAcceptsInput(page: Page, context: string): Prom
         revivedByOwnershipRebuild: revived,
         ownershipRebuildAttempted,
         readinessAlive,
+        probePtyId,
         ptyIds,
         binding: await collectPaneBindingDiagnostics(page),
         terminalTail: await getTerminalContent(page)
       })
     )
   }
+  // Why: a live pane whose id never reaches the store is a real product defect
+  // (activity dots and orphan cleanup read the store), so assert convergence
+  // separately instead of letting it masquerade as a frozen pane.
+  expect(ptyIds, `store did not adopt the pane's bound PTY id (${context})`).toContain(probePtyId)
 }
 
 test.describe.configure({ mode: 'serial' })
