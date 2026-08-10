@@ -176,48 +176,137 @@ code it exercises was touched by the fork's resolutions, not by a single run.
 | `tab-create-entry-file-paths` | 6 | omnibox shows no file rows | **ORCA-203** — product race, `FileListingCancelledError`; hook byte-identical to upstream *and* to pre-sync |
 | `orca-profiles` ×2 | 4 | `button /^Switch profile$/` never renders | `OrcaProfileSwitcher.tsx` is **byte-identical to both** upstream and the pre-sync tip — the fork changed nothing here |
 | `floating-tab-rename` | 2 | panel stays `aria-hidden="true"` | `FloatingTerminalPanel.tsx` is byte-identical to upstream and **+36/−9 vs pre-sync**: upstream changed it in this range and we took it wholesale |
-| `github-created-issue-start-prefill` | 2 | `--prefill` never reaches the terminal buffer (received `""`) | **lead, not a classification**: it also drives a fake CLI on PATH and reads the terminal buffer, the same shape as the ORCA-204 family. The ledger probe has *not* been run on it, so this is untested |
+| `github-created-issue-start-prefill` | 2 | `--prefill` never reaches the terminal buffer (received `""`) | **unclassified, and it needs a run** — see below. Not the ORCA-204 family |
 | `issue-12656-terminal-link-tooltip` | 2 | hover tooltip `display: none`, `currentLinkText: null` | smells like the ORCA-197 hidden-window frame class; helper exists at `tests/e2e/helpers/frame-independent-ui.ts` |
-| `repro-7732-gitlab-checks-job-details` | 2 | predicate timeout | stands alone: `PullRequestPage.tsx` is byte-identical to **both** upstream and the pre-sync tip; `GitHubItemDialog.tsx` is identical to upstream and +33/−4 vs pre-sync, i.e. an upstream change taken wholesale. The failing predicate itself was not read — the timeout gives no locator |
+| `repro-7732-gitlab-checks-job-details` | 2 | predicate timeout | **ORCA-203** — classified, see below |
+
+### The two that were left blank
+
+**`repro-7732-gitlab-checks-job-details` → ORCA-203.** The whole feature it exercises arrived
+with this merge and the fork's resolutions touched none of it. The spec file is +160/−0 vs the
+pre-sync tip (it does not exist there) and **byte-identical to `upstream/main`**; so are every
+surface on its path — `helpers/source-control-ai-generation.ts` (`openChecks`, where the
+predicate times out), `right-sidebar/checks-panel-content.tsx` (+103/−30 vs pre-sync),
+`right-sidebar/ChecksPanel.tsx` (+116/−27), `runtime/gitlab-job-trace-client.ts` (**+105/−0,
+new**) and `main/ipc/gitlab.ts` (+8/−2). The store symbols `openChecks` polls
+(`rightSidebarTab`, `setRightSidebarOpen`) exist in the merged tree, and
+`store/right-sidebar-route.ts` is identical to both trees. Upstream code, upstream spec,
+untouched by us — the fix stands without the sync, so it ships under ORCA-203.
+
+**`github-created-issue-start-prefill` → still unclassified, and deliberately so.** It is *not*
+the ORCA-204 family: no `orchestration.workerStart`, no Codex worker, no `ACK` — it launches
+Claude and asserts `--prefill` in the terminal buffer, which came back `""`. The spec is
+byte-identical to both upstream and the pre-sync tip, but its path is not: **`TaskPage.tsx` is
++947/−7 vs `upstream/main` and +1808/−818 vs pre-sync**, i.e. one of the most heavily
+fork-resolved files in the merge, sitting directly on this spec's flow
+(`openTaskPage({taskSource:'github'})` → New GitHub issue → Start workspace from issue).
+`launch-agent-in-new-tab.ts` (+3/−2 vs upstream, +2/−2 vs pre-sync) and `tui-agent-config.ts`
+(+11/−0 vs upstream) are also fork-divergent on that path. Byte-identity therefore cannot
+classify it either way, and no run was made — this session's machine time went to ORCA-204.
+It needs one local run to read the real failure point. Calling it inherited on the strength of
+the spec's byte-identity alone would be exactly the weak criterion this ticket already retracted
+once.
 
 **ORCA-204 belongs to #80** (decided; the rule below beat the earlier instruction to track it
 outside). A fix that stands without the sync ships as its own PR; one that exists only because
 the merge broke it goes in #80. Everything above except ORCA-204 is the former.
 
-The escape hatch was: prove the failure lives in the E2E harness — the fake Codex CLI — so a
-real worker is unaffected. **It is refuted, by positive evidence pointing the other way.**
-Running the pair locally with `--workers=1` and reading the spec's own ledgers:
+### Nobody kills the worker. That SIGTERM is the test's own teardown.
 
-| run | result | `spawn.jsonl` | `interruption.jsonl` |
-| --- | --- | --- | --- |
-| 1 | 3 passed | `{"pid":44573,"event":"spawn"}` | *(empty)* |
-| 2 | 2 failed | `{"pid":51193,"event":"spawn"}` | `{"pid":51193,"event":"signal","signal":"SIGTERM"}` |
+> Supersedes the "Orca is killing a freshly spawned worker" reading. The ledger evidence was
+> real; its timing was never measured, and the timing is what it turns on.
 
-The fake Codex starts, writes its title escape — which is why the spec finds the pane by
-`title === 'Codex Ready'` — and is then **sent SIGTERM**. A real Codex would die the same way:
-SIGTERM does not care that the binary is a fake. Orca is killing a freshly spawned worker. That
-also closes the latency line for good: the `ACK` is not late, the process that would write it
-is gone.
+The ledger entry carried no timestamp, so a teardown signal read as a mid-test kill. Adding
+`t` to the fake's `appendLedger` and instrumenting every kill/signal funnel settles it:
+
+| event | time |
+| --- | --- |
+| fake Codex spawns | `23:01:00.749` |
+| daemon `shutdownTerminalHostSessions` → `forceKill` on the worker PTY | `23:01:11.445` |
+| fake Codex receives SIGTERM | `23:01:11.444` |
+
+**One millisecond apart, ~11 s after spawn** — the 10 s `ACK` poll had already expired and the
+test had already failed. The worker is alive for the whole assertion window. Reproduced on
+three separate failing rounds.
+
+Instrumented and **silent before teardown** on every failing round: `killWithDescendantSweep`,
+`terminateDescendantSnapshot`'s `defaultSendSignal`, `forceKillPosixPtyProcessGroups`' pgroup
+signal, all six `client.request('kill', …)` call sites in `daemon-pty-adapter.ts`/
+`daemon-pty-provider.ts`, the daemon subprocess `kill`/`forceKill`/`signal`/`clear`, and
+`local-pty-provider`'s `killLocalPtyProcess`/`killAll`.
+
+Worth knowing before repeating this: **worker PTYs live in the daemon process, not in
+`local-pty-provider`.** Probing only the Electron main process finds nothing and reads as "no
+kill happened" for the wrong reason.
+
+### What the assertion actually measures
+
+Logging the daemon PTY's `write`/`onData` for the worker pane, on both arms:
+
+```
+08.765  write  "codex '--dangerously-bypass-approvals-and-sandbox'\n"
+08.807  data   "\e]0;Codex Ready\a OpenAI Codex / model: e2e / directory: e2e"
+08.814  write  "\e[200~You are working inside Orca… === TASK … Respond ACK and remain idle"
+08.814  data   "^[[200~You are working inside Orca…"      ← the tty echoing that write back
+09.315  write  "\r"
+```
+
+**The fake never writes `ACK` — on the passing arm either.** Its stdout is silent from the
+banner until teardown on both arms. What satisfies `toContain('ACK')` is the *echo of the
+preamble Orca pastes in*, which embeds the task spec `Respond ACK and remain idle`.
+
+So the two arms differ in one thing only: on the failing arm that echoed preamble is **absent
+from the buffer `terminal.read` returns**, even though the daemon PTY demonstrably produced it
+(the `data` lines above are from a failing round). The tail is two bare shell prompts because
+nothing from the worker's session ever reached that buffer — not because the banner was cleared
+and not because a process died.
+
+**ORCA-204 restated:** a freshly created worker terminal's daemon output intermittently does not
+reach the buffer served by `terminal.read`. The worker is healthy; the read path is not. The
+"latency" and "kill" lines are both closed.
+
+That also reopens the harness question the SIGTERM reading had closed. A real Codex would not be
+killed — nothing kills it. Whether a *user* sees the same hole depends on whether the renderer's
+buffer takes the same path as `terminal.read`; unverified, and the thing to settle first.
+
+### Where to look next
+
+Upstream rewrote exactly this seam in the merged range, and it is unaudited:
+`terminal-subscriber-driven-daemon-attach.test.ts` (+495, new),
+`terminal-output-path-candidates.ts` (+269, new), `terminal-restore-record-seed.test.ts` (+222),
+`terminal-requested-snapshot-unavailability.test.ts` (+233),
+`terminal-list-stale-leaf-liveness.test.ts` / `terminal-send-stale-leaf-liveness.test.ts`, and
+`rpc/terminal-close-attribution.ts` (+50, new).
+
+Reproducing the instrumentation costs ~10 min: a `orca204(msg)` helper that appends
+`new Error().stack` to a fixed path, called from the daemon's `pty-subprocess.ts`
+`write`/`onData`/`kill`/`forceKill`/`signal` and from `killWithDescendantSweep`. Two traps that
+cost this round several rounds:
+
+- **`ORCA204_LOG`-style env gating is unreliable here** — `createRestartSession` builds its own
+  launch env. Gate on a marker *file* instead.
+- **`SKIP_BUILD=1` on top of a manual `npm run build` gives an app that never reaches
+  `window.__store`.** Let global-setup build; the failure looks like a product regression.
+
+Also note the specs delete their `fakeCliDir` in `afterAll`, so the ledgers are gone before you
+can read them unless you guard that `rmSync`.
 
 Also ruled out: `orchestration-legacy-worker-restart-recovery.spec.ts` has **no** `app-server`
 branch in its fake and fails identically to the two that do, so the fake's `exit 2` is not the
-cause either.
-
-Next step, cheap and already scaffolded: the same ledger probe, plus logging on Orca's side of
-who calls the kill. First suspect is `[orchestration] legacy worker provider-ready recovery
-failed`, which appears in the main-process stderr of every CI spec's trace; then the startup
-PTY reconciliation (`reconcileSeededAgentLivePtys`) and the daemon session cleanup.
+cause either. And `[orchestration] legacy worker provider-ready recovery failed` is a dead end:
+`reconcileLegacyWorkerTerminalsNow` only ever *defers* — every failure branch is
+`deferredDispatchIds.add`, none of them kills.
 
 ## Still red in CI, and why
 
 | lane | status |
 | --- | --- |
-| `static analysis` | **inherited**, ORCA-202. 18 React Doctor errors, all upstream's; the gate bills them to the sync because it diffs against the fork's pre-sync tip. 0 introduced. |
+| `static analysis` | **fixed upstream of us** — ORCA-202 landed on `main` as `827ce46505` (PR #81) and this branch merged it (`8483dacef5`). No edit needed here. |
 | `e2e (full)` shards 1/2/4/5/6/10 | 8 specs **inherited** (ORCA-203) + the pair above (ours, open). |
 | everything else | green. |
 
-The PR **cannot go green** until ORCA-202 and ORCA-203 are resolved. That is the
-coordinator's call, not this PR's.
+The PR **cannot go green** until ORCA-203 is resolved. That is the coordinator's call, not this
+PR's.
 
 ## Method notes worth keeping
 
