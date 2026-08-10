@@ -89,15 +89,70 @@ of a 10s poll.
 not show `codex-trust-grant` lines. The experiment that settles it: restore the opt-out,
 re-run the interleaved A/B, and see whether HEAD goes 4/5 → 0/5.
 
-### Decision taken (approved)
+### The A/B was run. The mechanism is disconfirmed.
 
-Restore `codex-real-home-flag.ts` as a **deliberate fork divergence**. Upstream's
-replacement (`setRealHomeLaneGate` on `CodexRuntimeHomeService`) is in-process and cannot
-be reached from an E2E launch, so it does not serve this purpose. Documentation must say
-(1) why the divergence exists — upstream's gate is not reachable out-of-process — and
-(2) what would retire it: if upstream makes that gate reachable out-of-process, delete
-this. It must also appear in the PR body's fork-divergence list, because every divergence
-is conflict surface for sync #8.
+Restoring `codex-real-home-flag.ts` as a fork divergence was built and measured. **It
+changes nothing for these specs**, so it was not landed. It is kept intact and
+cherry-pickable on branch `fabolivark/orca-201-real-home-flag-divergence` (`412ad2777f`),
+and the decision to keep or drop it is open.
+
+The restoration was proven **live, not inert** before measuring — this is the trap that
+would have made an inert change read as a disproof:
+
+- `tests/e2e/electron-home-isolation.spec.ts` reads
+  `process.env.ORCA_CODEX_SYSTEM_DEFAULT_REAL_HOME` **inside the launched Electron main
+  process**: `'0'` by default, `'1'` when the fixture opts in. 2/2 pass.
+- A new unit case on `isHostSystemDefaultRealHomeSelected` discriminates — it fails with
+  the restored gate condition removed.
+
+Because the flag defaults to ON, `codexRealHomeEnabled: true` in the restored tree is
+behaviourally identical to plain HEAD (the only added source condition is satisfied). That
+makes the A/B one build and one tree, with no cross-tree confound:
+
+| arm | `missing-terminal` alone | pair (3 cases, `--workers=1`) |
+| --- | --- | --- |
+| lane ON (≡ HEAD `ea662ed65f`) | 2 / 5 rounds failed | 6 failed cases, 4 / 5 rounds |
+| lane OFF (restoration) | 2 / 5 rounds failed | 6 failed cases, 5 / 5 rounds |
+
+Two corrections to the section above fall out of that table:
+
+1. **The spec is not pair-only.** It fails **2/5 alone on both arms**, so this is not
+   global state leaking between paired specs. Beware single runs: the first run of each arm
+   here read as "ON passes alone, OFF fails alone", which five rounds show was noise.
+2. **The startup-work hypothesis has the sign backwards.** Turning the lane off does not
+   remove the `codex app-server` trust grant: `grantManagedCodexHookTrust` has three call
+   sites in `src/main/codex/hook-service.ts` on the **managed** lane too (same count
+   pre-sync). With the lane off, `prepareForCodexLaunch` returns the shared mirror instead
+   of `null` and then runs `invalidateBackfillAfterManagedSystemDefaultLaunch`,
+   `syncForCurrentSelection`, `syncSystemCodexResourcesIntoManagedHome()`,
+   `syncSystemConfigIntoManagedCodexHome()` and starts the session bridge — strictly *more*
+   synchronous launch work than the real-home lane, which returns early.
+
+Restoring only 1 of the 9 pre-sync gate sites is not what makes this neutral: with zero
+managed Codex accounts the other 8 are no-ops (`settings.codexManagedAccounts` is empty,
+and `pty.ts`'s site needs `selectedCodexHomePath === null`), and the backfill-invalidation
+site would only add work at flag-OFF.
+
+### Where to look next
+
+The symptom argues against latency altogether. The spec finds the pane by
+`title === 'Codex Ready'`, so the fake Codex **did** spawn and write its title escape;
+the tail then shows a shell prompt. That is "codex exited", not "codex was slow". The spec
+already instruments this — `spawn.jsonl` and `interruption.jsonl` in its `fakeCliDir`. Read
+`interruption.jsonl` on a failing run: a `signal` or `stdin-ctrl-c` entry means the pane was
+torn down and closes the latency line of inquiry for good.
+
+Upstream rewrote the surrounding machinery heavily in this range and it is unaudited for
+this failure: `codex-session-backfill*`, `codex-session-migration-scheduler.ts`, and a new
+`codex-state-db-backfill-recovery.ts` (+313 lines).
+
+### Landed from this front
+
+`tests/e2e/electron-home-isolation.spec.ts` compared `path.join(ORCA_E2E_USER_DATA_DIR,
+'home')` un-realpathed while `createElectronHomeIsolation` canonicalizes HOME, so it failed
+on any host with a symlinked tmpdir (macOS `/var` → `/private/var`). Confirmed failing
+identically on `ea662ed65f`, so it is not the sync's; Linux CI hides it. Fixed
+(`ce372efde0`).
 
 ## Still red in CI, and why
 
