@@ -162,6 +162,31 @@ on any host with a symlinked tmpdir (macOS `/var` → `/private/var`). Confirmed
 identically on `ea662ed65f`, so it is not the sync's; Linux CI hides it. Fixed
 (`ce372efde0`).
 
+## E2E triage as of `ffa266869b` — by spec, with provenance
+
+Shards 1 and 10 are **green** (`8a1a018324`, `ffa266869b`). Seven specs remain, across
+shards 2, 4 and 6. None of them is a stale-string fix; each was classified by whether the
+code it exercises was touched by the fork's resolutions, not by a single run.
+
+| spec | shard | symptom | provenance |
+| --- | --- | --- | --- |
+| `orchestration-legacy-worker-missing-terminal-recovery` | 4 | waits `ACK`, gets a shell prompt | **ORCA-204** |
+| `orchestration-legacy-worker-restart-recovery` | 4 | same | **ORCA-204** |
+| `orchestration-worker-terminal-visibility:109` | 4 | same | **ORCA-204** — found this round; the pattern is not "the pair", it is any spec that starts a Codex worker on a fake CLI and waits for `ACK` |
+| `tab-create-entry-file-paths` | 6 | omnibox shows no file rows | **ORCA-203** — product race, `FileListingCancelledError`; hook byte-identical to upstream *and* to pre-sync |
+| `orca-profiles` ×2 | 4 | `button /^Switch profile$/` never renders | `OrcaProfileSwitcher.tsx` is **byte-identical to both** upstream and the pre-sync tip — the fork changed nothing here |
+| `floating-tab-rename` | 2 | panel stays `aria-hidden="true"` | `FloatingTerminalPanel.tsx` is byte-identical to upstream and **+36/−9 vs pre-sync**: upstream changed it in this range and we took it wholesale |
+| `github-created-issue-start-prefill` | 2 | `--prefill` never reaches the terminal buffer | unclassified |
+| `issue-12656-terminal-link-tooltip` | 2 | hover tooltip `display: none`, `currentLinkText: null` | smells like the ORCA-197 hidden-window frame class; helper exists at `tests/e2e/helpers/frame-independent-ui.ts` |
+| `repro-7732-gitlab-checks-job-details` | 2 | predicate timeout | unclassified |
+
+**The open tension, for the coordinator.** The rule agreed this session is: a fix that stands
+without the sync ships as its own PR; one that exists only because the merge broke it goes in
+#80. Every row above except ORCA-204 classifies as "stands without the sync". ORCA-204 does
+not: the pre-sync tree measured 0/5 and 0/8 on the pair while the merged tree measured 4/5 and
+7/10, which is the one piece of evidence pointing at the merge. It is currently tracked
+*outside* #80 by explicit instruction, taken before that rule existed. Worth re-deciding.
+
 ## Still red in CI, and why
 
 | lane | status |
