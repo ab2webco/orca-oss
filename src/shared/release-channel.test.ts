@@ -67,7 +67,7 @@ describe('release channel', () => {
       'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-hourly.202607281400'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160-daily.202607281300')).toBe(
-      'https://github.com/stablyai/orca-daily/releases/tag/v1.4.160-daily.202607281300'
+      'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-daily.202607281300'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160')).toBe(
       'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160'

@@ -281,6 +281,9 @@ describe('OrchestrationDb dispatch assignee index migration', () => {
     expect(db.getDispatchContextById(dispatch.id)).toBeDefined()
   })
 
+  // Why v24 -> 29 rather than 24 -> 25: upstream's v24/v25 are the lab's v28/v29
+  // (see db.ts SCHEMA_VERSION), so a DB stamped 24 replays the whole remaining
+  // ladder and lands on the merged head version.
   it('adds the active-handle index to a populated v24 database idempotently', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'orca-active-dispatch-index-migration-'))
     const dbPath = join(tempDir, 'orchestration.db')
@@ -309,7 +312,7 @@ describe('OrchestrationDb dispatch assignee index migration', () => {
 
     db = new OrchestrationDb(dbPath)
     const sqlite = sqliteFor(db)
-    expect(sqlite.pragma('user_version', { simple: true })).toBe(25)
+    expect(sqlite.pragma('user_version', { simple: true })).toBe(29)
     expect(db.getTask(task.id)).toMatchObject({
       created_by_pane_key: 'tab_creator:leaf_creator',
       created_by_process_incarnation: 'pty_creator:incarnation-a',
@@ -328,7 +331,7 @@ describe('OrchestrationDb dispatch assignee index migration', () => {
 
     db.close()
     db = new OrchestrationDb(dbPath)
-    expect(sqliteFor(db).pragma('user_version', { simple: true })).toBe(25)
+    expect(sqliteFor(db).pragma('user_version', { simple: true })).toBe(29)
     expect(db.getTask(task.id)?.created_by_process_incarnation).toBe('pty_creator:incarnation-a')
   })
 })

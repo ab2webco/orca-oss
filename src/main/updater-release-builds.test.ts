@@ -47,7 +47,7 @@ describe('listReleaseBuilds', () => {
     ])
   })
 
-  it('lists daily builds from the dedicated repo, newest first', async () => {
+  it('lists daily builds from the fork repo, newest first', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
         release('v1.4.160-daily.202607271300'),
@@ -58,7 +58,8 @@ describe('listReleaseBuilds', () => {
 
     const builds = await listReleaseBuilds('daily')
 
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-daily')
+    // Same reason as hourly above: the fork publishes every channel here.
+    expect(fetchMock.mock.calls[0][0]).toContain('ab2webco/orca-oss')
     expect(builds.map((build) => build.version)).toEqual([
       '1.4.160-daily.202607291300',
       '1.4.160-daily.202607281300',

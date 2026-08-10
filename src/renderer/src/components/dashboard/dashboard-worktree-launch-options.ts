@@ -113,7 +113,11 @@ export function buildDashboardWorktreeLaunchOptions(
         available.add(card.agentType)
       }
     }
-    const enabled = filterEnabledTuiAgents(
+    // Why the explicit widening: the lab's TuiAgent union carries claude-zai, which
+    // has no catalog launcher entry on purpose (it runs through a managed
+    // custom-endpoint account), so it is absent from TUI_AGENT_AUTO_PICK_ORDER and
+    // the inferred element type is narrower than the settings' defaultTuiAgent.
+    const enabled: TuiAgent[] = filterEnabledTuiAgents(
       TUI_AGENT_AUTO_PICK_ORDER.filter((agent) => available.has(agent)),
       state.settings?.disabledTuiAgents
     )

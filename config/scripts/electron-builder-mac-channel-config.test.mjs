@@ -71,15 +71,19 @@ describe('electron-builder mac channel config', () => {
     expect(electronBuilderConfig.mac.notarize).toBe(false)
   })
 
-  // Why: the main repo's releases atom feed exposes only its 10 newest entries.
-  // Publishing 24 hourly tags a day there would evict every stable/RC entry and
-  // break update checks for every real user.
-  it('publishes hourly builds to the separate hourly repo', () => {
+  // Why upstream splits the dev channels into their own repos: the main repo's
+  // releases atom feed exposes only its 10 newest entries, and 24 hourly tags a
+  // day there would evict every stable/RC entry. The fork publishes no dev tags
+  // at all — every dev workflow is gated `github.repository == 'stablyai/orca'` —
+  // so one repo costs it nothing, and pointing a channel at upstream's repo would
+  // publish lab artifacts outside the fork. What the fork does keep is the
+  // prerelease downgrade, which is what stops a dev build taking Latest.
+  it('publishes hourly builds to the fork repo, born a prerelease', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toMatchObject({ repo: 'orca-hourly', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-oss', releaseType: 'prerelease' })
     })
     expect(electronBuilderConfig.publish).toMatchObject({
-      repo: 'orca',
+      repo: 'orca-oss',
       releaseType: 'release'
     })
   })
@@ -96,13 +100,13 @@ describe('electron-builder mac channel config', () => {
   // Why adhoc carries the identical mac identity to hourly: it installs over a
   // real Orca through the same updater path, so the same signing and the same TCC
   // argument apply. Only the destination repo differs.
-  it('builds adhoc artifacts with the release identity and its own repo', () => {
+  it('builds adhoc artifacts with the release identity, published to the fork', () => {
     withAdhocEnv((config) => {
       expect(config.appId).toBe('com.stablyai.orca')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toMatchObject({ repo: 'orca-adhoc', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-oss', releaseType: 'prerelease' })
     })
   })
 
@@ -115,13 +119,13 @@ describe('electron-builder mac channel config', () => {
     )
   })
 
-  it('builds daily artifacts with the release identity and its own repo', () => {
+  it('builds daily artifacts with the release identity, published to the fork', () => {
     withDailyEnv((config) => {
       expect(config.appId).toBe('com.stablyai.orca')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toMatchObject({ repo: 'orca-daily', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-oss', releaseType: 'prerelease' })
     })
   })
 
@@ -134,17 +138,23 @@ describe('electron-builder mac channel config', () => {
     )
   })
 
-  // Why: the dev channels share every packaging decision except where they
-  // publish, so a future edit that collapses them must not also collapse the
-  // repos — a branch or daily build landing in orca-hourly would be offered to
-  // everyone riding main's hourlies.
-  it('keeps the dev channels on separate repos', () => {
+  // Why inverted rather than dropped: upstream keeps the dev channels on separate
+  // repos so a branch or daily build never reaches someone riding main's hourlies.
+  // The fork publishes no dev tags, so the invariant it must hold instead is the
+  // one that protects its own users — every channel resolves inside the fork and
+  // none of them is born a full release. If the fork ever ungates a dev workflow,
+  // restore upstream's split before it publishes anything.
+  it('keeps every dev channel inside the fork, none of them a release', () => {
     withHourlyEnv((hourly) => {
       withDailyEnv((daily) => {
         withAdhocEnv((adhoc) => {
-          expect(new Set([hourly.publish.repo, daily.publish.repo, adhoc.publish.repo]).size).toBe(
-            3
-          )
+          for (const config of [hourly, daily, adhoc]) {
+            expect(config.publish).toMatchObject({
+              owner: 'ab2webco',
+              repo: 'orca-oss',
+              releaseType: 'prerelease'
+            })
+          }
         })
       })
     })

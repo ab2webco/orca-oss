@@ -6,8 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CrashReportRecord } from '../../../../shared/crash-reporting'
 import { CrashReportDialogSurface } from './CrashReportDialogSurface'
 
-const viewer = vi.fn(async () => null)
-
 vi.mock('./use-crash-report-copy', () => ({
   useCrashReportCopy: () => vi.fn(async () => {})
 }))
@@ -45,11 +43,15 @@ function crashReport(error: string): CrashReportRecord {
   }
 }
 
+// Why no gh.viewer handshake (ORCA-192/ORCA-201): upstream's dialog resolves a
+// GitHub viewer to decide whether to submit anonymously to its telemetry endpoint.
+// The fork's dialog opens an issue on its own repo instead and never makes that
+// call, so awaiting it here would hang forever. The overflow contract under test
+// is the same on both.
 beforeEach(() => {
-  viewer.mockClear()
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { gh: { viewer } }
+    value: {}
   })
 })
 
@@ -67,7 +69,7 @@ describe('CrashReportDialogSurface overflow containment', () => {
         onReportChange={() => {}}
       />
     )
-    await waitFor(() => expect(viewer).toHaveBeenCalledOnce())
+    await waitFor(() => expect(container.querySelector('[role="dialog"] pre')).not.toBeNull())
 
     const dialog = container.querySelector('[role="dialog"]')
     const output = dialog?.querySelector('pre')

@@ -111,6 +111,7 @@ describe('mergeRuntimeFolderWorkspace', () => {
       linkedLinearIssue: null,
       linkedLinearIssueWorkspaceId: null,
       linkedLinearIssueOrganizationUrlKey: null,
+      linkedPlaneWorkItem: null,
       linkedGitLabMR: null,
       linkedGitLabIssue: null,
       linkedBitbucketPR: null,

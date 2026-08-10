@@ -163,10 +163,15 @@ const { getLinuxRootPackageTypeMock, recordUpdaterLifecycleMock } = vi.hoisted((
 }))
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
-const PRE_COMMIT_INSTALL_FAILURE =
-  process.platform === 'darwin'
-    ? 'Could not restart to install the update. Quit and reopen Orca, then try again.'
-    : 'Could not start the update installer. Orca remains open.'
+const DARWIN_PRE_COMMIT_INSTALL_FAILURE =
+  'Could not restart to install the update. Quit and reopen Orca, then try again.'
+const NON_DARWIN_PRE_COMMIT_INSTALL_FAILURE =
+  'Could not start the update installer. Orca remains open.'
+// Why a function, not a constant: cases that pin process.platform do it inside the
+// test body, long after a module-level constant has already read the host's real
+// platform — which made the linux-pinned case below assert macOS copy on a Mac.
+const preCommitInstallFailure = (platform: NodeJS.Platform = process.platform): string =>
+  platform === 'darwin' ? DARWIN_PRE_COMMIT_INSTALL_FAILURE : NON_DARWIN_PRE_COMMIT_INSTALL_FAILURE
 
 // Why: only the marker resolver is faked so the real artifact capture/redaction path stays under test.
 vi.mock('./linux-update-package-type', () => ({
@@ -1843,7 +1848,7 @@ describe('updater', () => {
         // Why: a pre-commit install failure is not fixed by restarting, so the copy must not
         // suggest it — except on macOS, where quitting does re-stage a Squirrel update.
         // The updater's own text is appended because it is the only record of why the install never ran.
-        message: `${PRE_COMMIT_INSTALL_FAILURE} (No update filepath provided, can't quit and install)`
+        message: `${preCommitInstallFailure('linux')} (No update filepath provided, can't quit and install)`
       })
     )
     platformSpy.mockRestore()
@@ -3923,7 +3928,7 @@ describe('updater', () => {
     const lastStatus = (send: ReturnType<typeof vi.fn>): UpdateStatus | undefined =>
       send.mock.calls.findLast(([channel]) => channel === 'updater:status')?.[1]
 
-    const PRE_COMMIT_FAILURE_MESSAGE = PRE_COMMIT_INSTALL_FAILURE
+    const PRE_COMMIT_FAILURE_MESSAGE = preCommitInstallFailure()
     const AGENT_STDERR =
       'pkexec: Error executing command as another user: No authentication agent found.'
 

@@ -2273,7 +2273,11 @@ describe('AgentHookServer listener replay', () => {
         })
 
       await postHook({ hook_event_name: 'UserPromptSubmit', prompt: 'first launch' })
-      server.retirePaneAuthority(PANE)
+      // Why 'agent-exited' rather than the default (ORCA-201): a reusable pane is
+      // retired by command-finished, which passes exactly this reason. The default
+      // 'pane-closed' is the renderer's tab-close signal, and a closed tab must stay
+      // silent (ORCA-169) — so the un-retire below is scoped to the live-pane case.
+      server.retirePaneAuthority(PANE, 'agent-exited')
 
       // Why: `claude --resume` in the reused shell pane emits only SessionStart while idle;
       // without the un-retire the resumed session stays rowless until a prompt (STA-3386).

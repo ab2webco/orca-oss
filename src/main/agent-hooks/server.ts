@@ -1031,12 +1031,13 @@ export class AgentHookServer {
       return 'accept'
     }
     // Why: command completion retires launch authority but leaves its shell pane reusable.
-    // A live SessionStart proves a new agent process owns the retired pane just like a
-    // fresh prompt does — without it, a session resumed in a reused pane stays rowless (STA-3386).
-    if (
-      (event?.hookEventName === 'UserPromptSubmit' || event?.hookEventName === 'SessionStart') &&
-      event.isReplay !== true
-    ) {
+    // Why SessionStart is NOT an escape here, unlike upstream's STA-3386: this set is
+    // populated only by retirePaneAuthority(..., 'pane-closed') — the renderer's own
+    // signal that the tab is gone. An 'agent-exited' retirement never lands here, so a
+    // resumed session in a live pane still gets its row without letting a closed tab
+    // start reporting again (ORCA-169). A real prompt still proves a human is typing
+    // into a reused pane, so that escape stays.
+    if (event?.hookEventName === 'UserPromptSubmit' && event.isReplay !== true) {
       this.closedAgentStatusPaneKeys.delete(paneKey)
       this.closedAgentStatusPaneKeys.delete(ownerPaneKey)
       return 'restart'
