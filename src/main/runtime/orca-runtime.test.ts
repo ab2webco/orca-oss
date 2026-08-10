@@ -16904,6 +16904,36 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('resolves an unrecorded Codex owner before choosing the preview snapshot', async () => {
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: '\x1b[?1049h\x1b[2J\x1b[H >_ OpenAI Codex\r\n› Ready for input\r\n',
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    const pollutedTranscript = ['WWoWorWorkWorkiWorkinWorking', 'SStaStarStartStartiStarting']
+    runtime.onPtyData('pty-1', `${pollutedTranscript.join('\n')}\n`, 100)
+
+    const preview = await runtime.readTerminal(handle)
+    const cursorRead = await runtime.readTerminal(handle, { cursor: 0 })
+
+    expect(preview.tail).toEqual([' >_ OpenAI Codex', '› Ready for input'])
+    expect(cursorRead.tail).toEqual(pollutedTranscript)
+    expect(serializeBuffer).toHaveBeenCalledWith('pty-1', {
+      scrollbackRows: 0,
+      altScreenForcesZeroRows: false
+    })
+  })
+
   it('reads and shows the runtime-owned alternate-screen grid without serialization', async () => {
     const serializeBuffer = vi.fn()
     const serializeProviderBuffer = vi.fn()
