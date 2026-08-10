@@ -6,7 +6,6 @@ import { afterAll, describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const hookScript = join(projectDir, '.claude/hooks/main-merge-guard.py')
-const python = process.platform === 'win32' ? 'python' : 'python3'
 const tempDirs = []
 
 function git(cwd, args) {
@@ -16,9 +15,11 @@ function git(cwd, args) {
 function makeRepo() {
   const root = mkdtempSync(join(tmpdir(), 'orca-main-merge-guard-'))
   tempDirs.push(root)
-  git(root, ['init', '--quiet', '--initial-branch', 'main'])
+  // Why: `git init --initial-branch` es de git 2.28 y el piso del repo es 2.25.
+  git(root, ['init', '--quiet'])
   git(root, ['config', 'user.email', 'main-merge-guard-test@example.com'])
   git(root, ['config', 'user.name', 'Main Merge Guard Test'])
+  git(root, ['checkout', '--quiet', '-b', 'main'])
   git(root, ['remote', 'add', 'origin', 'git@example.com:owner/repo.git'])
   git(root, ['remote', 'add', 'upstream', 'git@example.com:someone-else/repo.git'])
   writeFileSync(join(root, 'base.txt'), 'base\n')
@@ -47,9 +48,9 @@ function runGuard(command, { cwd, ghBase } = {}) {
   const repo = cwd ?? makeRepo()
   const env = { ...process.env }
   if (ghBase !== undefined) {
-    env.PATH = `${makeFakeGhBin(ghBase)}${process.platform === 'win32' ? ';' : ':'}${env.PATH}`
+    env.PATH = `${makeFakeGhBin(ghBase)}:${env.PATH}`
   }
-  const result = spawnSync(python, [hookScript], {
+  const result = spawnSync('python3', [hookScript], {
     cwd: repo,
     env,
     encoding: 'utf8',
@@ -74,7 +75,8 @@ afterAll(() => {
   }
 })
 
-describe('main merge guard', () => {
+// Why: el `gh` falso es un script `#!/bin/sh` y el PATH se arma con `:`.
+describe.skipIf(process.platform === 'win32')('main merge guard', () => {
   describe('refuses merges that land on main', () => {
     it('refuses `gh pr merge` on a PR based on main', () => {
       expect(runGuard('gh pr merge 73 --squash --delete-branch', { ghBase: 'main' }).denied).toBe(
@@ -100,16 +102,20 @@ describe('main merge guard', () => {
       ['git push -o ci.skip origin main', 'push option consuming its value'],
       ['git push --mirror origin', 'mirror'],
       ['git push --all origin', 'all branches'],
-      ['git -C . push origin main', 'global option before the subcommand']
+      ['git -C . push origin main', 'global option before the subcommand'],
+      ['gh api -X PATCH repos/ab2webco/orca-oss/git/refs/heads/main -f sha=deadbeef', 'ref write']
     ])('refuses `%s` (%s)', (command) => {
       expect(runGuard(command).denied).toBe(true)
     })
 
-    it('refuses a bare `git push` while standing on main', () => {
-      const repo = makeRepo()
-      git(repo, ['checkout', '--quiet', 'main'])
-      expect(runGuard('git push', { cwd: repo }).denied).toBe(true)
-    })
+    it.each(['git push', 'git push origin HEAD', 'git push origin @'])(
+      'refuses `%s` while standing on main, where the target is implicit',
+      (command) => {
+        const repo = makeRepo()
+        git(repo, ['checkout', '--quiet', 'main'])
+        expect(runGuard(command, { cwd: repo }).denied).toBe(true)
+      }
+    )
 
     it.each([
       'gh api -X PUT repos/ab2webco/orca-oss/pulls/73/merge',
@@ -142,6 +148,8 @@ describe('main merge guard', () => {
       'git push origin fabolivark/orca-182-merge-guard',
       'git push --force-with-lease origin HEAD:fabolivark/orca-182-merge-guard',
       'git push -u origin feature',
+      'git push -u origin HEAD',
+      'gh api repos/ab2webco/orca-oss/git/refs/heads/main',
       'git push upstream main',
       'git push --mirror upstream',
       'gh pr view 73 --json state',

@@ -27,7 +27,8 @@ PROTECTED_BRANCH = "main"
 
 # Why: si el comando ni menciona un merge, no hay nada que parsear ni que resolver.
 # Sin `\b` al final: cubre `merge`, `merges` y `mergePullRequest` de una sola vez.
-MERGE_HINT = re.compile(r"\b(?:push|merge)")
+# `refs/heads/main` entra aparte: mover la ref por la API no dice "push" ni "merge".
+MERGE_HINT = re.compile(r"\b(?:push|merge)|refs/heads/" + PROTECTED_BRANCH)
 
 OPERATORS = {"&&", "||", ";", "|", "&"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -43,6 +44,12 @@ PUSH_VALUE_FLAGS = {"-o", "--push-option", "--receive-pack", "--exec"}
 GIT_GLOBAL_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
 
 PULL_MERGE_ENDPOINT = re.compile(r"pulls/\d+/merge")
+GIT_REF_ENDPOINT = re.compile(r"git/refs(?:/heads)?/" + PROTECTED_BRANCH)
+# Why: `gh api` sin flags de cuerpo es un GET. Leer la ref de `main` no la mueve.
+MUTATING_API = re.compile(
+    r"(?:^|\s)(?:-X|--method)[= ](?:PATCH|POST|PUT|DELETE)|(?:^|\s)(?:-f|-F|--field|--raw-field|--input)\b",
+    re.IGNORECASE,
+)
 
 REFUSAL = (
     "main-merge-guard (.claude/hooks/main-merge-guard.py) rechaza este merge a "
@@ -167,6 +174,11 @@ def push_targets_protected(args: list[str], cwd: str | None) -> str | None:
     for refspec in refspecs:
         source, _colon, destination = refspec.lstrip("+").partition(":")
         target = (destination or source).removeprefix("refs/heads/")
+        # Why: `git push origin HEAD` sin destino escribe la rama actual, y es la forma
+        # más común de subir. Sin resolverla, `HEAD` parado en `main` pasaba derecho.
+        if not destination and target in {"HEAD", "@"}:
+            code, branch = run(["git", "branch", "--show-current"], cwd)
+            target = branch if code == 0 else ""
         if target == PROTECTED_BRANCH:
             return f"El refspec `{refspec}` escribe `{PROTECTED_BRANCH}` en `{remote}`."
     return None
@@ -212,6 +224,11 @@ def check_gh(args: list[str], cwd: str | None, raw: str) -> None:
             deny("La mutación `mergePullRequest` de la API GraphQL mergea el PR igual que la CLI.")
         if PULL_MERGE_ENDPOINT.search(raw) or re.search(r"/merges\b", raw):
             deny("Este `gh api` pega contra el endpoint de merge de la API REST.")
+        if GIT_REF_ENDPOINT.search(raw) and MUTATING_API.search(raw):
+            deny(
+                f"Este `gh api` mueve `refs/heads/{PROTECTED_BRANCH}` directo por la API, "
+                "que aterriza en la rama igual que un merge."
+            )
 
 
 def main() -> None:
