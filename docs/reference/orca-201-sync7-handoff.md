@@ -176,16 +176,37 @@ code it exercises was touched by the fork's resolutions, not by a single run.
 | `tab-create-entry-file-paths` | 6 | omnibox shows no file rows | **ORCA-203** — product race, `FileListingCancelledError`; hook byte-identical to upstream *and* to pre-sync |
 | `orca-profiles` ×2 | 4 | `button /^Switch profile$/` never renders | `OrcaProfileSwitcher.tsx` is **byte-identical to both** upstream and the pre-sync tip — the fork changed nothing here |
 | `floating-tab-rename` | 2 | panel stays `aria-hidden="true"` | `FloatingTerminalPanel.tsx` is byte-identical to upstream and **+36/−9 vs pre-sync**: upstream changed it in this range and we took it wholesale |
-| `github-created-issue-start-prefill` | 2 | `--prefill` never reaches the terminal buffer | unclassified |
+| `github-created-issue-start-prefill` | 2 | `--prefill` never reaches the terminal buffer (received `""`) | **lead, not a classification**: it also drives a fake CLI on PATH and reads the terminal buffer, the same shape as the ORCA-204 family. The ledger probe has *not* been run on it, so this is untested |
 | `issue-12656-terminal-link-tooltip` | 2 | hover tooltip `display: none`, `currentLinkText: null` | smells like the ORCA-197 hidden-window frame class; helper exists at `tests/e2e/helpers/frame-independent-ui.ts` |
-| `repro-7732-gitlab-checks-job-details` | 2 | predicate timeout | unclassified |
+| `repro-7732-gitlab-checks-job-details` | 2 | predicate timeout | stands alone: `PullRequestPage.tsx` is byte-identical to **both** upstream and the pre-sync tip; `GitHubItemDialog.tsx` is identical to upstream and +33/−4 vs pre-sync, i.e. an upstream change taken wholesale. The failing predicate itself was not read — the timeout gives no locator |
 
-**The open tension, for the coordinator.** The rule agreed this session is: a fix that stands
-without the sync ships as its own PR; one that exists only because the merge broke it goes in
-#80. Every row above except ORCA-204 classifies as "stands without the sync". ORCA-204 does
-not: the pre-sync tree measured 0/5 and 0/8 on the pair while the merged tree measured 4/5 and
-7/10, which is the one piece of evidence pointing at the merge. It is currently tracked
-*outside* #80 by explicit instruction, taken before that rule existed. Worth re-deciding.
+**ORCA-204 belongs to #80** (decided; the rule below beat the earlier instruction to track it
+outside). A fix that stands without the sync ships as its own PR; one that exists only because
+the merge broke it goes in #80. Everything above except ORCA-204 is the former.
+
+The escape hatch was: prove the failure lives in the E2E harness — the fake Codex CLI — so a
+real worker is unaffected. **It is refuted, by positive evidence pointing the other way.**
+Running the pair locally with `--workers=1` and reading the spec's own ledgers:
+
+| run | result | `spawn.jsonl` | `interruption.jsonl` |
+| --- | --- | --- | --- |
+| 1 | 3 passed | `{"pid":44573,"event":"spawn"}` | *(empty)* |
+| 2 | 2 failed | `{"pid":51193,"event":"spawn"}` | `{"pid":51193,"event":"signal","signal":"SIGTERM"}` |
+
+The fake Codex starts, writes its title escape — which is why the spec finds the pane by
+`title === 'Codex Ready'` — and is then **sent SIGTERM**. A real Codex would die the same way:
+SIGTERM does not care that the binary is a fake. Orca is killing a freshly spawned worker. That
+also closes the latency line for good: the `ACK` is not late, the process that would write it
+is gone.
+
+Also ruled out: `orchestration-legacy-worker-restart-recovery.spec.ts` has **no** `app-server`
+branch in its fake and fails identically to the two that do, so the fake's `exit 2` is not the
+cause either.
+
+Next step, cheap and already scaffolded: the same ledger probe, plus logging on Orca's side of
+who calls the kill. First suspect is `[orchestration] legacy worker provider-ready recovery
+failed`, which appears in the main-process stderr of every CI spec's trace; then the startup
+PTY reconciliation (`reconcileSeededAgentLivePtys`) and the daemon session cleanup.
 
 ## Still red in CI, and why
 
