@@ -7,6 +7,10 @@ export const TUI_AGENT_AUTO_PICK_ORDER = [
   'claude',
   'claude-agent-teams',
   'openclaude',
+  // Why here: the lab's own Claude GLM entry. It was never listed, which upstream's
+  // dashboard launch options turned into a type error — the order must cover the
+  // whole TuiAgent union, and an unlisted agent is also never auto-picked.
+  'claude-zai',
   'codex',
   'grok',
   'copilot',
@@ -16,6 +20,7 @@ export const TUI_AGENT_AUTO_PICK_ORDER = [
   'trae',
   'pi',
   'omp',
+  'prime-agent',
   'gemini',
   'antigravity',
   'aider',

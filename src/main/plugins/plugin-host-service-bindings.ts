@@ -15,7 +15,8 @@ export type PluginRuntimeDelegate = {
   } | null>
   listTerminals(
     worktreeSelector?: string,
-    limit?: number
+    limit?: number,
+    opts?: { includeVisualLayouts?: boolean }
   ): Promise<{
     terminals: {
       handle: string
@@ -58,7 +59,8 @@ export function bindPluginHostServices(input: {
     listWorktreeTerminals: async (worktreeId) => {
       const result = await delegate.listTerminals(
         `id:${worktreeId}`,
-        PLUGIN_WORKSPACE_TERMINAL_LIMIT
+        PLUGIN_WORKSPACE_TERMINAL_LIMIT,
+        { includeVisualLayouts: false }
       )
       return (
         result.terminals

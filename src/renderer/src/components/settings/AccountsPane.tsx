@@ -21,6 +21,7 @@ import { Label } from '../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Separator } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
 import {
   AlertTriangle,
   ChevronDown,
@@ -102,6 +103,7 @@ import {
   type ProviderAccountRuntimeView
 } from './provider-account-visibility'
 import { translate } from '@/i18n/i18n'
+import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import { cn } from '@/lib/utils'
 import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
 import { isWebClientLocation } from '@/lib/web-client-location'
@@ -127,16 +129,7 @@ function formatMiniMaxRelativeRefresh(updatedAt: number, now: number): string {
   if (diffMs < 60_000) {
     return translate('auto.components.settings.AccountsPane.3a30aaf526', 'just now')
   }
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-  const minutes = Math.round(diffMs / 60_000)
-  if (minutes < 60) {
-    return formatter.format(-minutes, 'minute')
-  }
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) {
-    return formatter.format(-hours, 'hour')
-  }
-  return formatter.format(-Math.round(hours / 24), 'day')
+  return formatUiRelativeTime(-diffMs)
 }
 
 function MiniMaxCookieHelpPopover(): React.JSX.Element {
@@ -2111,25 +2104,19 @@ export function AccountsPane({
               )}
             </p>
           </div>
-          <button
-            role="switch"
-            aria-checked={settings.geminiCliOAuthEnabled}
-            onClick={() => {
+          <Switch
+            aria-label={translate(
+              'auto.components.settings.AccountsPane.96f3649526',
+              'Use Gemini CLI credentials (experimental)'
+            )}
+            checked={settings.geminiCliOAuthEnabled}
+            onCheckedChange={(checked) => {
               recordFeatureInteraction('usage-tracking')
               updateSettings({
-                geminiCliOAuthEnabled: !settings.geminiCliOAuthEnabled
+                geminiCliOAuthEnabled: checked
               })
             }}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors ${
-              settings.geminiCliOAuthEnabled ? 'bg-foreground' : 'bg-muted-foreground/30'
-            }`}
-          >
-            <span
-              className={`pointer-events-none block size-3.5 rounded-full bg-background shadow-sm transition-transform ${
-                settings.geminiCliOAuthEnabled ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+          />
         </SearchableSetting>
       </section>
     ) : null,

@@ -214,8 +214,8 @@ describe('a Claude pane restored after an app restart', () => {
       tabId: TAB_ID,
       leafId: LEAF_ID,
       launchConfig: LAUNCH_CONFIG,
-      launchToken: 'proven-at-spawn',
-      launchAgent: 'claude'
+      launchAgent: 'claude',
+      agentLaunchAuthority: { launchToken: 'proven-at-spawn', launchAgent: 'claude' }
     })
 
     // A renderer reload reattaches against a main that never died; its config is

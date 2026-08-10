@@ -24,6 +24,7 @@ const TUI_AGENT_KIND_BY_AGENT = {
   'mimo-code': 'mimo-code',
   pi: 'pi',
   omp: 'omp',
+  'prime-agent': 'prime-agent',
   gemini: 'gemini',
   antigravity: 'antigravity',
   aider: 'aider',

@@ -24,7 +24,9 @@ import {
 import type { SplitTerminalPaneDetail, CloseTerminalPaneDetail } from '@/constants/terminal'
 import { getVisibleWorktreeIds } from '@/components/sidebar/visible-worktrees'
 import { activateTabNumberShortcut } from '@/lib/tab-number-shortcuts'
+import { emitCmdJRowIndexJump } from '@/lib/cmd-j-row-index-jump'
 import { nextEditorFontZoomLevel, computeEditorFontSize } from '@/lib/editor-font-zoom'
+import { canConnectSshStatus } from '@/ssh/ssh-connection-recoverability'
 import type {
   TerminalLayoutSnapshot,
   TerminalPaneLayoutNode,
@@ -1349,6 +1351,12 @@ export function useIpcEvents(): void {
     unsubs.push(
       window.api.ui.onJumpToWorktreeIndex((index) => {
         const store = useAppStore.getState()
+        // Why: while Cmd+J is open the digit chord means "activate recent row N" — main already
+        // preventDefault'd it, so routing it here keeps digits out of the palette's search input.
+        if (store.activeModal === 'worktree-palette') {
+          emitCmdJRowIndexJump(index)
+          return
+        }
         if (store.activeView !== 'terminal') {
           return
         }
@@ -1361,6 +1369,10 @@ export function useIpcEvents(): void {
 
     unsubs.push(
       window.api.ui.onJumpToTabIndex((index) => {
+        // Why: dropped while Cmd+J is open — never switch tabs behind the overlay.
+        if (useAppStore.getState().activeModal === 'worktree-palette') {
+          return
+        }
         activateTabNumberShortcut(index)
       })
     )
@@ -1975,7 +1987,8 @@ export function useIpcEvents(): void {
           const detail: CloseTerminalPaneDetail = { tabId, paneRuntimeId }
           window.dispatchEvent(new CustomEvent(CLOSE_TERMINAL_PANE_EVENT, { detail }))
         } else {
-          closeTerminalTab(tabId)
+          // Why: the CLI/RPC caller is answered immediately, so it cannot wait on a modal.
+          closeTerminalTab(tabId, { skipRunningProcessConfirm: true })
         }
       })
     )
@@ -2815,7 +2828,7 @@ export function useIpcEvents(): void {
       const previous = store.sshConnectionStates?.get(targetId)
       store.setSshConnectionState(targetId, state)
 
-      if (['disconnected', 'auth-failed', 'reconnection-failed', 'error'].includes(state.status)) {
+      if (canConnectSshStatus(state.status)) {
         reconnectAuthorityByTarget.delete(targetId)
         reconnectCoordinator.invalidate(targetId)
         // Why: remote agent list is tied to a live relay; clear on disconnect so reconnect re-detects against the new relay.
@@ -3108,6 +3121,7 @@ export function useIpcEvents(): void {
         interactivePrompt: data.interactivePrompt,
         lastAssistantMessage: data.lastAssistantMessage,
         interrupted: data.interrupted,
+        sessionBoundary: data.sessionBoundary,
         // Why: same trap as interactivePrompt — this rebuild is a field whitelist, so subagent child rows vanish if omitted.
         subagents: data.subagents
       })

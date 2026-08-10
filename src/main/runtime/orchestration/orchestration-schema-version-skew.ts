@@ -82,6 +82,21 @@ function hasConsistentLegacyAdoption(db: Database.Database): boolean {
   return true
 }
 
+/** Last version both lineages agree on: v22 is `idx_dispatch_assignee_handle` on
+ *  either side. From v23 the numbers diverge (see db.ts SCHEMA_VERSION). */
+const LAST_SHARED_LINEAGE_VERSION = 22
+
+/** The lab's v23 adds this column and nothing else does, so its absence above v22
+ *  identifies a database an upstream build stamped. */
+const LAB_LINEAGE_MARKER: readonly [string, string] = ['dispatch_contexts', 'envelope_contract']
+
+function isUpstreamLineageDatabase(db: Database.Database, storedVersion: number): boolean {
+  if (storedVersion <= LAST_SHARED_LINEAGE_VERSION) {
+    return false
+  }
+  return !hasOrchestrationColumn(db, LAB_LINEAGE_MARKER[0], LAB_LINEAGE_MARKER[1])
+}
+
 function hasCompletePostV6Schema(db: Database.Database): boolean {
   return (
     POST_V6_COLUMNS.every(([table, column]) => hasOrchestrationColumn(db, table, column)) &&
@@ -96,6 +111,18 @@ export function resolveOrchestrationMigrationStartVersion(
   storedVersion: number,
   schemaVersion: number
 ): number {
+  // Why this runs before the newer-build guard below: both lineages ship
+  // appId com.stablyai.orca, so they share userData/orchestration.db. A stamp of
+  // 23–25 written by an upstream build would otherwise skip the lab's v23–v27 and
+  // leave the code selecting envelope_contract, monitor_deadline_at,
+  // turn_accepted_at and composer_ready_proven off tables that never got them —
+  // and the failure surfaces far from the migration that caused it. Rewinding to
+  // the last shared version replays the lab steps; every one is either
+  // hasColumn-guarded, CREATE ... IF NOT EXISTS, or a NOT EXISTS-filtered
+  // backfill, so re-running them over the upstream steps is inert.
+  if (isUpstreamLineageDatabase(db, storedVersion)) {
+    return Math.min(storedVersion, LAST_SHARED_LINEAGE_VERSION)
+  }
   if (storedVersion > schemaVersion) {
     return storedVersion
   }

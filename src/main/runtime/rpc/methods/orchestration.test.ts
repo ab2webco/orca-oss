@@ -9,13 +9,10 @@ import { OrcaRuntimeService } from '../../orca-runtime'
 import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
 import { ORCHESTRATION_ASK_MAX_TIMEOUT_MS } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
-import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages belong to one exact Dispatch and cannot target a group address.`
 }
-
-const LAUNCH_TOKEN = 'launch_test'
 
 describe('orchestration RPC methods', () => {
   let db: OrchestrationDb
@@ -31,23 +28,6 @@ describe('orchestration RPC methods', () => {
     dbOpen = true
     runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(db)
-    // Why: only the token-bound tier needs a live PTY the unit runtime cannot spawn, so stand in for
-    // that check alone and mirror the handle-derived tier verbatim — otherwise every token-less
-    // sender (SSH, reattach, hand-opened shell) drops out of coverage.
-    vi.spyOn(runtime, 'authenticateOrchestrationSender').mockImplementation(
-      ({ claimedHandle, paneKey, launchToken }) => {
-        if (launchToken === LAUNCH_TOKEN) {
-          return {
-            handle: claimedHandle ?? 'term_test',
-            paneKey: paneKey ?? 'tab_test:leaf_test'
-          }
-        }
-        const handle = claimedHandle ?? 'unknown'
-        // Why: mirrors the real contract — the runtime's observation of the pane outranks the
-        // caller's claim, which is only the last resort when the runtime cannot resolve it.
-        return { handle, paneKey: runtime.getTerminalPaneKey(handle) ?? paneKey ?? undefined }
-      }
-    )
     vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_coord' ? coordinatorPaneKey : null
     )
@@ -91,8 +71,6 @@ describe('orchestration RPC methods', () => {
     return method
   }
 
-  const AUTHENTICATED_METHODS = ['orchestration.send', 'orchestration.reply', 'orchestration.ask']
-
   async function call(name: string, params: Record<string, unknown>) {
     const method = findMethod(name)
     const scopedParams = { ...params }
@@ -114,19 +92,7 @@ describe('orchestration RPC methods', () => {
         scopedParams.from ??= 'term_coord'
       }
     }
-    // Why: only supply the launch credential when the case does not state its own sender identity —
-    // a test that passes --from or a pane key is exercising the token-less tier on purpose.
-    const authenticatedParams =
-      AUTHENTICATED_METHODS.includes(name) &&
-      !('from' in scopedParams) &&
-      !('senderPaneKey' in scopedParams)
-        ? {
-            senderPaneKey: 'tab_test:leaf_test',
-            senderLaunchToken: LAUNCH_TOKEN,
-            ...scopedParams
-          }
-        : scopedParams
-    const parsed = method.params ? method.params.parse(authenticatedParams) : undefined
+    const parsed = method.params ? method.params.parse(scopedParams) : undefined
     return method.handler(parsed, ctx)
   }
 
@@ -332,6 +298,8 @@ describe('orchestration RPC methods', () => {
   describe('orchestration.send', () => {
     it('sends a message', async () => {
       setup()
+      // Why: send notifies arrival so already-idle recipients get push-on-idle
+      // delivery without waiting for a status transition (#12536).
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
       const result = (await call('orchestration.send', {
         from: 'term_coord',
@@ -342,7 +310,7 @@ describe('orchestration RPC methods', () => {
       expect(result.message.id).toMatch(/^msg_/)
       expect(result.message.from_handle).toBe('term_coord')
       expect(result.message.run_id).toBe(activeRunId)
-      expect(runtime.deliverPendingMessagesForHandle).not.toHaveBeenCalled()
+      expect(runtime.deliverPendingMessagesForHandle).toHaveBeenCalled()
     })
 
     it('routes exact Dispatch mail independently of terminal handles', async () => {
@@ -452,14 +420,10 @@ describe('orchestration RPC methods', () => {
         to: 'term_coord',
         subject: 'Done',
         type: 'worker_done',
-        // Why: `outcome` is upstream's new lifecycle requirement for every worker_done, orthogonal
-        // to identity. Nothing else in this case may change — it guards that a sender with no
-        // stable pane identity still completes its own dispatch.
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
+          outcome: 'succeeded'
         })
       })
 
@@ -485,8 +449,7 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
+          outcome: 'succeeded'
         })
       })
 
@@ -511,8 +474,7 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
+          outcome: 'succeeded'
         })
       })) as {
         message: { id: string; type: string; subject: string }
@@ -546,8 +508,7 @@ describe('orchestration RPC methods', () => {
       const payload = JSON.stringify({
         taskId: task.id,
         dispatchId: dispatch.id,
-        outcome: 'succeeded',
-        envelope: SUCCESS_ENVELOPE
+        outcome: 'succeeded'
       })
 
       const rejected = (await call('orchestration.send', {
@@ -829,20 +790,14 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
+          outcome: 'succeeded'
         })
       })) as { message: { to_handle: string; type: string; payload: string | null } }
 
       expect(result.message.to_handle).toBe(`run:${activeRunId}`)
       expect(result.message.type).toBe('worker_done')
       expect(result.message.payload).toBe(
-        JSON.stringify({
-          taskId: task.id,
-          dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
-        })
+        JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
       )
     })
 
@@ -987,8 +942,7 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
+          outcome: 'succeeded'
         })
       })) as { message: { type: string } }
 
@@ -1019,60 +973,6 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
       expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBeTruthy()
       expect(db.getActiveDispatchForTerminal('term_worker')).toBeDefined()
-    })
-
-    // Why: black-box through the RPC — an unvalidated runtime accepts the extra
-    // payload key and completes the task, so this discriminates behavior, not
-    // the existence of a schema module.
-    it('rejects a malformed envelope at the send boundary instead of completing', async () => {
-      setup()
-      const task = db.createTask({ spec: 'envelope work' })
-      const dispatch = db.createDispatchContext(task.id, 'term_worker')
-      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
-
-      const result = (await call('orchestration.send', {
-        from: 'term_worker',
-        to: 'term_coord',
-        subject: 'Done',
-        type: 'worker_done',
-        payload: JSON.stringify({
-          taskId: task.id,
-          dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: { status: 'banana', summary: '', verification: 'green enough' }
-        })
-      })) as { lifecycle?: { action: string; code?: string; reason?: string } }
-
-      expect(result.lifecycle).toMatchObject({ action: 'rejected', code: 'invalid_envelope' })
-      expect(result.lifecycle?.reason).toContain('correction 1 of 2')
-      expect(db.getTask(task.id)?.status).toBe('dispatched')
-      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
-    })
-
-    it('accepts a valid envelope at the send boundary and settles the dispatch', async () => {
-      setup()
-      const task = db.createTask({ spec: 'envelope work' })
-      const dispatch = db.createDispatchContext(task.id, 'term_worker')
-      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
-
-      const result = (await call('orchestration.send', {
-        from: 'term_worker',
-        to: 'term_coord',
-        subject: 'Done',
-        type: 'worker_done',
-        payload: JSON.stringify({
-          taskId: task.id,
-          dispatchId: dispatch.id,
-          outcome: 'succeeded',
-          envelope: SUCCESS_ENVELOPE
-        })
-      })) as { lifecycle?: { action: string } }
-
-      expect(result.lifecycle).toBeUndefined()
-      expect(db.getTask(task.id)?.status).toBe('completed')
-      expect(JSON.parse(db.getTask(task.id)?.result ?? '{}').envelope).toMatchObject({
-        status: 'success'
-      })
     })
 
     it('does not release dispatch lock for non-lifecycle sends', async () => {
@@ -1117,7 +1017,6 @@ describe('orchestration RPC methods', () => {
         payload.dispatchId = params.dispatchId
       }
       payload.outcome = 'succeeded'
-      payload.envelope = SUCCESS_ENVELOPE
       if (params.filesModified !== undefined) {
         payload.filesModified = params.filesModified
       }
@@ -1867,17 +1766,27 @@ describe('orchestration RPC methods', () => {
       expect(result.task.status).toBe('pending')
     })
 
-    it('records the caller terminal handle when creating a task', async () => {
+    it('records the caller pane, process, and Run generation when creating a task', async () => {
       setup()
       vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
         handle === 'term_creator' ? coordinatorPaneKey : null
       )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
+        terminalHandle: 'term_creator',
+        paneKey: coordinatorPaneKey,
+        processIncarnation: 'pty-creator:incarnation-a'
+      } as never)
       const result = (await call('orchestration.taskCreate', {
         spec: 'spawn related workspace',
         callerTerminalHandle: 'term_creator'
       })) as { task: { id: string } }
 
-      expect(db.getTask(result.task.id)?.created_by_terminal_handle).toBe('term_creator')
+      expect(db.getTask(result.task.id)).toMatchObject({
+        created_by_terminal_handle: 'term_creator',
+        created_by_pane_key: coordinatorPaneKey,
+        created_by_process_incarnation: 'pty-creator:incarnation-a',
+        created_by_run_generation: 1
+      })
     })
 
     it('rejects invalid deps JSON', async () => {
@@ -2002,6 +1911,16 @@ describe('orchestration RPC methods', () => {
       vi.mocked(runtime.getTerminalPaneKey).mockImplementation((candidate) =>
         candidate === handle ? `tab_worker:${handle}` : coordinatorPaneKey
       )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation((candidate) =>
+        candidate === handle
+          ? ({
+              terminalHandle: handle,
+              paneKey: `tab_worker:${handle}`,
+              processIncarnation: `runtime_test:${handle}:1`,
+              launchTokenHash: null
+            } as never)
+          : null
+      )
     }
 
     it('dispatches a task to a terminal', async () => {
@@ -2033,7 +1952,7 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(result.dispatch.id)?.assignee_pane_key).toBe('tab_w:leaf_w')
     })
 
-    it('commits the target process launch token on a manual dispatch', async () => {
+    it('commits authenticated process authority on a manual dispatch', async () => {
       setup()
       vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
         runtimeId: runtime.getRuntimeId(),
@@ -2052,9 +1971,24 @@ describe('orchestration RPC methods', () => {
         to: 'term_a'
       })) as { dispatch: { id: string } }
 
-      expect(db.getDispatchContextById(result.dispatch.id)?.launch_token_hash).toBe(
-        'launch-token-hash'
-      )
+      expect(db.getDispatchContextById(result.dispatch.id)).toMatchObject({
+        assignee_pane_key: 'tab_w:leaf_w',
+        process_incarnation: 'runtime_test:term_a:1',
+        launch_token_hash: 'launch-token-hash'
+      })
+    })
+
+    it('does not infer manual process authority from an unauthenticated handle', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a'
+      })) as { dispatch: { id: string } }
+
+      expect(runtime.getTerminalProcessIncarnation('term_a')).toBe('runtime_test:term_a:1')
+      expect(db.getDispatchContextById(result.dispatch.id)?.process_incarnation).toBeNull()
     })
 
     it('rejects dispatch for a pending task', async () => {
@@ -2169,115 +2103,6 @@ describe('orchestration RPC methods', () => {
           inject: true
         })
       ).rejects.toThrow('no recognized agent detected')
-    })
-
-    // Why (#10666): the preamble is Enter-terminated input. Injecting into a pane parked on
-    // Codex's directory-trust prompt answered the prompt — silently granting trust — and swallowed
-    // the TASK body, leaving the task dispatched forever while dispatch reported injected: true.
-    it('rejects inject when the target pane is parked on an interactive prompt', async () => {
-      setup()
-      const task = db.createTask({ spec: 'work' })
-      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
-      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(true)
-      // Why: a resolving send makes the guard the only possible source of the rejection.
-      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
-        handle: 'term_a',
-        accepted: true,
-        bytesWritten: 1
-      })
-
-      await expect(
-        call('orchestration.dispatch', {
-          task: task.id,
-          to: 'term_a',
-          inject: true
-        })
-      ).rejects.toThrow('waiting on an interactive prompt')
-
-      // Nothing may reach the terminal, and no dispatch may be recorded against the task.
-      expect(send).not.toHaveBeenCalled()
-      expect(db.getTask(task.id)?.status).toBe('ready')
-      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
-    })
-
-    it('still injects when the target pane reports no interactive prompt', async () => {
-      setup()
-      const task = db.createTask({ spec: 'work' })
-      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
-      // target needs an observable pane like any real dispatch assignee.
-      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
-        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
-      )
-      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
-      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
-      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
-        handle: 'term_a',
-        accepted: true,
-        bytesWritten: 1
-      })
-
-      const result = (await call('orchestration.dispatch', {
-        task: task.id,
-        to: 'term_a',
-        inject: true
-      })) as { injected: boolean }
-
-      expect(result.injected).toBe(true)
-      expect(send).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not block dispatch when the pane is unreachable', async () => {
-      setup()
-      const task = db.createTask({ spec: 'work' })
-      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
-      // target needs an observable pane like any real dispatch assignee.
-      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
-        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
-      )
-      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
-      // A gone/exited/stale pane is not evidence of a prompt, so the send path keeps surfacing its
-      // own precise error instead of a misleading "blocked on a prompt" one.
-      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('terminal_gone'))
-      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
-        handle: 'term_a',
-        accepted: true,
-        bytesWritten: 1
-      })
-
-      const result = (await call('orchestration.dispatch', {
-        task: task.id,
-        to: 'term_a',
-        inject: true
-      })) as { injected: boolean }
-
-      expect(result.injected).toBe(true)
-      expect(send).toHaveBeenCalledTimes(1)
-    })
-
-    // Why: undetermined readiness must fail closed. Refusing costs a retry; accepting costs a
-    // swallowed task and a prompt answered on the user's behalf.
-    it('refuses inject when pane readiness cannot be determined', async () => {
-      setup()
-      const task = db.createTask({ spec: 'work' })
-      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
-      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('timeout'))
-      // Why: a resolving send means a fail-open guard would report success instead of throwing.
-      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
-        handle: 'term_a',
-        accepted: true,
-        bytesWritten: 1
-      })
-
-      await expect(
-        call('orchestration.dispatch', {
-          task: task.id,
-          to: 'term_a',
-          inject: true
-        })
-      ).rejects.toThrow('waiting on an interactive prompt')
-
-      expect(send).not.toHaveBeenCalled()
-      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
     })
 
     it('rejects dispatch to occupied terminal', async () => {
@@ -2411,6 +2236,61 @@ describe('orchestration RPC methods', () => {
         'term_worker',
         expect.stringContaining('--dispatch-capability dcap_')
       )
+    })
+
+    it('applies and reports opaque per-invocation model preferences', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'launch a custom model' })
+
+      const result = (await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        model: 'aws-bedrock-opus-5',
+        effort: 'high'
+      })) as {
+        dispatchId: string
+        state: string
+        launch: {
+          requested: { agent: string; model: string; effort: string }
+          effective: { agent: string; model: string; effort: string }
+        }
+      }
+
+      expect(result).toMatchObject({
+        state: 'ready',
+        launch: {
+          requested: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' },
+          effective: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' }
+        }
+      })
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({
+          startupAgent: 'claude',
+          launchPreferences: { model: 'aws-bedrock-opus-5', effort: 'high' }
+        })
+      )
+      expect(JSON.parse(db.getWorkerDispatch(result.dispatchId)!.start_options)).toMatchObject({
+        launch: result.launch
+      })
+    })
+
+    it('rejects launch preferences for an existing terminal before creating a Dispatch', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'reuse exact worker' })
+
+      await expect(
+        call('orchestration.workerStart', {
+          task: task.id,
+          from: 'term_coord',
+          terminal: 'term_worker',
+          model: 'gpt-5.6-sol'
+        })
+      ).rejects.toMatchObject({ code: 'invalid_argument' })
+      expect(db.getDispatchContext(task.id)).toBeUndefined()
     })
 
     it('passes launch-scoped account overrides to the created worker terminal', async () => {

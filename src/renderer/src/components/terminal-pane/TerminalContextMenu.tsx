@@ -13,6 +13,7 @@ import {
   PanelRightClose,
   Pencil,
   SquareTerminal,
+  TextSelect,
   X
 } from 'lucide-react'
 import {
@@ -25,12 +26,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { shouldIgnoreTerminalMenuPointerDownOutside } from './terminal-context-menu-dismiss'
 import type { ClaudeManagedAccountSummary, TerminalQuickCommand } from '../../../../shared/types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { formatPrimaryShortcutLabel } from '@/hooks/useShortcutLabel'
 import type { KeybindingOverrides } from '../../../../shared/keybindings'
 import { translate } from '@/i18n/i18n'
 import { isMacPlatform, nativeChatToggleShortcutLabel } from '../native-chat/native-chat-shortcut'
 import { AgentSessionContinuationMenuItem } from './AgentSessionContinuationMenuItem'
 import { TerminalClaudeAccountSwitchMenu } from './TerminalClaudeAccountSwitchMenu'
+import type { TerminalQuickCommandMenuHost } from '@/hooks/use-terminal-quick-command-hosts'
 import { TerminalQuickCommandsSubmenu } from './TerminalQuickCommandsSubmenu'
 
 type TerminalContextMenuProps = {
@@ -42,6 +45,7 @@ type TerminalContextMenuProps = {
   canExpandPane: boolean
   menuPaneIsExpanded: boolean
   onCopy: () => void
+  onSelectAll: () => void
   onPaste: () => void
   onSplitRight: () => void
   onSplitDown: () => void
@@ -59,11 +63,12 @@ type TerminalContextMenuProps = {
   isNativeChatView: boolean
   onToggleNativeChat: () => void
   onCopyAgentSessionContext: () => void
-  repoQuickCommands: TerminalQuickCommand[]
-  globalQuickCommands: TerminalQuickCommand[]
+  quickCommandHosts: TerminalQuickCommandMenuHost[]
+  quickCommandHostLoadFailed: boolean
+  quickCommandHostOwnershipPending: boolean
   quickCommandRepoLabel: string | null
-  onQuickCommand: (command: TerminalQuickCommand) => void
-  onAddQuickCommand: () => void
+  onQuickCommand: (command: TerminalQuickCommand, historyId: string) => void
+  onAddQuickCommand: (hostId: ExecutionHostId) => void
   onToggleExpand: () => void
   onSetTitle: () => void
   onClearPaneTitle: () => void
@@ -81,6 +86,7 @@ export default function TerminalContextMenu({
   canExpandPane,
   menuPaneIsExpanded,
   onCopy,
+  onSelectAll,
   onPaste,
   onSplitRight,
   onSplitDown,
@@ -98,8 +104,9 @@ export default function TerminalContextMenu({
   isNativeChatView,
   onToggleNativeChat,
   onCopyAgentSessionContext,
-  repoQuickCommands,
-  globalQuickCommands,
+  quickCommandHosts,
+  quickCommandHostLoadFailed,
+  quickCommandHostOwnershipPending,
   quickCommandRepoLabel,
   onQuickCommand,
   onAddQuickCommand,
@@ -110,11 +117,11 @@ export default function TerminalContextMenu({
   onCopyTerminalId,
   onCopyPaneId
 }: TerminalContextMenuProps): React.JSX.Element {
-  // Why: Windows/Linux shortcut labels are long; context menu rows should show
-  // the primary binding only so alternative bindings do not force row wraps.
+  // Why: one primary binding prevents Windows/Linux shortcut labels from forcing row wraps.
   const shortcuts = useMemo(
     () => ({
       copy: formatPrimaryShortcutLabel('terminal.copySelection', keybindings),
+      selectAll: formatPrimaryShortcutLabel('terminal.selectAll', keybindings),
       paste: formatPrimaryShortcutLabel('terminal.paste', keybindings),
       splitRight: formatPrimaryShortcutLabel('terminal.splitRight', keybindings),
       splitDown: formatPrimaryShortcutLabel('terminal.splitDown', keybindings),
@@ -155,13 +162,11 @@ export default function TerminalContextMenu({
         sideOffset={0}
         align="start"
         onCloseAutoFocus={(e) => {
-          // Prevent Radix from moving focus back to the hidden trigger;
-          // let xterm keep focus naturally.
+          // Keep xterm focused instead of Radix's hidden trigger.
           e.preventDefault()
         }}
         onFocusOutside={(e) => {
-          // xterm reclaims focus after the contextmenu event; don't let
-          // Radix treat that as a dismiss signal.
+          // xterm reclaiming focus after contextmenu is not an outside dismissal.
           e.preventDefault()
         }}
         onPointerDownOutside={(e) => {
@@ -180,18 +185,24 @@ export default function TerminalContextMenu({
           {translate('auto.components.terminal.pane.TerminalContextMenu.f3eeb1de13', 'Copy')}
           <DropdownMenuShortcut>{shortcuts.copy}</DropdownMenuShortcut>
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onSelectAll}>
+          <TextSelect />
+          {translate('auto.components.terminal.pane.TerminalContextMenu.selectAll', 'Select All')}
+          <DropdownMenuShortcut>{shortcuts.selectAll}</DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={onPaste}>
           <Clipboard />
           {translate('auto.components.terminal.pane.TerminalContextMenu.0a917b591a', 'Paste')}
           <DropdownMenuShortcut>{shortcuts.paste}</DropdownMenuShortcut>
         </DropdownMenuItem>
         <TerminalQuickCommandsSubmenu
-          repoQuickCommands={repoQuickCommands}
-          globalQuickCommands={globalQuickCommands}
-          quickCommandRepoLabel={quickCommandRepoLabel}
-          onQuickCommand={onQuickCommand}
-          onAddQuickCommand={onAddQuickCommand}
-          onOpenChange={onOpenChange}
+          hosts={quickCommandHosts}
+          hostLoadFailed={quickCommandHostLoadFailed}
+          hostOwnershipPending={quickCommandHostOwnershipPending}
+          repoLabel={quickCommandRepoLabel}
+          onRun={onQuickCommand}
+          onClose={() => onOpenChange(false)}
+          onAdd={onAddQuickCommand}
         />
         {canContinueAgentSessionInNewSession ? (
           <AgentSessionContinuationMenuItem onSelect={onContinueAgentSessionInNewSession} />
