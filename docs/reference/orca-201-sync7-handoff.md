@@ -92,9 +92,11 @@ re-run the interleaved A/B, and see whether HEAD goes 4/5 → 0/5.
 ### The A/B was run. The mechanism is disconfirmed.
 
 Restoring `codex-real-home-flag.ts` as a fork divergence was built and measured. **It
-changes nothing for these specs**, so it was not landed. It is kept intact and
-cherry-pickable on branch `fabolivark/orca-201-real-home-flag-divergence` (`412ad2777f`),
-and the decision to keep or drop it is open.
+changes nothing for these specs**, so it was **dropped** (coordinator's call, 2026-08-10).
+It is kept intact and cherry-pickable on branch
+`fabolivark/orca-201-real-home-flag-divergence` (`412ad2777f`) should a future sync need the
+out-of-process seam; it is deliberately absent from the PR's fork-divergence list, because a
+divergence with no verified purpose is pure conflict surface for sync #8.
 
 The restoration was proven **live, not inert** before measuring — this is the trap that
 would have made an inert change read as a disproof:
