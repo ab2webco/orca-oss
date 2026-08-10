@@ -20,6 +20,7 @@
 import { test, expect } from './helpers/orca-app'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { randomUUID } from 'node:crypto'
+import { SUCCESS_ENVELOPE } from '../../src/main/runtime/orchestration/worker-done-envelope-fixture'
 import { waitForSessionReady, waitForActiveWorktree, ensureTerminalVisible } from './helpers/store'
 import {
   execInTerminal,
@@ -391,10 +392,14 @@ test.describe('orchestration push-on-idle mail delivery', () => {
       to: pane.handle
     })
     const body = 'full private review finding must remain in SQLite'
+    // Why the envelope (ORCA-178): the lab gates worker_done on a typed envelope,
+    // so upstream's bare payload is rejected before the mail ever reaches the Run
+    // mailbox this case is about. Same adaptation sync #6 made for its unit tests.
     const payload = JSON.stringify({
       taskId: task.result.task.id,
       dispatchId: dispatched.result.dispatch.id,
-      outcome: 'succeeded'
+      outcome: 'succeeded',
+      envelope: SUCCESS_ENVELOPE
     })
     const sendParams = {
       from: pane.handle,
