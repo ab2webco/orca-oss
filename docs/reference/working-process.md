@@ -20,9 +20,12 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
 5. **Commits como unidades de trabajo**, cada uno con su porqué. Sin `Co-Authored-By` ni atribución
    de IA.
 6. **PR contra `ab2webco/main`**, con qué entrega al usuario, qué NO cierra, y cómo se verificó.
-7. **Mover el estado en Plane** al terminar: `orca plane status set`. Un board que describe un
+7. **El merge a `main` no lo hace el agente.** Pushear, abrir el PR, avisar con el número.
+   `main-merge-guard.py` lo hace cumplir para cualquier sesión de agente en este repo; el
+   coordinador mergea desde GitHub o desde una terminal fuera del agente, sin tocar la guarda.
+8. **Mover el estado en Plane** al terminar: `orca plane status set`. Un board que describe un
    estado viejo es peor que no tener board.
-8. **Release** sólo con el checklist de `lab-release-smoke-check.md` pasado.
+9. **Release** sólo con el checklist de `lab-release-smoke-check.md` pasado.
 
 ## Las guardas, y la falla que las originó
 
@@ -31,6 +34,7 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
 | `session-start-plane-board.py` | Inyecta el board al abrir sesión | El board quedó describiendo un estado de hace horas mientras el trabajo real iba por otro lado |
 | `status-line.py` | Muestra proyecto · rama · sin-commitear | La status line por defecto no dice ni el directorio ni la rama, así que no había forma de saber dónde se estaba trabajando |
 | `pre-commit-branch-guard.py` | Antes de commit/push dice rama, upstream y cuánto falta subir | Se hicieron 5 commits creyendo que iban a `main` cuando iban a una rama de feature, y se reportó "mergeado a main" siendo falso |
+| `main-merge-guard.py` | Rechaza desde la Bash tool cualquier push o merge que aterrice en `main` | Un worker mergeó el PR #73 a `main` por su cuenta, minutos después de que el mensaje que lo dirigía dijera que el merge lo hacía el coordinador. La única barrera era prosa en un brief |
 | `test-result-guard.py` | Lee el resumen de vitest y bloquea si hay rojos, ignorando el exit code | **Medido**: `npm test` salió con exit code 0 reportando `Tests 6 failed \| 40082 passed`. Un gate que mire `$?` deja pasar un build roto |
 | `pre-release-upstream-check.sh` | Chequea upstream antes de despachar una release | El checklist de release exige mergear `origin/main` primero y se salteaba |
 

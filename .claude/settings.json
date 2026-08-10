@@ -27,6 +27,11 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit-branch-guard.py",
             "if": "Bash(git push*)",
             "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/main-merge-guard.py",
+            "timeout": 20
           }
         ]
       }
