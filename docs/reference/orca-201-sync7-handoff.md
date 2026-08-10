@@ -40,6 +40,10 @@ git worktree add --detach <scratch>/up-main   upstream/main
 
 ## Open: the one real regression
 
+> **Read "The A/B was run" below before acting on this section.** Two of its claims are
+> measured false: the failure is not pair-only, and the real-home-lane mechanism is
+> disconfirmed. The section is kept as the record of how the bisect got there.
+
 `tests/e2e/orchestration-legacy-worker-missing-terminal-recovery.spec.ts` and
 `orchestration-legacy-worker-restart-recovery.spec.ts` fail **only when they run in the
 same worker** (they share shard 4, and did so in the green pre-sync run too — this is not
@@ -88,6 +92,8 @@ of a 10s poll.
 **Not yet proven.** It correlates and is in the right area, but the failing local runs did
 not show `codex-trust-grant` lines. The experiment that settles it: restore the opt-out,
 re-run the interleaved A/B, and see whether HEAD goes 4/5 → 0/5.
+
+That experiment was run. It did not. See below.
 
 ### The A/B was run. The mechanism is disconfirmed.
 
