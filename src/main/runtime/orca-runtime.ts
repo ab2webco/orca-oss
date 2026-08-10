@@ -230,6 +230,8 @@ import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState,
   ClaudeTerminalAccountReport,
+  ClaudeTerminalAccountOwnership,
+  ClaudeVaultSettingsInheritanceReport,
   ManagedPtyAccountOwner
 } from '../../shared/types'
 import {
@@ -239,6 +241,8 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
+import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
+import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
 import { getCodexPtyAccountOwner } from '../codex/codex-pane-account-registry'
 import type { TaskSourceContext } from '../../shared/task-source-context'
@@ -12854,7 +12858,7 @@ export class OrcaRuntimeService {
     const switchReadiness = await readClaudeTerminalSwitchReadiness(() =>
       this.snapshotClaudeTerminalSwitchTarget({ kind: 'handle', terminal: handle })
     )
-    return resolveClaudeTerminalAccountReport({
+    const report = resolveClaudeTerminalAccountReport({
       terminal: handle,
       switchReadiness,
       pane: pty
@@ -12873,6 +12877,47 @@ export class OrcaRuntimeService {
           claudeAccounts?.listAccounts().accounts.find((candidate) => candidate.id === accountId)
             ?.email ?? null
       }
+    })
+    return {
+      ...report,
+      settingsInheritance: this.resolveVaultSettingsInheritance(report.ownership)
+    }
+  }
+
+  /**
+   * Which of the user's `~/.claude/settings.json` keys this pane's vault actually
+   * resolved (ORCA-189). Until this existed, the only way to know a setting had
+   * not been inherited was to diff two JSON files by hand — and the app showed no
+   * sign at all, which is what let the no-attribution rule quietly stop applying.
+   */
+  private resolveVaultSettingsInheritance(
+    ownership: ClaudeTerminalAccountOwnership
+  ): ClaudeVaultSettingsInheritanceReport {
+    if (ownership.state === 'unknown') {
+      return { state: 'not-applicable', reason: 'unknown-account' }
+    }
+    // A shared pane runs against ~/.claude itself, so it already has every key.
+    if (ownership.state === 'none' || !ownership.pinned) {
+      return { state: 'not-applicable', reason: 'shared-home' }
+    }
+    const account = this.accountServices?.claudeAccounts
+      .listAccounts()
+      .accounts.find((candidate) => candidate.id === ownership.accountId)
+    if (!account) {
+      return { state: 'not-applicable', reason: 'unknown-account' }
+    }
+    if ((account.managedAuthRuntime ?? 'host') !== 'host') {
+      return { state: 'not-applicable', reason: 'remote-runtime' }
+    }
+    const owned = this.accountServices?.claudeAccounts.getOwnedManagedAuthPath(account.id) ?? null
+    if (!owned) {
+      return { state: 'not-applicable', reason: 'unknown-account' }
+    }
+    return describeVaultSettingsInheritance({
+      accountId: account.id,
+      vaultAuthPath: owned,
+      homeDir: homedir(),
+      readVaultSettings: () => readClaudeManagedAuthFile(owned, 'settings.json')
     })
   }
 

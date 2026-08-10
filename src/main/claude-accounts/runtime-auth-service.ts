@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: keeps file/Keychain/snapshot/env-patch auth semantics together so PTY launch and quota-fetch paths can't drift. */
 import { execFile } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
@@ -47,6 +48,7 @@ import {
   readManagedClaudeRefreshCredentials
 } from './claude-managed-refresh-chain'
 import { ClaudeRuntimePathResolver } from './runtime-paths'
+import { buildInheritedVaultSettings } from './vault-settings-inheritance'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
   readActiveClaudeKeychainCredentials,
@@ -1245,8 +1247,18 @@ export class ClaudeRuntimeAuthService {
         account.managedAuthPath,
         'settings.json'
       )
-      const mergedSettingsJson =
+      const instrumentedJson =
         claudeHookService.ensureInjectedVaultInstrumentation(currentSettingsJson)
+      // Why here and not at account creation: this runs once per pinned launch, so
+      // a vault created later — or a home file edited after it existed — inherits
+      // without anyone re-running a sync, and it lands before the CLI reads the
+      // file (outputStyle is read once at launch). ORCA-189.
+      const inheritedJson = buildInheritedVaultSettings(
+        account.managedAuthPath,
+        homedir(),
+        instrumentedJson ?? currentSettingsJson
+      )
+      const mergedSettingsJson = inheritedJson ?? instrumentedJson
       if (mergedSettingsJson !== null) {
         writeClaudeManagedAuthFile(account.managedAuthPath, 'settings.json', mergedSettingsJson)
       }

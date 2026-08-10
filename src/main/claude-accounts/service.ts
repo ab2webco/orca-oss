@@ -212,6 +212,20 @@ export class ClaudeAccountService {
     return this.getSnapshot()
   }
 
+  /** Ownership-checked vault location of one account, for read-only inspection
+   *  (which home settings that vault resolved — ORCA-189). Returns null when the
+   *  account is gone, lives on WSL, or its path fails the managed-auth check, so
+   *  a caller can never be handed a directory Orca does not own. */
+  getOwnedManagedAuthPath(accountId: string): string | null {
+    const account = this.store
+      .getSettings()
+      .claudeManagedAccounts.find((entry) => entry.id === accountId)
+    if (!account || (account.managedAuthRuntime ?? 'host') !== 'host') {
+      return null
+    }
+    return resolveOwnedClaudeManagedAuthPath(accountId, account.managedAuthPath)
+  }
+
   async addAccount(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState> {
     return this.serializeMutation(() => this.doAddAccount(target))
   }

@@ -2689,6 +2689,46 @@ export type ClaudeTerminalAccountOwnership =
   | { state: 'none' }
   | { state: 'unknown'; reason: ClaudeTerminalAccountUnknownReason }
 
+/** Keys of `~/.claude/settings.json` that belong to the user rather than to the
+ *  identity, and so are merged into a pinned account's isolated vault (ORCA-189). */
+export type ClaudeVaultSettingInheritanceKey =
+  | 'permissions'
+  | 'attribution'
+  | 'includeCoAuthoredBy'
+  | 'skillOverrides'
+  | 'agentPushNotifEnabled'
+  | 'outputStyle'
+
+/** `stale` is the state that matters: home defines the key, the vault carries a
+ *  different value, so the session running now does not have what the user set. */
+export type ClaudeVaultSettingInheritanceState =
+  | 'inherited'
+  | 'stale'
+  | 'absent'
+  /** Home defines it but it cannot load here — an `outputStyle` naming a style
+   *  this vault has no file for. Inheriting it would show `Default ✔` silently. */
+  | 'unresolved'
+
+export type ClaudeVaultSettingInheritance = {
+  key: ClaudeVaultSettingInheritanceKey
+  state: ClaudeVaultSettingInheritanceState
+}
+
+/**
+ * Why not-applicable is spelled out: a shared-home pane reads `~/.claude`
+ * directly and already has every key, so reporting it as missing would be the
+ * same silent-wrong-answer defect this exists to remove.
+ *
+ * Scope: this is the state of the *vault* right now, not a snapshot of what the
+ * pane's CLI read at launch. Two panes pinned to the same account share one
+ * vault, so a later launch re-merges it and an earlier pane will read
+ * `inherited` for a key its own process never loaded. Relaunch is what makes a
+ * key take effect either way.
+ */
+export type ClaudeVaultSettingsInheritanceReport =
+  | { state: 'not-applicable'; reason: 'shared-home' | 'remote-runtime' | 'unknown-account' }
+  | { state: 'vault'; accountId: string; keys: ClaudeVaultSettingInheritance[] }
+
 /** Which managed Claude account one terminal runs on, from the same binding the
  *  switch's `commit` writes — so it cannot drift from the status-line chip. */
 export type ClaudeTerminalAccountReport = {
@@ -2698,6 +2738,9 @@ export type ClaudeTerminalAccountReport = {
   /** Whether this pane could be account-switched right now, from the switch's own
    *  preflight. Absent from runtimes older than ORCA-187, which could not answer. */
   switchReadiness?: ClaudeTerminalSwitchReadiness
+  /** Which of the user's home settings this pane's vault actually resolved.
+   *  Absent from runtimes older than ORCA-189, which could not answer. */
+  settingsInheritance?: ClaudeVaultSettingsInheritanceReport
 }
 
 export type ManagedPtyAccountOwner = {

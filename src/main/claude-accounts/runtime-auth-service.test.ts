@@ -3956,6 +3956,52 @@ describe('ClaudeRuntimeAuthService', () => {
     })
   })
 
+  // ORCA-189: a pinned launch never reads ~/.claude/settings.json, so the user's
+  // no-AI-attribution rule silently stopped applying in every managed session.
+  it('inherits the user home settings into the vault before a pinned launch', async () => {
+    const pinnedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'pinned-host-account',
+      createClaudeCredentialsJson('pinned@example.com', 'pinned-token')
+    )
+    writeFileSync(
+      join(pinnedAuthPath, 'settings.json'),
+      `${JSON.stringify({ theme: 'dark', env: { ANTHROPIC_AUTH_TOKEN: 'vault-token' } })}\n`,
+      'utf-8'
+    )
+    mkdirSync(join(testState.fakeHomeDir, '.claude'), { recursive: true })
+    writeFileSync(
+      join(testState.fakeHomeDir, '.claude', 'settings.json'),
+      JSON.stringify({
+        includeCoAuthoredBy: false,
+        attribution: { commit: '', pr: '' },
+        permissions: { allow: ['Bash(npm test)'] },
+        env: { ANTHROPIC_AUTH_TOKEN: 'home-token' }
+      }),
+      'utf-8'
+    )
+    const store = createStore(
+      createSettings({
+        claudeManagedAccounts: [createClaudeAccount('pinned-host-account', pinnedAuthPath)]
+      })
+    )
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    await service.prepareForClaudeLaunch({
+      runtime: 'host',
+      overrideAccountId: 'pinned-host-account'
+    })
+
+    const vault = JSON.parse(readFileSync(join(pinnedAuthPath, 'settings.json'), 'utf-8'))
+    expect(vault.includeCoAuthoredBy).toBe(false)
+    expect(vault.attribution).toEqual({ commit: '', pr: '' })
+    expect(vault.permissions).toEqual({ allow: ['Bash(npm test)'] })
+    // The vault keeps its own identity- and Orca-owned keys.
+    expect(vault.env).toEqual({ ANTHROPIC_AUTH_TOKEN: 'vault-token' })
+    expect(vault.theme).toBe('dark')
+  })
+
   it('injects a pinned custom-endpoint account without seeding the scoped Keychain (macOS)', async () => {
     // Custom-endpoint accounts have no Anthropic credentials: only a marker and
     // a settings.json whose env carries the endpoint token for the CLI.
