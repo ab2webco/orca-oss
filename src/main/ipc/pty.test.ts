@@ -11291,6 +11291,9 @@ describe('registerPtyHandlers', () => {
       }),
       flushOrThrow: vi.fn(),
       persistPtyBinding: vi.fn(),
+      // Why (ORCA-201): upstream's spawn restructuring routes these cases through
+      // the fork's per-worktree Claude account resolution, which reads worktree meta.
+      getWorktreeMeta: vi.fn(() => undefined),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
       getProjectGroups: vi.fn(() => []),
@@ -11408,6 +11411,9 @@ describe('registerPtyHandlers', () => {
       }),
       flushOrThrow: vi.fn(),
       persistPtyBinding: vi.fn(),
+      // Why (ORCA-201): upstream's spawn restructuring routes these cases through
+      // the fork's per-worktree Claude account resolution, which reads worktree meta.
+      getWorktreeMeta: vi.fn(() => undefined),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
       getProjectGroups: vi.fn(() => []),
@@ -11530,6 +11536,9 @@ describe('registerPtyHandlers', () => {
       }),
       flushOrThrow: vi.fn(),
       persistPtyBinding: vi.fn(),
+      // Why (ORCA-201): upstream's spawn restructuring routes these cases through
+      // the fork's per-worktree Claude account resolution, which reads worktree meta.
+      getWorktreeMeta: vi.fn(() => undefined),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
       getProjectGroups: vi.fn(() => []),
@@ -11654,6 +11663,9 @@ describe('registerPtyHandlers', () => {
       }),
       flushOrThrow: vi.fn(),
       persistPtyBinding: vi.fn(),
+      // Why (ORCA-201): upstream's spawn restructuring routes these cases through
+      // the fork's per-worktree Claude account resolution, which reads worktree meta.
+      getWorktreeMeta: vi.fn(() => undefined),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
       getProjectGroups: vi.fn(() => []),
@@ -19834,7 +19846,10 @@ describe('registerPtyHandlers', () => {
       getForegroundProcess: vi.fn(async () => null)
     } as never)
     registerPtyHandlers(mainWindow as never, runtime, undefined, undefined, undefined, {
-      persistPtyBinding: vi.fn()
+      persistPtyBinding: vi.fn(),
+      // Why (ORCA-201): the spawn path now resolves the fork's per-worktree Claude
+      // account, which reads worktree meta off the store handed to the handlers.
+      getWorktreeMeta: vi.fn(() => undefined)
     } as never)
 
     const created = await runtime.createTerminal(`id:${worktreeId}`, {

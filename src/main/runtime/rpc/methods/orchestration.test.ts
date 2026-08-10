@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: orchestration tests share a mock runtime factory; splitting by method would duplicate 40 lines of setup per file without improving clarity. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { RpcDispatcher } from '../dispatcher'
 import { buildRegistry, type RpcContext, type RpcRequest } from '../core'
@@ -423,7 +424,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })
 
@@ -449,7 +451,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })
 
@@ -474,7 +477,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as {
         message: { id: string; type: string; subject: string }
@@ -508,7 +512,8 @@ describe('orchestration RPC methods', () => {
       const payload = JSON.stringify({
         taskId: task.id,
         dispatchId: dispatch.id,
-        outcome: 'succeeded'
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
       })
 
       const rejected = (await call('orchestration.send', {
@@ -790,14 +795,20 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as { message: { to_handle: string; type: string; payload: string | null } }
 
       expect(result.message.to_handle).toBe(`run:${activeRunId}`)
       expect(result.message.type).toBe('worker_done')
       expect(result.message.payload).toBe(
-        JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+        JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        })
       )
     })
 
@@ -942,7 +953,8 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       })) as { message: { type: string } }
 
@@ -973,6 +985,57 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
       expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBeTruthy()
       expect(db.getActiveDispatchForTerminal('term_worker')).toBeDefined()
+    })
+
+    it('rejects a malformed envelope at the send boundary instead of completing', async () => {
+      setup()
+      const task = db.createTask({ spec: 'envelope work' })
+      const dispatch = db.createDispatchContext(task.id, 'term_worker')
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+
+      const result = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'Done',
+        type: 'worker_done',
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: { status: 'banana', summary: '', verification: 'green enough' }
+        })
+      })) as { lifecycle?: { action: string; code?: string; reason?: string } }
+
+      expect(result.lifecycle).toMatchObject({ action: 'rejected', code: 'invalid_envelope' })
+      expect(result.lifecycle?.reason).toContain('correction 1 of 2')
+      expect(db.getTask(task.id)?.status).toBe('dispatched')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+    })
+
+    it('accepts a valid envelope at the send boundary and settles the dispatch', async () => {
+      setup()
+      const task = db.createTask({ spec: 'envelope work' })
+      const dispatch = db.createDispatchContext(task.id, 'term_worker')
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+
+      const result = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'Done',
+        type: 'worker_done',
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        })
+      })) as { lifecycle?: { action: string } }
+
+      expect(result.lifecycle).toBeUndefined()
+      expect(db.getTask(task.id)?.status).toBe('completed')
+      expect(JSON.parse(db.getTask(task.id)?.result ?? '{}').envelope).toMatchObject({
+        status: 'success'
+      })
     })
 
     it('does not release dispatch lock for non-lifecycle sends', async () => {
@@ -1017,6 +1080,7 @@ describe('orchestration RPC methods', () => {
         payload.dispatchId = params.dispatchId
       }
       payload.outcome = 'succeeded'
+      payload.envelope = SUCCESS_ENVELOPE
       if (params.filesModified !== undefined) {
         payload.filesModified = params.filesModified
       }
@@ -1797,6 +1861,19 @@ describe('orchestration RPC methods', () => {
     })
   })
 
+  it('records the caller terminal handle when creating a task', async () => {
+    setup()
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+      handle === 'term_creator' ? coordinatorPaneKey : null
+    )
+    const result = (await call('orchestration.taskCreate', {
+      spec: 'spawn related workspace',
+      callerTerminalHandle: 'term_creator'
+    })) as { task: { id: string } }
+
+    expect(db.getTask(result.task.id)?.created_by_terminal_handle).toBe('term_creator')
+  })
+
   describe('orchestration.taskList', () => {
     it('lists all tasks', async () => {
       setup()
@@ -2103,6 +2180,163 @@ describe('orchestration RPC methods', () => {
           inject: true
         })
       ).rejects.toThrow('no recognized agent detected')
+    })
+
+    it('commits the target process launch token on a manual dispatch', async () => {
+      setup()
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
+        runtimeId: runtime.getRuntimeId(),
+        terminalHandle: 'term_a',
+        ptyId: 'pty_a',
+        worktreeId: 'repo::worktree',
+        paneKey: 'tab_w:leaf_w',
+        processIncarnation: 'runtime_test:term_a:1',
+        launchTokenHash: 'launch-token-hash',
+        hostScope: { kind: 'local', hostId: 'local' }
+      })
+      const task = db.createTask({ spec: 'work' })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a'
+      })) as { dispatch: { id: string } }
+
+      expect(db.getDispatchContextById(result.dispatch.id)?.launch_token_hash).toBe(
+        'launch-token-hash'
+      )
+    })
+
+    it('rejects inject when the target pane is parked on an interactive prompt', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(true)
+      // Why: a resolving send makes the guard the only possible source of the rejection.
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      await expect(
+        call('orchestration.dispatch', {
+          task: task.id,
+          to: 'term_a',
+          inject: true
+        })
+      ).rejects.toThrow('waiting on an interactive prompt')
+
+      // Nothing may reach the terminal, and no dispatch may be recorded against the task.
+      expect(send).not.toHaveBeenCalled()
+      expect(db.getTask(task.id)?.status).toBe('ready')
+      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
+    })
+
+    it('still injects when the target pane reports no interactive prompt', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      // Why (ORCA-201): upstream now reads the pane and the process incarnation off
+      // the dispatch authority, not off the two accessors, and refuses --inject
+      // without both. That is the safer rule — the authority exists only for a
+      // connected pty with a resolvable host scope — so the target is stubbed with
+      // the authority a real live assignee would have.
+      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
+        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation(
+        (handle) =>
+          (handle === 'term_a'
+            ? {
+                terminalHandle: handle,
+                paneKey: 'tab_a:leaf_a',
+                processIncarnation: 'runtime_test:term_a:1'
+              }
+            : null) as never
+      )
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a',
+        inject: true
+      })) as { injected: boolean }
+
+      expect(result.injected).toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not block dispatch when the pane is unreachable', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      // Why (ORCA-201): upstream now reads the pane and the process incarnation off
+      // the dispatch authority, not off the two accessors, and refuses --inject
+      // without both. That is the safer rule — the authority exists only for a
+      // connected pty with a resolvable host scope — so the target is stubbed with
+      // the authority a real live assignee would have.
+      vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
+        handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation(
+        (handle) =>
+          (handle === 'term_a'
+            ? {
+                terminalHandle: handle,
+                paneKey: 'tab_a:leaf_a',
+                processIncarnation: 'runtime_test:term_a:1'
+              }
+            : null) as never
+      )
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      // A gone/exited/stale pane is not evidence of a prompt, so the send path keeps surfacing its
+      // own precise error instead of a misleading "blocked on a prompt" one.
+      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('terminal_gone'))
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a',
+        inject: true
+      })) as { injected: boolean }
+
+      expect(result.injected).toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    // Why: undetermined readiness must fail closed. Refusing costs a retry; accepting costs a
+    // swallowed task and a prompt answered on the user's behalf.
+
+    it('refuses inject when pane readiness cannot be determined', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'getTerminalAgentStatus').mockRejectedValue(new Error('timeout'))
+      // Why: a resolving send means a fail-open guard would report success instead of throwing.
+      const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
+        handle: 'term_a',
+        accepted: true,
+        bytesWritten: 1
+      })
+
+      await expect(
+        call('orchestration.dispatch', {
+          task: task.id,
+          to: 'term_a',
+          inject: true
+        })
+      ).rejects.toThrow('waiting on an interactive prompt')
+
+      expect(send).not.toHaveBeenCalled()
+      expect(db.getActiveDispatchForTerminal('term_a')).toBeUndefined()
     })
 
     it('rejects dispatch to occupied terminal', async () => {
