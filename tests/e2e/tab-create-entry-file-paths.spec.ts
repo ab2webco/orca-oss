@@ -20,7 +20,8 @@ test('new-tab file results prioritize the filename and reveal the full path on h
 
   await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })
   const input = orcaPage.getByRole('combobox', {
-    name: 'Open any file, URL, agent, ...'
+    // Source of truth: omniboxPlaceholder() in tab-bar/TabBarCreateEntry.tsx.
+    name: 'Search open tabs, files, URLs, agents…'
   })
   await input.fill('secondaryNav')
 
