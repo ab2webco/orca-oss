@@ -8,7 +8,7 @@ const prWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/pr.yml
 const e2eWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/e2e.yml'), 'utf8'))
 
 const filterStep = prWorkflow.jobs['e2e-paths'].steps.find(
-  (step) => step.name === 'Filter changed E2E specs'
+  (step) => step.name === 'Select E2E scope'
 )
 const verifyStep = prWorkflow.jobs.verify.steps.find(
   (step) => step.name === 'Require successful checks'
@@ -26,7 +26,7 @@ describe('PR E2E gate contract', () => {
     expect(verifyStep.run).not.toContain('$E2E')
   })
 
-  it('passes only changed specs to the reusable E2E workflow', () => {
+  it('passes the selected scope to the reusable E2E workflow', () => {
     // Why: without this the job could lose its filter and run on every PR — the
     // cost the path filter exists to avoid — while the gate assertions above
     // stay green.
@@ -39,6 +39,26 @@ describe('PR E2E gate contract', () => {
       '${{ steps.filter.outputs.test_files }}'
     )
     expect(prWorkflow.jobs.e2e.with.test_files).toBe('${{ needs.e2e-paths.outputs.test_files }}')
+  })
+
+  it('names the run after the scope it selected', () => {
+    // Why: #67 merged past a check that read `e2e: skipped`, which looks the
+    // same as a pass. The mode has to be on the check name or the reader has to
+    // open the log to learn whether anything ran.
+    expect(prWorkflow.jobs['e2e-paths'].outputs.mode).toBe('${{ steps.filter.outputs.mode }}')
+    expect(prWorkflow.jobs.e2e.name).toBe('e2e (${{ needs.e2e-paths.outputs.mode }})')
+  })
+
+  it('cancels a superseded PR E2E without reaching the shared callers', () => {
+    // Why on the caller job and not in e2e.yml: a workflow-level block there
+    // would put the scheduled run and release-cut's dispatch in one group, and
+    // neither is superseded by a push. Keyed to the PR number, this can only
+    // cancel a run for a commit that is no longer that PR's head.
+    expect(prWorkflow.jobs.e2e.concurrency).toEqual({
+      group: 'pr-e2e-${{ github.event.pull_request.number }}',
+      'cancel-in-progress': true
+    })
+    expect(e2eWorkflow.concurrency).toBeUndefined()
   })
 
   it('enforces every job verify depends on', () => {
@@ -55,10 +75,11 @@ describe('PR E2E gate contract', () => {
     }
   })
 
-  it('selects modified Playwright specs without running deleted tests', () => {
+  it('selects modified files without running deleted tests', () => {
+    // The path and spec patterns themselves live in the scope script, which is
+    // unit-tested against the real file lists of #57, #60 and #67.
     expect(filterStep.run).toContain('--diff-filter=AMCR')
-    expect(filterStep.run).toContain("'^tests/e2e/.*\\.spec\\.ts$'")
-    expect(filterStep.run).not.toContain('tests/playwright\\.')
+    expect(filterStep.run).toContain('node config/scripts/select-pr-e2e-scope.mjs')
   })
 
   it('uses one runner for changed specs and keeps full runs sharded', () => {
@@ -89,7 +110,11 @@ describe('PR E2E gate contract', () => {
   })
 
   it('scopes detection to the PR range so base drift cannot false-trigger', () => {
-    expect(filterStep.run).toContain('--merge-base "$BASE" "$HEAD"')
+    expect(filterStep.run).toContain('--merge-base "$BASE_SHA" "$HEAD_SHA"')
     expect(filterStep.run).toContain('set -euo pipefail')
+    // Why env and not inline expressions: the SHAs reach git as values, so a
+    // crafted ref cannot close the quote and run in this shell.
+    expect(filterStep.env.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
+    expect(filterStep.env.HEAD_SHA).toBe('${{ github.event.pull_request.head.sha }}')
   })
 })
