@@ -21,6 +21,7 @@ export type PluginRuntimeDelegate = {
       handle: string
       title: string | null
       liveness: RuntimeTerminalLiveness
+      writable?: boolean
     }[]
   }>
   sendTerminal(
@@ -61,9 +62,9 @@ export function bindPluginHostServices(input: {
       )
       return (
         result.terminals
-          // Why: plugins only get ids they can send text to; a sleeping pane has
-          // no PTY behind it and must be woken from the app first.
-          .filter((terminal) => terminal.liveness !== 'sleeping')
+          // Why: plugins only get ids that accept text now; starting and sleeping
+          // are observable but must never become destructive send probes.
+          .filter((terminal) => terminal.liveness === 'running' && terminal.writable === true)
           .slice(0, PLUGIN_WORKSPACE_TERMINAL_LIMIT)
           .map((terminal) => ({ id: terminal.handle }))
       )

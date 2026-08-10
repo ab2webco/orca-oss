@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { formatTerminalFocus, formatTerminalList } from './terminal-format'
+import { formatTerminalCreate, formatTerminalFocus, formatTerminalList } from './terminal-format'
+
+describe('formatTerminalCreate', () => {
+  it('surfaces spawn-time readiness before a caller writes', () => {
+    expect(
+      formatTerminalCreate({
+        terminal: {
+          handle: 'term_starting',
+          worktreeId: 'wt-1',
+          title: 'Worker',
+          connected: false,
+          writable: false,
+          liveness: 'starting'
+        }
+      })
+    ).toBe(
+      'Created terminal term_starting (title: "Worker") [connected: false, writable: false, liveness: starting]'
+    )
+  })
+})
 
 describe('formatTerminalFocus', () => {
   it('distinguishes superseded navigation from a winning focus', () => {

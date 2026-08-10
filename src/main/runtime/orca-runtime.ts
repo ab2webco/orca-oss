@@ -5811,6 +5811,9 @@ export class OrcaRuntimeService {
     this.refreshWritableFlags()
     for (const leaf of this.leaves.values()) {
       this.adoptPreAllocatedHandle(leaf)
+      if (leaf.writable && leaf.ptyId) {
+        this.resolveWritableWaiters(leaf)
+      }
     }
 
     // Why: createTerminal waits for the renderer's graph sync to populate the
@@ -9301,11 +9304,15 @@ export class OrcaRuntimeService {
       }
       pty.connected = true
       pty.disconnectedAt = null
+      this.resolvePtyWritableWaiters(pty, ptyId)
     }
     for (const leaf of this.getLeavesForPty(ptyId)) {
       leaf.connected = true
       leaf.writable = this.graphStatus === 'ready'
       this.adoptPreAllocatedHandle(leaf)
+      if (leaf.writable) {
+        this.resolveWritableWaiters(leaf)
+      }
     }
   }
 
@@ -9374,6 +9381,7 @@ export class OrcaRuntimeService {
     if (binding && paneKey) {
       this.ensurePtyBackedMobileSurfaceForRendererTab(worktreeId, binding.tabId)
     }
+    this.resolvePtyWritableWaiters(pty, ptyId)
   }
 
   assertPtyRegistrationAllowed(ptyId: string, incarnationId?: PtyIncarnationId): void {
@@ -13474,7 +13482,9 @@ export class OrcaRuntimeService {
       this.setPairedRendererSessionOwnership(pty.ptyId, false)
       pty.disconnectedAt = Date.now()
       pty.lastExitCode = exitCode
-      this.resolvePtyExitWaiters(pty, ptyId)
+      if (!preservesAbnormalSshSurface) {
+        this.resolvePtyExitWaiters(pty, ptyId)
+      }
       this.pruneDisconnectedPtyTranscript(pty)
     }
     if (preservesIntentionalHandlelessSurface || preservesAbnormalSshSurface) {
@@ -13491,10 +13501,13 @@ export class OrcaRuntimeService {
       leaf.connected = false
       leaf.writable = false
       leaf.lastExitCode = exitCode
-      this.resolveExitWaiters(leaf)
       if (!preservesAbnormalSshSurface) {
+        this.resolveExitWaiters(leaf)
         this.failActiveDispatchOnExit(leaf, exitCode)
       }
+    }
+    if (pty && !preservesAbnormalSshSurface) {
+      this.resolveGoneWritableWaitersForWorktree(pty.worktreeId)
     }
     this.pruneDisconnectedPtyRecords()
   }
@@ -15211,12 +15224,11 @@ export class OrcaRuntimeService {
     if (opts.requireFreshPtyLiveness && !refreshedPtyLiveness) {
       throw new Error('terminal_liveness_unavailable')
     }
-
-    const livePtyWorktreeIds = new Set<string>()
-    for (const pty of this.ptysById.values()) {
-      if (pty.connected) {
-        livePtyWorktreeIds.add(pty.worktreeId)
-      }
+    const refreshedWorktreeIds = targetWorktreeId
+      ? [targetWorktreeId]
+      : new Set([...this.ptysById.values()].map((pty) => pty.worktreeId))
+    for (const worktreeId of refreshedWorktreeIds) {
+      this.resolveGoneWritableWaitersForWorktree(worktreeId)
     }
 
     // Why: a hibernated agent pane keeps its identity in the workspace session
@@ -15245,16 +15257,10 @@ export class OrcaRuntimeService {
           continue
         }
         const paneKey = tryMakePaneKey(leaf.tabId, leaf.leafId)
-        // Why: an unbound leaf in a worktree that has live PTYs is a pane still
-        // binding its transport — listing it would duplicate the PTY row that
-        // already represents it. A sleeping pane is not mid-bind: its PTY was
-        // deliberately killed and will not come back on its own, so it carries
-        // the filter's reason as an explicit state instead of vanishing.
-        if (
-          !leaf.ptyId &&
-          livePtyWorktreeIds.has(leaf.worktreeId) &&
-          !(paneKey && sleepingAgentsByPaneKey.has(paneKey))
-        ) {
+        const hasExactBackingPty = !leaf.ptyId && this.getPotentialBackingPtyForLeaf(leaf) !== null
+        // Why: the exact backing PTY row owns identity while its leaf binds.
+        // Other unbound leaves remain observable as starting, never gone.
+        if (hasExactBackingPty) {
           continue
         }
         if (leaf.ptyId) {
@@ -15271,7 +15277,7 @@ export class OrcaRuntimeService {
     // the renderer graph is missing a leaf. terminal.list needs the same fallback
     // so mobile does not show a false "No terminals" create flow.
     for (const pty of this.ptysById.values()) {
-      if (!pty.connected || ptyIdsFromLeaves.has(pty.ptyId)) {
+      if (!this.isPotentiallyWritablePty(pty) || ptyIdsFromLeaves.has(pty.ptyId)) {
         continue
       }
       if (opts.requireFreshPtyLiveness && !refreshedPtyLiveness?.has(pty.ptyId)) {
@@ -16136,9 +16142,11 @@ export class OrcaRuntimeService {
         }
       }
       const listed = await this.listTerminals(worktreeSelector)
-      // Why: a sleeping pane is listed but cannot accept the caller's next
-      // command, so it must never become the implicit default terminal.
-      const first = listed.terminals.find((terminal) => terminal.liveness !== 'sleeping')?.handle
+      // Why: observable starting/sleeping rows cannot accept the caller's next
+      // command and must never become a destructive implicit send target.
+      const first = listed.terminals.find(
+        (terminal) => terminal.liveness === 'running' && terminal.writable
+      )?.handle
       if (first) {
         return first
       }
@@ -16160,7 +16168,7 @@ export class OrcaRuntimeService {
       }
       const leafKey = this.getLeafKey(tab.tabId, tab.activeLeafId)
       const leaf = this.leaves.get(leafKey)
-      if (leaf) {
+      if (leaf?.writable) {
         return this.issueHandle(leaf)
       }
     }
@@ -16170,7 +16178,9 @@ export class OrcaRuntimeService {
       if (targetWorktreeId && leaf.worktreeId !== targetWorktreeId) {
         continue
       }
-      return this.issueHandle(leaf)
+      if (leaf.writable) {
+        return this.issueHandle(leaf)
+      }
     }
 
     throw new Error('no_active_terminal')
@@ -17295,6 +17305,12 @@ export class OrcaRuntimeService {
     }
     const pty = this.getLivePtyForHandle(handle)
     if (pty) {
+      if (condition === 'writable' && pty.pty.connected) {
+        return buildPtyTerminalWaitResult(handle, condition, pty.pty)
+      }
+      if (condition === 'writable' && !this.isPotentiallyWritablePty(pty.pty)) {
+        return buildPtyTerminalWaitUnsatisfiedResult(handle, condition, pty.pty)
+      }
       if (condition === 'exit' && !pty.pty.connected) {
         return buildPtyTerminalWaitResult(handle, condition, pty.pty)
       }
@@ -17321,7 +17337,7 @@ export class OrcaRuntimeService {
         const effectiveTimeoutMs =
           typeof options?.timeoutMs === 'number' && options.timeoutMs > 0
             ? options.timeoutMs
-            : condition === 'tui-idle'
+            : condition === 'tui-idle' || condition === 'writable'
               ? TUI_IDLE_DEFAULT_TIMEOUT_MS
               : 0
         const waiter: TerminalWaiter = {
@@ -17353,6 +17369,13 @@ export class OrcaRuntimeService {
         if (!live) {
           this.removeWaiter(waiter)
           reject(new Error('terminal_handle_stale'))
+        } else if (condition === 'writable' && live.pty.connected) {
+          this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
+        } else if (condition === 'writable' && !this.isPotentiallyWritablePty(live.pty)) {
+          this.resolveWaiter(
+            waiter,
+            buildPtyTerminalWaitUnsatisfiedResult(handle, condition, live.pty)
+          )
         } else if (condition === 'exit' && !live.pty.connected) {
           this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
         } else if (condition === 'tui-idle') {
@@ -17381,6 +17404,17 @@ export class OrcaRuntimeService {
       })
     }
     const { leaf } = this.getLiveLeafForHandle(handle)
+
+    if (condition === 'writable' && leaf.writable && leaf.ptyId) {
+      return buildTerminalWaitResult(handle, condition, leaf)
+    }
+    if (
+      condition === 'writable' &&
+      (getTerminalState(leaf) === 'exited' ||
+        (!leaf.connected && !this.getPotentialBackingPtyForLeaf(leaf)))
+    ) {
+      return buildTerminalWaitUnsatisfiedResult(handle, condition, leaf)
+    }
 
     if (condition === 'exit' && getTerminalState(leaf) === 'exited') {
       return buildTerminalWaitResult(handle, condition, leaf)
@@ -17417,7 +17451,7 @@ export class OrcaRuntimeService {
       const effectiveTimeoutMs =
         typeof options?.timeoutMs === 'number' && options.timeoutMs > 0
           ? options.timeoutMs
-          : condition === 'tui-idle'
+          : condition === 'tui-idle' || condition === 'writable'
             ? TUI_IDLE_DEFAULT_TIMEOUT_MS
             : 0
 
@@ -17455,7 +17489,14 @@ export class OrcaRuntimeService {
       // exit honest instead of hanging on a terminal that already changed.
       try {
         const live = this.getLiveLeafForHandle(handle)
-        if (getTerminalState(live.leaf) === 'exited') {
+        if (condition === 'writable' && live.leaf.writable && live.leaf.ptyId) {
+          this.resolveWaiter(waiter, buildTerminalWaitResult(handle, condition, live.leaf))
+        } else if (condition === 'writable' && getTerminalState(live.leaf) === 'exited') {
+          this.resolveWaiter(
+            waiter,
+            buildTerminalWaitUnsatisfiedResult(handle, condition, live.leaf)
+          )
+        } else if (getTerminalState(live.leaf) === 'exited') {
           this.resolveWaiter(waiter, buildTerminalWaitResult(handle, condition, live.leaf))
         } else if (condition === 'tui-idle') {
           const liveLeafWaitText = buildTerminalWaitText(
@@ -25905,6 +25946,9 @@ export class OrcaRuntimeService {
           ptyId: result.id,
           worktreeId: workspace.id,
           title: pty?.title ?? launchOpts.title ?? null,
+          connected: pty?.connected ?? false,
+          writable: pty?.connected ?? false,
+          liveness: pty?.connected ? 'running' : 'starting',
           ...this.getPtyExecutionHostMetadata(result.id),
           surface,
           ...(result.agentSessionEnsure
@@ -26004,11 +26048,13 @@ export class OrcaRuntimeService {
       // populates this.leaves may not have arrived yet. Wait for the leaf to
       // appear so we can return a valid handle the caller can use right away.
       const handle = await this.waitForTerminalHandle(reply.tabId, 10_000, spawnFailure.signal)
+      const readiness = this.getTerminalCreateReadiness(handle)
       return {
         handle,
         tabId: reply.tabId,
         worktreeId: worktreeId ?? '',
         title: reply.title,
+        ...readiness,
         ...this.getPtyExecutionHostMetadata(this.handles.get(handle)?.ptyId ?? null),
         surface: 'visible'
       }
@@ -26107,7 +26153,30 @@ export class OrcaRuntimeService {
       ptyId: session.id,
       worktreeId,
       title: session.title || null,
+      connected: pty.connected,
+      writable: pty.connected,
+      liveness: pty.connected ? 'running' : 'starting',
       surface: 'background'
+    }
+  }
+
+  private getTerminalCreateReadiness(
+    handle: string
+  ): Pick<RuntimeTerminalCreate, 'connected' | 'writable' | 'liveness'> {
+    const runtimePty = this.getLivePtyForHandle(handle)
+    if (runtimePty) {
+      return {
+        connected: runtimePty.pty.connected,
+        writable: runtimePty.pty.connected,
+        liveness: runtimePty.pty.connected ? 'running' : 'starting'
+      }
+    }
+    const { leaf } = this.getLiveLeafForHandle(handle)
+    const hasLiveTransport = this.getPotentialBackingPtyForLeaf(leaf) !== null
+    return {
+      connected: leaf.connected,
+      writable: leaf.writable,
+      liveness: leaf.connected ? 'running' : hasLiveTransport ? 'starting' : 'gone'
     }
   }
 
@@ -30023,6 +30092,38 @@ export class OrcaRuntimeService {
     return this.leavesByPtyId.get(ptyId) ?? []
   }
 
+  private isPotentiallyWritablePty(pty: RuntimePtyWorktreeRecord): boolean {
+    return (
+      pty.connected ||
+      (pty.connectionId !== null &&
+        this.isSshOwnedPtyId(pty.ptyId) &&
+        (pty.lastExitCode === null
+          ? pty.disconnectedAt === null
+          : pty.lastExitCode < 0 &&
+            pty.disconnectedAt !== null &&
+            Date.now() - pty.disconnectedAt <= SSH_PANE_RECOVERY_GRACE_MS))
+    )
+  }
+
+  private getPotentialBackingPtyForLeaf(leaf: RuntimeLeafRecord): RuntimePtyWorktreeRecord | null {
+    if (getTerminalState(leaf) === 'exited') {
+      return null
+    }
+    const pty = leaf.ptyId ? this.ptysById.get(leaf.ptyId) : undefined
+    if (pty) {
+      return this.isPotentiallyWritablePty(pty) ? pty : null
+    }
+    const paneKey = tryMakePaneKey(leaf.tabId, leaf.leafId)
+    if (!paneKey) {
+      return null
+    }
+    return (
+      [...this.ptysById.values()].find(
+        (candidate) => candidate.paneKey === paneKey && this.isPotentiallyWritablePty(candidate)
+      ) ?? null
+    )
+  }
+
   private getSummaryForRuntimeWorktreeId(
     summaries: Map<string, RuntimeWorktreePsSummary>,
     runtimeWorktreeSummaryPathIndex: RuntimeWorktreeSummaryPathIndex,
@@ -30079,7 +30180,13 @@ export class OrcaRuntimeService {
       title: getLatestLeafTitle(leaf, tab?.title ?? null),
       connected: leaf.connected,
       writable: leaf.writable,
-      liveness: leaf.connected ? 'running' : sleeping ? 'sleeping' : 'gone',
+      liveness: leaf.connected
+        ? 'running'
+        : sleeping
+          ? 'sleeping'
+          : this.getPotentialBackingPtyForLeaf(leaf)
+            ? 'starting'
+            : 'gone',
       lastOutputAt: leaf.lastOutputAt,
       preview: leaf.preview,
       ...(sleeping ? { sleepingAgent: describeSleepingAgent(sleeping) } : {})
@@ -31659,7 +31766,11 @@ export class OrcaRuntimeService {
       title: getLatestPtyTitle(pty),
       connected: pty.connected,
       writable: pty.connected,
-      liveness: pty.connected ? 'running' : 'gone',
+      liveness: pty.connected
+        ? 'running'
+        : this.isPotentiallyWritablePty(pty)
+          ? 'starting'
+          : 'gone',
       lastOutputAt: pty.lastOutputAt,
       preview: pty.preview
     }
@@ -31872,6 +31983,15 @@ export class OrcaRuntimeService {
     if (!handle) {
       return
     }
+    const leaf = this.leaves.get(leafKey)
+    const waiters = this.waitersByHandle.get(handle)
+    if (leaf && waiters) {
+      for (const waiter of [...waiters]) {
+        if (waiter.condition === 'writable') {
+          this.resolveWaiter(waiter, buildTerminalWaitUnsatisfiedResult(handle, 'writable', leaf))
+        }
+      }
+    }
     this.handleByLeafKey.delete(leafKey)
     this.handles.delete(handle)
     this.syntheticTerminalHandles.delete(handle)
@@ -31913,6 +32033,8 @@ export class OrcaRuntimeService {
     for (const waiter of [...waiters]) {
       if (waiter.condition === 'exit') {
         this.resolveWaiter(waiter, buildTerminalWaitResult(handle, 'exit', leaf))
+      } else if (waiter.condition === 'writable') {
+        this.resolveWaiter(waiter, buildTerminalWaitUnsatisfiedResult(handle, 'writable', leaf))
       } else {
         // Why: after exit, conditions like tui-idle can never be satisfied — reject now instead of spinning the poll until timeout on a dead process.
         this.removeWaiter(waiter)
@@ -31937,6 +32059,59 @@ export class OrcaRuntimeService {
     }
   }
 
+  private resolveWritableWaiters(leaf: RuntimeLeafRecord): void {
+    const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+    if (!handle) {
+      return
+    }
+    const waiters = this.waitersByHandle.get(handle)
+    if (!waiters) {
+      return
+    }
+    for (const waiter of [...waiters]) {
+      if (waiter.condition === 'writable') {
+        this.resolveWaiter(waiter, buildTerminalWaitResult(handle, 'writable', leaf))
+      }
+    }
+  }
+
+  private resolveGoneWritableWaitersForWorktree(worktreeId: string): void {
+    for (const pty of this.ptysById.values()) {
+      if (pty.worktreeId !== worktreeId || this.isPotentiallyWritablePty(pty)) {
+        continue
+      }
+      const handle = this.handleByPtyId.get(pty.ptyId)
+      const waiters = handle ? this.waitersByHandle.get(handle) : undefined
+      if (!handle || !waiters) {
+        continue
+      }
+      for (const waiter of [...waiters]) {
+        if (waiter.condition === 'writable') {
+          this.resolveWaiter(waiter, buildPtyTerminalWaitUnsatisfiedResult(handle, 'writable', pty))
+        }
+      }
+    }
+    for (const leaf of this.leaves.values()) {
+      if (
+        leaf.worktreeId !== worktreeId ||
+        leaf.writable ||
+        this.getPotentialBackingPtyForLeaf(leaf)
+      ) {
+        continue
+      }
+      const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+      const waiters = handle ? this.waitersByHandle.get(handle) : undefined
+      if (!handle || !waiters) {
+        continue
+      }
+      for (const waiter of [...waiters]) {
+        if (waiter.condition === 'writable') {
+          this.resolveWaiter(waiter, buildTerminalWaitUnsatisfiedResult(handle, 'writable', leaf))
+        }
+      }
+    }
+  }
+
   private resolvePtyExitWaiters(pty: RuntimePtyWorktreeRecord, ptyId: string): void {
     const handle = this.handleByPtyId.get(ptyId)
     if (!handle) {
@@ -31949,6 +32124,8 @@ export class OrcaRuntimeService {
     for (const waiter of [...waiters]) {
       if (waiter.condition === 'exit') {
         this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, 'exit', pty))
+      } else if (waiter.condition === 'writable') {
+        this.resolveWaiter(waiter, buildPtyTerminalWaitUnsatisfiedResult(handle, 'writable', pty))
       } else {
         this.removeWaiter(waiter)
         waiter.reject(new Error('terminal_exited'))
@@ -31968,6 +32145,22 @@ export class OrcaRuntimeService {
     for (const waiter of [...waiters]) {
       if (waiter.condition === 'tui-idle') {
         this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, 'tui-idle', pty))
+      }
+    }
+  }
+
+  private resolvePtyWritableWaiters(pty: RuntimePtyWorktreeRecord, ptyId: string): void {
+    if (!pty.connected) {
+      return
+    }
+    const handle = this.handleByPtyId.get(ptyId)
+    const waiters = handle ? this.waitersByHandle.get(handle) : undefined
+    if (!handle || !waiters) {
+      return
+    }
+    for (const waiter of [...waiters]) {
+      if (waiter.condition === 'writable') {
+        this.resolveWaiter(waiter, buildPtyTerminalWaitResult(handle, 'writable', pty))
       }
     }
   }
@@ -37231,6 +37424,21 @@ function buildTerminalWaitBlockedResult(
   )
 }
 
+function buildTerminalWaitUnsatisfiedResult(
+  handle: string,
+  condition: RuntimeTerminalWaitCondition,
+  leaf: RuntimeLeafRecord
+): RuntimeTerminalWait {
+  return buildTerminalWait(
+    handle,
+    condition,
+    getTerminalState(leaf),
+    leaf.lastExitCode,
+    undefined,
+    false
+  )
+}
+
 function buildPtyTerminalWaitResult(
   handle: string,
   condition: RuntimeTerminalWaitCondition,
@@ -37254,17 +37462,33 @@ function buildPtyTerminalWaitBlockedResult(
   )
 }
 
+function buildPtyTerminalWaitUnsatisfiedResult(
+  handle: string,
+  condition: RuntimeTerminalWaitCondition,
+  pty: RuntimePtyWorktreeRecord
+): RuntimeTerminalWait {
+  return buildTerminalWait(
+    handle,
+    condition,
+    getPtyTerminalState(pty),
+    pty.lastExitCode,
+    undefined,
+    false
+  )
+}
+
 function buildTerminalWait(
   handle: string,
   condition: RuntimeTerminalWaitCondition,
   status: RuntimeTerminalState,
   exitCode: number | null,
-  blockedReason?: RuntimeTerminalWaitBlockedReason
+  blockedReason?: RuntimeTerminalWaitBlockedReason,
+  satisfied = blockedReason === undefined
 ): RuntimeTerminalWait {
   return {
     handle,
     condition,
-    satisfied: blockedReason === undefined,
+    satisfied,
     status,
     exitCode,
     ...(blockedReason ? { blockedReason } : {})

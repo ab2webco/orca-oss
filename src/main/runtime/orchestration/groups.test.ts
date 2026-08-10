@@ -73,6 +73,31 @@ describe('resolveGroupAddress', () => {
       const result = resolveGroupAddress('@all', 'term_a', terminals, noStatus)
       expect(result).toEqual(['term_c'])
     })
+
+    it.each(['@all', '@worktree:wt_default'])('skips starting terminals for %s', (group) => {
+      const terminals = [
+        makeSummary('term_a'),
+        makeSummary('term_starting', {
+          connected: false,
+          writable: false,
+          liveness: 'starting'
+        }),
+        makeSummary('term_running')
+      ]
+
+      expect(resolveGroupAddress(group, 'term_a', terminals, noStatus)).toEqual(['term_running'])
+    })
+
+    it('keeps legacy summaries without readiness while rejecting explicit non-writable rows', () => {
+      const legacy = { handle: 'term_legacy', worktreeId: 'wt_default' }
+      const terminals = [
+        makeSummary('term_a'),
+        legacy,
+        makeSummary('term_not_writable', { writable: false, liveness: 'running' })
+      ] as RuntimeTerminalSummary[]
+
+      expect(resolveGroupAddress('@all', 'term_a', terminals, noStatus)).toEqual(['term_legacy'])
+    })
   })
 
   describe('@idle', () => {

@@ -21,6 +21,8 @@ import type {
  *  reader into the same wrong inference the JSON output now prevents. */
 function formatTerminalLiveness(terminal: RuntimeTerminalSummary): string {
   switch (terminal.liveness) {
+    case 'starting':
+      return 'starting (transport binding)'
     case 'running':
       return 'running'
     case 'sleeping':
@@ -171,8 +173,14 @@ export function formatTerminalRename(result: { rename: RuntimeTerminalRename }):
 export function formatTerminalCreate(result: { terminal: RuntimeTerminalCreate }): string {
   const titleNote = result.terminal.title ? ` (title: "${result.terminal.title}")` : ''
   const surfaceNote = result.terminal.surface ? ` [${result.terminal.surface}]` : ''
+  const readinessNote =
+    result.terminal.connected !== undefined ||
+    result.terminal.writable !== undefined ||
+    result.terminal.liveness !== undefined
+      ? ` [connected: ${result.terminal.connected ?? 'unknown'}, writable: ${result.terminal.writable ?? 'unknown'}, liveness: ${result.terminal.liveness ?? 'unknown'}]`
+      : ''
   const warningNote = result.terminal.warning ? `\nwarning: ${result.terminal.warning}` : ''
-  return `Created terminal ${result.terminal.handle}${titleNote}${surfaceNote}${warningNote}`
+  return `Created terminal ${result.terminal.handle}${titleNote}${surfaceNote}${readinessNote}${warningNote}`
 }
 
 export function formatTerminalSplit(result: { split: RuntimeTerminalSplit }): string {

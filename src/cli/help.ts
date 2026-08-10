@@ -82,7 +82,7 @@ Terminals:
   terminal show             Show terminal metadata and preview
   terminal read             Read bounded terminal output
   terminal send             Send input to a live terminal
-  terminal wait             Wait for a terminal condition (exit, tui-idle, composer-ready)
+  terminal wait             Wait for a terminal condition (exit, tui-idle, composer-ready, writable)
   terminal stop             Stop terminals for a worktree
   terminal create           Create a terminal session in a worktree
   terminal rename           Set or clear the title of a terminal tab
@@ -246,7 +246,7 @@ Common Commands:
   orca terminal show [--terminal <handle>] [--json]
   orca terminal read [--terminal <handle>] [--cursor <n>] [--limit <n>] [--json]
   orca terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
-  orca terminal wait [--terminal <handle>] --for exit|tui-idle|composer-ready [--timeout-ms <ms>] [--json]
+  orca terminal wait [--terminal <handle>] --for exit|tui-idle|composer-ready|writable [--timeout-ms <ms>] [--json]
   orca terminal stop --worktree <selector> [--json]
   orca terminal create [--worktree <selector>] [--title <name>] [--agent <id>] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--focus] [--json]
   orca terminal split [--terminal <handle>] [--direction horizontal|vertical] [--command <text>] [--claude-account <email|id>] [--codex-account <email|id>] [--json]
@@ -552,7 +552,7 @@ export function formatFlagHelp(flag: string): string {
     enter: '--enter                Append Enter after sending text',
     force: '--force                Force worktree removal when supported',
     focus: '--focus                Reveal the created terminal session in Orca',
-    for: '--for exit|tui-idle|composer-ready    Wait condition to satisfy',
+    for: '--for exit|tui-idle|composer-ready|writable    Wait condition to satisfy',
     'from-element-index': '--from-element-index <n> Source element index from get-app-state',
     'from-x': '--from-x <x>           Source window-local x coordinate',
     'from-y': '--from-y <y>           Source window-local y coordinate',

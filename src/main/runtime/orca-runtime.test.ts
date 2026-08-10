@@ -13384,11 +13384,17 @@ describe('OrcaRuntimeService', () => {
       codexAccounts: { listAccounts: () => ({ accounts: [{ id: 'account-codex' }] }) }
     } as never)
 
-    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+    const created = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
       agent: 'codex',
       codexAccountId: 'account-codex'
     })
 
+    expect(created).toMatchObject({
+      connected: true,
+      writable: true,
+      liveness: 'running',
+      surface: 'background'
+    })
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         command: "codex '--dangerously-bypass-approvals-and-sandbox'",
@@ -14588,6 +14594,9 @@ describe('OrcaRuntimeService', () => {
     expect(created).toMatchObject({
       worktreeId: TEST_WORKTREE_ID,
       surface: 'background',
+      connected: true,
+      writable: true,
+      liveness: 'running',
       handle: expect.stringMatching(/^term_/)
     })
     expect(created.warning).toContain('could not make it discoverable')
@@ -27953,6 +27962,23 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('does not implicitly select a starting terminal while the graph is unavailable', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const ptyId = 'ssh:ssh-1@@pty-starting-default'
+    runtime.registerPty(ptyId, TEST_WORKTREE_ID, 'ssh-1', {
+      tabId: 'starting-tab',
+      leafId: HEADLESS_LEAF_ID
+    })
+    runtime.onPtyExit(ptyId, -1)
+
+    await expect(runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).resolves.toMatchObject({
+      terminals: [expect.objectContaining({ liveness: 'starting', writable: false })]
+    })
+    await expect(runtime.resolveActiveTerminal(`id:${TEST_WORKTREE_ID}`)).rejects.toThrow(
+      'no_active_terminal'
+    )
+  })
+
   it('keeps split sibling headless mobile terminal leaves when a desktop renderer omits them', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.syncWindowGraph(0, {
@@ -28690,6 +28716,54 @@ describe('OrcaRuntimeService', () => {
         ]
       })
       expect((await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)).tabs).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps writable waits pending across a recoverable abnormal SSH exit', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const ptyId = 'ssh:ssh-1@@pty-writable-recovery'
+      runtime.registerPty(ptyId, TEST_WORKTREE_ID, 'ssh-1', {
+        tabId: 'host-tab',
+        leafId: HEADLESS_LEAF_ID
+      })
+      const terminal = (await runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).terminals.find(
+        (candidate) => candidate.ptyId === ptyId
+      )!
+      runtime['ptysById'].get(ptyId)!.connected = false
+      const waiting = runtime.waitForTerminal(terminal.handle, {
+        condition: 'writable',
+        timeoutMs: 1_000
+      })
+
+      runtime.onPtyExit(ptyId, -1)
+
+      await expect(runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).resolves.toMatchObject({
+        terminals: [
+          expect.objectContaining({
+            handle: terminal.handle,
+            liveness: 'starting',
+            writable: false
+          })
+        ]
+      })
+      const laterWaiting = runtime.waitForTerminal(terminal.handle, {
+        condition: 'writable',
+        timeoutMs: 1_000
+      })
+      await vi.advanceTimersByTimeAsync(999)
+      expect(await Promise.race([waiting, Promise.resolve('still-pending')])).toBe('still-pending')
+      expect(await Promise.race([laterWaiting, Promise.resolve('still-pending')])).toBe(
+        'still-pending'
+      )
+      const timeout = expect(waiting).rejects.toThrow('timeout')
+      const laterTimeout = expect(laterWaiting).rejects.toThrow('timeout')
+      await vi.advanceTimersByTimeAsync(1)
+      await timeout
+      await laterTimeout
     } finally {
       vi.useRealTimers()
     }

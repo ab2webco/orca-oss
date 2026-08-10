@@ -225,7 +225,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     path: ['terminal', 'wait'],
     summary: 'Wait for a terminal condition',
     usage:
-      'orca terminal wait [--terminal <handle>] --for exit|tui-idle|composer-ready [--timeout-ms <ms>] [--json]',
+      'orca terminal wait [--terminal <handle>] --for exit|tui-idle|composer-ready|writable [--timeout-ms <ms>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'terminal', 'for', 'timeout-ms']
   },
   {

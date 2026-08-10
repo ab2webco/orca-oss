@@ -55,10 +55,14 @@ export function resolveGroupAddress(
 
   const group = to.toLowerCase()
 
-  // Why: sleeping panes are listed so callers stop reading absence as death, but
-  // a broadcast handle must be one that can receive — a message addressed to a
-  // sleeping handle is lost when the pane wakes under a new handle (ORCA-186).
-  const terminals = allTerminals.filter((t) => t.liveness !== 'sleeping')
+  // Why: listed starting/sleeping panes are not receive-capable; broadcasting
+  // to them turns observability into a destructive not-writable probe.
+  const terminals = allTerminals.filter((terminal) => {
+    return (
+      (terminal.liveness === undefined || terminal.liveness === 'running') &&
+      terminal.writable !== false
+    )
+  })
 
   if (group === '@all') {
     // Why: @all broadcasts to every terminal except the sender to avoid self-delivery loops.
