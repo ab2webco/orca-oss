@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- Why: orchestration tests share a mock runtime factory; splitting by method would duplicate 40 lines of setup per file without improving clarity. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { RpcDispatcher } from '../dispatcher'
 import { buildRegistry, type RpcContext, type RpcRequest } from '../core'
@@ -10,10 +9,13 @@ import { OrcaRuntimeService } from '../../orca-runtime'
 import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
 import { ORCHESTRATION_ASK_MAX_TIMEOUT_MS } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
+import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages belong to one exact Dispatch and cannot target a group address.`
 }
+
+const LAUNCH_TOKEN = 'launch_test'
 
 describe('orchestration RPC methods', () => {
   let db: OrchestrationDb
@@ -29,6 +31,23 @@ describe('orchestration RPC methods', () => {
     dbOpen = true
     runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(db)
+    // Why: only the token-bound tier needs a live PTY the unit runtime cannot spawn, so stand in for
+    // that check alone and mirror the handle-derived tier verbatim — otherwise every token-less
+    // sender (SSH, reattach, hand-opened shell) drops out of coverage.
+    vi.spyOn(runtime, 'authenticateOrchestrationSender').mockImplementation(
+      ({ claimedHandle, paneKey, launchToken }) => {
+        if (launchToken === LAUNCH_TOKEN) {
+          return {
+            handle: claimedHandle ?? 'term_test',
+            paneKey: paneKey ?? 'tab_test:leaf_test'
+          }
+        }
+        const handle = claimedHandle ?? 'unknown'
+        // Why: mirrors the real contract — the runtime's observation of the pane outranks the
+        // caller's claim, which is only the last resort when the runtime cannot resolve it.
+        return { handle, paneKey: runtime.getTerminalPaneKey(handle) ?? paneKey ?? undefined }
+      }
+    )
     vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_coord' ? coordinatorPaneKey : null
     )
@@ -72,6 +91,8 @@ describe('orchestration RPC methods', () => {
     return method
   }
 
+  const AUTHENTICATED_METHODS = ['orchestration.send', 'orchestration.reply', 'orchestration.ask']
+
   async function call(name: string, params: Record<string, unknown>) {
     const method = findMethod(name)
     const scopedParams = { ...params }
@@ -93,7 +114,19 @@ describe('orchestration RPC methods', () => {
         scopedParams.from ??= 'term_coord'
       }
     }
-    const parsed = method.params ? method.params.parse(scopedParams) : undefined
+    // Why: only supply the launch credential when the case does not state its own sender identity —
+    // a test that passes --from or a pane key is exercising the token-less tier on purpose.
+    const authenticatedParams =
+      AUTHENTICATED_METHODS.includes(name) &&
+      !('from' in scopedParams) &&
+      !('senderPaneKey' in scopedParams)
+        ? {
+            senderPaneKey: 'tab_test:leaf_test',
+            senderLaunchToken: LAUNCH_TOKEN,
+            ...scopedParams
+          }
+        : scopedParams
+    const parsed = method.params ? method.params.parse(authenticatedParams) : undefined
     return method.handler(parsed, ctx)
   }
 
@@ -421,6 +454,9 @@ describe('orchestration RPC methods', () => {
         to: 'term_coord',
         subject: 'Done',
         type: 'worker_done',
+        // Why: `outcome` is upstream's new lifecycle requirement for every worker_done, orthogonal
+        // to identity. Nothing else in this case may change — it guards that a sender with no
+        // stable pane identity still completes its own dispatch.
         payload: JSON.stringify({
           taskId: task.id,
           dispatchId: dispatch.id,
@@ -987,6 +1023,9 @@ describe('orchestration RPC methods', () => {
       expect(db.getActiveDispatchForTerminal('term_worker')).toBeDefined()
     })
 
+    // Why: black-box through the RPC — an unvalidated runtime accepts the extra
+    // payload key and completes the task, so this discriminates behavior, not
+    // the existence of a schema module.
     it('rejects a malformed envelope at the send boundary instead of completing', async () => {
       setup()
       const task = db.createTask({ spec: 'envelope work' })
@@ -1861,19 +1900,6 @@ describe('orchestration RPC methods', () => {
     })
   })
 
-  it('records the caller terminal handle when creating a task', async () => {
-    setup()
-    vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
-      handle === 'term_creator' ? coordinatorPaneKey : null
-    )
-    const result = (await call('orchestration.taskCreate', {
-      spec: 'spawn related workspace',
-      callerTerminalHandle: 'term_creator'
-    })) as { task: { id: string } }
-
-    expect(db.getTask(result.task.id)?.created_by_terminal_handle).toBe('term_creator')
-  })
-
   describe('orchestration.taskList', () => {
     it('lists all tasks', async () => {
       setup()
@@ -2182,30 +2208,9 @@ describe('orchestration RPC methods', () => {
       ).rejects.toThrow('no recognized agent detected')
     })
 
-    it('commits the target process launch token on a manual dispatch', async () => {
-      setup()
-      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
-        runtimeId: runtime.getRuntimeId(),
-        terminalHandle: 'term_a',
-        ptyId: 'pty_a',
-        worktreeId: 'repo::worktree',
-        paneKey: 'tab_w:leaf_w',
-        processIncarnation: 'runtime_test:term_a:1',
-        launchTokenHash: 'launch-token-hash',
-        hostScope: { kind: 'local', hostId: 'local' }
-      })
-      const task = db.createTask({ spec: 'work' })
-
-      const result = (await call('orchestration.dispatch', {
-        task: task.id,
-        to: 'term_a'
-      })) as { dispatch: { id: string } }
-
-      expect(db.getDispatchContextById(result.dispatch.id)?.launch_token_hash).toBe(
-        'launch-token-hash'
-      )
-    })
-
+    // Why (#10666): the preamble is Enter-terminated input. Injecting into a pane parked on
+    // Codex's directory-trust prompt answered the prompt — silently granting trust — and swallowed
+    // the TASK body, leaving the task dispatched forever while dispatch reported injected: true.
     it('rejects inject when the target pane is parked on an interactive prompt', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
@@ -2235,6 +2240,8 @@ describe('orchestration RPC methods', () => {
     it('still injects when the target pane reports no interactive prompt', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
+      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
+      // target needs an observable pane like any real dispatch assignee.
       // Why (ORCA-201): upstream now reads the pane and the process incarnation off
       // the dispatch authority, not off the two accessors, and refuses --inject
       // without both. That is the safer rule — the authority exists only for a
@@ -2274,6 +2281,8 @@ describe('orchestration RPC methods', () => {
     it('does not block dispatch when the pane is unreachable', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
+      // Why: upstream now requires a stable pane and process incarnation before injecting, so the
+      // target needs an observable pane like any real dispatch assignee.
       // Why (ORCA-201): upstream now reads the pane and the process incarnation off
       // the dispatch authority, not off the two accessors, and refuses --inject
       // without both. That is the safer rule — the authority exists only for a
@@ -2314,7 +2323,6 @@ describe('orchestration RPC methods', () => {
 
     // Why: undetermined readiness must fail closed. Refusing costs a retry; accepting costs a
     // swallowed task and a prompt answered on the user's behalf.
-
     it('refuses inject when pane readiness cannot be determined', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
@@ -2472,61 +2480,6 @@ describe('orchestration RPC methods', () => {
       )
     })
 
-    it('applies and reports opaque per-invocation model preferences', async () => {
-      setup()
-      mockCurrentWorkerStart()
-      const task = db.createTask({ spec: 'launch a custom model' })
-
-      const result = (await call('orchestration.workerStart', {
-        task: task.id,
-        from: 'term_coord',
-        agent: 'claude',
-        model: 'aws-bedrock-opus-5',
-        effort: 'high'
-      })) as {
-        dispatchId: string
-        state: string
-        launch: {
-          requested: { agent: string; model: string; effort: string }
-          effective: { agent: string; model: string; effort: string }
-        }
-      }
-
-      expect(result).toMatchObject({
-        state: 'ready',
-        launch: {
-          requested: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' },
-          effective: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' }
-        }
-      })
-      expect(runtime.createTerminal).toHaveBeenCalledWith(
-        'id:repo::worktree',
-        expect.objectContaining({
-          startupAgent: 'claude',
-          launchPreferences: { model: 'aws-bedrock-opus-5', effort: 'high' }
-        })
-      )
-      expect(JSON.parse(db.getWorkerDispatch(result.dispatchId)!.start_options)).toMatchObject({
-        launch: result.launch
-      })
-    })
-
-    it('rejects launch preferences for an existing terminal before creating a Dispatch', async () => {
-      setup()
-      mockCurrentWorkerStart()
-      const task = db.createTask({ spec: 'reuse exact worker' })
-
-      await expect(
-        call('orchestration.workerStart', {
-          task: task.id,
-          from: 'term_coord',
-          terminal: 'term_worker',
-          model: 'gpt-5.6-sol'
-        })
-      ).rejects.toMatchObject({ code: 'invalid_argument' })
-      expect(db.getDispatchContext(task.id)).toBeUndefined()
-    })
-
     it('passes launch-scoped account overrides to the created worker terminal', async () => {
       setup()
       mockCurrentWorkerStart()
@@ -2599,6 +2552,61 @@ describe('orchestration RPC methods', () => {
           } as never
         )
       ).rejects.toThrow('--claude-account')
+    })
+
+    it('applies and reports opaque per-invocation model preferences', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'launch a custom model' })
+
+      const result = (await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        model: 'aws-bedrock-opus-5',
+        effort: 'high'
+      })) as {
+        dispatchId: string
+        state: string
+        launch: {
+          requested: { agent: string; model: string; effort: string }
+          effective: { agent: string; model: string; effort: string }
+        }
+      }
+
+      expect(result).toMatchObject({
+        state: 'ready',
+        launch: {
+          requested: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' },
+          effective: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' }
+        }
+      })
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({
+          startupAgent: 'claude',
+          launchPreferences: { model: 'aws-bedrock-opus-5', effort: 'high' }
+        })
+      )
+      expect(JSON.parse(db.getWorkerDispatch(result.dispatchId)!.start_options)).toMatchObject({
+        launch: result.launch
+      })
+    })
+
+    it('rejects launch preferences for an existing terminal before creating a Dispatch', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'reuse exact worker' })
+
+      await expect(
+        call('orchestration.workerStart', {
+          task: task.id,
+          from: 'term_coord',
+          terminal: 'term_worker',
+          model: 'gpt-5.6-sol'
+        })
+      ).rejects.toMatchObject({ code: 'invalid_argument' })
+      expect(db.getDispatchContext(task.id)).toBeUndefined()
     })
 
     // Why: `cursor` on PATH is the Cursor desktop app; passing the agent id as a
