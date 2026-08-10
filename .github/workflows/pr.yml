@@ -270,6 +270,24 @@ jobs:
         with:
           native-runtime: node
 
+      # Why the fork has to pin the baseline: the harness defaults to the newest
+      # tag with no hyphen, i.e. a non-prerelease cut. Every tag this fork
+      # publishes is `vX.Y.Z-lab.N` (see lab-release.yml), so that filter selects
+      # nothing here and the lane dies on "found no release tags" — which is not
+      # a shallow clone, the failure the harness's own message guesses at.
+      # It cannot be caught locally either: a clone with the upstream remote has
+      # upstream's unprefixed tags and the default resolves fine.
+      - name: Resolve the newest lab release as the cross-version baseline
+        run: |
+          set -euo pipefail
+          baseline="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          if [ -z "$baseline" ]; then
+            echo "::error::No v* tags in the checkout; the cross-version lane has no baseline to skew against." >&2
+            exit 1
+          fi
+          echo "Baseline: $baseline"
+          echo "ORCA_CROSS_VERSION_BASELINE_REF=$baseline" >> "$GITHUB_ENV"
+
       # A path filter that matches nothing exits 1 ("No test files found"), so this
       # lane cannot report success while running zero tests.
       - name: Old/new client and server terminal journey
