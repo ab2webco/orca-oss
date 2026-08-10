@@ -4038,6 +4038,115 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('fails a create whose requested agent was refused instead of reporting success', async () => {
+    // Why: `worktree create --agent` folded a refused agent launch into `warning`
+    // and still answered ok, so a dispatch blocked by the Claude live-PTY gate left
+    // a workspace of bare shells and no agent (ORCA-190).
+    const folderRepo = {
+      id: 'folder-repo',
+      path: '/workspace/folder',
+      displayName: 'Folder',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'folder' as const
+    }
+    const metaById: Record<string, WorktreeMeta> = {
+      'folder-repo::/workspace/folder': makeWorktreeMeta({ instanceId: 'root-instance' })
+    }
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [folderRepo],
+      getRepo: (id: string) => (id === folderRepo.id ? folderRepo : undefined),
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      },
+      removeWorktreeMeta: (worktreeId: string) => {
+        delete metaById[worktreeId]
+      }
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setPtyController({
+      spawn: vi.fn(),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    vi.spyOn(runtime, 'createTerminal').mockRejectedValue(
+      new Error(
+        'This Claude account is already in use by a global terminal (terminal t3 "zsh" in "bot_multitenant"). Close it before launching the assigned account.'
+      )
+    )
+    runtime.setNotifier({ worktreesChanged: vi.fn() } as never)
+
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: 'id:folder-repo',
+        name: 'refused-session',
+        createdWithAgent: 'claude',
+        startup: { command: 'claude' }
+      })
+    ).rejects.toThrow(/claude agent could not start/)
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: 'id:folder-repo',
+        name: 'refused-session-2',
+        createdWithAgent: 'claude',
+        startup: { command: 'claude' }
+      })
+      // Why both: the refusal must survive, and the caller needs the workspace it
+      // can adopt so a retry does not create a duplicate.
+    ).rejects.toThrow(/already in use by a global terminal[\s\S]*still exists \(id:folder-repo::/)
+  })
+
+  it('still reports a create whose startup command has no agent as a warning', async () => {
+    const folderRepo = {
+      id: 'folder-repo',
+      path: '/workspace/folder',
+      displayName: 'Folder',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'folder' as const
+    }
+    const metaById: Record<string, WorktreeMeta> = {
+      'folder-repo::/workspace/folder': makeWorktreeMeta({ instanceId: 'root-instance' })
+    }
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [folderRepo],
+      getRepo: (id: string) => (id === folderRepo.id ? folderRepo : undefined),
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      },
+      removeWorktreeMeta: (worktreeId: string) => {
+        delete metaById[worktreeId]
+      }
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setPtyController({
+      spawn: vi.fn(),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    vi.spyOn(runtime, 'createTerminal').mockRejectedValue(new Error('pty unavailable'))
+    runtime.setNotifier({ worktreesChanged: vi.fn() } as never)
+
+    const result = await runtime.createManagedWorktree({
+      repoSelector: 'id:folder-repo',
+      name: 'plain-session',
+      startup: { command: 'npm run dev' }
+    })
+
+    expect(result.warning).toContain('pty unavailable')
+    expect(result.startupTerminal).toBeUndefined()
+  })
+
   it('creates additional workspace metadata for folder-mode repos through runtime create', async () => {
     const folderRepo = {
       id: 'folder-repo',
@@ -4101,6 +4210,45 @@ describe('OrcaRuntimeService', () => {
       createdWithAgent: 'codex',
       startup: { command: 'codex', viewMode: 'chat' }
     })
+    const listClaudeAccounts = vi.fn(() => ({ accounts: [{ id: 'account-a' }] }))
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: listClaudeAccounts
+      }
+    } as never)
+
+    await expect(
+      runtime.updateManagedWorktreesMeta([
+        {
+          worktreeSelector: `id:${result.worktree.id}`,
+          updates: { comment: 'batch-note', claudeAccountId: 'account-a' }
+        },
+        {
+          worktreeSelector: `id:${rootWorktreeId}`,
+          updates: { workspaceStatus: 'in-review' }
+        }
+      ])
+    ).resolves.toEqual({ updated: 2 })
+    expect(metaById[result.worktree.id]).toMatchObject({
+      comment: 'batch-note',
+      claudeAccountId: 'account-a'
+    })
+    listClaudeAccounts
+      .mockReturnValueOnce({ accounts: [{ id: 'account-a' }] })
+      .mockReturnValue({ accounts: [] })
+    await expect(
+      runtime.updateManagedWorktreesMeta([
+        {
+          worktreeSelector: `id:${result.worktree.id}`,
+          updates: { comment: 'must-not-persist', claudeAccountId: 'account-a' }
+        },
+        {
+          worktreeSelector: `id:${rootWorktreeId}`,
+          updates: { workspaceStatus: 'completed' }
+        }
+      ])
+    ).rejects.toThrow('no longer exists')
+    expect(metaById[result.worktree.id]?.comment).toBe('batch-note')
 
     expect(addWorktreeMock).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
@@ -12507,7 +12655,8 @@ describe('OrcaRuntimeService', () => {
 
     runtime.onPtyData('pty-authority', '\x1b]133;D;0\x07', 100)
 
-    expect(retireAuthority).toHaveBeenCalledWith(spawnEnv.ORCA_PANE_KEY)
+    // Why the reason: the pane outlives the command, so retiring must not silence it (ORCA-169).
+    expect(retireAuthority).toHaveBeenCalledWith(spawnEnv.ORCA_PANE_KEY, 'agent-exited')
     expect(runtime.verifyOrchestrationCompatibilityCaller(evidence)).toBeNull()
     expect(
       runtime.getAgentStatusLaunchConfigForPaneKey(spawnEnv.ORCA_PANE_KEY, {
@@ -12569,8 +12718,9 @@ describe('OrcaRuntimeService', () => {
     runtime.onPtyExit('pty-restored-exit', 0, 'restored-exit')
     runtime.onPtyExit('pty-ordinary-shell', 0, 'ordinary-shell')
 
-    expect(retireAuthority).toHaveBeenCalledWith(firstPane)
-    expect(retireAuthority).toHaveBeenCalledWith(secondPane)
+    expect(retireAuthority).toHaveBeenCalledWith(firstPane, 'agent-exited')
+    // Why still closed: the PTY is gone, so nothing can relaunch into that pane.
+    expect(retireAuthority).toHaveBeenCalledWith(secondPane, 'pane-closed')
     expect(retireAuthority).toHaveBeenCalledTimes(2)
   })
 
@@ -13705,6 +13855,200 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  function createAgentLaunchRuntime(
+    agentDefaultArgs: Record<string, string>,
+    agentDefaultEnv: Record<string, Record<string, string>> = {},
+    storeOverrides: Record<string, unknown> = {}
+  ): { runtime: OrcaRuntimeService; spawn: ReturnType<typeof vi.fn> } {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-flag' })
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      ...storeOverrides,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: [],
+        agentCmdOverrides: {},
+        agentDefaultArgs,
+        agentDefaultEnv
+      })
+    } as never)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    return { runtime, spawn }
+  }
+
+  it('applies the configured permission-mode args to agent-selected terminal creates', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime(
+      { claude: '--dangerously-skip-permissions' },
+      { claude: { CLAUDE_PROFILE: 'captured' } }
+    )
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      title: 'worker'
+    })
+
+    const spawnCall = spawn.mock.calls[0]?.[0] as
+      | { command?: string; env?: Record<string, string>; launchAgent?: string }
+      | undefined
+    expect(spawnCall?.command).toBe("claude '--dangerously-skip-permissions'")
+    expect(spawnCall?.launchAgent).toBe('claude')
+    expect(spawnCall?.env).toMatchObject({ CLAUDE_PROFILE: 'captured' })
+  })
+
+  it('never forces a permission bypass when the configured agent mode is manual', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({ claude: '' })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      title: 'worker'
+    })
+
+    const spawnCall = spawn.mock.calls[0]?.[0] as { command?: string } | undefined
+    expect(spawnCall?.command).toBe('claude')
+    expect(spawnCall?.command).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('composes the selected agent with a launch account override', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({
+      codex: '--dangerously-bypass-approvals-and-sandbox'
+    })
+    runtime.setAccountServices({
+      claudeAccounts: { listAccounts: () => ({ accounts: [] }) },
+      codexAccounts: { listAccounts: () => ({ accounts: [{ id: 'account-codex' }] }) }
+    } as never)
+
+    const created = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'codex',
+      codexAccountId: 'account-codex'
+    })
+
+    expect(created).toMatchObject({
+      connected: true,
+      writable: true,
+      liveness: 'running',
+      surface: 'background'
+    })
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        launchAgent: 'codex',
+        codexAccountId: 'account-codex'
+      })
+    )
+  })
+
+  it('resolves agent launch defaults for folder workspaces without a repo', async () => {
+    const folderPath = await mkdtemp(join(tmpdir(), 'orca-folder-agent-'))
+    try {
+      const folderWorkspace = makeFolderWorkspace({ folderPath })
+      const projectGroup = makeFolderProjectGroup({ parentPath: folderPath })
+      const { runtime, spawn } = createAgentLaunchRuntime(
+        { claude: '--dangerously-skip-permissions' },
+        {},
+        createFolderWorkspaceRuntimeStore(folderWorkspace, projectGroup)
+      )
+
+      await runtime.createTerminal(TEST_FOLDER_WORKSPACE_KEY, { agent: 'claude' })
+
+      const spawnCall = spawn.mock.calls[0]?.[0] as { command?: string } | undefined
+      expect(spawnCall?.command).toBe("claude '--dangerously-skip-permissions'")
+    } finally {
+      await rm(folderPath, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to launch a disabled agent instead of falling back to a bare shell', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-disabled' })
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: ['claude'],
+        agentCmdOverrides: {},
+        agentDefaultArgs: {},
+        agentDefaultEnv: {}
+      })
+    })
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await expect(
+      runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { agent: 'claude' })
+    ).rejects.toThrow('Selected agent is disabled')
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('rejects an agent-selected create with no worktree selector', async () => {
+    const { runtime, spawn } = createAgentLaunchRuntime({ claude: '' })
+
+    await expect(runtime.createTerminal(undefined, { agent: 'claude' })).rejects.toThrow(
+      'Pass a worktree selector when choosing an agent.'
+    )
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('sends agent launch defaults through renderer-backed agent-selected creates', async () => {
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => ({
+        ...store.getSettings(),
+        disabledTuiAgents: [],
+        agentCmdOverrides: {},
+        agentDefaultArgs: { claude: '--dangerously-skip-permissions' },
+        agentDefaultEnv: {}
+      })
+    })
+    const webContents = { send: vi.fn() }
+    webContents.send.mockImplementation((_channel: string, payload: { requestId: string }) => {
+      runtime.syncWindowGraph(1, {
+        tabs: [],
+        leaves: [
+          {
+            tabId: 'tab-renderer',
+            worktreeId: TEST_WORKTREE_ID,
+            leafId: 'pane:1',
+            paneRuntimeId: 1,
+            ptyId: 'pty-renderer',
+            paneTitle: null
+          }
+        ]
+      })
+      ipcMain.emit(
+        'terminal:tabCreateReply',
+        { sender: webContents },
+        { requestId: payload.requestId, tabId: 'tab-renderer', title: 'Claude' }
+      )
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    electronMocks.BrowserWindow.fromId.mockReturnValue({
+      isDestroyed: () => false,
+      webContents
+    })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      agent: 'claude',
+      rendererBacked: true
+    })
+
+    expect(webContents.send).toHaveBeenCalledWith(
+      'terminal:requestTabCreate',
+      expect.objectContaining({
+        command: "claude '--dangerously-skip-permissions'",
+        launchAgent: 'claude'
+      })
+    )
+  })
+
   it('injects runtime hook receiver env into terminal sessions', async () => {
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-hooked' })
     const runtime = new OrcaRuntimeService(store, undefined, {
@@ -14568,13 +14912,12 @@ describe('OrcaRuntimeService', () => {
       webContents
     })
 
-    await expect(
-      runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
-        command: 'codex',
-        rendererBacked: true,
-        title: 'Renderer Terminal'
-      })
-    ).resolves.toMatchObject({
+    const created = await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      command: 'codex',
+      rendererBacked: true,
+      title: 'Renderer Terminal'
+    })
+    expect(created).toMatchObject({
       handle: expect.stringMatching(/^term_/),
       tabId: 'tab-renderer',
       title: 'Renderer Terminal',
@@ -14594,9 +14937,106 @@ describe('OrcaRuntimeService', () => {
       'terminal:tabCreateReply',
       expect.any(Function)
     )
+
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-directed-split' })
+    const splitTerminal = vi.fn()
+    const revealTerminalSession = vi.fn().mockResolvedValue({ tabId: 'tab-renderer' })
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    runtime.setNotifier({
+      worktreesChanged: vi.fn(),
+      reposChanged: vi.fn(),
+      activateWorktree: vi.fn(),
+      createTerminal: vi.fn(),
+      revealTerminalSession,
+      splitTerminal,
+      renameTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminal: vi.fn(),
+      sleepWorktree: vi.fn(),
+      terminalFitOverrideChanged: vi.fn(),
+      terminalDriverChanged: vi.fn()
+    })
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-claude' }] })
+      },
+      codexAccounts: {
+        listAccounts: () => ({ accounts: [] })
+      }
+    } as never)
+
+    await runtime.splitTerminal(created.handle, {
+      direction: 'vertical',
+      command: 'claude',
+      claudeAccountId: 'account-claude'
+    })
+
+    expect(splitTerminal).not.toHaveBeenCalled()
+    expect(spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'claude',
+        claudeAccountId: 'account-claude',
+        tabId: 'tab-renderer'
+      })
+    )
+    expect(revealTerminalSession).toHaveBeenCalledWith(
+      TEST_WORKTREE_ID,
+      expect.objectContaining({
+        tabId: 'tab-renderer',
+        splitFromLeafId: 'pane:1',
+        splitDirection: 'vertical'
+      })
+    )
   })
 
-  it('splits visible pty-backed terminal sessions through the parent renderer tab', async () => {
+  it('propagates renderer-backed spawn failures instead of timing out for a handle', async () => {
+    vi.useFakeTimers()
+    try {
+      const webContents = { send: vi.fn() }
+      const message =
+        'This Claude account is in use by an assigned worktree. Close that Claude terminal before launching it globally.'
+      webContents.send.mockImplementation((_channel: string, payload: { requestId: string }) => {
+        ipcMain.emit(
+          'terminal:tabCreateReply',
+          { sender: webContents },
+          { requestId: payload.requestId, tabId: 'tab-failed', title: 'Claude' }
+        )
+        queueMicrotask(() => {
+          ipcMain.emit(
+            'terminal:tabCreateFailure',
+            { sender: webContents },
+            { requestId: payload.requestId, tabId: 'tab-failed', error: message }
+          )
+        })
+      })
+      const runtime = new OrcaRuntimeService(store)
+      runtime.attachWindow(1)
+      runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+      electronMocks.BrowserWindow.fromId.mockReturnValue({
+        isDestroyed: () => false,
+        webContents
+      })
+
+      const creation = runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+        agent: 'claude',
+        rendererBacked: true
+      })
+      const rejection = expect(creation).rejects.toThrow(message)
+      await vi.waitFor(() => expect(webContents.send).toHaveBeenCalledOnce())
+      await vi.advanceTimersByTimeAsync(10_001)
+
+      await rejection
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('forwards launch accounts when splitting visible pty-backed terminal sessions', async () => {
     const spawn = vi
       .fn()
       .mockResolvedValueOnce({ id: 'pty-source' })
@@ -14626,22 +15066,45 @@ describe('OrcaRuntimeService', () => {
     })
     runtime.attachWindow(1)
     runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    runtime.setAccountServices({
+      claudeAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-claude' }] })
+      },
+      codexAccounts: {
+        listAccounts: () => ({ accounts: [{ id: 'account-codex' }] })
+      }
+    } as never)
 
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
     const sourceEnv =
       (spawn.mock.calls[0]?.[0] as { env?: Record<string, string> } | undefined)?.env ?? {}
     const sourceLeafId = sourceEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
 
-    await expect(runtime.splitTerminal(handle, { direction: 'vertical' })).resolves.toMatchObject({
+    await expect(
+      runtime.splitTerminal(handle, { claudeAccountId: 'missing-account' })
+    ).rejects.toThrow('That Claude account no longer exists.')
+    expect(spawn).toHaveBeenCalledTimes(1)
+
+    await expect(
+      runtime.splitTerminal(handle, {
+        direction: 'vertical',
+        claudeAccountId: 'account-claude',
+        codexAccountId: 'account-codex'
+      })
+    ).resolves.toMatchObject({
       handle: expect.stringMatching(/^term_/),
       tabId: sourceEnv.ORCA_TAB_ID,
       paneRuntimeId: -1
     })
 
-    const splitEnv =
-      (spawn.mock.calls[1]?.[0] as { env?: Record<string, string> } | undefined)?.env ?? {}
+    const splitSpawn = spawn.mock.calls[1]?.[0]
+    const splitEnv = (splitSpawn as { env?: Record<string, string> } | undefined)?.env ?? {}
     const splitLeafId = splitEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
     expect(splitTerminal).not.toHaveBeenCalled()
+    expect(splitSpawn).toMatchObject({
+      claudeAccountId: 'account-claude',
+      codexAccountId: 'account-codex'
+    })
     expect(splitEnv.ORCA_TAB_ID).toBe(sourceEnv.ORCA_TAB_ID)
     expect(splitEnv.ORCA_WORKTREE_ID).toBe(TEST_WORKTREE_ID)
     expect(revealTerminalSession).toHaveBeenLastCalledWith(TEST_WORKTREE_ID, {
@@ -14815,6 +15278,9 @@ describe('OrcaRuntimeService', () => {
     expect(created).toMatchObject({
       worktreeId: TEST_WORKTREE_ID,
       surface: 'background',
+      connected: true,
+      writable: true,
+      liveness: 'running',
       handle: expect.stringMatching(/^term_/)
     })
     expect(created.warning).toContain('could not make it discoverable')
@@ -15675,6 +16141,83 @@ describe('OrcaRuntimeService', () => {
     ).rejects.toThrow('timeout')
   })
 
+  it('resolves tui-idle for an Antigravity lane past its dismissed trust prompt (#10666)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    // Antigravity paints its banner once, then the trust prompt is drawn over it, then it repaints
+    // model/path/prompt lines WITHOUT repeating the header. Ready evidence must be read from the
+    // latest repaint, or the answered prompt keeps matching in scrollback forever.
+    runtime.onPtyData(
+      'pty-bg',
+      [
+        'Antigravity CLI 1.0.3\n',
+        'user@example.com (Antigravity Business)\n',
+        'Gemini 3.5 Flash (High)\n',
+        '~/orca/workspaces/orca/agy-dispatch-issue\n',
+        '>\n',
+        'Do you trust the contents of this directory?\n',
+        '› 1. Yes, continue\n',
+        '  2. No, quit\n',
+        'Gemini 3.5 Flash (High)\n',
+        '~/orca/workspaces/orca/agy-dispatch-issue\n',
+        '>'
+      ].join(''),
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle,
+      condition: 'tui-idle',
+      satisfied: true,
+      status: 'running'
+    })
+  })
+
+  it('still reports blocked for an Antigravity lane sitting on a live trust prompt (#10666)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    // Same banner, but the trust prompt is the newest thing on screen and nothing repainted after
+    // it. Reading the latest ready evidence must not weaken this into a false "ready".
+    runtime.onPtyData(
+      'pty-bg',
+      [
+        'Antigravity CLI 1.0.3\n',
+        'user@example.com (Antigravity Business)\n',
+        'Gemini 3.5 Flash (High)\n',
+        '~/orca/workspaces/orca/agy-dispatch-issue\n',
+        '>\n',
+        'Do you trust the contents of this directory?\n',
+        '› 1. Yes, continue\n',
+        '  2. No, quit\n'
+      ].join(''),
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle,
+      condition: 'tui-idle',
+      satisfied: false,
+      status: 'running',
+      blockedReason: 'codex-trust-workspace'
+    })
+  })
+
   it('returns a blocked wait result for Codex cwd selection prompts', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
@@ -15911,6 +16454,150 @@ describe('OrcaRuntimeService', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // Why (ORCA-191): `tui-idle` is satisfied by stored idle/title state, a
+  // known-ready preview, or foreground quiescence, all of which Codex reaches
+  // before its composer accepts input — measured on ORCA-171 at 5,482 ms
+  // satisfied / 8,211 ms ready, and 10,506 / 14,598. `composer-ready` reports
+  // the agent's own marker instead, and reports honestly when it never came:
+  // this surface is satisfied by the marker only. The dispatch injector's
+  // never-refuse policy lives at its call sites, not here.
+  describe('composer-ready wait (ORCA-191)', () => {
+    async function createCodexPane(): Promise<{
+      runtime: OrcaRuntimeService
+      handle: string
+      ptyId: string
+    }> {
+      const ptyId = 'pty-codex'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        launchAgent: 'codex'
+      })
+      return { runtime, handle, ptyId }
+    }
+
+    it('reports the marker as proof once the composer prompt renders', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
+
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({
+        condition: 'composer-ready',
+        satisfied: true,
+        composerReadyState: 'ready'
+      })
+    })
+
+    // Why: this is the window `tui-idle` hands the injector — bracketed paste is
+    // enabled, the composer is not mounted, and a write here is the one the
+    // startup redraw swallows. The wait must say no, so that an operator asking
+    // `terminal wait --for composer-ready` gets an answer and not a rubber stamp.
+    it('is unsatisfied while the composer is still mounting', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b]0;Codex Ready\x07OpenAI Codex\n', 100)
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 20 })
+      ).resolves.toMatchObject({ satisfied: false, composerReadyState: 'awaiting-composer' })
+    })
+
+    // Why: this is the defect the live rig caught, and only a live run could —
+    // `launchAgent` is recorded only for token-bound spawns and `foregroundAgent`
+    // is refreshed lazily, so a plain `terminal create --agent codex` pane
+    // reached the gate with no recorded identity and never waited at all.
+    it('identifies the agent from the foreground process when none was recorded', async () => {
+      const ptyId = 'pty-codex-unrecorded'
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData(ptyId, '\x1b[?2004h\x1b[2J\x1b[H  Starting Codex', 100)
+      const wait = runtime.waitForTerminal(handle, {
+        condition: 'composer-ready',
+        timeoutMs: 5_000
+      })
+
+      runtime.onPtyData(ptyId, '\r\n› ', 101)
+
+      await expect(wait).resolves.toMatchObject({ composerReadyState: 'ready' })
+    })
+
+    it('reports unobserved for a pane it never watched from spawn', async () => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'codex'
+      })
+      // A leaf synced from the renderer for a PTY this runtime never registered
+      // is the restored/adopted case: nothing was watching its handshake, so
+      // there is nothing to wait for and no proof to report either way.
+      syncSinglePty(runtime)
+      const [terminal] = (await runtime.listTerminals()).terminals
+
+      const budgetMs = 5_000
+      const wait = await runtime.waitForTerminal(terminal.handle, {
+        condition: 'composer-ready',
+        timeoutMs: budgetMs
+      })
+
+      expect(wait).toMatchObject({ satisfied: false, composerReadyState: 'unobserved' })
+      // Why: it must not sleep out the budget — `dispatch --inject` rescues a
+      // stalled run through exactly this pane and cannot pay for a wait that
+      // can never resolve. Compared against the budget, not against a tight
+      // absolute, so a stalled event loop on a loaded runner cannot fail it.
+      expect(wait.waitedMs).toBeLessThan(budgetMs / 2)
+    })
+
+    it('observes turn acceptance from output that follows the write', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 5_000
+      })
+      runtime.onPtyData(ptyId, '\r\nWorking (0s • esc to interrupt)', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: true,
+        evidence: 'interrupt-affordance'
+      })
+      expect(sent.send.accepted).toBe(true)
+    })
+
+    it('reports an unaccepted turn instead of resending', async () => {
+      const { runtime, handle, ptyId } = await createCodexPane()
+      runtime.onPtyData(ptyId, '\x1b[?2004h› ', 100)
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, 'do the work', {
+        acceptanceTimeoutMs: 20
+      })
+      // Why: Codex collapses a long paste into a placeholder, so the payload is
+      // never on screen. Treating that as failure and resending is what
+      // interleaved six copies into one composer.
+      runtime.onPtyData(ptyId, '\r\n› [Pasted Content 1206 chars]', 101)
+
+      await expect(sent.turnAcceptance).resolves.toMatchObject({
+        accepted: false,
+        evidence: null
+      })
+    })
   })
 
   it('chunks large agent prompt paste frames before delayed submit', async () => {
@@ -16847,6 +17534,84 @@ describe('OrcaRuntimeService', () => {
     const read = await runtime.readTerminal(terminal.handle)
 
     expect(read.tail).toEqual(['Claude Code', 'Working on fix', 'Tool: Read'])
+    expect(serializeBuffer).toHaveBeenCalledWith('pty-1', {
+      scrollbackRows: 0,
+      altScreenForcesZeroRows: false
+    })
+  })
+
+  it('prefers the renderer screen over a polluted Codex redraw transcript for preview reads', async () => {
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: [
+        '\x1b[?1049h\x1b[2J\x1b[H >_ OpenAI Codex (v0.132.0)\r\n',
+        '› ORCA-171 verify snapshot\r\n',
+        'gpt-5.6-sol high\r\n'
+      ].join(''),
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'codex',
+      launchAgent: 'codex'
+    })
+
+    const pollutedTranscript = [
+      'Starting MCP servers (0/2): codex_apps, computer-use',
+      '• You have 1 usage limit reset available. Run /usage to use one.SStaSta2 (0s • esc to intrrupt)StaStarStartStartiSt'
+    ]
+    runtime.onPtyData('pty-1', `${pollutedTranscript.join('\n')}\n`, 100)
+
+    const preview = await runtime.readTerminal(handle)
+    const serializerCallsAfterPreview = serializeBuffer.mock.calls.length
+    const cursorRead = await runtime.readTerminal(handle, { cursor: 0 })
+
+    expect(preview.tail).toEqual([
+      ' >_ OpenAI Codex (v0.132.0)',
+      '› ORCA-171 verify snapshot',
+      'gpt-5.6-sol high'
+    ])
+    expect(cursorRead.tail).toEqual(pollutedTranscript)
+    expect(serializerCallsAfterPreview).toBeGreaterThan(0)
+    expect(serializeBuffer).toHaveBeenCalledTimes(serializerCallsAfterPreview)
+    expect(serializeBuffer).toHaveBeenCalledWith('pty-1', {
+      scrollbackRows: 0,
+      altScreenForcesZeroRows: false
+    })
+  })
+
+  it('resolves an unrecorded Codex owner before choosing the preview snapshot', async () => {
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: '\x1b[?1049h\x1b[2J\x1b[H >_ OpenAI Codex\r\n› Ready for input\r\n',
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    const pollutedTranscript = ['WWoWorWorkWorkiWorkinWorking', 'SStaStarStartStartiStarting']
+    runtime.onPtyData('pty-1', `${pollutedTranscript.join('\n')}\n`, 100)
+
+    const preview = await runtime.readTerminal(handle)
+    const cursorRead = await runtime.readTerminal(handle, { cursor: 0 })
+
+    expect(preview.tail).toEqual([' >_ OpenAI Codex', '› Ready for input'])
+    expect(cursorRead.tail).toEqual(pollutedTranscript)
     expect(serializeBuffer).toHaveBeenCalledWith('pty-1', {
       scrollbackRows: 0,
       altScreenForcesZeroRows: false
@@ -27632,6 +28397,7 @@ describe('OrcaRuntimeService', () => {
   it('operates PTY-backed mobile session terminals without a renderer graph', async () => {
     const spawn = vi.fn().mockResolvedValue({ id: 'laptop-created-pty' })
     const kill = vi.fn(() => true)
+    const stopAndWait = vi.fn().mockResolvedValue(true)
     const closeTerminal = vi.fn()
     const runtime = new OrcaRuntimeService(store)
     runtime.setNotifier({ closeTerminal } as never)
@@ -27639,6 +28405,7 @@ describe('OrcaRuntimeService', () => {
       spawn,
       write: () => true,
       kill,
+      stopAndWait,
       getForegroundProcess: async () => null
     })
 
@@ -27663,11 +28430,12 @@ describe('OrcaRuntimeService', () => {
       tabId: 'laptop-tab',
       ptyKilled: true
     })
-    expect(kill).toHaveBeenCalledWith('laptop-created-pty')
+    expect(stopAndWait).toHaveBeenCalledWith('laptop-created-pty')
+    expect(kill).not.toHaveBeenCalled()
     expect(closeTerminal).toHaveBeenCalledWith('laptop-tab')
   })
 
-  it('waits for renderer acknowledgement before returning a whole-tab close receipt', async () => {
+  it('waits for renderer acknowledgement and PTY exit before returning a whole-tab close receipt', async () => {
     const { runtimeStore } = makeRuntimeStoreWithWorkspaceSession(
       makeWorkspaceSessionWithHeadlessTerminal()
     )
@@ -27675,9 +28443,16 @@ describe('OrcaRuntimeService', () => {
     const closeTerminalTab = vi.fn(() => acknowledged.promise)
     const runtime = new OrcaRuntimeService(runtimeStore as never)
     runtime.setNotifier({ closeTerminal: vi.fn(), closeTerminalTab } as never)
+    const stopped = makeDeferred()
+    const kill = vi.fn(() => true)
+    const stopAndWait = vi.fn(async () => {
+      await stopped.promise
+      return true
+    })
     runtime.setPtyController({
       write: () => true,
-      kill: () => true,
+      kill,
+      stopAndWait,
       getForegroundProcess: async () => null,
       listProcesses: async () => []
     })
@@ -27712,12 +28487,17 @@ describe('OrcaRuntimeService', () => {
     expect(settled).toBe(false)
 
     acknowledged.resolve()
+    await vi.waitFor(() => expect(stopAndWait).toHaveBeenCalledWith('persisted-pty'))
+    expect(settled).toBe(false)
+    stopped.resolve()
     await expect(pending).resolves.toEqual({
       handle: terminal.handle,
       tabId: 'host-tab',
       closeMode: 'tab',
-      ptyKilled: false
+      ptyKilled: true
     })
+    expect(stopAndWait).toHaveBeenCalledWith('persisted-pty')
+    expect(kill).not.toHaveBeenCalled()
   })
 
   it('leases renderer publication until a paired whole-tab close is acknowledged', async () => {
@@ -27943,11 +28723,18 @@ describe('OrcaRuntimeService', () => {
       .mockResolvedValueOnce({ id: 'headless-left' })
       .mockResolvedValueOnce({ id: 'headless-right' })
     const kill = vi.fn(() => true)
+    const stopAndWait = vi.fn(async (ptyId: string) => {
+      if (ptyId === 'headless-right') {
+        throw new Error('physical stop failed')
+      }
+      return true
+    })
     const runtime = new OrcaRuntimeService({ ...runtimeStore, flushOrThrow } as never)
     runtime.setPtyController({
       spawn,
       write: () => true,
       kill,
+      stopAndWait,
       getForegroundProcess: async () => null
     })
     runtime.syncWindowGraph(0, { tabs: [], leaves: [] })
@@ -27957,10 +28744,17 @@ describe('OrcaRuntimeService', () => {
     })
     await runtime.splitTerminal(terminal.handle, { direction: 'vertical' })
 
-    await runtime.closeTerminalTab(terminal.handle)
+    await expect(runtime.closeTerminalTab(terminal.handle)).resolves.toEqual({
+      handle: terminal.handle,
+      tabId: 'durable-tab',
+      closeMode: 'tab',
+      ptyKilled: false
+    })
 
     expect(kill).toHaveBeenCalledWith('headless-left')
     expect(kill).toHaveBeenCalledWith('headless-right')
+    expect(stopAndWait).toHaveBeenCalledWith('headless-left')
+    expect(stopAndWait).toHaveBeenCalledWith('headless-right')
     expect(getSession().tabsByWorktree[TEST_WORKTREE_ID]).toEqual([])
     expect(getSession().terminalLayoutsByTabId['durable-tab']).toBeUndefined()
     expect(flushOrThrow).toHaveBeenCalledTimes(1)
@@ -28026,6 +28820,23 @@ describe('OrcaRuntimeService', () => {
       connected: true,
       ptyId: 'laptop-created-pty'
     })
+  })
+
+  it('does not implicitly select a starting terminal while the graph is unavailable', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const ptyId = 'ssh:ssh-1@@pty-starting-default'
+    runtime.registerPty(ptyId, TEST_WORKTREE_ID, 'ssh-1', {
+      tabId: 'starting-tab',
+      leafId: HEADLESS_LEAF_ID
+    })
+    runtime.onPtyExit(ptyId, -1)
+
+    await expect(runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).resolves.toMatchObject({
+      terminals: [expect.objectContaining({ liveness: 'starting', writable: false })]
+    })
+    await expect(runtime.resolveActiveTerminal(`id:${TEST_WORKTREE_ID}`)).rejects.toThrow(
+      'no_active_terminal'
+    )
   })
 
   it('keeps split sibling headless mobile terminal leaves when a desktop renderer omits them', async () => {
@@ -28765,6 +29576,54 @@ describe('OrcaRuntimeService', () => {
         ]
       })
       expect((await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)).tabs).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps writable waits pending across a recoverable abnormal SSH exit', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const ptyId = 'ssh:ssh-1@@pty-writable-recovery'
+      runtime.registerPty(ptyId, TEST_WORKTREE_ID, 'ssh-1', {
+        tabId: 'host-tab',
+        leafId: HEADLESS_LEAF_ID
+      })
+      const terminal = (await runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).terminals.find(
+        (candidate) => candidate.ptyId === ptyId
+      )!
+      runtime['ptysById'].get(ptyId)!.connected = false
+      const waiting = runtime.waitForTerminal(terminal.handle, {
+        condition: 'writable',
+        timeoutMs: 1_000
+      })
+
+      runtime.onPtyExit(ptyId, -1)
+
+      await expect(runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)).resolves.toMatchObject({
+        terminals: [
+          expect.objectContaining({
+            handle: terminal.handle,
+            liveness: 'starting',
+            writable: false
+          })
+        ]
+      })
+      const laterWaiting = runtime.waitForTerminal(terminal.handle, {
+        condition: 'writable',
+        timeoutMs: 1_000
+      })
+      await vi.advanceTimersByTimeAsync(999)
+      expect(await Promise.race([waiting, Promise.resolve('still-pending')])).toBe('still-pending')
+      expect(await Promise.race([laterWaiting, Promise.resolve('still-pending')])).toBe(
+        'still-pending'
+      )
+      const timeout = expect(waiting).rejects.toThrow('timeout')
+      const laterTimeout = expect(laterWaiting).rejects.toThrow('timeout')
+      await vi.advanceTimersByTimeAsync(1)
+      await timeout
+      await laterTimeout
     } finally {
       vi.useRealTimers()
     }
@@ -38489,6 +39348,70 @@ describe('OrcaRuntimeService', () => {
         capture: { source: 'manual-action', confidence: 'explicit' }
       })
     )
+  })
+
+  it('does not persist lineage when its account pin is removed during parent resolution', async () => {
+    const parentPath = '/tmp/worktree-parent'
+    const childPath = '/tmp/worktree-child'
+    const parentId = `${TEST_REPO_ID}::${parentPath}`
+    const childId = `${TEST_REPO_ID}::${childPath}`
+    const metaById: Record<string, WorktreeMeta> = {
+      [parentId]: makeWorktreeMeta({ instanceId: 'parent-instance' }),
+      [childId]: makeWorktreeMeta({ instanceId: 'child-instance' })
+    }
+    const setWorktreeLineage = vi.fn()
+    const setWorkspaceLineage = vi.fn()
+    const setWorktreeMeta = vi.fn()
+    const runtimeStore = {
+      ...store,
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta,
+      getWorktreeLineage: () => undefined,
+      setWorktreeLineage,
+      setWorkspaceLineage
+    }
+    vi.mocked(listWorktrees).mockResolvedValue([
+      {
+        path: parentPath,
+        head: 'abc',
+        branch: 'feature/parent',
+        isBare: false,
+        isMainWorktree: false
+      },
+      {
+        path: childPath,
+        head: 'def',
+        branch: 'feature/child',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    const child = await runtime['resolveWorktreeSelector'](`id:${childId}`)
+    const parent = await runtime['resolveWorktreeSelector'](`id:${parentId}`)
+    const parentResolution = deferred<typeof parent>()
+    const resolveWorktreeSelector = vi.fn((selector: string) =>
+      selector === `id:${parentId}` ? parentResolution.promise : Promise.resolve(child)
+    )
+    runtime['resolveWorktreeSelector'] = resolveWorktreeSelector
+    const listAccounts = vi
+      .fn()
+      .mockReturnValueOnce({ accounts: [{ id: 'account-a' }] })
+      .mockReturnValue({ accounts: [] })
+    runtime.setAccountServices({ claudeAccounts: { listAccounts } } as never)
+
+    const update = runtime.updateManagedWorktreeMeta(`id:${childId}`, {
+      claudeAccountId: 'account-a',
+      lineage: { parentWorktree: `id:${parentId}` }
+    })
+    await vi.waitFor(() => expect(resolveWorktreeSelector).toHaveBeenCalledTimes(2))
+    parentResolution.resolve(parent)
+
+    await expect(update).rejects.toThrow('no longer exists')
+    expect(setWorktreeLineage).not.toHaveBeenCalled()
+    expect(setWorkspaceLineage).not.toHaveBeenCalled()
+    expect(setWorktreeMeta).not.toHaveBeenCalled()
   })
 
   it.each([
