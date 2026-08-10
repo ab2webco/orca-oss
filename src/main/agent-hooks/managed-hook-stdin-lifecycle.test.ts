@@ -361,11 +361,17 @@ describe('Windows managed hook stdin structure', () => {
           expect(result.exitCode, `${fileName} exit code`).toBe(0)
           if (fileName.endsWith('.cmd')) {
             // Why (#11549): these guards exit rather than own stdin, so the writer breaks —
-            // EPIPE, or ECONNRESET when Windows tears the pipe down first. hookEnvironment()
-            // strips every ORCA_* var, so the relaxation only ever covers the missing-env
-            // path — a happy-path case added to this loop must not reuse it.
+            // EPIPE, or ECONNRESET when Windows tears the pipe down first, or EOF when the
+            // handle is already gone by the time libuv reports the failed write (seen on the
+            // windows-latest runner for antigravity-hook.cmd, ORCA-201). All three say the
+            // same thing the case is about: the child exited without owning stdin. The exit
+            // code is asserted separately, so widening this cannot hide a hook that failed.
+            // hookEnvironment() strips every ORCA_* var, so the relaxation only ever covers
+            // the missing-env path — a happy-path case added to this loop must not reuse it.
             for (const error of result.stdinErrors) {
-              expect(['EPIPE', 'ECONNRESET'], `${fileName} stdin error`).toContain(error.code)
+              expect(['EPIPE', 'ECONNRESET', 'EOF'], `${fileName} stdin error`).toContain(
+                error.code
+              )
             }
           } else {
             expect(result.stdinErrors, `${fileName} stdin errors`).toHaveLength(0)

@@ -1460,10 +1460,16 @@ function WorktreeJumpPaletteContent({
   const availableActionResults = useMemo(() => {
     const ctx = buildQuickActionContext()
     return actionResults.filter((action) => action.isAvailable(ctx).available)
+    // Why the directive sits here and not inside the array (ORCA-201): the rule is
+    // reported on the dependency-list line, so a disable next to the first extra dep
+    // suppresses nothing and then reports itself as unused. These are the
+    // availability-determining primitives buildQuickActionContext reads from the store;
+    // listing them makes the memo recompute when availability actually changes rather
+    // than on every render.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [
     actionResults,
     buildQuickActionContext,
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- these are the availability-determining primitives buildQuickActionContext reads from the store; listing them ensures the memo recomputes when availability actually changes, not on every render.
     activeView,
     activeWorktreeId,
     worktreesByRepo,
