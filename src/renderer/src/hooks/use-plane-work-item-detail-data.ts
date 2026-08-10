@@ -55,7 +55,12 @@ export function usePlaneWorkItemDetailData(
   // ref keeps loadComments + the load effect stable so they don't re-run every
   // render (which caused a setState→render→effect infinite loop, max-update-depth).
   const providerSettingsRef = useRef(providerSettings)
-  providerSettingsRef.current = providerSettings
+  // Why an effect and not a plain render write: React can replay or discard a
+  // render, so a mutation there can leak from UI that never commits. Declared
+  // ahead of the loaders below so it has already run when they fire.
+  useEffect(() => {
+    providerSettingsRef.current = providerSettings
+  })
 
   const loadComments = useCallback(
     async (targetItem: PlaneWorkItem, requestId: number): Promise<void> => {

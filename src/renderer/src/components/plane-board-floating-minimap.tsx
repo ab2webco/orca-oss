@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
@@ -28,12 +28,23 @@ export function PlaneBoardFloatingMinimap({
   columnCount,
   scrollContainerRef
 }: PlaneBoardFloatingMinimapProps): React.JSX.Element | null {
+  // Why the minimap names the scroller: role="scrollbar" requires aria-controls,
+  // and the board's overflow div carries no id of its own. Owning the id here
+  // keeps the a11y contract with the element that declares the role.
+  const scrollContainerId = useId()
   const trackRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<number | null>(null)
   const dragRef = useRef<{ pointerId: number; startX: number; startLeft: number } | null>(null)
   const [metrics, setMetrics] = useState<ScrollMetrics>(EMPTY_METRICS)
   const [trackWidth, setTrackWidth] = useState(0)
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (container) {
+      container.id = scrollContainerId
+    }
+  }, [scrollContainerId, scrollContainerRef])
 
   const recompute = useCallback(() => {
     const container = scrollContainerRef.current
@@ -175,6 +186,7 @@ export function PlaneBoardFloatingMinimap({
       <div
         ref={trackRef}
         role="scrollbar"
+        aria-controls={scrollContainerId}
         aria-orientation="horizontal"
         aria-valuemin={0}
         aria-valuemax={100}
