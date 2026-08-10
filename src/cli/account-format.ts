@@ -6,6 +6,7 @@ import type {
   CodexRateLimitAccountsState
 } from '../shared/types'
 import type { ClaudeTerminalAccountSwitchFailureReason } from '../shared/claude-terminal-account-switch'
+import { formatVaultSettingsInheritance } from './account-settings-inheritance-format'
 import type {
   InactiveAccountUsage,
   ProviderRateLimits,
@@ -206,16 +207,17 @@ function formatTerminalAccount(report: ClaudeTerminalAccountReport): string {
   const pane = report.terminal ? ` [${report.terminal}]` : ''
   const caution = '(`active` below is the global selection, not this terminal’s account.)'
   const switchable = formatSwitchReadiness(report)
+  const settings = formatVaultSettingsInheritance(report.settingsInheritance)
   const { ownership } = report
   if (ownership.state === 'account') {
     const label = ownership.email ?? `id ${ownership.accountId}`
     const binding = ownership.pinned ? 'pinned to this pane' : "Orca's shared runtime auth"
-    return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}${switchable}\n${caution}`
+    return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}${switchable}${settings}\n${caution}`
   }
   if (ownership.state === 'none') {
-    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}${switchable}\n${caution}`
+    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}${switchable}${settings}\n${caution}`
   }
-  return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}${switchable}\n${caution}`
+  return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}${switchable}${settings}\n${caution}`
 }
 
 export function formatAccountList(report: AccountListReport): string {
