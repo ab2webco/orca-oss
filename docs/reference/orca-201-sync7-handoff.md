@@ -265,28 +265,49 @@ Logging the daemon PTY's `write`/`onData` for the worker pane, on both arms:
 banner until teardown on both arms. What satisfies `toContain('ACK')` is the *echo of the
 preamble Orca pastes in*, which embeds the task spec `Respond ACK and remain idle`.
 
-So the two arms differ in one thing only: on the failing arm that echoed preamble is **absent
-from the buffer `terminal.read` returns**, even though the daemon PTY demonstrably produced it
-(the `data` lines above are from a failing round). The tail is two bare shell prompts because
-nothing from the worker's session ever reached that buffer — not because the banner was cleared
-and not because a process died.
+And the two arms differ in exactly one thing: **how far that echo gets before it stops.**
+Logging the worker session's whole `onData` stream on both arms, at a 400-char slice:
 
-**ORCA-204 restated:** a freshly created worker terminal's daemon output intermittently does not
-reach the buffer served by `terminal.read`. The worker is healthy; the read path is not. The
-"latency" and "kill" lines are both closed.
+| arm | last echoed chunk of the paste |
+| --- | --- |
+| passing | `…s task's follow-ups.\r\n\r\n=== TASK ===\r\nRespond ACK and` |
+| failing | `…stop, return to an idle prompt, and take no further actions — do NOT start\r\nnew or unrelated work, do NOT run` |
 
-That also reopens the harness question the SIGTERM reading had closed. A real Codex would not be
-killed — nothing kills it. Whether a *user* sees the same hole depends on whether the renderer's
-buffer takes the same path as `terminal.read`; unverified, and the thing to settle first.
+The failing arm's echo is **cut off before the `=== TASK ===` block** — the very tail of the
+paste, and the only place the string `ACK` appears anywhere in the run (`grep -c ACK` over the
+whole daemon log: 1 on the passing arm, **0** on the failing one). Seven echo chunks instead of
+eight; identical up to the truncation point.
 
-### Where to look next
+The read is of the right pane, not the coordinator's — checked, not assumed. On the failing
+round the spec's `worker.ptyId` is byte-for-byte the daemon session that received the
+`codex '--dangerously-bypass-approvals-and-sandbox'` write.
 
-Upstream rewrote exactly this seam in the merged range, and it is unaudited:
-`terminal-subscriber-driven-daemon-attach.test.ts` (+495, new),
-`terminal-output-path-candidates.ts` (+269, new), `terminal-restore-record-seed.test.ts` (+222),
-`terminal-requested-snapshot-unavailability.test.ts` (+233),
-`terminal-list-stale-leaf-liveness.test.ts` / `terminal-send-stale-leaf-liveness.test.ts`, and
-`rpc/terminal-close-attribution.ts` (+50, new).
+**ORCA-204 restated:** Orca pastes the worker preamble into the PTY as **one ~4–6 KB write**
+(`writeTerminalAgentPrompt` → `iterateTerminalInputChunks`, whose
+`TERMINAL_INPUT_CHUNK_MAX_BYTES` is 16 KB, so the whole preamble is a single chunk), and the tty
+intermittently drops its tail before the freshly-exec'd agent drains stdin. The `=== TASK ===`
+block is at the end, so what gets lost is the task itself. The "latency" and "kill" lines are
+both closed.
+
+**This is a product bug, not a test artifact, and it is worse than the test.** A real worker gets
+a truncated prompt — preamble rules intact, task missing — with nothing to signal it. The E2E only
+notices because the string it polls for happens to sit in the dropped tail.
+
+### Where to look next — a fix, not more diagnosis
+
+`src/shared/terminal-input.ts` is byte-identical to **both** trees, so the 16 KB chunk size is not
+what the merge changed; the preamble crossing a threshold, or the launch timing that decides
+whether the agent is draining stdin yet, is. The knobs:
+
+- `OrcaRuntime.writeTerminalAgentPrompt` (`orca-runtime.ts:17964`) already chunks with a
+  `setTimeout(0)` between chunks — it just never splits at this size. A smaller chunk bound for
+  the agent-prompt path is the narrow fix; verify it does not regress paste throughput.
+- `AGENT_PROMPT_SUBMIT_DELAY_MS` and `runtime/agent-composer-readiness.ts` decide *when* the paste
+  starts relative to the agent being ready to read. The failing arm pastes 7 ms after the fake's
+  banner.
+
+Verification bar: the pair fails roughly 1 in 2 to 4 rounds, so **one green round proves nothing**
+— at least 5 interleaved rounds, plus a unit case that fails with the fix reverted.
 
 Reproducing the instrumentation costs ~10 min: a `orca204(msg)` helper that appends
 `new Error().stack` to a fixed path, called from the daemon's `pty-subprocess.ts`
@@ -315,8 +336,8 @@ cause either. And `[orchestration] legacy worker provider-ready recovery failed`
 | `e2e (full)` shards 1/2/4/5/6/10 | 8 specs **inherited** (ORCA-203) + the pair above (ours, open). |
 | everything else | green. |
 
-The PR **cannot go green** until ORCA-203 is resolved. That is the coordinator's call, not this
-PR's.
+The PR **cannot go green** until ORCA-203 is resolved *and* ORCA-204 is fixed. ORCA-203 is the
+coordinator's call; ORCA-204 is this PR's, and it is diagnosed but not fixed.
 
 ## Method notes worth keeping
 
