@@ -6,14 +6,19 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 const relativeFilePath =
   'packages/orca/src/renderer/src/components/navigation/worktree/secondary-nav/SecondaryNav.tsx'
 
-test('new-tab file results prioritize the filename and reveal the full path on hover', async ({
-  orcaPage,
-  testRepoPath
-}) => {
+// Why beforeAll: the app resolves the worktree file list once and does not pick
+// up a directory created after launch on Linux CI (it does on macOS through
+// FSEvents), so writing this inside the test body makes the omnibox result
+// platform-dependent. Seed it before the fixture launches Electron.
+test.beforeAll(({ testRepoPath }) => {
   const filePath = path.join(testRepoPath, ...relativeFilePath.split('/'))
   mkdirSync(path.dirname(filePath), { recursive: true })
   writeFileSync(filePath, 'export const SecondaryNav = true\n')
+})
 
+test('new-tab file results prioritize the filename and reveal the full path on hover', async ({
+  orcaPage
+}) => {
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
