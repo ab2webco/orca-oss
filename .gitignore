@@ -97,6 +97,7 @@ docs/**
 !docs/mobile-terminal-shortcut-bar.md
 !docs/reference/
 !docs/reference/agent-verification-traps.md
+!docs/reference/orca-201-sync7-handoff.md
 !docs/reference/git-compatibility.md
 !docs/reference/lab-release-smoke-check.md
 !docs/reference/headless-linux-server.md
