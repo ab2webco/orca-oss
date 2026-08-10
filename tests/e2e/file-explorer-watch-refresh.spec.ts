@@ -5,24 +5,28 @@ import { openFileExplorer } from './helpers/file-explorer'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
 /**
- * Quarantined under ORCA-198, owner: whoever picks up the reconcile.
+ * The tree refresh itself was never the flake (ORCA-198).
  *
- * Fails 2 of 4 scheduled runs. The capture below has already ruled out the
- * delivery half: on the PR-check failure of run 31334299613 the renderer
- * received both events for the case-only rename, in one batch, 410ms after
- * the create —
+ * A file explorer row renders the file name AND its git decoration badge inside
+ * the same `[data-file-explorer-row]` button, so the row's own text goes from
+ * `WATCH-REFRESH-CASE.txt` to `WATCH-REFRESH-CASE.txtU` a few hundred ms after
+ * the row appears. This spec used to anchor on that whole-row text
+ * (`/^WATCH-REFRESH-CASE\.txt$/`), so the locator matched zero elements from the
+ * moment the decoration landed and only passed when Playwright happened to poll
+ * inside the gap — 2 of 4 scheduled runs lost that race and reported
+ * "element(s) not found" while the tree was showing the renamed file.
  *
- *   {"kind":"create","absolutePath":".../WATCH-REFRESH-CASE.txt"}
- *   {"kind":"delete","absolutePath":".../watch-refresh-case.txt"}
- *
- * — and the row still never appeared. So the watcher and its IPC are fine and
- * the fault is at or after `processFileExplorerFsPayload`. That points at a
- * user-facing bug on case-sensitive filesystems, not a test artifact, which is
- * why this is `fixme` and not a skip: it must go back to red once fixed.
+ * Assert on the name cell, which carries the file name and nothing else, and
+ * hold one assertion past the decoration so the whole-row form cannot come back.
  */
-test.fixme('refreshes the visible tree after external Windows file changes', async ({
-  orcaPage
-}) => {
+
+const NAME_CELL = '[data-file-explorer-row-name]'
+
+function exactly(name: string): RegExp {
+  return new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+}
+
+test('refreshes the visible tree after external Windows file changes', async ({ orcaPage }) => {
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
   await orcaPage.evaluate(() => window.__store?.getState().setRightSidebarOpen(false))
@@ -53,7 +57,7 @@ test.fixme('refreshes the visible tree after external Windows file changes', asy
   const row = (name: string) =>
     orcaPage
       .locator('[data-file-explorer-row]')
-      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) })
+      .filter({ has: orcaPage.locator(NAME_CELL).filter({ hasText: exactly(name) }) })
 
   rmSync(originalPath, { force: true })
   rmSync(renamedPath, { force: true })
@@ -61,37 +65,18 @@ test.fixme('refreshes the visible tree after external Windows file changes', asy
     await expect(row('README.md')).toBeVisible({ timeout: 10_000 })
     await orcaPage.waitForTimeout(2_000)
 
-    // Why: this spec fails intermittently on CI (ORCA-198) and a bare "row not
-    // found" cannot say which half broke. Recording the payloads the renderer
-    // actually received splits it: payloads present ⇒ the reconcile saw the
-    // event and still did not re-read the directory; none ⇒ the watcher never
-    // delivered, or the renderer's debounce timer was throttled while hidden.
-    // Registered here, so events before the README.md wait are not captured.
-    await orcaPage.evaluate(() => {
-      const sink = (window as Window & { __orcaE2eFsChanged?: unknown[] }).__orcaE2eFsChanged ?? []
-      ;(window as Window & { __orcaE2eFsChanged?: unknown[] }).__orcaE2eFsChanged = sink
-      window.api.fs.onFsChanged((payload) => {
-        sink.push({ at: Date.now(), payload })
-      })
-    })
-    const dumpWatchEvents = async (): Promise<string> =>
-      JSON.stringify(
-        await orcaPage.evaluate(
-          () => (window as Window & { __orcaE2eFsChanged?: unknown[] }).__orcaE2eFsChanged ?? []
-        )
-      )
-
     writeFileSync(originalPath, 'created outside Orca\n')
     await expect(row(originalName)).toBeVisible({ timeout: 10_000 })
 
+    // A case-only rename on a case-sensitive filesystem reaches the renderer as
+    // create + delete of two paths that differ only in case; the tree must
+    // re-read the directory and swap the row.
     renameSync(originalPath, renamedPath)
-    try {
-      await expect(row(renamedName)).toBeVisible({ timeout: 10_000 })
-    } catch (error) {
-      throw new Error(
-        `${error instanceof Error ? error.message : String(error)}\n\nfs:changed payloads: ${await dumpWatchEvents()}`
-      )
-    }
+    await expect(row(renamedName)).toBeVisible({ timeout: 10_000 })
+    // Why: the row is decorated with its git status badge shortly after it
+    // appears, which is what pushed the row's own text off the anchored form.
+    // Hold here until the decoration lands: `row()` must still resolve there.
+    await expect(row(renamedName)).not.toHaveText(exactly(renamedName), { timeout: 10_000 })
     await expect(row(originalName)).toHaveCount(0, { timeout: 10_000 })
 
     rmSync(renamedPath)

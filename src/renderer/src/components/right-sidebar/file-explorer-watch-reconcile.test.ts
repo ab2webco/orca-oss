@@ -440,6 +440,38 @@ describe('processFileExplorerFsPayload update reconciliation', () => {
   })
 })
 
+describe('processFileExplorerFsPayload case-only rename reconciliation', () => {
+  // Why: the exact payload captured on the ORCA-198 failure. A case-only rename on a
+  // case-sensitive filesystem arrives as create + delete of paths that differ only in case.
+  it('queues the parent re-read for a case-only rename split into create and delete', () => {
+    const root = '/tmp/orca-e2e-repo'
+    const refreshDir = vi.fn()
+    const refreshTree = vi.fn()
+
+    processFileExplorerFsPayload({
+      payload: {
+        worktreePath: root,
+        events: [
+          { kind: 'create', absolutePath: `${root}/WATCH-REFRESH-CASE.txt` },
+          { kind: 'delete', absolutePath: `${root}/watch-refresh-case.txt` }
+        ]
+      },
+      currentWorktreePath: root,
+      worktreeId: 'wt-1',
+      cache: { [root]: cacheWithChildren([`${root}/watch-refresh-case.txt`]) },
+      expanded: new Set(),
+      setDirCache: vi.fn(),
+      setSelectedPath: vi.fn(),
+      refreshDir,
+      refreshTree
+    })
+
+    expect(refreshDir).toHaveBeenCalledOnce()
+    expect(refreshDir).toHaveBeenCalledWith(root)
+    expect(refreshTree).not.toHaveBeenCalled()
+  })
+})
+
 describe('processFileExplorerFsPayload overflow reconciliation', () => {
   it('routes an overflow event to a single tree refresh and skips per-dir refreshes', () => {
     const root = '/repo'
