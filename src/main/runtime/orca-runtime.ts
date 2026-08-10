@@ -11563,7 +11563,10 @@ export class OrcaRuntimeService {
     if (typeof opts.cursor === 'number') {
       return read
     }
-    if (this.getKnownPtyAgent(ptyId) === 'codex') {
+    const rendererSnapshotAvailable =
+      Boolean(this.ptyController?.serializeBuffer) &&
+      this.ptyController?.hasRendererSerializer?.(ptyId) !== false
+    if (rendererSnapshotAvailable && (await this.resolvePtyAgentOwner(ptyId)) === 'codex') {
       const rendererLines = await this.readRendererVisibleSnapshotLines(ptyId)
       if (rendererLines.length > 0) {
         return buildVisibleSnapshotReadFallback(read, rendererLines, opts.limit)
@@ -16777,20 +16780,7 @@ export class OrcaRuntimeService {
     if (!ptyId) {
       return null
     }
-    const pty = this.ptysById.get(ptyId)
-    const recorded = pty?.launchAgent ?? pty?.foregroundAgent ?? null
-    if (recorded) {
-      return { ptyId, agent: recorded }
-    }
-    try {
-      const foreground = await this.ptyController?.getForegroundProcess(ptyId)
-      return {
-        ptyId,
-        agent: foreground ? (recognizeAgentProcess(foreground)?.agent ?? null) : null
-      }
-    } catch {
-      return { ptyId, agent: null }
-    }
+    return { ptyId, agent: await this.resolvePtyAgentOwner(ptyId) }
   }
 
   /**
@@ -32213,6 +32203,23 @@ export class OrcaRuntimeService {
   private getKnownPtyAgent(ptyId: string): TuiAgent | null {
     const pty = this.ptysById.get(ptyId)
     return pty?.launchAgent ?? pty?.foregroundAgent ?? null
+  }
+
+  private async resolvePtyAgentOwner(ptyId: string): Promise<TuiAgent | null> {
+    const recorded = this.getKnownPtyAgent(ptyId)
+    if (recorded) {
+      return recorded
+    }
+    if (this.ptysById.get(ptyId)?.connected) {
+      await this.loadPtyForegroundAgentFromController(ptyId)
+      return this.getKnownPtyAgent(ptyId)
+    }
+    try {
+      const foreground = await this.ptyController?.getForegroundProcess(ptyId)
+      return foreground ? (recognizeAgentProcess(foreground)?.agent ?? null) : null
+    } catch {
+      return null
+    }
   }
 
   // Why: the primary OSC-title signal can't fire for daemon-hosted terminals (no PTY data through the runtime), so this fallback polls the renderer-synced tab title + foreground-process quiescence; self-cancels when the OSC path fires.
