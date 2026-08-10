@@ -202,10 +202,20 @@ fork-resolved files in the merge, sitting directly on this spec's flow
 (`openTaskPage({taskSource:'github'})` → New GitHub issue → Start workspace from issue).
 `launch-agent-in-new-tab.ts` (+3/−2 vs upstream, +2/−2 vs pre-sync) and `tui-agent-config.ts`
 (+11/−0 vs upstream) are also fork-divergent on that path. Byte-identity therefore cannot
-classify it either way, and no run was made — this session's machine time went to ORCA-204.
-It needs one local run to read the real failure point. Calling it inherited on the strength of
-the spec's byte-identity alone would be exactly the weak criterion this ticket already retracted
-once.
+classify it either way.
+
+It was run locally, and **the run does not reproduce CI's failure**: it dies ~100 lines earlier,
+at `expect(newIssueButton).toBeEnabled()` (`spec:155`) — the *New GitHub issue* button stays
+`disabled` for the full 15 s. That gate is `disabled={!newIssueTargetRepo}` (`TaskPage.tsx:9925`),
+and `newIssueTargetRepo` is `selectedRepos.find(…) ?? selectedRepos[0] ?? null`, so locally
+`selectedRepos` is empty and the flow never starts. CI gets past that button and fails later, on
+the terminal buffer. One machine's earlier, different failure is not evidence about CI's, so this
+stays open rather than being classified on the wrong symptom.
+
+To close it, the next agent needs a run that reaches `spec:170` — either on Linux CI, or locally
+after making the task page's repo selection non-empty — and then the fork-divergence of
+`TaskPage.tsx` on that path decides it. Calling it inherited on the strength of the spec's
+byte-identity alone would be exactly the weak criterion this ticket already retracted once.
 
 **ORCA-204 belongs to #80** (decided; the rule below beat the earlier instruction to track it
 outside). A fix that stands without the sync ships as its own PR; one that exists only because
