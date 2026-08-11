@@ -319,10 +319,33 @@ Two consequences to settle before this can be called the merge's:
    an absence: a real Codex TUI puts its tty in raw mode and would receive the literal `\r`. The
    earlier refutation rested on the SIGTERM, which is teardown.
 
-Before writing any fix: decide whether the defect is the product (the prompt lands on the shell
-instead of the agent, ~1 run in 2–4 — a real user-facing race worth fixing) or only the spec's
-oracle. Both may be true. The measurement that separates them is whether a **real** agent, or a
-fake that sets `setRawMode(true)` and answers on `\r` or `\n`, ever misses the prompt.
+The measurement was run, with a corrected fake that calls `setRawMode(true)` and answers on `\r`
+**or** `\n`. Eight rounds, merged tree:
+
+| rounds | spec | prompt delivered to the agent | agent wrote ACK |
+| --- | --- | --- | --- |
+| 5 | **pass** | no — zero bytes | no |
+| 3 | **fail** | yes — all 5975 bytes | **yes** |
+
+So even when the agent both receives the prompt and answers, the buffer `terminal.read` returns is
+still just the shell prompt. **The assertion never observes the agent in either direction.**
+
+That splits ORCA-204 into two defects, neither of which is "the merge broke dispatch":
+
+- **(a) a delivery race** — the pasted prompt lands on the shell instead of the agent in ~5 of 8
+  runs. For a real user that is a worker sitting at a prompt with no task.
+- **(b) the agent's output never reaches the buffer `terminal.read` serves** — in the rounds where
+  the agent owns the tty, neither its banner nor its `ACK` appears, even though the title escape
+  from the *same write* does arrive (that is how the spec finds the pane by `title === 'Codex
+  Ready'`).
+
+**Classification is open, and must not be assumed.** If only the spec's oracle is wrong, the fix
+stands without the sync and ships as its own PR. If (a) or (b) is the merge's, it stays in #80.
+What decides it is running the same instrumented fake against the pre-sync tree
+`267f58acd613d2af0ad65546a29e0f64addfd0c7` and comparing the two rates. Until that is measured,
+ORCA-204 stays in #80.
+
+The echo trap is general and now has its own ticket with the suspect list: **ORCA-207**.
 
 **Superseded reading, kept for the record:** Orca pastes the worker preamble into the PTY as
 **one ~4–6 KB write**
