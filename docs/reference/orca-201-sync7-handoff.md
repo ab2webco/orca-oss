@@ -332,12 +332,98 @@ cause either. And `[orchestration] legacy worker provider-ready recovery failed`
 
 | lane | status |
 | --- | --- |
-| `static analysis` | **fixed upstream of us** — ORCA-202 landed on `main` as `827ce46505` (PR #81) and this branch merged it (`8483dacef5`). No edit needed here. |
-| `e2e (full)` shards 1/2/4/5/6/10 | 8 specs **inherited** (ORCA-203) + the pair above (ours, open). |
+| `static analysis` | **still red, and #81 does not fix it in CI.** See below. |
+| `e2e (full)` shards 2/4/6/7 | 9 spec files / 10 cases on run `31441780221`. Six are ORCA-203; three are the ORCA-204 family; one is new — see below. |
 | everything else | green. |
 
-The PR **cannot go green** until ORCA-203 is resolved *and* ORCA-204 is fixed. ORCA-203 is the
-coordinator's call; ORCA-204 is this PR's, and it is diagnosed but not fixed.
+The PR **cannot go green** until ORCA-203 is resolved, ORCA-204 is fixed, and static analysis is
+unblocked. ORCA-203 and the static-analysis call are the coordinator's; ORCA-204 is this PR's, and
+it is diagnosed but not fixed.
+
+### Static analysis: #81's resolver works, and its answer is discarded one layer down
+
+Measured on run `31441780221` (`ac9f4d264c`), the first run of this branch carrying #81:
+
+The resolver step does its job — the log says *React Doctor measures changed lines against
+`a63df9179024ce5c24b8545ee8590199e77f555d`*, the upstream tip. React Doctor then prints
+`Scanning changes: (detached HEAD) → 827ce46505ae…`, which is `main`'s tip, i.e. **the PR base**.
+The run before #81 (`b4b8ab5728`) printed the same line against `267f58acd613…` — `main`'s
+*previous* tip. Both runs measured against the PR base; neither ever saw `a63df91790`.
+
+The 18 are the same 18 ORCA-202 documented — checked first because it was the cheap branch. Error
+groups, files, lines and totals are identical across the two runs: `typescript/array-type ×9`
+(`mobile/src/session/use-mobile-native-chat-answer-send.test.ts:615`), `Ref mutated during
+render ×7` (`TaskPage.tsx:3877`), `Effect dependency recreated every render`
+(`useEditorPanelRemoteSiblingContentState.test.tsx:84`), 18 errors / 42 warnings / 63 / 25.
+
+Where the base is lost — `config/scripts/git-pull-request-diff-base.mjs`, which
+`check-react-doctor-changed.mjs` runs the requested base through:
+
+```js
+if (eventName === 'pull_request' && headParents.length >= 2) {
+  return headParents[0]
+}
+return requestedBase
+```
+
+Under `pull_request`, `actions/checkout` checks out the synthetic `refs/pull/N/merge`, which
+always has two parents and whose first parent is the base branch tip — so the override always
+fires and `requestedBase` is thrown away. Run against the real function with this run's SHAs:
+
+| event / HEAD shape | returned base |
+| --- | --- |
+| `pull_request` + synthetic merge | `827ce46505…` (the PR base) |
+| `push` + synthetic merge | `a63df91790…` |
+| `pull_request` + single parent | `a63df91790…` |
+
+The last two rows are why the local verification was green: locally there is no
+`GITHUB_EVENT_NAME=pull_request` and no two-parent synthetic HEAD, so the override never fires.
+ORCA-202's check exercised the resolver in isolation, not the whole chain under a PR event.
+
+Both `git-pull-request-diff-base.mjs` and `check-react-doctor-changed.mjs` are **byte-identical to
+`upstream/main`** — #81 added `resolve-changed-code-base.mjs` and a workflow step and did not
+touch either. `check:code-quality:changed` goes through the same helper, so **ORCA-205 inherits
+the same ceiling**: rebasing its base will not reach the tool either while the override stands.
+
+Filed back on ORCA-202 (reopened there, not silently absorbed here).
+
+### E2E on run `31441780221`, by spec
+
+Shards 2, 4, 6 and 7. `issue-12656-terminal-link-tooltip` is **gone** from the red list since the
+previous triage; `terminal-hidden-view-parking` is **new**. Compare by name, never by shard index.
+
+ORCA-203 (six): `floating-tab-rename`, `tab-create-entry-file-paths`, `orca-profiles` ×2,
+`repro-7732-gitlab-checks-job-details`, plus `github-created-issue-start-prefill` which is still
+the explicit non-classification above. ORCA-204 (three):
+`orchestration-legacy-worker-missing-terminal-recovery`,
+`orchestration-legacy-worker-restart-recovery`, `orchestration-worker-terminal-visibility:109`.
+
+**New: `terminal-hidden-view-parking.spec.ts:467` — "reproduces a static frame byte-for-byte
+across 25 park/reveal cycles".** It fails with `terminal tab … did not park (pane manager still
+mounted)` at `helpers/terminal-hidden-parking.ts:19`, a 20 s poll on
+`window.__paneManagers?.get(tabId) !== undefined`.
+
+This one is **not** inherited-by-construction and should not be filed as ORCA-203 without a
+measurement. The spec and its helper are byte-identical to *both* upstream and the pre-sync tip,
+and the case existed pre-sync — it was green in run `31355315929`, the last full-green pre-sync
+run. What is *not* identical is the surface it exercises: the only non-`env.d.ts` owner of
+`__paneManagers` is `terminal-pane/use-terminal-pane-lifecycle.ts`, which is **+15/−0 vs
+`upstream/main`** and +86/−22 vs pre-sync — a fork divergence carried through the merge, sitting
+exactly on the mount/unmount path the assertion polls.
+
+The 15 fork lines thread two extra callbacks (`onPtyCodexResumeBlockedRef`,
+`onAgentRateLimitDetected`) into the deps object rebuilt at `:861`. The obvious mechanism —
+a fresh function identity each render keeping the pane manager from settling into unmount — was
+checked and **does not hold**: `handleAgentRateLimitDetected` is `useCallback`-wrapped
+(`TerminalPane.tsx:962`) over `[paneTransportsRef, worktreeId]`, both stable, and it is listed in
+the consuming deps array at `:1853`. So the fork's added lines are not destabilising that object
+by identity.
+
+That leaves the failure unexplained, and it is the one red spec with no provenance verdict. Next
+measurement, in order: read the trace for run `31441780221` shard 7 to see whether the tab ever
+reaches the parked state at all or only misses the 20 s deadline, then run it locally against
+`upstream/main` and the pre-sync tip on repeated interleaved rounds — a single run cannot separate
+inherited from intermittent, which this file already learned twice.
 
 ## Method notes worth keeping
 
