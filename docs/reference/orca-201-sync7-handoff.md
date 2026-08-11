@@ -387,6 +387,29 @@ the same ceiling**: rebasing its base will not reach the tool either while the o
 
 Filed back on ORCA-202 (reopened there, not silently absorbed here).
 
+### ORCA-203 cannot ship as a PR off `main`, measured
+
+The rule says a fix that stands without the sync ships separately. For these specs that is true of
+the *defect* and false of the *fix site*: the broken code only exists inside the sync.
+
+| tree | result |
+| --- | --- |
+| `origin/main` (`827ce46505`) | `floating-tab-rename` ×3, `orca-profiles` ×3 — **6 passed**. `tab-create-entry-file-paths` and `repro-7732` do not exist there at all. |
+| `upstream/main` (`a63df91790`), unmodified | `floating-tab-rename:179`, `orca-profiles:7`, `orca-profiles:33`, `repro-7732:116`, `tab-create-entry-file-paths:9` — **5 failed**, 3 passed |
+
+So the provenance verdict is confirmed by positive evidence, on upstream's own tree, not by
+byte-identity: these five are upstream's, imported by the merge. And a branch off `origin/main`
+cannot fix them — two of the four spec files are absent there, and the other two pass because
+`main` does not yet carry the upstream code that breaks them. A fix authored there would be
+unverifiable and probably wrong.
+
+The shipping options are therefore: inside #80, or a branch stacked on
+`fabolivark/orca-201-upstream-sync7` that merges after it. Coordinator's call; the work is the
+same either way.
+
+Note `github-created-issue-start-prefill` is **not** one of these five — it is still the explicit
+non-classification above, and it *does* exist on all three trees.
+
 ### E2E on run `31441780221`, by spec
 
 Shards 2, 4, 6 and 7. `issue-12656-terminal-link-tooltip` is **gone** from the red list since the
