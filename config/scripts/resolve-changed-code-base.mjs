@@ -21,45 +21,52 @@ import process from 'node:process'
 
 const DEFAULT_UPSTREAM_REF = 'upstream/main'
 
-function git(args) {
+function git(args, cwd) {
   try {
-    return execFileSync('git', args, { encoding: 'utf-8' }).trim()
+    return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim()
   } catch {
     return null
   }
 }
 
-function resolveCommit(revision) {
+function resolveCommit(revision, cwd) {
   if (!revision) {
     return null
   }
-  return git(['rev-parse', '--verify', '--quiet', `${revision}^{commit}`])
+  return git(['rev-parse', '--verify', '--quiet', `${revision}^{commit}`], cwd)
 }
 
-function isAncestor(ancestor, descendant) {
+function isAncestor(ancestor, descendant, cwd) {
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { stdio: 'ignore' })
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+      cwd,
+      stdio: 'ignore'
+    })
     return true
   } catch {
     return false
   }
 }
 
-export function resolveChangedCodeBase(prBase, upstreamRef = DEFAULT_UPSTREAM_REF) {
-  const upstreamTip = resolveCommit(upstreamRef)
-  const prBaseCommit = resolveCommit(prBase)
+export function resolveChangedCodeBase(
+  prBase,
+  upstreamRef = DEFAULT_UPSTREAM_REF,
+  cwd = undefined
+) {
+  const upstreamTip = resolveCommit(upstreamRef, cwd)
+  const prBaseCommit = resolveCommit(prBase, cwd)
   if (!upstreamTip || !prBaseCommit) {
     return prBase
   }
   // The upstream frontier on each side: the newest upstream commit each one has.
-  const headFrontier = git(['merge-base', 'HEAD', upstreamTip])
-  const baseFrontier = git(['merge-base', prBaseCommit, upstreamTip])
+  const headFrontier = git(['merge-base', 'HEAD', upstreamTip], cwd)
+  const baseFrontier = git(['merge-base', prBaseCommit, upstreamTip], cwd)
   if (!headFrontier || !baseFrontier || headFrontier === baseFrontier) {
     return prBase
   }
   // Why the ancestry check: only a frontier that strictly advances the base's
   // is a sync. A branch that is merely behind upstream must not widen its base.
-  return isAncestor(baseFrontier, headFrontier) ? headFrontier : prBase
+  return isAncestor(baseFrontier, headFrontier, cwd) ? headFrontier : prBase
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
