@@ -339,11 +339,21 @@ That splits ORCA-204 into two defects, neither of which is "the merge broke disp
   from the *same write* does arrive (that is how the spec finds the pane by `title === 'Codex
   Ready'`).
 
-**Classification is open, and must not be assumed.** If only the spec's oracle is wrong, the fix
-stands without the sync and ships as its own PR. If (a) or (b) is the merge's, it stays in #80.
-What decides it is running the same instrumented fake against the pre-sync tree
-`267f58acd613d2af0ad65546a29e0f64addfd0c7` and comparing the two rates. Until that is measured,
-ORCA-204 stays in #80.
+**Classified and moved out of #80** (coordinator, 2026-08-10). Neither defect was created by the
+merge — it exposed them — so both stand without the sync and ship as their own tickets:
+
+- **ORCA-208** *(urgent)* — the delivery race. Explicitly linked to ORCA-191: that ticket closed
+  the **readiness** half (do not inject into a TUI that is not ready); the **delivery** half is
+  still open, and it is the same incident — a worker sitting at a prompt with no task while the
+  coordinator reports it working.
+- **ORCA-209** *(high)* — the agent's output missing from the buffer `terminal.read` serves. All
+  pane-reading supervision goes through that path, so it is blind exactly when the agent is
+  really working. Strongest lead: the title escape from the *same write* does arrive, so the data
+  enters the system and is lost after parsing.
+
+The three specs are `test.fixme` in this PR, not repaired and not deleted. Repairing the oracle
+belongs to ORCA-207; running them here would only re-assert something false, and a green would be
+a false green.
 
 The echo trap is general and now has its own ticket with the suspect list: **ORCA-207**.
 
