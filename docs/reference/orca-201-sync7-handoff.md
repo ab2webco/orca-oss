@@ -407,6 +407,25 @@ The shipping options are therefore: inside #80, or a branch stacked on
 `fabolivark/orca-201-upstream-sync7` that merges after it. Coordinator's call; the work is the
 same either way.
 
+Diagnosis started on the `upstream/main` worktree, which is the clean arm — the failures reproduce
+there with no fork code in the picture. What is established for `orca-profiles` ×2:
+
+- The switcher's trigger *is* labelled `Switch profile`, via `aria-label={triggerLabel}`
+  (`OrcaProfileSwitcher.tsx:228`), but only when `multiProfileUi` is true; otherwise it is
+  `Account`, and at `:118` the component returns `null` entirely when `!multiProfileUi` and cloud
+  is unconfigured — which is the E2E state. So "element not found" means the flag is false.
+- The flag is not being lost in the harness: `launchEnv` is spread into the launch env by
+  `createElectronHomeIsolation`, and `ORCA_MULTI_PROFILE_UI` is not in `RESTRICTED_ENV_KEYS`.
+  Exporting `ORCA_MULTI_PROFILE_UI=1` into the run's own environment as well **does not fix it** —
+  still 2 failed, so this is not the env-does-not-reach-the-app trap.
+
+Next step is the remaining link in that chain: main computes
+`multiProfileUi: isMultiProfileUiEnabled()` at `src/main/ipc/orca-profiles.ts:176`, and the
+renderer store reads `orcaProfilesMultiProfileUi: state.multiProfileUi` at
+`store/slices/orca-profiles.ts:57`. Check whether the payload the store actually consumes is the
+one that carries the field — if upstream added it to a different response shape, the flag never
+lands in the renderer, which would be a genuine upstream defect and fits ORCA-203's thesis.
+
 Note `github-created-issue-start-prefill` is **not** one of these five — it is still the explicit
 non-classification above, and it *does* exist on all three trees.
 
