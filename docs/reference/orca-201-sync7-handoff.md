@@ -446,11 +446,30 @@ the same way and right-clicks the tab — but on the plain `orcaPage` fixture in
 `menus: 1`, and the seeded file at `mode: 'edit'`, `readOnly: null`, `conflict: null`,
 `diffSource: null`, so `canRename` holds.
 
-So the failure belongs to the **restart-session launch path**, not to the menu, the tab or the
-fork's resolutions. Next: what the restart session's app has that the plain fixture's does not —
-it seeds no repo, so the likeliest candidate is an onboarding or empty-state overlay swallowing
-the right-click. Dump `document.elementFromPoint` at the tab's centre right after the right-click
-in the restart arm; an overlay identifies itself immediately.
+The restart arm was then probed directly, reusing the spec's own `seedFloatingMarkdownFile` and
+`openFloatingPanel` under `createRestartSession`: **the menu opens there too.** 11 items,
+`Rename⌘R` first, rect `198×28` inside a `2560×1355` viewport, `display:flex`,
+`visibility:visible`, `opacity:1`, and an ancestor walk finds **no** `aria-hidden`, `inert`,
+`display:none` or `visibility:hidden` anywhere up the chain. No overlay: `elementFromPoint` at the
+tab's centre is the tab's own label span.
+
+**So the context-menu reading was wrong, and the real local failure is later in the test:**
+
+```
+Locator: [data-floating-terminal-panel][aria-hidden="false"] >> [data-tab-id=…]
+Expected substring: "floating-renamed-<id>.md"
+Received string:    "floating-entered-<id>.md"
+```
+
+The first rename (context menu → type → Enter) **commits fine**. The second one does not: the
+spec dblclicks the tab, fills the input with the final name, and commits by *blurring* — clicking
+the `Rich Editor` radio — and the tab keeps the intermediate name. That is a blur-commit path in
+`EditorFileTab.tsx` (`commitRename` at `:133`, `openRenameInput` at `:125`), reproducible locally
+on the merged tree, alone, with `--grep`.
+
+Note CI reported this case failing at the *menuitem* instead. Either that is an earlier
+manifestation on Linux or a second failure mode; the local one is reproducible and specific, so
+start there and re-check CI after fixing it. Do not assume one fix covers both.
 
 **`tab-create-entry-file-paths:9` and `repro-7732:116` — untouched this session.** The first
 times out clicking `button 'New tab'`; the second times out inside `openChecks` waiting for
