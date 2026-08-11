@@ -25,6 +25,62 @@ git worktree add --detach <scratch>/pre-sync2 267f58acd6
 git worktree add --detach <scratch>/up-main   upstream/main
 ```
 
+## Where this stands — read this first (2026-08-10, third relay)
+
+**#80 has no sync-owned blocker left.** Everything still red is upstream's, classified, and either
+fixed here or parked with a written diagnosis.
+
+| item | state |
+| --- | --- |
+| `orca-profiles` ×2 | **fixed** (`745df186ab`) — upstream deleted the switcher's only render site |
+| `orchestration-legacy-worker-missing-terminal-recovery` | **parked** `test.fixme` (`f62c1f6882`) |
+| `orchestration-legacy-worker-restart-recovery` ×2 | **parked** `test.fixme` (`f62c1f6882`) |
+| `orchestration-worker-terminal-visibility:109` | **parked** `test.fixme` (`f62c1f6882`) |
+| `tab-create-entry-file-paths:9` | **parked** `test.fixme` (`cf9a6e883e`) |
+| `floating-tab-rename:179` | **open**, narrowed — see below |
+| `repro-7732:116` | **open**, untouched |
+| `github-created-issue-start-prefill` | **unclassified**, and now a suspect in ORCA-207 group A |
+
+Tickets opened from this sync: **ORCA-207** (the echo trap and its suspect list), **ORCA-208**
+(*urgent* — the dispatch delivery race; ORCA-191 closed the readiness half, this is the delivery
+half), **ORCA-209** (*high* — the agent's output missing from the buffer `terminal.read` serves).
+ORCA-202 landed as PR #82 / `63effe53a9`; `static analysis` should clear itself on the next run.
+
+**Coordinator decision, standing (2026-08-10):** if `floating-tab-rename:179` does not close, park
+it like the others with its diagnosis. It is upstream's, it is classified, and a 534-commit merge
+does not wait on a spec upstream has broken. **The successor must not treat it as a blocker.**
+
+### Where `floating-tab-rename:179` was left
+
+Do not re-derive this. Established, with measurements:
+
+- The spec file is byte-identical across pre-sync, `upstream/main` and HEAD, and
+  `tab-bar/EditorFileTabContextMenu.tsx` / `tab-bar/EditorFileTab.tsx` are too — and
+  `EditorFileTab.tsx` still renders the context menu in every tree.
+- **The context menu is not the problem.** Probed under `createRestartSession` with the spec's own
+  helpers: 11 menu items, `Rename⌘R` first, rect `198×28` in a `2560×1355` viewport,
+  `display:flex`/`visibility:visible`/`opacity:1`, no `aria-hidden`/`inert`/`display:none` anywhere
+  up the ancestor chain, and `elementFromPoint` at the tab's centre is the tab's own label span.
+- The real local failure is **later in the test**: `Expected "floating-renamed-<id>.md"`,
+  `Received "floating-entered-<id>.md"`. The first rename (menu → type → Enter) commits; the second
+  does not. That one commits by **blur** — clicking the `Rich Editor` radio — so the suspect is the
+  blur-commit path in `EditorFileTab.tsx` (`commitRename:133`, `openRenameInput:125`). Reproducible
+  locally on the merged tree, alone, with `--grep`.
+- **CI reports this case failing at the menuitem instead.** Either an earlier Linux-only
+  manifestation or a second failure mode. Do not assume one fix covers both.
+
+### Method that paid off, and the one that did not
+
+What broke ORCA-204 open was instrumenting **the process's stdin**, not the pane buffer — the
+buffer shows tty echo, and echo appears exactly when delivery did *not* happen. Four hypotheses
+died to that confusion. Apply it to any terminal question.
+
+Where it did not pay off: `tab-create-entry-file-paths` got the same treatment — a probe on
+`useRuntimeFileListForWorktree`, the source the classifier consumes — and never fired, 6/6 green on
+macOS. It reproduces only on Linux CI, so the probe has to run there. That is why it is parked
+rather than given a third inferred cause; its two earlier "confirmed" causes were both true and
+neither closed it.
+
 ## Done
 
 - Merge landed in 8 commits: ancestry repair (`38d550be72`), the merge, and corrections.
