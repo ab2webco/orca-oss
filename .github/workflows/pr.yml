@@ -42,10 +42,11 @@ jobs:
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
 
       # Why: a sync PR's changed lines are all of upstream's imported code, which
-      # bills the fork for upstream's existing React Doctor debt. The resolver
-      # below measures a sync against the upstream tip it merged instead. It
-      # needs upstream's history to tell a sync from a normal PR, and falls back
-      # to the PR base — the stricter measure — when the fetch is unavailable.
+      # bills the fork for upstream's existing React Doctor debt. The step below
+      # measures a sync against the upstream tip it merged instead, and prints
+      # the ref it resolved. It needs upstream's history to tell a sync from a
+      # normal PR, and falls back to the checkout's base — the stricter measure —
+      # when the fetch is unavailable.
       - name: Fetch upstream history for base resolution
         continue-on-error: true
         run: |
@@ -53,15 +54,8 @@ jobs:
             || git remote set-url upstream https://github.com/stablyai/orca.git
           git fetch --filter=blob:none --no-tags upstream main:refs/remotes/upstream/main
 
-      - name: Resolve the changed-lines base
-        id: changed-lines-base
-        run: |
-          base="$(node config/scripts/resolve-changed-code-base.mjs '${{ github.event.pull_request.base.sha }}')"
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "React Doctor measures changed lines against $base"
-
       - name: Enforce React Doctor on changed lines
-        run: pnpm run check:react-doctor:changed -- "${{ steps.changed-lines-base.outputs.base }}"
+        run: pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha }}"
 
       - name: Check Zustand selector fan-out budget
         run: pnpm run check:zustand-selector-fanout
