@@ -429,17 +429,28 @@ documents the switcher as *"stays reachable behind this product-scope toggle"*, 
 own removal made false. The fork had that UI before this sync. If we want it back, that is a
 divergence to decide deliberately.
 
-**`floating-tab-rename:179` — narrowed, not fixed.** Fails at
+**`floating-tab-rename:179` — narrowed to the restart session, not fixed.** Fails at
 `getByRole('menuitem').filter({ hasText: 'Rename' })` after right-clicking the tab; the other two
-cases in the file pass. Established: the spec file is **byte-identical across all three trees**
-and the right-click block existed pre-sync, where it was green; and
-`tab-bar/EditorFileTabContextMenu.tsx` and `tab-bar/EditorFileTab.tsx` — which own that menu item
-and the `Rename file <name>` textbox the spec then types into — are **byte-identical across all
-three trees too**. So neither the spec nor the menu component changed. The next thing to check is
-what stops the menu from opening at all in the new tree: whether the seeded floating tab still
-satisfies `canRename` (`EditorFileTab.tsx:123`: `file.mode === 'edit' && !file.diffSource &&
-!file.conflict && !file.readOnly`), and whether the right-click lands on the trigger. A DOM probe
-right after the right-click, like the one used for `orca-profiles`, is the cheap next step.
+cases in the file pass.
+
+Ruled out by static comparison: the spec file is **byte-identical across all three trees** and the
+right-click block existed pre-sync, where it was green; `tab-bar/EditorFileTabContextMenu.tsx` and
+`tab-bar/EditorFileTab.tsx` — which own that menu item and the `Rename file <name>` textbox the
+spec then types into — are byte-identical across all three too, and `EditorFileTab.tsx` still
+renders the context menu in every tree.
+
+Ruled out by measurement, which is the useful part: **the context menu works in the merged tree.**
+A probe that seeds the same floating Markdown tab through the same store calls, opens the panel
+the same way and right-clicks the tab — but on the plain `orcaPage` fixture instead of
+`createRestartSession` — gets the menu, with `Rename⌘R` first (which `hasText: 'Rename'` matches),
+`menus: 1`, and the seeded file at `mode: 'edit'`, `readOnly: null`, `conflict: null`,
+`diffSource: null`, so `canRename` holds.
+
+So the failure belongs to the **restart-session launch path**, not to the menu, the tab or the
+fork's resolutions. Next: what the restart session's app has that the plain fixture's does not —
+it seeds no repo, so the likeliest candidate is an onboarding or empty-state overlay swallowing
+the right-click. Dump `document.elementFromPoint` at the tab's centre right after the right-click
+in the restart arm; an overlay identifies itself immediately.
 
 **`tab-create-entry-file-paths:9` and `repro-7732:116` — untouched this session.** The first
 times out clicking `button 'New tab'`; the second times out inside `openChecks` waiting for
