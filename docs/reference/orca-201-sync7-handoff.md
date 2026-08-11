@@ -403,9 +403,47 @@ cannot fix them — two of the four spec files are absent there, and the other t
 `main` does not yet carry the upstream code that breaks them. A fix authored there would be
 unverifiable and probably wrong.
 
-The shipping options are therefore: inside #80, or a branch stacked on
-`fabolivark/orca-201-upstream-sync7` that merges after it. Coordinator's call; the work is the
-same either way.
+**Decided (coordinator, 2026-08-10): the five ship inside #80.** The rule's purpose is that #80
+not become a junk drawer, and its real criterion is whether the fix needs the sync to exist — here
+the *fix site* does not exist without it. The tie-breaker is that a sync landing with five red
+specs puts main's scheduled E2E back in the red the same day ORCA-197 made it green, which is the
+whole value of that ticket. A stacked branch was explicitly rejected: fragile merge ordering on a
+244k-line PR, with a window where main is red. They go in #80 under their own heading, listed
+apart from the merge resolutions. ORCA-203 stays open as the reference for the two-run evidence.
+
+### Progress on the five
+
+**`orca-profiles` ×2 — done (`745df186ab`).** Root cause: `OrcaProfileSwitcher` has **no render
+site left anywhere**. Pre-sync, `sidebar/SidebarToolbar.tsx:70` rendered
+`<OrcaProfileSwitcher placement="sidebar" />`; in `upstream/main` and in the merged tree nothing
+imports it, while the component, its unit test and the E2E spec all survive. Verified live, not
+inferred: with `ORCA_MULTI_PROFILE_UI=1` the store really does hold
+`orcaProfilesMultiProfileUi: true` and the IPC returns `multiProfileUi: true` — the flag chain is
+intact — and a DOM sweep finds **zero** buttons whose label or text matches `/profile|account/i`.
+So the two cases asserted a surface upstream deleted; they cannot be repaired without re-adding
+it. Removed, with the reason at the top of the file. The remaining case (`hides the account
+trigger when cloud is unconfigured`) still asserts real behaviour and passes.
+
+Worth flagging as a product question, not smuggling into a test fix: `profile-ui-scope.ts` still
+documents the switcher as *"stays reachable behind this product-scope toggle"*, which upstream's
+own removal made false. The fork had that UI before this sync. If we want it back, that is a
+divergence to decide deliberately.
+
+**`floating-tab-rename:179` — narrowed, not fixed.** Fails at
+`getByRole('menuitem').filter({ hasText: 'Rename' })` after right-clicking the tab; the other two
+cases in the file pass. Established: the spec file is **byte-identical across all three trees**
+and the right-click block existed pre-sync, where it was green; and
+`tab-bar/EditorFileTabContextMenu.tsx` and `tab-bar/EditorFileTab.tsx` — which own that menu item
+and the `Rename file <name>` textbox the spec then types into — are **byte-identical across all
+three trees too**. So neither the spec nor the menu component changed. The next thing to check is
+what stops the menu from opening at all in the new tree: whether the seeded floating tab still
+satisfies `canRename` (`EditorFileTab.tsx:123`: `file.mode === 'edit' && !file.diffSource &&
+!file.conflict && !file.readOnly`), and whether the right-click lands on the trigger. A DOM probe
+right after the right-click, like the one used for `orca-profiles`, is the cheap next step.
+
+**`tab-create-entry-file-paths:9` and `repro-7732:116` — untouched this session.** The first
+times out clicking `button 'New tab'`; the second times out inside `openChecks` waiting for
+`rightSidebarTab === 'checks'`.
 
 Diagnosis started on the `upstream/main` worktree, which is the clean arm — the failures reproduce
 there with no fork code in the picture. What is established for `orca-profiles` ×2:
