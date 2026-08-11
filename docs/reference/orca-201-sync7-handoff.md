@@ -282,7 +282,50 @@ The read is of the right pane, not the coordinator's — checked, not assumed. O
 round the spec's `worker.ptyId` is byte-for-byte the daemon session that received the
 `codex '--dangerously-bypass-approvals-and-sandbox'` write.
 
-**ORCA-204 restated:** Orca pastes the worker preamble into the PTY as **one ~4–6 KB write**
+### The arms are inverted: the spec passes when the prompt is *not* delivered
+
+> Supersedes the "dropped paste tail" reading below. That was inferred from the echo; the echo is
+> not the input. Instrumenting the fake's **stdin** settles it.
+
+The fake Codex now appends every stdin chunk to its ledger. Measured on both arms, same tree,
+same machine:
+
+| arm | what the fake process receives on stdin |
+| --- | --- |
+| **failing** | the **entire** preamble — 108 chunks, `total: 5975` bytes, including `=== TASK ===` and `…ACK and remain idle\e[201~` |
+| **passing** | **nothing.** `spawn.jsonl` is written, `interruption.jsonl` does not even exist |
+
+So nothing is truncated and nothing is dropped. The two arms differ in **who owns the tty when
+Orca pastes**:
+
+- **Passing:** the shell still owns it. The tty echoes the paste into the pane buffer, that text
+  contains the task spec `Respond ACK and remain idle`, and `toContain('ACK')` matches the echo.
+  The agent process never sees the prompt at all.
+- **Failing:** the agent owns it and reads the paste. Nothing is echoed, so the pane buffer is
+  still the shell prompt, and the assertion fails.
+
+**The spec passes only when the product fails to deliver the prompt to the agent, and fails when
+the product delivers it.** Every earlier reading — latency, a kill, a dropped tail — was built on
+the echo, which is present exactly when delivery did *not* happen.
+
+Two consequences to settle before this can be called the merge's:
+
+1. The `ACK` the assertion matches has never once been written by the fake. It replies only to a
+   literal `\r`; on the failing arm the submit `\r` produced no stdin read at all, and the
+   preamble's last chunk ends `\e[201~\n` — a newline, i.e. the tty is applying `ICRNL`. A fake
+   that keys on `\r` cannot answer through a canonical-mode tty, so **the ACK path is untestable
+   as written**, independent of the sync.
+2. That reopens the harness question for real, and this time with positive evidence rather than
+   an absence: a real Codex TUI puts its tty in raw mode and would receive the literal `\r`. The
+   earlier refutation rested on the SIGTERM, which is teardown.
+
+Before writing any fix: decide whether the defect is the product (the prompt lands on the shell
+instead of the agent, ~1 run in 2–4 — a real user-facing race worth fixing) or only the spec's
+oracle. Both may be true. The measurement that separates them is whether a **real** agent, or a
+fake that sets `setRawMode(true)` and answers on `\r` or `\n`, ever misses the prompt.
+
+**Superseded reading, kept for the record:** Orca pastes the worker preamble into the PTY as
+**one ~4–6 KB write**
 (`writeTerminalAgentPrompt` → `iterateTerminalInputChunks`, whose
 `TERMINAL_INPUT_CHUNK_MAX_BYTES` is 16 KB, so the whole preamble is a single chunk), and the tty
 intermittently drops its tail before the freshly-exec'd agent drains stdin. The `=== TASK ===`
