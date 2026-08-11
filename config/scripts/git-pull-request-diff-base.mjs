@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process'
 import process from 'node:process'
 import { resolveChangedCodeBase } from './resolve-changed-code-base.mjs'
 
+const DEFAULT_UPSTREAM_REF = 'upstream/main'
+
 /**
  * Why the first parent wins: `github.event.pull_request.base.sha` describes the
  * event, not the tree that was checked out, and the two drift. The ephemeral
@@ -49,6 +51,8 @@ export function resolvePullRequestDiffBase(
     requestedBase,
     headParents,
     eventName,
-    syncAware ? (checkoutBase) => resolveChangedCodeBase(checkoutBase) : null
+    syncAware
+      ? (checkoutBase) => resolveChangedCodeBase(checkoutBase, DEFAULT_UPSTREAM_REF, root)
+      : null
   )
 }
