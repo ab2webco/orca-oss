@@ -50,7 +50,43 @@ ORCA-202 landed as PR #82 / `63effe53a9`; `static analysis` should clear itself 
 it like the others with its diagnosis. It is upstream's, it is classified, and a 534-commit merge
 does not wait on a spec upstream has broken. **The successor must not treat it as a blocker.**
 
-### Where `floating-tab-rename:179` was left
+### `floating-tab-rename:179` — the failure moved, and everything below it is superseded
+
+> **2026-08-12.** On run `31453995130` (`9cc8764463`) the case no longer fails at the menuitem
+> *or* at the blur-commit. It fails at **`spec:244`**, inside `openFloatingPanel(second.page)` —
+> the **second** launch, after the restart:
+>
+> ```
+> Locator: [data-floating-terminal-panel][aria-hidden="false"]
+> Error:   element(s) not found        (10s)
+>   at openFloatingPanel (floating-tab-rename.spec.ts:84)
+>   at floating-tab-rename.spec.ts:244
+> ```
+>
+> The whole first-launch block — both renames, the blur commit and the filesystem poll — **passes
+> on CI**. It also passes locally now: one local run on the merged tree fails at the identical
+> line, so local and CI agree and the "two failure modes" caveat is closed.
+>
+> The panel element *is* in the DOM (the 30 s `waitForFunction` on `[data-floating-terminal-panel]`
+> succeeds); it is `aria-hidden="true"`. That attribute is driven by exactly one thing —
+> `aria-hidden={!open}` at `FloatingTerminalPanel.tsx:1765` — so this is the panel's `open` state,
+> not a viewport/settle race.
+>
+> **Upstream added panel-open persistence in this range.**
+> `src/renderer/src/components/floating-terminal/floating-terminal-panel-view-state.ts` does not
+> exist at the pre-sync tip `267f58acd6` and does exist at `a63df91790`. `App.tsx:451` seeds
+> `floatingTerminalOpen` from `readPersistedFloatingTerminalPanelViewState()?.open` and
+> `setFloatingTerminalOpenWithFocus` writes it back through `persistFloatingTerminalPanelOpen`.
+> The restart session reuses `userDataDir`, so localStorage survives the relaunch. The spec's
+> helper only ever dispatches `orca-toggle-floating-terminal` — a **toggle** — so a panel restored
+> already-open is toggled *closed*. Pre-sync the panel always came back closed and the toggle
+> opened it.
+>
+> Provenance: upstream's feature, upstream's spec (byte-identical to `a63df91790`), broken by each
+> other — ORCA-203 class, and the standing decision puts those inside #80.
+
+Everything below this box is the earlier record. Kept because the ruling-out is still valid; its
+conclusion about *where* the case fails is not.
 
 Do not re-derive this. Established, with measurements:
 
