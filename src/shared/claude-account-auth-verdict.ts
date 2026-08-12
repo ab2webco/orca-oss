@@ -1,3 +1,5 @@
+// When Orca verifies, why it never polls, and what each row state means:
+// docs/reference/claude-account-auth-verdicts.md
 import type { ProviderRateLimits, UsageRateLimitFailureKind } from './rate-limit-types'
 
 export type ClaudeAccountAuthState = 'authenticated' | 'failed' | 'unverified'
@@ -42,7 +44,8 @@ export function readClaudeAccountAuthProbe(
     return readClaudeAccountAuthProbeFromFailureKind(failureKind, now)
   }
   if (limits.error && NO_CREDENTIALS_ERROR_RE.test(limits.error.trim())) {
-    return { outcome: 'failed', at: now, failure: 'no-credentials' }
+    // Managed Keychain read failures currently collapse to this same legacy error.
+    return { outcome: 'undecided', at: now, undecided: 'unknown' }
   }
   return { outcome: 'undecided', at: now, undecided: 'unknown' }
 }

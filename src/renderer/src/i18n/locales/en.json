@@ -10623,7 +10623,8 @@
           "sessionUsed": "5h {{value0}}% used",
           "sessionUsedResets": "5h {{value0}}% used, resets in {{value1}}",
           "weeklyUsed": "7d {{value0}}% used",
-          "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}"
+          "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}",
+          "quotaUnknown": "remaining quota unknown"
         }
       },
       "right": {
@@ -15130,6 +15131,7 @@
         "claudeAuthFailure": {
           "account": "Claude sign-in expired for {{value0}}. Re-authenticate that account in Settings → Claude.",
           "shared": "Claude sign-in expired for this pane, which runs on the shared Claude login (no managed account pinned).",
+          "reauthenticatedSince": "This pane still holds an expired Claude sign-in, but {{value0}} was re-authenticated after this pane started. Restart the pane to pick up the new sign-in.",
           "unknown": "Claude sign-in expired in this pane. Orca could not tell which account it runs on."
         }
       }

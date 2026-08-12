@@ -310,6 +310,7 @@ import {
   observeAgentRateLimitOutput
 } from '@/lib/agent-rate-limit-detection-gate'
 import {
+  bindClaudeAuthFailureDetectionToPty,
   createClaudeAuthFailureDetectionState,
   detectClaudeAuthFailureOutput
 } from '../../../../shared/claude-auth-failure-detection'
@@ -7578,6 +7579,7 @@ export function connectPanePty(
         }
       }
       const currentPtyId = transport.getPtyId()
+      bindClaudeAuthFailureDetectionToPty(claudeAuthFailureDetection, currentPtyId, Date.now())
       if (currentPtyId !== rateLimitDetectionPtyId) {
         // Why: pane bindings can swap PTYs; stale split output must not trigger a new session.
         rateLimitDetectionPtyId = currentPtyId
@@ -7623,7 +7625,7 @@ export function connectPanePty(
         currentPtyId &&
         detectClaudeAuthFailureOutput(data, claudeAuthFailureDetection, Date.now())
       ) {
-        void notifyClaudeAuthFailure(currentPtyId)
+        void notifyClaudeAuthFailure(currentPtyId, claudeAuthFailureDetection.boundAt)
       }
       respondToTerminalPixelSizeQueries(data)
       observeTerminalBracketedPasteModeOutput(pane.terminal, data)

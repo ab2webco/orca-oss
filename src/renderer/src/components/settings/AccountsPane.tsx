@@ -349,6 +349,7 @@ export function AccountsPane({
   const miniMaxRateLimits = useAppStore((s) => s.rateLimits.minimax)
   const rateLimitsState = useAppStore((s) => s.rateLimits)
   const recheckClaudeAccountAuth = useAppStore((s) => s.recheckClaudeAccountAuth)
+  const fetchInactiveClaudeAccountUsage = useAppStore((s) => s.fetchInactiveClaudeAccountUsage)
   const [authStatusNow, setAuthStatusNow] = useState(() => Date.now())
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const fetchSettings = useAppStore((s) => s.fetchSettings)
@@ -607,6 +608,17 @@ export function AccountsPane({
   useEffect(() => {
     void refreshMiniMaxCredentialStatus()
   }, [])
+
+  useEffect(() => {
+    // Why: the roster's job is saying which account still authenticates, so it
+    // asks on open instead of waiting for a click. Same debounced per-account
+    // trickle the status bar uses: it skips accounts with fresh usage and never
+    // rotates a token a live pane owns. Remote scope has no local verdicts.
+    if (isRemoteAccountScope) {
+      return
+    }
+    void fetchInactiveClaudeAccountUsage()
+  }, [isRemoteAccountScope, fetchInactiveClaudeAccountUsage])
 
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready

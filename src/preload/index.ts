@@ -4652,6 +4652,8 @@ const api = {
       ipcRenderer.invoke('rateLimits:fetchInactiveClaudeAccounts'),
     recheckClaudeAccountAuth: (accountId: string): Promise<RateLimitState> =>
       ipcRenderer.invoke('rateLimits:recheckClaudeAccountAuth', accountId),
+    recordClaudeCredentialRejection: (accountId: string): Promise<RateLimitState> =>
+      ipcRenderer.invoke('rateLimits:recordClaudeCredentialRejection', accountId),
     fetchInactiveCodexAccounts: (): Promise<void> =>
       ipcRenderer.invoke('rateLimits:fetchInactiveCodexAccounts'),
     refreshMiniMax: (): Promise<RateLimitState> => ipcRenderer.invoke('rateLimits:refreshMiniMax'),

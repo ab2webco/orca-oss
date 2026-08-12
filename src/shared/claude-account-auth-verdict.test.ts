@@ -56,10 +56,10 @@ describe('readClaudeAccountAuthProbe', () => {
     expect(readClaudeAccountAuthProbe(finalRecord, NOW).outcome).toBe('authenticated')
   })
 
-  it('reads a bare "No credentials" error as a missing credential', () => {
+  it('keeps a bare "No credentials" error inconclusive because reads may have failed', () => {
     expect(
       readClaudeAccountAuthProbe(limits({ status: 'error', error: 'No credentials' }), NOW)
-    ).toEqual({ outcome: 'failed', at: NOW, failure: 'no-credentials' })
+    ).toEqual({ outcome: 'undecided', at: NOW, undecided: 'unknown' })
   })
 
   it('never blames the account for an unrecognized error', () => {

@@ -103,6 +103,25 @@ describe('managed Claude account auth verdicts', () => {
     })
   })
 
+  it('keeps ambiguous bare missing-credential results inconclusive', async () => {
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValue({
+      provider: 'claude',
+      session: null,
+      weekly: null,
+      updatedAt: Date.now(),
+      error: 'No credentials',
+      status: 'error'
+    })
+
+    const service = createService()
+    await service.recheckClaudeAccountAuth('acct_live')
+
+    expect(verdictFor(service, 'acct_live')).toMatchObject({
+      state: 'unverified',
+      undecided: 'unknown'
+    })
+  })
+
   it('never rotates a token a live pinned session owns when the user checks on demand', async () => {
     vi.mocked(hasLiveClaudePtysUsingAccount).mockReturnValue(true)
     vi.mocked(fetchManagedAccountUsage).mockResolvedValue(okUsage(30))
@@ -127,6 +146,42 @@ describe('managed Claude account auth verdicts', () => {
     })
   })
 
+  it('publishes checking state for an account with no prior verdict', async () => {
+    let resolveUsage!: (value: ProviderRateLimits) => void
+    vi.mocked(fetchManagedAccountUsage).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUsage = resolve
+      })
+    )
+    const service = createService()
+
+    const checking = service.recheckClaudeAccountAuth('acct_live')
+
+    expect(verdictFor(service, 'acct_live')).toMatchObject({ state: 'unverified', checking: true })
+    resolveUsage(okUsage(30))
+    await checking
+  })
+
+  it('does not let an older provider result overwrite a live credential rejection', async () => {
+    let resolveUsage!: (value: ProviderRateLimits) => void
+    vi.mocked(fetchManagedAccountUsage).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUsage = resolve
+      })
+    )
+    const service = createService()
+
+    const checking = service.recheckClaudeAccountAuth('acct_live')
+    service.recordClaudeCredentialRejection('acct_live')
+    resolveUsage(okUsage(30))
+    await checking
+
+    expect(verdictFor(service, 'acct_live')).toMatchObject({
+      state: 'failed',
+      failure: 'credential-rejected'
+    })
+  })
+
   it('does not verify anything on its own when nothing has fetched yet', () => {
     const service = createService()
 
@@ -143,5 +198,72 @@ describe('managed Claude account auth verdicts', () => {
     service.setManagedClaudeAccountsResolver(() => [ACCOUNTS[1]])
 
     expect(verdictFor(service, 'acct_live')).toBeUndefined()
+  })
+
+  it('records and publishes a hot credential rejection for a managed account', () => {
+    const service = createService()
+    const listener = vi.fn()
+    service.onStateChange(listener)
+
+    service.recordClaudeCredentialRejection('acct_live')
+
+    expect(verdictFor(service, 'acct_live')).toMatchObject({
+      state: 'failed',
+      failure: 'credential-rejected'
+    })
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claudeAccountAuth: [
+          expect.objectContaining({
+            accountId: 'acct_live',
+            state: 'failed',
+            failure: 'credential-rejected'
+          })
+        ]
+      })
+    )
+  })
+
+  it('retires a failure once the account is re-authenticated', () => {
+    const service = createService()
+    service.recordClaudeCredentialRejection('acct_live')
+
+    service.clearClaudeAccountAuthVerdict('acct_live')
+
+    expect(verdictFor(service, 'acct_live')).toBeUndefined()
+  })
+
+  it('does not let a fetch started before the re-authentication restore the old failure', async () => {
+    let resolveUsage!: (value: ProviderRateLimits) => void
+    vi.mocked(fetchManagedAccountUsage).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUsage = resolve
+      })
+    )
+    const service = createService()
+
+    const checking = service.recheckClaudeAccountAuth('acct_live')
+    service.recordClaudeCredentialRejection('acct_live')
+    service.clearClaudeAccountAuthVerdict('acct_live')
+    resolveUsage(okUsage(30))
+    await checking
+
+    // Neither the retired failure nor a pass the pre-reauth fetch cannot prove.
+    expect(verdictFor(service, 'acct_live')).toMatchObject({
+      state: 'unverified',
+      failure: null,
+      checkedAt: null
+    })
+  })
+
+  it('does not invent a verdict for an unresolved or removed account', () => {
+    const service = createService()
+    const listener = vi.fn()
+    service.onStateChange(listener)
+
+    service.recordClaudeCredentialRejection('acct_remote')
+
+    expect(service.getState().claudeAccountAuth).toEqual([])
+    expect(listener).not.toHaveBeenCalled()
   })
 })

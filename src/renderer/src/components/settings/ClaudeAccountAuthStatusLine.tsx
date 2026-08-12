@@ -131,7 +131,16 @@ export function ClaudeAccountAuthStatusLine({
           ? ShieldAlert
           : HelpCircle
   const undecided = describeUndecided(status)
-  const quota = describeQuota(usage, now)
+  const quota =
+    describeQuota(usage, now) ??
+    // Why: a row that already states the failure explains the missing figure; on
+    // any other row silence would read as "0% used".
+    (status.tone === 'negative'
+      ? null
+      : translate(
+          'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnknown',
+          'remaining quota unknown'
+        ))
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
       <Icon

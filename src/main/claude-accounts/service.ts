@@ -922,6 +922,7 @@ export class ClaudeAccountService {
       this.store.updateSettings({ claudeManagedAccounts: reauthenticatedAccounts })
       this.runtimeAuth.clearLastWrittenCredentialsJson(accountId)
       this.rateLimits.evictInactiveClaudeCache(accountId)
+      this.rateLimits.clearClaudeAccountAuthVerdict(accountId)
       await this.syncRuntimeAuthWithLivePtyGate(getClaudeSelectionTargetForAccount(account))
       await this.rateLimits.refreshForClaudeAccountChange(
         undefined,

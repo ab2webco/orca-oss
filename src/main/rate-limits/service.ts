@@ -17,6 +17,7 @@ import {
   applyClaudeAccountAuthProbe,
   readClaudeAccountAuthProbe,
   readClaudeAccountAuthProbeFromFailureKind,
+  unverifiedClaudeAccountAuthVerdict,
   type ClaudeAccountAuthVerdict
 } from '../../shared/claude-account-auth-verdict'
 import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
@@ -339,6 +340,7 @@ export class RateLimitService {
   private inactiveCodexFetching = new Set<string>()
   private claudeAuthVerdicts = new Map<string, ClaudeAccountAuthVerdict>()
   private claudeAuthChecking = new Set<string>()
+  private claudeAuthRejectionRevision = new Map<string, number>()
   private lastInactiveClaudeFetchAt = 0
   private inactiveClaudeAccountsGeneration = 0
   private lastInactiveCodexFetchAt = 0
@@ -495,14 +497,27 @@ export class RateLimitService {
         }
       }
     }
+    for (const accountId of this.claudeAuthChecking) {
+      if (!this.claudeAuthVerdicts.has(accountId)) {
+        this.claudeAuthVerdicts.set(accountId, unverifiedClaudeAccountAuthVerdict(accountId))
+      }
+    }
     return [...this.claudeAuthVerdicts.values()].map((verdict) => ({
       ...verdict,
       checking: this.claudeAuthChecking.has(verdict.accountId)
     }))
   }
 
-  private recordClaudeAuthVerdict(accountId: string | null, fresh: ProviderRateLimits): void {
-    if (!accountId) {
+  private recordClaudeAuthVerdict(
+    accountId: string | null,
+    fresh: ProviderRateLimits,
+    rejectionRevision?: number
+  ): void {
+    if (
+      !accountId ||
+      (rejectionRevision !== undefined &&
+        rejectionRevision !== (this.claudeAuthRejectionRevision.get(accountId) ?? 0))
+    ) {
       return
     }
     this.claudeAuthVerdicts.set(
@@ -515,7 +530,17 @@ export class RateLimitService {
     )
   }
 
-  private recordClaudeAuthVerdictFromError(accountId: string, error: unknown): void {
+  private recordClaudeAuthVerdictFromError(
+    accountId: string,
+    error: unknown,
+    rejectionRevision?: number
+  ): void {
+    if (
+      rejectionRevision !== undefined &&
+      rejectionRevision !== (this.claudeAuthRejectionRevision.get(accountId) ?? 0)
+    ) {
+      return
+    }
     this.claudeAuthVerdicts.set(
       accountId,
       applyClaudeAccountAuthProbe(
@@ -753,6 +778,7 @@ export class RateLimitService {
           this.pushToRenderer()
           continue
         }
+        const rejectionRevision = this.claudeAuthRejectionRevision.get(account.id) ?? 0
         try {
           // Why: trickle the per-account refreshes; a burst is what the token
           // endpoint 429s. Skipped before the first fetch so one account is instant.
@@ -788,7 +814,7 @@ export class RateLimitService {
             continue
           }
           const cached = this.inactiveClaudeCache.get(account.id) ?? null
-          this.recordClaudeAuthVerdict(account.id, fresh)
+          this.recordClaudeAuthVerdict(account.id, fresh, rejectionRevision)
           this.inactiveClaudeCache.set(
             account.id,
             this.applyStalePolicy(this.recordClaudeRefreshThrottle(account.id, fresh), cached)
@@ -802,7 +828,7 @@ export class RateLimitService {
           ) {
             this.inactiveClaudeCache.delete(account.id)
           } else if (!signal.aborted) {
-            this.recordClaudeAuthVerdictFromError(account.id, error)
+            this.recordClaudeAuthVerdictFromError(account.id, error, rejectionRevision)
             // Why: this path used to fail silently, so a per-account usage fetch
             // error (e.g. missing managed credentials, an unrefreshable OAuth
             // token) was invisible — surface it so the worktree usage meter's
@@ -936,6 +962,7 @@ export class RateLimitService {
       return this.getState()
     }
     this.claudeAuthChecking.add(accountId)
+    const rejectionRevision = this.claudeAuthRejectionRevision.get(accountId) ?? 0
     this.pushToRenderer()
     try {
       const fresh = await this.withClaudeAccountOperation(accountId, () =>
@@ -945,7 +972,7 @@ export class RateLimitService {
           networkProxySettings: this.networkProxySettingsResolver?.()
         })
       )
-      this.recordClaudeAuthVerdict(accountId, fresh)
+      this.recordClaudeAuthVerdict(accountId, fresh, rejectionRevision)
       if (this.isCurrentInactiveClaudeAccount(accountId)) {
         const cached = this.inactiveClaudeCache.get(accountId) ?? null
         this.inactiveClaudeCache.set(
@@ -954,12 +981,49 @@ export class RateLimitService {
         )
       }
     } catch (error) {
-      this.recordClaudeAuthVerdictFromError(accountId, error)
+      this.recordClaudeAuthVerdictFromError(accountId, error, rejectionRevision)
     } finally {
       this.claudeAuthChecking.delete(accountId)
       this.pushToRenderer()
     }
     return this.getState()
+  }
+
+  recordClaudeCredentialRejection(accountId: string): RateLimitState {
+    const managed = (this.managedClaudeAccountsResolver?.() ?? []).some(
+      (account) => account.id === accountId
+    )
+    if (!managed) {
+      return this.getState()
+    }
+    this.claudeAuthRejectionRevision.set(
+      accountId,
+      (this.claudeAuthRejectionRevision.get(accountId) ?? 0) + 1
+    )
+    this.claudeAuthVerdicts.set(
+      accountId,
+      applyClaudeAccountAuthProbe(this.claudeAuthVerdicts.get(accountId) ?? null, accountId, {
+        outcome: 'failed',
+        at: Date.now(),
+        failure: 'credential-rejected'
+      })
+    )
+    this.pushToRenderer()
+    return this.getState()
+  }
+
+  /**
+   * A reissued credential retires every earlier verdict: the recorded failure was
+   * about a credential that no longer exists. The revision bump keeps an in-flight
+   * pre-reauth fetch from restoring it.
+   */
+  clearClaudeAccountAuthVerdict(accountId: string): void {
+    this.claudeAuthRejectionRevision.set(
+      accountId,
+      (this.claudeAuthRejectionRevision.get(accountId) ?? 0) + 1
+    )
+    this.claudeAuthVerdicts.delete(accountId)
+    this.pushToRenderer()
   }
 
   evictInactiveClaudeCache(accountId: string): void {
@@ -2027,6 +2091,9 @@ export class RateLimitService {
     // Why: capture before any await so an account switch during the fetch invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
     const claudeAccountId = this.claudeAccountIdResolver?.(claudeTarget) ?? null
+    const authRejectionRevision = claudeAccountId
+      ? (this.claudeAuthRejectionRevision.get(claudeAccountId) ?? 0)
+      : 0
     // Why: even a forced fetch must not rotate a throttled account's token —
     // retrying is what keeps the 429 alive. Publish the retry time instead.
     const claudeCooldownRetryAtMs = this.getActiveClaudeRefreshCooldownRetryAtMs()
@@ -2257,7 +2324,7 @@ export class RateLimitService {
     }
 
     if (shouldApplyClaude) {
-      this.recordClaudeAuthVerdict(claudeAccountId, claude)
+      this.recordClaudeAuthVerdict(claudeAccountId, claude, authRejectionRevision)
     }
     const claudeToApply = shouldApplyClaude
       ? this.recordClaudeRefreshThrottle(claudeAccountId, claude)
@@ -2389,6 +2456,9 @@ export class RateLimitService {
     // Why: capture before any await so an account switch during the fetch invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
     const claudeAccountId = this.claudeAccountIdResolver?.(claudeTarget) ?? null
+    const authRejectionRevision = claudeAccountId
+      ? (this.claudeAuthRejectionRevision.get(claudeAccountId) ?? 0)
+      : 0
     const previousState = this.state
 
     this.updateState({
@@ -2424,7 +2494,7 @@ export class RateLimitService {
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', result.limits)
-      this.recordClaudeAuthVerdict(claudeAccountId, result.limits)
+      this.recordClaudeAuthVerdict(claudeAccountId, result.limits, authRejectionRevision)
     }
     const appliedLimits = shouldApplyClaude
       ? this.recordClaudeRefreshThrottle(claudeAccountId, result.limits)

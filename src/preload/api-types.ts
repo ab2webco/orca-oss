@@ -3644,6 +3644,7 @@ export type PreloadApi = {
     setPollingInterval: (ms: number) => Promise<void>
     fetchInactiveClaudeAccounts: () => Promise<void>
     recheckClaudeAccountAuth: (accountId: string) => Promise<RateLimitState>
+    recordClaudeCredentialRejection: (accountId: string) => Promise<RateLimitState>
     fetchInactiveCodexAccounts: () => Promise<void>
     refreshMiniMax: () => Promise<RateLimitState>
     refreshGrok: () => Promise<RateLimitState>

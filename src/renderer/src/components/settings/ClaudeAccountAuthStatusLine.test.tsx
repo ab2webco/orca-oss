@@ -84,6 +84,24 @@ describe('ClaudeAccountAuthStatusLine', () => {
     expect(markup).not.toContain('% used')
   })
 
+  it('says the remaining quota is unknown instead of leaving a blank that reads as zero', () => {
+    const markup = render({ tone: 'neutral', kind: 'unchecked', checkedAt: null, undecided: null })
+
+    expect(markup).not.toContain('% used')
+    expect(markup).toContain('remaining quota unknown')
+  })
+
+  it('does not repeat the quota caveat on a row that already states the failure', () => {
+    const markup = render({
+      tone: 'negative',
+      kind: 'credential-rejected',
+      checkedAt: NOW,
+      undecided: null
+    })
+
+    expect(markup).not.toContain('remaining quota unknown')
+  })
+
   it('flags an undecided later check without dropping the last verified state', () => {
     const markup = render({
       tone: 'positive',
