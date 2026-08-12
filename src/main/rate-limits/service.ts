@@ -13,6 +13,13 @@ import {
   fetchManagedAccountUsage
 } from './claude-fetcher'
 import type { InactiveClaudeAccountInfo } from './claude-fetcher'
+import {
+  applyClaudeAccountAuthProbe,
+  readClaudeAccountAuthProbe,
+  readClaudeAccountAuthProbeFromFailureKind,
+  type ClaudeAccountAuthVerdict
+} from '../../shared/claude-account-auth-verdict'
+import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
 import { resolveManagedClaudeAccountIdFromConfigDir } from '../claude-accounts/managed-config-dir-account'
 import { getClaudeManagedAccountsRoot } from '../claude-accounts/managed-auth-path'
 import { mapClaudeUsageWindow } from './claude-usage-window'
@@ -323,12 +330,15 @@ export class RateLimitService {
   private miniMaxConfigResolver: (() => MiniMaxRateLimitConfig) | null = null
   private geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
   private inactiveClaudeAccountsResolver: (() => InactiveClaudeAccountInfo[]) | null = null
+  private managedClaudeAccountsResolver: (() => InactiveClaudeAccountInfo[]) | null = null
   private inactiveCodexAccountsResolver: (() => InactiveCodexAccountInfo[]) | null = null
   private networkProxySettingsResolver: (() => NetworkProxySettings) | null = null
   private inactiveClaudeCache = new Map<string, ProviderRateLimits>()
   private inactiveCodexCache = new Map<string, ProviderRateLimits>()
   private inactiveClaudeFetching = new Set<string>()
   private inactiveCodexFetching = new Set<string>()
+  private claudeAuthVerdicts = new Map<string, ClaudeAccountAuthVerdict>()
+  private claudeAuthChecking = new Set<string>()
   private lastInactiveClaudeFetchAt = 0
   private inactiveClaudeAccountsGeneration = 0
   private lastInactiveCodexFetchAt = 0
@@ -385,6 +395,10 @@ export class RateLimitService {
 
   setNetworkProxySettingsResolver(resolver: () => NetworkProxySettings): void {
     this.networkProxySettingsResolver = resolver
+  }
+
+  setManagedClaudeAccountsResolver(resolver: () => InactiveClaudeAccountInfo[]): void {
+    this.managedClaudeAccountsResolver = resolver
   }
 
   setInactiveClaudeAccountsResolver(resolver: () => InactiveClaudeAccountInfo[]): void {
@@ -466,8 +480,53 @@ export class RateLimitService {
       inactiveCodexAccounts: this.buildInactiveArray(
         this.inactiveCodexCache,
         this.inactiveCodexFetching
-      )
+      ),
+      claudeAccountAuth: this.buildClaudeAuthVerdicts()
     }
+  }
+
+  private buildClaudeAuthVerdicts(): ClaudeAccountAuthVerdict[] {
+    const roster = this.managedClaudeAccountsResolver?.() ?? null
+    if (roster) {
+      const known = new Set(roster.map((account) => account.id))
+      for (const accountId of Array.from(this.claudeAuthVerdicts.keys())) {
+        if (!known.has(accountId)) {
+          this.claudeAuthVerdicts.delete(accountId)
+        }
+      }
+    }
+    return [...this.claudeAuthVerdicts.values()].map((verdict) => ({
+      ...verdict,
+      checking: this.claudeAuthChecking.has(verdict.accountId)
+    }))
+  }
+
+  private recordClaudeAuthVerdict(accountId: string | null, fresh: ProviderRateLimits): void {
+    if (!accountId) {
+      return
+    }
+    this.claudeAuthVerdicts.set(
+      accountId,
+      applyClaudeAccountAuthProbe(
+        this.claudeAuthVerdicts.get(accountId) ?? null,
+        accountId,
+        readClaudeAccountAuthProbe(fresh, Date.now())
+      )
+    )
+  }
+
+  private recordClaudeAuthVerdictFromError(accountId: string, error: unknown): void {
+    this.claudeAuthVerdicts.set(
+      accountId,
+      applyClaudeAccountAuthProbe(
+        this.claudeAuthVerdicts.get(accountId) ?? null,
+        accountId,
+        readClaudeAccountAuthProbeFromFailureKind(
+          classifyClaudeOAuthUsageError(error).failureKind,
+          Date.now()
+        )
+      )
+    )
   }
 
   async refresh(): Promise<RateLimitState> {
@@ -729,6 +788,7 @@ export class RateLimitService {
             continue
           }
           const cached = this.inactiveClaudeCache.get(account.id) ?? null
+          this.recordClaudeAuthVerdict(account.id, fresh)
           this.inactiveClaudeCache.set(
             account.id,
             this.applyStalePolicy(this.recordClaudeRefreshThrottle(account.id, fresh), cached)
@@ -742,6 +802,7 @@ export class RateLimitService {
           ) {
             this.inactiveClaudeCache.delete(account.id)
           } else if (!signal.aborted) {
+            this.recordClaudeAuthVerdictFromError(account.id, error)
             // Why: this path used to fail silently, so a per-account usage fetch
             // error (e.g. missing managed credentials, an unrefreshable OAuth
             // token) was invisible — surface it so the worktree usage meter's
@@ -865,6 +926,40 @@ export class RateLimitService {
     } finally {
       this.finishFetchCycle(controller)
     }
+  }
+
+  async recheckClaudeAccountAuth(accountId: string): Promise<RateLimitState> {
+    const account = (this.managedClaudeAccountsResolver?.() ?? []).find(
+      (candidate) => candidate.id === accountId
+    )
+    if (!account || this.claudeAuthChecking.has(accountId)) {
+      return this.getState()
+    }
+    this.claudeAuthChecking.add(accountId)
+    this.pushToRenderer()
+    try {
+      const fresh = await this.withClaudeAccountOperation(accountId, () =>
+        fetchManagedAccountUsage(account, {
+          allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+          allowTokenRotation: !hasLiveClaudePtysUsingAccount(accountId),
+          networkProxySettings: this.networkProxySettingsResolver?.()
+        })
+      )
+      this.recordClaudeAuthVerdict(accountId, fresh)
+      if (this.isCurrentInactiveClaudeAccount(accountId)) {
+        const cached = this.inactiveClaudeCache.get(accountId) ?? null
+        this.inactiveClaudeCache.set(
+          accountId,
+          this.applyStalePolicy(this.recordClaudeRefreshThrottle(accountId, fresh), cached)
+        )
+      }
+    } catch (error) {
+      this.recordClaudeAuthVerdictFromError(accountId, error)
+    } finally {
+      this.claudeAuthChecking.delete(accountId)
+      this.pushToRenderer()
+    }
+    return this.getState()
   }
 
   evictInactiveClaudeCache(accountId: string): void {
@@ -2161,6 +2256,9 @@ export class RateLimitService {
       this.trackActiveFailureStreak('minimax', miniMax)
     }
 
+    if (shouldApplyClaude) {
+      this.recordClaudeAuthVerdict(claudeAccountId, claude)
+    }
     const claudeToApply = shouldApplyClaude
       ? this.recordClaudeRefreshThrottle(claudeAccountId, claude)
       : claude
@@ -2326,6 +2424,7 @@ export class RateLimitService {
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', result.limits)
+      this.recordClaudeAuthVerdict(claudeAccountId, result.limits)
     }
     const appliedLimits = shouldApplyClaude
       ? this.recordClaudeRefreshThrottle(claudeAccountId, result.limits)

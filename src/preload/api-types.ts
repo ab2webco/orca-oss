@@ -3643,6 +3643,7 @@ export type PreloadApi = {
     refreshClaudeForTarget: (target: RateLimitRuntimeTarget) => Promise<RateLimitState>
     setPollingInterval: (ms: number) => Promise<void>
     fetchInactiveClaudeAccounts: () => Promise<void>
+    recheckClaudeAccountAuth: (accountId: string) => Promise<RateLimitState>
     fetchInactiveCodexAccounts: () => Promise<void>
     refreshMiniMax: () => Promise<RateLimitState>
     refreshGrok: () => Promise<RateLimitState>

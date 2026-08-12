@@ -1,3 +1,5 @@
+import type { ClaudeAccountAuthVerdict } from './claude-account-auth-verdict'
+
 export type RateLimitWindow = {
   /** Percentage of the window consumed (0–100). */
   usedPercent: number
@@ -137,4 +139,5 @@ export type RateLimitState = {
   codexTarget: RateLimitRuntimeTarget
   inactiveClaudeAccounts: InactiveAccountUsage[]
   inactiveCodexAccounts: InactiveAccountUsage[]
+  claudeAccountAuth?: ClaudeAccountAuthVerdict[]
 }

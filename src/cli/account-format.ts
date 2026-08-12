@@ -7,6 +7,7 @@ import type {
 } from '../shared/types'
 import type { ClaudeTerminalAccountSwitchFailureReason } from '../shared/claude-terminal-account-switch'
 import { formatVaultSettingsInheritance } from './account-settings-inheritance-format'
+import type { ClaudeAccountAuthVerdict } from '../shared/claude-account-auth-verdict'
 import type {
   InactiveAccountUsage,
   ProviderRateLimits,
@@ -47,6 +48,9 @@ export type AccountListEntry = {
   /** Null when no usage snapshot exists for this account (e.g. custom-endpoint
    *  Claude accounts have no usage API, or the cache has not been filled). */
   quota: AccountQuota | null
+  /** Whether the credential still authenticates. Null when nothing has checked
+   *  it — presence in this list never implies a working sign-in (ORCA-211). */
+  auth?: ClaudeAccountAuthVerdict | null
 }
 
 export type AccountListReport = {
@@ -119,7 +123,11 @@ export function buildAccountListReport(
         active,
         snapshot.rateLimits.claude,
         snapshot.rateLimits.inactiveClaudeAccounts
-      )
+      ),
+      auth:
+        snapshot.rateLimits.claudeAccountAuth?.find(
+          (verdict) => verdict.accountId === account.id
+        ) ?? null
     }
   })
   const codex = snapshot.codex.accounts.map((account): AccountListEntry => {
@@ -220,6 +228,19 @@ function formatTerminalAccount(report: ClaudeTerminalAccountReport): string {
   return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}${switchable}${settings}\n${caution}`
 }
 
+function formatAuthVerdict(verdict: ClaudeAccountAuthVerdict | null): string {
+  if (!verdict || verdict.state === 'unverified') {
+    return 'auth: not checked'
+  }
+  const undecided = verdict.undecided ? `last check undecided: ${verdict.undecided}` : null
+  if (verdict.state === 'failed') {
+    const failure =
+      verdict.failure === 'no-credentials' ? 'no stored credential' : 'credential rejected'
+    return `auth: FAILED (${[failure, undecided].filter(Boolean).join(', ')})`
+  }
+  return undecided ? `auth: verified (${undecided})` : 'auth: verified'
+}
+
 export function formatAccountList(report: AccountListReport): string {
   const terminal = formatTerminalAccount(report.terminal)
   if (report.accounts.length === 0) {
@@ -235,7 +256,8 @@ export function formatAccountList(report: AccountListReport): string {
       const active = entry.active ? '  active' : ''
       const pane =
         entry.provider === 'claude' && entry.id === paneAccountId ? '  <- this terminal' : ''
-      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}${pane}\n  ${formatQuota(entry.quota)}`
+      const auth = entry.provider === 'claude' ? `  ${formatAuthVerdict(entry.auth ?? null)}` : ''
+      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}${pane}\n  ${formatQuota(entry.quota)}${auth}`
     })
     .join('\n')
   return `${terminal}\n\n${accounts}`

@@ -4650,6 +4650,8 @@ const api = {
       ipcRenderer.invoke('rateLimits:setPollingInterval', ms),
     fetchInactiveClaudeAccounts: (): Promise<void> =>
       ipcRenderer.invoke('rateLimits:fetchInactiveClaudeAccounts'),
+    recheckClaudeAccountAuth: (accountId: string): Promise<RateLimitState> =>
+      ipcRenderer.invoke('rateLimits:recheckClaudeAccountAuth', accountId),
     fetchInactiveCodexAccounts: (): Promise<void> =>
       ipcRenderer.invoke('rateLimits:fetchInactiveCodexAccounts'),
     refreshMiniMax: (): Promise<RateLimitState> => ipcRenderer.invoke('rateLimits:refreshMiniMax'),
