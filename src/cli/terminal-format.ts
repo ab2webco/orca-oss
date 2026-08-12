@@ -32,6 +32,13 @@ function formatTerminalLiveness(terminal: RuntimeTerminalSummary): string {
   }
 }
 
+/** Why on the same line as liveness: `running` is true of the shell and says
+ *  nothing about the agent. A pane whose launch command was never written is
+ *  connected, titled, and empty, and reads as healthy without this (ORCA-210). */
+function formatStartupCommandWithheld(terminal: RuntimeTerminalSummary): string {
+  return terminal.startupCommandWithheld ? '  [no agent: launch command not yet sent]' : ''
+}
+
 export function formatTerminalList(result: RuntimeTerminalListResult): string {
   if (result.terminals.length === 0) {
     return 'No terminals.'
@@ -39,7 +46,7 @@ export function formatTerminalList(result: RuntimeTerminalListResult): string {
   const body = result.terminals
     .map(
       (terminal) =>
-        `${terminal.handle}  ${terminal.title ?? '(untitled)'}  ${formatTerminalLiveness(terminal)}  ${terminal.worktreePath}\n${terminal.preview ? `preview: ${terminal.preview}` : 'preview: <empty>'}`
+        `${terminal.handle}  ${terminal.title ?? '(untitled)'}  ${formatTerminalLiveness(terminal)}${formatStartupCommandWithheld(terminal)}  ${terminal.worktreePath}\n${terminal.preview ? `preview: ${terminal.preview}` : 'preview: <empty>'}`
     )
     .join('\n\n')
   const visualLayout = formatTerminalVisualLayouts(result.visualLayouts)
@@ -113,6 +120,9 @@ export function formatTerminalShow(result: { terminal: RuntimeTerminalShow }): s
     `leaf: ${terminal.leafId}`,
     `ptyId: ${terminal.ptyId ?? 'none'}`,
     `liveness: ${formatTerminalLiveness(terminal)}`,
+    ...(terminal.startupCommandWithheld
+      ? ['startupCommand: not sent (shell never reached a prompt; no agent in this pane)']
+      : []),
     `connected: ${terminal.connected}`,
     `writable: ${terminal.writable}`,
     `preview: ${terminal.preview || '<empty>'}`

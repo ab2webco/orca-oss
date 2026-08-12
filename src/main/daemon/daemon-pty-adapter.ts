@@ -515,6 +515,12 @@ export class DaemonPtyAdapter implements IPtyProvider {
       shellReadySupported && isCodexStartupCommand && !shouldWaitForShellReady
         ? CODEX_SHELL_READY_TIMEOUT_MS
         : undefined
+    // Why exclude the short-timeout lane: for Codex without a native draft flag
+    // the elapsed budget IS the delivery trigger, not a failure. Everywhere else
+    // the marker is the only proof the shell will read the command as a command
+    // rather than as the answer to whatever prompt owns the tty (ORCA-210).
+    const startupCommandRequiresShellReady =
+      shellReadySupported && shellReadyTimeoutMs === undefined
 
     const requestCreateOrAttach = (
       historySeed: string | undefined,
@@ -543,6 +549,9 @@ export class DaemonPtyAdapter implements IPtyProvider {
           : opts.terminalWindowsPowerShellImplementation,
         shellReadySupported: attachOnly ? false : shellReadySupported,
         ...(!attachOnly && shellReadyTimeoutMs !== undefined ? { shellReadyTimeoutMs } : {}),
+        ...(!attachOnly && startupCommandRequiresShellReady
+          ? { startupCommandRequiresShellReady: true as const }
+          : {}),
         ...(historySeed ? { historySeed } : {}),
         ...(historySeedTransferId ? { historySeedTransferId } : {}),
         ...(this.supportsStartupIngress && !attachOnly && opts.startupIngress
@@ -2342,6 +2351,12 @@ export class DaemonPtyAdapter implements IPtyProvider {
           ...(event.payload.mode2031PendingSubscribe
             ? { mode2031PendingSubscribe: true as const }
             : {})
+        })
+      } else if (event.event === 'startupCommandDelivery') {
+        this.emitBackgroundStreamEvent({
+          id: event.sessionId,
+          kind: 'startupCommandDelivery',
+          state: event.payload.state
         })
       } else if (event.event === 'dataGap') {
         this.emitBackgroundStreamEvent({

@@ -4192,6 +4192,10 @@ export function registerPtyHandlers(
           )
           return
         }
+        if (payload.kind === 'startupCommandDelivery') {
+          runtime?.noteStartupCommandDelivery(payload.id, payload.state)
+          return
+        }
         if (payload.kind === 'dataGap') {
           providerSnapshotRequiredPtys.add(payload.id)
           runtime?.notePtyDataGap(payload.id, payload.sequenceChars ?? payload.droppedChars)

@@ -23,6 +23,18 @@ export type ExitEvent = {
   payload: { code: number; incarnationId?: PtyIncarnationId }
 }
 
+/** The shell-ready budget elapsed with this session's launch command still
+ *  withheld: something at the shell's startup — an oh-my-zsh update question, a
+ *  `read` in the user's rc — is holding the tty, so the command was not written
+ *  and the pane has no agent in it yet. Delivery is not cancelled; it happens
+ *  when the marker finally fires. Old mains ignore unknown stream events. */
+export type StartupCommandDeliveryEvent = {
+  type: 'event'
+  event: 'startupCommandDelivery'
+  sessionId: string
+  payload: { state: 'withheld' | 'delivered' }
+}
+
 export type TerminalErrorEvent = {
   type: 'event'
   event: 'terminalError'
@@ -90,3 +102,4 @@ export type DaemonEvent =
   | SessionBackgroundMarkerEvent
   | DataGapEvent
   | TransientFactEvent
+  | StartupCommandDeliveryEvent

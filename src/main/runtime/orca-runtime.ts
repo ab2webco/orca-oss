@@ -3039,6 +3039,9 @@ export class OrcaRuntimeService {
   private titleObservationSequence = 0
   private headlessTerminals = new Map<string, RuntimeHeadlessTerminal>()
   private ptyOutputSequenceById = new Map<string, number>()
+  // Why a set, not a pty-record field: it must survive the pty record being
+  // rebuilt on reveal/adopt, and both summary shapes read the same fact.
+  private startupCommandWithheldPtyIds = new Set<string>()
   private providerSequenceInitializedPtys = new Set<string>()
   private providerSequenceOffsetByPtyId = new Map<string, number>()
   private providerSnapshotPreferredPtys = new Set<string>()
@@ -10225,6 +10228,54 @@ export class OrcaRuntimeService {
    *  carry so a half-open escape from before the gap cannot corrupt what
    *  follows, and drop the mobile headless mirror — it rebuilds from the
    *  delivered tail / snapshot seeds instead of parsing a gapped stream. */
+  /** The daemon reports what it did with a pane's launch command. `withheld`
+   *  means it was not written, because the shell-ready budget elapsed while
+   *  something at the shell's startup still owned the tty (ORCA-210); the pane
+   *  is a shell with no agent in it until this clears. */
+  noteStartupCommandDelivery(ptyId: string, state: 'withheld' | 'delivered'): void {
+    if (state === 'withheld') {
+      this.startupCommandWithheldPtyIds.add(ptyId)
+    } else {
+      this.startupCommandWithheldPtyIds.delete(ptyId)
+    }
+  }
+
+  private getStartupCommandWithheldMetadata(
+    ptyId: string | null
+  ): Pick<RuntimeTerminalSummary, 'startupCommandWithheld'> {
+    return ptyId !== null && this.startupCommandWithheldPtyIds.has(ptyId)
+      ? { startupCommandWithheld: true as const }
+      : {}
+  }
+
+  /** A blocked wait result when this pane's launch command was never written,
+   *  or null when it was. Only conditions that assert something about the agent
+   *  inside the pane can be answered this way; `exit` and `writable` stay true
+   *  statements about the shell. */
+  private buildStartupCommandWithheldWaitResult(
+    handle: string,
+    condition: RuntimeTerminalWaitCondition
+  ): RuntimeTerminalWait | null {
+    if (this.startupCommandWithheldPtyIds.size === 0) {
+      return null
+    }
+    const pty = this.getLivePtyForHandle(handle)
+    if (pty) {
+      return this.startupCommandWithheldPtyIds.has(pty.pty.ptyId)
+        ? buildPtyTerminalWaitBlockedResult(
+            handle,
+            condition,
+            pty.pty,
+            'shell-startup-command-withheld'
+          )
+        : null
+    }
+    const { leaf } = this.getLiveLeafForHandle(handle)
+    return leaf.ptyId !== null && this.startupCommandWithheldPtyIds.has(leaf.ptyId)
+      ? buildTerminalWaitBlockedResult(handle, condition, leaf, 'shell-startup-command-withheld')
+      : null
+  }
+
   notePtyDataGap(ptyId: string, droppedChars = 0): void {
     if (droppedChars > 0) {
       // Why: the daemon snapshot's seq counts bytes its monitoring stream
@@ -13857,6 +13908,7 @@ export class OrcaRuntimeService {
     if (exitIncarnationId && pty?.incarnationId && exitIncarnationId !== pty.incarnationId) {
       return
     }
+    this.startupCommandWithheldPtyIds.delete(ptyId)
     const preservesAbnormalSshSurface =
       this.isSshOwnedPtyId(ptyId) && pty?.connectionId != null && exitCode < 0
     if (preservesAbnormalSshSurface) {
@@ -18018,6 +18070,15 @@ export class OrcaRuntimeService {
     }
   ): Promise<RuntimeTerminalWait> {
     const condition = options?.condition ?? 'exit'
+    // Why before every other check: waiting for an agent Orca never launched
+    // burns the whole timeout and answers `unobserved`, which reads as "no
+    // evidence yet" rather than "there is nothing in this pane" (ORCA-210).
+    if (condition === 'tui-idle') {
+      const withheld = this.buildStartupCommandWithheldWaitResult(handle, condition)
+      if (withheld) {
+        return withheld
+      }
+    }
     if (condition === 'composer-ready') {
       return await this.waitForComposerReadyCondition(handle, options?.timeoutMs, options?.signal)
     }
@@ -18274,6 +18335,10 @@ export class OrcaRuntimeService {
     timeoutMs?: number,
     signal?: AbortSignal
   ): Promise<RuntimeTerminalWait> {
+    const withheld = this.buildStartupCommandWithheldWaitResult(handle, 'composer-ready')
+    if (withheld) {
+      return withheld
+    }
     const readiness = await this.waitForAgentComposerReady(handle, {
       holdWithoutPendingMarker: true,
       ...(typeof timeoutMs === 'number' && timeoutMs > 0 ? { timeoutMs } : {}),
@@ -30953,7 +31018,8 @@ export class OrcaRuntimeService {
               : 'gone',
       lastOutputAt: leaf.lastOutputAt,
       preview: leaf.preview,
-      ...(sleeping ? { sleepingAgent: describeSleepingAgent(sleeping) } : {})
+      ...(sleeping ? { sleepingAgent: describeSleepingAgent(sleeping) } : {}),
+      ...this.getStartupCommandWithheldMetadata(leaf.ptyId)
     }
   }
 
@@ -32752,7 +32818,8 @@ export class OrcaRuntimeService {
           ? 'starting'
           : 'gone',
       lastOutputAt: pty.lastOutputAt,
-      preview: pty.preview
+      preview: pty.preview,
+      ...this.getStartupCommandWithheldMetadata(pty.ptyId)
     }
   }
 

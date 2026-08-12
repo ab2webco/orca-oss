@@ -3970,6 +3970,7 @@ describe('registerPtyHandlers', () => {
               command
             })
 
+            mockProc.emitData('\x1b]777;orca-shell-ready\x07% ')
             await Promise.resolve()
             vi.runAllTimers()
             await Promise.resolve()
@@ -14324,7 +14325,15 @@ describe('registerPtyHandlers', () => {
         vi.runOnlyPendingTimers()
         expect(mockProc.proc.write).not.toHaveBeenCalled()
 
+        // A drawn prompt is not the signal: oh-my-zsh's update question draws
+        // one too and reads a key, and the launch command's first character
+        // would answer it (ORCA-210). Only the shell-ready marker releases it.
         mockProc.emitData('\x1b]133;A\x07% ')
+        await Promise.resolve()
+        vi.runAllTimers()
+        expect(mockProc.proc.write).not.toHaveBeenCalled()
+
+        mockProc.emitData('\x1b]777;orca-shell-ready\x07% ')
         await Promise.resolve()
         vi.runAllTimers()
         expect(mockProc.proc.write).toHaveBeenCalledWith('claude\n')
@@ -14466,7 +14475,9 @@ describe('registerPtyHandlers', () => {
     }
   })
 
-  posixOnlyIt('keeps the conservative max wait for non-agent startup commands', async () => {
+  posixOnlyIt('holds non-agent startup commands past the budget too', async () => {
+    // Why past the budget: the shell that never reached a prompt eats the first
+    // character of anything written, whatever that command is (ORCA-210).
     vi.useFakeTimers()
     const mockProc = createMockProc()
     spawnMock.mockReturnValue(mockProc.proc)
@@ -14480,11 +14491,13 @@ describe('registerPtyHandlers', () => {
         command: 'printf "hello"'
       })
 
-      vi.advanceTimersByTime(1499)
+      vi.advanceTimersByTime(1500)
+      await Promise.resolve()
+      vi.advanceTimersByTime(1000)
       await Promise.resolve()
       expect(mockProc.proc.write).not.toHaveBeenCalled()
 
-      vi.advanceTimersByTime(1)
+      mockProc.emitData('\x1b]777;orca-shell-ready\x07% ')
       await Promise.resolve()
       vi.runAllTimers()
       expect(mockProc.proc.write).toHaveBeenCalledWith('printf "hello"\n')

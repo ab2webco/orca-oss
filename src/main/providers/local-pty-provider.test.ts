@@ -680,7 +680,11 @@ describe('LocalPtyProvider', () => {
       }
     })
 
-    it('releases held marker-prefix bytes when local shell readiness times out', async () => {
+    it('releases held marker-prefix bytes without delivering when readiness times out', async () => {
+      // ORCA-210: the budget bounds reporting, not delivery. A shell still
+      // showing a startup prompt (oh-my-zsh's update question) eats the first
+      // character of whatever is written, so nothing is written until the marker
+      // proves the line editor is reading a command.
       vi.useFakeTimers()
       const onData = vi.fn()
       provider.configure({ onData })
@@ -701,10 +705,106 @@ describe('LocalPtyProvider', () => {
         )
         expect(mockProc.write).not.toHaveBeenCalled()
 
-        vi.advanceTimersByTime(200)
+        vi.advanceTimersByTime(5000)
         await Promise.resolve()
-        expect(mockProc.write).toHaveBeenCalledWith('printf ready\n')
+        expect(mockProc.write).not.toHaveBeenCalled()
       } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('delivers the startup command when the marker arrives after the budget', async () => {
+      vi.useFakeTimers()
+      provider.configure({ onData: vi.fn() })
+      try {
+        await provider.spawn({ cols: 80, rows: 24, command: 'printf ready' })
+        const dataCallback = mockProc.onData.mock.calls[0]?.[0] as (data: string) => void
+
+        dataCallback('[oh-my-zsh] Would you like to update? [Y/n] ')
+        vi.advanceTimersByTime(1500)
+        await Promise.resolve()
+        await Promise.resolve()
+        // Past the post-ready settle window too: nothing is written while the
+        // question owns the tty, however long it stays up.
+        vi.advanceTimersByTime(1000)
+        await Promise.resolve()
+        expect(mockProc.write).not.toHaveBeenCalled()
+
+        // The human answers; the shell reaches its prompt and the marker fires.
+        dataCallback('\r\n\x1b]777;orca-shell-ready\x07-> % ')
+        await Promise.resolve()
+        vi.advanceTimersByTime(300)
+        await Promise.resolve()
+
+        expect(mockProc.write).toHaveBeenCalledWith('printf ready\n')
+        expect(mockProc.write).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('reports the withheld launch command, then its delivery', async () => {
+      // ORCA-210: a degraded daemon spawns fresh panes through this provider, so
+      // the pane would otherwise be a shell with no agent and nothing to read it
+      // from but the buffer.
+      vi.useFakeTimers()
+      provider.configure({ onData: vi.fn() })
+      const events: { id: string; state: string }[] = []
+      const unsubscribe = provider.onBackgroundStreamEvent((payload) => {
+        if (payload.kind === 'startupCommandDelivery') {
+          events.push({ id: payload.id, state: payload.state })
+        }
+      })
+      try {
+        const { id } = await provider.spawn({ cols: 80, rows: 24, command: 'printf ready' })
+        const dataCallback = mockProc.onData.mock.calls[0]?.[0] as (data: string) => void
+
+        dataCallback('[oh-my-zsh] Would you like to update? [Y/n] ')
+        expect(events).toEqual([])
+
+        vi.advanceTimersByTime(1500)
+        await Promise.resolve()
+        expect(events).toEqual([{ id, state: 'withheld' }])
+
+        dataCallback('\r\n\x1b]777;orca-shell-ready\x07-> % ')
+        await Promise.resolve()
+        vi.advanceTimersByTime(300)
+        await Promise.resolve()
+
+        expect(events).toEqual([
+          { id, state: 'withheld' },
+          { id, state: 'delivered' }
+        ])
+      } finally {
+        unsubscribe()
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays silent when the marker beats the budget', async () => {
+      vi.useFakeTimers()
+      provider.configure({ onData: vi.fn() })
+      const events: unknown[] = []
+      const unsubscribe = provider.onBackgroundStreamEvent((payload) => {
+        if (payload.kind === 'startupCommandDelivery') {
+          events.push(payload)
+        }
+      })
+      try {
+        await provider.spawn({ cols: 80, rows: 24, command: 'printf ready' })
+        const dataCallback = mockProc.onData.mock.calls[0]?.[0] as (data: string) => void
+
+        dataCallback('\x1b]777;orca-shell-ready\x07-> % ')
+        await Promise.resolve()
+        vi.advanceTimersByTime(300)
+        await Promise.resolve()
+        vi.advanceTimersByTime(5000)
+        await Promise.resolve()
+
+        expect(mockProc.write).toHaveBeenCalledWith('printf ready\n')
+        expect(events).toEqual([])
+      } finally {
+        unsubscribe()
         vi.useRealTimers()
       }
     })

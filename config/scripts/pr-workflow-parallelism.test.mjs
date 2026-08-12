@@ -8,6 +8,7 @@ const dependencyAction = parse(
 )
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 const shellContractFiles = [
+  'src/main/daemon/session-startup-command-gate-real-shell.test.ts',
   'src/main/daemon/shell-ready.test.ts',
   'src/main/providers/local-pty-shell-ready.test.ts',
   'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
