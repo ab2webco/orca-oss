@@ -22,6 +22,7 @@ type TerminalHostSessionCreateDependencies = {
   onDeadSessionRemoved: (sessionId: string) => void
   onSessionCreated: (sessionId: string, generation: string | undefined, isAlive: boolean) => void
   onSessionExit: (sessionId: string, generation: string | undefined) => void
+  onStartupCommandStateChange?: (sessionId: string, state: 'withheld' | 'delivered') => void
 }
 
 export async function createOrAttachTerminalSession(
@@ -118,6 +119,9 @@ export async function createOrAttachTerminalSession(
       wslDistro
     }),
     shellReadySupported,
+    startupCommandRequiresShellReady: opts.startupCommandRequiresShellReady === true,
+    onStartupCommandStateChange: (state) =>
+      deps.onStartupCommandStateChange?.(opts.sessionId, state),
     historySeedChunks: opts.historySeedChunks,
     ...(opts.startupIngress ? { startupIngress: opts.startupIngress } : {}),
     wslDistro,
@@ -134,7 +138,7 @@ export async function createOrAttachTerminalSession(
   if (opts.command && !subprocess.startupCommandDeliveredInShellArgs) {
     const submit = process.platform === 'win32' ? '\r' : '\n'
     // Why: only Orca-wrapped shells advertise the paste-safe startup barrier.
-    session.write(
+    session.writeStartupCommand(
       buildStartupCommandSubmission(opts.command, {
         submit,
         bracketedPasteSafe: shellReadySupported

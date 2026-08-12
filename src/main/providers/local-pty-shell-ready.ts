@@ -364,6 +364,13 @@ function getWrappedShellLaunchConfig(
     return {
       args: ['-l'],
       env: {
+        // Why: oh-my-zsh's periodic update question runs inside .zshrc and reads a
+        // single key with `read -k`, so it holds the tty before any prompt exists.
+        // Suppressing it removes the most common trigger for ORCA-210, but it is a
+        // mitigation, not the fix — any other startup-file prompt reproduces the
+        // bug, which is why the launch command is gated on the shell-ready marker.
+        // Honored only when the user has not set `zstyle ':omz:update' mode`.
+        DISABLE_AUTO_UPDATE: 'true',
         ORCA_ORIG_ZDOTDIR: resolveOriginalZdotdir(),
         ORCA_ZSHENV_SOURCE_DIR: resolveOriginalZshenvSourceDir(),
         ZDOTDIR: `${getShellReadyWrapperRoot()}/zsh`,
@@ -420,8 +427,12 @@ export function writeStartupCommandWhenShellReady(
   startupCommand: string,
   onExit: (cleanup: () => void) => void,
   // Why: only Orca-wrapped bash/zsh have bracketed-paste active; other shells use the raw path to avoid echoing the ESC[200~ markers.
-  options: { bracketedPasteSafe?: boolean } = {}
+  options: { bracketedPasteSafe?: boolean; onDelivered?: () => void } = {}
 ): void {
+  // Why the caller resolves this promise only on the marker (ORCA-210): a shell
+  // that is still showing a startup prompt eats the command's first character as
+  // the answer, leaving a pane with a shell and no agent that looks identical to
+  // a healthy one.
   let sent = false
   let postReadyTimer: ReturnType<typeof setTimeout> | null = null
   let postReadyDataDisposable: { dispose: () => void } | null = null
@@ -457,6 +468,7 @@ export function writeStartupCommandWhenShellReady(
         bracketedPasteSafe: options.bracketedPasteSafe === true
       })
     )
+    options.onDelivered?.()
   }
 
   const schedulePostReadyFlush = (): void => {

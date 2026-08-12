@@ -212,6 +212,7 @@ jobs:
       - name: Test real shell contracts
         run: |
           pnpm exec vitest run --config config/vitest.config.ts \
+            src/main/daemon/session-startup-command-gate-real-shell.test.ts \
             src/main/daemon/shell-ready.test.ts \
             src/main/daemon/node-pty-fd-leak.test.ts \
             src/main/providers/local-pty-shell-ready.test.ts \
@@ -253,6 +254,7 @@ jobs:
       - name: Test shard
         run: |
           pnpm exec vitest run --config config/vitest.config.ts \
+            --exclude=src/main/daemon/session-startup-command-gate-real-shell.test.ts \
             --exclude=src/main/daemon/shell-ready.test.ts \
             --exclude=src/main/daemon/node-pty-fd-leak.test.ts \
             --exclude=src/main/providers/local-pty-shell-ready.test.ts \

@@ -15368,6 +15368,36 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('reports a pane whose launch command was never written (ORCA-210)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    // The pane is connected and titled; only the daemon knows the launch
+    // command never went in, so without this the pane reads as a healthy agent.
+    runtime.noteStartupCommandDelivery('pty-bg', 'withheld')
+
+    const listed = (await runtime.listTerminals()).terminals.find((t) => t.handle === handle)
+    expect(listed?.startupCommandWithheld).toBe(true)
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'composer-ready', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle,
+      condition: 'composer-ready',
+      satisfied: false,
+      blockedReason: 'shell-startup-command-withheld'
+    })
+
+    runtime.noteStartupCommandDelivery('pty-bg', 'delivered')
+    const cleared = (await runtime.listTerminals()).terminals.find((t) => t.handle === handle)
+    expect(cleared?.startupCommandWithheld).toBeUndefined()
+  })
+
   it('returns a blocked wait result for Codex workspace trust prompts', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({

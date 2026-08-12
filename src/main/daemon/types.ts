@@ -45,6 +45,14 @@ export type SessionState = 'created' | 'spawning' | 'running' | 'exiting' | 'exi
 
 export type ShellReadyState = 'pending' | 'ready' | 'timed_out' | 'unsupported'
 
+/** Delivery state of the launch command Orca writes into a fresh shell.
+ *  `withheld` means the shell-ready budget elapsed while a startup-file prompt
+ *  (oh-my-zsh's update question, a `read` in the user's rc) still owned the tty:
+ *  the command is kept, not dropped, and lands once the shell reaches a real
+ *  prompt. Writing it earlier feeds its first character to that prompt and
+ *  leaves a pane with no agent in it (ORCA-210). */
+export type StartupCommandState = 'none' | 'pending' | 'delivered' | 'withheld'
+
 // The on-disk checkpoint.json shape lives in daemon-checkpoint-file.ts (it
 // depends only on TerminalModes here) — re-exported so existing importers of
 // `./types` keep working.
@@ -89,6 +97,9 @@ export type CreateOrAttachRequest = {
     terminalWindowsPowerShellImplementation?: 'auto' | 'powershell.exe' | 'pwsh.exe'
     shellReadySupported?: boolean
     shellReadyTimeoutMs?: number
+    /** Withhold the startup command until the shell-ready marker fires, with no
+     *  expiry escape (ORCA-210). Absent on older mains. */
+    startupCommandRequiresShellReady?: boolean
     startupIngress?: PtyStartupIngressIntent
     agentSessionEnsure?: {
       claim: AgentSessionExecutionClaim

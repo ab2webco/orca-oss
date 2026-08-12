@@ -470,6 +470,14 @@ export type RuntimeTerminalSummary = {
   preview: string
   /** Set on `sleeping` rows: how to address the agent once it is awake. */
   sleepingAgent?: RuntimeTerminalSleepingAgent
+  /** Present only while this pane's launch command is still unwritten: the
+   *  shell-ready budget elapsed with something at the shell's startup holding
+   *  the tty (an oh-my-zsh update question, a `read` in the user's rc). The pane
+   *  is connected and titled but contains no agent, so a caller must not read
+   *  `liveness: running` here as "the agent I asked for is in there" (ORCA-210).
+   *  The command is held, not dropped; it lands when the shell reaches a
+   *  prompt, and the field clears. */
+  startupCommandWithheld?: true
 }
 
 export type RuntimeTerminalSleepingAgent = {
@@ -748,6 +756,10 @@ export type RuntimeTerminalWaitBlockedReason =
   | 'codex-model-migration-prompt'
   | 'codex-hooks-review-prompt'
   | 'codex-interactive-prompt'
+  /** The pane's launch command is still unwritten because the shell never
+   *  reached a prompt within the shell-ready budget — waiting for an agent that
+   *  was never started would burn the whole timeout as `unobserved` (ORCA-210). */
+  | 'shell-startup-command-withheld'
 
 export type RuntimeTerminalWait = {
   handle: string

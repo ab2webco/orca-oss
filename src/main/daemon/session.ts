@@ -22,6 +22,7 @@ import type {
   PendingOutputRecord,
   SessionState,
   ShellReadyState,
+  StartupCommandState,
   TakePendingOutputResult,
   TerminalSnapshot
 } from './types'
@@ -80,6 +81,14 @@ export type SessionOptions = {
   subprocess: SubprocessHandle
   shellReadySupported: boolean
   shellReadyTimeoutMs?: number
+  /** Gate the startup command on the shell-ready marker with no expiry escape
+   *  (ORCA-210). False keeps the legacy "deliver when the budget elapses"
+   *  behavior, which Codex relies on via CODEX_SHELL_READY_TIMEOUT_MS. */
+  startupCommandRequiresShellReady?: boolean
+  /** Fired when the budget elapses with the launch command still withheld, and
+   *  again if that withheld command is later delivered. Never fires on the
+   *  ordinary path, where the marker beats the budget. */
+  onStartupCommandStateChange?: (state: 'withheld' | 'delivered') => void
   historySeedChunks?: readonly string[]
   scrollback?: number
   wslDistro?: string
@@ -104,6 +113,12 @@ export class Session {
   readonly wslDistro: string | null
   private _state: SessionState = 'running'
   private _shellState: ShellReadyState
+  private _startupCommandState: StartupCommandState = 'none'
+  private pendingStartupCommand: string | null = null
+  private readonly startupCommandRequiresShellReady: boolean
+  private readonly onStartupCommandStateChange:
+    | ((state: 'withheld' | 'delivered') => void)
+    | undefined
   private _exitCode: number | null = null
   private _isTerminating = false
   private _disposed = false
@@ -153,6 +168,9 @@ export class Session {
         ? undefined
         : opts.historySeedChunks.every((chunk) => this.emulator.writeSync(chunk))
 
+    this.startupCommandRequiresShellReady =
+      opts.shellReadySupported && opts.startupCommandRequiresShellReady === true
+    this.onStartupCommandStateChange = opts.onStartupCommandStateChange
     if (opts.shellReadySupported) {
       this._shellState = 'pending'
       this.shellReadyScanState = createShellReadyScanState()
@@ -180,6 +198,10 @@ export class Session {
 
   get shellState(): ShellReadyState {
     return this._shellState
+  }
+
+  get startupCommandState(): StartupCommandState {
+    return this._startupCommandState
   }
 
   get historySeeded(): boolean | undefined {
@@ -227,6 +249,32 @@ export class Session {
     }
 
     this.subprocess.write(data)
+  }
+
+  /**
+   * Deliver the launch command Orca generated for this pane.
+   *
+   * Why separate from write(): user keystrokes and the launch command have
+   * opposite failure modes when the shell is not at a prompt. A keystroke the
+   * human typed must reach whatever is reading it (that is how an oh-my-zsh
+   * `[Y/n]` gets answered); the launch command must not, because its first
+   * character is consumed as the answer and the pane ends up with no agent
+   * while still looking healthy (ORCA-210).
+   */
+  writeStartupCommand(data: string): void {
+    if (this._state === 'exited' || this._disposed) {
+      return
+    }
+    if (!this.startupCommandRequiresShellReady) {
+      this._startupCommandState = 'delivered'
+      this.write(data)
+      return
+    }
+    this._startupCommandState = 'pending'
+    this.pendingStartupCommand = data
+    if (this._shellState === 'ready' && !this.postReadyFlushGate.isPending) {
+      this.flushPreReadyQueue()
+    }
   }
 
   resize(cols: number, rows: number): void {
@@ -614,11 +662,16 @@ export class Session {
       return
     }
 
-    if (this._shellState === 'pending' && this.shellReadyScanState) {
+    // Why not gated on 'pending': after the budget elapses the state is
+    // 'timed_out' but a withheld launch command still needs the marker, which
+    // arrives whenever the shell finally reaches its prompt (ORCA-210).
+    if (this.shellReadyScanState) {
       const scanned = scanForShellReady(this.shellReadyScanState, data)
       data = scanned.output
       if (scanned.matched) {
         this.transitionToReady(scanned.postMarkerBytesObserved)
+      } else {
+        this.postReadyFlushGate.notifyData()
       }
     } else {
       this.postReadyFlushGate.notifyData()
@@ -683,12 +736,14 @@ export class Session {
     this.onSessionExit?.(code)
   }
 
-  private releaseHeldShellReadyBytes(): string {
+  private releaseHeldShellReadyBytes({ keepScanning = false } = {}): string {
     if (!this.shellReadyScanState) {
       return ''
     }
     const heldBytes = drainShellReadyHeldBytes(this.shellReadyScanState)
-    this.shellReadyScanState = null
+    if (!keepScanning) {
+      this.shellReadyScanState = null
+    }
     // Why: scanning strips marker bytes before fan-out; if readiness never completes, release any held prefix before timeout/exit discards it.
     this.startupIngress.accept(heldBytes)
     return heldBytes
@@ -705,7 +760,7 @@ export class Session {
       clearTimeout(this.shellReadyTimer)
       this.shellReadyTimer = null
     }
-    if (this.preReadyStdinQueue.length === 0) {
+    if (this.preReadyStdinQueue.length === 0 && this.pendingStartupCommand === null) {
       return
     }
     this.postReadyFlushGate.arm(postMarkerBytesObserved)
@@ -717,11 +772,31 @@ export class Session {
       return
     }
     this._shellState = 'timed_out'
-    this.releaseHeldShellReadyBytes()
-    this.flushPreReadyQueue()
+    // Why keep scanning: the marker is still the only proof the shell reached a
+    // prompt, and it can arrive long after the budget — the moment the human
+    // answers whatever question owns the tty.
+    this.releaseHeldShellReadyBytes({ keepScanning: this.pendingStartupCommand !== null })
+    // Why flush stdin but not the launch command: releasing the queue is what
+    // lets the human answer that question at all.
+    this.flushPreReadyQueue({ includeStartupCommand: false })
+    if (this.pendingStartupCommand !== null) {
+      this._startupCommandState = 'withheld'
+      this.onStartupCommandStateChange?.('withheld')
+    }
   }
 
-  private flushPreReadyQueue(): void {
+  private flushPreReadyQueue({ includeStartupCommand = true } = {}): void {
+    if (includeStartupCommand && this.pendingStartupCommand !== null) {
+      const startupCommand = this.pendingStartupCommand
+      const wasWithheld = this._startupCommandState === 'withheld'
+      this.pendingStartupCommand = null
+      this._startupCommandState = 'delivered'
+      this.shellReadyScanState = null
+      this.subprocess.write(startupCommand)
+      if (wasWithheld) {
+        this.onStartupCommandStateChange?.('delivered')
+      }
+    }
     const queued = this.preReadyStdinQueue
     this.preReadyStdinQueue = []
     for (const data of queued) {
