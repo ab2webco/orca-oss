@@ -427,7 +427,7 @@ export function writeStartupCommandWhenShellReady(
   startupCommand: string,
   onExit: (cleanup: () => void) => void,
   // Why: only Orca-wrapped bash/zsh have bracketed-paste active; other shells use the raw path to avoid echoing the ESC[200~ markers.
-  options: { bracketedPasteSafe?: boolean } = {}
+  options: { bracketedPasteSafe?: boolean; onDelivered?: () => void } = {}
 ): void {
   // Why the caller resolves this promise only on the marker (ORCA-210): a shell
   // that is still showing a startup prompt eats the command's first character as
@@ -468,6 +468,7 @@ export function writeStartupCommandWhenShellReady(
         bracketedPasteSafe: options.bracketedPasteSafe === true
       })
     )
+    options.onDelivered?.()
   }
 
   const schedulePostReadyFlush = (): void => {

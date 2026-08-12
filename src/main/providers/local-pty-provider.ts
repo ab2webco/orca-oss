@@ -18,7 +18,13 @@ import {
   updateHistFileForFallback,
   logHistoryInjection
 } from '../terminal-history'
-import type { IPtyProvider, PtyProcessInfo, PtySpawnOptions, PtySpawnResult } from './types'
+import type {
+  IPtyProvider,
+  PtyBackgroundStreamEvent,
+  PtyProcessInfo,
+  PtySpawnOptions,
+  PtySpawnResult
+} from './types'
 import { requiredPtyReattachUnavailableMessage } from './pty-reattach-contract'
 import {
   ensureNodePtySpawnHelperExecutable,
@@ -131,7 +137,17 @@ type ExitCallback = (payload: { id: string; code: number; incarnationId?: string
 
 const dataListeners = new Set<DataCallback>()
 const exitListeners = new Set<ExitCallback>()
+const backgroundStreamListeners = new Set<(payload: PtyBackgroundStreamEvent) => void>()
 const startupIngressByPty = new Map<string, PtyStartupIngress>()
+
+// Why the local path reports it too: a degraded daemon routes fresh panes here
+// (degraded-daemon-fresh-spawn-routing.ts), and a withheld launch is invisible
+// otherwise — the pane keeps a shell, a title and no agent (ORCA-210).
+function emitStartupCommandDelivery(id: string, state: 'withheld' | 'delivered'): void {
+  for (const listener of backgroundStreamListeners) {
+    listener({ id, kind: 'startupCommandDelivery', state })
+  }
+}
 
 /**
  * Returns a stable default cwd for locally spawned PTYs.
@@ -945,6 +961,7 @@ export class LocalPtyProvider implements IPtyProvider {
     // Shell-ready startup command support
     let resolveShellReady: ((signal: ShellReadySignal) => void) | null = null
     let shellReadyTimeout: ReturnType<typeof setTimeout> | null = null
+    let startupCommandWithheld = false
     const shellReadyScanState = shellReadyLaunch?.supportsReadyMarker
       ? createShellReadyScanState()
       : null
@@ -983,6 +1000,8 @@ export class LocalPtyProvider implements IPtyProvider {
           // its own startup prompt. Delivery stays armed — the scanner keeps
           // running, so the command lands once the shell reaches a prompt.
           releaseHeldShellReadyBytes()
+          startupCommandWithheld = true
+          emitStartupCommandDelivery(id, 'withheld')
         }, STARTUP_COMMAND_READY_MAX_WAIT_MS)
       } else {
         finishShellReady({ postMarkerBytesObserved: false })
@@ -1057,7 +1076,15 @@ export class LocalPtyProvider implements IPtyProvider {
         (cleanup) => {
           startupCommandCleanup = cleanup
         },
-        { bracketedPasteSafe }
+        {
+          bracketedPasteSafe,
+          onDelivered: () => {
+            if (startupCommandWithheld) {
+              startupCommandWithheld = false
+              emitStartupCommandDelivery(id, 'delivered')
+            }
+          }
+        }
       )
     }
 
@@ -1420,6 +1447,13 @@ export class LocalPtyProvider implements IPtyProvider {
   onExit(callback: ExitCallback): () => void {
     exitListeners.add(callback)
     return () => exitListeners.delete(callback)
+  }
+
+  // Local PTYs have no keep-tail thinning; the only fact reported here is a
+  // launch command still withheld at the shell-ready budget (ORCA-210).
+  onBackgroundStreamEvent(callback: (payload: PtyBackgroundStreamEvent) => void): () => void {
+    backgroundStreamListeners.add(callback)
+    return () => backgroundStreamListeners.delete(callback)
   }
 
   // ─── Local-only helpers (not part of IPtyProvider interface) ───────
