@@ -37,7 +37,7 @@ fixed here or parked with a written diagnosis.
 | `orchestration-legacy-worker-restart-recovery` ×2 | **parked** `test.fixme` (`f62c1f6882`) |
 | `orchestration-worker-terminal-visibility:109` | **parked** `test.fixme` (`f62c1f6882`) |
 | `tab-create-entry-file-paths:9` | **parked** `test.fixme` (`cf9a6e883e`) |
-| `floating-tab-rename:179` | **open**, narrowed — see below |
+| `floating-tab-rename:179` | **fixed** (`f26386be4d`) — the restart arm toggled the restored panel shut; see below |
 | `repro-7732:116` | **open**, untouched |
 | `github-created-issue-start-prefill` | **unclassified**, and now a suspect in ORCA-207 group A |
 
@@ -84,6 +84,26 @@ does not wait on a spec upstream has broken. **The successor must not treat it a
 >
 > Provenance: upstream's feature, upstream's spec (byte-identical to `a63df91790`), broken by each
 > other — ORCA-203 class, and the standing decision puts those inside #80.
+>
+> **Measured, not inferred.** A probe that seeds a floating Markdown tab, opens the panel, restarts
+> and reads `localStorage`, `aria-hidden` and `settings.floatingTerminalEnabled` on both launches:
+>
+> | point | stored view state | panel `aria-hidden` |
+> | --- | --- | --- |
+> | launch 1, before toggle | `null` | `"true"` |
+> | launch 1, after toggle | `{"maximized":false,"open":true}` | `"false"` |
+> | launch 2, **before** toggle | `{"maximized":false,"open":true}` | **`"false"`** |
+> | launch 2, after toggle | `{"maximized":false,"open":false}` | `"true"` |
+>
+> So the relaunched panel is already open and the helper's blind toggle closes it. localStorage does
+> survive the restart, which was the load-bearing inference.
+>
+> **Fixed (`f26386be4d`)** by making `openFloatingPanel` idempotent — dispatch the toggle only when
+> `[aria-hidden="false"]` is absent. Upstream's persistence is untouched; its comment documents why
+> it exists (a restart-time size jump reflows xterm and mangles scrollback). All 3 cases in the file
+> pass locally, and the guard discriminates: without it the same spec fails at `:244` on this
+> machine and on CI run `31453995130`. No other spec is exposed — the four other e2e files that
+> dispatch this event never restart the app, so they always start from empty storage.
 
 Everything below this box is the earlier record. Kept because the ruling-out is still valid; its
 conclusion about *where* the case fails is not.
@@ -116,6 +136,31 @@ Where it did not pay off: `tab-create-entry-file-paths` got the same treatment �
 macOS. It reproduces only on Linux CI, so the probe has to run there. That is why it is parked
 rather than given a third inferred cause; its two earlier "confirmed" causes were both true and
 neither closed it.
+
+## `src/main/daemon/session.ts` is now a protected surface (ORCA-210 / #83)
+
+`origin/main` was merged in (`a49f782753`) — never rebased; a rebase would flatten the merge and
+break `git merge-base --is-ancestor a63df91790 HEAD`, which still returns true. One real conflict,
+`src/main/daemon/session.ts`, and **neither side was taken whole**:
+
+- `handleSubprocessData` — upstream's `releaseStartupDeviceAttributes` flag *and* ORCA-210's removal
+  of the `_shellState === 'pending'` guard (the marker still has to be scanned after the budget) and
+  its inner `else { postReadyFlushGate.notifyData() }`.
+- `onShellReadyTimeout` — upstream's `releaseStartupDeviceAttributes()` *and* ORCA-210's
+  `releaseHeldShellReadyBytes({ keepScanning })`, `flushPreReadyQueue({ includeStartupCommand: false })`
+  and the `withheld` state change.
+
+The gate's behaviour is intact: the launch command is never written before the OSC 777 marker, the
+budget bounds reporting only, a withheld command is retained rather than dropped, and user keystrokes
+still flush when the budget expires.
+
+Audited both directions with the line-level method from §7 of the PR body: all 69 unique lines
+`8c970c9cc9` added to this file are present in the merged copy, and no line the sync had added on
+top of the base is missing. `session.test.ts`, `session-startup-command-gate.test.ts` and
+`session-startup-command-gate-real-shell.test.ts` — **62 passed / 0 failed**, with the real-zsh case
+genuinely running (3.1 s). **They discriminate:** restoring the unconditional
+`flushPreReadyQueue()` — what taking the sync's side wholesale would have produced — fails 5 of the
+62. `npm run typecheck` clean.
 
 ## Done
 
