@@ -151,6 +151,7 @@ export class DaemonServer {
     }
   })
   private streamClientIdBySessionId = new Map<string, string>()
+  private startupCommandWithheldSessionIds = new Set<string>()
   private lastInputAtBySessionId = new Map<string, number>()
   private pendingPtySpawnPreparations = new Map<string, Set<PendingPtySpawnPreparation>>()
   private historySeedTransfers = new TerminalHistorySeedTransferRegistry()
@@ -189,6 +190,8 @@ export class DaemonServer {
     this.onAuthenticatedClientPair = opts.onAuthenticatedClientPair ?? (() => {})
     this.host = new TerminalHost({
       spawnSubprocess: opts.spawnSubprocess,
+      onStartupCommandStateChange: (sessionId, state) =>
+        this.emitStartupCommandDelivery(sessionId, state),
       ...(opts.onPtySessionExit ? { onSessionReaped: opts.onPtySessionExit } : {})
     })
     this.ptySpawnHealthCheck = opts.ptySpawnHealthCheck ?? checkPtySpawnHealth
@@ -310,6 +313,24 @@ export class DaemonServer {
       this.createOrAttachInFlight === 0 &&
       this.host.listSessions().length === 0
     )
+  }
+
+  private emitStartupCommandDelivery(sessionId: string, state: 'withheld' | 'delivered'): void {
+    if (state === 'withheld') {
+      this.startupCommandWithheldSessionIds.add(sessionId)
+    } else {
+      this.startupCommandWithheldSessionIds.delete(sessionId)
+    }
+    const clientId = this.streamClientIdBySessionId.get(sessionId)
+    if (!clientId) {
+      return
+    }
+    this.streamDataBatcher.enqueueControlEvent(clientId, sessionId, {
+      type: 'event',
+      event: 'startupCommandDelivery',
+      sessionId,
+      payload: { state }
+    })
   }
 
   private reevaluateIdleShutdown(): void {
@@ -768,6 +789,9 @@ export class DaemonServer {
             ...(p.shellReadyTimeoutMs !== undefined
               ? { shellReadyTimeoutMs: p.shellReadyTimeoutMs }
               : {}),
+            ...(p.startupCommandRequiresShellReady
+              ? { startupCommandRequiresShellReady: true as const }
+              : {}),
             ...(p.agentSessionEnsure ? { agentSessionEnsure: p.agentSessionEnsure } : {}),
             onSessionResolved: (sessionId) => {
               routedSessionId = sessionId
@@ -805,6 +829,7 @@ export class DaemonServer {
                 this.transientFactRelay.onSessionExit(routedSessionId)
                 this.streamDataBatcher.refreshSessionDroppability(routedSessionId)
                 this.streamClientIdBySessionId.delete(routedSessionId)
+                this.startupCommandWithheldSessionIds.delete(routedSessionId)
                 this.lastInputAtBySessionId.delete(routedSessionId)
                 this.reevaluateIdleShutdown()
               }
@@ -816,6 +841,12 @@ export class DaemonServer {
         }
         routedSessionId = result.agentSessionEnsure?.owner.ptyId ?? p.sessionId
         this.streamClientIdBySessionId.set(routedSessionId, clientId)
+        // Why re-emit on attach: a main that reconnects to a preserved daemon
+        // would otherwise never learn this pane's launch command is still
+        // withheld, and would read the pane as a healthy agent.
+        if (this.startupCommandWithheldSessionIds.has(routedSessionId)) {
+          this.emitStartupCommandDelivery(routedSessionId, 'withheld')
+        }
         this.streamDataBatcher.refreshSessionDroppability(routedSessionId)
         // Why an attach-time marker: background resync can precede this attach, so scan suppression must start at the new stream's head.
         if (this.transientFactRelay.isBackgrounded(routedSessionId)) {

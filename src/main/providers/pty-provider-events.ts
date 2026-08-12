@@ -27,3 +27,7 @@ export type PtyBackgroundStreamEvent =
     }
   | { id: string; kind: 'dataGap'; droppedChars: number; sequenceChars?: number }
   | { id: string; kind: 'transientFact'; fact: PtyTransientFact }
+  /** `withheld`: the shell-ready budget elapsed with this PTY's launch command
+   *  unwritten, so the pane holds a shell and no agent. `delivered`: the shell
+   *  finally reached a prompt and the held command went in (ORCA-210). */
+  | { id: string; kind: 'startupCommandDelivery'; state: 'withheld' | 'delivered' }

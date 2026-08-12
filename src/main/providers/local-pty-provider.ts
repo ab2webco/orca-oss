@@ -978,8 +978,11 @@ export class LocalPtyProvider implements IPtyProvider {
     if (args.command) {
       if (shellReadyLaunch?.supportsReadyMarker) {
         shellReadyTimeout = setTimeout(() => {
+          // Why the budget no longer delivers (ORCA-210): the marker is the only
+          // proof the shell is reading a command line rather than a keypress for
+          // its own startup prompt. Delivery stays armed — the scanner keeps
+          // running, so the command lands once the shell reaches a prompt.
           releaseHeldShellReadyBytes()
-          finishShellReady({ postMarkerBytesObserved: false })
         }, STARTUP_COMMAND_READY_MAX_WAIT_MS)
       } else {
         finishShellReady({ postMarkerBytesObserved: false })

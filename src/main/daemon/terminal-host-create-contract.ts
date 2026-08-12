@@ -28,6 +28,9 @@ export type CreateOrAttachOptions = {
   terminalWindowsPowerShellImplementation?: 'auto' | 'powershell.exe' | 'pwsh.exe'
   shellReadySupported?: boolean
   shellReadyTimeoutMs?: number
+  /** Withhold the startup command until the shell-ready marker proves the shell
+   *  is at a prompt, with no expiry escape (ORCA-210). */
+  startupCommandRequiresShellReady?: boolean
   historySeedChunks?: readonly string[]
   startupIngress?: PtyStartupIngressIntent
   agentSessionEnsure?: {

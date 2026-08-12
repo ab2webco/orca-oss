@@ -39,6 +39,8 @@ describe('Session', () => {
     }
     ownerBackend?: 'posix-pty' | 'windows-conpty' | 'windows-wsl'
     wslDistro?: string
+    startupCommandRequiresShellReady?: boolean
+    onStartupCommandStateChange?: (state: 'withheld' | 'delivered') => void
   }): Session {
     session = new Session({
       sessionId: 'test-session',
@@ -50,6 +52,10 @@ describe('Session', () => {
       ...(opts?.ownerBackend ? { ownerBackend: opts.ownerBackend } : {}),
       shellReadySupported: opts?.shellReadySupported ?? false,
       ...(opts?.startupIngress ? { startupIngress: opts.startupIngress } : {}),
+      ...(opts?.startupCommandRequiresShellReady ? { startupCommandRequiresShellReady: true } : {}),
+      ...(opts?.onStartupCommandStateChange
+        ? { onStartupCommandStateChange: opts.onStartupCommandStateChange }
+        : {}),
       ...(opts?.shellReadyTimeoutMs !== undefined
         ? { shellReadyTimeoutMs: opts.shellReadyTimeoutMs }
         : {})
