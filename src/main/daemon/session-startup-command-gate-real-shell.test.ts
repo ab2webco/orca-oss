@@ -134,7 +134,10 @@ describeWithZsh('Session startup command gate against a real zsh (ORCA-210)', ()
       subprocess,
       shellReadySupported: true,
       startupCommandRequiresShellReady: true,
-      shellReadyTimeoutMs: 1000,
+      // Why comfortably above the spawn: the budget starts here, and the
+      // question must be up before it elapses or the test proves the wrong
+      // ordering on a loaded runner.
+      shellReadyTimeoutMs: 3000,
       onStartupCommandStateChange: (state) => states.push(state)
     })
     cleanup.push(() => session.dispose())
