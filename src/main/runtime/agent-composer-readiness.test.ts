@@ -41,9 +41,13 @@ describe('composerReadySignalFor', () => {
     expect(composerReadySignalFor('codex')).toBe('codex-composer-prompt')
     expect(composerReadySignalFor('opencode')).toBe('render-cursor-after-bracketed-paste')
     expect(composerReadySignalFor('mimo-code')).toBe('render-cursor-after-bracketed-paste')
-    // Why: Claude, Gemini, Droid and Cursor have no marker in the byte stream.
-    // Inventing one would be a heuristic dressed as evidence.
-    expect(composerReadySignalFor('claude')).toBeNull()
+    // Why (ORCA-208): Claude does carry a marker — measured on a real v2.1.229
+    // PTY, the DECTCEM show-cursor lands only once the composer row is drawn
+    // and the cursor is placed in it. Leaving it null was a configuration gap,
+    // not a property of the agent, and it made every Claude dispatch ungated.
+    expect(composerReadySignalFor('claude')).toBe('render-cursor-after-bracketed-paste')
+    // Why: Gemini, Droid and Cursor still have no measured marker. Inventing
+    // one would be a heuristic dressed as evidence.
     expect(composerReadySignalFor('gemini')).toBeNull()
     expect(composerReadySignalFor('droid')).toBeNull()
     expect(composerReadySignalFor(null)).toBeNull()
@@ -61,9 +65,24 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
     const bus = createPtyBus()
     const tracker = watchedTracker(bus)
     tracker.observe(PTY, `${BRACKETED_PASTE_ON}› `)
-    // Claude has no marker in the byte stream; the same bytes that prove Codex
+    // Gemini has no marker in the byte stream; the same bytes that prove Codex
     // ready prove nothing about it.
-    expect(tracker.state(PTY, 'claude')).toBe('unobserved')
+    expect(tracker.state(PTY, 'gemini')).toBe('unobserved')
+  })
+
+  // Why (ORCA-208): the exact stream a real `claude` v2.1.229 emits — one
+  // DECSET 2004, the composer row, the cursor placed inside it, then the
+  // show-cursor. Before the signal was configured this pane answered
+  // `unobserved` forever, so `wait --for composer-ready` could never be
+  // satisfied on a live Claude composer and every Claude dispatch was written
+  // with no readiness proof at all.
+  it('tracks a claude pane to the cursor placed in its composer', () => {
+    const bus = createPtyBus()
+    const tracker = watchedTracker(bus)
+    tracker.observe(PTY, `${BRACKETED_PASTE_ON}\x1b[?1004h\x1b[?2031h\x1b]0;✳ Claude Code\x07`)
+    expect(tracker.state(PTY, 'claude')).toBe('awaiting-composer')
+    tracker.observe(PTY, `❯\xa0Try "edit …"\x1b[40;1H\x1b[36;3H${SHOW_CURSOR}`)
+    expect(tracker.state(PTY, 'claude')).toBe('ready')
   })
 
   // Why: this is the bug the live rig found. `launchAgent` is only recorded for
@@ -127,9 +146,24 @@ describe('AgentComposerReadinessTracker (ORCA-191)', () => {
     it('resolves immediately for an agent with no provable marker', async () => {
       const bus = createPtyBus()
       const tracker = watchedTracker(bus)
-      const readiness = await tracker.wait(PTY, 'claude', 60_000)
+      const readiness = await tracker.wait(PTY, 'gemini', 60_000)
       expect(readiness).toMatchObject({ ready: true, proven: false, state: 'unobserved' })
       expect(bus.listenerCount(PTY)).toBe(0)
+    })
+
+    // Why (ORCA-208): the inspection surface the user hit. Before Claude
+    // carried a signal this resolved `proven: false` in 0 ms against a composer
+    // that was drawn and accepting input — a false negative no caller could
+    // distinguish from a pane that never became ready.
+    it('proves a claude composer instead of answering unobserved in 0 ms', async () => {
+      const bus = createPtyBus()
+      const tracker = watchedTracker(bus)
+      const pending = tracker.wait(PTY, 'claude', 60_000, { holdWithoutPendingMarker: true })
+      bus.emit(PTY, BRACKETED_PASTE_ON)
+      tracker.observe(PTY, BRACKETED_PASTE_ON)
+      tracker.observe(PTY, SHOW_CURSOR)
+      bus.emit(PTY, SHOW_CURSOR)
+      expect(await pending).toMatchObject({ ready: true, proven: true, state: 'ready' })
     })
 
     // Why: `dispatch --inject` is the rescue path for an already-stalled run and

@@ -97,6 +97,7 @@ import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
 import IssueSourceIndicator, { sameGitHubOwnerRepo } from '@/components/github/IssueSourceIndicator'
 import IssueSourceSelector, { issueSourceChipClass } from '@/components/github/IssueSourceSelector'
 import { LinearPriorityIcon } from '@/components/linear-priority-icon'
+import { TaskBoard } from '@/components/task-board'
 import { reconcileLinearTeamSelection } from '@/components/task-page-linear-team-selection'
 import {
   getTaskSourceAvailabilityNotice,
@@ -201,6 +202,7 @@ import {
   LinearProjectTable
 } from '@/components/linear-project-view-surfaces'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
+import { TaskPageJiraBoard } from '@/components/task-page-jira-board'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
 import {
   getSingleJiraProjectScope,
@@ -323,7 +325,6 @@ import {
 import {
   DEFAULT_LINEAR_GROUP_BY,
   DEFAULT_LINEAR_ORDER_BY,
-  DEFAULT_LINEAR_VIEW_MODE,
   LINEAR_DISPLAY_PROPERTIES,
   selectLinearWorkspaceIssueFilter,
   serializeLinearIssueViewResumeState,
@@ -460,6 +461,8 @@ import {
   restoreAvailableDefaultTaskProvider,
   resolveVisibleTaskProvider
 } from '../../../shared/task-providers'
+import { normalizeLinearViewMode } from '../../../shared/linear-view-mode'
+import { normalizeJiraViewMode } from '../../../shared/jira-view-mode'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import {
@@ -473,13 +476,14 @@ import {
   getLinearModeOptions,
   getLinearOrderOptions,
   getLinearPriorityLabel,
-  getLinearViewOptions,
+  getTaskViewOptions,
   getPlanePresets,
   getSourceOptions,
   type GitHubTaskKind,
   type GitLabIssueFilter,
   type GitLabTaskFilter,
   type JiraPresetId,
+  type JiraViewMode,
   type PlanePresetId,
   LinearIcon,
   type LinearDisplayProperty,
@@ -3272,7 +3276,7 @@ export default function TaskPage(): React.JSX.Element {
   const planePresets = getPlanePresets()
   const gitLabIssueFilters = getGitLabIssueFilters()
   const gitLabMRFilters = getGitLabMRFilters()
-  const linearViewOptions = getLinearViewOptions()
+  const taskViewOptions = getTaskViewOptions()
   const linearGroupOptions = getLinearGroupOptions()
   const linearOrderOptions = getLinearOrderOptions()
   const linearDisplayPropertyOptions = getLinearDisplayProperties()
@@ -4620,9 +4624,17 @@ export default function TaskPage(): React.JSX.Element {
       ),
     [linearAttributeFilterWorkspaceId, linearIssueFiltersByWorkspaceId]
   )
+  // Why the sync's refs, not #87's: `linearAttributeFilterSignatureRef`, `linearPrimaryTeamIdRef`
+  // and `previousLinearWorkspaceIdForFiltersRef` have no consumer left in the merged file — the
+  // sync replaced them with these two, which are read in three places each.
   const linearAttributeFilterReadRef = useRef<LinearIssueListFilterRead | null>(null)
   const linearPrimaryTeamRef = useRef<LinearPrimaryTeamObservation | null>(null)
-  const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>(DEFAULT_LINEAR_VIEW_MODE)
+  // Why board by default: task providers share one column-first overview, with list one click away.
+  // #87's persisted view mode is kept; the group/order defaults resolve to the same values the
+  // literals did ('none' / 'priority'), so the shared constants stay.
+  const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>(() =>
+    normalizeLinearViewMode(settings?.linearViewMode)
+  )
   const [linearGroupBy, setLinearGroupBy] = useState<LinearGroupBy>(DEFAULT_LINEAR_GROUP_BY)
   const [linearOrderBy, setLinearOrderBy] = useState<LinearOrderBy>(DEFAULT_LINEAR_ORDER_BY)
   const [linearDisplayProperties, setLinearDisplayProperties] = useState<
@@ -4804,6 +4816,9 @@ export default function TaskPage(): React.JSX.Element {
   const [jiraSearchInput, setJiraSearchInput] = useState('')
   const [appliedJiraSearch, setAppliedJiraSearch] = useState('')
   const [activeJiraPreset, setActiveJiraPreset] = useState<JiraPresetId>('assigned')
+  const [jiraViewMode, setJiraViewMode] = useState<JiraViewMode>(() =>
+    normalizeJiraViewMode(settings?.jiraViewMode)
+  )
   const [jiraRefreshNonce, setJiraRefreshNonce] = useState(0)
   const [jiraProjectStatusOrder, setJiraProjectStatusOrder] = useState<{
     order: JiraProjectStatusOrder
@@ -5879,6 +5894,29 @@ export default function TaskPage(): React.JSX.Element {
     [pagedLinearIssues, linearGroupBy, linearOrderBy]
   )
   const linearStatusBoardEnabled = linearGroupBy === 'none' || linearGroupBy === 'status'
+  const linearBoardDragDisabledReason = linearStatusBoardEnabled
+    ? null
+    : translate(
+        'auto.components.TaskPage.linearBoardDragDisabled',
+        'Drag is unavailable while grouping by {{value0}}.',
+        { value0: linearGroupBy }
+      )
+
+  const selectLinearViewMode = useCallback(
+    (viewMode: LinearViewMode): void => {
+      setLinearViewMode(viewMode)
+      void updateSettings({ linearViewMode: viewMode })
+    },
+    [updateSettings]
+  )
+
+  const selectJiraViewMode = useCallback(
+    (viewMode: JiraViewMode): void => {
+      setJiraViewMode(viewMode)
+      void updateSettings({ jiraViewMode: viewMode })
+    },
+    [updateSettings]
+  )
 
   const handleLinearBoardCardDragStart = useCallback(
     (issue: LinearIssue, event: React.DragEvent<HTMLDivElement>) => {
@@ -11648,21 +11686,57 @@ export default function TaskPage(): React.JSX.Element {
                   <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
                   </div>
-                  <div className="shrink-0 text-[11px] text-muted-foreground">
-                    {displayedJiraIssues.length}{' '}
-                    {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      value={jiraViewMode}
+                      onValueChange={(value) => {
+                        if (value === 'list' || value === 'board') {
+                          selectJiraViewMode(value)
+                        }
+                      }}
+                      aria-label={translate(
+                        'auto.components.TaskPage.jiraViewModeLabel',
+                        'Jira view mode'
+                      )}
+                    >
+                      {taskViewOptions.map(({ id, label, Icon }) => (
+                        <ToggleGroupItem
+                          key={id}
+                          value={id}
+                          className="h-7 gap-1.5 px-2 text-[11px]"
+                          aria-label={label}
+                        >
+                          <Icon className="size-3.5" />
+                          {label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                    <div className="text-[11px] text-muted-foreground">
+                      {displayedJiraIssues.length}{' '}
+                      {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                    </div>
                   </div>
                 </div>
 
-                <TaskPageJiraSortControls
-                  direction={jiraOrderDirection}
-                  onSort={handleJiraSort}
-                  orderBy={jiraOrderBy}
-                />
+                {jiraViewMode === 'list' ? (
+                  <TaskPageJiraSortControls
+                    direction={jiraOrderDirection}
+                    onSort={handleJiraSort}
+                    orderBy={jiraOrderBy}
+                  />
+                ) : null}
 
                 <div
-                  className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek"
-                  style={{ scrollbarGutter: 'stable' }}
+                  className={cn(
+                    'min-h-0 flex-1',
+                    jiraViewMode === 'board'
+                      ? 'flex flex-col overflow-hidden'
+                      : 'overflow-y-auto scrollbar-sleek'
+                  )}
+                  style={jiraViewMode === 'list' ? { scrollbarGutter: 'stable' } : undefined}
                 >
                   {jiraStatus.credentialError ? (
                     <div className="border-b border-border px-4 py-4 text-sm text-destructive">
@@ -11710,17 +11784,34 @@ export default function TaskPage(): React.JSX.Element {
                     </div>
                   ) : null}
 
-                  <TaskPageJiraIssueList
-                    formatUpdatedAt={formatRelativeTime}
-                    getStatusTone={getJiraStatusTone}
-                    issues={sortedJiraIssues}
-                    onOpenIssue={openJiraDetailPage}
-                    onStartWorkspace={handleUseJiraItem}
-                    selectedIssue={selectedJiraIssue}
-                    showSiteContext={selectedJiraSiteId === 'all'}
-                    statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
-                    statusOrder={displayedJiraStatusOrder}
-                  />
+                  {sortedJiraIssues.length > 0 ? (
+                    jiraViewMode === 'board' ? (
+                      <div className="min-h-0 flex-1">
+                        <TaskPageJiraBoard
+                          formatUpdatedAt={formatRelativeTime}
+                          getStatusTone={getJiraStatusTone}
+                          issues={sortedJiraIssues}
+                          onOpenIssue={openJiraDetailPage}
+                          onStartWorkspace={handleUseJiraItem}
+                          selectedIssue={selectedJiraIssue}
+                          showSiteContext={selectedJiraSiteId === 'all'}
+                          statusOrder={displayedJiraStatusOrder}
+                        />
+                      </div>
+                    ) : (
+                      <TaskPageJiraIssueList
+                        formatUpdatedAt={formatRelativeTime}
+                        getStatusTone={getJiraStatusTone}
+                        issues={sortedJiraIssues}
+                        onOpenIssue={openJiraDetailPage}
+                        onStartWorkspace={handleUseJiraItem}
+                        selectedIssue={selectedJiraIssue}
+                        showSiteContext={selectedJiraSiteId === 'all'}
+                        statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
+                        statusOrder={displayedJiraStatusOrder}
+                      />
+                    )
+                  ) : null}
                 </div>
                 <JiraIssueWorkspace
                   issue={selectedJiraIssue}
@@ -12194,14 +12285,14 @@ export default function TaskPage(): React.JSX.Element {
                       'Linear view mode'
                     )}
                   >
-                    {linearViewOptions.map(({ id, label, Icon }) => {
+                    {taskViewOptions.map(({ id, label, Icon }) => {
                       const active = linearViewMode === id
                       return (
                         <Tooltip key={id}>
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              onClick={() => setLinearViewMode(id)}
+                              onClick={() => selectLinearViewMode(id)}
                               aria-label={translate(
                                 'auto.components.TaskPage.af377b13b1',
                                 '{{value0}} view',
@@ -12243,9 +12334,9 @@ export default function TaskPage(): React.JSX.Element {
                       </DropdownMenuLabel>
                       <DropdownMenuRadioGroup
                         value={linearViewMode}
-                        onValueChange={(value) => setLinearViewMode(value as LinearViewMode)}
+                        onValueChange={(value) => selectLinearViewMode(value as LinearViewMode)}
                       >
-                        {linearViewOptions.map(({ id, label, Icon }) => (
+                        {taskViewOptions.map(({ id, label, Icon }) => (
                           <DropdownMenuRadioItem key={id} value={id}>
                             <Icon className="size-3.5" />
                             {label}
@@ -12482,208 +12573,147 @@ export default function TaskPage(): React.JSX.Element {
                 ) : null}
 
                 {linearViewMode === 'board' ? (
-                  <div className="grid min-w-0 gap-3 p-3 md:grid-cols-2 xl:grid-cols-3">
-                    {linearBoardSections.map((section) => (
-                      <section
-                        key={section.key}
-                        onDragOver={(event) => handleLinearBoardDragOver(section, event)}
-                        onDrop={(event) => void handleLinearBoardDrop(section, event)}
-                        className={cn(
-                          'min-h-0 rounded-md border border-border/50 bg-muted/20 transition-[border-color,box-shadow]',
-                          linearBoardDragOverKey === section.key &&
-                            'border-ring/70 ring-1 ring-ring/70'
-                        )}
-                      >
-                        <div className="flex h-9 items-center justify-between border-b border-border/50 px-3">
-                          <span className="truncate text-xs font-medium text-foreground">
-                            {section.label}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {section.issues.length}
-                          </span>
-                        </div>
-                        <div className="space-y-2 p-2">
-                          {section.issues.map((issue) => {
-                            const selected = issue.id === selectedLinearIssueId
-                            const labels = issue.labels.slice(0, 2)
-                            const dragging = linearBoardDraggingIssueId === issue.id
-                            const updating = linearBoardUpdatingIssueIds.has(issue.id)
-                            const teamLabel =
-                              selectedLinearWorkspaceId === 'all' && issue.workspaceName
-                                ? `${issue.workspaceName} / ${issue.team.name}`
-                                : issue.team.name
-                            const attachedWorkspace = findLinearIssueWorkspaceAttachmentInIndex(
-                              linearIssueAttachmentIndex,
-                              issue
-                            )
-                            const attachedWorkspaceLabel = attachedWorkspace
-                              ? getLinearIssueWorkspaceAttachmentLabel(attachedWorkspace)
-                              : null
-                            return (
-                              <div
-                                key={issue.id}
-                                role="button"
-                                tabIndex={0}
-                                draggable={linearStatusBoardEnabled && !updating}
-                                aria-current={selected ? 'true' : undefined}
-                                data-current={selected ? 'true' : undefined}
-                                aria-disabled={updating ? 'true' : undefined}
-                                onDragStart={(event) =>
-                                  handleLinearBoardCardDragStart(issue, event)
-                                }
-                                onDragEnd={() => {
-                                  setLinearBoardDraggingIssueId(null)
-                                  setLinearBoardDragOverKey(null)
+                  <TaskBoard
+                    columns={linearBoardSections}
+                    dragDisabledReason={linearBoardDragDisabledReason}
+                    dragOverColumnKey={linearBoardDragOverKey}
+                    onColumnDragOver={handleLinearBoardDragOver}
+                    onColumnDrop={(section, event) => void handleLinearBoardDrop(section, event)}
+                    renderCard={(issue) => {
+                      const selected = issue.id === selectedLinearIssueId
+                      const labels = issue.labels.slice(0, 2)
+                      const dragging = linearBoardDraggingIssueId === issue.id
+                      const updating = linearBoardUpdatingIssueIds.has(issue.id)
+                      const teamLabel =
+                        selectedLinearWorkspaceId === 'all' && issue.workspaceName
+                          ? `${issue.workspaceName} / ${issue.team.name}`
+                          : issue.team.name
+                      return (
+                        <div
+                          key={issue.id}
+                          role="button"
+                          tabIndex={0}
+                          draggable={linearStatusBoardEnabled && !updating}
+                          aria-current={selected ? 'true' : undefined}
+                          data-current={selected ? 'true' : undefined}
+                          aria-disabled={updating ? 'true' : undefined}
+                          onDragStart={(event) => handleLinearBoardCardDragStart(issue, event)}
+                          onDragEnd={() => {
+                            setLinearBoardDraggingIssueId(null)
+                            setLinearBoardDragOverKey(null)
+                          }}
+                          onClick={() => openLinearDetailPage(issue)}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) {
+                              return
+                            }
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openLinearDetailPage(issue)
+                            }
+                          }}
+                          className={cn(
+                            'group/row cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                            linearStatusBoardEnabled &&
+                              !updating &&
+                              'cursor-grab active:cursor-grabbing',
+                            selected && 'bg-accent',
+                            dragging && 'opacity-50',
+                            updating && 'cursor-wait opacity-70'
+                          )}
+                        >
+                          <div className="flex min-w-0 items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                                {effectiveLinearDisplayProperties.has('priority') ? (
+                                  <LinearPriorityIcon
+                                    priority={issue.priority}
+                                    className="size-3.5"
+                                  />
+                                ) : null}
+                                <span className="truncate">{issue.identifier}</span>
+                              </div>
+                              <h3 className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
+                                {issue.title}
+                              </h3>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1 opacity-70 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                data-contextual-tour-target="tasks-start-workspace"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  handleUseLinearItem(issue)
                                 }}
-                                onClick={() => openLinearDetailPage(issue)}
-                                onKeyDown={(e) => {
-                                  if (e.target !== e.currentTarget) {
-                                    return
-                                  }
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                    openLinearDetailPage(issue)
-                                  }
-                                }}
-                                className={cn(
-                                  'group/row cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                  linearStatusBoardEnabled &&
-                                    !updating &&
-                                    'cursor-grab active:cursor-grabbing',
-                                  selected && 'bg-accent',
-                                  dragging && 'opacity-50',
-                                  updating && 'cursor-wait opacity-70'
+                                aria-label={translate(
+                                  'auto.components.TaskPage.ff90d0abc7',
+                                  'Start workspace from {{value0}}',
+                                  { value0: issue.identifier }
                                 )}
                               >
-                                <div className="flex min-w-0 items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                                      {effectiveLinearDisplayProperties.has('priority') ? (
-                                        <LinearPriorityIcon
-                                          priority={issue.priority}
-                                          className="size-3.5"
-                                        />
-                                      ) : null}
-                                      <span className="truncate">{issue.identifier}</span>
-                                    </div>
-                                    <h3 className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
-                                      {issue.title}
-                                    </h3>
-                                  </div>
-                                  <div className="flex shrink-0 items-center gap-1">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          // Why: solid primary when a workspace is already linked so Open reads stronger than Start.
-                                          variant={attachedWorkspace ? 'default' : 'ghost'}
-                                          size="icon-xs"
-                                          data-contextual-tour-target="tasks-start-workspace"
-                                          onClick={(event) => {
-                                            event.stopPropagation()
-                                            handleOpenOrUseLinearItem(issue)
-                                          }}
-                                          aria-label={
-                                            attachedWorkspace
-                                              ? translate(
-                                                  'auto.components.TaskPage.linearOpenAttachedWorkspace',
-                                                  'Open workspace attached to {{value0}}',
-                                                  { value0: issue.identifier }
-                                                )
-                                              : translate(
-                                                  'auto.components.TaskPage.ff90d0abc7',
-                                                  'Start workspace from {{value0}}',
-                                                  { value0: issue.identifier }
-                                                )
-                                          }
-                                        >
-                                          {attachedWorkspace ? (
-                                            <FolderOpen className="size-3.5" />
-                                          ) : (
-                                            <ArrowRight className="size-3.5" />
-                                          )}
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="bottom" sideOffset={6}>
-                                        {attachedWorkspace
-                                          ? translate('auto.components.TaskPage.606a85c774', 'Open')
-                                          : translate(
-                                              'auto.components.TaskPage.7d08e8be0f',
-                                              'Start'
-                                            )}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        window.api.shell.openUrl(issue.url)
-                                      }}
-                                      aria-label={translate(
-                                        'auto.components.TaskPage.246bd64aed',
-                                        'Open {{value0}} in Linear',
-                                        { value0: issue.identifier }
-                                      )}
-                                    >
-                                      <ExternalLink className="size-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                                  {effectiveLinearDisplayProperties.has('state') ? (
-                                    <LinearStateCell
-                                      issue={issue}
-                                      className="px-1.5 py-0.5"
-                                      sourceContext={linearTaskSourceContext}
-                                    />
-                                  ) : null}
-                                  {effectiveLinearDisplayProperties.has('assignee') ? (
-                                    <span>
-                                      {issue.assignee?.displayName ??
-                                        translate(
-                                          'auto.components.TaskPage.42a9160321',
-                                          'Unassigned'
-                                        )}
-                                    </span>
-                                  ) : null}
-                                  {effectiveLinearDisplayProperties.has('team') ? (
-                                    <span className="truncate">{teamLabel}</span>
-                                  ) : null}
-                                  {effectiveLinearDisplayProperties.has('updated') ? (
-                                    <span>{formatRelativeTime(issue.updatedAt)}</span>
-                                  ) : null}
-                                  {attachedWorkspaceLabel ? (
-                                    <span className="inline-flex min-w-0 items-center gap-1">
-                                      <FolderOpen className="size-3 shrink-0" />
-                                      <span className="truncate">{attachedWorkspaceLabel}</span>
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {effectiveLinearDisplayProperties.has('labels') &&
-                                issue.labels.length > 0 ? (
-                                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1">
-                                    {labels.map((label) => (
-                                      <span
-                                        key={label}
-                                        className="max-w-[140px] truncate rounded-full border border-border/50 bg-muted/35 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                      >
-                                        {label}
-                                      </span>
-                                    ))}
-                                    {issue.labels.length > labels.length ? (
-                                      <span className="text-[10px] text-muted-foreground">
-                                        +{issue.labels.length - labels.length}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </div>
-                            )
-                          })}
+                                <ArrowRight className="size-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  window.api.shell.openUrl(issue.url)
+                                }}
+                                aria-label={translate(
+                                  'auto.components.TaskPage.246bd64aed',
+                                  'Open {{value0}} in Linear',
+                                  { value0: issue.identifier }
+                                )}
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                            {effectiveLinearDisplayProperties.has('state') ? (
+                              <LinearStateCell
+                                issue={issue}
+                                className="px-1.5 py-0.5"
+                                sourceContext={linearTaskSourceContext}
+                              />
+                            ) : null}
+                            {effectiveLinearDisplayProperties.has('assignee') ? (
+                              <span>
+                                {issue.assignee?.displayName ??
+                                  translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
+                              </span>
+                            ) : null}
+                            {effectiveLinearDisplayProperties.has('team') ? (
+                              <span className="truncate">{teamLabel}</span>
+                            ) : null}
+                            {effectiveLinearDisplayProperties.has('updated') ? (
+                              <span>{formatRelativeTime(issue.updatedAt)}</span>
+                            ) : null}
+                          </div>
+                          {effectiveLinearDisplayProperties.has('labels') &&
+                          issue.labels.length > 0 ? (
+                            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1">
+                              {labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="max-w-[140px] truncate rounded-full border border-border/50 bg-muted/35 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                              {issue.labels.length > labels.length ? (
+                                <span className="text-[10px] text-muted-foreground">
+                                  +{issue.labels.length - labels.length}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
-                      </section>
-                    ))}
-                  </div>
+                      )
+                    }}
+                  />
                 ) : (
                   <div className="divide-y divide-border/50">
                     {linearIssueListRows.map((row) => {

@@ -2445,6 +2445,16 @@ describe('orchestration RPC methods', () => {
     it('starts a fresh agent in the coordinator current worktree', async () => {
       setup()
       mockCurrentWorkerStart()
+      // Why (ORCA-208): `dispatch_input` reports `accepted` only on a proven
+      // composer; without proof it reports `written_unproven`. This test is
+      // about worktree reuse, so it takes the healthy path explicitly.
+      vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+        ready: true,
+        proven: true,
+        state: 'ready',
+        signal: 'codex-composer-prompt',
+        waitedMs: 42
+      })
       const task = db.createTask({ spec: 'implement worker start' })
 
       const result = (await call('orchestration.workerStart', {

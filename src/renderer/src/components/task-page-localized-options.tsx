@@ -42,6 +42,11 @@ export type JiraPreset = { id: JiraPresetId; label: string }
 
 export type GitHubModeButton = { id: GitHubTaskKind | 'project'; label: string }
 
+export type TaskViewMode = 'list' | 'board'
+export type JiraViewMode = TaskViewMode
+// Why the re-export rather than #87's local copies: the sync moved these to the shared resume-state
+// module, whose values are identical (LINEAR_VIEW_MODES is ['list','board']). Keeping both would
+// duplicate the identifiers. `in-orca` is the fork's extra Linear mode and stays.
 export type LinearMode = 'issues' | 'projects' | 'views' | 'in-orca'
 export type {
   LinearDisplayProperty,
@@ -178,9 +183,9 @@ export const getLinearModeOptions = createLocalizedCatalog(
   ]
 )
 
-export const getLinearViewOptions = createLocalizedCatalog(
+export const getTaskViewOptions = createLocalizedCatalog(
   (): {
-    id: LinearViewMode
+    id: TaskViewMode
     label: string
     Icon: typeof List
   }[] => {

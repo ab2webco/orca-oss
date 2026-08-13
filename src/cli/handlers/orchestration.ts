@@ -26,6 +26,7 @@ import type { RuntimeStatus, RuntimeTerminalRead } from '../../shared/runtime-ty
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import { orchestrationMigrationData } from '../../shared/orchestration-rpc-contract'
 import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../shared/orchestration-run-pagination'
+import { formatDispatchDeliveryNote } from '../../shared/dispatch-delivery-proof'
 import {
   formatMessageReadOnlyTag,
   formatOrchestrationCheckText,
@@ -524,6 +525,25 @@ function safeJson(value: unknown): string {
   }
 }
 
+/** The `dispatch_input` effect's state, which worker-start carries instead of
+ *  the dispatch row (ORCA-208). Unknown shapes answer null, never "unproven". */
+function findDispatchInputEffectState(effects: unknown[] | undefined): string | null {
+  if (!Array.isArray(effects)) {
+    return null
+  }
+  for (const effect of effects) {
+    if (
+      effect &&
+      typeof effect === 'object' &&
+      (effect as { kind?: unknown }).kind === 'dispatch_input'
+    ) {
+      const state = (effect as { state?: unknown }).state
+      return typeof state === 'string' ? state : null
+    }
+  }
+  return null
+}
+
 export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
   'orchestration run-create': async ({ flags, client, cwd, json }) => {
     const from = await resolveCoordinatorTerminalHandle(flags, cwd, client)
@@ -969,7 +989,13 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       process.exitCode = 1
     }
     printResult(result, json, (worker) => {
-      const base = `Worker ${worker.dispatchId} [${worker.state}] for ${worker.taskId}`
+      // Why (ORCA-208): the delivery note rides the state, not a separate line —
+      // a coordinator scanning `[ready]` must not be able to read the state and
+      // miss the fact that nothing proved the agent took the preamble.
+      const delivery = formatDispatchDeliveryNote({
+        dispatchInputState: findDispatchInputEffectState(worker.effects)
+      })
+      const base = `Worker ${worker.dispatchId} [${worker.state}]${delivery} for ${worker.taskId}`
       if (worker.lastError) {
         return `${base}\n${worker.failedStage ?? 'start'}: ${worker.lastError}`
       }
@@ -979,17 +1005,22 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
 
   'orchestration worker-show': async ({ flags, client, json }) => {
     const result = await client.call<{
-      dispatch: { id: string; task_id: string; status: string }
+      dispatch: {
+        id: string
+        task_id: string
+        status: string
+        composer_ready_proven?: number | null
+      }
       worker: { state: string; stage: string; agent_terminal_handle: string | null }
     }>('orchestration.workerShow', {
       dispatch: getRequiredStringFlag(flags, 'dispatch')
     })
-    printResult(
-      result,
-      json,
-      (value) =>
-        `${value.dispatch.id} task=${value.dispatch.task_id} [${value.worker.state}] stage=${value.worker.stage}`
-    )
+    printResult(result, json, (value) => {
+      const delivery = formatDispatchDeliveryNote({
+        composerReadyProven: value.dispatch.composer_ready_proven
+      })
+      return `${value.dispatch.id} task=${value.dispatch.task_id} [${value.worker.state}] stage=${value.worker.stage}${delivery}`
+    })
   },
 
   'orchestration worker-read': async ({ flags, client, json }) => {
@@ -1256,7 +1287,12 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       ? await resolveCoordinatorTerminalHandle(flags, cwd, client)
       : undefined
     const result = await client.call<{
-      dispatch: { id: string; task_id: string; status: string } | null
+      dispatch: {
+        id: string
+        task_id: string
+        status: string
+        composer_ready_proven?: number | null
+      } | null
       preamble?: string
     }>('orchestration.dispatchShow', {
       task: getRequiredStringFlag(flags, 'task'),
@@ -1271,7 +1307,10 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       if (!r.dispatch) {
         return 'No dispatch context found.'
       }
-      return `${r.dispatch.id} task=${r.dispatch.task_id} [${r.dispatch.status}]`
+      const delivery = formatDispatchDeliveryNote({
+        composerReadyProven: r.dispatch.composer_ready_proven
+      })
+      return `${r.dispatch.id} task=${r.dispatch.task_id} [${r.dispatch.status}]${delivery}`
     })
   },
 

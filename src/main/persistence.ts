@@ -258,6 +258,8 @@ import {
   osc52ClipboardDefaultOnOverridesPersistedOff
 } from '../shared/osc52-clipboard-settings'
 import { normalizeTerminalLineHeight } from '../shared/terminal-line-height-settings'
+import { normalizeLinearViewMode } from '../shared/linear-view-mode'
+import { normalizeJiraViewMode } from '../shared/jira-view-mode'
 import { normalizeUiLanguage } from '../shared/ui-language'
 import { normalizeBrowserPageZoomLevel } from '../shared/browser-page-zoom'
 import { persistedUIValuesEqual } from '../shared/persisted-ui-equality'
@@ -2312,7 +2314,6 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
   return trimmed.length > 0 && trimmed.length <= 512 ? trimmed : null
 }
 
-// Why: unknown strings from hand-edited payloads fall back to the safe default.
 function normalizePlaneViewMode(value: unknown): PlaneViewMode {
   // Why 'board' by default: with agents moving work in parallel, the kanban shows
   // the state of everything at a glance. 'list' stays one click away.
@@ -3582,6 +3583,8 @@ export class Store {
               parsed.settings?.rateLimitFailoverAccountId
             ),
             planeViewMode: normalizePlaneViewMode(parsed.settings?.planeViewMode),
+            linearViewMode: normalizeLinearViewMode(parsed.settings?.linearViewMode),
+            jiraViewMode: normalizeJiraViewMode(parsed.settings?.jiraViewMode),
             rateLimitFailBackMode: normalizeRateLimitFailBackMode(
               parsed.settings?.rateLimitFailBackMode
             ),
@@ -5964,6 +5967,12 @@ export class Store {
       sanitizedUpdates.rateLimitFailoverAccountId = normalizeRateLimitFailoverAccountId(
         updates.rateLimitFailoverAccountId
       )
+    }
+    if ('linearViewMode' in updates) {
+      sanitizedUpdates.linearViewMode = normalizeLinearViewMode(updates.linearViewMode)
+    }
+    if ('jiraViewMode' in updates) {
+      sanitizedUpdates.jiraViewMode = normalizeJiraViewMode(updates.jiraViewMode)
     }
     if ('planeViewMode' in updates) {
       sanitizedUpdates.planeViewMode = normalizePlaneViewMode(updates.planeViewMode)
