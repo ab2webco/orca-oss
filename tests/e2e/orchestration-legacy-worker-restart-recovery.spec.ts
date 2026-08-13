@@ -238,15 +238,20 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
         .toBeTruthy()
       expect(worker?.incarnationId).toBeTruthy()
       const workerPaneKey = `${worker!.tabId}:${worker!.leafId}`
+      // Why a distinct marker: the preamble quotes "Respond ACK…", so a bare ACK
+      // assertion passes on tty echo of Orca's own write (ORCA-207/ORCA-209).
+      // Why a cursored read: this fake echoes, and the reply lands early in a
+      // long echo block that a bounded preview read drops off the top.
       await expect
         .poll(async () => {
           const read = await firstClient.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
             terminal: worker!.handle,
-            limit: 200
+            cursor: 0,
+            limit: 1000
           })
           return read.result.terminal.tail.join('\n')
         })
-        .toContain('ACK')
+        .toContain('AGENT-STDOUT-ACK')
       const initialWorker = {
         ptyId: worker!.ptyId,
         incarnationId: worker!.incarnationId,
@@ -377,15 +382,23 @@ for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION
       await expect(
         second.page.locator(`[data-testid="sortable-tab"][data-tab-id="${coordinatorTabId!}"]`)
       ).toHaveAttribute('data-active', 'true')
+      // Why the same marker: the adopted pane replays the same preamble echo, so a
+      // bare ACK would confirm adoption from Orca's own text instead of the agent's
+      // stdout (ORCA-207).
+      // Why NO cursor here, unlike the pre-restart read: the second runtime holds no
+      // transcript for an adopted pty, so the tail arrives only through
+      // withVisibleSnapshotFallback's recovered-worker branch — and that whole
+      // fallback is skipped when a cursor is passed. Widen the limit instead, so the
+      // marker cannot fall off the top of the bounded preview window.
       await expect
         .poll(async () => {
           const read = await secondClient.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
             terminal: recovered!.handle,
-            limit: 200
+            limit: 1000
           })
           return read.result.terminal.tail.join('\n')
         })
-        .toContain('ACK')
+        .toContain('AGENT-STDOUT-ACK')
 
       let assignmentRunId = run.result.run.id
       if (contractVersion === LEGACY_CONTRACT_VERSION) {
