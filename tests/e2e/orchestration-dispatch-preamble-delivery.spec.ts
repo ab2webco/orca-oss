@@ -333,7 +333,8 @@ test('every dispatched preamble reaches the agent process stdin', async (// oxli
 
     const delivered = outcomes.filter((outcome) => outcome.taskMarker)
     const starved = outcomes.filter((outcome) => outcome.bytes === 0)
-    // eslint-disable-next-line no-console -- the measurement is this spec's artifact.
+    // Why: the per-round ledger IS this spec's deliverable — a pass/fail alone
+    // does not carry the counts the ticket asks for.
     console.log(
       `[ORCA-208] rounds=${outcomes.length} delivered=${delivered.length} starved=${starved.length} ${JSON.stringify(outcomes)}`
     )
