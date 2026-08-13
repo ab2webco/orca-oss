@@ -231,7 +231,6 @@
           "83f9b126ad": "Issue Type can only be set on Issues.",
           "f963485d37": "Row not found",
           "a967f23983": "Project view not loaded",
-          "projectFieldWriteTimedOut": "Project field update timed out",
           "87020f6605": "Row has no owner/repo/number — cannot patch underlying item",
           "d49ef4b944": "Failed to save issue-source preference"
         },

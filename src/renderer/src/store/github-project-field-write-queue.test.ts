@@ -45,4 +45,30 @@ describe('enqueueGitHubProjectFieldWrite', () => {
     releaseFirst()
     await firstResult
   })
+
+  it('does not start a later same-field write while the provider write remains live', async () => {
+    vi.useFakeTimers()
+    let finishFirst: () => void = () => {}
+    const first = enqueueGitHubProjectFieldWrite(
+      { cacheKey: 'view', rowId: 'row', fieldId: 'status' },
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirst = resolve
+        })
+    )
+    const secondWrite = vi.fn(async () => undefined)
+    const second = enqueueGitHubProjectFieldWrite(
+      { cacheKey: 'view', rowId: 'row', fieldId: 'status' },
+      secondWrite
+    )
+
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(30_001)
+    expect(secondWrite).not.toHaveBeenCalled()
+    finishFirst()
+    await first
+    await second
+    expect(secondWrite).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
 })

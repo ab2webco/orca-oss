@@ -584,32 +584,11 @@ function rollbackRowIfPresent(
   applyRowPatch(set, cacheKey, rowId, previousRow)
 }
 
-const PROJECT_FIELD_WRITE_TIMEOUT_MS = 30_000
-
 async function settleProjectFieldMutation(
   mutation: Promise<GitHubProjectMutationResult>
 ): Promise<GitHubProjectMutationResult> {
-  let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    return await Promise.race([
-      mutation,
-      new Promise<GitHubProjectMutationResult>((resolve) => {
-        timeout = setTimeout(
-          () =>
-            resolve({
-              ok: false,
-              error: {
-                type: 'unknown',
-                message: translate(
-                  'auto.store.slices.github.projectFieldWriteTimedOut',
-                  'Project field update timed out'
-                )
-              }
-            }),
-          PROJECT_FIELD_WRITE_TIMEOUT_MS
-        )
-      })
-    ])
+    return await mutation
   } catch (error) {
     return {
       ok: false,
@@ -618,8 +597,6 @@ async function settleProjectFieldMutation(
         message: error instanceof Error ? error.message : String(error)
       }
     }
-  } finally {
-    clearTimeout(timeout)
   }
 }
 
