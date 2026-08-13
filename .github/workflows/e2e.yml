@@ -95,26 +95,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - shard: '1/10'
-            shard_name: 1-of-10
-          - shard: '2/10'
-            shard_name: 2-of-10
-          - shard: '3/10'
-            shard_name: 3-of-10
-          - shard: '4/10'
-            shard_name: 4-of-10
-          - shard: '5/10'
-            shard_name: 5-of-10
-          - shard: '6/10'
-            shard_name: 6-of-10
-          - shard: '7/10'
-            shard_name: 7-of-10
-          - shard: '8/10'
-            shard_name: 8-of-10
-          - shard: '9/10'
-            shard_name: 9-of-10
-          - shard: '10/10'
-            shard_name: 10-of-10
+          - shard: '1/12'
+            shard_name: 1-of-12
+          - shard: '2/12'
+            shard_name: 2-of-12
+          - shard: '3/12'
+            shard_name: 3-of-12
+          - shard: '4/12'
+            shard_name: 4-of-12
+          - shard: '5/12'
+            shard_name: 5-of-12
+          - shard: '6/12'
+            shard_name: 6-of-12
+          - shard: '7/12'
+            shard_name: 7-of-12
+          - shard: '8/12'
+            shard_name: 8-of-12
+          - shard: '9/12'
+            shard_name: 9-of-12
+          - shard: '10/12'
+            shard_name: 10-of-12
+          - shard: '11/12'
+            shard_name: 11-of-12
+          - shard: '12/12'
+            shard_name: 12-of-12
 
     steps:
       - name: Checkout
