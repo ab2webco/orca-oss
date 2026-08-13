@@ -56,9 +56,10 @@ function getFieldValueForGrouping(
   }
   if (field.kind === 'single-select' && value.kind === 'single-select') {
     const idx = field.options.findIndex((o) => o.id === value.optionId)
+    const option = idx === -1 ? undefined : field.options[idx]
     return {
       key: value.optionId,
-      label: value.name,
+      label: value.name || option?.name || 'Option',
       orderHint: idx === -1 ? UNKNOWN_INDEX_SENTINEL - 1 : idx,
       iteration: null
     }
@@ -98,6 +99,13 @@ export function groupRows(
   if (!groupField) {
     return [{ key: 'all', label: '', iteration: null, rows: rowsInOrder }]
   }
+  return groupRowsByField(groupField, rowsInOrder)
+}
+
+export function groupRowsByField(
+  groupField: GitHubProjectField,
+  rowsInOrder: GitHubProjectRow[]
+): ProjectGroup[] {
   const buckets = new Map<
     string,
     {

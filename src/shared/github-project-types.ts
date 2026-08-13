@@ -94,6 +94,8 @@ export type GitHubProjectView = {
   filter: string
   fields: GitHubProjectField[]
   groupByFields: GitHubProjectField[]
+  /** GitHub's vertical grouping drives BOARD_LAYOUT columns. Optional only for legacy in-memory caches. */
+  verticalGroupByFields?: GitHubProjectField[]
   sortByFields: GitHubProjectSort[]
 }
 
