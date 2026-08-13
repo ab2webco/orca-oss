@@ -40,6 +40,7 @@ import {
   githubProjectHost,
   githubProjectIdentityKey
 } from '../../../../shared/github-project-identity'
+import { isSupportedGitHubProjectViewLayout } from '../../../../shared/github-project-view-layout'
 
 export type ResolvedProjectSelection = {
   owner: string
@@ -758,7 +759,7 @@ function ViewPickStep({
           </div>
         ) : (
           views.map((v) => {
-            const supported = v.layout === 'TABLE_LAYOUT'
+            const supported = isSupportedGitHubProjectViewLayout(v.layout)
             return (
               <button
                 key={v.id}
@@ -775,10 +776,7 @@ function ViewPickStep({
                   {v.layout === 'TABLE_LAYOUT'
                     ? translate('auto.components.github.project.ProjectPicker.1a2b8e512e', 'Table')
                     : v.layout === 'BOARD_LAYOUT'
-                      ? translate(
-                          'auto.components.github.project.ProjectPicker.d34ef9b554',
-                          'Board (unsupported)'
-                        )
+                      ? translate('auto.components.github.project.ProjectPicker.board', 'Board')
                       : translate(
                           'auto.components.github.project.ProjectPicker.ab1a2c357d',
                           'Roadmap (unsupported)'
