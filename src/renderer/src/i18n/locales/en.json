@@ -231,6 +231,7 @@
           "83f9b126ad": "Issue Type can only be set on Issues.",
           "f963485d37": "Row not found",
           "a967f23983": "Project view not loaded",
+          "projectFieldWriteTimedOut": "Project field update timed out",
           "87020f6605": "Row has no owner/repo/number — cannot patch underlying item",
           "d49ef4b944": "Failed to save issue-source preference"
         },
@@ -2335,7 +2336,9 @@
             "draftItem": "Draft item",
             "startWork": "Start work",
             "openInGitHub": "Open in GitHub",
-            "readOnlyReason": "This board is read-only. Drag-and-drop updates are unavailable."
+            "dragWriteUnavailable": "Drag is unavailable because changes cannot be written in this context.",
+            "dragUnsupportedField": "Drag is unavailable because this board is grouped by {{value0}}. Only single-select fields can be changed by dragging.",
+            "dragMissingField": "Drag is unavailable because this board has no vertical group field."
           }
         },
         "GitHubMarkdownComposer": {

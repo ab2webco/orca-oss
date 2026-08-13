@@ -7207,6 +7207,119 @@ describe('createGitHubSlice.fetchWorkItems source/error envelope', () => {
     })
   })
 
+  it('rolls back a rejected native project field mutation and returns its error', async () => {
+    const store = createTestStore()
+    const cacheKey = projectViewCacheKey('organization', 'acme', 1, 'view-1')
+    store.setState({
+      projectViewCache: {
+        [cacheKey]: {
+          fetchedAt: 1,
+          data: {
+            project: {
+              id: 'project-1',
+              owner: 'acme',
+              ownerType: 'organization',
+              number: 1,
+              title: 'Roadmap',
+              url: 'https://github.com/orgs/acme/projects/1'
+            },
+            selectedView: {
+              id: 'view-1',
+              number: 1,
+              name: 'Board',
+              layout: 'BOARD_LAYOUT',
+              filter: '',
+              fields: [],
+              groupByFields: [],
+              verticalGroupByFields: [
+                {
+                  id: 'status',
+                  name: 'Status',
+                  dataType: 'SINGLE_SELECT',
+                  kind: 'single-select',
+                  options: [
+                    { id: 'todo', name: 'Todo', color: 'GRAY' },
+                    { id: 'done', name: 'Done', color: 'GREEN' }
+                  ]
+                }
+              ],
+              sortByFields: []
+            },
+            rows: [
+              {
+                id: 'row-1',
+                itemType: 'ISSUE',
+                content: {
+                  repository: 'acme/repo',
+                  number: 12,
+                  title: 'Issue',
+                  body: '',
+                  url: 'https://github.com/acme/repo/issues/12',
+                  state: 'OPEN',
+                  labels: [],
+                  assignees: [],
+                  issueType: null,
+                  parentIssue: null
+                },
+                fieldValuesByFieldId: {
+                  status: {
+                    kind: 'single-select',
+                    fieldId: 'status',
+                    optionId: 'todo',
+                    name: 'Todo',
+                    color: 'GRAY'
+                  }
+                }
+              }
+            ],
+            totalCount: 1,
+            parentFieldDropped: false
+          }
+        }
+      }
+    } as unknown as Partial<AppState>)
+    let rejectUpdate: (error: Error) => void = () => {}
+    mockApi.gh.updateProjectItemField.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectUpdate = reject
+        })
+    )
+
+    const update = store.getState().updateProjectFieldValue(cacheKey, 'row-1', 'status', {
+      kind: 'single-select',
+      optionId: 'done'
+    })
+
+    await Promise.resolve()
+    expect(mockApi.gh.updateProjectItemField).toHaveBeenCalledOnce()
+    expect(
+      store.getState().projectViewCache[cacheKey]?.data?.rows[0]?.fieldValuesByFieldId.status
+    ).toMatchObject({ optionId: 'done', name: 'Done' })
+    rejectUpdate(new Error('transport rejected'))
+    await expect(update).resolves.toEqual({
+      ok: false,
+      error: { type: 'unknown', message: 'transport rejected' }
+    })
+    expect(
+      store.getState().projectViewCache[cacheKey]?.data?.rows[0]?.fieldValuesByFieldId.status
+    ).toMatchObject({ optionId: 'todo', name: 'Todo' })
+
+    mockApi.gh.clearProjectItemField.mockRejectedValueOnce(new Error('clear transport rejected'))
+    const clear = store.getState().clearProjectFieldValue(cacheKey, 'row-1', 'status')
+    await Promise.resolve()
+    expect(
+      store.getState().projectViewCache[cacheKey]?.data?.rows[0]?.fieldValuesByFieldId.status
+    ).toBeUndefined()
+    await expect(clear).resolves.toEqual({
+      ok: false,
+      error: { type: 'unknown', message: 'clear transport rejected' }
+    })
+    expect(
+      store.getState().projectViewCache[cacheKey]?.data?.rows[0]?.fieldValuesByFieldId.status
+    ).toMatchObject({ optionId: 'todo', name: 'Todo' })
+  })
+
   it('routes slug-only project row mutations through the source encoded in the cache key', async () => {
     const store = createTestStore()
     const cacheKey = projectViewCacheKey(

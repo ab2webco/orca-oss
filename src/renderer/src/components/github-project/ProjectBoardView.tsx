@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { ArrowRight, ExternalLink, FileText, GitPullRequest, Lock } from 'lucide-react'
 
 import { TaskBoard, type TaskBoardColumn } from '@/components/task-board'
@@ -6,22 +6,40 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import { buildGitHubProjectBoardColumns } from '../../../../shared/github-project-board-columns'
-import type { GitHubProjectRow, GitHubProjectTable } from '../../../../shared/github-project-types'
+import {
+  buildGitHubProjectBoardColumns,
+  resolveGitHubProjectBoardGroupField
+} from '../../../../shared/github-project-board-columns'
+import type {
+  GitHubProjectFieldMutationValue,
+  GitHubProjectRow,
+  GitHubProjectTable
+} from '../../../../shared/github-project-types'
 
 type Props = {
   table: GitHubProjectTable
   onOpenDialog?: (row: GitHubProjectRow) => void
+  onEditField?: (
+    row: GitHubProjectRow,
+    fieldId: string,
+    value: GitHubProjectFieldMutationValue | null
+  ) => Promise<void> | void
   onStartWork?: (row: GitHubProjectRow) => void
   onOpenInBrowser?: (row: GitHubProjectRow) => void
 }
 
 function ProjectBoardCard({
+  draggable,
+  onDragEnd,
+  onDragStart,
   onOpenDialog,
   onOpenInBrowser,
   onStartWork,
   row
 }: {
+  draggable: boolean
+  onDragEnd: () => void
+  onDragStart: (event: React.DragEvent<HTMLDivElement>) => void
   onOpenDialog?: (row: GitHubProjectRow) => void
   onOpenInBrowser?: (row: GitHubProjectRow) => void
   onStartWork?: (row: GitHubProjectRow) => void
@@ -44,11 +62,14 @@ function ProjectBoardCard({
   return (
     <div
       data-github-project-board-card
-      draggable={false}
+      draggable={draggable}
       aria-disabled={row.itemType === 'REDACTED' ? 'true' : undefined}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={cn(
         'group/row rounded-md border border-border/50 bg-background px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        canStartWork ? 'cursor-pointer' : 'cursor-default opacity-60'
+        canStartWork ? 'cursor-pointer' : 'cursor-default opacity-60',
+        draggable && 'cursor-grab active:cursor-grabbing'
       )}
     >
       <div className="flex min-w-0 items-start justify-between gap-2">
@@ -142,10 +163,12 @@ function ProjectBoardCard({
 
 export default function ProjectBoardView({
   table,
+  onEditField,
   onOpenDialog,
   onOpenInBrowser,
   onStartWork
 }: Props): React.JSX.Element {
+  const groupField = resolveGitHubProjectBoardGroupField(table)
   const columns = useMemo<TaskBoardColumn<GitHubProjectRow>[]>(
     () =>
       buildGitHubProjectBoardColumns(table).map((column) => ({
@@ -155,18 +178,108 @@ export default function ProjectBoardView({
       })),
     [table]
   )
+  const draggedRowRef = useRef<GitHubProjectRow | null>(null)
+  const pendingKeysRef = useRef(new Set<string>())
+  const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const dragEnabled = groupField?.kind === 'single-select' && Boolean(onEditField)
+  const dragDisabledReason = dragEnabled
+    ? null
+    : groupField?.kind === 'single-select'
+      ? translate(
+          'auto.components.github.project.ProjectBoardView.dragWriteUnavailable',
+          'Drag is unavailable because changes cannot be written in this context.'
+        )
+      : groupField
+        ? translate(
+            'auto.components.github.project.ProjectBoardView.dragUnsupportedField',
+            'Drag is unavailable because this board is grouped by {{value0}}. Only single-select fields can be changed by dragging.',
+            { value0: groupField.name }
+          )
+        : translate(
+            'auto.components.github.project.ProjectBoardView.dragMissingField',
+            'Drag is unavailable because this board has no vertical group field.'
+          )
+
+  const isWritableColumn = (column: TaskBoardColumn<GitHubProjectRow>): boolean =>
+    column.key === '__empty__' ||
+    Boolean(
+      groupField?.kind === 'single-select' &&
+      groupField.options.some((option) => option.id === column.key)
+    )
+
+  const handleDrop = async (column: TaskBoardColumn<GitHubProjectRow>): Promise<void> => {
+    const row = draggedRowRef.current
+    draggedRowRef.current = null
+    if (!row || !groupField || groupField.kind !== 'single-select' || !isWritableColumn(column)) {
+      return
+    }
+    const pendingKey = `${row.id}:${groupField.id}`
+    if (pendingKeysRef.current.has(pendingKey)) {
+      return
+    }
+    const currentValue = row.fieldValuesByFieldId[groupField.id]
+    const currentOptionId = currentValue?.kind === 'single-select' ? currentValue.optionId : null
+    const nextOptionId = column.key === '__empty__' ? null : column.key
+    if (nextOptionId && !groupField.options.some((option) => option.id === nextOptionId)) {
+      return
+    }
+    if (currentOptionId === nextOptionId) {
+      return
+    }
+    pendingKeysRef.current.add(pendingKey)
+    setPendingKeys(new Set(pendingKeysRef.current))
+    try {
+      await onEditField?.(
+        row,
+        groupField.id,
+        nextOptionId ? { kind: 'single-select', optionId: nextOptionId } : null
+      )
+    } catch {
+      // The mutation owner reports provider errors; the board only releases its pending lock.
+    } finally {
+      pendingKeysRef.current.delete(pendingKey)
+      setPendingKeys(new Set(pendingKeysRef.current))
+    }
+  }
 
   return (
     <TaskBoard
       columns={columns}
-      dragDisabledReason={translate(
-        'auto.components.github.project.ProjectBoardView.readOnlyReason',
-        'This board is read-only. Drag-and-drop updates are unavailable.'
-      )}
+      dragDisabledReason={dragDisabledReason}
+      onColumnDragOver={
+        dragEnabled
+          ? (column, event) => {
+              if (draggedRowRef.current && isWritableColumn(column)) {
+                event.preventDefault()
+              }
+            }
+          : undefined
+      }
+      onColumnDrop={dragEnabled ? (column) => void handleDrop(column) : undefined}
       renderCard={(row) => (
         <ProjectBoardCard
           key={row.id}
           row={row}
+          draggable={Boolean(
+            dragEnabled &&
+            row.itemType !== 'REDACTED' &&
+            !pendingKeys.has(`${row.id}:${groupField?.id ?? ''}`)
+          )}
+          onDragStart={(event) => {
+            if (
+              !dragEnabled ||
+              row.itemType === 'REDACTED' ||
+              pendingKeysRef.current.has(`${row.id}:${groupField?.id ?? ''}`)
+            ) {
+              event.preventDefault()
+              return
+            }
+            draggedRowRef.current = row
+            event.dataTransfer?.setData('text/plain', row.id)
+          }}
+          onDragEnd={() => {
+            draggedRowRef.current = null
+          }}
           onOpenDialog={onOpenDialog}
           onOpenInBrowser={onOpenInBrowser}
           onStartWork={onStartWork}

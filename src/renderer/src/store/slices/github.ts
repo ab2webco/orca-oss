@@ -2,6 +2,7 @@
 import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
 import type { AppState } from '../types'
+import { enqueueGitHubProjectFieldWrite } from '../github-project-field-write-queue'
 import { githubRepoIdentityKey } from '../../../../shared/github-repository-identity-key'
 import { githubProjectIdentityKey } from '../../../../shared/github-project-identity'
 import type {
@@ -476,7 +477,10 @@ function optimisticFieldValueFromMutation(
   fieldId: string,
   value: GitHubProjectFieldMutationValue
 ): GitHubProjectTable['rows'][number]['fieldValuesByFieldId'][string] | null {
-  const field = table.selectedView.fields.find((f) => f.id === fieldId)
+  const field = [
+    ...table.selectedView.fields,
+    ...(table.selectedView.verticalGroupByFields ?? [])
+  ].find((candidate) => candidate.id === fieldId)
   switch (value.kind) {
     case 'single-select': {
       if (field?.kind === 'single-select') {
@@ -578,6 +582,69 @@ function rollbackRowIfPresent(
     return
   }
   applyRowPatch(set, cacheKey, rowId, previousRow)
+}
+
+const PROJECT_FIELD_WRITE_TIMEOUT_MS = 30_000
+
+async function settleProjectFieldMutation(
+  mutation: Promise<GitHubProjectMutationResult>
+): Promise<GitHubProjectMutationResult> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      mutation,
+      new Promise<GitHubProjectMutationResult>((resolve) => {
+        timeout = setTimeout(
+          () =>
+            resolve({
+              ok: false,
+              error: {
+                type: 'unknown',
+                message: translate(
+                  'auto.store.slices.github.projectFieldWriteTimedOut',
+                  'Project field update timed out'
+                )
+              }
+            }),
+          PROJECT_FIELD_WRITE_TIMEOUT_MS
+        )
+      })
+    ])
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        type: 'unknown',
+        message: error instanceof Error ? error.message : String(error)
+      }
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function rollbackProjectFieldIfCurrent(
+  set: (fn: (s: AppState) => Partial<AppState>) => void,
+  get: () => AppState,
+  cacheKey: string,
+  rowId: string,
+  fieldId: string,
+  optimisticField: GitHubProjectRow['fieldValuesByFieldId'][string] | undefined,
+  previousField: GitHubProjectRow['fieldValuesByFieldId'][string] | undefined
+): void {
+  const row = get().projectViewCache[cacheKey]?.data?.rows.find(
+    (candidate) => candidate.id === rowId
+  )
+  if (!row || row.fieldValuesByFieldId[fieldId] !== optimisticField) {
+    return
+  }
+  const fieldValuesByFieldId = { ...row.fieldValuesByFieldId }
+  if (previousField) {
+    fieldValuesByFieldId[fieldId] = previousField
+  } else {
+    delete fieldValuesByFieldId[fieldId]
+  }
+  applyRowPatch(set, cacheKey, rowId, { ...row, fieldValuesByFieldId })
 }
 
 function parseSlugAndNumber(
@@ -2195,127 +2262,151 @@ export const createGitHubSlice: StateCreator<AppState, [], [], GitHubSlice> = (s
     return request
   },
 
-  updateProjectFieldValue: async (cacheKey, rowId, fieldId, value) => {
-    const state = get()
-    const entry = state.projectViewCache[cacheKey]
-    const table = entry?.data
-    if (!table) {
-      return {
-        ok: false,
-        error: {
-          type: 'unknown',
-          message: translate('auto.store.slices.github.a967f23983', 'Project view not loaded')
+  updateProjectFieldValue: (cacheKey, rowId, fieldId, value) =>
+    enqueueGitHubProjectFieldWrite({ cacheKey, rowId, fieldId }, async () => {
+      const state = get()
+      const entry = state.projectViewCache[cacheKey]
+      const table = entry?.data
+      if (!table) {
+        return {
+          ok: false,
+          error: {
+            type: 'unknown',
+            message: translate('auto.store.slices.github.a967f23983', 'Project view not loaded')
+          }
         }
       }
-    }
-    const rowIndex = table.rows.findIndex((r) => r.id === rowId)
-    if (rowIndex === -1) {
-      return {
-        ok: false,
-        error: {
-          type: 'unknown',
-          message: translate('auto.store.slices.github.f963485d37', 'Row not found')
+      const rowIndex = table.rows.findIndex((r) => r.id === rowId)
+      if (rowIndex === -1) {
+        return {
+          ok: false,
+          error: {
+            type: 'unknown',
+            message: translate('auto.store.slices.github.f963485d37', 'Row not found')
+          }
         }
       }
-    }
-    const previousRow = table.rows[rowIndex]
-    // Optimistic patch: build a field value matching the mutation shape.
-    const nextField = optimisticFieldValueFromMutation(table, fieldId, value)
-    const optimisticFieldValues = { ...previousRow.fieldValuesByFieldId }
-    if (nextField) {
-      optimisticFieldValues[fieldId] = nextField
-    }
-    const optimisticRow: GitHubProjectRow = {
-      ...previousRow,
-      fieldValuesByFieldId: optimisticFieldValues
-    }
-    applyRowPatch(set, cacheKey, rowId, optimisticRow)
+      const previousRow = table.rows[rowIndex]
+      // Optimistic patch: build a field value matching the mutation shape.
+      const nextField = optimisticFieldValueFromMutation(table, fieldId, value)
+      const optimisticFieldValues = { ...previousRow.fieldValuesByFieldId }
+      if (nextField) {
+        optimisticFieldValues[fieldId] = nextField
+      }
+      const optimisticRow: GitHubProjectRow = {
+        ...previousRow,
+        fieldValuesByFieldId: optimisticFieldValues
+      }
+      applyRowPatch(set, cacheKey, rowId, optimisticRow)
 
-    const target = getActiveRuntimeTarget(settingsForProjectViewCacheKey(get().settings, cacheKey))
-    const result =
-      target.kind === 'environment'
-        ? await callRuntimeRpc<GitHubProjectMutationResult>(
-            target,
-            'github.project.updateItemField',
-            {
+      const target = getActiveRuntimeTarget(
+        settingsForProjectViewCacheKey(get().settings, cacheKey)
+      )
+      const result = await settleProjectFieldMutation(
+        target.kind === 'environment'
+          ? callRuntimeRpc<GitHubProjectMutationResult>(
+              target,
+              'github.project.updateItemField',
+              {
+                projectId: table.project.id,
+                host: table.project.host,
+                itemId: rowId,
+                fieldId,
+                value
+              },
+              { timeoutMs: 30_000 }
+            )
+          : window.api.gh.updateProjectItemField({
               projectId: table.project.id,
               host: table.project.host,
               itemId: rowId,
               fieldId,
               value
-            },
-            { timeoutMs: 30_000 }
-          )
-        : await window.api.gh.updateProjectItemField({
-            projectId: table.project.id,
-            host: table.project.host,
-            itemId: rowId,
-            fieldId,
-            value
-          })
-    if (!result.ok) {
-      rollbackRowIfPresent(set, get, cacheKey, rowId, previousRow)
-    }
-    return result
-  },
+            })
+      )
+      if (!result.ok) {
+        rollbackProjectFieldIfCurrent(
+          set,
+          get,
+          cacheKey,
+          rowId,
+          fieldId,
+          optimisticRow.fieldValuesByFieldId[fieldId],
+          previousRow.fieldValuesByFieldId[fieldId]
+        )
+      }
+      return result
+    }),
 
-  clearProjectFieldValue: async (cacheKey, rowId, fieldId) => {
-    const state = get()
-    const entry = state.projectViewCache[cacheKey]
-    const table = entry?.data
-    if (!table) {
-      return {
-        ok: false,
-        error: {
-          type: 'unknown',
-          message: translate('auto.store.slices.github.a967f23983', 'Project view not loaded')
+  clearProjectFieldValue: (cacheKey, rowId, fieldId) =>
+    enqueueGitHubProjectFieldWrite({ cacheKey, rowId, fieldId }, async () => {
+      const state = get()
+      const entry = state.projectViewCache[cacheKey]
+      const table = entry?.data
+      if (!table) {
+        return {
+          ok: false,
+          error: {
+            type: 'unknown',
+            message: translate('auto.store.slices.github.a967f23983', 'Project view not loaded')
+          }
         }
       }
-    }
-    const rowIndex = table.rows.findIndex((r) => r.id === rowId)
-    if (rowIndex === -1) {
-      return {
-        ok: false,
-        error: {
-          type: 'unknown',
-          message: translate('auto.store.slices.github.f963485d37', 'Row not found')
+      const rowIndex = table.rows.findIndex((r) => r.id === rowId)
+      if (rowIndex === -1) {
+        return {
+          ok: false,
+          error: {
+            type: 'unknown',
+            message: translate('auto.store.slices.github.f963485d37', 'Row not found')
+          }
         }
       }
-    }
-    const previousRow = table.rows[rowIndex]
-    const optimisticFieldValues = { ...previousRow.fieldValuesByFieldId }
-    delete optimisticFieldValues[fieldId]
-    const optimisticRow: GitHubProjectRow = {
-      ...previousRow,
-      fieldValuesByFieldId: optimisticFieldValues
-    }
-    applyRowPatch(set, cacheKey, rowId, optimisticRow)
+      const previousRow = table.rows[rowIndex]
+      const optimisticFieldValues = { ...previousRow.fieldValuesByFieldId }
+      delete optimisticFieldValues[fieldId]
+      const optimisticRow: GitHubProjectRow = {
+        ...previousRow,
+        fieldValuesByFieldId: optimisticFieldValues
+      }
+      applyRowPatch(set, cacheKey, rowId, optimisticRow)
 
-    const target = getActiveRuntimeTarget(settingsForProjectViewCacheKey(get().settings, cacheKey))
-    const result =
-      target.kind === 'environment'
-        ? await callRuntimeRpc<GitHubProjectMutationResult>(
-            target,
-            'github.project.clearItemField',
-            {
+      const target = getActiveRuntimeTarget(
+        settingsForProjectViewCacheKey(get().settings, cacheKey)
+      )
+      const result = await settleProjectFieldMutation(
+        target.kind === 'environment'
+          ? callRuntimeRpc<GitHubProjectMutationResult>(
+              target,
+              'github.project.clearItemField',
+              {
+                projectId: table.project.id,
+                host: table.project.host,
+                itemId: rowId,
+                fieldId
+              },
+              { timeoutMs: 30_000 }
+            )
+          : window.api.gh.clearProjectItemField({
               projectId: table.project.id,
               host: table.project.host,
               itemId: rowId,
               fieldId
-            },
-            { timeoutMs: 30_000 }
-          )
-        : await window.api.gh.clearProjectItemField({
-            projectId: table.project.id,
-            host: table.project.host,
-            itemId: rowId,
-            fieldId
-          })
-    if (!result.ok) {
-      rollbackRowIfPresent(set, get, cacheKey, rowId, previousRow)
-    }
-    return result
-  },
+            })
+      )
+      if (!result.ok) {
+        rollbackProjectFieldIfCurrent(
+          set,
+          get,
+          cacheKey,
+          rowId,
+          fieldId,
+          undefined,
+          previousRow.fieldValuesByFieldId[fieldId]
+        )
+      }
+      return result
+    }),
 
   patchProjectIssueOrPr: async (cacheKey, rowId, updates) => {
     const state = get()
