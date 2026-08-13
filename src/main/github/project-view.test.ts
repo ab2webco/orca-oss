@@ -32,6 +32,7 @@ import {
   _resetProjectViewCachesForTests,
   fetchProjectViewsPage,
   classifyProjectError,
+  getProjectViewTable,
   isValidOwnerSlug,
   isValidRepoSlug,
   normalizeFieldValue,
@@ -392,6 +393,36 @@ describe('GitHub Project board schema capability', () => {
     expect(runGraphqlMock.mock.calls[1][0]).not.toContain('verticalGroupByFields')
     expect(runGraphqlMock.mock.calls[2][0]).not.toContain('verticalGroupByFields')
     expect(runGraphqlMock.mock.calls[3][0]).toContain('verticalGroupByFields')
+  })
+
+  it('rejects a board before fetching items when its host cached unsupported board schema', async () => {
+    runGraphqlMock
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { type: 'unknown', message: 'Cannot query field.' },
+        raw: {
+          stderr: '',
+          stdout: JSON.stringify({
+            errors: [
+              { type: 'undefinedField', message: 'Cannot query field verticalGroupByFields' }
+            ]
+          })
+        }
+      })
+      .mockResolvedValueOnce(page('BOARD_LAYOUT'))
+      .mockResolvedValueOnce(page('BOARD_LAYOUT'))
+
+    await fetchPage('github.legacy.test')
+    await expect(
+      getProjectViewTable({
+        owner: 'acme',
+        ownerType: 'organization',
+        projectNumber: 1,
+        viewId: 'view',
+        host: 'github.legacy.test'
+      })
+    ).resolves.toMatchObject({ ok: false, error: { type: 'unsupported_layout' } })
+    expect(runGraphqlMock).toHaveBeenCalledTimes(3)
   })
 
   it('shares a custom-host capability probe across concurrent fetches', async () => {
