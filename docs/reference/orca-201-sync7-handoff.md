@@ -38,6 +38,7 @@ fixed here or parked with a written diagnosis.
 | `orchestration-worker-terminal-visibility:109` | **parked** `test.fixme` (`f62c1f6882`) |
 | `tab-create-entry-file-paths:9` | **parked** `test.fixme` (`cf9a6e883e`) |
 | `floating-tab-rename:179` | **fixed** (`f26386be4d`) — the restart arm toggled the restored panel shut; see below |
+| `terminal-hidden-view-parking:467` | **parked** — fails 3/3 on upstream's own tree; see the three-arm bisect below |
 | `repro-7732:116` | **open**, untouched |
 | `github-created-issue-start-prefill` | **unclassified**, and now a suspect in ORCA-207 group A |
 
@@ -219,8 +220,15 @@ fork's lines are absent from the arm that fails. `tabs:125` and
 `terminal-tab-close-restart-persistence:23` were **not** re-measured this way and keep their earlier,
 weaker verdict — do not extend this result to them without running the same three arms.
 
-Under the standing decision the five ORCA-203 specs ship inside #80, because the fix site only
-exists once the sync is applied. This one now has the written diagnosis a park requires.
+**Parked** (`test.fixme`, diagnosis in the spec file). Coordinator's call: the A/B is conclusive in
+the direction that matters — it fails on upstream's tree with no fork code and passes on the fork
+without the sync — so fixing it inside #80 would mean repairing an upstream defect in a PR that
+already carries 579 commits. The two are not to be mixed.
+
+**Keep the measured/inherited distinction.** `terminal-hidden-view-parking:467` has a three-arm
+measurement behind it. `tabs:125` and `terminal-tab-close-restart-persistence:23` do **not** — they
+were never run through these arms, so their "the merged tree's" verdict stays weaker and must not
+inherit this one's strength. Anyone extending this result to them owes the same three runs.
 
 **ORCA-211 (#84) is eliminated for free:** shard 7 failed this exact case on run `31654278963`,
 whose head was `6eabef707f` — *before* #84 was merged. Do not spend an arm on it.
