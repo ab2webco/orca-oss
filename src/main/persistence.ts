@@ -257,6 +257,7 @@ import {
 } from '../shared/osc52-clipboard-settings'
 import { normalizeTerminalLineHeight } from '../shared/terminal-line-height-settings'
 import { normalizeLinearViewMode } from '../shared/linear-view-mode'
+import { normalizeJiraViewMode } from '../shared/jira-view-mode'
 import { normalizeUiLanguage } from '../shared/ui-language'
 import { normalizeBrowserPageZoomLevel } from '../shared/browser-page-zoom'
 import { persistedUIValuesEqual } from '../shared/persisted-ui-equality'
@@ -3519,6 +3520,7 @@ export class Store {
             ),
             planeViewMode: normalizePlaneViewMode(parsed.settings?.planeViewMode),
             linearViewMode: normalizeLinearViewMode(parsed.settings?.linearViewMode),
+            jiraViewMode: normalizeJiraViewMode(parsed.settings?.jiraViewMode),
             rateLimitFailBackMode: normalizeRateLimitFailBackMode(
               parsed.settings?.rateLimitFailBackMode
             ),
@@ -5837,6 +5839,9 @@ export class Store {
     }
     if ('linearViewMode' in updates) {
       sanitizedUpdates.linearViewMode = normalizeLinearViewMode(updates.linearViewMode)
+    }
+    if ('jiraViewMode' in updates) {
+      sanitizedUpdates.jiraViewMode = normalizeJiraViewMode(updates.jiraViewMode)
     }
     if ('planeViewMode' in updates) {
       sanitizedUpdates.planeViewMode = normalizePlaneViewMode(updates.planeViewMode)

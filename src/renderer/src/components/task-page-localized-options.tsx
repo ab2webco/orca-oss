@@ -32,7 +32,9 @@ export type JiraPreset = { id: JiraPresetId; label: string }
 
 export type GitHubModeButton = { id: GitHubTaskKind | 'project'; label: string }
 
-export type LinearViewMode = 'list' | 'board'
+export type TaskViewMode = 'list' | 'board'
+export type LinearViewMode = TaskViewMode
+export type JiraViewMode = TaskViewMode
 export type LinearMode = 'issues' | 'projects' | 'views'
 export type LinearGroupBy = 'none' | 'status' | 'assignee' | 'priority' | 'team'
 export type LinearOrderBy = 'priority' | 'updated' | 'identifier'
@@ -168,9 +170,9 @@ export const getLinearModeOptions = createLocalizedCatalog(
   ]
 )
 
-export const getLinearViewOptions = createLocalizedCatalog(
+export const getTaskViewOptions = createLocalizedCatalog(
   (): {
-    id: LinearViewMode
+    id: TaskViewMode
     label: string
     Icon: typeof List
   }[] => [
