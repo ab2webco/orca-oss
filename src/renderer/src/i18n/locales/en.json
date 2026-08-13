@@ -1987,6 +1987,7 @@
         "linearEmptyAttributeFilter": "No issues match the selected filters. Clear a filter or try different criteria.",
         "linearEmptyUnfilteredScope": "No issues in this workspace scope. Try searching or adjusting teams.",
         "linearFetchMore": "Fetch more",
+        "linearBoardDragDisabled": "Drag is unavailable while grouping by {{value0}}.",
         "jiraSortAscending": "ascending",
         "jiraSortDescending": "descending",
         "jiraSortBy": "Sort by",

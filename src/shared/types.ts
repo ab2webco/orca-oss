@@ -594,6 +594,7 @@ export const CLAUDE_FAILOVER_ORIGIN_SHARED = '__shared__'
 export type RateLimitFailBackMode = 'off' | 'notify' | 'auto'
 
 export type PlaneViewMode = 'list' | 'board'
+export type LinearViewMode = 'list' | 'board'
 
 /** Provenance for workspaces created through `orca worktree create`. Absent on
  *  workspaces created before this field existed and on every non-CLI create, so
@@ -3155,6 +3156,8 @@ export type GlobalSettings = {
   /** How the Plane task view opens. Defaults to 'board': with agents moving work
    *  in parallel, the kanban reads the state of everything at a glance. */
   planeViewMode?: PlaneViewMode
+  /** How the Linear task view opens. Defaults to 'board' for a consistent task board. */
+  linearViewMode?: LinearViewMode
   /** When true (default), the Claude usage meters show the pinned managed
    *  account's usage while the focused worktree carries a claudeAccountId pin.
    *  false always shows the globally active account. */
