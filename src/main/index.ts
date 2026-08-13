@@ -2571,6 +2571,18 @@ void app.whenReady().then(async () => {
         }))
     )
   })
+  rateLimits.setManagedClaudeAccountsResolver(() =>
+    store!
+      .getSettings()
+      .claudeManagedAccounts.filter((account) => account.authMethod !== 'custom-endpoint')
+      .map((account) => ({
+        id: account.id,
+        managedAuthPath: account.managedAuthPath,
+        managedAuthRuntime: account.managedAuthRuntime,
+        wslDistro: account.wslDistro,
+        wslLinuxAuthPath: account.wslLinuxAuthPath
+      }))
+  )
   rateLimits.setInactiveCodexAccountsResolver(() => {
     const settings = store!.getSettings()
     const activeIds = new Set(

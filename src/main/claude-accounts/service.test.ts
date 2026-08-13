@@ -232,6 +232,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       refreshForClaudeAccountChange: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null)
     }
@@ -309,6 +310,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       refreshForClaudeAccountChange: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null)
     }
@@ -385,6 +387,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       refreshForClaudeAccountChange: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null)
     }
@@ -469,6 +472,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       refreshForClaudeAccountChange: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null)
     }
@@ -558,6 +562,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -644,6 +649,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => {
         throw new Error('refresh failed')
@@ -921,6 +927,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -947,6 +954,7 @@ describe('ClaudeAccountService credential capture', () => {
     await service.reauthenticateAccount('account-1')
 
     expect(rateLimits.evictInactiveClaudeCache).toHaveBeenCalledWith('account-1')
+    expect(rateLimits.clearClaudeAccountAuthVerdict).toHaveBeenCalledWith('account-1')
     expect(rateLimits.refreshForClaudeAccountChange).toHaveBeenCalledWith(undefined, {
       runtime: 'host'
     })
@@ -993,6 +1001,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -1084,6 +1093,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
     const { ClaudeAccountService } = await import('./service')
@@ -1164,6 +1174,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -1247,6 +1258,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -1641,6 +1653,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -1911,6 +1924,7 @@ describe('ClaudeAccountService credential capture', () => {
       }
       const rateLimits = {
         evictInactiveClaudeCache: vi.fn(),
+        clearClaudeAccountAuthVerdict: vi.fn(),
         getActiveClaudeSessionModel: vi.fn(() => null),
         refreshForClaudeAccountChange: vi.fn()
       }
@@ -2036,6 +2050,7 @@ describe('ClaudeAccountService credential capture', () => {
       }
       const rateLimits = {
         evictInactiveClaudeCache: vi.fn(),
+        clearClaudeAccountAuthVerdict: vi.fn(),
         getActiveClaudeSessionModel: vi.fn(() => null),
         refreshForClaudeAccountChange: vi.fn()
       }
@@ -2097,6 +2112,7 @@ describe('ClaudeAccountService credential capture', () => {
       }
       const rateLimits = {
         evictInactiveClaudeCache: vi.fn(),
+        clearClaudeAccountAuthVerdict: vi.fn(),
         getActiveClaudeSessionModel: vi.fn(() => null),
         refreshForClaudeAccountChange: vi.fn()
       }
@@ -2165,6 +2181,7 @@ describe('ClaudeAccountService credential capture', () => {
       }
       const rateLimits = {
         evictInactiveClaudeCache: vi.fn(),
+        clearClaudeAccountAuthVerdict: vi.fn(),
         getActiveClaudeSessionModel: vi.fn(() => null),
         refreshForClaudeAccountChange: vi.fn()
       }
@@ -2240,6 +2257,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -2312,6 +2330,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -2413,6 +2432,7 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
@@ -2776,6 +2796,7 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     }
     const rateLimits = {
       evictInactiveClaudeCache: vi.fn(),
+      clearClaudeAccountAuthVerdict: vi.fn(),
       getActiveClaudeSessionModel: vi.fn(() => null),
       refreshForClaudeAccountChange: vi.fn(async () => ({ accounts: [], activeAccountId: null }))
     }
