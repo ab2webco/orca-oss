@@ -153,6 +153,33 @@ file already learned once.
 | `tabs.spec:125` | **the merged tree's — ours** | see below |
 | `terminal-tab-close-restart-persistence:23` | **the merged tree's — ours** | see below |
 
+### Run `31654278963` — a different red set, so treat the list as a sample, not a defect list
+
+Second full run on the merged tree (`6eabef707f`, docs-only on top of the same code). **Five shards
+red, and not one spec repeats from the previous run.** `tabs:125` and
+`terminal-tab-close-restart-persistence:23` both **passed** here.
+
+| shard | spec | symptom |
+| --- | --- | --- |
+| 2 | `github-created-issue-start-prefill:122` | buffer holds the shell prompt, not `--prefill` |
+| 4 | `pr11346-selected-runtime-add:751` | `Add Project` click times out at 30 s — locator resolves, never stabilises |
+| 4 | `repro-7732-gitlab-checks-job-details:116` | predicate timeout, 10 s |
+| 5 | `source-control-large-file-count:319` | `page.evaluate: Execution context was destroyed` |
+| 7 | `terminal-hidden-view-parking:467` | `did not park (pane manager still mounted)` |
+| 10 | `worktree-switch-responsiveness:49` | perf budget: 72.4 ms vs ≤ 32 ms |
+
+Shard 7 finally has a verdict, and it is **`terminal-hidden-view-parking:467` again** — the spec this
+file already singled out as the one red with no provenance verdict, polling
+`window.__paneManagers?.get(tabId) !== undefined`.
+
+That is now three distinct specs, across three runs, all on the pane-manager mount/unmount path:
+this one, `tabs:125` (tab bar rendering zero tabs while one exists) and
+`terminal-tab-close-restart-persistence:23` (a terminal handle valid at `terminal.list` and gone at
+`terminal.split` milliseconds later). Whatever this is, it is one area, it is intermittent, and no
+single run's red list characterises it. Do not chase the per-run list; chase the area.
+
+Only `github-created-issue-start-prefill` and `repro-7732` appear in both runs.
+
 ### The two new ones are not ORCA-210's, and they are not reproducible off Linux CI
 
 **Not ORCA-210 alone.** `main` at `8c970c9cc9` — ORCA-210 present, the sync absent — is **E2E green**
@@ -202,11 +229,32 @@ it as an area, not a cause.
 **Do not push while an E2E run is in flight.** A push cancels it — that is how shard 7's re-run was
 lost on `31651257359`, and shard 7 still has no verdict.
 
-**Do not run `npm test` alongside a local Playwright run.** Both spawn daemons, PTYs and the relay.
-Run concurrently here, `npm test` wedged: one worker fork pinned at 100 % CPU for 59 minutes with the
-log frozen and no summary — indistinguishable from "slow" until you check `ps`. Whether the merge
-can wedge it on its own is unmeasured; the arms were confounded, so that run proves nothing either
-way and was rerun alone.
+### `npm test` never prints a summary — but nothing fails
+
+The unit suite **passes** on the merged tree. It just never exits, so there is no `Tests …` line to
+paste; count from a verbose run instead:
+
+```
+npx vitest run --config config/vitest.config.ts --reporter=verbose --silent
+```
+
+**51283 passed / 0 failed / 109 skipped**, over **4805 test files — every file the config collects**
+(`vitest list --filesOnly` returns 4805, and 4805 distinct paths appear in the log). Pre-sync was
+51257 passed; the +26 are ORCA-210's new cases. After the last file reports, one worker fork spins
+at ~99 % CPU indefinitely and the run hangs **in teardown**. A synchronous spin blocks the event
+loop, so no vitest timeout fires and it hangs instead of failing.
+
+Two wrong readings this cost, both recorded so nobody repeats them:
+
+- **"It wedged because it ran alongside Playwright."** No — it hangs the same way with nothing else
+  running.
+- **"The frozen log means the run is frozen."** No — the default reporter emits almost nothing in a
+  non-TTY, so the log naturally stops at the last test *stdout* line. Judge liveness with `ps`, and
+  use `--reporter=verbose` when you need per-file progress. (`--reporter=basic` does not exist in
+  vitest 4; it fails at startup and looks like a suite failure.)
+
+Whether the hang predates the `origin/main` merge is **unmeasured** — the pre-merge 51257 figure
+came from a run that did print a summary, so something changed, but the arms were never compared.
 
 **Not fixed, and deliberately not parked.** The ORCA-203/204 parks each rested on a written
 diagnosis of *upstream's* defect; these point at fork code, so `test.fixme` would bury a fork
