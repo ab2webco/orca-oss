@@ -2417,7 +2417,9 @@
             "draftItem": "Draft item",
             "startWork": "Start work",
             "openInGitHub": "Open in GitHub",
-            "readOnlyReason": "This board is read-only. Drag-and-drop updates are unavailable."
+            "dragWriteUnavailable": "Drag is unavailable because changes cannot be written in this context.",
+            "dragUnsupportedField": "Drag is unavailable because this board is grouped by {{value0}}. Only single-select fields can be changed by dragging.",
+            "dragMissingField": "Drag is unavailable because this board has no vertical group field."
           }
         },
         "GitHubMarkdownComposer": {

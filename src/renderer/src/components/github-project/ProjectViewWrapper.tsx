@@ -958,6 +958,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
           <ProjectBoardView
             table={visibleTable}
             onOpenDialog={handleOpenDialog}
+            onEditField={handleEditField}
             onOpenInBrowser={(row) => {
               if (row.content.url) {
                 void window.api.shell.openUrl(row.content.url)
