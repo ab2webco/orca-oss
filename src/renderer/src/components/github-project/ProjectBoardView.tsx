@@ -200,17 +200,10 @@ export default function ProjectBoardView({
             'Drag is unavailable because this board has no vertical group field.'
           )
 
-  const isWritableColumn = (column: TaskBoardColumn<GitHubProjectRow>): boolean =>
-    column.key === '__empty__' ||
-    Boolean(
-      groupField?.kind === 'single-select' &&
-      groupField.options.some((option) => option.id === column.key)
-    )
-
   const handleDrop = async (column: TaskBoardColumn<GitHubProjectRow>): Promise<void> => {
     const row = draggedRowRef.current
     draggedRowRef.current = null
-    if (!row || !groupField || groupField.kind !== 'single-select' || !isWritableColumn(column)) {
+    if (!row || !groupField || groupField.kind !== 'single-select') {
       return
     }
     const pendingKey = `${row.id}:${groupField.id}`
@@ -248,8 +241,8 @@ export default function ProjectBoardView({
       dragDisabledReason={dragDisabledReason}
       onColumnDragOver={
         dragEnabled
-          ? (column, event) => {
-              if (draggedRowRef.current && isWritableColumn(column)) {
+          ? (_column, event) => {
+              if (draggedRowRef.current) {
                 event.preventDefault()
               }
             }
