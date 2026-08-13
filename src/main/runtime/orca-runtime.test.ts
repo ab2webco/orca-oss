@@ -16964,6 +16964,71 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('keeps a Codex pane its own ingested output when the renderer screen is behind', async () => {
+    // A hidden-delivery-gated worker pane serializes to the pre-agent shell
+    // screen: no alternate-screen switch, and no trace of what the agent wrote.
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: 'fabolivar@host orca-e2e-repo % %\r\nfabolivar@host orca-e2e-repo % ',
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-1',
+      'fabolivar@host orca-e2e-repo % codex\r\n\x1b]0;Codex Ready\x07OpenAI Codex\r\nAGENT-STDOUT-ACK\r\n',
+      100
+    )
+
+    const preview = await runtime.readTerminal(handle)
+
+    expect(preview.tail).toEqual(expect.arrayContaining(['OpenAI Codex', 'AGENT-STDOUT-ACK']))
+  })
+
+  it('prefers a Codex frame that carries its own alternate-screen DECSET', async () => {
+    // The pane's serializer registers after the runtime built its model (parked
+    // pane revealed, daemon-hosted PTY), so the runtime never saw the TUI's
+    // 1049h and its emulator still reads normal-screen. Only the serialized
+    // frame's own DECSET can classify it.
+    let rendererMounted = false
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: '\x1b[?1049h\x1b[2J\x1b[H >_ OpenAI Codex\r\n› Ready for input\r\n',
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => rendererMounted,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    const pollutedTranscript = ['WWoWorWorkWorkiWorkinWorking', 'SStaStarStartStartiStarting']
+    runtime.onPtyData('pty-1', `${pollutedTranscript.join('\n')}\n`, 100)
+    // The second chunk closes hydration ('done' while no serializer was
+    // registered), so the frame's 1049h can never reach the runtime's emulator.
+    runtime.onPtyData('pty-1', 'still working\n', 200)
+    rendererMounted = true
+
+    const preview = await runtime.readTerminal(handle)
+
+    expect(preview.tail).toEqual([' >_ OpenAI Codex', '› Ready for input'])
+    // Or this would pass through the runtime's own mode state and prove nothing
+    // about classifying the frame.
+    expect(runtime.isTerminalAlternateScreen('pty-1')).toBe(false)
+  })
+
   it('reads and shows the runtime-owned alternate-screen grid without serialization', async () => {
     const serializeBuffer = vi.fn()
     const serializeProviderBuffer = vi.fn()

@@ -11618,9 +11618,14 @@ export class OrcaRuntimeService {
       Boolean(this.ptyController?.serializeBuffer) &&
       this.ptyController?.hasRendererSerializer?.(ptyId) !== false
     if (rendererSnapshotAvailable && (await this.resolvePtyAgentOwner(ptyId)) === 'codex') {
-      const rendererLines = await this.readRendererVisibleSnapshotLines(ptyId)
-      if (rendererLines.length > 0) {
-        return buildVisibleSnapshotReadFallback(read, rendererLines, opts.limit)
+      const rendererSnapshot = await this.readRendererVisibleSnapshot(ptyId)
+      // Why the full-screen gate: this preference exists because a Codex TUI's
+      // redraws leave the transcript polluted, so its live screen reads better.
+      // A pane whose renderer buffer is behind (hidden-delivery gated, parked,
+      // not yet hydrated) serializes to the pre-agent shell screen, and taking
+      // that would hide agent output the runtime already ingested (ORCA-209).
+      if (rendererSnapshot && rendererSnapshot.lines.length > 0 && rendererSnapshot.fullScreen) {
+        return buildVisibleSnapshotReadFallback(read, rendererSnapshot.lines, opts.limit)
       }
     }
     const blankFallback = shouldFallbackToVisibleTerminalSnapshot(read, opts)
@@ -11818,12 +11823,20 @@ export class OrcaRuntimeService {
   }
 
   private async readRendererVisibleSnapshotLines(ptyId: string): Promise<string[]> {
+    return (await this.readRendererVisibleSnapshot(ptyId))?.lines ?? []
+  }
+
+  /** Renderer xterm's active screen, plus whether that screen is a full-screen
+   *  (alternate-screen) view — the only state where it may outrank the tail. */
+  private async readRendererVisibleSnapshot(
+    ptyId: string
+  ): Promise<{ lines: string[]; fullScreen: boolean } | null> {
     const controller = this.ptyController
     if (!controller?.serializeBuffer) {
-      return []
+      return null
     }
     if (controller.hasRendererSerializer && !controller.hasRendererSerializer(ptyId)) {
-      return []
+      return null
     }
     try {
       // Why: raw PTY tails can be whitespace-only while a full-screen TUI is
@@ -11838,12 +11851,27 @@ export class OrcaRuntimeService {
         null
       )
       if (!snapshot || snapshot.data.length === 0) {
-        return []
+        return null
       }
-      return this.parseVisibleSnapshotLines(snapshot)
+      return {
+        lines: await this.parseVisibleSnapshotLines(snapshot),
+        fullScreen: this.isVisibleSnapshotFullScreen(ptyId, snapshot.data)
+      }
     } catch {
-      return []
+      return null
     }
+  }
+
+  /** Why the snapshot's own bytes count: SerializeAddon replays the alternate
+   *  screen with its DECSET, so a serialized frame classifies itself even when
+   *  the runtime never observed the switch (restored/daemon-hosted PTYs). */
+  private isVisibleSnapshotFullScreen(ptyId: string, data: string): boolean {
+    if (this.isTerminalAlternateScreen(ptyId)) {
+      return true
+    }
+    const tracker = new TerminalKittyKeyboardModeTracker()
+    tracker.scanReplay(data)
+    return tracker.isAlternateScreen
   }
 
   private async serializeHeadlessTerminalBuffer(
