@@ -176,10 +176,31 @@ shows the `terminal.list` poll **succeeded** (one match, handle captured); `term
 handle then returned `selector_not_found` milliseconds later. Handle valid at list time, gone at
 split time.
 
-**The fork divergence on that path:** `terminal-pane/use-terminal-pane-lifecycle.ts` is **+15 vs
-`a63df91790`** and owns the mount/unmount path both symptoms sit on. This file already flagged it
-once, for `terminal-hidden-view-parking` — which has since left the red list while these two
-arrived.
+**Neither arm alone fails; the combination does.** Three CI runs, one data point each — weak
+individually, coherent together:
+
+| arm | run | `tabs:125` | `terminal-tab-close-restart-persistence:23` |
+| --- | --- | --- | --- |
+| the sync, **before** the `origin/main` merge | `31453995130` | pass (shard 6 green) | pass (shard 9 green) |
+| `main` = ORCA-210 **without** the sync | `31648371052` | pass | pass |
+| **merged** (sync + ORCA-210) | `31651257359` | **fail** | **fail** |
+
+Both specs are confirmed to have *run* in the pre-merge arm, in these same shards — checked in the
+job logs, not inferred from the shard being green.
+
+So this is an **interaction**, which puts the `session.ts` resolution and ORCA-210's launch gate at
+the top of the suspect list, not a pre-existing fork wart: the gate changes *when* the launch
+command reaches the shell, and the sync rewrote terminal startup around it. First thing to check on
+the next red run is whether these panes come up `startupCommandWithheld`.
+
+**A weaker lead, stated as weak:** `terminal-pane/use-terminal-pane-lifecycle.ts` is +15 vs
+`a63df91790` and sits on the mount/unmount path. But its obvious mechanism was already disconfirmed
+earlier in this file (the two threaded callbacks are ref/`useCallback`-stable, so they do not
+destabilise the deps object by identity), and on re-reading, the 15 lines are pure plumbing. Treat
+it as an area, not a cause.
+
+**Do not push while an E2E run is in flight.** A push cancels it — that is how shard 7's re-run was
+lost on `31651257359`, and shard 7 still has no verdict.
 
 **Not fixed, and deliberately not parked.** The ORCA-203/204 parks each rested on a written
 diagnosis of *upstream's* defect; these point at fork code, so `test.fixme` would bury a fork
