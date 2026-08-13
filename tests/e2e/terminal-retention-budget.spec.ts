@@ -57,9 +57,15 @@ test.describe('terminal hidden-worktree retention budget', () => {
       if (!olderTabId) {
         throw new Error('older SSH terminal tab did not become active')
       }
-      // Why the ':' terminator: match the exact echoed line, not the typed command.
-      const olderMarker = `RETENTION_OLD_${Date.now()}`
-      await sendToTerminal(orcaPage, olderPtyId, `echo "${olderMarker}:"\r`)
+      // Why printf assembles the marker from arguments: `echo "RETENTION_OLD_1:"`
+      // carries the asserted text verbatim in its own command line, so the tty echo
+      // satisfied this assertion before the shell ran anything — the ':' terminator
+      // did not disambiguate, it sat inside the quotes too (ORCA-207). Only the
+      // shell's output can join the format and its arguments, and that string
+      // appears in no line this test types.
+      const olderNonce = `${Date.now()}`
+      const olderMarker = `RETENTION_OLD_${olderNonce}`
+      await sendToTerminal(orcaPage, olderPtyId, `printf 'RETENTION_%s_%s:\\n' OLD ${olderNonce}\r`)
       await expect
         .poll(() => getTerminalContent(orcaPage, 20_000), {
           timeout: 30_000,

@@ -71,9 +71,10 @@ process.stdin.on('data', (chunk) => {
   if (input.includes('\\x03')) {
     appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'stdin-ctrl-c' })
   }
-  if (!acknowledged && input.includes('\\r')) {
+  // Why \\n too: this tty is canonical, so ICRNL delivers Enter as \\n (ORCA-207).
+  if (!acknowledged && (input.includes('\\r') || input.includes('\\n'))) {
     acknowledged = true
-    process.stdout.write('ACK\\n')
+    process.stdout.write('AGENT-STDOUT-ACK\\n')
   }
   const legacyCompletion = input.match(/ORCA_E2E_RUN_LEGACY_DONE:([A-Za-z0-9+/=]+)/)
   if (!lifecycleSent && legacyCompletion) {
