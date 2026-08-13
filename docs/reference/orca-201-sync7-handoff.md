@@ -137,6 +137,56 @@ macOS. It reproduces only on Linux CI, so the probe has to run there. That is wh
 rather than given a third inferred cause; its two earlier "confirmed" causes were both true and
 neither closed it.
 
+## Triage of run `31651257359` — the first run after the `origin/main` merge
+
+Five shards red: four with one spec each, and 7-of-10 **cancelled by fail-fast** (re-run in flight,
+so it has no verdict yet). `floating-tab-rename` is gone from the list — the fix held on Linux CI.
+
+All four spec files are byte-identical to `a63df91790`; three are also byte-identical to
+`267f58acd6` and to `origin/main`. Byte-identity therefore classifies none of them, exactly as this
+file already learned once.
+
+| spec | verdict | basis |
+| --- | --- | --- |
+| `repro-7732-gitlab-checks-job-details:116` | **upstream's** (ORCA-203) | absent at `267f58acd6` *and* on `origin/main`; fails on upstream's own unmodified tree |
+| `github-created-issue-start-prefill:122` | **still unclassified, deliberately** | see the section above; the bar to close it is unchanged |
+| `tabs.spec:125` | **the merged tree's — ours** | see below |
+| `terminal-tab-close-restart-persistence:23` | **the merged tree's — ours** | see below |
+
+### The two new ones are not ORCA-210's, and they are not reproducible off Linux CI
+
+**Not ORCA-210 alone.** `main` at `8c970c9cc9` — ORCA-210 present, the sync absent — is **E2E green**
+(run `31648371052`). That is **one** run, so it is weak on its own; state it that way. The other main
+run at the same SHA (`31625380554`) is *not* a counter-example: its shard 6 died downloading the
+Electron binary (HTTP 503), never reaching a spec.
+
+**Not reproducible here.** On the merged tree, macOS: 3/3 green each, isolated; and `tabs.spec:125`
+is green again inside a full local `--shard=6/10`. (That shard run reds three *other* specs —
+`tab-rename:121`, `terminal-codex-home:30`, `terminal-codex-hidden-startup-background:229` — all of
+which CI's shard 6 passes; they are macOS-local, no real `codex` binary.)
+
+**`tabs.spec:125` is not a double-create.** The message reads "did not add a tab", but the numbers
+are `Expected: 1, Received: 2`, and CI's failure snapshot shows the tab bar holding **`Terminal 1`**
+— the tab the *previous* test in the file created — **and `Terminal 2`**, the Ctrl+T one. So
+`tabsBefore` sampled 0 while `Terminal 1` existed and was not rendered. The defect is a tab-bar
+render/mount gap in the baseline, not the keystroke.
+
+**`terminal-tab-close-restart-persistence:23` is the same instability from the RPC side.** The trace
+shows the `terminal.list` poll **succeeded** (one match, handle captured); `terminal.split` on that
+handle then returned `selector_not_found` milliseconds later. Handle valid at list time, gone at
+split time.
+
+**The fork divergence on that path:** `terminal-pane/use-terminal-pane-lifecycle.ts` is **+15 vs
+`a63df91790`** and owns the mount/unmount path both symptoms sit on. This file already flagged it
+once, for `terminal-hidden-view-parking` — which has since left the red list while these two
+arrived.
+
+**Not fixed, and deliberately not parked.** The ORCA-203/204 parks each rested on a written
+diagnosis of *upstream's* defect; these point at fork code, so `test.fixme` would bury a fork
+regression under a precedent that does not apply. Next measurement, and the only one left that
+discriminates: re-run shards 6 and 9 at this same SHA — a green separates intermittent-under-load
+from deterministic-in-shard, and a second red in the same place makes it bisectable.
+
 ## `src/main/daemon/session.ts` is now a protected surface (ORCA-210 / #83)
 
 `origin/main` was merged in (`a49f782753`) — never rebased; a rebase would flatten the merge and
