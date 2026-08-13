@@ -2258,7 +2258,8 @@
             "d34ef9b554": "Board (unsupported)",
             "43a88ae574": "BOARD_LAYOUT",
             "1a2b8e512e": "Table",
-            "cafb908f34": "TABLE_LAYOUT"
+            "cafb908f34": "TABLE_LAYOUT",
+            "board": "Board"
           },
           "ProjectRow": {
             "75b5d816e3": "Start work",
@@ -2328,6 +2329,13 @@
                 "7c302f8174": "Untitled"
               }
             }
+          },
+          "ProjectBoardView": {
+            "restrictedItem": "Restricted item",
+            "draftItem": "Draft item",
+            "startWork": "Start work",
+            "openInGitHub": "Open in GitHub",
+            "readOnlyReason": "This board is read-only. Drag-and-drop updates are unavailable."
           }
         },
         "GitHubMarkdownComposer": {

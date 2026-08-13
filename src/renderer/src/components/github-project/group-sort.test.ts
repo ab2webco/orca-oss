@@ -9,7 +9,7 @@ import type {
   GitHubProjectTable,
   GitHubProjectView
 } from '../../../../shared/github-project-types'
-import { sortRows, groupRows } from '../../../../shared/github-project-group-sort'
+import { groupRows, groupRowsByField, sortRows } from '../../../../shared/github-project-group-sort'
 
 const singleSelectField: GitHubProjectField = {
   kind: 'single-select',
@@ -239,5 +239,24 @@ describe('groupRows', () => {
     ]
     const groups = groupRows(makeTable(view, rows), rows)
     expect(groups.map((g) => g.key)).toEqual(['opt_a', '__empty__'])
+  })
+
+  it('groups rows by an explicit field without depending on the table view grouping', () => {
+    const rows = [
+      makeRow('rNone', 0, {}),
+      makeRow('rA', 1, {
+        F_status: {
+          kind: 'single-select',
+          fieldId: 'F_status',
+          optionId: 'opt_a',
+          name: 'Todo',
+          color: 'GRAY'
+        }
+      })
+    ]
+
+    const groups = groupRowsByField(singleSelectField, rows)
+
+    expect(groups.map((group) => group.key)).toEqual(['opt_a', '__empty__'])
   })
 })

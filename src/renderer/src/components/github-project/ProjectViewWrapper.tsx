@@ -44,6 +44,7 @@ import type {
 import type { GitHubWorkItem } from '../../../../shared/types'
 import ProjectPicker, { type ResolvedProjectSelection } from './ProjectPicker'
 import ProjectViewList from './ProjectViewList'
+import ProjectBoardView from './ProjectBoardView'
 import ProjectItemSlugDialog from './ProjectItemSlugDialog'
 import {
   filterProjectTableRowsBySelectedRepos,
@@ -65,6 +66,7 @@ import {
   githubProjectHost,
   githubProjectIdentityKey
 } from '../../../../shared/github-project-identity'
+import { isSupportedGitHubProjectViewLayout } from '../../../../shared/github-project-view-layout'
 
 type Props = {
   selectedRepoIds: ReadonlySet<string>
@@ -947,21 +949,34 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
           onClose={() => setDialogRepoItem(null)}
         />
       ) : visibleTable ? (
-        <ProjectViewList
-          table={visibleTable}
-          onOpenDialog={handleOpenDialog}
-          onEditField={handleEditField}
-          onEditAssignees={(row, add, remove) => void handleEditAssignees(row, add, remove)}
-          onEditLabels={(row, add, remove) => void handleEditLabels(row, add, remove)}
-          onEditIssueType={(row, issueType) => void handleEditIssueType(row, issueType)}
-          onOpenInBrowser={(row) => {
-            if (row.content.url) {
-              void window.api.shell.openUrl(row.content.url)
-            }
-          }}
-          onStartWork={handleStartWork}
-          sourceSettings={settings}
-        />
+        visibleTable.selectedView.layout === 'BOARD_LAYOUT' ? (
+          <ProjectBoardView
+            table={visibleTable}
+            onOpenDialog={handleOpenDialog}
+            onOpenInBrowser={(row) => {
+              if (row.content.url) {
+                void window.api.shell.openUrl(row.content.url)
+              }
+            }}
+            onStartWork={handleStartWork}
+          />
+        ) : (
+          <ProjectViewList
+            table={visibleTable}
+            onOpenDialog={handleOpenDialog}
+            onEditField={handleEditField}
+            onEditAssignees={(row, add, remove) => void handleEditAssignees(row, add, remove)}
+            onEditLabels={(row, add, remove) => void handleEditLabels(row, add, remove)}
+            onEditIssueType={(row, issueType) => void handleEditIssueType(row, issueType)}
+            onOpenInBrowser={(row) => {
+              if (row.content.url) {
+                void window.api.shell.openUrl(row.content.url)
+              }
+            }}
+            onStartWork={handleStartWork}
+            sourceSettings={settings}
+          />
+        )
       ) : null}
 
       {/* Slug-only dialog for unadded-repo rows; Start-work lives in the parent's `repoNotInOrca` modal, not here (avoids a confusing duplicate button). */}
@@ -1169,11 +1184,11 @@ function ViewTabStrip({
   activeViewId: string | null
   onPick: (viewId: string) => void
 }): React.JSX.Element {
-  // Why: emulate GitHub Projects' tab strip; non-table layouts stay visible but disabled.
+  // Why: emulate GitHub Projects' tab strip; Roadmap stays visible but disabled.
   return (
     <div className="project-view-tab-strip flex min-h-[41px] min-w-0 flex-none items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-border/50 bg-muted/20 px-3 pt-3">
       {views.map((v) => {
-        const supported = v.layout === 'TABLE_LAYOUT'
+        const supported = isSupportedGitHubProjectViewLayout(v.layout)
         const active = v.id === activeViewId
         const layoutLabel =
           v.layout === 'BOARD_LAYOUT'
@@ -1297,7 +1312,7 @@ function ErrorState({
     error.type === 'too_large'
       ? `This view has ${totalCount ?? 'many'} items — too large to render in Orca. Narrow the view's filter on GitHub.`
       : error.type === 'unsupported_layout'
-        ? 'Orca only renders table views yet. This is a Board or Roadmap view.'
+        ? error.message
         : error.type === 'not_found'
           ? 'Could not find this project or view.'
           : error.type === 'schema_drift'

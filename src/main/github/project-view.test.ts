@@ -7,7 +7,15 @@
 //     usernames/orgs),
 // (d) parseProjectPaste shorthand owner-only alphabet matches the renderer,
 // (e) project owner/capability caches stay bounded in long sessions.
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ProjectViewInternals from './project-view/internals'
+
+const { runGraphqlMock } = vi.hoisted(() => ({ runGraphqlMock: vi.fn() }))
+
+vi.mock('./project-view/internals', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProjectViewInternals>()),
+  runGraphql: runGraphqlMock
+}))
 import {
   GITHUB_PROJECT_REF_INPUT_MAX_BYTES,
   GITHUB_PROJECT_REF_INPUT_TOO_LARGE_ERROR
@@ -22,12 +30,42 @@ import {
   _markProjectViewParentFieldWarningLoggedForTests,
   _rememberProjectViewOwnerTypeForTests,
   _resetProjectViewCachesForTests,
+  fetchProjectViewsPage,
   classifyProjectError,
   isValidOwnerSlug,
   isValidRepoSlug,
+  normalizeFieldValue,
   parseProjectPaste,
-  resolveProjectRef
+  resolveProjectRef,
+  supportsModernProjectBoardSchema
 } from './project-view'
+
+describe('normalizeFieldValue board grouping values', () => {
+  it('normalizes repository and milestone values for board grouping', () => {
+    expect(
+      normalizeFieldValue({
+        __typename: 'ProjectV2ItemFieldRepositoryValue',
+        field: { id: 'repository', name: 'Repository', dataType: 'REPOSITORY' },
+        repository: { nameWithOwner: 'acme/repo' }
+      })
+    ).toEqual({ kind: 'text', fieldId: 'repository', text: 'acme/repo' })
+    expect(
+      normalizeFieldValue({
+        __typename: 'ProjectV2ItemFieldMilestoneValue',
+        field: { id: 'milestone', name: 'Milestone', dataType: 'MILESTONE' },
+        milestone: { title: 'v2' }
+      })
+    ).toEqual({ kind: 'text', fieldId: 'milestone', text: 'v2' })
+  })
+})
+
+describe('supportsModernProjectBoardSchema', () => {
+  it('optimistically allows unknown execution hosts until a runtime probe rejects the field', () => {
+    expect(supportsModernProjectBoardSchema()).toBe(true)
+    expect(supportsModernProjectBoardSchema('github.com')).toBe(true)
+    expect(supportsModernProjectBoardSchema('ghe.acme.test')).toBe(true)
+  })
+})
 
 describe('classifyProjectError', () => {
   it('classifies HTTP 404 as not_found', () => {
@@ -282,5 +320,96 @@ describe('project view owner caches', () => {
     expect(_hasProjectViewParentFieldWarningLoggedForTests('owner-0\u0000organization')).toBe(false)
     expect(_hasProjectViewParentFieldRetriedForTests('owner-1\u0000organization')).toBe(true)
     expect(_hasProjectViewParentFieldWarningLoggedForTests('owner-1\u0000organization')).toBe(true)
+  })
+})
+
+function page(layout: 'TABLE_LAYOUT' | 'BOARD_LAYOUT') {
+  return {
+    ok: true as const,
+    data: {
+      organization: {
+        projectV2: {
+          id: 'project',
+          title: 'Project',
+          url: 'https://example.test/project',
+          views: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [{ id: 'view', number: 1, name: 'View', layout }]
+          }
+        }
+      }
+    }
+  }
+}
+
+function fetchPage(host: string) {
+  return fetchProjectViewsPage({
+    owner: 'acme',
+    ownerType: 'organization',
+    projectNumber: 1,
+    host,
+    after: null
+  })
+}
+
+beforeEach(() => {
+  runGraphqlMock.mockReset()
+  _resetProjectViewCachesForTests()
+})
+
+describe('GitHub Project board schema capability', () => {
+  it('uses board schema on a capable custom host', async () => {
+    runGraphqlMock.mockResolvedValueOnce(page('BOARD_LAYOUT'))
+
+    await expect(fetchPage('github.capable.test')).resolves.toMatchObject({ ok: true })
+    expect(runGraphqlMock).toHaveBeenCalledTimes(1)
+    expect(runGraphqlMock.mock.calls[0][0]).toContain('verticalGroupByFields')
+  })
+
+  it('caches a narrow unsupported result without breaking tables or another host', async () => {
+    runGraphqlMock
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { type: 'unknown', message: 'Cannot query field.' },
+        raw: {
+          stderr: '',
+          stdout: JSON.stringify({
+            errors: [
+              { type: 'undefinedField', message: 'Cannot query field verticalGroupByFields' }
+            ]
+          })
+        }
+      })
+      .mockResolvedValueOnce(page('BOARD_LAYOUT'))
+      .mockResolvedValueOnce(page('TABLE_LAYOUT'))
+      .mockResolvedValueOnce(page('BOARD_LAYOUT'))
+
+    await expect(fetchPage('github.legacy.test')).resolves.toMatchObject({ ok: true })
+    await expect(fetchPage('github.legacy.test')).resolves.toMatchObject({ ok: true })
+    await expect(fetchPage('github.other.test')).resolves.toMatchObject({ ok: true })
+
+    expect(runGraphqlMock.mock.calls[0][0]).toContain('verticalGroupByFields')
+    expect(runGraphqlMock.mock.calls[1][0]).not.toContain('verticalGroupByFields')
+    expect(runGraphqlMock.mock.calls[2][0]).not.toContain('verticalGroupByFields')
+    expect(runGraphqlMock.mock.calls[3][0]).toContain('verticalGroupByFields')
+  })
+
+  it('shares a custom-host capability probe across concurrent fetches', async () => {
+    let releaseProbe: (value: ReturnType<typeof page>) => void = () => {}
+    runGraphqlMock
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (releaseProbe = resolve as typeof releaseProbe))
+      )
+      .mockResolvedValueOnce(page('TABLE_LAYOUT'))
+
+    const first = fetchPage('github.concurrent.test')
+    const second = fetchPage('github.concurrent.test')
+    expect(runGraphqlMock).toHaveBeenCalledTimes(1)
+
+    releaseProbe(page('BOARD_LAYOUT'))
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+
+    expect(runGraphqlMock).toHaveBeenCalledTimes(2)
+    expect(runGraphqlMock.mock.calls[1][0]).toContain('verticalGroupByFields')
   })
 })
