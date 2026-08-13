@@ -5,14 +5,14 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
-import { LinearBoard } from './linear-board'
+import { TaskBoard } from './task-board'
 
 afterEach(cleanup)
 
-describe('LinearBoard', () => {
+describe('TaskBoard', () => {
   it('lays groups out as horizontally scrollable fixed-width columns', () => {
     const { container } = render(
-      <LinearBoard
+      <TaskBoard
         columns={[
           { key: 'status:todo', label: 'Todo', issues: ['ORCA-1'] },
           { key: 'status:done', label: 'Done', issues: ['ORCA-2'] }
@@ -22,16 +22,14 @@ describe('LinearBoard', () => {
       />
     )
 
-    expect(container.querySelector('[data-linear-board-scroll]')).toHaveClass('overflow-x-auto')
-    expect(container.querySelector('[data-linear-board-column]')).toHaveClass('w-72', 'shrink-0')
-    expect(container.querySelector('[data-linear-board-column-cards]')).toHaveClass(
-      'overflow-y-auto'
-    )
+    expect(container.querySelector('[data-task-board-scroll]')).toHaveClass('overflow-x-auto')
+    expect(container.querySelector('[data-task-board-column]')).toHaveClass('w-72', 'shrink-0')
+    expect(container.querySelector('[data-task-board-column-cards]')).toHaveClass('overflow-y-auto')
   })
 
   it('keeps non-status groups as columns and explains why dragging is unavailable', () => {
     render(
-      <LinearBoard
+      <TaskBoard
         columns={[{ key: 'assignee:ada', label: 'Ada', issues: ['ORCA-1'] }]}
         dragDisabledReason="Drag is unavailable while grouping by assignee."
         renderCard={(item) => (

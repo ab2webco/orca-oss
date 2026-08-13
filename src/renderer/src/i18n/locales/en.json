@@ -1988,6 +1988,8 @@
         "linearEmptyUnfilteredScope": "No issues in this workspace scope. Try searching or adjusting teams.",
         "linearFetchMore": "Fetch more",
         "linearBoardDragDisabled": "Drag is unavailable while grouping by {{value0}}.",
+        "jiraBoardDragDisabled": "Drag is unavailable because Jira status changes require valid workflow transitions.",
+        "jiraViewModeLabel": "Jira view mode",
         "jiraSortAscending": "ascending",
         "jiraSortDescending": "descending",
         "jiraSortBy": "Sort by",

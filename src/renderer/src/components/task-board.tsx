@@ -3,30 +3,30 @@ import React, { useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { PlaneBoardFloatingMinimap } from './plane-board-floating-minimap'
 
-export type LinearBoardColumn<T> = {
+export type TaskBoardColumn<T> = {
   key: string
   label: string
   issues: T[]
 }
 
-type LinearBoardProps<T> = {
-  columns: LinearBoardColumn<T>[]
+type TaskBoardProps<T> = {
+  columns: TaskBoardColumn<T>[]
   dragDisabledReason: string | null
   renderCard: (item: T) => React.ReactNode
-  onColumnDragOver?: (column: LinearBoardColumn<T>, event: React.DragEvent<HTMLElement>) => void
-  onColumnDrop?: (column: LinearBoardColumn<T>, event: React.DragEvent<HTMLElement>) => void
+  onColumnDragOver?: (column: TaskBoardColumn<T>, event: React.DragEvent<HTMLElement>) => void
+  onColumnDrop?: (column: TaskBoardColumn<T>, event: React.DragEvent<HTMLElement>) => void
   dragOverColumnKey?: string | null
 }
 
-/** Native drag remains Linear-specific; this only shares Plane's column presentation. */
-export function LinearBoard<T>({
+/** Native drag remains provider-specific; this only shares Plane's column presentation. */
+export function TaskBoard<T>({
   columns,
   dragDisabledReason,
   renderCard,
   onColumnDragOver,
   onColumnDrop,
   dragOverColumnKey
-}: LinearBoardProps<T>): React.JSX.Element {
+}: TaskBoardProps<T>): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   return (
@@ -42,13 +42,13 @@ export function LinearBoard<T>({
       <div className="relative min-h-0 flex-1">
         <div
           ref={scrollContainerRef}
-          data-linear-board-scroll
+          data-task-board-scroll
           className="flex h-full min-h-0 gap-3 overflow-x-auto scrollbar-sleek p-3"
         >
           {columns.map((column) => (
             <section
               key={column.key}
-              data-linear-board-column
+              data-task-board-column
               onDragOver={(event) => onColumnDragOver?.(column, event)}
               onDrop={(event) => onColumnDrop?.(column, event)}
               className={cn(
@@ -57,11 +57,16 @@ export function LinearBoard<T>({
               )}
             >
               <div className="flex h-9 flex-none items-center justify-between border-b border-border/50 px-3">
-                <span className="truncate text-xs font-medium text-foreground">{column.label}</span>
+                <span
+                  data-task-board-column-label
+                  className="truncate text-xs font-medium text-foreground"
+                >
+                  {column.label}
+                </span>
                 <span className="text-[11px] text-muted-foreground">{column.issues.length}</span>
               </div>
               <div
-                data-linear-board-column-cards
+                data-task-board-column-cards
                 className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scrollbar-sleek p-2"
               >
                 {column.issues.map(renderCard)}

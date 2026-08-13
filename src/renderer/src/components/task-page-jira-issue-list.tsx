@@ -77,7 +77,7 @@ export function groupJiraIssuesByStatus(
   return statusDirection === 'desc' ? sortedSections.toReversed() : sortedSections
 }
 
-function isSelectedIssue(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
+export function isSelectedJiraIssue(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
   if (!selectedIssue || issue.key !== selectedIssue.key) {
     return false
   }
@@ -340,7 +340,7 @@ export function TaskPageJiraIssueList({
                   issue={issue}
                   onOpenIssue={onOpenIssue}
                   onStartWorkspace={onStartWorkspace}
-                  selected={isSelectedIssue(issue, selectedIssue)}
+                  selected={isSelectedJiraIssue(issue, selectedIssue)}
                   showSiteContext={showSiteContext}
                 />
               ))}

@@ -95,7 +95,7 @@ import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
 import IssueSourceIndicator, { sameGitHubOwnerRepo } from '@/components/github/IssueSourceIndicator'
 import IssueSourceSelector, { issueSourceChipClass } from '@/components/github/IssueSourceSelector'
 import { LinearPriorityIcon } from '@/components/linear-priority-icon'
-import { LinearBoard } from '@/components/linear-board'
+import { TaskBoard } from '@/components/task-board'
 import { reconcileLinearTeamSelection } from '@/components/task-page-linear-team-selection'
 import {
   getTaskSourceAvailabilityNotice,
@@ -161,6 +161,7 @@ import {
   LinearProjectTable
 } from '@/components/linear-project-view-surfaces'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
+import { TaskPageJiraBoard } from '@/components/task-page-jira-board'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
 import {
   getSingleJiraProjectScope,
@@ -398,6 +399,7 @@ import {
   resolveVisibleTaskProvider
 } from '../../../shared/task-providers'
 import { normalizeLinearViewMode } from '../../../shared/linear-view-mode'
+import { normalizeJiraViewMode } from '../../../shared/jira-view-mode'
 import { translate } from '@/i18n/i18n'
 import {
   getGitHubModeButtons,
@@ -410,13 +412,14 @@ import {
   getLinearModeOptions,
   getLinearOrderOptions,
   getLinearPriorityLabel,
-  getLinearViewOptions,
+  getTaskViewOptions,
   getPlanePresets,
   getSourceOptions,
   type GitHubTaskKind,
   type GitLabIssueFilter,
   type GitLabTaskFilter,
   type JiraPresetId,
+  type JiraViewMode,
   type PlanePresetId,
   LinearIcon,
   type LinearDisplayProperty,
@@ -3368,7 +3371,7 @@ export default function TaskPage(): React.JSX.Element {
   const planePresets = getPlanePresets()
   const gitLabIssueFilters = getGitLabIssueFilters()
   const gitLabMRFilters = getGitLabMRFilters()
-  const linearViewOptions = getLinearViewOptions()
+  const taskViewOptions = getTaskViewOptions()
   const linearGroupOptions = getLinearGroupOptions()
   const linearOrderOptions = getLinearOrderOptions()
   const linearDisplayPropertyOptions = getLinearDisplayProperties()
@@ -4770,6 +4773,9 @@ export default function TaskPage(): React.JSX.Element {
   const [jiraSearchInput, setJiraSearchInput] = useState('')
   const [appliedJiraSearch, setAppliedJiraSearch] = useState('')
   const [activeJiraPreset, setActiveJiraPreset] = useState<JiraPresetId>('assigned')
+  const [jiraViewMode, setJiraViewMode] = useState<JiraViewMode>(() =>
+    normalizeJiraViewMode(settings?.jiraViewMode)
+  )
   const [jiraRefreshNonce, setJiraRefreshNonce] = useState(0)
   const [jiraProjectStatusOrder, setJiraProjectStatusOrder] = useState<{
     order: JiraProjectStatusOrder
@@ -5801,6 +5807,14 @@ export default function TaskPage(): React.JSX.Element {
     (viewMode: LinearViewMode): void => {
       setLinearViewMode(viewMode)
       void updateSettings({ linearViewMode: viewMode })
+    },
+    [updateSettings]
+  )
+
+  const selectJiraViewMode = useCallback(
+    (viewMode: JiraViewMode): void => {
+      setJiraViewMode(viewMode)
+      void updateSettings({ jiraViewMode: viewMode })
     },
     [updateSettings]
   )
@@ -10774,21 +10788,57 @@ export default function TaskPage(): React.JSX.Element {
                   <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
                   </div>
-                  <div className="shrink-0 text-[11px] text-muted-foreground">
-                    {displayedJiraIssues.length}{' '}
-                    {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      value={jiraViewMode}
+                      onValueChange={(value) => {
+                        if (value === 'list' || value === 'board') {
+                          selectJiraViewMode(value)
+                        }
+                      }}
+                      aria-label={translate(
+                        'auto.components.TaskPage.jiraViewModeLabel',
+                        'Jira view mode'
+                      )}
+                    >
+                      {taskViewOptions.map(({ id, label, Icon }) => (
+                        <ToggleGroupItem
+                          key={id}
+                          value={id}
+                          className="h-7 gap-1.5 px-2 text-[11px]"
+                          aria-label={label}
+                        >
+                          <Icon className="size-3.5" />
+                          {label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                    <div className="text-[11px] text-muted-foreground">
+                      {displayedJiraIssues.length}{' '}
+                      {translate('auto.components.TaskPage.b7bae28b6a', 'shown')}
+                    </div>
                   </div>
                 </div>
 
-                <TaskPageJiraSortControls
-                  direction={jiraOrderDirection}
-                  onSort={handleJiraSort}
-                  orderBy={jiraOrderBy}
-                />
+                {jiraViewMode === 'list' ? (
+                  <TaskPageJiraSortControls
+                    direction={jiraOrderDirection}
+                    onSort={handleJiraSort}
+                    orderBy={jiraOrderBy}
+                  />
+                ) : null}
 
                 <div
-                  className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek"
-                  style={{ scrollbarGutter: 'stable' }}
+                  className={cn(
+                    'min-h-0 flex-1',
+                    jiraViewMode === 'board'
+                      ? 'flex flex-col overflow-hidden'
+                      : 'overflow-y-auto scrollbar-sleek'
+                  )}
+                  style={jiraViewMode === 'list' ? { scrollbarGutter: 'stable' } : undefined}
                 >
                   {jiraStatus.credentialError ? (
                     <div className="border-b border-border px-4 py-4 text-sm text-destructive">
@@ -10836,17 +10886,34 @@ export default function TaskPage(): React.JSX.Element {
                     </div>
                   ) : null}
 
-                  <TaskPageJiraIssueList
-                    formatUpdatedAt={formatRelativeTime}
-                    getStatusTone={getJiraStatusTone}
-                    issues={sortedJiraIssues}
-                    onOpenIssue={openJiraDetailPage}
-                    onStartWorkspace={handleUseJiraItem}
-                    selectedIssue={selectedJiraIssue}
-                    showSiteContext={selectedJiraSiteId === 'all'}
-                    statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
-                    statusOrder={displayedJiraStatusOrder}
-                  />
+                  {sortedJiraIssues.length > 0 ? (
+                    jiraViewMode === 'board' ? (
+                      <div className="min-h-0 flex-1">
+                        <TaskPageJiraBoard
+                          formatUpdatedAt={formatRelativeTime}
+                          getStatusTone={getJiraStatusTone}
+                          issues={sortedJiraIssues}
+                          onOpenIssue={openJiraDetailPage}
+                          onStartWorkspace={handleUseJiraItem}
+                          selectedIssue={selectedJiraIssue}
+                          showSiteContext={selectedJiraSiteId === 'all'}
+                          statusOrder={displayedJiraStatusOrder}
+                        />
+                      </div>
+                    ) : (
+                      <TaskPageJiraIssueList
+                        formatUpdatedAt={formatRelativeTime}
+                        getStatusTone={getJiraStatusTone}
+                        issues={sortedJiraIssues}
+                        onOpenIssue={openJiraDetailPage}
+                        onStartWorkspace={handleUseJiraItem}
+                        selectedIssue={selectedJiraIssue}
+                        showSiteContext={selectedJiraSiteId === 'all'}
+                        statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
+                        statusOrder={displayedJiraStatusOrder}
+                      />
+                    )
+                  ) : null}
                 </div>
                 <JiraIssueWorkspace
                   issue={selectedJiraIssue}
@@ -11315,7 +11382,7 @@ export default function TaskPage(): React.JSX.Element {
                       'Linear view mode'
                     )}
                   >
-                    {linearViewOptions.map(({ id, label, Icon }) => {
+                    {taskViewOptions.map(({ id, label, Icon }) => {
                       const active = linearViewMode === id
                       return (
                         <Tooltip key={id}>
@@ -11366,7 +11433,7 @@ export default function TaskPage(): React.JSX.Element {
                         value={linearViewMode}
                         onValueChange={(value) => selectLinearViewMode(value as LinearViewMode)}
                       >
-                        {linearViewOptions.map(({ id, label, Icon }) => (
+                        {taskViewOptions.map(({ id, label, Icon }) => (
                           <DropdownMenuRadioItem key={id} value={id}>
                             <Icon className="size-3.5" />
                             {label}
@@ -11581,7 +11648,7 @@ export default function TaskPage(): React.JSX.Element {
                 ) : null}
 
                 {linearViewMode === 'board' ? (
-                  <LinearBoard
+                  <TaskBoard
                     columns={linearBoardSections}
                     dragDisabledReason={linearBoardDragDisabledReason}
                     dragOverColumnKey={linearBoardDragOverKey}
