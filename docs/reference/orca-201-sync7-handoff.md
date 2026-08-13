@@ -286,6 +286,16 @@ it as an area, not a cause.
 **Do not push while an E2E run is in flight.** A push cancels it — that is how shard 7's re-run was
 lost on `31651257359`, and shard 7 still has no verdict.
 
+**A conflicting PR gets no CI at all, and it looks exactly like a slow queue.** Measured on #80:
+`main` took #85 at `01:25:17Z`, the last run for #80 started `01:24:19Z`, and after that two pushes
+produced **zero** workflow runs and zero checks on the PR — while other branches kept running
+normally. `pull_request` events stop being delivered once the PR is `mergeable_state: dirty`. Do not
+wait it out and do not keep re-pushing. Either resolve the conflict, or get the run another way:
+`e2e.yml` accepts `workflow_dispatch` with a `ref`, so
+`gh workflow run e2e.yml -R ab2webco/orca-oss --ref <branch>` runs the full suite on the branch head
+without the PR merge ref. That covers E2E only — typecheck, lint, unit and static analysis still
+need PR Checks.
+
 ### `npm test` never prints a summary — but nothing fails
 
 The unit suite **passes** on the merged tree. It just never exits, so there is no `Tests …` line to
