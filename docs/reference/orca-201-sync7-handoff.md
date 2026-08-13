@@ -180,6 +180,33 @@ single run's red list characterises it. Do not chase the per-run list; chase the
 
 Only `github-created-issue-start-prefill` and `repro-7732` appear in both runs.
 
+### `terminal-hidden-view-parking:467` — it degrades after ~12 cycles, and it reproduces locally
+
+Read from the CI trace of run `31654278963` shard 7 (`playwright-traces-7-of-10`), before running
+anything — the step titles carry the whole progression:
+
+| cycles | what the trace shows |
+| --- | --- |
+| 0 – 11 | each parks after ~5 poll attempts, then reveals and restores the reference frame |
+| 12 | the park poll runs **24 attempts over 20 s** and `window.__paneManagers.get(tabId)` never clears |
+
+So this is **not** a startup race and not "parking is broken". Parking works a dozen times in a row
+and then stops. Something **accumulates across park/reveal cycles** and eventually keeps the pane
+manager mounted. That reframing covers the sibling symptoms too — a tab bar rendering zero tabs
+while one exists, a terminal handle valid at `terminal.list` and gone at `terminal.split`.
+
+**It reproduces on macOS**, on the merged tree after the `origin/main` merge (`05ef9802a7`): the
+other three cases in the file pass, `:467` fails in 28 s with the identical message. That is the
+first local repro in this family, so the bisect is finally cheap. Arms are being measured; **run
+each at least 3 times** — a threshold at cycle 12 moves under load, and one green proves nothing.
+
+**ORCA-211 (#84) is eliminated for free:** shard 7 failed this exact case on run `31654278963`,
+whose head was `6eabef707f` — *before* #84 was merged. Do not spend an arm on it.
+
+If the bisect does not settle it, the cheap instrumentation is implied by the shape: count
+`__paneManagers` entries, pane listeners and pending frames per cycle and find what grows
+monotonically through cycle 11.
+
 ### The two new ones are not ORCA-210's, and they are not reproducible off Linux CI
 
 **Not ORCA-210 alone.** `main` at `8c970c9cc9` — ORCA-210 present, the sync absent — is **E2E green**
@@ -261,6 +288,26 @@ diagnosis of *upstream's* defect; these point at fork code, so `test.fixme` woul
 regression under a precedent that does not apply. Next measurement, and the only one left that
 discriminates: re-run shards 6 and 9 at this same SHA — a green separates intermittent-under-load
 from deterministic-in-shard, and a second red in the same place makes it bisectable.
+
+## `src/main/daemon/session.ts` and the ORCA-211 surface (#83, #84)
+
+The second `origin/main` merge (`05ef9802a7`) brought #84. Three conflicts: `.gitignore` and
+`en.json` are unions of both sides (`en.json` parses, and `verify:localization-{catalog,extraction,
+coverage}` all pass; no `config/scripts/locale-*-key-override*` pins the new keys, so editing the
+catalogue was enough here). `pty-connection.ts` carries #84's Claude-auth detection — all four call
+sites present — and ORCA-211's surface holds: **703 tests pass** across #84's ten suites plus
+`pty-connection.test.ts`, with named cases for each invariant (an `undecided` downgrades neither a
+verified nor a failed account; the pane message names the account it actually runs on and never
+names one it could not resolve; the verdict is a pure function of the probe —
+`claude-account-auth-verdict.ts` contains no `setTimeout` and no `existsSync`).
+
+**A resolution error worth the warning.** I re-added `import { isWslUncPath }` to
+`pty-connection.ts` believing #84 introduced it. It did not: the import is pre-existing, and the
+*sync* had deliberately removed it along with its only consumer,
+`getColdRestoreAgentResumePlatform`. `npm run typecheck` caught it (`TS6133`). The misread came from
+`git show <sha> -- <file> | grep -n "<symbol>"`, which matches **context** lines as readily as added
+ones. The line-level audit in §7 of the PR body (`grep '^+' | grep -v '^+++'`) is immune; the ad-hoc
+grep is not. Use the audit.
 
 ## `src/main/daemon/session.ts` is now a protected surface (ORCA-210 / #83)
 
