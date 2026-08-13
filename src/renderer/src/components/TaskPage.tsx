@@ -397,6 +397,7 @@ import {
   restoreAvailableDefaultTaskProvider,
   resolveVisibleTaskProvider
 } from '../../../shared/task-providers'
+import { normalizeLinearViewMode } from '../../../shared/linear-view-mode'
 import { translate } from '@/i18n/i18n'
 import {
   getGitHubModeButtons,
@@ -4585,8 +4586,8 @@ export default function TaskPage(): React.JSX.Element {
   const linearPrimaryTeamIdRef = useRef<string | null>(null)
   const previousLinearWorkspaceIdForFiltersRef = useRef<string | null | undefined>(undefined)
   // Why board by default: task providers share one column-first overview, with list one click away.
-  const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>(
-    () => settings?.linearViewMode ?? 'board'
+  const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>(() =>
+    normalizeLinearViewMode(settings?.linearViewMode)
   )
   const [linearGroupBy, setLinearGroupBy] = useState<LinearGroupBy>('none')
   const [linearOrderBy, setLinearOrderBy] = useState<LinearOrderBy>('priority')

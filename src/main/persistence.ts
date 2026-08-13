@@ -75,7 +75,6 @@ import type {
   ClaudeLiveSharedPtyAccountBinding,
   CodexDirectedPtyAccountBinding,
   PlaneViewMode,
-  LinearViewMode,
   RateLimitFailBackMode
 } from '../shared/types'
 import {
@@ -257,6 +256,7 @@ import {
   osc52ClipboardDefaultOnOverridesPersistedOff
 } from '../shared/osc52-clipboard-settings'
 import { normalizeTerminalLineHeight } from '../shared/terminal-line-height-settings'
+import { normalizeLinearViewMode } from '../shared/linear-view-mode'
 import { normalizeUiLanguage } from '../shared/ui-language'
 import { normalizeBrowserPageZoomLevel } from '../shared/browser-page-zoom'
 import { persistedUIValuesEqual } from '../shared/persisted-ui-equality'
@@ -2294,11 +2294,6 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
   }
   const trimmed = value.trim()
   return trimmed.length > 0 && trimmed.length <= 512 ? trimmed : null
-}
-
-// Why: unknown strings from hand-edited payloads fall back to the safe default.
-function normalizeLinearViewMode(value: unknown): LinearViewMode {
-  return value === 'list' ? 'list' : 'board'
 }
 
 function normalizePlaneViewMode(value: unknown): PlaneViewMode {

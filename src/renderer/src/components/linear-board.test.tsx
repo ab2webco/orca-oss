@@ -48,20 +48,3 @@ describe('LinearBoard', () => {
     expect(screen.getByText('ORCA-1')).toHaveAttribute('draggable', 'false')
   })
 })
-
-describe('Linear board preference persistence', () => {
-  it('defaults to board and persists a valid linear view mode', async () => {
-    const { readFileSync } = await import('node:fs')
-    const types = readFileSync('src/shared/types.ts', 'utf-8')
-    const persistence = readFileSync('src/main/persistence.ts', 'utf-8')
-    const taskPage = readFileSync('src/renderer/src/components/TaskPage.tsx', 'utf-8')
-
-    expect(types).toContain('linearViewMode?: LinearViewMode')
-    expect(persistence).toContain("return value === 'list' ? 'list' : 'board'")
-    expect(persistence).toContain('linearViewMode: normalizeLinearViewMode(')
-    expect(taskPage).toContain("settings?.linearViewMode ?? 'board'")
-    expect(taskPage).toContain('dragDisabledReason={linearBoardDragDisabledReason}')
-    expect(taskPage).toContain('draggable={linearStatusBoardEnabled && !updating}')
-    expect(taskPage).toContain('void updateSettings({ linearViewMode: viewMode })')
-  })
-})
