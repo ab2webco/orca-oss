@@ -196,9 +196,31 @@ manager mounted. That reframing covers the sibling symptoms too — a tab bar re
 while one exists, a terminal handle valid at `terminal.list` and gone at `terminal.split`.
 
 **It reproduces on macOS**, on the merged tree after the `origin/main` merge (`05ef9802a7`): the
-other three cases in the file pass, `:467` fails in 28 s with the identical message. That is the
-first local repro in this family, so the bisect is finally cheap. Arms are being measured; **run
-each at least 3 times** — a threshold at cycle 12 moves under load, and one green proves nothing.
+other three cases in the file pass, `:467` fails in 28 s with the identical message. That made the
+bisect cheap, and it is done.
+
+#### The bisect: it is upstream's
+
+Three arms, **interleaved on one machine**, `[e2e] Build complete.` confirmed on every round so no
+arm can be a stale build:
+
+| arm | what it is | result |
+| --- | --- | --- |
+| `origin/main` (`f6e71445b1`) | the fork **without** the sync — ORCA-210 and ORCA-211 included | **3 / 3 pass** (45–49 s) |
+| `a63df91790` | **upstream's own tip, unmodified** — no fork code at all | **3 / 3 fail** |
+| merged HEAD (`05ef9802a7`) | the sync | **3 / 3 fail** (and 3/3 in the first A/B) |
+
+Upstream's unmodified tree fails it. So the defect is **upstream's, imported by the merge** —
+ORCA-203 class, established by positive evidence on upstream's tree rather than by byte-identity.
+
+**This corrects the earlier framing.** This file previously pointed the pane-manager family at fork
+code (`use-terminal-pane-lifecycle.ts`, +15 vs upstream). For *this* spec that is now disproved: the
+fork's lines are absent from the arm that fails. `tabs:125` and
+`terminal-tab-close-restart-persistence:23` were **not** re-measured this way and keep their earlier,
+weaker verdict — do not extend this result to them without running the same three arms.
+
+Under the standing decision the five ORCA-203 specs ship inside #80, because the fix site only
+exists once the sync is applied. This one now has the written diagnosis a park requires.
 
 **ORCA-211 (#84) is eliminated for free:** shard 7 failed this exact case on run `31654278963`,
 whose head was `6eabef707f` — *before* #84 was merged. Do not spend an arm on it.
