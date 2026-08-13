@@ -16964,6 +16964,35 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('keeps a Codex pane its own ingested output when the renderer screen is behind', async () => {
+    // A hidden-delivery-gated worker pane serializes to the pre-agent shell
+    // screen: no alternate-screen switch, and no trace of what the agent wrote.
+    const serializeBuffer = vi.fn().mockResolvedValue({
+      data: 'fabolivar@host orca-e2e-repo % %\r\nfabolivar@host orca-e2e-repo % ',
+      cols: 80,
+      rows: 24
+    })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'codex',
+      hasRendererSerializer: () => true,
+      serializeBuffer
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-1',
+      'fabolivar@host orca-e2e-repo % codex\r\n\x1b]0;Codex Ready\x07OpenAI Codex\r\nAGENT-STDOUT-ACK\r\n',
+      100
+    )
+
+    const preview = await runtime.readTerminal(handle)
+
+    expect(preview.tail).toEqual(expect.arrayContaining(['OpenAI Codex', 'AGENT-STDOUT-ACK']))
+  })
+
   it('reads and shows the runtime-owned alternate-screen grid without serialization', async () => {
     const serializeBuffer = vi.fn()
     const serializeProviderBuffer = vi.fn()

@@ -38,9 +38,12 @@ process.stdin.on('data', (chunk) => {
   if (input.includes('\\x03')) {
     appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'stdin-ctrl-c' })
   }
-  if (!acknowledged && input.includes('\\r')) {
+  // Why \\n too: this pane's tty is in canonical mode, where ICRNL turns the
+  // dispatch's Enter into \\n before the agent reads it — a \\r-only check never
+  // acknowledged, and the old ACK assertion hid that by matching tty echo.
+  if (!acknowledged && (input.includes('\\r') || input.includes('\\n'))) {
     acknowledged = true
-    process.stdout.write('ACK\\n')
+    process.stdout.write('AGENT-STDOUT-ACK\\n')
   }
 })
 for (const signal of ['SIGINT', 'SIGHUP', 'SIGTERM']) {
@@ -164,15 +167,20 @@ test('worker-start preserves one live inactive worker across workspace re-entry'
   )
   expect(workerTerminal?.tabId).toBeTruthy()
   expect(workerTerminal?.leafId).toBeTruthy()
+  // Why a distinct marker: the preamble quotes "Respond ACK…", so a bare ACK
+  // assertion passes on tty echo of Orca's own write (ORCA-207/ORCA-209).
+  // Why a cursored read: this fake echoes, and the reply lands early in a
+  // ~110-line echo block that a bounded preview read drops off the top.
   await expect
     .poll(async () => {
       const read = await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
         terminal: workerTerminal!.handle,
-        limit: 200
+        cursor: 0,
+        limit: 1000
       })
       return read.result.terminal.tail.join('\n')
     })
-    .toContain('ACK')
+    .toContain('AGENT-STDOUT-ACK')
   const initialWorkerIdentity = {
     ptyId: workerTerminal!.ptyId,
     incarnationId: workerTerminal!.incarnationId,
