@@ -237,6 +237,39 @@ If the bisect does not settle it, the cheap instrumentation is implied by the sh
 `__paneManagers` entries, pane listeners and pending frames per cycle and find what grows
 monotonically through cycle 11.
 
+### After the park, two specs remain red — and one of them is not the sync's
+
+Dispatched run `31660777014` (`d214e7a588`, tree identical to the park commit) leaves exactly two:
+`github-created-issue-start-prefill:122` and `repro-7732-gitlab-checks-job-details:116`. The second
+is already ORCA-203, inherited.
+
+**`pr11346-selected-runtime-add:751` is not the sync's** — it failed on `main` too, run
+`31544024521`, and passed again on the same commit. Its shape says deadline, not assertion: the
+locator *does* resolve to `<button aria-label="Add Project">` and the 30 s timeout lands in
+`waiting for element to be visible, enabled and stable`. Corroborated off this branch: 1.8 min to
+fail on the Jira branch versus 19.9 s on `main` on 11 Aug. Tracked in **ORCA-214**, with a second
+spec that behaved the same way.
+
+### `github-created-issue-start-prefill:122` — the local A/B cannot decide it
+
+Three arms, 3 rounds each, interleaved, builds confirmed: **all three fail 3/3** — but all at
+`expect(newIssueButton).toBeEnabled()` (`spec:155`), roughly 100 lines *before* the `--prefill`
+assertion CI fails on. Sub-modes differ (on `a63df91790` the button is not found; on `origin/main`
+and on the merged tree it is `disabled`), and the cause is the empty `selectedRepos` this file
+already documented. **So the local measurement says nothing about CI's symptom** — recorded as
+inconclusive rather than dressed up as a verdict.
+
+What the Linux history does give, free: across **8** `main` E2E runs — including one at the pre-sync
+base `267f58acd6` — this spec **never failed**. `main`'s three E2E reds in that window were other
+causes (two Electron-download 503s, plus `pr11346-selected-runtime-add:751` and
+`file-explorer-watch-refresh:29`). On #80 it fails on Linux in 3 runs out of 3.
+
+That points at the merge but does not prove it, because the arm that separates *merge-created* from
+*upstream-broke-it-and-the-merge-imported-it* is upstream on Linux. `TaskPage.tsx` is +947/−7 vs
+upstream directly on this flow, so either is plausible. That arm is now running: `e2e.yml` dispatched
+on a throwaway branch `tmp/orca-201-upstream-arm` at `a63df91790` — run **31663020631**. No PR on
+that branch; delete it from the remote once read.
+
 ### The two new ones are not ORCA-210's, and they are not reproducible off Linux CI
 
 **Not ORCA-210 alone.** `main` at `8c970c9cc9` — ORCA-210 present, the sync absent — is **E2E green**
