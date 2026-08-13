@@ -342,8 +342,10 @@ describe('pasteDraftWhenAgentReady', () => {
     })
     await flushMicrotasks()
 
-    testState.ptyObserver?.(DECSET_BRACKETED_PASTE)
-    await vi.advanceTimersByTimeAsync(1500)
+    // Why (ORCA-208): claude now carries the show-cursor composer marker, so the
+    // paste waits for evidence instead of a 1500 ms quiet window.
+    testState.ptyObserver?.(`${DECSET_BRACKETED_PASTE}${SHOW_CURSOR}`)
+    await vi.advanceTimersByTimeAsync(0)
     await flushMicrotasks()
 
     expect(testState.sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
@@ -371,7 +373,7 @@ describe('pasteDraftWhenAgentReady', () => {
     })
     await flushMicrotasks()
 
-    testState.ptyObserver?.(DECSET_BRACKETED_PASTE)
+    testState.ptyObserver?.(`${DECSET_BRACKETED_PASTE}${SHOW_CURSOR}`)
     await vi.advanceTimersByTimeAsync(1500)
 
     await expect(promise).resolves.toBe(false)

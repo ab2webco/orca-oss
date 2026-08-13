@@ -50,7 +50,24 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     expectedProcess: 'claude',
     promptInjectionMode: 'argv',
     // Why: `claude --prefill <text>` seeds the input without submitting, avoiding the paste-after-ready race (PR https://github.com/stablyai/orca/pull/926).
-    draftPromptFlag: '--prefill'
+    draftPromptFlag: '--prefill',
+    // Why (ORCA-208): `--prefill` covers startup only. Every later write — the
+    // dispatch preamble above all — goes through the composer gate, and without
+    // a signal here that gate resolves `unobserved` in 0 ms, so Claude workers
+    // were dispatched with no readiness proof at all and `wait --for
+    // composer-ready` could never be satisfied on a Claude pane.
+    // Measured from a real `claude` v2.1.229 PTY, twice (inherited env and a
+    // clean boot): exactly one DECSET 2004, and the first DECTCEM show-cursor
+    // after it lands only once the composer row exists and the cursor has been
+    // moved into it — clean boot had `❯` at byte 630 and the show-cursor at 932,
+    // directly after `\x1b[37;3H`. Claude keeps the cursor hidden (`\x1b[?25l`)
+    // through each redraw and shows it again at the end of every frame, so the
+    // marker is re-emitted rather than one-shot. Same shape opencode carries,
+    // so it reuses that signal.
+    // Consequence worth knowing: this signal never arms the quiet-window
+    // fallback, so the renderer's startup draft paste now waits for the marker
+    // instead of pasting 1500 ms after the handshake.
+    draftPasteReadySignal: 'render-cursor-after-bracketed-paste'
   },
   'claude-agent-teams': {
     // Why: an Orca-provided launch mode, not a separate binary; detection follows the Orca CLI.
