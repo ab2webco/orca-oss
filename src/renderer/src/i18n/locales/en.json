@@ -5548,7 +5548,9 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "reassignSystemDefault": "System default"
+          "reassignSystemDefault": "System default",
+          "checkSignInHint": "Asks the provider whether this credential still works. One request for this account only.",
+          "checkSignIn": "Check sign-in"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -10606,6 +10608,23 @@
           "description": "Input device used for voice dictation. System default follows the OS microphone setting.",
           "accessHint": "Allow microphone access to list input devices.",
           "allowAccess": "Allow access"
+        },
+        "ClaudeAccountAuthStatusLine": {
+          "justNow": "just now",
+          "checkedAgo": "{{value0}} ago",
+          "checking": "Checking sign-in…",
+          "verified": "Sign-in verified",
+          "verifiedAt": "Sign-in verified {{value0}}",
+          "rejected": "Sign-in expired — re-authenticate this account",
+          "missing": "No stored credential — re-authenticate this account",
+          "unchecked": "Sign-in not checked yet",
+          "undecidedLiveSession": "last check deferred: a running session holds this token",
+          "undecided": "last check could not confirm it",
+          "sessionUsed": "5h {{value0}}% used",
+          "sessionUsedResets": "5h {{value0}}% used, resets in {{value1}}",
+          "weeklyUsed": "7d {{value0}}% used",
+          "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}",
+          "quotaUnknown": "remaining quota unknown"
         }
       },
       "right": {
@@ -15107,6 +15126,14 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
+      },
+      "terminal-pane": {
+        "claudeAuthFailure": {
+          "account": "Claude sign-in expired for {{value0}}. Re-authenticate that account in Settings → Claude.",
+          "shared": "Claude sign-in expired for this pane, which runs on the shared Claude login (no managed account pinned).",
+          "reauthenticatedSince": "This pane still holds an expired Claude sign-in, but {{value0}} was re-authenticated after this pane started. Restart the pane to pick up the new sign-in.",
+          "unknown": "Claude sign-in expired in this pane. Orca could not tell which account it runs on."
+        }
       }
     },
     "i18n": {

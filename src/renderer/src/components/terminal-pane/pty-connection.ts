@@ -309,6 +309,12 @@ import {
   createAgentRateLimitDetectionGate,
   observeAgentRateLimitOutput
 } from '@/lib/agent-rate-limit-detection-gate'
+import {
+  bindClaudeAuthFailureDetectionToPty,
+  createClaudeAuthFailureDetectionState,
+  detectClaudeAuthFailureOutput
+} from '../../../../shared/claude-auth-failure-detection'
+import { notifyClaudeAuthFailure } from './claude-auth-failure-notice'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
 import { createDraftPasteReadyScanner } from '../../../../shared/draft-paste-ready-scanner'
@@ -1331,6 +1337,7 @@ export function connectPanePty(
   const rateLimitDetectionGate = createAgentRateLimitDetectionGate()
   let lastRateLimitDetectionKey: string | null = null
   let rateLimitDetectionPtyId: string | null = null
+  const claudeAuthFailureDetection = createClaudeAuthFailureDetectionState()
   const resumeRateLimitDetectionAfterAcceptedInput = (): void => {
     if (!rateLimitDetectionGate.suppressed) {
       return
@@ -7572,6 +7579,7 @@ export function connectPanePty(
         }
       }
       const currentPtyId = transport.getPtyId()
+      bindClaudeAuthFailureDetectionToPty(claudeAuthFailureDetection, currentPtyId, Date.now())
       if (currentPtyId !== rateLimitDetectionPtyId) {
         // Why: pane bindings can swap PTYs; stale split output must not trigger a new session.
         rateLimitDetectionPtyId = currentPtyId
@@ -7612,6 +7620,12 @@ export function connectPanePty(
             }
           })
         }
+      }
+      if (
+        currentPtyId &&
+        detectClaudeAuthFailureOutput(data, claudeAuthFailureDetection, Date.now())
+      ) {
+        void notifyClaudeAuthFailure(currentPtyId, claudeAuthFailureDetection.boundAt)
       }
       respondToTerminalPixelSizeQueries(data)
       observeTerminalBracketedPasteModeOutput(pane.terminal, data)

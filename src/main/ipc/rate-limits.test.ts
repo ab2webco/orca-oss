@@ -32,12 +32,14 @@ function makeService(): {
   refresh: ReturnType<typeof vi.fn>
   refreshGrok: ReturnType<typeof vi.fn>
   consumeCodexRateLimitResetCredit: ReturnType<typeof vi.fn>
+  recordClaudeCredentialRejection: ReturnType<typeof vi.fn>
 } {
   const refresh = vi.fn(() => Promise.resolve({} as RateLimitState))
   const refreshGrok = vi.fn(() => Promise.resolve({} as RateLimitState))
   const consumeCodexRateLimitResetCredit = vi.fn(() =>
     Promise.resolve({ outcome: 'noCredit', state: {} as RateLimitState })
   )
+  const recordClaudeCredentialRejection = vi.fn(() => ({}) as RateLimitState)
   const service = {
     getState: vi.fn(() => ({}) as RateLimitState),
     refresh,
@@ -47,13 +49,16 @@ function makeService(): {
     consumeCodexRateLimitResetCredit,
     setPollingInterval: vi.fn(() => Promise.resolve()),
     fetchInactiveClaudeAccountsOnOpen: vi.fn(() => Promise.resolve()),
+    recheckClaudeAccountAuth: vi.fn(() => Promise.resolve({} as RateLimitState)),
+    recordClaudeCredentialRejection,
     fetchInactiveCodexAccountsOnOpen: vi.fn(() => Promise.resolve())
   }
   return {
     service: service as unknown as RateLimitService,
     refresh,
     refreshGrok,
-    consumeCodexRateLimitResetCredit
+    consumeCodexRateLimitResetCredit,
+    recordClaudeCredentialRejection
   }
 }
 
@@ -99,5 +104,15 @@ describe('registerRateLimitHandlers', () => {
 
     expect(codexAccounts.consumeCurrentRateLimitResetCredit).toHaveBeenCalledOnce()
     expect(consumeCodexRateLimitResetCredit).not.toHaveBeenCalled()
+  })
+
+  it('forwards a pane credential rejection to the rate-limit service', async () => {
+    const { service, recordClaudeCredentialRejection } = makeService()
+    registerRateLimitHandlers(service, makeCodexAccounts().service)
+    const handler = ipcState.handleHandlers.get('rateLimits:recordClaudeCredentialRejection')
+
+    await handler!({}, 'acct_live')
+
+    expect(recordClaudeCredentialRejection).toHaveBeenCalledWith('acct_live')
   })
 })

@@ -104,6 +104,12 @@ import {
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
+import { ClaudeAccountAuthStatusLine } from './ClaudeAccountAuthStatusLine'
+import {
+  findClaudeAccountAuthVerdict,
+  resolveClaudeAccountAuthRowStatus,
+  selectClaudeAccountUsage
+} from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
   emptyClaudeAccountsState,
@@ -341,6 +347,10 @@ export function AccountsPane({
   const codexRateLimits = useAppStore((s) => s.rateLimits.codex)
   const codexRateLimitTarget = useAppStore((s) => s.rateLimits.codexTarget)
   const miniMaxRateLimits = useAppStore((s) => s.rateLimits.minimax)
+  const rateLimitsState = useAppStore((s) => s.rateLimits)
+  const recheckClaudeAccountAuth = useAppStore((s) => s.recheckClaudeAccountAuth)
+  const fetchInactiveClaudeAccountUsage = useAppStore((s) => s.fetchInactiveClaudeAccountUsage)
+  const [authStatusNow, setAuthStatusNow] = useState(() => Date.now())
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const fetchSettings = useAppStore((s) => s.fetchSettings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
@@ -484,6 +494,10 @@ export function AccountsPane({
   // unusable, so without this the user only sees their edits being ignored.
   const [codexConfigSync, setCodexConfigSync] = useState<CodexConfigSyncStatus | null>(null)
   useEffect(() => {
+    const interval = setInterval(() => setAuthStatusNow(Date.now()), 30_000)
+    return () => clearInterval(interval)
+  }, [])
+  useEffect(() => {
     // Why: the status resolves the host's own ~/.codex and shared runtime home.
     // A WSL or remote scope mirrors different homes entirely, so showing it there
     // would name a config file that has nothing to do with the selected runtime.
@@ -594,6 +608,17 @@ export function AccountsPane({
   useEffect(() => {
     void refreshMiniMaxCredentialStatus()
   }, [])
+
+  useEffect(() => {
+    // Why: the roster's job is saying which account still authenticates, so it
+    // asks on open instead of waiting for a click. Same debounced per-account
+    // trickle the status bar uses: it skips accounts with fresh usage and never
+    // rotates a token a live pane owns. Remote scope has no local verdicts.
+    if (isRemoteAccountScope) {
+      return
+    }
+    void fetchInactiveClaudeAccountUsage()
+  }, [isRemoteAccountScope, fetchInactiveClaudeAccountUsage])
 
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready
@@ -1470,6 +1495,10 @@ export function AccountsPane({
                   )
                 const isReauthing = claudeAction === `reauth:${account.id}`
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
+                const authStatus = resolveClaudeAccountAuthRowStatus(
+                  findClaudeAccountAuthVerdict(rateLimitsState, account.id)
+                )
+                const accountUsage = selectClaudeAccountUsage(rateLimitsState, account.id, isActive)
 
                 return (
                   <div
@@ -1542,6 +1571,13 @@ export function AccountsPane({
                               ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
                               : formatAccountTimestamp(account.lastAuthenticatedAt)}
                         </span>
+                        {isCustomEndpoint ? null : (
+                          <ClaudeAccountAuthStatusLine
+                            status={authStatus}
+                            usage={accountUsage}
+                            now={authStatusNow}
+                          />
+                        )}
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
                         {isCustomEndpoint ? (
@@ -1562,6 +1598,34 @@ export function AccountsPane({
                             )}
                           </Button>
                         ) : (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            title={translate(
+                              'auto.components.settings.AccountsPane.checkSignInHint',
+                              'Asks the provider whether this credential still works. One request for this account only.'
+                            )}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void recheckClaudeAccountAuth(account.id)
+                            }}
+                            disabled={
+                              isRemoteAccountScope || isBusy || authStatus.kind === 'checking'
+                            }
+                            className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                          >
+                            {authStatus.kind === 'checking' ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="size-3" />
+                            )}
+                            {translate(
+                              'auto.components.settings.AccountsPane.checkSignIn',
+                              'Check sign-in'
+                            )}
+                          </Button>
+                        )}
+                        {isCustomEndpoint ? null : (
                           <Button
                             variant="ghost"
                             size="xs"

@@ -3066,6 +3066,8 @@ function createRateLimitsApi(): NonNullable<Partial<PreloadApi>['rateLimits']> {
     refreshClaudeForTarget: () => Promise.resolve(empty),
     setPollingInterval: () => Promise.resolve(),
     fetchInactiveClaudeAccounts: () => Promise.resolve(),
+    recheckClaudeAccountAuth: () => Promise.resolve(empty),
+    recordClaudeCredentialRejection: () => Promise.resolve(empty),
     fetchInactiveCodexAccounts: () => Promise.resolve(),
     refreshMiniMax: () => Promise.resolve(empty),
     refreshGrok: () => Promise.resolve(empty),
