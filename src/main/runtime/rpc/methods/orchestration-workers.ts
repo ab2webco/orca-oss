@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/types'
+import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
@@ -269,7 +270,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           // marker nothing in the byte stream supports that claim, so the
           // effect says what actually happened — bytes written, delivery
           // unproven — instead of overstating it.
-          state: composerReady.proven ? 'accepted' : 'written_unproven'
+          state: composerReady.proven ? 'accepted' : DISPATCH_INPUT_WRITTEN_UNPROVEN
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
         // Why: after markWorkerDispatchReady, not before — the update is scoped
