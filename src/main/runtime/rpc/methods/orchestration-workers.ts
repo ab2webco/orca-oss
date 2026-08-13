@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/types'
+import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
@@ -265,9 +266,15 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           kind: 'dispatch_input',
           role: 'agent',
           id: terminalHandle,
-          state: 'accepted'
+          // Why: `accepted` claims the agent took the preamble. Without the
+          // marker nothing in the byte stream supports that claim, so the
+          // effect says what actually happened — bytes written, delivery
+          // unproven — instead of overstating it.
+          state: composerReady.proven ? 'accepted' : DISPATCH_INPUT_WRITTEN_UNPROVEN
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
+        // Why: after markWorkerDispatchReady, not before — the update is scoped
+        // to `status = 'dispatched'`, which this call is what establishes.
         db.recordDispatchComposerReadiness(started.dispatch.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
         // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
