@@ -210,12 +210,16 @@ describe('a Claude pane restored after an app restart', () => {
   it('keeps the launch description that really ran when a reattach re-registers', async () => {
     const runtime = makeRuntime()
     syncAgentPane(runtime)
+    // Why the incarnation (ORCA-201): upstream's token admission binds the
+    // credential to the exact incarnation and pane it was proven on, and a real
+    // spawn always carries one. The description below deliberately does not.
     runtime.registerPty(PTY_ID, WORKTREE_ID, null, {
       tabId: TAB_ID,
       leafId: LEAF_ID,
+      incarnationId: 'pty-incarnation-a',
       launchConfig: LAUNCH_CONFIG,
-      launchToken: 'proven-at-spawn',
-      launchAgent: 'claude'
+      launchAgent: 'claude',
+      agentLaunchAuthority: { launchToken: 'proven-at-spawn', launchAgent: 'claude' }
     })
 
     // A renderer reload reattaches against a main that never died; its config is

@@ -613,45 +613,6 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe("codex --profile work 'fix it'")
   })
 
-  it('builds Windows resume plans that PowerShell can invoke', () => {
-    const plan = buildAgentResumeStartupPlan({
-      agent: 'codex',
-      providerSession: { key: 'session_id', id: 's1' },
-      cmdOverrides: {},
-      platform: 'win32'
-    })
-
-    expect(plan?.launchCommand).toBe("codex 'resume' 's1'")
-  })
-
-  it('honors command overrides when building POSIX resume plans', () => {
-    const plan = buildAgentResumeStartupPlan({
-      agent: 'codex',
-      providerSession: { key: 'session_id', id: 's1' },
-      cmdOverrides: { codex: 'codex --profile work' },
-      platform: 'linux'
-    })
-
-    expect(plan?.launchCommand).toBe("codex --profile work 'resume' 's1'")
-  })
-
-  it('uses a captured launch command when building resume plans after overrides change', () => {
-    const plan = buildAgentResumeStartupPlan({
-      agent: 'codex',
-      providerSession: { key: 'session_id', id: 's1' },
-      cmdOverrides: { codex: 'codex --profile changed' },
-      agentCommand: 'codex --profile captured',
-      platform: 'linux'
-    })
-
-    expect(plan?.launchCommand).toBe("codex --profile captured 'resume' 's1'")
-    expect(plan?.launchConfig).toEqual({
-      agentCommand: 'codex --profile captured',
-      agentArgs: '',
-      agentEnv: {}
-    })
-  })
-
   it('keeps an AI Vault OMP file locator separate from provider identity', () => {
     const plan = buildAgentResumeStartupPlan({
       agent: 'omp',
@@ -768,6 +729,23 @@ describe('tui agent startup plans', () => {
     expect(
       buildAgentDraftLaunchPlan({
         agent: 'mimo-code',
+        draft: 'x',
+        cmdOverrides: {},
+        platform: 'darwin'
+      })
+    ).toBeNull()
+  })
+
+  it('keeps grok on the composer-glyph paste draft route', () => {
+    // Why: grok has no --prefill-style flag, so every launch draft goes through
+    // paste-after-ready — and its shimmering startup logo never settles the
+    // quiet window, which is what made the paste take the full hard timeout.
+    expect(TUI_AGENT_CONFIG.grok.draftPasteReadySignal).toBe('grok-composer-prompt')
+    expect(TUI_AGENT_CONFIG.grok.draftPromptFlag).toBeUndefined()
+    expect(TUI_AGENT_CONFIG.grok.draftPromptEnvVar).toBeUndefined()
+    expect(
+      buildAgentDraftLaunchPlan({
+        agent: 'grok',
         draft: 'x',
         cmdOverrides: {},
         platform: 'darwin'

@@ -5,7 +5,7 @@ export const ORCHESTRATION_WORKER_COMMAND_SPECS: CommandSpec[] = [
     path: ['orchestration', 'worker-start'],
     summary: 'Start one supervised worker on the Run home or a connected Orca server',
     usage:
-      'orca orchestration worker-start --task <task_id> [--on <saved-environment>] [--worktree <current|selector|new-child|new-top-level>] (--agent <agent> | --terminal <handle>) [--name <name>] [--repo <selector>] [--base-branch <ref>] [--display-name <text>] [--comment <text>] [--setup <run|skip|inherit>] [--claude-account <email|id>] [--codex-account <email|id>] [--retry-of <dispatch_id>] [--timeout-ms <n>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json]',
+      'orca orchestration worker-start --task <task_id> [--on <saved-environment>] [--worktree <current|selector|new-child|new-top-level>] (--agent <agent> | --terminal <handle>) [--model <id>] [--effort <level>] [--name <name>] [--repo <selector>] [--base-branch <ref>] [--display-name <text>] [--comment <text>] [--setup <run|skip|inherit>] [--claude-account <email|id>] [--codex-account <email|id>] [--retry-of <dispatch_id>] [--timeout-ms <n>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'task',
@@ -18,6 +18,8 @@ export const ORCHESTRATION_WORKER_COMMAND_SPECS: CommandSpec[] = [
       'comment',
       'setup',
       'agent',
+      'model',
+      'effort',
       'terminal',
       'claude-account',
       'codex-account',
@@ -29,6 +31,7 @@ export const ORCHESTRATION_WORKER_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Current and existing worktrees never rerun setup; a fresh agent terminal is created unless --terminal is explicit.',
+      '--model supports Claude, Codex, and Cursor opaque provider model ids; --effort requires --model. Neither can combine with --terminal.',
       'New worktrees use agent-first creation and default --setup to run. Repository start-immediately runs setup beside the agent; wait-for-setup gates agent readiness and task input.',
       'Creation flags (--name, --repo, --base-branch, --display-name, --comment, --setup) are rejected for current/existing worktrees. Use exact --repo on the selected server; project/host convenience routing remains on worktree create.',
       'Pass --claude-account or --codex-account (email or id from `orca account list --json`) to direct the worker agent at one managed account: a persisted worktree pin on new-child/new-top-level, a launch-scoped override on current/existing worktrees. Rejected with --terminal (that agent is already running) and with --on (the connected server resolves accounts from its own roster).',
@@ -57,11 +60,14 @@ export const ORCHESTRATION_WORKER_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['orchestration', 'worker-stop'],
-    summary: 'Fence and stop only one supervised agent terminal',
+    summary: 'Fence one Dispatch and stop its supervised agent terminal',
     usage:
       'orca orchestration worker-stop --dispatch <dispatch_id> [--retry-request <id>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'dispatch', 'retry-request'],
-    notes: ['Never deletes the worktree, setup terminal, configured tabs, or unrelated processes.']
+    notes: [
+      'A Dispatch created by orchestration dispatch is fenced without closing its unsupervised terminal process.',
+      'Never deletes the worktree, setup terminal, configured tabs, or unrelated processes.'
+    ]
   },
   {
     path: ['orchestration', 'worker-abandon'],

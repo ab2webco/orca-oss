@@ -8,7 +8,6 @@ import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
 import { WorkerStartParams } from './orchestration-worker-start-schema'
-import { assertComposedWorkerStartParams } from './orchestration-worker-start-validation'
 import {
   createExistingWorktreeWorkerTerminal,
   createWorkerWorktree,
@@ -23,6 +22,7 @@ import {
   persistWorkerSetupWaitOutcome
 } from './orchestration-worker-setup-gate'
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
+import { prepareLocalWorkerStart } from './orchestration-worker-start-validation'
 
 export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
   defineMethod({
@@ -60,11 +60,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
       const requestedWorktree = params.worktree ?? 'current'
       const createsWorktree =
         requestedWorktree === 'new-child' || requestedWorktree === 'new-top-level'
-      assertComposedWorkerStartParams(params, createsWorktree)
-      const agent = params.agent
-      if (agent) {
-        runtime.validateOrchestrationAgentLauncher(agent as TuiAgent)
-      }
+      const { agent, launch } = prepareLocalWorkerStart({ params, createsWorktree, runtime })
 
       const coordinatorTerminal = await runtime.showTerminal(params.from)
       const coordinatorWorktree = await runtime.showManagedWorktree(
@@ -109,6 +105,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         agent: agent ?? null,
         claudeAccountId: params.claudeAccountId ?? null,
         codexAccountId: params.codexAccountId ?? null,
+        launch: launch.receipt,
         timeoutMs: params.timeoutMs ?? 60_000,
         setup: createsWorktree ? (params.setup ?? 'run') : 'not_applicable',
         setupSource: createsWorktree
@@ -153,6 +150,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             coordinatorWorktree,
             params,
             agent: agent as TuiAgent,
+            launchPreferences: launch.preferences,
             effects
           })
           resolvedWorktree = created.worktree
@@ -169,6 +167,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             runtime,
             worktreeId: resolvedWorktree!.id,
             agent: agent as TuiAgent,
+            launchPreferences: launch.preferences,
             taskId: task.id,
             claudeAccountId: params.claudeAccountId,
             codexAccountId: params.codexAccountId,
@@ -297,6 +296,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           state: worker.state,
           stage: worker.stage,
           setup: setupReceipt,
+          launch: launch.receipt,
           timeoutMs: params.timeoutMs ?? 60_000,
           effects,
           residualResources: [],
@@ -310,7 +310,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           dispatchId: started.dispatch.id,
           failedStage,
           error,
-          setup: setupReceipt
+          setup: setupReceipt,
+          launch: launch.receipt
         })
       }
     }

@@ -15,6 +15,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   // parsing, so `agent-teams-tmux` has no spec to derive from and both must be
   // asserted by name rather than through the specs loop.
   'agent-teams-tmux',
+  'artifacts',
   'automations',
   'back',
   'capture',

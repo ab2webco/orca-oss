@@ -155,7 +155,16 @@ test.afterAll(() => {
 
 for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION]) {
   const contractLabel = contractVersion === LEGACY_CONTRACT_VERSION ? 'legacy' : 'current'
-  test(`adopts one live ${contractLabel} worker after restart without replaying resume`, async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both Electron launches and intentionally opts out of the default app fixture.
+  // Why fixme and not a repair: the `ACK` this waits for was never written by the fake
+  // Codex. What satisfied it was the tty echo of the preamble Orca pastes, which
+  // contains the task spec text — so the assertion passed only in the runs where the
+  // prompt never reached the agent, and failed in the runs where it did. Measured over
+  // 8 rounds with an instrumented fake: 5 pass with 0 bytes delivered, 3 fail with all
+  // 5975 bytes delivered and answered. The two product defects it stumbled into ship
+  // outside this sync (ORCA-208 delivery race, ORCA-209 agent output missing from the
+  // read buffer); the oracle itself is ORCA-207. Running it here would only re-assert
+  // something false.
+  test.fixme(`adopts one live ${contractLabel} worker after restart without replaying resume`, async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both Electron launches and intentionally opts out of the default app fixture.
   {}, testInfo) => {
     test.setTimeout(300_000)
     resetWorkerRestartLedgers()

@@ -193,7 +193,8 @@ describe('terminal.sendText explicit worktree routing', () => {
     expect(delegate.listTerminals).toHaveBeenCalledTimes(1)
     expect(delegate.listTerminals).toHaveBeenCalledWith(
       'id:worktree-1',
-      PLUGIN_WORKSPACE_TERMINAL_LIMIT
+      PLUGIN_WORKSPACE_TERMINAL_LIMIT,
+      { includeVisualLayouts: false }
     )
     expect(delegate.sendTerminal).not.toHaveBeenCalled()
   })
@@ -210,7 +211,8 @@ describe('terminal.sendText explicit worktree routing', () => {
       expect(delegate.listTerminals).toHaveBeenCalledTimes(1)
       expect(delegate.listTerminals).toHaveBeenCalledWith(
         'id:worktree-1',
-        PLUGIN_WORKSPACE_TERMINAL_LIMIT
+        PLUGIN_WORKSPACE_TERMINAL_LIMIT,
+        { includeVisualLayouts: false }
       )
       expect(delegate.sendTerminal).toHaveBeenCalledTimes(1)
       expect(delegate.sendTerminal).toHaveBeenCalledWith(terminalId, {

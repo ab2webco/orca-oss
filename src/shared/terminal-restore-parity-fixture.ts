@@ -176,9 +176,7 @@ export function normalBufferStylesTrimmed(terminal: Terminal): string[] {
 export const SNAPSHOT_REPLAY_PREAMBLE_NORMAL = '\x1b[2J\x1b[3J\x1b[H'
 export const SNAPSHOT_REPLAY_PREAMBLE_ALT = '\x1b[0m\x1b[?1049h\x1b[2J\x1b[H'
 
-// Twin of POST_REPLAY_LIVE_SNAPSHOT_RESET (layout-serialization.ts) — the
-// renderer suite pins equality against the real constant so drift fails fast.
-export const POST_REPLAY_LIVE_SNAPSHOT_RESET_PARITY = '\x1b[0 q\x1b[?25h\x1b[?1004l'
+export { POST_REPLAY_LIVE_SNAPSHOT_RESET as POST_REPLAY_LIVE_SNAPSHOT_RESET_PARITY } from './terminal-mode-reset-profiles'
 
 export type ParityMainSnapshot = {
   data: string

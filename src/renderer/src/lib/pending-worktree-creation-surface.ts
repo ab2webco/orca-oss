@@ -1,17 +1,6 @@
 import { useAppStore } from '@/store'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { getWorktreeCreationIndeterminate } from '@/lib/worktree-creation-flow-startup'
 import type { WorktreeCreationPhase, WorktreeCreationRequest } from './pending-worktree-creation'
-
-export function getWorktreeCreationIndeterminate(request: WorktreeCreationRequest): boolean {
-  if (request.worktreeCreateProgressMode) {
-    return request.worktreeCreateProgressMode === 'indeterminate'
-  }
-  return getActiveRuntimeTarget(useAppStore.getState().settings).kind !== 'local'
-}
-
-export function getInitialWorktreeCreationPhase(request: WorktreeCreationRequest): WorktreeCreationPhase {
-  return request.ephemeralVmRecipe && !request.ephemeralVmRuntimeId ? 'provisioning-vm' : 'fetching'
-}
 
 // Why: activePendingCreationId can outlive the terminal route when the user
 // switches app views; only the terminal route renders the creation panel.

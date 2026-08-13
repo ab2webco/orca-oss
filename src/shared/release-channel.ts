@@ -1,13 +1,20 @@
 import { compareAppVersions, isValidAppVersion } from './app-version'
 
-export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'adhoc'
+export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'daily' | 'adhoc'
 
-export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc', 'hourly', 'adhoc']
+export const RELEASE_CHANNELS: readonly ReleaseChannel[] = [
+  'stable',
+  'rc',
+  'hourly',
+  'daily',
+  'adhoc'
+]
 
 export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = {
   stable: 'Stable',
   rc: 'RC',
   hourly: 'Hourly',
+  daily: 'Daily',
   adhoc: 'Adhoc'
 }
 
@@ -19,21 +26,23 @@ export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = 
  *  Keep in sync with src/main/update-feed-target.ts (shared/ cannot import main/).
  *  Upstream isolates each dev channel in its own repo so their tags never evict
  *  stable/RC entries from the 10-entry atom feed. That split buys the fork
- *  nothing: both .github/workflows/hourly-mac-build.yml and adhoc-mac-build.yml
- *  are gated `github.repository == 'stablyai/orca'`, so neither runs here and no
- *  ab2webco hourly/adhoc repo exists. Both channels therefore resolve to this
- *  repo and simply list no dev builds. If the fork ever ungates one of those
- *  workflows, give that channel its own repo again rather than letting its tags
- *  evict this feed's stable/RC entries. */
+ *  nothing: hourly-mac-build.yml, daily-mac-build.yml and adhoc-mac-build.yml are
+ *  all gated `github.repository == 'stablyai/orca'`, so none runs here and no
+ *  ab2webco hourly/daily/adhoc repo exists. Every channel therefore resolves to
+ *  this repo and simply lists no dev builds. If the fork ever ungates one of
+ *  those workflows, give that channel its own repo again rather than letting its
+ *  tags evict this feed's stable/RC entries. */
 export const HOURLY_RELEASE_REPO = 'ab2webco/orca-oss'
+export const DAILY_RELEASE_REPO = 'ab2webco/orca-oss'
 export const ADHOC_RELEASE_REPO = 'ab2webco/orca-oss'
 export const MAIN_RELEASE_REPO = 'ab2webco/orca-oss'
 
 export const HOURLY_PRERELEASE_IDENTIFIER = 'hourly'
+export const DAILY_PRERELEASE_IDENTIFIER = 'daily'
 export const ADHOC_PRERELEASE_IDENTIFIER = 'adhoc'
 
 /** The dev channels, each published to its own repo rather than the main one. */
-const DEDICATED_REPO_CHANNELS = ['hourly', 'adhoc'] as const
+const DEDICATED_REPO_CHANNELS = ['hourly', 'daily', 'adhoc'] as const
 
 export type DedicatedRepoChannel = (typeof DEDICATED_REPO_CHANNELS)[number]
 
@@ -41,6 +50,7 @@ const CHANNEL_RELEASE_REPOS: Record<ReleaseChannel, string> = {
   stable: MAIN_RELEASE_REPO,
   rc: MAIN_RELEASE_REPO,
   hourly: HOURLY_RELEASE_REPO,
+  daily: DAILY_RELEASE_REPO,
   adhoc: ADHOC_RELEASE_REPO
 }
 
@@ -58,8 +68,8 @@ export function hasDedicatedReleaseRepo(channel: ReleaseChannel): channel is Ded
  * Shared so the picker, the main-process check, and any future surface cannot
  * drift on where a channel is available.
  *
- * Why this rides on the dev-channel list: both dev channels are produced only by
- * macOS workflows, so neither has an artifact to offer elsewhere. If one ever
+ * Why this rides on the dev-channel list: all dev channels are produced only by
+ * macOS workflows, so none has an artifact to offer elsewhere. If one ever
  * gains a Windows or Linux job, split the two concepts apart — they coincide
  * today, but "published to its own repo" and "built for macOS only" are not the
  * same claim.
@@ -83,14 +93,19 @@ export function normalizeTagToVersion(tag: string): string {
  *  uniquely versioned so electron-updater never reads one as "same version". */
 const HOURLY_VERSION = /^\d+\.\d+\.\d+-hourly\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/
 
+/** `1.4.160-daily.202607281415` — same minute stamp as hourly. Daily cuts once
+ *  per day, so collisions are not a concern; the stamp still carries the hour so
+ *  a forced re-cut the same calendar day remains unique. */
+const DAILY_VERSION = /^\d+\.\d+\.\d+-daily\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/
+
 /**
  * `1.4.160-adhoc.20260728140533` — same idea, but stamped to the second.
  *
- * Why seconds here and not for hourly: hourly runs under a concurrency group, so
- * two of them can never be cut in the same minute. Adhoc builds are dispatched
- * on demand by whoever wants one, so two people cutting from different branches
- * at once is ordinary — and a minute-resolution stamp would collide on the tag
- * and fail the second build eight minutes in.
+ * Why seconds here and not for hourly/daily: those run under a concurrency
+ * group, so two of them can never be cut in the same minute. Adhoc builds are
+ * dispatched on demand by whoever wants one, so two people cutting from
+ * different branches at once is ordinary — and a minute-resolution stamp would
+ * collide on the tag and fail the second build eight minutes in.
  */
 const ADHOC_VERSION = /^\d+\.\d+\.\d+-adhoc\.(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/
 
@@ -124,12 +139,20 @@ export function isHourlyVersion(version: string): boolean {
   return HOURLY_VERSION.test(normalizeTagToVersion(version))
 }
 
+export function isDailyVersion(version: string): boolean {
+  return DAILY_VERSION.test(normalizeTagToVersion(version))
+}
+
 export function isAdhocVersion(version: string): boolean {
   return ADHOC_VERSION.test(normalizeTagToVersion(version))
 }
 
 export function formatHourlyVersion(baseVersion: string, stamp: string): string {
   return `${baseVersion}-${HOURLY_PRERELEASE_IDENTIFIER}.${stamp}`
+}
+
+export function formatDailyVersion(baseVersion: string, stamp: string): string {
+  return `${baseVersion}-${DAILY_PRERELEASE_IDENTIFIER}.${stamp}`
 }
 
 export function formatAdhocVersion(baseVersion: string, stamp: string): string {
@@ -141,15 +164,24 @@ export function parseHourlyVersionStamp(version: string): Date | null {
   return parseStampedVersion(version, HOURLY_VERSION)
 }
 
+/** Returns the build's UTC timestamp, or null when the version isn't daily. */
+export function parseDailyVersionStamp(version: string): Date | null {
+  return parseStampedVersion(version, DAILY_VERSION)
+}
+
 /** Returns the build's UTC timestamp, or null when the version isn't adhoc. */
 export function parseAdhocVersionStamp(version: string): Date | null {
   return parseStampedVersion(version, ADHOC_VERSION)
 }
 
-/** The build's UTC timestamp for either dev channel, so a picker row can render
- *  a date without first working out which channel produced the version. */
+/** The build's UTC timestamp for any dev channel, so a picker row can render a
+ *  date without first working out which channel produced the version. */
 export function parseDevBuildStamp(version: string): Date | null {
-  return parseHourlyVersionStamp(version) ?? parseAdhocVersionStamp(version)
+  return (
+    parseHourlyVersionStamp(version) ??
+    parseDailyVersionStamp(version) ??
+    parseAdhocVersionStamp(version)
+  )
 }
 
 export function getVersionChannel(version: string): ReleaseChannel | null {
@@ -159,6 +191,9 @@ export function getVersionChannel(version: string): ReleaseChannel | null {
   }
   if (isHourlyVersion(normalized)) {
     return 'hourly'
+  }
+  if (isDailyVersion(normalized)) {
+    return 'daily'
   }
   if (isAdhocVersion(normalized)) {
     return 'adhoc'

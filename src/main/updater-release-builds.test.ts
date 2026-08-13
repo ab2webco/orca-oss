@@ -47,6 +47,26 @@ describe('listReleaseBuilds', () => {
     ])
   })
 
+  it('lists daily builds from the fork repo, newest first', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.160-daily.202607271300'),
+        release('v1.4.160-daily.202607291300'),
+        release('v1.4.160-daily.202607281300')
+      ])
+    )
+
+    const builds = await listReleaseBuilds('daily')
+
+    // Same reason as hourly above: the fork publishes every channel here.
+    expect(fetchMock.mock.calls[0][0]).toContain('ab2webco/orca-oss')
+    expect(builds.map((build) => build.version)).toEqual([
+      '1.4.160-daily.202607291300',
+      '1.4.160-daily.202607281300',
+      '1.4.160-daily.202607271300'
+    ])
+  })
+
   // Why: the main repo serves stable and rc from one endpoint, so an unfiltered
   // list would offer RC tags under the Stable channel.
   it('separates stable from rc in the shared main repo', async () => {
@@ -122,6 +142,14 @@ describe('resolveTargetBuild', () => {
       tag: 'v1.4.160-hourly.202607281400',
       version: '1.4.160-hourly.202607281400',
       feedUrl: 'https://github.com/ab2webco/orca-oss/releases/download/v1.4.160-hourly.202607281400'
+    })
+  })
+
+  it('pins a daily tag at the fork repo download path', () => {
+    expect(resolveTargetBuild('daily', 'v1.4.160-daily.202607281300')).toEqual({
+      tag: 'v1.4.160-daily.202607281300',
+      version: '1.4.160-daily.202607281300',
+      feedUrl: 'https://github.com/ab2webco/orca-oss/releases/download/v1.4.160-daily.202607281300'
     })
   })
 

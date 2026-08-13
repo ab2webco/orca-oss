@@ -42,6 +42,18 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
     vi.spyOn(runtime, 'getTerminalProcessIncarnation').mockImplementation(
       (handle) => `runtime_test:${handle}:1`
     )
+    // Why (ORCA-201): upstream's dispatch now refuses --inject without a stable
+    // pane AND process incarnation, and it reads both off the dispatch authority
+    // rather than the two accessors above. These cases are about the composer
+    // marker, so they hand it the authority a real live pane would have.
+    vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation(
+      (handle) =>
+        ({
+          terminalHandle: handle,
+          paneKey: handle === WORKER ? `tab_worker:${WORKER}` : COORD_PANE,
+          processIncarnation: `runtime_test:${handle}:1`
+        }) as never
+    )
     vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
     vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
     runId = db.createRun({

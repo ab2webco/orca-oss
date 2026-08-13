@@ -189,4 +189,77 @@ describe('OrchestrationDb version-skew migration', () => {
 
     raw.close()
   })
+
+  // Why this scenario is reachable: the lab fork and upstream ship the same
+  // appId (com.stablyai.orca) and productName, so both write the same
+  // userData/orchestration.db. Numbers 23-25 mean different migrations on the two
+  // lineages, so a stamp written by an upstream build must not be trusted.
+  describe('upstream-lineage stamps', () => {
+    // Columns the lab ladder adds at v23-v27; an upstream build adds none of them.
+    const LAB_LINEAGE_COLUMNS = [
+      'envelope_contract',
+      'envelope_correction_attempts',
+      'monitor_deadline_at',
+      'first_lifecycle_signal_at',
+      'turn_accepted_at',
+      'composer_ready_proven'
+    ]
+
+    function createUpstreamLineageDatabase(stampedVersion: number): string {
+      tempDir = mkdtempSync(join(tmpdir(), 'orca-db-upstream-lineage-'))
+      const dbPath = join(tempDir, 'orchestration.db')
+      const seeded = new OrchestrationDb(dbPath)
+      seeded.close()
+      // Rewind to what an upstream build of that version would have left behind:
+      // its own steps applied, none of the lab's, and its own number stamped.
+      const raw = new Database(dbPath)
+      raw.exec('DROP INDEX IF EXISTS idx_dispatch_monitor_deadline')
+      for (const column of LAB_LINEAGE_COLUMNS) {
+        raw.exec(`ALTER TABLE dispatch_contexts DROP COLUMN ${column}`)
+      }
+      raw.pragma(`user_version = ${stampedVersion}`)
+      raw.close()
+      return dbPath
+    }
+
+    function dispatchColumns(dbPath: string): string[] {
+      const raw = new Database(dbPath)
+      const rows = raw.pragma('table_info(dispatch_contexts)') as { name: string }[]
+      raw.close()
+      return rows.map((row) => row.name)
+    }
+
+    it.each([23, 24, 25])('re-runs the lab ladder over a DB upstream stamped %i', (stamped) => {
+      const dbPath = createUpstreamLineageDatabase(stamped)
+      expect(dispatchColumns(dbPath)).not.toContain('envelope_contract')
+
+      db = new OrchestrationDb(dbPath)
+      db.close()
+      db = undefined
+
+      expect(dispatchColumns(dbPath)).toEqual(expect.arrayContaining(LAB_LINEAGE_COLUMNS))
+    })
+
+    it('rewinds only to the last version both lineages agree on', () => {
+      const dbPath = createUpstreamLineageDatabase(25)
+      const raw = new Database(dbPath)
+
+      expect(resolveOrchestrationMigrationStartVersion(raw, 25, 29)).toBe(22)
+
+      raw.close()
+    })
+
+    it('leaves a lab-lineage stamp alone', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'orca-db-lab-lineage-'))
+      const dbPath = join(tempDir, 'orchestration.db')
+      const seeded = new OrchestrationDb(dbPath)
+      seeded.close()
+      const raw = new Database(dbPath)
+      raw.pragma('user_version = 25')
+
+      expect(resolveOrchestrationMigrationStartVersion(raw, 25, 29)).toBe(25)
+
+      raw.close()
+    })
+  })
 })
