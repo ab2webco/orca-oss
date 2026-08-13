@@ -202,6 +202,12 @@ it as an area, not a cause.
 **Do not push while an E2E run is in flight.** A push cancels it — that is how shard 7's re-run was
 lost on `31651257359`, and shard 7 still has no verdict.
 
+**Do not run `npm test` alongside a local Playwright run.** Both spawn daemons, PTYs and the relay.
+Run concurrently here, `npm test` wedged: one worker fork pinned at 100 % CPU for 59 minutes with the
+log frozen and no summary — indistinguishable from "slow" until you check `ps`. Whether the merge
+can wedge it on its own is unmeasured; the arms were confounded, so that run proves nothing either
+way and was rerun alone.
+
 **Not fixed, and deliberately not parked.** The ORCA-203/204 parks each rested on a written
 diagnosis of *upstream's* defect; these point at fork code, so `test.fixme` would bury a fork
 regression under a precedent that does not apply. Next measurement, and the only one left that
