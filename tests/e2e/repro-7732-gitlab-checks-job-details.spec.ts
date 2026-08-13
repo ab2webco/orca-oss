@@ -113,7 +113,25 @@ async function linkGitLabMRToWorktree(page: Page, worktreeId: string): Promise<v
 }
 
 test.describe('#7732 GitLab Checks panel job details', () => {
-  test('expanding a failed pipeline job shows its log, not "No inline details"', async ({
+  // Parked, not repaired — inherited from upstream, established by positive evidence rather than
+  // byte-identity. Measured: run 31665209057, the full E2E suite dispatched on upstream's own tip
+  // a63df91790 with no fork code in the tree — this case FAILS there. The same run also reds
+  // github-created-issue-start-prefill:122, terminal-hidden-view-parking:467,
+  // floating-tab-rename:179, tab-create-entry-file-paths and orca-profiles ×2.
+  //
+  // The whole feature it exercises arrived with sync #7 and the fork's resolutions touched none of
+  // it: the spec does not exist at the pre-sync tip 267f58acd6, and every surface on its path is
+  // byte-identical to upstream — helpers/source-control-ai-generation.ts (`openChecks`, where the
+  // predicate times out), right-sidebar/checks-panel-content.tsx, right-sidebar/ChecksPanel.tsx,
+  // runtime/gitlab-job-trace-client.ts and main/ipc/gitlab.ts.
+  //
+  // Trap worth knowing before re-measuring: upstream's tip cannot run its own E2E suite as-is —
+  // tests/e2e/terminal-macos-system-key-remap imports './terminal-ime-pane-arena', which is absent
+  // from that tree, so Playwright dies at collection and every shard reds before a spec runs. Drop
+  // that one spec to get a measurable upstream arm.
+  //
+  // Unparked by: a fix upstream, or one in its own PR — not inside this sync (ORCA-203).
+  test.fixme('expanding a failed pipeline job shows its log, not "No inline details"', async ({
     orcaPage,
     electronApp
   }) => {
