@@ -75,6 +75,7 @@ import type {
   ClaudeLiveSharedPtyAccountBinding,
   CodexDirectedPtyAccountBinding,
   PlaneViewMode,
+  LinearViewMode,
   RateLimitFailBackMode
 } from '../shared/types'
 import {
@@ -2296,6 +2297,10 @@ function normalizeRateLimitFailoverAccountId(value: unknown): string | null {
 }
 
 // Why: unknown strings from hand-edited payloads fall back to the safe default.
+function normalizeLinearViewMode(value: unknown): LinearViewMode {
+  return value === 'list' ? 'list' : 'board'
+}
+
 function normalizePlaneViewMode(value: unknown): PlaneViewMode {
   // Why 'board' by default: with agents moving work in parallel, the kanban shows
   // the state of everything at a glance. 'list' stays one click away.
@@ -3518,6 +3523,7 @@ export class Store {
               parsed.settings?.rateLimitFailoverAccountId
             ),
             planeViewMode: normalizePlaneViewMode(parsed.settings?.planeViewMode),
+            linearViewMode: normalizeLinearViewMode(parsed.settings?.linearViewMode),
             rateLimitFailBackMode: normalizeRateLimitFailBackMode(
               parsed.settings?.rateLimitFailBackMode
             ),
@@ -5833,6 +5839,9 @@ export class Store {
       sanitizedUpdates.rateLimitFailoverAccountId = normalizeRateLimitFailoverAccountId(
         updates.rateLimitFailoverAccountId
       )
+    }
+    if ('linearViewMode' in updates) {
+      sanitizedUpdates.linearViewMode = normalizeLinearViewMode(updates.linearViewMode)
     }
     if ('planeViewMode' in updates) {
       sanitizedUpdates.planeViewMode = normalizePlaneViewMode(updates.planeViewMode)
