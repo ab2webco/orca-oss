@@ -653,4 +653,6 @@ jobs:
         run: |
           node config/scripts/report-ci-failure-classes.mjs \
             --run "$RUNNER_TEMP/ci-run.json" \
-            --jobs "$RUNNER_TEMP/ci-jobs.json"
+            --jobs "$RUNNER_TEMP/ci-jobs.json" \
+            --gate-job verify \
+            --exclude-job 'ci failure class'

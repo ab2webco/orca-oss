@@ -5,7 +5,8 @@
  * classification is reproducible off a saved run and needs no network here.
  *
  * Usage:
- *   node config/scripts/report-ci-failure-classes.mjs --run run.json --jobs jobs.json
+ *   node config/scripts/report-ci-failure-classes.mjs --run run.json --jobs jobs.json \
+ *     [--gate-job <name>]... [--exclude-job <name>]...
  */
 
 import { appendFileSync, readFileSync } from 'node:fs'
@@ -17,22 +18,34 @@ import {
   createJobDefinitionResolver
 } from './ci-workflow-job-definitions.mjs'
 
+const SINGLE_VALUE_FLAGS = ['run', 'jobs', 'workflows', 'summary']
+const REPEATABLE_FLAGS = { 'gate-job': 'gateJobNames', 'exclude-job': 'excludedJobNames' }
+
 function parseArgs(argv) {
-  const options = { workflows: '.github/workflows', summary: process.env.GITHUB_STEP_SUMMARY }
+  const options = {
+    workflows: '.github/workflows',
+    summary: process.env.GITHUB_STEP_SUMMARY,
+    gateJobNames: [],
+    excludedJobNames: []
+  }
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index]
     if (!flag.startsWith('--')) {
       throw new Error(`Unexpected argument: ${flag}`)
     }
     const key = flag.slice(2)
-    if (!['run', 'jobs', 'workflows', 'summary'].includes(key)) {
+    if (!SINGLE_VALUE_FLAGS.includes(key) && !(key in REPEATABLE_FLAGS)) {
       throw new Error(`Unknown flag: ${flag}`)
     }
     const value = argv[index + 1]
     if (value === undefined) {
       throw new Error(`Missing value for ${flag}`)
     }
-    options[key] = value
+    if (key in REPEATABLE_FLAGS) {
+      options[REPEATABLE_FLAGS[key]].push(value)
+    } else {
+      options[key] = value
+    }
     index += 1
   }
   if (!options.run || !options.jobs) {
@@ -54,7 +67,13 @@ function main() {
   const resolveJobDefinition = createJobDefinitionResolver(
     collectWorkflowJobDefinitions(options.workflows)
   )
-  const classified = classifyRunJobs({ run, jobs, resolveJobDefinition })
+  const classified = classifyRunJobs({
+    run,
+    jobs,
+    resolveJobDefinition,
+    gateJobNames: options.gateJobNames,
+    excludedJobNames: options.excludedJobNames
+  })
 
   for (const annotation of renderAnnotations(classified)) {
     process.stdout.write(`${annotation}\n`)

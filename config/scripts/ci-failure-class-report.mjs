@@ -11,6 +11,7 @@ const HEADLINE = {
   [CI_FAILURE_CLASS.CANCELLED_BY_FAIL_FAST]: 'cancelled by another job — not a failure',
   [CI_FAILURE_CLASS.SETUP_FAILED]: 'a step failed before the tests ran',
   [CI_FAILURE_CLASS.TESTS_FAILED]: 'a test failed',
+  [CI_FAILURE_CLASS.GATE_FAILED]: 'failed because a job it depends on failed',
   [CI_FAILURE_CLASS.DEPENDENCY_SKIPPED]: 'never ran — a dependency kept it out',
   [CI_FAILURE_CLASS.PENDING]: 'still running when the run was classified',
   [CI_FAILURE_CLASS.UNCLASSIFIED]: 'signals disagree — open the log'
@@ -24,6 +25,7 @@ const CLASS_ORDER = [
   CI_FAILURE_CLASS.TIMEOUT,
   CI_FAILURE_CLASS.CANCELLED_BY_FAIL_FAST,
   CI_FAILURE_CLASS.CANCELLED_BY_RUN,
+  CI_FAILURE_CLASS.GATE_FAILED,
   CI_FAILURE_CLASS.DEPENDENCY_SKIPPED,
   CI_FAILURE_CLASS.PENDING
 ]

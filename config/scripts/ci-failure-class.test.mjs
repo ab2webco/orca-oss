@@ -39,8 +39,13 @@ const HISTORICAL_DEFINITIONS = [
 
 const resolveHistorical = createJobDefinitionResolver(HISTORICAL_DEFINITIONS)
 
-function classify(fixture, resolveJobDefinition = resolveHistorical) {
-  return classifyRunJobs({ run: fixture.run, jobs: fixture.jobs, resolveJobDefinition })
+function classify(fixture, resolveJobDefinition = resolveHistorical, extra = {}) {
+  return classifyRunJobs({
+    run: fixture.run,
+    jobs: fixture.jobs,
+    resolveJobDefinition,
+    ...extra
+  })
 }
 
 function entryFor(classified, jobName) {
@@ -128,6 +133,33 @@ describe('CI failure classification against recorded runs', () => {
     it('does not read the skipped test step as a test failure', () => {
       const entry = entryFor(classified, 'tests node 24 11/16')
       expect(entry.failureClass).not.toBe(CI_FAILURE_CLASS.TESTS_FAILED)
+    })
+
+    // `verify`'s only step echoes `needs.*.result`, so by shape it looks exactly
+    // like a work step that ran and failed. Left unnamed it reads "a test failed"
+    // on every red PR.
+    it('does not read the merge gate as a job that failed on its own account', () => {
+      const gated = classify(loadRun('31654278963'), resolveHistorical, {
+        gateJobNames: ['verify']
+      })
+      const entry = entryFor(gated, 'verify')
+      expect(entry.failureClass).toBe(CI_FAILURE_CLASS.GATE_FAILED)
+      expect(entry.triage).toBe('none')
+      expect(renderJobSummary(gated)).toContain('6 job(s) failed on their own account')
+    })
+
+    it('counts the gate as a real failure when it is not declared as one', () => {
+      const entry = entryFor(classified, 'verify')
+      expect(entry.failureClass).toBe(CI_FAILURE_CLASS.TESTS_FAILED)
+      expect(renderJobSummary(classified)).toContain('7 job(s) failed on their own account')
+    })
+
+    it('leaves an excluded job out of the report entirely', () => {
+      const withoutGate = classify(loadRun('31654278963'), resolveHistorical, {
+        excludedJobNames: ['verify']
+      })
+      expect(withoutGate.some((entry) => entry.name === 'verify')).toBe(false)
+      expect(classified.some((entry) => entry.name === 'verify')).toBe(true)
     })
   })
 

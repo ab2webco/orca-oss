@@ -24,6 +24,7 @@ declared it).
 | `cancelled-by-fail-fast` | `job.conclusion == "cancelled"` and a matrix sibling reported `failure` within 120s before it | none — **a cancelled shard is not a failed shard** |
 | `setup-failed`           | `job.conclusion == "failure"`, and a later executable step is `skipped`                       | the named step failed; the job's work never ran    |
 | `tests-failed`           | `job.conclusion == "failure"`, and no later step was skipped                                  | code — the work step ran to completion and failed  |
+| `gate-failed`            | `job.conclusion == "failure"` and the job is a declared gate (`--gate-job`)                   | none — it failed because a job it needs did        |
 | `dependency-skipped`     | `job.conclusion == "skipped"`                                                                 | none — an `if` or a dependency kept it out         |
 | `pending`                | `job.status != "completed"`                                                                   | none — still running when the run was classified   |
 | `unclassified`           | anything the rules above do not cover                                                         | unknown — open the log                             |
@@ -36,6 +37,12 @@ Two rules carry the weight:
   `ci-failure-class.test.mjs` pins it against a real failed job stretched past its cap.
 - **When the cap cannot be resolved, the class is `unclassified`, not `timeout`.** Guessing a
   timeout from a bare `cancelled` is the same lie in the other direction.
+
+Gate jobs are **named, not detected**. `verify`'s only step echoes `needs.*.result`, so by shape
+it is identical to a job whose work step ran and failed — left unnamed it would print "a test
+failed" on every red PR, which is this ticket's lie pointed the other way. `pr.yml` passes
+`--gate-job verify`, and `--exclude-job 'ci failure class'` keeps the reporter from reporting on
+itself (it is `in_progress` in its own API response).
 
 The 60s timeout grace is measured, not chosen: job `94316018103` ran 30m17s against a 30-minute
 cap, and `tests node 24 9/16` ran 15m14s against 15. `started_at` includes runner setup and the
@@ -62,6 +69,10 @@ runner kills the job a few seconds past the cap.
 - No matrix in this repo sets `fail-fast: true` today, so `cancelled-by-fail-fast` has no recorded
   run. Its test derives the shape from a real cancelled shard rather than inventing a payload, and
   the class exists so the guarantee holds the day a matrix omits `fail-fast`.
+- `cancelled-by-run` is not observable from inside `pr.yml`: the run's own
+  `cancel-in-progress` concurrency cancels the reporter along with everything else. It exists so
+  a `cancelled` job can never be called a `timeout` when the run itself was cancelled, and it is
+  exercised by the run `31663317660` fixture — not because you will see it printed here.
 - The reporter never gates. `verify` remains the merge gate and is untouched.
 
 ## Keeping it from degrading

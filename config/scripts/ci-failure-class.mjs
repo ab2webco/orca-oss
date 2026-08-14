@@ -14,6 +14,7 @@ export const CI_FAILURE_CLASS = Object.freeze({
   CANCELLED_BY_FAIL_FAST: 'cancelled-by-fail-fast',
   SETUP_FAILED: 'setup-failed',
   TESTS_FAILED: 'tests-failed',
+  GATE_FAILED: 'gate-failed',
   DEPENDENCY_SKIPPED: 'dependency-skipped',
   PENDING: 'pending',
   UNCLASSIFIED: 'unclassified'
@@ -29,6 +30,7 @@ export const CI_FAILURE_TRIAGE = Object.freeze({
   [CI_FAILURE_CLASS.CANCELLED_BY_FAIL_FAST]: 'none',
   [CI_FAILURE_CLASS.SETUP_FAILED]: 'setup',
   [CI_FAILURE_CLASS.TESTS_FAILED]: 'code',
+  [CI_FAILURE_CLASS.GATE_FAILED]: 'none',
   [CI_FAILURE_CLASS.DEPENDENCY_SKIPPED]: 'none',
   [CI_FAILURE_CLASS.PENDING]: 'none',
   [CI_FAILURE_CLASS.UNCLASSIFIED]: 'unknown'
@@ -168,6 +170,17 @@ function classifyOneJob(job, context) {
     return classifyCancelledJob(job, context)
   }
   if (job.conclusion === 'failure') {
+    // Why gates are named rather than detected: a gate job's only step echoes
+    // `needs.*.result`, so by shape it is indistinguishable from a job whose work
+    // step ran and failed — and calling `verify` "a test failed" is the same lie
+    // this exists to kill, pointed the other way.
+    if (context.gateJobNames.has(job.name)) {
+      return {
+        failureClass: CI_FAILURE_CLASS.GATE_FAILED,
+        evidence:
+          'a merge gate: it failed because a job it depends on did, and carries no diagnosis of its own'
+      }
+    }
     return classifyFailedJob(job)
   }
   return {
@@ -181,10 +194,21 @@ function classifyOneJob(job, context) {
  * @param {{conclusion?: string|null}} input.run trimmed `GET /actions/runs/{id}`
  * @param {Array<object>} input.jobs trimmed `GET /actions/runs/{id}/jobs`
  * @param {(jobName: string) => ({workflowFile: string, jobKey: string, timeoutMinutes: number|null}|null)} [input.resolveJobDefinition]
+ * @param {Array<string>} [input.gateJobNames] jobs that only echo other jobs' results
+ * @param {Array<string>} [input.excludedJobNames] jobs to leave out entirely — the
+ *   reporter is `in_progress` in its own API response and would report on itself
  * @returns {Array<object>} one entry per job that is not `success`
  */
-export function classifyRunJobs({ run, jobs, resolveJobDefinition }) {
+export function classifyRunJobs({
+  run,
+  jobs,
+  resolveJobDefinition,
+  gateJobNames = [],
+  excludedJobNames = []
+}) {
   const resolve = resolveJobDefinition ?? (() => null)
+  const gates = new Set(gateJobNames)
+  const excluded = new Set(excludedJobNames)
   const definitions = new Map()
   const siblingsByKey = new Map()
   for (const job of jobs) {
@@ -205,12 +229,16 @@ export function classifyRunJobs({ run, jobs, resolveJobDefinition }) {
     if (job.status === 'completed' && job.conclusion === 'success') {
       continue
     }
+    if (excluded.has(job.name)) {
+      continue
+    }
     const definition = definitions.get(job.id)
     const key = definition ? `${definition.workflowFile}#${definition.jobKey}` : null
     const outcome = classifyOneJob(job, {
       runConclusion: run?.conclusion ?? null,
       timeoutMinutes: definition?.timeoutMinutes ?? null,
-      siblings: (key && siblingsByKey.get(key)) || []
+      siblings: (key && siblingsByKey.get(key)) || [],
+      gateJobNames: gates
     })
     classified.push({
       id: job.id,

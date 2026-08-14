@@ -27,4 +27,12 @@ describe('the CI failure-class reporter job', () => {
   it('is not part of the merge gate', () => {
     expect(workflow.jobs.verify.needs).not.toContain('ci_failure_class')
   })
+
+  it('names `verify` as a gate and excludes itself, using the names the API reports', () => {
+    const command = reporter.steps.at(-1).run
+    expect(command).toContain('--gate-job verify')
+    // The API reports a job by its rendered `name`, not its key.
+    expect(command).toContain(`--exclude-job '${reporter.name}'`)
+    expect(workflow.jobs.verify.name ?? 'verify').toBe('verify')
+  })
 })
