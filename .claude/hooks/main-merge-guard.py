@@ -15,6 +15,9 @@ del coordinador queda abierto donde el guard no llega: fuera de la Bash tool.
 Alcance: sólo escrituras sobre `main` del remoto propio. Un PR encadenado contra una
 rama de feature pasa sin ruido — una guarda que obligue a saltearla todos los días
 no es una guarda.
+
+Esta guarda es defensa en profundidad: si el host deja de invocar `PreToolUse`, falla
+abierto. La protección obligatoria vive en la política de rama del remoto.
 """
 
 import json
