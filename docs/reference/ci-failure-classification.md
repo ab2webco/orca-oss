@@ -1,0 +1,75 @@
+# CI Failure Classification
+
+A job killed by `timeout-minutes`, a job whose setup step failed, and a job with a red test all
+report the same thing in the checks UI: `fail`. They are opposite diagnoses — one is the code,
+one is the budget, one is the runner — and confusing them sends the wrong person to the wrong
+place. It happened twice in one night (ORCA-215), and once a "red specs" list handed to a worker
+included a spec that never ran.
+
+The `ci failure class` job in `.github/workflows/pr.yml` reads this run's jobs back from the
+GitHub Actions API at the end of the run and names each non-successful job's class on the run
+summary page. **The goal is that a red check says why it is red without opening a log.**
+
+## The classes and the signal behind each
+
+`GET /actions/runs/{run_id}` and `GET /actions/runs/{run_id}/jobs` are the only inputs. Neither
+carries `timeout-minutes`, so the cap comes from the workflow YAML in the checkout
+(`config/scripts/ci-workflow-job-definitions.mjs` matches an API job name back to the job that
+declared it).
+
+| Class                    | Signal                                                                                        | Triage                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `timeout`                | `job.conclusion == "cancelled"` **and** `completed_at - started_at >= cap - 60s`              | budget — nothing failed, the job ran out of time   |
+| `cancelled-by-run`       | `job.conclusion == "cancelled"` and `run.conclusion == "cancelled"`                           | none — a superseding push or a manual cancel       |
+| `cancelled-by-fail-fast` | `job.conclusion == "cancelled"` and a matrix sibling reported `failure` within 120s before it | none — **a cancelled shard is not a failed shard** |
+| `setup-failed`           | `job.conclusion == "failure"`, and a later executable step is `skipped`                       | the named step failed; the job's work never ran    |
+| `tests-failed`           | `job.conclusion == "failure"`, and no later step was skipped                                  | code — the work step ran to completion and failed  |
+| `dependency-skipped`     | `job.conclusion == "skipped"`                                                                 | none — an `if` or a dependency kept it out         |
+| `pending`                | `job.status != "completed"`                                                                   | none — still running when the run was classified   |
+| `unclassified`           | anything the rules above do not cover                                                         | unknown — open the log                             |
+
+Two rules carry the weight:
+
+- **`timeout` is reachable only from `conclusion == "cancelled"`.** A job that reported `failure`
+  is never reclassified by how long it ran, at any duration. The dangerous failure of this change
+  would be a real red test masked as "ran out of time"; the branch order makes it unreachable and
+  `ci-failure-class.test.mjs` pins it against a real failed job stretched past its cap.
+- **When the cap cannot be resolved, the class is `unclassified`, not `timeout`.** Guessing a
+  timeout from a bare `cancelled` is the same lie in the other direction.
+
+The 60s timeout grace is measured, not chosen: job `94316018103` ran 30m17s against a 30-minute
+cap, and `tests node 24 9/16` ran 15m14s against 15. `started_at` includes runner setup and the
+runner kills the job a few seconds past the cap.
+
+## Why the run summary and annotations, and not the other surfaces
+
+- **Not the check name.** A job's `name` is fixed when the workflow is parsed. It cannot carry a
+  class that is only decidable once the run has ended.
+- **Not a step inside the failing job.** A job that was skipped or cancelled before its steps ran
+  executes no steps at all, so it cannot report on itself — and those are exactly the classes this
+  exists to name. `if: always()` does not help: a skipped job has nothing to always-run.
+- **Not a PR comment.** It needs `pull-requests: write`, it does not work on fork PRs, and it adds
+  a notification per run.
+- **The job summary** (`$GITHUB_STEP_SUMMARY`) renders on the run summary page — the page a red
+  check links to — above the job list, with no log opened. Annotations ride along for the classes
+  worth a badge.
+
+## What is not covered
+
+- `e2e.yml` on its `schedule` and `workflow_dispatch` triggers produces its own runs, which have
+  no reporter job. When `e2e.yml` is called from `pr.yml` its jobs are part of the PR run and are
+  classified.
+- No matrix in this repo sets `fail-fast: true` today, so `cancelled-by-fail-fast` has no recorded
+  run. Its test derives the shape from a real cancelled shard rather than inventing a payload, and
+  the class exists so the guarantee holds the day a matrix omits `fail-fast`.
+- The reporter never gates. `verify` remains the merge gate and is untouched.
+
+## Keeping it from degrading
+
+- Fixtures are trimmed verbatim API payloads under `config/scripts/fixtures/ci-failure-class/`,
+  each carrying its run URL, head SHA, and the `timeout-minutes` that were in effect at that SHA.
+  The caps a test feeds the classifier are asserted equal to the caps recorded in the fixture, so
+  the two cannot drift apart silently.
+- The resolver test runs against the live `.github/workflows`, so renaming a job's `name:`
+  template or moving its `timeout-minutes` fails a test instead of quietly turning every timeout
+  into `unclassified`.
