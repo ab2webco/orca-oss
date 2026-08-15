@@ -69,6 +69,13 @@ export function hasLiveInjectedClaudePtyBoundToAccount(accountId: string): boole
   return [...liveInjectedClaudePtyAccounts.values()].includes(accountId)
 }
 
+/** Every PTY id the gate currently treats as a live Claude CLI, shared and
+ *  injected alike. Reservations are excluded: they name no session yet, so a
+ *  daemon inventory cannot speak to them. */
+export function gatedLiveClaudePtyIds(): string[] {
+  return [...new Set([...liveClaudePtyIds, ...liveInjectedClaudePtyAccounts.keys()])]
+}
+
 export function hasLiveClaudePtysUsingAccount(accountId: string): boolean {
   return (
     hasLiveInjectedClaudePtysForAccount(accountId) || hasLiveSharedClaudePtysForAccount(accountId)

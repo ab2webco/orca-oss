@@ -29,6 +29,7 @@ import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
 import { runManagedClaudeAccountRead } from '../claude-accounts/run-managed-claude-account-mutation'
 import { hasLiveClaudePtysUsingAccount } from '../claude-accounts/live-pty-gate'
+import { reconcileLiveClaudePtyGate } from '../claude-accounts/live-claude-pty-gate-reconciliation'
 import type { NetworkProxySettings } from '../../shared/network-proxy'
 import {
   normalizeClaudeAccountSelectionTarget,
@@ -808,12 +809,13 @@ export class RateLimitService {
             }
           }
           fetchedInThisCycle += 1
+          const allowTokenRotation = await this.canRotateClaudeAccountToken(account.id)
           const fresh = await this.withClaudeAccountOperation(account.id, () =>
             fetchManagedAccountUsage(account, {
               allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
               // Why: a live CLI holds this account's single-use refresh token; reading a
               // usage percentage must never rotate it out from under that session.
-              allowTokenRotation: !hasLiveClaudePtysUsingAccount(account.id),
+              allowTokenRotation,
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             })
@@ -971,6 +973,22 @@ export class RateLimitService {
     }
   }
 
+  /**
+   * Whether this account's single-use refresh token may be rotated to read
+   * usage. A gate entry claiming the account is re-checked against the daemon
+   * before it is believed: a leftover claim from a session that already died
+   * defers rotation forever, so an account whose token expires meanwhile can
+   * never be refreshed again (ORCA-224). A session the daemon still hosts keeps
+   * its protection — reconciliation releases nothing it cannot see is gone.
+   */
+  private async canRotateClaudeAccountToken(accountId: string): Promise<boolean> {
+    if (!hasLiveClaudePtysUsingAccount(accountId)) {
+      return true
+    }
+    await reconcileLiveClaudePtyGate()
+    return !hasLiveClaudePtysUsingAccount(accountId)
+  }
+
   async recheckClaudeAccountAuth(accountId: string): Promise<RateLimitState> {
     const account = (this.managedClaudeAccountsResolver?.() ?? []).find(
       (candidate) => candidate.id === accountId
@@ -982,10 +1000,11 @@ export class RateLimitService {
     const rejectionRevision = this.claudeAuthRejectionRevision.get(accountId) ?? 0
     this.pushToRenderer()
     try {
+      const allowTokenRotation = await this.canRotateClaudeAccountToken(accountId)
       const fresh = await this.withClaudeAccountOperation(accountId, () =>
         fetchManagedAccountUsage(account, {
           allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-          allowTokenRotation: !hasLiveClaudePtysUsingAccount(accountId),
+          allowTokenRotation,
           networkProxySettings: this.networkProxySettingsResolver?.()
         })
       )

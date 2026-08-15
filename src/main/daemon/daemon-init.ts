@@ -58,6 +58,7 @@ import {
   hasSeededUnconfirmedClaudePtys
 } from '../claude-accounts/live-pty-gate'
 import { attachLiveSharedClaudePtySessionLister } from '../claude-accounts/unknown-shared-claude-pty-owner-resolution'
+import { attachLiveClaudePtyGateInventory } from '../claude-accounts/live-claude-pty-gate-reconciliation'
 import {
   confirmSeededDirectedCodexPtyBindings,
   hasSeededUnconfirmedDirectedCodexPtys
@@ -1039,6 +1040,10 @@ export async function initDaemonPtyProvider(
   logDaemonMilestone('daemon-init-done', {
     legacyAdapters: legacyAdapters.length
   })
+  // Why outside reconcileSeededAgentLivePtys: that pass returns early when there
+  // are no startup seeds, and the runtime gate reconciliation is needed exactly
+  // for entries registered after startup (ORCA-224).
+  attachLiveClaudePtyGateInventory(() => listLiveDaemonPtyIds())
   await reconcileSeededAgentLivePtys(routedAdapter)
 }
 

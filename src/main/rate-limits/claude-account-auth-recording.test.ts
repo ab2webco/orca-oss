@@ -5,6 +5,7 @@ import { fetchManagedAccountUsage } from './claude-fetcher'
 import { OAuthUsageError } from './claude-oauth-usage-error'
 import type * as livePtyGate from '../claude-accounts/live-pty-gate'
 import { hasLiveClaudePtysUsingAccount } from '../claude-accounts/live-pty-gate'
+import { reconcileLiveClaudePtyGate } from '../claude-accounts/live-claude-pty-gate-reconciliation'
 
 type LivePtyGateModule = typeof livePtyGate
 
@@ -30,6 +31,10 @@ vi.mock('../minimax/minimax-cookie-store', () => ({ hasMiniMaxSessionCookie: vi.
 vi.mock('../claude-accounts/live-pty-gate', async (importOriginal) => ({
   ...(await importOriginal<LivePtyGateModule>()),
   hasLiveClaudePtysUsingAccount: vi.fn(() => false)
+}))
+
+vi.mock('../claude-accounts/live-claude-pty-gate-reconciliation', () => ({
+  reconcileLiveClaudePtyGate: vi.fn(async () => [])
 }))
 
 const ACCOUNTS = [
@@ -141,6 +146,58 @@ describe('managed Claude account auth verdicts', () => {
     const service = createService()
     await service.recheckClaudeAccountAuth('acct_live')
 
+    expect(vi.mocked(fetchManagedAccountUsage).mock.calls[0]?.[1]).toMatchObject({
+      allowTokenRotation: true
+    })
+  })
+
+  // ORCA-224: a gate entry left behind by a session that already died deferred
+  // rotation forever, so an account whose token expired meanwhile could never be
+  // refreshed. The gate's claim is re-checked against the daemon before it is
+  // believed — and only that re-check may lift it.
+  it('rotates after a claim proves to belong to a session that already died', async () => {
+    vi.mocked(hasLiveClaudePtysUsingAccount).mockReturnValueOnce(true).mockReturnValue(false)
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValue(okUsage(30))
+
+    const service = createService()
+    await service.recheckClaudeAccountAuth('acct_dead')
+
+    expect(reconcileLiveClaudePtyGate).toHaveBeenCalled()
+    expect(vi.mocked(fetchManagedAccountUsage).mock.calls[0]?.[1]).toMatchObject({
+      allowTokenRotation: true
+    })
+  })
+
+  it('keeps deferring when the claim survives the daemon re-check', async () => {
+    vi.mocked(hasLiveClaudePtysUsingAccount).mockReturnValue(true)
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValue(okUsage(30))
+
+    const service = createService()
+    await service.recheckClaudeAccountAuth('acct_live')
+
+    expect(reconcileLiveClaudePtyGate).toHaveBeenCalled()
+    expect(vi.mocked(fetchManagedAccountUsage).mock.calls[0]?.[1]).toMatchObject({
+      allowTokenRotation: false
+    })
+  })
+
+  it('does not probe the daemon when no claim is blocking the account', async () => {
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValue(okUsage(30))
+
+    const service = createService()
+    await service.recheckClaudeAccountAuth('acct_live')
+
+    expect(reconcileLiveClaudePtyGate).not.toHaveBeenCalled()
+  })
+
+  it('re-checks a stale claim on the background inactive-account sweep too', async () => {
+    vi.mocked(hasLiveClaudePtysUsingAccount).mockReturnValueOnce(true).mockReturnValue(false)
+    vi.mocked(fetchManagedAccountUsage).mockResolvedValue(okUsage(30))
+
+    const service = createService()
+    await service.fetchInactiveClaudeAccountsOnOpen()
+
+    expect(reconcileLiveClaudePtyGate).toHaveBeenCalled()
     expect(vi.mocked(fetchManagedAccountUsage).mock.calls[0]?.[1]).toMatchObject({
       allowTokenRotation: true
     })
