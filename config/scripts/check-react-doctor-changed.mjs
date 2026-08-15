@@ -6,7 +6,7 @@ const requestedBase =
   process.argv.slice(2).find((argument) => argument !== '--') ??
   process.env.ORCA_CODE_QUALITY_BASE ??
   'origin/main'
-// Why syncAware here and not in check:code-quality:changed — see resolvePullRequestDiffBase.
+// Why syncAware — see resolvePullRequestDiffBase.
 const base = resolvePullRequestDiffBase(process.cwd(), requestedBase, undefined, {
   syncAware: true
 })

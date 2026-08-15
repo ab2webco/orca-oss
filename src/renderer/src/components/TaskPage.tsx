@@ -3232,7 +3232,7 @@ export default function TaskPage(): React.JSX.Element {
     selectedJiraSiteId && selectedJiraSiteId !== 'all'
       ? (jiraSites.find((site) => site.id === selectedJiraSiteId) ?? null)
       : null
-  const planeWorkspaces = planeStatus.workspaces ?? []
+  const planeWorkspaces = useMemo(() => planeStatus.workspaces ?? [], [planeStatus.workspaces])
   const selectedPlaneWorkspaceId: PlaneWorkspaceSelection | null =
     planeStatus.selectedWorkspaceId ??
     planeStatus.activeWorkspaceId ??

@@ -18,7 +18,6 @@ import { useConfirmationDialog } from './confirmation-dialog-context'
 import {
   planeCreateWorkItem,
   planeDeleteState,
-  planeListStates,
   planeUpdateState,
   planeUpdateWorkItem,
   type RuntimePlaneSettings
@@ -30,6 +29,7 @@ import { PlaneBoardCard } from './plane-board-card'
 import { PlaneBoardColumnView } from './plane-board-column'
 import { PlaneBoardFloatingMinimap } from './plane-board-floating-minimap'
 import { PlaneBoardMinimap } from './plane-board-minimap'
+import { usePlaneBoardProjectStates } from '../hooks/use-plane-board-project-states'
 import {
   applyPlaneBoardStateOverrides,
   parsePlaneBoardColumnDroppableId,
@@ -78,37 +78,17 @@ export function TaskPagePlaneBoard({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const confirm = useConfirmationDialog()
   const patchPlaneWorkItem = useAppStore((s) => s.patchPlaneWorkItem)
-  const [projectStates, setProjectStates] = useState<PlaneState[]>([])
+  const { projectStates, setProjectStates, refreshStates } = usePlaneBoardProjectStates(
+    providerSettings,
+    projectId,
+    workspaceId
+  )
   const [overrides, setOverrides] = useState<PlaneBoardStateOverrides>({})
   const [activeWorkItemId, setActiveWorkItemId] = useState<string | null>(null)
 
   // Why: a distance constraint lets a plain click through to onOpenItem; only
   // real pointer movement past the threshold begins a drag (mouse-friendly).
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-
-  // Monotonic token so a slow refetch from a previous project can never clobber
-  // the current project's states after a rapid switch.
-  const fetchTokenRef = useRef(0)
-
-  // Lifted so column rename/create can re-run it after a successful mutation.
-  const refreshStates = useCallback(async (): Promise<void> => {
-    const token = ++fetchTokenRef.current
-    try {
-      const states = await planeListStates(providerSettings, projectId, workspaceId)
-      if (fetchTokenRef.current === token) {
-        setProjectStates(states)
-      }
-    } catch {
-      // Keep the current columns rendered; a later refresh retries.
-    }
-  }, [providerSettings, projectId, workspaceId])
-
-  // Load the project's full state list so empty columns render, ordered by
-  // sequence. Falls back to item-derived states inside resolvePlaneBoardColumns.
-  useEffect(() => {
-    setProjectStates([])
-    void refreshStates()
-  }, [refreshStates])
 
   const handleRenameColumn = useCallback(
     (stateId: string, name: string): void => {
@@ -135,7 +115,7 @@ export function TaskPagePlaneBoard({
           )
         })
     },
-    [projectStates, providerSettings, projectId, workspaceId, refreshStates]
+    [projectStates, setProjectStates, providerSettings, projectId, workspaceId, refreshStates]
   )
 
   const handleCreateItem = useCallback(
@@ -243,7 +223,7 @@ export function TaskPagePlaneBoard({
         )
       }
     },
-    [providerSettings, projectId, workspaceId, refreshStates]
+    [providerSettings, projectId, workspaceId, refreshStates, setProjectStates]
   )
 
   const handleColumnDragEnd = useCallback(
@@ -282,7 +262,7 @@ export function TaskPagePlaneBoard({
       )
       void persistColumnReorder(updates, previousStates)
     },
-    [columnStateIds, projectStates, persistColumnReorder]
+    [columnStateIds, projectStates, setProjectStates, persistColumnReorder]
   )
 
   const handleDeleteColumn = useCallback(

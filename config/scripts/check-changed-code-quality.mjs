@@ -80,7 +80,11 @@ function resolveBase(root, requestedBase) {
 export function collectAddedLineRanges(root, requestedBase) {
   const base = resolveBase(root, requestedBase)
   const mergeBase = runGit(root, ['merge-base', base, 'HEAD']).trim()
-  const comparisonBase = resolvePullRequestDiffBase(root, mergeBase)
+  // Why syncAware: on a sync PR the pre-sync tip hides the fork's own lines —
+  // they did not change against it — so this gate saw none of them (ORCA-205).
+  const comparisonBase = resolvePullRequestDiffBase(root, mergeBase, undefined, {
+    syncAware: true
+  })
   const changedFiles = splitNullDelimited(
     runGit(root, ['diff', '--name-only', '-z', '--diff-filter=ACMRTUB', comparisonBase, '--'])
   )
@@ -186,10 +190,16 @@ export function main(
   root = process.cwd(),
   requestedBase = process.argv.slice(2).find((argument) => argument !== '--')
 ) {
-  const { base, comparisonBase, rangesByFile } = collectAddedLineRanges(root, requestedBase)
+  const { comparisonBase, rangesByFile } = collectAddedLineRanges(root, requestedBase)
+  // Why print the resolved ref and not the requested one: a caller that computes
+  // the base separately prints one ref while this measures another, which is how
+  // a base fix read as landed for a full sync cycle without effect (ORCA-202).
+  console.log(`Changed-code quality gate measures changed lines against ${comparisonBase}`)
   const files = [...rangesByFile.keys()]
   if (files.length === 0) {
-    console.log(`Changed-code quality gate: no changed JavaScript or TypeScript since ${base}.`)
+    console.log(
+      `Changed-code quality gate: no changed JavaScript or TypeScript since ${comparisonBase}.`
+    )
     return 0
   }
 

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 import type { RuntimePlaneSettings } from '@/runtime/runtime-plane-client'
@@ -52,7 +52,9 @@ describe('usePlaneWorkItemDetailData: load effect stability', () => {
         usePlaneWorkItemDetailData(item, providerSettings),
       {
         initialProps: {
-          providerSettings: { activeRuntimeEnvironmentId: null } as RuntimePlaneSettings
+          providerSettings: {
+            activeRuntimeEnvironmentId: null
+          } as RuntimePlaneSettings
         }
       }
     )
@@ -67,7 +69,9 @@ describe('usePlaneWorkItemDetailData: load effect stability', () => {
     // providerSettings value directly and re-ran on every one of these.
     for (let i = 0; i < 5; i += 1) {
       hook.rerender({
-        providerSettings: { activeRuntimeEnvironmentId: null } as RuntimePlaneSettings
+        providerSettings: {
+          activeRuntimeEnvironmentId: null
+        } as RuntimePlaneSettings
       })
     }
 
@@ -76,5 +80,66 @@ describe('usePlaneWorkItemDetailData: load effect stability', () => {
     expect(runtimeMocks.planeListStates).toHaveBeenCalledTimes(1)
     expect(runtimeMocks.planeListMembers).toHaveBeenCalledTimes(1)
     expect(runtimeMocks.planeListWorkItemComments).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('usePlaneWorkItemDetailData: drafts', () => {
+  const settings = { activeRuntimeEnvironmentId: null } as RuntimePlaneSettings
+
+  function renderDetail(item: PlaneWorkItem | null) {
+    runtimeMocks.planeListStates.mockResolvedValue([])
+    runtimeMocks.planeListMembers.mockResolvedValue([])
+    runtimeMocks.planeListWorkItemComments.mockResolvedValue([])
+    return renderHook(
+      ({ current }: { current: PlaneWorkItem | null }) =>
+        usePlaneWorkItemDetailData(current, settings),
+      { initialProps: { current: item } }
+    )
+  }
+
+  it('follows the fetched full item, including the description the list item truncates', async () => {
+    runtimeMocks.planeGetWorkItem.mockResolvedValue(
+      planeWorkItem({
+        title: 'Full title',
+        description: 'Full description',
+        labels: ['bug']
+      })
+    )
+
+    const hook = renderDetail(planeWorkItem({ description: 'Truncated' }))
+
+    await waitFor(() => expect(hook.result.current.titleDraft).toBe('Full title'))
+    expect(hook.result.current.descriptionDraft).toBe('Full description')
+    expect(hook.result.current.labelsDraft).toBe('bug')
+  })
+
+  it('keeps an edit made while the fetch is in flight instead of overwriting it', async () => {
+    let resolveItem: (item: PlaneWorkItem) => void = () => {}
+    runtimeMocks.planeGetWorkItem.mockReturnValue(
+      new Promise<PlaneWorkItem>((resolve) => {
+        resolveItem = resolve
+      })
+    )
+
+    const hook = renderDetail(planeWorkItem())
+    act(() => hook.result.current.setTitleDraft('Typed while loading'))
+    act(() => resolveItem(planeWorkItem({ title: 'Full title' })))
+
+    await waitFor(() => expect(hook.result.current.itemLoading).toBe(false))
+    expect(hook.result.current.titleDraft).toBe('Typed while loading')
+  })
+
+  it('drops an edit when the work item changes', async () => {
+    runtimeMocks.planeGetWorkItem.mockResolvedValue(null)
+
+    const hook = renderDetail(planeWorkItem())
+    act(() => hook.result.current.setTitleDraft('Edited'))
+    expect(hook.result.current.titleDraft).toBe('Edited')
+
+    hook.rerender({
+      current: planeWorkItem({ id: 'item-2', title: 'Another item' })
+    })
+
+    await waitFor(() => expect(hook.result.current.titleDraft).toBe('Another item'))
   })
 })
