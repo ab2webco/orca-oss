@@ -4002,7 +4002,7 @@
           "tipReadOnly": "La skill aquí está en una ubicación de solo lectura, así que no se puede actualizar hasta que cambies sus permisos.",
           "tipInRepo": "La skill aquí vive dentro de un proyecto, no en tus skills globales; Orca solo actualiza las globales.",
           "tipPluginCache": "La skill aquí la gestiona un plugin; actualiza el plugin en su lugar.",
-          "skippedReasonUnrecognized": "The copy here doesn’t match the official version — it may be modified, or a different skill with the same name. Orca left it out of the update so it won’t overwrite it. Remove it if you want Orca to update this skill.",
+          "skippedReasonUnrecognized": "Esta copia no coincide con la versión oficial: puede estar modificada o ser otra skill con el mismo nombre. Revisa las diferencias antes de que Orca cree una copia de seguridad y reinstale la versión oficial.",
           "skippedReasonReadOnly": "This copy is in a read-only location, so Orca left it out of the update. Change its permissions to let Orca update it.",
           "skippedReasonInaccessible": "Orca couldn’t read this copy, so it left the skill out of the update.",
           "skippedReasonInRepo": "This is a project skill, not a global one — Orca only updates your global skills, so it left this out of the update.",
@@ -4013,7 +4013,18 @@
           "skippedReasonNewer": "This copy is a later version than the one this build of Orca ships, so Orca left it alone rather than roll it back. Updating Orca will bring the two back in line.",
           "skippedReasonStaleRecord": "The skills updater has no usable record of this copy, so it reports the skill as already up to date and changes nothing. Reinstall it to bring the record back in line: {{value0}}",
           "chipNewer": "Newer",
-          "tipNewer": "This copy is a later version than the one this build of Orca ships."
+          "tipNewer": "This copy is a later version than the one this build of Orca ships.",
+          "reviewRepair": "Revisar y reparar"
+        },
+        "SkillRepairReview": {
+          "title": "Revisar reemplazo",
+          "description": "Orca conservará una copia de seguridad recuperable y reinstalará la skill con el instalador oficial.",
+          "loading": "Comparando copias…",
+          "summary": "Se eliminarán {{value0}} líneas instaladas · se añadirán {{value1}} líneas oficiales",
+          "cancel": "Cancelar",
+          "repairing": "Reinstalando…",
+          "confirm": "Crear copia y reinstalar",
+          "backupSaved": "Copia de seguridad recuperable guardada"
         },
         "SkillFreshnessUpdateDialog": {
           "title": "Actualizar skills",

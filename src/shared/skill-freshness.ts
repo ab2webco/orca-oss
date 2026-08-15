@@ -242,3 +242,26 @@ export type SkillUpdateRun =
 export type SkillUpdateStartResult =
   | { started: true }
   | { started: false; reason: 'already-running' | 'invalid-names' | 'unsafe-command-path' }
+
+export type SkillRepairPreview = {
+  placementId: string
+  name: string
+  expectedObservedPackageDigest: string
+  addedLines: number
+  removedLines: number
+  diff: string
+}
+
+export type SkillRepairResult =
+  | {
+      repaired: true
+      name: string
+      backupPath: string
+      inventory: SkillFreshnessInventory
+    }
+  | {
+      repaired: false
+      reason: 'not-repairable' | 'copy-changed' | 'install-failed' | 'did-not-converge'
+      message: string
+      backupPath?: string
+    }

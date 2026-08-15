@@ -436,6 +436,8 @@ import type {
 import type { SkillDiscoveryResult, SkillDiscoveryTarget } from '../shared/skills'
 import type {
   SkillFreshnessInventory,
+  SkillRepairPreview,
+  SkillRepairResult,
   SkillUpdateRun,
   SkillUpdateStartResult
 } from '../shared/skill-freshness'
@@ -2848,6 +2850,11 @@ export type PreloadApi = {
   skills: {
     discover: (target?: SkillDiscoveryTarget) => Promise<SkillDiscoveryResult>
     freshnessInventory: () => Promise<SkillFreshnessInventory>
+    previewRepair: (placementId: string) => Promise<SkillRepairPreview>
+    repairUnrecognized: (request: {
+      placementId: string
+      expectedObservedPackageDigest: string
+    }) => Promise<SkillRepairResult>
     startUpdateRun: (names: string[]) => Promise<SkillUpdateStartResult>
     cancelUpdateRun: () => Promise<void>
     acknowledgeUpdateRun: () => Promise<void>

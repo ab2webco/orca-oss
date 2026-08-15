@@ -30,6 +30,18 @@ function placement(
 }
 
 describe('groupSkillFreshness', () => {
+  it('keeps a pinned repaired skill visible as current after provider alias deduplication', () => {
+    const groups = groupSkillFreshness(
+      [placement('switch-account', { status: 'current', topology: 'canonical-copy' })],
+      [],
+      ['switch-account']
+    )
+
+    expect(groups).toMatchObject([
+      { name: 'switch-account', status: 'current', locations: [{ chip: 'current' }] }
+    ])
+  })
+
   it('marks an eligible outdated skill as update-available with one location', () => {
     const groups = groupSkillFreshness([placement('orca-cli')], ['orca-cli'])
     expect(groups).toHaveLength(1)
@@ -79,6 +91,7 @@ describe('groupSkillFreshness', () => {
       {
         name: 'dataviz',
         status: 'cannot-update',
+        repairPlacementId: expect.any(String),
         locations: [
           {
             id: expect.any(String),
@@ -91,6 +104,7 @@ describe('groupSkillFreshness', () => {
       {
         name: 'linear-tickets',
         status: 'cannot-update',
+        repairPlacementId: null,
         locations: [
           {
             id: expect.any(String),

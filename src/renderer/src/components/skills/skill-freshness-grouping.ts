@@ -5,7 +5,7 @@ import {
   type SkillFreshnessInstallation
 } from '../../../../shared/skill-freshness'
 
-export type SkillGroupStatus = 'update-available' | 'cannot-update'
+export type SkillGroupStatus = 'update-available' | 'cannot-update' | 'current'
 
 export type SkillLocationChip =
   | 'current'
@@ -32,6 +32,7 @@ export type SkillFreshnessGroupModel = {
   name: string
   status: SkillGroupStatus
   locations: SkillLocationRow[]
+  repairPlacementId: string | null
 }
 
 // Why: an owner-managed scope outranks 'unrecognized', or a project copy reads "may be
@@ -125,8 +126,23 @@ export function groupSkillFreshness(
       .sort((left, right) => left.path.localeCompare(right.path, 'en'))
     groups.push({
       name,
-      status: eligible.has(name) ? 'update-available' : 'cannot-update',
-      locations
+      status: eligible.has(name)
+        ? 'update-available'
+        : pinned.has(name) &&
+            !entries
+              .filter(skillPlacementParticipatesInGlobalFreshness)
+              .some(isSkillCopyNeedingAttention)
+          ? 'current'
+          : 'cannot-update',
+      locations,
+      repairPlacementId:
+        entries.find(
+          (entry) =>
+            entry.sourceKind === 'home' &&
+            entry.status === 'unrecognized' &&
+            !isOwnerManagedSkillScope(entry.topology) &&
+            entry.topology === 'independent-copy'
+        )?.id ?? null
     })
   }
   return groups.sort((left, right) => left.name.localeCompare(right.name, 'en'))

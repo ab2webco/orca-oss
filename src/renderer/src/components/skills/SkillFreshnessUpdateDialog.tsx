@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Loader2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Copy, Loader2, RefreshCw } from 'lucide-react'
 import {
   buildTargetedSkillUpdateCommand,
   isSkillScanIssueNeedingAttention,
@@ -18,11 +18,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { groupSkillFreshness } from './skill-freshness-grouping'
 import { SkillFreshnessScanIssues } from './skill-freshness-scan-issues'
 import { SkillUpdateRow } from './SkillUpdateRow'
+import { SkillRepairSection } from './SkillRepairSection'
+import { SkillUpdateRunLog } from './SkillUpdateRunLog'
 import { SummaryHeadline, summarizeInventory } from './skill-freshness-summary-headline'
 import {
   acknowledgeSkillUpdateRun,
@@ -36,33 +37,6 @@ import {
   subscribeSkillFreshnessUpdateDialog
 } from './skill-freshness-update-dialog'
 
-function RunLog({ output }: { output: string }): React.JSX.Element | null {
-  if (!output.trim()) {
-    return null
-  }
-  return (
-    <Collapsible className="min-w-0">
-      <CollapsibleTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className="group -ml-2 gap-1.5 text-muted-foreground"
-        >
-          <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
-          {translate('auto.components.skills.SkillFreshnessUpdateDialog.showLog', 'Show log')}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-1 min-w-0">
-        {/* Displayed verbatim, never parsed — `skills update` has no --json. */}
-        <pre className="scrollbar-sleek max-h-40 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-muted px-3 py-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-          {output.trim()}
-        </pre>
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
-
 export function SkillFreshnessUpdateDialog(): React.JSX.Element {
   const activeSkillRuntime = useActiveProjectSkillRuntime()
   const state = useSkillFreshness(activeSkillRuntime.canUseLocalSkillFreshness)
@@ -73,6 +47,10 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
     getSkillFreshnessUpdateDialogRequest
   )
   const [copied, setCopied] = useState(false)
+  const [repairPlacementId, setRepairPlacementId] = useState<string | null>(null)
+  const [repairInventory, setRepairInventory] = useState<SkillFreshnessInventory | null>(null)
+  const [repairedNames, setRepairedNames] = useState<string[]>([])
+  const [repairBackupPath, setRepairBackupPath] = useState<string | null>(null)
 
   // Why: settling a run notifies every skills surface, and that refresh nulls the
   // inventory *synchronously* while it re-hashes each package on disk. Rendering
@@ -86,7 +64,14 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
   if (state.inventory && state.inventory !== retainedInventory) {
     setRetainedInventory(state.inventory)
   }
-  const inventory = state.inventory ?? (state.loading ? retainedInventory : null)
+  if (
+    repairInventory &&
+    state.inventory &&
+    state.inventory.scannedAt >= repairInventory.scannedAt
+  ) {
+    setRepairInventory(null)
+  }
+  const inventory = repairInventory ?? state.inventory ?? (state.loading ? retainedInventory : null)
   const eligibleNames = useMemo(() => state.inventory?.eligibleUpdateNames ?? [], [state.inventory])
   // Display only. The action still fires `eligibleNames`, so a re-scan in flight
   // can never authorize work — but the button keeps its place and its label
@@ -104,9 +89,12 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
   const groups = useMemo(
     () =>
       inventory
-        ? groupSkillFreshness(inventory.installations, inventory.eligibleUpdateNames, runNames)
+        ? groupSkillFreshness(inventory.installations, inventory.eligibleUpdateNames, [
+            ...runNames,
+            ...repairedNames
+          ])
         : [],
-    [inventory, runNames]
+    [inventory, runNames, repairedNames]
   )
   const hasBlockedGroup = groups.some((group) => group.status === 'cannot-update')
   const blockedCount = groups.filter((group) => group.status === 'cannot-update').length
@@ -141,7 +129,12 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
       }
       return {
         group,
-        state: group.status === 'cannot-update' ? ('blocked' as const) : ('available' as const)
+        state:
+          group.status === 'cannot-update'
+            ? ('blocked' as const)
+            : group.status === 'current'
+              ? ('current' as const)
+              : ('available' as const)
       }
     })
   }, [groups, isRunning, failedNamesKey, runNames])
@@ -154,6 +147,7 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
     // status-bar segment carries it from here.
     consumeSkillFreshnessUpdateDialogRequest()
     setCopied(false)
+    setRepairPlacementId(null)
     // Don't carry a finished session's rows into the next open — but a live run
     // keeps its own, or reopening from the status segment mid-run would land on
     // an empty list while the close's own re-scan is still reading disk.
@@ -311,11 +305,29 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
           <div className={`min-w-0 ${isRunning ? '' : 'border-t border-border/60'}`}>
             <TooltipProvider>
               {rows.map((row) => (
-                <SkillUpdateRow key={row.group.name} group={row.group} state={row.state} />
+                <SkillUpdateRow
+                  key={row.group.name}
+                  group={row.group}
+                  state={row.state}
+                  onRepair={setRepairPlacementId}
+                />
               ))}
             </TooltipProvider>
           </div>
         ) : null}
+
+        <SkillRepairSection
+          placementId={repairPlacementId}
+          backupPath={repairBackupPath}
+          onCancel={() => setRepairPlacementId(null)}
+          onRepaired={(result) => {
+            setRepairInventory(result.inventory)
+            setRepairedNames((names) => [...new Set([...names, result.name])])
+            setRepairBackupPath(result.backupPath)
+            setRepairPlacementId(null)
+            notifyInstalledAgentSkillsChanged()
+          }}
+        />
 
         {/* Why: folders, not skills — a plugin path Orca could not read says nothing
             about which skill lives there, so it cannot be a row above. */}
@@ -367,7 +379,7 @@ export function SkillFreshnessUpdateDialog(): React.JSX.Element {
           </div>
         ) : null}
 
-        {isRunning || showResult ? <RunLog output={run.output} /> : null}
+        {isRunning || showResult ? <SkillUpdateRunLog output={run.output} /> : null}
 
         <DialogFooter className="sm:justify-between">
           {isRunning ? (

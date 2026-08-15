@@ -4002,7 +4002,7 @@
           "tipReadOnly": "여기 있는 스킬은 읽기 전용 위치에 있어 권한을 변경해야 업데이트할 수 있습니다.",
           "tipInRepo": "여기 있는 스킬은 전역 스킬이 아니라 프로젝트 안에 있습니다. Orca는 전역 스킬만 업데이트합니다.",
           "tipPluginCache": "여기 있는 스킬은 플러그인이 관리합니다. 대신 플러그인을 업데이트하세요.",
-          "skippedReasonUnrecognized": "The copy here doesn’t match the official version — it may be modified, or a different skill with the same name. Orca left it out of the update so it won’t overwrite it. Remove it if you want Orca to update this skill.",
+          "skippedReasonUnrecognized": "The copy here doesn’t match the official version — it may be modified, or a different skill with the same name. Review the differences before Orca backs it up and reinstalls the official version.",
           "skippedReasonReadOnly": "This copy is in a read-only location, so Orca left it out of the update. Change its permissions to let Orca update it.",
           "skippedReasonInaccessible": "Orca couldn’t read this copy, so it left the skill out of the update.",
           "skippedReasonInRepo": "This is a project skill, not a global one — Orca only updates your global skills, so it left this out of the update.",
@@ -4013,7 +4013,18 @@
           "skippedReasonNewer": "This copy is a later version than the one this build of Orca ships, so Orca left it alone rather than roll it back. Updating Orca will bring the two back in line.",
           "skippedReasonStaleRecord": "The skills updater has no usable record of this copy, so it reports the skill as already up to date and changes nothing. Reinstall it to bring the record back in line: {{value0}}",
           "chipNewer": "Newer",
-          "tipNewer": "This copy is a later version than the one this build of Orca ships."
+          "tipNewer": "This copy is a later version than the one this build of Orca ships.",
+          "reviewRepair": "Review and repair"
+        },
+        "SkillRepairReview": {
+          "title": "Review replacement",
+          "description": "Orca will keep a recoverable backup, then reinstall through the official installer.",
+          "loading": "Comparing copies…",
+          "summary": "{{value0}} installed line will be removed · {{value1}} official line will be added",
+          "cancel": "Cancel",
+          "repairing": "Reinstalling…",
+          "confirm": "Back up and reinstall",
+          "backupSaved": "Recoverable backup saved"
         },
         "SkillFreshnessUpdateDialog": {
           "title": "스킬 업데이트",

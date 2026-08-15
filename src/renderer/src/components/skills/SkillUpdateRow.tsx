@@ -4,10 +4,11 @@ import { translate } from '@/i18n/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 import { chipLabel, chipTooltip } from './skill-location-chip-copy'
 import { skippedReason } from './skill-freshness-skipped-reason'
 
-export type SkillRowState = 'available' | 'blocked' | 'pending' | 'done' | 'failed'
+export type SkillRowState = 'available' | 'blocked' | 'pending' | 'done' | 'failed' | 'current'
 
 /**
  * Leading status glyph. Absent for `available` on purpose: an empty reserved box
@@ -16,6 +17,7 @@ export type SkillRowState = 'available' | 'blocked' | 'pending' | 'done' | 'fail
 function StateIcon({ state }: { state: SkillRowState }): React.JSX.Element | null {
   switch (state) {
     case 'done':
+    case 'current':
       return <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
     case 'failed':
       return <XCircle className="size-4 shrink-0 text-destructive" />
@@ -66,10 +68,12 @@ function StateBadge({ state }: { state: SkillRowState }): React.JSX.Element | nu
  */
 export function SkillUpdateRow({
   group,
-  state
+  state,
+  onRepair
 }: {
   group: SkillFreshnessGroupModel
   state: SkillRowState
+  onRepair?: (placementId: string) => void
 }): React.JSX.Element {
   const locationCount = group.locations.length
   return (
@@ -117,9 +121,24 @@ export function SkillUpdateRow({
           the whole point of a skipped row, so it must not depend on a click —
           nor on a mount-time `defaultOpen` that a re-scan can't re-fire. */}
       {state === 'blocked' ? (
-        <p className="px-1.5 pb-1.5 text-xs leading-5 text-muted-foreground">
-          {skippedReason(group.locations, group.name)}
-        </p>
+        <div className="space-y-2 px-1.5 pb-1.5">
+          <p className="text-xs leading-5 text-muted-foreground">
+            {skippedReason(group.locations, group.name)}
+          </p>
+          {group.repairPlacementId && onRepair ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => onRepair(group.repairPlacementId!)}
+            >
+              {translate(
+                'auto.components.skills.SkillFreshnessRow.reviewRepair',
+                'Review and repair'
+              )}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
