@@ -7,11 +7,14 @@ import {
 } from '../../shared/skills'
 import type {
   SkillFreshnessInventory,
+  SkillRepairPreview,
+  SkillRepairResult,
   SkillUpdateRun,
   SkillUpdateStartResult
 } from '../../shared/skill-freshness'
 import { inventorySkillFreshness } from '../skills/skill-freshness-inventory'
 import { SkillUpdateRunner } from '../skills/skill-update-run'
+import { SkillUnrecognizedRepair } from '../skills/skill-unrecognized-repair'
 import { skillUpdateFailedNames } from '../skills/skill-update-outcome'
 import { readGloballyUpdatableSkillLocks } from '../skills/skill-update-registration'
 import {
@@ -48,6 +51,7 @@ export function registerSkillsHandlers(store: Store): void {
       }
     }
   })
+  const repair = new SkillUnrecognizedRepair({ scan: scanInventory })
 
   ipcMain.handle(
     'skills:discover',
@@ -60,6 +64,43 @@ export function registerSkillsHandlers(store: Store): void {
   ipcMain.handle('skills:freshnessInventory', async (): Promise<SkillFreshnessInventory> => {
     return scanInventory()
   })
+
+  ipcMain.handle(
+    'skills:previewRepair',
+    async (_event, request: unknown): Promise<SkillRepairPreview> => {
+      const placementId =
+        request && typeof request === 'object' && 'placementId' in request
+          ? request.placementId
+          : null
+      if (typeof placementId !== 'string' || !/^[a-f0-9-]{1,64}$/.test(placementId)) {
+        throw new Error('Invalid skill repair placement identity')
+      }
+      return repair.preview(placementId)
+    }
+  )
+
+  ipcMain.handle(
+    'skills:repairUnrecognized',
+    async (_event, request: unknown): Promise<SkillRepairResult> => {
+      const placementId =
+        request && typeof request === 'object' && 'placementId' in request
+          ? request.placementId
+          : null
+      const expectedObservedPackageDigest =
+        request && typeof request === 'object' && 'expectedObservedPackageDigest' in request
+          ? request.expectedObservedPackageDigest
+          : null
+      if (
+        typeof placementId !== 'string' ||
+        !/^[a-f0-9-]{1,64}$/.test(placementId) ||
+        typeof expectedObservedPackageDigest !== 'string' ||
+        expectedObservedPackageDigest.length === 0
+      ) {
+        throw new Error('Invalid skill repair request')
+      }
+      return repair.repair({ placementId, expectedObservedPackageDigest })
+    }
+  )
 
   ipcMain.handle(
     'skills:startUpdateRun',

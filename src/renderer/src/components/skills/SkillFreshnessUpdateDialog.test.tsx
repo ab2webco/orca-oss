@@ -81,6 +81,8 @@ vi.mock('@/components/ui/collapsible', () => ({
 }))
 
 const skillsApi = {
+  previewRepair: vi.fn(),
+  repairUnrecognized: vi.fn(),
   startUpdateRun: vi.fn(async () => ({ started: true as const })),
   cancelUpdateRun: vi.fn(async () => {}),
   acknowledgeUpdateRun: vi.fn(async () => {}),
@@ -184,6 +186,8 @@ describe('SkillFreshnessUpdateDialog', () => {
     mocks.refresh.mockReset()
     mocks.notifyChanged.mockReset()
     skillsApi.startUpdateRun.mockClear()
+    skillsApi.previewRepair.mockReset()
+    skillsApi.repairUnrecognized.mockReset()
     skillsApi.cancelUpdateRun.mockClear()
     skillsApi.acknowledgeUpdateRun.mockClear()
     skillsApi.getUpdateRun.mockClear()
@@ -457,6 +461,130 @@ describe('SkillFreshnessUpdateDialog', () => {
     expect(row?.querySelector('[data-collapsible-content]')?.textContent).not.toContain(
       'This copy is in a read-only location'
     )
+  })
+
+  it('shows the user-only diff before repairing an unrecognized user-owned copy', async () => {
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [
+        placement('switch-account', {
+          id: 'abc123',
+          rootId: 'home-claude',
+          topology: 'independent-copy',
+          status: 'unrecognized',
+          observedPackageDigest: 'local-digest',
+          unresolvedPath: '/home/.claude/skills/switch-account'
+        })
+      ],
+      eligibleUpdateNames: [],
+      scanIssues: [],
+      scannedAt: 4
+    }
+    skillsApi.previewRepair.mockResolvedValue({
+      placementId: 'abc123',
+      name: 'switch-account',
+      expectedObservedPackageDigest: 'local-digest',
+      addedLines: 1,
+      removedLines: 1,
+      diff: '--- installed/SKILL.md\n+++ official/SKILL.md\n-user-only\n+official-only'
+    })
+    await renderDialog()
+    await openViaRequest()
+
+    await clickButton('Review and repair')
+
+    expect(skillsApi.previewRepair).toHaveBeenCalledWith('abc123')
+    expect(container?.textContent).toContain('1 installed line will be removed')
+    expect(container?.querySelector('pre')?.textContent).toContain('-user-only')
+    expect(findButton('Back up and reinstall')).toBeDefined()
+  })
+
+  it('keeps the repaired skill visible as Current after closing and reopening', async () => {
+    const broken = placement('switch-account', {
+      id: 'abc123',
+      rootId: 'home-claude',
+      topology: 'independent-copy',
+      status: 'unrecognized',
+      observedPackageDigest: 'local-digest',
+      unresolvedPath: '/home/.claude/skills/switch-account'
+    })
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [broken],
+      eligibleUpdateNames: [],
+      scanIssues: [],
+      scannedAt: 4
+    }
+    skillsApi.previewRepair.mockResolvedValue({
+      placementId: 'abc123',
+      name: 'switch-account',
+      expectedObservedPackageDigest: 'local-digest',
+      addedLines: 1,
+      removedLines: 1,
+      diff: '-old\n+current'
+    })
+    skillsApi.repairUnrecognized.mockResolvedValue({
+      repaired: true,
+      name: 'switch-account',
+      backupPath: '/home/.claude/skills/switch-account.orca-backup-1-a',
+      inventory: {
+        schemaVersion: 1,
+        installations: [
+          placement('switch-account', {
+            id: 'abc123',
+            rootId: 'home-claude',
+            topology: 'provider-alias',
+            status: 'current',
+            observedPackageDigest: 'official-digest',
+            unresolvedPath: '/home/.claude/skills/switch-account'
+          })
+        ],
+        eligibleUpdateNames: [],
+        scanIssues: [],
+        scannedAt: 7
+      }
+    })
+    await renderDialog()
+    await openViaRequest()
+    await clickButton('Review and repair')
+    await clickButton('Back up and reinstall')
+
+    expect(skillsApi.repairUnrecognized).toHaveBeenCalledWith({
+      placementId: 'abc123',
+      expectedObservedPackageDigest: 'local-digest'
+    })
+    expect(container?.textContent).toContain('/home/.claude/skills/switch-account.orca-backup-1-a')
+    await clickButton('Close')
+    await openViaRequest()
+
+    const row = container?.querySelector('[data-skill-row="switch-account"]')
+    expect(row).not.toBeNull()
+    expect(row?.getAttribute('data-state-label')).toBe('current')
+    expect(row?.textContent).toContain('Current')
+    expect(row?.textContent).not.toContain('Unrecognized')
+  })
+
+  it('never offers repair for an owner-managed copy', async () => {
+    mocks.inventory = {
+      schemaVersion: 1,
+      installations: [
+        placement('switch-account', { topology: 'read-only', status: 'unrecognized' }),
+        placement('switch-account', {
+          id: 'plugin-copy',
+          rootId: 'plugin',
+          sourceKind: 'plugin',
+          topology: 'plugin-cache',
+          status: 'unrecognized'
+        })
+      ],
+      eligibleUpdateNames: [],
+      scanIssues: [],
+      scannedAt: 4
+    }
+    await renderDialog()
+    await openViaRequest()
+
+    expect(findButton('Review and repair')).toBeUndefined()
   })
 
   it('raises no row for a skill whose only finding is a project-owned copy', async () => {

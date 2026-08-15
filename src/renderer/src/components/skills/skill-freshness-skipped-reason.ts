@@ -52,7 +52,7 @@ export function skippedReason(locations: readonly SkillLocationRow[], skillName?
     case 'unrecognized':
       return translate(
         'auto.components.skills.SkillFreshnessRow.skippedReasonUnrecognized',
-        'The copy here doesn’t match the official version — it may be modified, or a different skill with the same name. Orca left it out of the update so it won’t overwrite it. Remove it if you want Orca to update this skill.'
+        'The copy here doesn’t match the official version — it may be modified, or a different skill with the same name. Review the differences before Orca backs it up and reinstalls the official version.'
       )
     case 'read-only':
       return translate(

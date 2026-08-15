@@ -139,6 +139,8 @@ import type {
 import type { SkillDiscoveryResult, SkillDiscoveryTarget } from '../shared/skills'
 import type {
   SkillFreshnessInventory,
+  SkillRepairPreview,
+  SkillRepairResult,
   SkillUpdateRun,
   SkillUpdateStartResult
 } from '../shared/skill-freshness'
@@ -2743,6 +2745,12 @@ const api = {
       ipcRenderer.invoke('skills:discover', target),
     freshnessInventory: (): Promise<SkillFreshnessInventory> =>
       ipcRenderer.invoke('skills:freshnessInventory'),
+    previewRepair: (placementId: string): Promise<SkillRepairPreview> =>
+      ipcRenderer.invoke('skills:previewRepair', { placementId }),
+    repairUnrecognized: (request: {
+      placementId: string
+      expectedObservedPackageDigest: string
+    }): Promise<SkillRepairResult> => ipcRenderer.invoke('skills:repairUnrecognized', request),
     startUpdateRun: (names: string[]): Promise<SkillUpdateStartResult> =>
       ipcRenderer.invoke('skills:startUpdateRun', names),
     cancelUpdateRun: (): Promise<void> => ipcRenderer.invoke('skills:cancelUpdateRun'),

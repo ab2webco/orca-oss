@@ -22,8 +22,7 @@ const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.
 const isMacHourly = process.env.ORCA_MAC_HOURLY === '1'
 const isMacDaily = process.env.ORCA_MAC_DAILY === '1'
 const isMacAdhoc = process.env.ORCA_MAC_ADHOC === '1'
-const isMacRelease =
-  process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
+const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion = isMacRelease ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
 const devChannelBuildVersion = isMacHourly
@@ -51,8 +50,8 @@ const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
 }
-// Why: freshness detection needs immutable identity metadata from this exact
-// app build, but never needs the skill package bytes or a runtime network read.
+// Why: freshness and repair need immutable identity metadata plus reviewable
+// SKILL.md content from this exact app build, without a runtime network read.
 const skillFreshnessResources = {
   from: 'resources/skills',
   to: 'skills'

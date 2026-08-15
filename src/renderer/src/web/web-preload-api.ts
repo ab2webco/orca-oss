@@ -3104,6 +3104,10 @@ function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
         scanIssues: [],
         scannedAt: Date.now()
       }),
+    previewRepair: () =>
+      Promise.reject(new Error('Skill repair is unavailable in the web client.')),
+    repairUnrecognized: () =>
+      Promise.reject(new Error('Skill repair is unavailable in the web client.')),
     // Why: with no local skill homes there is nothing to update, so the run rail
     // reports a permanently idle state rather than spawning anything.
     startUpdateRun: () => Promise.resolve({ started: false as const, reason: 'invalid-names' }),

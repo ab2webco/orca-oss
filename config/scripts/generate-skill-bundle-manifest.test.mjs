@@ -49,7 +49,13 @@ async function createReleaseSandbox() {
   const script = path.join(root, 'config', 'scripts', 'generate-skill-bundle-manifest.mjs')
   await mkdir(path.dirname(script), { recursive: true })
   await mkdir(skillRoot, { recursive: true })
-  await copyFile(path.join(import.meta.dirname, 'generate-skill-bundle-manifest.mjs'), script)
+  await Promise.all([
+    copyFile(path.join(import.meta.dirname, 'generate-skill-bundle-manifest.mjs'), script),
+    copyFile(
+      path.join(import.meta.dirname, 'skill-bundle-release-mapping-prefix.mjs'),
+      path.join(path.dirname(script), 'skill-bundle-release-mapping-prefix.mjs')
+    )
+  ])
   await writeFile(path.join(skillRoot, 'SKILL.md'), 'demo skill\n')
   return {
     generate: (...args) => execFileSync(process.execPath, [script, ...args], { stdio: 'pipe' }),
@@ -352,8 +358,9 @@ describe('skill bundle manifest generator', () => {
     const sandbox = await createReleaseSandbox()
 
     sandbox.generate('--write')
-    const [manifest, registry] = await Promise.all([
+    const [manifest, content, registry] = await Promise.all([
       sandbox.read('current-manifest.json'),
+      sandbox.read('current-content.json'),
       sandbox.read('snapshot-registry.json')
     ])
     sandbox.generate('--release', 'v1.4.156')
@@ -364,6 +371,7 @@ describe('skill bundle manifest generator', () => {
       { appVersion: '1.4.156', skills: { demo: 1 } }
     ])
     expect(await sandbox.read('current-manifest.json')).toBe(manifest)
+    expect(await sandbox.read('current-content.json')).toBe(content)
     expect(await sandbox.read('snapshot-registry.json')).toBe(registry)
 
     // Bytes that changed since the last regeneration would make the row name a

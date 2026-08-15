@@ -5,6 +5,7 @@ import { access, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/prom
 import path from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
+import { isToleratedReleaseMappingPrefix } from './skill-bundle-release-mapping-prefix.mjs'
 
 // Why: the three artifacts version independently — bumping one shape must not
 // rewrite the others or bypass the registry's schema-gated append-only guard.
@@ -16,12 +17,17 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
 const SKILLS_ROOT = path.join(REPO_ROOT, 'skills')
 const OUTPUT_ROOT = path.join(REPO_ROOT, 'resources', 'skills')
 const CURRENT_MANIFEST_PATH = path.join(OUTPUT_ROOT, 'current-manifest.json')
+const CURRENT_CONTENT_PATH = path.join(OUTPUT_ROOT, 'current-content.json')
 const SNAPSHOT_REGISTRY_PATH = path.join(OUTPUT_ROOT, 'snapshot-registry.json')
 const RELEASE_MAPPING_PATH = path.join(OUTPUT_ROOT, 'release-mapping.json')
 // Why: the manifest and registry are content-addressed — they describe skill
 // bytes. The mapping is provenance: which already-committed revision a tag
 // shipped. A release cut may append the second without regenerating the first.
-const CONTENT_ADDRESSED_PATHS = [CURRENT_MANIFEST_PATH, SNAPSHOT_REGISTRY_PATH]
+const CONTENT_ADDRESSED_PATHS = [
+  CURRENT_MANIFEST_PATH,
+  CURRENT_CONTENT_PATH,
+  SNAPSHOT_REGISTRY_PATH
+]
 const ALL_ARTIFACT_PATHS = [...CONTENT_ADDRESSED_PATHS, RELEASE_MAPPING_PATH]
 
 function sha256(bytes) {
@@ -470,6 +476,7 @@ async function buildArtifacts(releasedHistory) {
     .map((entry) => entry.name)
     .sort(compareCodeUnits)
   const currentSkills = []
+  const currentContent = {}
   for (const name of skillDirectories) {
     const filesWithGitHashes = await collectPackageFiles(path.join(SKILLS_ROOT, name))
     if (!filesWithGitHashes.some((file) => file.path === 'SKILL.md')) {
@@ -495,12 +502,14 @@ async function buildArtifacts(releasedHistory) {
       sourcePath: `skills/${name}`,
       ...snapshot
     })
+    currentContent[name] = await readFile(path.join(SKILLS_ROOT, name, 'SKILL.md'), 'utf8')
   }
   return {
     currentManifest: {
       schemaVersion: CURRENT_MANIFEST_SCHEMA_VERSION,
       skills: currentSkills
     },
+    currentContent: { schemaVersion: 1, skills: currentContent },
     snapshotRegistry: registry,
     releaseMapping: mapping,
     releasedSnapshotCounts
@@ -578,43 +587,12 @@ function serialized(value) {
 async function writeArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {
   const values = new Map([
     [CURRENT_MANIFEST_PATH, artifacts.currentManifest],
+    [CURRENT_CONTENT_PATH, artifacts.currentContent],
     [SNAPSHOT_REGISTRY_PATH, artifacts.snapshotRegistry],
     [RELEASE_MAPPING_PATH, artifacts.releaseMapping]
   ])
   await mkdir(OUTPUT_ROOT, { recursive: true })
   await Promise.all(paths.map((filePath) => writeFile(filePath, serialized(values.get(filePath)))))
-}
-
-// Why: cutting a release tag adds a trailing mapping row on every checkout at
-// once, before any branch can regenerate. A trailing row whose revisions all
-// equal the current manifest is provably redundant until the next real
-// regeneration (installs of those bytes classify as current and are labeled by
-// the running build), so verify must not fail branches over it.
-function isToleratedReleaseMappingPrefix(committedText, artifacts) {
-  let committed
-  try {
-    committed = JSON.parse(committedText)
-  } catch {
-    return false
-  }
-  const derived = artifacts.releaseMapping
-  const committedCount = Array.isArray(committed?.releases) ? committed.releases.length : -1
-  if (committedCount < 0 || committedCount >= derived.releases.length) {
-    return false
-  }
-  const prefix = {
-    schemaVersion: derived.schemaVersion,
-    releases: derived.releases.slice(0, committedCount)
-  }
-  if (committedText !== serialized(prefix)) {
-    return false
-  }
-  const currentRevisions = Object.fromEntries(
-    artifacts.currentManifest.skills.map((skill) => [skill.name, skill.releaseRevision])
-  )
-  return derived.releases
-    .slice(committedCount)
-    .every((release) => isDeepStrictEqual(release.skills, currentRevisions))
 }
 
 async function verifyArtifacts(artifacts, paths = ALL_ARTIFACT_PATHS) {

@@ -5,6 +5,8 @@ const {
   discoverSkillsMock,
   discoverSkillsInWslMock,
   inventorySkillFreshnessMock,
+  repairPreviewMock,
+  repairRunMock,
   getDefaultWslDistroMock,
   getWslHomeMock,
   parseWslPathMock
@@ -13,6 +15,8 @@ const {
   discoverSkillsMock: vi.fn(),
   discoverSkillsInWslMock: vi.fn(),
   inventorySkillFreshnessMock: vi.fn(),
+  repairPreviewMock: vi.fn(),
+  repairRunMock: vi.fn(),
   getDefaultWslDistroMock: vi.fn(),
   getWslHomeMock: vi.fn(),
   parseWslPathMock: vi.fn()
@@ -37,6 +41,13 @@ vi.mock('../skills/skill-discovery-wsl', () => ({
 
 vi.mock('../skills/skill-freshness-inventory', () => ({
   inventorySkillFreshness: inventorySkillFreshnessMock
+}))
+
+vi.mock('../skills/skill-unrecognized-repair', () => ({
+  SkillUnrecognizedRepair: class {
+    preview = repairPreviewMock
+    repair = repairRunMock
+  }
 }))
 
 vi.mock('../wsl', () => ({
@@ -111,6 +122,15 @@ describe('registerSkillsHandlers', () => {
       throw new Error('skills:freshnessInventory handler was not registered')
     }
     return call[1] as (_event: unknown) => Promise<unknown>
+  }
+
+  function getHandler(name: string) {
+    registerSkillsHandlers(store as never)
+    const call = handleMock.mock.calls.find((entry: unknown[]) => entry[0] === name)
+    if (!call) {
+      throw new Error(`${name} handler was not registered`)
+    }
+    return call[1] as (_event: unknown, request: unknown) => Promise<unknown>
   }
 
   it('uses host skill discovery when resolved project runtime overrides stale WSL target state', async () => {
@@ -224,5 +244,31 @@ describe('registerSkillsHandlers', () => {
       repos
     })
     expect(getWslHomeMock).not.toHaveBeenCalled()
+  })
+
+  it('authorizes a repair preview by stable placement id without accepting a renderer path', async () => {
+    repairPreviewMock.mockResolvedValue({ placementId: 'abc123', diff: '-old\n+new' })
+    const handler = getHandler('skills:previewRepair')
+
+    await handler(null, { placementId: 'abc123', path: 'C:\\attacker' })
+
+    expect(repairPreviewMock).toHaveBeenCalledWith('abc123')
+  })
+
+  it('repairs by preview identity and returns the fresh converged inventory', async () => {
+    repairRunMock.mockResolvedValue({ repaired: true, inventory: { scannedAt: 7 } })
+    const handler = getHandler('skills:repairUnrecognized')
+
+    const result = await handler(null, {
+      placementId: 'abc123',
+      expectedObservedPackageDigest: 'previewed-digest',
+      path: 'C:\\attacker'
+    })
+
+    expect(repairRunMock).toHaveBeenCalledWith({
+      placementId: 'abc123',
+      expectedObservedPackageDigest: 'previewed-digest'
+    })
+    expect(result).toMatchObject({ repaired: true, inventory: { scannedAt: 7 } })
   })
 })

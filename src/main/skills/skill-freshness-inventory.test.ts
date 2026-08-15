@@ -103,6 +103,10 @@ async function fixture() {
       `${JSON.stringify({ schemaVersion: 2, skills: [current] }, null, 2)}\n`
     ),
     writeFile(
+      join(skillResourceRoot, 'current-content.json'),
+      `${JSON.stringify({ schemaVersion: 1, skills: { 'orca-cli': currentMarkdown } }, null, 2)}\n`
+    ),
+    writeFile(
       join(skillResourceRoot, 'snapshot-registry.json'),
       `${JSON.stringify({ schemaVersion: 1, skills: { 'orca-cli': snapshots } }, null, 2)}\n`
     ),

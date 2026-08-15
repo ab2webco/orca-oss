@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { z, type ZodType } from 'zod'
@@ -15,6 +16,7 @@ export type SkillBundleArtifacts = {
   releaseMapping: SkillReleaseMapping
   knownSnapshots: Record<string, SkillKnownSnapshot[]>
   releasedAppVersions: Record<string, Record<number, string>>
+  currentContent: Record<string, string>
 }
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -72,6 +74,9 @@ const releaseMappingSchema = z
     )
   })
   .strict()
+const currentContentSchema = z
+  .object({ schemaVersion: z.literal(1), skills: z.record(z.string().min(1), z.string()) })
+  .strict()
 
 function parseArtifact<T>(schema: ZodType<T>, value: unknown, label: string): T {
   const result = schema.safeParse(value)
@@ -102,8 +107,9 @@ export function loadSkillBundleArtifacts(
 
 async function readSkillBundleArtifacts(resourceRoot: string): Promise<SkillBundleArtifacts> {
   const bundleRoot = join(resourceRoot, 'skills')
-  const [manifestValue, registryValue, releaseMappingValue] = await Promise.all([
+  const [manifestValue, contentValue, registryValue, releaseMappingValue] = await Promise.all([
     readFile(join(bundleRoot, 'current-manifest.json'), 'utf8').then(JSON.parse),
+    readFile(join(bundleRoot, 'current-content.json'), 'utf8').then(JSON.parse),
     readFile(join(bundleRoot, 'snapshot-registry.json'), 'utf8').then(JSON.parse),
     readFile(join(bundleRoot, 'release-mapping.json'), 'utf8').then(JSON.parse)
   ])
@@ -112,6 +118,7 @@ async function readSkillBundleArtifacts(resourceRoot: string): Promise<SkillBund
     manifestValue,
     'skill bundle manifest'
   )
+  const currentContent = parseArtifact(currentContentSchema, contentValue, 'skill current content')
   const registry: SkillSnapshotRegistry = parseArtifact(
     registrySchema,
     registryValue,
@@ -131,6 +138,15 @@ async function readSkillBundleArtifacts(resourceRoot: string): Promise<SkillBund
       )
     ) {
       throw new Error(`Inconsistent current skill snapshot: ${current.name}`)
+    }
+    const skillMarkdown = currentContent.skills[current.name]
+    const expectedSkillMarkdown = current.files.find((file) => file.path === 'SKILL.md')
+    if (
+      skillMarkdown === undefined ||
+      !expectedSkillMarkdown ||
+      createHash('sha256').update(skillMarkdown).digest('hex') !== expectedSkillMarkdown.exactSha256
+    ) {
+      throw new Error(`Inconsistent current skill content: ${current.name}`)
     }
   }
 
@@ -154,6 +170,7 @@ async function readSkillBundleArtifacts(resourceRoot: string): Promise<SkillBund
     // Why: newer-known classification needs every identity packaged with this
     // build, while release mapping remains the provenance record for shipped revisions.
     knownSnapshots: registry.skills,
-    releasedAppVersions
+    releasedAppVersions,
+    currentContent: currentContent.skills
   }
 }
