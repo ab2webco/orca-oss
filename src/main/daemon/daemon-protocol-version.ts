@@ -27,6 +27,8 @@ export const HISTORY_SEED_TRANSFER_PROTOCOL_VERSION = 31
 // "cannot inspect" and gets routed through the fallback.
 export const COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION = 30
 export const GET_FOREGROUND_PROCESS_PROTOCOL_VERSION = 11
+// Why: `getSize` landed in v18; older daemons reject it as an unknown request type.
+export const GET_SIZE_PROTOCOL_VERSION = 18
 export const PTY_STARTUP_INGRESS_PROTOCOL_VERSION = 25
 export const AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION = 27
 export const AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION = 27

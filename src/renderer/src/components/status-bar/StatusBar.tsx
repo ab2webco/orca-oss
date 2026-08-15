@@ -80,6 +80,7 @@ import {
   resolveCodexUsageAccountScope
 } from './codex-usage-account-scope'
 import { SkillUpdateStatusSegment } from './SkillUpdateStatusSegment'
+import { CaffeinateStatusSegment } from './CaffeinateStatusSegment'
 import { RemoteServerUpdateStatusSegment } from './RemoteServerUpdateStatusSegment'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
@@ -93,6 +94,7 @@ import { TOGGLE_FLOATING_TERMINAL_EVENT } from '@/lib/floating-terminal'
 import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { FloatingTerminalIconContextMenu } from '@/components/floating-terminal/FloatingTerminalIconContextMenu'
 import { summarizeCodexRestartStatus } from './codex-restart-status-summary'
+import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
 import {
   getWindowsTerminalCapabilityOwnerKey,
   useWindowsTerminalCapabilities
@@ -2490,6 +2492,7 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
       <div className="flex-1" />
 
       <div className="flex items-center gap-3">
+        {!isPairedWebClientWindow() ? <CaffeinateStatusSegment iconOnly={iconOnly} /> : null}
         <RemoteServerUpdateStatusSegment iconOnly={iconOnly} />
         <SkillUpdateStatusSegment iconOnly={iconOnly} />
         <UpdateStatusSegment compact={compact} iconOnly={iconOnly} />
@@ -2510,7 +2513,11 @@ function StatusBarInner({ floatingTerminalOpen }: StatusBarProps): React.JSX.Ele
                   className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded border border-border bg-secondary text-secondary-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
                   aria-label={
                     showFloatingWorkspaceAttentionDot
-                      ? `${floatingTerminalActionLabel}, new activity`
+                      ? translate(
+                          'auto.components.status.bar.StatusBar.floatingTerminalNewActivity',
+                          '{{label}}, new activity',
+                          { label: floatingTerminalActionLabel }
+                        )
                       : floatingTerminalActionLabel
                   }
                   onClick={() => {

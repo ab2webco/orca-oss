@@ -1,47 +1,13 @@
 import type { TuiAgent } from './types'
 import { getOrcaCliCommandNameForPlatform } from './orca-cli-command-name'
+import type { TuiAgentConfig } from './tui-agent-config-types'
 
-export type AgentPromptInjectionMode =
-  | 'argv'
-  | 'flag-prompt'
-  | 'flag-prompt-interactive'
-  | 'flag-interactive'
-  | 'hermes-query'
-  | 'stdin-after-start'
-
-export type DraftPasteReadySignal =
-  | 'render-quiet-after-bracketed-paste'
-  | 'codex-composer-prompt'
-  | 'render-cursor-after-bracketed-paste'
-
-export type TuiAgentDetectionRuntime = NodeJS.Platform | 'wsl'
-
-export type TuiAgentConfig = {
-  detectCmd: string
-  /** Additional executable names that identify the same agent on PATH. */
-  detectCmdAliases?: readonly string[]
-  /** Other commands that must also be present before this agent counts as installed. */
-  detectRequiredCommands?: readonly string[]
-  /** Detection runtimes where this launch mode is not available as a detected agent. */
-  detectUnsupportedRuntimes?: readonly TuiAgentDetectionRuntime[]
-  launchCmd: string
-  /** Platform-specific launch command when the public binary name differs. */
-  launchCmdByPlatform?: Partial<Record<NodeJS.Platform, string>>
-  expectedProcess: string
-  promptInjectionMode: AgentPromptInjectionMode
-  /** Option terminator required before positional prompts that may look like CLI syntax. */
-  argvPromptSeparator?: '--'
-  /** Native CLI flag that seeds the input without submitting (e.g. Claude's `--prefill <text>`); preferred over the paste-after-ready path. */
-  draftPromptFlag?: string
-  /** Startup env var that seeds the input without submitting, for agents with no `--prefill`-style flag (e.g. pi); avoids the paste-after-ready race. */
-  draftPromptEnvVar?: string
-  /** Pre-write a trust artifact so the agent's first-launch "trust this folder?" menu doesn't consume the bracketed paste (see agent-trust-presets.ts). */
-  preflightTrust?: 'cursor' | 'copilot' | 'codex'
-  /** Renderer-specific signal that the composer is ready for paste, stronger than the default quiet-render window. */
-  draftPasteReadySignal?: DraftPasteReadySignal
-  /** Windows Shift+Enter encoding override; omitted agents keep the legacy Esc+CR path. */
-  windowsShiftEnterEncoding?: 'csi-u'
-}
+export type {
+  AgentPromptInjectionMode,
+  DraftPasteReadySignal,
+  TuiAgentConfig,
+  TuiAgentDetectionRuntime
+} from './tui-agent-config-types'
 
 export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
   claude: {
@@ -50,7 +16,24 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     expectedProcess: 'claude',
     promptInjectionMode: 'argv',
     // Why: `claude --prefill <text>` seeds the input without submitting, avoiding the paste-after-ready race (PR https://github.com/stablyai/orca/pull/926).
-    draftPromptFlag: '--prefill'
+    draftPromptFlag: '--prefill',
+    // Why (ORCA-208): `--prefill` covers startup only. Every later write — the
+    // dispatch preamble above all — goes through the composer gate, and without
+    // a signal here that gate resolves `unobserved` in 0 ms, so Claude workers
+    // were dispatched with no readiness proof at all and `wait --for
+    // composer-ready` could never be satisfied on a Claude pane.
+    // Measured from a real `claude` v2.1.229 PTY, twice (inherited env and a
+    // clean boot): exactly one DECSET 2004, and the first DECTCEM show-cursor
+    // after it lands only once the composer row exists and the cursor has been
+    // moved into it — clean boot had `❯` at byte 630 and the show-cursor at 932,
+    // directly after `\x1b[37;3H`. Claude keeps the cursor hidden (`\x1b[?25l`)
+    // through each redraw and shows it again at the end of every frame, so the
+    // marker is re-emitted rather than one-shot. Same shape opencode carries,
+    // so it reuses that signal.
+    // Consequence worth knowing: this signal never arms the quiet-window
+    // fallback, so the renderer's startup draft paste now waits for the marker
+    // instead of pasting 1500 ms after the handshake.
+    draftPasteReadySignal: 'render-cursor-after-bracketed-paste'
   },
   'claude-agent-teams': {
     // Why: an Orca-provided launch mode, not a separate binary; detection follows the Orca CLI.
@@ -152,6 +135,18 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     promptInjectionMode: 'argv',
     draftPromptEnvVar: 'ORCA_OMP_PREFILL'
   },
+  'prime-agent': {
+    detectCmd: 'prime-agent',
+    launchCmd: 'prime-agent',
+    expectedProcess: 'prime-agent',
+    // Why: `prime-agent [options] [@files...] [message...]` takes the task as positional argv.
+    promptInjectionMode: 'argv',
+    // Why: separator so prompts starting with `help`/`agents`/`-…` aren't parsed as a
+    // subcommand or flag — its help documents `--` as "treat all following arguments as messages".
+    argvPromptSeparator: '--',
+    // Why: Prime Agent embeds Pi's TUI and decodes CSI-u the same way (see pi above).
+    windowsShiftEnterEncoding: 'csi-u'
+  },
   gemini: {
     detectCmd: 'gemini',
     launchCmd: 'gemini',
@@ -250,7 +245,8 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     expectedProcess: 'droid',
     promptInjectionMode: 'argv',
     // Why: Droid decodes CSI-u on Windows; the legacy Esc+CR fallback reads as Enter and submits instead of newline.
-    windowsShiftEnterEncoding: 'csi-u'
+    windowsShiftEnterEncoding: 'csi-u',
+    ctrlEnterEncoding: 'csi-u'
   },
   kimi: {
     detectCmd: 'kimi',
@@ -309,7 +305,12 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     // Why: argv (grok takes a positional prompt) so multi-line/special-char text isn't mangled as raw PTY keystrokes.
     promptInjectionMode: 'argv',
     // Why: separator so prompts like `help`/`--version` aren't parsed as Grok CLI syntax.
-    argvPromptSeparator: '--'
+    argvPromptSeparator: '--',
+    // Why: grok shimmers its startup logo until the session opens, so the quiet
+    // window never settles and launch drafts waited out the full 8s hard
+    // timeout; its composer glyph lands ~0.6s in.
+    draftPasteReadySignal: 'grok-composer-prompt',
+    ctrlEnterEncoding: 'csi-u'
   },
   devin: {
     detectCmd: 'devin',

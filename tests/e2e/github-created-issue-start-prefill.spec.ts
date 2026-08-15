@@ -119,7 +119,27 @@ function configureGitHubRemote(repoPath: string): void {
   })
 }
 
-test('starting a just-created GitHub issue launches Claude with its URL prefilled', async ({
+// Parked, not repaired — inherited from upstream, established by positive evidence rather than
+// byte-identity (the spec exists in all three trees, so byte-identity decides nothing here).
+// Measured: run 31665209057, the full E2E suite dispatched on upstream's own tip a63df91790 with
+// no fork code in the tree — this case FAILS there. The same run also reds
+// terminal-hidden-view-parking:467, repro-7732-gitlab-checks-job-details:116,
+// floating-tab-rename:179, tab-create-entry-file-paths and orca-profiles ×2, confirming the
+// earlier ORCA-203 classifications.
+//
+// Two traps this cost, both worth avoiding on the next attempt:
+//   - Locally the case never reaches its real assertion: it dies ~100 lines earlier at
+//     `expect(newIssueButton).toBeEnabled()` (:155) on ALL arms, including upstream and the fork
+//     without the sync, because no store repo satisfies `getTaskEligibleRepos`
+//     (`isGitRepoKind && (hasProjectRemoteIdentity || isProjectRemoteIdentityPending)`). A local
+//     A/B therefore cannot decide this one — 3 interleaved rounds per arm proved only that.
+//   - Upstream's tip cannot run its own E2E suite as-is: tests/e2e/terminal-macos-system-key-remap
+//     imports './terminal-ime-pane-arena', which does not exist in that tree, so Playwright fails
+//     at collection and every shard dies before a single spec runs. Drop that one spec to get a
+//     measurable upstream arm.
+//
+// Unparked by: a fix upstream, or one in its own PR — not inside this sync (ORCA-203).
+test.fixme('starting a just-created GitHub issue launches Claude with its URL prefilled', async ({
   orcaPage,
   testRepoPath
 }) => {

@@ -332,6 +332,8 @@ describe('orchestration RPC methods', () => {
   describe('orchestration.send', () => {
     it('sends a message', async () => {
       setup()
+      // Why: send notifies arrival so already-idle recipients get push-on-idle
+      // delivery without waiting for a status transition (#12536).
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
       const result = (await call('orchestration.send', {
         from: 'term_coord',
@@ -342,7 +344,7 @@ describe('orchestration RPC methods', () => {
       expect(result.message.id).toMatch(/^msg_/)
       expect(result.message.from_handle).toBe('term_coord')
       expect(result.message.run_id).toBe(activeRunId)
-      expect(runtime.deliverPendingMessagesForHandle).not.toHaveBeenCalled()
+      expect(runtime.deliverPendingMessagesForHandle).toHaveBeenCalled()
     })
 
     it('routes exact Dispatch mail independently of terminal handles', async () => {
@@ -1867,17 +1869,27 @@ describe('orchestration RPC methods', () => {
       expect(result.task.status).toBe('pending')
     })
 
-    it('records the caller terminal handle when creating a task', async () => {
+    it('records the caller pane, process, and Run generation when creating a task', async () => {
       setup()
       vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
         handle === 'term_creator' ? coordinatorPaneKey : null
       )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
+        terminalHandle: 'term_creator',
+        paneKey: coordinatorPaneKey,
+        processIncarnation: 'pty-creator:incarnation-a'
+      } as never)
       const result = (await call('orchestration.taskCreate', {
         spec: 'spawn related workspace',
         callerTerminalHandle: 'term_creator'
       })) as { task: { id: string } }
 
-      expect(db.getTask(result.task.id)?.created_by_terminal_handle).toBe('term_creator')
+      expect(db.getTask(result.task.id)).toMatchObject({
+        created_by_terminal_handle: 'term_creator',
+        created_by_pane_key: coordinatorPaneKey,
+        created_by_process_incarnation: 'pty-creator:incarnation-a',
+        created_by_run_generation: 1
+      })
     })
 
     it('rejects invalid deps JSON', async () => {
@@ -2002,6 +2014,16 @@ describe('orchestration RPC methods', () => {
       vi.mocked(runtime.getTerminalPaneKey).mockImplementation((candidate) =>
         candidate === handle ? `tab_worker:${handle}` : coordinatorPaneKey
       )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation((candidate) =>
+        candidate === handle
+          ? ({
+              terminalHandle: handle,
+              paneKey: `tab_worker:${handle}`,
+              processIncarnation: `runtime_test:${handle}:1`,
+              launchTokenHash: null
+            } as never)
+          : null
+      )
     }
 
     it('dispatches a task to a terminal', async () => {
@@ -2033,7 +2055,7 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(result.dispatch.id)?.assignee_pane_key).toBe('tab_w:leaf_w')
     })
 
-    it('commits the target process launch token on a manual dispatch', async () => {
+    it('commits authenticated process authority on a manual dispatch', async () => {
       setup()
       vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
         runtimeId: runtime.getRuntimeId(),
@@ -2052,9 +2074,24 @@ describe('orchestration RPC methods', () => {
         to: 'term_a'
       })) as { dispatch: { id: string } }
 
-      expect(db.getDispatchContextById(result.dispatch.id)?.launch_token_hash).toBe(
-        'launch-token-hash'
-      )
+      expect(db.getDispatchContextById(result.dispatch.id)).toMatchObject({
+        assignee_pane_key: 'tab_w:leaf_w',
+        process_incarnation: 'runtime_test:term_a:1',
+        launch_token_hash: 'launch-token-hash'
+      })
+    })
+
+    it('does not infer manual process authority from an unauthenticated handle', async () => {
+      setup()
+      const task = db.createTask({ spec: 'work' })
+
+      const result = (await call('orchestration.dispatch', {
+        task: task.id,
+        to: 'term_a'
+      })) as { dispatch: { id: string } }
+
+      expect(runtime.getTerminalProcessIncarnation('term_a')).toBe('runtime_test:term_a:1')
+      expect(db.getDispatchContextById(result.dispatch.id)?.process_incarnation).toBeNull()
     })
 
     it('rejects dispatch for a pending task', async () => {
@@ -2205,8 +2242,23 @@ describe('orchestration RPC methods', () => {
       const task = db.createTask({ spec: 'work' })
       // Why: upstream now requires a stable pane and process incarnation before injecting, so the
       // target needs an observable pane like any real dispatch assignee.
+      // Why (ORCA-201): upstream now reads the pane and the process incarnation off
+      // the dispatch authority, not off the two accessors, and refuses --inject
+      // without both. That is the safer rule — the authority exists only for a
+      // connected pty with a resolvable host scope — so the target is stubbed with
+      // the authority a real live assignee would have.
       vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
         handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation(
+        (handle) =>
+          (handle === 'term_a'
+            ? {
+                terminalHandle: handle,
+                paneKey: 'tab_a:leaf_a',
+                processIncarnation: 'runtime_test:term_a:1'
+              }
+            : null) as never
       )
       vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
       vi.spyOn(runtime, 'isTerminalBlockedOnInteractivePrompt').mockResolvedValue(false)
@@ -2231,8 +2283,23 @@ describe('orchestration RPC methods', () => {
       const task = db.createTask({ spec: 'work' })
       // Why: upstream now requires a stable pane and process incarnation before injecting, so the
       // target needs an observable pane like any real dispatch assignee.
+      // Why (ORCA-201): upstream now reads the pane and the process incarnation off
+      // the dispatch authority, not off the two accessors, and refuses --inject
+      // without both. That is the safer rule — the authority exists only for a
+      // connected pty with a resolvable host scope — so the target is stubbed with
+      // the authority a real live assignee would have.
       vi.mocked(runtime.getTerminalPaneKey).mockImplementation((handle) =>
         handle === 'term_a' ? 'tab_a:leaf_a' : handle === 'term_coord' ? coordinatorPaneKey : null
+      )
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation(
+        (handle) =>
+          (handle === 'term_a'
+            ? {
+                terminalHandle: handle,
+                paneKey: 'tab_a:leaf_a',
+                processIncarnation: 'runtime_test:term_a:1'
+              }
+            : null) as never
       )
       vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
       // A gone/exited/stale pane is not evidence of a prompt, so the send path keeps surfacing its
@@ -2378,6 +2445,16 @@ describe('orchestration RPC methods', () => {
     it('starts a fresh agent in the coordinator current worktree', async () => {
       setup()
       mockCurrentWorkerStart()
+      // Why (ORCA-208): `dispatch_input` reports `accepted` only on a proven
+      // composer; without proof it reports `written_unproven`. This test is
+      // about worktree reuse, so it takes the healthy path explicitly.
+      vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+        ready: true,
+        proven: true,
+        state: 'ready',
+        signal: 'codex-composer-prompt',
+        waitedMs: 42
+      })
       const task = db.createTask({ spec: 'implement worker start' })
 
       const result = (await call('orchestration.workerStart', {
@@ -2485,6 +2562,61 @@ describe('orchestration RPC methods', () => {
           } as never
         )
       ).rejects.toThrow('--claude-account')
+    })
+
+    it('applies and reports opaque per-invocation model preferences', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'launch a custom model' })
+
+      const result = (await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        model: 'aws-bedrock-opus-5',
+        effort: 'high'
+      })) as {
+        dispatchId: string
+        state: string
+        launch: {
+          requested: { agent: string; model: string; effort: string }
+          effective: { agent: string; model: string; effort: string }
+        }
+      }
+
+      expect(result).toMatchObject({
+        state: 'ready',
+        launch: {
+          requested: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' },
+          effective: { agent: 'claude', model: 'aws-bedrock-opus-5', effort: 'high' }
+        }
+      })
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({
+          startupAgent: 'claude',
+          launchPreferences: { model: 'aws-bedrock-opus-5', effort: 'high' }
+        })
+      )
+      expect(JSON.parse(db.getWorkerDispatch(result.dispatchId)!.start_options)).toMatchObject({
+        launch: result.launch
+      })
+    })
+
+    it('rejects launch preferences for an existing terminal before creating a Dispatch', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'reuse exact worker' })
+
+      await expect(
+        call('orchestration.workerStart', {
+          task: task.id,
+          from: 'term_coord',
+          terminal: 'term_worker',
+          model: 'gpt-5.6-sol'
+        })
+      ).rejects.toMatchObject({ code: 'invalid_argument' })
+      expect(db.getDispatchContext(task.id)).toBeUndefined()
     })
 
     // Why: `cursor` on PATH is the Cursor desktop app; passing the agent id as a

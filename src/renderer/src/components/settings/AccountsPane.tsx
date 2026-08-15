@@ -21,6 +21,7 @@ import { Label } from '../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Separator } from '../ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
 import {
   AlertTriangle,
   ChevronDown,
@@ -102,8 +103,15 @@ import {
   type ProviderAccountRuntimeView
 } from './provider-account-visibility'
 import { translate } from '@/i18n/i18n'
+import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import { cn } from '@/lib/utils'
 import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
+import { ClaudeAccountAuthStatusLine } from './ClaudeAccountAuthStatusLine'
+import {
+  findClaudeAccountAuthVerdict,
+  resolveClaudeAccountAuthRowStatus,
+  selectClaudeAccountUsage
+} from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
   emptyClaudeAccountsState,
@@ -127,16 +135,7 @@ function formatMiniMaxRelativeRefresh(updatedAt: number, now: number): string {
   if (diffMs < 60_000) {
     return translate('auto.components.settings.AccountsPane.3a30aaf526', 'just now')
   }
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-  const minutes = Math.round(diffMs / 60_000)
-  if (minutes < 60) {
-    return formatter.format(-minutes, 'minute')
-  }
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) {
-    return formatter.format(-hours, 'hour')
-  }
-  return formatter.format(-Math.round(hours / 24), 'day')
+  return formatUiRelativeTime(-diffMs)
 }
 
 function MiniMaxCookieHelpPopover(): React.JSX.Element {
@@ -341,6 +340,10 @@ export function AccountsPane({
   const codexRateLimits = useAppStore((s) => s.rateLimits.codex)
   const codexRateLimitTarget = useAppStore((s) => s.rateLimits.codexTarget)
   const miniMaxRateLimits = useAppStore((s) => s.rateLimits.minimax)
+  const rateLimitsState = useAppStore((s) => s.rateLimits)
+  const recheckClaudeAccountAuth = useAppStore((s) => s.recheckClaudeAccountAuth)
+  const fetchInactiveClaudeAccountUsage = useAppStore((s) => s.fetchInactiveClaudeAccountUsage)
+  const [authStatusNow, setAuthStatusNow] = useState(() => Date.now())
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const fetchSettings = useAppStore((s) => s.fetchSettings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
@@ -484,6 +487,10 @@ export function AccountsPane({
   // unusable, so without this the user only sees their edits being ignored.
   const [codexConfigSync, setCodexConfigSync] = useState<CodexConfigSyncStatus | null>(null)
   useEffect(() => {
+    const interval = setInterval(() => setAuthStatusNow(Date.now()), 30_000)
+    return () => clearInterval(interval)
+  }, [])
+  useEffect(() => {
     // Why: the status resolves the host's own ~/.codex and shared runtime home.
     // A WSL or remote scope mirrors different homes entirely, so showing it there
     // would name a config file that has nothing to do with the selected runtime.
@@ -594,6 +601,17 @@ export function AccountsPane({
   useEffect(() => {
     void refreshMiniMaxCredentialStatus()
   }, [])
+
+  useEffect(() => {
+    // Why: the roster's job is saying which account still authenticates, so it
+    // asks on open instead of waiting for a click. Same debounced per-account
+    // trickle the status bar uses: it skips accounts with fresh usage and never
+    // rotates a token a live pane owns. Remote scope has no local verdicts.
+    if (isRemoteAccountScope) {
+      return
+    }
+    void fetchInactiveClaudeAccountUsage()
+  }, [isRemoteAccountScope, fetchInactiveClaudeAccountUsage])
 
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready
@@ -1470,6 +1488,10 @@ export function AccountsPane({
                   )
                 const isReauthing = claudeAction === `reauth:${account.id}`
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
+                const authStatus = resolveClaudeAccountAuthRowStatus(
+                  findClaudeAccountAuthVerdict(rateLimitsState, account.id)
+                )
+                const accountUsage = selectClaudeAccountUsage(rateLimitsState, account.id, isActive)
 
                 return (
                   <div
@@ -1542,6 +1564,13 @@ export function AccountsPane({
                               ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
                               : formatAccountTimestamp(account.lastAuthenticatedAt)}
                         </span>
+                        {isCustomEndpoint ? null : (
+                          <ClaudeAccountAuthStatusLine
+                            status={authStatus}
+                            usage={accountUsage}
+                            now={authStatusNow}
+                          />
+                        )}
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
                         {isCustomEndpoint ? (
@@ -1562,6 +1591,34 @@ export function AccountsPane({
                             )}
                           </Button>
                         ) : (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            title={translate(
+                              'auto.components.settings.AccountsPane.checkSignInHint',
+                              'Asks the provider whether this credential still works. One request for this account only.'
+                            )}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void recheckClaudeAccountAuth(account.id)
+                            }}
+                            disabled={
+                              isRemoteAccountScope || isBusy || authStatus.kind === 'checking'
+                            }
+                            className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                          >
+                            {authStatus.kind === 'checking' ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="size-3" />
+                            )}
+                            {translate(
+                              'auto.components.settings.AccountsPane.checkSignIn',
+                              'Check sign-in'
+                            )}
+                          </Button>
+                        )}
+                        {isCustomEndpoint ? null : (
                           <Button
                             variant="ghost"
                             size="xs"
@@ -2111,25 +2168,19 @@ export function AccountsPane({
               )}
             </p>
           </div>
-          <button
-            role="switch"
-            aria-checked={settings.geminiCliOAuthEnabled}
-            onClick={() => {
+          <Switch
+            aria-label={translate(
+              'auto.components.settings.AccountsPane.96f3649526',
+              'Use Gemini CLI credentials (experimental)'
+            )}
+            checked={settings.geminiCliOAuthEnabled}
+            onCheckedChange={(checked) => {
               recordFeatureInteraction('usage-tracking')
               updateSettings({
-                geminiCliOAuthEnabled: !settings.geminiCliOAuthEnabled
+                geminiCliOAuthEnabled: checked
               })
             }}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors ${
-              settings.geminiCliOAuthEnabled ? 'bg-foreground' : 'bg-muted-foreground/30'
-            }`}
-          >
-            <span
-              className={`pointer-events-none block size-3.5 rounded-full bg-background shadow-sm transition-transform ${
-                settings.geminiCliOAuthEnabled ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+          />
         </SearchableSetting>
       </section>
     ) : null,

@@ -52,6 +52,7 @@ import {
   isGitHubProjectRefInputTooLarge
 } from '../../shared/github-project-ref-input'
 import { githubProjectHost } from '../../shared/github-project-identity'
+import { isSupportedGitHubProjectViewLayout } from '../../shared/github-project-view-layout'
 
 // Re-export the public API so existing `./project-view` call sites keep working; the split is internal-only.
 export { isValidOwnerSlug, isValidRepoSlug } from './project-view/internals'
@@ -123,6 +124,8 @@ const parentFieldRetriedByOwner = new Map<string, true>()
 const parentFieldWarningLoggedByOwner = new Map<string, true>()
 // Why: in-flight promise per owner so concurrent fetchAllItems callers share one probe instead of each racing a duplicate first-page probe.
 const parentFieldProbeInFlight = new Map<string, Promise<void>>()
+const boardSchemaSupportByHost = new Map<string, boolean>()
+const boardSchemaProbeByHost = new Map<string, Promise<boolean | undefined>>()
 
 // Why: GHES owners are a separate namespace and capability surface from
 // github.com owners with the same login — scope cache keys by host so one
@@ -173,6 +176,8 @@ export function _resetProjectViewCachesForTests(): void {
   parentFieldRetriedByOwner.clear()
   parentFieldWarningLoggedByOwner.clear()
   parentFieldProbeInFlight.clear()
+  boardSchemaSupportByHost.clear()
+  boardSchemaProbeByHost.clear()
 }
 
 export function _getProjectViewCacheSizesForTests(): {
@@ -333,6 +338,8 @@ type RawFieldValue = {
   date?: string
   labels?: { nodes?: RawLabel[] }
   users?: { nodes?: RawUser[] }
+  repository?: { nameWithOwner?: string }
+  milestone?: { title?: string }
 }
 
 export function normalizeFieldValue(
@@ -387,6 +394,14 @@ export function normalizeFieldValue(
         .filter((u): u is GitHubProjectUser => u !== null)
       return { kind: 'users', fieldId, users }
     }
+    case 'ProjectV2ItemFieldRepositoryValue':
+      return {
+        kind: 'text',
+        fieldId,
+        text: raw.repository?.nameWithOwner ?? ''
+      }
+    case 'ProjectV2ItemFieldMilestoneValue':
+      return { kind: 'text', fieldId, text: raw.milestone?.title ?? '' }
     case undefined:
     default:
       // Unknown __typename → forward-compat: drop silently, don't classify as drift (see design §Error Handling).
@@ -586,7 +601,8 @@ function itemContentSelection(includeParent: boolean): string {
   `
 }
 
-const FIELD_VALUES_SELECTION = `
+function fieldValuesSelection(includeBoardFields: boolean): string {
+  return `
   fieldValues(first:${FIELD_VALUES_PAGE_SIZE}) {
     pageInfo { hasNextPage }
     nodes {
@@ -598,9 +614,24 @@ const FIELD_VALUES_SELECTION = `
       ... on ProjectV2ItemFieldDateValue         { field { ...FieldConfig } date }
       ... on ProjectV2ItemFieldLabelValue        { field { ...FieldConfig } labels(first:10) { nodes { name color } } }
       ... on ProjectV2ItemFieldUserValue         { field { ...FieldConfig } users(first:5) { nodes { login name avatarUrl } } }
+      ${includeBoardFields ? '... on ProjectV2ItemFieldRepositoryValue { field { ...FieldConfig } repository { nameWithOwner } }' : ''}
+      ${includeBoardFields ? '... on ProjectV2ItemFieldMilestoneValue { field { ...FieldConfig } milestone { title } }' : ''}
     }
   }
 `
+}
+
+function isUnsupportedBoardSchemaError(raw: { stderr: string; stdout: string }): boolean {
+  const message = `${raw.stderr}\n${raw.stdout}`.toLowerCase()
+  return (
+    message.includes('verticalgroupbyfields') &&
+    (message.includes('cannot query field') || message.includes('undefinedfield'))
+  )
+}
+
+export function supportsModernProjectBoardSchema(host?: string): boolean {
+  return boardSchemaSupportByHost.get(githubProjectHost(host).toLowerCase()) !== false
+}
 
 // ─── Project config fetch (views + fields, paginated) ──────────────────
 
@@ -625,6 +656,7 @@ type RawProjectView = {
     nodes?: (RawProjectV2Field | null)[]
   }
   groupByFields?: { nodes?: (RawProjectV2Field | null)[] }
+  verticalGroupByFields?: { nodes?: (RawProjectV2Field | null)[] }
   sortByFields?: {
     nodes?: ({ direction?: string; field?: RawProjectV2Field | null } | null)[]
   }
@@ -634,7 +666,7 @@ function ownerQueryRoot(ownerType: GitHubProjectOwnerType): string {
   return ownerType === 'organization' ? 'organization' : 'user'
 }
 
-async function fetchProjectViewsPage(args: {
+export async function fetchProjectViewsPage(args: {
   owner: string
   ownerType: GitHubProjectOwnerType
   projectNumber: number
@@ -653,7 +685,8 @@ async function fetchProjectViewsPage(args: {
   const root = ownerQueryRoot(args.ownerType)
   const afterArg = args.after ? `, after: $after` : ''
   const afterVar = args.after ? `$after:String!, ` : ''
-  const query = `
+  const runPageQuery = async (includeBoardSchema: boolean) => {
+    const query = `
     query(${afterVar}$owner:String!, $num:Int!) {
       ${root}(login:$owner) {
         projectV2(number:$num) {
@@ -667,6 +700,7 @@ async function fetchProjectViewsPage(args: {
                 nodes { ...FieldConfig }
               }
               groupByFields(first:10) { nodes { ...FieldConfig } }
+              ${includeBoardSchema ? 'verticalGroupByFields(first:10) { nodes { ...FieldConfig } }' : ''}
               sortByFields(first:10) {
                 nodes { direction field { ...FieldConfig } }
               }
@@ -677,15 +711,49 @@ async function fetchProjectViewsPage(args: {
     }
     ${FIELD_CONFIG_FRAGMENT}
   `
-  const vars: GraphqlVars = { owner: args.owner, num: args.projectNumber }
-  if (args.after) {
-    vars.after = args.after
+    const vars: GraphqlVars = { owner: args.owner, num: args.projectNumber }
+    if (args.after) {
+      vars.after = args.after
+    }
+    return runGraphql<Record<string, { projectV2?: RawProjectConfig | null } | null>>(
+      query,
+      vars,
+      projectGhExecOptions(args.host)
+    )
   }
-  const res = await runGraphql<Record<string, { projectV2?: RawProjectConfig | null } | null>>(
-    query,
-    vars,
-    projectGhExecOptions(args.host)
-  )
+
+  const host = githubProjectHost(args.host).toLowerCase()
+  let supportsBoardSchema = boardSchemaSupportByHost.get(host)
+  const existingProbe = boardSchemaProbeByHost.get(host)
+  if (supportsBoardSchema === undefined && existingProbe) {
+    supportsBoardSchema = await existingProbe
+  }
+  let res
+  if (supportsBoardSchema === undefined) {
+    let resolveProbe: (supported: boolean | undefined) => void = () => {}
+    boardSchemaProbeByHost.set(
+      host,
+      new Promise((resolve) => {
+        resolveProbe = resolve
+      })
+    )
+    res = await runPageQuery(true)
+    if (res.ok) {
+      supportsBoardSchema = true
+    } else if (isUnsupportedBoardSchemaError(res.raw)) {
+      supportsBoardSchema = false
+    }
+    if (supportsBoardSchema !== undefined) {
+      boardSchemaSupportByHost.set(host, supportsBoardSchema)
+    }
+    resolveProbe(supportsBoardSchema)
+    boardSchemaProbeByHost.delete(host)
+    if (supportsBoardSchema === false) {
+      res = await runPageQuery(false)
+    }
+  } else {
+    res = await runPageQuery(supportsBoardSchema)
+  }
   if (!res.ok) {
     return res
   }
@@ -777,6 +845,13 @@ function finalizeView(
       groupByFields.push(n)
     }
   }
+  const verticalGroupByFields: GitHubProjectField[] = []
+  for (const f of raw.verticalGroupByFields?.nodes ?? []) {
+    const n = normalizeField(f)
+    if (n) {
+      verticalGroupByFields.push(n)
+    }
+  }
   const sortByFields: GitHubProjectSort[] = []
   for (const s of raw.sortByFields?.nodes ?? []) {
     if (!s || (s.direction !== 'ASC' && s.direction !== 'DESC')) {
@@ -798,6 +873,7 @@ function finalizeView(
       filter: typeof raw.filter === 'string' ? raw.filter : '',
       fields,
       groupByFields,
+      verticalGroupByFields,
       sortByFields
     }
   }
@@ -846,6 +922,7 @@ async function fetchItemsPageWithRaw(args: {
   first: number
   after: string | null
   includeParent: boolean
+  includeBoardFields: boolean
   host?: string
 }): Promise<
   | { ok: true; page: RawItemsPage }
@@ -875,7 +952,7 @@ async function fetchItemsPageWithRaw(args: {
               type
               updatedAt
               content { ${itemContentSelection(args.includeParent)} }
-              ${FIELD_VALUES_SELECTION}
+              ${fieldValuesSelection(args.includeBoardFields)}
             }
           }
         }
@@ -980,6 +1057,7 @@ async function fetchAllItems(args: {
   ownerType: GitHubProjectOwnerType
   projectNumber: number
   query: string
+  includeBoardFields: boolean
   host?: string
 }): Promise<
   | { ok: true; rows: GitHubProjectRow[]; totalCount: number; parentFieldDropped: boolean }
@@ -1013,6 +1091,7 @@ async function fetchAllItems(args: {
           first: ITEM_PAGE_SIZE,
           after: null,
           includeParent: true,
+          includeBoardFields: args.includeBoardFields,
           host: args.host
         })
         // Why: set the retried flag BEFORE resolving/clearing the probe so siblings awoken on inFlight.catch() see it and don't fire duplicate with-parent probes.
@@ -1035,6 +1114,7 @@ async function fetchAllItems(args: {
       first: ITEM_PAGE_SIZE,
       after: null,
       includeParent,
+      includeBoardFields: args.includeBoardFields,
       host: args.host
     })
   }
@@ -1057,6 +1137,7 @@ async function fetchAllItems(args: {
       first: ITEM_PAGE_SIZE,
       after: null,
       includeParent: false,
+      includeBoardFields: args.includeBoardFields,
       host: args.host
     })
   }
@@ -1125,6 +1206,7 @@ async function fetchAllItems(args: {
       first: ITEM_PAGE_SIZE,
       after: cursor as string,
       includeParent,
+      includeBoardFields: args.includeBoardFields,
       host: args.host
     })
     if (!next.ok) {
@@ -1282,12 +1364,25 @@ export async function getProjectViewTable(
   }
   const selectedView = finalized.view
 
+  if (
+    selectedView.layout === 'BOARD_LAYOUT' &&
+    boardSchemaSupportByHost.get(githubProjectHost(args.host).toLowerCase()) === false
+  ) {
+    return {
+      ok: false,
+      error: {
+        type: 'unsupported_layout',
+        message: 'Board views require GitHub Projects schema support unavailable on this host.'
+      }
+    }
+  }
+
   // Why: empty-string override means "no filter"; undefined means "use the view's stored filter". The override is ephemeral, never persisted.
   const effectiveQuery =
     typeof args.queryOverride === 'string' ? args.queryOverride : selectedView.filter
 
   // Unsupported layout: skip item pagination; best-effort count-only query.
-  if (selectedView.layout !== 'TABLE_LAYOUT') {
+  if (!isSupportedGitHubProjectViewLayout(selectedView.layout)) {
     const count = await fetchItemsCountOnly({
       owner: args.owner,
       ownerType: args.ownerType,
@@ -1299,7 +1394,7 @@ export async function getProjectViewTable(
       ok: false,
       error: {
         type: 'unsupported_layout',
-        message: `Orca only renders table views. This is a ${selectedView.layout.replace('_LAYOUT', '').toLowerCase()} view.`
+        message: `Orca renders table and board views. This is a ${selectedView.layout.replace('_LAYOUT', '').toLowerCase()} view.`
       },
       ...(typeof count === 'number' ? { totalCount: count } : {})
     }
@@ -1311,6 +1406,7 @@ export async function getProjectViewTable(
     ownerType: args.ownerType,
     projectNumber: args.projectNumber,
     query: effectiveQuery,
+    includeBoardFields: selectedView.layout === 'BOARD_LAYOUT',
     host: args.host
   })
   if (!items.ok) {

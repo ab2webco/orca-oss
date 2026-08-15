@@ -90,31 +90,42 @@ jobs:
     needs: build
     if: inputs.test_files == ''
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Why 45 and not 30: Playwright shards by index over the sorted spec list, not
+    # by duration, so the slowest shard carries the cost. Measured on run
+    # 31648371052 — the last green E2E on main, no sync in the tree — shard 7 took
+    # 27.0 min against the old 30, while shard 3 took 10.9 (2.5x spread). The cap
+    # was already at 90% before any PR added a spec, so it read as a red check on
+    # whichever PR happened to cross it (ORCA-215). Raising it buys margin; the real
+    # fix is balancing by duration, tracked in ORCA-215.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - shard: '1/10'
-            shard_name: 1-of-10
-          - shard: '2/10'
-            shard_name: 2-of-10
-          - shard: '3/10'
-            shard_name: 3-of-10
-          - shard: '4/10'
-            shard_name: 4-of-10
-          - shard: '5/10'
-            shard_name: 5-of-10
-          - shard: '6/10'
-            shard_name: 6-of-10
-          - shard: '7/10'
-            shard_name: 7-of-10
-          - shard: '8/10'
-            shard_name: 8-of-10
-          - shard: '9/10'
-            shard_name: 9-of-10
-          - shard: '10/10'
-            shard_name: 10-of-10
+          - shard: '1/12'
+            shard_name: 1-of-12
+          - shard: '2/12'
+            shard_name: 2-of-12
+          - shard: '3/12'
+            shard_name: 3-of-12
+          - shard: '4/12'
+            shard_name: 4-of-12
+          - shard: '5/12'
+            shard_name: 5-of-12
+          - shard: '6/12'
+            shard_name: 6-of-12
+          - shard: '7/12'
+            shard_name: 7-of-12
+          - shard: '8/12'
+            shard_name: 8-of-12
+          - shard: '9/12'
+            shard_name: 9-of-12
+          - shard: '10/12'
+            shard_name: 10-of-12
+          - shard: '11/12'
+            shard_name: 11-of-12
+          - shard: '12/12'
+            shard_name: 12-of-12
 
     steps:
       - name: Checkout

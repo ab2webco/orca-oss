@@ -144,7 +144,13 @@ test.describe('local HTTPS certificate trust', () => {
       // The certificate-failure branch keeps its safe recovery actions and the
       // certificate-specific hint, but never the local-server connectivity hint.
       await expect(firstSlot.getByRole('button', { name: 'Copy Address' })).toBeVisible()
-      await expect(firstSlot.getByRole('button', { name: 'Retry' })).toBeVisible()
+      // Upstream #12483 gave the toolbar reload button the accessible name
+      // 'Retry' too, so the bare name matches two elements in the slot. Scope
+      // to the failure overlay's own live region.
+      const failureOverlay = firstSlot
+        .locator('[aria-live="polite"]')
+        .filter({ has: orcaPage.getByRole('heading', { name: "Connection isn't secure" }) })
+      await expect(failureOverlay.getByRole('button', { name: 'Retry' })).toBeVisible()
       await expect(firstSlot.getByText(/use a trusted local certificate/i)).toBeVisible()
       await expect(firstSlot.getByText(/make sure the server is running/i)).toHaveCount(0)
       await firstSlot.getByRole('button', { name: 'Proceed Anyway (Unsafe)' }).click()

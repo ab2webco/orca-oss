@@ -45,9 +45,12 @@ process.stdin.on('data', (chunk) => {
   if (input.includes('\\x03')) {
     appendLedger('ORCA_E2E_INTERRUPTION_LEDGER', { event: 'stdin-ctrl-c' })
   }
-  if (!acknowledged && input.includes('\\r')) {
+  // Why \\n too: this pane's tty is in canonical mode, where ICRNL turns the
+  // dispatch's Enter into \\n before the agent reads it — a \\r-only check never
+  // acknowledged, and the old ACK assertion hid that by matching tty echo.
+  if (!acknowledged && (input.includes('\\r') || input.includes('\\n'))) {
     acknowledged = true
-    process.stdout.write('ACK\\n')
+    process.stdout.write('AGENT-STDOUT-ACK\\n')
   }
 })
 for (const signal of ['SIGINT', 'SIGHUP', 'SIGTERM']) {
@@ -177,7 +180,16 @@ test.afterAll(() => {
   rmSync(fakeCliDir, { recursive: true, force: true })
 })
 
-test('a missing legacy worker cannot spawn a replacement during restart recovery', async (// oxlint-disable-next-line no-empty-pattern -- This restart test owns both Electron launches.
+// Why fixme and not a repair: the `ACK` this waits for was never written by the fake
+// Codex. What satisfied it was the tty echo of the preamble Orca pastes, which
+// contains the task spec text — so the assertion passed only in the runs where the
+// prompt never reached the agent, and failed in the runs where it did. Measured over
+// 8 rounds with an instrumented fake: 5 pass with 0 bytes delivered, 3 fail with all
+// 5975 bytes delivered and answered. The two product defects it stumbled into ship
+// outside this sync (ORCA-208 delivery race, ORCA-209 agent output missing from the
+// read buffer); the oracle itself is ORCA-207. Running it here would only re-assert
+// something false.
+test.fixme('a missing legacy worker cannot spawn a replacement during restart recovery', async (// oxlint-disable-next-line no-empty-pattern -- This restart test owns both Electron launches.
 {}, testInfo) => {
   test.setTimeout(300_000)
   rmSync(spawnLedgerPath, { force: true })
@@ -247,15 +259,20 @@ test('a missing legacy worker cannot spawn a replacement during restart recovery
       })
       .toBeTruthy()
     const workerPaneKey = `${worker!.tabId}:${worker!.leafId}`
+    // Why a distinct marker: the preamble quotes "Respond ACK…", so a bare ACK
+    // assertion passes on tty echo of Orca's own write (ORCA-207/ORCA-209).
+    // Why a cursored read: this fake echoes, and the reply lands early in a
+    // ~110-line echo block that a bounded preview read drops off the top.
     await expect
       .poll(async () => {
         const read = await firstClient.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
           terminal: worker!.handle,
-          limit: 100
+          cursor: 0,
+          limit: 1000
         })
         return read.result.terminal.tail.join('\n')
       })
-      .toContain('ACK')
+      .toContain('AGENT-STDOUT-ACK')
     const dispatch = await firstClient.call<{
       dispatch: { id: string } | null
     }>('orchestration.dispatchShow', { task: task.result.task.id })

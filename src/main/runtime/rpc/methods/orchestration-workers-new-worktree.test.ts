@@ -69,6 +69,17 @@ describe('orchestration new-worktree workers', () => {
       accepted: true,
       bytesWritten: 1
     })
+    // Why (ORCA-208): the healthy path is a proven composer, and the
+    // `dispatch_input` effect now reports `accepted` only there. Tests about
+    // setup gating should not have to reason about readiness; the two that do
+    // override this.
+    vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+      ready: true,
+      proven: true,
+      state: 'ready',
+      signal: 'codex-composer-prompt',
+      waitedMs: 42
+    })
   })
 
   afterEach(() => db.close())
@@ -172,6 +183,29 @@ describe('orchestration new-worktree workers', () => {
       ])
     )
     expect(runtime.createTerminal).not.toHaveBeenCalled()
+  })
+
+  it('passes launch preferences into agent-first worktree creation', async () => {
+    mockCreatedWorktree()
+
+    const { result } = await startWorker({
+      model: 'custom-codex-model',
+      effort: 'high'
+    })
+
+    expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startupAgent: 'codex',
+        startupLaunchPreferences: { model: 'custom-codex-model', effort: 'high' }
+      })
+    )
+    expect(result).toMatchObject({
+      state: 'ready',
+      launch: {
+        requested: { agent: 'codex', model: 'custom-codex-model', effort: 'high' },
+        effective: { agent: 'codex', model: 'custom-codex-model', effort: 'high' }
+      }
+    })
   })
 
   it('rejects a new worktree for a folder project before creating effects', async () => {
@@ -461,6 +495,14 @@ describe('orchestration new-worktree workers', () => {
     expect(db.getTask(task.id)?.status).toBe('dispatched')
     // The lost failure becomes a recorded fact the deadline can cite later.
     expect(db.getDispatchContext(task.id)?.composer_ready_proven).toBe(0)
+    // Why (ORCA-208): the effect must not claim the agent accepted a preamble
+    // nothing in the byte stream proves it received. Bytes were written; the
+    // delivery is unproven, and the effect log says exactly that.
+    expect(result).toMatchObject({
+      effects: expect.arrayContaining([
+        expect.objectContaining({ kind: 'dispatch_input', state: 'written_unproven' })
+      ])
+    })
   })
 
   it('waits for composer readiness after tui-idle and before the write', async () => {

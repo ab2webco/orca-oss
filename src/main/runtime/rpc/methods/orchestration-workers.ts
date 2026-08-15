@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/types'
+import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
@@ -7,7 +8,6 @@ import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
 import { WorkerStartParams } from './orchestration-worker-start-schema'
-import { assertComposedWorkerStartParams } from './orchestration-worker-start-validation'
 import {
   createExistingWorktreeWorkerTerminal,
   createWorkerWorktree,
@@ -22,6 +22,7 @@ import {
   persistWorkerSetupWaitOutcome
 } from './orchestration-worker-setup-gate'
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
+import { prepareLocalWorkerStart } from './orchestration-worker-start-validation'
 
 export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
   defineMethod({
@@ -59,11 +60,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
       const requestedWorktree = params.worktree ?? 'current'
       const createsWorktree =
         requestedWorktree === 'new-child' || requestedWorktree === 'new-top-level'
-      assertComposedWorkerStartParams(params, createsWorktree)
-      const agent = params.agent
-      if (agent) {
-        runtime.validateOrchestrationAgentLauncher(agent as TuiAgent)
-      }
+      const { agent, launch } = prepareLocalWorkerStart({ params, createsWorktree, runtime })
 
       const coordinatorTerminal = await runtime.showTerminal(params.from)
       const coordinatorWorktree = await runtime.showManagedWorktree(
@@ -108,6 +105,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         agent: agent ?? null,
         claudeAccountId: params.claudeAccountId ?? null,
         codexAccountId: params.codexAccountId ?? null,
+        launch: launch.receipt,
         timeoutMs: params.timeoutMs ?? 60_000,
         setup: createsWorktree ? (params.setup ?? 'run') : 'not_applicable',
         setupSource: createsWorktree
@@ -152,6 +150,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             coordinatorWorktree,
             params,
             agent: agent as TuiAgent,
+            launchPreferences: launch.preferences,
             effects
           })
           resolvedWorktree = created.worktree
@@ -168,6 +167,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             runtime,
             worktreeId: resolvedWorktree!.id,
             agent: agent as TuiAgent,
+            launchPreferences: launch.preferences,
             taskId: task.id,
             claudeAccountId: params.claudeAccountId,
             codexAccountId: params.codexAccountId,
@@ -265,9 +265,15 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           kind: 'dispatch_input',
           role: 'agent',
           id: terminalHandle,
-          state: 'accepted'
+          // Why: `accepted` claims the agent took the preamble. Without the
+          // marker nothing in the byte stream supports that claim, so the
+          // effect says what actually happened — bytes written, delivery
+          // unproven — instead of overstating it.
+          state: composerReady.proven ? 'accepted' : DISPATCH_INPUT_WRITTEN_UNPROVEN
         })
         const worker = db.markWorkerDispatchReady(started.dispatch.id, effects)
+        // Why: after markWorkerDispatchReady, not before — the update is scoped
+        // to `status = 'dispatched'`, which this call is what establishes.
         db.recordDispatchComposerReadiness(started.dispatch.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
         // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
@@ -290,6 +296,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           state: worker.state,
           stage: worker.stage,
           setup: setupReceipt,
+          launch: launch.receipt,
           timeoutMs: params.timeoutMs ?? 60_000,
           effects,
           residualResources: [],
@@ -303,7 +310,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           dispatchId: started.dispatch.id,
           failedStage,
           error,
-          setup: setupReceipt
+          setup: setupReceipt,
+          launch: launch.receipt
         })
       }
     }

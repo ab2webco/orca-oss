@@ -92,6 +92,7 @@ type Props = {
   onContextMenuSelect?: (event: React.MouseEvent<HTMLElement>) => readonly Worktree[]
   onAssignWorkspaceStatus?: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onOpenChange?: (open: boolean) => void
+  onLifecycleComplete?: () => void
 }
 
 const CLOSE_ALL_CONTEXT_MENUS_EVENT = 'orca-close-all-context-menus'
@@ -363,7 +364,8 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   selectedWorktrees,
   onContextMenuSelect,
   onAssignWorkspaceStatus,
-  onOpenChange
+  onOpenChange,
+  onLifecycleComplete
 }: Props) {
   const defaultSelectedWorktrees = useMemo(() => [worktree], [worktree])
   const effectiveSelectedWorktrees = selectedWorktrees ?? defaultSelectedWorktrees
@@ -392,6 +394,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     effectiveSelectedWorktrees
   )
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false)
+  const createGroupDialogActiveRef = useRef(false)
   const [parentPicker, setParentPicker] = useState<{
     childWorktreeId: string
     anchorElement: HTMLElement
@@ -403,6 +406,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   } | null>(null)
   const parentPickerFallbackTimerRef = useRef<number | null>(null)
   const parentPickerUnmountTimerRef = useRef<number | null>(null)
+  const lifecycleStartedRef = useRef(false)
   const isDeleting = deleteState?.isDeleting ?? false
   const repoMap = useRepoMap()
   const worktreeMap = useWorktreeMap()
@@ -623,6 +627,33 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   )
 
   useEffect(() => {
+    if (!onLifecycleComplete) {
+      return
+    }
+    if (menuOpen) {
+      lifecycleStartedRef.current = true
+    }
+    if (
+      !lifecycleStartedRef.current ||
+      menuOpen ||
+      createGroupDialogOpen ||
+      createGroupDialogActiveRef.current ||
+      parentPicker !== null ||
+      pendingParentPickerRef.current !== null
+    ) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      if (createGroupDialogActiveRef.current || pendingParentPickerRef.current !== null) {
+        return
+      }
+      lifecycleStartedRef.current = false
+      onLifecycleComplete?.()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker])
+
+  useEffect(() => {
     const closeMenu = (): void => setMenuOpenState(false)
     window.addEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeMenu)
     return () => window.removeEventListener(CLOSE_ALL_CONTEXT_MENUS_EVENT, closeMenu)
@@ -700,8 +731,14 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     if (!repo) {
       return
     }
+    createGroupDialogActiveRef.current = true
     setCreateGroupDialogOpen(true)
   }, [repo])
+
+  const handleCreateGroupDialogOpenChange = useCallback((open: boolean) => {
+    createGroupDialogActiveRef.current = open
+    setCreateGroupDialogOpen(open)
+  }, [])
 
   const handleSubmitNewProjectGroup = useCallback(
     async (name: string) => {
@@ -790,6 +827,9 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleRename = useCallback(() => {
     openModal('edit-meta', {
       worktreeId: worktree.id,
+      // Why: the same workspace ID can exist under two hosts. Naming the owner
+      // keeps the dialog on this row instead of the ambiguous lookup.
+      repoId: worktree.repoId,
       currentDisplayName: worktree.displayName,
       currentIssue: worktree.linkedIssue,
       currentPR: worktree.linkedPR,
@@ -798,6 +838,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     })
   }, [
     worktree.id,
+    worktree.repoId,
     worktree.displayName,
     worktree.linkedIssue,
     worktree.linkedPR,
@@ -1372,7 +1413,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
         )}
         initialName={repo ? `${repo.displayName} group` : ''}
         confirmLabel="Create"
-        onOpenChange={setCreateGroupDialogOpen}
+        onOpenChange={handleCreateGroupDialogOpenChange}
         onSubmit={handleSubmitNewProjectGroup}
       />
       {/* Why: mounted only while open — one instance of this lives behind every

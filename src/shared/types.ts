@@ -54,6 +54,8 @@ import type { PersistedNativeChatSessionOptions } from './native-chat-session-op
 import type { CodexResetCreditAttemptLedger } from './codex-reset-credit-attempt-ledger'
 import type { TaskSourceContext } from './task-source-context'
 import type { SetupRunnerShell } from './setup-runner-command'
+import type { AiVaultSessionTitle } from './ai-vault-session-title'
+import type { ComputerAwakeMode } from './computer-awake-mode'
 
 // Re-exported for backward compat with renderer call sites that import
 // `WorkspaceCreateTelemetrySource` from '../../../shared/types'.
@@ -253,8 +255,9 @@ export type Repo = {
   badgeColor: string
   repoIcon?: RepoIcon | null
   /** Set when the repo is a fork: the upstream/parent owner/repo. Drives the
-   *  default avatar (upstream owner, not the personal fork) and the fork
-   *  indicator. Absent = not a fork, or fork status not yet resolved. */
+   *  fork indicator and the default avatar of same-name forks (renamed forks
+   *  keep their own owner). Absent = not a fork, or fork status not yet
+   *  resolved. */
   upstream?: GitHubRepositoryIdentity | null
   addedAt: number
   kind?: RepoKind
@@ -594,6 +597,8 @@ export const CLAUDE_FAILOVER_ORIGIN_SHARED = '__shared__'
 export type RateLimitFailBackMode = 'off' | 'notify' | 'auto'
 
 export type PlaneViewMode = 'list' | 'board'
+export type LinearViewMode = 'list' | 'board'
+export type JiraViewMode = 'list' | 'board'
 
 /** Provenance for workspaces created through `orca worktree create`. Absent on
  *  workspaces created before this field existed and on every non-CLI create, so
@@ -889,6 +894,8 @@ export type Tab = {
   contentType: TabContentType
   label: string // display title (auto-derived from PTY or filename)
   generatedLabel?: string | null
+  /** Stable AI Vault conversation name, bound to its provider session identity. */
+  aiVaultTitle?: AiVaultSessionTitle | null
   quickCommandLabel?: string | null
   customLabel: string | null
   color: string | null
@@ -929,6 +936,8 @@ export type TerminalTab = {
   defaultTitle?: string
   /** Stable opt-in label derived from the first known agent prompt. */
   generatedTitle?: string | null
+  /** Stable AI Vault conversation name, bound to its provider session identity. */
+  aiVaultTitle?: AiVaultSessionTitle | null
   /** Stable label from the tab-bar Quick Command that created this terminal. */
   quickCommandLabel?: string | null
   customTitle: string | null
@@ -1076,6 +1085,12 @@ export type BrowserTab = BrowserWorkspace
 
 export type BrowserSessionProfileScope = 'default' | 'isolated' | 'imported'
 
+export type BrowserSessionUserAgentMode = 'clean' | 'native'
+
+export type BrowserSessionProfileCreateOptions = {
+  userAgentMode?: BrowserSessionUserAgentMode
+}
+
 export type BrowserSessionProfileSource = {
   browserFamily:
     | 'chrome'
@@ -1097,6 +1112,7 @@ export type BrowserSessionProfile = {
   partition: string
   label: string
   source: BrowserSessionProfileSource | null
+  userAgentMode?: BrowserSessionUserAgentMode
 }
 
 export type BrowserCookieImportSummary = {
@@ -1458,6 +1474,9 @@ export type PRCheckDetail = {
   url: string | null
   checkRunId?: number
   workflowRunId?: number
+  // Why: the GitLab job trace API is addressed by numeric job id only, so the
+  // Checks panel cannot load a job log without carrying it on the row.
+  gitlabJobId?: number
 }
 
 export type PRCheckAnnotation = {
@@ -1520,6 +1539,7 @@ export type GitHubReactionContent =
 export type GitHubReaction = {
   content: GitHubReactionContent
   count: number
+  viewerHasReacted?: boolean
 }
 
 export type PRComment = {
@@ -1530,6 +1550,8 @@ export type PRComment = {
   createdAt: string
   url: string
   reactions?: GitHubReaction[]
+  /** GraphQL node ID for GitHub comments that support reaction mutations. */
+  reactionSubjectId?: string
   /** File path for inline review comments (absent for top-level conversation comments). */
   path?: string
   /** GraphQL node ID of the review thread — present only for inline review comments.
@@ -1589,6 +1611,8 @@ export type IssueInfo = {
   state: IssueState
   url: string
   labels: string[]
+  /** Full markdown body when fetched through the single-issue endpoint. */
+  description?: string
 }
 
 export type GitHubViewer = {
@@ -2826,6 +2850,7 @@ export type TuiAgent =
   | 'devin' // Devin CLI
   | 'ante' // Ante (Antigma Labs)
   | 'trae' // Trae CLI
+  | 'prime-agent' // Prime Agent (Prime Intellect)
 
 export type TaskViewPresetId = 'all' | 'issues' | 'review' | 'my-issues' | 'my-prs' | 'prs'
 
@@ -3078,6 +3103,8 @@ export type GlobalSettings = {
   openLinksInAppPreferencePrompted: boolean
   /** Opt-in: Shift+modifier click inverts openLinksInApp instead of always forcing the system browser. Off keeps the historical one-way escape hatch. */
   openLinksInAppModifierInverts?: boolean
+  /** Show terminal link actions on plain click; off restores modifier-click-only terminal links. */
+  terminalLinkActionPopoverEnabled?: boolean
   /** Opt-in: open new coding-agent tabs in native chat instead of the raw terminal; optional for legacy settings. */
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
@@ -3101,6 +3128,12 @@ export type GlobalSettings = {
   showTasksButton: boolean
   /** Only toggles the sidebar shortcut; Automations stay reachable from Settings/View menu. */
   showAutomationsButton?: boolean
+  /** Deprecated: Artifacts are always available. Use showArtifactsButton for sidebar visibility. */
+  artifactsEnabled?: boolean
+  /** Capability gate for agent-driven publishing; off until granted, enforced in main, not just the UI. */
+  artifactSharingEnabled?: boolean
+  /** Only toggles the sidebar shortcut; Artifacts stay reachable from Settings. */
+  showArtifactsButton?: boolean
   /** Only toggles the sidebar shortcut; Orca Mobile stays reachable from Settings. */
   showMobileButton?: boolean
   /** Pinned workspaces show in one sidebar location by default; opt in to also show them in their natural groups. */
@@ -3155,6 +3188,10 @@ export type GlobalSettings = {
   /** How the Plane task view opens. Defaults to 'board': with agents moving work
    *  in parallel, the kanban reads the state of everything at a glance. */
   planeViewMode?: PlaneViewMode
+  /** How the Linear task view opens. Defaults to 'board' for a consistent task board. */
+  linearViewMode?: LinearViewMode
+  /** How the Jira task view opens. Defaults to the read-only status board. */
+  jiraViewMode?: JiraViewMode
   /** When true (default), the Claude usage meters show the pinned managed
    *  account's usage while the focused worktree carries a claudeAccountId pin.
    *  false always shows the globally active account. */
@@ -3203,6 +3240,8 @@ export type GlobalSettings = {
   skipCloseTerminalWithRunningProcessConfirm: boolean
   /** Why: deleting an automation also deletes its run history; keep this skip separate from worktree deletion. */
   skipDeleteAutomationConfirm: boolean
+  /** Why: deleting an artifact breaks a public link others may already hold; keep this skip separate from local deletions. */
+  skipDeleteArtifactConfirm: boolean
   /** Why: a Codex rate-limit reset spends a scarce credit on the live account; keep this skip separate from local confirmations. */
   skipCodexRateLimitResetConfirm: boolean
   /** Default preset in the new-workspace GitHub task view. */
@@ -3269,6 +3308,8 @@ export type GlobalSettings = {
   confirmClosePinnedTab: boolean
   /** When true, Orca requests local awake assertions while hook-reported agents are working. */
   keepComputerAwakeWhileAgentsRun: boolean
+  /** Optional for mixed-version compatibility; the legacy boolean maps true to Auto. */
+  computerAwakeMode?: ComputerAwakeMode
   /** macOS Option key: compose layout chars (@ German, € French) vs act as Meta/Esc for readline.
    *  'auto' (default) = layout-aware via navigator.keyboard.getLayoutMap() (US → Meta, else compose);
    *  'false' = compose; 'true' = Meta on both Option keys; 'left'/'right' = only that key is Meta.
@@ -3568,7 +3609,7 @@ export type TaskResumeState = {
   githubItemsPreset?: TaskViewPresetId | null
   githubItemsQuery?: string
   githubProjectHiddenFieldIdsByView?: Record<string, string[]>
-  linearMode?: 'issues' | 'projects' | 'views'
+  linearMode?: 'issues' | 'projects' | 'views' | 'in-orca'
   linearPreset?: 'assigned' | 'created' | 'all' | 'completed'
   linearQuery?: string
   linearContext?: {
@@ -3620,6 +3661,7 @@ export type TopLevelView =
   | 'automations'
   | 'space'
   | 'skills'
+  | 'artifacts'
   | 'mobile'
 
 export type PersistedUIState = {
@@ -3662,6 +3704,8 @@ export type PersistedUIState = {
   hideCliCreatedWorkspaces?: boolean
   /** Hide workspaces sitting on a detached HEAD; folder workspaces (no head at all) are unaffected. */
   hideDetachedHeadWorkspaces?: boolean
+  /** Keep each project's main workspace out of the "Hide sleeping" sweep. Absent means on (#8873). */
+  alwaysShowDefaultBranchWorkspace?: boolean
   /** Per-worktree Explorer dotfile visibility. Missing entries inherit the default: show. */
   showDotfilesByWorktree?: Record<string, boolean>
   filterRepoIds: string[]

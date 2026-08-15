@@ -1,4 +1,4 @@
-export type NativeChatTranscriptAgent = 'claude' | 'codex' | 'grok'
+export type NativeChatTranscriptAgent = 'claude' | 'codex' | 'grok' | 'omp'
 
 /** Agents whose transcripts the native chat view can parse and render. */
 export const NATIVE_CHAT_SUPPORTED_AGENTS: ReadonlySet<string> = new Set([
@@ -8,11 +8,21 @@ export const NATIVE_CHAT_SUPPORTED_AGENTS: ReadonlySet<string> = new Set([
   // and the hook-reported transcript_path locates them under its config dir.
   'claude-zai',
   'codex',
-  'grok'
+  'grok',
+  'omp'
 ])
 
 export function isNativeChatSupportedAgent(agent: string | null | undefined): boolean {
   return agent != null && NATIVE_CHAT_SUPPORTED_AGENTS.has(agent)
+}
+
+/** Agents whose hook discloses no transcript path (`extractAgentProviderSession`),
+ *  so native chat can only reach the session file by scanning a sessions root on
+ *  a disk THIS process can read. Under Model-A SSH that disk is the wrong host,
+ *  so the chat view must stay closed instead of loading forever. */
+export function nativeChatRequiresLocalTranscript(agent: string | null | undefined): boolean {
+  const transcriptAgent = resolveNativeChatTranscriptAgent(agent)
+  return transcriptAgent === 'grok' || transcriptAgent === 'omp'
 }
 
 /** True when the agent renders a digit-commit question selector that ignores
@@ -33,7 +43,7 @@ export function resolveNativeChatTranscriptAgent(
   if (agent === 'claude' || agent === 'openclaude' || agent === 'claude-zai') {
     return 'claude'
   }
-  if (agent === 'codex' || agent === 'grok') {
+  if (agent === 'codex' || agent === 'grok' || agent === 'omp') {
     return agent
   }
   return null

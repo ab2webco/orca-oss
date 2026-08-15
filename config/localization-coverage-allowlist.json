@@ -1,5 +1,19 @@
 [
   {
+    "filePath": "src/renderer/src/lib/agent-background-session-test-state.ts",
+    "kind": "object-property:title",
+    "text": "Terminal 1",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
+    "kind": "jsx-attribute:label",
+    "text": "sidebar",
+    "dynamic": false,
+    "count": 1
+  },
+  {
     "filePath": "src/renderer/src/components/settings/appearance-search.ts",
     "kind": "object-property:keywords",
     "text": "Idioma",

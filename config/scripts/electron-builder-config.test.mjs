@@ -267,10 +267,6 @@ describe('electron-builder config', () => {
     }
   })
 
-  // Why: Squirrel.Mac swaps the .app in place only when the replacement carries the
-  // same bundle id and a valid Developer ID signature. A hourly built on the local
-  // (com.stablyai.orca.local, ad-hoc) identity would be un-installable over a real
-  // Orca — the whole point of the channel.
   it('uses Orca native rebuild hook instead of electron-builder default rebuild', () => {
     expect(electronBuilderConfig.beforeBuild).toBe(electronBuilderNativeRebuild)
     expect(electronBuilderConfig.npmRebuild).toBe(true)

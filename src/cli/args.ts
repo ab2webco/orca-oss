@@ -29,6 +29,7 @@ export const BOOLEAN_FLAGS = new Set([
   'help',
   'inject',
   'include-archived',
+  'include-visual-layouts',
   'interrupt',
   'json',
   'local',
@@ -155,6 +156,7 @@ export function supportsBrowserPageFlag(commandPath: string[]): boolean {
   if (
     [
       'account',
+      'artifacts',
       'automations',
       'project',
       'repo',
@@ -203,6 +205,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
     (commandPath.length === 1 &&
       [
         'account',
+        'artifacts',
         'automations',
         'project',
         'repo',

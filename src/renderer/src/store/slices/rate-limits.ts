@@ -11,6 +11,7 @@ export type RateLimitSlice = {
   refreshCodexRateLimitsForTarget: (target: RateLimitRuntimeTarget) => Promise<void>
   consumeCodexRateLimitResetCredit: () => Promise<void>
   fetchInactiveClaudeAccountUsage: () => Promise<void>
+  recheckClaudeAccountAuth: (accountId: string) => Promise<void>
   fetchInactiveCodexAccountUsage: () => Promise<void>
   setRateLimitsFromPush: (state: RateLimitState) => void
 }
@@ -30,7 +31,8 @@ export const createRateLimitSlice: StateCreator<AppState, [], [], RateLimitSlice
     claudeTarget: { runtime: 'host', wslDistro: null },
     codexTarget: { runtime: 'host', wslDistro: null },
     inactiveClaudeAccounts: [],
-    inactiveCodexAccounts: []
+    inactiveCodexAccounts: [],
+    claudeAccountAuth: []
   },
 
   fetchRateLimits: async () => {
@@ -135,6 +137,15 @@ export const createRateLimitSlice: StateCreator<AppState, [], [], RateLimitSlice
       await window.api.rateLimits.fetchInactiveClaudeAccounts()
     } catch (error) {
       console.error('Failed to fetch inactive Claude account usage:', error)
+    }
+  },
+
+  recheckClaudeAccountAuth: async (accountId) => {
+    try {
+      const state = await window.api.rateLimits.recheckClaudeAccountAuth(accountId)
+      set({ rateLimits: state })
+    } catch (error) {
+      console.error('Failed to re-check Claude account auth:', error)
     }
   },
 

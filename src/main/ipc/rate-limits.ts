@@ -25,6 +25,12 @@ export function registerRateLimitHandlers(
   ipcMain.handle('rateLimits:fetchInactiveClaudeAccounts', () =>
     rateLimits.fetchInactiveClaudeAccountsOnOpen()
   )
+  ipcMain.handle('rateLimits:recheckClaudeAccountAuth', (_event, accountId: string) =>
+    rateLimits.recheckClaudeAccountAuth(accountId)
+  )
+  ipcMain.handle('rateLimits:recordClaudeCredentialRejection', (_event, accountId: string) =>
+    rateLimits.recordClaudeCredentialRejection(accountId)
+  )
   ipcMain.handle('rateLimits:fetchInactiveCodexAccounts', () =>
     rateLimits.fetchInactiveCodexAccountsOnOpen()
   )

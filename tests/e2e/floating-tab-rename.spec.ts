@@ -80,7 +80,12 @@ async function openFloatingPanel(page: Page): Promise<void> {
     PANEL_SELECTOR,
     { timeout: 30_000 }
   )
-  await page.evaluate(() => window.dispatchEvent(new Event('orca-toggle-floating-terminal')))
+  // Why the guard: the event toggles, and the panel now restores its `open` flag from
+  // localStorage across a restart (floating-terminal-panel-view-state.ts). Dispatching it
+  // blind on the relaunched app closes a panel that came back open.
+  if ((await page.locator(OPEN_PANEL_SELECTOR).count()) === 0) {
+    await page.evaluate(() => window.dispatchEvent(new Event('orca-toggle-floating-terminal')))
+  }
   await expect(page.locator(OPEN_PANEL_SELECTOR)).toBeVisible()
 }
 

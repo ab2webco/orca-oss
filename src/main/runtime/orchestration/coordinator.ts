@@ -25,7 +25,8 @@ export type CoordinatorRuntime = {
   ensureOrchestrationDispatchDeadlineMonitor?(): void
   listTerminals(
     worktreeSelector?: string,
-    limit?: number
+    limit?: number,
+    opts?: { includeVisualLayouts?: boolean }
   ): Promise<{
     terminals: { handle: string; worktreeId: string; connected: boolean; writable: boolean }[]
   }>
@@ -43,8 +44,14 @@ export type CoordinatorRuntime = {
     behind: number
     recentSubjects: string[]
   } | null>
-  // Why: optional so lightweight runtime fakes keep compiling; when present, dispatch records the assignee's remint-stable pane identity.
+  // Why: pane-only fallback preserves reservation identity for lightweight runtime fakes.
   getTerminalPaneKey?(handle: string): string | null
+  // Why: automatic dispatch persists the same authenticated pane/process tuple as manual dispatch.
+  getOrchestrationDispatchAuthority?(handle: string): {
+    paneKey: string | null
+    processIncarnation: string | null
+    launchTokenHash: string | null
+  } | null
   // Why: Windows can host native and WSL workers at once, so the worker pane (not the coordinator) picks the packaged CLI name.
   getTerminalOrchestrationCliCommand?(handle: string): 'orca' | 'orca-ide'
 }
@@ -446,7 +453,10 @@ export class Coordinator {
       task.id,
       targetHandle,
       authority?.paneKey ?? this.runtime.getTerminalPaneKey?.(targetHandle) ?? undefined,
-      authority?.launchTokenHash ?? undefined
+      authority?.launchTokenHash ?? undefined,
+      // Why: the incarnation is only meaningful alongside the pane key it was
+      // observed on; without one, the row must not claim creator authority.
+      authority?.paneKey && authority.processIncarnation ? authority.processIncarnation : undefined
     )
     // Why (ORCA-191): the loop minted no capability, so slice 1's deadline —
     // which is armed only behind a live capability — could never cover it. The
@@ -526,7 +536,9 @@ export class Coordinator {
 
   private async getAvailableTerminals(): Promise<string[]> {
     try {
-      const result = await this.runtime.listTerminals(this.opts.worktree)
+      const result = await this.runtime.listTerminals(this.opts.worktree, undefined, {
+        includeVisualLayouts: false
+      })
       const dispatched = this.db.listTasks({ status: 'dispatched' })
       const busyHandles = new Set<string>()
 
