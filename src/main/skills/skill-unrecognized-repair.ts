@@ -1,18 +1,30 @@
 import { randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { lstat, mkdir, readFile, rename, rm } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { readFile, realpath, rename } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type {
   SkillFreshnessInstallation,
   SkillFreshnessInventory,
   SkillRepairPreview,
   SkillRepairResult
 } from '../../shared/skill-freshness'
-import { isOwnerManagedSkillScope } from '../../shared/skill-freshness'
+import {
+  isOwnerManagedSkillScope,
+  SUPPORTED_GLOBAL_SKILL_TOPOLOGIES
+} from '../../shared/skill-freshness'
 import { buildAgentFeatureSkillInstallArgs } from '../../shared/agent-feature-install-commands'
 import { resolveCliCommand } from '../codex-cli/command'
 import { getSpawnArgsForWindows } from '../win32-utils'
 import { loadSkillBundleArtifacts } from './skill-bundle-artifacts'
+import {
+  canonicalSkillPath,
+  collisionSafeBackupPath,
+  linkProviderAliasToCanonical,
+  pendingCanonicalCopy,
+  restoreBackup
+} from './skill-repair-backup'
+import { normalizedSkillIdentityPath } from './skill-installation-topology'
 import { observeSkillPackage } from './skill-package-identity'
 
 type InstallerResult = { code: number; output: string }
@@ -24,6 +36,7 @@ type RepairDeps = {
   runInstaller?: (name: string, agents: readonly string[]) => Promise<InstallerResult>
   now?: () => number
   randomId?: () => string
+  homeDir?: () => string
 }
 
 type RepairRequest = {
@@ -50,26 +63,37 @@ function repairablePlacement(
   return installation
 }
 
-function installAgents(installation: SkillFreshnessInstallation): string[] {
-  const rootAgent = new Map<string, string>([
-    ['home-claude', 'claude-code'],
-    ['home-codex', 'codex'],
-    ['home-grok', 'grok'],
-    ['home-opencode', 'opencode'],
-    ['home-pi', 'pi'],
-    ['home-omp', 'omp'],
-    ['home-prime-agent', 'prime-agent'],
-    ['home-gemini', 'gemini'],
-    ['home-antigravity', 'antigravity'],
-    ['home-cursor', 'cursor'],
-    ['home-agents', 'universal']
-  ])
-  const agent = rootAgent.get(installation.rootId)
-  if (!agent) {
-    throw new Error(`Unsupported repair location: ${installation.rootId}`)
-  }
-  return [agent]
+// Why: 'current' is the state the repair is judged by, but the installer fetches repo
+// HEAD, which legitimately runs ahead of the revision this build bundles — rejecting
+// that would roll a correct install back to the copy the user asked us to replace.
+// 'outdated' stays out: a managed copy behind the bundle is not what the button promised.
+function isRepairedStatus(installation: SkillFreshnessInstallation): boolean {
+  return installation.status === 'current' || installation.status === 'newer-known'
 }
+
+// Roots whose copy is the user's to replace. Named rather than derived so a root added
+// to discovery cannot silently start accepting repairs before anyone judged its layout.
+const REPAIRABLE_HOME_ROOT_IDS: ReadonlySet<string> = new Set([
+  'home-claude',
+  'home-codex',
+  'home-grok',
+  'home-opencode',
+  'home-pi',
+  'home-omp',
+  'home-prime-agent',
+  'home-gemini',
+  'home-antigravity',
+  'home-cursor',
+  'home-agents'
+])
+
+// Why 'universal' and not the provider's own key: measured against the real CLI, an
+// `--agent claude-code` install copies a second real directory into the provider home
+// even when `~/.agents/skills/<name>` already holds the same skill — the layout that
+// made this copy unrecognized in the first place, and that the global update cannot
+// converge. 'universal' is the only target that writes the canonical copy; the provider
+// alias pointing at it is ours to create.
+const CANONICAL_INSTALL_AGENT = 'universal'
 
 function splitLines(value: string): string[] {
   return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
@@ -161,34 +185,6 @@ export function buildSkillRepairInstallArgs(name: string, agents: readonly strin
   ]
 }
 
-async function collisionSafeBackupPath(
-  targetPath: string,
-  now: number,
-  randomId: () => string
-): Promise<string> {
-  const home = dirname(dirname(dirname(targetPath)))
-  const parent = join(home, '.orca', 'skill-backups')
-  const name = basename(targetPath)
-  await mkdir(parent, { recursive: true, mode: 0o700 })
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const candidate = join(parent, `${name}-${now}-${randomId()}`)
-    try {
-      await lstat(candidate)
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-        return candidate
-      }
-      throw error
-    }
-  }
-  throw new Error('Could not allocate a backup path')
-}
-
-async function restoreBackup(targetPath: string, backupPath: string): Promise<void> {
-  await rm(targetPath, { recursive: true, force: true })
-  await rename(backupPath, targetPath)
-}
-
 export class SkillUnrecognizedRepair {
   constructor(private readonly deps: RepairDeps) {}
 
@@ -225,8 +221,18 @@ export class SkillUnrecognizedRepair {
         message: 'The copy changed after the preview. Review it again.'
       }
     }
+    if (!REPAIRABLE_HOME_ROOT_IDS.has(installation.rootId)) {
+      return {
+        repaired: false,
+        reason: 'not-repairable',
+        message: `Unsupported repair location: ${installation.rootId}`
+      }
+    }
+    const home = (this.deps.homeDir ?? homedir)()
     const targetPath = installation.unresolvedPath
+    const orphanCanonicalPath = await pendingCanonicalCopy(home, installation.name)
     const backupPath = await collisionSafeBackupPath(
+      home,
       targetPath,
       (this.deps.now ?? Date.now)(),
       this.deps.randomId ?? (() => randomBytes(4).toString('hex'))
@@ -234,12 +240,11 @@ export class SkillUnrecognizedRepair {
     await rename(targetPath, backupPath)
     let installed: InstallerResult
     try {
-      installed = await (this.deps.runInstaller ?? defaultInstaller)(
-        installation.name,
-        installAgents(installation)
-      )
+      installed = await (this.deps.runInstaller ?? defaultInstaller)(installation.name, [
+        CANONICAL_INSTALL_AGENT
+      ])
     } catch (error) {
-      await restoreBackup(targetPath, backupPath)
+      await restoreBackup(targetPath, backupPath, orphanCanonicalPath)
       return {
         repaired: false,
         reason: 'install-failed',
@@ -247,34 +252,60 @@ export class SkillUnrecognizedRepair {
       }
     }
     if (installed.code !== 0) {
-      await restoreBackup(targetPath, backupPath)
+      await restoreBackup(targetPath, backupPath, orphanCanonicalPath)
       return { repaired: false, reason: 'install-failed', message: installed.output }
+    }
+    const canonicalPath = canonicalSkillPath(home, installation.name)
+    if (normalizedSkillIdentityPath(canonicalPath) !== normalizedSkillIdentityPath(targetPath)) {
+      try {
+        await linkProviderAliasToCanonical(targetPath, canonicalPath)
+      } catch (error) {
+        await restoreBackup(targetPath, backupPath, orphanCanonicalPath)
+        return {
+          repaired: false,
+          reason: 'install-failed',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
     }
     let inventory: SkillFreshnessInventory
     try {
       inventory = await this.deps.scan()
     } catch (error) {
-      await restoreBackup(targetPath, backupPath)
+      await restoreBackup(targetPath, backupPath, orphanCanonicalPath)
       return {
         repaired: false,
         reason: 'did-not-converge',
         message: error instanceof Error ? error.message : String(error)
       }
     }
-    // The canonical copy wins physical deduplication after install, so the original
-    // provider placement id can legitimately disappear when it becomes an alias.
-    const repaired = inventory.installations.find(
-      (entry) =>
-        entry.name === installation.name &&
-        entry.status === 'current' &&
-        (entry.topology === 'canonical-copy' || entry.topology === 'provider-alias')
-    )
+    // Judged at the path we emptied, never by skill name: a healthy canonical copy
+    // elsewhere is the normal state before a repair, so a name match reports success for
+    // an installer that left this location empty or wrote another real directory — the
+    // same unrecognized copy again on the next release.
+    //
+    // Matched through what the path resolves to rather than the path itself: an alias and
+    // its canonical target share an inode, so the scan dedupes them into the canonical
+    // row and no installation carries the provider path once the repair works.
+    const repairedTarget = await realpath(targetPath).catch(() => null)
+    const repaired =
+      repairedTarget === null
+        ? undefined
+        : inventory.installations.find(
+            (entry) =>
+              entry.resolvedPath !== null &&
+              normalizedSkillIdentityPath(entry.resolvedPath) ===
+                normalizedSkillIdentityPath(repairedTarget) &&
+              entry.name === installation.name &&
+              isRepairedStatus(entry) &&
+              SUPPORTED_GLOBAL_SKILL_TOPOLOGIES.has(entry.topology)
+          )
     if (!repaired) {
-      await restoreBackup(targetPath, backupPath)
+      await restoreBackup(targetPath, backupPath, orphanCanonicalPath)
       return {
         repaired: false,
         reason: 'did-not-converge',
-        message: 'The installer finished, but the repaired copy is not current.'
+        message: 'The installer finished, but this location is not an up-to-date copy.'
       }
     }
     return { repaired: true, name: installation.name, backupPath, inventory }
