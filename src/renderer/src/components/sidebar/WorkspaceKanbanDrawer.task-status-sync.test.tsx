@@ -394,7 +394,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
       updated: 0,
       skipped: 1,
       failed: 0,
-      messages: [{ kind: 'missing-workflow-state', statusLabel: 'In review' }]
+      messages: [{ kind: 'missing-workflow-state', provider: 'linear', statusLabel: 'In review' }]
     })
     const item = worktree()
     renderDrawer(item)
@@ -408,6 +408,59 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
       'Task status sync skipped',
       expect.objectContaining({
         description: '1 skipped. No matching Linear workflow state for In review.'
+      })
+    )
+  })
+
+  it('names Plane, not Linear, when the skipped move was a Plane write', async () => {
+    syncWorkspaceBoardTaskStatusesMock.mockResolvedValueOnce({
+      updated: 0,
+      skipped: 1,
+      failed: 0,
+      messages: [{ kind: 'missing-workflow-state', provider: 'plane', statusLabel: 'In review' }]
+    })
+    const item = worktree()
+    renderDrawer(item)
+
+    await act(async () => {
+      documentDropState.current?.onMoveWorktreeToStatus(item.id, 'in-review')
+      await Promise.resolve()
+    })
+
+    expect(toastWarningMock).toHaveBeenCalledWith(
+      'Task status sync skipped',
+      expect.objectContaining({
+        description: '1 skipped. No Plane state matches In review in this work item project.'
+      })
+    )
+  })
+
+  it('reports a failed Plane write as an error naming the Plane work item', async () => {
+    syncWorkspaceBoardTaskStatusesMock.mockResolvedValueOnce({
+      updated: 0,
+      skipped: 0,
+      failed: 1,
+      messages: [
+        {
+          kind: 'update-failed',
+          provider: 'plane',
+          issueIdentifier: 'ORCA-153',
+          detail: 'Plane is unavailable'
+        }
+      ]
+    })
+    const item = worktree()
+    renderDrawer(item)
+
+    await act(async () => {
+      documentDropState.current?.onMoveWorktreeToStatus(item.id, 'in-review')
+      await Promise.resolve()
+    })
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'Task status sync failed',
+      expect.objectContaining({
+        description: '1 failed. Could not update Plane work item ORCA-153.'
       })
     )
   })

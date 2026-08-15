@@ -6,6 +6,7 @@ import type {
   Worktree
 } from '../../../../shared/types'
 import type { LinearMutationResult } from '@/runtime/runtime-linear-client'
+import type { PlaneMutationResult, PlaneState, PlaneWorkItem } from '../../../../shared/plane-types'
 import {
   getWorkspaceBoardTaskStatusSyncRequest,
   syncWorkspaceBoardTaskStatuses
@@ -46,6 +47,72 @@ function worktree(overrides: Partial<Worktree> = {}): Worktree {
     linkedLinearIssueWorkspaceId: 'workspace-1',
     ...overrides
   } as Worktree
+}
+
+// Kept link-exclusive on purpose: a fixture carrying both links cannot prove
+// which provider branch ran.
+function planeWorktree(overrides: Partial<Worktree> = {}): Worktree {
+  return {
+    id: 'repo::/plane-worktree',
+    linkedLinearIssue: null,
+    linkedPlaneWorkItem: {
+      identifier: 'ORCA-153',
+      projectId: 'project-1',
+      workspaceId: 'plane-workspace-1'
+    },
+    ...overrides
+  } as Worktree
+}
+
+function planeState(overrides: Partial<PlaneState> = {}): PlaneState {
+  return { id: 'plane-state-review', name: 'In review', group: 'started', ...overrides }
+}
+
+function planeWorkItem(overrides: Partial<PlaneWorkItem> = {}): PlaneWorkItem {
+  return {
+    id: 'work-item-uuid',
+    identifier: 'ORCA-153',
+    sequenceId: 153,
+    workspaceId: 'plane-workspace-1',
+    title: 'Sync the board',
+    url: 'https://plane.example/browse/ORCA-153/',
+    project: { id: 'project-1', name: 'Orca Lab', identifier: 'ORCA' },
+    state: { id: 'plane-state-todo', name: 'Todo', group: 'unstarted' },
+    labels: [],
+    updatedAt: '2026-06-15T00:00:00.000Z',
+    createdAt: '2026-06-15T00:00:00.000Z',
+    ...overrides
+  } as PlaneWorkItem
+}
+
+function setupPlane(overrides: Partial<Worktree> = {}) {
+  const target = targetStatus()
+  const item = planeWorktree(overrides)
+  const getWorkItem = vi.fn().mockResolvedValue(planeWorkItem())
+  const listStates = vi.fn().mockResolvedValue([planeState()])
+  const updateWorkItem = vi.fn<() => Promise<PlaneMutationResult>>().mockResolvedValue({ ok: true })
+  const getIssue = vi.fn()
+  const teamStates = vi.fn()
+  const updateIssue = vi.fn()
+
+  return {
+    item,
+    target,
+    getWorkItem,
+    listStates,
+    updateWorkItem,
+    getIssue,
+    updateIssue,
+    run: () =>
+      syncWorkspaceBoardTaskStatuses({
+        worktreeIds: [item.id],
+        targetStatus: target,
+        worktreesById: new Map([[item.id, item]]),
+        settings: { activeRuntimeEnvironmentId: 'runtime-1' },
+        getLatestWorkspaceStatus: () => target.id,
+        deps: { getWorkItem, listStates, updateWorkItem, getIssue, teamStates, updateIssue }
+      })
+  }
 }
 
 function targetStatus(
@@ -263,7 +330,7 @@ describe('syncWorkspaceBoardTaskStatuses', () => {
       updated: 0,
       skipped: 1,
       failed: 0,
-      messages: [{ kind: 'missing-workflow-state', statusLabel: 'In review' }]
+      messages: [{ kind: 'missing-workflow-state', provider: 'linear', statusLabel: 'In review' }]
     })
     expect(missing.updateIssue).not.toHaveBeenCalled()
 
@@ -277,7 +344,7 @@ describe('syncWorkspaceBoardTaskStatuses', () => {
       updated: 0,
       skipped: 1,
       failed: 0,
-      messages: [{ kind: 'ambiguous-workflow-state', statusLabel: 'In review' }]
+      messages: [{ kind: 'ambiguous-workflow-state', provider: 'linear', statusLabel: 'In review' }]
     })
     expect(ambiguous.updateIssue).not.toHaveBeenCalled()
   })
@@ -364,11 +431,235 @@ describe('syncWorkspaceBoardTaskStatuses', () => {
       messages: [
         {
           kind: 'update-failed',
+          provider: 'linear',
           issueIdentifier: 'ORC-1',
           detail: 'Linear is unavailable'
         }
       ]
     })
+  })
+})
+
+describe('syncWorkspaceBoardTaskStatuses with Plane-linked workspaces', () => {
+  it('resolves the board column against the work item project and writes the state', async () => {
+    const { run, getWorkItem, listStates, updateWorkItem, getIssue, updateIssue } = setupPlane()
+
+    await expect(run()).resolves.toEqual({ updated: 1, skipped: 0, failed: 0, messages: [] })
+
+    expect(getWorkItem).toHaveBeenCalledWith(
+      { activeRuntimeEnvironmentId: 'runtime-1' },
+      'ORCA-153',
+      'project-1',
+      'plane-workspace-1'
+    )
+    expect(listStates).toHaveBeenCalledWith(
+      { activeRuntimeEnvironmentId: 'runtime-1' },
+      'project-1',
+      'plane-workspace-1'
+    )
+    expect(updateWorkItem).toHaveBeenCalledWith(
+      { activeRuntimeEnvironmentId: 'runtime-1' },
+      'project-1',
+      'work-item-uuid',
+      { stateId: 'plane-state-review' },
+      'plane-workspace-1'
+    )
+    expect(getIssue).not.toHaveBeenCalled()
+    expect(updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the fetched work item project and workspace when the link omits them', async () => {
+    const { item, target, getWorkItem, listStates, updateWorkItem } = setupPlane({
+      linkedPlaneWorkItem: { identifier: 'ORCA-153', projectId: '' }
+    })
+    getWorkItem.mockResolvedValueOnce(
+      planeWorkItem({
+        project: { id: 'fetched-project', name: 'Orca Lab', identifier: 'ORCA' },
+        workspaceId: 'fetched-workspace'
+      })
+    )
+
+    await syncWorkspaceBoardTaskStatuses({
+      worktreeIds: [item.id],
+      targetStatus: target,
+      worktreesById: new Map([[item.id, item]]),
+      settings: null,
+      getLatestWorkspaceStatus: () => target.id,
+      deps: { getWorkItem, listStates, updateWorkItem }
+    })
+
+    expect(listStates).toHaveBeenCalledWith(null, 'fetched-project', 'fetched-workspace')
+    expect(updateWorkItem).toHaveBeenCalledWith(
+      null,
+      'fetched-project',
+      'work-item-uuid',
+      { stateId: 'plane-state-review' },
+      'fetched-workspace'
+    )
+  })
+
+  it('surfaces a column with no equivalent state in that project instead of failing silently', async () => {
+    const { run, listStates, updateWorkItem } = setupPlane()
+    listStates.mockResolvedValueOnce([planeState({ id: 'plane-state-done', name: 'Done' })])
+
+    await expect(run()).resolves.toMatchObject({
+      updated: 0,
+      skipped: 1,
+      failed: 0,
+      messages: [{ kind: 'missing-workflow-state', provider: 'plane', statusLabel: 'In review' }]
+    })
+    expect(updateWorkItem).not.toHaveBeenCalled()
+  })
+
+  it('surfaces several equivalent states in that project instead of guessing one', async () => {
+    const { run, listStates, updateWorkItem } = setupPlane()
+    listStates.mockResolvedValueOnce([
+      planeState({ id: 'plane-state-a' }),
+      planeState({ id: 'plane-state-b', name: ' in REVIEW ' })
+    ])
+
+    await expect(run()).resolves.toMatchObject({
+      updated: 0,
+      skipped: 1,
+      failed: 0,
+      messages: [{ kind: 'ambiguous-workflow-state', provider: 'plane', statusLabel: 'In review' }]
+    })
+    expect(updateWorkItem).not.toHaveBeenCalled()
+  })
+
+  it('surfaces an unreadable work item instead of reporting a clean move', async () => {
+    const { run, getWorkItem, listStates, updateWorkItem } = setupPlane()
+    getWorkItem.mockResolvedValueOnce(null)
+
+    await expect(run()).resolves.toEqual({
+      updated: 0,
+      skipped: 1,
+      failed: 0,
+      messages: [{ kind: 'issue-read-failed', provider: 'plane', issueIdentifier: 'ORCA-153' }]
+    })
+    expect(listStates).not.toHaveBeenCalled()
+    expect(updateWorkItem).not.toHaveBeenCalled()
+  })
+
+  it('reports a rejected Plane write as failed, not as a silent skip', async () => {
+    const { run, updateWorkItem } = setupPlane()
+    updateWorkItem.mockResolvedValueOnce({ ok: false, error: 'Plane is unavailable' })
+
+    await expect(run()).resolves.toEqual({
+      updated: 0,
+      skipped: 0,
+      failed: 1,
+      messages: [
+        {
+          kind: 'update-failed',
+          provider: 'plane',
+          issueIdentifier: 'ORCA-153',
+          detail: 'Plane is unavailable'
+        }
+      ]
+    })
+  })
+
+  it('reports a thrown Plane read as failed and names Plane', async () => {
+    const { run, getWorkItem } = setupPlane()
+    getWorkItem.mockRejectedValueOnce(new Error('Runtime disconnected'))
+
+    await expect(run()).resolves.toEqual({
+      updated: 0,
+      skipped: 0,
+      failed: 1,
+      messages: [
+        {
+          kind: 'provider-error',
+          provider: 'plane',
+          issueIdentifier: 'ORCA-153',
+          detail: 'Runtime disconnected'
+        }
+      ]
+    })
+  })
+
+  it('skips when the work item already sits in the mapped state', async () => {
+    const { run, updateWorkItem, getWorkItem } = setupPlane()
+    getWorkItem.mockResolvedValueOnce(
+      planeWorkItem({ state: { id: 'plane-state-review', name: 'In review', group: 'started' } })
+    )
+
+    await expect(run()).resolves.toEqual({ updated: 0, skipped: 1, failed: 0, messages: [] })
+    expect(updateWorkItem).not.toHaveBeenCalled()
+  })
+
+  it('drops a stale Plane write when the board moved on during the reads', async () => {
+    const { item, target, getWorkItem, listStates, updateWorkItem } = setupPlane()
+
+    const result = await syncWorkspaceBoardTaskStatuses({
+      worktreeIds: [item.id],
+      targetStatus: target,
+      worktreesById: new Map([[item.id, item]]),
+      settings: null,
+      getLatestWorkspaceStatus: () => 'done',
+      deps: { getWorkItem, listStates, updateWorkItem }
+    })
+
+    expect(result).toEqual({ updated: 0, skipped: 1, failed: 0, messages: [] })
+    expect(updateWorkItem).not.toHaveBeenCalled()
+  })
+
+  it('writes both systems when a workspace carries a Linear and a Plane link', async () => {
+    const target = targetStatus()
+    const item = planeWorktree({ linkedLinearIssue: 'ORC-1' })
+    const getIssue = vi.fn().mockResolvedValue(issue())
+    const teamStates = vi.fn().mockResolvedValue([state()])
+    const updateIssue = vi.fn<() => Promise<LinearMutationResult>>().mockResolvedValue({ ok: true })
+    const getWorkItem = vi.fn().mockResolvedValue(planeWorkItem())
+    const listStates = vi.fn().mockResolvedValue([planeState()])
+    const updateWorkItem = vi
+      .fn<() => Promise<PlaneMutationResult>>()
+      .mockResolvedValue({ ok: true })
+
+    const result = await syncWorkspaceBoardTaskStatuses({
+      worktreeIds: [item.id],
+      targetStatus: target,
+      worktreesById: new Map([[item.id, item]]),
+      settings: null,
+      getLatestWorkspaceStatus: () => target.id,
+      deps: { getIssue, teamStates, updateIssue, getWorkItem, listStates, updateWorkItem }
+    })
+
+    expect(result).toEqual({ updated: 2, skipped: 0, failed: 0, messages: [] })
+    expect(updateIssue).toHaveBeenCalledWith(
+      null,
+      'issue-1',
+      { stateId: 'state-review' },
+      undefined
+    )
+    expect(updateWorkItem).toHaveBeenCalledWith(
+      null,
+      'project-1',
+      'work-item-uuid',
+      { stateId: 'plane-state-review' },
+      'plane-workspace-1'
+    )
+  })
+
+  it('skips silently only when the workspace has no task link at all', async () => {
+    const target = targetStatus()
+    const item = planeWorktree({ linkedPlaneWorkItem: null })
+    const getWorkItem = vi.fn()
+    const getIssue = vi.fn()
+
+    const result = await syncWorkspaceBoardTaskStatuses({
+      worktreeIds: [item.id],
+      targetStatus: target,
+      worktreesById: new Map([[item.id, item]]),
+      settings: null,
+      getLatestWorkspaceStatus: () => target.id,
+      deps: { getWorkItem, getIssue }
+    })
+
+    expect(result).toEqual({ updated: 0, skipped: 1, failed: 0, messages: [] })
+    expect(getWorkItem).not.toHaveBeenCalled()
+    expect(getIssue).not.toHaveBeenCalled()
   })
 })
 
