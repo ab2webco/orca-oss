@@ -106,6 +106,7 @@ docs/**
 !docs/reference/linux-glibc-compatibility.md
 !docs/reference/relay-grace-time-reconfiguration.md
 !docs/reference/upstream-pr-adoption.md
+!docs/reference/upstream-runtime-dependencies.md
 !docs/reference/remote-wire-compatibility.md
 !docs/reference/windows-setup-shell.md
 

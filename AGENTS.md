@@ -81,6 +81,10 @@ When adding or changing a Git command:
 
 Source-control and review changes must consider GitLab and other supported git providers, not only GitHub. Keep provider-specific behavior behind explicit checks, and avoid GitHub-only naming for generic review concepts.
 
+## Upstream Runtime Dependencies
+
+Three services still resolve against upstream in a packaged Lab build — artifact sharing, Orca Cloud sign-in, and the mobile relay. What each one sends, what the user is told, and why none of them is hostable here is in [`docs/reference/upstream-runtime-dependencies.md`](./docs/reference/upstream-runtime-dependencies.md). Read it before adding a fourth.
+
 ## GitHub CLI Usage
 
 Be mindful of the user's `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.
