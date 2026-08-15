@@ -1,0 +1,1079 @@
+<title>Orca Lab</title>
+<style>
+  :root {
+    --ground: #f7f8f8;
+    --surface: #ffffff;
+    --ink: #14171a;
+    --ink-soft: #454d54;
+    --muted: #7c858d;
+    --hairline: #dce0e3;
+    --hairline-strong: #c3c9cd;
+    --true: #1f7a74;
+    --true-wash: rgba(31, 122, 116, 0.09);
+    --stale: #9aa2a8;
+    --shadow: rgba(20, 23, 26, 0.06);
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+    --step-0: 0.9375rem;
+    --step-1: 1.0625rem;
+    --step-2: 1.375rem;
+    --step-3: 2rem;
+    --step-4: clamp(2.5rem, 6vw, 4.25rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0b0d0f;
+      --surface: #111417;
+      --ink: #e9ecee;
+      --ink-soft: #b3bbc1;
+      --muted: #79838b;
+      --hairline: #1e2327;
+      --hairline-strong: #2c3338;
+      --true: #55b8b0;
+      --true-wash: rgba(85, 184, 176, 0.1);
+      --stale: #5c666d;
+      --shadow: rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0b0d0f;
+    --surface: #111417;
+    --ink: #e9ecee;
+    --ink-soft: #b3bbc1;
+    --muted: #79838b;
+    --hairline: #1e2327;
+    --hairline-strong: #2c3338;
+    --true: #55b8b0;
+    --true-wash: rgba(85, 184, 176, 0.1);
+    --stale: #5c666d;
+    --shadow: rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 74rem;
+    margin: 0 auto;
+    padding: 0 clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  .band { border-bottom: 1px solid var(--hairline); }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero { padding: clamp(4rem, 11vw, 8rem) 0 clamp(3rem, 7vw, 5rem); }
+
+  .hero-mark {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: clamp(3rem, 8vw, 5rem);
+  }
+
+  .hero-mark span {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+
+  .hero-mark span b { font-weight: 600; }
+  .hero-mark span i { font-style: normal; color: var(--muted); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: var(--step-4);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    font-weight: 500;
+    margin: 0 0 1.5rem;
+    max-width: 20ch;
+    text-wrap: balance;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--true);
+  }
+
+  .lede {
+    font-size: var(--step-1);
+    line-height: 1.65;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0 0 2.5rem;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    padding: 0.6rem 1.1rem;
+    border: 1px solid var(--ink);
+    color: var(--ground);
+    background: var(--ink);
+    transition: opacity 0.15s ease;
+  }
+
+  .btn:hover { opacity: 0.82; }
+
+  .btn.ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--hairline-strong);
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--true);
+    outline-offset: 2px;
+  }
+
+  /* ---------- thesis ---------- */
+
+  .thesis { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .thesis-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+
+  @media (min-width: 56rem) {
+    .thesis-grid { grid-template-columns: 22rem minmax(0, 1fr); gap: 4rem; }
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: var(--step-2);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+    margin: 0.75rem 0 0;
+    text-wrap: balance;
+  }
+
+  .thesis p { color: var(--ink-soft); max-width: 62ch; margin: 0 0 1.1rem; }
+  .thesis p:last-child { margin-bottom: 0; }
+  .thesis strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- state pairs ---------- */
+
+  .pairs { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .pair-list {
+    display: grid;
+    gap: 0;
+    margin-top: 2.5rem;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem 2.5rem;
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--hairline);
+    align-items: start;
+  }
+
+  @media (min-width: 56rem) {
+    .pair { grid-template-columns: 9.5rem minmax(0, 1fr) minmax(0, 1fr); }
+  }
+
+  .pair-id {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding-top: 0.2rem;
+  }
+
+  .pair h3 {
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+    line-height: 1.4;
+  }
+
+  .pair p { margin: 0; color: var(--ink-soft); max-width: 46ch; }
+
+  .states { display: grid; gap: 0.5rem; }
+
+  .state {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .state dt {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .state dd { margin: 0; }
+  .state.before dd { color: var(--stale); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .state.after dd { color: var(--true); }
+
+  /* ---------- diagram band ---------- */
+
+  .figure-band { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .figures {
+    display: grid;
+    gap: 2.5rem;
+    margin-top: 2.5rem;
+  }
+
+  @media (min-width: 52rem) {
+    .figures { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; }
+  }
+
+  figure { margin: 0; }
+
+  figure svg { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    font-size: 0.875rem;
+    color: var(--ink-soft);
+    margin-top: 1rem;
+    max-width: 34ch;
+  }
+
+  figcaption b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+  }
+
+  /* ---------- numbers ---------- */
+
+  .numbers { padding: clamp(3rem, 7vw, 4.5rem) 0; }
+
+  .figures-num {
+    display: grid;
+    gap: 2rem 1.5rem;
+    margin: 2rem 0 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 52rem) {
+    .figures-num { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .figures-num dt {
+    font-family: var(--mono);
+    font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .figures-num dd {
+    margin: 0.6rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--muted);
+    max-width: 22ch;
+  }
+
+  figcaption code {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    background: var(--true-wash);
+    padding: 0.05em 0.3em;
+  }
+
+  /* ---------- compare ---------- */
+
+  .compare { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .compare-note {
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 1.25rem 0 0;
+  }
+
+  .table-scroll { overflow-x: auto; margin-top: 2.5rem; }
+
+  table {
+    width: 100%;
+    min-width: 44rem;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 1rem 0.75rem 0;
+    border-bottom: 1px solid var(--hairline-strong);
+    vertical-align: bottom;
+  }
+
+  thead th.ours { color: var(--true); }
+
+  tbody th {
+    font-weight: 600;
+    text-align: left;
+    padding: 0.9rem 1rem 0.9rem 0;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--ink);
+    vertical-align: top;
+    width: 12rem;
+  }
+
+  tbody td {
+    padding: 0.9rem 1rem 0.9rem 0;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--muted);
+    vertical-align: top;
+  }
+
+  tbody td.ours { color: var(--ink); }
+  tbody td.wins { color: var(--ink); }
+
+  tbody td.wins::after {
+    content: "";
+    display: block;
+    width: 1.75rem;
+    height: 2px;
+    margin-top: 0.5rem;
+    background: var(--ink);
+    opacity: 0.35;
+  }
+
+  .caveats {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .caveats p {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 62ch;
+  }
+
+  .caveats b { color: var(--ink); font-weight: 600; }
+
+  tbody td.ours code {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--true);
+    background: var(--true-wash);
+    padding: 0.05em 0.3em;
+  }
+
+  /* ---------- inventory ---------- */
+
+  .inventory { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .inv-grid {
+    display: grid;
+    gap: 0;
+    margin-top: 2.5rem;
+    border-top: 1px solid var(--hairline);
+  }
+
+  @media (min-width: 52rem) {
+    .inv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 4rem; }
+  }
+
+  .inv {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .inv h3 {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.5rem;
+    color: var(--ink);
+  }
+
+  .inv p { margin: 0; color: var(--ink-soft); font-size: 0.875rem; max-width: 46ch; }
+
+  .inv code {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    background: var(--true-wash);
+    padding: 0.05em 0.3em;
+  }
+
+  /* ---------- close ---------- */
+
+  .close { padding: clamp(3.5rem, 8vw, 6rem) 0 clamp(4rem, 9vw, 7rem); }
+
+  .close h2 { max-width: 24ch; font-size: var(--step-3); }
+
+  .close p { color: var(--ink-soft); max-width: 54ch; margin: 1.25rem 0 2rem; }
+
+  .codeline {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    color: var(--ink-soft);
+    margin-bottom: 2rem;
+  }
+
+  .codeline span { color: var(--true); }
+
+  footer {
+    border-top: 1px solid var(--hairline);
+    padding: 2rem 0 3rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    justify-content: space-between;
+  }
+
+  footer a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--hairline-strong); }
+  footer a:hover { color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <header class="hero band">
+    <div class="hero-mark">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <rect x="0.75" y="0.75" width="20.5" height="20.5" stroke="currentColor" stroke-opacity="0.35" />
+        <rect x="4.5" y="4.5" width="5" height="13" fill="currentColor" fill-opacity="0.25" />
+        <rect x="11.5" y="4.5" width="6" height="6" fill="currentColor" fill-opacity="0.6" />
+        <rect x="11.5" y="12.5" width="6" height="5" fill="currentColor" fill-opacity="0.25" />
+      </svg>
+      <span><b>Orca Lab</b> &nbsp;<i>fork de Orca · por Ab2Web</i></span>
+    </div>
+
+    <h1>El estado que ves es el estado que <em>hay</em>.</h1>
+
+    <p class="lede">
+      Orca Lab es el build de Orca para quien corre muchos agentes a la vez, en varias cuentas.
+      Todo lo que agregamos sale del mismo problema: un panel que dice una cosa mientras la
+      máquina hace otra. Un worker dormido que parece silencio. Una cuenta caída que sigue
+      figurando bien. Una tarea que nunca llegó y quedó registrada como entregada.
+    </p>
+
+    <div class="actions">
+      <a class="btn" href="https://github.com/ab2webco/orca-oss/releases/latest">Descargar la última versión</a>
+      <a class="btn ghost" href="https://github.com/ab2webco/orca-oss">Ver el repositorio</a>
+    </div>
+  </header>
+
+  <section class="thesis band">
+    <div class="thesis-grid">
+      <div>
+        <p class="eyebrow">Por qué existe</p>
+        <h2>Upstream te da agentes. Aquí los puedes auditar.</h2>
+      </div>
+      <div>
+        <p>
+          Orca es excelente y este fork lo sigue de cerca: traemos cada versión de
+          <strong>stablyai/orca</strong> completa, sin quedarnos atrás. Lo que sumamos encima no
+          son features sueltas, es una misma corrección repetida en cada superficie donde el
+          estado reportado y el estado real podían no coincidir.
+        </p>
+        <p>
+          Esa diferencia importa recién cuando dejas de mirar un agente y pasas a coordinar seis.
+          Ahí un reporte optimista deja de ser un detalle y se vuelve trabajo perdido: horas de un
+          worker que nunca recibió la tarea, o una cuenta que se cayó sin avisar y se llevó la
+          sesión con ella.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="pairs band">
+    <p class="eyebrow">Lo que cambia, en concreto</p>
+    <h2>Antes decía. Ahora prueba.</h2>
+
+    <div class="pair-list">
+
+      <article class="pair">
+        <p class="pair-id">Cuentas</p>
+        <div>
+          <h3>Cada cuenta de Claude dice si todavía autentica</h3>
+          <p>
+            El veredicto sale de una respuesta del proveedor, nunca de que exista un archivo
+            de credencial. Y no se consulta en un timer: renovar un token que un CLI vivo está
+            usando es justo lo que rompe la cadena.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>tres cuentas idénticas, una muerta</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>auth: verified · por cuenta</dd></div>
+        </dl>
+      </article>
+
+      <article class="pair">
+        <p class="pair-id">Paneles</p>
+        <div>
+          <h3>Cada terminal dice en qué cuenta corre</h3>
+          <p>
+            Y cuando una sesión expira dentro de un panel, el mensaje nombra la cuenta que hay
+            que renovar en vez de mandarte a buscarla.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>Login expired · ¿de cuál?</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>state: account · nombre@dominio</dd></div>
+        </dl>
+      </article>
+
+      <article class="pair">
+        <p class="pair-id">Lanzamiento</p>
+        <div>
+          <h3>Ningún panel queda sin agente pareciendo sano</h3>
+          <p>
+            El comando de lanzamiento espera una señal observable de que el shell está listo.
+            Si esa señal no llega, el comando se retiene — no se descarta — y el panel no se
+            reporta como un agente vivo.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>command not found: laude</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>entrega atada al marcador del shell</dd></div>
+        </dl>
+      </article>
+
+      <article class="pair">
+        <p class="pair-id">Despacho</p>
+        <div>
+          <h3>Una entrega sin prueba no se cuenta como aceptada</h3>
+          <p>
+            Cuando no hay evidencia de que el agente tomó el texto, el registro lo dice con esas
+            palabras — y lo dice en la línea que una persona lee, no sólo en el JSON.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>accepted</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>written_unproven</dd></div>
+        </dl>
+      </article>
+
+      <article class="pair">
+        <p class="pair-id">Workers</p>
+        <div>
+          <h3>Un worker dormido se reporta dormido</h3>
+          <p>
+            No como silencio. Y su salida llega al buffer que lees, incluso mientras el agente
+            es dueño de la terminal.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>sin salida · indistinguible de muerto</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>liveness: sleeping</dd></div>
+        </dl>
+      </article>
+
+      <article class="pair">
+        <p class="pair-id">Cuota</p>
+        <div>
+          <h3>Una cuenta con cuota no queda escondida</h3>
+          <p>
+            Si falla la lectura de uso de una cuenta, eso ya no la borra de la lista de
+            candidatas. Y el gasto de los modelos nuevos se cotiza en vez de descartarse.
+          </p>
+        </div>
+        <dl class="states">
+          <div class="state before"><dt>Antes</dt><dd>Claude 5 y GPT-5.6 · $0.00</dd></div>
+          <div class="state after"><dt>Ahora</dt><dd>gasto real · reset a la vista</dd></div>
+        </dl>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="figure-band band">
+    <p class="eyebrow">Cómo se ve</p>
+    <h2>Seis cosas que el oficial no hace.</h2>
+
+    <div class="figures">
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Un tablero de columnas con tarjetas repartidas en tres estados">
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none" stroke-width="1">
+            <rect x="8" y="24" width="92" height="148" />
+            <rect x="114" y="24" width="92" height="148" />
+            <rect x="220" y="24" width="92" height="148" />
+            <line x1="8" y1="46" x2="100" y2="46" />
+            <line x1="114" y1="46" x2="206" y2="46" />
+            <line x1="220" y1="46" x2="312" y2="46" />
+          </g>
+          <g fill="currentColor" fill-opacity="0.45">
+            <rect x="18" y="32" width="34" height="6" rx="1" />
+            <rect x="124" y="32" width="26" height="6" rx="1" />
+            <rect x="230" y="32" width="30" height="6" rx="1" />
+          </g>
+          <g fill="currentColor" fill-opacity="0.09" stroke="currentColor" stroke-opacity="0.18">
+            <rect x="18" y="58" width="72" height="26" />
+            <rect x="18" y="92" width="72" height="26" />
+            <rect x="124" y="58" width="72" height="26" />
+            <rect x="230" y="58" width="72" height="26" />
+            <rect x="230" y="92" width="72" height="26" />
+            <rect x="230" y="126" width="72" height="26" />
+          </g>
+          <g fill="var(--true)">
+            <rect x="124" y="58" width="2" height="26" />
+          </g>
+          <g fill="currentColor" fill-opacity="0.3">
+            <rect x="26" y="66" width="40" height="4" rx="1" />
+            <rect x="26" y="100" width="46" height="4" rx="1" />
+            <rect x="134" y="66" width="38" height="4" rx="1" />
+            <rect x="238" y="66" width="44" height="4" rx="1" />
+            <rect x="238" y="100" width="36" height="4" rx="1" />
+            <rect x="238" y="134" width="42" height="4" rx="1" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>Columnas en todos lados</b>
+          Linear, Jira y GitHub Projects se ven como tablero, no como lista. Donde arrastrar
+          escribe el estado en el sistema de origen, arrastras; donde no, el arrastre está
+          apagado y dice por qué.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Cuatro paneles, cada uno rotulado con una cuenta distinta">
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none" stroke-width="1">
+            <rect x="8" y="24" width="146" height="66" />
+            <rect x="166" y="24" width="146" height="66" />
+            <rect x="8" y="102" width="146" height="66" />
+            <rect x="166" y="102" width="146" height="66" />
+          </g>
+          <g fill="currentColor" fill-opacity="0.22">
+            <rect x="18" y="34" width="52" height="5" rx="1" />
+            <rect x="176" y="34" width="46" height="5" rx="1" />
+            <rect x="18" y="112" width="58" height="5" rx="1" />
+            <rect x="176" y="112" width="40" height="5" rx="1" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="8" fill="var(--true)">
+            <text x="18" y="78">@fabiana</text>
+            <text x="176" y="78">@fabian.a</text>
+            <text x="18" y="156">@scloud</text>
+            <text x="176" y="156">@codex</text>
+          </g>
+          <g stroke="var(--true)" stroke-opacity="0.55" fill="none">
+            <line x1="18" y1="64" x2="60" y2="64" />
+            <line x1="176" y1="64" x2="212" y2="64" />
+            <line x1="18" y1="142" x2="54" y2="142" />
+            <line x1="176" y1="142" x2="206" y2="142" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>Una cuenta por panel</b>
+          Cada terminal queda fijado a la cuenta que elijas, y el cambio de cuenta en vivo
+          retoma la misma sesión en vez de matar al agente.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Un despacho que se detiene en el shell frente a otro que llega al agente">
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none" stroke-width="1">
+            <rect x="8" y="30" width="60" height="40" />
+            <rect x="252" y="30" width="60" height="40" />
+            <rect x="8" y="112" width="60" height="40" />
+            <rect x="252" y="112" width="60" height="40" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.5">
+            <text x="14" y="54">orca</text>
+            <text x="258" y="54">shell</text>
+            <text x="14" y="136">orca</text>
+            <text x="258" y="136">agente</text>
+          </g>
+          <g stroke="var(--stale)" stroke-width="1.5" fill="none" stroke-dasharray="3 3">
+            <line x1="68" y1="50" x2="230" y2="50" />
+          </g>
+          <g stroke="var(--stale)" stroke-width="1.5">
+            <line x1="224" y1="44" x2="236" y2="56" />
+            <line x1="236" y1="44" x2="224" y2="56" />
+          </g>
+          <g stroke="var(--true)" stroke-width="1.5" fill="none">
+            <line x1="68" y1="132" x2="246" y2="132" />
+            <polyline points="240,127 248,132 240,137" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>La tarea llega o se ve que no</b>
+          El preámbulo se inyecta cuando el agente ya es dueño de la terminal. Si el texto
+          termina en el shell, deja de contarse como despachado.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Una barra de estado con modelo, barras de progreso de cuota y una flecha de tendencia de contexto">
+          <rect x="8" y="52" width="304" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.18" />
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.55">
+            <text x="18" y="73">orca-oss</text>
+            <text x="72" y="73">Opus 5</text>
+            <text x="122" y="73">ctx</text>
+            <text x="196" y="73">5h</text>
+            <text x="256" y="73">7d</text>
+          </g>
+          <g>
+            <rect x="140" y="66" width="40" height="6" fill="currentColor" fill-opacity="0.12" />
+            <rect x="140" y="66" width="21" height="6" fill="var(--true)" />
+            <rect x="212" y="66" width="34" height="6" fill="currentColor" fill-opacity="0.12" />
+            <rect x="212" y="66" width="9" height="6" fill="var(--true)" />
+            <rect x="272" y="66" width="34" height="6" fill="currentColor" fill-opacity="0.12" />
+            <rect x="272" y="66" width="24" height="6" fill="var(--true)" />
+          </g>
+          <g stroke="var(--true)" stroke-width="1.4" fill="none">
+            <polyline points="184,72 188,66 192,69" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="7" fill="currentColor" fill-opacity="0.35">
+            <text x="140" y="104">contexto</text>
+            <text x="212" y="104">sesión</text>
+            <text x="272" y="104">semana</text>
+          </g>
+          <g stroke="currentColor" stroke-opacity="0.18" stroke-dasharray="2 2">
+            <line x1="160" y1="80" x2="160" y2="96" />
+            <line x1="229" y1="80" x2="229" y2="96" />
+            <line x1="289" y1="80" x2="289" y2="96" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>Una status line que dice algo</b>
+          Cuota de sesión y semanal con barras reales, tendencia de contexto y cuándo resetea.
+          Se recorta sola al ancho de la terminal y existe también en <code>cmd.exe</code>.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Una sesión que continúa mientras la cuenta debajo cambia">
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none">
+            <rect x="8" y="26" width="304" height="52" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.5">
+            <text x="18" y="46">sesión</text>
+          </g>
+          <g stroke="var(--true)" stroke-width="1.5" fill="none">
+            <line x1="18" y1="62" x2="302" y2="62" />
+          </g>
+          <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3">
+            <line x1="160" y1="26" x2="160" y2="160" />
+          </g>
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none">
+            <rect x="8" y="104" width="140" height="46" />
+            <rect x="172" y="104" width="140" height="46" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="8">
+            <text x="18" y="124" fill="var(--stale)">@cuenta-a</text>
+            <text x="182" y="124" fill="var(--true)">@cuenta-b</text>
+            <text x="18" y="140" fill="currentColor" fill-opacity="0.35">sin cuota</text>
+            <text x="182" y="140" fill="currentColor" fill-opacity="0.35">activa</text>
+          </g>
+          <g stroke="var(--true)" stroke-width="1.5" fill="none">
+            <polyline points="150,127 168,127" />
+            <polyline points="162,122 170,127 162,132" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>La cuenta cambia, la sesión sigue</b>
+          El cambio ocurre debajo de la conversación: la misma sesión continúa. Lo puede pedir
+          el usuario o el propio agente al quedarse sin cuota.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 180" role="img" aria-label="Un coordinador repartiendo tareas a cuatro workers, cada uno en una cuenta distinta">
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none">
+            <rect x="118" y="14" width="84" height="30" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.55">
+            <text x="128" y="33">coordinador</text>
+          </g>
+          <g stroke="var(--true)" stroke-opacity="0.6" fill="none">
+            <path d="M160 44 V64 H44 V88" />
+            <path d="M160 44 V64 H122 V88" />
+            <path d="M160 44 V64 H198 V88" />
+            <path d="M160 44 V64 H276 V88" />
+          </g>
+          <g stroke="currentColor" stroke-opacity="0.22" fill="none">
+            <rect x="14" y="88" width="60" height="56" />
+            <rect x="92" y="88" width="60" height="56" />
+            <rect x="168" y="88" width="60" height="56" />
+            <rect x="246" y="88" width="60" height="56" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="7" fill="var(--true)">
+            <text x="22" y="106">@a</text>
+            <text x="100" y="106">@b</text>
+            <text x="176" y="106">@c</text>
+            <text x="254" y="106">@d</text>
+          </g>
+          <g fill="currentColor" fill-opacity="0.14">
+            <rect x="22" y="116" width="44" height="4" />
+            <rect x="22" y="126" width="32" height="4" />
+            <rect x="100" y="116" width="38" height="4" />
+            <rect x="176" y="116" width="44" height="4" />
+            <rect x="176" y="126" width="28" height="4" />
+            <rect x="254" y="116" width="40" height="4" />
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="7" fill="currentColor" fill-opacity="0.4">
+            <text x="22" y="140">trabajando</text>
+            <text x="100" y="140">dormido</text>
+            <text x="176" y="140">trabajando</text>
+            <text x="254" y="140">listo</text>
+          </g>
+        </svg>
+        <figcaption>
+          <b>Varias cuentas, un solo tablero</b>
+          Repartir el trabajo entre cuentas deja de ser malabarismo: cada panel dice en cuál
+          corre y en qué estado está, sin abrir uno por uno.
+        </figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <section class="numbers band">
+    <p class="eyebrow">Dónde está el fork hoy</p>
+    <dl class="figures-num">
+      <div><dt>616</dt><dd>commits propios por delante de upstream</dd></div>
+      <div><dt>263</dt><dd>arreglos y funciones escritos acá</dd></div>
+      <div><dt>83</dt><dd>versiones publicadas del lab</dd></div>
+      <div><dt>1.4.160</dt><dd>versión de upstream que ya trae, completa</dd></div>
+    </dl>
+  </section>
+
+  <section class="compare band">
+    <p class="eyebrow">Dónde encaja</p>
+    <h2>Contra las otras formas de correr varios agentes.</h2>
+    <p class="compare-note">
+      Correr cada agente en su propio worktree ya lo hacen todos: Conductor, Cursor, Zed,
+      Nimbalyst, Vibe Kanban y JetBrains Air. No es un diferencial y no lo presentamos como tal.
+      La comparación va sobre los dos ejes donde sí encontramos una diferencia real, y sobre el
+      eje donde perdemos.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">cmux</th>
+            <th scope="col">Conductor</th>
+            <th scope="col">Cursor · Zed · VS&nbsp;Code</th>
+            <th scope="col" class="ours">Orca Lab</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Unidad de trabajo</th>
+            <td>panel de terminal</td>
+            <td>workspace sobre worktree</td>
+            <td>sesión o hilo, worktree opcional</td>
+            <td class="ours">workspace sobre worktree</td>
+          </tr>
+          <tr>
+            <th scope="row">Varias cuentas del mismo proveedor</th>
+            <td>no verificado</td>
+            <td>no verificado</td>
+            <td>no verificado</td>
+            <td class="ours">una por panel, con cambio en vivo</td>
+          </tr>
+          <tr>
+            <th scope="row">Saber si el prompt llegó al agente</th>
+            <td>no documentado · <code>cmux send</code> escribe al PTY</td>
+            <td>no verificado</td>
+            <td>no verificado</td>
+            <td class="ours">queda registrado, y sin prueba dice <code>written_unproven</code></td>
+          </tr>
+          <tr>
+            <th scope="row">Tareas desde un tracker externo</th>
+            <td>no tiene tablero</td>
+            <td>crea workspace desde issue de GitHub o Linear</td>
+            <td>no verificado</td>
+            <td class="ours">Plane, Linear, Jira y GitHub, en columnas</td>
+          </tr>
+          <tr>
+            <th scope="row">Motor de terminal</th>
+            <td class="wins">nativo sobre libghostty, con GPU</td>
+            <td>no verificado</td>
+            <td>el del editor</td>
+            <td class="ours">paneles de Electron</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="caveats">
+      <p>
+        <b>No verificado no quiere decir que no lo tenga.</b> Quiere decir que no encontramos una
+        fuente primaria que lo confirme. Todo lo de esta tabla se leyó de repositorios y
+        documentación oficial el 14 de agosto de 2026, y estas herramientas cambian rápido.
+      </p>
+      <p>
+        <b>Y hay un eje donde cmux nos gana sin discusión:</b> la terminal misma. Renderizado por
+        GPU, API por socket, attach a tmux remoto por SSH, restauración de sesión que sobrevive un
+        reinicio de la máquina y app de iOS. Eso es un motor de terminal nativo contra paneles de
+        Electron, y no es algo que se alcance sumando funciones.
+      </p>
+    </div>
+  </section>
+
+  <section class="inventory band">
+    <p class="eyebrow">Además</p>
+    <h2>Lo demás que trae el lab.</h2>
+
+    <div class="inv-grid">
+
+      <div class="inv">
+        <h3>Plane, integrado de verdad</h3>
+        <p>
+          Proyectos, work items, ciclos, módulos y adjuntos, desde la app y desde el CLI. El
+          tablero recuerda la vista que elegiste, deja crear una columna donde la pides, y se
+          refresca solo cuando un agente cambia un work item.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Cambiar de cuenta sin perder la sesión</h3>
+        <p>
+          Desde la app, desde el CLI con <code>orca account switch</code>, o pedido por el propio
+          agente cuando se queda sin cuota. Retoma la misma conversación en vez de arrancar de
+          cero, y el skill <code>/switch-account</code> viene incluido.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Eliges la cuenta al lanzar</h3>
+        <p>
+          Cada agente arranca contra la cuenta de Claude o Codex que le indiques, también al
+          dividir una terminal. Es lo que hace posible repartir el trabajo entre varias cuentas
+          a la vez.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Status line de Claude configurable</h3>
+        <p>
+          Eliges qué items mostrar, con barras de progreso, tendencia de contexto, cuándo resetea
+          la cuota y vista previa en vivo mientras la editas. Se adapta al ancho real de la
+          terminal, y también existe en <code>cmd.exe</code> para Windows.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Historial que sobrevive al cambio de cuenta</h3>
+        <p>
+          Los transcripts se comparten entre las cuentas guardadas y el home compartido, así que
+          cambiar de login no te deja sin historial. Y la app te avisa qué logins comparten cadena
+          de refresh antes de que uno tumbe al otro.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Los paneles sobreviven al daemon</h3>
+        <p>
+          Un panel dirigido a una cuenta se vuelve a enganchar aunque el daemon cambie de
+          protocolo por debajo, en vez de quedar huérfano.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Canal de prueba propio</h3>
+        <p>
+          El lab publica candidatas que ningún usuario recibe por accidente: sólo llegan si las
+          pides a propósito. Lo que se promueve a release ya pasó por ahí.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Ningún agente mergea a main</h3>
+        <p>
+          Una guarda del harness rechaza cualquier merge a la rama principal hecho desde la
+          herramienta Bash, para todos por igual.
+        </p>
+      </div>
+
+      <div class="inv">
+        <h3>Al día con upstream</h3>
+        <p>
+          Cada sync trae la versión completa de stablyai/orca conservando la ascendencia de
+          upstream, y las superficies propias del lab se verifican una por una antes de entrar.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="close">
+    <p class="eyebrow">Instalar</p>
+    <h2>Se actualiza solo, desde este repositorio.</h2>
+    <p>
+      Descarga el build para tu sistema y listo: el feed de actualización apunta al lab, no a
+      upstream, así que las versiones siguientes te llegan sin hacer nada. macOS firmado y
+      notarizado; también hay build de Linux y Windows.
+    </p>
+    <div class="codeline">github.com/ab2webco/orca-oss/releases/<span>latest</span></div>
+    <div class="actions">
+      <a class="btn" href="https://github.com/ab2webco/orca-oss/releases/latest">Ver la última release</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>Orca Lab · un fork de <a href="https://github.com/stablyai/orca">stablyai/orca</a></span>
+    <span>Mantenido por Ab2Web</span>
+  </footer>
+
+</div>

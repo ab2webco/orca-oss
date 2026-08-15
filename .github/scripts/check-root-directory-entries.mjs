@@ -21,6 +21,8 @@ function checkRootDirectoryEntries(argv) {
 
   const [baseSha, headSha] = argv
   const baseEntries = new Set(readRootEntries(baseSha))
+  // Why: site is the fork's public GitHub Pages root, separate from private docs.
+  baseEntries.add('site')
   const blockedEntries = readRootEntries(headSha).filter((entry) => !baseEntries.has(entry))
 
   if (blockedEntries.length === 0) {
