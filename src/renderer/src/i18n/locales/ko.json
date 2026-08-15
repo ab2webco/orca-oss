@@ -10454,6 +10454,9 @@
         "BrowserLinkRoutingSetting": {
           "description": "터미널, Markdown, 편집기의 http(s) 링크를 Orca 내장 브라우저에서 엽니다. {{shortcut}}을(를) 누르면 항상 시스템 브라우저를 사용합니다.",
           "descriptionBase": "터미널, Markdown, 편집기의 http(s) 링크를 Orca 내장 브라우저에서 엽니다."
+        },
+        "artifacts": {
+          "allowPublishingDescription": "HTML 및 Markdown 파일을 URL을 아는 누구나 열 수 있는 링크로 게시합니다. 파일 내용은 {{host}}에 업로드되며, 이 서버는 업스트림 Orca가 운영합니다. 이 빌드가 호스팅하지 않습니다. 기존 링크는 Artifacts에서 삭제할 때까지 유지됩니다."
         }
       },
       "right": {
@@ -14945,6 +14948,11 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
+      },
+      "artifacts": {
+        "ArtifactPublishButton": {
+          "confirmDescription": "현재 파일을 {{host}}에 업로드하고 URL을 아는 누구나 볼 수 있는 링크를 만듭니다."
+        }
       }
     },
     "i18n": {

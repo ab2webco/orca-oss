@@ -56,7 +56,8 @@ vi.mock('@/components/ui/tooltip', () => ({
 }))
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, string>) =>
+    fallback.replace(/\{\{(\w+)\}\}/g, (token, name: string) => options?.[name] ?? token)
 }))
 
 vi.mock('./artifact-publish-flow', () => ({
@@ -70,6 +71,7 @@ vi.mock('./artifact-link-actions', () => ({
   openArtifactInBrowser: mocks.openLink
 }))
 
+import { ARTIFACT_SHARE_HOST } from '../../../../shared/artifacts'
 import { ArtifactPublishButton } from './ArtifactPublishButton'
 
 describe('ArtifactPublishButton', () => {
@@ -101,6 +103,19 @@ describe('ArtifactPublishButton', () => {
     await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith(createRequest))
     expect(screen.getByText('https://example.com')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Update shared content' })).toBeInTheDocument()
+  })
+
+  it('names the upload host while nothing has been uploaded yet', async () => {
+    const user = userEvent.setup()
+    render(<ArtifactPublishButton sourceKey="/repo/report.md" createRequest={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Share as artifact' }))
+    await screen.findByRole('button', { name: 'Share public link' })
+
+    expect(
+      screen.getByText(new RegExp(ARTIFACT_SHARE_HOST.replace(/\./g, '\\.')))
+    ).toBeInTheDocument()
+    expect(mocks.publish).not.toHaveBeenCalled()
   })
 
   it('offers sign-in and blocks confirmation while signed out', async () => {

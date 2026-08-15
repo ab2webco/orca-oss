@@ -1,6 +1,7 @@
 import { app } from 'electron'
+import { ARTIFACT_SHARE_HOST } from '../../shared/artifacts'
 
-const PRODUCTION_ARTIFACTS_API_URL = 'https://share.onorca.dev'
+const PRODUCTION_ARTIFACTS_API_URL = `https://${ARTIFACT_SHARE_HOST}`
 
 function isPackaged(): boolean {
   try {

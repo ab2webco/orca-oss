@@ -10454,6 +10454,9 @@
         "BrowserLinkRoutingSetting": {
           "description": "Abre los enlaces http(s) del terminal, Markdown y el editor en el navegador integrado de Orca. {{shortcut}} siempre usa el navegador del sistema.",
           "descriptionBase": "Abre los enlaces http(s) del terminal, Markdown y el editor en el navegador integrado de Orca."
+        },
+        "artifacts": {
+          "allowPublishingDescription": "Publica archivos HTML y Markdown como enlaces que cualquiera con la URL puede abrir. El contenido de los archivos se sube a {{host}}, que opera Orca upstream; esta compilación no lo aloja. Los enlaces existentes se mantienen hasta que los elimines desde Artifacts."
         }
       },
       "right": {
@@ -14934,6 +14937,11 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
+      },
+      "artifacts": {
+        "ArtifactPublishButton": {
+          "confirmDescription": "Esto sube el archivo actual a {{host}} y crea un enlace que cualquiera con la URL puede ver."
+        }
       }
     },
     "i18n": {

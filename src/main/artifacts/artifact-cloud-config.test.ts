@@ -3,10 +3,16 @@ import {
   allowsArtifactCloudAuthOverride,
   resolveArtifactCloudApiUrl
 } from './artifact-cloud-config'
+import { ARTIFACT_SHARE_HOST } from '../../shared/artifacts'
 
 describe('resolveArtifactCloudApiUrl', () => {
   it('uses the first-party production origin by default', () => {
     expect(resolveArtifactCloudApiUrl(undefined, {}, true)).toBe('https://share.onorca.dev')
+  })
+
+  // Why: the pre-upload copy names ARTIFACT_SHARE_HOST, so it has to stay the default upload target.
+  it('uploads to the host the publish confirmation discloses', () => {
+    expect(resolveArtifactCloudApiUrl(undefined, {}, true)).toBe(`https://${ARTIFACT_SHARE_HOST}`)
   })
 
   it('allows loopback HTTP only in development', () => {
