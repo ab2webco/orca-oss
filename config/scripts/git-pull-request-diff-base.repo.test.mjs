@@ -91,8 +91,8 @@ describe('pull request diff base resolution against a repository', () => {
   })
 
   it('keeps sync widening opt-in, so a gate that has not opted in still gets the PR base', () => {
-    // check:code-quality:changed calls without options and must stay on the PR
-    // base: ORCA-205 measured 3 real findings that the wider base hides.
+    // Both changed-line gates opt in now, but the default is what protects every
+    // other caller — and flipping it would widen `push` and non-PR runs too.
     expect(resolvePullRequestDiffBase(repo, sha.aheadOfUpstream, 'pull_request')).toBe(sha.prBase)
     expect(
       resolvePullRequestDiffBase(repo, sha.aheadOfUpstream, 'pull_request', { syncAware: false })
@@ -122,19 +122,20 @@ describe('pull request diff base resolution against a repository', () => {
     }
   })
 
-  // Why read the source: the default keeps the code-quality gate on the PR base,
-  // but nothing stops a future edit from opting that one call site in. ORCA-205
-  // measured 3 real findings the wider base hides, and hiding them again would
-  // be silent. This fails loudly when that gate opts in, which is when ORCA-205
-  // should be updating this test on purpose.
-  it('does not let the changed-code-quality gate opt into sync widening', () => {
-    const source = readFileSync(
-      path.join(import.meta.dirname, 'check-changed-code-quality.mjs'),
-      'utf8'
-    )
-    expect(source).toContain('resolvePullRequestDiffBase')
-    expect(source).not.toContain('syncAware')
-  })
+  // Why read the source: dropping `syncAware` at a call site is invisible — the
+  // gate keeps passing, just against the pre-sync tip, where the fork's own lines
+  // never changed and so are never scanned. ORCA-205 measured 3 real findings the
+  // narrow base was hiding. This pins the opt-in for both gates so removing one
+  // fails here instead of quietly restoring the blind spot.
+  it.each(['check-changed-code-quality.mjs', 'check-react-doctor-changed.mjs'])(
+    'keeps %s opted into sync widening',
+    (gateFile) => {
+      const source = readFileSync(path.join(import.meta.dirname, gateFile), 'utf8')
+
+      expect(source).toContain('resolvePullRequestDiffBase')
+      expect(source).toContain('syncAware: true')
+    }
+  )
 
   it('keeps the requested base outside a pull request event', () => {
     expect(resolvePullRequestDiffBase(repo, sha.aheadOfUpstream, 'push', { syncAware: true })).toBe(

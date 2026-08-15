@@ -29,11 +29,12 @@ export function selectPullRequestDiffBase(
 }
 
 /**
- * Opt-in, not automatic, because the two changed-line gates disagree about what
- * a sync base should do: React Doctor stops billing the fork for upstream's
- * debt, while `check:code-quality:changed` gains findings the pre-sync base was
- * hiding (ORCA-205). Each gate flips this on when it has dealt with its own
- * side; a shared default would decide that for both.
+ * Opt-in, not automatic. Both changed-line gates now pass it — React Doctor to
+ * stop billing the fork for upstream's debt (ORCA-202), the code-quality gate to
+ * stop hiding the fork's own lines behind the pre-sync tip (ORCA-205) — but the
+ * default is what keeps every other caller, and every non-`pull_request` event,
+ * on the stricter PR base. A gate opts in once it has dealt with the findings
+ * the wider base surfaces; a shared default would decide that for all of them.
  */
 export function resolvePullRequestDiffBase(
   root,

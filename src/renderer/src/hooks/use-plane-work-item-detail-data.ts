@@ -16,6 +16,13 @@ import type {
   PlaneWorkItem
 } from '../../../shared/plane-types'
 
+type PlaneWorkItemDraftEdits = {
+  itemId: string
+  title?: string
+  description?: string
+  labels?: string
+}
+
 export type PlaneWorkItemDetailData = {
   displayed: PlaneWorkItem | null
   setDisplayed: (item: PlaneWorkItem | null) => void
@@ -46,9 +53,11 @@ export function usePlaneWorkItemDetailData(
   const [commentsError, setCommentsError] = useState<string | null>(null)
   const [states, setStates] = useState<PlaneState[]>([])
   const [members, setMembers] = useState<PlaneUser[]>([])
-  const [titleDraft, setTitleDraft] = useState('')
-  const [descriptionDraft, setDescriptionDraft] = useState('')
-  const [labelsDraft, setLabelsDraft] = useState('')
+  // Why edits and not three seeded drafts: seeding state from `item` in the load
+  // effect is derived state — an extra render, and a fetched title overwriting
+  // whatever the user had already typed. Keyed by item id so switching items
+  // drops the edits without an effect that clears them a frame late (ORCA-205).
+  const [draftEdits, setDraftEdits] = useState<PlaneWorkItemDraftEdits | null>(null)
   const requestIdRef = useRef(0)
   const optimisticCommentsRef = useRef<PlaneComment[]>([])
   // Why: the caller recomputes providerSettings fresh each render; holding it in a
@@ -103,9 +112,6 @@ export function usePlaneWorkItemDetailData(
       setCommentsError(null)
       setStates([])
       setMembers([])
-      setTitleDraft('')
-      setDescriptionDraft('')
-      setLabelsDraft('')
       optimisticCommentsRef.current = []
       return
     }
@@ -113,10 +119,9 @@ export function usePlaneWorkItemDetailData(
     requestIdRef.current += 1
     const requestId = requestIdRef.current
     optimisticCommentsRef.current = []
-    setFullItem(item)
-    setTitleDraft(item.title)
-    setDescriptionDraft(item.description ?? '')
-    setLabelsDraft(item.labels.join(', '))
+    // Why null and not `item`: `displayed` already falls back to it, so writing
+    // it here only buys a render — and one derived from a dependency.
+    setFullItem(null)
     setComments([])
     setCommentsError(null)
     setItemLoading(true)
@@ -127,8 +132,6 @@ export function usePlaneWorkItemDetailData(
           return
         }
         setFullItem(result)
-        setTitleDraft(result.title)
-        setLabelsDraft(result.labels.join(', '))
       })
       .catch(() => {})
       .finally(() => {
@@ -153,8 +156,24 @@ export function usePlaneWorkItemDetailData(
     void loadComments(item, requestId)
   }, [item, loadComments])
 
+  const itemId = item?.id ?? null
+  const editDraft = useCallback(
+    (field: 'title' | 'description' | 'labels', value: string): void => {
+      if (!itemId) {
+        return
+      }
+      setDraftEdits((previous) => ({
+        ...(previous?.itemId === itemId ? previous : { itemId }),
+        [field]: value
+      }))
+    },
+    [itemId]
+  )
+  const displayed = fullItem ?? item
+  const edits = draftEdits?.itemId === itemId ? draftEdits : null
+
   return {
-    displayed: fullItem ?? item,
+    displayed,
     setDisplayed: setFullItem,
     itemLoading,
     states,
@@ -164,11 +183,11 @@ export function usePlaneWorkItemDetailData(
     commentsLoading,
     commentsError,
     optimisticCommentsRef,
-    titleDraft,
-    descriptionDraft,
-    setDescriptionDraft,
-    setTitleDraft,
-    labelsDraft,
-    setLabelsDraft
+    titleDraft: edits?.title ?? displayed?.title ?? '',
+    descriptionDraft: edits?.description ?? displayed?.description ?? '',
+    labelsDraft: edits?.labels ?? displayed?.labels.join(', ') ?? '',
+    setTitleDraft: (value) => editDraft('title', value),
+    setDescriptionDraft: (value) => editDraft('description', value),
+    setLabelsDraft: (value) => editDraft('labels', value)
   }
 }
