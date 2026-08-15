@@ -466,6 +466,88 @@ describe('daemon-init: reconcileSeededClaudeLivePtys', () => {
     expect(gate.hasLiveClaudePtys()).toBe(false)
   })
 
+  // ORCA-224: the runtime gate reconciliation releases a claim only against an
+  // AUTHORITATIVE inventory, and the whole protection rests on
+  // listLiveDaemonPtyIds answering null unless EVERY daemon generation reported.
+  // Nothing else pins that: reconcileLiveClaudePtyGate's own tests inject a fake
+  // inventory, so a simplification here — treating a partial listing as complete
+  // — would go green while rotating the token of a CLI the silent generation is
+  // still hosting.
+  describe('runtime gate reconciliation inventory authority', () => {
+    const LIVE_PTY = 'repo::/live@@aaaa'
+    const DEAD_PTY = 'repo::/dead@@bbbb'
+    const LIVE_ACCOUNT = 'account-live'
+    const DEAD_ACCOUNT = 'account-dead'
+
+    /** Two daemon generations behind one router — the shape the null contract is
+     *  about. Returns the legacy adapter so a test can decide how it answers. */
+    async function initTwoGenerationRouter(
+      mod: Awaited<ReturnType<typeof importFresh>>
+    ): Promise<MockAdapter> {
+      await mod.initDaemonPtyProvider()
+      const { DaemonPtyRouter } = await import('./daemon-pty-router')
+      const { DaemonPtyAdapter } = await import('./daemon-pty-adapter')
+      const current = adapterInstances[0]
+      const legacy = new DaemonPtyAdapter({
+        socketPath: '/fake/legacy.sock',
+        tokenPath: '/fake/legacy.token',
+        protocolVersion: 3
+      }) as unknown as MockAdapter
+      current.listProcesses.mockImplementation(async () => [{ id: LIVE_PTY }])
+      // Why the swap after init: it also proves the inventory closure attached at
+      // init reads the module-level provider at call time, so it follows a daemon
+      // respawn instead of pinning the adapter it was created with.
+      mod.replaceDaemonProvider(
+        new DaemonPtyRouter({
+          current: current as unknown as InstanceType<typeof DaemonPtyAdapter>,
+          legacy: [legacy as unknown as InstanceType<typeof DaemonPtyAdapter>]
+        })
+      )
+      return legacy
+    }
+
+    it('releases nothing when one daemon generation refuses to report', async () => {
+      const mod = await importFresh()
+      const gate = await import('../claude-accounts/live-pty-gate')
+      const { reconcileLiveClaudePtyGate } =
+        await import('../claude-accounts/live-claude-pty-gate-reconciliation')
+      const legacy = await initTwoGenerationRouter(mod)
+      legacy.listProcesses.mockImplementation(async () => {
+        throw new Error('legacy daemon unreachable')
+      })
+      gate.markInjectedClaudePtySpawned(LIVE_PTY, LIVE_ACCOUNT)
+      gate.markInjectedClaudePtySpawned(DEAD_PTY, DEAD_ACCOUNT)
+
+      const released = await reconcileLiveClaudePtyGate()
+
+      // The silent generation may be hosting DEAD_PTY. Its silence is unknown,
+      // not empty, so neither account may lose its protection.
+      expect(released).toEqual([])
+      expect(gate.hasLiveClaudePtysUsingAccount(DEAD_ACCOUNT)).toBe(true)
+      expect(gate.hasLiveClaudePtysUsingAccount(LIVE_ACCOUNT)).toBe(true)
+      gate.markClaudePtyExited(LIVE_PTY)
+      gate.markClaudePtyExited(DEAD_PTY)
+    })
+
+    it('releases the dead claim once every generation has reported', async () => {
+      const mod = await importFresh()
+      const gate = await import('../claude-accounts/live-pty-gate')
+      const { reconcileLiveClaudePtyGate } =
+        await import('../claude-accounts/live-claude-pty-gate-reconciliation')
+      const legacy = await initTwoGenerationRouter(mod)
+      legacy.listProcesses.mockImplementation(async () => [])
+      gate.markInjectedClaudePtySpawned(LIVE_PTY, LIVE_ACCOUNT)
+      gate.markInjectedClaudePtySpawned(DEAD_PTY, DEAD_ACCOUNT)
+
+      const released = await reconcileLiveClaudePtyGate()
+
+      expect(released).toEqual([DEAD_PTY])
+      expect(gate.hasLiveClaudePtysUsingAccount(DEAD_ACCOUNT)).toBe(false)
+      expect(gate.hasLiveClaudePtysUsingAccount(LIVE_ACCOUNT)).toBe(true)
+      gate.markClaudePtyExited(LIVE_PTY)
+    })
+  })
+
   it('warns when it releases seeded ids because a daemon stayed unreachable', async () => {
     vi.useFakeTimers()
     const mod = await importFresh()
