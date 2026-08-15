@@ -37,6 +37,7 @@ Two that bite most often:
 - **Tests need the repo config.** There is no root `vitest.config.*`, so a bare `npx vitest run` resolves no `@/` alias and no `ORCA_FEATURE_WALL_ENABLED`. Renderer suites then fail at import and read as regressions. Use `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`.
 - **A delegated report's summary is not its evidence.** When a `worker_done` payload carries a `reportPath`, read that file before accepting or contradicting the worker.
 - **A red check is not a failed test.** A timeout, a failed setup step, and a red assertion all print `fail`. The run summary page names the class per job — see [`docs/reference/ci-failure-classification.md`](./docs/reference/ci-failure-classification.md) — before you name a spec.
+- **A red timing budget is usually not a slow product.** `expect(latencyMs).toBeLessThan(N)` measures the product plus the cost of whatever the test does to observe it, and a poll-based measurement can only report values on its backoff grid. Four of these went red here in two nights with no product change behind any of them. Before blaming the code, run the three checks in [`docs/reference/timing-budget-assertions.md`](./docs/reference/timing-budget-assertions.md) — and read it before writing a new threshold.
 
 # Considerations
 ## Worktree Safety

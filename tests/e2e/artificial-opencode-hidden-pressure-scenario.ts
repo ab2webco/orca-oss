@@ -271,6 +271,12 @@ async function measureHiddenOutputRestoreLatency(
   await switchToWorktree(orcaPage, worktreeId)
   await expect
     .poll(() => getTerminalContent(orcaPage, 20_000), {
+      // Why: the return value is asserted against MAX_HIDDEN_RESTORE_LATENCY_MS, and
+      // expect.poll's default backoff ([100, 250, 500, 1000], last repeating) can only
+      // report the cumulative steps 0/100/350/850/1850ms. Restore lands at ~1.1s on its
+      // tail, i.e. right on the 850ms poll: miss it and the next reading is 1850ms plus
+      // callback cost, over the 2s ceiling no matter how fast the restore was (ORCA-214).
+      intervals: [25, 50, 100],
       timeout: 20_000,
       message: 'Hidden PTY output was not restored from main buffer on return'
     })
