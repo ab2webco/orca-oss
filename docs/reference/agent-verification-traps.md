@@ -122,6 +122,21 @@ failure, the isolated pass, and the run conditions. Never let it disappear into 
 The same rule covers anything handed to you: a delegated worker's report, an upstream PR, another
 agent's "verified". Review it before building on it *or* contradicting it.
 
+## 9. A red check is not the same as a failed test
+
+`gh pr checks` prints `fail` for a job killed by `timeout-minutes`, a job whose setup step
+failed, and a job with a red assertion alike. Reading the check name tells you none of them
+apart — a "red specs" list handed to a worker once included a spec that never ran, because its
+shard's `Install Electron package binary for tests` step failed and `Test shard` was `skipped`.
+
+**Tell:** a failed job with no failing test in the log, or a shard whose duration sits at its
+`timeout-minutes` cap.
+
+**Rule:** read the class off the run summary page before naming a spec. The `ci failure class`
+job classifies every non-successful job in the run from its API signals — see
+[`ci-failure-classification.md`](./ci-failure-classification.md). `cancelled` is never a failed
+test; `skipped` is never a red spec.
+
 ## The common rule
 
 Before reporting something verified, answer one question: **what would this check have shown if

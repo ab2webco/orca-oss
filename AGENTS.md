@@ -36,6 +36,7 @@ Two that bite most often:
 
 - **Tests need the repo config.** There is no root `vitest.config.*`, so a bare `npx vitest run` resolves no `@/` alias and no `ORCA_FEATURE_WALL_ENABLED`. Renderer suites then fail at import and read as regressions. Use `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`.
 - **A delegated report's summary is not its evidence.** When a `worker_done` payload carries a `reportPath`, read that file before accepting or contradicting the worker.
+- **A red check is not a failed test.** A timeout, a failed setup step, and a red assertion all print `fail`. The run summary page names the class per job — see [`docs/reference/ci-failure-classification.md`](./docs/reference/ci-failure-classification.md) — before you name a spec.
 
 # Considerations
 ## Worktree Safety

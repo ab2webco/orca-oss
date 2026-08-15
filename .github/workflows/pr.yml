@@ -605,3 +605,54 @@ jobs:
               exit 1
             fi
           done
+
+  # Why a separate job and not a step somewhere else: a job killed by
+  # `timeout-minutes`, a job whose setup step failed, and a job with a red test
+  # all report `fail`, so triage went to the wrong place twice in one night
+  # (ORCA-215). A step inside the failing job cannot fix that — a job that was
+  # skipped or cancelled before its steps ran executes no steps at all — and
+  # `verify` deliberately does not need `e2e`, so it finishes long before the E2E
+  # shards whose timeouts this exists to name. This job reports; it never gates.
+  ci_failure_class:
+    name: ci failure class
+    if: always()
+    needs:
+      - verify
+      - e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Why actions:read: the workflow default is contents:read only, and the jobs
+    # API this reads 403s without it.
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Capture this run's jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_PATH: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api "$RUN_PATH" > "$RUNNER_TEMP/ci-run.json"
+          gh api --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]' \
+            | jq -s '{jobs: .}' > "$RUNNER_TEMP/ci-jobs.json"
+
+      # Why the job summary and annotations and not the check name: a job's name
+      # is fixed when the workflow is parsed, so it cannot carry a class decided
+      # at the end of the run. The summary renders on the run page — where a red
+      # check lands you — so the class is readable without opening a log.
+      - name: Report CI failure classes
+        run: |
+          node config/scripts/report-ci-failure-classes.mjs \
+            --run "$RUNNER_TEMP/ci-run.json" \
+            --jobs "$RUNNER_TEMP/ci-jobs.json" \
+            --gate-job verify \
+            --exclude-job 'ci failure class'
