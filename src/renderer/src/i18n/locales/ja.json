@@ -10459,6 +10459,9 @@
         "BrowserLinkRoutingSetting": {
           "description": "ターミナル、Markdown、エディターの http(s) リンクを Orca の組み込みブラウザで開きます。{{shortcut}} は常にシステムブラウザを使用します。",
           "descriptionBase": "ターミナル、Markdown、エディターの http(s) リンクを Orca の組み込みブラウザで開きます。"
+        },
+        "artifacts": {
+          "allowPublishingDescription": "HTML と Markdown のファイルを、URL を知っている人なら誰でも開けるリンクとして公開します。ファイルの内容は {{host}} にアップロードされます。これは上流の Orca が運用しており、このビルドがホストしているわけではありません。作成済みのリンクは Artifacts から削除するまで残ります。"
         }
       },
       "right": {
@@ -14939,6 +14942,11 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
+      },
+      "artifacts": {
+        "ArtifactPublishButton": {
+          "confirmDescription": "現在のファイルを {{host}} にアップロードし、URL を知っている人なら誰でも閲覧できるリンクを作成します。"
+        }
       }
     },
     "i18n": {

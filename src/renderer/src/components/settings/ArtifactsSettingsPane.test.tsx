@@ -5,6 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
+import { ARTIFACT_SHARE_HOST } from '../../../../shared/artifacts'
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -21,7 +22,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, string>) =>
+    fallback.replace(/\{\{(\w+)\}\}/g, (token, name: string) => options?.[name] ?? token)
 }))
 
 vi.mock('@/lib/web-client-location', () => ({
@@ -148,6 +150,14 @@ describe('ArtifactsSettingsPane', () => {
     expect(screen.getByText(/Publish HTML and Markdown files as links/)).toBeInTheDocument()
     expect(screen.getByText(/Existing links remain until you delete them/)).toBeInTheDocument()
     expect(screen.queryByText(/Off by default/)).not.toBeInTheDocument()
+  })
+
+  it('names the upload host and says upstream operates it, before the toggle is on', () => {
+    render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
+
+    const description = screen.getByText(new RegExp(ARTIFACT_SHARE_HOST.replace(/\./g, '\\.')))
+    expect(description).toHaveTextContent(ARTIFACT_SHARE_HOST)
+    expect(description).toHaveTextContent(/upstream Orca operates/)
   })
 
   it('grants and revokes the publish capability through the toggle', async () => {

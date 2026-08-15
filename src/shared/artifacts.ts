@@ -1,5 +1,9 @@
 export const ARTIFACT_CLI_MAX_RPC_BYTES = 800 * 1024
 
+// Why: the only host publishing can reach (resolveArtifactCloudApiUrl rejects the rest), so the
+// pre-upload copy can name it without asking main where the file is going.
+export const ARTIFACT_SHARE_HOST = 'share.onorca.dev'
+
 export function artifactWriteRequestByteLength(request: ArtifactWriteRequest): number {
   return new TextEncoder().encode(JSON.stringify(request)).byteLength
 }

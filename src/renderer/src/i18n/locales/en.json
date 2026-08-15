@@ -10918,7 +10918,7 @@
           "enableStepDescription": "Turn on “Allow publishing public artifact links” above.",
           "allowPublishing": "Allow publishing public artifact links",
           "allowPublishingWebDescription": "Desktop only. Open Settings → Artifacts on the host device to change this setting.",
-          "allowPublishingDescription": "Publish HTML and Markdown files as links anyone with the URL can open. Existing links remain until you delete them from Artifacts.",
+          "allowPublishingDescription": "Publish HTML and Markdown files as links anyone with the URL can open. File contents are uploaded to {{host}}, which upstream Orca operates — this build does not host it. Existing links remain until you delete them from Artifacts.",
           "howToDescriptionDisabled": "Enable artifact sharing above to publish HTML or Markdown files as public links.",
           "allowPublishingSearchDescription": "Allow Orca to publish HTML and Markdown files as public links."
         },
@@ -15671,7 +15671,7 @@
         "ArtifactPublishButton": {
           "a4a49da6af": "Share as artifact",
           "confirmTitle": "Share as artifact",
-          "confirmDescription": "This publishes the current file at a link anyone with the URL can view.",
+          "confirmDescription": "This uploads the current file to {{host}} and creates a link anyone with the URL can view.",
           "accountTitle": "Orca account",
           "accountDescription": "Sign in to create and manage this link.",
           "signingIn": "Signing in…",

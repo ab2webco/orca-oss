@@ -10479,6 +10479,9 @@
           "description": "用于语音听写的输入设备，系统默认会跟随操作系统的麦克风设置。",
           "accessHint": "允许麦克风访问以列出输入设备。",
           "allowAccess": "允许访问"
+        },
+        "artifacts": {
+          "allowPublishingDescription": "将 HTML 和 Markdown 文件发布为任何知道 URL 的人都能打开的链接。文件内容会上传到 {{host}}，该服务由上游 Orca 运营，并非由此构建版本托管。已有链接会一直保留，直到你在 Artifacts 中删除它们。"
         }
       },
       "right": {
@@ -14959,6 +14962,11 @@
         "titleLabel": "Work item title",
         "create": "Add",
         "cancel": "Cancel"
+      },
+      "artifacts": {
+        "ArtifactPublishButton": {
+          "confirmDescription": "这会将当前文件上传到 {{host}}，并创建一个任何知道该 URL 的人都能查看的链接。"
+        }
       }
     },
     "i18n": {

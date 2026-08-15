@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ArrowRight, Files } from 'lucide-react'
 import type { GlobalSettings } from '../../../../shared/types'
+import { ARTIFACT_SHARE_HOST } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
 import { SettingsSwitchRow } from './SettingsFormControls'
 import { useAppStore } from '@/store'
@@ -98,7 +99,8 @@ export function ArtifactsSettingsPane({
               )
             : translate(
                 'auto.components.settings.artifacts.allowPublishingDescription',
-                'Publish HTML and Markdown files as links anyone with the URL can open. Existing links remain until you delete them from Artifacts.'
+                'Publish HTML and Markdown files as links anyone with the URL can open. File contents are uploaded to {{host}}, which upstream Orca operates — this build does not host it. Existing links remain until you delete them from Artifacts.',
+                { host: ARTIFACT_SHARE_HOST }
               )
         }
         checked={sharingEnabled}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Loader2, Share2 } from 'lucide-react'
 import type { ArtifactWriteRequest } from '../../../../shared/artifacts'
+import { ARTIFACT_SHARE_HOST } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -158,7 +159,8 @@ export function ArtifactPublishButton({
                 )
               : translate(
                   'auto.components.artifacts.ArtifactPublishButton.confirmDescription',
-                  'This publishes the current file at a link anyone with the URL can view.'
+                  'This uploads the current file to {{host}} and creates a link anyone with the URL can view.',
+                  { host: ARTIFACT_SHARE_HOST }
                 )}
           </p>
         </div>
