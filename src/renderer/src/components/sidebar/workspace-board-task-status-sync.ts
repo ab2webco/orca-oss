@@ -1,49 +1,49 @@
-import {
-  linearGetIssue,
-  linearTeamStates,
-  linearUpdateIssue,
-  type LinearMutationResult,
-  type RuntimeLinearSettings
-} from '@/runtime/runtime-linear-client'
 import type {
-  LinearIssue,
-  LinearWorkflowState,
+  GlobalSettings,
   WorkspaceStatus,
   WorkspaceStatusDefinition,
   Worktree
 } from '../../../../shared/types'
 import { getWorkspaceStatus } from '../../../../shared/workspace-statuses'
+import {
+  defaultLinearStatusWriteDependencies,
+  writeLinearWorkspaceStatus,
+  type LinearStatusWriteDependencies
+} from './workspace-board-linear-status-write'
+import {
+  defaultPlaneStatusWriteDependencies,
+  writePlaneWorkspaceStatus,
+  type PlaneStatusWriteDependencies
+} from './workspace-board-plane-status-write'
+import {
+  emptyStatusSyncResult,
+  mergeResult,
+  skipped,
+  type WorkspaceBoardTaskStatusSyncResult
+} from './workspace-board-task-status-sync-result'
 
-export type WorkspaceBoardTaskStatusSyncResult = {
-  updated: number
-  skipped: number
-  failed: number
-  messages: WorkspaceBoardTaskStatusSyncMessage[]
-}
+export type {
+  WorkspaceBoardTaskStatusSyncMessage,
+  WorkspaceBoardTaskStatusSyncProvider,
+  WorkspaceBoardTaskStatusSyncResult
+} from './workspace-board-task-status-sync-result'
 
-export type WorkspaceBoardTaskStatusSyncMessage =
-  | { kind: 'issue-read-failed'; issueIdentifier: string }
-  | { kind: 'missing-workflow-state'; statusLabel: string }
-  | { kind: 'ambiguous-workflow-state'; statusLabel: string }
-  | { kind: 'update-failed'; issueIdentifier: string; detail?: string }
-  | { kind: 'provider-error'; issueIdentifier: string; detail?: string }
-  | { kind: 'unexpected-error'; detail?: string }
+export type WorkspaceBoardTaskStatusSyncDependencies = LinearStatusWriteDependencies &
+  PlaneStatusWriteDependencies
 
-type WorkspaceBoardTaskStatusSyncDependencies = {
-  getIssue: typeof linearGetIssue
-  teamStates: typeof linearTeamStates
-  updateIssue: typeof linearUpdateIssue
-}
+type SyncedWorktreeLinks = Pick<
+  Worktree,
+  'linkedLinearIssue' | 'linkedLinearIssueWorkspaceId' | 'linkedPlaneWorkItem'
+>
 
 export type SyncWorkspaceBoardTaskStatusesArgs = {
   worktreeIds: readonly string[]
   targetStatus: WorkspaceStatusDefinition
-  worktreesById: ReadonlyMap<
-    string,
-    Pick<Worktree, 'linkedLinearIssue' | 'linkedLinearIssueWorkspaceId'>
-  >
-  settings?: RuntimeLinearSettings
-  getSettingsForWorktree?: (worktreeId: string) => RuntimeLinearSettings
+  worktreesById: ReadonlyMap<string, SyncedWorktreeLinks>
+  settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null
+  getSettingsForWorktree?: (
+    worktreeId: string
+  ) => Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null
   getLatestWorkspaceStatus: (worktreeId: string) => WorkspaceStatus | null | undefined
   deps?: Partial<WorkspaceBoardTaskStatusSyncDependencies>
 }
@@ -78,77 +78,11 @@ export function getWorkspaceBoardTaskStatusSyncRequest(args: {
 }
 
 const defaultDeps: WorkspaceBoardTaskStatusSyncDependencies = {
-  getIssue: linearGetIssue,
-  teamStates: linearTeamStates,
-  updateIssue: linearUpdateIssue
+  ...defaultLinearStatusWriteDependencies,
+  ...defaultPlaneStatusWriteDependencies
 }
 
 const worktreeSyncQueues = new Map<string, Promise<unknown>>()
-
-function normalizeStateName(name: string): string {
-  return name.trim().toLowerCase()
-}
-
-function matchingWorkflowStates(
-  states: readonly LinearWorkflowState[],
-  targetStatus: WorkspaceStatusDefinition
-): LinearWorkflowState[] {
-  const targetName = normalizeStateName(targetStatus.label)
-  return states.filter((state) => normalizeStateName(state.name) === targetName)
-}
-
-function getMessageKey(message: WorkspaceBoardTaskStatusSyncMessage): string {
-  return JSON.stringify(message)
-}
-
-function addMessage(
-  result: WorkspaceBoardTaskStatusSyncResult,
-  message: WorkspaceBoardTaskStatusSyncMessage
-): void {
-  const key = getMessageKey(message)
-  if (!result.messages.some((item) => getMessageKey(item) === key)) {
-    result.messages.push(message)
-  }
-}
-
-function skipped(
-  result: WorkspaceBoardTaskStatusSyncResult,
-  message?: WorkspaceBoardTaskStatusSyncMessage
-): WorkspaceBoardTaskStatusSyncResult {
-  result.skipped += 1
-  if (message) {
-    addMessage(result, message)
-  }
-  return result
-}
-
-function failed(
-  result: WorkspaceBoardTaskStatusSyncResult,
-  message: WorkspaceBoardTaskStatusSyncMessage
-): WorkspaceBoardTaskStatusSyncResult {
-  result.failed += 1
-  addMessage(result, message)
-  return result
-}
-
-function isAlreadyInState(issue: LinearIssue, workflowState: LinearWorkflowState): boolean {
-  return (
-    normalizeStateName(issue.state.name) === normalizeStateName(workflowState.name) &&
-    issue.state.type === workflowState.type
-  )
-}
-
-function mergeResult(
-  aggregate: WorkspaceBoardTaskStatusSyncResult,
-  item: WorkspaceBoardTaskStatusSyncResult
-): void {
-  aggregate.updated += item.updated
-  aggregate.skipped += item.skipped
-  aggregate.failed += item.failed
-  for (const message of item.messages) {
-    addMessage(aggregate, message)
-  }
-}
 
 async function enqueueWorktreeSync(
   worktreeId: string,
@@ -165,103 +99,66 @@ async function enqueueWorktreeSync(
   return next
 }
 
-async function syncLinearWorktreeStatus(
+// Why: both links are explicit user choices. Writing only one would drop the
+// other without a trace, which is the failure this sync exists to avoid.
+async function syncWorktreeStatus(
   args: SyncWorkspaceBoardTaskStatusesArgs,
   worktreeId: string,
   deps: WorkspaceBoardTaskStatusSyncDependencies
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
-  const result: WorkspaceBoardTaskStatusSyncResult = {
-    updated: 0,
-    skipped: 0,
-    failed: 0,
-    messages: []
-  }
+  const aggregate = emptyStatusSyncResult()
   const worktree = args.worktreesById.get(worktreeId)
-  if (!worktree?.linkedLinearIssue) {
-    return skipped(result)
+  const linearIssue = worktree?.linkedLinearIssue ?? null
+  const planeLink = worktree?.linkedPlaneWorkItem ?? null
+  if (!linearIssue && !planeLink) {
+    return skipped(aggregate)
   }
 
   const settings = args.getSettingsForWorktree
     ? args.getSettingsForWorktree(worktreeId)
     : args.settings
-  const linkedWorkspaceId = worktree.linkedLinearIssueWorkspaceId ?? undefined
+  const isStillTargetStatus = (): boolean =>
+    args.getLatestWorkspaceStatus(worktreeId) === args.targetStatus.id
 
-  try {
-    const issue = await deps.getIssue(settings, worktree.linkedLinearIssue, linkedWorkspaceId)
-    if (!issue?.team?.id) {
-      return skipped(result, {
-        kind: 'issue-read-failed',
-        issueIdentifier: worktree.linkedLinearIssue
+  if (linearIssue) {
+    mergeResult(
+      aggregate,
+      await writeLinearWorkspaceStatus({
+        issueIdentifier: linearIssue,
+        linkedWorkspaceId: worktree?.linkedLinearIssueWorkspaceId ?? undefined,
+        settings,
+        targetStatus: args.targetStatus,
+        isStillTargetStatus,
+        deps
       })
-    }
-
-    const workspaceId = linkedWorkspaceId ?? issue.workspaceId
-    const states = await deps.teamStates(settings, issue.team.id, workspaceId)
-    const matches = matchingWorkflowStates(states, args.targetStatus)
-    if (matches.length === 0) {
-      return skipped(result, {
-        kind: 'missing-workflow-state',
-        statusLabel: args.targetStatus.label
-      })
-    }
-    if (matches.length > 1) {
-      return skipped(result, {
-        kind: 'ambiguous-workflow-state',
-        statusLabel: args.targetStatus.label
-      })
-    }
-
-    const [workflowState] = matches
-    if (isAlreadyInState(issue, workflowState)) {
-      return skipped(result)
-    }
-
-    // Why: board moves are local-first; slow provider reads must not let an
-    // older board move overwrite a newer local status in Linear.
-    if (args.getLatestWorkspaceStatus(worktreeId) !== args.targetStatus.id) {
-      return skipped(result)
-    }
-
-    const updateResult: LinearMutationResult = await deps.updateIssue(
-      settings,
-      issue.id,
-      { stateId: workflowState.id },
-      workspaceId
     )
-    if (updateResult.ok === false) {
-      return failed(result, {
-        kind: 'update-failed',
-        issueIdentifier: issue.identifier,
-        detail: updateResult.error
-      })
-    }
-    result.updated += 1
-    return result
-  } catch (error) {
-    return failed(result, {
-      kind: 'provider-error',
-      issueIdentifier: worktree.linkedLinearIssue,
-      detail: error instanceof Error ? error.message : undefined
-    })
   }
+  if (planeLink) {
+    mergeResult(
+      aggregate,
+      await writePlaneWorkspaceStatus({
+        link: planeLink,
+        settings,
+        targetStatus: args.targetStatus,
+        isStillTargetStatus,
+        deps
+      })
+    )
+  }
+  return aggregate
 }
 
 export async function syncWorkspaceBoardTaskStatuses(
   args: SyncWorkspaceBoardTaskStatusesArgs
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
   const deps = { ...defaultDeps, ...args.deps }
-  const aggregate: WorkspaceBoardTaskStatusSyncResult = {
-    updated: 0,
-    skipped: 0,
-    failed: 0,
-    messages: []
-  }
+  const aggregate = emptyStatusSyncResult()
 
   const uniqueIds = new Set(args.worktreeIds)
   await Promise.all(
     [...uniqueIds].map(async (worktreeId) => {
       const item = await enqueueWorktreeSync(worktreeId, () =>
-        syncLinearWorktreeStatus(args, worktreeId, deps)
+        syncWorktreeStatus(args, worktreeId, deps)
       )
       mergeResult(aggregate, item)
     })

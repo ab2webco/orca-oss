@@ -41,9 +41,9 @@ import { useWorkspaceKanbanSearch } from './use-workspace-kanban-search'
 import {
   getWorkspaceBoardTaskStatusSyncRequest,
   syncWorkspaceBoardTaskStatuses,
-  type WorkspaceBoardTaskStatusSyncMessage,
   type WorkspaceBoardTaskStatusSyncResult
 } from './workspace-board-task-status-sync'
+import { formatTaskStatusSyncDescription } from './workspace-board-task-status-sync-messages'
 import {
   buildManualOrderUpdatesForGroupDrop,
   shouldWriteManualOrderForGroupDrop,
@@ -64,80 +64,6 @@ type WorkspaceKanbanDrawerProps = {
   preserveOpenForMenu: boolean
   onOpenChange: (open: boolean) => void
   onMenuOpenChange: (open: boolean) => void
-}
-
-function formatTaskStatusSyncMessage(message: WorkspaceBoardTaskStatusSyncMessage): string {
-  switch (message.kind) {
-    case 'issue-read-failed':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.c1d2e3f4a5',
-        'Linear issue {{value0}} could not be read.',
-        { value0: message.issueIdentifier }
-      )
-    case 'missing-workflow-state':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.d2e3f4a5b6',
-        'No matching Linear workflow state for {{value0}}.',
-        { value0: message.statusLabel }
-      )
-    case 'ambiguous-workflow-state':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.e3f4a5b6c7',
-        'Multiple Linear workflow states match {{value0}}.',
-        { value0: message.statusLabel }
-      )
-    case 'update-failed':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.f4a5b6c7d8',
-        'Could not update Linear issue {{value0}}.',
-        { value0: message.issueIdentifier }
-      )
-    case 'provider-error':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.a5b6c7d8e9',
-        'Could not sync Linear issue {{value0}}.',
-        { value0: message.issueIdentifier }
-      )
-    case 'unexpected-error':
-      return translate(
-        'auto.components.sidebar.WorkspaceKanbanDrawer.b6c7d8e9f0',
-        'Task status sync could not finish.'
-      )
-  }
-}
-
-function formatTaskStatusSyncDescription(result: WorkspaceBoardTaskStatusSyncResult): string {
-  const counts = [
-    result.updated > 0
-      ? translate(
-          'auto.components.sidebar.WorkspaceKanbanDrawer.c7d8e9f0a1',
-          '{{value0}} updated',
-          {
-            value0: result.updated
-          }
-        )
-      : null,
-    result.skipped > 0
-      ? translate(
-          'auto.components.sidebar.WorkspaceKanbanDrawer.d8e9f0a1b2',
-          '{{value0}} skipped',
-          {
-            value0: result.skipped
-          }
-        )
-      : null,
-    result.failed > 0
-      ? translate('auto.components.sidebar.WorkspaceKanbanDrawer.e9f0a1b2c3', '{{value0}} failed', {
-          value0: result.failed
-        })
-      : null
-  ].filter((part): part is string => part !== null)
-  return [
-    counts.join(', '),
-    result.messages[0] ? formatTaskStatusSyncMessage(result.messages[0]) : null
-  ]
-    .filter(Boolean)
-    .join('. ')
 }
 
 export default function WorkspaceKanbanDrawer({

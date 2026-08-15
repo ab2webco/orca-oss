@@ -91,7 +91,7 @@ export default function WorkspaceKanbanSettingsMenu({
               <span className="block text-[11px] leading-4 text-muted-foreground">
                 {translate(
                   'auto.components.sidebar.WorkspaceKanbanSettingsMenu.4c2eaa78cc',
-                  'Moving a linked workspace updates its Linear issue status when a matching workflow state exists.'
+                  'Moving a linked workspace updates its Linear issue or Plane work item status when a matching state exists. Moves that could not write say so.'
                 )}
               </span>
             </span>
