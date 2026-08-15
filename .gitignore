@@ -107,6 +107,7 @@ docs/**
 !docs/reference/relay-grace-time-reconfiguration.md
 !docs/reference/upstream-pr-adoption.md
 !docs/reference/remote-wire-compatibility.md
+!docs/reference/timing-budget-assertions.md
 !docs/reference/windows-setup-shell.md
 
 # Stably CLI (only docs/ are tracked)
