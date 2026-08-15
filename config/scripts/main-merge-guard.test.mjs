@@ -1,15 +1,24 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const hookScript = join(projectDir, '.claude/hooks/main-merge-guard.py')
+const settingsPath = join(projectDir, '.claude/settings.json')
+const workingProcessPath = join(projectDir, 'docs/reference/working-process.md')
 const tempDirs = []
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+}
+
+function hasConfiguredMainMergeGuard(settings) {
+  return (settings.hooks?.PreToolUse ?? []).some(
+    ({ matcher, hooks }) =>
+      matcher === 'Bash' && hooks?.some(({ command }) => command.endsWith('/main-merge-guard.py'))
+  )
 }
 
 function makeRepo() {
@@ -73,6 +82,25 @@ afterAll(() => {
   for (const dir of tempDirs) {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+describe('main merge guard static contract', () => {
+  it('pins the update floor without claiming it blocks old installations at startup', () => {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
+    const workingProcess = readFileSync(workingProcessPath, 'utf8')
+
+    expect(settings.minimumVersion).toBe('2.1.229')
+    expect(workingProcess).toContain('piso de actualizaciones, no un requisito de arranque')
+    expect(workingProcess).toMatch(/sesión nueva|reinici/i)
+  })
+
+  it('detects an absent PreToolUse registration', () => {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
+
+    expect(hasConfiguredMainMergeGuard(settings)).toBe(true)
+    delete settings.hooks.PreToolUse
+    expect(hasConfiguredMainMergeGuard(settings)).toBe(false)
+  })
 })
 
 // Why: el `gh` falso es un script `#!/bin/sh` y el PATH se arma con `:`.

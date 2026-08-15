@@ -21,22 +21,38 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
    de IA.
 6. **PR contra `ab2webco/main`**, con qué entrega al usuario, qué NO cierra, y cómo se verificó.
 7. **El merge a `main` no lo hace el agente.** Pushear, abrir el PR, avisar con el número.
-   `main-merge-guard.py` lo hace cumplir para cualquier sesión de agente en este repo; el
-   coordinador mergea desde GitHub o desde una terminal fuera del agente, sin tocar la guarda.
+   `main-merge-guard.py` es defensa en profundidad para la Bash tool; el coordinador mergea desde
+   GitHub o desde una terminal fuera del agente, sin tocar la guarda. Si Claude Code deja de invocar
+   `PreToolUse`, el control local falla abierto: sólo una ruleset del remoto puede imponer la regla
+   fuera de la identidad compartida por coordinador y workers.
 8. **Mover el estado en Plane** al terminar: `orca plane status set`. Un board que describe un
    estado viejo es peor que no tener board.
 9. **Release** sólo con el checklist de `lab-release-smoke-check.md` pasado.
 
 ## Las guardas, y la falla que las originó
 
-| Guarda | Qué hace | Por qué existe |
-| --- | --- | --- |
-| `session-start-plane-board.py` | Inyecta el board al abrir sesión | El board quedó describiendo un estado de hace horas mientras el trabajo real iba por otro lado |
-| `status-line.py` | Muestra proyecto · rama · sin-commitear | La status line por defecto no dice ni el directorio ni la rama, así que no había forma de saber dónde se estaba trabajando |
-| `pre-commit-branch-guard.py` | Antes de commit/push dice rama, upstream y cuánto falta subir | Se hicieron 5 commits creyendo que iban a `main` cuando iban a una rama de feature, y se reportó "mergeado a main" siendo falso |
-| `main-merge-guard.py` | Rechaza desde la Bash tool cualquier push o merge que aterrice en `main` | Un worker mergeó el PR #73 a `main` por su cuenta, minutos después de que el mensaje que lo dirigía dijera que el merge lo hacía el coordinador. La única barrera era prosa en un brief |
-| `test-result-guard.py` | Lee el resumen de vitest y bloquea si hay rojos, ignorando el exit code | **Medido**: `npm test` salió con exit code 0 reportando `Tests 6 failed \| 40082 passed`. Un gate que mire `$?` deja pasar un build roto |
-| `pre-release-upstream-check.sh` | Chequea upstream antes de despachar una release | El checklist de release exige mergear `origin/main` primero y se salteaba |
+| Guarda                          | Qué hace                                                                 | Por qué existe                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session-start-plane-board.py`  | Inyecta el board al abrir sesión                                         | El board quedó describiendo un estado de hace horas mientras el trabajo real iba por otro lado                                                                                          |
+| `status-line.py`                | Muestra proyecto · rama · sin-commitear                                  | La status line por defecto no dice ni el directorio ni la rama, así que no había forma de saber dónde se estaba trabajando                                                              |
+| `pre-commit-branch-guard.py`    | Antes de commit/push dice rama, upstream y cuánto falta subir            | Se hicieron 5 commits creyendo que iban a `main` cuando iban a una rama de feature, y se reportó "mergeado a main" siendo falso                                                         |
+| `main-merge-guard.py`           | Rechaza desde la Bash tool cualquier push o merge que aterrice en `main` | Un worker mergeó el PR #73 a `main` por su cuenta, minutos después de que el mensaje que lo dirigía dijera que el merge lo hacía el coordinador. La única barrera era prosa en un brief |
+| `test-result-guard.py`          | Lee el resumen de vitest y bloquea si hay rojos, ignorando el exit code  | **Medido**: `npm test` salió con exit code 0 reportando `Tests 6 failed \| 40082 passed`. Un gate que mire `$?` deja pasar un build roto                                                |
+| `pre-release-upstream-check.sh` | Chequea upstream antes de despachar una release                          | El checklist de release exige mergear `origin/main` primero y se salteaba                                                                                                               |
+
+### Ciclo de vida del guard de merge
+
+`minimumVersion` fija Claude Code 2.1.229 como piso de actualizaciones, no un requisito de arranque:
+una instalación anterior todavía puede iniciar. La versión cubre el principal sospechoso upstream,
+una fuga de handles del file watcher, pero no hay logs que prueben causalidad. Evita downgrades
+futuros, pero no actualiza un proceso que ya está corriendo. Después de actualizar Claude Code o de cambiar
+`.claude/settings.json` o `.claude/hooks/`, cerrá la sesión y arrancá una sesión nueva; no confíes en
+que el hot reload haya incorporado una guarda nueva a una sesión larga.
+
+Esto reduce la exposición al fallo observado en ORCA-206, pero no convierte al hook en una frontera
+de seguridad. Si el host no lo invoca, el comando sigue su curso y no hay señal local confiable de
+la ausencia. La protección obligatoria contra merges directos a `main` debe vivir en una ruleset de
+la organización; el hook conserva valor como rechazo temprano y explicación dentro del agente.
 
 ## Verificación: lo que no se puede dar por bueno
 
