@@ -94,6 +94,44 @@ credentials` as a bare error string is treated as inconclusive, not as a
 failure, because managed keychain read failures currently collapse to that same
 legacy message.
 
+## When A Live Session Holds The Token
+
+`live-session-holds-token` means Orca refused to rotate this account's single-use
+refresh token because a live Claude CLI owns the chain (ORCA-211). That refusal
+is correct and stays: rotating under a running CLI strands it on a dead token and
+costs two sessions instead of one.
+
+What is not correct is believing a claim forever. The gate is populated in main
+by `markClaudePtySpawned` / `markInjectedClaudePtySpawned` and cleared by
+`markClaudePtyExited`. A daemon-side kill the main process never observed leaves
+the claim standing, and `confirmSeededClaudeLivePtys` cannot help: it runs once,
+at daemon init, over startup seeds only. So an account claimed by a session that
+already died can never rotate again — and when its token expires meanwhile, the
+row is stuck on `live-session-holds-token` with no way out (ORCA-224).
+
+`reconcileLiveClaudePtyGate` re-checks a blocking claim against the daemon before
+the rotation decision believes it. Its boundaries are what keep this a sharper
+distinction rather than a weaker protection:
+
+- The daemon that hosts the session is the only authority. `listLiveDaemonPtyIds`
+  returns `null` unless **every** daemon generation answered, and a `null`
+  inventory releases nothing. One unreachable adapter means unknown, not empty.
+  (Daemon init may fail open on that same signal because no PTY can exist before
+  it; at runtime that reasoning does not hold.)
+- A claim registered while the probe was in flight is kept, since the inventory
+  could not have seen it.
+- Launch reservations are never touched. They hold an account before any session
+  id exists, so no inventory can vouch for them.
+
+There is no signal for the case the ticket describes from the outside — "this
+CLI's login expired, so it can no longer use the token Orca is protecting for
+it". Nothing outside the CLI observes that. Process existence is the signal Orca
+does have, and a dead process cannot be stranded by a rotation.
+
+`beginManagedClaudeAccountMutation` is synchronous and still believes the gate
+without a re-check, so a stale claim can still block select/re-auth/remove until
+some rotation decision reconciles it.
+
 ## Known Limit
 
 "A pane cannot testify about a credential issued after it started" is decided in

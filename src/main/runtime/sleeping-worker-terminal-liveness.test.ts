@@ -86,6 +86,38 @@ function makeRuntime(
   } as never)
 }
 
+/** Same shape as makeRuntime, but with a session the runtime can write back to,
+ *  so a test can observe the resume record a close is supposed to retire. */
+function makeWritableRuntime(sleeping: Record<string, SleepingAgentSessionRecord>): {
+  runtime: OrcaRuntimeService
+  getSleeping: () => Record<string, SleepingAgentSessionRecord>
+  closeTerminalNotification: ReturnType<typeof vi.fn>
+} {
+  let session: WorkspaceSessionState = {
+    ...getDefaultWorkspaceSession(),
+    sleepingAgentSessionsByPaneKey: sleeping
+  }
+  const runtime = new OrcaRuntimeService({
+    getRepos: () => [LIVE_REPO],
+    getRepo: (id: string) => (id === REPO_ID ? LIVE_REPO : undefined),
+    getAllWorktreeMeta: () => ({ [WORKTREE_ID]: WORKTREE_META }),
+    getWorktreeMeta: (worktreeId: string) =>
+      worktreeId === WORKTREE_ID ? WORKTREE_META : undefined,
+    getWorkspaceSession: () => session,
+    setWorkspaceSession: (next: WorkspaceSessionState) => {
+      session = next
+    },
+    flushOrThrow: vi.fn()
+  } as never)
+  const closeTerminalNotification = vi.fn()
+  runtime.setNotifier({ closeTerminal: closeTerminalNotification } as never)
+  return {
+    runtime,
+    getSleeping: () => session.sleepingAgentSessionsByPaneKey ?? {},
+    closeTerminalNotification
+  }
+}
+
 /** Worker pane asleep (no PTY) next to a live shell pane in the same worktree —
  *  the shape a coordinator polls while a worker is mid-task. */
 function syncWorkerAsleepBesideLiveShell(runtime: OrcaRuntimeService): void {
@@ -394,7 +426,6 @@ describe('terminal.list liveness for sleeping workers', () => {
     await expect(
       runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 50 })
     ).rejects.toThrow('terminal_asleep')
-    await expect(runtime.closeTerminal(handle)).rejects.toThrow('terminal_asleep')
   })
 
   it('withholds sleeping rows from callers that require fresh PTY liveness', async () => {
@@ -405,6 +436,94 @@ describe('terminal.list liveness for sleeping workers', () => {
     await expect(
       runtime.listTerminals(WORKTREE_SELECTOR, 100, { requireFreshPtyLiveness: true })
     ).rejects.toThrow('terminal_liveness_unavailable')
+  })
+
+  // Why close breaks with read/send above: `terminal_asleep` tells the caller
+  // "wake it and try again", which is the right answer for a read and no answer
+  // at all for a close. Refusing it left a pane that `terminal.list` shows, the
+  // Claude credential gate counts, and nothing outside the UI could retire —
+  // the headless half of ORCA-224.
+  it('closes a sleeping pane instead of refusing it as asleep', async () => {
+    const { runtime, getSleeping, closeTerminalNotification } = makeWritableRuntime({
+      [WORKER_PANE_KEY]: sleepingRecord()
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    await expect(runtime.closeTerminal(handle)).resolves.toMatchObject({
+      handle,
+      tabId: WORKER_TAB_ID,
+      ptyKilled: false
+    })
+
+    expect(closeTerminalNotification).toHaveBeenCalledWith(WORKER_TAB_ID, undefined)
+    // Why the record too: leaving it behind relists the pane as sleeping on the
+    // caller's very next poll, so the close would read as a no-op.
+    expect(getSleeping()[WORKER_PANE_KEY]).toBeUndefined()
+    expect((await runtime.listTerminals(WORKTREE_SELECTOR)).terminals).toEqual([])
+  })
+
+  // A sleeping handle is minted only while the pane publishes no graph leaf, but
+  // it is cached by paneKey and survives the tab coming back — so the handle a
+  // caller is holding can outlive that leafless state.
+  it('closes only the pane when the tab republishes with a live sibling', async () => {
+    const { runtime, closeTerminalNotification } = makeWritableRuntime({
+      [WORKER_PANE_KEY]: sleepingRecord()
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    runtime.registerPty('pty-sibling', WORKTREE_ID)
+    runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          title: 'Worker',
+          activeLeafId: WORKER_LEAF_ID,
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          leafId: WORKER_LEAF_ID,
+          paneRuntimeId: 7,
+          ptyId: null
+        },
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          leafId: SHELL_LEAF_ID,
+          paneRuntimeId: 8,
+          ptyId: 'pty-sibling'
+        }
+      ]
+    })
+
+    await runtime.closeTerminal(handle)
+
+    // The pane, not the tab: the live sibling must survive.
+    expect(closeTerminalNotification).toHaveBeenCalledWith(WORKER_TAB_ID, 7)
+  })
+
+  it('closes a sleeping pane addressed with --tab', async () => {
+    const { runtime, getSleeping } = makeWritableRuntime({
+      [WORKER_PANE_KEY]: sleepingRecord()
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    await expect(runtime.closeTerminalTab(handle)).resolves.toMatchObject({
+      handle,
+      tabId: WORKER_TAB_ID,
+      closeMode: 'tab'
+    })
+    expect(getSleeping()[WORKER_PANE_KEY]).toBeUndefined()
   })
 
   it('drops the sleeping handle once the pane wakes', async () => {

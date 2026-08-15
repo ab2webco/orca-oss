@@ -28301,6 +28301,10 @@ export class OrcaRuntimeService {
   }
 
   async closeTerminal(handle: string): Promise<RuntimeTerminalClose> {
+    const sleepingRecord = this.sleepingHandleRecords.get(handle)
+    if (sleepingRecord) {
+      return this.closeSleepingTerminal(handle, sleepingRecord)
+    }
     const pty = this.getLivePtyForHandle(handle)
     this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
     if (pty) {
@@ -28346,7 +28350,69 @@ export class OrcaRuntimeService {
     return { handle, tabId: leaf.tabId, ptyKilled }
   }
 
+  /**
+   * Closes a pane whose agent is asleep. `terminal.read`/`send` answer such a
+   * handle with `terminal_asleep` because the pane is addressable again after a
+   * wake (ORCA-186) — but close is the one operation for which "asleep" is not a
+   * reason to refuse, and refusing it left a handle that `terminal.list` shows,
+   * the Claude credential gate counts, and nothing outside the UI could retire
+   * (ORCA-224).
+   */
+  private async closeSleepingTerminal(
+    handle: string,
+    record: SleepingAgentSessionRecord
+  ): Promise<RuntimeTerminalClose> {
+    const pane = parsePaneKey(record.paneKey)
+    if (!pane) {
+      throw new Error('terminal_handle_stale')
+    }
+    const tabId = record.tabId ?? pane.tabId
+    const leaf = this.leaves.get(this.getLeafKey(tabId, pane.leafId))
+    // Why: the resume record outlives the PTY, so leaving it behind relists the
+    // pane as sleeping on the caller's very next `terminal.list`.
+    this.forgetSleepingAgentSession(record)
+    this.sleepingHandlesByPaneKey.delete(record.paneKey)
+    this.sleepingHandleRecords.delete(handle)
+    this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
+    // Why the same rule as a PTY-backed close: address the pane when siblings
+    // remain, and the tab when this was the last one.
+    const siblingCount = this.countLeavesInTab(tabId)
+    this.notifier?.closeTerminal(tabId, leaf && siblingCount > 1 ? leaf.paneRuntimeId : undefined)
+    return { handle, tabId, ptyKilled: false }
+  }
+
+  /** Drops a sleeping pane's resume record so the pane cannot be relisted or
+   *  resumed after it was explicitly closed. */
+  private forgetSleepingAgentSession(record: SleepingAgentSessionRecord): void {
+    const store = this.store
+    const session = this.getWorkspaceSessionForWorktree(record.worktreeId)
+    if (!store?.setWorkspaceSession || !store.flushOrThrow || !session) {
+      return
+    }
+    if (!session.sleepingAgentSessionsByPaneKey?.[record.paneKey]) {
+      return
+    }
+    const next = structuredClone(session)
+    delete next.sleepingAgentSessionsByPaneKey?.[record.paneKey]
+    try {
+      this.setWorkspaceSessionForWorktree(record.worktreeId, next)
+      store.flushOrThrow()
+    } catch (error) {
+      this.setWorkspaceSessionForWorktree(record.worktreeId, session)
+      console.warn('[terminal] failed to drop the sleeping agent session record', {
+        paneKey: record.paneKey,
+        error
+      })
+    }
+  }
+
   async closeTerminalTab(handle: string): Promise<RuntimeTerminalClose> {
+    const sleepingRecord = this.sleepingHandleRecords.get(handle)
+    if (sleepingRecord) {
+      // Why not a separate whole-tab path: a sleeping pane has no PTY to kill,
+      // so the pane close already retires everything this handle owns.
+      return { ...(await this.closeSleepingTerminal(handle, sleepingRecord)), closeMode: 'tab' }
+    }
     const pty = this.getLivePtyForHandle(handle)
     if (pty) {
       const tabId = pty.pty.tabId
