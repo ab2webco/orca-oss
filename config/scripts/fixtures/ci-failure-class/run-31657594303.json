@@ -1,0 +1,940 @@
+{
+  "meta": {
+    "capturedFrom": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303",
+    "headSha": "96199bde573417288bf6222f8fafcbe21ecc17e8",
+    "note": "run and jobs are trimmed verbatim GitHub Actions API payloads (GET /actions/runs/{id} and /jobs). steps are kept only for jobs that did not succeed; successful jobs keep an empty steps array.",
+    "jobTimeoutMinutesAtHeadSha": {
+      "e2e.yml#build": 10,
+      "e2e.yml#e2e": 30,
+      "e2e.yml#changed-e2e": 30,
+      "e2e.yml#ssh-docker-watcher-isolation": 35,
+      "pr.yml#test": 15
+    }
+  },
+  "run": {
+    "conclusion": "failure",
+    "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303",
+    "id": 31657594303,
+    "name": "PR Checks",
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "jobs": [
+    {
+      "id": 94315437641,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "package (windows)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:24:50Z",
+      "completed_at": "2026-08-13T01:27:46Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437641",
+      "steps": []
+    },
+    {
+      "id": 94315437682,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "shell contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:21Z",
+      "completed_at": "2026-08-13T01:27:33Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437682",
+      "steps": []
+    },
+    {
+      "id": 94315437687,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "package",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:24:51Z",
+      "completed_at": "2026-08-13T01:26:17Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437687",
+      "steps": []
+    },
+    {
+      "id": 94315437701,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "static analysis",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:27Z",
+      "completed_at": "2026-08-13T01:34:24Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437701",
+      "steps": []
+    },
+    {
+      "id": 94315437705,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "detect e2e scope",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:23Z",
+      "completed_at": "2026-08-13T01:26:50Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437705",
+      "steps": []
+    },
+    {
+      "id": 94315437706,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "typecheck",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:18Z",
+      "completed_at": "2026-08-13T01:27:22Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437706",
+      "steps": []
+    },
+    {
+      "id": 94315437708,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "root directory guard",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:58Z",
+      "completed_at": "2026-08-13T01:27:24Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437708",
+      "steps": []
+    },
+    {
+      "id": 94315437723,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 10/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:00Z",
+      "completed_at": "2026-08-13T01:27:07Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437723",
+      "steps": []
+    },
+    {
+      "id": 94315437729,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "cross-version wire compatibility",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:14Z",
+      "completed_at": "2026-08-13T01:28:36Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437729",
+      "steps": []
+    },
+    {
+      "id": 94315437734,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 1/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:03Z",
+      "completed_at": "2026-08-13T01:27:11Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437734",
+      "steps": []
+    },
+    {
+      "id": 94315437739,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 3/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:30Z",
+      "completed_at": "2026-08-13T01:28:24Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437739",
+      "steps": []
+    },
+    {
+      "id": 94315437747,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "Git compatibility",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:24Z",
+      "completed_at": "2026-08-13T01:29:05Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437747",
+      "steps": []
+    },
+    {
+      "id": 94315437757,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 5/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:18Z",
+      "completed_at": "2026-08-13T01:27:25Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437757",
+      "steps": []
+    },
+    {
+      "id": 94315437763,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 14/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:28Z",
+      "completed_at": "2026-08-13T01:27:47Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437763",
+      "steps": []
+    },
+    {
+      "id": 94315437765,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "Windows platform tests",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:24:51Z",
+      "completed_at": "2026-08-13T01:27:11Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437765",
+      "steps": []
+    },
+    {
+      "id": 94315437774,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 8/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:55Z",
+      "completed_at": "2026-08-13T01:29:13Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437774",
+      "steps": []
+    },
+    {
+      "id": 94315437776,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 13/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:55Z",
+      "completed_at": "2026-08-13T01:28:01Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437776",
+      "steps": []
+    },
+    {
+      "id": 94315437777,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 11/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:41Z",
+      "completed_at": "2026-08-13T01:29:36Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437777",
+      "steps": []
+    },
+    {
+      "id": 94315437778,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 12/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:28:02Z",
+      "completed_at": "2026-08-13T01:30:02Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437778",
+      "steps": []
+    },
+    {
+      "id": 94315437780,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "managed hooks on Node 18",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:28:51Z",
+      "completed_at": "2026-08-13T01:29:42Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437780",
+      "steps": []
+    },
+    {
+      "id": 94315437781,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 7/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:25:31Z",
+      "completed_at": "2026-08-13T01:27:45Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437781",
+      "steps": []
+    },
+    {
+      "id": 94315437782,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 15/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:17Z",
+      "completed_at": "2026-08-13T01:28:53Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437782",
+      "steps": []
+    },
+    {
+      "id": 94315437784,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 6/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:28:26Z",
+      "completed_at": "2026-08-13T01:30:41Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437784",
+      "steps": []
+    },
+    {
+      "id": 94315437796,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 2/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:33Z",
+      "completed_at": "2026-08-13T01:28:49Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437796",
+      "steps": []
+    },
+    {
+      "id": 94315437815,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 9/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:56Z",
+      "completed_at": "2026-08-13T01:29:13Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437815",
+      "steps": []
+    },
+    {
+      "id": 94315437830,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 4/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:50Z",
+      "completed_at": "2026-08-13T01:30:16Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437830",
+      "steps": []
+    },
+    {
+      "id": 94315437863,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "tests node 24 16/16",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:26:40Z",
+      "completed_at": "2026-08-13T01:29:01Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315437863",
+      "steps": []
+    },
+    {
+      "id": 94315755342,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / build e2e app",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:27:09Z",
+      "completed_at": "2026-08-13T01:28:31Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94315755342",
+      "steps": []
+    },
+    {
+      "id": 94316018081,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 3-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:29:14Z",
+      "completed_at": "2026-08-13T01:46:53Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018081",
+      "steps": []
+    },
+    {
+      "id": 94316018084,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 2-of-10",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-08-13T01:29:07Z",
+      "completed_at": "2026-08-13T01:50:35Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018084",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:08Z",
+          "completed_at": "2026-08-13T01:29:10Z"
+        },
+        {
+          "number": 2,
+          "name": "Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:10Z",
+          "completed_at": "2026-08-13T01:29:17Z"
+        },
+        {
+          "number": 3,
+          "name": "Install native build tools",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:17Z",
+          "completed_at": "2026-08-13T01:29:26Z"
+        },
+        {
+          "number": 4,
+          "name": "Install xvfb",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:26Z",
+          "completed_at": "2026-08-13T01:29:26Z"
+        },
+        {
+          "number": 5,
+          "name": "Setup Node.js",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:26Z",
+          "completed_at": "2026-08-13T01:29:27Z"
+        },
+        {
+          "number": 6,
+          "name": "Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:27Z",
+          "completed_at": "2026-08-13T01:29:31Z"
+        },
+        {
+          "number": 7,
+          "name": "Use external node-gyp to avoid pnpm's bundled copy (Linux only)",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:31Z",
+          "completed_at": "2026-08-13T01:29:34Z"
+        },
+        {
+          "number": 8,
+          "name": "Install dependencies",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:34Z",
+          "completed_at": "2026-08-13T01:29:59Z"
+        },
+        {
+          "number": 9,
+          "name": "Download E2E build output",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:59Z",
+          "completed_at": "2026-08-13T01:30:03Z"
+        },
+        {
+          "number": 10,
+          "name": "Run E2E tests (2-of-10)",
+          "conclusion": "failure",
+          "started_at": "2026-08-13T01:30:03Z",
+          "completed_at": "2026-08-13T01:50:30Z"
+        },
+        {
+          "number": 11,
+          "name": "Upload Playwright traces",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:50:30Z",
+          "completed_at": "2026-08-13T01:50:32Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:50:32Z",
+          "completed_at": "2026-08-13T01:50:32Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Setup Node.js",
+          "conclusion": "skipped",
+          "started_at": "2026-08-13T01:50:32Z",
+          "completed_at": "2026-08-13T01:50:32Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:50:32Z",
+          "completed_at": "2026-08-13T01:50:32Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:50:32Z",
+          "completed_at": "2026-08-13T01:50:32Z"
+        }
+      ]
+    },
+    {
+      "id": 94316018087,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 5-of-10",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-08-13T01:29:14Z",
+      "completed_at": "2026-08-13T01:47:43Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018087",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:15Z",
+          "completed_at": "2026-08-13T01:29:16Z"
+        },
+        {
+          "number": 2,
+          "name": "Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:16Z",
+          "completed_at": "2026-08-13T01:29:23Z"
+        },
+        {
+          "number": 3,
+          "name": "Install native build tools",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:23Z",
+          "completed_at": "2026-08-13T01:29:32Z"
+        },
+        {
+          "number": 4,
+          "name": "Install xvfb",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:32Z",
+          "completed_at": "2026-08-13T01:29:32Z"
+        },
+        {
+          "number": 5,
+          "name": "Setup Node.js",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:32Z",
+          "completed_at": "2026-08-13T01:29:33Z"
+        },
+        {
+          "number": 6,
+          "name": "Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:33Z",
+          "completed_at": "2026-08-13T01:29:36Z"
+        },
+        {
+          "number": 7,
+          "name": "Use external node-gyp to avoid pnpm's bundled copy (Linux only)",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:36Z",
+          "completed_at": "2026-08-13T01:29:39Z"
+        },
+        {
+          "number": 8,
+          "name": "Install dependencies",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:39Z",
+          "completed_at": "2026-08-13T01:30:11Z"
+        },
+        {
+          "number": 9,
+          "name": "Download E2E build output",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:30:11Z",
+          "completed_at": "2026-08-13T01:30:13Z"
+        },
+        {
+          "number": 10,
+          "name": "Run E2E tests (5-of-10)",
+          "conclusion": "failure",
+          "started_at": "2026-08-13T01:30:13Z",
+          "completed_at": "2026-08-13T01:47:41Z"
+        },
+        {
+          "number": 11,
+          "name": "Upload Playwright traces",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:47:41Z",
+          "completed_at": "2026-08-13T01:47:41Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:47:41Z",
+          "completed_at": "2026-08-13T01:47:41Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Setup Node.js",
+          "conclusion": "skipped",
+          "started_at": "2026-08-13T01:47:41Z",
+          "completed_at": "2026-08-13T01:47:41Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:47:41Z",
+          "completed_at": "2026-08-13T01:47:42Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:47:42Z",
+          "completed_at": "2026-08-13T01:47:42Z"
+        }
+      ]
+    },
+    {
+      "id": 94316018101,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 6-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:30:04Z",
+      "completed_at": "2026-08-13T01:46:47Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018101",
+      "steps": []
+    },
+    {
+      "id": 94316018102,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 9-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:29:44Z",
+      "completed_at": "2026-08-13T01:54:14Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018102",
+      "steps": []
+    },
+    {
+      "id": 94316018103,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 7-of-10",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "started_at": "2026-08-13T01:29:39Z",
+      "completed_at": "2026-08-13T01:59:56Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018103",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:40Z",
+          "completed_at": "2026-08-13T01:29:43Z"
+        },
+        {
+          "number": 2,
+          "name": "Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:43Z",
+          "completed_at": "2026-08-13T01:29:50Z"
+        },
+        {
+          "number": 3,
+          "name": "Install native build tools",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:50Z",
+          "completed_at": "2026-08-13T01:29:59Z"
+        },
+        {
+          "number": 4,
+          "name": "Install xvfb",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:59Z",
+          "completed_at": "2026-08-13T01:29:59Z"
+        },
+        {
+          "number": 5,
+          "name": "Setup Node.js",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:29:59Z",
+          "completed_at": "2026-08-13T01:30:00Z"
+        },
+        {
+          "number": 6,
+          "name": "Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:30:00Z",
+          "completed_at": "2026-08-13T01:30:04Z"
+        },
+        {
+          "number": 7,
+          "name": "Use external node-gyp to avoid pnpm's bundled copy (Linux only)",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:30:04Z",
+          "completed_at": "2026-08-13T01:30:06Z"
+        },
+        {
+          "number": 8,
+          "name": "Install dependencies",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:30:06Z",
+          "completed_at": "2026-08-13T01:30:31Z"
+        },
+        {
+          "number": 9,
+          "name": "Download E2E build output",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:30:31Z",
+          "completed_at": "2026-08-13T01:30:35Z"
+        },
+        {
+          "number": 10,
+          "name": "Run E2E tests (7-of-10)",
+          "conclusion": "cancelled",
+          "started_at": "2026-08-13T01:30:35Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        },
+        {
+          "number": 11,
+          "name": "Upload Playwright traces",
+          "conclusion": "skipped",
+          "started_at": "2026-08-13T01:59:52Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:59:52Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Setup Node.js",
+          "conclusion": "skipped",
+          "started_at": "2026-08-13T01:59:52Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:59:52Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:59:52Z",
+          "completed_at": "2026-08-13T01:59:52Z"
+        }
+      ]
+    },
+    {
+      "id": 94316018105,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 8-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:30:18Z",
+      "completed_at": "2026-08-13T01:41:25Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018105",
+      "steps": []
+    },
+    {
+      "id": 94316018113,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / ssh docker watcher isolation",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:39:45Z",
+      "completed_at": "2026-08-13T01:43:23Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018113",
+      "steps": []
+    },
+    {
+      "id": 94316018124,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 1-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:30:18Z",
+      "completed_at": "2026-08-13T01:50:54Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018124",
+      "steps": []
+    },
+    {
+      "id": 94316018130,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 4-of-10",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-08-13T01:34:27Z",
+      "completed_at": "2026-08-13T01:56:46Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018130",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:28Z",
+          "completed_at": "2026-08-13T01:34:30Z"
+        },
+        {
+          "number": 2,
+          "name": "Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:30Z",
+          "completed_at": "2026-08-13T01:34:37Z"
+        },
+        {
+          "number": 3,
+          "name": "Install native build tools",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:37Z",
+          "completed_at": "2026-08-13T01:34:46Z"
+        },
+        {
+          "number": 4,
+          "name": "Install xvfb",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:46Z",
+          "completed_at": "2026-08-13T01:34:46Z"
+        },
+        {
+          "number": 5,
+          "name": "Setup Node.js",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:46Z",
+          "completed_at": "2026-08-13T01:34:47Z"
+        },
+        {
+          "number": 6,
+          "name": "Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:47Z",
+          "completed_at": "2026-08-13T01:34:50Z"
+        },
+        {
+          "number": 7,
+          "name": "Use external node-gyp to avoid pnpm's bundled copy (Linux only)",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:50Z",
+          "completed_at": "2026-08-13T01:34:53Z"
+        },
+        {
+          "number": 8,
+          "name": "Install dependencies",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:34:53Z",
+          "completed_at": "2026-08-13T01:35:20Z"
+        },
+        {
+          "number": 9,
+          "name": "Download E2E build output",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:35:20Z",
+          "completed_at": "2026-08-13T01:35:24Z"
+        },
+        {
+          "number": 10,
+          "name": "Run E2E tests (4-of-10)",
+          "conclusion": "failure",
+          "started_at": "2026-08-13T01:35:24Z",
+          "completed_at": "2026-08-13T01:56:41Z"
+        },
+        {
+          "number": 11,
+          "name": "Upload Playwright traces",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:56:41Z",
+          "completed_at": "2026-08-13T01:56:43Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Setup pnpm",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:56:43Z",
+          "completed_at": "2026-08-13T01:56:43Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Setup Node.js",
+          "conclusion": "skipped",
+          "started_at": "2026-08-13T01:56:43Z",
+          "completed_at": "2026-08-13T01:56:43Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:56:43Z",
+          "completed_at": "2026-08-13T01:56:43Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success",
+          "started_at": "2026-08-13T01:56:43Z",
+          "completed_at": "2026-08-13T01:56:43Z"
+        }
+      ]
+    },
+    {
+      "id": 94316018152,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / e2e 10-of-10",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:30:43Z",
+      "completed_at": "2026-08-13T01:48:11Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018152",
+      "steps": []
+    },
+    {
+      "id": 94316018833,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "e2e (full) / changed e2e specs",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-08-13T01:28:32Z",
+      "completed_at": "2026-08-13T01:28:32Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316018833",
+      "steps": []
+    },
+    {
+      "id": 94316970477,
+      "run_id": 31657594303,
+      "workflow_name": "PR Checks",
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-08-13T01:40:08Z",
+      "completed_at": "2026-08-13T01:40:11Z",
+      "html_url": "https://github.com/ab2webco/orca-oss/actions/runs/31657594303/job/94316970477",
+      "steps": []
+    }
+  ]
+}
