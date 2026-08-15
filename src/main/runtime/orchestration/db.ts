@@ -1883,12 +1883,27 @@ export class OrchestrationDb {
     return { terminalHandle: params.terminalHandle, paneKey: params.paneKey }
   }
 
+  // Why: caller-side fence jurisdiction. Widening this fences more callers, so keep it narrow.
   isLegacyCoordinatorHandle(runId: string, terminalHandle: string): boolean {
     const principal = this.getLegacyCoordinatorPrincipal(runId)
     if (principal) {
       return principal.terminal_handle === terminalHandle
     }
     return this.getUniqueLegacyCoordinatorHandle(runId) === terminalHandle
+  }
+
+  // Why: recipient-side permit for legacy lifecycle mail. After a takeover revokes the old principal
+  // the replacement coordinator is only reachable through the Run binding.
+  isLegacyCoordinatorDeliveryTarget(runId: string, terminalHandle: string): boolean {
+    if (this.isLegacyCoordinatorHandle(runId, terminalHandle)) {
+      return true
+    }
+    if (this.getRunRaw(runId)?.coordinator_handle !== terminalHandle) {
+      return false
+    }
+    // Why: must match resolveLegacyWorkerCoordinatorDelivery's takeover test. A still-committed
+    // principal routes legacy_direct to this handle, and no reader can see that mailbox.
+    return this.getLegacyCoordinatorPrincipal(runId)?.status !== 'committed'
   }
 
   findLegacyWorkerCompletion(params: {
