@@ -56,7 +56,16 @@ type TraceEvent = {
 }
 
 const ANCHOR_MARK = 'orca-task-trace-anchor'
-const TRACE_CATEGORIES = ['disabled-by-default-devtools.timeline', 'blink.user_timing']
+/**
+ * `devtools.timeline` carries the JS-level events (ORCA-239). Without it a
+ * 900ms page task of pure JS reports no child at all — measured, not assumed —
+ * so an empty frame list read as "nothing instrumented ran here".
+ */
+const TRACE_CATEGORIES = [
+  'devtools.timeline',
+  'disabled-by-default-devtools.timeline',
+  'blink.user_timing'
+]
 /** Two tasks closer than this never let a posted task through between them. */
 const IDLE_GAP_MS = 1
 const CONTIGUOUS_FRACTION = 0.8
@@ -190,6 +199,16 @@ export function worstBusyRun(
   return worst
 }
 
+/**
+ * Trace timestamps minus `performance.now()`, from the anchor mark. Null when
+ * the trace never saw the mark. Other instruments on the same renderer share
+ * this clock, so they can borrow the conversion instead of deriving their own.
+ */
+export function traceClockOffsetMs(handle: RendererTaskTraceHandle): number | null {
+  const anchor = handle.events.find((event) => event.name === ANCHOR_MARK && event.ts !== undefined)
+  return anchor?.ts === undefined ? null : anchor.ts / 1000 - handle.anchorPerfNowMs
+}
+
 /** Largest trace events nested inside a task: what the task was doing. */
 export function framesInsideTask(
   handle: RendererTaskTraceHandle,
@@ -203,6 +222,8 @@ export function framesInsideTask(
   const offsetMs = anchor.ts / 1000 - handle.anchorPerfNowMs
   const startUs = (task.startMs + offsetMs) * 1000
   const endUs = (task.startMs + task.durationMs + offsetMs) * 1000
+  // Overlap, not containment: a child that fills its parent is the interesting
+  // case and strict containment drops it on a microsecond of quantization.
   return handle.events
     .filter(
       (event) =>
@@ -211,17 +232,63 @@ export function framesInsideTask(
         event.name !== 'RunTask' &&
         event.ts !== undefined &&
         event.dur !== undefined &&
-        event.ts >= startUs &&
-        event.ts + event.dur <= endUs &&
-        event.dur / 1000 >= MIN_FRAME_MS
+        overlapMs(event.ts, event.ts + event.dur, startUs, endUs) >= MIN_FRAME_MS
     )
     .map((event) => ({
       name: event.name ?? 'unknown',
-      durationMs: (event.dur ?? 0) / 1000,
+      durationMs: overlapMs(event.ts ?? 0, (event.ts ?? 0) + (event.dur ?? 0), startUs, endUs),
       source: callFrameSource(event)
     }))
     .sort((a, b) => b.durationMs - a.durationMs)
     .slice(0, limit)
+}
+
+function overlapMs(
+  startUs: number,
+  endUs: number,
+  windowStartUs: number,
+  windowEndUs: number
+): number {
+  return Math.max(0, Math.min(endUs, windowEndUs) - Math.max(startUs, windowStartUs)) / 1000
+}
+
+/**
+ * Every traced event overlapping a task, by name — including the sub-millisecond
+ * ones `framesInsideTask` drops. An empty census and a census of a thousand
+ * 0.1ms events are different faults, and a frame list shows neither.
+ */
+export function taskEventCensus(
+  handle: RendererTaskTraceHandle,
+  task: RendererTracedTask
+): { name: string; count: number; totalMs: number }[] {
+  const anchor = handle.events.find((event) => event.name === ANCHOR_MARK && event.ts !== undefined)
+  if (!anchor?.ts) {
+    return []
+  }
+  const offsetMs = anchor.ts / 1000 - handle.anchorPerfNowMs
+  const startUs = (task.startMs + offsetMs) * 1000
+  const endUs = (task.startMs + task.durationMs + offsetMs) * 1000
+  const byName = new Map<string, { name: string; count: number; totalMs: number }>()
+  for (const event of handle.events) {
+    if (event.pid !== anchor.pid || event.tid !== anchor.tid || event.name === 'RunTask') {
+      continue
+    }
+    if (event.ts === undefined) {
+      continue
+    }
+    const eventEndUs = event.ts + (event.dur ?? 0)
+    if (eventEndUs < startUs || event.ts > endUs) {
+      continue
+    }
+    const name = event.name ?? 'unknown'
+    const entry = byName.get(name) ?? { name, count: 0, totalMs: 0 }
+    entry.count += 1
+    entry.totalMs += overlapMs(event.ts, eventEndUs, startUs, endUs)
+    byName.set(name, entry)
+  }
+  return [...byName.values()]
+    .map((entry) => ({ ...entry, totalMs: Number(entry.totalMs.toFixed(1)) }))
+    .sort((a, b) => b.totalMs - a.totalMs || b.count - a.count)
 }
 
 function callFrameSource(event: TraceEvent): string | null {

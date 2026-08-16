@@ -6,10 +6,13 @@ import {
 } from './helpers/renderer-main-thread-block-probe'
 import {
   formatBusyRun,
+  framesInsideTask,
   startRendererTaskTrace,
   stopRendererTaskTrace,
+  taskEventCensus,
   worstBusyRun,
-  type RendererBusyRun
+  type RendererBusyRun,
+  type RendererTracedFrame
 } from './helpers/renderer-task-trace'
 
 /**
@@ -48,7 +51,14 @@ const ARMS: { label: string; inject: Injection }[] = [
   { label: 'short-chunks', inject: 'short-chunks' }
 ]
 
-type ArmResult = { label: string; gapMs: number; run: RendererBusyRun; anchored: boolean }
+type ArmResult = {
+  label: string
+  gapMs: number
+  run: RendererBusyRun
+  anchored: boolean
+  inside: RendererTracedFrame[]
+  census: { name: string; count: number; totalMs: number }[]
+}
 
 test('the task trace tells one long task from a starved queue the sampler reads alike @freeze-repro', async ({
   orcaPage
@@ -74,9 +84,17 @@ test('the task trace tells one long task from a starved queue the sampler reads 
     await orcaPage.waitForTimeout(WINDOW_HALF_MS)
     const traced = await stopRendererTaskTrace(trace)
     const run = worstBusyRun(traced)
+    const longest = [...traced.tasks].sort((a, b) => b.durationMs - a.durationMs)[0]
 
     console.log('[trace calibration]', formatBusyRun(run, arm.label))
-    measured.push({ label: arm.label, gapMs: block.maxBlockMs, run, anchored: traced.anchored })
+    measured.push({
+      label: arm.label,
+      gapMs: block.maxBlockMs,
+      run,
+      anchored: traced.anchored,
+      inside: longest ? framesInsideTask(trace, longest) : [],
+      census: longest ? taskEventCensus(trace, longest) : []
+    })
   }
 
   console.log(
@@ -89,7 +107,13 @@ test('the task trace tells one long task from a starved queue the sampler reads 
         busyRunMs: Number(entry.run.busyRunMs.toFixed(1)),
         tasksInRun: entry.run.taskCount,
         maxTaskMs: Number(entry.run.maxTaskMs.toFixed(1)),
-        shape: entry.run.shape
+        shape: entry.run.shape,
+        inside: entry.inside.map((frame) => ({
+          name: frame.name,
+          durationMs: Number(frame.durationMs.toFixed(1)),
+          source: frame.source
+        })),
+        census: entry.census
       })),
       null,
       2
