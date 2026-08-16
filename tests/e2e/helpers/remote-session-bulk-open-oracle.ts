@@ -39,7 +39,7 @@ export const SOFT_FREEZE_LAG_MS = 2_000
 export const HARD_FREEZE_LAG_MS = 5_000
 /**
  * Soft freeze signal — one task the UI cannot interrupt, which is what a user
- * feels. Derived, not chosen: 2.5x the worst of five measured CI runs against a
+ * feels. Derived, not chosen: 2.5x the worst of six measured CI runs against a
  * composited window, rounded up to the next 50ms (2.5 x 235.1 = 587.8 -> 600).
  *
  * The six: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563, 31954298734),
@@ -50,7 +50,7 @@ export const HARD_FREEZE_LAG_MS = 5_000
  * n=6 is not a distribution, and the margin is sized for that rather than for
  * confidence in the number. Read the cost before treating 600 as tight: it sits
  * 2.6x above the worst measured task, so a regression has to more than double
- * the longest task to trip it. That is the price of five samples, not a claim
+ * the longest task to trip it. That is the price of six samples, not a claim
  * about where the product's budget is. The value is recorded on green so CI
  * builds the real distribution and this can be tightened against it.
  * See docs/reference/timing-budget-assertions.md.
@@ -61,7 +61,7 @@ export const HARD_FREEZE_TASK_MS = 1_500
 /**
  * Hang detector on the busy run, deliberately loose: that number is throughput
  * (870-1322 tasks back to back), not a stall, and the two do not move together
- * — the run that measured the longest busy run of the five, 1725.7ms, also
+ * — the run that measured the longest busy run, 1725.7ms, also
  * measured the second *lowest* longest task. 2.5x that worst, rounded up.
  */
 export const CATASTROPHIC_BUSY_RUN_MS = 4_500
@@ -84,7 +84,7 @@ export type BulkOpenFreezeReport = {
    * Longest single task in that stretch — what a gap cannot say. A freeze is
    * one task the UI cannot interrupt; a saturated queue of short ones is a
    * different fault with a different fix, and the two read alike as a gap
-   * (ORCA-230). Recorded now, asserted on once CI has a distribution of it.
+   * (ORCA-230). This is the quantity the soft/hard verdict reads.
    */
   bulkOpenMaxTaskMs: number
   hiddenFloodMaxLagMs: number
