@@ -16,6 +16,10 @@ import { waitForActivePanePtyId } from './terminal'
 /** Multi-worktree load: several agent-like streaming terminals per worktree. */
 export const BULK_OPEN_WORKTREE_COUNT = 3
 export const BULK_OPEN_TABS_PER_WORKTREE = 4
+/** Agent backlog the remotes build up while the terminal view is away. */
+const FLOOD_ACCUMULATION_MS = 4_000
+export const HIDDEN_FLOOD_WINDOW_MS = 2_000
+const STORM_SETTLE_MS = 3_000
 /**
  * Soft freeze signal — UI feels stuck. Unchanged at 2s, now with a derivation
  * (ORCA-199): the number it is compared against is the longest stretch the
@@ -207,23 +211,8 @@ export async function seedBulkOpenRemoteSessions(
   }
 }
 
-/**
- * Repro R1 core: leave remotes streaming hidden, then burst-open sessions
- * (reopening remote sessions after agents have been writing in the background).
- */
-export async function runBulkOpenFreezeOracle(
-  page: Page,
-  sessions: BulkOpenSession[],
-  opts: {
-    topology: BulkOpenFreezeReport['topology']
-    versionHint?: string
-    reportDir?: string
-  }
-): Promise<BulkOpenFreezeReport> {
-  const notes: string[] = []
-  const worktreeIds = [...new Set(sessions.map((s) => s.worktreeId))]
-
-  // Leave terminal view so panes can park / go inactive while flooding.
+/** Leave the terminal view so panes park, then let the remote flood accumulate. */
+export async function settleBeforeBulkOpen(page: Page): Promise<void> {
   await page.evaluate(() => window.__store?.getState().setActiveView('tasks'))
   await page.evaluate(
     () =>
@@ -231,21 +220,16 @@ export async function runBulkOpenFreezeOracle(
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
   )
-  // Accumulate remote flood for several seconds (agent backlog).
-  await page.waitForTimeout(4_000)
+  await page.waitForTimeout(FLOOD_ACCUMULATION_MS)
+}
 
-  // Same instrument, same page, no bulk open inside it: the control for the
-  // measured window below, and the only thing that makes a large bulk-open
-  // reading attributable to the bulk open.
-  const hiddenProbe = await startRendererMainThreadBlockProbe(page)
-  await page.waitForTimeout(2_000)
-  const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
-  await hiddenProbe.dispose()
-  const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
-  notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
-
-  // Burst open remote sessions (worktree + tab activate).
-  const openProbe = await startRendererMainThreadBlockProbe(page)
+/**
+ * The burst itself. Shared so the shape diagnostic
+ * (remote-session-bulk-open-block-shape.spec.ts) drives the identical storm
+ * rather than a lookalike.
+ */
+export async function runBulkOpenStorm(page: Page, sessions: BulkOpenSession[]): Promise<number> {
+  const worktreeIds = [...new Set(sessions.map((session) => session.worktreeId))]
   const openStarted = Date.now()
   for (const worktreeId of worktreeIds) {
     const tabs = sessions.filter((session) => session.worktreeId === worktreeId)
@@ -269,11 +253,45 @@ export async function runBulkOpenFreezeOracle(
     }
   }
   // Let the storm settle enough to measure residual lag.
-  await page.waitForTimeout(3_000)
+  await page.waitForTimeout(STORM_SETTLE_MS)
+  return Date.now() - openStarted
+}
+
+/**
+ * Repro R1 core: leave remotes streaming hidden, then burst-open sessions
+ * (reopening remote sessions after agents have been writing in the background).
+ */
+export async function runBulkOpenFreezeOracle(
+  page: Page,
+  sessions: BulkOpenSession[],
+  opts: {
+    topology: BulkOpenFreezeReport['topology']
+    versionHint?: string
+    reportDir?: string
+  }
+): Promise<BulkOpenFreezeReport> {
+  const notes: string[] = []
+  const worktreeIds = [...new Set(sessions.map((s) => s.worktreeId))]
+
+  await settleBeforeBulkOpen(page)
+
+  // Same instrument, same page, no bulk open inside it: the control for the
+  // measured window below, and the only thing that makes a large bulk-open
+  // reading attributable to the bulk open.
+  const hiddenProbe = await startRendererMainThreadBlockProbe(page)
+  await page.waitForTimeout(HIDDEN_FLOOD_WINDOW_MS)
+  const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
+  await hiddenProbe.dispose()
+  const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
+  notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
+
+  // Burst open remote sessions (worktree + tab activate).
+  const openProbe = await startRendererMainThreadBlockProbe(page)
+  const openWallMs = await runBulkOpenStorm(page, sessions)
   const bulkOpen = await readRendererBlockWindow(openProbe, 'bulk open')
   await openProbe.dispose()
   const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
-  notes.push(`bulk open wall=${Date.now() - openStarted}ms`)
+  notes.push(`bulk open wall=${openWallMs}ms`)
   notes.push(formatBlockWindow(bulkOpen, 'bulk open'))
 
   // Confirm last session is live after the storm (host PTYs survived).

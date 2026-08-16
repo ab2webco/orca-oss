@@ -8,6 +8,8 @@ export type RendererBlockWindow = {
   maxBlockAtMs: number
   /** Tasks the sampler serviced. Near-zero means the instrument, not the renderer, was dead. */
   sampleCount: number
+  /** `performance.now()` at window start, so another instrument's entries can be lined up with it. */
+  startedAtMs: number
   windowMs: number
 }
 
@@ -55,6 +57,7 @@ export async function startRendererMainThreadBlockProbe(
       maxBlockMs: number
       maxBlockAtMs: number
       sampleCount: number
+      startedAtMs: number
       windowMs: number
     } | null = null
     channel.port1.onmessage = (): void => {
@@ -83,6 +86,7 @@ export async function startRendererMainThreadBlockProbe(
           maxBlockMs,
           maxBlockAtMs,
           sampleCount,
+          startedAtMs: startedAt,
           windowMs: performance.now() - startedAt
         }
         channel.port1.close()
