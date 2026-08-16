@@ -14,6 +14,13 @@
  * phases it enters. V8 stack sampling over the same window names what ran
  * inside it, which the trace cannot say at any category setting.
  *
+ * What they found (run 31965460025): the storm's long tasks are two different
+ * things. The longest, 214-250ms, is one React commit that mounts terminal
+ * panes — 93% under react-dom's commit phase, and diffuse inside it, no leaf
+ * above 11ms. The next tier, 123-128ms, is a `TimerFire` into xterm's
+ * `_innerWrite` -> `parse` -> `print`/`scroll` at 94% of the task, entered from
+ * pane-terminal-output-scheduler.ts:854.
+ *
  * Four arms, one storm each:
  *
  * - `never-shown, ORCA-230 categories` and `never-shown` differ only in what
