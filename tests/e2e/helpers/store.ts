@@ -254,8 +254,10 @@ export async function switchToWorktree(page: Page, worktreeId: string): Promise<
  * Ensure the active tab is a terminal and that the first terminal tab exists.
  *
  * Why: the first terminal tab is created by a renderer effect after session
- * hydration. Waiting on store state is more reliable than DOM visibility in
- * hidden-window mode and avoids racing that initial auto-create step.
+ * hydration, so the store is driven directly to avoid racing that auto-create
+ * step. The tab bar paints a render later, and callers count
+ * `[data-testid="sortable-tab"]` nodes, so the store state alone is not enough
+ * to resolve on — a baseline read one render early sees 0 tabs (ORCA-243).
  */
 export async function ensureTerminalVisible(page: Page, timeoutMs = 10_000): Promise<void> {
   await expect
@@ -298,11 +300,25 @@ export async function ensureTerminalVisible(page: Page, timeoutMs = 10_000): Pro
           if (state.activeTabType !== 'terminal' || state.activeWorktreeId !== worktreeId) {
             return false
           }
-          return (state.tabsByWorktree[worktreeId] ?? []).some(
-            (tab) => tab.id === state.activeTabId
+          const worktreeTabs = state.tabsByWorktree[worktreeId] ?? []
+          if (!worktreeTabs.some((tab) => tab.id === state.activeTabId)) {
+            return false
+          }
+
+          // Read the DOM in the same tick as the store so the two cannot drift
+          // between reads. Every store tab must have painted, not just the
+          // active one: a caller's baseline count is wrong while any is missing.
+          const renderedTabIds = new Set(
+            Array.from(document.querySelectorAll('[data-testid="sortable-tab"]')).map((node) =>
+              node.getAttribute('data-tab-id')
+            )
           )
+          return worktreeTabs.every((tab) => renderedTabIds.has(tab.id))
         }),
-      { timeout: timeoutMs, message: 'No active terminal tab found for current worktree' }
+      {
+        timeout: timeoutMs,
+        message: 'Active terminal tab did not reach the tab bar for current worktree'
+      }
     )
     .toBe(true)
 }
