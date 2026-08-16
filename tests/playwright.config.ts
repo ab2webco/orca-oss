@@ -50,6 +50,18 @@ export default defineConfig({
         orcaHeadful: false
       }
     },
+    // Why a project and not a --grep: a project's grepInvert applies on top of
+    // CLI --grep, so nothing passed on the command line can reach a spec
+    // electron-headless has already excluded.
+    {
+      name: 'electron-ondemand',
+      testMatch: '**/*.spec.ts',
+      grep: /@ondemand/,
+      grepInvert: /@headful/,
+      metadata: {
+        orcaHeadful: false
+      }
+    },
     {
       name: 'electron-headful',
       testMatch: '**/*.spec.ts',
