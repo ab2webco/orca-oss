@@ -7,8 +7,10 @@
  *   R1: headless Remote Orca host + paired desktop web client (paired-remote-server)
  *
  * Measurement:
- *   renderer timer drift during hidden flood + bulk worktree/tab open.
- *   soft freeze >= 2s, hard freeze >= 5s.
+ *   main-thread task boundaries during hidden flood + bulk worktree/tab open.
+ *   Soft freeze is one task >= 600ms, hard freeze one task >= 1500ms; the busy
+ *   run carries only a 4500ms hang ceiling because it is throughput, not a
+ *   stall. All four derived in remote-session-bulk-open-oracle.ts.
  *
  * Run:
  *   SKIP_BUILD=1 pnpm exec playwright test \
@@ -30,10 +32,11 @@ import {
   type PairedWebClient
 } from './helpers/paired-electron-client'
 import {
-  HARD_FREEZE_LAG_MS,
+  CATASTROPHIC_BUSY_RUN_MS,
+  HARD_FREEZE_TASK_MS,
   runBulkOpenFreezeOracle,
   seedBulkOpenRemoteSessions,
-  SOFT_FREEZE_LAG_MS
+  SOFT_FREEZE_TASK_MS
 } from './helpers/remote-session-bulk-open-oracle'
 import {
   runHostFocusStorm,
@@ -176,7 +179,8 @@ test('R1 paired remote bulk-open freeze oracle @freeze-repro', async ({
         `HARD FREEZE signal: bulkOpenMaxLagMs=${report.bulkOpenMaxLagMs.toFixed(0)} ` +
           `bulkOpenMaxTaskMs=${report.bulkOpenMaxTaskMs.toFixed(0)} ` +
           `interactionProbeMs=${report.interactionProbeMs.toFixed(0)} ` +
-          `(threshold ${HARD_FREEZE_LAG_MS}ms). notes=${report.notes.join('; ')}`
+          `(task ceiling ${HARD_FREEZE_TASK_MS}ms, busy-run ceiling ${CATASTROPHIC_BUSY_RUN_MS}ms). ` +
+          `notes=${report.notes.join('; ')}`
       )
     }
     if (report.softFreeze) {
@@ -184,7 +188,7 @@ test('R1 paired remote bulk-open freeze oracle @freeze-repro', async ({
         `SOFT FREEZE signal: bulkOpenMaxLagMs=${report.bulkOpenMaxLagMs.toFixed(0)} ` +
           `bulkOpenMaxTaskMs=${report.bulkOpenMaxTaskMs.toFixed(0)} ` +
           `interactionProbeMs=${report.interactionProbeMs.toFixed(0)} ` +
-          `(threshold ${SOFT_FREEZE_LAG_MS}ms). notes=${report.notes.join('; ')}`
+          `(task ceiling ${SOFT_FREEZE_TASK_MS}ms). notes=${report.notes.join('; ')}`
       )
     }
 

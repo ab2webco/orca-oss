@@ -22,26 +22,44 @@ const FLOOD_ACCUMULATION_MS = 4_000
 export const HIDDEN_FLOOD_WINDOW_MS = 2_000
 const STORM_SETTLE_MS = 3_000
 /**
- * Soft freeze signal — UI feels stuck.
+ * Soft/hard freeze against the longest unserviced stretch.
  *
- * Kept at 2s and still compared against the longest stretch the main thread
- * went unserviced, but the derivation ORCA-199 wrote here was wrong and is
- * withdrawn (ORCA-230). The 1017.7 / 1017.8ms it called "real product
- * behaviour" was the harness: with the paired client's window never shown, two
- * tasks per storm run ~1017ms on a single ~1004ms compositor `Commit`, and
- * showing the window — or driving one second of animation frames first —
- * removes them, leaving a longest task of 217-235ms. The oracle now shows its
- * window, so this ceiling no longer half-spends itself on that.
+ * No longer this oracle's verdict (ORCA-230) — see the task ceilings below.
+ * Kept because ssh-docker-bulk-open-freeze-repro.spec.ts asserts on them over
+ * its own topology, which has no measurements here and must not inherit a
+ * ceiling derived from this one.
  *
- * It is deliberately NOT re-derived yet: what remains under a shown window is a
- * 1.1-1.2s busy run of 870-1300 tasks, measured twice, and two samples are not
- * a distribution. `bulkOpenMaxTaskMs` is recorded on green so the distribution
- * builds itself; the ceiling moves to that quantity once it exists.
- * See docs/reference/timing-budget-assertions.md.
+ * The derivation ORCA-199 left here is withdrawn: the 1017.7 / 1017.8ms it
+ * called "real product behaviour" was the harness. With the paired client's
+ * window never shown, two tasks per storm run ~1017ms on a single ~1004ms
+ * compositor `Commit`; showing the window removes them. Nothing below may be
+ * re-derived from those numbers.
  */
 export const SOFT_FREEZE_LAG_MS = 2_000
-/** Hard freeze signal — matches trusted "screen fully frozen" reports. */
 export const HARD_FREEZE_LAG_MS = 5_000
+/**
+ * Soft freeze signal — one task the UI cannot interrupt, which is what a user
+ * feels. Derived, not chosen: 2.5x the worst of five measured CI runs against a
+ * composited window, rounded up to the next 50ms (2.5 x 235.1 = 587.8 -> 600).
+ *
+ * The five: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563, 31954298734)
+ * and 171.0 / 235.1 (runs 31951413594, 31952659728, shown arm of the shape
+ * diagnostic over the identical storm). Range 171.0-235.1, a 1.4x spread.
+ *
+ * n=5 is not a distribution, and the margin is sized for that rather than for
+ * confidence in the number: the value is recorded on green so CI builds the
+ * real one. See docs/reference/timing-budget-assertions.md.
+ */
+export const SOFT_FREEZE_TASK_MS = 600
+/** Hard freeze — "screen fully frozen". 2.5x the soft ceiling, the ratio it had before. */
+export const HARD_FREEZE_TASK_MS = 1_500
+/**
+ * Hang detector on the busy run, deliberately loose: that number is throughput
+ * (870-1322 tasks back to back), not a stall, and the two do not move together
+ * — the run that measured the longest busy run of the five, 1725.7ms, also
+ * measured the second *lowest* longest task. 2.5x that worst, rounded up.
+ */
+export const CATASTROPHIC_BUSY_RUN_MS = 4_500
 
 export type BulkOpenSession = {
   marker: string
@@ -338,8 +356,12 @@ export async function runBulkOpenFreezeOracle(
     hiddenFloodMaxLagMs,
     hiddenFloodMaxTaskMs: hiddenFlood.maxTaskMs,
     interactionProbeMs,
-    hardFreeze: bulkOpenMaxLagMs >= HARD_FREEZE_LAG_MS || interactionProbeMs >= HARD_FREEZE_LAG_MS,
-    softFreeze: bulkOpenMaxLagMs >= SOFT_FREEZE_LAG_MS || interactionProbeMs >= SOFT_FREEZE_LAG_MS,
+    hardFreeze:
+      bulkOpen.maxTaskMs >= HARD_FREEZE_TASK_MS ||
+      interactionProbeMs >= HARD_FREEZE_TASK_MS ||
+      bulkOpenMaxLagMs >= CATASTROPHIC_BUSY_RUN_MS,
+    softFreeze:
+      bulkOpen.maxTaskMs >= SOFT_FREEZE_TASK_MS || interactionProbeMs >= SOFT_FREEZE_TASK_MS,
     sessionCount: sessions.length,
     worktreeCount: worktreeIds.length,
     topology: opts.topology,
