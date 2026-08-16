@@ -5,10 +5,11 @@ import {
   toHostSessionTabId,
   toWebTerminalSurfaceTabId
 } from '../../../src/shared/terminal-surface-id'
+import { readPairedRetentionSample } from '../paired-runtime-retention-metrics'
 import {
-  readPairedRetentionSample,
-  startRendererLagProbe
-} from '../paired-runtime-retention-metrics'
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe
+} from './renderer-main-thread-block-probe'
 import { expect } from './orca-app'
 import { verifyHiddenPairedTerminalOutputSuppression } from './paired-terminal-hidden-output-oracle'
 import { createPairedTerminalParkingFixture } from './paired-terminal-parking-fixture'
@@ -141,7 +142,7 @@ export async function runPairedTerminalParkingOracle(
     )
     expect(baseline.bufferCells).toBeGreaterThan(MIN_STAGED_BUFFER_CELLS)
 
-    const lagProbe = await startRendererLagProbe(page)
+    const lagProbe = await startRendererMainThreadBlockProbe(page)
     let maxLagMs = Number.POSITIVE_INFINITY
     let lagProbeStopped = false
     try {
@@ -182,7 +183,7 @@ export async function runPairedTerminalParkingOracle(
           parked: TARGET_WORKTREE_COUNT - 1,
           retentionBudgetEnabled: false
         })
-      maxLagMs = await lagProbe.evaluate((probe) => probe.stop())
+      maxLagMs = (await readRendererBlockWindow(lagProbe, 'paired parking eviction')).maxBlockMs
       lagProbeStopped = true
     } finally {
       if (!lagProbeStopped) {

@@ -1,6 +1,9 @@
 import type { Page } from '@stablyai/playwright-test'
 import type { RuntimeTerminalRead } from '../../../src/shared/runtime-types'
-import { startRendererLagProbe } from '../paired-runtime-retention-metrics'
+import {
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe
+} from './renderer-main-thread-block-probe'
 import { expect } from './orca-app'
 
 const MAX_HIDDEN_FLOOD_LAG_MS = 500
@@ -56,7 +59,7 @@ export async function verifyHiddenPairedTerminalOutputSuppression(
     debug.reset()
   })
 
-  const lagProbe = await startRendererLagProbe(page)
+  const lagProbe = await startRendererMainThreadBlockProbe(page)
   const tokens = terminals.map((_, index) => `HIDDEN_FLOOD_${index}_${Date.now()}`)
   try {
     await Promise.all(
@@ -85,7 +88,8 @@ export async function verifyHiddenPairedTerminalOutputSuppression(
         { timeout: 30_000 }
       )
       .toEqual(Array(terminals.length).fill(true))
-    const hiddenFloodLagMs = await lagProbe.evaluate((probe) => probe.stop())
+    const hiddenFlood = await readRendererBlockWindow(lagProbe, 'hidden paired flood')
+    const hiddenFloodLagMs = hiddenFlood.maxBlockMs
     const scheduler = await page.evaluate(
       () =>
         (

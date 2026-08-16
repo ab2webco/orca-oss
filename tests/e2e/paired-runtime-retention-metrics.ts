@@ -1,4 +1,4 @@
-import type { JSHandle, Page } from '@stablyai/playwright-test'
+import type { Page } from '@stablyai/playwright-test'
 
 export type PairedRetentionSample = {
   bufferCells: number
@@ -45,23 +45,4 @@ export async function readPairedRetentionSample(
       targetPanes
     }
   }, tabIds)
-}
-
-export async function startRendererLagProbe(page: Page): Promise<JSHandle<{ stop: () => number }>> {
-  return page.evaluateHandle(() => {
-    const sampleMs = 16
-    let lastAt = performance.now()
-    let maxDriftMs = 0
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      maxDriftMs = Math.max(maxDriftMs, now - lastAt - sampleMs)
-      lastAt = now
-    }, sampleMs)
-    return {
-      stop: () => {
-        window.clearInterval(timer)
-        return maxDriftMs
-      }
-    }
-  })
 }

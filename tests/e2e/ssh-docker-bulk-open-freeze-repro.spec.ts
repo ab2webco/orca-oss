@@ -25,8 +25,15 @@ import {
   waitForActiveTerminalManager,
   waitForTerminalOutput
 } from './helpers/terminal'
-import { startRendererLagProbe } from './paired-runtime-retention-metrics'
-import { HARD_FREEZE_LAG_MS, SOFT_FREEZE_LAG_MS } from './helpers/remote-session-bulk-open-oracle'
+import {
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe
+} from './helpers/renderer-main-thread-block-probe'
+import {
+  HARD_FREEZE_LAG_MS,
+  measureRendererInteractionMs,
+  SOFT_FREEZE_LAG_MS
+} from './helpers/remote-session-bulk-open-oracle'
 
 const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
 const REPORT_DIR = path.join(process.cwd(), 'test-results', 'freeze-repro')
@@ -90,13 +97,14 @@ test.describe('R2 Docker SSH bulk-open freeze', () => {
       await orcaPage.evaluate(() => window.__store?.getState().setActiveView('tasks'))
       await orcaPage.waitForTimeout(4_000)
 
-      const hiddenProbe = await startRendererLagProbe(orcaPage)
+      const hiddenProbe = await startRendererMainThreadBlockProbe(orcaPage)
       await orcaPage.waitForTimeout(2_000)
-      const hiddenFloodMaxLagMs = await hiddenProbe.evaluate((probe) => probe.stop())
+      const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'docker hidden streaming')
       await hiddenProbe.dispose()
+      const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
 
       // Burst open: return to terminal and cycle panes rapidly.
-      const openProbe = await startRendererLagProbe(orcaPage)
+      const openProbe = await startRendererMainThreadBlockProbe(orcaPage)
       await orcaPage.evaluate(() => window.__store?.getState().setActiveView('terminal'))
       for (let pass = 0; pass < 3; pass += 1) {
         for (let i = 0; i < SESSION_SPLITS; i += 1) {
@@ -105,23 +113,15 @@ test.describe('R2 Docker SSH bulk-open freeze', () => {
         }
       }
       await orcaPage.waitForTimeout(3_000)
-      const bulkOpenMaxLagMs = await openProbe.evaluate((probe) => probe.stop())
+      const bulkOpen = await readRendererBlockWindow(openProbe, 'docker bulk open')
       await openProbe.dispose()
+      const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
 
-      const interactionProbeMs = await orcaPage.evaluate(async () => {
-        const started = performance.now()
-        const state = window.__store?.getState()
-        const view = state?.activeView
-        state?.setActiveView(view === 'tasks' ? 'terminal' : 'tasks')
-        await new Promise<void>((r) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => r()))
-        )
-        state?.setActiveView(view ?? 'terminal')
-        await new Promise<void>((r) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => r()))
-        )
-        return performance.now() - started
-      })
+      // Why not the double-rAF probe this used to run (ORCA-197): the E2E
+      // window is never shown, so it produces no compositor frames and the
+      // probe reported ~1900ms of "freeze" against this spec's own 2000ms
+      // threshold on a responsive renderer.
+      const interactionProbeMs = await measureRendererInteractionMs(orcaPage)
 
       const report = {
         topology: 'docker-ssh' as const,

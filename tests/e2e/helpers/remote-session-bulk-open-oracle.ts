@@ -1,10 +1,15 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { JSHandle, Page } from '@stablyai/playwright-test'
 import { toWebTerminalSurfaceTabId } from '../../../src/shared/terminal-surface-id'
 import { expect } from './orca-app'
 import { createRemoteSessionBulkOpenFixture } from './remote-session-bulk-open-fixture'
-import { startRendererLagProbe } from '../paired-runtime-retention-metrics'
+import {
+  formatBlockWindow,
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe,
+  type RendererBlockWindow
+} from './renderer-main-thread-block-probe'
 import { closeStreamingTerminals } from './streaming-terminal-cleanup'
 import { waitForActivePanePtyId } from './terminal'
 
@@ -33,7 +38,48 @@ export type BulkOpenFreezeReport = {
   worktreeCount: number
   topology: 'paired-remote-server' | 'docker-ssh'
   versionHint: string
+  /**
+   * Full measurement windows behind the two scalars above. The scalars keep
+   * their names so readings stay comparable with runs recorded before this
+   * instrument changed; these carry what a scalar cannot — where in the window
+   * the worst block landed, and how many tasks the probe serviced, without
+   * which a `0` cannot be told from a probe that never ran.
+   */
+  probeWindows: {
+    bulkOpen: RendererBlockWindow
+    hiddenFlood: RendererBlockWindow
+  }
   notes: string[]
+}
+
+/**
+ * TEMPORARY (ORCA-199): the `setInterval(16)` probe this oracle used until now,
+ * kept beside its replacement for one CI run so the ~1010ms this oracle has
+ * been reporting can be attributed. It ships nothing and is removed once that
+ * run is read.
+ */
+async function startLegacyTimerDriftProbe(
+  page: Page
+): Promise<JSHandle<{ stop: () => { maxDriftMs: number; tickCount: number; windowMs: number } }>> {
+  return page.evaluateHandle(() => {
+    const sampleMs = 16
+    const startedAt = performance.now()
+    let lastAt = startedAt
+    let maxDriftMs = 0
+    let tickCount = 0
+    const timer = window.setInterval(() => {
+      const now = performance.now()
+      tickCount += 1
+      maxDriftMs = Math.max(maxDriftMs, now - lastAt - sampleMs)
+      lastAt = now
+    }, sampleMs)
+    return {
+      stop: () => {
+        window.clearInterval(timer)
+        return { maxDriftMs, tickCount, windowMs: performance.now() - startedAt }
+      }
+    }
+  })
 }
 
 async function callRuntime<TResult>(page: Page, method: string, params: unknown): Promise<TResult> {
@@ -59,7 +105,7 @@ async function callRuntime<TResult>(page: Page, method: string, params: unknown)
  * 2000ms threshold, which is what made it flake. MessagePort tasks carry no
  * frame or timer-throttling dependency, so this measures the main thread.
  */
-async function measureRendererInteractionMs(page: Page): Promise<number> {
+export async function measureRendererInteractionMs(page: Page): Promise<number> {
   return page.evaluate(async () => {
     const started = performance.now()
     if (!window.__store) {
@@ -204,14 +250,23 @@ export async function runBulkOpenFreezeOracle(
   // Accumulate remote flood for several seconds (agent backlog).
   await page.waitForTimeout(4_000)
 
-  const hiddenProbe = await startRendererLagProbe(page)
+  // Same instrument, same page, no bulk open inside it: the control for the
+  // measured window below, and the only thing that makes a large bulk-open
+  // reading attributable to the bulk open.
+  const hiddenProbe = await startRendererMainThreadBlockProbe(page)
+  const hiddenLegacyProbe = await startLegacyTimerDriftProbe(page)
   await page.waitForTimeout(2_000)
-  const hiddenFloodMaxLagMs = await hiddenProbe.evaluate((probe) => probe.stop())
+  const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
   await hiddenProbe.dispose()
-  notes.push(`hidden streaming lag max=${hiddenFloodMaxLagMs.toFixed(0)}ms`)
+  const hiddenLegacy = await hiddenLegacyProbe.evaluate((probe) => probe.stop())
+  await hiddenLegacyProbe.dispose()
+  const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
+  notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
+  notes.push(`AB hidden legacy=${JSON.stringify(hiddenLegacy)}`)
 
   // Burst open remote sessions (worktree + tab activate).
-  const openProbe = await startRendererLagProbe(page)
+  const openProbe = await startRendererMainThreadBlockProbe(page)
+  const openLegacyProbe = await startLegacyTimerDriftProbe(page)
   const openStarted = Date.now()
   for (const worktreeId of worktreeIds) {
     const tabs = sessions.filter((session) => session.worktreeId === worktreeId)
@@ -236,9 +291,14 @@ export async function runBulkOpenFreezeOracle(
   }
   // Let the storm settle enough to measure residual lag.
   await page.waitForTimeout(3_000)
-  const bulkOpenMaxLagMs = await openProbe.evaluate((probe) => probe.stop())
+  const bulkOpen = await readRendererBlockWindow(openProbe, 'bulk open')
   await openProbe.dispose()
-  notes.push(`bulk open wall=${Date.now() - openStarted}ms lagMax=${bulkOpenMaxLagMs.toFixed(0)}ms`)
+  const openLegacy = await openLegacyProbe.evaluate((probe) => probe.stop())
+  await openLegacyProbe.dispose()
+  const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
+  notes.push(`bulk open wall=${Date.now() - openStarted}ms`)
+  notes.push(formatBlockWindow(bulkOpen, 'bulk open'))
+  notes.push(`AB open legacy=${JSON.stringify(openLegacy)}`)
 
   // Confirm last session is live after the storm (host PTYs survived).
   const last = sessions.at(-1)
@@ -271,6 +331,7 @@ export async function runBulkOpenFreezeOracle(
     worktreeCount: worktreeIds.length,
     topology: opts.topology,
     versionHint: opts.versionHint ?? process.env.ORCA_VERSION ?? 'unknown',
+    probeWindows: { bulkOpen, hiddenFlood },
     notes
   }
 
