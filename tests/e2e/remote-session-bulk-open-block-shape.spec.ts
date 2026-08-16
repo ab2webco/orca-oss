@@ -1,5 +1,6 @@
 /**
- * ORCA-230 — what shape is the ~1017ms main-thread block in R1's bulk open?
+ * ORCA-230 — what shape is the ~1017ms main-thread block in R1's bulk open,
+ * and is it the product or the harness?
  *
  * The freeze oracle measures the gap between a sampler's own turns, and one
  * long task and a queue of short ones produce the same gap. This drives the
@@ -8,9 +9,18 @@
  * trace records one event per task) and reports task boundaries, which do
  * separate them.
  *
+ * The first measurement found one contiguous 1017.7ms task whose only child was
+ * a 1003.8ms `Commit` — the main thread waiting on the compositor, not JS. The
+ * paired client's window is never shown, so Chromium composites nothing for it;
+ * both arms below run the same storm and differ only in that. Same run, same
+ * runner, so the comparison needs no cross-run assumption. Frames delivered per
+ * arm are recorded because "the window was shown" is otherwise a claim, not an
+ * observation.
+ *
  * Run: CI Linux only — the paired web client does not hydrate `window.__store`
  * locally. `gh workflow run "E2E" -R ab2webco/orca-oss --ref <branch> -f ref=<branch>`
  */
+import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { launchHeadlessPairedRuntimeHost } from './helpers/headless-paired-runtime-host'
 import { launchPairedWebClient, type PairedWebClient } from './helpers/paired-electron-client'
@@ -26,16 +36,64 @@ import {
   startRendererTaskTrace,
   stopRendererTaskTrace,
   worstBusyRun,
-  type RendererTaskTraceHandle
+  type RendererBusyRun,
+  type RendererTaskTraceHandle,
+  type RendererTracedTask
 } from './helpers/renderer-task-trace'
 
 const POSITIVE_CONTROL_MS = 400
 const CONTROL_WINDOW_MS = 1_500
+const FRAME_PROBE_MS = 1_000
 /** Tasks worth naming inside the storm. */
-const REPORTED_TASKS = 6
+const REPORTED_TASKS = 4
 
-test('R1 bulk-open block shape @freeze-repro', async ({ testRepoPath }) => {
-  test.setTimeout(420_000)
+type ArmMeasurement = {
+  label: string
+  shown: boolean
+  framesPerSecond: number
+  control: RendererBusyRun
+  hidden: RendererBusyRun
+  storm: RendererBusyRun
+  stormWallMs: number
+  tracedTasks: number
+  anchored: boolean
+  longestTasks: unknown[]
+}
+
+test('R1 bulk-open block shape, shown against never-shown window @freeze-repro', async ({
+  testRepoPath
+}) => {
+  test.setTimeout(900_000)
+  const arms: ArmMeasurement[] = []
+  for (const arm of [
+    { label: 'never-shown window', shown: false },
+    { label: 'shown window', shown: true }
+  ]) {
+    arms.push(await measureArm(testRepoPath, arm.label, arm.shown))
+  }
+
+  console.log('[block-shape]', JSON.stringify(arms, null, 2))
+  const [neverShown, shown] = arms
+  if (!neverShown || !shown) {
+    throw new Error('block-shape A/B lost an arm')
+  }
+
+  // Validity gates, not budgets. A reading from an instrument that measured
+  // nothing is worse than no reading, and "the window was shown" has to be an
+  // observation before either arm's Commit means anything.
+  for (const arm of arms) {
+    expect(arm.anchored).toBe(true)
+    expect(arm.control.maxTaskMs).toBeGreaterThanOrEqual(POSITIVE_CONTROL_MS * 0.8)
+    expect(arm.storm.taskCount).toBeGreaterThan(0)
+  }
+  expect(shown.framesPerSecond).toBeGreaterThan(neverShown.framesPerSecond)
+})
+
+async function measureArm(
+  testRepoPath: string,
+  label: string,
+  shown: boolean
+): Promise<ArmMeasurement> {
   const host = await launchHeadlessPairedRuntimeHost()
   let webClient: PairedWebClient | null = null
   let disposeSessions: (() => Promise<void>) | null = null
@@ -57,7 +115,8 @@ test('R1 bulk-open block shape @freeze-repro', async ({ testRepoPath }) => {
       .toBeGreaterThan(0)
 
     webClient = await launchPairedWebClient(host.app, host.offer, {
-      terminalParkingDelayMs: 500
+      terminalParkingDelayMs: 500,
+      showWindow: shown
     })
     const page = webClient.page
     await page.waitForFunction(() => Boolean(window.__store), null, { timeout: 60_000 })
@@ -70,11 +129,15 @@ test('R1 bulk-open block shape @freeze-repro', async ({ testRepoPath }) => {
     const seeded = await seedBulkOpenRemoteSessions(page, { repoId: added.result.repo.id })
     disposeSessions = seeded.dispose
 
+    // Whether Chromium composites for this window at all, which is the only
+    // difference between the arms and therefore the thing to observe first.
+    const framesPerSecond = await countDeliveredFrames(page)
+
     await settleBeforeBulkOpen(page)
 
     // Positive control, in the same run that produces the measurement: a block
-    // of known size must read at its size, or a small reading below means
-    // nothing. Driven exactly like the storm, through the inspector.
+    // of known size must read at its size, or a small reading means nothing.
+    // Driven exactly like the storm, through the inspector.
     const controlTrace = await startRendererTaskTrace(page)
     await page.evaluate((blockMs) => {
       const until = performance.now() + blockMs
@@ -96,50 +159,56 @@ test('R1 bulk-open block shape @freeze-repro', async ({ testRepoPath }) => {
     const stormWindow = await stopRendererTaskTrace(stormTrace)
     const storm = worstBusyRun(stormWindow)
 
-    console.log('[block-shape]', formatBusyRun(control, 'positive control'))
-    console.log('[block-shape]', formatBusyRun(hidden, 'hidden streaming'))
-    console.log('[block-shape]', formatBusyRun(storm, 'bulk open'))
-    console.log(
-      '[block-shape]',
-      JSON.stringify(
-        {
-          stormWallMs,
-          tracedEvents: stormWindow.eventCount,
-          tracedTasks: stormWindow.tasks.length,
-          anchored: stormWindow.anchored,
-          notes: stormWindow.notes,
-          positiveControlMs: Number(control.maxTaskMs.toFixed(1)),
-          hiddenStreamingBusyRunMs: Number(hidden.busyRunMs.toFixed(1)),
-          bulkOpen: {
-            busyRunMs: Number(storm.busyRunMs.toFixed(1)),
-            busyRunAtMs: Number(storm.startMs.toFixed(0)),
-            tasksInRun: storm.taskCount,
-            maxTaskMs: Number(storm.maxTaskMs.toFixed(1)),
-            longestTaskFraction: Number(storm.longestTaskFraction.toFixed(3)),
-            shape: storm.shape
-          },
-          longestTasks: describeLongestTasks(stormTrace, stormWindow.tasks)
-        },
-        null,
-        2
-      )
-    )
+    console.log('[block-shape]', formatBusyRun(control, `${label} positive control`))
+    console.log('[block-shape]', formatBusyRun(hidden, `${label} hidden streaming`))
+    console.log('[block-shape]', formatBusyRun(storm, `${label} bulk open`))
+    console.log('[block-shape]', `${label} frames=${framesPerSecond}/s shown=${shown}`)
 
-    // Validity gates, not budgets: a reading from an instrument that measured
-    // nothing is worse than no reading.
-    expect(stormWindow.anchored).toBe(true)
-    expect(control.maxTaskMs).toBeGreaterThanOrEqual(POSITIVE_CONTROL_MS * 0.8)
-    expect(storm.taskCount).toBeGreaterThan(0)
+    return {
+      label,
+      shown,
+      framesPerSecond,
+      control,
+      hidden,
+      storm,
+      stormWallMs,
+      tracedTasks: stormWindow.tasks.length,
+      anchored: stormWindow.anchored,
+      longestTasks: describeLongestTasks(stormTrace, stormWindow.tasks)
+    }
   } finally {
     await disposeSessions?.()
     await webClient?.dispose()
     await host.dispose()
   }
-})
+}
+
+/** Animation frames Chromium delivers in a second — 0 means it composites nothing. */
+async function countDeliveredFrames(page: Page): Promise<number> {
+  return page.evaluate(
+    (windowMs) =>
+      new Promise<number>((resolve) => {
+        let frames = 0
+        let running = true
+        const tick = (): void => {
+          frames += 1
+          if (running) {
+            requestAnimationFrame(tick)
+          }
+        }
+        requestAnimationFrame(tick)
+        setTimeout(() => {
+          running = false
+          resolve(frames)
+        }, windowMs)
+      }),
+    FRAME_PROBE_MS
+  )
+}
 
 function describeLongestTasks(
   handle: RendererTaskTraceHandle,
-  tasks: { startMs: number; durationMs: number }[]
+  tasks: RendererTracedTask[]
 ): unknown[] {
   return [...tasks]
     .sort((a, b) => b.durationMs - a.durationMs)
