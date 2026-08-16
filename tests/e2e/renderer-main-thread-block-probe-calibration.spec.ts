@@ -25,23 +25,25 @@ import {
 const WINDOW_MS = 2_500
 const INJECTED_BLOCK_MS = [0, 10, 40, 120] as const
 /**
- * Idle ceiling — a hang detector for the instrument itself, not a precision
- * budget: the positive controls below carry the precision. Measured 5.6ms and
- * 19.7ms over two local idle windows on a 10-core M-series, so the run-to-run
- * spread on the best hardware in play is already 3.5x and a tight ceiling would
- * flake on a shared runner. 250 still separates an idle renderer from the
- * ~1010ms the bulk-open oracle reports, which is the claim this control has to
- * support.
+ * Idle ceiling — a hang detector for the instrument, not a precision budget:
+ * the positive controls carry the precision. The window is only idle in the
+ * sense that this spec injects nothing into it; a booted Orca renderer is still
+ * running. Measured 5.6 / 19.7 / 24.6ms locally on a 10-core M-series and
+ * 74.4 / 106.0ms on 2-core CI runners, so a tight ceiling is a flake. 400 keeps
+ * ~3.8x over the worst measured and still separates an idle renderer from the
+ * ~1018ms the bulk-open oracle reports, which is the claim this control exists
+ * to support.
  */
-const MAX_IDLE_BLOCK_MS = 250
+const MAX_IDLE_BLOCK_MS = 400
 /**
- * Injected blocks measured 10.2 / 40.0 / 120.1ms for 10 / 40 / 120ms injected.
- * The instrument is accurate to well under a millisecond; these tolerances
- * exist for runner noise landing inside the same window, not for instrument
- * error.
+ * Injected blocks measured 10.2-12.0 / 40.0-40.3 / 120.1-120.7ms for
+ * 10 / 40 / 120ms injected, across local and CI. The instrument's own error is
+ * under a millisecond; the tolerances exist for unrelated renderer work landing
+ * in the same window, which is why the upper bound is allowed the idle window
+ * this run actually measured rather than a fixed guess.
  */
 const MIN_INJECTED_BLOCK_FRACTION = 0.8
-const MAX_INJECTION_OVERHEAD_MS = 40
+const MIN_INJECTION_HEADROOM_MS = 40
 type LegacyDriftWindow = {
   maxDriftMs: number
   tickCount: number
@@ -58,6 +60,13 @@ test('renderer block probe reads injected main-thread blocks at their size', asy
   orcaPage
 }) => {
   test.setTimeout(120_000)
+
+  // Why: across four CI and local sweeps the first window's worst block always
+  // landed in its first ~150ms (+128, +141, +146ms) — the app still settling
+  // after the test opened it, not anything this spec injected. Burning one
+  // window keeps that out of the idle control the tolerances below are read
+  // from.
+  await orcaPage.waitForTimeout(WINDOW_MS)
 
   const windows: CalibrationWindow[] = []
   for (const injectedBlockMs of INJECTED_BLOCK_MS) {
@@ -120,17 +129,29 @@ test('renderer block probe reads injected main-thread blocks at their size', asy
     )
   )
 
+  const idle = windows.find((window) => window.injectedBlockMs === 0)
+  if (!idle) {
+    throw new Error('calibration sweep lost its idle control')
+  }
+  // Negative control: the instrument must read a renderer nobody blocked low,
+  // or a freeze budget built on it fails on the instrument's own cost.
+  expect(idle.block.maxBlockMs).toBeLessThan(MAX_IDLE_BLOCK_MS)
+
+  // How much unrelated renderer work this particular runner puts in a window of
+  // this length — measured, not assumed, so a loaded runner widens the upper
+  // bound below without anyone raising a constant.
+  const noiseAllowanceMs = Math.max(MIN_INJECTION_HEADROOM_MS, idle.block.maxBlockMs)
+
   for (const window of windows) {
     if (window.injectedBlockMs === 0) {
-      // Negative control: the instrument must read an idle renderer low, or a
-      // freeze budget built on it fails on the instrument's own cost.
-      expect(window.block.maxBlockMs).toBeLessThan(MAX_IDLE_BLOCK_MS)
       continue
     }
-    // Positive control: a block of known size has to read as its size.
+    // Positive control: a block of known size has to read as its size. The
+    // lower bound is the one that proves the instrument sees a real block at
+    // all — a probe stuck at 0 passes every freeze budget ever written.
     expect(window.block.maxBlockMs).toBeGreaterThanOrEqual(
       window.injectedBlockMs * MIN_INJECTED_BLOCK_FRACTION
     )
-    expect(window.block.maxBlockMs).toBeLessThan(window.injectedBlockMs + MAX_INJECTION_OVERHEAD_MS)
+    expect(window.block.maxBlockMs).toBeLessThan(window.injectedBlockMs + noiseAllowanceMs)
   }
 })

@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
-import type { JSHandle, Page } from '@stablyai/playwright-test'
+import type { Page } from '@stablyai/playwright-test'
 import { toWebTerminalSurfaceTabId } from '../../../src/shared/terminal-surface-id'
 import { expect } from './orca-app'
 import { createRemoteSessionBulkOpenFixture } from './remote-session-bulk-open-fixture'
@@ -16,9 +16,23 @@ import { waitForActivePanePtyId } from './terminal'
 /** Multi-worktree load: several agent-like streaming terminals per worktree. */
 export const BULK_OPEN_WORKTREE_COUNT = 3
 export const BULK_OPEN_TABS_PER_WORKTREE = 4
-/** Soft freeze signal — UI feels stuck. */
+/**
+ * Soft freeze signal — UI feels stuck. Unchanged at 2s, now with a derivation
+ * (ORCA-199): the number it is compared against is the longest stretch the
+ * renderer's main thread went unserviced, so 2000 means two seconds of real
+ * block. Healthy runs measure 1017.7ms and 1017.8ms (CI runs 31923503662 and
+ * 31923470791), which leaves only a 1.96x margin — deliberately, because that
+ * ~1s block is real product behaviour under bulk open, not instrument
+ * artifact: the replaced timer probe read 1009.7 / 1018.8ms over the same two
+ * windows while ticking at its full 16ms cadence. The ceiling is here to catch
+ * that block doubling, and tightening it below the measured behaviour would
+ * only make every run red.
+ */
 export const SOFT_FREEZE_LAG_MS = 2_000
-/** Hard freeze signal — matches trusted "screen fully frozen" reports. */
+/**
+ * Hard freeze signal — matches trusted "screen fully frozen" reports. 4.9x the
+ * measured healthy value above.
+ */
 export const HARD_FREEZE_LAG_MS = 5_000
 
 export type BulkOpenSession = {
@@ -50,36 +64,6 @@ export type BulkOpenFreezeReport = {
     hiddenFlood: RendererBlockWindow
   }
   notes: string[]
-}
-
-/**
- * TEMPORARY (ORCA-199): the `setInterval(16)` probe this oracle used until now,
- * kept beside its replacement for one CI run so the ~1010ms this oracle has
- * been reporting can be attributed. It ships nothing and is removed once that
- * run is read.
- */
-async function startLegacyTimerDriftProbe(
-  page: Page
-): Promise<JSHandle<{ stop: () => { maxDriftMs: number; tickCount: number; windowMs: number } }>> {
-  return page.evaluateHandle(() => {
-    const sampleMs = 16
-    const startedAt = performance.now()
-    let lastAt = startedAt
-    let maxDriftMs = 0
-    let tickCount = 0
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      tickCount += 1
-      maxDriftMs = Math.max(maxDriftMs, now - lastAt - sampleMs)
-      lastAt = now
-    }, sampleMs)
-    return {
-      stop: () => {
-        window.clearInterval(timer)
-        return { maxDriftMs, tickCount, windowMs: performance.now() - startedAt }
-      }
-    }
-  })
 }
 
 async function callRuntime<TResult>(page: Page, method: string, params: unknown): Promise<TResult> {
@@ -254,19 +238,14 @@ export async function runBulkOpenFreezeOracle(
   // measured window below, and the only thing that makes a large bulk-open
   // reading attributable to the bulk open.
   const hiddenProbe = await startRendererMainThreadBlockProbe(page)
-  const hiddenLegacyProbe = await startLegacyTimerDriftProbe(page)
   await page.waitForTimeout(2_000)
   const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
   await hiddenProbe.dispose()
-  const hiddenLegacy = await hiddenLegacyProbe.evaluate((probe) => probe.stop())
-  await hiddenLegacyProbe.dispose()
   const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
   notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
-  notes.push(`AB hidden legacy=${JSON.stringify(hiddenLegacy)}`)
 
   // Burst open remote sessions (worktree + tab activate).
   const openProbe = await startRendererMainThreadBlockProbe(page)
-  const openLegacyProbe = await startLegacyTimerDriftProbe(page)
   const openStarted = Date.now()
   for (const worktreeId of worktreeIds) {
     const tabs = sessions.filter((session) => session.worktreeId === worktreeId)
@@ -293,12 +272,9 @@ export async function runBulkOpenFreezeOracle(
   await page.waitForTimeout(3_000)
   const bulkOpen = await readRendererBlockWindow(openProbe, 'bulk open')
   await openProbe.dispose()
-  const openLegacy = await openLegacyProbe.evaluate((probe) => probe.stop())
-  await openLegacyProbe.dispose()
   const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
   notes.push(`bulk open wall=${Date.now() - openStarted}ms`)
   notes.push(formatBlockWindow(bulkOpen, 'bulk open'))
-  notes.push(`AB open legacy=${JSON.stringify(openLegacy)}`)
 
   // Confirm last session is live after the storm (host PTYs survived).
   const last = sessions.at(-1)
