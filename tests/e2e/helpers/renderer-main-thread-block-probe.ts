@@ -13,32 +13,18 @@ export type RendererBlockWindow = {
 
 export type RendererMainThreadBlockProbe = JSHandle<{ stop: () => RendererBlockWindow }>
 
-/** A window with fewer ticks than this measured nothing; see assertBlockWindowMeasured. */
+/** A window with fewer ticks than this measured nothing; see readRendererBlockWindow. */
 const MIN_MEASURED_SAMPLES = 2
 
 /**
  * Longest stretch the renderer's main thread went without servicing a task.
  *
- * Why not `setInterval` (ORCA-199), which is what the freeze oracles used
- * before: a 16ms drift probe cannot resolve a block shorter than its own
- * period and under-reports the ones it does catch (a 120ms injected block read
- * 109.4ms beside this probe's 120.1ms), and — the part that decided the swap —
- * a window in which the timer never fired reports `0`, which is
- * indistinguishable from a perfectly responsive renderer. Two paired-terminal
- * budgets were asserting `< 500ms` against exactly that.
+ * MessagePort tasks are ordinary macrotasks: not tied to a compositor frame
+ * (the E2E window is never shown, so rAF fires at ~1Hz or not at all) and not
+ * subject to timer clamping. Keeping the longest gap, rather than sampling,
+ * catches a block wherever in the window it lands.
  *
- * Why not `requestAnimationFrame` (ORCA-197, ORCA-220): the E2E window is never
- * shown, so Chromium produces no compositor frames for it and rAF fires at ~1Hz
- * or not at all — a double-rAF probe read 1914ms on a responsive renderer.
- *
- * MessagePort tasks carry neither dependency: they are ordinary macrotasks, not
- * tied to a frame and not subject to timer clamping. Ticking one and keeping
- * the longest gap between turns sees every task the renderer runs, wherever in
- * the window it lands — the property a single sample lacks (ORCA-222: a
- * deliberate 60ms freeze read 1.4ms on a one-shot timer that missed it).
- *
- * Calibrated in renderer-main-thread-block-probe-calibration.spec.ts: 10 / 40 /
- * 120ms injected blocks read 10.2 / 40.0 / 120.1ms, an idle window 5.6ms.
+ * Calibrated in renderer-main-thread-block-probe-calibration.spec.ts.
  */
 export async function startRendererMainThreadBlockProbe(
   page: Page
@@ -96,15 +82,12 @@ export async function startRendererMainThreadBlockProbe(
 /**
  * Closes a window, records it, and refuses to return one that measured nothing.
  *
- * The liveness check is the point: a probe that never ticked reports
- * `maxBlockMs: 0`, which reads as a perfectly responsive renderer — that is how
- * a lag budget goes green having observed no renderer at all. A real freeze is
- * the other shape, few samples but `maxBlockMs` covering most of the window, so
- * that still reports rather than throwing.
+ * A probe that never ticked reports `maxBlockMs: 0`, indistinguishable from a
+ * responsive renderer — that is how a lag budget goes green having observed
+ * nothing. A real freeze is the other shape (few samples, `maxBlockMs` covering
+ * most of the window), so it still reports rather than throwing.
  *
- * It logs on green as well as red because every timing budget in this repo was
- * unreadable until someone re-ran it by hand to recover the value.
- * See docs/reference/timing-budget-assertions.md.
+ * Logs on green too: see docs/reference/timing-budget-assertions.md.
  */
 export async function readRendererBlockWindow(
   probe: RendererMainThreadBlockProbe,
