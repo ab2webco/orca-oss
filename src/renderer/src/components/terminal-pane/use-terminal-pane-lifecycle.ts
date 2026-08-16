@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: terminal pane lifecycle wiring is intentionally co-located so PTY attach, theme sync, and runtime graph publication remain consistent for live terminals. */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { IDisposable, Terminal } from '@xterm/xterm'
 import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status-types'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
@@ -285,6 +285,7 @@ type UseTerminalPaneLifecycleDeps = {
   isVisibleRef: React.RefObject<boolean>
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
+  onMountReadyChangeRef: React.RefObject<((ready: boolean) => void) | undefined>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
   onPtyCodexResumeBlockedRef?: React.RefObject<
     (paneId: number, providerSession: AgentProviderSessionMetadata | null) => void
@@ -631,6 +632,7 @@ export function useTerminalPaneLifecycle({
   isVisibleRef,
   onPtyExitRef,
   onAgentExitedRef,
+  onMountReadyChangeRef,
   onPtyErrorRef,
   onPtyCodexResumeBlockedRef,
   onAgentRateLimitDetected,
@@ -692,6 +694,7 @@ export function useTerminalPaneLifecycle({
   const imeNativeTextForwarderDisposablesRef = useRef(new Map<number, IDisposable>())
   const queuedInitialCwdRef = useRef<string | null | undefined>(undefined)
   const restoredViewportBlankingPanesRef = useRef(new Set<number>())
+  const [lifecycleInitializationKey, setLifecycleInitializationKey] = useState<string | null>(null)
 
   const applyAppearance = (manager: PaneManager): void => {
     const currentSettings = settingsRef.current
@@ -712,11 +715,30 @@ export function useTerminalPaneLifecycle({
 
   // Initialize PaneManager instance once
   useEffect(() => {
+    const channel = new MessageChannel()
+    channel.port1.onmessage = () => {
+      setLifecycleInitializationKey(`${tabId}\0${cwd ?? ''}`)
+      channel.port1.close()
+      channel.port2.close()
+    }
+    // Why: interaction effects may flush before paint; a task boundary lets the retained worktree paint before xterm setup starts.
+    channel.port2.postMessage(undefined)
+    return () => {
+      channel.port1.close()
+      channel.port2.close()
+    }
+  }, [cwd, tabId])
+
+  useEffect(() => {
+    if (lifecycleInitializationKey !== `${tabId}\0${cwd ?? ''}`) {
+      return
+    }
     const container = containerRef.current
     if (!container) {
       return
     }
     const expandedStyleSnapshots = expandedStyleSnapshotRef.current
+    let mountReady = false
     const paneTransports = paneTransportsRef.current
     const panePtyBindings = panePtyBindingsRef.current
     const linkDisposables = linkProviderDisposablesRef.current
@@ -1565,6 +1587,8 @@ export function useTerminalPaneLifecycle({
       window.__paneManagers.set(tabId, manager)
     }
     const restoredPaneByLeafId = replayTerminalLayout(manager, initialLayoutRef.current, isActive)
+    mountReady = true
+    onMountReadyChangeRef.current?.(true)
 
     const restoredBuffers = initialLayoutRef.current.buffersByLeafId
     restoreScrollbackBuffers(
@@ -1764,6 +1788,9 @@ export function useTerminalPaneLifecycle({
     window.addEventListener(CLOSE_TERMINAL_PANE_EVENT, onCliClosePane)
 
     return () => {
+      if (mountReady) {
+        onMountReadyChangeRef.current?.(false)
+      }
       window.removeEventListener(SPLIT_TERMINAL_PANE_EVENT, onCliSplitPane)
       window.removeEventListener(CLOSE_TERMINAL_PANE_EVENT, onCliClosePane)
       const currentWorktreeTabs = useAppStore.getState().tabsByWorktree[worktreeId]
@@ -1866,7 +1893,7 @@ export function useTerminalPaneLifecycle({
       setTabCanExpandPane(tabId, false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId, cwd])
+  }, [tabId, cwd, lifecycleInitializationKey])
 
   // Why: mobile wake fanout — pane self-selects by worktreeId and fires its own armed --resume while staying hidden (no reveal/focus change).
   useEffect(() => {

@@ -440,4 +440,154 @@ test.describe('Worktree switch responsiveness', () => {
       MAX_SAMPLE_SWITCH_WINDOW_BLOCK_MS
     )
   })
+
+  test('@headful mounts the incoming terminal before revealing its worktree', async ({
+    orcaPage
+  }, testInfo) => {
+    const [firstWorktreeId, secondWorktreeId] = await prepareSidebarForSwitchTest(orcaPage)
+    await expect(orcaPage.locator('.xterm-screen').filter({ visible: true })).toHaveCount(1)
+
+    const targetPtyIds = await orcaPage.evaluate((worktreeId) => {
+      const state = window.__store?.getState()
+      if (!state) {
+        throw new Error('window.__store is not available')
+      }
+      return (state.tabsByWorktree[worktreeId] ?? []).flatMap(
+        (tab) => state.ptyIdsByTabId[tab.id] ?? []
+      )
+    }, secondWorktreeId)
+    for (const ptyId of targetPtyIds) {
+      await orcaPage.evaluate((id) => window.api.pty.kill(id), ptyId)
+    }
+    await orcaPage.evaluate((worktreeId) => {
+      const store = window.__store
+      if (!store) {
+        throw new Error('window.__store is not available')
+      }
+      const everActivatedWorktreeIds = new Set(store.getState().everActivatedWorktreeIds)
+      everActivatedWorktreeIds.delete(worktreeId)
+      store.setState({ everActivatedWorktreeIds })
+    }, secondWorktreeId)
+
+    const result = await orcaPage.evaluate(
+      async ({ firstId, secondId }) => {
+        type FrameSample = {
+          atMs: number
+          xterms: number
+          screens: number
+          xtermsTotal: number
+          containersTotal: number
+          rendered: string | null
+        }
+        const root = document.querySelector<HTMLElement>('[data-rendered-active-worktree-id]')
+        const targetSurface = [...document.querySelectorAll<HTMLElement>('[data-worktree-id]')]
+          .find((candidate) => candidate.dataset.worktreeId === secondId)
+          ?.querySelector<HTMLElement>('[data-worktree-card-surface]')
+        if (!root || !targetSurface) {
+          throw new Error('Missing rendered worktree root or target surface')
+        }
+        const visibleCount = (selector: string): number =>
+          [...document.querySelectorAll<HTMLElement>(selector)].filter((element) =>
+            element.checkVisibility()
+          ).length
+        const frames: FrameSample[] = []
+        let sampling = true
+        const sample = (atMs: number): void => {
+          frames.push({
+            atMs,
+            xterms: visibleCount('.xterm'),
+            screens: visibleCount('.xterm-screen'),
+            xtermsTotal: document.querySelectorAll('.xterm').length,
+            containersTotal: document.querySelectorAll('[data-terminal-tab-id]').length,
+            rendered: root.getAttribute('data-rendered-active-worktree-id')
+          })
+          if (sampling) {
+            requestAnimationFrame(sample)
+          }
+        }
+        requestAnimationFrame(sample)
+        while (frames.length < 3) {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        }
+        // Click late in the sampled frame so a deferred empty commit cannot hide inside a fresh frame budget.
+        await new Promise((resolve) => window.setTimeout(resolve, 24))
+        const visibleBefore = visibleCount('.xterm-screen')
+        const clickAtMs = performance.now()
+        let incomingScreensAtReveal = -1
+        const reveal = new Promise<number>((resolve, reject) => {
+          const timeoutId = window.setTimeout(() => {
+            observer.disconnect()
+            reject(new Error('Incoming worktree was not revealed'))
+          }, 2000)
+          const observer = new MutationObserver(() => {
+            if (root.getAttribute('data-rendered-active-worktree-id') !== secondId) {
+              return
+            }
+            const incomingSurface = [
+              ...document.querySelectorAll<HTMLElement>('[data-terminal-worktree-id]')
+            ].find((surface) => surface.dataset.terminalWorktreeId === secondId)
+            incomingScreensAtReveal = incomingSurface?.querySelectorAll('.xterm-screen').length ?? 0
+            window.clearTimeout(timeoutId)
+            observer.disconnect()
+            resolve(performance.now() - clickAtMs)
+          })
+          observer.observe(root, {
+            attributes: true,
+            attributeFilter: ['data-rendered-active-worktree-id']
+          })
+        })
+        targetSurface.click()
+        const revealMs = await reveal
+        await new Promise((resolve) => window.setTimeout(resolve, 800))
+        sampling = false
+        const visibleAfter = visibleCount('.xterm-screen')
+        const switchFrames = frames.filter((frame) => frame.atMs >= clickAtMs)
+        return {
+          firstId,
+          secondId,
+          revealMs,
+          incomingScreensAtReveal,
+          visibleBefore,
+          visibleAfter,
+          framesBeforeClick: frames.filter((frame) => frame.atMs < clickAtMs).length,
+          framesTotal: frames.length,
+          emptyFrames: switchFrames.filter((frame) => frame.xterms === 0),
+          screenlessFrames: switchFrames.filter((frame) => frame.xterms > 0 && frame.screens === 0),
+          doublePaintedFrames: switchFrames.filter((frame) => frame.xterms > 1),
+          frames
+        }
+      },
+      { firstId: firstWorktreeId, secondId: secondWorktreeId }
+    )
+
+    console.info(
+      '[ORCA-229 frame probe]',
+      JSON.stringify({
+        revealMs: result.revealMs,
+        incomingScreensAtReveal: result.incomingScreensAtReveal,
+        framesBeforeClick: result.framesBeforeClick,
+        framesTotal: result.framesTotal,
+        visibleBefore: result.visibleBefore,
+        visibleAfter: result.visibleAfter,
+        emptyFrames: result.emptyFrames.length,
+        screenlessFrames: result.screenlessFrames.length,
+        doublePaintedFrames: result.doublePaintedFrames.length,
+        maxXtermsTotal: Math.max(...result.frames.map((frame) => frame.xtermsTotal)),
+        maxContainersTotal: Math.max(...result.frames.map((frame) => frame.containersTotal))
+      })
+    )
+    await testInfo.attach('worktree-switch-frame-probe', {
+      body: JSON.stringify(result, null, 2),
+      contentType: 'application/json'
+    })
+    expect(result.framesBeforeClick).toBeGreaterThan(0)
+    expect(result.framesTotal).toBeGreaterThan(20)
+    expect(result.visibleBefore).toBe(1)
+    expect(result.visibleAfter).toBe(1)
+    expect(result.incomingScreensAtReveal).toBeGreaterThan(0)
+    expect(result.emptyFrames).toEqual([])
+    expect(result.screenlessFrames).toEqual([])
+    expect(result.doublePaintedFrames).toEqual([])
+    expect(result.revealMs).toBeLessThan(100)
+  })
 })

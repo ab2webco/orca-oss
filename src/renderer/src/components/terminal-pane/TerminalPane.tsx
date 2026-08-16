@@ -281,6 +281,7 @@ type TerminalPaneProps = {
   isolatedPaneKey?: string | null
   // Why: ephemeral one-off command terminals don't need the header's prominent split affordance (split shortcuts still work).
   showSplitButton?: boolean
+  onMountReadyChange?: (ready: boolean) => void
   onPtyExit: (ptyId: string) => void
   onCloseTab: () => void
 }
@@ -334,12 +335,15 @@ function TerminalPane(
     isWorktreeActive = isVisible,
     isolatedPaneKey = null,
     showSplitButton = true,
+    onMountReadyChange,
     onPtyExit,
     onCloseTab
   }: TerminalPaneProps,
   ref: React.ForwardedRef<TerminalPaneHandle>
 ): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
+  const onMountReadyChangeRef = useRef(onMountReadyChange)
+  onMountReadyChangeRef.current = onMountReadyChange
   const managerRef = useRef<PaneManager | null>(null)
   const paneFontSizesRef = useRef<Map<number, number>>(new Map())
   const expandedPaneIdRef = useRef<number | null>(null)
@@ -1607,6 +1611,7 @@ function TerminalPane(
     isVisibleRef,
     onPtyExitRef,
     onAgentExitedRef,
+    onMountReadyChangeRef,
     onPtyErrorRef,
     onPtyCodexResumeBlockedRef,
     onAgentRateLimitDetected: handleAgentRateLimitDetected,
