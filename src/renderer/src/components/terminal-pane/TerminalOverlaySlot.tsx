@@ -42,7 +42,7 @@ type TerminalOverlaySlotProps = {
   isVisible: boolean
   isActive: boolean
   activityTerminalPortal: ActivityTerminalPortalTarget | null
-  onMountReadyChange?: (ready: boolean) => void
+  onMountReadyChange?: (worktreeId: string, tabId: string, ready: boolean) => void
   onFocusOwningGroup: ((groupId: string) => void) | undefined
   consumeSuppressedPtyExit: (ptyId: string) => boolean
   leaveWorktreeIfEmpty: () => void
@@ -210,6 +210,10 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
             },
     [anchorName, isVisible, measuredFallbackRect, shouldMeasureHiddenStartup]
   )
+  const notifyMountReady = useCallback(
+    (ready: boolean) => onMountReadyChange?.(worktreeId, terminalTabId, ready),
+    [onMountReadyChange, terminalTabId, worktreeId]
+  )
   const focusGroup = useCallback(() => {
     if (groupId !== undefined && onFocusOwningGroup) {
       onFocusOwningGroup(groupId)
@@ -229,7 +233,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       isVisible={isVisible || activityTerminalPortal !== null}
       isWorktreeActive={isWorktreeActive || activityTerminalPortal !== null}
       isolatedPaneKey={activityTerminalPortal?.paneKey ?? null}
-      onMountReadyChange={onMountReadyChange}
+      onMountReadyChange={notifyMountReady}
       onPtyExit={(ptyId) => {
         if (consumeSuppressedPtyExit(ptyId)) {
           return

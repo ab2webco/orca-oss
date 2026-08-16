@@ -1,3 +1,6 @@
+/** Stranding backstop only: readiness is the gate, this bounds a pane that never reports. */
+export const TERMINAL_SWITCH_REVEAL_BACKSTOP_MS = 1000
+
 export type TerminalWorktreeSwitchResolution = {
   mountedWorktreeIds: ReadonlySet<string>
   preparingIncomingWorktreeId: string | null
@@ -33,23 +36,25 @@ export function collectRequiredTerminalTabIds(args: {
   if (args.activeTabType !== 'terminal') {
     return new Set()
   }
+  // Why no terminalTabs[0] fallback: the reveal may only wait on tabs the mount planner puts in
+  // immediateTabIds (Terminal.tsx). A tab cold-activation parked never mounts, so gating on it
+  // would hold the outgoing surface until the backstop fires.
   const candidateIds = [args.rememberedActiveTabId, args.activeTabId]
   const activeTerminalTabId = candidateIds.find(
     (candidate): candidate is string =>
       candidate !== null && candidate !== undefined && terminalTabIds.has(candidate)
   )
-  const fallbackTabId = activeTerminalTabId ?? args.terminalTabs[0]?.id
-  return new Set(fallbackTabId ? [fallbackTabId] : [])
+  return new Set(activeTerminalTabId ? [activeTerminalTabId] : [])
 }
 
+/** The worktree to reveal when the readiness gate never resolved, or null if the switch moved on. */
 export function resolveTimedOutTerminalWorktreeSwitch(
   epoch: number,
   currentEpoch: number,
   incomingId: string,
-  currentActiveId: string | null,
-  outgoingId: string | null
+  currentActiveId: string | null
 ): string | null {
-  return epoch === currentEpoch && incomingId === currentActiveId ? outgoingId : null
+  return epoch === currentEpoch && incomingId === currentActiveId ? incomingId : null
 }
 
 export function resolveTerminalWorktreeSwitch(args: {

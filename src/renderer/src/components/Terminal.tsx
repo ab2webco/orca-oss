@@ -186,6 +186,7 @@ import {
   useManualTerminalWorktreeParking
 } from './terminal-pane/use-manual-terminal-worktree-parking'
 import {
+  TERMINAL_SWITCH_REVEAL_BACKSTOP_MS,
   collectRequiredTerminalTabIds,
   resolveTimedOutTerminalWorktreeSwitch,
   resolveTerminalWorktreeSwitch
@@ -466,25 +467,25 @@ function Terminal(): React.JSX.Element | null {
       setRenderedActiveWorktreeId(activeWorktreeId)
       return
     }
+    // Why: readiness is the gate, this is only a stranding backstop — reveal the worktree the user
+    // asked for even if its panes never report, never undo their navigation.
     const timeoutId = window.setTimeout(() => {
-      const outgoingId = resolveTimedOutTerminalWorktreeSwitch(
+      const revealId = resolveTimedOutTerminalWorktreeSwitch(
         epoch,
         switchEpochRef.current,
         activeWorktreeId,
-        useAppStore.getState().activeWorktreeId,
-        renderedActiveWorktreeId
+        useAppStore.getState().activeWorktreeId
       )
-      if (outgoingId) {
-        setActiveWorktree(outgoingId)
+      if (revealId) {
+        setRenderedActiveWorktreeId(revealId)
       }
-    }, 1000)
+    }, TERMINAL_SWITCH_REVEAL_BACKSTOP_MS)
     return () => window.clearTimeout(timeoutId)
   }, [
     activeWorktreeId,
     renderedActiveWorktreeId,
     terminalMountReadinessRevision,
-    terminalWorktreeSwitch.canReveal,
-    setActiveWorktree
+    terminalWorktreeSwitch.canReveal
   ])
 
   const markFileDirty = useAppStore((s) => s.markFileDirty)
@@ -2572,9 +2573,7 @@ function Terminal(): React.JSX.Element | null {
                   activationDeferredMountTabIds={
                     activationDeferredMountTabIdsByWorktreeRef.current.get(workspace.id) ?? null
                   }
-                  onTerminalMountReadyChange={(tabId, ready) =>
-                    handleTerminalMountReadyChange(workspace.id, tabId, ready)
-                  }
+                  onTerminalMountReadyChange={handleTerminalMountReadyChange}
                 />
               )
             })}
@@ -2860,7 +2859,7 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
   activityTerminalPortals: ActivityTerminalPortalTarget[]
   backgroundMountTabIds: ReadonlySet<string> | null
   activationDeferredMountTabIds: ReadonlySet<string> | null
-  onTerminalMountReadyChange: (tabId: string, ready: boolean) => void
+  onTerminalMountReadyChange: (worktreeId: string, tabId: string, ready: boolean) => void
 }): React.JSX.Element {
   const browserPageIds = useAppStore(
     useShallow((state) =>
@@ -2900,6 +2899,7 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
         worktreeId={worktreeId}
         worktreePath={worktreePath}
         isWorktreeActive={isVisible}
+        isPreparingIncoming={isPreparingIncoming}
         coldParkTerminalPanes={shouldColdParkTerminalPanes}
         isForceParked={isForceParked}
         shouldMeasureHiddenWorktree={shouldMeasureHiddenWorktree}

@@ -84,8 +84,22 @@ describe('terminal worktree switch readiness', () => {
     ).toEqual(new Set(['terminal-a']))
   })
 
-  it('cancels only the current timed-out preparation back to its outgoing worktree', () => {
-    expect(resolveTimedOutTerminalWorktreeSwitch(2, 2, 'b', 'b', 'a')).toBe('a')
-    expect(resolveTimedOutTerminalWorktreeSwitch(2, 3, 'b', 'c', 'a')).toBeNull()
+  it('reveals the worktree the user asked for when readiness never reports, instead of undoing the switch', () => {
+    expect(resolveTimedOutTerminalWorktreeSwitch(2, 2, 'b', 'b')).toBe('b')
+    expect(resolveTimedOutTerminalWorktreeSwitch(2, 3, 'b', 'c')).toBeNull()
+  })
+
+  it('does not gate the reveal on a tab the mount planner may have parked', () => {
+    expect(
+      collectRequiredTerminalTabIds({
+        activeTabType: 'terminal',
+        // Why: mid-switch the global active tab still points at the outgoing worktree.
+        activeTabId: 'outgoing-tab',
+        rememberedActiveTabId: undefined,
+        terminalTabs: [{ id: 'parked-a' }, { id: 'parked-b' }],
+        unifiedTabs: [],
+        groups: []
+      })
+    ).toEqual(new Set())
   })
 })

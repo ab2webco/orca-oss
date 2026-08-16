@@ -26,6 +26,7 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
   worktreeId,
   worktreePath,
   isWorktreeActive,
+  isPreparingIncoming = false,
   coldParkTerminalPanes = false,
   isForceParked = false,
   shouldMeasureHiddenWorktree = false,
@@ -37,6 +38,8 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
   worktreeId: string
   worktreePath: string
   isWorktreeActive: boolean
+  /** The incoming worktree of a switch: mounted, still hidden, awaited by the reveal gate. */
+  isPreparingIncoming?: boolean
   coldParkTerminalPanes?: boolean
   /** Retention-budget force-park keeps eviction-exempt tabs mounted. */
   isForceParked?: boolean
@@ -46,7 +49,7 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
   backgroundMountTabIds?: ReadonlySet<string> | null
   /** Cold-activation deferred tabs receive immediate parked watcher coverage. */
   activationDeferredMountTabIds?: ReadonlySet<string> | null
-  onTerminalMountReadyChange?: (tabId: string, ready: boolean) => void
+  onTerminalMountReadyChange?: (worktreeId: string, tabId: string, ready: boolean) => void
 }): React.JSX.Element | null {
   const { terminalTabs, unifiedTabs, groups, activeGroupId } = useAppStore(
     useShallow((state) => ({
@@ -106,7 +109,12 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
     worktreeId,
     terminalTabs,
     assignments,
-    isWorktreeActive,
+    // Why (ORCA-229): the reveal gate withholds isWorktreeActive until the incoming panes
+    // report their mount, and per-tab cold parking keys its unpark on that same flag — a
+    // parked group-active tab could never mount, so the switch would resolve on the
+    // stranding backstop. Parking sees the incoming worktree as active; the render below
+    // keeps using the raw flag so nothing paints or takes focus before the reveal.
+    isWorktreeActive: isWorktreeActive || isPreparingIncoming,
     coldParkTerminalPanes,
     isForceParked,
     shouldMeasureHiddenWorktree,
@@ -148,7 +156,7 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
               isVisible={isVisible}
               isActive={isActive}
               activityTerminalPortal={activityTerminalPortal}
-              onMountReadyChange={(ready) => onTerminalMountReadyChange?.(terminalTab.id, ready)}
+              onMountReadyChange={onTerminalMountReadyChange}
               onFocusOwningGroup={focusOwningGroup}
               consumeSuppressedPtyExit={consumeSuppressedPtyExit}
               leaveWorktreeIfEmpty={leaveWorktreeIfEmpty}

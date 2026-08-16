@@ -474,6 +474,7 @@ test.describe('Worktree switch responsiveness', () => {
         type FrameSample = {
           atMs: number
           xterms: number
+          xtermsLoose: number
           screens: number
           xtermsTotal: number
           containersTotal: number
@@ -486,7 +487,20 @@ test.describe('Worktree switch responsiveness', () => {
         if (!root || !targetSurface) {
           throw new Error('Missing rendered worktree root or target surface')
         }
+        // Why the explicit options: bare checkVisibility() only rejects display:none —
+        // visibilityProperty / opacityProperty / contentVisibilityAuto all default false. The
+        // pre-mounted incoming worktree is `visibility:hidden`, so the bare call would count its
+        // panes as painted and the probe would report a healthy switch without looking at one.
         const visibleCount = (selector: string): number =>
+          [...document.querySelectorAll<HTMLElement>(selector)].filter((element) =>
+            element.checkVisibility({
+              visibilityProperty: true,
+              opacityProperty: true,
+              contentVisibilityAuto: true
+            })
+          ).length
+        // Recorded beside it so the claim above is evidence in the run, not an assertion here.
+        const looseVisibleCount = (selector: string): number =>
           [...document.querySelectorAll<HTMLElement>(selector)].filter((element) =>
             element.checkVisibility()
           ).length
@@ -496,6 +510,7 @@ test.describe('Worktree switch responsiveness', () => {
           frames.push({
             atMs,
             xterms: visibleCount('.xterm'),
+            xtermsLoose: looseVisibleCount('.xterm'),
             screens: visibleCount('.xterm-screen'),
             xtermsTotal: document.querySelectorAll('.xterm').length,
             containersTotal: document.querySelectorAll('[data-terminal-tab-id]').length,
@@ -554,6 +569,7 @@ test.describe('Worktree switch responsiveness', () => {
           emptyFrames: switchFrames.filter((frame) => frame.xterms === 0),
           screenlessFrames: switchFrames.filter((frame) => frame.xterms > 0 && frame.screens === 0),
           doublePaintedFrames: switchFrames.filter((frame) => frame.xterms > 1),
+          maxLooseXterms: Math.max(...switchFrames.map((frame) => frame.xtermsLoose)),
           frames
         }
       },
@@ -572,6 +588,7 @@ test.describe('Worktree switch responsiveness', () => {
         emptyFrames: result.emptyFrames.length,
         screenlessFrames: result.screenlessFrames.length,
         doublePaintedFrames: result.doublePaintedFrames.length,
+        maxLooseXterms: result.maxLooseXterms,
         maxXtermsTotal: Math.max(...result.frames.map((frame) => frame.xtermsTotal)),
         maxContainersTotal: Math.max(...result.frames.map((frame) => frame.containersTotal))
       })
