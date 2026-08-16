@@ -221,23 +221,37 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
     const seeded = await seedBulkOpenRemoteSessions(page, { repoId: added.result.repo.id })
     disposeSessions = seeded.dispose
 
+    // One profile for the whole arm, opened before the settle so the sampler has
+    // seconds to come up. A session opened just before each phase does not
+    // sample it: 500ms after `Profiler.start` a 400ms block still came back
+    // with one sample and nothing attributed (run 31964719937).
+    const cpu = arm.profiled ? await startRendererCpuProfile(page) : null
+
     await settleBeforeBulkOpen(page)
 
     // Positive control, in the same run that produces the measurement: a block
     // of known size must read at its size, and in the profiled arm it must also
     // come back under its own name, or a small reading means nothing.
     const controlTrace = await startRendererTaskTrace(page, { categories: arm.categories })
-    const controlCpu = arm.profiled ? await startRendererCpuProfile(page) : null
     await injectPositiveControl(page)
     await page.waitForTimeout(CONTROL_WINDOW_MS)
     const controlWindow = await stopRendererTaskTrace(controlTrace)
-    if (controlCpu) {
-      await stopRendererCpuProfile(controlCpu)
-    }
     const control = worstBusyRun(controlWindow)
-    const controlProfile = controlCpu
-      ? controlProfileWindow(controlCpu, controlTrace, controlWindow.tasks)
-      : null
+
+    // Negative control: the same instruments over hidden streaming, no bulk
+    // open inside. Without it a large storm reading is not attributable.
+    const hiddenTrace = await startRendererTaskTrace(page, { categories: arm.categories })
+    await page.waitForTimeout(HIDDEN_FLOOD_WINDOW_MS)
+    const hidden = worstBusyRun(await stopRendererTaskTrace(hiddenTrace))
+
+    const stormTrace = await startRendererTaskTrace(page, { categories: arm.categories })
+    const stormWallMs = await runBulkOpenStorm(page, seeded.sessions)
+    const stormWindow = await stopRendererTaskTrace(stormTrace)
+    const storm = worstBusyRun(stormWindow)
+    if (cpu) {
+      await stopRendererCpuProfile(cpu)
+    }
+    const controlProfile = cpu ? controlProfileWindow(cpu, controlTrace, controlWindow.tasks) : null
     const controlAttributedMs = controlProfile
       ? Number(selfTimeUnder(controlProfile, CONTROL_FUNCTION).toFixed(1))
       : null
@@ -251,21 +265,6 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
       await page.waitForTimeout(CONTROL_WINDOW_MS)
       controlUnprofiledMs = worstBusyRun(await stopRendererTaskTrace(repeatTrace)).maxTaskMs
     }
-
-    // Negative control: the same instruments over hidden streaming, no bulk
-    // open inside. Without it a large storm reading is not attributable.
-    const hiddenTrace = await startRendererTaskTrace(page, { categories: arm.categories })
-    await page.waitForTimeout(HIDDEN_FLOOD_WINDOW_MS)
-    const hidden = worstBusyRun(await stopRendererTaskTrace(hiddenTrace))
-
-    const stormTrace = await startRendererTaskTrace(page, { categories: arm.categories })
-    const stormCpu = arm.profiled ? await startRendererCpuProfile(page) : null
-    const stormWallMs = await runBulkOpenStorm(page, seeded.sessions)
-    const stormWindow = await stopRendererTaskTrace(stormTrace)
-    if (stormCpu) {
-      await stopRendererCpuProfile(stormCpu)
-    }
-    const storm = worstBusyRun(stormWindow)
 
     // Only now: driving frames removes the very block the never-shown arm
     // exists to reproduce, so counting them cannot happen before the storm.
@@ -292,7 +291,7 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
       stormWallMs,
       tracedTasks: stormWindow.tasks.length,
       anchored: stormWindow.anchored,
-      longestTasks: describeLongestTasks(stormTrace, stormCpu, stormWindow.tasks)
+      longestTasks: describeLongestTasks(stormTrace, cpu, stormWindow.tasks)
     }
   } finally {
     await disposeSessions?.()

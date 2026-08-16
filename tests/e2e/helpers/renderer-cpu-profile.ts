@@ -3,11 +3,11 @@ import type { CDPSession, Page } from '@stablyai/playwright-test'
 /**
  * Where a task's milliseconds went, by V8 stack sample (ORCA-239).
  *
- * The task trace says how long a task ran and which Blink phases it entered; it
- * does not say which function burned the time, and for the case that matters it
- * cannot — work driven through the inspector emits no `FunctionCall` at all,
- * measured in renderer-cpu-profile-calibration.spec.ts. Every task in R1's
- * bulk-open storm is inspector-driven.
+ * The task trace says how long a task ran, which Blink phases it entered, and
+ * the function a `FunctionCall` entered through. It does not say where the time
+ * went inside that call, and for work the inspector drives it says nothing at
+ * all — measured in renderer-cpu-profile-calibration.spec.ts, a 400ms block run
+ * through `page.evaluate` produces an empty event census.
  *
  * Timestamps come from the task trace's anchor mark rather than from a second
  * anchor of this instrument's own: a named spin is the obvious way to place the
@@ -66,13 +66,15 @@ type CdpProfile = {
   timeDeltas: number[]
 }
 
-/** 250us over a 200ms task is ~800 samples — enough to rank, cheap enough not to distort. */
-const SAMPLE_INTERVAL_US = 250
+/** 500us over a 200ms task is ~400 samples — enough to rank, cheap enough not to distort. */
+const SAMPLE_INTERVAL_US = 500
 /**
- * `Profiler.start` returns before the sampler is actually taking samples.
- * Measured (ORCA-239): a 400ms block injected immediately after it came back
- * with ONE sample carrying a 477.7ms delta — the profile looked valid and
- * attributed nothing. Work measured inside this window is not sampled.
+ * `Profiler.start` returns well before the sampler is taking samples, and how
+ * far before is not fixed. Measured (ORCA-239): a 400ms block injected
+ * immediately after it came back with ONE sample carrying a 477.7ms delta, and
+ * 500ms of warm-up did not change that on the paired client's page. This delay
+ * is a floor, not the fix — open the profile seconds before the window that
+ * matters and check `sampleCount` against what the window is owed.
  */
 const SAMPLER_WARMUP_MS = 500
 /** Below this share of the samples a window is owed, the sampler was not really on. */
