@@ -102,48 +102,107 @@ test.describe('Worktree switch with a cold-parked split tab', () => {
     )
     expect(parkedTabIds.length).toBeGreaterThan(0)
 
-    const reveal = await orcaPage.evaluate(async (secondId) => {
-      const root = document.querySelector<HTMLElement>('[data-rendered-active-worktree-id]')
-      const targetSurface = [...document.querySelectorAll<HTMLElement>('[data-worktree-id]')]
-        .find((candidate) => candidate.dataset.worktreeId === secondId)
-        ?.querySelector<HTMLElement>('[data-worktree-card-surface]')
-      if (!root || !targetSurface) {
-        throw new Error('Missing rendered worktree root or target surface')
-      }
-      const clickAtMs = performance.now()
-      const revealed = new Promise<number | null>((resolve) => {
-        const timeoutId = window.setTimeout(() => {
-          observer.disconnect()
-          resolve(null)
-        }, 5000)
-        const observer = new MutationObserver(() => {
-          if (root.getAttribute('data-rendered-active-worktree-id') !== secondId) {
-            return
-          }
-          window.clearTimeout(timeoutId)
-          observer.disconnect()
-          resolve(performance.now() - clickAtMs)
+    const reveal = await orcaPage.evaluate(
+      async ({ secondId, parkedTabId }) => {
+        const root = document.querySelector<HTMLElement>('[data-rendered-active-worktree-id]')
+        const targetSurface = [...document.querySelectorAll<HTMLElement>('[data-worktree-id]')]
+          .find((candidate) => candidate.dataset.worktreeId === secondId)
+          ?.querySelector<HTMLElement>('[data-worktree-card-surface]')
+        if (!root || !targetSurface) {
+          throw new Error('Missing rendered worktree root or target surface')
+        }
+        // Delivery batch, not DOM order: a backstop reveal remounts the parked tab in its own
+        // commit, so both land in one batch. Readiness needs the mount to have happened earlier.
+        let batchIndex = 0
+        let mutationIndex = 0
+        let parkedTabMountIndex: number | null = null
+        let parkedTabMountBatch: number | null = null
+        let revealIndex: number | null = null
+        let revealBatch: number | null = null
+        const clickAtMs = performance.now()
+        const revealed = new Promise<number | null>((resolve) => {
+          const timeoutId = window.setTimeout(() => {
+            observer.disconnect()
+            resolve(null)
+          }, 5000)
+          const observer = new MutationObserver((records) => {
+            batchIndex += 1
+            for (const record of records) {
+              mutationIndex += 1
+              if (
+                parkedTabMountIndex === null &&
+                record.type === 'childList' &&
+                [...record.addedNodes].some(
+                  (node) =>
+                    node instanceof HTMLElement &&
+                    (node.matches(`[data-terminal-tab-id="${parkedTabId}"]`) ||
+                      node.querySelector(`[data-terminal-tab-id="${parkedTabId}"]`) !== null)
+                )
+              ) {
+                parkedTabMountIndex = mutationIndex
+                parkedTabMountBatch = batchIndex
+              }
+              if (
+                revealIndex === null &&
+                record.type === 'attributes' &&
+                root.getAttribute('data-rendered-active-worktree-id') === secondId
+              ) {
+                revealIndex = mutationIndex
+                revealBatch = batchIndex
+              }
+            }
+            if (revealIndex === null) {
+              return
+            }
+            window.clearTimeout(timeoutId)
+            observer.disconnect()
+            resolve(performance.now() - clickAtMs)
+          })
+          observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-rendered-active-worktree-id'],
+            childList: true,
+            subtree: true
+          })
         })
-        observer.observe(root, {
-          attributes: true,
-          attributeFilter: ['data-rendered-active-worktree-id']
-        })
-      })
-      targetSurface.click()
-      const revealMs = await revealed
-      return {
-        revealMs,
-        activeWorktreeId: window.__store?.getState().activeWorktreeId ?? null,
-        renderedWorktreeId: root.getAttribute('data-rendered-active-worktree-id')
-      }
-    }, secondWorktreeId)
+        targetSurface.click()
+        const revealMs = await revealed
+        return {
+          revealMs,
+          parkedTabMountIndex,
+          parkedTabMountBatch,
+          revealIndex,
+          revealBatch,
+          activeWorktreeId: window.__store?.getState().activeWorktreeId ?? null,
+          renderedWorktreeId: root.getAttribute('data-rendered-active-worktree-id')
+        }
+      },
+      { secondId: secondWorktreeId, parkedTabId: parkedTabIds[0] }
+    )
 
-    console.info('[ORCA-229 parked-tab reveal]', JSON.stringify({ ...reveal, parkedTabIds }))
+    console.info(
+      '[ORCA-229 parked-tab reveal]',
+      JSON.stringify({
+        revealMs: reveal.revealMs,
+        activeWorktreeId: reveal.activeWorktreeId,
+        renderedWorktreeId: reveal.renderedWorktreeId,
+        parkedTabMountBatch: reveal.parkedTabMountBatch,
+        revealBatch: reveal.revealBatch,
+        parkedTabIds,
+        expectedWorktreeId: secondWorktreeId,
+        outgoingWorktreeId: firstWorktreeId
+      })
+    )
     await testInfo.attach('parked-tab-reveal', {
       body: JSON.stringify({ ...reveal, parkedTabIds, splitTabIds }, null, 2),
       contentType: 'application/json'
     })
 
+    // The parked tab remounted in an earlier commit than the reveal: readiness released it.
+    expect(reveal.parkedTabMountBatch).not.toBeNull()
+    expect(reveal.parkedTabMountBatch ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      reveal.revealBatch ?? 0
+    )
     expect(reveal.activeWorktreeId).toBe(secondWorktreeId)
     expect(reveal.renderedWorktreeId).toBe(secondWorktreeId)
     expect(reveal.revealMs).not.toBeNull()
