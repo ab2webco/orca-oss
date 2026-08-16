@@ -4,16 +4,35 @@ import type { Page } from '@stablyai/playwright-test'
 import { toWebTerminalSurfaceTabId } from '../../../src/shared/terminal-surface-id'
 import { expect } from './orca-app'
 import { createRemoteSessionBulkOpenFixture } from './remote-session-bulk-open-fixture'
-import { startRendererLagProbe } from '../paired-runtime-retention-metrics'
+import {
+  formatBlockWindow,
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe,
+  type RendererBlockWindow
+} from './renderer-main-thread-block-probe'
 import { closeStreamingTerminals } from './streaming-terminal-cleanup'
 import { waitForActivePanePtyId } from './terminal'
 
 /** Multi-worktree load: several agent-like streaming terminals per worktree. */
 export const BULK_OPEN_WORKTREE_COUNT = 3
 export const BULK_OPEN_TABS_PER_WORKTREE = 4
-/** Soft freeze signal — UI feels stuck. */
+/**
+ * Soft freeze signal — UI feels stuck. Unchanged at 2s, now with a derivation
+ * (ORCA-199): the number it is compared against is the longest stretch the
+ * renderer's main thread went unserviced, so 2000 means two seconds of real
+ * block. Healthy runs measure 1017.7ms and 1017.8ms (CI runs 31923503662 and
+ * 31923470791), which leaves only a 1.96x margin — deliberately, because that
+ * ~1s block is real product behaviour under bulk open, not instrument
+ * artifact: the replaced timer probe read 1009.7 / 1018.8ms over the same two
+ * windows while ticking at its full 16ms cadence. The ceiling is here to catch
+ * that block doubling, and tightening it below the measured behaviour would
+ * only make every run red.
+ */
 export const SOFT_FREEZE_LAG_MS = 2_000
-/** Hard freeze signal — matches trusted "screen fully frozen" reports. */
+/**
+ * Hard freeze signal — matches trusted "screen fully frozen" reports. 4.9x the
+ * measured healthy value above.
+ */
 export const HARD_FREEZE_LAG_MS = 5_000
 
 export type BulkOpenSession = {
@@ -33,6 +52,17 @@ export type BulkOpenFreezeReport = {
   worktreeCount: number
   topology: 'paired-remote-server' | 'docker-ssh'
   versionHint: string
+  /**
+   * Full measurement windows behind the two scalars above. The scalars keep
+   * their names so readings stay comparable with runs recorded before this
+   * instrument changed; these carry what a scalar cannot — where in the window
+   * the worst block landed, and how many tasks the probe serviced, without
+   * which a `0` cannot be told from a probe that never ran.
+   */
+  probeWindows: {
+    bulkOpen: RendererBlockWindow
+    hiddenFlood: RendererBlockWindow
+  }
   notes: string[]
 }
 
@@ -59,7 +89,7 @@ async function callRuntime<TResult>(page: Page, method: string, params: unknown)
  * 2000ms threshold, which is what made it flake. MessagePort tasks carry no
  * frame or timer-throttling dependency, so this measures the main thread.
  */
-async function measureRendererInteractionMs(page: Page): Promise<number> {
+export async function measureRendererInteractionMs(page: Page): Promise<number> {
   return page.evaluate(async () => {
     const started = performance.now()
     if (!window.__store) {
@@ -204,14 +234,18 @@ export async function runBulkOpenFreezeOracle(
   // Accumulate remote flood for several seconds (agent backlog).
   await page.waitForTimeout(4_000)
 
-  const hiddenProbe = await startRendererLagProbe(page)
+  // Same instrument, same page, no bulk open inside it: the control for the
+  // measured window below, and the only thing that makes a large bulk-open
+  // reading attributable to the bulk open.
+  const hiddenProbe = await startRendererMainThreadBlockProbe(page)
   await page.waitForTimeout(2_000)
-  const hiddenFloodMaxLagMs = await hiddenProbe.evaluate((probe) => probe.stop())
+  const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
   await hiddenProbe.dispose()
-  notes.push(`hidden streaming lag max=${hiddenFloodMaxLagMs.toFixed(0)}ms`)
+  const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
+  notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
 
   // Burst open remote sessions (worktree + tab activate).
-  const openProbe = await startRendererLagProbe(page)
+  const openProbe = await startRendererMainThreadBlockProbe(page)
   const openStarted = Date.now()
   for (const worktreeId of worktreeIds) {
     const tabs = sessions.filter((session) => session.worktreeId === worktreeId)
@@ -236,9 +270,11 @@ export async function runBulkOpenFreezeOracle(
   }
   // Let the storm settle enough to measure residual lag.
   await page.waitForTimeout(3_000)
-  const bulkOpenMaxLagMs = await openProbe.evaluate((probe) => probe.stop())
+  const bulkOpen = await readRendererBlockWindow(openProbe, 'bulk open')
   await openProbe.dispose()
-  notes.push(`bulk open wall=${Date.now() - openStarted}ms lagMax=${bulkOpenMaxLagMs.toFixed(0)}ms`)
+  const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
+  notes.push(`bulk open wall=${Date.now() - openStarted}ms`)
+  notes.push(formatBlockWindow(bulkOpen, 'bulk open'))
 
   // Confirm last session is live after the storm (host PTYs survived).
   const last = sessions.at(-1)
@@ -271,6 +307,7 @@ export async function runBulkOpenFreezeOracle(
     worktreeCount: worktreeIds.length,
     topology: opts.topology,
     versionHint: opts.versionHint ?? process.env.ORCA_VERSION ?? 'unknown',
+    probeWindows: { bulkOpen, hiddenFlood },
     notes
   }
 

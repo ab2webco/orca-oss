@@ -1,9 +1,22 @@
 import type { Page } from '@stablyai/playwright-test'
 import type { RuntimeTerminalRead } from '../../../src/shared/runtime-types'
-import { startRendererLagProbe } from '../paired-runtime-retention-metrics'
+import {
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe
+} from './renderer-main-thread-block-probe'
 import { expect } from './orca-app'
 
-const MAX_HIDDEN_FLOOD_LAG_MS = 500
+/**
+ * Longest main-thread block tolerated while hidden paired terminals are flooded.
+ *
+ * Was 500 with no derivation, and unreachable with it (ORCA-199): the probe
+ * window closes as soon as every terminal has flooded — 528ms and 540ms on the
+ * two CI runs below — and a window's worst block cannot exceed the window, so
+ * only a stall covering ~95% of it could ever have failed. Measured 1.0ms
+ * (31923503662) and 1.7ms (31923470791) on 2-core CI runners. 150 is ~88x the
+ * worse of the two and lands well inside the window, so it can report a red.
+ */
+const MAX_HIDDEN_FLOOD_LAG_MS = 150
 
 type HiddenPairedTerminal = {
   tabId: string
@@ -56,7 +69,7 @@ export async function verifyHiddenPairedTerminalOutputSuppression(
     debug.reset()
   })
 
-  const lagProbe = await startRendererLagProbe(page)
+  const lagProbe = await startRendererMainThreadBlockProbe(page)
   const tokens = terminals.map((_, index) => `HIDDEN_FLOOD_${index}_${Date.now()}`)
   try {
     await Promise.all(
@@ -85,7 +98,8 @@ export async function verifyHiddenPairedTerminalOutputSuppression(
         { timeout: 30_000 }
       )
       .toEqual(Array(terminals.length).fill(true))
-    const hiddenFloodLagMs = await lagProbe.evaluate((probe) => probe.stop())
+    const hiddenFlood = await readRendererBlockWindow(lagProbe, 'hidden paired flood')
+    const hiddenFloodLagMs = hiddenFlood.maxBlockMs
     const scheduler = await page.evaluate(
       () =>
         (

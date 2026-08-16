@@ -5,10 +5,11 @@ import {
   toHostSessionTabId,
   toWebTerminalSurfaceTabId
 } from '../../../src/shared/terminal-surface-id'
+import { readPairedRetentionSample } from '../paired-runtime-retention-metrics'
 import {
-  readPairedRetentionSample,
-  startRendererLagProbe
-} from '../paired-runtime-retention-metrics'
+  readRendererBlockWindow,
+  startRendererMainThreadBlockProbe
+} from './renderer-main-thread-block-probe'
 import { expect } from './orca-app'
 import { verifyHiddenPairedTerminalOutputSuppression } from './paired-terminal-hidden-output-oracle'
 import { createPairedTerminalParkingFixture } from './paired-terminal-parking-fixture'
@@ -17,7 +18,16 @@ import { getTerminalContent, waitForActivePanePtyId } from './terminal'
 const TARGET_WORKTREE_COUNT = 6
 const MIN_STAGED_BUFFER_CELLS = 1_000_000
 const MAX_RETAINED_CELL_FRACTION = 0.45
-const MAX_EVICTION_LAG_MS = 500
+/**
+ * Same class as MAX_HIDDEN_FLOOD_LAG_MS, and worse (ORCA-199): the eviction
+ * window closes when parking settles — 224ms and 244ms on CI — so a 500ms
+ * ceiling was above the window itself and could not fail at all. Measured
+ * 34.6ms (31923503662) and 52.1ms (31923470791). 150 is 2.9x the worse one.
+ * Only two samples back it, so a red here is a signal to sample more, not to
+ * raise the number: what a ceiling above the window length bought was a green
+ * that meant nothing.
+ */
+const MAX_EVICTION_LAG_MS = 150
 const MAX_HEAP_GROWTH_BYTES = 16 * 1024 * 1024
 
 type RemoteTab = {
@@ -141,7 +151,7 @@ export async function runPairedTerminalParkingOracle(
     )
     expect(baseline.bufferCells).toBeGreaterThan(MIN_STAGED_BUFFER_CELLS)
 
-    const lagProbe = await startRendererLagProbe(page)
+    const lagProbe = await startRendererMainThreadBlockProbe(page)
     let maxLagMs = Number.POSITIVE_INFINITY
     let lagProbeStopped = false
     try {
@@ -182,7 +192,7 @@ export async function runPairedTerminalParkingOracle(
           parked: TARGET_WORKTREE_COUNT - 1,
           retentionBudgetEnabled: false
         })
-      maxLagMs = await lagProbe.evaluate((probe) => probe.stop())
+      maxLagMs = (await readRendererBlockWindow(lagProbe, 'paired parking eviction')).maxBlockMs
       lagProbeStopped = true
     } finally {
       if (!lagProbeStopped) {
