@@ -42,11 +42,12 @@ export const HARD_FREEZE_LAG_MS = 5_000
  * feels. Derived, not chosen: 2.5x the worst of five measured CI runs against a
  * composited window, rounded up to the next 50ms (2.5 x 235.1 = 587.8 -> 600).
  *
- * The five: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563, 31954298734)
- * and 171.0 / 235.1 (runs 31951413594, 31952659728, shown arm of the shape
- * diagnostic over the identical storm). Range 171.0-235.1, a 1.4x spread.
+ * The six: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563, 31954298734),
+ * 171.0 / 235.1 (runs 31951413594, 31952659728, shown arm of the shape
+ * diagnostic over the identical storm) and 166.6 (run 31956652960, the first
+ * under these ceilings). Range 166.6-235.1, a 1.4x spread.
  *
- * n=5 is not a distribution, and the margin is sized for that rather than for
+ * n=6 is not a distribution, and the margin is sized for that rather than for
  * confidence in the number. Read the cost before treating 600 as tight: it sits
  * 2.6x above the worst measured task, so a regression has to more than double
  * the longest task to trip it. That is the price of five samples, not a claim
