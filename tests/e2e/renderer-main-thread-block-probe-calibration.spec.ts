@@ -28,11 +28,13 @@ const INJECTED_BLOCK_MS = [0, 10, 40, 120] as const
  * Idle ceiling — a hang detector for the instrument, not a precision budget:
  * the positive controls carry the precision. The window is only idle in the
  * sense that this spec injects nothing into it; a booted Orca renderer is still
- * running. Measured 5.6 / 19.7 / 24.6ms locally on a 10-core M-series and
- * 74.4 / 106.0ms on 2-core CI runners, so a tight ceiling is a flake. 400 keeps
- * ~3.8x over the worst measured and still separates an idle renderer from the
- * ~1018ms the bulk-open oracle reports, which is the claim this control exists
- * to support.
+ * running. Measured 74.4 and 106.0ms on 2-core CI runners before the warm-up
+ * window below existed, and 9.1ms on the same runners after it; locally
+ * 5.6-24.6ms, and 5.7-6.0ms with the warm-up. 400 is sized against the
+ * pre-warm-up numbers on purpose — one post-warm-up CI sample is not a
+ * distribution, and a control that flakes is worth less than a loose one. It
+ * still separates an idle renderer from the ~1017ms the bulk-open oracle
+ * reports, which is the claim this control exists to support.
  */
 const MAX_IDLE_BLOCK_MS = 400
 /**
