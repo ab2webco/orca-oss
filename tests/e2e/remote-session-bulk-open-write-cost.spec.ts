@@ -1,5 +1,5 @@
 /**
- * ORCA-251 — what costs 116ms inside one xterm write element?
+ * ORCA-251 — one xterm write element, measured; now the guard on the split.
  *
  * On demand, not in the suite: it answers a question rather than guarding a
  * regression, and it costs a paired host and a seeded storm.
@@ -11,14 +11,17 @@
  * stream parses in 1.50ms median (n=64, @xterm/headless 6.1.0-beta.287, 80x60,
  * scrollback 5000, macOS). Three readings that cannot all be true at once.
  *
- * Three explanations, and this spec separates them in one run on one machine:
+ * Three explanations, separated in one run on one machine. **A**, settled: the
+ * element was not 16 KiB, it was 579,767 chars — the snapshot replay wrote it
+ * whole, bypassing the scheduler's chunker (`replay-guard.ts`).
  *
  * - A: the element is not 16 KiB in the product. `live` reports maxChars.
- * - B: the DOM Terminal amplifies what the parse triggers. `dom` vs `nodom`,
- *   same page, same run, same bundle — the only pair that can say this.
- * - C: the runner is just slow. The 400ms positive control gives the runner's
- *   scalar, and `nodom` gives the parse under it. A cross-machine comparison
- *   against the headless number cannot decide C; these two can.
+ * - B: dead — the DOM Terminal costs 1.6x the DOM-less one (0.8 vs 0.5ms per
+ *   16 KiB), not the 77x the contradiction needed. `dom` vs `nodom`, same page,
+ *   same run, same bundle: the only pair that can say this.
+ * - C: dead — the 400ms control read 400.4ms, and 16 KiB parses FASTER on CI
+ *   (0.5ms) than on the Mac (1.5ms). A cross-machine comparison against the
+ *   headless number could not have decided this; these two arms can.
  *
  * Per element it records the parse AND the write callback, because they
  * partition the task: a cheap parse alone would only move the question.
@@ -30,6 +33,10 @@
  * What `dom` is not: the product's panes also carry the webgl renderer, the
  * search/links/unicode addons and the scheduler's own callbacks. `dom` is the
  * bare DOM Terminal, so `live` minus `dom` is what Orca adds on top.
+ *
+ * After ORCA-251's split, the storm's longest task can still be the React
+ * commit that mounts panes (229.5ms in run 31972534074) — that is ORCA-239's
+ * other regime, not this one. The gate is on the element, which is this ticket's.
  *
  * Run: CI Linux only — the paired web client does not hydrate `window.__store`
  * locally. `gh workflow run "E2E" -R ab2webco/orca-oss --ref <branch>
@@ -86,6 +93,8 @@ const BENCH_QUIET_SETTLE_MS = 2_000
 const BENCH_QUIET_WINDOW_MS = 1_000
 /** A page still this busy before the bench cannot host a per-element measurement. */
 const MAX_QUIET_TASK_MS = 200
+/** See the gate below: sized to fail on both pre-fix runs, not to be a budget. */
+const MAX_ELEMENT_PARSE_MS = 40
 const BENCH_COLS = 80
 const BENCH_ROWS = 60
 const BENCH_SCROLLBACK_ROWS = 5_000
@@ -300,15 +309,21 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
       expect(entry.result.writesRun).toBeGreaterThanOrEqual(MIN_BENCH_WRITES)
     }
 
-    // Explanation A, settled in run 31971270025: the largest element the product
-    // handed xterm was 579,767 chars, 35x the chunk cap, and its parse was 102ms
-    // of a 103.3ms task. What is open now is which caller writes it, so the gate
-    // is that the oversized write reproduced AND its stack was captured. A run
-    // that measures no oversized write did not reproduce the phenomenon and its
-    // stacks say nothing.
-    expect(live?.maxChars ?? 0).toBeGreaterThan(BACKGROUND_CHUNK_CHARS)
-    expect(bigWrites.length).toBeGreaterThan(0)
-    expect(bigWrites[0]?.stack ?? '').toContain('at ')
+    // The fix, in the two quantities that carried it.
+    //
+    // Before (runs 31971270025 and 31972534074, this same spec against the
+    // unsplit replay): maxChars 579,767 — 35x the cap — with 5 oversized writes
+    // in one storm, and a single element parsing for 102 and 114.3ms. Those two
+    // runs are the mutation arm: the product then handed the snapshot to xterm
+    // in one write, and every gate below fails on their recorded numbers.
+    //
+    // The 40ms ceiling is not the target, it is the discriminator: a 16 KiB
+    // element at the slowest live parse rate measured here (5.7 MB/s) is ~2.9ms,
+    // so 40ms leaves an order of magnitude of CI noise while still failing on
+    // both pre-fix readings.
+    expect(live?.maxChars ?? 0).toBeLessThanOrEqual(BACKGROUND_CHUNK_CHARS)
+    expect(bigWrites).toEqual([])
+    expect(live?.maxActionMs ?? Number.POSITIVE_INFINITY).toBeLessThan(MAX_ELEMENT_PARSE_MS)
   } finally {
     await disposeSessions?.()
     await webClient?.dispose()
