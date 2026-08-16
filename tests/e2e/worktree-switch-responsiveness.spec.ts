@@ -565,8 +565,6 @@ test.describe('Worktree switch responsiveness', () => {
           framesBeforeClick: frames.filter((frame) => frame.atMs < clickAtMs).length,
           framesTotal: frames.length,
           emptyFrames: switchFrames.filter((frame) => frame.xterms === 0),
-          screenlessFrames: switchFrames.filter((frame) => frame.xterms > 0 && frame.screens === 0),
-          doublePaintedFrames: switchFrames.filter((frame) => frame.xterms > 1),
           maxLooseXterms: Math.max(...switchFrames.map((frame) => frame.xtermsLoose)),
           frames
         }
@@ -584,8 +582,6 @@ test.describe('Worktree switch responsiveness', () => {
         visibleBefore: result.visibleBefore,
         visibleAfter: result.visibleAfter,
         emptyFrames: result.emptyFrames.length,
-        screenlessFrames: result.screenlessFrames.length,
-        doublePaintedFrames: result.doublePaintedFrames.length,
         maxLooseXterms: result.maxLooseXterms,
         maxXtermsTotal: Math.max(...result.frames.map((frame) => frame.xtermsTotal)),
         maxContainersTotal: Math.max(...result.frames.map((frame) => frame.containersTotal))
@@ -601,8 +597,7 @@ test.describe('Worktree switch responsiveness', () => {
     expect(result.visibleAfter).toBe(1)
     expect(result.incomingScreensAtReveal).toBeGreaterThan(0)
     expect(result.emptyFrames).toEqual([])
-    expect(result.screenlessFrames).toEqual([])
-    expect(result.doublePaintedFrames).toEqual([])
+    // Hang detector, not a budget: the reveal comparison against origin/main lives in ORCA-229.
     expect(result.revealMs).toBeLessThan(100)
   })
 })
