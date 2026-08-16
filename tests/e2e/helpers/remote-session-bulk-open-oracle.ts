@@ -47,8 +47,12 @@ export const HARD_FREEZE_LAG_MS = 5_000
  * diagnostic over the identical storm). Range 171.0-235.1, a 1.4x spread.
  *
  * n=5 is not a distribution, and the margin is sized for that rather than for
- * confidence in the number: the value is recorded on green so CI builds the
- * real one. See docs/reference/timing-budget-assertions.md.
+ * confidence in the number. Read the cost before treating 600 as tight: it sits
+ * 2.6x above the worst measured task, so a regression has to more than double
+ * the longest task to trip it. That is the price of five samples, not a claim
+ * about where the product's budget is. The value is recorded on green so CI
+ * builds the real distribution and this can be tightened against it.
+ * See docs/reference/timing-budget-assertions.md.
  */
 export const SOFT_FREEZE_TASK_MS = 600
 /** Hard freeze — "screen fully frozen". 2.5x the soft ceiling, the ratio it had before. */
