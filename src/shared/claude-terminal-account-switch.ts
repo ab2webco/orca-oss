@@ -53,6 +53,9 @@ export type ClaudeTerminalAccountSwitchFailureReason =
   | 'missing-launch-config'
   /** No Claude provider session id observed for this pane, so nothing to resume. */
   | 'missing-session'
+  /** The pane's worktree never resolved to a path, so no step past it could run (ORCA-195). */
+  | 'workspace-unresolved'
+  /** The transcript copy into the target account's universe failed. */
   | 'transcript-unavailable'
   /**
    * A universe involved in the switch has no managed hook that reports a resumed
@@ -196,6 +199,8 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
     'Orca has no recorded launch command for this Claude process, so it will not relaunch it with guessed flags.',
   'missing-session':
     'No Claude session was observed in this terminal, so there is nothing to resume.',
+  'workspace-unresolved':
+    'Orca could not resolve a working directory for this terminal, so the switch stopped before touching the session.',
   'transcript-unavailable':
     'The session transcript could not be made readable from the selected account.',
   'resume-verification-unavailable':

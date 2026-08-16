@@ -54,7 +54,7 @@ describe('resolveClaudeTerminalSwitchReadiness', () => {
     ['terminal-not-found', { paneResolved: false }],
     ['unsupported-runtime', { isWsl: true }],
     ['unsupported-runtime', { remoteConnectionId: 'ssh-1' }],
-    ['transcript-unavailable', { cwd: null }],
+    ['workspace-unresolved', { cwd: null }],
     ['source-unknown', { sourceAccountId: null }],
     ['missing-session', { providerSessionId: null }]
   ] as const)('reports %s', (reason, overrides) => {
@@ -71,6 +71,27 @@ describe('resolveClaudeTerminalSwitchReadiness', () => {
       resolveClaudeTerminalSwitchReadiness(
         preflight({ cwd: null, sourceAccountId: null, launchConfig: null })
       )
-    ).toEqual({ state: 'unavailable', reason: 'transcript-unavailable' })
+    ).toEqual({ state: 'unavailable', reason: 'workspace-unresolved' })
+  })
+
+  // ORCA-195: the transcript is copied two steps later, so no unmet prerequisite
+  // here may borrow its reason.
+  it('never names the transcript for a prerequisite the switch checks before it', () => {
+    const reasons = (
+      [
+        { servicesAttached: false },
+        { paneResolved: false },
+        { isWsl: true },
+        { remoteConnectionId: 'ssh-1' },
+        { cwd: null },
+        { sourceAccountId: null },
+        { providerSessionId: null },
+        { launchConfig: null }
+      ] as const
+    ).map((overrides) => resolveClaudeTerminalSwitchReadiness(preflight(overrides)))
+    expect(reasons).not.toContainEqual({
+      state: 'unavailable',
+      reason: 'transcript-unavailable'
+    })
   })
 })
