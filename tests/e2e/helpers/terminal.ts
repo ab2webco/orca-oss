@@ -456,6 +456,8 @@ export async function splitActiveTerminalPane(
   if (!tabId) {
     throw new Error('splitActiveTerminalPane: no active terminal tab')
   }
+  // Pane setup runs a task after the commit that creates the tab, so a bare read races it.
+  await waitForActiveTerminalManager(page)
   await page.evaluate(
     ({ tabId, direction }) => {
       const paneManagers = window.__paneManagers

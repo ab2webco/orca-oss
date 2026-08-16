@@ -342,8 +342,6 @@ function TerminalPane(
   ref: React.ForwardedRef<TerminalPaneHandle>
 ): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
-  const onMountReadyChangeRef = useRef(onMountReadyChange)
-  onMountReadyChangeRef.current = onMountReadyChange
   const managerRef = useRef<PaneManager | null>(null)
   const paneFontSizesRef = useRef<Map<number, number>>(new Map())
   const expandedPaneIdRef = useRef<number | null>(null)
@@ -1611,7 +1609,7 @@ function TerminalPane(
     isVisibleRef,
     onPtyExitRef,
     onAgentExitedRef,
-    onMountReadyChangeRef,
+    onMountReadyChange,
     onPtyErrorRef,
     onPtyCodexResumeBlockedRef,
     onAgentRateLimitDetected: handleAgentRateLimitDetected,

@@ -285,7 +285,7 @@ type UseTerminalPaneLifecycleDeps = {
   isVisibleRef: React.RefObject<boolean>
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
-  onMountReadyChangeRef: React.RefObject<((ready: boolean) => void) | undefined>
+  onMountReadyChange: ((ready: boolean) => void) | undefined
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
   onPtyCodexResumeBlockedRef?: React.RefObject<
     (paneId: number, providerSession: AgentProviderSessionMetadata | null) => void
@@ -632,7 +632,7 @@ export function useTerminalPaneLifecycle({
   isVisibleRef,
   onPtyExitRef,
   onAgentExitedRef,
-  onMountReadyChangeRef,
+  onMountReadyChange,
   onPtyErrorRef,
   onPtyCodexResumeBlockedRef,
   onAgentRateLimitDetected,
@@ -738,9 +738,8 @@ export function useTerminalPaneLifecycle({
       return
     }
     const expandedStyleSnapshots = expandedStyleSnapshotRef.current
-    // Captured at mount: the cleanup must retract the readiness THIS pane published, and the ref
-    // may already point at the next tab's callback by then.
-    const notifyMountReady = onMountReadyChangeRef.current
+    // Captured at mount: the cleanup must retract the readiness THIS pane published.
+    const notifyMountReady = onMountReadyChange
     let mountReady = false
     const paneTransports = paneTransportsRef.current
     const panePtyBindings = panePtyBindingsRef.current

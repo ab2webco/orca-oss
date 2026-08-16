@@ -324,7 +324,6 @@ function Terminal(): React.JSX.Element | null {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const [renderedActiveWorktreeId, setRenderedActiveWorktreeId] = useState(activeWorktreeId)
   const readyTerminalTabIdsByWorktreeRef = useRef(new Map<string, Set<string>>())
-  const requiredIncomingTerminalTabIdsRef = useRef<ReadonlySet<string>>(new Set())
   const switchEpochRef = useRef(0)
   const [terminalMountReadinessRevision, setTerminalMountReadinessRevision] = useState(0)
   const activeWorktreeDeferralHostId = useAppStore((s) =>
@@ -415,15 +414,9 @@ function Terminal(): React.JSX.Element | null {
           readyByWorktree.delete(worktreeId)
         }
       }
+      // The reveal itself belongs to the effect below: it recomputes canReveal from this same
+      // ready set on the render this bump schedules.
       setTerminalMountReadinessRevision((revision) => revision + 1)
-      const activeId = useAppStore.getState().activeWorktreeId
-      if (
-        ready &&
-        activeId === worktreeId &&
-        Array.from(requiredIncomingTerminalTabIdsRef.current).every((id) => next.has(id))
-      ) {
-        setRenderedActiveWorktreeId(worktreeId)
-      }
     },
     []
   )
@@ -456,7 +449,6 @@ function Terminal(): React.JSX.Element | null {
       ? (readyTerminalTabIdsByWorktreeRef.current.get(activeWorktreeId) ?? new Set())
       : new Set()
   })
-  requiredIncomingTerminalTabIdsRef.current = requiredIncomingTerminalTabIds
 
   useEffect(() => {
     const epoch = ++switchEpochRef.current
