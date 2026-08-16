@@ -68,13 +68,28 @@ type CdpProfile = {
 
 /** 250us over a 200ms task is ~800 samples — enough to rank, cheap enough not to distort. */
 const SAMPLE_INTERVAL_US = 250
+/**
+ * `Profiler.start` returns before the sampler is actually taking samples.
+ * Measured (ORCA-239): a 400ms block injected immediately after it came back
+ * with ONE sample carrying a 477.7ms delta — the profile looked valid and
+ * attributed nothing. Work measured inside this window is not sampled.
+ */
+const SAMPLER_WARMUP_MS = 500
+/** Below this share of the samples a window is owed, the sampler was not really on. */
+const MIN_SAMPLE_DENSITY = 0.5
 
 export async function startRendererCpuProfile(page: Page): Promise<RendererCpuProfileHandle> {
   const session = await page.context().newCDPSession(page)
   await session.send('Profiler.enable')
   await session.send('Profiler.setSamplingInterval', { interval: SAMPLE_INTERVAL_US })
   await session.send('Profiler.start')
+  await page.waitForTimeout(SAMPLER_WARMUP_MS)
   return { session, profile: null }
+}
+
+/** Samples a live sampler owes a window of this length. */
+export function expectedSampleCount(windowMs: number): number {
+  return (windowMs * 1000) / SAMPLE_INTERVAL_US
 }
 
 export async function stopRendererCpuProfile(
@@ -151,6 +166,13 @@ export function profileWindow(
         `${profile.samples.length} taken`
     )
     return empty
+  }
+  const owed = expectedSampleCount(toMs - fromMs)
+  if (owed > 0 && sampleCount < owed * MIN_SAMPLE_DENSITY) {
+    notes.push(
+      `sampler covered ${sampleCount} of ~${owed.toFixed(0)} samples this window owes — ` +
+        `attribution below is not the whole window`
+    )
   }
   const frames = [...selfUs.entries()]
     .map(([id, entry]) => {
