@@ -64,8 +64,8 @@ const FRAME_PROBE_MS = 1_000
 const CONTROL_FUNCTION = 'orcaBulkOpenPositiveControl'
 /** Sampling is coarse and the burn shares its task with the call into it. */
 const MIN_ATTRIBUTED_FRACTION = 0.7
-/** Profiling must not change the storm it measures by more than this. */
-const MAX_PERTURBATION_FRACTION = 0.35
+/** Profiling must not change the injected block it measures by more than this. */
+const MAX_PERTURBATION_FRACTION = 0.1
 /** Tasks worth naming inside the storm. */
 const REPORTED_TASKS = 3
 
@@ -138,10 +138,13 @@ test('R1 bulk-open longest task, attributed @ondemand @freeze-repro', async ({ t
   expect(profiled.longestTasks[0]?.samplesInTask ?? 0).toBeGreaterThan(0)
 
   // Perturbation control: sampling must not be what the storm is measuring.
-  const unprofiled = arm('shown')
-  const drift =
-    Math.abs(profiled.storm.busyRunMs - unprofiled.storm.busyRunMs) / unprofiled.storm.busyRunMs
-  expect(drift).toBeLessThan(MAX_PERTURBATION_FRACTION)
+  // Decided on the injected 400ms block and not on the storm's busy run —
+  // ORCA-230 measured that quantity at 507.0 to 1725.7ms across seven runs
+  // with no profiler anywhere, so a threshold on it would answer noise.
+  const controlDrift =
+    Math.abs(profiled.control.maxTaskMs - arm('shown').control.maxTaskMs) /
+    arm('shown').control.maxTaskMs
+  expect(controlDrift).toBeLessThan(MAX_PERTURBATION_FRACTION)
 })
 
 async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasurement> {

@@ -70,6 +70,8 @@ const TRACE_CATEGORIES = [
 const IDLE_GAP_MS = 1
 const CONTIGUOUS_FRACTION = 0.8
 const MIN_FRAME_MS = 1
+/** Trace timestamps are whole microseconds; a child filling its parent rounds past it. */
+const CONTAINMENT_SLACK_US = 1_000
 
 /**
  * Every main-thread task and its duration, from the renderer's own trace.
@@ -222,8 +224,10 @@ export function framesInsideTask(
   const offsetMs = anchor.ts / 1000 - handle.anchorPerfNowMs
   const startUs = (task.startMs + offsetMs) * 1000
   const endUs = (task.startMs + task.durationMs + offsetMs) * 1000
-  // Overlap, not containment: a child that fills its parent is the interesting
-  // case and strict containment drops it on a microsecond of quantization.
+  // Containment with a microsecond of slack: a child that fills its parent is
+  // the interesting case, and it must not lose to quantization. Not overlap —
+  // an event that encloses the task would clip to the task's own length and
+  // outrank every real child.
   return handle.events
     .filter(
       (event) =>
@@ -232,11 +236,13 @@ export function framesInsideTask(
         event.name !== 'RunTask' &&
         event.ts !== undefined &&
         event.dur !== undefined &&
-        overlapMs(event.ts, event.ts + event.dur, startUs, endUs) >= MIN_FRAME_MS
+        event.ts >= startUs - CONTAINMENT_SLACK_US &&
+        event.ts + event.dur <= endUs + CONTAINMENT_SLACK_US &&
+        event.dur / 1000 >= MIN_FRAME_MS
     )
     .map((event) => ({
       name: event.name ?? 'unknown',
-      durationMs: overlapMs(event.ts ?? 0, (event.ts ?? 0) + (event.dur ?? 0), startUs, endUs),
+      durationMs: (event.dur ?? 0) / 1000,
       source: callFrameSource(event)
     }))
     .sort((a, b) => b.durationMs - a.durationMs)
