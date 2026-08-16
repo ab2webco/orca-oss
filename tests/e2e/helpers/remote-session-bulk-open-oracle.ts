@@ -39,18 +39,19 @@ export const SOFT_FREEZE_LAG_MS = 2_000
 export const HARD_FREEZE_LAG_MS = 5_000
 /**
  * Soft freeze signal — one task the UI cannot interrupt, which is what a user
- * feels. Derived, not chosen: 2.5x the worst of six measured CI runs against a
+ * feels. Derived, not chosen: 2.5x the worst of seven measured CI runs against a
  * composited window, rounded up to the next 50ms (2.5 x 235.1 = 587.8 -> 600).
  *
- * The six: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563, 31954298734),
- * 171.0 / 235.1 (runs 31951413594, 31952659728, shown arm of the shape
- * diagnostic over the identical storm) and 166.6 (run 31956652960, the first
- * under these ceilings). Range 166.6-235.1, a 1.4x spread.
+ * The seven: 196.3 / 216.9 / 232.1 (runs 31954263506, 31954280563,
+ * 31954298734), 171.0 / 235.1 (runs 31951413594, 31952659728, shown arm of the
+ * shape diagnostic over the identical storm), and 166.6 / 175.1 (runs
+ * 31956652960, 31957995010, the two under these ceilings). Range 166.6-235.1,
+ * a 1.4x spread; the worst is unchanged from n=5, so the ceiling is too.
  *
- * n=6 is not a distribution, and the margin is sized for that rather than for
+ * n=7 is not a distribution, and the margin is sized for that rather than for
  * confidence in the number. Read the cost before treating 600 as tight: it sits
  * 2.6x above the worst measured task, so a regression has to more than double
- * the longest task to trip it. That is the price of six samples, not a claim
+ * the longest task to trip it. That is the price of seven samples, not a claim
  * about where the product's budget is. The value is recorded on green so CI
  * builds the real distribution and this can be tightened against it.
  * See docs/reference/timing-budget-assertions.md.
