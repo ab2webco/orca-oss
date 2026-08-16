@@ -5,11 +5,12 @@ import { toWebTerminalSurfaceTabId } from '../../../src/shared/terminal-surface-
 import { expect } from './orca-app'
 import { createRemoteSessionBulkOpenFixture } from './remote-session-bulk-open-fixture'
 import {
-  formatBlockWindow,
-  readRendererBlockWindow,
-  startRendererMainThreadBlockProbe,
-  type RendererBlockWindow
-} from './renderer-main-thread-block-probe'
+  formatBusyRun,
+  startRendererTaskTrace,
+  stopRendererTaskTrace,
+  worstBusyRun,
+  type RendererBusyRun
+} from './renderer-task-trace'
 import { closeStreamingTerminals } from './streaming-terminal-cleanup'
 import { waitForActivePanePtyId } from './terminal'
 
@@ -21,22 +22,25 @@ const FLOOD_ACCUMULATION_MS = 4_000
 export const HIDDEN_FLOOD_WINDOW_MS = 2_000
 const STORM_SETTLE_MS = 3_000
 /**
- * Soft freeze signal — UI feels stuck. Unchanged at 2s, now with a derivation
- * (ORCA-199): the number it is compared against is the longest stretch the
- * renderer's main thread went unserviced, so 2000 means two seconds of real
- * block. Healthy runs measure 1017.7ms and 1017.8ms (CI runs 31923503662 and
- * 31923470791), which leaves only a 1.96x margin — deliberately, because that
- * ~1s block is real product behaviour under bulk open, not instrument
- * artifact: the replaced timer probe read 1009.7 / 1018.8ms over the same two
- * windows while ticking at its full 16ms cadence. The ceiling is here to catch
- * that block doubling, and tightening it below the measured behaviour would
- * only make every run red.
+ * Soft freeze signal — UI feels stuck.
+ *
+ * Kept at 2s and still compared against the longest stretch the main thread
+ * went unserviced, but the derivation ORCA-199 wrote here was wrong and is
+ * withdrawn (ORCA-230). The 1017.7 / 1017.8ms it called "real product
+ * behaviour" was the harness: with the paired client's window never shown, two
+ * tasks per storm run ~1017ms on a single ~1004ms compositor `Commit`, and
+ * showing the window — or driving one second of animation frames first —
+ * removes them, leaving a longest task of 217-235ms. The oracle now shows its
+ * window, so this ceiling no longer half-spends itself on that.
+ *
+ * It is deliberately NOT re-derived yet: what remains under a shown window is a
+ * 1.1-1.2s busy run of 870-1300 tasks, measured twice, and two samples are not
+ * a distribution. `bulkOpenMaxTaskMs` is recorded on green so the distribution
+ * builds itself; the ceiling moves to that quantity once it exists.
+ * See docs/reference/timing-budget-assertions.md.
  */
 export const SOFT_FREEZE_LAG_MS = 2_000
-/**
- * Hard freeze signal — matches trusted "screen fully frozen" reports. 4.9x the
- * measured healthy value above.
- */
+/** Hard freeze signal — matches trusted "screen fully frozen" reports. */
 export const HARD_FREEZE_LAG_MS = 5_000
 
 export type BulkOpenSession = {
@@ -47,8 +51,21 @@ export type BulkOpenSession = {
 }
 
 export type BulkOpenFreezeReport = {
+  /**
+   * Longest stretch the main thread never went idle. Keeps the name a gap
+   * sampler gave it because it is the same quantity, so readings stay
+   * comparable across the instrument change.
+   */
   bulkOpenMaxLagMs: number
+  /**
+   * Longest single task in that stretch — what a gap cannot say. A freeze is
+   * one task the UI cannot interrupt; a saturated queue of short ones is a
+   * different fault with a different fix, and the two read alike as a gap
+   * (ORCA-230). Recorded now, asserted on once CI has a distribution of it.
+   */
+  bulkOpenMaxTaskMs: number
   hiddenFloodMaxLagMs: number
+  hiddenFloodMaxTaskMs: number
   interactionProbeMs: number
   hardFreeze: boolean
   softFreeze: boolean
@@ -57,15 +74,14 @@ export type BulkOpenFreezeReport = {
   topology: 'paired-remote-server' | 'docker-ssh'
   versionHint: string
   /**
-   * Full measurement windows behind the two scalars above. The scalars keep
-   * their names so readings stay comparable with runs recorded before this
-   * instrument changed; these carry what a scalar cannot — where in the window
-   * the worst block landed, and how many tasks the probe serviced, without
-   * which a `0` cannot be told from a probe that never ran.
+   * Full measurement windows behind the scalars above: where the worst stretch
+   * landed, how many tasks filled it, and how much of it the longest one took.
+   * Without the task count a `0` cannot be told from an instrument that never
+   * ran, and without the fraction a stall cannot be told from a storm.
    */
   probeWindows: {
-    bulkOpen: RendererBlockWindow
-    hiddenFlood: RendererBlockWindow
+    bulkOpen: RendererBusyRun
+    hiddenFlood: RendererBusyRun
   }
   notes: string[]
 }
@@ -278,21 +294,22 @@ export async function runBulkOpenFreezeOracle(
   // Same instrument, same page, no bulk open inside it: the control for the
   // measured window below, and the only thing that makes a large bulk-open
   // reading attributable to the bulk open.
-  const hiddenProbe = await startRendererMainThreadBlockProbe(page)
+  const hiddenTrace = await startRendererTaskTrace(page)
   await page.waitForTimeout(HIDDEN_FLOOD_WINDOW_MS)
-  const hiddenFlood = await readRendererBlockWindow(hiddenProbe, 'hidden streaming')
-  await hiddenProbe.dispose()
-  const hiddenFloodMaxLagMs = hiddenFlood.maxBlockMs
-  notes.push(formatBlockWindow(hiddenFlood, 'hidden streaming'))
+  const hiddenFlood = worstBusyRun(await stopRendererTaskTrace(hiddenTrace))
+  const hiddenFloodMaxLagMs = hiddenFlood.busyRunMs
+  notes.push(formatBusyRun(hiddenFlood, 'hidden streaming'))
 
   // Burst open remote sessions (worktree + tab activate).
-  const openProbe = await startRendererMainThreadBlockProbe(page)
+  const openTrace = await startRendererTaskTrace(page)
   const openWallMs = await runBulkOpenStorm(page, sessions)
-  const bulkOpen = await readRendererBlockWindow(openProbe, 'bulk open')
-  await openProbe.dispose()
-  const bulkOpenMaxLagMs = bulkOpen.maxBlockMs
+  const bulkOpen = worstBusyRun(await stopRendererTaskTrace(openTrace))
+  const bulkOpenMaxLagMs = bulkOpen.busyRunMs
   notes.push(`bulk open wall=${openWallMs}ms`)
-  notes.push(formatBlockWindow(bulkOpen, 'bulk open'))
+  notes.push(formatBusyRun(bulkOpen, 'bulk open'))
+  if (bulkOpen.taskCount === 0) {
+    throw new Error('bulk open window traced no tasks — the window measured nothing')
+  }
 
   // Confirm last session is live after the storm (host PTYs survived).
   const last = sessions.at(-1)
@@ -317,7 +334,9 @@ export async function runBulkOpenFreezeOracle(
 
   const report: BulkOpenFreezeReport = {
     bulkOpenMaxLagMs,
+    bulkOpenMaxTaskMs: bulkOpen.maxTaskMs,
     hiddenFloodMaxLagMs,
+    hiddenFloodMaxTaskMs: hiddenFlood.maxTaskMs,
     interactionProbeMs,
     hardFreeze: bulkOpenMaxLagMs >= HARD_FREEZE_LAG_MS || interactionProbeMs >= HARD_FREEZE_LAG_MS,
     softFreeze: bulkOpenMaxLagMs >= SOFT_FREEZE_LAG_MS || interactionProbeMs >= SOFT_FREEZE_LAG_MS,

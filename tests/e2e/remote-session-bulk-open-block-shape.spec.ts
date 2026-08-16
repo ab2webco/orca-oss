@@ -1,28 +1,27 @@
 /**
- * ORCA-230 — what shape is the ~1017ms main-thread block in R1's bulk open,
- * and is it the product or the harness?
+ * ORCA-230 — is a stall in R1's bulk open the product or the harness?
  *
- * The freeze oracle measures the gap between a sampler's own turns, and one
- * long task and a queue of short ones produce the same gap. This drives the
- * identical storm with the task trace instead of the sampler (they cannot share
- * a window: the sampler services tens of thousands of tasks a second and the
- * trace records one event per task) and reports task boundaries, which do
- * separate them.
+ * On demand, not in the suite. It answers a question rather than guarding a
+ * regression, and it costs a full paired host plus a seeded storm.
  *
- * The first measurement found one contiguous 1017.7ms task whose only child was
- * a 1003.8ms `Commit` — the main thread waiting on the compositor, not JS. The
- * paired client's window is never shown, so Chromium composites nothing for it.
+ * What it measures: task boundaries, not the gap between a sampler's own turns.
+ * One long synchronous task and a queue of short ones produce the same gap and
+ * do not have the same fix, so the freeze oracle's number cannot tell them
+ * apart on its own. Calibrated in renderer-task-trace-calibration.spec.ts.
  *
- * The three arms below run the same storm and differ only in what the window
- * did before it. The middle one exists because it was found by accident: adding
- * a one-second `requestAnimationFrame` loop before the storm — meant only to
- * observe whether the window composites — removed the block, while the
- * untouched oracle in the same shard still read 1017.4ms. So the probe is an
- * arm, not an observation, and `cold` keeps the sequence that reproduced it.
- * Frames are counted after the storm precisely so counting cannot perturb it.
+ * What it found, and why it stays as the control: with the paired client's
+ * window never shown, the storm contains two tasks of 1017.8 and 1017.3ms whose
+ * only child is a ~1004ms compositor `Commit`. Showing the window, or driving
+ * one second of animation frames beforehand, replaces them with a saturated
+ * queue whose longest task is 217-235ms — while the untouched oracle in the
+ * same shard still read 1021ms. That block is the harness, and this spec is
+ * what re-establishes it: it must keep reporting a ~1017ms contiguous task
+ * against a never-shown window, and the oracle must stop reporting one.
  *
  * Run: CI Linux only — the paired web client does not hydrate `window.__store`
- * locally. `gh workflow run "E2E" -R ab2webco/orca-oss --ref <branch> -f ref=<branch>`
+ * locally.
+ *   pnpm exec playwright test tests/e2e/remote-session-bulk-open-block-shape.spec.ts \
+ *     --config tests/playwright.config.ts --project electron-headless --grep @ondemand
  */
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
@@ -40,7 +39,6 @@ import {
   startRendererTaskTrace,
   stopRendererTaskTrace,
   worstBusyRun,
-  type RendererBusyRun,
   type RendererTaskTraceHandle,
   type RendererTracedTask
 } from './helpers/renderer-task-trace'
@@ -51,59 +49,10 @@ const FRAME_PROBE_MS = 1_000
 /** Tasks worth naming inside the storm. */
 const REPORTED_TASKS = 4
 
-type Arm = {
-  label: string
-  shown: boolean
-  /** Drive animation frames before the storm — the manipulation, not a reading. */
-  warmFrames: boolean
-}
-
-type ArmMeasurement = Arm & {
-  framesPerSecondAfterStorm: number
-  control: RendererBusyRun
-  hidden: RendererBusyRun
-  storm: RendererBusyRun
-  stormWallMs: number
-  tracedTasks: number
-  anchored: boolean
-  longestTasks: unknown[]
-}
-
-const ARMS: Arm[] = [
-  { label: 'never-shown, cold', shown: false, warmFrames: false },
-  { label: 'never-shown, frames driven first', shown: false, warmFrames: true },
-  { label: 'shown window', shown: true, warmFrames: false }
-]
-
-test('R1 bulk-open block shape against window compositing state @freeze-repro', async ({
+test('R1 bulk-open block shape against a never-shown window @ondemand @freeze-repro', async ({
   testRepoPath
 }) => {
-  test.setTimeout(1_200_000)
-  const arms: ArmMeasurement[] = []
-  for (const arm of ARMS) {
-    arms.push(await measureArm(testRepoPath, arm))
-  }
-
-  console.log('[block-shape]', JSON.stringify(arms, null, 2))
-
-  // Validity gates, not budgets. A reading from an instrument that measured
-  // nothing is worse than no reading, and "the window composites" has to be an
-  // observation before any arm's Commit means anything.
-  for (const arm of arms) {
-    expect(arm.anchored).toBe(true)
-    expect(arm.control.maxTaskMs).toBeGreaterThanOrEqual(POSITIVE_CONTROL_MS * 0.8)
-    expect(arm.storm.taskCount).toBeGreaterThan(0)
-  }
-  const shown = arms.find((arm) => arm.shown)
-  const cold = arms.find((arm) => !arm.shown && !arm.warmFrames)
-  if (!shown || !cold) {
-    throw new Error('block-shape experiment lost an arm')
-  }
-  expect(shown.framesPerSecondAfterStorm).toBeGreaterThan(cold.framesPerSecondAfterStorm)
-})
-
-async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasurement> {
-  const { label, shown } = arm
+  test.setTimeout(600_000)
   const host = await launchHeadlessPairedRuntimeHost()
   let webClient: PairedWebClient | null = null
   let disposeSessions: (() => Promise<void>) | null = null
@@ -124,9 +73,9 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
       )
       .toBeGreaterThan(0)
 
+    // Never shown, which is the condition under test.
     webClient = await launchPairedWebClient(host.app, host.offer, {
-      terminalParkingDelayMs: 500,
-      showWindow: shown
+      terminalParkingDelayMs: 500
     })
     const page = webClient.page
     await page.waitForFunction(() => Boolean(window.__store), null, { timeout: 60_000 })
@@ -138,10 +87,6 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
 
     const seeded = await seedBulkOpenRemoteSessions(page, { repoId: added.result.repo.id })
     disposeSessions = seeded.dispose
-
-    if (arm.warmFrames) {
-      await countDeliveredFrames(page)
-    }
 
     await settleBeforeBulkOpen(page)
 
@@ -169,37 +114,45 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
     const stormWindow = await stopRendererTaskTrace(stormTrace)
     const storm = worstBusyRun(stormWindow)
 
-    // Only now: driving frames is a manipulation, so it cannot happen before
-    // the measurement in an arm that is supposed to be cold.
+    // Only now: driving frames removes the very block this spec exists to show,
+    // so counting them cannot happen before the measurement.
     const framesPerSecondAfterStorm = await countDeliveredFrames(page)
 
-    console.log('[block-shape]', formatBusyRun(control, `${label} positive control`))
-    console.log('[block-shape]', formatBusyRun(hidden, `${label} hidden streaming`))
-    console.log('[block-shape]', formatBusyRun(storm, `${label} bulk open`))
+    console.log('[block-shape]', formatBusyRun(control, 'positive control'))
+    console.log('[block-shape]', formatBusyRun(hidden, 'hidden streaming'))
+    console.log('[block-shape]', formatBusyRun(storm, 'bulk open'))
     console.log(
       '[block-shape]',
-      `${label} framesAfter=${framesPerSecondAfterStorm}/s shown=${shown} warmFrames=${arm.warmFrames}`
+      JSON.stringify(
+        {
+          stormWallMs,
+          framesPerSecondAfterStorm,
+          tracedTasks: stormWindow.tasks.length,
+          anchored: stormWindow.anchored,
+          notes: stormWindow.notes,
+          control,
+          hidden,
+          storm,
+          longestTasks: describeLongestTasks(stormTrace, stormWindow.tasks)
+        },
+        null,
+        2
+      )
     )
 
-    return {
-      ...arm,
-      framesPerSecondAfterStorm,
-      control,
-      hidden,
-      storm,
-      stormWallMs,
-      tracedTasks: stormWindow.tasks.length,
-      anchored: stormWindow.anchored,
-      longestTasks: describeLongestTasks(stormTrace, stormWindow.tasks)
-    }
+    // Validity gates, not budgets: a reading from an instrument that measured
+    // nothing is worse than no reading.
+    expect(stormWindow.anchored).toBe(true)
+    expect(control.maxTaskMs).toBeGreaterThanOrEqual(POSITIVE_CONTROL_MS * 0.8)
+    expect(storm.taskCount).toBeGreaterThan(0)
   } finally {
     await disposeSessions?.()
     await webClient?.dispose()
     await host.dispose()
   }
-}
+})
 
-/** Animation frames Chromium delivers in a second — 0 means it composites nothing. */
+/** Animation frames Chromium delivers in a second — a never-shown window reads ~1. */
 async function countDeliveredFrames(page: Page): Promise<number> {
   return page.evaluate(
     (windowMs) =>
