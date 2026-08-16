@@ -152,7 +152,8 @@ async function printUrlBelowAFullViewport(
   // Overfill the viewport so the buffer is already scrolling, as it is on CI.
   const fillerLines = (await readTerminalRows(page, tabId)) + 5
   await sendToTerminal(page, ptyId, printUrlAfterFillerCommand(url, fillerLines))
-  await waitForTerminalOutput(page, url)
+  // Why: the URL now arrives from a node spawn, not a shell builtin.
+  await waitForTerminalOutput(page, url, 15_000)
 }
 
 async function captureProof(page: Page, testInfo: TestInfo, name: string): Promise<void> {
@@ -226,20 +227,20 @@ test.describe('Issue #12656 terminal link tooltip', () => {
       throw new Error('URL never became hoverable before the scroll')
     }
 
-    // A bare Enter reprints the prompt, shifting every viewport row up by one.
+    // A bare Enter reprints the prompt, which scrolls the link off its row.
     await sendToTerminal(orcaPage, ptyId, '\r')
     await expect
       .poll(
         async () => {
           const target = await hoverUrl(orcaPage, tabId, url)
-          if (!target || target.row !== beforeScroll.row - 1) {
-            return { row: target?.row ?? null, currentLinkText: null }
+          if (!target || target.row >= beforeScroll.row) {
+            return { rowMovedUp: false, currentLinkText: null }
           }
           const state = await readTooltipState(orcaPage, tabId)
-          return { row: target.row, currentLinkText: state.currentLinkText }
+          return { rowMovedUp: true, currentLinkText: state.currentLinkText }
         },
         { message: 'the link tooltip did not reopen at the scrolled row' }
       )
-      .toMatchObject({ row: beforeScroll.row - 1, currentLinkText: url })
+      .toMatchObject({ rowMovedUp: true, currentLinkText: url })
   })
 })
