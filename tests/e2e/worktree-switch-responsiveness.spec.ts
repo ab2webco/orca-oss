@@ -487,10 +487,8 @@ test.describe('Worktree switch responsiveness', () => {
         if (!root || !targetSurface) {
           throw new Error('Missing rendered worktree root or target surface')
         }
-        // Why the explicit options: bare checkVisibility() only rejects display:none —
-        // visibilityProperty / opacityProperty / contentVisibilityAuto all default false. The
-        // pre-mounted incoming worktree is `visibility:hidden`, so the bare call would count its
-        // panes as painted and the probe would report a healthy switch without looking at one.
+        // Explicit options: bare checkVisibility() only rejects display:none, so it would count
+        // the pre-mounted `visibility:hidden` worktree as painted.
         const visibleCount = (selector: string): number =>
           [...document.querySelectorAll<HTMLElement>(selector)].filter((element) =>
             element.checkVisibility({
@@ -499,7 +497,7 @@ test.describe('Worktree switch responsiveness', () => {
               contentVisibilityAuto: true
             })
           ).length
-        // Recorded beside it so the claim above is evidence in the run, not an assertion here.
+        // Recorded beside it so the run carries the evidence for that.
         const looseVisibleCount = (selector: string): number =>
           [...document.querySelectorAll<HTMLElement>(selector)].filter((element) =>
             element.checkVisibility()

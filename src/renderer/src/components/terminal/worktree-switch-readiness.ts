@@ -1,4 +1,4 @@
-/** Stranding backstop only: readiness is the gate, this bounds a pane that never reports. */
+/** Bounds a pane that never reports ready; readiness is the gate. */
 export const TERMINAL_SWITCH_REVEAL_BACKSTOP_MS = 1000
 
 export type TerminalWorktreeSwitchResolution = {
@@ -36,9 +36,7 @@ export function collectRequiredTerminalTabIds(args: {
   if (args.activeTabType !== 'terminal') {
     return new Set()
   }
-  // Why no terminalTabs[0] fallback: the reveal may only wait on tabs the mount planner puts in
-  // immediateTabIds (Terminal.tsx). A tab cold-activation parked never mounts, so gating on it
-  // would hold the outgoing surface until the backstop fires.
+  // Why no terminalTabs[0] fallback: only tabs the mount planner marks immediate ever mount here.
   const candidateIds = [args.rememberedActiveTabId, args.activeTabId]
   const activeTerminalTabId = candidateIds.find(
     (candidate): candidate is string =>

@@ -1,21 +1,14 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
-// Why (ORCA-229): the pre-mount reveal gate holds the outgoing worktree until every
-// group-active terminal of the incoming one reports its mount. Per-tab cold parking
-// unmounts exactly those tabs while the worktree is hidden, and its own visibility
-// input is the same flag the gate is withholding — so a parked tab can never report,
-// and the switch resolves on the stranding backstop instead of on readiness.
-// The 5-minute hot-retain window is shrunk here the way every other parking spec
-// shrinks it; the wiring under test is identical.
+// Shrinks the 5-minute hot-retain window so a tab parks inside a test run.
 const PARKING_DELAY_MS = Number(process.env.ORCA_E2E_TERMINAL_PARKING_DELAY_MS) || 500
 
 test.use({
   orcaAppExtraEnv: { ORCA_E2E_TERMINAL_PARKING_DELAY_MS: String(PARKING_DELAY_MS) }
 })
 
-// Why: readiness-driven reveal is one render past the pane mount. Anything near the
-// 1s stranding backstop means the gate never resolved and the timer decided the switch.
+// Anything near the 1s stranding backstop means the timer, not readiness, decided the switch.
 const MAX_PARKED_TAB_REVEAL_MS = 400
 
 test.describe('Worktree switch with a cold-parked split tab', () => {
@@ -52,9 +45,7 @@ test.describe('Worktree switch with a cold-parked split tab', () => {
       return [first.id, second.id]
     })
 
-    // Split the incoming worktree so two groups are visible at once: both group-active
-    // tabs are required by the reveal gate, and only the most recently hidden one is
-    // exempt from cold parking.
+    // Two visible groups: both group-active tabs gate the reveal, only one is park-exempt.
     const splitTabIds = await orcaPage.evaluate(async (worktreeId) => {
       const store = window.__store
       if (!store) {
@@ -90,13 +81,11 @@ test.describe('Worktree switch with a cold-parked split tab', () => {
     )
     await expect(incomingXterms).toHaveCount(2, { timeout: 30_000 })
 
-    // Hide the worktree and let per-tab cold parking run past its shrunk hot-retain window.
     await orcaPage.evaluate((worktreeId) => {
       window.__store?.getState().setActiveWorktree(worktreeId)
     }, firstWorktreeId)
 
-    // Precondition, asserted rather than assumed: a group-active tab of the incoming
-    // worktree really did get unmounted while hidden. Without it the repro proves nothing.
+    // Precondition, not assumption: a group-active tab really did unmount while hidden.
     await expect(incomingXterms).toHaveCount(1, { timeout: PARKING_DELAY_MS * 20 })
     const parkedTabIds = await orcaPage.evaluate(
       ({ worktreeId, tabIds }) => {
@@ -155,7 +144,6 @@ test.describe('Worktree switch with a cold-parked split tab', () => {
       contentType: 'application/json'
     })
 
-    // The switch must land on the worktree the user clicked, never bounce back.
     expect(reveal.activeWorktreeId).toBe(secondWorktreeId)
     expect(reveal.renderedWorktreeId).toBe(secondWorktreeId)
     expect(reveal.revealMs).not.toBeNull()

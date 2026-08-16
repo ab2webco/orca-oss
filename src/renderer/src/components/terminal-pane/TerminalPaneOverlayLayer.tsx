@@ -109,11 +109,8 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
     worktreeId,
     terminalTabs,
     assignments,
-    // Why (ORCA-229): the reveal gate withholds isWorktreeActive until the incoming panes
-    // report their mount, and per-tab cold parking keys its unpark on that same flag — a
-    // parked group-active tab could never mount, so the switch would resolve on the
-    // stranding backstop. Parking sees the incoming worktree as active; the render below
-    // keeps using the raw flag so nothing paints or takes focus before the reveal.
+    // Why not the raw flag: the reveal gate withholds it until these panes mount, so a parked
+    // tab could never unpark. Only parking sees the incoming worktree as active; render does not.
     isWorktreeActive: isWorktreeActive || isPreparingIncoming,
     coldParkTerminalPanes,
     isForceParked,

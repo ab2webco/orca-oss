@@ -467,8 +467,7 @@ function Terminal(): React.JSX.Element | null {
       setRenderedActiveWorktreeId(activeWorktreeId)
       return
     }
-    // Why: readiness is the gate, this is only a stranding backstop — reveal the worktree the user
-    // asked for even if its panes never report, never undo their navigation.
+    // Stranding backstop only: reveal what the user clicked, never undo their navigation.
     const timeoutId = window.setTimeout(() => {
       const revealId = resolveTimedOutTerminalWorktreeSwitch(
         epoch,
