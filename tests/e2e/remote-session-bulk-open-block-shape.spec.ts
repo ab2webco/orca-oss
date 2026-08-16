@@ -11,11 +11,15 @@
  *
  * The first measurement found one contiguous 1017.7ms task whose only child was
  * a 1003.8ms `Commit` — the main thread waiting on the compositor, not JS. The
- * paired client's window is never shown, so Chromium composites nothing for it;
- * both arms below run the same storm and differ only in that. Same run, same
- * runner, so the comparison needs no cross-run assumption. Frames delivered per
- * arm are recorded because "the window was shown" is otherwise a claim, not an
- * observation.
+ * paired client's window is never shown, so Chromium composites nothing for it.
+ *
+ * The three arms below run the same storm and differ only in what the window
+ * did before it. The middle one exists because it was found by accident: adding
+ * a one-second `requestAnimationFrame` loop before the storm — meant only to
+ * observe whether the window composites — removed the block, while the
+ * untouched oracle in the same shard still read 1017.4ms. So the probe is an
+ * arm, not an observation, and `cold` keeps the sequence that reproduced it.
+ * Frames are counted after the storm precisely so counting cannot perturb it.
  *
  * Run: CI Linux only — the paired web client does not hydrate `window.__store`
  * locally. `gh workflow run "E2E" -R ab2webco/orca-oss --ref <branch> -f ref=<branch>`
@@ -47,10 +51,15 @@ const FRAME_PROBE_MS = 1_000
 /** Tasks worth naming inside the storm. */
 const REPORTED_TASKS = 4
 
-type ArmMeasurement = {
+type Arm = {
   label: string
   shown: boolean
-  framesPerSecond: number
+  /** Drive animation frames before the storm — the manipulation, not a reading. */
+  warmFrames: boolean
+}
+
+type ArmMeasurement = Arm & {
+  framesPerSecondAfterStorm: number
   control: RendererBusyRun
   hidden: RendererBusyRun
   storm: RendererBusyRun
@@ -60,40 +69,41 @@ type ArmMeasurement = {
   longestTasks: unknown[]
 }
 
-test('R1 bulk-open block shape, shown against never-shown window @freeze-repro', async ({
+const ARMS: Arm[] = [
+  { label: 'never-shown, cold', shown: false, warmFrames: false },
+  { label: 'never-shown, frames driven first', shown: false, warmFrames: true },
+  { label: 'shown window', shown: true, warmFrames: false }
+]
+
+test('R1 bulk-open block shape against window compositing state @freeze-repro', async ({
   testRepoPath
 }) => {
-  test.setTimeout(900_000)
+  test.setTimeout(1_200_000)
   const arms: ArmMeasurement[] = []
-  for (const arm of [
-    { label: 'never-shown window', shown: false },
-    { label: 'shown window', shown: true }
-  ]) {
-    arms.push(await measureArm(testRepoPath, arm.label, arm.shown))
+  for (const arm of ARMS) {
+    arms.push(await measureArm(testRepoPath, arm))
   }
 
   console.log('[block-shape]', JSON.stringify(arms, null, 2))
-  const [neverShown, shown] = arms
-  if (!neverShown || !shown) {
-    throw new Error('block-shape A/B lost an arm')
-  }
 
   // Validity gates, not budgets. A reading from an instrument that measured
-  // nothing is worse than no reading, and "the window was shown" has to be an
-  // observation before either arm's Commit means anything.
+  // nothing is worse than no reading, and "the window composites" has to be an
+  // observation before any arm's Commit means anything.
   for (const arm of arms) {
     expect(arm.anchored).toBe(true)
     expect(arm.control.maxTaskMs).toBeGreaterThanOrEqual(POSITIVE_CONTROL_MS * 0.8)
     expect(arm.storm.taskCount).toBeGreaterThan(0)
   }
-  expect(shown.framesPerSecond).toBeGreaterThan(neverShown.framesPerSecond)
+  const shown = arms.find((arm) => arm.shown)
+  const cold = arms.find((arm) => !arm.shown && !arm.warmFrames)
+  if (!shown || !cold) {
+    throw new Error('block-shape experiment lost an arm')
+  }
+  expect(shown.framesPerSecondAfterStorm).toBeGreaterThan(cold.framesPerSecondAfterStorm)
 })
 
-async function measureArm(
-  testRepoPath: string,
-  label: string,
-  shown: boolean
-): Promise<ArmMeasurement> {
+async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasurement> {
+  const { label, shown } = arm
   const host = await launchHeadlessPairedRuntimeHost()
   let webClient: PairedWebClient | null = null
   let disposeSessions: (() => Promise<void>) | null = null
@@ -129,9 +139,9 @@ async function measureArm(
     const seeded = await seedBulkOpenRemoteSessions(page, { repoId: added.result.repo.id })
     disposeSessions = seeded.dispose
 
-    // Whether Chromium composites for this window at all, which is the only
-    // difference between the arms and therefore the thing to observe first.
-    const framesPerSecond = await countDeliveredFrames(page)
+    if (arm.warmFrames) {
+      await countDeliveredFrames(page)
+    }
 
     await settleBeforeBulkOpen(page)
 
@@ -159,15 +169,21 @@ async function measureArm(
     const stormWindow = await stopRendererTaskTrace(stormTrace)
     const storm = worstBusyRun(stormWindow)
 
+    // Only now: driving frames is a manipulation, so it cannot happen before
+    // the measurement in an arm that is supposed to be cold.
+    const framesPerSecondAfterStorm = await countDeliveredFrames(page)
+
     console.log('[block-shape]', formatBusyRun(control, `${label} positive control`))
     console.log('[block-shape]', formatBusyRun(hidden, `${label} hidden streaming`))
     console.log('[block-shape]', formatBusyRun(storm, `${label} bulk open`))
-    console.log('[block-shape]', `${label} frames=${framesPerSecond}/s shown=${shown}`)
+    console.log(
+      '[block-shape]',
+      `${label} framesAfter=${framesPerSecondAfterStorm}/s shown=${shown} warmFrames=${arm.warmFrames}`
+    )
 
     return {
-      label,
-      shown,
-      framesPerSecond,
+      ...arm,
+      framesPerSecondAfterStorm,
       control,
       hidden,
       storm,
