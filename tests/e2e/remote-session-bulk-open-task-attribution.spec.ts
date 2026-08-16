@@ -41,6 +41,7 @@ import {
   settleBeforeBulkOpen
 } from './helpers/remote-session-bulk-open-oracle'
 import {
+  expectedSampleCount,
   profileWindow,
   selfTimeUnder,
   startRendererCpuProfile,
@@ -68,6 +69,8 @@ const FRAME_PROBE_MS = 1_000
 const CONTROL_FUNCTION = 'orcaBulkOpenPositiveControl'
 /** Sampling is coarse and the burn shares its task with the call into it. */
 const MIN_ATTRIBUTED_FRACTION = 0.7
+/** A window sampled below this share of what it is owed was not really sampled. */
+const MIN_SAMPLE_DENSITY = 0.5
 /** Profiling must not change the injected block it measures by more than this. */
 const MAX_PERTURBATION_FRACTION = 0.1
 /** Tasks worth naming inside the storm. */
@@ -143,17 +146,34 @@ test('R1 bulk-open longest task, attributed @ondemand @freeze-repro', async ({ t
   // #112 instead of here.
   const ghost = arm('never-shown').longestTasks[0]
   const ghostLegacy = arm('never-shown, ORCA-230 categories').longestTasks[0]
+  if (ghost.inside[0]?.name !== 'Commit' || ghostLegacy.inside[0]?.name !== 'Commit') {
+    // The ghost is not deterministic — run 31963571496 produced it in neither
+    // arm. Say so, because equivalence between two arms that both missed it is
+    // a pass that establishes nothing.
+    console.log(
+      '[task-attribution] ghost absent this run — equivalence round is vacuous',
+      JSON.stringify({ ghost: ghost.inside[0], legacy: ghostLegacy.inside[0] })
+    )
+  }
   expect(ghost.inside[0]?.name).toBe(ghostLegacy.inside[0]?.name)
   expect(Math.abs(ghost.durationMs - ghostLegacy.durationMs)).toBeLessThan(
     Math.max(ghost.durationMs, ghostLegacy.durationMs) * 0.5
   )
 
-  // The profiler found the injected block in the profiled arm's own run.
+  // The profiler found the injected block in the profiled arm's own run, and
+  // sampled densely enough that "found" means the window and not one sample.
   const profiled = arm('shown, profiled')
+  const controlSamples = profiled.controlProfile?.sampleCount ?? 0
+  expect(controlSamples).toBeGreaterThan(
+    expectedSampleCount(profiled.control.maxTaskMs) * MIN_SAMPLE_DENSITY
+  )
   expect(profiled.controlAttributedMs).toBeGreaterThanOrEqual(
     POSITIVE_CONTROL_MS * MIN_ATTRIBUTED_FRACTION
   )
-  expect(profiled.longestTasks[0]?.samplesInTask ?? 0).toBeGreaterThan(0)
+  const longest = profiled.longestTasks[0]
+  expect(longest?.samplesInTask ?? 0).toBeGreaterThan(
+    expectedSampleCount(longest?.durationMs ?? 0) * MIN_SAMPLE_DENSITY
+  )
 
   // Perturbation control: sampling must not be what the storm is measuring.
   // Decided on the injected 400ms block and not on the storm's busy run —
