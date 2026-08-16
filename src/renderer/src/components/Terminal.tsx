@@ -916,7 +916,11 @@ function Terminal(): React.JSX.Element | null {
   // Why: only cold-activation deferral (not targeted mounts, which share the map above) creates watcher coverage for every unmounted tab.
   const activationDeferredMountTabIdsByWorktreeRef = useRef(new Map<string, ReadonlySet<string>>())
   // Why: run the cold-activation deferral decision once per activation transition, not on every re-render.
-  const lastActivationWorktreeIdRef = useRef<string | null>(null)
+  // State, not a ref: React may discard a render, and a ref advanced by a pass that never commits
+  // would make the next real activation skip its deferral plan.
+  const [plannedActivationWorktreeId, setPlannedActivationWorktreeId] = useState<string | null>(
+    null
+  )
   useEffect(() => {
     const timers = measurableBackgroundWorktreeTimersRef.current
     const closeDialogDebounceTimers = closeDialogDebounceTimersRef.current
@@ -1409,8 +1413,11 @@ function Terminal(): React.JSX.Element | null {
             pairedRuntimeParkingEnvironmentIds
           })
         : terminalProviderHasAuthoritativeSnapshot(ptyId)
-    if (lastActivationWorktreeIdRef.current !== activeWorktreeId) {
-      lastActivationWorktreeIdRef.current = activeWorktreeId
+    // Why activeWorktreeId and not renderedActiveWorktreeId: the reveal gate holds `rendered` back
+    // until these panes mount, so keying there would plan the deferral after every tab already
+    // mounted — exactly the burst it exists to prevent.
+    if (plannedActivationWorktreeId !== activeWorktreeId) {
+      setPlannedActivationWorktreeId(activeWorktreeId)
       const tabById = new Map(worktreeTabs.map((tab) => [tab.id, tab]))
       planColdActivationTabDeferral({
         restrictions: backgroundMountTabIdsByWorktreeRef.current,
@@ -1455,7 +1462,9 @@ function Terminal(): React.JSX.Element | null {
     }
   } else {
     // Why: reset so the next ready activation re-runs the deferral decision even for the same worktree.
-    lastActivationWorktreeIdRef.current = null
+    if (plannedActivationWorktreeId !== null) {
+      setPlannedActivationWorktreeId(null)
+    }
   }
   pruneClosedBackgroundMountTabs(
     backgroundMountTabIdsByWorktreeRef.current,
