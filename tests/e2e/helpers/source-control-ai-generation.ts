@@ -18,10 +18,15 @@ export async function openSourceControl(page: Page, worktreeId: string): Promise
           return (
             state?.activeWorktreeId === targetWorktreeId &&
             state.rightSidebarOpen &&
-            state.rightSidebarTab === 'source-control'
+            state.rightSidebarTab === 'source-control' &&
+            // The panel is a lazy chunk behind `Suspense fallback={null}`, so the flags
+            // flip while the DOM is still empty; read store and DOM in one tick. Its
+            // "select a workspace" / folder early returns paint no toolbar — every
+            // caller here is a git worktree (ORCA-247).
+            document.querySelectorAll('[data-testid^="source-control-filter-"]').length > 0
           )
         }, worktreeId),
-      { timeout: 5_000 }
+      { timeout: 5_000, message: 'Source Control panel did not paint for the active worktree' }
     )
     .toBe(true)
 }
