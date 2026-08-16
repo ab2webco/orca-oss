@@ -738,6 +738,9 @@ export function useTerminalPaneLifecycle({
       return
     }
     const expandedStyleSnapshots = expandedStyleSnapshotRef.current
+    // Captured at mount: the cleanup must retract the readiness THIS pane published, and the ref
+    // may already point at the next tab's callback by then.
+    const notifyMountReady = onMountReadyChangeRef.current
     let mountReady = false
     const paneTransports = paneTransportsRef.current
     const panePtyBindings = panePtyBindingsRef.current
@@ -1588,7 +1591,7 @@ export function useTerminalPaneLifecycle({
     }
     const restoredPaneByLeafId = replayTerminalLayout(manager, initialLayoutRef.current, isActive)
     mountReady = true
-    onMountReadyChangeRef.current?.(true)
+    notifyMountReady?.(true)
 
     const restoredBuffers = initialLayoutRef.current.buffersByLeafId
     restoreScrollbackBuffers(
@@ -1789,7 +1792,7 @@ export function useTerminalPaneLifecycle({
 
     return () => {
       if (mountReady) {
-        onMountReadyChangeRef.current?.(false)
+        notifyMountReady?.(false)
       }
       window.removeEventListener(SPLIT_TERMINAL_PANE_EVENT, onCliSplitPane)
       window.removeEventListener(CLOSE_TERMINAL_PANE_EVENT, onCliClosePane)
