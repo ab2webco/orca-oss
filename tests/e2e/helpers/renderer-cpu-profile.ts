@@ -37,7 +37,23 @@ export type RendererProfileWindow = {
   windowToMs: number
   sampleCount: number
   frames: RendererProfileFrame[]
+  /**
+   * Time under each frame including its callees, ranked.
+   *
+   * A leaf ranking answers "which line is hot" and this answers "who owns the
+   * task", which are different questions when the cost is spread: a 217ms task
+   * whose heaviest leaf is 8ms is not eight milliseconds of work.
+   */
+  subtrees: RendererProfileSubtree[]
   notes: string[]
+}
+
+export type RendererProfileSubtree = {
+  functionName: string
+  location: string | null
+  totalMs: number
+  /** Share of the window, so a rollup cannot be read as bigger than its task. */
+  shareOfWindow: number
 }
 
 export type RendererCpuProfileHandle = {
@@ -128,6 +144,7 @@ export function profileWindow(
     windowToMs: toMs,
     sampleCount: 0,
     frames: [],
+    subtrees: [],
     notes
   }
   if (!profile) {
@@ -189,7 +206,52 @@ export function profileWindow(
     })
     .sort((a, b) => b.selfMs - a.selfMs)
     .slice(0, limit)
-  return { attributed: true, windowFromMs: fromMs, windowToMs: toMs, sampleCount, frames, notes }
+  return {
+    attributed: true,
+    windowFromMs: fromMs,
+    windowToMs: toMs,
+    sampleCount,
+    frames,
+    subtrees: rollUpSubtrees(selfUs, parentOf, byId, toMs - fromMs, limit),
+    notes
+  }
+}
+
+function rollUpSubtrees(
+  selfUs: Map<number, { us: number; samples: number }>,
+  parentOf: Map<number, number>,
+  byId: Map<number, CdpProfileNode>,
+  windowMs: number,
+  limit: number
+): RendererProfileSubtree[] {
+  const totals = new Map<string, RendererProfileSubtree>()
+  for (const [id, entry] of selfUs) {
+    // A recursive frame appears on its own stack more than once; count it once
+    // per sample or its rollup exceeds the task it sits in.
+    const seen = new Set<string>()
+    let current: number | undefined = id
+    while (current !== undefined) {
+      const node = byId.get(current)
+      const functionName = node?.callFrame.functionName || '(anonymous)'
+      const location = formatLocation(node?.callFrame)
+      const key = `${functionName}@${location ?? ''}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        const total = totals.get(key) ?? { functionName, location, totalMs: 0, shareOfWindow: 0 }
+        total.totalMs += entry.us / 1000
+        totals.set(key, total)
+      }
+      current = parentOf.get(current)
+    }
+  }
+  return [...totals.values()]
+    .map((entry) => ({
+      ...entry,
+      totalMs: Number(entry.totalMs.toFixed(1)),
+      shareOfWindow: windowMs > 0 ? Number((entry.totalMs / windowMs).toFixed(2)) : 0
+    }))
+    .sort((a, b) => b.totalMs - a.totalMs)
+    .slice(0, limit)
 }
 
 /**
