@@ -7,22 +7,25 @@
  * ORCA-230 established that the ~1017ms block against a never-shown window is
  * the harness — one compositor `Commit` on a window that never produced a
  * frame. With the window shown, what is left is real: a busy run of 1.1-1.2s
- * whose longest single task is 217-235ms. That task has never been attributed,
- * because the trace cannot attribute it: the storm drives every tab through
- * `page.evaluate`, and inspector-driven work emits no `FunctionCall` (measured
- * in renderer-cpu-profile-calibration.spec.ts). This adds V8 stack sampling
- * over the same window and names the frames.
+ * whose longest single task is 217-235ms, and that task has never been named.
  *
- * Three arms, one storm each:
+ * Two instruments, because they answer different halves. The trace, once it
+ * records `devtools.timeline`, names the task's entry point and the Blink
+ * phases it enters. V8 stack sampling over the same window names what ran
+ * inside it, which the trace cannot say at any category setting.
  *
- * - `never-shown` reproduces ORCA-230's ghost, and exists here as the
- *   equivalence control for this ticket's change to the trace's categories: it
- *   must still read ~1017ms with a ~1004ms `Commit` child, or the instrument
- *   lost the attribution it already had.
+ * Four arms, one storm each:
+ *
+ * - `never-shown, ORCA-230 categories` and `never-shown` differ only in what
+ *   the trace records. They are the equivalence control for this ticket's
+ *   category addition, decided against each other on one runner rather than
+ *   against ORCA-230's recorded numbers, because the ghost is a compositor
+ *   wait and machine load is not a constant across runs.
  * - `shown` is the regime a user is in, measured with the profiler off.
- * - `shown, profiled` is the same regime with sampling on. Its busy run and
- *   longest task must match the arm above, or the reading is of the profiler.
- *   ORCA-230 lost a phenomenon to exactly this, so it is an arm, not a note.
+ * - `shown, profiled` is the same regime with sampling on. It injects the
+ *   400ms control twice, once profiled and once not, so perturbation is read
+ *   on one page instead of across two hosts. ORCA-230 lost a phenomenon to an
+ *   observation, so this is an arm, not a note.
  *
  * Run: CI Linux only — the paired web client does not hydrate `window.__store`
  * locally. `gh workflow run "E2E" -R ab2webco/orca-oss --ref <branch> -f ref=<branch>`
@@ -48,6 +51,7 @@ import {
 import {
   formatBusyRun,
   framesInsideTask,
+  PRE_ORCA_239_TRACE_CATEGORIES,
   startRendererTaskTrace,
   stopRendererTaskTrace,
   taskEventCensus,
@@ -69,7 +73,7 @@ const MAX_PERTURBATION_FRACTION = 0.1
 /** Tasks worth naming inside the storm. */
 const REPORTED_TASKS = 3
 
-type Arm = { label: string; shown: boolean; profiled: boolean }
+type Arm = { label: string; shown: boolean; profiled: boolean; categories?: string[] }
 
 type AttributedTask = {
   durationMs: number
@@ -84,6 +88,9 @@ type ArmMeasurement = Arm & {
   framesPerSecondAfterStorm: number
   control: RendererBusyRun
   controlAttributedMs: number | null
+  controlProfile: RendererProfileWindow | null
+  /** Same injection, same page, profiler stopped: the paired perturbation read. */
+  controlUnprofiledMs: number | null
   hidden: RendererBusyRun
   storm: RendererBusyRun
   stormWallMs: number
@@ -93,6 +100,12 @@ type ArmMeasurement = Arm & {
 }
 
 const ARMS: Arm[] = [
+  {
+    label: 'never-shown, ORCA-230 categories',
+    shown: false,
+    profiled: false,
+    categories: PRE_ORCA_239_TRACE_CATEGORIES
+  },
   { label: 'never-shown', shown: false, profiled: false },
   { label: 'shown', shown: true, profiled: false },
   { label: 'shown, profiled', shown: true, profiled: true }
@@ -123,12 +136,17 @@ test('R1 bulk-open longest task, attributed @ondemand @freeze-repro', async ({ t
     expect(entry.storm.taskCount).toBeGreaterThan(0)
   }
 
-  // The trace still attributes what ORCA-230 attributed with it: the ghost's
-  // total AND its `Commit` child, not just a similar number.
+  // Equivalence, decided against the same storm on the same runner rather than
+  // against ORCA-230's recorded numbers: whatever the ghost arm reproduces, the
+  // two category sets have to reproduce alike. If only the ORCA-230 set shows
+  // the ~1017ms `Commit`, the category addition is not additive and belongs in
+  // #112 instead of here.
   const ghost = arm('never-shown').longestTasks[0]
-  expect(ghost.durationMs).toBeGreaterThan(900)
-  expect(ghost.inside[0]?.name).toBe('Commit')
-  expect(ghost.inside[0]?.durationMs).toBeGreaterThan(900)
+  const ghostLegacy = arm('never-shown, ORCA-230 categories').longestTasks[0]
+  expect(ghost.inside[0]?.name).toBe(ghostLegacy.inside[0]?.name)
+  expect(Math.abs(ghost.durationMs - ghostLegacy.durationMs)).toBeLessThan(
+    Math.max(ghost.durationMs, ghostLegacy.durationMs) * 0.5
+  )
 
   // The profiler found the injected block in the profiled arm's own run.
   const profiled = arm('shown, profiled')
@@ -141,9 +159,9 @@ test('R1 bulk-open longest task, attributed @ondemand @freeze-repro', async ({ t
   // Decided on the injected 400ms block and not on the storm's busy run —
   // ORCA-230 measured that quantity at 507.0 to 1725.7ms across seven runs
   // with no profiler anywhere, so a threshold on it would answer noise.
+  const unprofiledControlMs = profiled.controlUnprofiledMs ?? 0
   const controlDrift =
-    Math.abs(profiled.control.maxTaskMs - arm('shown').control.maxTaskMs) /
-    arm('shown').control.maxTaskMs
+    Math.abs(profiled.control.maxTaskMs - unprofiledControlMs) / unprofiledControlMs
   expect(controlDrift).toBeLessThan(MAX_PERTURBATION_FRACTION)
 })
 
@@ -188,7 +206,7 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
     // Positive control, in the same run that produces the measurement: a block
     // of known size must read at its size, and in the profiled arm it must also
     // come back under its own name, or a small reading means nothing.
-    const controlTrace = await startRendererTaskTrace(page)
+    const controlTrace = await startRendererTaskTrace(page, { categories: arm.categories })
     const controlCpu = arm.profiled ? await startRendererCpuProfile(page) : null
     await injectPositiveControl(page)
     await page.waitForTimeout(CONTROL_WINDOW_MS)
@@ -197,17 +215,30 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
       await stopRendererCpuProfile(controlCpu)
     }
     const control = worstBusyRun(controlWindow)
-    const controlAttributedMs = controlCpu
-      ? attributedControlMs(controlCpu, controlTrace, controlWindow.tasks)
+    const controlProfile = controlCpu
+      ? controlProfileWindow(controlCpu, controlTrace, controlWindow.tasks)
       : null
+    const controlAttributedMs = controlProfile
+      ? Number(selfTimeUnder(controlProfile, CONTROL_FUNCTION).toFixed(1))
+      : null
+
+    // The same injection again with the profiler stopped, on this same page and
+    // host. Comparing two arms would compare two machines.
+    let controlUnprofiledMs: number | null = null
+    if (arm.profiled) {
+      const repeatTrace = await startRendererTaskTrace(page, { categories: arm.categories })
+      await injectPositiveControl(page)
+      await page.waitForTimeout(CONTROL_WINDOW_MS)
+      controlUnprofiledMs = worstBusyRun(await stopRendererTaskTrace(repeatTrace)).maxTaskMs
+    }
 
     // Negative control: the same instruments over hidden streaming, no bulk
     // open inside. Without it a large storm reading is not attributable.
-    const hiddenTrace = await startRendererTaskTrace(page)
+    const hiddenTrace = await startRendererTaskTrace(page, { categories: arm.categories })
     await page.waitForTimeout(HIDDEN_FLOOD_WINDOW_MS)
     const hidden = worstBusyRun(await stopRendererTaskTrace(hiddenTrace))
 
-    const stormTrace = await startRendererTaskTrace(page)
+    const stormTrace = await startRendererTaskTrace(page, { categories: arm.categories })
     const stormCpu = arm.profiled ? await startRendererCpuProfile(page) : null
     const stormWallMs = await runBulkOpenStorm(page, seeded.sessions)
     const stormWindow = await stopRendererTaskTrace(stormTrace)
@@ -225,7 +256,8 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
     console.log('[task-attribution]', formatBusyRun(storm, `${arm.label} bulk open`))
     console.log(
       '[task-attribution]',
-      `${arm.label} framesAfter=${framesPerSecondAfterStorm}/s controlAttributed=${controlAttributedMs}`
+      `${arm.label} framesAfter=${framesPerSecondAfterStorm}/s ` +
+        `controlAttributed=${controlAttributedMs} controlUnprofiled=${controlUnprofiledMs}`
     )
 
     return {
@@ -233,6 +265,8 @@ async function measureArm(testRepoPath: string, arm: Arm): Promise<ArmMeasuremen
       framesPerSecondAfterStorm,
       control,
       controlAttributedMs,
+      controlProfile,
+      controlUnprofiledMs,
       hidden,
       storm,
       stormWallMs,
@@ -264,22 +298,16 @@ async function injectPositiveControl(page: Page): Promise<void> {
   }, POSITIVE_CONTROL_MS)
 }
 
-function attributedControlMs(
+function controlProfileWindow(
   cpu: RendererCpuProfileHandle,
   trace: RendererTaskTraceHandle,
   tasks: RendererTracedTask[]
-): number | null {
+): RendererProfileWindow | null {
   const task = [...tasks].sort((a, b) => b.durationMs - a.durationMs)[0]
   if (!task) {
     return null
   }
-  const window = profileWindow(
-    cpu,
-    traceClockOffsetMs(trace),
-    task.startMs,
-    task.startMs + task.durationMs
-  )
-  return Number(selfTimeUnder(window, CONTROL_FUNCTION).toFixed(1))
+  return profileWindow(cpu, traceClockOffsetMs(trace), task.startMs, task.startMs + task.durationMs)
 }
 
 /** Animation frames Chromium delivers in a second — a never-shown window reads ~1. */

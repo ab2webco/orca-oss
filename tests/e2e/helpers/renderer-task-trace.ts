@@ -61,8 +61,18 @@ const ANCHOR_MARK = 'orca-task-trace-anchor'
  * 900ms page task of pure JS reports no child at all — measured, not assumed —
  * so an empty frame list read as "nothing instrumented ran here".
  */
-const TRACE_CATEGORIES = [
+export const TRACE_CATEGORIES = [
   'devtools.timeline',
+  'disabled-by-default-devtools.timeline',
+  'blink.user_timing'
+]
+/**
+ * The set ORCA-230 measured with. Kept so the category addition above can be
+ * A/B'd against the phenomenon that PR established, rather than assumed
+ * harmless: recording more events is not free, and the ghost it reproduces is
+ * a compositor wait.
+ */
+export const PRE_ORCA_239_TRACE_CATEGORIES = [
   'disabled-by-default-devtools.timeline',
   'blink.user_timing'
 ]
@@ -92,7 +102,10 @@ const CONTAINMENT_SLACK_US = 1_000
  * its thread pins the task list to this renderer rather than to every process
  * the trace happened to cover.
  */
-export async function startRendererTaskTrace(page: Page): Promise<RendererTaskTraceHandle> {
+export async function startRendererTaskTrace(
+  page: Page,
+  options: { categories?: string[] } = {}
+): Promise<RendererTaskTraceHandle> {
   const session = await page.context().newCDPSession(page)
   const events: TraceEvent[] = []
   session.on('Tracing.dataCollected', (payload) => {
@@ -103,7 +116,7 @@ export async function startRendererTaskTrace(page: Page): Promise<RendererTaskTr
   })
   await session.send('Tracing.start', {
     transferMode: 'ReportEvents',
-    traceConfig: { includedCategories: TRACE_CATEGORIES }
+    traceConfig: { includedCategories: options.categories ?? TRACE_CATEGORIES }
   })
   const anchorPerfNowMs = await page.evaluate((mark) => {
     performance.mark(mark)
