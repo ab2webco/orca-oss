@@ -61,6 +61,7 @@ import {
 import {
   installXtermWriteCostProbe,
   setXtermWriteCostRecording,
+  takeXtermBigWrites,
   takeXtermWriteElements,
   waitForXtermWriteCostProbe
 } from './helpers/xterm-write-element-cost'
@@ -161,7 +162,7 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
 
     // Installed before the storm mounts the panes it measures; awaited after,
     // because the storm is what makes the first terminal exist.
-    await installXtermWriteCostProbe(page)
+    await installXtermWriteCostProbe(page, { bigWriteChars: BACKGROUND_CHUNK_CHARS + 1 })
 
     const seeded = await seedBulkOpenRemoteSessions(page, { repoId: added.result.repo.id })
     disposeSessions = seeded.dispose
@@ -202,6 +203,7 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
     const stormWallMs = await runBulkOpenStorm(page, seeded.sessions)
     const storm = worstBusyRun(await stopRendererTaskTrace(stormTrace))
     const stormElements = await takeXtermWriteElements(page)
+    const bigWrites = await takeXtermBigWrites(page)
     await setXtermWriteCostRecording(page, false)
     const scheduler = await readSchedulerDebug(page)
     const armed = await waitForXtermWriteCostProbe(page, PROBE_ARM_TIMEOUT_MS)
@@ -249,6 +251,12 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
     for (const stats of stormStats) {
       console.log('[write-cost]', `storm ${formatXtermWriteStats(stats)}`)
     }
+    for (const [index, big] of bigWrites.entries()) {
+      console.log(
+        '[write-cost]',
+        `big write #${index} chars=${big.chars} at=+${big.atMs.toFixed(0)}ms\n${big.stack}`
+      )
+    }
     for (const entry of benches) {
       console.log(
         '[write-cost]',
@@ -272,6 +280,7 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
           scheduler,
           hiddenStats,
           stormStats,
+          bigWrites,
           benches,
           benchStats
         },
@@ -291,11 +300,15 @@ test('R1 bulk-open xterm write element cost @ondemand @freeze-repro', async ({ t
       expect(entry.result.writesRun).toBeGreaterThanOrEqual(MIN_BENCH_WRITES)
     }
 
-    // Explanation A, decided on the product's own writes: the scheduler cannot
-    // hand xterm an element larger than its chunk cap. If this fails, the
-    // 116ms element is simply bigger than anyone thought and the fix is upstream
-    // of xterm.
-    expect(live?.maxChars ?? 0).toBeLessThanOrEqual(BACKGROUND_CHUNK_CHARS)
+    // Explanation A, settled in run 31971270025: the largest element the product
+    // handed xterm was 579,767 chars, 35x the chunk cap, and its parse was 102ms
+    // of a 103.3ms task. What is open now is which caller writes it, so the gate
+    // is that the oversized write reproduced AND its stack was captured. A run
+    // that measures no oversized write did not reproduce the phenomenon and its
+    // stacks say nothing.
+    expect(live?.maxChars ?? 0).toBeGreaterThan(BACKGROUND_CHUNK_CHARS)
+    expect(bigWrites.length).toBeGreaterThan(0)
+    expect(bigWrites[0]?.stack ?? '').toContain('at ')
   } finally {
     await disposeSessions?.()
     await webClient?.dispose()
