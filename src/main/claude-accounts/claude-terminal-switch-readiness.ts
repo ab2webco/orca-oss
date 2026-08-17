@@ -37,8 +37,10 @@ export function resolveClaudeTerminalSwitchReadiness(
   if (preflight.isWsl || preflight.remoteConnectionId) {
     return { state: 'unavailable', reason: 'unsupported-runtime' }
   }
+  // Why not `transcript-unavailable`: nothing has read a transcript yet, and the
+  // transcript copy is two steps further down (ORCA-195).
   if (!preflight.cwd) {
-    return { state: 'unavailable', reason: 'transcript-unavailable' }
+    return { state: 'unavailable', reason: 'workspace-unresolved' }
   }
   if (!preflight.sourceAccountId) {
     return { state: 'unavailable', reason: 'source-unknown' }
