@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CLAUDE_STATUSLINE_MIN_POST_INTERVAL_SECONDS } from '../../shared/claude-statusline-rate-limits'
-import { publishStatuslineResetCountdown } from './statusline-reset-countdown'
+import {
+  publishStatuslineResetCountdown,
+  statuslineResetCountdownPath
+} from './statusline-reset-countdown'
 import { getManagedStatusLineScript } from './statusline-script'
 
 const ORIGINAL_PLATFORM = process.platform
@@ -774,17 +777,27 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
     mkdirSync(configDir, { recursive: true })
     const originalTmpdir = process.env.TMPDIR
     process.env.TMPDIR = dir
+    let countdownPath = ''
     try {
       // Why this test and not two independent ones: writer and reader derive the same path from
       // opposite languages, and a mismatch degrades to "the field never appears" — invisible.
+      // Why a frozen whole-second epoch and not Date.now(): the countdown text is formatted here,
+      // at write time, and floored to minutes — two clock reads straddling a millisecond turn the
+      // expected 3h into 2h59m. Whole seconds also keep the seconds→ms roundtrip exact.
+      const publishedAt = 1_770_000_000_000
       publishStatuslineResetCountdown(
         {
           configDir,
-          fiveHour: { used_percentage: 37, resets_at: (Date.now() + 3 * 60 * 60_000) / 1000 },
+          fiveHour: {
+            used_percentage: 37,
+            resets_at: (publishedAt + 3 * 60 * 60_000) / 1000
+          },
           sevenDay: null
         },
-        Date.now()
+        publishedAt
       )
+      // os.tmpdir() re-reads TMPDIR per call, so resolve the writer's path while it is overridden.
+      countdownPath = statuslineResetCountdownPath(configDir)
     } finally {
       if (originalTmpdir === undefined) {
         delete process.env.TMPDIR
@@ -799,7 +812,11 @@ describe.skipIf(process.platform === 'win32')('statusline curl throttle (posix b
       'tab-1:reset-roundtrip',
       configDir
     )
-    expect(stdout.trimEnd()).toContain('· ↻ 3h')
+    // Split so a red names the broken half: the literal pins what Orca wrote, the interpolation
+    // pins that the script found that same file.
+    const published = readFileSync(countdownPath, 'utf8').trim()
+    expect(published).toBe('3h')
+    expect(stdout.trimEnd()).toContain(`· ↻ ${published}`)
   })
 
   it('prints without any Orca env so sessions outside Orca keep their line', async () => {
