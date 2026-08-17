@@ -7,8 +7,10 @@
  *   R1: headless Remote Orca host + paired desktop web client (paired-remote-server)
  *
  * Measurement:
- *   renderer timer drift during hidden flood + bulk worktree/tab open.
- *   soft freeze >= 2s, hard freeze >= 5s.
+ *   main-thread task boundaries during hidden flood + bulk worktree/tab open.
+ *   Soft freeze is one task >= 600ms, hard freeze one task >= 1500ms; the busy
+ *   run carries only a 4500ms hang ceiling because it is throughput, not a
+ *   stall. All four derived in remote-session-bulk-open-oracle.ts.
  *
  * Run:
  *   SKIP_BUILD=1 pnpm exec playwright test \
@@ -30,10 +32,11 @@ import {
   type PairedWebClient
 } from './helpers/paired-electron-client'
 import {
-  HARD_FREEZE_LAG_MS,
+  CATASTROPHIC_BUSY_RUN_MS,
+  HARD_FREEZE_TASK_MS,
   runBulkOpenFreezeOracle,
   seedBulkOpenRemoteSessions,
-  SOFT_FREEZE_LAG_MS
+  SOFT_FREEZE_TASK_MS
 } from './helpers/remote-session-bulk-open-oracle'
 import {
   runHostFocusStorm,
@@ -140,7 +143,12 @@ test('R1 paired remote bulk-open freeze oracle @freeze-repro', async ({
         desktopClient = await launchPairedElectronClient(host.offer, testInfo, 'freeze-r1')
         return desktopClient.page
       }
+      // Shown on purpose (ORCA-230): a never-shown window makes two ~1017ms
+      // compositor commits per storm that no user can hit, and they were eating
+      // half of this oracle's budget. remote-session-bulk-open-block-shape.spec.ts
+      // is the control that keeps that attribution honest.
       webClient = await launchPairedWebClient(host.app, host.offer, {
+        showWindow: true,
         terminalParkingDelayMs: 500
       })
       return webClient.page
@@ -169,15 +177,18 @@ test('R1 paired remote bulk-open freeze oracle @freeze-repro', async ({
     if (report.hardFreeze) {
       throw new Error(
         `HARD FREEZE signal: bulkOpenMaxLagMs=${report.bulkOpenMaxLagMs.toFixed(0)} ` +
+          `bulkOpenMaxTaskMs=${report.bulkOpenMaxTaskMs.toFixed(0)} ` +
           `interactionProbeMs=${report.interactionProbeMs.toFixed(0)} ` +
-          `(threshold ${HARD_FREEZE_LAG_MS}ms). notes=${report.notes.join('; ')}`
+          `(task ceiling ${HARD_FREEZE_TASK_MS}ms, busy-run ceiling ${CATASTROPHIC_BUSY_RUN_MS}ms). ` +
+          `notes=${report.notes.join('; ')}`
       )
     }
     if (report.softFreeze) {
       throw new Error(
         `SOFT FREEZE signal: bulkOpenMaxLagMs=${report.bulkOpenMaxLagMs.toFixed(0)} ` +
+          `bulkOpenMaxTaskMs=${report.bulkOpenMaxTaskMs.toFixed(0)} ` +
           `interactionProbeMs=${report.interactionProbeMs.toFixed(0)} ` +
-          `(threshold ${SOFT_FREEZE_LAG_MS}ms). notes=${report.notes.join('; ')}`
+          `(task ceiling ${SOFT_FREEZE_TASK_MS}ms). notes=${report.notes.join('; ')}`
       )
     }
 

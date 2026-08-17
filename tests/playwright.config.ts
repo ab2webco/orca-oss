@@ -43,7 +43,9 @@ export default defineConfig({
     {
       name: 'electron-headless',
       testMatch: '**/*.spec.ts',
-      grepInvert: /@headful/,
+      // @ondemand: diagnostics kept for re-asking a question, not for guarding
+      // a regression. They carry real load and earn nothing on every run.
+      grepInvert: /@headful|@ondemand/,
       metadata: {
         orcaHeadful: false
       }

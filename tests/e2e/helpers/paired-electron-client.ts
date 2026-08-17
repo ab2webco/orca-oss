@@ -104,10 +104,10 @@ export async function launchPairedWebClient(
   const pagePromise = hubApp.waitForEvent('window').then((candidate) => (page = candidate))
   try {
     await hubApp.evaluate(
-      async ({ BrowserWindow }, { partition, url }) => {
+      async ({ BrowserWindow }, { partition, url, show }) => {
         const clientWindow = new BrowserWindow({
           height: 1200,
-          show: false,
+          show,
           width: 1440,
           webPreferences: {
             contextIsolation: true,
@@ -123,7 +123,8 @@ export async function launchPairedWebClient(
       },
       {
         partition: `e2e-nested-runtime-web-${randomUUID()}`,
-        url: clientUrl
+        url: clientUrl,
+        show: options.showWindow === true
       }
     )
     page = await pagePromise

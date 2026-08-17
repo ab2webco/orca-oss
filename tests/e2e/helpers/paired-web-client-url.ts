@@ -1,5 +1,7 @@
 export type PairedWebClientOptions = {
   disableRemoteTerminalStallRecovery?: boolean
+  /** Show the client window so Chromium composites for it (ORCA-230's A/B). */
+  showWindow?: boolean
   terminalParkingDelayMs?: number
   terminalRetentionLimit?: number
   waitForWorkspace?: boolean
