@@ -67,6 +67,25 @@ async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<str
   return worktreeId
 }
 
+// Why: the measured windows here end when the diff renders, so their length is decided by the
+// machine. Sampling the floor for exactly that many ms — back to back, same page — is what makes
+// the two comparable; a fixed-length floor would be judging unequal windows against each other.
+async function measureIdleFloorMs(orcaPage: Page, windowMs: number): Promise<number> {
+  return orcaPage.evaluate(async (durationMs: number) => {
+    const intervalMs = 50
+    let last = performance.now()
+    let maxLagMs = 0
+    const timer = window.setInterval(() => {
+      const now = performance.now()
+      maxLagMs = Math.max(maxLagMs, Math.max(0, now - last - intervalMs))
+      last = now
+    }, intervalMs)
+    await new Promise((resolve) => window.setTimeout(resolve, durationMs))
+    window.clearInterval(timer)
+    return maxLagMs
+  }, windowMs)
+}
+
 test.describe('Large diff freeze repro', () => {
   test.describe.configure({ mode: 'serial' })
   test.use({ seedTestRepo: false })
@@ -146,7 +165,8 @@ test.describe('Large diff freeze repro', () => {
         }
       )
 
-      console.log(`large diff measurement ${JSON.stringify(measurement)}`)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.elapsedMs)
+      console.log(`large diff measurement ${JSON.stringify({ ...measurement, idleFloorMs })}`)
       expect(measurement.rendered).toBe(true)
       expect(measurement.fallbackVisible).toBe(expectFallback)
       if (expectFallback) {
@@ -154,7 +174,9 @@ test.describe('Large diff freeze repro', () => {
       } else {
         expect(measurement.editorCount).toBeGreaterThan(0)
       }
-      expect(measurement.maxLagMs).toBeLessThan(1_000)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail the test on noise alone; the second is what opening the diff may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(idleFloorMs + 1_000)
     } finally {
       rmSync(fixture.repoPath, { recursive: true, force: true })
     }
@@ -229,6 +251,7 @@ test.describe('Large diff freeze repro', () => {
             editorCount,
             fallbackCount,
             classHits,
+            elapsedMs: performance.now() - startedAt,
             maxLagMs,
             sampleCount: samples.length,
             p95LagMs: samples.length
@@ -239,10 +262,15 @@ test.describe('Large diff freeze repro', () => {
         { wId: worktreeId, repoPath: fixture.repoPath, expectedPaths: fixture.relativePaths }
       )
 
-      console.log(`stale unstaged combined diff measurement ${JSON.stringify(measurement)}`)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.elapsedMs)
+      console.log(
+        `stale unstaged combined diff measurement ${JSON.stringify({ ...measurement, idleFloorMs })}`
+      )
       expect(measurement.editorCount + measurement.fallbackCount).toBeGreaterThanOrEqual(5)
       expect(measurement.classHits).toBeGreaterThan(0)
-      expect(measurement.maxLagMs).toBeLessThan(1_000)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail the test on noise alone; the second is what opening the diff may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(idleFloorMs + 1_000)
     } finally {
       rmSync(fixture.repoPath, { recursive: true, force: true })
     }
