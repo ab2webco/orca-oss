@@ -7,10 +7,13 @@ el coordinador. Salió bien por suerte, no por control: PR Checks no corre E2E
 (ORCA-196), así que un verde de PR no dice nada del runtime. La única barrera era
 prosa en un brief, y la prosa se pondera contra el criterio propio del agente.
 
-Esto no distingue worker de coordinador: no se puede. Comparten el mismo token de
-`gh` y el mismo usuario, y cualquier marca que el guard aceptara (variable, archivo,
-label) el agente la puede escribir. Entonces niega para todos por igual, y el camino
-del coordinador queda abierto donde el guard no llega: fuera de la Bash tool.
+Distingue worker de coordinador por cwd: el coordinador trabaja en el worktree
+primario parado en `main`; los workers viven en worktrees de feature, que es donde
+estaba el del PR #73. Eso corta la falla medida, no la clase entera: un worker puede
+hacer `cd` al primario, y comparten el mismo token de `gh` y el mismo usuario, asi que
+ninguna marca de host es infalsificable. La proteccion obligatoria vive en la politica
+de rama del remoto (aprobacion de alguien que no sea el autor), que es lo unico que el
+token compartido no alcanza.
 
 Alcance: sólo escrituras sobre `main` del remoto propio. Un PR encadenado contra una
 rama de feature pasa sin ruido — una guarda que obligue a saltearla todos los días
@@ -27,6 +30,7 @@ import subprocess
 import sys
 
 PROTECTED_BRANCH = "main"
+PROJECT_SLUG = "ab2webco/orca-oss"
 
 # Why: si el comando ni menciona un merge, no hay nada que parsear ni que resolver.
 # Sin `\b` al final: cubre `merge`, `merges` y `mergePullRequest` de una sola vez.
@@ -81,6 +85,25 @@ def deny(detail: str) -> None:
         sys.stdout,
     )
     sys.exit(0)
+
+
+def is_coordinator_cwd(cwd: str | None) -> bool:
+    """El coordinador es el worktree primario del repo del proyecto, parado en `main`."""
+    # Why sin `--path-format`: es de git 2.31 y el piso del repo es 2.25. Las dos salidas
+    # crudas son consistentes entre si en una misma invocacion, que es lo unico que importa.
+    code, common = run(["git", "rev-parse", "--git-common-dir"], cwd)
+    if code != 0:
+        return False
+    code, own = run(["git", "rev-parse", "--git-dir"], cwd)
+    if code != 0 or own != common:
+        return False
+    code, branch = run(["git", "branch", "--show-current"], cwd)
+    if code != 0 or branch != PROTECTED_BRANCH:
+        return False
+    # Why: sin anclar la identidad del repo, cualquier checkout primario en `main` abre la
+    # puerta — incluido el temporal que usan los tests de esta guarda para probar que niega.
+    code, origin_url = run(["git", "remote", "get-url", "origin"], cwd)
+    return code == 0 and PROJECT_SLUG in origin_url
 
 
 def run(args: list[str], cwd: str | None) -> tuple[int, str]:
@@ -245,6 +268,9 @@ def main() -> None:
         sys.exit(0)
 
     cwd = payload.get("cwd")
+
+    if is_coordinator_cwd(cwd):
+        sys.exit(0)
 
     try:
         tokens = shlex.split(command)
