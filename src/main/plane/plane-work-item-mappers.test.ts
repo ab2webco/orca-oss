@@ -7,7 +7,8 @@ import {
   mapPlaneProjectMember,
   mapPlaneState,
   mapPlaneUser,
-  mapPlaneWorkItem
+  mapPlaneWorkItem,
+  UNRESOLVED_COMMENT_AUTHOR_NAME
 } from './plane-work-item-mappers'
 import type { PlaneProject } from '../../shared/plane-types'
 
@@ -150,20 +151,47 @@ describe('mapPlaneComment', () => {
     })
   })
 
-  it('omits updatedAt and user when absent', () => {
+  it('surfaces a bare actor UUID as the author id instead of dropping the author', () => {
     expect(
       mapPlaneComment({
         id: 'c-2',
         comment_html: '<p>note</p>',
-        created_at: '2026-01-01T00:00:00Z'
+        created_at: '2026-01-01T00:00:00Z',
+        actor: 'u-2'
       })
     ).toEqual({
       id: 'c-2',
       body: 'note',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: undefined,
-      user: undefined
+      user: { id: 'u-2', displayName: 'u-2' }
     })
+  })
+
+  it('marks the author unresolved when actor is absent, and omits updatedAt', () => {
+    expect(
+      mapPlaneComment({
+        id: 'c-3',
+        comment_html: '<p>note</p>',
+        created_at: '2026-01-01T00:00:00Z'
+      })
+    ).toEqual({
+      id: 'c-3',
+      body: 'note',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: undefined,
+      user: { id: '', displayName: UNRESOLVED_COMMENT_AUTHOR_NAME }
+    })
+  })
+
+  // Collapsing these two would leave "author id we could not name" and "no actor
+  // at all" indistinguishable, which is the bug this file used to encode.
+  it('keeps the bare-UUID and absent actors distinguishable', () => {
+    const bare = mapPlaneComment({ id: 'c-4', created_at: 'x', actor: 'u-4' }).user
+    const missing = mapPlaneComment({ id: 'c-5', created_at: 'x' }).user
+    expect(bare).not.toEqual(missing)
+    expect(bare?.id).toBe('u-4')
+    expect(missing?.id).toBe('')
   })
 })
 
