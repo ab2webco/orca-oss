@@ -280,8 +280,11 @@ describe('incremental terminal history restore', () => {
     while (!settled) {
       expect(pendingYields.length).toBeLessThanOrEqual(maxConcurrentYields)
       pendingYields.shift()?.()
+      // Why not nextTick: recursive nextTick never lets the loop reach the poll
+      // phase, so the fs reads `work` awaits can never complete and this spins
+      // forever (ORCA-264). setImmediate is mocked above, so a timer is the yield.
       await new Promise<void>((resolve) => {
-        process.nextTick(resolve)
+        setTimeout(resolve, 0)
       })
     }
     return tracked
@@ -314,8 +317,9 @@ describe('incremental terminal history restore', () => {
       expect((await drainYieldsUntilSettled(firstReplay, pendingYields))?.scrollbackAnsi).toContain(
         '😀second'
       )
-      await vi.waitFor(() => expect(pendingYields.length).toBeGreaterThanOrEqual(1))
-
+      // No second wait for a pending yield: a real yield lets the first drain admit
+      // and finish the second replay too. The one-at-a-time guarantee is asserted
+      // on every drain iteration, not by catching the second replay mid-flight.
       expect(
         (await drainYieldsUntilSettled(secondReplay, pendingYields))?.scrollbackAnsi
       ).toContain('😀second')
