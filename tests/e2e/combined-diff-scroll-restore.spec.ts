@@ -534,7 +534,14 @@ test.describe('Combined diff scroll restore', () => {
       // Assert the viewport barely moved rather than an exact anchor key: sections
       // are ~viewport-sized, so a sub-pixel focus scroll from the click can flip the
       // topmost-visible key by one without meaningfully moving the scroll position.
-      expect(Math.abs(afterLineClick.top - afterSwitch.top)).toBeLessThan(80)
+      // Why the message carries both anchors: a bare number cannot tell an anchoring
+      // regression from the two movements this file already documents as legitimate — a
+      // changed `key` (:534) or a `scrollHeight` swap (:538). Same payload as the restore
+      // assertion above, so the next red arrives with the geometry instead of a guess.
+      expect(
+        Math.abs(afterLineClick.top - afterSwitch.top),
+        `line-click drift; afterSwitch=${JSON.stringify(afterSwitch)} afterLineClick=${JSON.stringify(afterLineClick)}`
+      ).toBeLessThan(80)
       // Why: when a section above the viewport swaps its estimated height for
       // Monaco's measured one, scrollHeight changes and Chromium's default
       // scroll anchoring (no `overflow-anchor: none` here) legitimately moves
