@@ -219,6 +219,7 @@ describe('PR workflow parallelism', () => {
       'typecheck',
       'git_compatibility',
       'shell_contracts',
+      'cli_subprocess',
       'test',
       'managed_hook_node18',
       'package',
