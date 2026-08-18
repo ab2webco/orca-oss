@@ -65,6 +65,9 @@ export type WorktreeBasePollerOptions = {
   onFullScan?: () => void
   /** Test hook: called before a pending `.git` marker stat. */
   onPendingMarkerProbe?: (path: string) => void
+  /** Test hook: called when a marker leaves the fast-probe window. Closes the
+   *  probe episode a budget assertion has to count, one marker at a time. */
+  onPendingMarkerRetired?: (path: string) => void
   /** Test hook: overrides the fast-probe window. */
   pendingMarkerMaxTicks?: number
 }
@@ -250,6 +253,7 @@ async function startBasePoller(
       }
       if (tickCount - firstSeenTick > pendingMarkerMaxTicks) {
         markerProbeStartedAt.set(dir, null)
+        options.onPendingMarkerRetired?.(join(dir, '.git'))
         continue
       }
       options.onPendingMarkerProbe?.(join(dir, '.git'))
