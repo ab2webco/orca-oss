@@ -9,37 +9,29 @@ import {
 } from '../../shared/agent-session-log-state'
 import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import { resolveSessionFilePath } from './session-file-resolver'
-import {
-  nativeChatLineDecoderForAgent,
-  readNativeChatTranscriptTailFile,
-  type NativeChatLineDecoder
-} from './transcript-tail-reader'
+import { scanTranscriptTailForTurn, type TranscriptTailTurnScan } from './transcript-tail-turn-scan'
 import { nativeChatTurnLifecycleDecoderForAgent } from './transcript-turn-lifecycle'
 import {
-  decodeTranscriptQueuedInput,
   pendingQueuedInputCount,
   QUEUED_INPUT_UNSUPPORTED_REASON,
-  transcriptAgentWritesQueuedInput,
-  type TranscriptQueuedInputOperation
+  transcriptAgentWritesQueuedInput
 } from './transcript-queued-input'
-
-/** Turn boundaries cluster at the tail; this bounds the scan on a multi-MB log. */
-const TAIL_RECORD_LIMIT = 200
 
 export type ReadAgentSessionLogStateArgs = {
   agent: AgentType
   sessionId: string
   transcriptPath?: string
+  /** Test seam: shrink the scan ceiling to exercise the beyond-scan branch. */
+  maxScanBytes?: number
 }
 
 export async function readAgentSessionLogState(
   args: ReadAgentSessionLogStateArgs
 ): Promise<AgentSessionLogReading> {
-  const decodeMessage = resolveNativeChatTranscriptAgent(args.agent)
-    ? nativeChatLineDecoderForAgent(args.agent)
+  const decodeLifecycle = resolveNativeChatTranscriptAgent(args.agent)
+    ? nativeChatTurnLifecycleDecoderForAgent(args.agent)
     : null
-  const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
-  if (!decodeMessage || !decodeLifecycle) {
+  if (!decodeLifecycle) {
     return { read: false, reason: 'agent-unsupported' }
   }
 
@@ -55,44 +47,27 @@ export async function readAgentSessionLogState(
     return { read: false, reason: 'session-log-missing' }
   }
 
-  const queuedOperations: TranscriptQueuedInputOperation[] = []
-  // Queued-input records are not messages; consuming them here keeps them out of
-  // the tail reader's record budget while reusing its single pass over the tail.
-  const decode: NativeChatLineDecoder = (line, fallbackId) => {
-    const queued = decodeTranscriptQueuedInput(line)
-    if (queued) {
-      queuedOperations.push(queued)
-      return null
-    }
-    return decodeMessage(line, fallbackId)
-  }
-
+  let scan: TranscriptTailTurnScan
   try {
-    const page = await readNativeChatTranscriptTailFile(
-      filePath,
-      TAIL_RECORD_LIMIT,
-      decode,
-      false,
-      undefined,
-      decodeLifecycle
-    )
-    return foldAgentSessionLogState({
-      lifecycle: page.lifecycle ?? null,
-      queuedInput: resolveQueuedInput(args.agent, queuedOperations),
-      unparsedRecords: (page.malformedRecordCount ?? 0) + (page.oversizedRecordCount ?? 0)
-    })
+    scan = await scanTranscriptTailForTurn(filePath, decodeLifecycle, args.maxScanBytes)
   } catch {
     return { read: false, reason: 'session-log-unreadable' }
   }
+  return foldAgentSessionLogState({
+    lifecycle: scan.lifecycle,
+    queuedInput: resolveQueuedInput(args.agent, scan),
+    unparsedRecords: scan.unparsedRecords,
+    scanReachedCeiling: scan.reachedCeiling
+  })
 }
 
 function resolveQueuedInput(
   agent: AgentType,
-  operations: TranscriptQueuedInputOperation[]
+  scan: TranscriptTailTurnScan
 ): AgentSessionLogQueuedInput {
   if (!transcriptAgentWritesQueuedInput(agent)) {
     return { supported: false, reason: QUEUED_INPUT_UNSUPPORTED_REASON }
   }
-  // The tail reader walks backwards, so restore chronological order before netting.
-  return { supported: true, pending: pendingQueuedInputCount(operations.toReversed()) }
+  // The scan collects newest-first; restore chronological order before netting.
+  return { supported: true, pending: pendingQueuedInputCount(scan.queuedOperations.toReversed()) }
 }

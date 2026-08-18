@@ -238,7 +238,8 @@ const AGENT_SESSION_UNREAD_TEXT: Record<AgentSessionLogUnreadReason, string> = {
   'agent-unsupported': 'this agent writes no session log Orca can read',
   'agent-session-unknown': 'no agent session is identified for this pane yet',
   'session-log-missing': 'no session log found for this pane',
-  'session-log-unreadable': 'the session log could not be read'
+  'session-log-unreadable': 'the session log could not be read',
+  'turn-boundary-beyond-scan': 'the turn boundary is older than the session-log scan reaches'
 }
 
 export function formatTerminalAgentSessionState(result: {

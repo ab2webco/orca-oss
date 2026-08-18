@@ -28,7 +28,10 @@ export const AGENT_SESSION_LOG_UNREAD_REASONS = [
   /** Orca does not know which session this pane is running (no hook identity yet). */
   'agent-session-unknown',
   'session-log-missing',
-  'session-log-unreadable'
+  'session-log-unreadable',
+  /** The scan spent its ceiling without reaching a turn boundary. "I could not
+   *  see the boundary" must never read as "there is no boundary". */
+  'turn-boundary-beyond-scan'
 ] as const
 export type AgentSessionLogUnreadReason = (typeof AGENT_SESSION_LOG_UNREAD_REASONS)[number]
 
@@ -49,15 +52,17 @@ export type AgentSessionLogFoldInput = {
   lifecycle: NativeChatTurnLifecycle | null
   queuedInput: AgentSessionLogQueuedInput
   unparsedRecords: number
+  /** The scan stopped on its own ceiling rather than on the start of the log. */
+  scanReachedCeiling: boolean
 }
 
-export function foldAgentSessionLogState(
-  input: AgentSessionLogFoldInput
-): Extract<AgentSessionLogReading, { read: true }> {
+export function foldAgentSessionLogState(input: AgentSessionLogFoldInput): AgentSessionLogReading {
   const { lifecycle, queuedInput, unparsedRecords } = input
   const base = { read: true as const, queuedInput, unparsedRecords }
   if (!lifecycle) {
-    return { ...base, state: 'no-activity', lastTurnAtMs: null }
+    return input.scanReachedCeiling
+      ? { read: false, reason: 'turn-boundary-beyond-scan' }
+      : { ...base, state: 'no-activity', lastTurnAtMs: null }
   }
   if (lifecycle.state === 'working') {
     return { ...base, state: 'working', lastTurnAtMs: lifecycle.timestamp }

@@ -19,8 +19,13 @@ function stage(fixture: string, extraLines: string[] = []): string {
   return path
 }
 
-function read(agent: AgentType, transcriptPath: string) {
-  return readAgentSessionLogState({ agent, sessionId: 'session-under-test', transcriptPath })
+function read(agent: AgentType, transcriptPath: string, maxScanBytes?: number) {
+  return readAgentSessionLogState({
+    agent,
+    sessionId: 'session-under-test',
+    transcriptPath,
+    ...(maxScanBytes === undefined ? {} : { maxScanBytes })
+  })
 }
 
 describe('readAgentSessionLogState', () => {
@@ -87,6 +92,25 @@ describe('readAgentSessionLogState', () => {
     ]
     const reading = await read('claude', stage('claude-awaiting-input', unknown))
     expect(reading).toMatchObject({ read: true, state: 'awaiting-input' })
+  })
+
+  // A real 741-record stretch with no turn boundary in it: the `working` row that
+  // opens it is far behind anything a message budget would reach.
+  it('finds the boundary of a turn far longer than any message window', async () => {
+    const reading = await read('claude', stage('claude-long-turn-working'))
+    expect(reading).toMatchObject({ read: true, state: 'working' })
+  })
+
+  it('says the boundary is out of reach instead of calling a busy agent idle', async () => {
+    const path = stage('claude-long-turn-working')
+    expect(await read('claude', path, 4_096)).toEqual({
+      read: false,
+      reason: 'turn-boundary-beyond-scan'
+    })
+    expect(await read('claude', path, 16 * 1024 * 1024)).toMatchObject({
+      read: true,
+      state: 'working'
+    })
   })
 
   it('separates a missing log from every real state', async () => {

@@ -226,7 +226,8 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Derived from the agent's own append-only session log: turn boundaries and queued input, never terminal titles or scrollback.",
       'The log cannot observe process liveness, so no state here means the agent is dead; state is unknown when the pane has no identified agent session.',
-      'Queued input is reported as unobservable for agents whose log carries no queue records.'
+      'Queued input is reported as unobservable for agents whose log carries no queue records.',
+      'A turn boundary older than the scan reaches reports its own reason rather than an idle state.'
     ],
     examples: ['orca terminal state --json', 'orca terminal state --terminal term_abc123']
   },
