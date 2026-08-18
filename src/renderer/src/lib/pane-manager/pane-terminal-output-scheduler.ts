@@ -6,6 +6,7 @@ import {
   type ForegroundTerminalOutputTarget
 } from './pane-terminal-foreground-render-settle'
 import { runGuardedWriteCompletionStep } from './xterm-write-callback-guard'
+import { TERMINAL_WRITE_CHUNK_CHARS } from './terminal-write-chunk-size'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
 import {
   discardInFlightTerminalOutputAckCredits,
@@ -94,7 +95,7 @@ type QueueEntry = {
 const BACKGROUND_FLUSH_DELAY_MS = 50
 const BACKGROUND_DRAIN_INTERVAL_MS = 16
 const HIGH_PRIORITY_DRAIN_INTERVAL_MS = 4
-const BACKGROUND_CHUNK_CHARS = 16 * 1024
+const BACKGROUND_CHUNK_CHARS = TERMINAL_WRITE_CHUNK_CHARS
 const MAX_WRITES_PER_DRAIN = 2
 // Why 8: per-tick volume (8 x 16KB = 128KB ≈ 1.3ms parse) sets the sustained ceiling (~30MB/s) within DRAIN_TIME_BUDGET_MS; at 2 it was only 8MB/s against a ~100MB/s parser (see throughput bench).
 const HIGH_PRIORITY_MAX_WRITES_PER_DRAIN = 8

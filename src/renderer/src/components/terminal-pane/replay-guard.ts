@@ -2,6 +2,7 @@ import type { ManagedPane } from '@/lib/pane-manager/pane-manager'
 import { writeForegroundTerminalChunk } from '@/lib/pane-manager/pane-terminal-foreground-render-settle'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
 import { ensureArabicShapingJoinerForText } from '@/lib/pane-manager/terminal-arabic-shaping-joiner'
+import { TERMINAL_WRITE_CHUNK_CHARS } from '@/lib/pane-manager/terminal-write-chunk-size'
 import {
   captureTerminalParseProgressGeneration,
   hasTerminalParseProgressSince,
@@ -167,6 +168,48 @@ function engageReplayGuard(
   }
 }
 
+/**
+ * Hand the replay to xterm in chunks it can yield between.
+ *
+ * A whole restored snapshot in one `write` is one element, and xterm checks its
+ * 12ms budget only BETWEEN elements — ORCA-251 measured 579,767 chars parsing
+ * for 114ms with nothing able to interrupt it.
+ *
+ * The guard is engaged once by the caller and released by the LAST chunk only:
+ * xterm's write buffer is FIFO, so that callback proves every earlier chunk
+ * parsed. Releasing per chunk would drop the guard while replay bytes were still
+ * being parsed, and their auto-replies would reach the shell — the leak this
+ * whole module exists to stop. The failure callback goes on every chunk (release
+ * runs once) so a mid-loop rejection cannot leave the guard waiting for a last
+ * chunk that never gets written.
+ */
+function writeReplayChunks(
+  pane: ManagedPane,
+  data: string,
+  guardCallbacks: ReplayGuardWriteCallbacks,
+  options: ReplayTerminalOptions
+): void {
+  for (let offset = 0; offset < data.length; offset += TERMINAL_WRITE_CHUNK_CHARS) {
+    const isLastChunk = offset + TERMINAL_WRITE_CHUNK_CHARS >= data.length
+    const accepted = writeForegroundTerminalChunk(
+      pane.terminal,
+      data.slice(offset, offset + TERMINAL_WRITE_CHUNK_CHARS),
+      {
+        // Why only the last: one repaint per replay, as before the split.
+        forceViewportRefresh: isLastChunk,
+        followupViewportRefresh: isLastChunk,
+        shouldRefreshViewportSynchronously: options.shouldRefreshViewportSynchronously,
+        shouldReleaseRenderPause: options.shouldReleaseRenderPause,
+        onParsed: isLastChunk ? guardCallbacks.onParsed : undefined,
+        onWriteFailure: guardCallbacks.onWriteFailure
+      }
+    )
+    if (!accepted) {
+      return
+    }
+  }
+}
+
 /** Writes `data` into the pane's terminal with the replay guard engaged, so
  *  xterm's auto-replies to embedded query sequences don't leak to the shell.
  *  The counter increments/decrements so nested replays compose correctly. */
@@ -192,14 +235,7 @@ export function replayIntoTerminal(
     replayGuardBreadcrumbData(pane, options.breadcrumbIdentity)
   )
   // Why: hidden/snapshot replay skips the foreground path; WebGL/canvas still need a post-parse repaint to drop stale cells.
-  writeForegroundTerminalChunk(pane.terminal, data, {
-    forceViewportRefresh: true,
-    followupViewportRefresh: true,
-    shouldRefreshViewportSynchronously: options.shouldRefreshViewportSynchronously,
-    shouldReleaseRenderPause: options.shouldReleaseRenderPause,
-    onParsed: guardCallbacks.onParsed,
-    onWriteFailure: guardCallbacks.onWriteFailure
-  })
+  writeReplayChunks(pane, data, guardCallbacks, options)
 }
 
 export function replayIntoTerminalAsync(
@@ -226,14 +262,10 @@ export function replayIntoTerminalAsync(
       replayGuardBreadcrumbData(pane, options.breadcrumbIdentity),
       resolve
     )
-    writeForegroundTerminalChunk(pane.terminal, data, {
-      forceViewportRefresh: true,
-      followupViewportRefresh: true,
-      shouldRefreshViewportSynchronously: options.shouldRefreshViewportSynchronously,
-      shouldReleaseRenderPause: options.shouldReleaseRenderPause,
-      onParsed: guardCallbacks.onParsed,
-      onWriteFailure: guardCallbacks.onWriteFailure
-    })
+    // Why no await between chunks: the chunks all land in xterm's write buffer,
+    // and xterm's own 12ms budget is what yields between them. An await here
+    // would stretch the replay without cutting anything further.
+    writeReplayChunks(pane, data, guardCallbacks, options)
   })
 }
 
