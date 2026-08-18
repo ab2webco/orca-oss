@@ -56,11 +56,32 @@ type TraceEvent = {
 }
 
 const ANCHOR_MARK = 'orca-task-trace-anchor'
-const TRACE_CATEGORIES = ['disabled-by-default-devtools.timeline', 'blink.user_timing']
+/**
+ * `devtools.timeline` carries the JS-level events (ORCA-239). Without it a
+ * 900ms page task of pure JS reports no child at all — measured, not assumed —
+ * so an empty frame list read as "nothing instrumented ran here".
+ */
+export const TRACE_CATEGORIES = [
+  'devtools.timeline',
+  'disabled-by-default-devtools.timeline',
+  'blink.user_timing'
+]
+/**
+ * The set ORCA-230 measured with. Kept so the category addition above can be
+ * A/B'd against the phenomenon that PR established, rather than assumed
+ * harmless: recording more events is not free, and the ghost it reproduces is
+ * a compositor wait.
+ */
+export const PRE_ORCA_239_TRACE_CATEGORIES = [
+  'disabled-by-default-devtools.timeline',
+  'blink.user_timing'
+]
 /** Two tasks closer than this never let a posted task through between them. */
 const IDLE_GAP_MS = 1
 const CONTIGUOUS_FRACTION = 0.8
 const MIN_FRAME_MS = 1
+/** Trace timestamps are whole microseconds; a child filling its parent rounds past it. */
+const CONTAINMENT_SLACK_US = 1_000
 
 /**
  * Every main-thread task and its duration, from the renderer's own trace.
@@ -81,7 +102,10 @@ const MIN_FRAME_MS = 1
  * its thread pins the task list to this renderer rather than to every process
  * the trace happened to cover.
  */
-export async function startRendererTaskTrace(page: Page): Promise<RendererTaskTraceHandle> {
+export async function startRendererTaskTrace(
+  page: Page,
+  options: { categories?: string[] } = {}
+): Promise<RendererTaskTraceHandle> {
   const session = await page.context().newCDPSession(page)
   const events: TraceEvent[] = []
   session.on('Tracing.dataCollected', (payload) => {
@@ -92,7 +116,7 @@ export async function startRendererTaskTrace(page: Page): Promise<RendererTaskTr
   })
   await session.send('Tracing.start', {
     transferMode: 'ReportEvents',
-    traceConfig: { includedCategories: TRACE_CATEGORIES }
+    traceConfig: { includedCategories: options.categories ?? TRACE_CATEGORIES }
   })
   const anchorPerfNowMs = await page.evaluate((mark) => {
     performance.mark(mark)
@@ -190,6 +214,16 @@ export function worstBusyRun(
   return worst
 }
 
+/**
+ * Trace timestamps minus `performance.now()`, from the anchor mark. Null when
+ * the trace never saw the mark. Other instruments on the same renderer share
+ * this clock, so they can borrow the conversion instead of deriving their own.
+ */
+export function traceClockOffsetMs(handle: RendererTaskTraceHandle): number | null {
+  const anchor = handle.events.find((event) => event.name === ANCHOR_MARK && event.ts !== undefined)
+  return anchor?.ts === undefined ? null : anchor.ts / 1000 - handle.anchorPerfNowMs
+}
+
 /** Largest trace events nested inside a task: what the task was doing. */
 export function framesInsideTask(
   handle: RendererTaskTraceHandle,
@@ -203,6 +237,10 @@ export function framesInsideTask(
   const offsetMs = anchor.ts / 1000 - handle.anchorPerfNowMs
   const startUs = (task.startMs + offsetMs) * 1000
   const endUs = (task.startMs + task.durationMs + offsetMs) * 1000
+  // Containment with a microsecond of slack: a child that fills its parent is
+  // the interesting case, and it must not lose to quantization. Not overlap —
+  // an event that encloses the task would clip to the task's own length and
+  // outrank every real child.
   return handle.events
     .filter(
       (event) =>
@@ -211,8 +249,8 @@ export function framesInsideTask(
         event.name !== 'RunTask' &&
         event.ts !== undefined &&
         event.dur !== undefined &&
-        event.ts >= startUs &&
-        event.ts + event.dur <= endUs &&
+        event.ts >= startUs - CONTAINMENT_SLACK_US &&
+        event.ts + event.dur <= endUs + CONTAINMENT_SLACK_US &&
         event.dur / 1000 >= MIN_FRAME_MS
     )
     .map((event) => ({
@@ -222,6 +260,54 @@ export function framesInsideTask(
     }))
     .sort((a, b) => b.durationMs - a.durationMs)
     .slice(0, limit)
+}
+
+function overlapMs(
+  startUs: number,
+  endUs: number,
+  windowStartUs: number,
+  windowEndUs: number
+): number {
+  return Math.max(0, Math.min(endUs, windowEndUs) - Math.max(startUs, windowStartUs)) / 1000
+}
+
+/**
+ * Every traced event overlapping a task, by name — including the sub-millisecond
+ * ones `framesInsideTask` drops. An empty census and a census of a thousand
+ * 0.1ms events are different faults, and a frame list shows neither.
+ */
+export function taskEventCensus(
+  handle: RendererTaskTraceHandle,
+  task: RendererTracedTask
+): { name: string; count: number; totalMs: number }[] {
+  const anchor = handle.events.find((event) => event.name === ANCHOR_MARK && event.ts !== undefined)
+  if (!anchor?.ts) {
+    return []
+  }
+  const offsetMs = anchor.ts / 1000 - handle.anchorPerfNowMs
+  const startUs = (task.startMs + offsetMs) * 1000
+  const endUs = (task.startMs + task.durationMs + offsetMs) * 1000
+  const byName = new Map<string, { name: string; count: number; totalMs: number }>()
+  for (const event of handle.events) {
+    if (event.pid !== anchor.pid || event.tid !== anchor.tid || event.name === 'RunTask') {
+      continue
+    }
+    if (event.ts === undefined) {
+      continue
+    }
+    const eventEndUs = event.ts + (event.dur ?? 0)
+    if (eventEndUs < startUs || event.ts > endUs) {
+      continue
+    }
+    const name = event.name ?? 'unknown'
+    const entry = byName.get(name) ?? { name, count: 0, totalMs: 0 }
+    entry.count += 1
+    entry.totalMs += overlapMs(event.ts, eventEndUs, startUs, endUs)
+    byName.set(name, entry)
+  }
+  return [...byName.values()]
+    .map((entry) => ({ ...entry, totalMs: Number(entry.totalMs.toFixed(1)) }))
+    .sort((a, b) => b.totalMs - a.totalMs || b.count - a.count)
 }
 
 function callFrameSource(event: TraceEvent): string | null {

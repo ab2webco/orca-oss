@@ -17,10 +17,22 @@ on:
         description: JSON array of changed specs; empty runs the full suite
         required: false
         type: string
+      project:
+        description: Extra Playwright project for those specs, e.g. electron-ondemand
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       ref:
         description: Ref to check out (defaults to the workflow ref)
+        required: false
+        type: string
+      test_files:
+        description: JSON array of specs to run; empty runs the full suite
+        required: false
+        type: string
+      project:
+        description: Extra Playwright project for those specs, e.g. electron-ondemand
         required: false
         type: string
   schedule:
@@ -239,13 +251,17 @@ jobs:
           name: e2e-build-out
           path: out/
 
+      # Why PROJECT: electron-headless excludes @ondemand diagnostics and its
+      # grepInvert wins over any --grep, so reaching one needs its own project
+      # added to the run.
       - name: Run changed E2E specs
         env:
           TEST_FILES_JSON: ${{ inputs.test_files }}
+          PROJECT: ${{ inputs.project }}
         run: |
           mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
           xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 \
-            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1
+            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 ${PROJECT:+--project "$PROJECT"}
 
       - name: Upload Playwright traces
         if: failure()
