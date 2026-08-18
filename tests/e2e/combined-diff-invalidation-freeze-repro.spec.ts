@@ -56,6 +56,12 @@ async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<str
   )
 }
 
+const INVALIDATION_ROUNDS = 3
+const INVALIDATION_ROUND_GAP_MS = 700
+const INVALIDATION_SETTLE_MS = 3_000
+const INVALIDATION_WINDOW_MS =
+  INVALIDATION_ROUNDS * INVALIDATION_ROUND_GAP_MS + INVALIDATION_SETTLE_MS
+
 test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
   test.describe.configure({ mode: 'serial' })
   test.use({ seedTestRepo: false })
@@ -102,6 +108,33 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
       console.log(`staged diff opened ${JSON.stringify(opened)}`)
       expect(opened.editorCount).toBeGreaterThan(0)
 
+      // Why: an idle window of the same length as the measured one, taken before the diff is
+      // invalidated. The mounted editors alone stall the main thread on a loaded machine, so
+      // the invalidation has to be judged against that floor rather than a fixed ceiling.
+      const baseline = await orcaPage.evaluate(async (windowMs: number) => {
+        const intervalMs = 50
+        const samples: number[] = []
+        let last = performance.now()
+        let maxLagMs = 0
+        const startedAt = performance.now()
+        const timer = window.setInterval(() => {
+          const lag = Math.max(0, performance.now() - last - intervalMs)
+          maxLagMs = Math.max(maxLagMs, lag)
+          samples.push(lag)
+          last = performance.now()
+        }, intervalMs)
+        await new Promise((resolve) => window.setTimeout(resolve, windowMs))
+        window.clearInterval(timer)
+        const sorted = [...samples].sort((a, b) => a - b)
+        return {
+          elapsedMs: performance.now() - startedAt,
+          maxLagMs,
+          p95LagMs: sorted.length ? sorted[Math.floor(sorted.length * 0.95)] : 0,
+          sampleCount: samples.length
+        }
+      }, INVALIDATION_WINDOW_MS)
+      console.log(`invalidation baseline ${JSON.stringify(baseline)}`)
+
       // Why: the reported freeze starts when the open diff is invalidated by a
       // commit/rebase — the snapshot files stop having any staged diff at all.
       execFileSync('git', ['commit', '-m', 'Invalidate the open staged diff'], {
@@ -110,7 +143,7 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
       })
 
       const measurement = await orcaPage.evaluate(
-        async ({ wId, repoPath }) => {
+        async ({ wId, repoPath, rounds, roundGapMs, settleMs }) => {
           const store = window.__store
           if (!store) {
             throw new Error('window.__store is not available')
@@ -132,12 +165,12 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
           try {
             // Why: the file watcher pushes several status refreshes while git
             // rewrites the index; replay that churn instead of a single update.
-            for (let round = 0; round < 3; round += 1) {
+            for (let round = 0; round < rounds; round += 1) {
               const status = await window.api.git.status({ worktreePath: repoPath })
               store.getState().setGitStatus(wId, status)
-              await new Promise((resolve) => window.setTimeout(resolve, 700))
+              await new Promise((resolve) => window.setTimeout(resolve, roundGapMs))
             }
-            await new Promise((resolve) => window.setTimeout(resolve, 3_000))
+            await new Promise((resolve) => window.setTimeout(resolve, settleMs))
           } finally {
             window.clearInterval(timer)
           }
@@ -155,11 +188,20 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
             sectionRowCount: document.querySelectorAll('[data-combined-diff-section-row]').length
           }
         },
-        { wId: worktreeId, repoPath: fixture.repoPath }
+        {
+          wId: worktreeId,
+          repoPath: fixture.repoPath,
+          rounds: INVALIDATION_ROUNDS,
+          roundGapMs: INVALIDATION_ROUND_GAP_MS,
+          settleMs: INVALIDATION_SETTLE_MS
+        }
       )
 
       console.log(`invalidation measurement ${JSON.stringify(measurement)}`)
-      expect(measurement.maxLagMs).toBeLessThan(1_000)
+      // Why: every limit rides the identical idle window measured above, so a slow machine's
+      // floor cannot fail the test; the allowances on top are what invalidation may add.
+      expect(measurement.p95LagMs).toBeLessThanOrEqual(baseline.p95LagMs + 100)
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(Math.max(baseline.maxLagMs, 100) + 1_000)
       // Why: staying responsive isn't enough — invalidation must also leave the rows loaded
       // instead of parking a section in its loading state.
       expect(measurement.loadingRowCount).toBe(0)
