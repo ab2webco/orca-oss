@@ -162,9 +162,21 @@ export type MapPlaneWorkItemContext = {
   labelsById?: ReadonlyMap<string, string>
 }
 
-// `actor` per Plane's comment schema is the expanded creator object (same
-// shape mapPlaneUser already expects); comments are never authored by a bare
-// UUID the way assignees/labels can arrive.
+// Shown when `actor` carries nothing to identify the author with, so the field
+// stays present instead of reading as a comment nobody wrote.
+export const UNRESOLVED_COMMENT_AUTHOR_NAME = 'Unresolved Plane user'
+
+// `actor` arrives expanded, as a bare member UUID, or not at all — the bare and
+// missing forms both collapse under asRecord, so branch before mapping. A bare
+// UUID is surfaced as the id rather than dropped; resolving it to a name needs a
+// members map this mapper is not given.
+function mapPlaneCommentActor(raw: unknown): PlaneUser {
+  if (typeof raw === 'string' && raw) {
+    return { id: raw, displayName: raw }
+  }
+  return mapPlaneUser(raw) ?? { id: '', displayName: UNRESOLVED_COMMENT_AUTHOR_NAME }
+}
+
 export function mapPlaneComment(raw: unknown): PlaneComment {
   const comment = asRecord(raw)
   return {
@@ -172,7 +184,7 @@ export function mapPlaneComment(raw: unknown): PlaneComment {
     body: planeHtmlToMarkdown(asString(comment.comment_html)),
     createdAt: asString(comment.created_at, new Date().toISOString()),
     updatedAt: asString(comment.updated_at) || undefined,
-    user: mapPlaneUser(comment.actor)
+    user: mapPlaneCommentActor(comment.actor)
   }
 }
 
