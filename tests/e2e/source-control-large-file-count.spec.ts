@@ -20,6 +20,7 @@
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { measureIdleFloorMs } from './helpers/idle-floor-lag'
 import {
   createLargeFileCountRepo,
   removeLargeFileCountRepo,
@@ -238,25 +239,6 @@ async function measureSourceControlLoad(
   }, args)
 }
 
-// Why: every window here ends when the panel renders, so the machine decides its length. Sampling
-// the floor for exactly that many ms, same page and back to back, is what makes the two comparable;
-// a fixed-length floor would judge unequal windows against each other.
-async function measureIdleFloorMs(orcaPage: Page, windowMs: number): Promise<number> {
-  return orcaPage.evaluate(async (durationMs: number) => {
-    const intervalMs = 50
-    let last = performance.now()
-    let maxLagMs = 0
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      maxLagMs = Math.max(maxLagMs, Math.max(0, now - last - intervalMs))
-      last = now
-    }, intervalMs)
-    await new Promise((resolve) => window.setTimeout(resolve, durationMs))
-    window.clearInterval(timer)
-    return maxLagMs
-  }, windowMs)
-}
-
 function logMeasurement(
   label: string,
   measurement: LoadMeasurement & { rendererWorkingSetMb?: { before: number; after: number } }
@@ -326,6 +308,7 @@ test.describe('Source Control large file count (#8013)', () => {
       // a virtualized panel mounts viewport + overscan only.
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
       const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      console.log(`[large-file-count] idle-floor ${JSON.stringify({ idleFloorMs })}`)
       // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
       // cannot fail on noise alone; the allowance is what the load itself may add on top.
       expect(measurement.maxLagMs).toBeLessThanOrEqual(
@@ -373,6 +356,7 @@ test.describe('Source Control large file count (#8013)', () => {
       expect(measurement.renderedRows).toBeGreaterThan(0)
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
       const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      console.log(`[large-file-count] idle-floor ${JSON.stringify({ idleFloorMs })}`)
       // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
       // cannot fail on noise alone; the allowance is what the load itself may add on top.
       expect(measurement.maxLagMs).toBeLessThanOrEqual(
@@ -456,12 +440,14 @@ test.describe('Source Control large file count (#8013)', () => {
       expect(measurement.payloadBytes).toBeLessThan(MAX_CAPPED_STATUS_PAYLOAD_BYTES)
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
       const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      console.log(`[large-file-count] idle-floor ${JSON.stringify({ idleFloorMs })}`)
       // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
       // cannot fail on noise alone; the allowance is what the load itself may add on top.
       expect(measurement.maxLagMs).toBeLessThanOrEqual(
         idleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
       )
       const activationIdleFloorMs = await measureIdleFloorMs(orcaPage, activationMs)
+      console.log(`[large-file-count] idle-floor ${JSON.stringify({ activationIdleFloorMs })}`)
       expect(activationMaxLagMs).toBeLessThanOrEqual(
         activationIdleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
       )
@@ -586,6 +572,7 @@ test.describe('Source Control large file count (#8013)', () => {
 
       expect(measurement.entryCount).toBe(0)
       const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      console.log(`[large-file-count] idle-floor ${JSON.stringify({ idleFloorMs })}`)
       // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
       // cannot fail on noise alone; the allowance is what the load itself may add on top.
       expect(measurement.maxLagMs).toBeLessThanOrEqual(
