@@ -286,9 +286,12 @@ jobs:
       - name: Install Electron package binary for tests
         run: node config/scripts/install-electron-package-binary.mjs
 
+      # Why the wrapper: a wedged shard used to burn the whole 15-minute cap in
+      # silence and die unnamed, which reads in the rollup as a red test
+      # (ORCA-257). It forwards every argument below untouched.
       - name: Test shard
         run: |
-          pnpm exec vitest run --config config/vitest.config.ts \
+          node config/scripts/run-vitest-with-hang-watchdog.mjs --config config/vitest.config.ts \
             --exclude=src/main/daemon/session-startup-command-gate-real-shell.test.ts \
             --exclude=src/main/daemon/shell-ready.test.ts \
             --exclude=src/main/daemon/node-pty-fd-leak.test.ts \

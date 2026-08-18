@@ -18,7 +18,14 @@ export default defineConfig({
     // Why: Node 26's undefined Web Storage globals prevent Vitest from installing happy-dom's.
     execArgv: ['--no-experimental-webstorage'],
     // Why: happy-dom drops MutationObserver callbacks on GC; keep them alive like a browser does.
-    setupFiles: [resolve('config/scripts/happy-dom-mutation-observer-retention.ts')],
+    setupFiles: [
+      resolve('config/scripts/happy-dom-mutation-observer-retention.ts'),
+      // Only under the hang watchdog: it costs every worker a signal handler and
+      // is read exactly once, when the run is already declared wedged.
+      ...(process.env.ORCA_VITEST_HANG_JOURNAL
+        ? [resolve('config/scripts/vitest-worker-active-resources-probe.ts')]
+        : [])
+    ],
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
