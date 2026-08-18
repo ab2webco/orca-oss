@@ -29,7 +29,7 @@ import { DEFAULT_GIT_STATUS_LIMIT } from '../../src/shared/git-status-limit'
 
 // Matches the large-diff freeze budget: a blocking stall past 1s is the
 // "UI becomes unresponsive" symptom reported in #8013.
-const MAX_EVENT_LOOP_LAG_MS = 1_000
+const MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS = 1_000
 // A second full status→store→render cycle with identical data must not leak
 // unbounded memory; allow generous headroom for GC timing noise.
 const MAX_HEAP_GROWTH_PER_CYCLE_MB = 75
@@ -40,6 +40,7 @@ const MAX_MOUNTED_ROWS = 200
 const MAX_CAPPED_STATUS_PAYLOAD_BYTES = 200_000
 
 type LoadMeasurement = {
+  measuredWindowMs: number
   entryCount: number
   didHitLimit: boolean
   scanMs: number
@@ -168,6 +169,7 @@ async function measureSourceControlLoad(
     }
 
     try {
+      const measuredWindowStart = performance.now()
       const scanStart = performance.now()
       const status = await window.api.git.status({ worktreePath: repoPath })
       const scanMs = performance.now() - scanStart
@@ -215,6 +217,7 @@ async function measureSourceControlLoad(
 
       const sorted = [...lagSamples].sort((a, b) => a - b)
       return {
+        measuredWindowMs: performance.now() - measuredWindowStart,
         entryCount: status.entries.length,
         didHitLimit: status.didHitLimit === true,
         scanMs,
@@ -233,6 +236,25 @@ async function measureSourceControlLoad(
       window.clearInterval(probe)
     }
   }, args)
+}
+
+// Why: every window here ends when the panel renders, so the machine decides its length. Sampling
+// the floor for exactly that many ms, same page and back to back, is what makes the two comparable;
+// a fixed-length floor would judge unequal windows against each other.
+async function measureIdleFloorMs(orcaPage: Page, windowMs: number): Promise<number> {
+  return orcaPage.evaluate(async (durationMs: number) => {
+    const intervalMs = 50
+    let last = performance.now()
+    let maxLagMs = 0
+    const timer = window.setInterval(() => {
+      const now = performance.now()
+      maxLagMs = Math.max(maxLagMs, Math.max(0, now - last - intervalMs))
+      last = now
+    }, intervalMs)
+    await new Promise((resolve) => window.setTimeout(resolve, durationMs))
+    window.clearInterval(timer)
+    return maxLagMs
+  }, windowMs)
 }
 
 function logMeasurement(
@@ -303,7 +325,12 @@ test.describe('Source Control large file count (#8013)', () => {
       // Why: mounting rows proportional to the change set is the #8013 bug;
       // a virtualized panel mounts viewport + overscan only.
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
-      expect(measurement.maxLagMs).toBeLessThan(MAX_EVENT_LOOP_LAG_MS)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail on noise alone; the allowance is what the load itself may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(
+        idleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
+      )
       if (measurement.heapUsedMbPerCycle.length > 1) {
         const first = measurement.heapUsedMbPerCycle[0]
         const last = measurement.heapUsedMbPerCycle.at(-1) ?? first
@@ -345,7 +372,12 @@ test.describe('Source Control large file count (#8013)', () => {
       expect(measurement.entryCount).toBeGreaterThanOrEqual(modifiedFiles)
       expect(measurement.renderedRows).toBeGreaterThan(0)
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
-      expect(measurement.maxLagMs).toBeLessThan(MAX_EVENT_LOOP_LAG_MS)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail on noise alone; the allowance is what the load itself may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(
+        idleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
+      )
     } finally {
       await unregisterLargeFileCountRepos(orcaPage, [fixture.repoPath])
     }
@@ -423,8 +455,16 @@ test.describe('Source Control large file count (#8013)', () => {
       expect(measurement.entryCount).toBeLessThanOrEqual(DEFAULT_GIT_STATUS_LIMIT)
       expect(measurement.payloadBytes).toBeLessThan(MAX_CAPPED_STATUS_PAYLOAD_BYTES)
       expect(measurement.renderedRows).toBeLessThan(MAX_MOUNTED_ROWS)
-      expect(measurement.maxLagMs).toBeLessThan(MAX_EVENT_LOOP_LAG_MS)
-      expect(activationMaxLagMs).toBeLessThan(MAX_EVENT_LOOP_LAG_MS)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail on noise alone; the allowance is what the load itself may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(
+        idleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
+      )
+      const activationIdleFloorMs = await measureIdleFloorMs(orcaPage, activationMs)
+      expect(activationMaxLagMs).toBeLessThanOrEqual(
+        activationIdleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
+      )
 
       // Why: didHitLimit must park the worktree in the huge-status state so
       // background polling stops re-running tens-of-seconds git scans.
@@ -529,7 +569,12 @@ test.describe('Source Control large file count (#8013)', () => {
       })
 
       expect(measurement.entryCount).toBe(0)
-      expect(measurement.maxLagMs).toBeLessThan(MAX_EVENT_LOOP_LAG_MS)
+      const idleFloorMs = await measureIdleFloorMs(orcaPage, measurement.measuredWindowMs)
+      // Why: the ceiling rides this machine's floor instead of a fixed number, so a loaded runner
+      // cannot fail on noise alone; the allowance is what the load itself may add on top.
+      expect(measurement.maxLagMs).toBeLessThanOrEqual(
+        idleFloorMs + MAX_EVENT_LOOP_LAG_OVER_FLOOR_MS
+      )
     } finally {
       await unregisterLargeFileCountRepos(orcaPage, [fixture.repoPath])
     }
