@@ -51,6 +51,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   _resetTracerForTests()
   clearCrashBreadcrumbsForTest()
@@ -157,6 +158,7 @@ describe('recordProcessGoneCrash', () => {
   })
 
   it('reports how many repeats a coalesced suppression stands for', () => {
+    vi.useFakeTimers()
     const dedupe = new ProcessGoneDedupe()
     const utilityCrash = event({
       source: 'child',
@@ -164,13 +166,11 @@ describe('recordProcessGoneCrash', () => {
       reason: 'crashed',
       details: { serviceName: 'network.mojom.NetworkService' }
     })
-    const nowSpy = vi.spyOn(Date, 'now')
 
-    nowSpy.mockReturnValue(0)
     for (let i = 0; i < 700; i++) {
       recordProcessGoneCrash({ record: vi.fn() } as never, utilityCrash, dedupe)
     }
-    nowSpy.mockReturnValue(30_000)
+    vi.advanceTimersByTime(30_000)
     recordProcessGoneCrash({ record: vi.fn() } as never, utilityCrash, dedupe)
 
     expect(getCrashBreadcrumbSnapshot()).toEqual([
