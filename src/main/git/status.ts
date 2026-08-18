@@ -30,6 +30,7 @@ import {
   parseNumstat,
   type GitLineStats
 } from '../../shared/git-uncommitted-line-stats'
+import type { UntrackedStatsCacheTally } from '../../shared/git-status-types'
 import { decodeGitCQuotedPath } from '../../shared/git-cquoted-path'
 import {
   gitExecFileAsync,
@@ -388,6 +389,9 @@ async function runGetStatus(
 
   // Why: line counts run only for areas with entries (clean tree = 0 calls); skip past the limit to avoid numstat over a huge set.
   let branchLineTotal: GitBranchLineTotal | undefined
+  // Mutated in place by the scan below, so a reused line-stat result leaves it at
+  // zero — which is the honest report that no scan ran.
+  const untrackedCacheTally: UntrackedStatsCacheTally = { hits: 0, misses: 0 }
   if (!didHitLimit) {
     const branchLineTotalInput = createBranchLineTotalInput(
       worktreePath,
@@ -402,7 +406,7 @@ async function runGetStatus(
       writeToken: lineStatsWriteToken,
       reuse: options.reuseLineStats === true,
       isAborted: () => options.signal?.aborted === true,
-      recompute: () => attachLineStats(worktreePath, entries, options),
+      recompute: () => attachLineStats(worktreePath, entries, options, untrackedCacheTally),
       ...(branchLineTotalInput ? { branchLineTotal: branchLineTotalInput } : {})
     })
     branchLineTotal = lineStats.branchLineTotal
@@ -424,6 +428,7 @@ async function runGetStatus(
     branch,
     ...(options.includeIgnored ? { ignoredPaths: parser.ignoredPaths } : {}),
     ...(branchLineTotal ? { branchLineTotal } : {}),
+    untrackedLineStatsCache: untrackedCacheTally,
     ...(didHitLimit ? { didHitLimit: true, statusLength: parser.statusLength } : {}),
     ...(statusSucceeded
       ? {
@@ -639,7 +644,8 @@ async function runNumstat(
 async function attachLineStats(
   worktreePath: string,
   entries: GitStatusEntry[],
-  options: GitRuntimeOptions = {}
+  options: GitRuntimeOptions = {},
+  untrackedCacheTally?: UntrackedStatsCacheTally
 ): Promise<boolean> {
   if (entries.length === 0) {
     return true
@@ -653,7 +659,7 @@ async function attachLineStats(
   const [stagedStats, unstagedStats, untrackedStats] = await Promise.all([
     hasStaged ? runNumstat(worktreePath, true, options) : Promise.resolve(emptyStats),
     hasUnstaged ? runNumstat(worktreePath, false, options) : Promise.resolve(emptyStats),
-    collectUntrackedAdditions(worktreePath, untrackedPaths, options.signal)
+    collectUntrackedAdditions(worktreePath, untrackedPaths, options.signal, untrackedCacheTally)
   ])
   for (const entry of entries) {
     applyLineStats(

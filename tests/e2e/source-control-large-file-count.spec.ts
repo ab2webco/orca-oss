@@ -518,23 +518,39 @@ test.describe('Source Control large file count (#8013)', () => {
       registerPostElectronShutdownCleanup(() => removeLargeFileCountRepo(largeRepoPath))
       await waitForSessionReady(orcaPage)
 
-      const warmRescanPerFileMs = async (repoPath: string, files: number): Promise<number> => {
+      // Why: read the cache outcome of a warm rescan instead of timing it. The per-file
+      // duration cannot tell a cache that stopped serving from a busy runner — measured
+      // both ways, it lands on either side of any threshold.
+      const warmRescanCacheTally = async (
+        repoPath: string,
+        files: number
+      ): Promise<{ hits: number; misses: number }> => {
         const worktreeId = await addAndActivateRepo(orcaPage, repoPath)
-        const measurement = await measureSourceControlLoad(orcaPage, {
+        await measureSourceControlLoad(orcaPage, {
           worktreeId,
           repoPath,
           expectedRows: files,
           pollCycles: 1
         })
-        return measurement.rescanMs / files
+        return orcaPage.evaluate(async (path: string) => {
+          const status = await window.api.git.status({ worktreePath: path })
+          return status.untrackedLineStatsCache ?? { hits: -1, misses: -1 }
+        }, repoPath)
       }
 
-      const smallPerFileMs = await warmRescanPerFileMs(smallRepo.repoPath, 400)
-      const largePerFileMs = await warmRescanPerFileMs(largeRepo.repoPath, 800)
+      const small = await warmRescanCacheTally(smallRepo.repoPath, 400)
+      const large = await warmRescanCacheTally(largeRepo.repoPath, 800)
       console.log(
-        `[large-file-count] line-stat-cache smallPerFileMs=${smallPerFileMs.toFixed(4)} largePerFileMs=${largePerFileMs.toFixed(4)} ratio=${(largePerFileMs / smallPerFileMs).toFixed(2)}`
+        `[large-file-count] line-stat-cache small=${JSON.stringify(small)} large=${JSON.stringify(large)}`
       )
-      expect(largePerFileMs).toBeLessThan(smallPerFileMs * 2)
+      // Why: without this the assertion below passes whenever no scan ran at all — a
+      // reused line-stat result reports zero of both.
+      expect(small.hits).toBeGreaterThan(0)
+      expect(large.hits).toBeGreaterThan(0)
+      // The property under test: at both sub-cap scales the cache still serves every
+      // untracked file on a warm rescan.
+      expect(small.misses).toBe(0)
+      expect(large.misses).toBe(0)
     } finally {
       await unregisterLargeFileCountRepos(orcaPage, [
         smallRepo.repoPath,
