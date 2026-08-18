@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatTerminalCreate, formatTerminalFocus, formatTerminalList } from './terminal-format'
+import {
+  formatTerminalAgentSessionState,
+  formatTerminalCreate,
+  formatTerminalFocus,
+  formatTerminalList
+} from './terminal-format'
 
 describe('formatTerminalCreate', () => {
   it('surfaces spawn-time readiness before a caller writes', () => {
@@ -98,5 +103,59 @@ describe('formatTerminalList liveness', () => {
     expect(formatTerminalList({ terminals: [], totalCount: 0, truncated: false })).toBe(
       'No terminals.'
     )
+  })
+})
+
+describe('formatTerminalAgentSessionState', () => {
+  const base = { handle: 'term-1', agent: 'claude', sessionId: 'session-1' }
+
+  it('prints the state, the last turn and the queue depth', () => {
+    const output = formatTerminalAgentSessionState({
+      agentSession: {
+        ...base,
+        session: {
+          read: true,
+          state: 'queued-input',
+          lastTurnAtMs: Date.parse('2026-07-24T03:15:59.000Z'),
+          queuedInput: { supported: true, pending: 2 },
+          unparsedRecords: 0
+        }
+      }
+    })
+    expect(output).toContain('state: queued-input')
+    expect(output).toContain('last turn: 2026-07-24T03:15:59.000Z')
+    expect(output).toContain('queued input: 2')
+  })
+
+  it('says queued input is unobservable instead of printing a zero', () => {
+    const output = formatTerminalAgentSessionState({
+      agentSession: {
+        ...base,
+        agent: 'codex',
+        session: {
+          read: true,
+          state: 'awaiting-input',
+          lastTurnAtMs: null,
+          queuedInput: { supported: false, reason: 'no queued-input records' },
+          unparsedRecords: 3
+        }
+      }
+    })
+    expect(output).toContain('queued input: unobservable — no queued-input records')
+    expect(output).toContain('last turn: none in the session log')
+    expect(output).toContain('warning: 3 session-log records could not be parsed')
+  })
+
+  it('names why the state is unknown rather than defaulting to one', () => {
+    const output = formatTerminalAgentSessionState({
+      agentSession: {
+        handle: 'term-1',
+        agent: null,
+        sessionId: null,
+        session: { read: false, reason: 'agent-session-unknown' }
+      }
+    })
+    expect(output).toContain('agent: unknown')
+    expect(output).toContain('state: unknown — no agent session is identified for this pane yet')
   })
 })

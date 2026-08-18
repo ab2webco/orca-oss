@@ -5,6 +5,7 @@ import type {
   AgentStatusState,
   AgentType
 } from './agent-status-types'
+import type { AgentSessionLogReading } from './agent-session-log-state'
 import type { ComposerReadyState } from './composer-ready-observation'
 import type {
   BaseRefSearchResult,
@@ -645,6 +646,15 @@ export type RuntimeTerminalSend = {
 }
 
 export type RuntimeTerminalAgentStatusState = 'working' | 'permission' | 'idle' | null
+
+/** Agent state read from the session log rather than the terminal buffer (ORCA-236). */
+export type RuntimeTerminalAgentSessionState = {
+  handle: string
+  /** Null when no hook row has identified this pane's agent yet. */
+  agent: AgentType | null
+  sessionId: string | null
+  session: AgentSessionLogReading
+}
 
 export type RuntimeTerminalAgentStatus = {
   handle: string

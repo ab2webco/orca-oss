@@ -3,6 +3,7 @@ import type {
   RuntimeTerminalCreate,
   RuntimeTerminalFocus,
   RuntimeTerminalListResult,
+  RuntimeTerminalAgentSessionState,
   RuntimeTerminalRead,
   RuntimeTerminalRename,
   RuntimeTerminalSend,
@@ -13,6 +14,7 @@ import type {
 import type { CommandHandler } from '../dispatch'
 import { shouldUseRendererBackedInteractiveTerminal } from '../codex-command-classification'
 import {
+  formatTerminalAgentSessionState,
   formatTerminalClose,
   formatTerminalCreate,
   formatTerminalFocus,
@@ -113,6 +115,13 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
       limit: getOptionalPositiveIntegerFlag(flags, 'limit')
     })
     printResult(result, json, formatTerminalRead)
+  },
+  'terminal state': async ({ flags, client, cwd, json }) => {
+    const result = await client.call<{ agentSession: RuntimeTerminalAgentSessionState }>(
+      'terminal.agentSessionState',
+      { terminal: await getTerminalHandle(flags, cwd, client) }
+    )
+    printResult(result, json, formatTerminalAgentSessionState)
   },
   'terminal send': async ({ flags, client, cwd, json }) => {
     const result = await client.call<{ send: RuntimeTerminalSend }>('terminal.send', {

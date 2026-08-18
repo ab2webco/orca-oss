@@ -12,6 +12,10 @@ import {
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { sortDirEntries } from '../../shared/file-name-sort'
+import {
+  readTerminalAgentSessionLogState,
+  selectAgentSessionIdentity
+} from './terminal-agent-session-log-state'
 import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-listing'
 import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
 import { parseFileUriPathParts } from '../daemon/osc7-file-uri'
@@ -325,6 +329,7 @@ import {
   type RuntimeRepoSearchRefs,
   type RuntimeTerminalRead,
   type RuntimeTerminalRename,
+  type RuntimeTerminalAgentSessionState,
   type RuntimeTerminalAgentStatus,
   type RuntimeTerminalSend,
   type RuntimeTerminalCreate,
@@ -17549,6 +17554,17 @@ export class OrcaRuntimeService {
     const isRunningAgent = await this.isTerminalRunningAgent(handle)
     this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
     return { handle, isRunningAgent, status: null }
+  }
+
+  /** Agent state from the pane's own session log — no title, buffer, or process
+   *  inspection. See getTerminalAgentStatus for the scrape-based reading. */
+  async getTerminalAgentSessionState(handle: string): Promise<RuntimeTerminalAgentSessionState> {
+    const identity = selectAgentSessionIdentity(
+      handle,
+      this.getPaneKeyForTerminalHandle(handle),
+      this.getAgentStatusSnapshotFn?.() ?? []
+    )
+    return readTerminalAgentSessionLogState(handle, identity)
   }
 
   private getTerminalAgentStatusPtyId(handle: string): string {

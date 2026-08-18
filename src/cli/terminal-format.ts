@@ -1,4 +1,6 @@
+import type { AgentSessionLogUnreadReason } from '../shared/agent-session-log-state'
 import type {
+  RuntimeTerminalAgentSessionState,
   RuntimeTerminalClose,
   RuntimeTerminalCreate,
   RuntimeTerminalFocus,
@@ -230,4 +232,41 @@ export function formatTerminalWait(result: { wait: RuntimeTerminalWait }): strin
     lines.push(`waitedMs: ${result.wait.waitedMs}`)
   }
   return lines.join('\n')
+}
+
+const AGENT_SESSION_UNREAD_TEXT: Record<AgentSessionLogUnreadReason, string> = {
+  'agent-unsupported': 'this agent writes no session log Orca can read',
+  'agent-session-unknown': 'no agent session is identified for this pane yet',
+  'session-log-missing': 'no session log found for this pane',
+  'session-log-unreadable': 'the session log could not be read'
+}
+
+export function formatTerminalAgentSessionState(result: {
+  agentSession: RuntimeTerminalAgentSessionState
+}): string {
+  const { handle, agent, sessionId, session } = result.agentSession
+  const identity = [
+    `handle: ${handle}`,
+    `agent: ${agent ?? 'unknown'}`,
+    `session: ${sessionId ?? 'unknown'}`
+  ]
+  if (!session.read) {
+    return [...identity, `state: unknown — ${AGENT_SESSION_UNREAD_TEXT[session.reason]}`].join('\n')
+  }
+  const lastTurn =
+    session.lastTurnAtMs === null
+      ? 'last turn: none in the session log'
+      : `last turn: ${new Date(session.lastTurnAtMs).toISOString()}`
+  const queued = session.queuedInput.supported
+    ? `queued input: ${session.queuedInput.pending}`
+    : `queued input: unobservable — ${session.queuedInput.reason}`
+  return [
+    ...identity,
+    `state: ${session.state}`,
+    lastTurn,
+    queued,
+    ...(session.unparsedRecords > 0
+      ? [`warning: ${session.unparsedRecords} session-log records could not be parsed`]
+      : [])
+  ].join('\n')
 }
