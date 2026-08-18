@@ -1213,6 +1213,13 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     })
   }),
   defineMethod({
+    name: 'terminal.agentSessionState',
+    params: TerminalHandle,
+    handler: async (params, { runtime }) => ({
+      agentSession: await runtime.getTerminalAgentSessionState(params.terminal)
+    })
+  }),
+  defineMethod({
     name: 'terminal.agentStatus',
     params: TerminalHandle,
     handler: async (params, { runtime }) => ({

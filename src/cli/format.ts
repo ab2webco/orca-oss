@@ -35,6 +35,7 @@ export {
   formatTerminalCreate,
   formatTerminalFocus,
   formatTerminalList,
+  formatTerminalAgentSessionState,
   formatTerminalRead,
   formatTerminalRename,
   formatTerminalSend,
