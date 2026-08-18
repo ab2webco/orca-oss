@@ -215,7 +215,8 @@ describe('worktree base directory poller', () => {
     const received: WorktreeBasePollEvent[][] = []
     const target = makeTarget('base', root)
     let fullScans = 0
-    let pendingMarkerProbes = 0
+    let probesThisEpisode = 0
+    const probesPerRetiredEpisode: number[] = []
     let writeMarkerOnNextProbe = false
     const pendingMarkerMaxTicks = WORKTREE_BASE_BACKSTOP_TICKS * 2
     const markerCreationTick = pendingMarkerMaxTicks * 2 + WORKTREE_BASE_BACKSTOP_TICKS * 4
@@ -233,10 +234,18 @@ describe('worktree base directory poller', () => {
           }
         },
         onPendingMarkerProbe: (path) => {
-          pendingMarkerProbes += 1
+          if (path === markerPath) {
+            probesThisEpisode += 1
+          }
           if (writeMarkerOnNextProbe && path === markerPath) {
             writeMarkerOnNextProbe = false
             writeFileSync(markerPath, 'gitdir: elsewhere')
+          }
+        },
+        onPendingMarkerRetired: (path) => {
+          if (path === markerPath) {
+            probesPerRetiredEpisode.push(probesThisEpisode)
+            probesThisEpisode = 0
           }
         }
       }
@@ -259,7 +268,13 @@ describe('worktree base directory poller', () => {
         flat.filter((event) => event.type === 'create' && event.path === markerPath).length === 2
     )
 
-    expect(pendingMarkerProbes).toBeLessThanOrEqual(pendingMarkerMaxTicks)
+    // Count probes within one pending episode, not across the test: the window closes
+    // after a fixed number of ticks, so a slower runner adds waiting, never probes.
+    // Summing every episode charged the runner's speed to the poller's budget.
+    expect(probesPerRetiredEpisode.length).toBeGreaterThan(0)
+    for (const probes of probesPerRetiredEpisode) {
+      expect(probes).toBeLessThanOrEqual(pendingMarkerMaxTicks)
+    }
     expect(
       events.filter((event) => event.type === 'create' && event.path === markerPath)
     ).toHaveLength(2)
