@@ -143,23 +143,36 @@ test.describe('Default branch visibility', () => {
     await expect(featureRow).toHaveCount(0)
 
     // Opting out of the exemption is the only way back to the pre-#8873 sweep.
-    await orcaPage.evaluate(() => {
-      window.__store?.getState().setAlwaysShowDefaultBranchWorkspace(false)
-    })
+    // Set inside the poll, same reason as above: a one-shot set loses to a
+    // hydration that lands after it, and the assertion then retries forever.
+    await expect
+      .poll(async () => {
+        await orcaPage.evaluate(() => {
+          window.__store?.getState().setAlwaysShowDefaultBranchWorkspace(false)
+        })
+        return defaultBranchRow.count()
+      })
+      .toBe(0)
 
-    await expect(defaultBranchRow).toHaveCount(0)
-
-    await orcaPage.evaluate(() => {
-      window.__store?.getState().setAlwaysShowDefaultBranchWorkspace(true)
-    })
+    await expect
+      .poll(async () => {
+        await orcaPage.evaluate(() => {
+          window.__store?.getState().setAlwaysShowDefaultBranchWorkspace(true)
+        })
+        return defaultBranchRow.count()
+      })
+      .toBe(1)
 
     await expect(defaultBranchRow).toBeVisible()
 
     // The explicit hide filter still outranks the exemption.
-    await orcaPage.evaluate(() => {
-      window.__store?.getState().setHideDefaultBranchWorkspace(true)
-    })
-
-    await expect(defaultBranchRow).toHaveCount(0)
+    await expect
+      .poll(async () => {
+        await orcaPage.evaluate(() => {
+          window.__store?.getState().setHideDefaultBranchWorkspace(true)
+        })
+        return defaultBranchRow.count()
+      })
+      .toBe(0)
   })
 })
