@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { isBinaryBuffer } from './binary-buffer'
 import { decodeGitCQuotedPath } from './git-cquoted-path'
 import { DEFAULT_GIT_STATUS_LIMIT } from './git-status-limit'
+import type { UntrackedStatsCacheTally } from './git-status-types'
 import { iterateNulDelimitedFields } from './nul-delimited-fields'
 import { readNodeFileWithinLimit } from './node-bounded-file-reader'
 
@@ -106,7 +107,10 @@ function parseNulDelimitedNumstat(stdout: string): Map<string, GitLineStats> {
   return stats
 }
 
-async function countFileAdditions(absolutePath: string): Promise<GitLineStats> {
+async function countFileAdditions(
+  absolutePath: string,
+  tally?: UntrackedStatsCacheTally
+): Promise<GitLineStats> {
   try {
     const fileStat = await lstat(absolutePath)
     const cached = untrackedStatsCache.get(absolutePath)
@@ -121,7 +125,13 @@ async function countFileAdditions(absolutePath: string): Promise<GitLineStats> {
       // survive another worktree's scan sharing this cache.
       untrackedStatsCache.delete(absolutePath)
       untrackedStatsCache.set(absolutePath, cached)
+      if (tally) {
+        tally.hits += 1
+      }
       return cached.stats
+    }
+    if (tally) {
+      tally.misses += 1
     }
     if (fileStat.isSymbolicLink()) {
       return rememberUntrackedStats(absolutePath, fileStat, { added: 1 })
@@ -187,7 +197,8 @@ function createGitLineStatsAbortError(): Error {
 export async function collectUntrackedAdditions(
   worktreePath: string,
   untrackedPaths: readonly string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tally?: UntrackedStatsCacheTally
 ): Promise<Map<string, GitLineStats>> {
   const result = new Map<string, GitLineStats>()
   for (let i = 0; i < untrackedPaths.length; i += UNTRACKED_READ_CONCURRENCY) {
@@ -200,7 +211,10 @@ export async function collectUntrackedAdditions(
     const chunk = untrackedPaths.slice(i, i + UNTRACKED_READ_CONCURRENCY)
     await Promise.all(
       chunk.map(async (relativePath) => {
-        result.set(relativePath, await countFileAdditions(path.join(worktreePath, relativePath)))
+        result.set(
+          relativePath,
+          await countFileAdditions(path.join(worktreePath, relativePath), tally)
+        )
       })
     )
   }

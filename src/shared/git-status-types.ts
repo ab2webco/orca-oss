@@ -85,7 +85,14 @@ export type GitStatusResult = {
   // Only computed when the request carried a merge-base OID (the renderer's
   // visibility gate), and omitted — never zeroed — whenever it cannot be trusted.
   branchLineTotal?: GitBranchLineTotal
+  // Why: whether the untracked line-stat cache actually served this scan. A warm
+  // rescan that still misses means the cache is too small to hold one status
+  // result, which is #8013 returning. Optional: remote hosts may not report it.
+  untrackedLineStatsCache?: UntrackedStatsCacheTally
 }
+
+/** Cache outcomes for one scan of the untracked line-stat cache. */
+export type UntrackedStatsCacheTally = { hits: number; misses: number }
 
 // Why: when hasUpstream is false, ahead/behind are placeholder zeros, not a
 // "sync" signal — callers must check hasUpstream before treating 0/0 as in-sync.
