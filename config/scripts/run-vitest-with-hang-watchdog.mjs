@@ -16,6 +16,11 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { HANG_JOURNAL_ENV, readHangJournalSummary } from './vitest-hang-journal.mjs'
+import {
+  VITEST_HANG_ANNOTATION_TITLE,
+  VITEST_HANG_BLOCK_HEADER,
+  VITEST_HANG_EXIT_CODE
+} from './vitest-hang-marker.mjs'
 
 const scriptDir = import.meta.dirname
 const repoRoot = resolve(scriptDir, '..', '..')
@@ -25,9 +30,6 @@ const DEFAULT_IDLE_SECONDS = 180
 
 // Grace for the workers to answer SIGUSR2 with their active handles.
 const PROBE_GRACE_MS = 2_000
-
-// `timeout(1)`'s convention, so the exit code alone separates this from a red test.
-const HANG_EXIT_CODE = 124
 
 function readIdleSeconds() {
   const raw = process.env.ORCA_VITEST_HANG_IDLE_SECONDS
@@ -83,10 +85,10 @@ function reportHang({ journalPath, idleMs, childPid }) {
   const now = Date.now()
   const lines = []
   lines.push(
-    `::error title=Vitest hang::No output for ${formatSeconds(idleMs)}; the run is wedged, not slow.`
+    `::error title=${VITEST_HANG_ANNOTATION_TITLE}::No output for ${formatSeconds(idleMs)}; the run is wedged, not slow.`
   )
   lines.push('')
-  lines.push('===== orca hang watchdog =====')
+  lines.push(VITEST_HANG_BLOCK_HEADER)
   lines.push(`silence: ${formatSeconds(idleMs)}`)
   lines.push(`verdict: ${summary.verdict}`)
   lines.push(`modules: ${summary.endedCount} finished of ${summary.plannedCount} planned`)
@@ -178,7 +180,7 @@ async function main() {
       signalGroup(child.pid, 'SIGUSR2')
       setTimeout(() => {
         signalGroup(child.pid, 'SIGKILL')
-        resolveExit(HANG_EXIT_CODE)
+        resolveExit(VITEST_HANG_EXIT_CODE)
       }, PROBE_GRACE_MS)
     }, 1_000)
 

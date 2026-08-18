@@ -1,0 +1,45 @@
+ src/renderer/src/components/pet/pet-overlay-visibility.test.ts (2 tests) 3ms
+ ✓ src/renderer/src/components/status-bar/usage-percentage-label.test.ts (1 test) 3ms
+ ✓ src/renderer/src/lib/linked-work-item-provider.test.ts (3 tests) 2ms
+ ✓ src/renderer/src/components/workspace-cleanup/workspace-cleanup-removal-candidates.test.ts (1 test) 3ms
+ ✓ src/main/daemon/daemon-errors.test.ts (2 tests) 1ms
+ ✓ src/renderer/src/hooks/direct-ssh-reconnect-tokens.test.ts (2 tests) 1ms
+ ✓ src/renderer/src/components/tab-group/tab-drag-pointer.test.ts (1 test) 3ms
+ ✓ src/main/memory/process-memory-metric.test.ts (2 tests) 2ms
+ ✓ src/shared/github-repository-identity-key.test.ts (1 test) 2ms
+ ✓ src/renderer/src/components/right-sidebar/check-details-resize.test.ts (1 test) 2ms
+ ✓ src/renderer/src/components/terminal-pane/mobile-driver-overlay-visibility.test.ts (1 test) 2ms
+ ↓ src/main/wsl-approved-root-race.wsl.test.ts (2 tests | 2 skipped)
+ ↓ src/main/powershell-osc133-bootstrap-windows-clm.test.ts (4 tests | 4 skipped)
+ ↓ src/main/wsl-unc-delete.wsl.test.ts (3 tests | 3 skipped)
+ ↓ src/main/codex/codex-session-resume-windows.test.ts (1 test | 1 skipped)
+ ↓ src/shared/git-binary-compatibility.test.ts (6 tests | 6 skipped)
+ ↓ src/main/local-worktree-removal-recovery-live.test.ts (1 test | 1 skipped)
+ ↓ src/shared/setup-agent-sequencing.windows.test.ts (7 tests | 7 skipped)
+ ↓ src/shared/hermes-startup-query.windows.test.ts (1 test | 1 skipped)
+ ↓ src/main/daemon/headless-emulator-snapshot-cost.bench.test.ts (2 tests | 2 skipped)
+ ↓ src/main/git/worktree-removal-large-tree.bench.test.ts (1 test | 1 skipped)
+ ↓ src/main/ipc/preflight-windows-path-refresh.repro.test.ts (1 test | 1 skipped)
+ ✓ src/renderer/src/hooks/use-task-page-github-work-item-mutation-host.test.ts (2 tests) 3ms
+ ↓ src/main/daemon/session-ingest-throughput.bench.test.ts (1 test | 1 skipped)
+ ↓ src/main/ssh/ssh-relay-live-connect.test.ts (1 test | 1 skipped)
+ ↓ src/renderer/src/web/web-runtime-direct-proxy-live.integration.test.ts (3 tests | 3 skipped)
+ ↓ src/main/ssh/ssh-relay-upload-cancel.docker.test.ts (2 tests | 2 skipped)
+ ✓ src/renderer/src/components/onboarding/OnboardingInlineCommandTerminal.test.ts (1 test) 1ms
+ ↓ src/main/runtime/orchestration-cli-subprocess.test.ts (3 tests | 3 skipped)
+::error title=Vitest hang::No output for 120.6s; the run is wedged, not slow.
+
+===== orca hang watchdog =====
+silence: 120.6s
+verdict: wedged-modules
+modules: 4839 finished of 4840 planned
+modules that reached a worker and never finished:
+  /Users/fabolivar/Projects/orca-oss/inv-upstream-b/src/main/daemon/terminal-history-incremental-restore.test.ts — running, 316.8s ago
+
+surviving process tree:
+  45079 72947 R          05:17 /Users/fabolivar/.nvm/versions/node/v24.15.0/bin/node --experimental-import-meta-resolve --require /Users/fabolivar/Projects/orca-oss/inv-upstream-b/node_modules/.pnpm/vitest@4.1.5_@opentelemetry+api@1.9.1_@types+node@25.9.5_happy-dom@20.9.0_msw@2.14.3_@t_639633e6b2d780614ee105c365a381f8/node_modules/vitest/suppress-warnings.cjs --conditions node --conditions development --no-experimental-webstorage /Users/fabolivar/Projects/orca-oss/inv-upstream-b/node_modules/.pnpm/vitest@4.1.5_@opentelemetry+api@1.9.1_@types+node@25.9.5_happy-dom@20.9.0_msw@2.14.3_@t_639633e6b2d780614ee105c365a381f8/node_modules/vitest/dist/workers/forks.js
+  72947 72946 Ss         06:48 /Users/fabolivar/.nvm/versions/node/v24.15.0/bin/node /Users/fabolivar/Projects/orca-oss/inv-upstream-b/node_modules/vitest/vitest.mjs run --config config/vitest.config.ts --reporter=default --reporter=/Users/fabolivar/Projects/orca-oss/inv-upstream-b/config/scripts/vitest-hang-journal-reporter.mjs
+
+worker handles (SIGUSR2 replies follow; a synchronously blocked worker cannot answer):
+==============================
+[orca-hang-watchdog] vitest main pid=72947 activeResources=["PipeWrap","PipeWrap","PipeWrap","PipeWrap","PipeWrap","PipeWrap","ProcessWrap"]

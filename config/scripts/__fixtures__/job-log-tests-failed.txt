@@ -1,0 +1,36 @@
+T05:54:20.8434277Z  [32m✓[39m src/renderer/src/components/settings/sparse-preset-date.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+2026-08-18T05:54:20.8761550Z  [32m✓[39m src/renderer/src/components/editor/RichMarkdownSlashMenu.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 21[2mms[22m[39m
+2026-08-18T05:54:21.0383628Z  [32m✓[39m src/cli/flags.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-08-18T05:54:21.0555915Z  [32m✓[39m src/shared/jira-view-mode.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+2026-08-18T05:54:21.2512600Z  [32m✓[39m src/renderer/src/components/ui/color-picker.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 29[2mms[22m[39m
+2026-08-18T05:54:21.2684137Z 
+2026-08-18T05:54:21.2705607Z [2m Test Files [22m [1m[32m302 passed[39m[22m[90m (302)[39m
+2026-08-18T05:54:21.2754934Z [2m      Tests [22m [1m[32m3482 passed[39m[22m[2m | [22m[33m6 skipped[39m[90m (3488)[39m
+2026-08-18T05:54:21.2755620Z [2m   Start at [22m 05:52:56
+2026-08-18T05:54:21.2760827Z [2m   Duration [22m 85.23s[2m (transform 31.24s, setup 1.90s, import 100.28s, tests 95.15s, environment 8.83s)[22m
+2026-08-18T05:54:21.2762990Z 
+2026-08-18T05:54:21.4831612Z Post job cleanup.
+2026-08-18T05:54:21.4835989Z ##[start-action display=Setup requested Node.js;id=__5f126cf9-99dc-45ef-9849-80ee9ebe0c46.__actions_setup-node_2]
+2026-08-18T05:54:21.4873060Z Post job cleanup.
+2026-08-18T05:54:21.6060737Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-b04cc3cd3973a73868fb9f0e2265fe2c62b4e09edb66bfa6d4417e62b4b35c83, not saving cache.
+2026-08-18T05:54:21.6112539Z ##[end-action id=__5f126cf9-99dc-45ef-9849-80ee9ebe0c46.__actions_setup-node_2;outcome=success;conclusion=success;duration_ms=127]
+2026-08-18T05:54:21.6115070Z ##[start-action display=Setup pnpm;id=__5f126cf9-99dc-45ef-9849-80ee9ebe0c46.__pnpm_action-setup]
+2026-08-18T05:54:21.6146616Z Post job cleanup.
+2026-08-18T05:54:21.7512371Z Pruning is unnecessary.
+2026-08-18T05:54:21.7607852Z ##[end-action id=__5f126cf9-99dc-45ef-9849-80ee9ebe0c46.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=149]
+2026-08-18T05:54:21.7702168Z Post job cleanup.
+2026-08-18T05:54:21.8708595Z [command]/usr/bin/git version
+2026-08-18T05:54:21.8748818Z git version 2.54.0
+2026-08-18T05:54:21.8784516Z Temporarily overriding HOME='/home/runner/work/_temp/88843421-86cb-4e6c-8afe-15a30d8041f2' before making global git config changes
+2026-08-18T05:54:21.8785933Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-18T05:54:21.8790429Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/orca-oss/orca-oss
+2026-08-18T05:54:21.8825518Z Removing SSH command configuration
+2026-08-18T05:54:21.8832459Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-18T05:54:21.8867232Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-18T05:54:21.9084691Z Removing HTTP extra header
+2026-08-18T05:54:21.9090593Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-18T05:54:21.9124967Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-18T05:54:21.9357301Z Removing includeIf entries pointing to credentials config files
+2026-08-18T05:54:21.9368228Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-18T05:54:21.9403690Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-18T05:54:21.9818823Z Cleaning up orphan processes

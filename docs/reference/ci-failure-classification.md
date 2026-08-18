@@ -12,7 +12,8 @@ summary page. **The goal is that a red check says why it is red without opening 
 
 ## The classes and the signal behind each
 
-`GET /actions/runs/{run_id}` and `GET /actions/runs/{run_id}/jobs` are the only inputs. Neither
+`GET /actions/runs/{run_id}` and `GET /actions/runs/{run_id}/jobs` are the inputs for every
+class but one; `hang` also needs the job's log, fetched for failed jobs only (see below). Neither
 carries `timeout-minutes`, so the cap comes from the workflow YAML in the checkout
 (`config/scripts/ci-workflow-job-definitions.mjs` matches an API job name back to the job that
 declared it).
@@ -23,6 +24,7 @@ declared it).
 | `cancelled-by-run`       | `job.conclusion == "cancelled"` and `run.conclusion == "cancelled"`                           | none — a superseding push or a manual cancel       |
 | `cancelled-by-fail-fast` | `job.conclusion == "cancelled"` and a matrix sibling reported `failure` within 120s before it | none — **a cancelled shard is not a failed shard** |
 | `setup-failed`           | `job.conclusion == "failure"`, and a later executable step is `skipped`                       | the named step failed; the job's work never ran    |
+| `hang`                   | would be `tests-failed`, **and** the job log carries the watchdog's `===== orca hang watchdog =====` block | budget — a test file wedged, no test failed |
 | `tests-failed`           | `job.conclusion == "failure"`, and no later step was skipped                                  | code — the work step ran to completion and failed  |
 | `gate-failed`            | `job.conclusion == "failure"` and the job is a declared gate (`--gate-job`)                   | none — it failed because a job it needs did        |
 | `dependency-skipped`     | `job.conclusion == "skipped"`                                                                 | none — an `if` or a dependency kept it out         |
@@ -61,6 +63,25 @@ runner kills the job a few seconds past the cap.
   check links to — above the job list, with no log opened. Annotations ride along for the classes
   worth a badge.
 
+## Why `hang` needs the log, and what bounds the cost
+
+The hang watchdog (`config/scripts/run-vitest-with-hang-watchdog.mjs`, ORCA-257) kills a wedged
+shard and exits `124`, so the job reports `failure` — the same conclusion, the same step shape,
+as a red test. Nothing in the jobs API separates them, which sent triage looking for a spec that
+does not exist (ORCA-263).
+
+Both distinguishing signals live in the log: the `::error title=Vitest hang::` annotation with
+its `===== orca hang watchdog =====` block, and the step's exit code `124`. The block is what the
+class keys on — any step may exit `124` for its own reasons, so the code alone would over-claim.
+The marker strings are exported from `config/scripts/vitest-hang-marker.mjs` and imported by both
+the watchdog that writes them and the classifier that reads them, so a rename cannot silently
+retire the detection.
+
+Cost is bounded twice over: the workflow fetches a log only for jobs whose conclusion is
+`failure`, and the classifier asks for one only when the API signals already say `tests-failed`.
+A green run reads no logs at all. `classifyRunJobs` still performs no I/O of its own — the caller
+passes a `readJobLog` function, so classification stays reproducible off saved payloads.
+
 ## What is not covered
 
 - `e2e.yml` on its `schedule` and `workflow_dispatch` triggers produces its own runs, which have
@@ -73,6 +94,8 @@ runner kills the job a few seconds past the cap.
   `cancel-in-progress` concurrency cancels the reporter along with everything else. It exists so
   a `cancelled` job can never be called a `timeout` when the run itself was cancelled, and it is
   exercised by the run `31663317660` fixture — not because you will see it printed here.
+- A hang in a job whose log has expired or could not be fetched falls back to `tests-failed`.
+  The classifier keeps the API answer rather than guessing when the log is missing.
 - The reporter never gates. `verify` remains the merge gate and is untouched.
 
 ## Keeping it from degrading
