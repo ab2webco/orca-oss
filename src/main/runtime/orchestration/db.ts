@@ -1883,12 +1883,27 @@ export class OrchestrationDb {
     return { terminalHandle: params.terminalHandle, paneKey: params.paneKey }
   }
 
+  // Why: caller-side fence jurisdiction. Widening this fences more callers, so keep it narrow.
   isLegacyCoordinatorHandle(runId: string, terminalHandle: string): boolean {
     const principal = this.getLegacyCoordinatorPrincipal(runId)
     if (principal) {
       return principal.terminal_handle === terminalHandle
     }
     return this.getUniqueLegacyCoordinatorHandle(runId) === terminalHandle
+  }
+
+  // Why: recipient-side permit for legacy lifecycle mail. After a takeover revokes the old principal
+  // the replacement coordinator is only reachable through the Run binding.
+  isLegacyCoordinatorDeliveryTarget(runId: string, terminalHandle: string): boolean {
+    if (this.isLegacyCoordinatorHandle(runId, terminalHandle)) {
+      return true
+    }
+    if (this.getRunRaw(runId)?.coordinator_handle !== terminalHandle) {
+      return false
+    }
+    // Why: must match resolveLegacyWorkerCoordinatorDelivery's takeover test. A still-committed
+    // principal routes legacy_direct to this handle, and no reader can see that mailbox.
+    return this.getLegacyCoordinatorPrincipal(runId)?.status !== 'committed'
   }
 
   findLegacyWorkerCompletion(params: {
@@ -3898,8 +3913,6 @@ export class OrchestrationDb {
     }
     const id = generateId('task')
     const depsJson = JSON.stringify(task.deps ?? [])
-    const hasDeps = (task.deps ?? []).length > 0
-    const status: TaskStatus = hasDeps ? 'pending' : 'ready'
     const display = buildOrchestrationTaskDisplayMetadata({
       spec: task.spec,
       taskTitle: task.taskTitle,
@@ -3911,7 +3924,18 @@ export class OrchestrationDb {
            id, run_id, parent_id, created_by_terminal_handle, created_by_pane_key,
            created_by_process_incarnation, created_by_run_generation,
            task_title, display_name, spec, status, deps
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           CASE WHEN EXISTS (
+             SELECT 1
+             FROM json_each(?) requested
+             LEFT JOIN tasks dependency ON dependency.id = requested.value
+             WHERE dependency.id IS NULL
+                OR dependency.run_id <> ?
+                OR dependency.status <> 'completed'
+           ) THEN 'pending' ELSE 'ready' END,
+           ?
+         )`
       )
       .run(
         id,
@@ -3924,7 +3948,8 @@ export class OrchestrationDb {
         display.taskTitle || null,
         display.displayName || null,
         task.spec,
-        status,
+        depsJson,
+        runId,
         depsJson
       )
     return this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as TaskRow
