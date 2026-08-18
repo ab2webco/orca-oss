@@ -1,4 +1,4 @@
-import { lstat, mkdir, rename, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdir, realpath, rename, rm, symlink } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 
 export function canonicalSkillPath(home: string, name: string): string {
@@ -31,11 +31,15 @@ export async function linkProviderAliasToCanonical(
   }
   const parent = dirname(targetPath)
   await mkdir(parent, { recursive: true })
-  await symlink(
-    process.platform === 'win32' ? canonicalPath : relative(parent, canonicalPath),
-    targetPath,
-    process.platform === 'win32' ? 'junction' : 'dir'
-  )
+  if (process.platform === 'win32') {
+    await symlink(canonicalPath, targetPath, 'junction')
+    return
+  }
+  // Why: a provider skills root is often itself a symlink, and the kernel resolves a
+  // relative link against the physical directory — counting `../` from the logical path
+  // walks off the filesystem root. Only this end needs resolving: the canonical stays as
+  // written so the link keeps following whatever indirection the user put under `~`.
+  await symlink(relative(await realpath(parent), canonicalPath), targetPath, 'dir')
 }
 
 /**
