@@ -228,10 +228,10 @@ jobs:
       build_ref: ${{ steps.push.outputs.build_ref }}
       prev: ${{ steps.push.outputs.prev }}
     steps:
-      - name: Checkout the commit the gate verified
+      - name: Checkout main
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve.outputs.sha }}
+          ref: main
           fetch-depth: 0
 
       # Why: `concurrency` serializes releases but does not stop a human push, and
@@ -240,8 +240,7 @@ jobs:
         env:
           VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
-          git fetch origin main
-          head="$(git rev-parse origin/main)"
+          head="$(git rev-parse HEAD)"
           if [[ "$head" != "$VERIFIED_SHA" ]]; then
             echo "main moved to $head after the gate verified $VERIFIED_SHA" >&2
             exit 1

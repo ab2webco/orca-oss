@@ -70,13 +70,16 @@ describe('the lab release signal gate', () => {
     expect(release.jobs.gate_tests['timeout-minutes']).toBe(pr.jobs.test['timeout-minutes'])
   })
 
-  it('verifies and builds one pinned commit rather than resolving main twice', () => {
+  it('verifies the one pinned commit and refuses to release past it', () => {
     const pinned = '${{ needs.resolve.outputs.sha }}'
     expect(release.jobs.gate_static.steps[0].with.ref).toBe(pinned)
     expect(release.jobs.gate_tests.steps[0].with.ref).toBe(pinned)
-    expect(release.jobs.version.steps[0].with.ref).toBe(pinned)
-    // Concurrency serializes releases but does not stop a human push.
-    expect(release.jobs.version.steps[1].run).toContain('git rev-parse origin/main')
+    // Concurrency serializes releases but does not stop a human push, so the
+    // build refuses rather than bumping on top of an unverified commit.
+    const guard = release.jobs.version.steps[1]
+    expect(guard.env.VERIFIED_SHA).toBe(pinned)
+    expect(guard.run).toContain('git rev-parse HEAD')
+    expect(guard.run).toContain('exit 1')
   })
 
   it('skips the gate only on a dry run or an explicit request', () => {
