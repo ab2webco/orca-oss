@@ -340,7 +340,12 @@ jobs:
 
       # Why: this is the release-path proof that the deployed Linux relay keeps
       # its PTY and explorer live across a real watcher SIGSEGV.
+      # Why the per-suite output file: both suites in this job share one config, so
+      # they resolve the same `outputFile` and the second overwrites the first —
+      # uploading that reports one suite while reading as the whole job (ORCA-266).
       - name: Run Docker SSH watcher isolation E2E
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/e2e-report-ssh-docker-watcher-isolation.json
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker-watcher-isolation
 
       # Why always(): these specs gate the C1 terminal parking/retention budget
@@ -348,7 +353,21 @@ jobs:
       # failure above must not silently skip them.
       - name: Run Docker SSH terminal parking + retention E2E
         if: always()
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/e2e-report-ssh-docker-terminal-parking.json
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker-terminal-parking
+
+      # Why the repo-root path: PLAYWRIGHT_JSON_OUTPUT_FILE resolves against cwd,
+      # while the config's own outputFile resolves against tests/ — so these two
+      # land beside the checkout, not under tests/test-results.
+      - name: Upload SSH docker E2E JSON reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-ssh-docker-attempt-${{ github.run_attempt }}
+          path: test-results/e2e-report-ssh-docker-*.json
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload watcher isolation traces
         if: failure()
