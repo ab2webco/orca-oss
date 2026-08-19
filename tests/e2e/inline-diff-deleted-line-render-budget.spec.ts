@@ -2,7 +2,10 @@ import { rmSync, writeFileSync } from 'node:fs'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { addAndActivateIsolatedRepo } from './helpers/isolated-diff-repo-activation'
+import {
+  addAndActivateIsolatedRepo,
+  evaluateThroughContextSwaps
+} from './helpers/isolated-diff-repo-activation'
 import {
   buildRevisionedSourceFile,
   createIsolatedRevisionedFileRepo
@@ -29,27 +32,37 @@ async function openDiffAndObserve(
   absolutePath: string,
   relativePath: string
 ): Promise<DiffRenderObservation> {
-  await page.evaluate(
-    ({ wId, filePath, relPath }) => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('window.__store is not available')
-      }
-      store.getState().openDiff(wId, filePath, relPath, 'typescript', false)
-    },
-    { wId: worktreeId, filePath: absolutePath, relPath: relativePath }
+  await evaluateThroughContextSwaps(
+    page,
+    () =>
+      page.evaluate(
+        ({ wId, filePath, relPath }) => {
+          const store = window.__store
+          if (!store) {
+            throw new Error('window.__store is not available')
+          }
+          store.getState().openDiff(wId, filePath, relPath, 'typescript', false)
+        },
+        { wId: worktreeId, filePath: absolutePath, relPath: relativePath }
+      ),
+    'opening the diff'
   )
 
   const read = (): Promise<DiffRenderObservation> =>
-    page.evaluate(() => ({
-      layout:
-        document
-          .querySelector('[data-diff-render-layout]')
-          ?.getAttribute('data-diff-render-layout') ?? '',
-      editors: document.querySelectorAll('.monaco-diff-editor').length,
-      viewLines: document.querySelectorAll('.monaco-diff-editor .view-line').length,
-      deletedZones: document.querySelectorAll('.monaco-diff-editor .line-delete').length
-    }))
+    evaluateThroughContextSwaps(
+      page,
+      () =>
+        page.evaluate(() => ({
+          layout:
+            document
+              .querySelector('[data-diff-render-layout]')
+              ?.getAttribute('data-diff-render-layout') ?? '',
+          editors: document.querySelectorAll('.monaco-diff-editor').length,
+          viewLines: document.querySelectorAll('.monaco-diff-editor .view-line').length,
+          deletedZones: document.querySelectorAll('.monaco-diff-editor .line-delete').length
+        })),
+      'reading the diff render layout'
+    )
 
   await expect
     .poll(async () => (await read()).editors, {
