@@ -24,6 +24,7 @@ import { classifyClaudeOAuthUsageError } from './claude-usage-error-classificati
 import { resolveManagedClaudeAccountIdFromConfigDir } from '../claude-accounts/managed-config-dir-account'
 import { getClaudeManagedAccountsRoot } from '../claude-accounts/managed-auth-path'
 import { mapClaudeUsageWindow } from './claude-usage-window'
+import { findUnresetExhaustedWindow } from '../../shared/rate-limit-exhausted-window'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
@@ -688,9 +689,11 @@ export class RateLimitService {
   ): Promise<RateLimitState> {
     const nextTarget = normalizeClaudeAccountSelectionTarget(target)
     // Why: snapshot the outgoing account's usage before clearing so the switcher's inline bars can show last-known data immediately.
+    // Why session-or-weekly: a weekly-exhausted account can report no session window, and
+    // gating on session alone dropped exactly the snapshot the auto-switch needs (as in Codex).
     if (
       outgoingAccountId &&
-      this.state.claude?.session &&
+      (this.state.claude?.session || this.state.claude?.weekly) &&
       this.isSameClaudeTarget(this.claudeFetchTarget, nextTarget)
     ) {
       this.inactiveClaudeCache.set(outgoingAccountId, this.state.claude)
@@ -2616,11 +2619,16 @@ export class RateLimitService {
     }
 
     // Previous data is too old — don't show stale data
+    const now = Date.now()
     const staleThresholdMs =
       fresh.usageMetadata?.failureKind === 'rate-limited'
         ? RATE_LIMITED_STALE_THRESHOLD_MS
         : STALE_THRESHOLD_MS
-    if (Date.now() - previous.updatedAt > staleThresholdMs) {
+    // Why an exhausted window outlives the threshold: "weekly hit 100%, resets Thursday"
+    // stays true for days, and dropping it left the one account that cannot be re-measured
+    // — a live terminal defers its own account's refresh — with no quota at all, so the
+    // auto-switch had nothing to decide on. It ages out as soon as that reset passes.
+    if (now - previous.updatedAt > staleThresholdMs && !findUnresetExhaustedWindow(previous, now)) {
       return fresh
     }
 
