@@ -444,6 +444,46 @@ describe('runAgentRateLimitAutoSwitch — existing switch flow', () => {
     expect(onRelaunchStarting).not.toHaveBeenCalled()
   })
 
+  it("switches when the PTY owner's retained snapshot is exhausted and unreset", async () => {
+    api.claudeAccounts.getLivePtyAccount.mockResolvedValue({
+      accountId: 'active-1',
+      injected: false
+    })
+    api.claudeAccounts.list.mockResolvedValue(
+      claudeState([claudeAccount({ id: 'active-1' }), claudeAccount({ id: 'spare-1' })])
+    )
+    // Why: the account that hit its limit is the one whose refresh its own live terminal
+    // defers, so it can only ever present its last real measurement.
+    api.rateLimits.get.mockResolvedValue(
+      rateLimitState({
+        claude: {
+          ...usableLimits(100),
+          session: {
+            usedPercent: 100,
+            windowMinutes: 300,
+            resetsAt: Date.now() + 60 * 60 * 1000,
+            resetDescription: null
+          },
+          status: 'error',
+          error:
+            'Claude usage refresh is waiting for the live Claude terminal to rotate its credentials.',
+          usageMetadata: {
+            failureKind: 'deferred-by-live-session',
+            deferredByLiveClaudeSession: true
+          }
+        },
+        inactiveClaudeAccounts: [
+          { accountId: 'spare-1', rateLimits: usableLimits(10), updatedAt: 1, isFetching: false }
+        ]
+      })
+    )
+
+    const result = await runClaudeAutoSwitch()
+
+    expect(result).toEqual({ ok: true, agent: 'claude', accountLabel: 'spare-1@example.com' })
+    expect(stopForegroundAgent).toHaveBeenCalledOnce()
+  })
+
   it('switches to an Anthropic account with quota and resumes in the same PTY', async () => {
     const onRelaunchStarting = vi.fn()
     api.claudeAccounts.list.mockResolvedValue(

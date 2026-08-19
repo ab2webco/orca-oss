@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits, RateLimitState } from '../../../shared/rate-limit-types'
 import type {
   ClaudeRateLimitAccountsState,
@@ -486,5 +486,119 @@ describe('selectAutoSwitchAccount — accounts whose usage read failed', () => {
     )
 
     expect(result).toBeNull()
+  })
+})
+
+describe('assessSourceAccountQuota — quota retained while the live terminal defers the refresh', () => {
+  const NOW = Date.UTC(2026, 7, 19, 12, 0, 0)
+  const HOUR_MS = 60 * 60 * 1000
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** The snapshot applyStalePolicy keeps when an account's own live terminal defers its refresh. */
+  function deferredLimits(weeklyPercent: number, weeklyResetsAt: number): ProviderRateLimits {
+    return {
+      provider: 'claude',
+      session: {
+        usedPercent: 12,
+        windowMinutes: 300,
+        resetsAt: NOW + HOUR_MS,
+        resetDescription: null
+      },
+      weekly: {
+        usedPercent: weeklyPercent,
+        windowMinutes: 10080,
+        resetsAt: weeklyResetsAt,
+        resetDescription: null
+      },
+      updatedAt: NOW - 2 * HOUR_MS,
+      error:
+        'Claude usage refresh is waiting for the live Claude terminal to rotate its credentials.',
+      status: 'error',
+      usageMetadata: {
+        failureKind: 'deferred-by-live-session',
+        deferredByLiveClaudeSession: true
+      }
+    }
+  }
+
+  function assessGloballySelectedSource(
+    claude: ProviderRateLimits
+  ): ReturnType<typeof assessSourceAccountQuota> {
+    return assessSourceAccountQuota({
+      agent: 'claude',
+      target: { runtime: 'host', wslDistro: null },
+      sourceAccountId: 'source',
+      verifiedAfter: NOW,
+      accounts: {
+        claude: {
+          accounts: [claudeAccount('source'), claudeAccount('spare')],
+          activeAccountId: 'source',
+          activeAccountIdsByRuntime: { host: 'source', wsl: {} }
+        },
+        codex: emptyCodex,
+        rateLimits: rateLimitState({ claude })
+      }
+    })
+  }
+
+  function assessPinnedSource(
+    limits: ProviderRateLimits
+  ): ReturnType<typeof assessSourceAccountQuota> {
+    return assessSourceAccountQuota({
+      agent: 'claude',
+      target: { runtime: 'host', wslDistro: null },
+      sourceAccountId: 'source',
+      verifiedAfter: NOW,
+      accounts: {
+        claude: {
+          accounts: [claudeAccount('other'), claudeAccount('source')],
+          activeAccountId: 'other',
+          activeAccountIdsByRuntime: { host: 'other', wsl: {} }
+        },
+        codex: emptyCodex,
+        rateLimits: rateLimitState({
+          inactiveClaudeAccounts: [
+            {
+              accountId: 'source',
+              rateLimits: limits,
+              updatedAt: limits.updatedAt,
+              isFetching: false
+            }
+          ]
+        })
+      }
+    })
+  }
+
+  it('reports the exhausted account as exhausted even though its refresh failed', () => {
+    // Why this is the whole bug: the account that hit its weekly limit is the one whose
+    // refresh its own live terminal defers, so it never carries a fresh 100%.
+    expect(assessGloballySelectedSource(deferredLimits(100, NOW + 72 * HOUR_MS))).toBe('exhausted')
+  })
+
+  it('does not report a healthy account as exhausted on the same deferred read', () => {
+    expect(assessGloballySelectedSource(deferredLimits(3, NOW + 72 * HOUR_MS))).toBe('unknown')
+  })
+
+  it('stops trusting the retained 100% once its window has reset', () => {
+    expect(assessGloballySelectedSource(deferredLimits(100, NOW - HOUR_MS))).toBe('unknown')
+  })
+
+  it('reports a pinned account exhausted despite the retained snapshot predating this refresh', () => {
+    // Why the freshness requirement cannot apply here: this cycle did run and could not
+    // measure the account, so no snapshot can ever be newer than the refresh that failed.
+    expect(assessPinnedSource(deferredLimits(100, NOW + 72 * HOUR_MS))).toBe('exhausted')
+  })
+
+  it('keeps a pinned healthy account unknown rather than clearing it on stale data', () => {
+    expect(assessPinnedSource(deferredLimits(3, NOW + 72 * HOUR_MS))).toBe('unknown')
   })
 })

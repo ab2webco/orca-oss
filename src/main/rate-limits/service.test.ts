@@ -107,6 +107,37 @@ function okProvider(
   }
 }
 
+/** A weekly-only plan's snapshot: no session window, which is the exhausted shape here. */
+function weeklyClaudeProvider(usedPercent: number, resetsAt: number): ProviderRateLimits {
+  return {
+    provider: 'claude',
+    session: null,
+    weekly: {
+      usedPercent,
+      windowMinutes: 10080,
+      resetsAt,
+      resetDescription: null
+    },
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok'
+  }
+}
+
+/** The read the live Claude terminal defers because it owns the account's credentials. */
+function deferredClaudeProvider(): ProviderRateLimits {
+  return {
+    ...errorProvider(
+      'claude',
+      'Claude usage refresh is waiting for the live Claude terminal to rotate its credentials.'
+    ),
+    usageMetadata: {
+      failureKind: 'deferred-by-live-session',
+      deferredByLiveClaudeSession: true
+    }
+  }
+}
+
 function errorProvider(
   provider: ProviderRateLimits['provider'],
   message: string
@@ -668,6 +699,76 @@ describe('RateLimitService', () => {
       expect(claude?.status).toBe('error')
       expect(claude?.error).toBe('Claude usage is rate limited right now.')
       expect(claude?.session?.usedPercent).toBe(18)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a weekly exhaustion readable past the stale threshold until its window resets', async () => {
+    vi.useFakeTimers()
+    try {
+      const resetsAt = Date.now() + 72 * 60 * 60 * 1000
+      vi.mocked(fetchClaudeRateLimits)
+        .mockImplementationOnce(async () => weeklyClaudeProvider(100, resetsAt))
+        .mockImplementation(async () => deferredClaudeProvider())
+      mockFreshBackgroundProviderFetches()
+
+      const service = new RateLimitService()
+
+      await service.refresh()
+      expect(service.getState().claude?.weekly?.usedPercent).toBe(100)
+
+      // Past the 30-minute threshold the snapshot would be dropped, leaving the account
+      // that cannot be re-measured with no quota at all — and nothing for the switch to read.
+      await vi.advanceTimersByTimeAsync(31 * 60 * 1000)
+      await service.refresh()
+
+      const claude = service.getState().claude
+      expect(claude?.status).toBe('error')
+      expect(claude?.weekly?.usedPercent).toBe(100)
+      expect(claude?.weekly?.resetsAt).toBe(resetsAt)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('still drops a healthy weekly snapshot past the stale threshold', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetchClaudeRateLimits)
+        .mockImplementationOnce(async () =>
+          weeklyClaudeProvider(60, Date.now() + 72 * 60 * 60 * 1000)
+        )
+        .mockImplementation(async () => deferredClaudeProvider())
+      mockFreshBackgroundProviderFetches()
+
+      const service = new RateLimitService()
+
+      await service.refresh()
+      await vi.advanceTimersByTimeAsync(31 * 60 * 1000)
+      await service.refresh()
+
+      expect(service.getState().claude?.weekly).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops the retained exhaustion once its reset has passed', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetchClaudeRateLimits)
+        .mockImplementationOnce(async () => weeklyClaudeProvider(100, Date.now() + 60 * 60 * 1000))
+        .mockImplementation(async () => deferredClaudeProvider())
+      mockFreshBackgroundProviderFetches()
+
+      const service = new RateLimitService()
+
+      await service.refresh()
+      await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000)
+      await service.refresh()
+
+      expect(service.getState().claude?.weekly).toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -1867,6 +1968,33 @@ describe('RateLimitService', () => {
 
     expect(service.getState().inactiveCodexAccounts).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ accountId: 'account-empty' })])
+    )
+  })
+
+  it('caches an outgoing weekly-exhausted Claude account that reports no session window', async () => {
+    const service = new RateLimitService()
+    service.setInactiveClaudeAccountsResolver(() => [
+      { id: 'account-weekly', managedAuthPath: '/tmp/account-weekly/auth' }
+    ])
+
+    vi.mocked(fetchClaudeRateLimits)
+      .mockResolvedValueOnce(weeklyClaudeProvider(100, Date.now() + 72 * 60 * 60 * 1000))
+      .mockResolvedValueOnce(okProvider('claude', 10, Date.now()))
+    vi.mocked(fetchCodexRateLimits).mockResolvedValueOnce(okProvider('codex', 20, Date.now()))
+
+    await service.refresh()
+    await service.refreshForClaudeAccountChange('account-weekly')
+
+    expect(service.getState().inactiveClaudeAccounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountId: 'account-weekly',
+          rateLimits: expect.objectContaining({
+            session: null,
+            weekly: expect.objectContaining({ usedPercent: 100 })
+          })
+        })
+      ])
     )
   })
 

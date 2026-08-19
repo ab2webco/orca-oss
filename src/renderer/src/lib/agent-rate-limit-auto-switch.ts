@@ -2,10 +2,14 @@ import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-
 import type {
   InactiveAccountUsage,
   ProviderRateLimits,
-  RateLimitWindow,
   RateLimitRuntimeTarget,
   RateLimitState
 } from '../../../shared/rate-limit-types'
+import {
+  EXHAUSTED_USED_PERCENT,
+  findUnresetExhaustedWindow,
+  getAccountQuotaWindows
+} from '../../../shared/rate-limit-exhausted-window'
 import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
@@ -114,17 +118,14 @@ function getUsageScore(
   if (limits.usageMetadata?.failureKind === 'missing-credentials') {
     return null
   }
-  const windows = [
-    limits.session,
-    limits.weekly,
-    limits.monthly ?? null,
-    ...(limits.buckets ?? [])
-  ].filter((window): window is RateLimitWindow => window !== null)
+  const windows = getAccountQuotaWindows(limits)
   if (windows.length === 0) {
     return null
   }
   const usedPercent = Math.max(...windows.map((window) => window.usedPercent))
-  return usedPercent < 100 ? { usedPercent, fresh: limits.status === 'ok' } : null
+  return usedPercent < EXHAUSTED_USED_PERCENT
+    ? { usedPercent, fresh: limits.status === 'ok' }
+    : null
 }
 
 /** Indexes only usable inactive accounts; exhausted or unreadable ones are omitted. */
@@ -202,20 +203,27 @@ export function selectAutoSwitchAccount(args: {
   return candidates[0] ?? null
 }
 
-function assessKnownQuota(limits: ProviderRateLimits | null | undefined): SourceQuotaAssessment {
-  if (!limits || limits.status !== 'ok') {
+function assessKnownQuota(
+  limits: ProviderRateLimits | null | undefined,
+  now: number
+): SourceQuotaAssessment {
+  if (!limits) {
     return 'unknown'
   }
-  const windows = [
-    limits.session,
-    limits.weekly,
-    limits.monthly ?? null,
-    ...(limits.buckets ?? [])
-  ].filter((window): window is RateLimitWindow => window !== null)
+  if (limits.status !== 'ok') {
+    // Why only this direction: a retained sub-100 reading cannot prove the account
+    // still has quota — it may have hit the limit since — so it stays 'unknown'.
+    return limits.status === 'error' && findUnresetExhaustedWindow(limits, now) !== null
+      ? 'exhausted'
+      : 'unknown'
+  }
+  const windows = getAccountQuotaWindows(limits)
   if (windows.length === 0) {
     return 'unknown'
   }
-  return Math.max(...windows.map((window) => window.usedPercent)) >= 100 ? 'exhausted' : 'available'
+  return Math.max(...windows.map((window) => window.usedPercent)) >= EXHAUSTED_USED_PERCENT
+    ? 'exhausted'
+    : 'available'
 }
 
 /** Validates the quota attached to the exact account that owns the PTY. */
@@ -226,11 +234,13 @@ export function assessSourceAccountQuota(args: {
   sourceAccountId: string | null
   verifiedAfter?: number
 }): SourceQuotaAssessment {
+  const now = Date.now()
   const providerAccounts = args.agent === 'claude' ? args.accounts.claude : args.accounts.codex
   const activeAccountId = getActiveAccountId(providerAccounts, args.target)
   if (activeAccountId === args.sourceAccountId) {
     return assessKnownQuota(
-      args.agent === 'claude' ? args.accounts.rateLimits.claude : args.accounts.rateLimits.codex
+      args.agent === 'claude' ? args.accounts.rateLimits.claude : args.accounts.rateLimits.codex,
+      now
     )
   }
   const inactive =
@@ -241,10 +251,18 @@ export function assessSourceAccountQuota(args: {
   if (
     !sourceUsage ||
     sourceUsage.isFetching ||
-    sourceUsage.updatedAt !== sourceUsage.rateLimits?.updatedAt ||
-    sourceUsage.updatedAt < (args.verifiedAfter ?? Number.NEGATIVE_INFINITY)
+    sourceUsage.updatedAt !== sourceUsage.rateLimits?.updatedAt
   ) {
     return 'unknown'
   }
-  return assessKnownQuota(sourceUsage.rateLimits)
+  if (sourceUsage.updatedAt < (args.verifiedAfter ?? Number.NEGATIVE_INFINITY)) {
+    // Why the freshness requirement is waived only for a failed read: this cycle's
+    // refresh did run and could not measure this account, so "measured after we
+    // asked" is unsatisfiable and the unreset window is the only evidence there is.
+    return sourceUsage.rateLimits.status === 'error' &&
+      findUnresetExhaustedWindow(sourceUsage.rateLimits, now) !== null
+      ? 'exhausted'
+      : 'unknown'
+  }
+  return assessKnownQuota(sourceUsage.rateLimits, now)
 }
