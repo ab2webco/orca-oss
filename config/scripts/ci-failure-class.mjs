@@ -8,11 +8,14 @@
  * Signal-per-class table: docs/reference/ci-failure-classification.md.
  */
 
+import { detectVitestHangInLog } from './vitest-hang-marker.mjs'
+
 export const CI_FAILURE_CLASS = Object.freeze({
   TIMEOUT: 'timeout',
   CANCELLED_BY_RUN: 'cancelled-by-run',
   CANCELLED_BY_FAIL_FAST: 'cancelled-by-fail-fast',
   SETUP_FAILED: 'setup-failed',
+  HANG: 'hang',
   TESTS_FAILED: 'tests-failed',
   GATE_FAILED: 'gate-failed',
   DEPENDENCY_SKIPPED: 'dependency-skipped',
@@ -29,6 +32,7 @@ export const CI_FAILURE_TRIAGE = Object.freeze({
   [CI_FAILURE_CLASS.CANCELLED_BY_RUN]: 'none',
   [CI_FAILURE_CLASS.CANCELLED_BY_FAIL_FAST]: 'none',
   [CI_FAILURE_CLASS.SETUP_FAILED]: 'setup',
+  [CI_FAILURE_CLASS.HANG]: 'budget',
   [CI_FAILURE_CLASS.TESTS_FAILED]: 'code',
   [CI_FAILURE_CLASS.GATE_FAILED]: 'none',
   [CI_FAILURE_CLASS.DEPENDENCY_SKIPPED]: 'none',
@@ -150,6 +154,48 @@ function classifyFailedJob(job) {
   }
 }
 
+/**
+ * A watchdog-killed job exits non-zero, so the jobs API reports `failure` and it
+ * is shaped exactly like a red test. Only the log separates them (ORCA-263).
+ *
+ * @param {object} outcome the API-only classification
+ * @param {object} job
+ * @param {((job: object) => string|null)|null} readJobLog
+ */
+function reclassifyHangFromLog(outcome, job, readJobLog) {
+  if (!readJobLog || outcome.failureClass !== CI_FAILURE_CLASS.TESTS_FAILED) {
+    return outcome
+  }
+  let log = null
+  try {
+    log = readJobLog(job)
+  } catch {
+    log = null
+  }
+  // Why say it instead of falling through quietly: without a log this class cannot
+  // be asserted, and a silent `tests-failed` is the ORCA-263 bug on the error path.
+  if (!log) {
+    return {
+      ...outcome,
+      evidence: `${outcome.evidence} — no job log was captured, so the hang check did not run`,
+      hangCheckSkipped: true
+    }
+  }
+  const detection = detectVitestHangInLog(log)
+  if (!detection.hang) {
+    return outcome
+  }
+  const named = detection.module ? `, wedged on ${detection.module}` : ''
+  const silence =
+    detection.silenceSeconds === null ? '' : ` after ${detection.silenceSeconds}s of silence`
+  return {
+    failureClass: CI_FAILURE_CLASS.HANG,
+    evidence: `the hang watchdog killed step "${outcome.step ?? 'unknown'}"${silence}${named}`,
+    ...(outcome.step ? { step: outcome.step } : {}),
+    ...(detection.module ? { wedgedModule: detection.module } : {})
+  }
+}
+
 function classifyOneJob(job, context) {
   if (job.status !== 'completed') {
     return {
@@ -197,6 +243,8 @@ function classifyOneJob(job, context) {
  * @param {Array<string>} [input.gateJobNames] jobs that only echo other jobs' results
  * @param {Array<string>} [input.excludedJobNames] jobs to leave out entirely — the
  *   reporter is `in_progress` in its own API response and would report on itself
+ * @param {((job: object) => string|null)|null} [input.readJobLog] returns a job's raw log.
+ *   Called only for jobs the API signals classify as `tests-failed`.
  * @returns {Array<object>} one entry per job that is not `success`
  */
 export function classifyRunJobs({
@@ -204,7 +252,8 @@ export function classifyRunJobs({
   jobs,
   resolveJobDefinition,
   gateJobNames = [],
-  excludedJobNames = []
+  excludedJobNames = [],
+  readJobLog = null
 }) {
   const resolve = resolveJobDefinition ?? (() => null)
   const gates = new Set(gateJobNames)
@@ -234,12 +283,15 @@ export function classifyRunJobs({
     }
     const definition = definitions.get(job.id)
     const key = definition ? `${definition.workflowFile}#${definition.jobKey}` : null
-    const outcome = classifyOneJob(job, {
+    const apiOutcome = classifyOneJob(job, {
       runConclusion: run?.conclusion ?? null,
       timeoutMinutes: definition?.timeoutMinutes ?? null,
       siblings: (key && siblingsByKey.get(key)) || [],
       gateJobNames: gates
     })
+    // Only a tests-failed job can be hiding a hang, so at most one log is read
+    // per failing job and never for a run that is already green.
+    const outcome = reclassifyHangFromLog(apiOutcome, job, readJobLog)
     classified.push({
       id: job.id,
       name: job.name,

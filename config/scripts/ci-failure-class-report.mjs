@@ -10,6 +10,7 @@ const HEADLINE = {
   [CI_FAILURE_CLASS.CANCELLED_BY_RUN]: 'cancelled with the whole run — not a failure',
   [CI_FAILURE_CLASS.CANCELLED_BY_FAIL_FAST]: 'cancelled by another job — not a failure',
   [CI_FAILURE_CLASS.SETUP_FAILED]: 'a step failed before the tests ran',
+  [CI_FAILURE_CLASS.HANG]: 'a test file wedged — no test failed',
   [CI_FAILURE_CLASS.TESTS_FAILED]: 'a test failed',
   [CI_FAILURE_CLASS.GATE_FAILED]: 'failed because a job it depends on failed',
   [CI_FAILURE_CLASS.DEPENDENCY_SKIPPED]: 'never ran — a dependency kept it out',

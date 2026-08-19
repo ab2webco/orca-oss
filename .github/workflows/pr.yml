@@ -683,6 +683,25 @@ jobs:
           gh api --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]' \
             | jq -s '{jobs: .}' > "$RUNNER_TEMP/ci-jobs.json"
 
+      # Why only failed jobs: a watchdog kill and a red test are the same shape in
+      # the jobs API, and only the log separates them (ORCA-263). One request per
+      # failed job, none at all when the run is green.
+      - name: Capture logs for failed jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-job-logs"
+          jq -r '.jobs[] | select(.conclusion == "failure") | .id' "$RUNNER_TEMP/ci-jobs.json" \
+            | while read -r job_id; do
+                gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
+                  > "$RUNNER_TEMP/ci-job-logs/$job_id.txt" || true
+                # A failed request leaves the file empty, and an empty log reads as
+                # "no hang" — the same silent misclassification, on the error path.
+                [ -s "$RUNNER_TEMP/ci-job-logs/$job_id.txt" ] \
+                  || rm -f "$RUNNER_TEMP/ci-job-logs/$job_id.txt"
+              done
+
       # Why the job summary and annotations and not the check name: a job's name
       # is fixed when the workflow is parsed, so it cannot carry a class decided
       # at the end of the run. The summary renders on the run page — where a red
@@ -692,5 +711,6 @@ jobs:
           node config/scripts/report-ci-failure-classes.mjs \
             --run "$RUNNER_TEMP/ci-run.json" \
             --jobs "$RUNNER_TEMP/ci-jobs.json" \
+            --job-log-dir "$RUNNER_TEMP/ci-job-logs" \
             --gate-job verify \
             --exclude-job 'ci failure class'

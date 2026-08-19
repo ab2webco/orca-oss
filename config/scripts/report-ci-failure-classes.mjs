@@ -10,6 +10,7 @@
  */
 
 import { appendFileSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { classifyRunJobs } from './ci-failure-class.mjs'
 import { renderAnnotations, renderJobSummary } from './ci-failure-class-report.mjs'
@@ -18,7 +19,7 @@ import {
   createJobDefinitionResolver
 } from './ci-workflow-job-definitions.mjs'
 
-const SINGLE_VALUE_FLAGS = ['run', 'jobs', 'workflows', 'summary']
+const SINGLE_VALUE_FLAGS = ['run', 'jobs', 'workflows', 'summary', 'job-log-dir']
 const REPEATABLE_FLAGS = { 'gate-job': 'gateJobNames', 'exclude-job': 'excludedJobNames' }
 
 function parseArgs(argv) {
@@ -43,6 +44,8 @@ function parseArgs(argv) {
     }
     if (key in REPEATABLE_FLAGS) {
       options[REPEATABLE_FLAGS[key]].push(value)
+    } else if (key === 'job-log-dir') {
+      options.jobLogDir = value
     } else {
       options[key] = value
     }
@@ -52,6 +55,15 @@ function parseArgs(argv) {
     throw new Error('Both --run and --jobs are required')
   }
   return options
+}
+
+/** Missing is normal: logs are captured only for jobs that failed. */
+function readJobLog(dir, jobId) {
+  try {
+    return readFileSync(join(dir, `${jobId}.txt`), 'utf8')
+  } catch {
+    return null
+  }
 }
 
 function readJson(path) {
@@ -72,7 +84,8 @@ function main() {
     jobs,
     resolveJobDefinition,
     gateJobNames: options.gateJobNames,
-    excludedJobNames: options.excludedJobNames
+    excludedJobNames: options.excludedJobNames,
+    readJobLog: options.jobLogDir ? (job) => readJobLog(options.jobLogDir, job.id) : null
   })
 
   for (const annotation of renderAnnotations(classified)) {
