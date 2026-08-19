@@ -29,6 +29,19 @@ on:
         required: false
         type: boolean
         default: false
+      skip_gate:
+        description: >-
+          Publish without the release signal gate. For a hotfix when CI itself is
+          down — never for a red suite. Requires skip_gate_reason, and both land
+          in the release notes.
+        required: false
+        type: boolean
+        default: false
+      skip_gate_reason:
+        description: Why the gate is being skipped. Recorded in the release notes.
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -38,10 +51,174 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version:
+  # Why its own job: every gate job and the build must agree on one commit.
+  # Resolving `main` per job would let a push land between them, verifying one
+  # tree and releasing another.
+  resolve:
+    name: resolve release commit
     # Why: gate to the fork so this workflow no-ops if the file ever reaches
     # upstream or another fork (mirrors release-cut.yml's canonical-repo guard).
     if: github.repository == 'ab2webco/orca-oss'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Pin the commit under release
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
+  # Why the gate re-runs the suite instead of reading an existing check: PR Checks
+  # is `pull_request`-only, so no commit on `main` — least of all the version-bump
+  # commit this workflow authors — ever carries one. The only signal that can be
+  # about the released tree is one produced against it.
+  gate_static:
+    name: release gate static analysis
+    needs: resolve
+    if: inputs.dry_run != true && inputs.skip_gate != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the commit under release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - run: pnpm typecheck
+
+      - run: pnpm run lint
+
+  gate_tests:
+    name: release gate tests ${{ matrix.shard }}/${{ matrix.shard_total }}
+    needs: resolve
+    if: inputs.dry_run != true && inputs.skip_gate != true
+    runs-on: ubuntu-latest
+    # Why 15: mirrors pr.yml's shard cap so a wedged shard reports as a failure
+    # instead of holding the release for the 6h default.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        shard_total: [16]
+
+    steps:
+      - name: Checkout the commit under release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
+
+      # Kept byte-identical to pr.yml's shard step; the parity is pinned by
+      # config/scripts/release-signal-gate-workflow.test.mjs.
+      - name: Test shard
+        run: |
+          node config/scripts/run-vitest-with-hang-watchdog.mjs --config config/vitest.config.ts \
+            --exclude=src/main/daemon/session-startup-command-gate-real-shell.test.ts \
+            --exclude=src/main/daemon/shell-ready.test.ts \
+            --exclude=src/main/daemon/node-pty-fd-leak.test.ts \
+            --exclude=src/main/providers/local-pty-shell-ready.test.ts \
+            --exclude=src/main/providers/__tests__/shell-ready-framework-example.test.ts \
+            --exclude=src/main/pty/omp-shell-wrapper.node-pty.test.ts \
+            --exclude=src/shared/posix-command-path-lookup.test.ts \
+            --exclude=tests/e2e/cross-version-wire/** \
+            --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+
+  gate:
+    name: release gate verdict
+    needs: [resolve, gate_static, gate_tests]
+    # Why always(): a skipped or failed gate job must reach the verdict, not
+    # cascade past it. The verdict itself is what refuses to publish.
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Why actions:read: the workflow default is contents:write only, and the jobs
+    # API this reads 403s without it.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reason: ${{ steps.decide.outputs.reason }}
+      headline: ${{ steps.decide.outputs.headline }}
+    steps:
+      # Why the workflow ref and not the release commit: the API reports a job by
+      # its rendered name, and only this run's own workflow file maps that name
+      # back to the job that declared it.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Capture this run's jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_PATH: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Why `|| true`: an unreadable API must reach the decision as "unknown",
+        # which refuses to publish, rather than as a step failure with no verdict.
+        run: |
+          gh api "$RUN_PATH" > "$RUNNER_TEMP/gate-run.json" || true
+          gh api --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]' \
+            | jq -s '{jobs: .}' > "$RUNNER_TEMP/gate-jobs.json" || true
+
+      # Why only failed jobs: a watchdog kill and a red test are the same shape in
+      # the jobs API, and only the log separates them (ORCA-263).
+      - name: Capture logs for failed gate jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/gate-job-logs"
+          jq -r '.jobs[]? | select(.conclusion == "failure") | .id' "$RUNNER_TEMP/gate-jobs.json" \
+            | while read -r job_id; do
+                gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
+                  > "$RUNNER_TEMP/gate-job-logs/$job_id.txt" || true
+                # An empty log reads as "no hang" — the same misclassification on
+                # the error path, so a failed fetch must leave no file at all.
+                [ -s "$RUNNER_TEMP/gate-job-logs/$job_id.txt" ] \
+                  || rm -f "$RUNNER_TEMP/gate-job-logs/$job_id.txt"
+              done
+
+      # Why the operator's text goes through env and never into the command line:
+      # it is arbitrary input and would otherwise be shell.
+      - name: Decide whether this release may publish
+        id: decide
+        env:
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+          SKIP_REASON: >-
+            ${{ inputs.dry_run && 'dry run — nothing is published' || inputs.skip_gate_reason }}
+        run: |
+          node config/scripts/decide-release-signal-gate.mjs \
+            --run "$RUNNER_TEMP/gate-run.json" \
+            --jobs "$RUNNER_TEMP/gate-jobs.json" \
+            --job-log-dir "$RUNNER_TEMP/gate-job-logs" \
+            --release-sha "$RELEASE_SHA" \
+            --verified-sha "$RELEASE_SHA" \
+            --signal-job gate_static \
+            --signal-job gate_tests \
+            --expected-jobs 17 \
+            ${{ inputs.release_candidate && '--release-candidate' || '' }} \
+            ${{ (inputs.dry_run || inputs.skip_gate) && '--skip-gate' || '' }} \
+            --skip-reason "$SKIP_REASON"
+
+  version:
+    needs: [resolve, gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -51,11 +228,24 @@ jobs:
       build_ref: ${{ steps.push.outputs.build_ref }}
       prev: ${{ steps.push.outputs.prev }}
     steps:
-      - name: Checkout main
+      - name: Checkout the commit the gate verified
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
+
+      # Why: `concurrency` serializes releases but does not stop a human push, and
+      # a bump built on top of an unverified commit would ship one.
+      - name: Refuse to release past the verified commit
+        env:
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          git fetch origin main
+          head="$(git rev-parse origin/main)"
+          if [[ "$head" != "$VERIFIED_SHA" ]]; then
+            echo "main moved to $head after the gate verified $VERIFIED_SHA" >&2
+            exit 1
+          fi
 
       - name: Configure git author
         run: |
@@ -122,8 +312,8 @@ jobs:
         id: push
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "Dry run — skipping bump/tag; building from main tip."
-            echo "build_ref=main" >>"$GITHUB_OUTPUT"
+            echo "Dry run — skipping bump/tag; building the resolved commit."
+            echo "build_ref=${{ needs.resolve.outputs.sha }}" >>"$GITHUB_OUTPUT"
             exit 0
           fi
           next="${{ steps.next.outputs.version }}"
@@ -293,7 +483,7 @@ jobs:
           pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish "$publish"
 
   finalize:
-    needs: [version, mac, linux, windows]
+    needs: [resolve, gate, version, mac, linux, windows]
     if: inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -306,6 +496,9 @@ jobs:
       - name: Set title, notes and Latest marker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+          GATE_REASON: ${{ needs.gate.outputs.reason }}
+          GATE_HEADLINE: ${{ needs.gate.outputs.headline }}
         run: |
           tag="${{ needs.version.outputs.tag }}"
           title="${{ needs.version.outputs.title }}"
@@ -327,6 +520,14 @@ jobs:
             echo "El build de macOS va firmado y notarizado con Developer ID, así que Gatekeeper lo abre sin pasos extra. Descarga el \`.dmg\` o deja que Orca se auto-actualice."
             echo
             echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
+            echo
+            echo "## Validación"
+            # The released tree is this commit plus the version string this workflow wrote.
+            echo "- Commit validado: \`${VERIFIED_SHA}\`"
+            echo "- Compuerta de señal: \`${GATE_REASON}\` — ${GATE_HEADLINE}"
+            if [[ "$GATE_REASON" == "gate-skipped" ]]; then
+              echo "- **Esta build salió sin la compuerta de tests.**"
+            fi
             if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
               echo
               echo "## Release candidate"
