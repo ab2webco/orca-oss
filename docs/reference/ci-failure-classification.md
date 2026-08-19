@@ -99,6 +99,12 @@ passes a `readJobLog` function, so classification stays reproducible off saved p
   than guessing — but it never asserts a red test on a log it did not read. The workflow
   deletes a zero-byte capture for the same reason: an empty log reads as "no hang".
 - The reporter never gates. `verify` remains the merge gate and is untouched.
+- One consumer does gate: `lab-release.yml`'s release signal gate classifies its own test jobs
+  with `classifyRunJobs` before publishing (`config/scripts/release-signal-gate.mjs`). It blocks
+  on every class, including `hang` and `timeout` — a run that did not finish cannot be read as
+  green, or an infra hiccup would disarm the gate. The classes are what its message names, and
+  the only place they change a verdict is a release candidate, which is not `--latest` and
+  announces to nobody.
 
 ## Keeping it from degrading
 
