@@ -20,6 +20,7 @@ import { installEditorSaveShortcut, installMonacoEditorFindShortcut } from './ed
 import { diffEditorScrollbarOptions } from './diff-editor-scrollbar-options'
 import { LargeDiffFallback } from './LargeDiffFallback'
 import { getLargeDiffRenderLimit } from './large-diff-render-limit'
+import { exceedsInlineDeletedLineBudget } from './inline-diff-deleted-line-budget'
 import { useDiffViewerLargeDiffLifecycle } from './useDiffViewerLargeDiffLifecycle'
 import { getDiffViewerLargeDiffSaveAction } from './diff-viewer-large-diff-save-action'
 import type { DiffViewerProps } from './diff-viewer-props'
@@ -27,6 +28,7 @@ import { buildDiffEditorWordWrapOptions } from './diff-editor-word-wrap-options'
 import { useDiffEditorRegistration } from './diff-navigation-context'
 import { preserveDiffViewStateAcrossModelSwaps } from './diff-model-swap-view-state'
 import { monacoFindOptions } from './monaco-find-options'
+import { useDiffViewerFirstDiffAutoScroll } from './useDiffViewerFirstDiffAutoScroll'
 
 export default function DiffViewer({
   modelKey,
@@ -86,6 +88,15 @@ export default function DiffViewer({
   const renderLimit = useMemo(
     () => largeDiffRenderLimit ?? getLargeDiffRenderLimit({ originalContent, modifiedContent }),
     [largeDiffRenderLimit, originalContent, modifiedContent]
+  )
+  // Why: inline rendering materializes DOM for every deleted line, so an
+  // over-budget diff renders side by side, which only renders the viewport.
+  const renderSideBySide = useMemo(
+    () =>
+      sideBySide ||
+      (!renderLimit.limited &&
+        exceedsInlineDeletedLineBudget({ originalContent, modifiedContent })),
+    [sideBySide, renderLimit.limited, originalContent, modifiedContent]
   )
   const hasLineCommentAction = Boolean(worktreeId || onAddLineComment)
 
@@ -154,68 +165,12 @@ export default function DiffViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modifiedEditor, popover?.lineNumber])
 
-  // Why: center the first diff from a dedicated effect (not handleMount) so it runs after the decorator's view zones, which would otherwise shift content downward.
-  const didAutoScrollFirstDiffRef = useRef(false)
-  const didAutoScrollModelKeyRef = useRef(modelKey)
-  useEffect(() => {
-    if (didAutoScrollModelKeyRef.current !== modelKey) {
-      didAutoScrollModelKeyRef.current = modelKey
-      // Why: reset the per-modelKey one-shot here before the first-diff guard runs for the new file.
-      didAutoScrollFirstDiffRef.current = false
-    }
-    const diffEditor = diffEditorRef.current
-    if (!diffEditor || !modifiedEditor) {
-      return
-    }
-    if (didAutoScrollFirstDiffRef.current) {
-      return
-    }
-    if (diffViewStateCache.get(modelKey)) {
-      return
-    }
-    if (pendingScrollForThisViewer) {
-      // Why: decorator owns this scroll, so set the one-shot flag; else we'd re-run and overwrite it when pendingScroll flips back to null.
-      didAutoScrollFirstDiffRef.current = true
-      return
-    }
-    let rafId: number | null = null
-    const run = (): void => {
-      if (didAutoScrollFirstDiffRef.current) {
-        return
-      }
-      const changes = diffEditor.getLineChanges()
-      if (!changes || changes.length === 0) {
-        return
-      }
-      const line = Math.max(1, changes[0].modifiedStartLineNumber)
-      // Defer one frame so view zones are laid out before measuring; cancel any earlier rAF to avoid a redundant scroll.
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId)
-      }
-      rafId = requestAnimationFrame(() => {
-        rafId = null
-        if (didAutoScrollFirstDiffRef.current || !modifiedEditor.getModel()) {
-          return
-        }
-        const top = modifiedEditor.getTopForLineNumber(line, true)
-        const editorHeight = modifiedEditor.getLayoutInfo().height
-        modifiedEditor.setPosition({ lineNumber: line, column: 1 })
-        modifiedEditor.setScrollTop(Math.max(0, top - editorHeight / 2))
-        didAutoScrollFirstDiffRef.current = true
-      })
-    }
-    // Run now if the diff is ready; otherwise onDidUpdateDiff fires once the computation lands.
-    if (diffEditor.getLineChanges()) {
-      run()
-    }
-    const sub = diffEditor.onDidUpdateDiff(() => run())
-    return () => {
-      sub.dispose()
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId)
-      }
-    }
-  }, [modifiedEditor, modelKey, pendingScrollForThisViewer])
+  useDiffViewerFirstDiffAutoScroll({
+    diffEditorRef,
+    modifiedEditor,
+    modelKey,
+    pendingScrollCommentId: pendingScrollForThisViewer
+  })
 
   const handleEnterLargeDiffFallback = useCallback(() => {
     // Why: on fallback transition, drop stale Monaco refs so decorators/save handlers don't talk to disposed UI.
@@ -290,7 +245,10 @@ export default function DiffViewer({
       diffEditorRef.current = diffEditor
       registerDiffEditor(diffEditor)
       lineNumberOptionsSubRef.current?.dispose()
-      lineNumberOptionsSubRef.current = applyDiffEditorLineNumberOptions(diffEditor, sideBySide)
+      lineNumberOptionsSubRef.current = applyDiffEditorLineNumberOptions(
+        diffEditor,
+        renderSideBySide
+      )
 
       const originalEditor = diffEditor.getOriginalEditor()
       const modifiedEditor = diffEditor.getModifiedEditor()
@@ -344,7 +302,15 @@ export default function DiffViewer({
         setPopover(null)
       })
     },
-    [editable, setupCopy, modelKey, filePath, sideBySide, registerDiffEditor, unregisterDiffEditor]
+    [
+      editable,
+      setupCopy,
+      modelKey,
+      filePath,
+      renderSideBySide,
+      registerDiffEditor,
+      unregisterDiffEditor
+    ]
   )
 
   // Why: snapshot view state on deactivation (layoutEffect cleanup fires before unmount), not on scroll.
@@ -366,16 +332,20 @@ export default function DiffViewer({
       return
     }
     lineNumberOptionsSubRef.current?.dispose()
-    lineNumberOptionsSubRef.current = applyDiffEditorLineNumberOptions(diffEditor, sideBySide)
+    lineNumberOptionsSubRef.current = applyDiffEditorLineNumberOptions(diffEditor, renderSideBySide)
     return () => {
       lineNumberOptionsSubRef.current?.dispose()
       lineNumberOptionsSubRef.current = null
     }
-  }, [sideBySide])
+  }, [renderSideBySide])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div ref={diffBodyRef} className="flex-1 min-h-0 relative">
+      <div
+        ref={diffBodyRef}
+        className="flex-1 min-h-0 relative"
+        data-diff-render-layout={renderSideBySide ? 'side-by-side' : 'inline'}
+      >
         {popover && hasLineCommentAction && !renderLimit.limited && (
           <DiffCommentPopover
             key={popover.lineNumber}
@@ -419,7 +389,7 @@ export default function DiffViewer({
             options={{
               readOnly: !editable,
               originalEditable: false,
-              renderSideBySide: sideBySide,
+              renderSideBySide,
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
               fontSize: diffEditorFontSize,
