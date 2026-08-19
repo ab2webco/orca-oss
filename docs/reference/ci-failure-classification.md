@@ -94,8 +94,10 @@ passes a `readJobLog` function, so classification stays reproducible off saved p
   `cancel-in-progress` concurrency cancels the reporter along with everything else. It exists so
   a `cancelled` job can never be called a `timeout` when the run itself was cancelled, and it is
   exercised by the run `31663317660` fixture — not because you will see it printed here.
-- A hang in a job whose log has expired or could not be fetched falls back to `tests-failed`.
-  The classifier keeps the API answer rather than guessing when the log is missing.
+- A hang in a job whose log has expired or could not be fetched falls back to `tests-failed`,
+  and the evidence says so (`hangCheckSkipped`). The classifier keeps the API answer rather
+  than guessing — but it never asserts a red test on a log it did not read. The workflow
+  deletes a zero-byte capture for the same reason: an empty log reads as "no hang".
 - The reporter never gates. `verify` remains the merge gate and is untouched.
 
 ## Keeping it from degrading

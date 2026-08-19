@@ -55,13 +55,16 @@ describe('detectVitestHangInLog', () => {
     expect(detectVitestHangInLog('##[error]Process completed with exit code 124.').hang).toBe(false)
   })
 
-  it('tolerates GitHub timestamp prefixes on every line', () => {
+  // Production never sees a bare block: `gh api .../jobs/<id>/logs` prefixes every
+  // line with an ISO timestamp, so this is the only shape that matters in CI.
+  it('reads the block through the timestamp prefix the jobs API adds', () => {
     const prefixed = HANG_LOG.split('\n')
-      .map((line) => `2026-08-18T19:07:00.1234567Z ${line}`)
+      .map((line) => `2026-08-18T23:17:44.2699610Z ${line}`)
       .join('\n')
-    expect(detectVitestHangInLog(prefixed).module).toContain(
-      'terminal-history-incremental-restore.test.ts'
-    )
+    const detection = detectVitestHangInLog(prefixed)
+    expect(detection.verdict).toBe('wedged-modules')
+    expect(detection.module).toBe('src/main/daemon/terminal-history-incremental-restore.test.ts')
+    expect(detection.phase).toBe('running')
   })
 
   it('reports absence rather than throwing when there is no log', () => {
@@ -88,12 +91,26 @@ describe('classifyRunJobs with job logs', () => {
     expect(classify(null).failureClass).toBe(CI_FAILURE_CLASS.TESTS_FAILED)
   })
 
-  it('keeps the API classification when the log cannot be read', () => {
-    const thrown = classify(() => {
-      throw new Error('log expired')
-    })
-    expect(thrown.failureClass).toBe(CI_FAILURE_CLASS.TESTS_FAILED)
-    expect(classify(() => null).failureClass).toBe(CI_FAILURE_CLASS.TESTS_FAILED)
+  // A failed `gh api` used to leave an empty file, which reads as "no hang" and
+  // asserted `tests-failed` with nothing behind it.
+  it('says the hang check did not run when the log is missing, empty or unreadable', () => {
+    for (const readJobLog of [
+      () => null,
+      () => '',
+      () => {
+        throw new Error('log expired')
+      }
+    ]) {
+      const outcome = classify(readJobLog)
+      expect(outcome.failureClass).toBe(CI_FAILURE_CLASS.TESTS_FAILED)
+      expect(outcome.hangCheckSkipped).toBe(true)
+      expect(outcome.evidence).toContain('no job log was captured')
+    }
+  })
+
+  it('does not claim the check was skipped when a real log was read', () => {
+    expect(classify(() => RED_TEST_LOG).hangCheckSkipped).toBeUndefined()
+    expect(classify(() => HANG_LOG).hangCheckSkipped).toBeUndefined()
   })
 
   it('reads at most one log, and only for a job the API called tests-failed', () => {

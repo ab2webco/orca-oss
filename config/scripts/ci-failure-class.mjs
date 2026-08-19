@@ -170,7 +170,16 @@ function reclassifyHangFromLog(outcome, job, readJobLog) {
   try {
     log = readJobLog(job)
   } catch {
-    return outcome
+    log = null
+  }
+  // Why say it instead of falling through quietly: without a log this class cannot
+  // be asserted, and a silent `tests-failed` is the ORCA-263 bug on the error path.
+  if (!log) {
+    return {
+      ...outcome,
+      evidence: `${outcome.evidence} — no job log was captured, so the hang check did not run`,
+      hangCheckSkipped: true
+    }
   }
   const detection = detectVitestHangInLog(log)
   if (!detection.hang) {

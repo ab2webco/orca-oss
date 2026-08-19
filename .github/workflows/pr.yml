@@ -696,6 +696,10 @@ jobs:
             | while read -r job_id; do
                 gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
                   > "$RUNNER_TEMP/ci-job-logs/$job_id.txt" || true
+                # A failed request leaves the file empty, and an empty log reads as
+                # "no hang" — the same silent misclassification, on the error path.
+                [ -s "$RUNNER_TEMP/ci-job-logs/$job_id.txt" ] \
+                  || rm -f "$RUNNER_TEMP/ci-job-logs/$job_id.txt"
               done
 
       # Why the job summary and annotations and not the check name: a job's name
