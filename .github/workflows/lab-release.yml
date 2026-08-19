@@ -179,7 +179,7 @@ jobs:
             | jq -s '{jobs: .}' > "$RUNNER_TEMP/gate-jobs.json" || true
 
       # Why only failed jobs: a watchdog kill and a red test are the same shape in
-      # the jobs API, and only the log separates them (ORCA-263).
+      # the jobs API, and only the log separates them.
       - name: Capture logs for failed gate jobs
         env:
           GH_TOKEN: ${{ github.token }}

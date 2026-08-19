@@ -5,7 +5,7 @@
  * Why a module and not shell in the workflow: the YAML cannot be tested, and the
  * one thing this must never do is read a run that did not finish as "green".
  * Failure classes come from ci-failure-class.mjs — a wedged shard and a red test
- * are the same `failure` in the jobs API (ORCA-263).
+ * are the same `failure` in the jobs API.
  */
 
 import { CI_FAILURE_CLASS } from './ci-failure-class.mjs'
