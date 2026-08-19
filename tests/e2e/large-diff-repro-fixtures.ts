@@ -35,6 +35,33 @@ export function createIsolatedLargeDiffRepo(): IsolatedLargeDiffRepo {
   return { repoPath, relativePath, absolutePath }
 }
 
+/** Same line count on both revisions, so `changedLineCount` is the deleted-line count a diff sees. */
+export function buildRevisionedSourceFile(lineCount: number, changedLineCount: number): string {
+  const lines: string[] = []
+  for (let i = 0; i < lineCount; i += 1) {
+    const revision = i < changedLineCount ? 'changed' : 'base'
+    lines.push(`export const revisionedValue${i} = '${revision} payload'`)
+  }
+  return `${lines.join('\n')}\n`
+}
+
+/** A committed multi-line file, so a rewrite of it produces real deleted lines. */
+export function createIsolatedRevisionedFileRepo(lineCount: number): IsolatedLargeDiffRepo {
+  const repoPath = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'orca-revisioned-diff-')))
+  runGit(repoPath, ['init'])
+  runGit(repoPath, ['config', 'user.email', 'e2e@test.local'])
+  runGit(repoPath, ['config', 'user.name', 'E2E Test'])
+
+  mkdirSync(path.join(repoPath, 'src'), { recursive: true })
+  const relativePath = path.join('src', `revisioned-diff-${randomUUID()}.ts`)
+  const absolutePath = path.join(repoPath, relativePath)
+  writeFileSync(absolutePath, buildRevisionedSourceFile(lineCount, 0))
+  runGit(repoPath, ['add', '-A'])
+  runGit(repoPath, ['commit', '-m', 'Initial revisioned diff fixture'])
+
+  return { repoPath, relativePath, absolutePath }
+}
+
 export function buildLargeTypeScriptFile(lineCount: number): string {
   const lines: string[] = []
   for (let i = 0; i < lineCount; i += 1) {

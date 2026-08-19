@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import { useMemo, type RefObject } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { AlertCircle, RefreshCw } from 'lucide-react'
 import { DiffEditor, type DiffOnMount } from '@monaco-editor/react'
@@ -11,6 +11,7 @@ import { translate } from '@/i18n/i18n'
 import { LargeDiffFallback } from './LargeDiffFallback'
 import { buildDiffEditorWordWrapOptions } from './diff-editor-word-wrap-options'
 import { monacoFindOptions } from './monaco-find-options'
+import { exceedsInlineDeletedLineBudget } from './inline-diff-deleted-line-budget'
 
 const ImageDiffViewer = lazy(() => import('./ImageDiffViewer'))
 
@@ -70,12 +71,24 @@ export function DiffSectionBody({
   onMount
 }: DiffSectionBodyProps): React.JSX.Element {
   const renderLimit = section.largeDiffRenderLimit?.limited ? section.largeDiffRenderLimit : null
+  // Why: inline rendering materializes DOM for every deleted line, so an
+  // over-budget section renders side by side, which only renders the viewport.
+  const inlineDeletedLinesOverBudget = useMemo(
+    () =>
+      exceedsInlineDeletedLineBudget({
+        originalContent: section.originalContent,
+        modifiedContent: section.modifiedContent
+      }),
+    [section.originalContent, section.modifiedContent]
+  )
+  const renderSideBySide = sideBySide || (renderLimit === null && inlineDeletedLinesOverBudget)
 
   return (
     <div
       ref={sectionBodyRef}
       className={cn('relative', useIntrinsicImageHeight && 'overflow-visible')}
       style={sectionBodyHeight === undefined ? undefined : { height: sectionBodyHeight }}
+      data-diff-render-layout={renderSideBySide ? 'side-by-side' : 'inline'}
     >
       {popover && !renderLimit?.limited ? (
         // Why: key by lineNumber so the popover remounts when the anchor
@@ -188,7 +201,7 @@ export function DiffSectionBody({
           options={{
             readOnly: !isEditable,
             originalEditable: false,
-            renderSideBySide: sideBySide,
+            renderSideBySide,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: diffEditorFontSize,
