@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { CI_FAILURE_CLASS } from './ci-failure-class.mjs'
 import { decideReleaseGate, RELEASE_GATE_REASON } from './release-signal-gate.mjs'
+import { VITEST_HANG_BLOCK_HEADER } from './vitest-hang-marker.mjs'
 
 const SHA = 'a'.repeat(40)
 const OTHER_SHA = 'b'.repeat(40)
@@ -157,6 +158,8 @@ describe('decide-release-signal-gate.mjs', () => {
 
   const successStep = { name: 'Test shard', conclusion: 'success' }
   const failedStep = { name: 'Test shard', conclusion: 'failure' }
+  // A watchdog kill reports `failure` like a red test; only this block separates them.
+  const HANG_LOG = `${VITEST_HANG_BLOCK_HEADER}\nverdict: wedged\nsilence: 300.0s\n`
 
   function job(name, overrides = {}) {
     return {
@@ -179,12 +182,21 @@ describe('decide-release-signal-gate.mjs', () => {
     ]
   }
 
-  function runGate(jobs, { runConclusion = 'success', extraArgs = [], writeJobs = true } = {}) {
+  function runGate(
+    jobs,
+    { runConclusion = 'success', extraArgs = [], writeJobs = true, jobLogs = {} } = {}
+  ) {
     const label = `case-${Math.random().toString(36).slice(2)}`
     const runPath = join(workspace, `${label}-run.json`)
     const jobsPath = join(workspace, `${label}-jobs.json`)
     const summaryPath = join(workspace, `${label}-summary.md`)
     const outputPath = join(workspace, `${label}-output.txt`)
+    const logDir = join(workspace, `${label}-logs`)
+    mkdirSync(logDir, { recursive: true })
+    for (const [name, text] of Object.entries(jobLogs)) {
+      const target = jobs.find((entry) => entry.name === name)
+      writeFileSync(join(logDir, `${target.id}.txt`), text)
+    }
     writeFileSync(runPath, JSON.stringify({ conclusion: runConclusion }))
     if (writeJobs) {
       writeFileSync(jobsPath, JSON.stringify({ jobs }))
@@ -201,6 +213,8 @@ describe('decide-release-signal-gate.mjs', () => {
           runPath,
           '--jobs',
           jobsPath,
+          '--job-log-dir',
+          logDir,
           '--release-sha',
           SHA,
           '--verified-sha',
@@ -261,6 +275,32 @@ describe('decide-release-signal-gate.mjs', () => {
     })
     expect(result.status).toBe(0)
     expect(result.summary).toContain('**PUBLISH**')
+  })
+
+  // The RC lane's tolerance has to survive the CLI's flag wiring, not just the
+  // decision function it forwards to.
+  it('exits 0 on a wedged shard once --release-candidate is passed, and 1 without it', () => {
+    const jobs = signalJobs()
+    jobs[3] = job('release gate tests 3/16', {
+      conclusion: 'failure',
+      steps: [{ name: 'Set up job', conclusion: 'success' }, failedStep]
+    })
+    const logs = { 'release gate tests 3/16': HANG_LOG }
+    expect(runGate(jobs, { jobLogs: logs }).status).toBe(1)
+    const candidate = runGate(jobs, { jobLogs: logs, extraArgs: ['--release-candidate'] })
+    expect(candidate.status).toBe(0)
+    expect(candidate.summary).toContain('release candidate proceeding')
+  })
+
+  it('still exits 1 for a release candidate when a shard failed a test', () => {
+    const jobs = signalJobs()
+    jobs[3] = job('release gate tests 3/16', {
+      conclusion: 'failure',
+      steps: [{ name: 'Set up job', conclusion: 'success' }, failedStep]
+    })
+    const result = runGate(jobs, { extraArgs: ['--release-candidate'] })
+    expect(result.status).toBe(1)
+    expect(result.summary).toContain('tests-failed')
   })
 
   it('exits 1 when a signal job is missing from the API answer', () => {

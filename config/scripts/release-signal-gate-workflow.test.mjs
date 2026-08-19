@@ -10,6 +10,10 @@ const pr = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
 const verdict = release.jobs.gate
 const decideStep = verdict.steps.at(-1)
 
+function signalJobKeys() {
+  return decideStep.run.match(/--signal-job (\S+)/g).map((flag) => flag.split(' ')[1])
+}
+
 function needsClosure(jobKey) {
   const seen = new Set()
   const queue = [jobKey]
@@ -42,17 +46,24 @@ describe('the lab release signal gate', () => {
   })
 
   it('names signal jobs that this workflow actually declares', () => {
-    const declared = decideStep.run.match(/--signal-job (\S+)/g).map((flag) => flag.split(' ')[1])
-    expect(declared).toEqual(['gate_static', 'gate_tests'])
-    for (const jobKey of declared) {
+    expect(signalJobKeys()).toEqual(['gate_static', 'gate_tests'])
+    for (const jobKey of signalJobKeys()) {
       expect(release.jobs[jobKey]).toBeDefined()
     }
   })
 
-  // A count that drifts below the matrix would let a missing shard read as green.
-  it('expects exactly the number of jobs the gate declares', () => {
-    const shards = release.jobs.gate_tests.strategy.matrix.shard.length
-    expect(decideStep.run).toContain(`--expected-jobs ${shards + 1}`)
+  // A count that drifts below what the signal jobs expand to would let a missing
+  // shard read as green, so it is derived from those jobs rather than restated.
+  it('expects exactly the number of jobs its declared signal jobs expand to', () => {
+    const expanded = signalJobKeys()
+      .map((jobKey) => {
+        const matrix = release.jobs[jobKey].strategy?.matrix
+        return matrix
+          ? Object.values(matrix).reduce((product, axis) => product * axis.length, 1)
+          : 1
+      })
+      .reduce((total, count) => total + count, 0)
+    expect(decideStep.run).toContain(`--expected-jobs ${expanded}`)
   })
 
   it('runs the same shard command and shard count as the PR suite', () => {

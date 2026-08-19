@@ -253,9 +253,13 @@ jobs:
 
       - name: Compute next lab version
         id: next
+        # Why env and not ${{ }} in the body: the override is free operator text,
+        # and this job holds push access.
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version }}
         run: |
           current="$(node -p "require('./package.json').version")"
-          override="${{ inputs.version }}"
+          override="$VERSION_OVERRIDE"
           # Why: clean `X.Y.Z-lab.N` scheme (no upstream `-rc.X` noise). A bare
           # `X.Y.Z-lab.N` sorts BELOW `X.Y.Z-rc.…` in semver, so migrating off the
           # old `-rc.X.lab.N` tags bumps the patch to stay above installed labs and
