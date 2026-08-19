@@ -93,6 +93,7 @@
     "test:e2e:terminal-perf:scale:report": "pnpm run ensure:electron-runtime && node config/scripts/run-terminal-scale-perf-report-gate.mjs",
     "test:e2e:terminal-perf:check-report": "node config/scripts/check-terminal-perf-report-budgets.mjs",
     "test:e2e:terminal-perf:summarize": "node config/scripts/summarize-terminal-perf-report.mjs",
+    "report:e2e-failure-rate": "node config/scripts/e2e-failure-rate-report.mjs",
     "test:e2e:terminal-perf:html-report": "node config/scripts/generate-terminal-perf-html-report.mjs",
     "test:e2e:ssh-docker-perf": "node config/scripts/run-ssh-docker-perf-e2e.mjs",
     "test:e2e:ssh-docker-watcher-isolation": "node config/scripts/run-ssh-docker-watcher-isolation-e2e.mjs",

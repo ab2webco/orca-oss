@@ -32,7 +32,16 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: 'list',
+  // Why both: `list` is what a human reads in the job log; the JSON report is the
+  // only per-spec record a later run can compare against, so a red spec can be
+  // asked "how often does this fail on main?" instead of bisected from scratch.
+  reporter: [['list'], ['json', { outputFile: 'test-results/e2e-report.json' }]],
+  // Why in the report and not only in the artifact name: a rerun of one shard
+  // overwrites its job, so an attempt that cannot identify itself is unharvestable.
+  metadata: {
+    orcaRunId: process.env.GITHUB_RUN_ID ?? 'local',
+    orcaRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1'
+  },
   use: {
     // Why: this suite intentionally runs with retries disabled so first-failure
     // traces are the only reliable debugging artifact we can collect in CI.

@@ -199,6 +199,18 @@ jobs:
       - name: Run E2E tests (${{ matrix.shard_name }})
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e --shard=${{ matrix.shard }}
 
+      # Why always() and why the attempt is in the name: the base failure rate needs
+      # the green runs as its denominator, and re-running one shard must not overwrite
+      # the attempt that failed. Harvested by config/scripts/e2e-failure-rate-report.mjs.
+      - name: Upload E2E JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-${{ matrix.shard_name }}-attempt-${{ github.run_attempt }}
+          path: tests/test-results/e2e-report.json
+          retention-days: 30
+          if-no-files-found: warn
+
       # Why: Playwright retains traces/screenshots only on failure. Uploading
       # them as an artifact makes post-mortem debugging on CI possible without
       # re-running locally.
@@ -262,6 +274,15 @@ jobs:
           mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
           xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 \
             pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 ${PROJECT:+--project "$PROJECT"}
+
+      - name: Upload E2E JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-changed-attempt-${{ github.run_attempt }}
+          path: tests/test-results/e2e-report.json
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload Playwright traces
         if: failure()
