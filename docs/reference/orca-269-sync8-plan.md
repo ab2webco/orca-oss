@@ -315,8 +315,8 @@ typechecks, and quietly drops fork behavior. Measured examples:
 | `src/preload/api-types.ts` | ×5 hunks | split modules | — |
 | `src/main/claude-usage/store.ts`, `src/main/codex-usage/store.ts` | ×5, ×3 hunks | split modules | — |
 
-Run the §3 fork-authored-lines check on **every T2 hunk** without exception. That is the list the
-check exists for.
+Run the §3 fork-authored-lines check on **every T2 hunk** without exception — and, per the sample
+below, on the T1 hunks too. That is the list the check exists for.
 
 ### Validation of the tiers
 
@@ -331,6 +331,44 @@ One known misclassification is left in, named rather than papered over: the add/
 `src/main/runtime/rpc/methods/worktree-create-schemas.ts` has an empty base, so the rule reads it as
 a union when it is really two independent implementations of the same new module — a design call.
 It is 1 hunk of 327; the counts above already move it into T3.
+
+
+### Validation in the other direction, and the error bar on 58.4%
+
+Every refinement above moved hunks *out* of T3 and was driven by hunks suspected of being
+misclassified — that covers false positives only. The false-negative direction was checked
+separately: **10 T1 hunks drawn at random** (seed 269, over all 191) and read by hand.
+
+**10 of 10 resolve as unions in minutes.** The sub-rules behind the 167 `T1-union` hunks split
+**84 co-insertion / 83 disjoint-ranges**; `one-side-equals-base` is empty, as it must be, since git
+does not conflict a hunk one side left alone. Two caveats the sample surfaced, both worth carrying:
+
+- `src/renderer/src/store/slices/github.ts:0` reached `disjoint` through an interval-arithmetic edge
+  (the fork's pure insertion sits at index 0, upstream replaces indices 0-2, and a zero-width point
+  at a range's left edge is not counted as inside it). The **resolution is still a union** — keep
+  upstream's repointed `shared/github/*` imports, add the fork's new one — so the cost tier is right
+  and the reason is not. Expect a handful more like it.
+- **A T1 hunk can be coupled to a T3 hunk in the same file.** `src/main/runtime/orca-runtime.ts:7`
+  is a clean union at the declaration site, but upstream also changes
+  `orchestrationFederationSyncs` from `Map<string, Promise<void>>` to
+  `Map<string, { db, promise }>`, and the fork's uses of it live in that file's other 7 T3 hunks.
+  Hunk tiers do **not** add up to a per-file cost. Resolve file by file, tier by hunk.
+
+**The most useful thing the sample found is a correction to §7's own advice.** Two of the ten random
+T1 hunks carry ORCA-210 protected-surface fork fields:
+`src/main/daemon/terminal-host-options.ts:0` (`onStartupCommandStateChange`, co-inserted opposite
+upstream's `reportReadinessEvent`) and `src/main/daemon/daemon-server.ts:1` (its wiring, opposite
+upstream's `reportReadinessEvent` plus an `onSessionReaped` rework). A union that quietly resolves
+"toward upstream" on a hunk that *looks* trivial drops a protected field exactly as silently as a T2
+does. So: **run the fork-authored-lines check over every conflicted file, T1 included** — the same
+instruction §3 already gives, and §7 should not have narrowed it to T2.
+
+### Denominator, stated once more
+
+The 327 hunks live in the 146 marker-carrying paths. The **28 modify/deletes sit outside that
+denominator**, and about 3 of them are design calls, not batch work — `c86418eaad` deletes
+`src/shared/orca-attribution.ts`, a protected surface. So "29.1% design" is a share of the
+marker-carrying subset, not of all 174 paths.
 
 ### What this changes about the chunk order
 
@@ -391,13 +429,26 @@ One more spec in the conflict set deserves naming for the opposite reason:
 do-not-reopen list — ORCA-197 (`44a97d6f74`) fixed it, 0/14 recently. It is not parked and must not
 become parked; a wrong resolution here re-breaks a spec that was already paid for.
 
-**Three parks have no reason left to exist.** The three `orchestration-*` parks each state their
-unpark condition as ORCA-207 / ORCA-208 / ORCA-209 (see
-`orchestration-legacy-worker-missing-terminal-recovery.spec.ts:189-190`). **All three tickets are
-Done.** Nobody lifted the parks, so three specs of orchestration coverage are dead going into a
-692-commit merge — exactly where that coverage is worth most. Lifting them is a separate PR from the
-sync (a park lifted inside a chunk cannot be attributed), and it should land **before** chunk 1 so
-the specs are contributing to the §5 baseline while the chunks are in flight.
+**One park is stale, two are not — and "the ticket is Done" does not settle it.** The three
+`orchestration-*` parks each name ORCA-207 / ORCA-208 / ORCA-209 as their unpark condition (see
+`orchestration-legacy-worker-missing-terminal-recovery.spec.ts:189-190`), and all three tickets are
+Done. But ORCA-207 is *the oracle itself* — the specs assert on a tty echo of Orca's own write — and
+closing it did not necessarily repair these three. Checked with
+`git log f62c1f6882..origin/main -- <spec>`:
+
+| spec | what actually landed since the park | verdict |
+| --- | --- | --- |
+| `orchestration-legacy-worker-restart-recovery.spec.ts` | **`d45645cd81`** — `test(e2e): assert agent output, not tty echo, in two pane-buffer oracles (ORCA-207) (#89)`, which rewrote this file's assertions, **plus** the ORCA-208/209 product fixes | all three stated blockers addressed; the `test.fixme` and its rationale comment are **stale** |
+| `orchestration-legacy-worker-missing-terminal-recovery.spec.ts` | only `20a5fc1970` (ORCA-209 product fix) | **oracle never repaired** — #89 covered two oracles and this was not one |
+| `orchestration-worker-terminal-visibility.spec.ts` | only `20a5fc1970` (ORCA-209 product fix) | **oracle never repaired** |
+
+So PR 0 is **verify, not lift blind**: run the three on `main` under `--project=electron-headless`
+before chunk 1, lift only what goes green, and file the oracle repair for the two that never got one
+as its own ticket rather than as a sync prerequisite. Un-parking all three on the strength of the
+ticket states would put two fresh reds in front of chunk 1 — the exact inversion of the goal. It
+still belongs before chunk 1 and outside it, because a park lifted inside a chunk cannot be
+attributed, and because a spec that goes green early starts contributing to the §5 baseline while
+the chunks are in flight.
 
 The other two #7 parks keep their reason: `terminal-hidden-view-parking:484` needs the accumulating
 pane-manager defect fixed (product, not test), and `tab-create-entry-file-paths:29` needs the probe
