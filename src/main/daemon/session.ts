@@ -27,7 +27,6 @@ import {
   type PtyIngressEmission,
   type PtyStartupIngressIntent
 } from '../../shared/pty-startup-ingress'
-import { takeLiveQueryReply } from '../../shared/terminal-query-reply'
 import type {
   PendingOutputRecord,
   SessionState,
@@ -37,7 +36,6 @@ import type {
   TerminalSnapshot
 } from './types'
 import type { PtyOwnerBackend } from '../../shared/pty-owner-backend'
-import { createPtySlaveEchoProbe } from '../../shared/pty-slave-line-discipline-echo'
 
 const SHELL_READY_TIMEOUT_MS = 15_000
 // Why: Codex skips marker-gated command delivery; this only bounds older daemon/local paths that still report shell-ready for Codex.
@@ -213,13 +211,11 @@ export class Session {
     }
 
     this.postReadyFlushGate = new PostReadyFlushGate(() => this.flushPreReadyQueue())
-    const echoProbe = createPtySlaveEchoProbe(this.subprocess.slavePath)
     this.startupIngress = new PtyStartupIngress({
       ...(opts.startupIngress ? { intent: opts.startupIngress } : {}),
       ...(opts.ownerBackend ? { ownerBackend: opts.ownerBackend } : {}),
       write: (data) => this.subprocess.write(data),
-      onEmission: (emission) => this.emitSubprocessOutput(emission),
-      ...(echoProbe ? { echoProbe } : {})
+      onEmission: (emission) => this.emitSubprocessOutput(emission)
     })
     if (this._shellState === 'pending') {
       this.shellPromptReadinessProbe = createShellPromptReadinessProbe({
@@ -290,7 +286,8 @@ export class Session {
     }
 
     // Daemon POSIX PTYs need the local provider's cooked-echo containment (#13137).
-    if (takeLiveQueryReply(this.startupIngress, data)) {
+    // DA1/CPR stay immediate unless an echo-risk reply is already held (#13892, #15559).
+    if (this.startupIngress.answerLiveQueryReply(data)) {
       return
     }
 

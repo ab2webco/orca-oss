@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   containsTerminalQueryReply,
   extractOnlyCookedEchoSafeQueryReplies,
+  extractOnlyTerminalQueryReplies,
   isRuntimeOwnedViewAttributeReply,
   isTerminalQueryReply,
-  needsCookedEchoSafeQueryReply,
-  takeLiveQueryReply
+  needsCookedEchoSafeQueryReply
 } from './terminal-query-reply'
 import { PtyStartupIngress } from './pty-startup-ingress'
 
@@ -91,6 +91,15 @@ describe('isTerminalQueryReply', () => {
       '\x1b[?997;1n'
     ])
     expect(extractOnlyCookedEchoSafeQueryReplies('\x1b[?997;1ny')).toBe(null)
+    expect(extractOnlyTerminalQueryReplies('\x1b[?1;2c\x1b[1;1R')).toEqual([
+      '\x1b[?1;2c',
+      '\x1b[1;1R'
+    ])
+    expect(extractOnlyTerminalQueryReplies('\x1b]11;rgb:2828/2c2c/3434\x1b\\\x1b[?1;2c')).toEqual([
+      '\x1b]11;rgb:2828/2c2c/3434\x1b\\',
+      '\x1b[?1;2c'
+    ])
+    expect(extractOnlyTerminalQueryReplies('\x1b[?1;2chello')).toBe(null)
   })
 
   it('does NOT match ordinary typed input or navigation sequences', () => {
@@ -221,13 +230,13 @@ describe('isRuntimeOwnedViewAttributeReply', () => {
 // probe, so a CPR taken straight to the PTY overtakes it and leaves `ESC ]` in the
 // tty for the next program — bubbletea then dies with
 // "unexpected escape sequence from terminal: ['\x1b' ']']".
-describe('takeLiveQueryReply ordering (termenv OSC-then-CPR)', () => {
+describe('query reply ordering (termenv OSC-then-CPR)', () => {
   const OSC_11_REPLY = '\x1b]11;rgb:1e1e/1e1e/1e1e\x1b\\'
   const CPR_REPLY = '\x1b[1;1R'
 
   function hostWrites(ingress: PtyStartupIngress, pty: string[]) {
     return (data: string): void => {
-      if (!takeLiveQueryReply(ingress, data)) {
+      if (!ingress.answerLiveQueryReply(data)) {
         pty.push(data)
       }
     }
@@ -238,7 +247,6 @@ describe('takeLiveQueryReply ordering (termenv OSC-then-CPR)', () => {
     const pty: string[] = []
     const ingress = new PtyStartupIngress({
       ownerBackend: 'posix-pty',
-      echoProbe: async () => 'quiet',
       write: (data) => pty.push(data),
       onEmission: () => {}
     })
@@ -260,7 +268,6 @@ describe('takeLiveQueryReply ordering (termenv OSC-then-CPR)', () => {
     const pty: string[] = []
     const ingress = new PtyStartupIngress({
       ownerBackend: 'posix-pty',
-      echoProbe: async () => 'quiet',
       write: (data) => pty.push(data),
       onEmission: () => {}
     })
@@ -280,7 +287,7 @@ describe('takeLiveQueryReply ordering (termenv OSC-then-CPR)', () => {
     })
 
     for (const keystroke of ['y', 'gh auth login\r', '\x1b[A', '\x1b', '\x03']) {
-      expect(takeLiveQueryReply(ingress, keystroke)).toBe(false)
+      expect(ingress.answerLiveQueryReply(keystroke)).toBe(false)
     }
     ingress.drainAndClose()
   })
@@ -291,7 +298,7 @@ describe('takeLiveQueryReply ordering (termenv OSC-then-CPR)', () => {
 // takeLiveQueryReply match whole strings, so a coalesced payload is not a reply, and
 // ordinary input never rides the queue at all. Pinned so the boundary is explicit —
 // if a change makes these take the ordered path, that is an improvement, not a break.
-describe('takeLiveQueryReply: writes that still bypass the ordered queue', () => {
+describe('writes that still bypass the ordered queue', () => {
   const BYPASSING = [
     { what: 'reply coalesced with a keystroke', data: '\x1b[6;1Ry' },
     { what: 'keystroke coalesced with a reply', data: 'y\x1b[6;1R' },
@@ -301,13 +308,12 @@ describe('takeLiveQueryReply: writes that still bypass the ordered queue', () =>
   it.each(BYPASSING)('does not take $what', ({ data }) => {
     const ingress = new PtyStartupIngress({
       ownerBackend: 'posix-pty',
-      echoProbe: () => new Promise(() => {}),
       write: () => {},
       onEmission: () => {}
     })
     // Deferral is open, so an ordered write WOULD be queued here.
     expect(ingress.answerLiveQueryReply('\x1b]11;rgb:00/00/00\x07')).toBe(true)
-    expect(takeLiveQueryReply(ingress, data)).toBe(false)
+    expect(ingress.answerLiveQueryReply(data)).toBe(false)
     ingress.drainAndClose()
   })
 })
