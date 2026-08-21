@@ -169,10 +169,12 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
     // Why the suppressed alias is still listed: tombstones only block passive bulk import, so
     // deleting one Orca target must not make ~/.ssh/config look empty. It is badged instead,
     // and it is excluded from the "Add all" count below.
-    await expect(configHostRow(picker, hosts.alpha)).toBeVisible()
-    await expect(
-      configHostRow(picker, hosts.alpha).getByText('Removed from Orca', { exact: true })
-    ).toBeVisible()
+    // Suppressed aliases stay listed (re-pickable) but never count as new.
+    const alphaRow = configHostRow(picker, hosts.alpha)
+    await expect(alphaRow).toBeVisible()
+    await expect(alphaRow).toBeEnabled()
+    await expect(alphaRow.getByText('Removed from Orca', { exact: true })).toBeVisible()
+    await expect(alphaRow.getByText('In Orca', { exact: true })).toHaveCount(0)
     await expect(configHostRow(picker, hosts.bravo)).toBeVisible()
     await expect(
       configHostRow(picker, hosts.bravo).getByText('In Orca', { exact: true })

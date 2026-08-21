@@ -6,9 +6,7 @@ const {
   callRuntimeEnvironmentMock,
   registerCliHandlersMock,
   registerPreflightHandlersMock,
-  registerClaudeUsageHandlersMock,
-  registerCodexUsageHandlersMock,
-  registerOpenCodeUsageHandlersMock,
+  registerUsageProviderHandlersMock,
   registerGitHubHandlersMock,
   registerFeedbackHandlersMock,
   registerStatsHandlersMock,
@@ -73,9 +71,7 @@ const {
   callRuntimeEnvironmentMock: vi.fn(),
   registerCliHandlersMock: vi.fn(),
   registerPreflightHandlersMock: vi.fn(),
-  registerClaudeUsageHandlersMock: vi.fn(),
-  registerCodexUsageHandlersMock: vi.fn(),
-  registerOpenCodeUsageHandlersMock: vi.fn(),
+  registerUsageProviderHandlersMock: vi.fn(),
   registerGitHubHandlersMock: vi.fn(),
   registerFeedbackHandlersMock: vi.fn(),
   registerStatsHandlersMock: vi.fn(),
@@ -182,16 +178,8 @@ vi.mock('./preflight', () => ({
   registerPreflightHandlers: registerPreflightHandlersMock
 }))
 
-vi.mock('./claude-usage', () => ({
-  registerClaudeUsageHandlers: registerClaudeUsageHandlersMock
-}))
-
-vi.mock('./codex-usage', () => ({
-  registerCodexUsageHandlers: registerCodexUsageHandlersMock
-}))
-
-vi.mock('./opencode-usage', () => ({
-  registerOpenCodeUsageHandlers: registerOpenCodeUsageHandlersMock
+vi.mock('./usage-provider-handlers', () => ({
+  registerUsageProviderHandlers: registerUsageProviderHandlersMock
 }))
 
 vi.mock('./github', () => ({
@@ -401,9 +389,7 @@ describe('registerCoreHandlers', () => {
     callRuntimeEnvironmentMock.mockReset()
     registerCliHandlersMock.mockReset()
     registerPreflightHandlersMock.mockReset()
-    registerClaudeUsageHandlersMock.mockReset()
-    registerCodexUsageHandlersMock.mockReset()
-    registerOpenCodeUsageHandlersMock.mockReset()
+    registerUsageProviderHandlersMock.mockReset()
     registerGitHubHandlersMock.mockReset()
     registerFeedbackHandlersMock.mockReset()
     registerStatsHandlersMock.mockReset()
@@ -501,9 +487,11 @@ describe('registerCoreHandlers', () => {
       result: { sessions: 'bad-shape' }
     })
 
-    expect(registerClaudeUsageHandlersMock).toHaveBeenCalledWith(claudeUsage)
-    expect(registerCodexUsageHandlersMock).toHaveBeenCalledWith(codexUsage)
-    expect(registerOpenCodeUsageHandlersMock).toHaveBeenCalledWith(openCodeUsage)
+    expect(registerUsageProviderHandlersMock).toHaveBeenCalledWith({
+      claudeUsage,
+      codexUsage,
+      openCodeUsage
+    })
     expect(registerAppHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
     expect(registerCodexAccountHandlersMock).toHaveBeenCalledWith(
       codexAccounts,

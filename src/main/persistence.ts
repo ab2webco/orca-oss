@@ -3347,6 +3347,13 @@ export class Store {
           parsed.settings
         )
         const migratedTerminalCursorStyle = normalizeTerminalCursorStyleDefault(parsed.settings)
+        if (
+          parsed.settings?.terminalCursorStyle !==
+            migratedTerminalCursorStyle.terminalCursorStyle ||
+          parsed.settings?.terminalCursorStyleDefaultedToBlock !== true
+        ) {
+          this.loadNeedsSave = true
+        }
         const migratedTerminalLineHeight = normalizeTerminalLineHeight(
           parsed.settings?.terminalLineHeight
         )
@@ -4621,6 +4628,7 @@ export class Store {
     linkedTask?: FolderWorkspace['linkedTask']
     linkedTaskSourceContext?: FolderWorkspace['linkedTaskSourceContext']
     connectionId?: string | null
+    creatorProvenance?: FolderWorkspace['creatorProvenance']
     createdWithAgent?: FolderWorkspace['createdWithAgent']
     pendingFirstAgentMessageRename?: boolean
   }): FolderWorkspace {
@@ -4643,6 +4651,7 @@ export class Store {
       name: normalizeFolderWorkspaceName(input.name, `${group.name} workspace`),
       folderPath,
       connectionId: input.connectionId ?? group.connectionId ?? null,
+      ...(input.creatorProvenance ? { creatorProvenance: input.creatorProvenance } : {}),
       linkedTask,
       linkedTaskSourceContext: isWorkspaceLinkedItemSourceContextMatch(linkedTask, sourceContext)
         ? sourceContext
@@ -5926,7 +5935,7 @@ export class Store {
     }
   }
 
-  // Why: UI view-state is written from both desktop and mobile (ui.set RPC), so notify to keep bi-directional sync (desktop hydrates UI only once).
+  // Why: renderer-visible UI state is written from desktop and mobile, so notify to keep bi-directional sync.
   onUIChanged(listener: (ui: PersistedState['ui']) => void): () => void {
     this.uiChangeListeners.add(listener)
     return () => {
@@ -6012,6 +6021,15 @@ export class Store {
     if ('terminalCustomThemes' in updates) {
       sanitizedUpdates.terminalCustomThemes = normalizeTerminalCustomThemes(
         updates.terminalCustomThemes
+      )
+    }
+    if ('terminalCursorStyle' in updates) {
+      Object.assign(
+        sanitizedUpdates,
+        normalizeTerminalCursorStyleDefault(
+          { terminalCursorStyle: updates.terminalCursorStyle },
+          { preserveExplicitValue: true }
+        )
       )
     }
     if ('terminalScrollbackRows' in updates) {
@@ -6365,7 +6383,8 @@ export class Store {
       (lastEmittedBucket === null ||
         compareFeatureInteractionUsageBuckets(nextBucket, lastEmittedBucket) > 0)
 
-    this.updateUI({
+    this.state.ui = {
+      ...this.state.ui,
       featureInteractions: {
         ...featureInteractions,
         [id]: {
@@ -6373,11 +6392,15 @@ export class Store {
           interactionCount: nextCount
         }
       }
-    })
+    }
     this.state.featureInteractionTelemetryBuckets = shouldEmit
       ? { ...telemetryBuckets, [id]: nextBucket }
       : telemetryBuckets
     this.scheduleSave()
+    // Why: live UI only consumes the seen transition; count-only telemetry must not re-hydrate the renderer.
+    if (!existing) {
+      this.notifyUIChanged()
+    }
 
     if (shouldEmit) {
       track('feature_interaction_usage_bucket_reached', {

@@ -23,7 +23,7 @@ import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agen
 import { filterEnabledTuiAgents, isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
 import { repoIsRemote } from '../../../shared/agent-launch-remote'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
-import { resolveNativeChatLaunchSessionOptions } from '@/components/native-chat/native-chat-session-option-enrichment'
+import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
 import {
   resolveTuiAgentLaunchArgs,
@@ -150,7 +150,9 @@ import {
   toLinearLinkedWorkItem
 } from '@/components/sidebar/folder-workspace-composer-helpers'
 import { useFolderWorkspaceComposerPathStatus } from '@/components/sidebar/folder-workspace-composer-path-status'
+import { resolveFolderWorkspaceLaunchDraft } from '@/components/sidebar/folder-workspace-linked-startup-plan'
 import { submitFolderWorkspaceCreate } from '@/components/sidebar/folder-workspace-composer-submit'
+import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import {
   getRepoExecutionHostId,
@@ -827,7 +829,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const folderTargetIsRemote =
     folderTargetConnectionId !== null || folderTargetRuntimeEnvironmentId !== null
   const folderTargetAgentDetectionTarget = folderTargetRuntimeEnvironmentId
-    ? { kind: 'runtime' as const, environmentId: folderTargetRuntimeEnvironmentId }
+    ? {
+        kind: 'runtime' as const,
+        environmentId: folderTargetRuntimeEnvironmentId
+      }
     : folderTargetConnectionId
       ? { kind: 'ssh' as const, connectionId: folderTargetConnectionId }
       : selectedProjectGroup
@@ -1398,7 +1403,11 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             setupAgentStartupPolicySaveRef.current = null
           }
         })
-        setupAgentStartupPolicySaveRef.current = { repoId: currentRepo.id, policy, promise }
+        setupAgentStartupPolicySaveRef.current = {
+          repoId: currentRepo.id,
+          policy,
+          promise
+        }
         const saved = await promise
         if (
           saved &&
@@ -1506,7 +1515,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             { repo: repoId },
             { timeoutMs: 30_000 }
           )
-        : (window.api.gh.repoSlug({ repoPath: selectedRepoPath, repoId }) as Promise<{
+        : (window.api.gh.repoSlug({
+            repoPath: selectedRepoPath,
+            repoId
+          }) as Promise<{
             owner: string
             repo: string
           } | null>)
@@ -1865,7 +1877,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     )
       .then((result) => {
         if (!cancelled) {
-          setLoadedIssueCommand({ contextKey: selectedRepoHookContextKey, result })
+          setLoadedIssueCommand({
+            contextKey: selectedRepoHookContextKey,
+            result
+          })
         }
       })
       .catch(() => {
@@ -2015,7 +2030,11 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
 
     const lookupRepoId = selectedRepo.id
     void window.api.gh
-      .listWorkItems({ repoPath: selectedRepo.path, repoId: selectedRepo.id, limit: 100 })
+      .listWorkItems({
+        repoPath: selectedRepo.path,
+        repoId: selectedRepo.id,
+        limit: 100
+      })
       .then((envelope) => {
         if (!cancelled) {
           // Why: IPC omits repoId — stamp it from the queried repo below; cast through unknown since spreading the discriminated union loses the discriminant.
@@ -2199,7 +2218,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 ? { baseRefName: startPointSelection.item.baseRefName }
                 : {}),
               ...(startPointSelection.item.isCrossRepository !== undefined
-                ? { isCrossRepository: startPointSelection.item.isCrossRepository }
+                ? {
+                    isCrossRepository: startPointSelection.item.isCrossRepository
+                  }
                 : {})
             }))
           startPointSelection.resolved = selectedPrStartPoint
@@ -2609,7 +2630,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           )
         )
       }
-      return { filePaths: uploadResult.filePaths, folderPaths: uploadResult.folderPaths }
+      return {
+        filePaths: uploadResult.filePaths,
+        folderPaths: uploadResult.folderPaths
+      }
     },
     [connectionId, selectedRepoPath, selectedRepoSettings]
   )
@@ -2713,7 +2737,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const handleRepoChange = useCallback(
     (
       value: string,
-      options: { preserveStartFrom?: boolean; forceResetStartFrom?: boolean } = {}
+      options: {
+        preserveStartFrom?: boolean
+        forceResetStartFrom?: boolean
+      } = {}
     ): void => {
       setProjectError(null)
       if (value === repoId && !options.forceResetStartFrom) {
@@ -2889,7 +2916,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       if (!nextRepoId) {
         return
       }
-      handleRepoChange(nextRepoId, { forceResetStartFrom: isProjectGroupTarget })
+      handleRepoChange(nextRepoId, {
+        forceResetStartFrom: isProjectGroupTarget
+      })
     },
     [
       eligibleRepos,
@@ -2971,7 +3000,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       branchAutoNameRef.current = ''
       setStartFromResetHint(null)
       // Why: a Start-from PR pick is also a linkedWorkItem assignment; reuse applyLinkedWorkItem so auto-name and linkedPR stay one code path.
-      applyLinkedWorkItem(item, { preserveBranchNameOverride: Boolean(nextBranchNameOverride) })
+      applyLinkedWorkItem(item, {
+        preserveBranchNameOverride: Boolean(nextBranchNameOverride)
+      })
       // Why: prefill the note from the PR (only when empty or still an auto-fill) so the sidebar surfaces it without clobbering user text.
       const identity = resolveGitHubWorkItemIdentity(item)
       if (identity.type === 'pr') {
@@ -3175,7 +3206,11 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 : {})
             })
           : callRuntimeRpc<
-              | { baseBranch: string; compareBaseRef?: string; pushTarget?: GitPushTarget }
+              | {
+                  baseBranch: string
+                  compareBaseRef?: string
+                  pushTarget?: GitPushTarget
+                }
               | { error: string }
             >(
               target,
@@ -3476,6 +3511,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         const smartGitHubResolution = smartGitHubSettlement.value
         const smartGitHubMetadata =
           smartGitHubResolution.kind === 'none' ? null : smartGitHubResolution
+        const submitLinkedWorkItem = smartGitHubMetadata?.linkedWorkItem ?? linkedWorkItem
         const agent =
           requestedAgent && isTuiAgentEnabled(requestedAgent, disabledTuiAgents)
             ? requestedAgent
@@ -3483,11 +3519,15 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         if (isSubmissionCancelled()) {
           return
         }
+        const folderLaunchDraftText =
+          agent && submitLinkedWorkItem
+            ? resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, note)
+            : null
         const folderWorkspaceCreated = await submitFolderWorkspaceCreate({
           projectGroup: selectedProjectGroup,
           name: smartGitHubMetadata?.workspaceName ?? name,
           lastAutoName: lastAutoNameRef.current,
-          linkedWorkItem: smartGitHubMetadata?.linkedWorkItem ?? linkedWorkItem,
+          linkedWorkItem: submitLinkedWorkItem,
           linkedTaskSourceContext: taskSourceContext,
           note,
           quickAgent: agent,
@@ -3498,7 +3538,24 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             : undefined,
           agentEnv: agent ? resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv) : undefined,
           sessionOptions: agent
-            ? resolveNativeChatLaunchSessionOptions(settings?.nativeChatSessionOptions, agent)
+            ? resolveInitialNativeChatSessionOptions(
+                {
+                  experimentalNativeChat: settings?.experimentalNativeChat,
+                  openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+                  nativeChatSessionOptions: settings?.nativeChatSessionOptions
+                },
+                {
+                  agent,
+                  ...(folderLaunchDraftText
+                    ? {
+                        promptDelivery: 'draft' as const,
+                        launchDraftText: folderLaunchDraftText
+                      }
+                    : {}),
+                  nativeChatTranscriptIsLocalReadable:
+                    isNativeChatTranscriptLocalReadable(folderTargetConnectionId)
+                }
+              )
             : undefined,
           terminalWindowsShell: settings?.terminalWindowsShell,
           isRemote: folderTargetIsRemote,
@@ -3545,6 +3602,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       createFolderWorkspace,
       disabledTuiAgents,
       folderCreateDisabled,
+      folderTargetConnectionId,
       folderTargetIsRemote,
       folderTargetRuntimeEnvironmentId,
       folderSourceRepos.length,
@@ -3560,7 +3618,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       settings?.agentDefaultArgs,
       settings?.agentDefaultEnv,
       settings?.autoRenameBranchFromWork,
+      settings?.experimentalNativeChat,
       settings?.nativeChatSessionOptions,
+      settings?.openAgentTabsInChatByDefault,
       settings?.terminalWindowsShell,
       taskSourceContext,
       telemetrySource
@@ -3811,9 +3871,18 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         cmdOverrides: settings?.agentCmdOverrides ?? {},
         agentArgs: resolveTuiAgentLaunchArgs(tuiAgent, settings?.agentDefaultArgs),
         agentEnv: resolveTuiAgentLaunchEnv(tuiAgent, settings?.agentDefaultEnv),
-        sessionOptions: resolveNativeChatLaunchSessionOptions(
-          settings?.nativeChatSessionOptions,
-          tuiAgent
+        sessionOptions: resolveInitialNativeChatSessionOptions(
+          {
+            experimentalNativeChat: settings?.experimentalNativeChat,
+            openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+            nativeChatSessionOptions: settings?.nativeChatSessionOptions
+          },
+          {
+            agent: tuiAgent,
+            nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
+              selectedRepo.connectionId
+            )
+          }
         ),
         platform: selectedRepoAgentLaunchPlatform,
         shell: selectedRepoStartupShell,
@@ -3942,7 +4011,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 launchAgent: tuiAgent,
                 ...(startupPlan.draftPrompt ? { draftPrompt: startupPlan.draftPrompt } : {}),
                 ...(startupPlan.startupCommandDelivery
-                  ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
+                  ? {
+                      startupCommandDelivery: startupPlan.startupCommandDelivery
+                    }
                   : {}),
                 ...(shouldSeedInitialAgentStatus
                   ? {
@@ -4032,7 +4103,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     settings?.agentDefaultEnv,
     launchPromptTemplates,
     settings?.autoRenameBranchFromWork,
+    settings?.experimentalNativeChat,
     settings?.nativeChatSessionOptions,
+    settings?.openAgentTabsInChatByDefault,
     smartNameMode,
     setSidebarOpen,
     setupDecision,
@@ -4347,7 +4420,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         })
         const baseBranchSettlement = await settleComposerSubmit(
           selectedRepoIsGit
-            ? resolveWorktreeCreateBaseBranch({ explicitBaseBranch: smartSubmitBaseBranch })
+            ? resolveWorktreeCreateBaseBranch({
+                explicitBaseBranch: smartSubmitBaseBranch
+              })
             : Promise.resolve(undefined),
           isSubmissionCancelled
         )
@@ -4378,6 +4453,28 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             trimmedNote,
             getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)
           )
+        const quickSessionOptions =
+          agent === null
+            ? undefined
+            : resolveInitialNativeChatSessionOptions(
+                {
+                  experimentalNativeChat: settings?.experimentalNativeChat,
+                  openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+                  nativeChatSessionOptions: settings?.nativeChatSessionOptions
+                },
+                {
+                  agent,
+                  ...(quickDraftPrompt
+                    ? {
+                        promptDelivery: 'draft' as const,
+                        launchDraftText: quickDraftPrompt
+                      }
+                    : {}),
+                  nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
+                    selectedRepo.connectionId
+                  )
+                }
+              )
         const draftLaunchPlan =
           agent === null || !quickDraftPrompt
             ? null
@@ -4387,10 +4484,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 cmdOverrides: settings?.agentCmdOverrides ?? {},
                 agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
                 agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
-                sessionOptions: resolveNativeChatLaunchSessionOptions(
-                  settings?.nativeChatSessionOptions,
-                  agent
-                ),
+                sessionOptions: quickSessionOptions,
                 platform: selectedRepoAgentLaunchPlatform,
                 shell: selectedRepoStartupShell,
                 isRemote: selectedRepoIsRemote
@@ -4408,7 +4502,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
               ? { sessionOptions: draftLaunchPlan.sessionOptions }
               : {}),
             ...(draftLaunchPlan.startupCommandDelivery
-              ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
+              ? {
+                  startupCommandDelivery: draftLaunchPlan.startupCommandDelivery
+                }
               : {}),
             ...(draftLaunchPlan.env ? { env: draftLaunchPlan.env } : {})
           }
@@ -4419,10 +4515,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             cmdOverrides: settings?.agentCmdOverrides ?? {},
             agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
             agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
-            sessionOptions: resolveNativeChatLaunchSessionOptions(
-              settings?.nativeChatSessionOptions,
-              agent
-            ),
+            sessionOptions: quickSessionOptions,
             platform: selectedRepoAgentLaunchPlatform,
             shell: selectedRepoStartupShell,
             isRemote: selectedRepoIsRemote,
@@ -4450,7 +4543,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 launchConfig: startupPlan.launchConfig,
                 ...(agent ? { launchAgent: agent } : {}),
                 ...(startupPlan.startupCommandDelivery
-                  ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
+                  ? {
+                      startupCommandDelivery: startupPlan.startupCommandDelivery
+                    }
                   : {}),
                 ...(quickTelemetry ? { telemetry: quickTelemetry } : {})
               }
@@ -4635,7 +4730,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       settings?.agentDefaultEnv,
       launchPromptTemplates,
       settings?.autoRenameBranchFromWork,
+      settings?.experimentalNativeChat,
       settings?.nativeChatSessionOptions,
+      settings?.openAgentTabsInChatByDefault,
       smartNameMode,
       sourceIntentBlocksCreate,
       disabledTuiAgents,

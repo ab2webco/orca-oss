@@ -139,11 +139,19 @@ function configureGitHubRemote(repoPath: string): void {
 //     measurable upstream arm.
 //
 // Unparked by: a fix upstream, or one in its own PR — not inside this sync (ORCA-203).
-test.fixme('starting a just-created GitHub issue launches Claude with its URL prefilled', async ({
-  orcaPage,
-  testRepoPath
-}) => {
+// Upstream's beforeAll below is the leading unpark candidate: it configures the remote
+// this case needs before Electron launches. Verify on Linux CI in its own PR.
+// Why: the remote must exist before Electron launches. `repos.add` probes the
+// remote once, and a settled "no remote" both makes the repo ineligible for the
+// tasks page (disabling "New GitHub issue") and suppresses re-probes for five
+// minutes — so adding origin inside the test body can never recover.
+test.beforeAll(({ testRepoPath }) => {
   configureGitHubRemote(testRepoPath)
+})
+
+test.fixme('starting a just-created GitHub issue launches Claude with its URL prefilled', async ({
+  orcaPage
+}) => {
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
 
@@ -186,6 +194,17 @@ test.fixme('starting a just-created GitHub issue launches Claude with its URL pr
   })
 
   await orcaPage.getByRole('button', { name: 'Start workspace from issue' }).click()
+
+  // Why: starting a GitHub issue now routes through the quick-create composer,
+  // which carries the linked issue URL into the agent launch command on submit.
+  const composer = orcaPage.getByRole('dialog', { name: /Create (workspace|worktree)/i })
+  await expect(composer).toBeVisible({ timeout: 15_000 })
+  const createWorkspaceButton = composer.getByRole('button', {
+    name: /Create (workspace|worktree)/i
+  })
+  await expect(createWorkspaceButton).toBeEnabled({ timeout: 15_000 })
+  await createWorkspaceButton.click()
+  await expect(composer).toBeHidden({ timeout: 20_000 })
 
   let terminalText = ''
   await expect

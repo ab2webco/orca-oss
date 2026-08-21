@@ -61,6 +61,10 @@ import {
   releaseContextOnlyDispatch,
   type ContextOnlyDispatchReleaseResult
 } from './context-only-dispatch-release'
+import {
+  ensureMutationReceiptCapacity,
+  migrateMutationReceiptCapacity
+} from './mutation-receipt-capacity'
 
 // Why: leaf UUID is the remint-stable pane identity (tab half changes on break-out); exact match covers legacy/unparseable keys.
 function isEquivalentPaneKey(a: string, b: string): boolean {
@@ -266,7 +270,9 @@ function legacyMessageMatchesQuestion(
     return false
   }
   try {
-    const payload = JSON.parse(message.payload ?? '{}') as { options?: unknown }
+    const payload = JSON.parse(message.payload ?? '{}') as {
+      options?: unknown
+    }
     return (
       normalizeLegacyQuestionOptions(payload.options) === normalizeLegacyQuestionOptions(options)
     )
@@ -279,9 +285,6 @@ export const LEGACY_RUN_ID = ORCHESTRATION_LEGACY_RUN_ID
 
 export const LEGACY_CONTRACT_VERSION = 0
 export const CURRENT_CONTRACT_VERSION = ORCHESTRATION_CONTRACT_VERSION
-
-const MUTATION_RECEIPT_MAX_ROWS = 10_000
-const MUTATION_RECEIPT_MAX_AGE_DAYS = 30
 
 export type RunListPage = {
   runs: RunRow[]
@@ -300,19 +303,19 @@ type RunListCursor = {
   id: string
 }
 
-// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership, v25 dispatch first-signal deadline, v26 turn_accepted_at, v27 composer_ready_proven, v28 creator-incarnation authority, v29 active Dispatch handle lookup.
+// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership, v25 dispatch first-signal deadline, v26 turn_accepted_at, v27 composer_ready_proven, v28 creator-incarnation authority, v29 active Dispatch handle lookup, v30 indexed mutation receipt capacity.
 // Why the lab ladder keeps renumbering upstream's steps: 23, 24 and 25 mean
 // different migrations on the two lineages (upstream: terminal ownership,
 // creator-incarnation, active-handle index; lab: envelope contract, terminal
 // ownership, first-signal deadline). A stamped number is the only thing migrate()
 // consults, so reusing one silently skips the other lineage's step and leaves the
 // code reading a column that was never added. v24 was the first such renumber
-// (upstream's 23); v28/v29 are upstream's 24/25 for the same reason.
+// (upstream's 23); v28/v29 are upstream's 24/25, and v30 is its 26, for the same reason.
 // Both builds share appId com.stablyai.orca and productName Orca, so both write
 // the same userData/orchestration.db — the skew is reachable, not theoretical.
 // See resolveOrchestrationMigrationStartVersion for what happens to a DB an
-// upstream build already stamped 23–25.
-const SCHEMA_VERSION = 29
+// upstream build already stamped 23–26.
+const SCHEMA_VERSION = 30
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
   if (dbPath === ':memory:' || process.platform === 'win32') {
@@ -658,7 +661,9 @@ export class OrchestrationDb {
 
   // Why: CREATE TABLE IF NOT EXISTS won't alter existing DBs; migrate in a txn that bumps user_version only on success (atomic all-or-nothing).
   private migrate(): void {
-    const storedVersion = this.db.pragma('user_version', { simple: true }) as number
+    const storedVersion = this.db.pragma('user_version', {
+      simple: true
+    }) as number
     const current = resolveOrchestrationMigrationStartVersion(
       this.db,
       storedVersion,
@@ -1072,6 +1077,10 @@ export class OrchestrationDb {
             ON dispatch_contexts(assignee_handle)
             WHERE assignee_handle IS NOT NULL AND status IN ('pending', 'dispatched');
         `)
+      }
+      if (current < 30) {
+        // Upstream's v26 (indexed mutation receipt capacity), renumbered.
+        migrateMutationReceiptCapacity(this.db)
       }
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_dispatch_assignee_pane_leaf
@@ -1488,44 +1497,6 @@ export class OrchestrationDb {
 
   // ── Durable mutation receipts ──
 
-  private ensureMutationReceiptCapacity(): void {
-    this.db
-      .prepare(
-        `DELETE FROM mutation_receipts
-         WHERE state = 'completed'
-           AND updated_at < datetime('now', ?)`
-      )
-      .run(`-${MUTATION_RECEIPT_MAX_AGE_DAYS} days`)
-
-    const row = this.db.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get() as {
-      count: number
-    }
-    const completedToRemove = row.count - MUTATION_RECEIPT_MAX_ROWS + 1
-    if (completedToRemove > 0) {
-      this.db
-        .prepare(
-          `DELETE FROM mutation_receipts
-           WHERE rowid IN (
-             SELECT rowid FROM mutation_receipts
-             WHERE state = 'completed'
-             ORDER BY updated_at ASC, rowid ASC
-             LIMIT ?
-           )`
-        )
-        .run(completedToRemove)
-    }
-
-    const retained = this.db.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get() as {
-      count: number
-    }
-    if (retained.count >= MUTATION_RECEIPT_MAX_ROWS) {
-      throw new OrchestrationError(
-        'mutation_ledger_full',
-        'The durable mutation ledger is full of unresolved operations. Resolve or inspect them before starting another mutation.'
-      )
-    }
-  }
-
   beginMutationReceipt(params: {
     callerFingerprint: string
     requestId: string
@@ -1548,7 +1519,7 @@ export class OrchestrationDb {
         this.db.exec('COMMIT')
         return { disposition: existing.state, row: existing }
       }
-      this.ensureMutationReceiptCapacity()
+      ensureMutationReceiptCapacity(this.db)
       this.db
         .prepare(
           `INSERT INTO mutation_receipts (
@@ -2112,7 +2083,10 @@ export class OrchestrationDb {
         limit
       ) as MessageRow[]
     if (recovery.length > 0) {
-      return { messages: exposeMessageListTimestamps(recovery), recovery: true }
+      return {
+        messages: exposeMessageListTimestamps(recovery),
+        recovery: true
+      }
     }
 
     const unread = this.db
@@ -2817,7 +2791,11 @@ export class OrchestrationDb {
         }
         const messages = this.getDeliveryMessages(existing)
         this.db.exec('COMMIT')
-        return { delivery: exposeDeliveryTimestamps(existing), messages, replayed: true }
+        return {
+          delivery: exposeDeliveryTimestamps(existing),
+          messages,
+          replayed: true
+        }
       }
 
       const address = `run:${params.runId}`
@@ -2866,7 +2844,11 @@ export class OrchestrationDb {
         )
       const delivery = this.getDeliveryRaw(deliveryId) as DeliveryRow
       this.db.exec('COMMIT')
-      return { delivery: exposeDeliveryTimestamps(delivery), messages, replayed: false }
+      return {
+        delivery: exposeDeliveryTimestamps(delivery),
+        messages,
+        replayed: false
+      }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -2899,7 +2881,10 @@ export class OrchestrationDb {
       }
       if (delivery.status === 'acknowledged') {
         this.db.exec('COMMIT')
-        return { delivery: exposeDeliveryTimestamps(delivery), duplicate: true }
+        return {
+          delivery: exposeDeliveryTimestamps(delivery),
+          duplicate: true
+        }
       }
 
       const messageIds = JSON.parse(delivery.message_ids) as string[]
@@ -2916,7 +2901,10 @@ export class OrchestrationDb {
         .run(delivery.id)
       const acknowledged = this.getDeliveryRaw(delivery.id) as DeliveryRow
       this.db.exec('COMMIT')
-      return { delivery: exposeDeliveryTimestamps(acknowledged), duplicate: false }
+      return {
+        delivery: exposeDeliveryTimestamps(acknowledged),
+        duplicate: false
+      }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -3149,7 +3137,10 @@ export class OrchestrationDb {
           )
           .run(principal.id)
       }
-      const responseJson = JSON.stringify({ messageId: message.id, settlement })
+      const responseJson = JSON.stringify({
+        messageId: message.id,
+        settlement
+      })
       const receipt = this.insertLegacyOperationReceipt({
         principalId: principal.id,
         operationKey: params.operationKey,
@@ -3186,7 +3177,9 @@ export class OrchestrationDb {
       const principal = this.requireCommittedLegacyPrincipal(params.principalId, 'worker')
       const receipt = this.requireMatchingLegacyOperationReceipt(params)
       if (receipt) {
-        const response = JSON.parse(receipt.response_json) as { questionId: string }
+        const response = JSON.parse(receipt.response_json) as {
+          questionId: string
+        }
         const question = this.getQuestion(response.questionId)
         const message = this.getMessageById(response.questionId)
         if (!question || !message) {
@@ -3779,7 +3772,10 @@ export class OrchestrationDb {
       const question = this.getQuestionRaw(message.id) as QuestionRow
       const storedMessage = this.getMessageById(message.id) as MessageRow
       this.db.exec('COMMIT')
-      return { question: exposeQuestionTimestamps(question), message: storedMessage }
+      return {
+        question: exposeQuestionTimestamps(question),
+        message: storedMessage
+      }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -3831,7 +3827,11 @@ export class OrchestrationDb {
           throw new Error(`Recorded answer message ${question.answer_message_id} was not found.`)
         }
         this.db.exec('COMMIT')
-        return { question: exposeQuestionTimestamps(question), message, duplicate: true }
+        return {
+          question: exposeQuestionTimestamps(question),
+          message,
+          duplicate: true
+        }
       }
 
       const message = this.insertMessage({
@@ -4129,7 +4129,7 @@ export class OrchestrationDb {
             `Mutation ${receipt.requestId} already has a durable acceptance record.`
           )
         }
-        this.ensureMutationReceiptCapacity()
+        ensureMutationReceiptCapacity(this.db)
         this.db
           .prepare(
             `INSERT INTO mutation_receipts (
@@ -4767,7 +4767,7 @@ export class OrchestrationDb {
           `Remote attachment request ${params.mutationReceipt.requestId} already exists.`
         )
       }
-      this.ensureMutationReceiptCapacity()
+      ensureMutationReceiptCapacity(this.db)
       this.db
         .prepare(
           `INSERT INTO mutation_receipts (
@@ -5129,7 +5129,10 @@ export class OrchestrationDb {
            FROM federation_relay_items
            WHERE dispatch_id = ? AND direction = ? AND acked_at IS NULL`
         )
-        .get(params.dispatchId, params.direction) as { count: number; bytes: number }
+        .get(params.dispatchId, params.direction) as {
+        count: number
+        bytes: number
+      }
       if (quota.count >= 256 || quota.bytes + byteCount > 1024 * 1024) {
         if (params.kind === 'worker_done') {
           const heartbeat = this.db
@@ -5507,11 +5510,17 @@ export class OrchestrationDb {
     )
   }
 
-  beginWorkerStop(
-    dispatchId: string
-  ):
-    | { disposition: 'stopping'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
-    | { disposition: 'already_settled'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
+  beginWorkerStop(dispatchId: string):
+    | {
+        disposition: 'stopping'
+        worker: WorkerDispatchRow
+        dispatch: DispatchContextRow
+      }
+    | {
+        disposition: 'already_settled'
+        worker: WorkerDispatchRow
+        dispatch: DispatchContextRow
+      }
     | ({ disposition: 'context_only' } & ContextOnlyDispatchReleaseResult) {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -5994,8 +6003,16 @@ export class OrchestrationDb {
         const transferred = this.getWorkerTerminalResourceFormerlyOwnedBy(dispatchId)
         this.db.exec('COMMIT')
         return transferred
-          ? { disposition: 'retained', resource: transferred, reason: 'ownership_transferred' }
-          : { disposition: 'retained', resource: null, reason: 'no_owned_resource' }
+          ? {
+              disposition: 'retained',
+              resource: transferred,
+              reason: 'ownership_transferred'
+            }
+          : {
+              disposition: 'retained',
+              resource: null,
+              reason: 'no_owned_resource'
+            }
       }
       if (resource.release_state === 'released' || resource.ownership_state === 'released') {
         this.db.exec('COMMIT')
@@ -6015,7 +6032,11 @@ export class OrchestrationDb {
       }
       if (resource.ownership_state === 'transferred') {
         this.db.exec('COMMIT')
-        return { disposition: 'retained', resource, reason: 'ownership_transferred' }
+        return {
+          disposition: 'retained',
+          resource,
+          reason: 'ownership_transferred'
+        }
       }
       if (
         resource.release_state === 'unknown' ||
@@ -6210,7 +6231,11 @@ export class OrchestrationDb {
             WHERE pane_key = ? AND ownership_state = 'owned'
               AND release_state IN ('not_requested', 'retained', 'requested')`
         )
-        .all(paneKey) as { id: string; owner_dispatch_id: string; pane_key: string }[]
+        .all(paneKey) as {
+        id: string
+        owner_dispatch_id: string
+        pane_key: string
+      }[]
       const candidates =
         exact.length > 0
           ? exact
@@ -6222,7 +6247,11 @@ export class OrchestrationDb {
                     AND release_state IN ('not_requested', 'retained', 'requested')
                     AND pane_key IS NOT NULL`
                 )
-                .all() as { id: string; owner_dispatch_id: string; pane_key: string }[]
+                .all() as {
+                id: string
+                owner_dispatch_id: string
+                pane_key: string
+              }[]
             ).filter((candidate) => isEquivalentPaneKey(candidate.pane_key, paneKey))
       const update = this.db.prepare(
         `UPDATE worker_terminal_resources
@@ -6468,13 +6497,22 @@ export class OrchestrationDb {
   }): { valid: true } | { valid: false; reason: string } {
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {
-      return { valid: false, reason: `Dispatch ${params.dispatchId} was not found.` }
+      return {
+        valid: false,
+        reason: `Dispatch ${params.dispatchId} was not found.`
+      }
     }
     if (!dispatch.capability_hash) {
-      return { valid: false, reason: `Dispatch ${params.dispatchId} has no lifecycle capability.` }
+      return {
+        valid: false,
+        reason: `Dispatch ${params.dispatchId} has no lifecycle capability.`
+      }
     }
     if (dispatch.capability_revoked_at) {
-      return { valid: false, reason: `Dispatch ${params.dispatchId} capability is revoked.` }
+      return {
+        valid: false,
+        reason: `Dispatch ${params.dispatchId} capability is revoked.`
+      }
     }
     if (!params.capability) {
       return { valid: false, reason: 'The Dispatch capability is missing.' }
@@ -6496,7 +6534,10 @@ export class OrchestrationDb {
       !params.processIncarnation ||
       dispatch.process_incarnation !== params.processIncarnation
     ) {
-      return { valid: false, reason: 'The Dispatch process incarnation changed.' }
+      return {
+        valid: false,
+        reason: 'The Dispatch process incarnation changed.'
+      }
     }
     return { valid: true }
   }
@@ -6619,7 +6660,11 @@ export class OrchestrationDb {
   }): WorkerReportSettlement {
     const task = this.getTask(params.taskId)
     if (!task) {
-      return { action: 'rejected', code: 'unknown_task', reason: `Unknown task ${params.taskId}.` }
+      return {
+        action: 'rejected',
+        code: 'unknown_task',
+        reason: `Unknown task ${params.taskId}.`
+      }
     }
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {

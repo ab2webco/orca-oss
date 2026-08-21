@@ -1617,10 +1617,12 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     handler: (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       if (params.all) {
+        runtime.stopOrchestrationFederationRelay()
         db.resetAll()
         return { reset: 'all' }
       }
       if (params.tasks) {
+        runtime.stopOrchestrationFederationRelay()
         db.resetTasks()
         return { reset: 'tasks' }
       }

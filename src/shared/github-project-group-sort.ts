@@ -29,10 +29,16 @@ const EMPTY_GROUP_KEY = '__empty__'
 // Array.sort's behavior implementation-defined and skips later tie-breaks.
 const UNKNOWN_INDEX_SENTINEL = Number.MAX_SAFE_INTEGER
 
+// Preserve the mobile mirror's fallback for partial ordering metadata.
 function getFieldValueForGrouping(
   row: GitHubProjectRow,
   field: GitHubProjectField
-): { key: string; label: string; orderHint: number; iteration: ProjectGroup['iteration'] } {
+): {
+  key: string
+  label: string
+  orderHint: number
+  iteration: ProjectGroup['iteration']
+} {
   const value = row.fieldValuesByFieldId[field.id]
   if (!value) {
     return {
@@ -43,20 +49,26 @@ function getFieldValueForGrouping(
     }
   }
   if (field.kind === 'iteration' && value.kind === 'iteration') {
-    const idx = field.iterations.findIndex((it) => it.id === value.iterationId)
-    const meta = field.iterations.find((it) => it.id === value.iterationId)
+    const iterations = field.iterations ?? []
+    const idx = iterations.findIndex((iteration) => iteration.id === value.iterationId)
+    const meta = iterations.find((iteration) => iteration.id === value.iterationId)
     return {
       key: value.iterationId,
       label: value.title || meta?.title || 'Iteration',
       orderHint: idx === -1 ? UNKNOWN_INDEX_SENTINEL - 1 : idx,
       iteration: meta
-        ? { startDate: meta.startDate, duration: meta.duration, completed: meta.completed }
+        ? {
+            startDate: meta.startDate,
+            duration: meta.duration,
+            completed: meta.completed
+          }
         : null
     }
   }
   if (field.kind === 'single-select' && value.kind === 'single-select') {
-    const idx = field.options.findIndex((o) => o.id === value.optionId)
-    const option = idx === -1 ? undefined : field.options[idx]
+    const options = field.options ?? []
+    const idx = options.findIndex((o) => o.id === value.optionId)
+    const option = idx === -1 ? undefined : options[idx]
     return {
       key: value.optionId,
       label: value.name || option?.name || 'Option',
@@ -166,8 +178,9 @@ function compareSort(a: GitHubProjectRow, b: GitHubProjectRow, sort: GitHubProje
     aValue.kind === 'single-select' &&
     bValue.kind === 'single-select'
   ) {
-    const aIdx = field.options.findIndex((o) => o.id === aValue.optionId)
-    const bIdx = field.options.findIndex((o) => o.id === bValue.optionId)
+    const options = field.options ?? []
+    const aIdx = options.findIndex((option) => option.id === aValue.optionId)
+    const bIdx = options.findIndex((option) => option.id === bValue.optionId)
     cmp =
       (aIdx === -1 ? UNKNOWN_INDEX_SENTINEL : aIdx) - (bIdx === -1 ? UNKNOWN_INDEX_SENTINEL : bIdx)
   } else if (
@@ -175,8 +188,9 @@ function compareSort(a: GitHubProjectRow, b: GitHubProjectRow, sort: GitHubProje
     aValue.kind === 'iteration' &&
     bValue.kind === 'iteration'
   ) {
-    const aIdx = field.iterations.findIndex((it) => it.id === aValue.iterationId)
-    const bIdx = field.iterations.findIndex((it) => it.id === bValue.iterationId)
+    const iterations = field.iterations ?? []
+    const aIdx = iterations.findIndex((iteration) => iteration.id === aValue.iterationId)
+    const bIdx = iterations.findIndex((iteration) => iteration.id === bValue.iterationId)
     cmp =
       (aIdx === -1 ? UNKNOWN_INDEX_SENTINEL : aIdx) - (bIdx === -1 ? UNKNOWN_INDEX_SENTINEL : bIdx)
   } else if (aValue.kind === 'number' && bValue.kind === 'number') {

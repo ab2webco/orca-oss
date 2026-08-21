@@ -40,7 +40,10 @@ import {
   shutdownDaemon
 } from './daemon/daemon-init'
 import {
-  hasRecordedLegacySharedCodexPane,
+  type CodexPaneHomeRoute,
+  getCodexPaneAccount,
+  hasRecordedManagedHostCodexPane,
+  isCodexPaneHomeRouteProvenAwayFromSharedHome,
   reconcileCodexPaneAccountsWithLivePtys
 } from './codex/codex-pane-account-registry'
 import { closeAllWatchers } from './ipc/filesystem-watcher'
@@ -229,6 +232,7 @@ import {
   normalizeClaudeRuntimeSelection
 } from './claude-accounts/runtime-selection'
 import { codexHookService, setSystemCodexHomeHookSweepSuppressed } from './codex/hook-service'
+import { reconcileRetainedCodexHookHomes } from './codex/retained-codex-hook-state'
 import {
   ensureRealHomeCodexHookState,
   isRealHomeCodexHookLaneUsable
@@ -433,10 +437,23 @@ function handleCodexHomePtySpawned(args: {
   id: string
   codexHomePath: string | null
   reattached?: boolean
+  reattachedHomeRoute?: CodexPaneHomeRoute | null
   launchEnv?: NodeJS.ProcessEnv
   startedAt?: Date
   startedSequence?: number
 }): void {
+  // Why: only shared or ambiguous retained shells can create rollout logs that still need publication.
+  if (args.reattached && args.startedSequence !== undefined) {
+    const paneAccount = getCodexPaneAccount(args.id)
+    const homeRoute =
+      args.reattachedHomeRoute !== undefined
+        ? (args.reattachedHomeRoute ?? undefined)
+        : paneAccount?.homeRoute
+    if (codexSessionMigration && isCodexPaneHomeRouteProvenAwayFromSharedHome(homeRoute)) {
+      codexSessionMigration.ignoreLaunch(args.id, args.startedSequence)
+      return
+    }
+  }
   const fullScanRequired =
     codexRuntimeHome?.beginHostSystemDefaultSessionMigrationLaunch(args.codexHomePath, {
       reattached: args.reattached,
@@ -954,10 +971,19 @@ function startTerminalRuntimeStartupServices(): Promise<void> {
       await initDaemonPtyProvider(signal, {
         macosLoginSessionWatch: process.platform === 'darwin' && !isServeMode
       })
-      if (codexRuntimeHome?.isHostSystemDefaultRealHome() && hasRecordedLegacySharedCodexPane()) {
+      // Why: a retained shell keeps its launch-time Codex home even when the current routing lane changes.
+      if (codexRuntimeHome && hasRecordedManagedHostCodexPane()) {
         const livePtyIds = await listLiveDaemonPtyIds()
         if (livePtyIds) {
           reconcileCodexPaneAccountsWithLivePtys(livePtyIds)
+          const settings = store?.getSettings()
+          reconcileRetainedCodexHookHomes({
+            hookService: codexHookService,
+            hooksEnabled:
+              isAgentStatusHooksEnabled(settings) &&
+              settings?.disabledTuiAgents.includes('codex') !== true,
+            runtimeHomePaths: codexRuntimeHome.getRetainedHostCodexHookHomePaths(livePtyIds)
+          })
         }
       }
       // Why: retained shells can invoke Codex immediately after the startup gate.

@@ -98,7 +98,7 @@ type NewWorkspaceComposerCardProps = {
   claudeAccounts: ClaudeManagedAccountSummary[]
   claudeAccountId: string | null
   onClaudeAccountIdChange: (accountId: string | null) => void
-  eligibleRepos: RepoOption[]
+  eligibleRepos: readonly RepoOption[]
   repoId: string
   projectOptions?: NewWorkspaceProjectOption[]
   selectedProjectId?: string | null
@@ -112,7 +112,7 @@ type NewWorkspaceComposerCardProps = {
   selectedEphemeralVmRecipeId?: string | null
   onEphemeralVmRecipeChange?: (recipeId: string | null) => void
   ephemeralVmRecipeError?: string | null
-  repoBackedSearchRepos?: RepoOption[]
+  repoBackedSearchRepos?: readonly RepoOption[]
   repoBackedSourcesDisabled?: boolean
   allowSmartNameAddProject?: boolean
   smartNameRepoSwitchTarget?: 'project' | 'task-source'

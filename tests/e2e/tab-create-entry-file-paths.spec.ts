@@ -34,10 +34,9 @@ test.fixme('new-tab file results prioritize the filename and reveal the full pat
   await ensureTerminalVisible(orcaPage)
 
   await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })
-  const input = orcaPage.getByRole('combobox', {
-    // Source of truth: omniboxPlaceholder() in tab-bar/TabBarCreateEntry.tsx.
-    name: 'Search open tabs, files, URLs, agents…'
-  })
+  // Not the placeholder/aria-label: that copy is translated and already drifted
+  // once. aria-controls points at the results listbox id, which is structural.
+  const input = orcaPage.locator('input[role="combobox"][aria-controls="tab-create-entry-results"]')
   await input.fill('secondaryNav')
 
   const row = orcaPage.locator('[role="option"]').filter({ hasText: 'Open file' }).first()
