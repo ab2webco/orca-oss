@@ -98,16 +98,33 @@ jobs:
           rm -rf .github/workflows
           git checkout "origin/${base}" -- .github/workflows
           git add -A .github/workflows
+          # Why the diffstat: the retention commit reverts upstream's workflow
+          # changes wholesale, and said so nowhere a reviewer looks. Staged
+          # against HEAD it is exactly what the sync drops.
+          discarded="$(git diff --cached --stat HEAD -- .github/workflows)"
+          workflow_commits="$(git rev-list --count "origin/${base}..upstream/main" -- .github/workflows)"
+          {
+            echo "workflow_commits=$workflow_commits"
+            echo 'workflow_discard<<ORCA_DISCARD_EOF'
+            echo "$discarded"
+            echo 'ORCA_DISCARD_EOF'
+          } >>"$GITHUB_OUTPUT"
           if ! git diff --cached --quiet -- .github/workflows; then
             git commit -m "chore(sync): retain fork .github/workflows (bot token cannot push workflow changes)"
           fi
           git push -f origin "$sync_branch"
           echo "branch=$sync_branch" >>"$GITHUB_OUTPUT"
 
+      # Why GH_REPO: the `upstream` remote added above outranks `origin` in gh's
+      # base-repo resolution, so every `gh pr` call here targeted stablyai/orca
+      # and `gh pr create` died on "Resource not accessible by integration".
       - name: Open or update sync PR
         if: steps.check.outputs.behind != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          WORKFLOW_COMMITS: ${{ steps.merge.outputs.workflow_commits }}
+          WORKFLOW_DISCARD: ${{ steps.merge.outputs.workflow_discard }}
         run: |
           base="${{ steps.base.outputs.branch }}"
           head="${{ steps.merge.outputs.branch }}"
@@ -119,6 +136,11 @@ jobs:
             note="✅ Clean merge. Use a **merge commit** (not squash) to preserve upstream history."
           fi
           body=$(printf '%s\n\n%s\n' "Automated sync of **${behind}** new commit(s) from \`stablyai/orca@main\` into \`${base}\`." "$note")
+          if [[ -n "$WORKFLOW_DISCARD" ]]; then
+            summary="<details><summary>Workflow changes this branch does <b>not</b> carry (${WORKFLOW_COMMITS} upstream commit(s) touched \`.github/workflows\`)</summary>"
+            why="Diffstat of the retention commit: **deletions are upstream workflow content this branch drops**, insertions are the fork's own workflows being restored. \`GITHUB_TOKEN\` cannot push workflow changes, so adopt any upstream workflow change deliberately, in a separate reviewed PR."
+            body=$(printf '%s\n%s\n\n%s\n\n```\n%s\n```\n</details>\n' "$body" "$summary" "$why" "$WORKFLOW_DISCARD")
+          fi
           if gh pr view "$head" --json number >/dev/null 2>&1; then
             gh pr edit "$head" --body "$body"
             echo "Updated existing sync PR."
