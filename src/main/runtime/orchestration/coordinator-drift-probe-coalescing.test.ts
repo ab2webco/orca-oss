@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Coordinator, DISPATCH_STALE_THRESHOLD, type CoordinatorRuntime } from './coordinator'
 import { OrchestrationDb } from './db'
+import { SUCCESS_ENVELOPE } from './worker-done-envelope-fixture'
 
 describe('Coordinator drift probe coalescing', () => {
   let db: OrchestrationDb
@@ -67,7 +68,15 @@ describe('Coordinator drift probe coalescing', () => {
         to: 'coord',
         subject: 'Done',
         type: 'worker_done',
-        payload: JSON.stringify({ taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' })
+        // Why the envelope: the lab's worker_done contract rejects a bare outcome, so
+        // upstream's payload literal would leave the run waiting for a valid report.
+        payload: JSON.stringify({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
+        }),
+        senderPaneKey: dispatch.assignee_pane_key ?? undefined
       })
     }
 
