@@ -1,11 +1,13 @@
 name: Sync from upstream (stablyai/orca)
 
 # Why: this fork tracks the official Orca repo. This workflow keeps a
-# `upstream-sync/main` branch pointed at upstream's newest main and opens (or
-# refreshes) a single PR so new upstream commits land through review. It NEVER
-# pushes to the fork's default branch and NEVER auto-resolves conflicts — the
-# 55-commit divergence means most syncs conflict (pty.ts, persistence.ts,
-# daemon/*, i18n locales), so a human resolves them in the PR.
+# `upstream-sync/main` branch pointed at upstream's newest main. A PR is opened
+# only while that branch still contains every commit on the fork's base branch;
+# once the conflict fallback resets it to upstream's tip it is a mirror, and
+# merging a mirror reverts the fork — so it is published as a readable snapshot
+# and any open PR is closed. It NEVER pushes to the fork's default branch and
+# NEVER auto-resolves conflicts; the divergence means most syncs conflict
+# (pty.ts, persistence.ts, daemon/*, i18n locales) and land in reviewed chunks.
 
 on:
   schedule:
