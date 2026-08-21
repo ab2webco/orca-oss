@@ -21,15 +21,32 @@ const REPORTED_SIDEBAR_WIDTH = 490
 const LONG_ACCOUNT_EMAIL = 'fabian.altahona@koombea-engineering.example.com'
 const PLANE_IDENTIFIER = 'ORCA-161'
 
-async function seedLinkedCard(page: Page, worktreeId: string): Promise<unknown> {
+type SeedResult = { ok: true } | { ok: false; error: string }
+
+async function seedLinkedCard(page: Page, worktreeId: string): Promise<SeedResult> {
   return page.evaluate(
-    ({ worktreeId, email, identifier }) => {
+    async ({ worktreeId, email, identifier }) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
       }
       const accountId = 'e2e-claude-account'
       const now = Date.now()
+      // Why: main rejects the whole updateMeta call when claudeAccountId names no
+      // registered managed account, which drops linkedPlaneWorkItem with it.
+      await store.getState().updateSettingsOrThrow({
+        claudeManagedAccounts: [
+          {
+            id: accountId,
+            email,
+            managedAuthPath: `orca-e2e-managed-claude-account/${accountId}`,
+            authMethod: 'oauth',
+            createdAt: now,
+            updatedAt: now,
+            lastAuthenticatedAt: now
+          }
+        ]
+      })
       store
         .getState()
         .setWorktreeCardProperties([
@@ -78,20 +95,14 @@ async function seedLinkedCard(page: Page, worktreeId: string): Promise<unknown> 
           }
         }
       })
-      return store
-        .getState()
-        .updateWorktreeMeta(worktreeId, {
-          claudeAccountId: accountId,
-          linkedPlaneWorkItem: {
-            identifier,
-            projectId: 'e2e-project',
-            url: `https://plane.example.com/ab2web/browse/${identifier}/`
-          }
-        })
-        .then(
-          () => 'SEEDED',
-          (error) => `updateWorktreeMeta failed: ${String(error)}`
-        )
+      return store.getState().updateWorktreeMeta(worktreeId, {
+        claudeAccountId: accountId,
+        linkedPlaneWorkItem: {
+          identifier,
+          projectId: 'e2e-project',
+          url: `https://plane.example.com/ab2web/browse/${identifier}/`
+        }
+      })
     },
     { worktreeId, email: LONG_ACCOUNT_EMAIL, identifier: PLANE_IDENTIFIER }
   )
@@ -173,7 +184,7 @@ test.describe('Workspace card chips across sidebar widths', () => {
     orcaPage
   }) => {
     const worktreeId = (await getActiveWorktreeId(orcaPage))!
-    expect(await seedLinkedCard(orcaPage, worktreeId)).toEqual('SEEDED')
+    expect(await seedLinkedCard(orcaPage, worktreeId)).toEqual({ ok: true })
     await settleSidebarWidth(orcaPage, NARROW_SIDEBAR_WIDTH)
 
     await expect(planeChipLocator(orcaPage, worktreeId)).toBeAttached({ timeout: 15_000 })
@@ -189,7 +200,7 @@ test.describe('Workspace card chips across sidebar widths', () => {
     orcaPage
   }) => {
     const worktreeId = (await getActiveWorktreeId(orcaPage))!
-    expect(await seedLinkedCard(orcaPage, worktreeId)).toEqual('SEEDED')
+    expect(await seedLinkedCard(orcaPage, worktreeId)).toEqual({ ok: true })
     await settleSidebarWidth(orcaPage, REPORTED_SIDEBAR_WIDTH)
 
     const planeChip = planeChipLocator(orcaPage, worktreeId)
