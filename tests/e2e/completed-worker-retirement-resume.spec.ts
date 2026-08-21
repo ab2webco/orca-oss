@@ -480,37 +480,7 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(targetWorktreeId)
     await waitForActiveTerminalManager(orcaPage)
-    // TEMP-DIAG(ORCA-269): CI never binds this PTY while a local run binds in ~0.4s;
-    // print what the renderer holds so the difference is readable from the job log.
-    try {
-      await waitForActivePanePtyId(orcaPage)
-    } finally {
-      const diag = await orcaPage.evaluate((worktreeId) => {
-        const state = window.__store?.getState()
-        const tabs = state?.tabsByWorktree?.[worktreeId] ?? []
-        const resolvedTabId =
-          state?.activeTabType === 'terminal'
-            ? state?.activeTabId
-            : (state?.activeTabIdByWorktree?.[worktreeId] ?? tabs[0]?.id ?? null)
-        const manager = resolvedTabId ? window.__paneManagers?.get(resolvedTabId) : null
-        return {
-          activeWorktreeId: state?.activeWorktreeId ?? null,
-          activeTabType: state?.activeTabType ?? null,
-          activeTabId: state?.activeTabId ?? null,
-          activeTabIdByWorktree: state?.activeTabIdByWorktree?.[worktreeId] ?? null,
-          resolvedTabId,
-          tabs: tabs.map((tab) => ({ id: tab.id, type: tab.type, ptyId: tab.ptyId ?? null })),
-          panes: (manager?.getPanes?.() ?? []).map((pane) => ({
-            leafId: pane.leafId ?? null,
-            ptyId: pane.container?.dataset?.ptyId ?? null
-          })),
-          pendingStartup: Object.keys(state?.pendingStartupByTabId ?? {}),
-          sleeping: Object.keys(state?.sleepingAgentSessionsByPaneKey ?? {})
-        }
-      }, targetWorktreeId)
-      console.log(`BIND_DIAG ${JSON.stringify(diag)}`)
-      console.log(`BIND_DIAG_LEDGER ${JSON.stringify(readCompletedWorkerLedger())}`)
-    }
+    await waitForActivePanePtyId(orcaPage)
     const activatedPane = await waitForActivePaneHookDescriptor(orcaPage)
     expect(activatedPane.worktreeId).toBe(targetWorktreeId)
     const activatedResolved = await client.call<{ terminal: { handle: string } }>(
