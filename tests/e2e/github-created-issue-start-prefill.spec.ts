@@ -139,6 +139,8 @@ function configureGitHubRemote(repoPath: string): void {
 //     measurable upstream arm.
 //
 // Unparked by: a fix upstream, or one in its own PR — not inside this sync (ORCA-203).
+// Keep this fixme through an upstream merge: upstream's copy has none, and its own tip reds
+// this case, so resolving this file toward upstream re-imports a known failure un-parked.
 test.fixme('starting a just-created GitHub issue launches Claude with its URL prefilled', async ({
   orcaPage,
   testRepoPath
