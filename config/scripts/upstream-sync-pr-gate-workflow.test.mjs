@@ -41,6 +41,27 @@ describe('the sync PR gate', () => {
     expect(gate.id).toBe('gate')
   })
 
+  // The job installs nothing, so a dependency added to either file would only fail
+  // at 12:00 UTC, after the branch is already pushed.
+  it.each(['decide-upstream-sync-pr.mjs', 'upstream-sync-pr-gate.mjs'])(
+    'keeps %s runnable on a bare node, importing builtins and siblings only',
+    (file) => {
+      const source = readFileSync(`config/scripts/${file}`, 'utf8')
+      const specifiers = [...source.matchAll(/^import .* from '([^']+)'$/gm)].map(
+        (match) => match[1]
+      )
+      expect(specifiers.filter((specifier) => !/^(node:|\.\/)/.test(specifier))).toEqual([])
+      expect(sync.steps.some((candidate) => candidate.uses?.startsWith('actions/setup-node'))).toBe(
+        false
+      )
+    }
+  )
+
+  it('reaches the verdict through the module the unit tests exercise', () => {
+    const cli = readFileSync('config/scripts/decide-upstream-sync-pr.mjs', 'utf8')
+    expect(cli).toContain("from './upstream-sync-pr-gate.mjs'")
+  })
+
   it('feeds it the measurement and the route the branch took', () => {
     expect(gate.run).toContain('--dropped "${{ steps.merge.outputs.dropped }}"')
     expect(gate.run).toContain('--conflicts "${{ steps.merge.outputs.conflicts }}"')
@@ -73,14 +94,18 @@ describe('the pull request the gate authorises', () => {
     expect(open.if).not.toBe(withdraw.if)
   })
 
-  // `gh pr view <branch>` resolves closed PRs too, so its exit code cannot tell
-  // "a PR to update" from "a PR someone already closed".
+  // The branch permanently carries closed PRs, and `gh pr view <branch>` picks one
+  // of them by an order neither documented nor tested. Asking for open PRs only
+  // leaves nothing to guess, and acts on the number rather than the branch name.
   it.each([
     ['Open or update sync PR', open],
     ['Withdraw the PR the sync branch cannot support', withdraw]
-  ])('decides %s from the PR state, not from gh exit codes', (_name, gh) => {
-    expect(gh.run).toContain('gh pr view "$head" --json state --jq .state')
-    expect(gh.run).toContain('if [[ "$state" == "OPEN" ]]; then')
+  ])('finds the PR for %s by asking only for open ones', (_name, gh) => {
+    expect(gh.run).toContain(
+      `number="$(gh pr list --head "$head" --state open --json number --jq '.[0].number // empty')"`
+    )
+    expect(gh.run).toContain('if [[ -n "$number" ]]; then')
+    expect(gh.run).not.toContain('gh pr view')
   })
 
   it('keeps every gh call pointed at the fork, not at the upstream remote', () => {

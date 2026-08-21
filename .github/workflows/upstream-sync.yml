@@ -121,6 +121,8 @@ jobs:
           # mirrored sync branch does not carry it.
           git checkout --force --detach "origin/${base}"
 
+      # No setup-node step: the gate script imports only node: builtins, so the
+      # runner's preinstalled node runs it without an install this job never does.
       - name: Decide whether the sync branch may be proposed
         id: gate
         if: steps.check.outputs.behind != '0'
@@ -147,12 +149,13 @@ jobs:
         run: |
           base="${{ steps.base.outputs.branch }}"
           head="${{ steps.merge.outputs.branch }}"
-          # Why --json state and not the exit code: `gh pr view <branch>` resolves
-          # closed PRs too, so a bare success edits a closed PR forever instead of
-          # opening the one this run is entitled to.
-          state="$(gh pr view "$head" --json state --jq .state 2>/dev/null || true)"
-          if [[ "$state" == "OPEN" ]]; then
-            gh pr edit "$head" --title "$PR_TITLE" --body-file "${RUNNER_TEMP}/sync-pr-body.md"
+          # Why `--state open` and a number: looking a single PR up by head branch
+          # resolves closed ones too, so the answer depends on gh's preference among
+          # the closed PRs this branch permanently carries. Asking only for open PRs
+          # removes that ordering assumption, and the number is unambiguous.
+          number="$(gh pr list --head "$head" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh pr edit "$number" --title "$PR_TITLE" --body-file "${RUNNER_TEMP}/sync-pr-body.md"
             echo "Updated existing sync PR."
           else
             gh pr create \
@@ -172,9 +175,9 @@ jobs:
           # Declining to create one is not enough: a PR an earlier clean sync opened
           # becomes fork-reverting the moment this branch is force-pushed as a
           # mirror, so the open one has to go.
-          state="$(gh pr view "$head" --json state --jq .state 2>/dev/null || true)"
-          if [[ "$state" == "OPEN" ]]; then
-            gh pr close "$head" --comment "$(cat "${RUNNER_TEMP}/sync-pr-body.md")"
+          number="$(gh pr list --head "$head" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh pr close "$number" --comment "$(cat "${RUNNER_TEMP}/sync-pr-body.md")"
             echo "Closed the sync PR: the branch no longer contains the fork."
           else
             echo "No open sync PR to close."
