@@ -35,7 +35,7 @@ test.afterAll(() => {
 })
 
 for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
-  test(`completed background worker ${closeMode} retires resume authority before first activation`, async ({
+  test(`completed background worker ${closeMode} preserves resume authority through first activation`, async ({
     orcaPage,
     electronApp
   }) => {
@@ -401,6 +401,11 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
         processAction: 'closed_agent_terminal'
       })
     }
+    // Why the fork diverges from upstream (which expects `recoveryPresent: false`): both close
+    // modes reach the renderer as a bare `pty-exit` — main kills the PTY and its `ui:closeTerminal`
+    // echo lands after the pane unmounted — and by then neither the pane's agent status nor its
+    // runtime orchestration context survives to prove the worker finished. An interrupted agent is
+    // indistinguishable here, so resume authority is kept and only an explicit user release drops it.
     await expect
       .poll(() =>
         orcaPage.evaluate(() => {
@@ -409,12 +414,10 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
             .__orcaRetiredWorkerTransitions
         })
       )
-      .toEqual(
-        expect.arrayContaining([
-          { tabPresent: true, recoveryPresent: true },
-          { tabPresent: false, recoveryPresent: false }
-        ])
-      )
+      .toEqual([
+        { tabPresent: true, recoveryPresent: true },
+        { tabPresent: false, recoveryPresent: true }
+      ])
     await orcaPage.evaluate(() => {
       const e2eWindow = window as typeof window & { __orcaRetiredWorkerUnsubscribe?: () => void }
       e2eWindow.__orcaRetiredWorkerUnsubscribe?.()
@@ -423,36 +426,50 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     await expect
       .poll(() =>
         orcaPage.evaluate(
-          (paneKey) => window.__store?.getState().sleepingAgentSessionsByPaneKey[paneKey] ?? null,
+          (paneKey) =>
+            window.__store?.getState().sleepingAgentSessionsByPaneKey[paneKey]?.providerSession
+              .id ?? null,
           workerPaneKey
         )
       )
-      .toBeNull()
+      .toBe(PROVIDER_SESSION_ID)
 
     await orcaPage.evaluate(() => window.dispatchEvent(new Event('beforeunload')))
     await expect
       .poll(() =>
         orcaPage.evaluate(async (paneKey) => {
           const session = await window.api.session.get()
-          return session.sleepingAgentSessionsByPaneKey?.[paneKey] ?? null
+          return session.sleepingAgentSessionsByPaneKey?.[paneKey]?.providerSession?.id ?? null
         }, workerPaneKey)
       )
-      .toBeNull()
+      .toBe(PROVIDER_SESSION_ID)
     await orcaPage.evaluate(() => window.api.session.flush())
-    expect(readPersistedWorkerRecoveryRecord(userDataDir, workerPaneKey)).toBeNull()
+    // The flush's own return proves nothing about what landed; read the file it wrote.
+    expect(readPersistedWorkerRecoveryRecord(userDataDir, workerPaneKey)?.providerSession?.id).toBe(
+      PROVIDER_SESSION_ID
+    )
 
     await orcaPage.reload()
     await waitForSessionReady(orcaPage)
 
-    const beforeActivation = await orcaPage.evaluate((worktreeId) => {
-      const state = window.__store?.getState()
-      return {
-        everActivated: state?.everActivatedWorktreeIds.has(worktreeId) ?? false,
-        tabCount: state?.tabsByWorktree[worktreeId]?.length ?? 0,
-        pendingStartupCount: Object.keys(state?.pendingStartupByTabId ?? {}).length
-      }
-    }, targetWorktreeId)
-    expect(beforeActivation).toEqual({ everActivated: false, tabCount: 0, pendingStartupCount: 0 })
+    const beforeActivation = await orcaPage.evaluate(
+      ({ paneKey, worktreeId }) => {
+        const state = window.__store?.getState()
+        return {
+          everActivated: state?.everActivatedWorktreeIds.has(worktreeId) ?? false,
+          tabCount: state?.tabsByWorktree[worktreeId]?.length ?? 0,
+          pendingStartupCount: Object.keys(state?.pendingStartupByTabId ?? {}).length,
+          recoveryPresent: Boolean(state?.sleepingAgentSessionsByPaneKey[paneKey])
+        }
+      },
+      { paneKey: workerPaneKey, worktreeId: targetWorktreeId }
+    )
+    expect(beforeActivation).toEqual({
+      everActivated: false,
+      tabCount: 0,
+      pendingStartupCount: 0,
+      recoveryPresent: true
+    })
 
     const targetCard = orcaPage
       .locator(`[data-worktree-id="${String(targetWorktreeId)}"]`)
@@ -483,14 +500,22 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
       )
       .not.toBe('')
 
-    const spawnEvents = readCompletedWorkerLedger().filter((event) => event.event === 'spawn')
-    expect(spawnEvents).toHaveLength(1)
-    expect(
-      spawnEvents.filter(
-        (event) => event.args?.includes('resume') && event.args?.includes(PROVIDER_SESSION_ID)
+    // The preserved authority is spent here, not retired: first activation resumes the exact
+    // provider session and says so. A future manual release is what makes this spawn stop.
+    await expect
+      .poll(
+        () =>
+          readCompletedWorkerLedger().filter(
+            (event) =>
+              event.event === 'spawn' &&
+              event.args?.includes('resume') &&
+              event.args?.includes(PROVIDER_SESSION_ID)
+          ).length,
+        { timeout: 30_000, message: 'first activation never resumed the preserved session' }
       )
-    ).toEqual([])
-    await expect(orcaPage.locator('.session-restored-banner')).toHaveCount(0)
+      .toBe(1)
+    expect(readCompletedWorkerLedger().filter((event) => event.event === 'spawn')).toHaveLength(2)
+    await expect(orcaPage.locator('.session-restored-banner')).toHaveCount(1)
 
     const afterActivation = await orcaPage.evaluate(
       ({ originalTabId, worktreeId }) => {
@@ -500,10 +525,10 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
           everActivated: state?.everActivatedWorktreeIds.has(worktreeId) ?? false,
           originalTabPresent: tabs.some((tab) => tab.id === originalTabId),
           replacementTabCount: tabs.filter((tab) => tab.id !== originalTabId).length,
-          pendingResumeSessionIds: Object.values(state?.pendingStartupByTabId ?? {}).flatMap(
-            (startup) => (startup.resumeProviderSession ? [startup.resumeProviderSession.id] : [])
-          ),
-          resumeClaimCount: Object.keys(state?.automaticAgentResumeClaimsByTabId ?? {}).length
+          resumeClaimTabCount: Object.keys(state?.automaticAgentResumeClaimsByTabId ?? {}).length,
+          claimedResumeSessionIds: Object.values(
+            state?.automaticAgentResumeClaimsByTabId ?? {}
+          ).map((claim) => claim.providerSession.id)
         }
       },
       { originalTabId: workerBefore.tabId, worktreeId: targetWorktreeId }
@@ -512,8 +537,8 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
       everActivated: true,
       originalTabPresent: false,
       replacementTabCount: 1,
-      pendingResumeSessionIds: [],
-      resumeClaimCount: 0
+      resumeClaimTabCount: 1,
+      claimedResumeSessionIds: [PROVIDER_SESSION_ID]
     })
 
     const coordinatorAfter = (await listRuntimeTerminals(client)).find(
