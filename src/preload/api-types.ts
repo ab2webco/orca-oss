@@ -1149,6 +1149,23 @@ export type PluginHostListEntry = {
     }[]
   }[]
   restarts: number
+  /** Manifest-declared settings the user can fill from Settings -> Plugins.
+   *  A `secret` entry never carries `value`; only whether one is stored. */
+  settings?: {
+    key: string
+    type: 'string' | 'boolean' | 'number'
+    label: string
+    description?: string
+    secret: boolean
+    required: boolean
+    placeholder?: string
+    min?: number
+    max?: number
+    value?: string | number | boolean
+    configured: boolean
+  }[]
+  /** A required setting has no value, so the plugin runs unconfigured. */
+  needsSetup?: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
   source?: {
     kind: 'local-path' | 'git' | 'marketplace' | 'bundled'
@@ -3891,6 +3908,13 @@ export type PreloadApi = {
     }) => Promise<PluginMarketplaceHostInstallPreview>
     rollbackMarketplacePlugin: (args: { pluginKey: string }) => Promise<PluginHostInstallResult>
     remove: (args: { pluginKey: string }) => Promise<PluginHostListEntry[]>
+    /** Persists one manifest-declared setting; secrets go to the plugin vault,
+     *  everything else to the same settings.json `settings:own` reads. */
+    setSetting: (args: {
+      pluginKey: string
+      key: string
+      value: string | number | boolean
+    }) => Promise<PluginHostListEntry[]>
     getLogs: (args: { pluginKey: string }) => Promise<PluginHostLogLine[]>
     /** Re-discovers after settings edits (feature flag, dev paths). */
     refresh: () => Promise<PluginHostListEntry[]>

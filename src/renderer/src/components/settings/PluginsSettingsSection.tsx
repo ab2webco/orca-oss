@@ -13,6 +13,7 @@ import { getPluginsSectionPresentation } from './plugins-search'
 import { SettingsSection } from './SettingsSection'
 import { usePluginLogs } from './use-plugin-logs'
 import { usePluginMarketplaceLifecycle } from './use-plugin-marketplace-lifecycle'
+import { usePluginSettingsEditor } from './use-plugin-settings-editor'
 
 type PluginsSettingsSectionProps = {
   mounted: boolean
@@ -148,6 +149,12 @@ export function PluginsSettingsSection({
     setBusyPluginKeys
   })
   const pluginLogs = usePluginLogs(mounted, mountedRef, plugins)
+  const pluginSettings = usePluginSettingsEditor(
+    mounted,
+    mountedRef,
+    plugins,
+    applyCompletedMutation
+  )
 
   const sectionPresentation = getPluginsSectionPresentation()
 
@@ -326,6 +333,8 @@ export function PluginsSettingsSection({
         busyPluginKeys={busyPluginKeys}
         openLogs={pluginLogs.openLogs}
         logsByPlugin={pluginLogs.logsByPlugin}
+        openSettings={pluginSettings.openSettings}
+        settingsFormByPlugin={pluginSettings.formStateByPlugin}
         devPaths={settings.devPluginPaths}
         devPathsBusy={devPathsBusy}
         onToggleFeature={() => void toggleFeature()}
@@ -333,6 +342,8 @@ export function PluginsSettingsSection({
         onReview={setConsentPluginId}
         onToggleEnabled={(entry) => void toggleEnabled(entry)}
         onToggleLogs={pluginLogs.toggleLogs}
+        onToggleSettings={pluginSettings.toggleSettings}
+        onSaveSetting={pluginSettings.saveSetting}
         onMarketplaceInstalled={marketplaceLifecycle.reloadAfterMutation}
         onRollbackRequest={marketplaceLifecycle.requestRollback}
         onRemoveRequest={setRemovePluginId}

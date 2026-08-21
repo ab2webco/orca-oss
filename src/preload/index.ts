@@ -641,6 +641,11 @@ const api = {
       ipcRenderer.invoke('plugins:rollbackMarketplacePlugin', args),
     remove: (args: { pluginKey: string }): Promise<PluginHostListEntry[]> =>
       ipcRenderer.invoke('plugins:remove', args),
+    setSetting: (args: {
+      pluginKey: string
+      key: string
+      value: string | number | boolean
+    }): Promise<PluginHostListEntry[]> => ipcRenderer.invoke('plugins:setSetting', args),
     getLogs: (args: { pluginKey: string }): Promise<PluginHostLogLine[]> =>
       ipcRenderer.invoke('plugins:getLogs', args),
     refresh: (): Promise<PluginHostListEntry[]> => ipcRenderer.invoke('plugins:refresh'),

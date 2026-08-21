@@ -10529,7 +10529,8 @@
           "experimental": "Experimental",
           "description": "Install and manage Orca plugins. Plugins run on this computer, even for SSH workspaces.",
           "logsFailed": "Could not load plugin logs.",
-          "rollbackFailed": "Could not roll back this plugin. A previous immutable version may not be available."
+          "rollbackFailed": "Could not roll back this plugin. A previous immutable version may not be available.",
+          "settingSaveFailed": "Could not save this setting."
         },
         "PluginSettingsRow": {
           "blocked": "Blocked",
@@ -10559,7 +10560,10 @@
           "remove": "Remove",
           "disableLabel": "Disable {{value0}}",
           "enableLabel": "Enable {{value0}}",
-          "invalidPluginError": "The plugin manifest or installed files are invalid. Fix the plugin, then refresh."
+          "invalidPluginError": "The plugin manifest or installed files are invalid. Fix the plugin, then refresh.",
+          "needsSetup": "Needs setup",
+          "finishSetup": "Finish setup",
+          "configure": "Configure"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",
@@ -10990,6 +10994,10 @@
           "weeklyUsed": "7d {{value0}}% used",
           "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}",
           "quotaUnknown": "remaining quota unknown"
+        },
+        "PluginSettingsForm": {
+          "requiredHint": "Required to run.",
+          "secretStored": "Stored — type to replace"
         }
       },
       "right": {

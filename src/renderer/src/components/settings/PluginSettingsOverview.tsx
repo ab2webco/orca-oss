@@ -5,6 +5,7 @@ import { PluginCatalogEmptyState } from '../plugin-catalog/PluginCatalogEmptySta
 import { PluginDevelopmentSection } from './PluginDevelopmentSection'
 import { PluginMarketplaceBrowser } from './PluginMarketplaceBrowser'
 import { PluginSettingsRow, type PluginLogsState } from './PluginSettingsRow'
+import type { PluginSettingsFormState } from './PluginSettingsForm'
 import { SettingsRow, SettingsSwitch } from './SettingsFormControls'
 
 type PluginSettingsOverviewProps = {
@@ -17,6 +18,8 @@ type PluginSettingsOverviewProps = {
   busyPluginKeys: ReadonlySet<string>
   openLogs: ReadonlySet<string>
   logsByPlugin: Readonly<Record<string, PluginLogsState>>
+  openSettings: ReadonlySet<string>
+  settingsFormByPlugin: Readonly<Record<string, PluginSettingsFormState>>
   devPaths: readonly string[]
   devPathsBusy: boolean
   onToggleFeature: () => void
@@ -24,6 +27,8 @@ type PluginSettingsOverviewProps = {
   onReview: (pluginKey: string) => void
   onToggleEnabled: (plugin: PluginHostListEntry) => void
   onToggleLogs: (pluginKey: string) => void
+  onToggleSettings: (pluginKey: string) => void
+  onSaveSetting: (pluginKey: string, key: string, value: string | number | boolean) => void
   onMarketplaceInstalled: (pluginKey: string) => Promise<void>
   onRollbackRequest: (pluginKey: string) => void
   onRemoveRequest: (pluginKey: string) => void
@@ -50,6 +55,8 @@ export function PluginSettingsOverview({
   busyPluginKeys,
   openLogs,
   logsByPlugin,
+  openSettings,
+  settingsFormByPlugin,
   devPaths,
   devPathsBusy,
   onToggleFeature,
@@ -57,6 +64,8 @@ export function PluginSettingsOverview({
   onReview,
   onToggleEnabled,
   onToggleLogs,
+  onToggleSettings,
+  onSaveSetting,
   onMarketplaceInstalled,
   onRollbackRequest,
   onRemoveRequest,
@@ -151,9 +160,13 @@ export function PluginSettingsOverview({
                       busy={busyPluginKeys.has(plugin.pluginKey)}
                       logsOpen={openLogs.has(plugin.pluginKey)}
                       logsState={logsByPlugin[plugin.pluginKey]}
+                      settingsOpen={openSettings.has(plugin.pluginKey)}
+                      settingsFormState={settingsFormByPlugin[plugin.pluginKey]}
                       onReview={onReview}
                       onToggleEnabled={onToggleEnabled}
                       onToggleLogs={onToggleLogs}
+                      onToggleSettings={onToggleSettings}
+                      onSaveSetting={onSaveSetting}
                       onRollbackRequest={onRollbackRequest}
                       onRemoveRequest={onRemoveRequest}
                     />
