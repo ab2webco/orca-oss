@@ -86,7 +86,7 @@ jobs:
             git merge --abort
             git reset --hard upstream/main
             echo "conflicts=true" >>"$GITHUB_OUTPUT"
-            echo "Merge has conflicts — the reviewer must resolve them in the PR."
+            echo "Merge has conflicts — this branch is now a MIRROR of upstream, not a merge."
           fi
           # Why: GITHUB_TOKEN cannot create/update files under .github/workflows/
           # on push (GitHub rejects it: "refusing to allow ... without workflows
@@ -115,11 +115,37 @@ jobs:
           git push -f origin "$sync_branch"
           echo "branch=$sync_branch" >>"$GITHUB_OUTPUT"
 
+      # Why no PR on the conflict path: the step above resets the branch to
+      # upstream's tip, so it carries none of the fork's commits — a PR from it is
+      # a revert of the fork wearing a sync's title (measured on #151: 676 fork
+      # commits missing, 8383 files). The branch still gets pushed and stays useful
+      # as a reference; the reviewable sync is the chunked, hand-resolved one.
+      - name: Retire the mirror PR
+        if: steps.check.outputs.behind != '0' && steps.merge.outputs.conflicts == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          head="${{ steps.merge.outputs.branch }}"
+          {
+            echo "### Upstream sync: mirror, not a merge"
+            echo
+            echo "A real merge of upstream/main conflicted, so '$head' was reset to"
+            echo "upstream tip. It shares no history with this fork past the last sync, so it"
+            echo "is deliberately NOT offered as a pull request. Sync upstream in"
+            echo "hand-resolved chunks instead."
+          } >>"$GITHUB_STEP_SUMMARY"
+          if gh pr view "$head" --json number >/dev/null 2>&1; then
+            gh pr comment "$head" --body "Closing automatically: a real merge conflicted, so this branch was reset to upstream tip and carries none of the fork commits. Merging it would revert the fork. Sync upstream in hand-resolved chunks instead."
+            gh pr close "$head"
+            echo "Closed the mirror PR."
+          fi
+
       # Why GH_REPO: the `upstream` remote added above outranks `origin` in gh's
       # base-repo resolution, so every `gh pr` call here targeted stablyai/orca
       # and `gh pr create` died on "Resource not accessible by integration".
       - name: Open or update sync PR
-        if: steps.check.outputs.behind != '0'
+        if: steps.check.outputs.behind != '0' && steps.merge.outputs.conflicts != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -129,12 +155,8 @@ jobs:
           base="${{ steps.base.outputs.branch }}"
           head="${{ steps.merge.outputs.branch }}"
           behind="${{ steps.check.outputs.behind }}"
-          conflicts="${{ steps.merge.outputs.conflicts }}"
-          if [[ "$conflicts" == "true" ]]; then
-            note="⚠️ **This sync has merge conflicts.** Resolve them locally (\`git merge upstream/main\`) or via the GitHub conflict editor before merging. Use a **merge commit** (not squash) to preserve upstream history."
-          else
-            note="✅ Clean merge. Use a **merge commit** (not squash) to preserve upstream history."
-          fi
+          # Why unconditional: the conflict path never reaches this step any more.
+          note="✅ Clean merge. Use a **merge commit** (not squash) to preserve upstream history."
           body=$(printf '%s\n\n%s\n' "Automated sync of **${behind}** new commit(s) from \`stablyai/orca@main\` into \`${base}\`." "$note")
           if [[ -n "$WORKFLOW_DISCARD" ]]; then
             summary="<details><summary>Workflow changes this branch does <b>not</b> carry (${WORKFLOW_COMMITS} upstream commit(s) touched \`.github/workflows\`)</summary>"
