@@ -74,12 +74,7 @@ const MODEL_PRICING: Record<string, ClaudeModelPricing> = {
   'claude-opus-4-7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-  'claude-opus-4-1': {
-    input: 15,
-    output: 75,
-    cacheRead: 1.5,
-    cacheWrite: 18.75
-  },
+  'claude-opus-4-1': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   'claude-opus-4': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   // Why: introductory rates, in effect through 2026-08-31; SONNET_5_STANDARD_PRICING
   // takes over from 2026-09-01. Unlike Sonnet 4.x it bills its full 1M window flat,
@@ -106,26 +101,11 @@ const MODEL_PRICING: Record<string, ClaudeModelPricing> = {
     cacheWrite: 3.75,
     ...SONNET_LONG_CONTEXT_PRICING
   },
-  'claude-sonnet-3-7': {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75
-  },
-  'claude-sonnet-3-5': {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75
-  },
+  'claude-sonnet-3-7': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  'claude-sonnet-3-5': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   'claude-haiku-4-5': { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
   'claude-haiku-3-5': { input: 0.8, output: 4, cacheRead: 0.08, cacheWrite: 1 },
-  'claude-haiku-3': {
-    input: 0.25,
-    output: 1.25,
-    cacheRead: 0.03,
-    cacheWrite: 0.3
-  }
+  'claude-haiku-3': { input: 0.25, output: 1.25, cacheRead: 0.03, cacheWrite: 0.3 }
 }
 
 const MODEL_ALIASES: Record<string, string> = {

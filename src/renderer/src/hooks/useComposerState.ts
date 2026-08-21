@@ -829,10 +829,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const folderTargetIsRemote =
     folderTargetConnectionId !== null || folderTargetRuntimeEnvironmentId !== null
   const folderTargetAgentDetectionTarget = folderTargetRuntimeEnvironmentId
-    ? {
-        kind: 'runtime' as const,
-        environmentId: folderTargetRuntimeEnvironmentId
-      }
+    ? { kind: 'runtime' as const, environmentId: folderTargetRuntimeEnvironmentId }
     : folderTargetConnectionId
       ? { kind: 'ssh' as const, connectionId: folderTargetConnectionId }
       : selectedProjectGroup
@@ -1403,11 +1400,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             setupAgentStartupPolicySaveRef.current = null
           }
         })
-        setupAgentStartupPolicySaveRef.current = {
-          repoId: currentRepo.id,
-          policy,
-          promise
-        }
+        setupAgentStartupPolicySaveRef.current = { repoId: currentRepo.id, policy, promise }
         const saved = await promise
         if (
           saved &&
@@ -1515,10 +1508,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             { repo: repoId },
             { timeoutMs: 30_000 }
           )
-        : (window.api.gh.repoSlug({
-            repoPath: selectedRepoPath,
-            repoId
-          }) as Promise<{
+        : (window.api.gh.repoSlug({ repoPath: selectedRepoPath, repoId }) as Promise<{
             owner: string
             repo: string
           } | null>)
@@ -1877,10 +1867,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     )
       .then((result) => {
         if (!cancelled) {
-          setLoadedIssueCommand({
-            contextKey: selectedRepoHookContextKey,
-            result
-          })
+          setLoadedIssueCommand({ contextKey: selectedRepoHookContextKey, result })
         }
       })
       .catch(() => {
@@ -2030,11 +2017,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
 
     const lookupRepoId = selectedRepo.id
     void window.api.gh
-      .listWorkItems({
-        repoPath: selectedRepo.path,
-        repoId: selectedRepo.id,
-        limit: 100
-      })
+      .listWorkItems({ repoPath: selectedRepo.path, repoId: selectedRepo.id, limit: 100 })
       .then((envelope) => {
         if (!cancelled) {
           // Why: IPC omits repoId — stamp it from the queried repo below; cast through unknown since spreading the discriminated union loses the discriminant.
@@ -2218,9 +2201,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 ? { baseRefName: startPointSelection.item.baseRefName }
                 : {}),
               ...(startPointSelection.item.isCrossRepository !== undefined
-                ? {
-                    isCrossRepository: startPointSelection.item.isCrossRepository
-                  }
+                ? { isCrossRepository: startPointSelection.item.isCrossRepository }
                 : {})
             }))
           startPointSelection.resolved = selectedPrStartPoint
@@ -2630,10 +2611,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           )
         )
       }
-      return {
-        filePaths: uploadResult.filePaths,
-        folderPaths: uploadResult.folderPaths
-      }
+      return { filePaths: uploadResult.filePaths, folderPaths: uploadResult.folderPaths }
     },
     [connectionId, selectedRepoPath, selectedRepoSettings]
   )
@@ -2737,10 +2715,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const handleRepoChange = useCallback(
     (
       value: string,
-      options: {
-        preserveStartFrom?: boolean
-        forceResetStartFrom?: boolean
-      } = {}
+      options: { preserveStartFrom?: boolean; forceResetStartFrom?: boolean } = {}
     ): void => {
       setProjectError(null)
       if (value === repoId && !options.forceResetStartFrom) {
@@ -2916,9 +2891,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       if (!nextRepoId) {
         return
       }
-      handleRepoChange(nextRepoId, {
-        forceResetStartFrom: isProjectGroupTarget
-      })
+      handleRepoChange(nextRepoId, { forceResetStartFrom: isProjectGroupTarget })
     },
     [
       eligibleRepos,
@@ -3000,9 +2973,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       branchAutoNameRef.current = ''
       setStartFromResetHint(null)
       // Why: a Start-from PR pick is also a linkedWorkItem assignment; reuse applyLinkedWorkItem so auto-name and linkedPR stay one code path.
-      applyLinkedWorkItem(item, {
-        preserveBranchNameOverride: Boolean(nextBranchNameOverride)
-      })
+      applyLinkedWorkItem(item, { preserveBranchNameOverride: Boolean(nextBranchNameOverride) })
       // Why: prefill the note from the PR (only when empty or still an auto-fill) so the sidebar surfaces it without clobbering user text.
       const identity = resolveGitHubWorkItemIdentity(item)
       if (identity.type === 'pr') {
@@ -3206,11 +3177,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 : {})
             })
           : callRuntimeRpc<
-              | {
-                  baseBranch: string
-                  compareBaseRef?: string
-                  pushTarget?: GitPushTarget
-                }
+              | { baseBranch: string; compareBaseRef?: string; pushTarget?: GitPushTarget }
               | { error: string }
             >(
               target,
@@ -3547,10 +3514,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 {
                   agent,
                   ...(folderLaunchDraftText
-                    ? {
-                        promptDelivery: 'draft' as const,
-                        launchDraftText: folderLaunchDraftText
-                      }
+                    ? { promptDelivery: 'draft' as const, launchDraftText: folderLaunchDraftText }
                     : {}),
                   nativeChatTranscriptIsLocalReadable:
                     isNativeChatTranscriptLocalReadable(folderTargetConnectionId)
@@ -4011,9 +3975,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 launchAgent: tuiAgent,
                 ...(startupPlan.draftPrompt ? { draftPrompt: startupPlan.draftPrompt } : {}),
                 ...(startupPlan.startupCommandDelivery
-                  ? {
-                      startupCommandDelivery: startupPlan.startupCommandDelivery
-                    }
+                  ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
                   : {}),
                 ...(shouldSeedInitialAgentStatus
                   ? {
@@ -4420,9 +4382,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         })
         const baseBranchSettlement = await settleComposerSubmit(
           selectedRepoIsGit
-            ? resolveWorktreeCreateBaseBranch({
-                explicitBaseBranch: smartSubmitBaseBranch
-              })
+            ? resolveWorktreeCreateBaseBranch({ explicitBaseBranch: smartSubmitBaseBranch })
             : Promise.resolve(undefined),
           isSubmissionCancelled
         )
@@ -4465,10 +4425,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 {
                   agent,
                   ...(quickDraftPrompt
-                    ? {
-                        promptDelivery: 'draft' as const,
-                        launchDraftText: quickDraftPrompt
-                      }
+                    ? { promptDelivery: 'draft' as const, launchDraftText: quickDraftPrompt }
                     : {}),
                   nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
                     selectedRepo.connectionId
@@ -4502,9 +4459,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
               ? { sessionOptions: draftLaunchPlan.sessionOptions }
               : {}),
             ...(draftLaunchPlan.startupCommandDelivery
-              ? {
-                  startupCommandDelivery: draftLaunchPlan.startupCommandDelivery
-                }
+              ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
               : {}),
             ...(draftLaunchPlan.env ? { env: draftLaunchPlan.env } : {})
           }
@@ -4543,9 +4498,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 launchConfig: startupPlan.launchConfig,
                 ...(agent ? { launchAgent: agent } : {}),
                 ...(startupPlan.startupCommandDelivery
-                  ? {
-                      startupCommandDelivery: startupPlan.startupCommandDelivery
-                    }
+                  ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
                   : {}),
                 ...(quickTelemetry ? { telemetry: quickTelemetry } : {})
               }

@@ -33,12 +33,7 @@ const UNKNOWN_INDEX_SENTINEL = Number.MAX_SAFE_INTEGER
 function getFieldValueForGrouping(
   row: GitHubProjectRow,
   field: GitHubProjectField
-): {
-  key: string
-  label: string
-  orderHint: number
-  iteration: ProjectGroup['iteration']
-} {
+): { key: string; label: string; orderHint: number; iteration: ProjectGroup['iteration'] } {
   const value = row.fieldValuesByFieldId[field.id]
   if (!value) {
     return {
@@ -57,11 +52,7 @@ function getFieldValueForGrouping(
       label: value.title || meta?.title || 'Iteration',
       orderHint: idx === -1 ? UNKNOWN_INDEX_SENTINEL - 1 : idx,
       iteration: meta
-        ? {
-            startDate: meta.startDate,
-            duration: meta.duration,
-            completed: meta.completed
-          }
+        ? { startDate: meta.startDate, duration: meta.duration, completed: meta.completed }
         : null
     }
   }

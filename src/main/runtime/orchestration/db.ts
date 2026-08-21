@@ -270,9 +270,7 @@ function legacyMessageMatchesQuestion(
     return false
   }
   try {
-    const payload = JSON.parse(message.payload ?? '{}') as {
-      options?: unknown
-    }
+    const payload = JSON.parse(message.payload ?? '{}') as { options?: unknown }
     return (
       normalizeLegacyQuestionOptions(payload.options) === normalizeLegacyQuestionOptions(options)
     )
@@ -661,9 +659,7 @@ export class OrchestrationDb {
 
   // Why: CREATE TABLE IF NOT EXISTS won't alter existing DBs; migrate in a txn that bumps user_version only on success (atomic all-or-nothing).
   private migrate(): void {
-    const storedVersion = this.db.pragma('user_version', {
-      simple: true
-    }) as number
+    const storedVersion = this.db.pragma('user_version', { simple: true }) as number
     const current = resolveOrchestrationMigrationStartVersion(
       this.db,
       storedVersion,
@@ -2083,10 +2079,7 @@ export class OrchestrationDb {
         limit
       ) as MessageRow[]
     if (recovery.length > 0) {
-      return {
-        messages: exposeMessageListTimestamps(recovery),
-        recovery: true
-      }
+      return { messages: exposeMessageListTimestamps(recovery), recovery: true }
     }
 
     const unread = this.db
@@ -2791,11 +2784,7 @@ export class OrchestrationDb {
         }
         const messages = this.getDeliveryMessages(existing)
         this.db.exec('COMMIT')
-        return {
-          delivery: exposeDeliveryTimestamps(existing),
-          messages,
-          replayed: true
-        }
+        return { delivery: exposeDeliveryTimestamps(existing), messages, replayed: true }
       }
 
       const address = `run:${params.runId}`
@@ -2844,11 +2833,7 @@ export class OrchestrationDb {
         )
       const delivery = this.getDeliveryRaw(deliveryId) as DeliveryRow
       this.db.exec('COMMIT')
-      return {
-        delivery: exposeDeliveryTimestamps(delivery),
-        messages,
-        replayed: false
-      }
+      return { delivery: exposeDeliveryTimestamps(delivery), messages, replayed: false }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -2881,10 +2866,7 @@ export class OrchestrationDb {
       }
       if (delivery.status === 'acknowledged') {
         this.db.exec('COMMIT')
-        return {
-          delivery: exposeDeliveryTimestamps(delivery),
-          duplicate: true
-        }
+        return { delivery: exposeDeliveryTimestamps(delivery), duplicate: true }
       }
 
       const messageIds = JSON.parse(delivery.message_ids) as string[]
@@ -2901,10 +2883,7 @@ export class OrchestrationDb {
         .run(delivery.id)
       const acknowledged = this.getDeliveryRaw(delivery.id) as DeliveryRow
       this.db.exec('COMMIT')
-      return {
-        delivery: exposeDeliveryTimestamps(acknowledged),
-        duplicate: false
-      }
+      return { delivery: exposeDeliveryTimestamps(acknowledged), duplicate: false }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -3137,10 +3116,7 @@ export class OrchestrationDb {
           )
           .run(principal.id)
       }
-      const responseJson = JSON.stringify({
-        messageId: message.id,
-        settlement
-      })
+      const responseJson = JSON.stringify({ messageId: message.id, settlement })
       const receipt = this.insertLegacyOperationReceipt({
         principalId: principal.id,
         operationKey: params.operationKey,
@@ -3177,9 +3153,7 @@ export class OrchestrationDb {
       const principal = this.requireCommittedLegacyPrincipal(params.principalId, 'worker')
       const receipt = this.requireMatchingLegacyOperationReceipt(params)
       if (receipt) {
-        const response = JSON.parse(receipt.response_json) as {
-          questionId: string
-        }
+        const response = JSON.parse(receipt.response_json) as { questionId: string }
         const question = this.getQuestion(response.questionId)
         const message = this.getMessageById(response.questionId)
         if (!question || !message) {
@@ -3772,10 +3746,7 @@ export class OrchestrationDb {
       const question = this.getQuestionRaw(message.id) as QuestionRow
       const storedMessage = this.getMessageById(message.id) as MessageRow
       this.db.exec('COMMIT')
-      return {
-        question: exposeQuestionTimestamps(question),
-        message: storedMessage
-      }
+      return { question: exposeQuestionTimestamps(question), message: storedMessage }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -3827,11 +3798,7 @@ export class OrchestrationDb {
           throw new Error(`Recorded answer message ${question.answer_message_id} was not found.`)
         }
         this.db.exec('COMMIT')
-        return {
-          question: exposeQuestionTimestamps(question),
-          message,
-          duplicate: true
-        }
+        return { question: exposeQuestionTimestamps(question), message, duplicate: true }
       }
 
       const message = this.insertMessage({
@@ -5129,10 +5096,7 @@ export class OrchestrationDb {
            FROM federation_relay_items
            WHERE dispatch_id = ? AND direction = ? AND acked_at IS NULL`
         )
-        .get(params.dispatchId, params.direction) as {
-        count: number
-        bytes: number
-      }
+        .get(params.dispatchId, params.direction) as { count: number; bytes: number }
       if (quota.count >= 256 || quota.bytes + byteCount > 1024 * 1024) {
         if (params.kind === 'worker_done') {
           const heartbeat = this.db
@@ -5510,17 +5474,11 @@ export class OrchestrationDb {
     )
   }
 
-  beginWorkerStop(dispatchId: string):
-    | {
-        disposition: 'stopping'
-        worker: WorkerDispatchRow
-        dispatch: DispatchContextRow
-      }
-    | {
-        disposition: 'already_settled'
-        worker: WorkerDispatchRow
-        dispatch: DispatchContextRow
-      }
+  beginWorkerStop(
+    dispatchId: string
+  ):
+    | { disposition: 'stopping'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
+    | { disposition: 'already_settled'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
     | ({ disposition: 'context_only' } & ContextOnlyDispatchReleaseResult) {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -6003,16 +5961,8 @@ export class OrchestrationDb {
         const transferred = this.getWorkerTerminalResourceFormerlyOwnedBy(dispatchId)
         this.db.exec('COMMIT')
         return transferred
-          ? {
-              disposition: 'retained',
-              resource: transferred,
-              reason: 'ownership_transferred'
-            }
-          : {
-              disposition: 'retained',
-              resource: null,
-              reason: 'no_owned_resource'
-            }
+          ? { disposition: 'retained', resource: transferred, reason: 'ownership_transferred' }
+          : { disposition: 'retained', resource: null, reason: 'no_owned_resource' }
       }
       if (resource.release_state === 'released' || resource.ownership_state === 'released') {
         this.db.exec('COMMIT')
@@ -6032,11 +5982,7 @@ export class OrchestrationDb {
       }
       if (resource.ownership_state === 'transferred') {
         this.db.exec('COMMIT')
-        return {
-          disposition: 'retained',
-          resource,
-          reason: 'ownership_transferred'
-        }
+        return { disposition: 'retained', resource, reason: 'ownership_transferred' }
       }
       if (
         resource.release_state === 'unknown' ||
@@ -6231,11 +6177,7 @@ export class OrchestrationDb {
             WHERE pane_key = ? AND ownership_state = 'owned'
               AND release_state IN ('not_requested', 'retained', 'requested')`
         )
-        .all(paneKey) as {
-        id: string
-        owner_dispatch_id: string
-        pane_key: string
-      }[]
+        .all(paneKey) as { id: string; owner_dispatch_id: string; pane_key: string }[]
       const candidates =
         exact.length > 0
           ? exact
@@ -6247,11 +6189,7 @@ export class OrchestrationDb {
                     AND release_state IN ('not_requested', 'retained', 'requested')
                     AND pane_key IS NOT NULL`
                 )
-                .all() as {
-                id: string
-                owner_dispatch_id: string
-                pane_key: string
-              }[]
+                .all() as { id: string; owner_dispatch_id: string; pane_key: string }[]
             ).filter((candidate) => isEquivalentPaneKey(candidate.pane_key, paneKey))
       const update = this.db.prepare(
         `UPDATE worker_terminal_resources
@@ -6497,22 +6435,13 @@ export class OrchestrationDb {
   }): { valid: true } | { valid: false; reason: string } {
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {
-      return {
-        valid: false,
-        reason: `Dispatch ${params.dispatchId} was not found.`
-      }
+      return { valid: false, reason: `Dispatch ${params.dispatchId} was not found.` }
     }
     if (!dispatch.capability_hash) {
-      return {
-        valid: false,
-        reason: `Dispatch ${params.dispatchId} has no lifecycle capability.`
-      }
+      return { valid: false, reason: `Dispatch ${params.dispatchId} has no lifecycle capability.` }
     }
     if (dispatch.capability_revoked_at) {
-      return {
-        valid: false,
-        reason: `Dispatch ${params.dispatchId} capability is revoked.`
-      }
+      return { valid: false, reason: `Dispatch ${params.dispatchId} capability is revoked.` }
     }
     if (!params.capability) {
       return { valid: false, reason: 'The Dispatch capability is missing.' }
@@ -6534,10 +6463,7 @@ export class OrchestrationDb {
       !params.processIncarnation ||
       dispatch.process_incarnation !== params.processIncarnation
     ) {
-      return {
-        valid: false,
-        reason: 'The Dispatch process incarnation changed.'
-      }
+      return { valid: false, reason: 'The Dispatch process incarnation changed.' }
     }
     return { valid: true }
   }
@@ -6660,11 +6586,7 @@ export class OrchestrationDb {
   }): WorkerReportSettlement {
     const task = this.getTask(params.taskId)
     if (!task) {
-      return {
-        action: 'rejected',
-        code: 'unknown_task',
-        reason: `Unknown task ${params.taskId}.`
-      }
+      return { action: 'rejected', code: 'unknown_task', reason: `Unknown task ${params.taskId}.` }
     }
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {
