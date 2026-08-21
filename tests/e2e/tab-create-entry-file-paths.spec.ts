@@ -26,6 +26,8 @@ test.beforeAll(({ testRepoPath }) => {
 // probe has to run there, and debug instrumentation is not something to land in a sync PR.
 // Unparked by: run that probe on Linux and read what the results component actually
 // receives, in order. Do not add a fourth inferred cause from the DOM (ORCA-203).
+// Keep this fixme through an upstream merge: upstream's copy has none, so resolving this
+// file toward upstream silently un-parks a spec that is still red on Linux CI.
 test.fixme('new-tab file results prioritize the filename and reveal the full path on hover', async ({
   orcaPage
 }) => {
