@@ -20,6 +20,7 @@ import {
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalRead, RuntimeTerminalSummary } from '../../src/shared/runtime-types'
 import { splitWorktreeIdForFilesystem } from '../../src/shared/worktree-id'
+import { SUCCESS_ENVELOPE } from '../../src/main/runtime/orchestration/worker-done-envelope-fixture'
 
 const PROVIDER_SESSION_ID = '019feb51-2269-71c2-89c6-faa8dc65c8dc'
 
@@ -280,10 +281,13 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
         subject: 'Completed',
         body: 'The fixture completed. It found no work. Nothing remains.',
         type: 'worker_done',
+        // Why the envelope: the lab's worker_done contract rejects a bare outcome, so
+        // upstream's payload literal would leave task and dispatch stuck at `dispatched`.
         payload: JSON.stringify({
           taskId: task.result.task.id,
           dispatchId: started.result.dispatchId,
-          outcome: 'succeeded'
+          outcome: 'succeeded',
+          envelope: SUCCESS_ENVELOPE
         })
       },
       { orchestrationCapability: dispatchCapability }
