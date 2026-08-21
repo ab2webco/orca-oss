@@ -43,6 +43,10 @@ existed. The branch push (step 7) succeeds, so the mirror is current while the r
 was built to create is absent. Fixing that is one repository setting ("Allow GitHub Actions to
 create and approve pull requests"), tracked separately from this sync.
 
+> Superseded on 2026-08-21 (ORCA-270). The `gh` repo target was fixed, the sync then opened that
+> PR from the mirror, and merging it would have reverted the fork. The workflow no longer proposes
+> a branch that drops base commits, so the paragraph above no longer describes what it does.
+
 ### Verdict: use it as a recipe, not as a merge base
 
 The retention commit is worth exactly **2 conflicts**, measured by isolating it — dry-merge

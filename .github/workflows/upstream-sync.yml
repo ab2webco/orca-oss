@@ -1,11 +1,13 @@
 name: Sync from upstream (stablyai/orca)
 
 # Why: this fork tracks the official Orca repo. This workflow keeps a
-# `upstream-sync/main` branch pointed at upstream's newest main and opens (or
-# refreshes) a single PR so new upstream commits land through review. It NEVER
-# pushes to the fork's default branch and NEVER auto-resolves conflicts — the
-# 55-commit divergence means most syncs conflict (pty.ts, persistence.ts,
-# daemon/*, i18n locales), so a human resolves them in the PR.
+# `upstream-sync/main` branch pointed at upstream's newest main. A PR is opened
+# only while that branch still contains every commit on the fork's base branch;
+# once the conflict fallback resets it to upstream's tip it is a mirror, and
+# merging a mirror reverts the fork — so it is published as a readable snapshot
+# and any open PR is closed. It NEVER pushes to the fork's default branch and
+# NEVER auto-resolves conflicts; the divergence means most syncs conflict
+# (pty.ts, persistence.ts, daemon/*, i18n locales) and land in reviewed chunks.
 
 on:
   schedule:
@@ -101,53 +103,83 @@ jobs:
           # Why the diffstat: the retention commit reverts upstream's workflow
           # changes wholesale, and said so nowhere a reviewer looks. Staged
           # against HEAD it is exactly what the sync drops.
-          discarded="$(git diff --cached --stat HEAD -- .github/workflows)"
+          git diff --cached --stat HEAD -- .github/workflows >"${RUNNER_TEMP}/workflow-discard.txt"
           workflow_commits="$(git rev-list --count "origin/${base}..upstream/main" -- .github/workflows)"
-          {
-            echo "workflow_commits=$workflow_commits"
-            echo 'workflow_discard<<ORCA_DISCARD_EOF'
-            echo "$discarded"
-            echo 'ORCA_DISCARD_EOF'
-          } >>"$GITHUB_OUTPUT"
+          echo "workflow_commits=$workflow_commits" >>"$GITHUB_OUTPUT"
           if ! git diff --cached --quiet -- .github/workflows; then
             git commit -m "chore(sync): retain fork .github/workflows (bot token cannot push workflow changes)"
           fi
           git push -f origin "$sync_branch"
+          # Measured on what was actually pushed: commits on the fork branch that
+          # merging this branch would delete. The conflict fallback above resets to
+          # upstream's tip, which drops every one of them.
+          dropped="$(git rev-list --count "${sync_branch}..origin/${base}")"
+          echo "dropped=$dropped" >>"$GITHUB_OUTPUT"
           echo "branch=$sync_branch" >>"$GITHUB_OUTPUT"
+          echo "Merging $sync_branch would drop $dropped commit(s) from origin/${base}."
+          # Back to the fork's tree: the gate below lives on the fork, and a
+          # mirrored sync branch does not carry it.
+          git checkout --force --detach "origin/${base}"
+
+      # No setup-node step: the gate script imports only node: builtins, so the
+      # runner's preinstalled node runs it without an install this job never does.
+      - name: Decide whether the sync branch may be proposed
+        id: gate
+        if: steps.check.outputs.behind != '0'
+        run: |
+          node config/scripts/decide-upstream-sync-pr.mjs \
+            --base "${{ steps.base.outputs.branch }}" \
+            --sync-branch "${{ steps.merge.outputs.branch }}" \
+            --behind "${{ steps.check.outputs.behind }}" \
+            --dropped "${{ steps.merge.outputs.dropped }}" \
+            --conflicts "${{ steps.merge.outputs.conflicts }}" \
+            --workflow-commits "${{ steps.merge.outputs.workflow_commits }}" \
+            --workflow-discard-file "${RUNNER_TEMP}/workflow-discard.txt" \
+            --body-file "${RUNNER_TEMP}/sync-pr-body.md"
 
       # Why GH_REPO: the `upstream` remote added above outranks `origin` in gh's
       # base-repo resolution, so every `gh pr` call here targeted stablyai/orca
       # and `gh pr create` died on "Resource not accessible by integration".
       - name: Open or update sync PR
-        if: steps.check.outputs.behind != '0'
+        if: steps.gate.outputs.action == 'open'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          WORKFLOW_COMMITS: ${{ steps.merge.outputs.workflow_commits }}
-          WORKFLOW_DISCARD: ${{ steps.merge.outputs.workflow_discard }}
+          PR_TITLE: ${{ steps.gate.outputs.title }}
         run: |
           base="${{ steps.base.outputs.branch }}"
           head="${{ steps.merge.outputs.branch }}"
-          behind="${{ steps.check.outputs.behind }}"
-          conflicts="${{ steps.merge.outputs.conflicts }}"
-          if [[ "$conflicts" == "true" ]]; then
-            note="⚠️ **This sync has merge conflicts.** Resolve them locally (\`git merge upstream/main\`) or via the GitHub conflict editor before merging. Use a **merge commit** (not squash) to preserve upstream history."
-          else
-            note="✅ Clean merge. Use a **merge commit** (not squash) to preserve upstream history."
-          fi
-          body=$(printf '%s\n\n%s\n' "Automated sync of **${behind}** new commit(s) from \`stablyai/orca@main\` into \`${base}\`." "$note")
-          if [[ -n "$WORKFLOW_DISCARD" ]]; then
-            summary="<details><summary>Workflow changes this branch does <b>not</b> carry (${WORKFLOW_COMMITS} upstream commit(s) touched \`.github/workflows\`)</summary>"
-            why="Diffstat of the retention commit: **deletions are upstream workflow content this branch drops**, insertions are the fork's own workflows being restored. \`GITHUB_TOKEN\` cannot push workflow changes, so adopt any upstream workflow change deliberately, in a separate reviewed PR."
-            body=$(printf '%s\n%s\n\n%s\n\n```\n%s\n```\n</details>\n' "$body" "$summary" "$why" "$WORKFLOW_DISCARD")
-          fi
-          if gh pr view "$head" --json number >/dev/null 2>&1; then
-            gh pr edit "$head" --body "$body"
+          # Why `--state open` and a number: looking a single PR up by head branch
+          # resolves closed ones too, so the answer depends on gh's preference among
+          # the closed PRs this branch permanently carries. Asking only for open PRs
+          # removes that ordering assumption, and the number is unambiguous.
+          number="$(gh pr list --head "$head" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh pr edit "$number" --title "$PR_TITLE" --body-file "${RUNNER_TEMP}/sync-pr-body.md"
             echo "Updated existing sync PR."
           else
             gh pr create \
               --base "$base" \
               --head "$head" \
-              --title "chore: sync ${behind} commit(s) from upstream stablyai/orca" \
-              --body "$body"
+              --title "$PR_TITLE" \
+              --body-file "${RUNNER_TEMP}/sync-pr-body.md"
           fi
+
+      - name: Withdraw the PR the sync branch cannot support
+        if: steps.gate.outputs.action == 'withdraw'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          head="${{ steps.merge.outputs.branch }}"
+          # Declining to create one is not enough: a PR an earlier clean sync opened
+          # becomes fork-reverting the moment this branch is force-pushed as a
+          # mirror, so the open one has to go.
+          number="$(gh pr list --head "$head" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh pr close "$number" --comment "$(cat "${RUNNER_TEMP}/sync-pr-body.md")"
+            echo "Closed the sync PR: the branch no longer contains the fork."
+          else
+            echo "No open sync PR to close."
+          fi
+          echo "Branch $head is published as an upstream snapshot; no PR opened."
