@@ -42,17 +42,24 @@ export function readProposedTerminalCols(pane: ManagedPane): number | undefined 
   return readProposedPaneFitDimensions(pane)?.cols
 }
 
+/**
+ * Diverges from upstream on purpose: upstream also skips when the target grid is
+ * unmeasurable (its `skipIfTargetUnknown`), betting a live app repaints after the
+ * deferred fit. A hidden pane whose process already exited has no such repaint, so
+ * that bet drops the only copy of the screen. Skipping stays for a *measured*
+ * narrower grid, which is the clipping upstream set out to fix. The two
+ * pty-connection tests named "keeps a ... alt frame ... cannot ... measure" are
+ * what fails if a sync restores the option, so keep them with this.
+ */
 export function shouldSkipAltFrameForWidthMismatch(
   snapshotCols: number | undefined,
-  targetCols: number | undefined,
-  options: { skipIfTargetUnknown?: boolean } = {}
+  targetCols: number | undefined
 ): boolean {
   if (typeof snapshotCols !== 'number' || !Number.isFinite(snapshotCols) || snapshotCols <= 0) {
     return false
   }
   if (typeof targetCols !== 'number' || !Number.isFinite(targetCols) || targetCols <= 0) {
-    // A hidden pane has no final grid; its live app can repaint after the deferred fit.
-    return options.skipIfTargetUnknown === true
+    return false
   }
   // Fixed-grid alt rows clip at narrower columns; normal history remains reflowable.
   return snapshotCols > targetCols

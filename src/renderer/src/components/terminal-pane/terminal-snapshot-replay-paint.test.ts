@@ -90,13 +90,10 @@ describe('shouldSkipAltFrameForWidthMismatch', () => {
     expect(shouldSkipAltFrameForWidthMismatch(Number.POSITIVE_INFINITY, 128)).toBe(false)
   })
 
-  it('can conservatively skip a live frame until a hidden pane has a final grid', () => {
-    expect(shouldSkipAltFrameForWidthMismatch(135, undefined, { skipIfTargetUnknown: true })).toBe(
-      true
-    )
-    expect(
-      shouldSkipAltFrameForWidthMismatch(undefined, undefined, { skipIfTargetUnknown: true })
-    ).toBe(false)
+  it('keeps a wider frame when the target grid is unmeasurable', () => {
+    // Why no opt-out: upstream's skipIfTargetUnknown traded a hidden pane's only
+    // screen copy for a repaint that an exited process never sends.
+    expect(shouldSkipAltFrameForWidthMismatch(135, undefined)).toBe(false)
   })
 })
 

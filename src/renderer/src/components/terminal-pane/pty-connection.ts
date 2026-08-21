@@ -7332,9 +7332,7 @@ export function connectPanePty(
             skippedAltFrame =
               snapshot.alternateScreen === true &&
               snapshot.frameRestoreAnsi !== undefined &&
-              shouldSkipAltFrameForWidthMismatch(snapshot.cols, readProposedTerminalCols(pane), {
-                skipIfTargetUnknown: true
-              })
+              shouldSkipAltFrameForWidthMismatch(snapshot.cols, readProposedTerminalCols(pane))
             for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot, {
               skipAltFrame: skippedAltFrame
             })) {
@@ -8328,8 +8326,7 @@ export function connectPanePty(
             typeof snapshotFrameRestoreAnsi === 'string' &&
             shouldSkipAltFrameForWidthMismatch(
               connectResult.snapshotCols,
-              readProposedTerminalCols(pane),
-              { skipIfTargetUnknown: true }
+              readProposedTerminalCols(pane)
             )
           writeReplayData(
             daemonAltFrameSkippable
@@ -8395,10 +8392,7 @@ export function connectPanePty(
             for (const replayChunk of buildMainModelSnapshotReplayWrites(modelSnapshot, {
               skipAltFrame: shouldSkipAltFrameForWidthMismatch(
                 modelCols,
-                readProposedTerminalCols(pane),
-                {
-                  skipIfTargetUnknown: true
-                }
+                readProposedTerminalCols(pane)
               )
             })) {
               writeReplayData(replayChunk)

@@ -8855,7 +8855,7 @@ describe('connectPanePty', () => {
     expect(writes.join('')).not.toContain('ALT-FRAME-BODY')
   })
 
-  it('drops a live daemon alt frame until a hidden pane has a final grid', async () => {
+  it('keeps a live daemon alt frame while the pane has no measurable grid', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('tab-pty')
     transport.connect.mockImplementation(async ({ sessionId }: { sessionId?: string }) =>
@@ -8891,9 +8891,11 @@ describe('connectPanePty', () => {
     )
     await flushAsyncTicks(20)
 
+    // Why the frame survives an unmeasurable target: no width proves it too wide, and
+    // a PTY whose process already exited never sends the repaint upstream waits for.
     const writes = (pane.terminal.write as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])
     expect(writes.join('')).toContain('PREFIX-SCROLLBACK')
-    expect(writes.join('')).not.toContain('ALT-FRAME-BODY')
+    expect(writes.join('')).toContain('ALT-FRAME-BODY')
   })
 
   it('falls back to the merged daemon snapshot when split metadata is incomplete', async () => {
@@ -15537,7 +15539,7 @@ describe('connectPanePty', () => {
     disposable.dispose()
   })
 
-  it('pulses a skipped hidden alt frame when reveal keeps the snapshot grid', async () => {
+  it('pulses a narrower-target skipped hidden alt frame when reveal keeps the snapshot grid', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const { safeFit } = await import('@/lib/pane-manager/pane-tree-ops')
     const transport = createMockTransport('pty-id')
@@ -15561,8 +15563,10 @@ describe('connectPanePty', () => {
       scrollbackAnsi: 'preserved history'
     })
     const pane = createPane(1)
-    let paneRect = createRect(0, 0)
+    let paneRect = createRect(400, 600)
     pane.container.getBoundingClientRect = vi.fn(() => paneRect)
+    let proposedCols = 80
+    pane.fitAddon.proposeDimensions = vi.fn(() => ({ cols: proposedCols, rows: 40 }))
     let xtermContainerDisplay = 'none'
     const xtermContainer = new EventTarget() as HTMLElement
     Object.defineProperty(xtermContainer, 'parentElement', { value: null })
@@ -15583,18 +15587,68 @@ describe('connectPanePty', () => {
     )
     expect(writes.join('')).not.toContain('TOO-WIDE-ALT-FRAME')
     expect(writes.join('')).toContain('\x1b[?1004h\x1b[?25l')
-    expect(transport.resize).not.toHaveBeenCalled()
 
-    xtermContainerDisplay = 'block'
-    paneRect = createRect(800, 600)
-    safeFit(pane as never)
-    await flushAsyncTicks(12)
-
+    // Why the pulse: a same-size restore SIGWINCH is not emitted, so the TUI that
+    // owns the dropped frame would never be told to repaint it.
     const pulseStart = transport.resize.mock.calls.findIndex(
       ([cols, rows]) => cols === 119 && rows === 40
     )
     expect(pulseStart).toBeGreaterThanOrEqual(0)
     expect(transport.resize.mock.calls[pulseStart + 1]).toEqual([120, 40])
+
+    xtermContainerDisplay = 'block'
+    paneRect = createRect(800, 600)
+    proposedCols = 120
+    safeFit(pane as never)
+    await flushAsyncTicks(12)
+    disposable.dispose()
+  })
+
+  it('keeps a hidden alt frame the pane cannot yet measure', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    let onData: ConnectCallbacks['onData']
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      onData = callbacks.onData
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+    const getMainBufferSnapshot = window.api.pty.getMainBufferSnapshot as unknown as ReturnType<
+      typeof vi.fn
+    >
+    const hidden = 'x'.repeat(2 * 1024 * 1024 + 1)
+    getMainBufferSnapshot.mockResolvedValue({
+      data: 'ONLY-COPY-ALT-FRAME',
+      frameRestoreAnsi: '\x1b[?1004h\x1b[?25l',
+      cols: 120,
+      rows: 40,
+      seq: hidden.length + 1,
+      alternateScreen: true,
+      scrollbackAnsi: 'preserved history'
+    })
+    const pane = createPane(1)
+    pane.container.getBoundingClientRect = vi.fn(() => createRect(0, 0))
+    const xtermContainer = new EventTarget() as HTMLElement
+    Object.defineProperty(xtermContainer, 'parentElement', { value: null })
+    Object.defineProperty(xtermContainer, 'ownerDocument', {
+      value: { defaultView: { getComputedStyle: () => ({ display: 'none' }) } }
+    })
+    ;(pane as { xtermContainer?: HTMLElement }).xtermContainer = xtermContainer
+    const deps = createDeps({ isVisibleRef: { current: false } })
+    const disposable = connectPanePty(pane as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks(6)
+    onData?.(hidden, { seq: hidden.length, rawLength: hidden.length })
+    ;(deps.isVisibleRef as { current: boolean }).current = true
+    onData?.('x', { seq: hidden.length + 1, rawLength: 1 })
+    await flushAsyncTicks(20)
+
+    // The restore is the only place this screen still exists: an unmeasurable target
+    // is not evidence the frame is too wide, and a finished process never repaints it.
+    const writes = (pane.terminal.write as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => call[0]
+    )
+    expect(writes.join('')).toContain('ONLY-COPY-ALT-FRAME')
+    expect(writes.join('')).toContain('preserved history')
     disposable.dispose()
   })
 
