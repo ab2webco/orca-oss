@@ -29,9 +29,6 @@ on:
       - 'electron.vite.config.ts'
       - 'config/build-plugins/**'
       - 'src/main/daemon/**'
-      - 'src/main/providers/local-pty-provider.ts'
-      - 'src/main/providers/windows-shell-args.ts'
-      - 'src/main/providers/windows-shell-preflight-runtime.windows.test.ts'
       - 'native/computer-use-macos/**'
       - 'native/computer-use-linux/**'
       - 'native/computer-use-windows/**'
@@ -109,7 +106,6 @@ jobs:
           src/main/computer/macos-native-provider-socket.test.ts
           src/main/computer/macos-computer-use-permissions.test.ts
           src/main/computer/macos-computer-use-permission-status.test.ts
-          src/main/providers/windows-shell-preflight-runtime.windows.test.ts
           src/main/computer/desktop-script-provider-client.test.ts
           src/main/computer/desktop-script-provider-cache.test.ts
           src/main/computer/desktop-script-provider-actions.test.ts

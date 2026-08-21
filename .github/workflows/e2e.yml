@@ -17,10 +17,22 @@ on:
         description: JSON array of changed specs; empty runs the full suite
         required: false
         type: string
+      project:
+        description: Extra Playwright project for those specs, e.g. electron-ondemand
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       ref:
         description: Ref to check out (defaults to the workflow ref)
+        required: false
+        type: string
+      test_files:
+        description: JSON array of specs to run; empty runs the full suite
+        required: false
+        type: string
+      project:
+        description: Extra Playwright project for those specs, e.g. electron-ondemand
         required: false
         type: string
   schedule:
@@ -46,18 +58,15 @@ jobs:
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential python3
 
-      # Why pnpm first: setup-node needs pnpm on PATH to locate the store it caches.
-      # Without that cache every E2E job re-downloaded the whole dependency set.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
 
       # Why: this job runs the same pnpm install path as pr.yml's verify
       # job, so it needs the same pinned node-gyp override to avoid pnpm's
@@ -73,23 +82,18 @@ jobs:
 
       # Why: building here avoids parallel builds inside Playwright globalSetup;
       # paired-browser specs also need the standalone web bundle.
-      - name: Build E2E outputs
+      - name: Build Electron app for E2E
         env:
           VITE_EXPOSE_STORE: 'true'
         run: |
           npx electron-vite build --mode e2e
           pnpm run build:web-from-renderer
-          pnpm run build:relay
 
       - name: Upload E2E build output
         uses: actions/upload-artifact@v7
         with:
           name: e2e-build-out
           path: out/
-          # Why: build-relay.mjs writes each relay's marker as `out/relay/<platform>/.version`,
-          # and upload-artifact drops dotfiles by default — consumers then fail SSH specs with
-          # "local relay build is missing its version marker".
-          include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
 
@@ -98,31 +102,42 @@ jobs:
     needs: build
     if: inputs.test_files == ''
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Why 45 and not 30: Playwright shards by index over the sorted spec list, not
+    # by duration, so the slowest shard carries the cost. Measured on run
+    # 31648371052 — the last green E2E on main, no sync in the tree — shard 7 took
+    # 27.0 min against the old 30, while shard 3 took 10.9 (2.5x spread). The cap
+    # was already at 90% before any PR added a spec, so it read as a red check on
+    # whichever PR happened to cross it (ORCA-215). Raising it buys margin; the real
+    # fix is balancing by duration, tracked in ORCA-215.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - shard: '1/10'
-            shard_name: 1-of-10
-          - shard: '2/10'
-            shard_name: 2-of-10
-          - shard: '3/10'
-            shard_name: 3-of-10
-          - shard: '4/10'
-            shard_name: 4-of-10
-          - shard: '5/10'
-            shard_name: 5-of-10
-          - shard: '6/10'
-            shard_name: 6-of-10
-          - shard: '7/10'
-            shard_name: 7-of-10
-          - shard: '8/10'
-            shard_name: 8-of-10
-          - shard: '9/10'
-            shard_name: 9-of-10
-          - shard: '10/10'
-            shard_name: 10-of-10
+          - shard: '1/12'
+            shard_name: 1-of-12
+          - shard: '2/12'
+            shard_name: 2-of-12
+          - shard: '3/12'
+            shard_name: 3-of-12
+          - shard: '4/12'
+            shard_name: 4-of-12
+          - shard: '5/12'
+            shard_name: 5-of-12
+          - shard: '6/12'
+            shard_name: 6-of-12
+          - shard: '7/12'
+            shard_name: 7-of-12
+          - shard: '8/12'
+            shard_name: 8-of-12
+          - shard: '9/12'
+            shard_name: 9-of-12
+          - shard: '10/12'
+            shard_name: 10-of-12
+          - shard: '11/12'
+            shard_name: 11-of-12
+          - shard: '12/12'
+            shard_name: 12-of-12
 
     steps:
       - name: Checkout
@@ -133,8 +148,11 @@ jobs:
       # Why: pnpm install rebuilds native modules, and those postinstall
       # scripts still need the Linux toolchain even though this shard reuses
       # the prebuilt Electron output.
+      # Why fonts-noto-cjk: ubuntu-latest carries no font with Korean coverage
+      # (`fc-list :lang=ko` is empty), so a spec measuring CJK glyph metrics
+      # measures a tofu box instead of Hangul.
       - name: Install native build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk python3 zsh
+        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk python3
 
       # Why: Electron on Linux needs an X display even when the app
       # suppresses mainWindow.show() via ORCA_E2E_HEADLESS. xvfb provides a
@@ -142,18 +160,15 @@ jobs:
       - name: Install xvfb
         run: sudo apt-get install -y xvfb
 
-      # Why pnpm first: setup-node needs pnpm on PATH to locate the store it caches.
-      # Without that cache every E2E job re-downloaded the whole dependency set.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
 
       # Why: this job runs the same pnpm install path as pr.yml's verify
       # job, so it needs the same pinned node-gyp override to avoid pnpm's
@@ -185,7 +200,19 @@ jobs:
       # ORCA_E2E_FORWARD_APP_LOGS keeps startup failures visible when Electron
       # launches but never creates a BrowserWindow.
       - name: Run E2E tests (${{ matrix.shard_name }})
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay" pnpm run test:e2e --shard=${{ matrix.shard }}
+        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e --shard=${{ matrix.shard }}
+
+      # Why always() and why the attempt is in the name: the base failure rate needs
+      # the green runs as its denominator, and re-running one shard must not overwrite
+      # the attempt that failed. Harvested by config/scripts/e2e-failure-rate-report.mjs.
+      - name: Upload E2E JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-${{ matrix.shard_name }}-attempt-${{ github.run_attempt }}
+          path: tests/test-results/e2e-report.json
+          retention-days: 30
+          if-no-files-found: warn
 
       # Why: Playwright retains traces/screenshots only on failure. Uploading
       # them as an artifact makes post-mortem debugging on CI possible without
@@ -204,9 +231,7 @@ jobs:
     needs: build
     if: inputs.test_files != ''
     runs-on: ubuntu-latest
-    # Why 45: pr.yml now maps SSH source edits onto Docker-backed specs, so this lane can
-    # pay a container image build plus ~22 serial SSH tests on top of the changed specs.
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -214,24 +239,20 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # Why fonts-noto-cjk: same reason as the sharded job — a changed CJK spec
+      # lands here instead.
       - name: Install native build and headless UI tools
-        # Why ripgrep: Quick Open's bounded host-side search requires rg instead of an
-        # unbounded inventory fallback; the paired fixture exercises that real boundary.
-        # Why openssh-client: the Docker-SSH fixture shells out to ssh/ssh-keygen, and this
-        # lane now receives those specs from pr.yml's SSH source mapping.
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk openssh-client python3 ripgrep xvfb zsh
+        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk python3 xvfb
 
-      # Why pnpm first: setup-node needs pnpm on PATH to locate the store it caches.
-      # Without that cache every E2E job re-downloaded the whole dependency set.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
 
       - name: Use external node-gyp to avoid pnpm's bundled copy
         run: |
@@ -247,32 +268,26 @@ jobs:
           name: e2e-build-out
           path: out/
 
+      # Why PROJECT: electron-headless excludes @ondemand diagnostics and its
+      # grepInvert wins over any --grep, so reaching one needs its own project
+      # added to the run.
       - name: Run changed E2E specs
         env:
           TEST_FILES_JSON: ${{ inputs.test_files }}
+          PROJECT: ${{ inputs.project }}
         run: |
-          mapfile -t TEST_FILES < <(jq -r '.[] | select(
-            . != "tests/e2e/ssh-startup-exec-readiness.spec.ts" and
-            . != "tests/e2e/paired-startup-exec-readiness.spec.ts"
-          )' <<<"$TEST_FILES_JSON")
-          if [ "${#TEST_FILES[@]}" -eq 0 ]; then
-            echo "Changed startup-readiness specs are owned by the dedicated live lane."
-            exit 0
-          fi
-          E2E_ENV=(SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay")
-          # Second clause: a spec that reads ORCA_E2E_SSH_DOCKER test.skip()s itself without it, so
-          # naming only one trigger silently skipped every other Docker-SSH spec in this lane.
-          # The first clause stays because that spec needs Docker without referencing the variable.
-          if printf '%s\n' "${TEST_FILES[@]}" | grep -qx 'tests/e2e/ephemeral-vm-provisioned-root.spec.ts' \
-            || grep -l 'ORCA_E2E_SSH_DOCKER' "${TEST_FILES[@]}" >/dev/null 2>&1; then
-            E2E_ENV+=(ORCA_E2E_SSH_DOCKER=1)
-          fi
-          E2E_PROJECT_ARGS=()
-          if grep -l '@headful' "${TEST_FILES[@]}" >/dev/null; then
-            E2E_PROJECT_ARGS+=(--project=electron-headful)
-          fi
-          xvfb-run --auto-servernum env "${E2E_ENV[@]}" \
-            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"
+          mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
+          xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 \
+            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 ${PROJECT:+--project "$PROJECT"}
+
+      - name: Upload E2E JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-changed-attempt-${{ github.run_attempt }}
+          path: tests/test-results/e2e-report.json
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload Playwright traces
         if: failure()
@@ -286,13 +301,10 @@ jobs:
   ssh-docker-watcher-isolation:
     name: ssh docker watcher isolation
     needs: build
-    if: >-
-      inputs.test_files == '' ||
-      contains(inputs.test_files, 'tests/e2e/ssh-startup-exec-readiness.spec.ts') ||
-      contains(inputs.test_files, 'tests/e2e/paired-startup-exec-readiness.spec.ts')
+    if: inputs.test_files == ''
     runs-on: ubuntu-latest
-    # Why 35: the parking, retention, startup-exec, and paired parity specs run
-    # serially on isolated Electron/SSH fixtures after watcher isolation.
+    # Why 35: the terminal parking + retention specs below add two more
+    # docker-rig tests capped at 240s each on top of the watcher isolation pair.
     timeout-minutes: 35
 
     steps:
@@ -302,20 +314,17 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Install native build and headless UI tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk openssh-client python3 xvfb zsh
-
-      # Why pnpm first: setup-node needs pnpm on PATH to locate the store it caches.
-      # Without that cache every E2E job re-downloaded the whole dependency set.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
+        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk openssh-client python3 xvfb
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
 
       # Why: same Linux-only node-gyp pin as build/e2e jobs so the workaround
       # stays consistent across workflows even while this job is ubuntu-latest.
@@ -336,14 +345,34 @@ jobs:
 
       # Why: this is the release-path proof that the deployed Linux relay keeps
       # its PTY and explorer live across a real watcher SIGSEGV.
+      # Why the per-suite output file: both suites in this job share one config, so
+      # they resolve the same `outputFile` and the second overwrites the first —
+      # uploading that reports one suite while reading as the whole job (ORCA-266).
       - name: Run Docker SSH watcher isolation E2E
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/e2e-report-ssh-docker-watcher-isolation.json
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker-watcher-isolation
 
-      # Why always(): this lane gates SSH parking/retention plus startup-exec
-      # readiness across live SSH, headed paired, and headless serve topologies.
-      - name: Run Docker SSH terminal parking + startup readiness E2E
+      # Why always(): these specs gate the C1 terminal parking/retention budget
+      # over a real SSH host and run in no other lane, so a watcher-isolation
+      # failure above must not silently skip them.
+      - name: Run Docker SSH terminal parking + retention E2E
         if: always()
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/e2e-report-ssh-docker-terminal-parking.json
         run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:ssh-docker-terminal-parking
+
+      # Why the repo-root path: PLAYWRIGHT_JSON_OUTPUT_FILE resolves against cwd,
+      # while the config's own outputFile resolves against tests/ — so these two
+      # land beside the checkout, not under tests/test-results.
+      - name: Upload SSH docker E2E JSON reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-report-ssh-docker-attempt-${{ github.run_attempt }}
+          path: test-results/e2e-report-ssh-docker-*.json
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload watcher isolation traces
         if: failure()
