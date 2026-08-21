@@ -42,6 +42,7 @@ import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-c
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
+import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
 import {
   deriveWorkerTerminalListState,
   type WorkerTerminalResourceRow,
@@ -300,19 +301,13 @@ type RunListCursor = {
   id: string
 }
 
-// Schema versions: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup, v23 worker_done envelope contract and correction attempts, v24 worker terminal resource ownership, v25 dispatch first-signal deadline, v26 turn_accepted_at, v27 composer_ready_proven, v28 creator-incarnation authority, v29 active Dispatch handle lookup.
-// Why the lab ladder keeps renumbering upstream's steps: 23, 24 and 25 mean
-// different migrations on the two lineages (upstream: terminal ownership,
-// creator-incarnation, active-handle index; lab: envelope contract, terminal
-// ownership, first-signal deadline). A stamped number is the only thing migrate()
-// consults, so reusing one silently skips the other lineage's step and leaves the
-// code reading a column that was never added. v24 was the first such renumber
-// (upstream's 23); v28/v29 are upstream's 24/25 for the same reason.
-// Both builds share appId com.stablyai.orca and productName Orca, so both write
-// the same userData/orchestration.db — the skew is reachable, not theoretical.
-// See resolveOrchestrationMigrationStartVersion for what happens to a DB an
-// upstream build already stamped 23–25.
-const SCHEMA_VERSION = 29
+// Schema versions v1-v22, shared with upstream step for step: v2 'heartbeat'+last_heartbeat_at, v3 delivered_at, v4 task-creator terminal, v5 task_title/display_name, v6 pane identity, v7 lightweight Runs, v8 crash-safe Run deliveries, v9 durable question threads, v10 Dispatch capabilities, v11 durable mutation receipts, v12 composed worker state, v18 post-v6 version-skew repair, v19 adopted legacy Runs and compatibility receipts, v20 legacy question backfill, v21 legacy scheduler-loss provenance, v22 dispatch assignee lookup.
+// From v23 the two lineages number different migrations, so every step above it
+// is declared in orchestration-schema-migration-ledger.ts and pinned against this
+// ladder by its test. Read that file before landing an incoming migration; reusing
+// a number silently skips one lineage's step. See also
+// resolveOrchestrationMigrationStartVersion for a DB an upstream build stamped 23-25.
+const SCHEMA_VERSION = ORCHESTRATION_SCHEMA_VERSION
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
   if (dbPath === ':memory:' || process.platform === 'win32') {
@@ -1053,8 +1048,7 @@ export class OrchestrationDb {
         }
       }
       if (current < 28) {
-        // Upstream's v24 (creator-incarnation authority), renumbered: see the
-        // SCHEMA_VERSION comment.
+        // Upstream's v24 (creator-incarnation authority), renumbered: see the ledger.
         if (!this.hasColumn('tasks', 'created_by_pane_key')) {
           this.db.exec('ALTER TABLE tasks ADD COLUMN created_by_pane_key TEXT')
         }
@@ -1066,7 +1060,7 @@ export class OrchestrationDb {
         }
       }
       if (current < 29) {
-        // Upstream's v25 (active Dispatch handle lookup), renumbered.
+        // Upstream's v25 (active Dispatch handle lookup), renumbered: see the ledger.
         this.db.exec(`
           CREATE INDEX IF NOT EXISTS idx_dispatch_active_assignee_handle
             ON dispatch_contexts(assignee_handle)
