@@ -43,6 +43,9 @@ export type PlaneWorkItemListSlice = {
   planeListInvalidationToken: { scope: string; version: number }
 
   getCachedPlaneWorkItems: (args: PlaneWorkItemReadArgs) => PlaneWorkItem[] | null
+  getCachedPlaneWorkItemsEntry: (
+    args: PlaneWorkItemReadArgs
+  ) => CacheEntry<PlaneWorkItem[]> | null
   searchPlaneWorkItems: (
     query: string,
     projectId?: string,
@@ -68,18 +71,24 @@ export const createPlaneWorkItemListSlice: StateCreator<
   planeListCache: {},
   planeListInvalidationToken,
 
-  getCachedPlaneWorkItems: (args) => {
+  getCachedPlaneWorkItems: (args) => get().getCachedPlaneWorkItemsEntry(args)?.data ?? null,
+
+  // Why the entry and not just `data`: stale-while-revalidate has to tell the
+  // user how old the list it just rendered is, which needs `fetchedAt`.
+  // Deliberately freshness-agnostic — an expired entry is still the best thing
+  // to show while the revalidation runs.
+  getCachedPlaneWorkItemsEntry: (args) => {
     const workspaceId = getSelectedPlaneWorkspaceId(get().planeStatus)
     if (args.kind === 'search') {
       const cacheKey = planeSearchCacheKey(workspaceId, args.projectId, args.query)
-      return get().planeSearchCache[cacheKey]?.data ?? null
+      return get().planeSearchCache[cacheKey] ?? null
     }
     const cacheKey = planeWorkItemListCacheKey(
       workspaceId,
       args.filter ?? 'assigned',
       args.projectId
     )
-    return get().planeListCache[cacheKey]?.data ?? null
+    return get().planeListCache[cacheKey] ?? null
   },
 
   searchPlaneWorkItems: async (query, projectId, workspaceId, options) => {
@@ -119,8 +128,13 @@ export const createPlaneWorkItemListSlice: StateCreator<
               [cacheKey]: { data: items, fetchedAt: Date.now() }
             })
           }))
+          return items
         }
-        return items
+        // Superseded by a mutation/context switch while this request was in
+        // flight: `items` reflects a snapshot that predates that change, so
+        // returning it would hand the caller a lost update. Whatever the cache
+        // holds now (possibly patched by that very mutation) is authoritative.
+        return get().planeSearchCache[cacheKey]?.data ?? []
       })
       .catch((error) => {
         console.warn('[plane] searchPlaneWorkItems failed:', error)
@@ -185,8 +199,14 @@ export const createPlaneWorkItemListSlice: StateCreator<
               [cacheKey]: { data: items, fetchedAt: Date.now() }
             })
           }))
+          return items
         }
-        return items
+        // Superseded by a mutation/context switch while this request was in
+        // flight (e.g. a board drag's patchPlaneWorkItem landed first): `items`
+        // is a pre-mutation snapshot, so handing it to the caller would clobber
+        // the pane with a lost update. The current cache — possibly patched by
+        // that very mutation — is authoritative instead.
+        return get().planeListCache[cacheKey]?.data ?? []
       })
       .catch((error) => {
         console.warn('[plane] listPlaneWorkItems failed:', error)

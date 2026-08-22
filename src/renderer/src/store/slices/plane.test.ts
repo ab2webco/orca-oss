@@ -193,6 +193,79 @@ describe('createPlaneSlice caching', () => {
     ])
   })
 
+  // The Plane pane seeds from this entry on every entry, so it must survive the
+  // TTL: expiry means "refetch in the background", not "show nothing".
+  it('keeps serving a TTL-expired list entry, with its fetchedAt, to the seed selector', async () => {
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-1')])
+    const store = createTestStore()
+    store.setState({ planeStatus: connectedStatus() })
+
+    await store.getState().listPlaneWorkItems('assigned')
+    const entry = store.getState().getCachedPlaneWorkItemsEntry({ kind: 'list', filter: 'assigned' })
+    expect(entry?.data).toEqual([workItem('PLN-1')])
+    expect(typeof entry?.fetchedAt).toBe('number')
+
+    // Age the entry well past PLANE_CACHE_TTL (120s).
+    store.setState((s) => ({
+      planeListCache: Object.fromEntries(
+        Object.entries(s.planeListCache).map(([key, value]) => [
+          key,
+          { ...value, fetchedAt: value.fetchedAt - 600_000 }
+        ])
+      )
+    }))
+
+    const stale = store.getState().getCachedPlaneWorkItemsEntry({ kind: 'list', filter: 'assigned' })
+    expect(stale?.data).toEqual([workItem('PLN-1')])
+
+    // ...and the expiry still drives a real refetch rather than being ignored.
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-2')])
+    await store.getState().listPlaneWorkItems('assigned')
+    expect(planeListWorkItems).toHaveBeenCalledTimes(2)
+  })
+
+  // Stale-while-revalidate's classic hole: a background GET that was already
+  // in flight when the user dragged a card must not land the pre-drag
+  // snapshot back over the optimistic patch once it resolves. Regression for
+  // ORCA-275 (the SWR pane keeps a fetch running while the board stays
+  // interactive, unlike the old blocking-skeleton load).
+  it('does not let a revalidation started before a work-item patch clobber it on resolve', async () => {
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-1')])
+    const store = createTestStore()
+    store.setState({ planeStatus: connectedStatus() })
+
+    // Warm the cache the way the pane's mount-time seed does.
+    await store.getState().listPlaneWorkItems('assigned')
+
+    // A background revalidation starts while the pane still shows PLN-1 in
+    // its cached (Todo) state.
+    const gate = deferred<PlaneWorkItem[]>()
+    planeListWorkItems.mockReturnValueOnce(gate.promise)
+    const revalidation = store
+      .getState()
+      .listPlaneWorkItems('assigned', undefined, undefined, { force: true })
+
+    // The user drags the card to Done before the revalidation settles — the
+    // same optimistic call task-page-plane-board.tsx makes on drop.
+    const doneState = { id: 's-2', name: 'Done', group: 'completed' }
+    store.getState().patchPlaneWorkItem('PLN-1', { state: doneState })
+
+    // The revalidation resolves with the snapshot it captured BEFORE the
+    // drag — still Todo.
+    gate.resolve([workItem('PLN-1')])
+    const resolved = await revalidation
+
+    // Neither the value handed back to the caller (what TaskPage renders)
+    // nor the cache a later mount seeds from may show the pre-drag state.
+    expect(resolved.find((item) => item.id === 'PLN-1')?.state.id).toBe('s-2')
+    expect(
+      store
+        .getState()
+        .getCachedPlaneWorkItems({ kind: 'list', filter: 'assigned' })
+        ?.find((item) => item.id === 'PLN-1')?.state.id
+    ).toBe('s-2')
+  })
+
   it('dedupes concurrent list requests for the same key into one promise', async () => {
     const gate = deferred<PlaneWorkItem[]>()
     planeListWorkItems.mockReturnValueOnce(gate.promise)

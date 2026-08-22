@@ -6,6 +6,7 @@ import { isIntegrationCredentialDecryptionError } from '../../../../shared/integ
 import { planeGetWorkItem } from '@/runtime/runtime-plane-client'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import {
+  bumpPlaneCacheGeneration,
   canWritePlaneReadResult,
   currentPlaneCacheGeneration,
   currentPlaneMutationGeneration,
@@ -125,17 +126,51 @@ export const createPlaneWorkItemDetailSlice: StateCreator<
     return get().fetchPlaneWorkItem(workItemId, projectId, workspaceId, { force: true })
   },
 
+  // Why bump the cache generation here: this is the ONLY point every optimistic
+  // Plane write passes through (board drag included), and a list/search fetch
+  // already in flight when the user edits must not be allowed to land the
+  // pre-edit snapshot back over it — see canWritePlaneReadResult. Patching the
+  // list/search caches in place (not just the single-item cache) means that
+  // rejected, now-stale fetch has a CORRECT value to fall back to instead of an
+  // empty result (see listPlaneWorkItems / searchPlaneWorkItems).
   patchPlaneWorkItem: (workItemId, patch) => {
+    bumpPlaneCacheGeneration()
     set((s) => {
       let changed = false
-      const next = { ...s.planeWorkItemCache }
-      for (const [key, entry] of Object.entries(next)) {
+      const nextItemCache = { ...s.planeWorkItemCache }
+      for (const [key, entry] of Object.entries(nextItemCache)) {
         if (entry?.data?.id === workItemId) {
-          next[key] = { ...entry, data: { ...entry.data, ...patch } }
+          nextItemCache[key] = { ...entry, data: { ...entry.data, ...patch } }
           changed = true
         }
       }
-      return changed ? { planeWorkItemCache: next } : {}
+      const patchListLikeCache = (
+        cache: Record<string, CacheEntry<PlaneWorkItem[]>>
+      ): { cache: Record<string, CacheEntry<PlaneWorkItem[]>>; changed: boolean } => {
+        let localChanged = false
+        const next = { ...cache }
+        for (const [key, entry] of Object.entries(cache)) {
+          const index = entry?.data?.findIndex((item) => item.id === workItemId) ?? -1
+          if (!entry?.data || index === -1) {
+            continue
+          }
+          const nextData = [...entry.data]
+          nextData[index] = { ...nextData[index], ...patch }
+          next[key] = { data: nextData, fetchedAt: Date.now() }
+          localChanged = true
+        }
+        return { cache: localChanged ? next : cache, changed: localChanged }
+      }
+      const listResult = patchListLikeCache(s.planeListCache)
+      const searchResult = patchListLikeCache(s.planeSearchCache)
+      changed = changed || listResult.changed || searchResult.changed
+      return changed
+        ? {
+            planeWorkItemCache: nextItemCache,
+            planeListCache: listResult.cache,
+            planeSearchCache: searchResult.cache
+          }
+        : {}
     })
   }
 })
