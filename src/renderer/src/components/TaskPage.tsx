@@ -221,6 +221,7 @@ import {
   formatPlaneSnapshotAge,
   resolvePlanePaneSeedState
 } from '@/components/task-page-plane-snapshot-freshness'
+import { runPlaneWorkspaceSwitch } from '@/components/task-page-plane-workspace-switch'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
@@ -9571,24 +9572,18 @@ export default function TaskPage(): React.JSX.Element {
       setAvailablePlaneProjects([])
       setPlaneItems([])
       setPlaneError(null)
-      setPlaneLoading(true)
-      void selectPlaneWorkspace(workspaceId)
-        .catch(() => {
+      void runPlaneWorkspaceSwitch({
+        switchWorkspace: () => selectPlaneWorkspace(workspaceId),
+        onFailure: () => {
           toast.error(
             translate(
               'auto.components.TaskPage.planeWorkspaceSwitchFailed',
               'Failed to switch Plane workspace.'
             )
           )
-        })
-        // Why finally and not just catch: selectPlaneWorkspace RESOLVES without
-        // touching planeStatus when its mutation generation was superseded, so
-        // no load-effect dep changes and nothing else ever clears this flag —
-        // the pane stayed on a blocking skeleton forever. The load effect sets
-        // it back to true on the paths where the selection really did change.
-        .finally(() => {
-          setPlaneLoading(false)
-        })
+        },
+        setLoading: setPlaneLoading
+      })
     },
     [selectPlaneWorkspace, setSelectedPlaneWorkItem]
   )
