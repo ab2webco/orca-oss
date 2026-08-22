@@ -66,6 +66,51 @@ Both produce the same Playwright message, so the message alone decides nothing.
 The last row is the honest default. Do not upgrade it to "product bug" or downgrade it to
 "flaky" without one of the rows above.
 
+## Reading the automated evidence (ORCA-280)
+
+The second row above used to require a human to notice `Target crashed` in a job log by hand —
+nobody did, which is why every occurrence of this failure was undiagnosable after the fact. As of
+ORCA-280, every E2E test reports this automatically. On any non-passing test, the `electronApp`
+fixture (`tests/e2e/helpers/orca-app.ts`) reads `<userData>/crash-reports.json` — written
+unconditionally by `CrashReportStore`, unlike the NDJSON trace sink, which `initObservability()`
+disables in CI — before deleting the userData dir, via
+`tests/e2e/helpers/renderer-recovery-evidence.ts`. It prints one line to the job log:
+
+```
+[renderer-recovery-evidence] <spec> > <test> :: <detail>
+```
+
+and attaches the full `RendererRecoveryEvidence` object as `renderer-recovery-evidence.json`.
+Playwright inlines small attachments as base64 directly in `tests/test-results/e2e-report.json`,
+which CI already uploads on every run (`always()`), so no extra artifact wiring was needed.
+
+`detail` lands on one of four outcomes:
+
+| outcome | meaning |
+| --- | --- |
+| `did not fire` | no renderer-source crash record exists — no crash evidence at all |
+| `LIKELY` | a renderer crash record exists with a recoverable `reason`; the reload almost certainly ran but nothing on disk directly proves it — **this is the normal shape for a single-crash test failure** |
+| `CONFIRMED` | a `renderer_recovery_reload` breadcrumb was found — direct proof, but this breadcrumb is only carried inside a *later* crash record in the same run, so it requires a second crash to appear at all |
+| `did NOT run` (crash recorded) | the recorded reason is `integrity-failure`, the one reason `shouldRecoverRendererAfterProcessGone` always refuses |
+
+Two things that are not obvious from the source and were confirmed empirically (ORCA-280, via
+`window.webContents.forcefullyCrashRenderer()` in the `@ondemand`-tagged
+`tests/e2e/renderer-recovery-evidence-repro.spec.ts`):
+
+- `forcefullyCrashRenderer()` reports `reason: 'killed'`, not `'crashed'`. A persisted `'killed'`
+  record still counts as LIKELY: `shouldRecordProcessGoneCrash` only ever drops a `'killed'` event
+  before it reaches disk when `expectedTeardown` was `'app-shutdown'` or `'renderer-reload'`, so any
+  `'killed'` record that *is* on disk already implies the one `expectedTeardown` value
+  (`'none'`) that `shouldRecoverRendererAfterProcessGone` recovers from.
+- `TestInfo.titlePath` is a property (`Array<string>`), not a method — an early version of this
+  hook called it as one and only failed silently inside the hook's own try/catch, never in the
+  test. If evidence is missing for a real failure, check the job log for
+  `[renderer-recovery-evidence] failed to collect evidence:` first.
+
+Bypass: specs that launch their own `ElectronApplication` outside the `electronApp` fixture
+(`tests/e2e/helpers/orca-restart.ts`, `tests/e2e/helpers/paired-electron-client.ts`) do not go
+through this hook.
+
 ## Why one failure looks like four small ones
 
 Per spec this mode reads as 4/37, 2/37, 2/11 and 1/33 — four minor rows nobody prioritises.
