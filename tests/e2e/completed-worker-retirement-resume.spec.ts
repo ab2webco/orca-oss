@@ -480,7 +480,52 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(targetWorktreeId)
     await waitForActiveTerminalManager(orcaPage)
-    await waitForActivePanePtyId(orcaPage)
+    // TEMP-DIAG(ORCA-279): a prior diagnostic (73a9ee1a3f, reverted) printed only
+    // `sleeping`/`pendingStartup`, which are empty on a passing run too (both are
+    // cleared synchronously once launchSleepingAgentSession runs, before any PTY
+    // binds). These fields instead answer: did a replacement tab exist, did the
+    // renderer-side launch fully complete (claim recorded), and — the decisive
+    // one — did the main-process runtime ever see a new PTY for this worktree at
+    // all. That last field is reachable without touching production code because
+    // the spec already holds a RuntimeClient.
+    try {
+      await waitForActivePanePtyId(orcaPage)
+    } finally {
+      const diag = await orcaPage.evaluate(
+        ({ worktreeId, workerTabId }) => {
+          const state = window.__store?.getState()
+          const tabs = state?.tabsByWorktree?.[worktreeId] ?? []
+          const resolvedTabId =
+            state?.activeTabType === 'terminal'
+              ? state?.activeTabId
+              : (state?.activeTabIdByWorktree?.[worktreeId] ?? tabs[0]?.id ?? null)
+          const manager = resolvedTabId ? window.__paneManagers?.get(resolvedTabId) : null
+          return {
+            workerTabId,
+            tabs: tabs.map((tab) => ({ id: tab.id, ptyId: tab.ptyId ?? null })),
+            resolvedTabId,
+            isReplacementTab: resolvedTabId !== null && resolvedTabId !== workerTabId,
+            panes: (manager?.getPanes?.() ?? []).map((pane) => ({
+              leafId: pane.leafId ?? null,
+              ptyId: pane.container?.dataset?.ptyId ?? null
+            })),
+            claimTabIds: Object.keys(state?.automaticAgentResumeClaimsByTabId ?? {}),
+            claimSessions: Object.values(state?.automaticAgentResumeClaimsByTabId ?? {}).map(
+              (claim) => claim.providerSession.id
+            ),
+            pendingStartup: Object.keys(state?.pendingStartupByTabId ?? {}),
+            sleeping: Object.keys(state?.sleepingAgentSessionsByPaneKey ?? {})
+          }
+        },
+        { worktreeId: targetWorktreeId, workerTabId: workerBefore.tabId }
+      )
+      const runtimeTerminals = (await listRuntimeTerminals(client)).filter(
+        (terminal) => terminal.worktreeId === targetWorktreeId
+      )
+      console.log(`BIND_DIAG ${JSON.stringify(diag)}`)
+      console.log(`BIND_DIAG_RUNTIME ${JSON.stringify(runtimeTerminals)}`)
+      console.log(`BIND_DIAG_LEDGER ${JSON.stringify(readCompletedWorkerLedger())}`)
+    }
     const activatedPane = await waitForActivePaneHookDescriptor(orcaPage)
     expect(activatedPane.worktreeId).toBe(targetWorktreeId)
     const activatedResolved = await client.call<{ terminal: { handle: string } }>(
