@@ -201,10 +201,13 @@ export function PluginConsentDialog({
               <AlertTriangle className="mt-1 size-4 shrink-0" />
               <span>
                 {plugin.hasWorker
-                  ? translate(
+                  ? `${translate(
                       'auto.components.settings.PluginConsentDialog.warning',
                       "These permissions limit how the plugin uses Orca's API. Its worker still runs as a normal process on your computer with full access to your files, network, and other processes."
-                    )
+                    )} ${translate(
+                      'auto.components.settings.PluginConsentDialog.networkAccessNote',
+                      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
+                    )}`
                   : hasInstructionalContent(plugin)
                     ? translate(
                         'auto.components.settings.PluginConsentDialog.instructionalWarning',
