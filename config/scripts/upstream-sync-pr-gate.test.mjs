@@ -90,9 +90,9 @@ describe('the body the gate hands to gh', () => {
     })
     expect(withDiscard).toContain('3 upstream commit(s) touched')
     expect(withDiscard).toContain(discard)
-    expect(renderSyncPrBody(decideSyncPr(CLEAN), { ...CLEAN, workflowDiscard: '\n' })).not.toContain(
-      '<details>'
-    )
+    expect(
+      renderSyncPrBody(decideSyncPr(CLEAN), { ...CLEAN, workflowDiscard: '\n' })
+    ).not.toContain('<details>')
   })
 })
 

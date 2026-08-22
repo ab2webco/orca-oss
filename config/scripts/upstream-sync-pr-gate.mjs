@@ -98,7 +98,7 @@ function renderWorkflowDiscard({ workflowCommits, workflowDiscard }) {
   return [
     `<details><summary>Workflow changes this branch does <b>not</b> carry (${workflowCommits} upstream commit(s) touched \`.github/workflows\`)</summary>`,
     '',
-    'Diffstat of the retention commit: **deletions are upstream workflow content this branch drops**, insertions are the fork\'s own workflows being restored. `GITHUB_TOKEN` cannot push workflow changes, so adopt any upstream workflow change deliberately, in a separate reviewed PR.',
+    "Diffstat of the retention commit: **deletions are upstream workflow content this branch drops**, insertions are the fork's own workflows being restored. `GITHUB_TOKEN` cannot push workflow changes, so adopt any upstream workflow change deliberately, in a separate reviewed PR.",
     '',
     '```',
     workflowDiscard.trimEnd(),

@@ -1,20 +1,16 @@
-import { existsSync, rmSync, writeFileSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import type { SFTPWrapper } from 'ssh2'
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
-import {
-  isPlainObject,
-  readHooksJson,
-  writeHooksJson,
-  writeManagedScript,
-  type HooksConfig
-} from '../agent-hooks/installer-utils'
+import { readHooksJson, writeHooksJson, writeManagedScript } from '../agent-hooks/installer-utils'
 import {
   readHooksJsonRemote,
   writeHooksJsonRemote,
   writeManagedScriptRemote
 } from '../agent-hooks/installer-utils-remote'
 import { getManagedScript } from './managed-hook-script'
+import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import { getManagedStatusLineScript } from './statusline-script'
+import { installManagedStatusLine, parseVaultConfig } from './hook-service-vault-statusline'
 import {
   applyManagedHooks,
   applyManagedStatusLine,
@@ -29,7 +25,6 @@ import {
   getStatusLineInstallMarkerPath,
   getStatusLineScriptFileName,
   getStatusLineScriptPath,
-  getStatusLineSlotState,
   removeManagedHooks,
   removeManagedStatusLine,
   type ClaudeCompatibleHookSettings,
@@ -131,6 +126,18 @@ export class ClaudeHookService {
     return { agent: this.options.agent, state, configPath, managedHooksPresent, detail }
   }
 
+  async refreshManagedScripts(): Promise<void> {
+    await refreshManagedScriptIfPresent(
+      getManagedScriptPath(this.options.settings),
+      getManagedScript('local', { skipWhenDevinImportsClaude: this.options.agent === 'claude' })
+    )
+    // Why: no agent gate — the statusline script only ever exists for claude, so presence is the gate.
+    await refreshManagedScriptIfPresent(
+      getStatusLineScriptPath(this.options.settings),
+      getManagedStatusLineScript('local')
+    )
+  }
+
   install(): AgentHookInstallStatus {
     const configPath = getConfigPath(this.options.settings)
     const scriptPath = getManagedScriptPath(this.options.settings)
@@ -158,7 +165,7 @@ export class ClaudeHookService {
     )
     // Why: the statusline usage feed is Claude-only — OpenClaude data would be misattributed to the Claude provider.
     if (this.options.agent === 'claude') {
-      nextConfig = this.installManagedStatusLine(nextConfig)
+      nextConfig = installManagedStatusLine(nextConfig, this.options.settings)
     }
     writeHooksJson(configPath, nextConfig)
     return this.getStatus()
@@ -173,7 +180,7 @@ export class ClaudeHookService {
   // (never clobber unknown vault content — it may hold a custom-endpoint token). The caller
   // owns the mode-600, ownership-checked write.
   ensureInjectedVaultInstrumentation(currentSettingsJson: string | null): string | null {
-    const config = this.parseVaultConfig(currentSettingsJson)
+    const config = parseVaultConfig(currentSettingsJson)
     if (!config) {
       return null
     }
@@ -205,18 +212,6 @@ export class ClaudeHookService {
     return `${JSON.stringify(nextConfig, null, 2)}\n`
   }
 
-  private parseVaultConfig(currentSettingsJson: string | null): HooksConfig | null {
-    if (currentSettingsJson === null) {
-      return {}
-    }
-    try {
-      const parsed: unknown = JSON.parse(currentSettingsJson)
-      return isPlainObject(parsed) ? (parsed as HooksConfig) : null
-    } catch {
-      return null
-    }
-  }
-
   // Why a dedicated refresh: the Settings toggle must reach the installed script immediately —
   // every pinned vault points at this one shared file, so waiting for the next install() means
   // waiting for an app relaunch. Rewriting only the script never touches settings.json, so a
@@ -229,35 +224,6 @@ export class ClaudeHookService {
       getStatusLineScriptPath(this.options.settings),
       getManagedStatusLineScript('local')
     )
-  }
-
-  // Why: the statusline feed is opportunistic (usage display, not agent status); a user who deleted the
-  // managed entry has opted out, and the marker distinguishes that deletion from a first install.
-  private installManagedStatusLine(config: HooksConfig): HooksConfig {
-    const scriptFileName = getStatusLineScriptFileName(this.options.settings)
-    const markerPath = getStatusLineInstallMarkerPath(this.options.settings)
-    const slot = getStatusLineSlotState(config, scriptFileName)
-    // Why refresh the script before the slot decision: the file is shared, and every managed
-    // account's vault settings.json points at it. Skipping the write because THIS config has a
-    // user-owned statusLine froze the script for every pinned vault that depends on it — a user
-    // with their own line stopped everyone from getting statusline updates, including themselves
-    // through their pinned accounts.
-    const statusLineScriptPath = getStatusLineScriptPath(this.options.settings)
-    writeManagedScript(statusLineScriptPath, getManagedStatusLineScript('local'))
-    if (slot === 'user' || (slot === 'empty' && existsSync(markerPath))) {
-      return config
-    }
-    const next = applyManagedStatusLine(
-      config,
-      getManagedCommand(statusLineScriptPath),
-      scriptFileName
-    )
-    try {
-      writeFileSync(markerPath, '')
-    } catch {
-      // Best-effort: a missing marker only means one future user deletion gets re-installed once.
-    }
-    return next
   }
 
   // Why: install the Claude hook on the remote box (via SFTP); POSIX-only by design (Windows-remote deferred).

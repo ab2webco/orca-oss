@@ -28,7 +28,7 @@ async function postCodexHookEvent(
   expect(response.status).toBe(204)
 }
 
-test('shows Caffeinate mode and Auto activity in the status bar', async ({
+test('shows Caffeinate mode and Agent activity in the status bar', async ({
   electronApp,
   orcaPage
 }) => {
@@ -39,26 +39,26 @@ test('shows Caffeinate mode and Auto activity in the status bar', async ({
   await expect(offStatus).toHaveText('Off')
   await offStatus.click()
   await expect(orcaPage.getByRole('menuitemradio', { name: /^On/ })).toBeVisible()
-  await expect(orcaPage.getByRole('menuitemradio', { name: /^Auto/ })).toBeVisible()
+  await expect(orcaPage.getByRole('menuitemradio', { name: /^Agent/ })).toBeVisible()
   await expect(orcaPage.getByRole('menuitemradio', { name: /^Off/ })).toBeVisible()
   const menuProofPath = process.env.ORCA_CAFFEINATE_MENU_PROOF_PATH
   if (menuProofPath) {
     await orcaPage.screenshot({ path: menuProofPath })
   }
-  await orcaPage.getByRole('menuitemradio', { name: /^Auto/ }).click()
+  await orcaPage.getByRole('menuitemradio', { name: /^Agent/ }).click()
 
   const autoInactiveStatus = orcaPage.getByRole('button', {
-    name: 'Caffeinate, Auto · Inactive'
+    name: 'Caffeinate, Agent · Inactive'
   })
   await expect(autoInactiveStatus).toBeVisible()
 
   const paneKey = `e2e-caffeinate-tab:${randomUUID()}`
   await postCodexHookEvent(electronApp, paneKey, 'UserPromptSubmit')
   const autoActiveStatus = orcaPage.getByRole('button', {
-    name: 'Caffeinate, Auto · Active'
+    name: 'Caffeinate, Agent · Active'
   })
   await expect(autoActiveStatus).toBeVisible()
-  await expect(autoActiveStatus).toHaveText('Auto')
+  await expect(autoActiveStatus).toHaveText('Agent')
 
   const proofPath = process.env.ORCA_CAFFEINATE_PROOF_PATH
   if (proofPath) {
