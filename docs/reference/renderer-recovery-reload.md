@@ -112,9 +112,41 @@ Two things that are not obvious from the source and were confirmed empirically (
   test. If evidence is missing for a real failure, check the job log for
   `[renderer-recovery-evidence] failed to collect evidence:` first.
 
-Bypass: specs that launch their own `ElectronApplication` outside the `electronApp` fixture
-(`tests/e2e/helpers/orca-restart.ts`, `tests/e2e/helpers/paired-electron-client.ts`) do not go
-through this hook.
+Coverage: specs that launch their own `ElectronApplication` outside the `electronApp` fixture
+(`orca-restart.ts`'s `createRestartSession`, `paired-electron-client.ts`'s
+`launchPairedElectronClient`) originally bypassed this hook entirely — a real assertion failure in
+`paired-remote-terminal-host-restart-background-sync.spec.ts` on PR #160 produced no evidence line
+at all, which is silence indistinguishable from "no crash". Both helpers now call
+`reportRendererRecoveryEvidence` from their own dispose/cleanup, but **always with
+`{ force: true }`**, not the status-gated default the `electronApp` fixture uses. That is not a
+style choice: `dispose()` runs inside the *test's own* `finally` block, not as Playwright fixture
+teardown. A regular (non-soft) failed `expect()`/`expect.poll()` only calls `throw error` — it does
+not update `testInfo.status` until the exception has propagated all the way out of the test
+function, which is *after* the test's own `finally` has already run. Only fixture teardown (which
+runs once that propagation is complete) reliably sees the finalized status; verified empirically by
+gating one of these calls on status, confirming zero output for a real failing `expect()`, then
+switching to `force: true` and confirming the line appears. The tradeoff: these two helpers report
+on every test, pass or fail — a small cost (37 specs, one small file read each) accepted because a
+gate that reads stale status would silently do nothing, which is worse than a passing-path cost.
+
+## The first classified occurrence (ORCA-280)
+
+PR #160's own CI run put this to use immediately. Three of the four failing shards were genuine,
+unrelated bugs (left alone — see their own issues); the other two were this failure class, and the
+hook gave a direct answer for both:
+
+```
+[renderer-recovery-evidence] combined-diff-invalidation-freeze-repro.spec.ts > ... :: renderer_recovery_reload: did not fire — crash-reports.json was never written to the E2E user-data dir, so Orca never recorded a renderer process-gone event.
+```
+
+Same verdict for `large-diff-freeze-repro.spec.ts`. Both stacks pointed at the identical shape: an
+`expect.poll(() => orcaPage.evaluate(...))` inside a locally-defined `addAndActivateRepo` helper,
+polling `fetchWorktrees` right after adding an isolated repo. No renderer crash — row 4, the
+"genuinely transient navigation" case this doc always allowed for. Per "Why the test dies instead of
+retrying" above, the fix was to make that one `page.evaluate` swallow only
+`isExecutionContextDestroyedError` (`tests/e2e/helpers/execution-context-destroyed.ts`) and let the
+poll retry, while any other thrown error still fails the test immediately — the assertions the specs
+exist to make (freeze budgets, loaded-row counts) were not touched.
 
 ## Why one failure looks like four small ones
 
