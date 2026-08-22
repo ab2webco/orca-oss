@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Columns3, Orbit, XIcon } from 'lucide-react'
+import { XIcon } from 'lucide-react'
 import {
   DASHBOARD_BUCKET_ORDER,
   type DashboardBucket,
@@ -22,10 +22,16 @@ import {
 } from './agent-board-filtering'
 import './agent-board-transitions.css'
 import { translate } from '@/i18n/i18n'
-import { Button } from '@/components/ui/button'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import { AgentDashboardViewToggle } from './AgentDashboardViewToggle'
+import { type AgentDashboardView } from './agent-dashboard-view'
 
-export type AgentDashboardView = 'map' | 'board'
+export type { AgentDashboardView }
+
+const AgentGridView = lazyWithRetry(
+  () => import('./AgentGridView').then((module) => ({ default: module.AgentGridView })),
+  { reloadKey: 'agent-dashboard-grid-view' }
+)
 
 const AgentDashboardMapView = lazyWithRetry(
   () =>
@@ -195,7 +201,9 @@ export function AgentKanbanBoard({
     () => snapshot.cards.filter((card) => visibleBuckets.includes(card.bucket)),
     [snapshot.cards, visibleBuckets]
   )
-  const availableCards = view === 'map' ? snapshot.cards : visibleCards
+  // Why the grid joins the map on the full pool: a finished agent is still
+  // information when you are watching a project, and visibleCards drops it.
+  const availableCards = view === 'board' ? visibleCards : snapshot.cards
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_DASHBOARD_FILTERS)
@@ -313,34 +321,7 @@ export function AgentKanbanBoard({
               count: availableCards.length
             })}
           </span>
-          <div
-            className="flex items-center gap-0.5 rounded-md border border-border p-0.5"
-            role="group"
-            aria-label={translate('dashboardPopout.view.label', 'Dashboard view')}
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              aria-pressed={view === 'board'}
-              className={cn('h-6 gap-1 px-2', view === 'board' && 'bg-accent')}
-              onClick={() => handleViewChange('board')}
-            >
-              <Columns3 className="size-3" />
-              {translate('dashboardPopout.view.board', 'Dashboard')}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              aria-pressed={view === 'map'}
-              className={cn('h-6 gap-1 px-2', view === 'map' && 'bg-accent')}
-              onClick={() => handleViewChange('map')}
-            >
-              <Orbit className="size-3" />
-              {translate('dashboardPopout.view.map', 'Agent Map')}
-            </Button>
-          </div>
+          <AgentDashboardViewToggle view={view} onViewChange={handleViewChange} />
           {headerActions || onClose ? (
             <div className="ml-auto flex items-center gap-1">
               {headerActions}
@@ -357,7 +338,21 @@ export function AgentKanbanBoard({
             </div>
           ) : null}
         </div>
-        {view !== 'board' ? (
+        {view === 'grid' ? (
+          <Suspense fallback={null}>
+            <AgentGridView
+              snapshot={snapshot}
+              cards={filteredCards}
+              query={query}
+              onQueryChange={setQuery}
+              filters={filters}
+              onFiltersChange={setFilters}
+              searchInputRef={searchInputRef}
+              now={now}
+              onRevealAgent={onRevealAgent}
+            />
+          </Suspense>
+        ) : view === 'map' ? (
           <Suspense fallback={null}>
             <AgentDashboardMapView
               snapshot={snapshot}
