@@ -13,6 +13,7 @@ type FakeClock = StartupGridFrameClock & {
   advance: (ms: number) => void
   pendingFrames: () => number
   pendingTimers: () => number
+  timerWonFrames: () => number
 }
 
 function createFakeClock(): FakeClock {
@@ -21,6 +22,7 @@ function createFakeClock(): FakeClock {
   let nextFrame = 1
   let nextTimer = 1
   let now = 0
+  let timerWon = 0
 
   return {
     requestAnimationFrame: (callback) => {
@@ -55,11 +57,13 @@ function createFakeClock(): FakeClock {
         timers.delete(handle)
       }
       for (const [, timer] of due) {
+        timerWon += 1
         timer.callback()
       }
     },
     pendingFrames: () => frames.size,
-    pendingTimers: () => timers.size
+    pendingTimers: () => timers.size,
+    timerWonFrames: () => timerWon
   }
 }
 
@@ -105,6 +109,39 @@ describe('startup-grid frame scheduler', () => {
     }
 
     expect(onSettled).not.toHaveBeenCalled()
+  })
+
+  it('lets a healthy compositor win every race, so the settle counts real frames', () => {
+    const clock = createFakeClock()
+    const scheduler = createStartupGridFrameScheduler(clock)
+    const onSettled = vi.fn()
+    let measured = { cols: 40, rows: 12 }
+
+    waitForStableStartupGrid({
+      isAlive: () => true,
+      measure: () => measured,
+      onSettled,
+      requestFrame: scheduler.requestFrame,
+      cancelFrame: scheduler.cancelFrame
+    })
+
+    // A 30Hz display is the slow end of healthy; every frame must still be a paint.
+    for (let frame = 0; frame < 12 && onSettled.mock.calls.length === 0; frame += 1) {
+      if (frame === 1) {
+        measured = STABLE_GRID
+      }
+      clock.advance(33)
+      clock.paint()
+    }
+
+    expect(onSettled).toHaveBeenCalledWith(STABLE_GRID)
+    expect(clock.timerWonFrames()).toBe(0)
+  })
+
+  it('keeps the starvation fallback outside the paint budget', () => {
+    // Why asserted: a fallback inside a frame interval would let the timer advance
+    // the settle between paints, satisfying "stable" without a layout ever landing.
+    expect(STARTUP_GRID_FRAME_STARVATION_MS).toBeGreaterThan(1000 / 30)
   })
 
   it('prefers a real paint and drops that frame timer, so a frame fires once', () => {

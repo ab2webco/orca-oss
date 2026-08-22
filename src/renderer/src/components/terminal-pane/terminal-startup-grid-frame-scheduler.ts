@@ -20,9 +20,13 @@ export type StartupGridFrameScheduler = {
   cancelFrame: (handle: number) => void
 }
 
-/** One frame at ~30fps: long enough to prefer a real paint, short enough that the
- *  12-frame settle budget still resolves well inside the connect's own deadlines. */
-export const STARTUP_GRID_FRAME_STARVATION_MS = 32
+/** Deliberately far outside any paint budget, and the same 250ms the connect
+ *  fallback timer used for this job before this branch cancelled it. A healthy
+ *  compositor — even one briefly behind, or a 30Hz display — therefore wins every
+ *  race, so the settle still counts real measured frames and only falls back when
+ *  rAF is genuinely starved. Worst case is 12 frames = 3s, well inside the
+ *  connect's callers. */
+export const STARTUP_GRID_FRAME_STARVATION_MS = 250
 
 type PendingFrame = {
   animationHandle: number | null
