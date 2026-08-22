@@ -211,6 +211,8 @@ import type {
   AgentStatusIpcPayload,
   MigrationUnsupportedPtyEntry
 } from '../shared/agent-status-types'
+import type { AgentSessionLogPaneReading } from '../shared/agent-session-log-state'
+import type { AgentDashboardPopoutView } from '../shared/dashboard-snapshot'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -2575,7 +2577,7 @@ const api = {
 
   dashboard: {
     // Open the pop-out dashboard window, or focus it if already open.
-    openPopout: (view?: 'board' | 'map'): Promise<void> =>
+    openPopout: (view?: AgentDashboardPopoutView): Promise<void> =>
       ipcRenderer.invoke('dashboardPopout:open', view),
 
     // ── Producer side (main window) ──────────────────────────────────────
@@ -2627,7 +2629,7 @@ const api = {
       ipcRenderer.on('dashboard:snapshot', listener)
       return () => ipcRenderer.removeListener('dashboard:snapshot', listener)
     },
-    onViewRequested: (callback: (view: 'board' | 'map') => void): (() => void) => {
+    onViewRequested: (callback: (view: AgentDashboardPopoutView) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, view: 'board' | 'map'): void =>
         callback(view)
       ipcRenderer.on('dashboard:viewRequested', listener)
@@ -5071,6 +5073,11 @@ const api = {
       ipcRenderer.on('mobile:unpairedDeviceAuthFailure', listener)
       return () => ipcRenderer.removeListener('mobile:unpairedDeviceAuthFailure', listener)
     }
+  },
+
+  agentSessionLog: {
+    readPanes: (paneKeys: string[]): Promise<AgentSessionLogPaneReading[]> =>
+      ipcRenderer.invoke('agentSessionLog:readPanes', paneKeys)
   },
 
   agentStatus: {
