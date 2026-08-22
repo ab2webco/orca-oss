@@ -1,72 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
-import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { isExecutionContextDestroyedError } from './helpers/execution-context-destroyed'
+import { addAndActivateIsolatedRepo } from './helpers/isolated-diff-repo-activation'
 import {
   createIsolatedManyFileStagedDiffRepo,
   createIsolatedStagedLocaleDiffRepo
 } from './large-diff-repro-fixtures'
-
-async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<string> {
-  const repoId = await orcaPage.evaluate(async (pathToRepo: string) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
-    }
-    const addedRepo = await store.getState().addRepoPath(pathToRepo)
-    if (!addedRepo) {
-      throw new Error(`isolated repo not found: ${pathToRepo}`)
-    }
-    return addedRepo.id
-  }, repoPath)
-
-  await expect
-    .poll(
-      () =>
-        orcaPage
-          .evaluate(async (targetRepoId: string) => {
-            const store = window.__store
-            if (!store) {
-              return 0
-            }
-            await store.getState().fetchWorktrees(targetRepoId)
-            return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
-          }, repoId)
-          // Why: expect.poll retries a failed assertion, not a thrown
-          // exception — a navigation mid-evaluate (e.g. a lazy chunk reload
-          // during hydration) must not kill the poll outright. Any other
-          // thrown error still propagates and fails the test immediately.
-          .catch((error: unknown) => {
-            if (isExecutionContextDestroyedError(error)) {
-              return 0
-            }
-            throw error
-          }),
-      { timeout: 30_000, message: 'isolated staged-diff worktree did not load' }
-    )
-    .toBeGreaterThan(0)
-
-  return orcaPage.evaluate(
-    ({ targetRepoId, pathToRepo }) => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('window.__store is not available')
-      }
-      const state = store.getState()
-      const worktrees = state.worktreesByRepo[targetRepoId] ?? []
-      const worktree = worktrees.find((entry) => entry.path === pathToRepo) ?? worktrees[0]
-      if (!worktree) {
-        throw new Error(`isolated worktree not found: ${pathToRepo}`)
-      }
-      state.setActiveRepo(targetRepoId)
-      state.setActiveWorktree(worktree.id)
-      return worktree.id
-    },
-    { targetRepoId: repoId, pathToRepo: repoPath }
-  )
-}
 
 const INVALIDATION_ROUNDS = 3
 const INVALIDATION_ROUND_GAP_MS = 700
@@ -85,7 +25,7 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
     const fixture = createIsolatedStagedLocaleDiffRepo()
 
     try {
-      const worktreeId = await addAndActivateRepo(orcaPage, fixture.repoPath)
+      const worktreeId = await addAndActivateIsolatedRepo(orcaPage, fixture.repoPath)
 
       const opened = await orcaPage.evaluate(
         async ({ wId, repoPath }) => {
@@ -233,7 +173,7 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
     const fixture = createIsolatedManyFileStagedDiffRepo(8, 15_000)
 
     try {
-      const worktreeId = await addAndActivateRepo(orcaPage, fixture.repoPath)
+      const worktreeId = await addAndActivateIsolatedRepo(orcaPage, fixture.repoPath)
 
       const opened = await orcaPage.evaluate(
         async ({ wId, repoPath }) => {
