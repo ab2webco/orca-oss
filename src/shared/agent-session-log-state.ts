@@ -2,6 +2,7 @@
 // Every value here is a fact the append-only transcript states outright. The
 // log cannot observe process liveness, so no state here means "dead" (ORCA-236).
 
+import type { AgentType } from './agent-status-types'
 import type { NativeChatTurnLifecycle } from './native-chat-types'
 
 export const AGENT_SESSION_LOG_STATES = [
@@ -35,6 +36,22 @@ export const AGENT_SESSION_LOG_UNREAD_REASONS = [
 ] as const
 export type AgentSessionLogUnreadReason = (typeof AGENT_SESSION_LOG_UNREAD_REASONS)[number]
 
+/** Truncation ceiling for prose crossing IPC: a grid cell shows a few lines. */
+export const AGENT_SESSION_LOG_ACTIVITY_TEXT_LIMIT = 280
+
+/** What the agent is doing, not just whether it is busy (ORCA-234). */
+export type AgentSessionLogActivity = {
+  /** Newest assistant prose in the scanned window, collapsed and truncated. */
+  lastAssistantText: string | null
+  /** Tool invoked with no result behind it yet, i.e. the one in flight. */
+  pendingToolName: string | null
+  /** Epoch ms of the newest record that carried either of the above. */
+  atMs: number | null
+  /** The activity budget ran out before any prose. "I could not see it" must
+   *  never read as "the agent said nothing". */
+  textBeyondScan: boolean
+}
+
 export type AgentSessionLogReading =
   | {
       read: true
@@ -44,8 +61,18 @@ export type AgentSessionLogReading =
       queuedInput: AgentSessionLogQueuedInput
       /** Records the tail scan could not parse. Non-zero is degradation, not failure. */
       unparsedRecords: number
+      /** Absent when the caller did not ask for activity. */
+      activity?: AgentSessionLogActivity
     }
   | { read: false; reason: AgentSessionLogUnreadReason }
+
+/** One dashboard pane's log reading. The pane key is the join to a snapshot card. */
+export type AgentSessionLogPaneReading = {
+  paneKey: string
+  agent: AgentType | null
+  sessionId: string | null
+  session: AgentSessionLogReading
+}
 
 export type AgentSessionLogFoldInput = {
   /** Newest turn boundary in the scanned window, if the log had one. */
@@ -54,11 +81,17 @@ export type AgentSessionLogFoldInput = {
   unparsedRecords: number
   /** The scan stopped on its own ceiling rather than on the start of the log. */
   scanReachedCeiling: boolean
+  activity?: AgentSessionLogActivity
 }
 
 export function foldAgentSessionLogState(input: AgentSessionLogFoldInput): AgentSessionLogReading {
   const { lifecycle, queuedInput, unparsedRecords } = input
-  const base = { read: true as const, queuedInput, unparsedRecords }
+  const base = {
+    read: true as const,
+    queuedInput,
+    unparsedRecords,
+    ...(input.activity ? { activity: input.activity } : {})
+  }
   if (!lifecycle) {
     return input.scanReachedCeiling
       ? { read: false, reason: 'turn-boundary-beyond-scan' }

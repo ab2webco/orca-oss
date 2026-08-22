@@ -7,6 +7,7 @@
 // scan is bounded by bytes and reports when it spent them without finding one.
 
 import { open, stat } from 'node:fs/promises'
+import type { AgentSessionLogActivity } from '../../shared/agent-session-log-state'
 import type { NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import { MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES } from './transcript-tail-reader'
 import { transcriptFallbackId } from './transcript-fallback-id'
@@ -15,6 +16,11 @@ import {
   decodeTranscriptQueuedInput,
   type TranscriptQueuedInputOperation
 } from './transcript-queued-input'
+import type { NativeChatLineDecoder } from './transcript-tail-reader'
+import {
+  TranscriptActivityAccumulator,
+  transcriptActivityRecord
+} from './transcript-activity-scan'
 
 const CHUNK_BYTES = 64 * 1024
 // The widest boundary-free stretch measured across this repo's six largest real
@@ -29,22 +35,27 @@ export type TranscriptTailTurnScan = {
   unparsedRecords: number
   /** True when the byte ceiling ran out before any boundary was found. */
   reachedCeiling: boolean
+  /** Only collected when the caller passed an activity decoder. */
+  activity: AgentSessionLogActivity | null
 }
 
 export async function scanTranscriptTailForTurn(
   filePath: string,
   decodeLifecycle: NativeChatTurnLifecycleDecoder,
-  maxScanBytes: number = DEFAULT_TURN_SCAN_BYTES
+  maxScanBytes: number = DEFAULT_TURN_SCAN_BYTES,
+  decodeActivity?: NativeChatLineDecoder | null
 ): Promise<TranscriptTailTurnScan> {
   const size = (await stat(filePath)).size
+  const activity = decodeActivity ? new TranscriptActivityAccumulator() : null
   const scan: TranscriptTailTurnScan = {
     lifecycle: null,
     queuedOperations: [],
     unparsedRecords: 0,
-    reachedCeiling: false
+    reachedCeiling: false,
+    activity: null
   }
   if (size === 0) {
-    return scan
+    return finish()
   }
 
   const handle = await open(filePath, 'r')
@@ -65,7 +76,7 @@ export async function scanTranscriptTailForTurn(
     while (cursor > 0) {
       if (scanned >= maxScanBytes) {
         scan.reachedCeiling = true
-        return scan
+        return finish()
       }
       const start = Math.max(0, cursor - CHUNK_BYTES)
       const buffer = Buffer.allocUnsafe(cursor - start)
@@ -89,7 +100,7 @@ export async function scanTranscriptTailForTurn(
         carryParts = []
         carryBytes = 0
         if (consume(line, start + index + 1)) {
-          return scan
+          return finish()
         }
       }
       if (segmentEnd > 0) {
@@ -106,7 +117,7 @@ export async function scanTranscriptTailForTurn(
     if (carryParts.length > 0 && !skipTornTail) {
       consume(Buffer.concat(carryParts), 0)
     }
-    return scan
+    return finish()
 
     /** Returns true once the boundary is found and the scan can stop. */
     function consume(raw: Buffer, offset: number): boolean {
@@ -119,7 +130,12 @@ export async function scanTranscriptTailForTurn(
         scan.queuedOperations.push(queued)
         return false
       }
-      const lifecycle = decodeLifecycle(line, transcriptFallbackId(filePath, offset))
+      const fallbackId = transcriptFallbackId(filePath, offset)
+      // Before the boundary check, not after: on a settled transcript the newest
+      // lifecycle row IS the last assistant row, so deferring this would leave
+      // every idle agent's cell blank.
+      collectActivity(line, fallbackId)
+      const lifecycle = decodeLifecycle(line, fallbackId)
       if (lifecycle) {
         scan.lifecycle = lifecycle
         return true
@@ -129,7 +145,26 @@ export async function scanTranscriptTailForTurn(
       }
       return false
     }
+
+    function collectActivity(line: string, fallbackId: string): void {
+      if (!activity || !decodeActivity || !activity.wants || !activity.spend()) {
+        return
+      }
+      const message = decodeActivity(line, fallbackId)
+      if (!message) {
+        return
+      }
+      const record = transcriptActivityRecord(message)
+      if (record) {
+        activity.push(record)
+      }
+    }
   } finally {
     await handle.close()
+  }
+
+  function finish(): TranscriptTailTurnScan {
+    scan.activity = activity ? activity.result() : null
+    return scan
   }
 }
