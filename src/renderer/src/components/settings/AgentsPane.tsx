@@ -20,6 +20,7 @@ import { Input } from '../ui/input'
 import { cn } from '@/lib/utils'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
 import { AgentCacheTimerSection } from './AgentCacheTimerSection'
+import { PreservedAgentSessionsSection } from './resume-vault/PreservedAgentSessionsSection'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
 import {
   AgentSessionSourceHomeInput,
@@ -876,6 +877,8 @@ export function AgentsPane({
       ) : null}
 
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
+
+      <PreservedAgentSessionsSection />
 
       <AgentPermissionsSetting mode={agentPermissionMode} onChange={saveAgentPermissionMode} />
 
