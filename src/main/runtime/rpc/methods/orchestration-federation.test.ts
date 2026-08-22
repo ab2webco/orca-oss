@@ -11,6 +11,7 @@ import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 import { createFederationWorkerStartRequest as startRequest } from './orchestration-federation-test-request'
+import { configureWorkerRuntime } from './orchestration-federation-worker-runtime-mocks'
 
 describe('orchestration federation', () => {
   const databases: OrchestrationDb[] = []
@@ -96,65 +97,6 @@ describe('orchestration federation', () => {
       coordinatorPaneKey: 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     })
     return homeDb.createTask({ spec: 'Audit Windows behavior', runId: run.id })
-  }
-
-  function configureWorkerRuntime(runtime: OrcaRuntimeService): void {
-    vi.spyOn(runtime, 'validateOrchestrationAgentLauncher').mockImplementation(() => {})
-    vi.spyOn(runtime, 'showRepo').mockResolvedValue({
-      id: 'windows-repo',
-      kind: 'git'
-    } as never)
-    vi.spyOn(runtime, 'createManagedWorktree').mockResolvedValue({
-      worktree: { id: 'repo::windows-worktree', repoId: 'repo' },
-      startupTerminal: { spawned: true, handle: 'term_windows_worker' },
-      setupReceipt: {
-        requested: 'run',
-        hookFound: true,
-        startupPolicy: 'start-immediately',
-        state: 'running'
-      }
-    } as never)
-    vi.spyOn(runtime, 'listTerminals').mockResolvedValue({
-      terminals: [
-        { handle: 'term_windows_worker', title: 'Codex' },
-        { handle: 'term_windows_setup', title: 'Setup' }
-      ],
-      totalCount: 2,
-      truncated: false
-    } as never)
-    vi.spyOn(runtime, 'waitForTerminal').mockResolvedValue({
-      handle: 'term_windows_worker',
-      condition: 'tui-idle',
-      satisfied: true,
-      status: 'running',
-      exitCode: null
-    })
-    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(
-      'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
-    )
-    vi.spyOn(runtime, 'getTerminalProcessIncarnation').mockReturnValue('windows_runtime:pty:1')
-    vi.spyOn(runtime, 'getTerminalOrchestrationCliCommand').mockReturnValue('orca')
-    vi.spyOn(runtime, 'sendTerminalAgentPrompt').mockResolvedValue({
-      handle: 'term_windows_worker',
-      accepted: true,
-      bytesWritten: 1
-    })
-    vi.spyOn(runtime, 'showTerminal').mockResolvedValue({
-      handle: 'term_windows_worker',
-      worktreeId: 'repo::windows-worktree',
-      status: 'running'
-    } as never)
-    vi.spyOn(runtime, 'readTerminal').mockResolvedValue({
-      handle: 'term_windows_worker',
-      status: 'running',
-      entries: [{ cursor: 1, text: 'remote output' }],
-      nextCursor: '1',
-      limited: false
-    } as never)
-    vi.spyOn(runtime, 'closeTerminal').mockResolvedValue({
-      handle: 'term_windows_worker',
-      closed: true
-    } as never)
   }
 
   function restartWorkerRuntime(): void {
@@ -509,7 +451,7 @@ describe('orchestration federation', () => {
   it('retries a lost relay acknowledgment without duplicating the home message', async () => {
     const task = createHomeTask()
     await homeDispatcher.dispatch(startRequest(task.id))
-    const dispatch = homeDb.getDispatchContext(task.id)!
+    homeRuntime.stopOrchestrationFederationRelay()
     const prompt = vi.mocked(workerRuntime.sendTerminalAgentPrompt).mock.calls[0]?.[1] ?? ''
     const capability = prompt.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1]
     await workerDispatcher.dispatch({
@@ -527,6 +469,7 @@ describe('orchestration federation', () => {
       }
     })
     loseNextAckResponse = true
+    const remoteCall = vi.spyOn(homeRuntime, 'callOrchestrationWorkerServer')
 
     await expect(homeRuntime.syncOrchestrationFederation()).resolves.toBeUndefined()
     await homeRuntime.syncOrchestrationFederation()
@@ -536,7 +479,10 @@ describe('orchestration federation', () => {
         .getRunMailboxHistory(task.run_id, 10)
         .filter((message) => message.subject === 'Checkpoint')
     ).toHaveLength(1)
-    expect(homeDb.getFederatedDispatch(dispatch.id)?.to_home_imported_sequence).toBe(1)
+    const acknowledgments = remoteCall.mock.calls.filter(
+      ([, method]) => method === 'orchestration.federationAck'
+    )
+    expect(acknowledgments).toHaveLength(2)
   })
 
   it('rejects a reordered relay gap, then converges without loss or duplication', async () => {

@@ -2,12 +2,12 @@ import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
-// Source of truth: the CommandInput placeholder in WorktreeJumpPalette.tsx.
-const PALETTE_PLACEHOLDER = 'Search chats, terminals, worktrees, settings, and actions...'
 const LOCAL_PROJECT = 'E2E Palette Local Project'
 const REMOTE_PROJECT = 'E2E Palette Remote Project'
 const REMOTE_WORKSPACE = 'E2E Palette Remote Workspace'
 const REMOTE_HOST = 'E2E Palette Builder'
+// Source of truth: the CommandInput placeholder in WorktreeJumpPalette.tsx.
+const SEARCH_PLACEHOLDER = 'Search chats, terminals, worktrees, settings, and actions...'
 
 type PaletteFilterFixture = { localWorktreeId: string; remoteWorktreeId: string }
 
@@ -109,7 +109,7 @@ async function openPalette(page: Page): Promise<void> {
 }
 
 async function searchFixtureWorkspaces(page: Page, fixture: PaletteFilterFixture): Promise<void> {
-  const input = palette(page).getByPlaceholder(PALETTE_PLACEHOLDER)
+  const input = palette(page).getByPlaceholder(SEARCH_PLACEHOLDER)
   await input.fill('E2E Palette')
   await expect(worktreeRow(page, fixture.localWorktreeId)).toBeVisible()
   await expect(worktreeRow(page, fixture.remoteWorktreeId)).toBeVisible()
@@ -117,7 +117,7 @@ async function searchFixtureWorkspaces(page: Page, fixture: PaletteFilterFixture
 
 async function selectRemoteHost(page: Page, useKeyboard = false): Promise<void> {
   if (useKeyboard) {
-    const input = palette(page).getByPlaceholder(PALETTE_PLACEHOLDER)
+    const input = palette(page).getByPlaceholder(SEARCH_PLACEHOLDER)
     await input.press('Tab')
     await expect(filterTrigger(page)).toBeFocused()
     await filterTrigger(page).click()
@@ -154,7 +154,7 @@ test.describe('Worktree jump-palette filters', () => {
     await expect(worktreeRow(orcaPage, fixture.localWorktreeId)).toHaveCount(0)
 
     // P2: host and project fields intersect, with the filter-specific empty state.
-    await palette(orcaPage).getByPlaceholder(PALETTE_PLACEHOLDER).fill('')
+    await palette(orcaPage).getByPlaceholder(SEARCH_PLACEHOLDER).fill('')
     await filterTrigger(orcaPage).click()
     await palette(orcaPage).getByText('Projects', { exact: true }).click()
     const projects = palette(orcaPage).getByRole('listbox', { name: 'Projects' })

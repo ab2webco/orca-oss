@@ -62,6 +62,10 @@ import {
   releaseContextOnlyDispatch,
   type ContextOnlyDispatchReleaseResult
 } from './context-only-dispatch-release'
+import {
+  ensureMutationReceiptCapacity,
+  migrateMutationReceiptCapacity
+} from './mutation-receipt-capacity'
 
 // Why: leaf UUID is the remint-stable pane identity (tab half changes on break-out); exact match covers legacy/unparseable keys.
 function isEquivalentPaneKey(a: string, b: string): boolean {
@@ -281,9 +285,6 @@ export const LEGACY_RUN_ID = ORCHESTRATION_LEGACY_RUN_ID
 export const LEGACY_CONTRACT_VERSION = 0
 export const CURRENT_CONTRACT_VERSION = ORCHESTRATION_CONTRACT_VERSION
 
-const MUTATION_RECEIPT_MAX_ROWS = 10_000
-const MUTATION_RECEIPT_MAX_AGE_DAYS = 30
-
 export type RunListPage = {
   runs: RunRow[]
   nextCursor: string | null
@@ -306,7 +307,7 @@ type RunListCursor = {
 // is declared in orchestration-schema-migration-ledger.ts and pinned against this
 // ladder by its test. Read that file before landing an incoming migration; reusing
 // a number silently skips one lineage's step. See also
-// resolveOrchestrationMigrationStartVersion for a DB an upstream build stamped 23-25.
+// resolveOrchestrationMigrationStartVersion for a DB an upstream build stamped 23-26.
 const SCHEMA_VERSION = ORCHESTRATION_SCHEMA_VERSION
 
 function hardenOrchestrationDatabaseFiles(dbPath: string | ':memory:'): void {
@@ -1067,6 +1068,10 @@ export class OrchestrationDb {
             WHERE assignee_handle IS NOT NULL AND status IN ('pending', 'dispatched');
         `)
       }
+      if (current < 30) {
+        // Upstream's v26 (indexed mutation receipt capacity), renumbered.
+        migrateMutationReceiptCapacity(this.db)
+      }
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_dispatch_assignee_pane_leaf
           ON dispatch_contexts(${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL})
@@ -1482,44 +1487,6 @@ export class OrchestrationDb {
 
   // ── Durable mutation receipts ──
 
-  private ensureMutationReceiptCapacity(): void {
-    this.db
-      .prepare(
-        `DELETE FROM mutation_receipts
-         WHERE state = 'completed'
-           AND updated_at < datetime('now', ?)`
-      )
-      .run(`-${MUTATION_RECEIPT_MAX_AGE_DAYS} days`)
-
-    const row = this.db.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get() as {
-      count: number
-    }
-    const completedToRemove = row.count - MUTATION_RECEIPT_MAX_ROWS + 1
-    if (completedToRemove > 0) {
-      this.db
-        .prepare(
-          `DELETE FROM mutation_receipts
-           WHERE rowid IN (
-             SELECT rowid FROM mutation_receipts
-             WHERE state = 'completed'
-             ORDER BY updated_at ASC, rowid ASC
-             LIMIT ?
-           )`
-        )
-        .run(completedToRemove)
-    }
-
-    const retained = this.db.prepare('SELECT COUNT(*) AS count FROM mutation_receipts').get() as {
-      count: number
-    }
-    if (retained.count >= MUTATION_RECEIPT_MAX_ROWS) {
-      throw new OrchestrationError(
-        'mutation_ledger_full',
-        'The durable mutation ledger is full of unresolved operations. Resolve or inspect them before starting another mutation.'
-      )
-    }
-  }
-
   beginMutationReceipt(params: {
     callerFingerprint: string
     requestId: string
@@ -1542,7 +1509,7 @@ export class OrchestrationDb {
         this.db.exec('COMMIT')
         return { disposition: existing.state, row: existing }
       }
-      this.ensureMutationReceiptCapacity()
+      ensureMutationReceiptCapacity(this.db)
       this.db
         .prepare(
           `INSERT INTO mutation_receipts (
@@ -4123,7 +4090,7 @@ export class OrchestrationDb {
             `Mutation ${receipt.requestId} already has a durable acceptance record.`
           )
         }
-        this.ensureMutationReceiptCapacity()
+        ensureMutationReceiptCapacity(this.db)
         this.db
           .prepare(
             `INSERT INTO mutation_receipts (
@@ -4761,7 +4728,7 @@ export class OrchestrationDb {
           `Remote attachment request ${params.mutationReceipt.requestId} already exists.`
         )
       }
-      this.ensureMutationReceiptCapacity()
+      ensureMutationReceiptCapacity(this.db)
       this.db
         .prepare(
           `INSERT INTO mutation_receipts (
