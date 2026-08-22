@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { isExecutionContextDestroyedError } from './helpers/execution-context-destroyed'
 import {
   createIsolatedManyFileStagedDiffRepo,
   createIsolatedStagedLocaleDiffRepo
@@ -24,14 +25,25 @@ async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<str
   await expect
     .poll(
       () =>
-        orcaPage.evaluate(async (targetRepoId: string) => {
-          const store = window.__store
-          if (!store) {
-            return 0
-          }
-          await store.getState().fetchWorktrees(targetRepoId)
-          return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
-        }, repoId),
+        orcaPage
+          .evaluate(async (targetRepoId: string) => {
+            const store = window.__store
+            if (!store) {
+              return 0
+            }
+            await store.getState().fetchWorktrees(targetRepoId)
+            return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
+          }, repoId)
+          // Why: expect.poll retries a failed assertion, not a thrown
+          // exception — a navigation mid-evaluate (e.g. a lazy chunk reload
+          // during hydration) must not kill the poll outright. Any other
+          // thrown error still propagates and fails the test immediately.
+          .catch((error: unknown) => {
+            if (isExecutionContextDestroyedError(error)) {
+              return 0
+            }
+            throw error
+          }),
       { timeout: 30_000, message: 'isolated staged-diff worktree did not load' }
     )
     .toBeGreaterThan(0)
