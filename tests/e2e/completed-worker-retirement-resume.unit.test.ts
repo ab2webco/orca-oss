@@ -37,6 +37,26 @@ const HELPER_TAB_ID = 'worker-child-terminal'
 const HELPER_LEAF_ID = '33333333-3333-4333-8333-333333333333'
 const HELPER_PANE_KEY = makePaneKey(HELPER_TAB_ID, HELPER_LEAF_ID)
 const TERMINAL_HANDLE = 'terminal-background-worker'
+
+// Why: ORCA-272 makes the append-only session log the sole authority for retiring a
+// resume record — window.api.agentSessionLog.readForIdentity is always wired in the
+// real preload (src/preload/index.ts), so every close/release path exercised below
+// must mock it explicitly rather than rely on it being absent.
+const mockReadForIdentity = vi.fn()
+const finishedSessionLogReading = {
+  read: true as const,
+  state: 'awaiting-input' as const,
+  lastTurnAtMs: 1,
+  queuedInput: { supported: true as const, pending: 0 },
+  unparsedRecords: 0
+}
+const stillWorkingSessionLogReading = {
+  read: true as const,
+  state: 'working' as const,
+  lastTurnAtMs: 1,
+  queuedInput: { supported: true as const, pending: 0 },
+  unparsedRecords: 0
+}
 const initialAppStoreState = useAppStore.getState()
 
 function makeWorktree(id: string, workspacePath: string): Worktree {
@@ -372,11 +392,14 @@ async function hydrateSession(
 
 beforeEach(() => {
   vi.spyOn(console, 'debug').mockImplementation(() => {})
+  mockReadForIdentity.mockReset()
+  mockReadForIdentity.mockResolvedValue(finishedSessionLogReading)
   vi.stubGlobal('window', {
     api: {
       pty: { kill: vi.fn().mockResolvedValue(undefined) },
       runtime: { call: vi.fn().mockResolvedValue({ ok: true, result: {} }) },
-      runtimeEnvironments: { call: vi.fn().mockResolvedValue({ ok: true, result: {} }) }
+      runtimeEnvironments: { call: vi.fn().mockResolvedValue({ ok: true, result: {} }) },
+      agentSessionLog: { readForIdentity: mockReadForIdentity }
     }
   })
   seedWorkspace()
@@ -429,11 +452,37 @@ describe('completed background-worker retirement resume matrix', () => {
       providerSession: { key: 'session_id', id: PROVIDER_SESSION_ID }
     })
     await releaseCompletedWorker('exited')
-    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[ORIGINAL_PANE_KEY]).toBeUndefined()
+    // Why: once the live/retained status is gone (dropped by the prior pty-exit close),
+    // retirement can only come from the async session-log read (ORCA-272) — give its
+    // .then() a turn rather than assuming enough microtasks already flushed.
+    await vi.waitFor(() =>
+      expect(
+        useAppStore.getState().sleepingAgentSessionsByPaneKey[ORIGINAL_PANE_KEY]
+      ).toBeUndefined()
+    )
 
     const retiredRestart = persistAndParseCurrentSession()
     expect(retiredRestart.tabsByWorktree[WORKTREE_ID]).toEqual([])
     expect(retiredRestart.sleepingAgentSessionsByPaneKey?.[ORIGINAL_PANE_KEY]).toBeUndefined()
+
+    // Case 3b: the same PTY-exit-first release must NOT retire the record when the
+    // append-only session log still shows the agent mid-turn — orchestration settling
+    // the dispatch 'succeeded' is not itself proof the agent's last turn ended; only
+    // the log is (ORCA-272). This is the discriminating case: a reader mocked to always
+    // report "finished" would pass Case 3 even with that guarantee broken.
+    seedWorkspace()
+    recordCompletedWorker()
+    useAppStore.getState().removeAgentStatus(ORIGINAL_PANE_KEY)
+    useAppStore.getState().closeTab(ORIGINAL_TAB_ID, { reason: 'pty-exit' })
+    mockReadForIdentity.mockResolvedValue(stillWorkingSessionLogReading)
+    await releaseCompletedWorker('exited')
+    await vi.waitFor(() => expect(mockReadForIdentity).toHaveBeenCalled())
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[ORIGINAL_PANE_KEY]).toMatchObject({
+      providerSession: { key: 'session_id', id: PROVIDER_SESSION_ID }
+    })
+    mockReadForIdentity.mockResolvedValue(finishedSessionLogReading)
 
     // Case 4: legacy rollback preserves a fenced record; exited resolution clears it.
     seedWorkspace()
@@ -513,7 +562,11 @@ describe('completed background-worker retirement resume matrix', () => {
       skipRunningProcessConfirm: true,
       localPtyTeardownOwnedExternally: true
     })
-    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[HELPER_PANE_KEY]).toBeUndefined()
+    // Why: the helper pane has no live/retained status, so its retirement is also
+    // resolved by the async session-log read (ORCA-272).
+    await vi.waitFor(() =>
+      expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[HELPER_PANE_KEY]).toBeUndefined()
+    )
     expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[ORIGINAL_PANE_KEY]).toBeDefined()
     expect(resumeSleepingAgentSessionsForWorktree(WORKTREE_ID)).toBe(0)
     expectCanaryUnchanged()
@@ -557,6 +610,13 @@ describe('completed background-worker retirement resume matrix', () => {
     useAppStore.getState().removeAgentStatus(ORIGINAL_PANE_KEY)
     useAppStore.getState().closeTab(ORIGINAL_TAB_ID, { reason: 'pty-exit' })
     await releaseCompletedWorker('exited')
+    // Why: same async session-log retirement as Case 3 — wait for it to settle before
+    // snapshotting the session for the restart assertions in Case 8.
+    await vi.waitFor(() =>
+      expect(
+        useAppStore.getState().sleepingAgentSessionsByPaneKey[ORIGINAL_PANE_KEY]
+      ).toBeUndefined()
+    )
     const restartAfterRetirement = persistAndParseCurrentSession()
     await hydrateSession(restartAfterRetirement)
 
