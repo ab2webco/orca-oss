@@ -8,12 +8,17 @@ const mockRuntimeCall = vi.fn().mockResolvedValue({
   result: {},
   _meta: { runtimeId: 'local-runtime' }
 })
+const mockReadForIdentity = vi.fn()
 
 vi.stubGlobal('window', {
   api: {
     pty: { kill: mockKill },
     runtime: { call: mockRuntimeCall },
-    runtimeEnvironments: { call: vi.fn() }
+    runtimeEnvironments: { call: vi.fn() },
+    agentSessionLog: { readForIdentity: mockReadForIdentity },
+    // Why: a 'done' setAgentStatus transition best-effort-triggers a PR refresh; stub it
+    // so that side effect doesn't throw when unrelated to what a test is asserting.
+    gh: { enqueuePRRefresh: vi.fn().mockResolvedValue(true) }
   }
 })
 
@@ -64,6 +69,7 @@ describe('terminal tab retirement store boundary', () => {
       result: {},
       _meta: { runtimeId: 'local-runtime' }
     })
+    mockReadForIdentity.mockReset()
     parkedWatchersByTabId.clear()
     capturedPanesByTabId.clear()
   })
@@ -111,7 +117,13 @@ describe('terminal tab retirement store boundary', () => {
     expect(store.getState().tabsByWorktree['wt-1']).toEqual([])
     expect(store.getState().deferredSshSessionIdsByTabId['tab-1']).toBeUndefined()
     expect(store.getState().pendingReconnectPtyIdByTabId['tab-1']).toBeUndefined()
+    // Why: PTY teardown for a closed tab is unconditional, but its sleeping agent-session
+    // records are not — with no agentSessionLog reader wired (as here), the session log
+    // authority can't confirm the turn ended, so ORCA-272 preserves them all, including
+    // the closing tab's own records, rather than retiring on the close alone.
     expect(store.getState().sleepingAgentSessionsByPaneKey).toEqual({
+      'tab-1:leaf-1': sleepingRecord('tab-1:leaf-1', 'tab-1'),
+      'legacy-key': sleepingRecord('legacy-key', 'tab-1'),
       'tab-2:leaf-2': siblingRecord
     })
     expect(store.getState().sleepingAgentSessionsByPaneKey['tab-2:leaf-2']).toBe(siblingRecord)
@@ -266,5 +278,174 @@ describe('terminal tab retirement store boundary', () => {
 
     expect(store.getState().tabsByWorktree['wt-1']).toEqual([])
     warn.mockRestore()
+  })
+
+  describe('ORCA-272: sleeping agent-session retirement on close', () => {
+    function seedTabWithSleepingSession(store: ReturnType<typeof createRetirementStore>) {
+      const record = sleepingRecord('tab-1:leaf-1', 'tab-1')
+      seedStore(store, {
+        tabsByWorktree: {
+          'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1', ptyId: 'pty-1' })]
+        },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        sleepingAgentSessionsByPaneKey: { 'tab-1:leaf-1': record }
+      })
+      return record
+    }
+
+    it('retires the resume record synchronously when the live status already reports done', () => {
+      // Why: orchestration worker release (and any other caller that closes a tab right
+      // after observing 'done') depends on this being immediate, not deferred behind an
+      // IPC round trip — a live/retained 'done' status is already a reliable, synchronous
+      // completion signal, so the async session-log authority is reserved for panes this
+      // renderer cannot already vouch for.
+      const store = createRetirementStore()
+      const paneKey = 'tab-1:leaf-1'
+      seedStore(store, {
+        tabsByWorktree: {
+          'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1', ptyId: 'pty-1' })]
+        },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] }
+      })
+      const providerSession = { key: 'session_id' as const, id: 'sess-done' }
+      store
+        .getState()
+        .setAgentStatus(
+          paneKey,
+          { state: 'working', prompt: 'do work', agentType: 'codex' },
+          'Codex',
+          { updatedAt: 1000, stateStartedAt: 1000 },
+          { tabId: 'tab-1', worktreeId: 'wt-1' },
+          { providerSession }
+        )
+      store
+        .getState()
+        .setAgentStatus(
+          paneKey,
+          { state: 'done', prompt: 'do work', agentType: 'codex' },
+          'Codex',
+          { updatedAt: 2000, stateStartedAt: 2000 },
+          { tabId: 'tab-1', worktreeId: 'wt-1' },
+          { providerSession }
+        )
+      expect(store.getState().sleepingAgentSessionsByPaneKey[paneKey]).toBeDefined()
+
+      store.getState().closeTab('tab-1')
+
+      expect(store.getState().sleepingAgentSessionsByPaneKey[paneKey]).toBeUndefined()
+      expect(mockReadForIdentity).not.toHaveBeenCalled()
+    })
+
+    it('does not fast-path an interrupt-synthesized done — falls through to the session log', async () => {
+      // Why: agent-status-types.ts: "a narrow interrupt fallback synthesizes a final `done`
+      // when an agent misses its cancellation hook." That done means the turn was cut short,
+      // not finished — treating it as known-done would retire an interrupted agent's resume
+      // record through a second door beside Cmd+W (ORCA-272).
+      const store = createRetirementStore()
+      const paneKey = 'tab-1:leaf-1'
+      seedStore(store, {
+        tabsByWorktree: {
+          'wt-1': [makeTab({ id: 'tab-1', worktreeId: 'wt-1', ptyId: 'pty-1' })]
+        },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] }
+      })
+      const providerSession = { key: 'session_id' as const, id: 'sess-interrupted' }
+      store
+        .getState()
+        .setAgentStatus(
+          paneKey,
+          { state: 'working', prompt: 'do work', agentType: 'codex' },
+          'Codex',
+          { updatedAt: 1000, stateStartedAt: 1000 },
+          { tabId: 'tab-1', worktreeId: 'wt-1' },
+          { providerSession }
+        )
+      store
+        .getState()
+        .setAgentStatus(
+          paneKey,
+          { state: 'done', prompt: 'do work', agentType: 'codex', interrupted: true },
+          'Codex',
+          { updatedAt: 2000, stateStartedAt: 2000 },
+          { tabId: 'tab-1', worktreeId: 'wt-1' },
+          { providerSession }
+        )
+      expect(store.getState().agentStatusByPaneKey[paneKey]).toMatchObject({
+        state: 'done',
+        interrupted: true
+      })
+      mockReadForIdentity.mockResolvedValue({ read: false, reason: 'session-log-unreadable' })
+
+      store.getState().closeTab('tab-1')
+      await vi.waitFor(() => expect(mockReadForIdentity).toHaveBeenCalledOnce())
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(store.getState().sleepingAgentSessionsByPaneKey[paneKey]).toBeDefined()
+    })
+
+    it('preserves the resume record when the session log shows the agent mid-turn', async () => {
+      const store = createRetirementStore()
+      seedTabWithSleepingSession(store)
+      mockReadForIdentity.mockResolvedValue({
+        read: true,
+        state: 'working',
+        lastTurnAtMs: 1,
+        queuedInput: { supported: true, pending: 0 },
+        unparsedRecords: 0
+      })
+
+      store.getState().closeTab('tab-1')
+      await vi.waitFor(() => expect(mockReadForIdentity).toHaveBeenCalledOnce())
+      // Why: give the resolved read's .then() a turn to run before asserting nothing changed.
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']).toBeDefined()
+    })
+
+    it('retires the resume record once the session log confirms the turn ended', async () => {
+      const store = createRetirementStore()
+      seedTabWithSleepingSession(store)
+      mockReadForIdentity.mockResolvedValue({
+        read: true,
+        state: 'awaiting-input',
+        lastTurnAtMs: 1,
+        queuedInput: { supported: true, pending: 0 },
+        unparsedRecords: 0
+      })
+
+      store.getState().closeTab('tab-1')
+
+      await vi.waitFor(() =>
+        expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']).toBeUndefined()
+      )
+    })
+
+    it('preserves the resume record when the session log cannot be read', async () => {
+      const store = createRetirementStore()
+      seedTabWithSleepingSession(store)
+      mockReadForIdentity.mockResolvedValue({ read: false, reason: 'session-log-unreadable' })
+
+      store.getState().closeTab('tab-1')
+      await vi.waitFor(() => expect(mockReadForIdentity).toHaveBeenCalledOnce())
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']).toBeDefined()
+    })
+
+    it('preserves the resume record when the reader itself rejects', async () => {
+      const store = createRetirementStore()
+      seedTabWithSleepingSession(store)
+      mockReadForIdentity.mockRejectedValue(new Error('ipc unavailable'))
+
+      store.getState().closeTab('tab-1')
+      await vi.waitFor(() => expect(mockReadForIdentity).toHaveBeenCalledOnce())
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(store.getState().sleepingAgentSessionsByPaneKey['tab-1:leaf-1']).toBeDefined()
+    })
   })
 })
