@@ -1,10 +1,21 @@
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('electron', () => ({
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(`encrypted:${value}`, 'utf8'),
+    decryptString: (value: Buffer) => value.toString('utf8').slice('encrypted:'.length)
+  }
+}))
 import { emptyPluginLockfile } from '../../shared/plugins/plugin-install-lockfile'
 import { pluginManifestSchema } from '../../shared/plugins/plugin-manifest'
 import type { InvalidDiscoveredPlugin, ValidDiscoveredPlugin } from './plugin-discovery'
+import { getPluginsDataDir } from './plugin-discovery'
 import { buildPluginList } from './plugin-list-projection'
+import { writePluginSetting } from './plugin-settings-write'
 import type { PluginService } from './plugin-service'
 
 const manifest = pluginManifestSchema.parse({
@@ -26,12 +37,14 @@ function serviceWith(
     worker?: ReturnType<PluginService['workerState']>
     vmRecipes?: ReturnType<PluginService['contentPacks']['vmRecipes']['preview']>
     commands?: ReturnType<PluginService['contentPacks']['commands']['preview']>
+    userDataPath?: string
   } = {}
 ): PluginService {
   return {
     options: {
       getPluginConsents: () => ({}),
-      getDisabledPlugins: () => []
+      getDisabledPlugins: () => [],
+      userDataPath: options.userDataPath ?? join(tmpdir(), 'orca-projection-no-settings')
     },
     getDiscovered: () => [discovered],
     activationState: () => options.activation ?? 'pending',
@@ -220,5 +233,94 @@ describe('buildPluginList consent identity', () => {
         keybindings: [{ key: 'Mod+Alt+T', when: 'worktree' }]
       }
     ])
+  })
+})
+
+describe('buildPluginList declared settings', () => {
+  const settingsManifest = pluginManifestSchema.parse({
+    manifestVersion: 1,
+    id: 'webhook',
+    publisher: 'orca-samples',
+    name: 'Webhook',
+    version: '1.0.0',
+    engines: { orca: '>=1.0.0' },
+    pluginApi: 1,
+    contributes: {
+      settings: [{ key: 'webhookUrl', type: 'string', label: 'Webhook URL', required: true }]
+    },
+    capabilities: [{ kind: 'settings:own' }]
+  })
+
+  function discovered(manifest: typeof settingsManifest): ValidDiscoveredPlugin {
+    return {
+      pluginKey: 'orca-samples.webhook',
+      rootDir: join(tmpdir(), 'plugins', 'webhook'),
+      manifest,
+      consentFingerprint: 'sha256-current',
+      contentHash: null,
+      isDev: false
+    }
+  }
+
+  it('projects the declared settings and flags an unconfigured required key', async () => {
+    const userDataPath = await mkdtemp(join(tmpdir(), 'orca-projection-settings-'))
+    try {
+      const service = serviceWith(discovered(settingsManifest), {
+        activation: 'approved',
+        worker: { state: 'running', restarts: 0 },
+        userDataPath
+      })
+      const entry = (await buildPluginList(service, emptyPluginLockfile()))[0]!
+
+      expect(entry.needsSetup).toBe(true)
+      expect(entry.settings).toEqual([
+        {
+          key: 'webhookUrl',
+          type: 'string',
+          label: 'Webhook URL',
+          secret: false,
+          required: true,
+          configured: false
+        }
+      ])
+
+      writePluginSetting({
+        pluginsDataDir: getPluginsDataDir(userDataPath),
+        pluginKey: 'orca-samples.webhook',
+        declared: settingsManifest.contributes.settings,
+        key: 'webhookUrl',
+        value: 'https://hooks.example.test/abc'
+      })
+      const configured = (await buildPluginList(service, emptyPluginLockfile()))[0]!
+      expect(configured.needsSetup).toBeUndefined()
+      expect(configured.settings?.[0]?.value).toBe('https://hooks.example.test/abc')
+    } finally {
+      await rm(userDataPath, { recursive: true, force: true })
+    }
+  })
+
+  it('omits the settings block entirely when the manifest declares none', async () => {
+    const entry = (
+      await buildPluginList(serviceWith(discovered(manifest)), emptyPluginLockfile())
+    )[0]!
+    expect(entry).not.toHaveProperty('settings')
+    expect(entry).not.toHaveProperty('needsSetup')
+  })
+
+  it('does not outrank a disabled plugin with a setup prompt', async () => {
+    const userDataPath = await mkdtemp(join(tmpdir(), 'orca-projection-disabled-'))
+    try {
+      const entry = (
+        await buildPluginList(
+          serviceWith(discovered(settingsManifest), { activation: 'disabled', userDataPath }),
+          emptyPluginLockfile()
+        )
+      )[0]!
+      expect(entry.status).toBe('disabled')
+      expect(entry.needsSetup).toBeUndefined()
+      expect(entry.settings).toHaveLength(1)
+    } finally {
+      await rm(userDataPath, { recursive: true, force: true })
+    }
   })
 })

@@ -5,7 +5,7 @@ import {
 import { needsReconsent } from '../../shared/plugins/plugin-consent-state'
 import { pluginPanelTabKey } from '../../shared/plugins/plugin-manifest'
 import type { PluginLockfile } from '../../shared/plugins/plugin-install-lockfile'
-import { isInvalidDiscoveredPlugin } from './plugin-discovery'
+import { getPluginsDataDir, isInvalidDiscoveredPlugin } from './plugin-discovery'
 import type { PluginService } from './plugin-service'
 import { listPluginVmRecipeCommands } from '../../shared/plugins/plugin-vm-recipe-artifact'
 import type { PluginCommandAliasActionId } from '../../shared/plugins/plugin-command-actions'
@@ -15,6 +15,7 @@ import {
   isOfficialPluginIdentity
 } from '../../shared/plugins/plugin-marketplace'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { projectPluginSettings, type PluginSettingProjection } from './plugin-settings-values'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -72,6 +73,10 @@ export type PluginListEntry = {
     commands: { phase: 'create' | 'suspend' | 'resume' | 'destroy'; command: string }[]
   }[]
   restarts: number
+  /** Manifest-declared settings with their current state; absent when none. */
+  settings?: PluginSettingProjection[]
+  /** A required setting has no value, so the plugin runs unconfigured. */
+  needsSetup?: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
   source?: {
     kind: 'local-path' | 'git' | 'marketplace' | 'bundled'
@@ -145,6 +150,21 @@ export async function buildPluginList(
         candidateLockEntry.contentHash === plugin.contentHash
           ? candidateLockEntry
           : undefined
+      const declaredSettings = plugin.manifest.contributes.settings
+      const settingsState =
+        declaredSettings.length > 0
+          ? projectPluginSettings(
+              getPluginsDataDir(service.options.userDataPath),
+              plugin.pluginKey,
+              declaredSettings
+            )
+          : { settings: [], unconfigured: [] }
+      // Why: a disabled or unreadable plugin is already described by its own
+      // status; surfacing "needs setup" there would outrank the truer label.
+      const needsSetup =
+        settingsState.unconfigured.length > 0 &&
+        activation !== 'disabled' &&
+        activation !== 'pending'
       const bundled = lockEntry?.source.kind === 'bundled'
       const official =
         bundled ||
@@ -192,6 +212,8 @@ export async function buildPluginList(
           commands: listPluginVmRecipeCommands(recipe)
         })),
         restarts: worker.restarts,
+        ...(settingsState.settings.length > 0 ? { settings: settingsState.settings } : {}),
+        ...(needsSetup ? { needsSetup: true } : {}),
         ...(killListEntry
           ? {
               blockedByKillList: {

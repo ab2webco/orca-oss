@@ -539,3 +539,85 @@ describe('PluginsSettingsSection lifecycle', () => {
     expect(container.textContent).toContain('Could not save plugin settings.')
   })
 })
+
+const unconfiguredPlugin: PluginHostListEntry = {
+  ...plugin,
+  status: 'running',
+  settings: [
+    {
+      key: 'webhookUrl',
+      type: 'string',
+      label: 'Webhook URL',
+      secret: false,
+      required: true,
+      configured: false
+    }
+  ],
+  needsSetup: true
+}
+
+const configuredPlugin: PluginHostListEntry = {
+  ...unconfiguredPlugin,
+  settings: [
+    { ...unconfiguredPlugin.settings![0]!, value: 'https://hooks.test/a', configured: true }
+  ],
+  needsSetup: undefined
+}
+
+async function typeWebhookUrl(container: HTMLElement, value: string): Promise<void> {
+  const field = container.querySelector<HTMLInputElement>('[data-setting-key="webhookUrl"]')!
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+    setter.call(field, value)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })
+}
+
+describe('PluginsSettingsSection declared settings', () => {
+  it('adopts the list the write returns, so the row only leaves needs-setup once main agrees', async () => {
+    const setSetting = vi.fn().mockResolvedValue([configuredPlugin])
+    installApi({
+      list: vi.fn().mockResolvedValue([unconfiguredPlugin]),
+      refresh: vi.fn().mockResolvedValue([unconfiguredPlugin]),
+      setSetting
+    })
+    const { container } = await renderSection()
+
+    expect(container.textContent).toContain('Needs setup')
+    const configure = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Finish setup')
+    )!
+    await act(async () => click(configure))
+    await typeWebhookUrl(container, 'https://hooks.test/a')
+
+    expect(setSetting).toHaveBeenCalledWith({
+      pluginKey: 'acme.notes',
+      key: 'webhookUrl',
+      value: 'https://hooks.test/a'
+    })
+    expect(container.textContent).not.toContain('Needs setup')
+    expect(container.textContent).toContain('Running')
+  })
+
+  it('keeps the plugin in needs-setup when the write is rejected', async () => {
+    installApi({
+      list: vi.fn().mockResolvedValue([unconfiguredPlugin]),
+      refresh: vi.fn().mockResolvedValue([unconfiguredPlugin]),
+      setSetting: vi.fn().mockRejectedValue(new Error('value exceeds 4096 bytes'))
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { container } = await renderSection()
+
+    const configure = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Finish setup')
+    )!
+    await act(async () => click(configure))
+    await typeWebhookUrl(container, 'https://hooks.test/a')
+
+    expect(container.textContent).toContain('Could not save this setting.')
+    expect(container.textContent).toContain('Needs setup')
+  })
+})

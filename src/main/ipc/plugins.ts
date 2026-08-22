@@ -6,7 +6,12 @@ import type {
   PluginPanelActionOutcome,
   PluginPanelEntry
 } from '../../shared/plugins/plugin-panel-bridge'
-import { getUserPluginsDir, getPluginsDataDir } from '../plugins/plugin-discovery'
+import {
+  getUserPluginsDir,
+  getPluginsDataDir,
+  isInvalidDiscoveredPlugin
+} from '../plugins/plugin-discovery'
+import { writePluginSetting } from '../plugins/plugin-settings-write'
 import {
   installPluginFromGit,
   installPluginFromLocalPath,
@@ -62,6 +67,12 @@ const installArgsSchema = z.discriminatedUnion('kind', [
 export function parsePluginInstallArgs(args: unknown): z.infer<typeof installArgsSchema> {
   return installArgsSchema.parse(args)
 }
+
+const setSettingArgsSchema = z.object({
+  pluginKey: z.string().refine(isQualifiedPluginKey, 'invalid qualified plugin key'),
+  key: z.string().min(1).max(64),
+  value: z.union([z.string(), z.boolean(), z.number()])
+})
 
 const removeArgsSchema = z.object({
   pluginKey: z.string().refine(isQualifiedPluginKey, 'invalid qualified plugin key')
@@ -237,6 +248,29 @@ export function registerPluginHandlers(
       { notifyListeners: true, originWebContentsId: event.sender.id }
     )
     await pluginService.refresh()
+    return listPluginsForClients(pluginService)
+  })
+
+  // Why: the manifest's declaration is the allowlist — main resolves it here so
+  // a renderer can never name a key the plugin did not ask the user to fill.
+  ipcMain.handle('plugins:setSetting', async (_event, args: unknown) => {
+    await pluginService.whenReady()
+    const parsed = setSettingArgsSchema.parse(args)
+    const plugin = pluginService
+      .getDiscovered()
+      .find((candidate) => candidate.pluginKey === parsed.pluginKey)
+    const declared =
+      plugin && !isInvalidDiscoveredPlugin(plugin) ? plugin.manifest.contributes.settings : []
+    const result = writePluginSetting({
+      pluginsDataDir: getPluginsDataDir(pluginService.options.userDataPath),
+      pluginKey: parsed.pluginKey,
+      declared,
+      key: parsed.key,
+      value: parsed.value
+    })
+    if (!result.ok) {
+      throw new Error(result.error)
+    }
     return listPluginsForClients(pluginService)
   })
 
