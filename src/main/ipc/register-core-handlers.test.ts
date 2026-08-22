@@ -35,6 +35,7 @@ const {
   registerOrcaProfileHandlersMock,
   registerCodexAccountHandlersMock,
   registerAgentHookHandlersMock,
+  registerAgentSessionLogPaneHandlersMock,
   registerAgentTrustHandlersMock,
   registerClaudeAccountHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
@@ -102,6 +103,7 @@ const {
   registerOrcaProfileHandlersMock: vi.fn(),
   registerCodexAccountHandlersMock: vi.fn(),
   registerAgentHookHandlersMock: vi.fn(),
+  registerAgentSessionLogPaneHandlersMock: vi.fn(),
   registerAgentTrustHandlersMock: vi.fn(),
   registerClaudeAccountHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
@@ -327,6 +329,10 @@ vi.mock('./agent-hooks', () => ({
   registerAgentHookHandlers: registerAgentHookHandlersMock
 }))
 
+vi.mock('./agent-session-log-panes', () => ({
+  registerAgentSessionLogPaneHandlers: registerAgentSessionLogPaneHandlersMock
+}))
+
 vi.mock('./agent-trust', () => ({
   registerAgentTrustHandlers: registerAgentTrustHandlersMock
 }))
@@ -430,6 +436,7 @@ describe('registerCoreHandlers', () => {
     registerOrcaProfileHandlersMock.mockReset()
     registerCodexAccountHandlersMock.mockReset()
     registerAgentHookHandlersMock.mockReset()
+    registerAgentSessionLogPaneHandlersMock.mockReset()
     registerAgentTrustHandlersMock.mockReset()
     registerClaudeAccountHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
@@ -512,6 +519,7 @@ describe('registerCoreHandlers', () => {
     expect(registerAgentHookHandlersMock).toHaveBeenCalledWith(runtime, {
       getPtyIdForPaneKey: expect.any(Function)
     })
+    expect(registerAgentSessionLogPaneHandlersMock).toHaveBeenCalledTimes(1)
     expect(registerCodexConfigSyncHandlersMock).toHaveBeenCalledWith(
       codexAccounts.runtimeHomeService
     )
