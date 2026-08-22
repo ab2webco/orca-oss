@@ -3,9 +3,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  flushQueuedRendererRecoveryEvidence,
   formatRendererRecoveryEvidenceLine,
+  queueRendererRecoveryEvidence,
   readRendererRecoveryEvidence,
-  reportRendererRecoveryEvidence
+  reportRendererRecoveryEvidence,
+  type RendererRecoveryEvidence
 } from './renderer-recovery-evidence'
 
 function crashRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -145,6 +148,27 @@ describe('formatRendererRecoveryEvidenceLine', () => {
   })
 })
 
+type FakeTestInfo = {
+  status: string
+  titlePath: string[]
+  attach: (name: string, options?: { body?: string | Buffer }) => Promise<void>
+}
+
+function fakeTestInfo(status: string): {
+  testInfo: FakeTestInfo
+  attachCalls: { name: string; body: string }[]
+} {
+  const attachCalls: { name: string; body: string }[] = []
+  const testInfo: FakeTestInfo = {
+    status,
+    titlePath: ['spec.ts', 'suite', 'test'],
+    attach: async (name, options) => {
+      attachCalls.push({ name, body: String(options?.body ?? '') })
+    }
+  }
+  return { testInfo, attachCalls }
+}
+
 describe('reportRendererRecoveryEvidence', () => {
   let userDataDir: string
 
@@ -156,42 +180,74 @@ describe('reportRendererRecoveryEvidence', () => {
     rmSync(userDataDir, { recursive: true, force: true })
   })
 
-  function fakeTestInfo(status: string): {
-    testInfo: Parameters<typeof reportRendererRecoveryEvidence>[1]
-    attachCalls: { name: string; body: string }[]
-    logs: string[]
-  } {
-    const attachCalls: { name: string; body: string }[] = []
-    const testInfo = {
-      status,
-      titlePath: ['spec.ts', 'suite', 'test'],
-      attach: async (name: string, options?: { body?: string | Buffer }) => {
-        attachCalls.push({ name, body: String(options?.body ?? '') })
-      }
-    } as unknown as Parameters<typeof reportRendererRecoveryEvidence>[1]
-    return { testInfo, attachCalls, logs: [] }
-  }
-
-  it('skips work on a passed test without force', async () => {
+  it('skips work on a passed test', async () => {
     const { testInfo, attachCalls } = fakeTestInfo('passed')
-    await reportRendererRecoveryEvidence(userDataDir, testInfo)
+    await reportRendererRecoveryEvidence(
+      userDataDir,
+      testInfo as unknown as Parameters<typeof reportRendererRecoveryEvidence>[1]
+    )
     expect(attachCalls).toHaveLength(0)
   })
 
   it('reports on a failed test', async () => {
     const { testInfo, attachCalls } = fakeTestInfo('failed')
-    await reportRendererRecoveryEvidence(userDataDir, testInfo)
+    await reportRendererRecoveryEvidence(
+      userDataDir,
+      testInfo as unknown as Parameters<typeof reportRendererRecoveryEvidence>[1]
+    )
     expect(attachCalls).toHaveLength(1)
     expect(attachCalls[0].name).toBe('renderer-recovery-evidence.json')
     expect(attachCalls[0].body).toContain('did not fire')
   })
+})
 
-  it('reports on a passed test when force is set', async () => {
-    // Why: testInfo.status is only reliable from fixture teardown — a normal
-    // failed expect() leaves it 'passed' throughout the test's own finally
-    // blocks, so a bypass helper's dispose() must force the report (ORCA-280).
+describe('queueRendererRecoveryEvidence / flushQueuedRendererRecoveryEvidence', () => {
+  // Why this pair matters: a prior version of this fix used
+  // reportRendererRecoveryEvidence(..., { force: true }) from dispose(),
+  // which reports unconditionally — including on every PASSING test using
+  // orca-restart.ts/paired-electron-client.ts. That is the exact defect this
+  // suite exists to catch: both directions must hold, not just "it reports
+  // on failure".
+  function evidence(): RendererRecoveryEvidence {
+    return {
+      rendererCrashRecorded: false,
+      recoveryReloadConfirmed: false,
+      recoveryReloadLikely: false,
+      crashReasons: [],
+      rendererCrashRecordCount: 0,
+      recoveryBreadcrumbCount: 0,
+      detail: 'renderer_recovery_reload: did not fire — test fixture evidence.'
+    }
+  }
+
+  it('reports queued evidence once status is finalized as failed', async () => {
     const { testInfo, attachCalls } = fakeTestInfo('passed')
-    await reportRendererRecoveryEvidence(userDataDir, testInfo, { force: true })
+    const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
+    // Why status starts 'passed' then flips: this mirrors the real timing —
+    // queuing happens mid-test (status not yet finalized), Playwright then
+    // finalizes status once the test function's promise settles, and only
+    // then does the auto fixture's teardown call flush.
+    queueRendererRecoveryEvidence(asTestInfo, evidence())
+    testInfo.status = 'failed'
+    await flushQueuedRendererRecoveryEvidence(asTestInfo)
     expect(attachCalls).toHaveLength(1)
+    expect(attachCalls[0].name).toBe('renderer-recovery-evidence.json')
+  })
+
+  it('does not report queued evidence when the test ends up passing', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('passed')
+    const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
+    queueRendererRecoveryEvidence(asTestInfo, evidence())
+    // status stays 'passed' — the test that queued this evidence recovered
+    // or never actually failed.
+    await flushQueuedRendererRecoveryEvidence(asTestInfo)
+    expect(attachCalls).toHaveLength(0)
+  })
+
+  it('is a no-op when nothing was queued', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('failed')
+    const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
+    await flushQueuedRendererRecoveryEvidence(asTestInfo)
+    expect(attachCalls).toHaveLength(0)
   })
 })

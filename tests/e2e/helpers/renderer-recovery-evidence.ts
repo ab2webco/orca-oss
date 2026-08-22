@@ -189,23 +189,24 @@ export function formatRendererRecoveryEvidenceLine(
 
 /**
  * Read and report the renderer recovery evidence for `userDataDir` before a
- * caller deletes it. Gated on `testInfo.status` by default so the passing
- * path never pays for a file read — but that gate is only reliable from
- * Playwright *fixture* teardown. `testInfo.status` isn't updated until an
- * error has propagated all the way out of the test function: a regular
- * (non-soft) failed `expect()`/`expect.poll()` just `throw`s, so status is
- * still 'passed' throughout the test's *own* `finally` blocks. Pass
- * `force: true` from any call site that isn't Playwright fixture teardown —
- * e.g. a helper's own `dispose()` called from a test's `finally` — or a real
- * failure there will be silently unreported. Never throws so a diagnostics
- * failure cannot mask the real error.
+ * caller deletes it. Gated on `testInfo.status` so the passing path never
+ * pays for a file read. Only call this from Playwright *fixture* teardown
+ * (e.g. the `electronApp` fixture), where `testInfo.status` is reliable —
+ * fixture teardown runs strictly after the test function's promise has
+ * settled, which is when Playwright finalizes it. A regular (non-soft)
+ * failed `expect()`/`expect.poll()` only `throw`s; status stays 'passed'
+ * until that throw has propagated all the way out of the test function, so
+ * reading `testInfo.status` from inside the test's *own* code (e.g. a
+ * helper's `dispose()` called from a `finally` block) is unreliable — use
+ * `queueRendererRecoveryEvidence`/`flushQueuedRendererRecoveryEvidence`
+ * instead for those call sites. Never throws so a diagnostics failure
+ * cannot mask the real error.
  */
 export async function reportRendererRecoveryEvidence(
   userDataDir: string,
-  testInfo: TestInfo,
-  options: { force?: boolean } = {}
+  testInfo: TestInfo
 ): Promise<void> {
-  if (!options.force && (testInfo.status === 'passed' || testInfo.status === 'skipped')) {
+  if (testInfo.status === 'passed' || testInfo.status === 'skipped') {
     return
   }
   try {
@@ -217,5 +218,61 @@ export async function reportRendererRecoveryEvidence(
     })
   } catch (error) {
     console.error('[renderer-recovery-evidence] failed to collect evidence:', error)
+  }
+}
+
+// Why a WeakMap and not a fixture-provided register callback: helpers like
+// createRestartSession/launchPairedElectronClient are called with only
+// `testInfo`, not the fixture object, and adding a callback parameter would
+// mean touching every one of their 30+ existing call sites. testInfo is a
+// stable, unique object per test, so it doubles as the queue key.
+const queuedEvidenceByTest = new WeakMap<TestInfo, RendererRecoveryEvidence[]>()
+
+/**
+ * Queue evidence for later reporting by `flushQueuedRendererRecoveryEvidence`.
+ * For a helper that bypasses the `electronApp` fixture and must read the
+ * evidence from inside the test's own `finally` (before it deletes
+ * `userDataDir`) — where `testInfo.status` is not yet reliable. Read the
+ * evidence eagerly, at the point disk state is still available; defer only
+ * the "should this be printed" decision to flush time.
+ */
+export function queueRendererRecoveryEvidence(
+  testInfo: TestInfo,
+  evidence: RendererRecoveryEvidence
+): void {
+  const queued = queuedEvidenceByTest.get(testInfo) ?? []
+  queued.push(evidence)
+  queuedEvidenceByTest.set(testInfo, queued)
+}
+
+/**
+ * Report every evidence entry queued during this test, but only if the test
+ * did not pass. Call from an `{ auto: true }` Playwright fixture so specs
+ * that never request the `electronApp` fixture (e.g. ones that launch their
+ * own `ElectronApplication` via orca-restart.ts/paired-electron-client.ts)
+ * still get flushed. Safe to call with nothing queued (no-op). Queuing
+ * always happens inside the test's own code, which completes strictly
+ * before any fixture teardown runs, so by the time this flush runs the
+ * queue is already complete regardless of fixture teardown ordering.
+ */
+export async function flushQueuedRendererRecoveryEvidence(testInfo: TestInfo): Promise<void> {
+  const queued = queuedEvidenceByTest.get(testInfo)
+  queuedEvidenceByTest.delete(testInfo)
+  if (!queued || queued.length === 0) {
+    return
+  }
+  if (testInfo.status === 'passed' || testInfo.status === 'skipped') {
+    return
+  }
+  try {
+    for (const evidence of queued) {
+      console.log(formatRendererRecoveryEvidenceLine(testInfo.titlePath.join(' > '), evidence))
+      await testInfo.attach('renderer-recovery-evidence.json', {
+        body: JSON.stringify(evidence, null, 2),
+        contentType: 'application/json'
+      })
+    }
+  } catch (error) {
+    console.error('[renderer-recovery-evidence] failed to report queued evidence:', error)
   }
 }

@@ -33,11 +33,18 @@ import {
   createElectronHomeIsolation
 } from './electron-home-isolation'
 import { createSeededTestRepo, isValidGitRepo } from './seeded-test-repo'
-import { reportRendererRecoveryEvidence } from './renderer-recovery-evidence'
+import {
+  flushQueuedRendererRecoveryEvidence,
+  reportRendererRecoveryEvidence
+} from './renderer-recovery-evidence'
 
 type OrcaTestFixtures = {
   electronApp: ElectronApplication
   registerPostElectronShutdownCleanup: (cleanup: () => Promise<void>) => void
+  // Why: auto-runs for every test (not just ones that request electronApp) so
+  // specs that launch their own ElectronApplication via orca-restart.ts /
+  // paired-electron-client.ts still get their queued evidence reported.
+  flushRendererRecoveryEvidenceQueue: void
   sharedPage: Page
   orcaPage: Page
   // Why: every fresh userData dir paints the first-launch onboarding overlay
@@ -152,6 +159,21 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
       await provideFixture(repoPath)
     },
     { scope: 'worker' }
+  ],
+
+  // Why auto + its own fixture, not folded into electronApp's teardown:
+  // this must run for tests that never request electronApp at all (e.g.
+  // paired-remote-terminal-host-restart-background-sync.spec.ts, which owns
+  // its own launches). Queuing always finishes inside the test's own code,
+  // strictly before any fixture teardown starts, so this flush sees a
+  // complete queue regardless of teardown ordering relative to other fixtures.
+  flushRendererRecoveryEvidenceQueue: [
+    // oxlint-disable-next-line no-empty-pattern -- Playwright fixture callbacks require object destructuring here.
+    async ({}, provideFixture, testInfo) => {
+      await provideFixture()
+      await flushQueuedRendererRecoveryEvidence(testInfo)
+    },
+    { auto: true, scope: 'test' }
   ],
 
   // Why: Windows keeps watched worktrees locked until Electron and its

@@ -17,7 +17,10 @@ import {
   createElectronHomeIsolation
 } from './electron-home-isolation'
 import { forwardElectronProcessLogs } from './orca-app'
-import { reportRendererRecoveryEvidence } from './renderer-recovery-evidence'
+import {
+  queueRendererRecoveryEvidence,
+  readRendererRecoveryEvidence
+} from './renderer-recovery-evidence'
 import {
   replaceRuntimePairingInPlace,
   type SameIdPairingReplacement
@@ -242,10 +245,9 @@ export async function launchPairedElectronClient(
       dispose: async () => {
         await closeElectronAppForE2E(app)
         await cleanupE2EDaemons(userDataDir)
-        // Why force: dispose() runs inside the test's own finally, not as
-        // fixture teardown, so testInfo.status is never finalized here for a
-        // normal failed expect() (ORCA-280).
-        await reportRendererRecoveryEvidence(userDataDir, testInfo, { force: true })
+        // Why queue-and-flush, not an immediate report: see orca-restart.ts's
+        // dispose() for the full reasoning (ORCA-280).
+        queueRendererRecoveryEvidence(testInfo, await readRendererRecoveryEvidence(userDataDir))
         await removeProfile(userDataDir)
       },
       getDirectSshAttemptTargetIds: async () =>
@@ -258,8 +260,8 @@ export async function launchPairedElectronClient(
   } catch (error) {
     await closeElectronAppForE2E(app)
     await cleanupE2EDaemons(userDataDir)
-    // Why: status isn't finalized this early — force the report (see doc comment).
-    await reportRendererRecoveryEvidence(userDataDir, testInfo, { force: true })
+    // Why queue-and-flush: see orca-restart.ts's dispose() (ORCA-280).
+    queueRendererRecoveryEvidence(testInfo, await readRendererRecoveryEvidence(userDataDir))
     await removeProfile(userDataDir)
     throw error
   }
