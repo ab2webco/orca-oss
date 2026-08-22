@@ -20,6 +20,10 @@
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import {
+  addAndActivateIsolatedRepo,
+  evaluateThroughContextSwaps
+} from './helpers/isolated-diff-repo-activation'
 import { measureIdleFloorMs } from './helpers/idle-floor-lag'
 import {
   createLargeFileCountRepo,
@@ -57,55 +61,22 @@ type LoadMeasurement = {
   cycleMaxLagMs: number[]
 }
 
+// Why not a pure call to addAndActivateIsolatedRepo: this suite also needs
+// the Source Control sidebar opened and confirmed visible right after
+// activation, so it delegates the crash-tolerant repo/worktree setup and
+// layers those extra steps on top, through the same evaluateThroughContextSwaps
+// tolerance for the one additional store-mutating evaluate.
 async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<string> {
-  const repoId = await orcaPage.evaluate(async (pathToRepo: string) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
-    }
-    const addedRepo = await store.getState().addRepoPath(pathToRepo)
-    if (!addedRepo) {
-      throw new Error(`isolated repo not found: ${pathToRepo}`)
-    }
-    return addedRepo.id
-  }, repoPath)
-
-  // Why: fetchWorktrees() resolves before Zustand always reflects the async
-  // worktree scan, so poll the same public store path real repo setup uses.
-  await expect
-    .poll(
-      () =>
-        orcaPage.evaluate(async (targetRepoId: string) => {
-          const store = window.__store
-          if (!store) {
-            return 0
-          }
-          await store.getState().fetchWorktrees(targetRepoId)
-          return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
-        }, repoId),
-      { timeout: 30_000, message: 'isolated large-file-count worktree did not load' }
-    )
-    .toBeGreaterThan(0)
-
-  const worktreeId = await orcaPage.evaluate(
-    ({ targetRepoId, pathToRepo }) => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('window.__store is not available')
-      }
-      const state = store.getState()
-      const worktrees = state.worktreesByRepo[targetRepoId] ?? []
-      const worktree = worktrees.find((entry) => entry.path === pathToRepo) ?? worktrees[0]
-      if (!worktree) {
-        throw new Error(`isolated worktree not found: ${pathToRepo}`)
-      }
-      state.setActiveRepo(targetRepoId)
-      state.setActiveWorktree(worktree.id)
-      state.setRightSidebarOpen(true)
-      state.setRightSidebarTab('source-control')
-      return worktree.id
-    },
-    { targetRepoId: repoId, pathToRepo: repoPath }
+  const worktreeId = await addAndActivateIsolatedRepo(orcaPage, repoPath)
+  await evaluateThroughContextSwaps(
+    orcaPage,
+    () =>
+      orcaPage.evaluate(() => {
+        const state = window.__store?.getState()
+        state?.setRightSidebarOpen(true)
+        state?.setRightSidebarTab('source-control')
+      }),
+    'opening the Source Control panel'
   )
 
   // Why: repo activation can finish sidebar routing after the store mutation;

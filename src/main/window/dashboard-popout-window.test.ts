@@ -231,10 +231,12 @@ describe('createOrFocusDashboardPopout', () => {
     expect(options).toEqual({ search: 'view=kanban' })
   })
 
-  it('opens on the current dashboard view by default', () => {
+  // The consolidated grid is the default because it is the only view that says
+  // what every agent is doing without opening one (ORCA-234).
+  it('opens on the consolidated grid by default', () => {
     createOrFocusDashboardPopout(makeStore() as never)
 
-    expect(instances[0].loadFile.mock.calls[0][1]).toEqual({ search: 'view=board' })
+    expect(instances[0].loadFile.mock.calls[0][1]).toEqual({ search: 'view=grid' })
   })
 
   it('loads the dev server URL with the requested view when in dev', () => {

@@ -131,6 +131,7 @@ commits since the base vs upstream commits since the base:
 | `src/shared/orca-repository-url.ts` | 1 | 0 | no upstream movement |
 | `src/main/plugins/plugin-kill-list-exemptions.ts` | 1 | 0 | no upstream movement |
 | `config/scripts/select-pr-e2e-scope.mjs` | 1 | 0 | no upstream movement |
+| `src/shared/plugins/plugin-settings-contribution.ts` | 1 | 0 | fork-only file; **its 4 wiring lines in `plugin-manifest.ts` are the risk** |
 
 **Zero upstream movement is not safety.** PR #80's central finding is that a revert needs no
 conflict — it needs upstream to move fork-modified logic into a file the fork does not have. The
@@ -141,6 +142,16 @@ four anchors that caught it in #7, at their current locations:
   `additionalClaudeProjectsDirs`, the managed-vault projects roots plus the realpath dedup.
 - `src/shared/release-channel.ts:36` — `DAILY_RELEASE_REPO = 'ab2webco/orca-oss'`; a wrong value
   here ships the fork's daily channel from upstream's repo.
+- `src/shared/plugins/plugin-manifest.ts` — the four lines that admit declarative plugin
+  settings (ORCA-274): the `plugin-settings-contribution` import, `settings:
+  pluginSettingsContributionSchema` inside `contributes`, `settings: []` in the `contributes`
+  default, and the chained `.superRefine(validatePluginSettingsContributions)`. Upstream resolves
+  plugin configuration through panels instead (open PRs #14766, #15643, #13220, #12229) and has
+  nothing equivalent, so a merge that takes upstream's `contributes` object drops all four
+  silently — the schema file survives, imported by nothing, and every declared setting stops
+  parsing. Guarded by `src/shared/plugins/plugin-settings-contribution.test.ts`, which parses a
+  manifest with `contributes.settings` through `pluginManifestSchema`: losing the wiring fails a
+  test rather than shipping a dead file.
 - `.github/workflows/pr.yml:271` — the Node matrix owner ternary. Upstream's `pr.yml` has the
   literal `node: ['24', '26']` at its own `:381`; the fork runs one major to halve CI cost, and
   Node 26 coverage returns with every sync (ORCA-127, now Done). Guarded by

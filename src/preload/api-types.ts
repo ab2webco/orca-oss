@@ -12,6 +12,7 @@ import type { NativeFileDropPayload } from '../shared/native-file-drop'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type { BrowserFindSource } from '../shared/browser-find-source'
 import type {
+  AgentDashboardPopoutView,
   DashboardRevealAgentArgs,
   DashboardSleepWorkspaceArgs,
   DashboardSnapshot,
@@ -116,6 +117,7 @@ import type { ProjectExecutionRuntimeResolution } from '../shared/project-execut
 import type { StartupCommandDelivery } from '../shared/codex-startup-delivery'
 import type {
   AgentProviderSessionMetadata,
+  ResumableTuiAgent,
   SleepingAgentLaunchConfig
 } from '../shared/agent-session-resume'
 import type {
@@ -409,6 +411,10 @@ import type {
   AgentStatusIpcPayload,
   MigrationUnsupportedPtyEntry
 } from '../shared/agent-status-types'
+import type {
+  AgentSessionLogPaneReading,
+  AgentSessionLogReading
+} from '../shared/agent-session-log-state'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -1069,6 +1075,23 @@ export type PluginHostListEntry = {
     }[]
   }[]
   restarts: number
+  /** Manifest-declared settings the user can fill from Settings -> Plugins.
+   *  A `secret` entry never carries `value`; only whether one is stored. */
+  settings?: {
+    key: string
+    type: 'string' | 'boolean' | 'number'
+    label: string
+    description?: string
+    secret: boolean
+    required: boolean
+    placeholder?: string
+    min?: number
+    max?: number
+    value?: string | number | boolean
+    configured: boolean
+  }[]
+  /** A required setting has no value, so the plugin runs unconfigured. */
+  needsSetup?: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
   source?: {
     kind: 'local-path' | 'git' | 'marketplace' | 'bundled'
@@ -2698,7 +2721,7 @@ export type PreloadApi = {
     ) => Promise<OnboardingState>
   }
   dashboard: {
-    openPopout: (view?: 'board' | 'map') => Promise<void>
+    openPopout: (view?: AgentDashboardPopoutView) => Promise<void>
     publishSnapshot: (snapshot: DashboardSnapshot) => Promise<void>
     getPopoutOpen: () => Promise<boolean>
     onPopoutOpenChanged: (callback: (open: boolean) => void) => () => void
@@ -2709,7 +2732,7 @@ export type PreloadApi = {
     onSleepWorkspace: (callback: (args: DashboardSleepWorkspaceArgs) => void) => () => void
     requestSnapshot: () => Promise<void>
     onSnapshot: (callback: (snapshot: DashboardSnapshot) => void) => () => void
-    onViewRequested: (callback: (view: 'board' | 'map') => void) => () => void
+    onViewRequested: (callback: (view: AgentDashboardPopoutView) => void) => () => void
     revealAgent: (args: DashboardRevealAgentArgs) => Promise<void>
     ackAgent: (paneKey: string) => Promise<void>
     spawnAgent: (args: DashboardSpawnAgentArgs) => Promise<void>
@@ -3816,11 +3839,32 @@ export type PreloadApi = {
     }) => Promise<PluginMarketplaceHostInstallPreview>
     rollbackMarketplacePlugin: (args: { pluginKey: string }) => Promise<PluginHostInstallResult>
     remove: (args: { pluginKey: string }) => Promise<PluginHostListEntry[]>
+    /** Persists one manifest-declared setting; secrets go to the plugin vault,
+     *  everything else to the same settings.json `settings:own` reads. */
+    setSetting: (args: {
+      pluginKey: string
+      key: string
+      value: string | number | boolean
+    }) => Promise<PluginHostListEntry[]>
     getLogs: (args: { pluginKey: string }) => Promise<PluginHostLogLine[]>
     /** Re-discovers after settings edits (feature flag, dev paths). */
     refresh: () => Promise<PluginHostListEntry[]>
     /** Fires whenever installed plugins, worker states, panels, or content packs change. */
     onChanged: (callback: (event: PluginChangeEvent) => void) => () => void
+  }
+  agentSessionLog: {
+    /** Batch pane → session-log reading: agent state and what it is doing, read
+     *  from the transcript rather than a terminal buffer. One call per tick. */
+    readPanes: (paneKeys: string[]) => Promise<AgentSessionLogPaneReading[]>
+    /** Reads turn state for one already-known provider-session identity — used
+     *  when the caller already holds a persisted resume record (agent +
+     *  providerSession) rather than a live pane key to look up in the hook
+     *  cache. Independent of that cache, so it still answers after the pane's
+     *  live status has been dropped (e.g. mid-close). */
+    readForIdentity: (identity: {
+      agent: ResumableTuiAgent
+      providerSession: AgentProviderSessionMetadata
+    }) => Promise<AgentSessionLogReading>
   }
   agentStatus: {
     /** Listen for agent status updates forwarded from native hook receivers. */

@@ -18,6 +18,10 @@ import {
   pluginRelativePathSchema
 } from './plugin-manifest-fields'
 import { validatePluginManifestContributions } from './plugin-manifest-contribution-validation'
+import {
+  pluginSettingsContributionSchema,
+  validatePluginSettingsContributions
+} from './plugin-settings-contribution'
 
 /**
  * Plugin manifest v1 (`orca-plugin.json` at the plugin root). The
@@ -116,7 +120,8 @@ export const pluginManifestSchema = z
         agents: z
           .array(pluginAgentProfileContributionSchema)
           .max(PLUGIN_AGENT_PROFILE_LIMIT)
-          .default([])
+          .default([]),
+        settings: pluginSettingsContributionSchema
       })
       .strict()
       .default(() => ({
@@ -126,11 +131,13 @@ export const pluginManifestSchema = z
         languagePacks: [],
         keybindings: [],
         vmRecipes: [],
-        agents: []
+        agents: [],
+        settings: []
       })),
     capabilities: z.array(pluginCapabilitySchema).max(32).default([])
   })
   .superRefine(validatePluginManifestContributions)
+  .superRefine(validatePluginSettingsContributions)
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>
 export type PluginPanelContribution = z.infer<typeof panelContributionSchema>

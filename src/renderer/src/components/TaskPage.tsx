@@ -217,6 +217,11 @@ import {
   TaskPagePlaneBoardSkeleton,
   resolvePlaneLoadingSkeleton
 } from '@/components/task-page-plane-board-skeleton'
+import {
+  formatPlaneSnapshotAge,
+  resolvePlanePaneSeedState
+} from '@/components/task-page-plane-snapshot-freshness'
+import { runPlaneWorkspaceSwitch } from '@/components/task-page-plane-workspace-switch'
 import { TaskPagePlaneSortControls } from '@/components/task-page-plane-sort-controls'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TaskPagePlaneScopeSwitcher } from '@/components/task-page-plane-scope-switcher'
@@ -4888,14 +4893,36 @@ export default function TaskPage(): React.JSX.Element {
   // Plane tab state. Why: no priority-fetch or project-status-order effect —
   // Plane has a static priority enum and a native per-item state.sequence
   // (see mem #2200), unlike Jira which fetches both per site/project.
-  const [planeItems, setPlaneItems] = useState<PlaneWorkItem[]>([])
+  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('everything')
+  // Why seeded from the store cache at mount: planeItems used to reset to [] on
+  // every entry, so the pane showed a blocking skeleton even with a warm cache.
+  // Reads the entry regardless of TTL — an old list beats an empty one while the
+  // revalidation runs, as long as its age is on screen (planeFetchedAt).
+  const planeMountSeed = useState(() =>
+    resolvePlanePaneSeedState(
+      useAppStore.getState().getCachedPlaneWorkItemsEntry({
+        kind: 'list',
+        filter: activePlanePreset,
+        projectId: getPlaneProjectIdForFetch(selectedPlaneWorkspaceId, selectedPlaneProjectId)
+      })
+    )
+  )[0]
+  const [planeItems, setPlaneItems] = useState<PlaneWorkItem[]>(
+    () => planeMountSeed.seededItems ?? []
+  )
+  const [planeFetchedAt, setPlaneFetchedAt] = useState<number | null>(
+    () => planeMountSeed.seededFetchedAt
+  )
   const [planeLoading, setPlaneLoading] = useState(false)
+  const [planeRevalidating, setPlaneRevalidating] = useState(false)
   const [planeError, setPlaneError] = useState<TaskPagePlaneLoadError | null>(null)
   const [planeErrorDetailsOpen, setPlaneErrorDetailsOpen] = useState(false)
   const [planeSearchInput, setPlaneSearchInput] = useState('')
   const [appliedPlaneSearch, setAppliedPlaneSearch] = useState('')
-  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('everything')
   const [planeRefreshNonce, setPlaneRefreshNonce] = useState(0)
+  // Set by the manual refresh so the next load-effect run forces past the TTL
+  // without clearing every other scope's cache entry.
+  const planeForceNextLoadRef = useRef(false)
   // Why tracked by id: the sheet should open into the description editor only for
   // the card the composer just made, not for every item opened afterwards.
   const [planeJustCreatedItemId, setPlaneJustCreatedItemId] = useState<string | null>(null)
@@ -4922,6 +4949,18 @@ export default function TaskPage(): React.JSX.Element {
     itemCount: planeItems.length,
     viewMode: effectivePlaneViewMode
   })
+
+  // Ticks only while a Plane snapshot is on screen, so the rendered age doesn't
+  // freeze at the value it had when the list landed.
+  const [planeFreshnessNow, setPlaneFreshnessNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (planeFetchedAt === null) {
+      return
+    }
+    const timer = setInterval(() => setPlaneFreshnessNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [planeFetchedAt])
+  const planeSnapshotAgeLabel = formatPlaneSnapshotAge(planeFetchedAt, planeFreshnessNow)
 
   const handlePlaneSort = useCallback(
     (column: PlaneWorkItemSortColumn) => {
@@ -9236,7 +9275,6 @@ export default function TaskPage(): React.JSX.Element {
     }
 
     let cancelled = false
-    setPlaneLoading(true)
     setPlaneError(null)
     setPlaneErrorDetailsOpen(false)
 
@@ -9244,7 +9282,28 @@ export default function TaskPage(): React.JSX.Element {
     // client-side filter (see planeSearchedItems). Fetch is driven only by the
     // preset; typing in search must not refetch.
     const projectId = getPlaneProjectIdForFetch(selectedPlaneWorkspaceId, selectedPlaneProjectId)
-    const request = listPlaneWorkItems(activePlanePreset, projectId, selectedPlaneWorkspaceId)
+
+    // Re-seed on every scope change, not just at mount: switching preset or
+    // project lands on a different cache key, which may already be populated.
+    const seed = resolvePlanePaneSeedState(
+      useAppStore.getState().getCachedPlaneWorkItemsEntry({
+        kind: 'list',
+        filter: activePlanePreset,
+        projectId
+      })
+    )
+    if (seed.seededItems) {
+      setPlaneItems(seed.seededItems)
+      setPlaneFetchedAt(seed.seededFetchedAt)
+    }
+    setPlaneLoading(seed.blocking)
+    setPlaneRevalidating(true)
+
+    const force = planeForceNextLoadRef.current
+    planeForceNextLoadRef.current = false
+    const request = listPlaneWorkItems(activePlanePreset, projectId, selectedPlaneWorkspaceId, {
+      force
+    })
 
     void request
       .then((items) => {
@@ -9252,7 +9311,19 @@ export default function TaskPage(): React.JSX.Element {
           return
         }
         setPlaneItems(items)
-        setPlaneLoading(false)
+        // Why the cache entry and not Date.now(): listPlaneWorkItems resolves
+        // with the PREVIOUS data when the request failed, so stamping "now"
+        // here would present a stale (or empty) list as freshly fetched — the
+        // one thing this indicator exists to prevent. No entry means the write
+        // was rejected or never happened, so the old age stands.
+        const settled = useAppStore.getState().getCachedPlaneWorkItemsEntry({
+          kind: 'list',
+          filter: activePlanePreset,
+          projectId
+        })
+        if (settled) {
+          setPlaneFetchedAt(settled.fetchedAt)
+        }
       })
       .catch((err) => {
         if (cancelled) {
@@ -9261,7 +9332,17 @@ export default function TaskPage(): React.JSX.Element {
         const failureState = createTaskPagePlaneLoadFailureState(err)
         setPlaneItems(failureState.items)
         setPlaneError(failureState.error)
+      })
+      // Why finally: listPlaneWorkItems resolves with cached data on transport
+      // failure rather than rejecting, so clearing these on the success path
+      // alone would leave the "updating" indicator spinning after a failed
+      // revalidation — the same stuck-forever shape this ticket is fixing.
+      .finally(() => {
+        if (cancelled) {
+          return
+        }
         setPlaneLoading(false)
+        setPlaneRevalidating(false)
       })
 
     return () => {
@@ -9491,15 +9572,17 @@ export default function TaskPage(): React.JSX.Element {
       setAvailablePlaneProjects([])
       setPlaneItems([])
       setPlaneError(null)
-      setPlaneLoading(true)
-      void selectPlaneWorkspace(workspaceId).catch(() => {
-        setPlaneLoading(false)
-        toast.error(
-          translate(
-            'auto.components.TaskPage.planeWorkspaceSwitchFailed',
-            'Failed to switch Plane workspace.'
+      void runPlaneWorkspaceSwitch({
+        switchWorkspace: () => selectPlaneWorkspace(workspaceId),
+        onFailure: () => {
+          toast.error(
+            translate(
+              'auto.components.TaskPage.planeWorkspaceSwitchFailed',
+              'Failed to switch Plane workspace.'
+            )
           )
-        )
+        },
+        setLoading: setPlaneLoading
       })
     },
     [selectPlaneWorkspace, setSelectedPlaneWorkItem]
@@ -10540,26 +10623,45 @@ export default function TaskPage(): React.JSX.Element {
                         })}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
+                        {planeSnapshotAgeLabel ? (
+                          <span
+                            data-testid="plane-snapshot-freshness"
+                            className="text-[11px] text-muted-foreground"
+                          >
+                            {planeRevalidating
+                              ? translate(
+                                  'auto.components.TaskPage.planeSnapshotUpdating',
+                                  'Updating…'
+                                )
+                              : translate(
+                                  'auto.components.TaskPage.planeSnapshotUpdatedAt',
+                                  'Updated {{value0}}',
+                                  { value0: planeSnapshotAgeLabel }
+                                )}
+                          </span>
+                        ) : null}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="outline"
                               size="icon"
                               onClick={() => {
-                                // Why invalidate here too: without it the manual
-                                // refresh refetched into the same cached list, so
-                                // the button appeared to do nothing at all.
-                                invalidatePlaneWorkItemLists()
+                                // Why force instead of invalidatePlaneWorkItemLists:
+                                // a fresh cache entry would otherwise be served
+                                // straight back and the button would do nothing —
+                                // but wiping every key also cold-loads unrelated
+                                // scopes and drops the list we're still showing.
+                                planeForceNextLoadRef.current = true
                                 setPlaneRefreshNonce((n) => n + 1)
                               }}
-                              disabled={planeLoading}
+                              disabled={planeLoading || planeRevalidating}
                               aria-label={translate(
                                 'auto.components.TaskPage.planeRefreshWorkItems',
                                 'Refresh Plane work items'
                               )}
                               className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
                             >
-                              {planeLoading ? (
+                              {planeLoading || planeRevalidating ? (
                                 <LoaderCircle className="size-4 animate-spin" />
                               ) : (
                                 <RefreshCw className="size-4" />

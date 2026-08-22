@@ -64,6 +64,17 @@ describe('fingerprintPluginConsent', () => {
     expect(fingerprintPluginConsent({ main: undefined, capabilities })).toBe(legacy)
   })
 
+  // Regression guard (ORCA-277 item 3): the consent surface now shows a
+  // runtime note about unrestricted plugin network access, but that note is
+  // UI copy, not a capability. Pin the canonical encoding so a future change
+  // to plugin-capabilities.ts that accidentally alters ordering/shape is
+  // caught here rather than silently re-prompting every installed plugin.
+  it('keeps the canonical capability-set encoding stable', () => {
+    expect(canonicalizeCapabilitySet([workspaceRead, storage])).toBe(
+      '["{\\"kind\\":\\"storage\\"}","{\\"kind\\":\\"workspace:read\\"}"]'
+    )
+  })
+
   it('requires re-consent when instructional content bytes change', () => {
     const subject = {
       main: undefined,

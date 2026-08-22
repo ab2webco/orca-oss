@@ -59,6 +59,7 @@ import { registerTerminalRenderDesyncEvidenceHandler } from './terminal-render-d
 import { registerOrcaProfileHandlers } from './orca-profiles'
 import { registerCodexAccountHandlers } from './codex-accounts'
 import { registerAgentHookHandlers } from './agent-hooks'
+import { registerAgentSessionLogPaneHandlers } from './agent-session-log-panes'
 import { registerCodexConfigSyncHandlers } from './codex-config-sync'
 import { getPtyIdForPaneKey } from './pty'
 import { registerAgentTrustHandlers } from './agent-trust'
@@ -146,6 +147,7 @@ export function registerCoreHandlers(
   registerUsageProviderHandlers({ claudeUsage, codexUsage, openCodeUsage })
   registerCodexAccountHandlers(codexAccounts, () => store.getSettings())
   registerAgentHookHandlers(runtime, { getPtyIdForPaneKey })
+  registerAgentSessionLogPaneHandlers()
   registerCodexConfigSyncHandlers(codexAccounts.runtimeHomeService)
   registerAgentTrustHandlers()
   registerClaudeAccountHandlers(claudeAccounts, store)

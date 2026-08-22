@@ -5,6 +5,7 @@ import {
   Loader2,
   MoreHorizontal,
   RotateCcw,
+  SlidersHorizontal,
   Trash2
 } from 'lucide-react'
 import type { PluginHostListEntry, PluginHostLogLine } from '../../../../preload/api-types'
@@ -21,6 +22,7 @@ import {
   DropdownMenuTrigger
 } from '../ui/dropdown-menu'
 import { SettingsSwitch } from './SettingsFormControls'
+import { PluginSettingsForm, type PluginSettingsFormState } from './PluginSettingsForm'
 
 export type PluginLogsState = {
   loading: boolean
@@ -33,7 +35,11 @@ type PluginSettingsRowProps = {
   busy: boolean
   logsOpen: boolean
   logsState?: PluginLogsState
+  settingsOpen: boolean
+  settingsFormState?: PluginSettingsFormState
   onReview: (pluginKey: string) => void
+  onToggleSettings: (pluginKey: string) => void
+  onSaveSetting: (pluginKey: string, key: string, value: string | number | boolean) => void
   onToggleEnabled: (plugin: PluginHostListEntry) => void
   onToggleLogs: (pluginKey: string) => void
   onRollbackRequest: (pluginKey: string) => void
@@ -50,6 +56,12 @@ function statusPresentation(plugin: PluginHostListEntry): { label: string; class
   if (plugin.needsReconsent || plugin.status === 'pending') {
     return {
       label: translate('auto.components.settings.PluginSettingsRow.needsReview', 'Needs review'),
+      className: 'border-foreground/20 bg-foreground/8 text-foreground'
+    }
+  }
+  if (plugin.needsSetup) {
+    return {
+      label: translate('auto.components.settings.PluginSettingsRow.needsSetup', 'Needs setup'),
       className: 'border-foreground/20 bg-foreground/8 text-foreground'
     }
   }
@@ -132,9 +144,13 @@ export function PluginSettingsRow({
   busy,
   logsOpen,
   logsState,
+  settingsOpen,
+  settingsFormState,
   onReview,
   onToggleEnabled,
   onToggleLogs,
+  onToggleSettings,
+  onSaveSetting,
   onRollbackRequest,
   onRemoveRequest
 }: PluginSettingsRowProps): React.JSX.Element {
@@ -161,7 +177,29 @@ export function PluginSettingsRow({
       {translate('auto.components.settings.PluginSettingsRow.reviewAndEnable', 'Review & enable')}
     </Button>
   ) : null
-  const footerAction = reviewAction
+  const configurableSettings = plugin.settings ?? []
+  const configureAction =
+    configurableSettings.length > 0 ? (
+      <Button
+        variant={plugin.needsSetup ? 'secondary' : 'outline'}
+        size="sm"
+        disabled={busy}
+        aria-expanded={settingsOpen}
+        onClick={() => onToggleSettings(plugin.pluginKey)}
+      >
+        <SlidersHorizontal />
+        {plugin.needsSetup
+          ? translate('auto.components.settings.PluginSettingsRow.finishSetup', 'Finish setup')
+          : translate('auto.components.settings.PluginSettingsRow.configure', 'Configure')}
+      </Button>
+    ) : null
+  const footerAction =
+    reviewAction || configureAction ? (
+      <>
+        {configureAction}
+        {reviewAction}
+      </>
+    ) : null
 
   return (
     <article
@@ -327,6 +365,14 @@ export function PluginSettingsRow({
         <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-3">
           {footerAction}
         </div>
+      ) : null}
+      {settingsOpen && configurableSettings.length > 0 ? (
+        <PluginSettingsForm
+          pluginKey={plugin.pluginKey}
+          settings={configurableSettings}
+          state={settingsFormState}
+          onSave={onSaveSetting}
+        />
       ) : null}
       {logsOpen ? <PluginLogs pluginKey={plugin.pluginKey} state={logsState} /> : null}
     </article>

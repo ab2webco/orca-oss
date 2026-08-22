@@ -2121,7 +2121,9 @@
         "linearModeHasWorktreeTooltip": "Linear tickets linked to an Orca workspace",
         "linearEmptyHasWorktree": "No Linear tickets are linked to an Orca workspace yet. Start work from a Linear issue to see it here.",
         "linearOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
-        "linearWorktreesColumn": "Workspaces"
+        "linearWorktreesColumn": "Workspaces",
+        "planeSnapshotUpdating": "Updating…",
+        "planeSnapshotUpdatedAt": "Updated {{value0}}"
       },
       "Terminal": {
         "73768427cf": "Close",
@@ -10410,6 +10412,7 @@
           "reconsent": "Permissions, the worker trust tier, or instructional content changed since you last reviewed this plugin. Review it again before it can run.",
           "capabilities": "This plugin can",
           "warning": "These permissions limit how the plugin uses Orca's API. Its worker still runs as a normal process on your computer with full access to your files, network, and other processes.",
+          "networkAccessNote": "It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.",
           "instructionalWarning": "This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.",
           "panelWarning": "These permissions limit how the plugin uses Orca's API. This plugin has no background worker.",
           "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API.",
@@ -10523,6 +10526,7 @@
           "noContributions": "Manifest metadata only",
           "capabilities": "Requested access",
           "workerWarning": "Capabilities limit how this plugin uses Orca's API. Its worker still runs as a normal process on this computer with full access to your files, network, and other processes.",
+          "networkAccessNote": "It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.",
           "blocked": "Orca's safety list blocks this plugin: {{value0}}",
           "current": "This exact plugin content is already installed.",
           "close": "Close",
@@ -10581,7 +10585,8 @@
           "experimental": "Experimental",
           "description": "Install and manage Orca plugins. Plugins run on this computer, even for SSH workspaces.",
           "logsFailed": "Could not load plugin logs.",
-          "rollbackFailed": "Could not roll back this plugin. A previous immutable version may not be available."
+          "rollbackFailed": "Could not roll back this plugin. A previous immutable version may not be available.",
+          "settingSaveFailed": "Could not save this setting."
         },
         "PluginSettingsRow": {
           "blocked": "Blocked",
@@ -10611,7 +10616,10 @@
           "remove": "Remove",
           "disableLabel": "Disable {{value0}}",
           "enableLabel": "Enable {{value0}}",
-          "invalidPluginError": "The plugin manifest or installed files are invalid. Fix the plugin, then refresh."
+          "invalidPluginError": "The plugin manifest or installed files are invalid. Fix the plugin, then refresh.",
+          "needsSetup": "Needs setup",
+          "finishSetup": "Finish setup",
+          "configure": "Configure"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",
@@ -11042,6 +11050,10 @@
           "weeklyUsed": "7d {{value0}}% used",
           "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}",
           "quotaUnknown": "remaining quota unknown"
+        },
+        "PluginSettingsForm": {
+          "requiredHint": "Required to run.",
+          "secretStored": "Stored — type to replace"
         }
       },
       "right": {
@@ -15920,7 +15932,8 @@
     "view": {
       "label": "Dashboard view",
       "board": "Dashboard",
-      "map": "Agent Map"
+      "map": "Agent Map",
+      "grid": "Grid"
     },
     "map": {
       "host": {
@@ -15958,6 +15971,21 @@
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
       "noWorkspaceAgents": "No agents in this workspace."
+    },
+    "grid": {
+      "empty": "No agents to show",
+      "agentCount_one": "{{count}} agent",
+      "agentCount_other": "{{count}} agents",
+      "noMessageYet": "No message yet",
+      "unread": {
+        "agentUnsupported": "No readable session log",
+        "sessionUnknown": "Session not identified yet",
+        "logMissing": "Session log not found",
+        "logUnreadable": "Session log unreadable",
+        "beyondScan": "Turn start beyond the scan",
+        "textBeyondScan": "Last message beyond the scan"
+      },
+      "agentCount": "{{count}} agents"
     }
   },
   "dashboard": {
@@ -16000,6 +16028,37 @@
       "title": "Claude login needs repair",
       "message": "The system-wide Claude Code login is no longer usable.",
       "detail": "Your Orca-managed Claude accounts are unaffected. To restore the system-wide login, run claude outside Orca and complete /login once."
+    }
+  },
+  "resumeVault": {
+    "section": {
+      "title": "Preserved Agent Sessions",
+      "description": "Orca keeps a resume record when it can't confirm a closed session's agent actually finished its turn. Review and release the ones you don't need.",
+      "manage": "Manage",
+      "manageWithCount": "Manage ({{value0}})"
+    },
+    "title": "Preserved agent sessions",
+    "description": "Orca keeps a resume pointer for a session it can't yet confirm has finished. Release the ones you don't need — this never deletes the transcript.",
+    "empty": "No preserved resume records right now.",
+    "workspaceUnavailable": "(workspace not open)",
+    "captured": "Captured {{value0}}",
+    "release": "Release",
+    "releaseAll": "Release all",
+    "releaseAllInProject": "Release all ({{value0}})",
+    "currentlyWorking": "Working",
+    "currentlyWorkingTooltip": "This agent is currently working — its resume record can't be released until it stops.",
+    "reason": {
+      "finished": "Reported finished (unconfirmed)",
+      "interrupted": "Closed mid-turn",
+      "unknown": "Still working when captured"
+    },
+    "confirmRelease": {
+      "title": "Release this resume record?",
+      "description": "Orca will no longer offer to resume this {{value0}} session. The transcript on disk is not affected."
+    },
+    "confirmReleaseAll": {
+      "title": "Release {{value0}} resume records?",
+      "description": "Orca will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected."
     }
   }
 }

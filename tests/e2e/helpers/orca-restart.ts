@@ -24,6 +24,10 @@ import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-pro
 import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
 import {
+  queueRendererRecoveryEvidence,
+  readRendererRecoveryEvidence
+} from './renderer-recovery-evidence'
+import {
   assertElectronResolvedIsolatedHome,
   createElectronHomeIsolation,
   type ElectronHomeIsolation
@@ -206,6 +210,12 @@ export function createRestartSession(
 
   const dispose = async (): Promise<void> => {
     await cleanupE2EDaemons(userDataDir)
+    // Why queue-and-flush, not an immediate report: dispose() runs inside
+    // the test's own finally block, not Playwright fixture teardown, so
+    // testInfo.status is never finalized here. Read now, while the userData
+    // dir this deletes below still exists; the auto fixture in orca-app.ts
+    // reports it later, once status is reliable, and only on a real failure.
+    queueRendererRecoveryEvidence(testInfo, await readRendererRecoveryEvidence(userDataDir))
     if (process.env.ORCA_E2E_PRESERVE_RESTART_PROFILE === '1') {
       console.log(`[e2e] Preserved restart profile at ${userDataDir}`)
       return

@@ -235,6 +235,10 @@ export function PluginMarketplacePreviewDialog({
                   {translate(
                     'auto.components.settings.PluginMarketplacePreviewDialog.workerWarning',
                     "Capabilities limit how this plugin uses Orca's API. Its worker still runs as a normal process on this computer with full access to your files, network, and other processes."
+                  )}{' '}
+                  {translate(
+                    'auto.components.settings.PluginMarketplacePreviewDialog.networkAccessNote',
+                    'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
                   )}
                 </span>
               </div>

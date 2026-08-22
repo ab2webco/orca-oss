@@ -18,9 +18,9 @@ import {
   createRuntimeDesktopPairingOffer,
   launchPairedElectronClient,
   launchPairedWebClient,
-  rePairPairedElectronClient,
   type PairedElectronClient
 } from './helpers/paired-electron-client'
+import { rePairPairedElectronClient } from './helpers/paired-electron-client-repair'
 import {
   focusActiveTerminalInput,
   getTerminalContent,

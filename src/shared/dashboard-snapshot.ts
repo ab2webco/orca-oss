@@ -11,6 +11,10 @@ import type { TuiAgent } from './types'
  */
 
 /** Agent lifecycle columns; idle is optional while completed agents remain visible. */
+/** Layouts the pop-out dashboard window can be opened on. */
+export const AGENT_DASHBOARD_POPOUT_VIEWS = ['grid', 'board', 'map'] as const
+export type AgentDashboardPopoutView = (typeof AGENT_DASHBOARD_POPOUT_VIEWS)[number]
+
 export type DashboardBucket = 'attention' | 'working' | 'done' | 'idle'
 
 /** Column order shared by producer and pop-out so they never drift. */

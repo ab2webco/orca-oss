@@ -14,9 +14,9 @@ import {
 import {
   createRuntimeDesktopPairingOffer,
   launchPairedElectronClient,
-  rePairPairedElectronClient,
   type PairedElectronClient
 } from './helpers/paired-electron-client'
+import { rePairPairedElectronClient } from './helpers/paired-electron-client-repair'
 import { createRestartSession } from './helpers/orca-restart'
 import {
   encodeTerminalStreamFrame,

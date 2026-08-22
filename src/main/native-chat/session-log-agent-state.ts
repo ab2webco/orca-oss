@@ -9,6 +9,7 @@ import {
 } from '../../shared/agent-session-log-state'
 import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import { resolveSessionFilePath } from './session-file-resolver'
+import { nativeChatLineDecoderForAgent } from './transcript-tail-reader'
 import { scanTranscriptTailForTurn, type TranscriptTailTurnScan } from './transcript-tail-turn-scan'
 import { nativeChatTurnLifecycleDecoderForAgent } from './transcript-turn-lifecycle'
 import {
@@ -23,6 +24,8 @@ export type ReadAgentSessionLogStateArgs = {
   transcriptPath?: string
   /** Test seam: shrink the scan ceiling to exercise the beyond-scan branch. */
   maxScanBytes?: number
+  /** Also project what the agent is doing, not just whether it is busy. */
+  includeActivity?: boolean
 }
 
 export async function readAgentSessionLogState(
@@ -49,7 +52,12 @@ export async function readAgentSessionLogState(
 
   let scan: TranscriptTailTurnScan
   try {
-    scan = await scanTranscriptTailForTurn(filePath, decodeLifecycle, args.maxScanBytes)
+    scan = await scanTranscriptTailForTurn(
+      filePath,
+      decodeLifecycle,
+      args.maxScanBytes,
+      args.includeActivity ? nativeChatLineDecoderForAgent(args.agent) : null
+    )
   } catch {
     return { read: false, reason: 'session-log-unreadable' }
   }
@@ -57,7 +65,8 @@ export async function readAgentSessionLogState(
     lifecycle: scan.lifecycle,
     queuedInput: resolveQueuedInput(args.agent, scan),
     unparsedRecords: scan.unparsedRecords,
-    scanReachedCeiling: scan.reachedCeiling
+    scanReachedCeiling: scan.reachedCeiling,
+    ...(scan.activity ? { activity: scan.activity } : {})
   })
 }
 

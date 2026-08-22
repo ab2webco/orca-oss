@@ -18,7 +18,7 @@ const MIN_WIDTH = 480
 const MIN_HEIGHT = 360
 const DEFAULT_WIDTH = 960
 const DEFAULT_HEIGHT = 720
-const DEFAULT_VIEW = 'board'
+const DEFAULT_VIEW = 'grid'
 const DASHBOARD_POPOUT_PARTITION = 'orca-dashboard-popout'
 
 // Why: singleton — the dashboard is a companion surface, so a second "Pop Out"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AgentKanbanBoard, type AgentDashboardView } from './AgentKanbanBoard'
+import { AgentKanbanBoard } from './AgentKanbanBoard'
+import { resolveAgentDashboardView, type AgentDashboardView } from './agent-dashboard-view'
 import { useDashboardSnapshot } from './useDashboardSnapshot'
 
 type DashboardPopoutRootProps = {
@@ -13,9 +14,17 @@ type DashboardPopoutRootProps = {
  */
 export function DashboardPopoutRoot(_props: DashboardPopoutRootProps): React.JSX.Element {
   const snapshot = useDashboardSnapshot()
+  // The consolidated grid is the pop-out's default: it is the only view that
+  // answers "what are they all doing" without opening anything (ORCA-234).
   const [view, setView] = useState<AgentDashboardView>(() =>
-    _props.view === 'map' || _props.view === 'rings' ? 'map' : 'board'
+    resolveAgentDashboardView(_props.view, 'grid')
   )
-  useEffect(() => window.api.dashboard.onViewRequested(setView), [])
+  useEffect(
+    () =>
+      window.api.dashboard.onViewRequested((next) =>
+        setView(resolveAgentDashboardView(next, 'grid'))
+      ),
+    []
+  )
   return <AgentKanbanBoard key={view} snapshot={snapshot} initialView={view} />
 }

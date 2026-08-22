@@ -5,6 +5,7 @@ import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { addAndActivateIsolatedRepo } from './helpers/isolated-diff-repo-activation'
 
 type CombinedDiffScrollRepo = {
   repoPath: string
@@ -72,59 +73,6 @@ function createCombinedDiffScrollRepo(): CombinedDiffScrollRepo {
   }
 
   return { repoPath }
-}
-
-async function addAndActivateRepo(page: Page, repoPath: string): Promise<string> {
-  const repoId = await page.evaluate(async (pathToRepo: string) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
-    }
-
-    const addedRepo = await store.getState().addRepoPath(pathToRepo)
-    if (!addedRepo) {
-      throw new Error(`isolated combined-diff repo not found: ${pathToRepo}`)
-    }
-    return addedRepo.id
-  }, repoPath)
-
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (targetRepoId: string) => {
-          const store = window.__store
-          if (!store) {
-            return 0
-          }
-          await store.getState().fetchWorktrees(targetRepoId)
-          return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
-        }, repoId),
-      {
-        timeout: 30_000,
-        message: 'isolated combined-diff worktree did not load'
-      }
-    )
-    .toBeGreaterThan(0)
-
-  return page.evaluate(
-    ({ targetRepoId, pathToRepo }) => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('window.__store is not available')
-      }
-
-      const state = store.getState()
-      const worktrees = state.worktreesByRepo[targetRepoId] ?? []
-      const worktree = worktrees.find((entry) => entry.path === pathToRepo) ?? worktrees[0]
-      if (!worktree) {
-        throw new Error(`isolated combined-diff worktree not found: ${pathToRepo}`)
-      }
-      state.setActiveRepo(targetRepoId)
-      state.setActiveWorktree(worktree.id)
-      return worktree.id
-    },
-    { targetRepoId: repoId, pathToRepo: repoPath }
-  )
 }
 
 async function openCombinedDiff(page: Page, worktreeId: string, repoPath: string): Promise<string> {
@@ -484,7 +432,7 @@ test.describe('Combined diff scroll restore', () => {
     const fixture = createCombinedDiffScrollRepo()
 
     try {
-      const worktreeId = await addAndActivateRepo(orcaPage, fixture.repoPath)
+      const worktreeId = await addAndActivateIsolatedRepo(orcaPage, fixture.repoPath)
       const diffTabId = await openCombinedDiff(orcaPage, worktreeId, fixture.repoPath)
       await expect(orcaPage.locator('.combined-diff-scroll-container')).toBeVisible()
       await expect(orcaPage.getByText(`${FILE_COUNT} changed files`)).toBeVisible()

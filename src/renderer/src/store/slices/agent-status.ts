@@ -579,7 +579,12 @@ function normalizeSleepingAgentSessionCollectOptions(
     : (options as CollectSleepingAgentSessionRecordsOptions)
 }
 
-function isValidCompletedAgentHibernationEntry(entry: AgentStatusEntry): boolean {
+/** A `done` status is only real evidence of completion when it wasn't synthesized by the
+ *  interrupt fallback (agent-status-types.ts: "a narrow interrupt fallback synthesizes a
+ *  final `done` when an agent misses its cancellation hook") — that `done` means the turn
+ *  was cut short, not finished. Shared by hibernation capture and tab-close retirement
+ *  (ORCA-272), since both need "genuinely done" and not just "state says done". */
+export function isGenuinelyCompletedAgentStatusEntry(entry: AgentStatusEntry): boolean {
   return entry.state === 'done' && entry.interrupted !== true
 }
 
@@ -746,7 +751,7 @@ export function collectSleepingAgentSessionRecordsForWorktree(
     if (!belongsToWorktree) {
       continue
     }
-    if (isCompletedAgentHibernation && !isValidCompletedAgentHibernationEntry(entry)) {
+    if (isCompletedAgentHibernation && !isGenuinelyCompletedAgentStatusEntry(entry)) {
       continue
     }
     const record = sleepingRecordFromEntry({

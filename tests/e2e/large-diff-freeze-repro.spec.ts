@@ -1,7 +1,7 @@
 import { rmSync, writeFileSync } from 'node:fs'
-import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { addAndActivateIsolatedRepo } from './helpers/isolated-diff-repo-activation'
 import { measureIdleFloorMs } from './helpers/idle-floor-lag'
 import { getLargeDiffRenderLimit } from '../../src/shared/large-diff-render-limit'
 import {
@@ -9,64 +9,6 @@ import {
   createIsolatedLargeDiffRepo,
   createIsolatedStagedLocaleDiffRepo
 } from './large-diff-repro-fixtures'
-
-async function addAndActivateRepo(orcaPage: Page, repoPath: string): Promise<string> {
-  const repoId = await orcaPage.evaluate(async (pathToRepo: string) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
-    }
-
-    const addedRepo = await store.getState().addRepoPath(pathToRepo)
-    if (!addedRepo) {
-      throw new Error(`isolated repo not found: ${pathToRepo}`)
-    }
-
-    return addedRepo.id
-  }, repoPath)
-
-  // Why: fetchWorktrees() resolves before Zustand always reflects the async
-  // worktree scan, so poll the same public store path real repo setup uses.
-  await expect
-    .poll(
-      () =>
-        orcaPage.evaluate(async (targetRepoId: string) => {
-          const store = window.__store
-          if (!store) {
-            return 0
-          }
-          await store.getState().fetchWorktrees(targetRepoId)
-          return store.getState().worktreesByRepo[targetRepoId]?.length ?? 0
-        }, repoId),
-      {
-        timeout: 30_000,
-        message: 'isolated large-diff worktree did not load'
-      }
-    )
-    .toBeGreaterThan(0)
-
-  const worktreeId = await orcaPage.evaluate(
-    ({ targetRepoId, pathToRepo }) => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('window.__store is not available')
-      }
-
-      const state = store.getState()
-      const worktrees = state.worktreesByRepo[targetRepoId] ?? []
-      const worktree = worktrees.find((entry) => entry.path === pathToRepo) ?? worktrees[0]
-      if (!worktree) {
-        throw new Error(`isolated worktree not found: ${pathToRepo}`)
-      }
-      state.setActiveRepo(targetRepoId)
-      state.setActiveWorktree(worktree.id)
-      return worktree.id
-    },
-    { targetRepoId: repoId, pathToRepo: repoPath }
-  )
-
-  return worktreeId
-}
 
 test.describe('Large diff freeze repro', () => {
   test.describe.configure({ mode: 'serial' })
@@ -87,7 +29,7 @@ test.describe('Large diff freeze repro', () => {
     }).limited
 
     try {
-      const worktreeId = await addAndActivateRepo(orcaPage, fixture.repoPath)
+      const worktreeId = await addAndActivateIsolatedRepo(orcaPage, fixture.repoPath)
       writeFileSync(fixture.absolutePath, modifiedContent)
       const measurement = await orcaPage.evaluate(
         async ({ wId, absolutePath, relativePath, expectFallback }) => {
@@ -171,7 +113,7 @@ test.describe('Large diff freeze repro', () => {
     const fixture = createIsolatedStagedLocaleDiffRepo()
 
     try {
-      const worktreeId = await addAndActivateRepo(orcaPage, fixture.repoPath)
+      const worktreeId = await addAndActivateIsolatedRepo(orcaPage, fixture.repoPath)
       const measurement = await orcaPage.evaluate(
         async ({ wId, repoPath, expectedPaths }) => {
           const store = window.__store

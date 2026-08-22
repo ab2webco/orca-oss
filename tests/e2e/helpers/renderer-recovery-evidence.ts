@@ -1,0 +1,278 @@
+/**
+ * Self-classifying evidence for the dominant E2E failure mode: Playwright's
+ * `page.evaluate: Execution context was destroyed, most likely because of a
+ * navigation.` See docs/reference/renderer-recovery-reload.md.
+ *
+ * Orca's own crash-recovery reload (src/main/index.ts `onBeforeRecoveryReload`)
+ * only ever runs after `webContents.on('render-process-gone')` fires with a
+ * crash-report reason, and that same event unconditionally persists a
+ * `CrashReportRecord` (source: 'renderer') to `<userData>/crash-reports.json`
+ * (src/main/crash-reporting/process-gone-recorder.ts) before the reload is
+ * even scheduled. That file is unconditional — unlike the NDJSON trace sink,
+ * it is not gated by CI/telemetry consent — so it is the one durable, on-disk
+ * signal that survives the renderer dying and is still readable after the
+ * test's userData dir is about to be deleted.
+ *
+ * The persisted record does not carry `expectedTeardown`, so a `reason`
+ * alone cannot always *prove* the reload ran — but for every reason except
+ * `integrity-failure` it is strong evidence, once the recorder's own filter
+ * is accounted for. `shouldRecordProcessGoneCrash`
+ * (process-gone-classification.ts) only ever suppresses a `reason: 'killed'`
+ * record when `expectedTeardown` is `'app-shutdown'` or `'renderer-reload'`;
+ * a `'killed'` record that made it to disk therefore already implies
+ * `expectedTeardown === 'none'`, which is exactly the case
+ * `shouldRecoverRendererAfterProcessGone` returns true for (empirically
+ * verified on macOS in ORCA-280 via `forcefullyCrashRenderer()`, which
+ * reports `reason: 'killed'` there and does recover; not yet checked on
+ * Linux CI). LIKELY is still an inference on top of that: `scheduleRendererRecovery`
+ * (createMainWindow.ts) can bail after this check passes — `windowClosing`,
+ * `getIsQuitting()`, or a tripped circuit breaker (3 recoveries/60s) — so a
+ * LIKELY-classified record does not *guarantee* the reload ran. Two
+ * confidence tiers follow:
+ *   - CONFIRMED: a `renderer_recovery_reload` breadcrumb was found. This
+ *     breadcrumb is only carried on disk inside a *later* crash record's
+ *     `breadcrumbs` snapshot (durable-crash-breadcrumb.ts), so it requires a
+ *     second crash in the same run — rare for a single-crash test failure.
+ *   - LIKELY: a renderer-source crash record exists whose `reason` is not
+ *     `integrity-failure` (the one reason `shouldRecoverRendererAfterProcessGone`
+ *     always refuses), so the reload was very likely scheduled even though
+ *     nothing on disk directly proves it fired.
+ */
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import type { TestInfo } from '@stablyai/playwright-test'
+import type { CrashReportRecord } from '../../../src/shared/crash-reporting'
+
+// Why: mirrors NON_RECOVERABLE_RENDERER_REASONS in
+// src/main/crash-reporting/process-gone-classification.ts. 'killed' is
+// deliberately excluded from this set — see the module doc comment above for
+// why a persisted 'killed' record already implies recovery ran.
+const NON_RECOVERABLE_REASONS = new Set(['integrity-failure'])
+
+export type RendererRecoveryEvidence = {
+  /** A renderer-source crash record was found in crash-reports.json. */
+  rendererCrashRecorded: boolean
+  /** Direct evidence: a `renderer_recovery_reload` breadcrumb was found. */
+  recoveryReloadConfirmed: boolean
+  /** Inferred evidence: a crash reason was recorded that recovers by default. */
+  recoveryReloadLikely: boolean
+  /** Distinct `reason` values off matching renderer-source crash records. */
+  crashReasons: string[]
+  /** How many renderer-source crash records were found. */
+  rendererCrashRecordCount: number
+  /** How many `renderer_recovery_reload` breadcrumbs were found across all records. */
+  recoveryBreadcrumbCount: number
+  /** Human-readable line safe to print directly into the job log. */
+  detail: string
+}
+
+type CrashReportFile = {
+  reports?: unknown
+}
+
+function isCrashReportRecord(value: unknown): value is CrashReportRecord {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  return typeof record.source === 'string' && typeof record.reason === 'string'
+}
+
+function countRecoveryBreadcrumbs(records: CrashReportRecord[]): number {
+  let count = 0
+  for (const record of records) {
+    for (const breadcrumb of record.breadcrumbs ?? []) {
+      if (breadcrumb.name === 'renderer_recovery_reload') {
+        count += 1
+      }
+    }
+  }
+  return count
+}
+
+function noEvidenceResult(detail: string): RendererRecoveryEvidence {
+  return {
+    rendererCrashRecorded: false,
+    recoveryReloadConfirmed: false,
+    recoveryReloadLikely: false,
+    crashReasons: [],
+    rendererCrashRecordCount: 0,
+    recoveryBreadcrumbCount: 0,
+    detail
+  }
+}
+
+function buildEvidence(records: CrashReportRecord[]): RendererRecoveryEvidence {
+  const rendererRecords = records.filter((record) => record.source === 'renderer')
+  const recoveryBreadcrumbCount = countRecoveryBreadcrumbs(records)
+  const crashReasons = [...new Set(rendererRecords.map((record) => record.reason))]
+  const rendererCrashRecorded = rendererRecords.length > 0
+  const recoveryReloadConfirmed = recoveryBreadcrumbCount > 0
+  const recoveryReloadLikely =
+    !recoveryReloadConfirmed &&
+    rendererRecords.some((record) => !NON_RECOVERABLE_REASONS.has(record.reason))
+
+  if (!rendererCrashRecorded && !recoveryReloadConfirmed) {
+    return noEvidenceResult(
+      records.length === 0
+        ? `renderer_recovery_reload: did not fire — crash-reports.json in the E2E ` +
+            `user-data dir has no records; Orca never observed a render-process-gone event.`
+        : `renderer_recovery_reload: did not fire — crash-reports.json exists but ` +
+            `contains no renderer-source crash record (${records.length} unrelated record(s)).`
+    )
+  }
+
+  const reasonList = `reason(s)=[${crashReasons.join(', ')}]`
+  const detail = recoveryReloadConfirmed
+    ? `renderer_recovery_reload: CONFIRMED — crash-reports.json carries ` +
+      `${recoveryBreadcrumbCount} renderer_recovery_reload breadcrumb(s) alongside ` +
+      `${rendererRecords.length} renderer crash record(s), ${reasonList}.`
+    : recoveryReloadLikely
+      ? `renderer_recovery_reload: LIKELY (not directly confirmed) — crash-reports.json ` +
+        `recorded ${rendererRecords.length} renderer crash(es), ${reasonList}; that reason ` +
+        `recovers by default per shouldRecoverRendererAfterProcessGone.`
+      : `renderer crash recorded but recovery reload did NOT run — ` +
+        `crash-reports.json recorded ${rendererRecords.length} renderer crash(es), ` +
+        `${reasonList}, which shouldRecoverRendererAfterProcessGone always refuses.`
+
+  return {
+    rendererCrashRecorded,
+    recoveryReloadConfirmed,
+    recoveryReloadLikely,
+    crashReasons,
+    rendererCrashRecordCount: rendererRecords.length,
+    recoveryBreadcrumbCount,
+    detail
+  }
+}
+
+/**
+ * Read `<userDataDir>/crash-reports.json` and classify whether Orca's own
+ * renderer-crash-recovery reload ran during this test. Never throws — a
+ * missing or unreadable file is a real finding ("did not fire"), not an error.
+ */
+export async function readRendererRecoveryEvidence(
+  userDataDir: string
+): Promise<RendererRecoveryEvidence> {
+  const filePath = path.join(userDataDir, 'crash-reports.json')
+  let raw: string
+  try {
+    raw = await readFile(filePath, 'utf8')
+  } catch {
+    return noEvidenceResult(
+      'renderer_recovery_reload: did not fire — crash-reports.json was never written to ' +
+        'the E2E user-data dir, so Orca never recorded a renderer process-gone event.'
+    )
+  }
+
+  let parsed: CrashReportFile
+  try {
+    parsed = JSON.parse(raw) as CrashReportFile
+  } catch {
+    return noEvidenceResult(
+      'renderer_recovery_reload: undetermined — crash-reports.json was unreadable JSON.'
+    )
+  }
+
+  const reports = Array.isArray(parsed.reports) ? parsed.reports : []
+  const records = reports.filter(isCrashReportRecord)
+  return buildEvidence(records)
+}
+
+/** One-line, job-log-safe summary tying the evidence to a specific test. */
+export function formatRendererRecoveryEvidenceLine(
+  testTitle: string,
+  evidence: RendererRecoveryEvidence
+): string {
+  return `[renderer-recovery-evidence] ${testTitle} :: ${evidence.detail}`
+}
+
+/**
+ * Read and report the renderer recovery evidence for `userDataDir` before a
+ * caller deletes it. Gated on `testInfo.status` so the passing path never
+ * pays for a file read. Only call this from Playwright *fixture* teardown
+ * (e.g. the `electronApp` fixture), where `testInfo.status` is reliable —
+ * fixture teardown runs strictly after the test function's promise has
+ * settled, which is when Playwright finalizes it. A regular (non-soft)
+ * failed `expect()`/`expect.poll()` only `throw`s; status stays 'passed'
+ * until that throw has propagated all the way out of the test function, so
+ * reading `testInfo.status` from inside the test's *own* code (e.g. a
+ * helper's `dispose()` called from a `finally` block) is unreliable — use
+ * `queueRendererRecoveryEvidence`/`flushQueuedRendererRecoveryEvidence`
+ * instead for those call sites. Never throws so a diagnostics failure
+ * cannot mask the real error.
+ */
+export async function reportRendererRecoveryEvidence(
+  userDataDir: string,
+  testInfo: TestInfo
+): Promise<void> {
+  if (testInfo.status === 'passed' || testInfo.status === 'skipped') {
+    return
+  }
+  try {
+    const evidence = await readRendererRecoveryEvidence(userDataDir)
+    console.log(formatRendererRecoveryEvidenceLine(testInfo.titlePath.join(' > '), evidence))
+    await testInfo.attach('renderer-recovery-evidence.json', {
+      body: JSON.stringify(evidence, null, 2),
+      contentType: 'application/json'
+    })
+  } catch (error) {
+    console.error('[renderer-recovery-evidence] failed to collect evidence:', error)
+  }
+}
+
+// Why a WeakMap and not a fixture-provided register callback: helpers like
+// createRestartSession/launchPairedElectronClient are called with only
+// `testInfo`, not the fixture object, and adding a callback parameter would
+// mean touching every one of their 30+ existing call sites. testInfo is a
+// stable, unique object per test, so it doubles as the queue key.
+const queuedEvidenceByTest = new WeakMap<TestInfo, RendererRecoveryEvidence[]>()
+
+/**
+ * Queue evidence for later reporting by `flushQueuedRendererRecoveryEvidence`.
+ * For a helper that bypasses the `electronApp` fixture and must read the
+ * evidence from inside the test's own `finally` (before it deletes
+ * `userDataDir`) — where `testInfo.status` is not yet reliable. Read the
+ * evidence eagerly, at the point disk state is still available; defer only
+ * the "should this be printed" decision to flush time.
+ */
+export function queueRendererRecoveryEvidence(
+  testInfo: TestInfo,
+  evidence: RendererRecoveryEvidence
+): void {
+  const queued = queuedEvidenceByTest.get(testInfo) ?? []
+  queued.push(evidence)
+  queuedEvidenceByTest.set(testInfo, queued)
+}
+
+/**
+ * Report every evidence entry queued during this test, but only if the test
+ * did not pass. Call from an `{ auto: true }` Playwright fixture so specs
+ * that never request the `electronApp` fixture (e.g. ones that launch their
+ * own `ElectronApplication` via orca-restart.ts/paired-electron-client.ts)
+ * still get flushed. Safe to call with nothing queued (no-op). Queuing
+ * always happens inside the test's own code, which completes strictly
+ * before any fixture teardown runs, so by the time this flush runs the
+ * queue is already complete regardless of fixture teardown ordering.
+ */
+export async function flushQueuedRendererRecoveryEvidence(testInfo: TestInfo): Promise<void> {
+  const queued = queuedEvidenceByTest.get(testInfo)
+  queuedEvidenceByTest.delete(testInfo)
+  if (!queued || queued.length === 0) {
+    return
+  }
+  if (testInfo.status === 'passed' || testInfo.status === 'skipped') {
+    return
+  }
+  try {
+    for (const evidence of queued) {
+      console.log(formatRendererRecoveryEvidenceLine(testInfo.titlePath.join(' > '), evidence))
+      await testInfo.attach('renderer-recovery-evidence.json', {
+        body: JSON.stringify(evidence, null, 2),
+        contentType: 'application/json'
+      })
+    }
+  } catch (error) {
+    console.error('[renderer-recovery-evidence] failed to report queued evidence:', error)
+  }
+}
