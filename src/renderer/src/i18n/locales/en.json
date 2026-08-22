@@ -16149,5 +16149,36 @@
       "message": "The system-wide Claude Code login is no longer usable.",
       "detail": "Your Orca-managed Claude accounts are unaffected. To restore the system-wide login, run claude outside Orca and complete /login once."
     }
+  },
+  "resumeVault": {
+    "section": {
+      "title": "Preserved Agent Sessions",
+      "description": "Orca keeps a resume record when it can't confirm a closed session's agent actually finished its turn. Review and release the ones you don't need.",
+      "manage": "Manage",
+      "manageWithCount": "Manage ({{value0}})"
+    },
+    "title": "Preserved agent sessions",
+    "description": "Orca keeps a resume pointer for a session it can't yet confirm has finished. Release the ones you don't need — this never deletes the transcript.",
+    "empty": "No preserved resume records right now.",
+    "workspaceUnavailable": "(workspace not open)",
+    "captured": "Captured {{value0}}",
+    "release": "Release",
+    "releaseAll": "Release all",
+    "releaseAllInProject": "Release all ({{value0}})",
+    "currentlyWorking": "Working",
+    "currentlyWorkingTooltip": "This agent is currently working — its resume record can't be released until it stops.",
+    "reason": {
+      "finished": "Reported finished (unconfirmed)",
+      "interrupted": "Closed mid-turn",
+      "unknown": "Still working when captured"
+    },
+    "confirmRelease": {
+      "title": "Release this resume record?",
+      "description": "Orca will no longer offer to resume this {{value0}} session. The transcript on disk is not affected."
+    },
+    "confirmReleaseAll": {
+      "title": "Release {{value0}} resume records?",
+      "description": "Orca will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected."
+    }
   }
 }
