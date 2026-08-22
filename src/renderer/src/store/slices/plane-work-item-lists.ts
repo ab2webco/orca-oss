@@ -128,8 +128,13 @@ export const createPlaneWorkItemListSlice: StateCreator<
               [cacheKey]: { data: items, fetchedAt: Date.now() }
             })
           }))
+          return items
         }
-        return items
+        // Superseded by a mutation/context switch while this request was in
+        // flight: `items` reflects a snapshot that predates that change, so
+        // returning it would hand the caller a lost update. Whatever the cache
+        // holds now (possibly patched by that very mutation) is authoritative.
+        return get().planeSearchCache[cacheKey]?.data ?? []
       })
       .catch((error) => {
         console.warn('[plane] searchPlaneWorkItems failed:', error)
@@ -194,8 +199,14 @@ export const createPlaneWorkItemListSlice: StateCreator<
               [cacheKey]: { data: items, fetchedAt: Date.now() }
             })
           }))
+          return items
         }
-        return items
+        // Superseded by a mutation/context switch while this request was in
+        // flight (e.g. a board drag's patchPlaneWorkItem landed first): `items`
+        // is a pre-mutation snapshot, so handing it to the caller would clobber
+        // the pane with a lost update. The current cache — possibly patched by
+        // that very mutation — is authoritative instead.
+        return get().planeListCache[cacheKey]?.data ?? []
       })
       .catch((error) => {
         console.warn('[plane] listPlaneWorkItems failed:', error)

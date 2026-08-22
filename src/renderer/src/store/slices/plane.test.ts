@@ -224,6 +224,48 @@ describe('createPlaneSlice caching', () => {
     expect(planeListWorkItems).toHaveBeenCalledTimes(2)
   })
 
+  // Stale-while-revalidate's classic hole: a background GET that was already
+  // in flight when the user dragged a card must not land the pre-drag
+  // snapshot back over the optimistic patch once it resolves. Regression for
+  // ORCA-275 (the SWR pane keeps a fetch running while the board stays
+  // interactive, unlike the old blocking-skeleton load).
+  it('does not let a revalidation started before a work-item patch clobber it on resolve', async () => {
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-1')])
+    const store = createTestStore()
+    store.setState({ planeStatus: connectedStatus() })
+
+    // Warm the cache the way the pane's mount-time seed does.
+    await store.getState().listPlaneWorkItems('assigned')
+
+    // A background revalidation starts while the pane still shows PLN-1 in
+    // its cached (Todo) state.
+    const gate = deferred<PlaneWorkItem[]>()
+    planeListWorkItems.mockReturnValueOnce(gate.promise)
+    const revalidation = store
+      .getState()
+      .listPlaneWorkItems('assigned', undefined, undefined, { force: true })
+
+    // The user drags the card to Done before the revalidation settles — the
+    // same optimistic call task-page-plane-board.tsx makes on drop.
+    const doneState = { id: 's-2', name: 'Done', group: 'completed' }
+    store.getState().patchPlaneWorkItem('PLN-1', { state: doneState })
+
+    // The revalidation resolves with the snapshot it captured BEFORE the
+    // drag — still Todo.
+    gate.resolve([workItem('PLN-1')])
+    const resolved = await revalidation
+
+    // Neither the value handed back to the caller (what TaskPage renders)
+    // nor the cache a later mount seeds from may show the pre-drag state.
+    expect(resolved.find((item) => item.id === 'PLN-1')?.state.id).toBe('s-2')
+    expect(
+      store
+        .getState()
+        .getCachedPlaneWorkItems({ kind: 'list', filter: 'assigned' })
+        ?.find((item) => item.id === 'PLN-1')?.state.id
+    ).toBe('s-2')
+  })
+
   it('dedupes concurrent list requests for the same key into one promise', async () => {
     const gate = deferred<PlaneWorkItem[]>()
     planeListWorkItems.mockReturnValueOnce(gate.promise)
