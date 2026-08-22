@@ -3,7 +3,16 @@
 
 import { ipcMain } from 'electron'
 import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
-import type { AgentSessionLogPaneReading } from '../../shared/agent-session-log-state'
+import type {
+  AgentSessionLogPaneReading,
+  AgentSessionLogReading
+} from '../../shared/agent-session-log-state'
+import {
+  isResumableTuiAgent,
+  normalizeAgentProviderSession,
+  type AgentProviderSessionMetadata,
+  type ResumableTuiAgent
+} from '../../shared/agent-session-resume'
 import { agentHookServer, isValidPaneKey } from '../agent-hooks/server'
 import { readAgentSessionLogState } from '../native-chat/session-log-agent-state'
 import { selectAgentSessionIdentityForPane } from '../runtime/terminal-agent-session-log-state'
@@ -73,6 +82,31 @@ async function readOnePane(
   return { paneKey, agent: identity.agent, sessionId: identity.providerSession.id, session }
 }
 
+export type AgentSessionLogIdentityRequest = {
+  agent: ResumableTuiAgent
+  providerSession: AgentProviderSessionMetadata
+}
+
+/** Unlike pane-keyed reads, this identity travels with the caller (e.g. a
+ *  persisted resume record) instead of being looked up in the hook cache, so
+ *  it still answers once that cache has been dropped for the pane (ORCA-272). */
+export function normalizeAgentSessionLogIdentityRequest(
+  request: unknown
+): AgentSessionLogIdentityRequest | null {
+  if (typeof request !== 'object' || request === null) {
+    return null
+  }
+  const record = request as Record<string, unknown>
+  if (!isResumableTuiAgent(record.agent)) {
+    return null
+  }
+  const providerSession = normalizeAgentProviderSession(record.providerSession)
+  if (!providerSession) {
+    return null
+  }
+  return { agent: record.agent, providerSession }
+}
+
 export function registerAgentSessionLogPaneHandlers(): void {
   ipcMain.removeHandler('agentSessionLog:readPanes')
   ipcMain.handle(
@@ -82,6 +116,21 @@ export function registerAgentSessionLogPaneHandlers(): void {
       return paneKeys.length === 0
         ? []
         : readAgentSessionLogPanes(paneKeys, agentHookServer.getStatusSnapshot())
+    }
+  )
+  ipcMain.removeHandler('agentSessionLog:readForIdentity')
+  ipcMain.handle(
+    'agentSessionLog:readForIdentity',
+    async (_event, request: unknown): Promise<AgentSessionLogReading> => {
+      const identity = normalizeAgentSessionLogIdentityRequest(request)
+      if (!identity) {
+        return { read: false, reason: 'agent-session-unknown' }
+      }
+      return readAgentSessionLogState({
+        agent: identity.agent,
+        sessionId: identity.providerSession.id,
+        transcriptPath: identity.providerSession.transcriptPath
+      })
     }
   )
 }

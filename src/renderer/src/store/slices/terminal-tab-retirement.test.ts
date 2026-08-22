@@ -8,7 +8,8 @@ import {
   buildTerminalTabRetirementPlan,
   buildTerminalTabRetirementPlans,
   isTerminalTabPresent,
-  removeSleepingAgentSessionsForTab
+  removeSleepingAgentSessionsForTab,
+  selectSleepingAgentSessionsOwnedByTab
 } from './terminal-tab-retirement'
 
 type RetirementState = Parameters<typeof buildTerminalTabRetirementPlan>[0]
@@ -425,5 +426,33 @@ describe('sleeping agent retirement', () => {
     expect(next).toEqual({ 'tab-2:leaf-2': sibling })
     expect(next['tab-2:leaf-2']).toBe(sibling)
     expect(removeSleepingAgentSessionsForTab(next, 'missing-tab')).toBe(next)
+  })
+
+  it('selects key- and metadata-owned records without removing anything (ORCA-272)', () => {
+    const owned1 = makeSleepingRecord('tab-1:leaf-1')
+    const owned2 = makeSleepingRecord('legacy-pane-key', 'tab-1')
+    const sibling = makeSleepingRecord('tab-2:leaf-2', 'tab-2')
+    const records = {
+      'tab-1:leaf-1': owned1,
+      'legacy-pane-key': owned2,
+      'tab-2:leaf-2': sibling
+    }
+
+    const owned = selectSleepingAgentSessionsOwnedByTab(records, 'tab-1')
+
+    expect(owned).toEqual(
+      expect.arrayContaining([
+        { paneKey: 'tab-1:leaf-1', record: owned1 },
+        { paneKey: 'legacy-pane-key', record: owned2 }
+      ])
+    )
+    expect(owned).toHaveLength(2)
+    // Why: selection must never mutate the source map — the caller decides retirement later.
+    expect(records).toEqual({
+      'tab-1:leaf-1': owned1,
+      'legacy-pane-key': owned2,
+      'tab-2:leaf-2': sibling
+    })
+    expect(selectSleepingAgentSessionsOwnedByTab(records, 'missing-tab')).toEqual([])
   })
 })

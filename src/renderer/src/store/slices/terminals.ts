@@ -151,6 +151,7 @@ import {
 import {
   collectHibernatedCompletionEvidenceForWorktree,
   collectSleepingAgentSessionRecordsForWorktree,
+  isGenuinelyCompletedAgentStatusEntry,
   removeSleepingRecordsReplacedByManualWorktreeSleep,
   type AgentStatusWorktreeShutdownReason
 } from './agent-status'
@@ -158,10 +159,14 @@ import {
   buildTerminalTabRetirementPlan,
   classifyTerminalRetirementWorktree,
   isTerminalTabPresent,
+  removeSleepingAgentSessionsForPaneKeys,
   removeSleepingAgentSessionsForTab,
+  selectSleepingAgentSessionsOwnedByTab,
+  sleepingAgentSessionBelongsToTab,
   type TerminalTabCloseReason,
   type TerminalTabRetirementPlan
 } from './terminal-tab-retirement'
+import { resolveRetirableSleepingAgentPaneKeys } from './terminal-tab-close-agent-session-retirement'
 
 function getNextTerminalOrdinal(tabs: TerminalTab[]): number {
   const usedOrdinals = new Set<number>()
@@ -1599,6 +1604,31 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   closeTab: (tabId, opts) => {
     const closeReason = opts?.reason ?? 'user'
     const retiresSession = closeReason === 'user' || closeReason === 'cleanup'
+    // Why: a close is not evidence an agent finished (ORCA-272) — snapshot the tab's
+    // sleeping records now, before anything mutates them. A live/retained hook status that
+    // is genuinely 'done' (not an interrupt-synthesized one — see
+    // isGenuinelyCompletedAgentStatusEntry) is a synchronous, reliable completion signal
+    // (existing callers — e.g. orchestration worker release — depend on that retirement
+    // being immediate), so only the panes this renderer cannot already vouch for (still
+    // working/blocked/waiting, interrupted, or no status at all) go through the async
+    // session-log authority; everything else survives the close so the user can resume it.
+    const knownDoneSleepingAgentPaneKeys = new Set<string>()
+    const sleepingAgentSessionsPendingCloseCheck = retiresSession
+      ? selectSleepingAgentSessionsOwnedByTab(get().sleepingAgentSessionsByPaneKey, tabId).filter(
+          ({ paneKey }) => {
+            const liveEntry = get().agentStatusByPaneKey[paneKey]
+            const retainedEntry = get().retainedAgentsByPaneKey[paneKey]?.entry
+            const knownDone =
+              (liveEntry && isGenuinelyCompletedAgentStatusEntry(liveEntry)) ||
+              (retainedEntry && isGenuinelyCompletedAgentStatusEntry(retainedEntry))
+            if (knownDone) {
+              knownDoneSleepingAgentPaneKeys.add(paneKey)
+              return false
+            }
+            return true
+          }
+        )
+      : []
     const retirementPlan =
       opts?.precomputedRetirementPlan?.tabId === tabId
         ? opts.precomputedRetirementPlan
@@ -1752,9 +1782,16 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           delete nextLastTerminalInputAtByPaneKey[paneKey]
         }
       }
-      const nextSleepingAgentSessionsByPaneKey = retiresSession
-        ? removeSleepingAgentSessionsForTab(s.sleepingAgentSessionsByPaneKey, tabId)
-        : s.sleepingAgentSessionsByPaneKey
+      // Why: only the panes already known 'done' retire here; the rest are resolved
+      // once the session log confirms the agent's last turn actually ended (ORCA-272,
+      // see sleepingAgentSessionsPendingCloseCheck below).
+      const nextSleepingAgentSessionsByPaneKey =
+        knownDoneSleepingAgentPaneKeys.size > 0
+          ? removeSleepingAgentSessionsForPaneKeys(
+              s.sleepingAgentSessionsByPaneKey,
+              knownDoneSleepingAgentPaneKeys
+            )
+          : s.sleepingAgentSessionsByPaneKey
       const nextPendingStartupByTabId = { ...s.pendingStartupByTabId }
       delete nextPendingStartupByTabId[tabId]
       const nextAutomaticAgentResumeClaimsByTabId = { ...s.automaticAgentResumeClaimsByTabId }
@@ -1871,6 +1908,40 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           : {})
       }
     })
+    if (sleepingAgentSessionsPendingCloseCheck.length > 0) {
+      // Why: fire-and-forget, like the PTY teardown above — the tab is already gone from
+      // the UI by the time this resolves, so it only ever prunes sleepingAgentSessionsByPaneKey
+      // by paneKey by then. Re-check ownership at delete time: a reused paneKey with a fresh
+      // record must never be clobbered by a check that started against the old one.
+      void resolveRetirableSleepingAgentPaneKeys(
+        sleepingAgentSessionsPendingCloseCheck.map(({ paneKey, record }) => ({
+          paneKey,
+          agent: record.agent,
+          providerSession: record.providerSession
+        })),
+        window.api.agentSessionLog?.readForIdentity
+      ).then((retirablePaneKeys) => {
+        if (retirablePaneKeys.size === 0) {
+          return
+        }
+        set((s) => {
+          let next = s.sleepingAgentSessionsByPaneKey
+          for (const paneKey of retirablePaneKeys) {
+            const current = next[paneKey]
+            if (!current || !sleepingAgentSessionBelongsToTab(paneKey, current, tabId)) {
+              continue
+            }
+            if (next === s.sleepingAgentSessionsByPaneKey) {
+              next = { ...next }
+            }
+            delete next[paneKey]
+          }
+          return next === s.sleepingAgentSessionsByPaneKey
+            ? s
+            : { sleepingAgentSessionsByPaneKey: next }
+        })
+      })
+    }
     // Why: sweep tab agent status through its suppressor-aware removal path.
     // Why: Pi can leave a completed row keyed under an already-missing tab id; pass the worktree to sweep that orphan while preserving active pre-render child rows.
     get().dropAgentStatusByTabPrefix(

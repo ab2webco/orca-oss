@@ -227,13 +227,21 @@ export function buildTerminalTabRetirementPlans(
   return plans
 }
 
+export function sleepingAgentSessionBelongsToTab(
+  paneKey: string,
+  record: Pick<SleepingAgentSessionRecord, 'tabId'>,
+  tabId: string
+): boolean {
+  return paneKey.startsWith(`${tabId}:`) || record.tabId === tabId
+}
+
 export function removeSleepingAgentSessionsForTab(
   records: Record<string, SleepingAgentSessionRecord>,
   tabId: string
 ): Record<string, SleepingAgentSessionRecord> {
   let next = records
   for (const [paneKey, record] of Object.entries(records)) {
-    if (!paneKey.startsWith(`${tabId}:`) && record.tabId !== tabId) {
+    if (!sleepingAgentSessionBelongsToTab(paneKey, record, tabId)) {
       continue
     }
     if (next === records) {
@@ -242,4 +250,40 @@ export function removeSleepingAgentSessionsForTab(
     delete next[paneKey]
   }
   return next
+}
+
+/** Removes only the named pane keys — for a close that already knows (or has since
+ *  learned) exactly which of a tab's sleeping records are safe to retire, rather than
+ *  every record the tab owns (ORCA-272). */
+export function removeSleepingAgentSessionsForPaneKeys(
+  records: Record<string, SleepingAgentSessionRecord>,
+  paneKeys: ReadonlySet<string> | readonly string[]
+): Record<string, SleepingAgentSessionRecord> {
+  let next = records
+  for (const paneKey of paneKeys) {
+    if (!(paneKey in records)) {
+      continue
+    }
+    if (next === records) {
+      next = { ...records }
+    }
+    delete next[paneKey]
+  }
+  return next
+}
+
+/** The tab's sleeping records, as-is — for callers that must decide (via an
+ *  external authority) whether each one is still safe to keep before it is
+ *  ever removed. Order is not significant. */
+export function selectSleepingAgentSessionsOwnedByTab(
+  records: Record<string, SleepingAgentSessionRecord>,
+  tabId: string
+): { paneKey: string; record: SleepingAgentSessionRecord }[] {
+  const owned: { paneKey: string; record: SleepingAgentSessionRecord }[] = []
+  for (const [paneKey, record] of Object.entries(records)) {
+    if (sleepingAgentSessionBelongsToTab(paneKey, record, tabId)) {
+      owned.push({ paneKey, record })
+    }
+  }
+  return owned
 }
