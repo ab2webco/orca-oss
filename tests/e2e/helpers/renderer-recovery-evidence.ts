@@ -188,16 +188,24 @@ export function formatRendererRecoveryEvidenceLine(
 }
 
 /**
- * Fixture-teardown hook: on a non-passing test, read and report the renderer
- * recovery evidence before the caller deletes `userDataDir`. Gated on status
- * so the passing path never pays for a file read; never throws so a
- * diagnostics failure cannot mask the real test failure.
+ * Read and report the renderer recovery evidence for `userDataDir` before a
+ * caller deletes it. Gated on `testInfo.status` by default so the passing
+ * path never pays for a file read — but that gate is only reliable from
+ * Playwright *fixture* teardown. `testInfo.status` isn't updated until an
+ * error has propagated all the way out of the test function: a regular
+ * (non-soft) failed `expect()`/`expect.poll()` just `throw`s, so status is
+ * still 'passed' throughout the test's *own* `finally` blocks. Pass
+ * `force: true` from any call site that isn't Playwright fixture teardown —
+ * e.g. a helper's own `dispose()` called from a test's `finally` — or a real
+ * failure there will be silently unreported. Never throws so a diagnostics
+ * failure cannot mask the real error.
  */
-export async function reportRendererRecoveryEvidenceOnFailure(
+export async function reportRendererRecoveryEvidence(
   userDataDir: string,
-  testInfo: TestInfo
+  testInfo: TestInfo,
+  options: { force?: boolean } = {}
 ): Promise<void> {
-  if (testInfo.status === 'passed' || testInfo.status === 'skipped') {
+  if (!options.force && (testInfo.status === 'passed' || testInfo.status === 'skipped')) {
     return
   }
   try {

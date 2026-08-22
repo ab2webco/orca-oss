@@ -33,7 +33,7 @@ import {
   createElectronHomeIsolation
 } from './electron-home-isolation'
 import { createSeededTestRepo, isValidGitRepo } from './seeded-test-repo'
-import { reportRendererRecoveryEvidenceOnFailure } from './renderer-recovery-evidence'
+import { reportRendererRecoveryEvidence } from './renderer-recovery-evidence'
 
 type OrcaTestFixtures = {
   electronApp: ElectronApplication
@@ -268,7 +268,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     // descendants are gone in CI; worker teardown then hangs on open handles.
     await closeElectronAppForE2E(app)
     await cleanupE2EDaemons(userDataDir)
-    await reportRendererRecoveryEvidenceOnFailure(userDataDir, testInfo)
+    await reportRendererRecoveryEvidence(userDataDir, testInfo)
     await removeUserDataDirAfterShutdown(userDataDir)
   },
 

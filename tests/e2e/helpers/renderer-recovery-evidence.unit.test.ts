@@ -4,7 +4,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   formatRendererRecoveryEvidenceLine,
-  readRendererRecoveryEvidence
+  readRendererRecoveryEvidence,
+  reportRendererRecoveryEvidence
 } from './renderer-recovery-evidence'
 
 function crashRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -141,5 +142,56 @@ describe('formatRendererRecoveryEvidenceLine', () => {
     } finally {
       rmSync(userDataDir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('reportRendererRecoveryEvidence', () => {
+  let userDataDir: string
+
+  beforeEach(() => {
+    userDataDir = mkdtempSync(path.join(os.tmpdir(), 'renderer-recovery-evidence-'))
+  })
+
+  afterEach(() => {
+    rmSync(userDataDir, { recursive: true, force: true })
+  })
+
+  function fakeTestInfo(status: string): {
+    testInfo: Parameters<typeof reportRendererRecoveryEvidence>[1]
+    attachCalls: { name: string; body: string }[]
+    logs: string[]
+  } {
+    const attachCalls: { name: string; body: string }[] = []
+    const testInfo = {
+      status,
+      titlePath: ['spec.ts', 'suite', 'test'],
+      attach: async (name: string, options?: { body?: string | Buffer }) => {
+        attachCalls.push({ name, body: String(options?.body ?? '') })
+      }
+    } as unknown as Parameters<typeof reportRendererRecoveryEvidence>[1]
+    return { testInfo, attachCalls, logs: [] }
+  }
+
+  it('skips work on a passed test without force', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('passed')
+    await reportRendererRecoveryEvidence(userDataDir, testInfo)
+    expect(attachCalls).toHaveLength(0)
+  })
+
+  it('reports on a failed test', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('failed')
+    await reportRendererRecoveryEvidence(userDataDir, testInfo)
+    expect(attachCalls).toHaveLength(1)
+    expect(attachCalls[0].name).toBe('renderer-recovery-evidence.json')
+    expect(attachCalls[0].body).toContain('did not fire')
+  })
+
+  it('reports on a passed test when force is set', async () => {
+    // Why: testInfo.status is only reliable from fixture teardown — a normal
+    // failed expect() leaves it 'passed' throughout the test's own finally
+    // blocks, so a bypass helper's dispose() must force the report (ORCA-280).
+    const { testInfo, attachCalls } = fakeTestInfo('passed')
+    await reportRendererRecoveryEvidence(userDataDir, testInfo, { force: true })
+    expect(attachCalls).toHaveLength(1)
   })
 })
