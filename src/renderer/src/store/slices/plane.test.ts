@@ -193,6 +193,37 @@ describe('createPlaneSlice caching', () => {
     ])
   })
 
+  // The Plane pane seeds from this entry on every entry, so it must survive the
+  // TTL: expiry means "refetch in the background", not "show nothing".
+  it('keeps serving a TTL-expired list entry, with its fetchedAt, to the seed selector', async () => {
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-1')])
+    const store = createTestStore()
+    store.setState({ planeStatus: connectedStatus() })
+
+    await store.getState().listPlaneWorkItems('assigned')
+    const entry = store.getState().getCachedPlaneWorkItemsEntry({ kind: 'list', filter: 'assigned' })
+    expect(entry?.data).toEqual([workItem('PLN-1')])
+    expect(typeof entry?.fetchedAt).toBe('number')
+
+    // Age the entry well past PLANE_CACHE_TTL (120s).
+    store.setState((s) => ({
+      planeListCache: Object.fromEntries(
+        Object.entries(s.planeListCache).map(([key, value]) => [
+          key,
+          { ...value, fetchedAt: value.fetchedAt - 600_000 }
+        ])
+      )
+    }))
+
+    const stale = store.getState().getCachedPlaneWorkItemsEntry({ kind: 'list', filter: 'assigned' })
+    expect(stale?.data).toEqual([workItem('PLN-1')])
+
+    // ...and the expiry still drives a real refetch rather than being ignored.
+    planeListWorkItems.mockResolvedValueOnce([workItem('PLN-2')])
+    await store.getState().listPlaneWorkItems('assigned')
+    expect(planeListWorkItems).toHaveBeenCalledTimes(2)
+  })
+
   it('dedupes concurrent list requests for the same key into one promise', async () => {
     const gate = deferred<PlaneWorkItem[]>()
     planeListWorkItems.mockReturnValueOnce(gate.promise)

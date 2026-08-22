@@ -43,6 +43,9 @@ export type PlaneWorkItemListSlice = {
   planeListInvalidationToken: { scope: string; version: number }
 
   getCachedPlaneWorkItems: (args: PlaneWorkItemReadArgs) => PlaneWorkItem[] | null
+  getCachedPlaneWorkItemsEntry: (
+    args: PlaneWorkItemReadArgs
+  ) => CacheEntry<PlaneWorkItem[]> | null
   searchPlaneWorkItems: (
     query: string,
     projectId?: string,
@@ -68,18 +71,24 @@ export const createPlaneWorkItemListSlice: StateCreator<
   planeListCache: {},
   planeListInvalidationToken,
 
-  getCachedPlaneWorkItems: (args) => {
+  getCachedPlaneWorkItems: (args) => get().getCachedPlaneWorkItemsEntry(args)?.data ?? null,
+
+  // Why the entry and not just `data`: stale-while-revalidate has to tell the
+  // user how old the list it just rendered is, which needs `fetchedAt`.
+  // Deliberately freshness-agnostic — an expired entry is still the best thing
+  // to show while the revalidation runs.
+  getCachedPlaneWorkItemsEntry: (args) => {
     const workspaceId = getSelectedPlaneWorkspaceId(get().planeStatus)
     if (args.kind === 'search') {
       const cacheKey = planeSearchCacheKey(workspaceId, args.projectId, args.query)
-      return get().planeSearchCache[cacheKey]?.data ?? null
+      return get().planeSearchCache[cacheKey] ?? null
     }
     const cacheKey = planeWorkItemListCacheKey(
       workspaceId,
       args.filter ?? 'assigned',
       args.projectId
     )
-    return get().planeListCache[cacheKey]?.data ?? null
+    return get().planeListCache[cacheKey] ?? null
   },
 
   searchPlaneWorkItems: async (query, projectId, workspaceId, options) => {
