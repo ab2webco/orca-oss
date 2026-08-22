@@ -229,6 +229,7 @@ import {
   waitForStableStartupGrid,
   type TerminalStartupGridSettleHandle
 } from './terminal-startup-grid-settle'
+import { startupGridFrameScheduler } from './terminal-startup-grid-frame-scheduler'
 import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
 import { resolveTerminalPasteRuntime } from './terminal-paste-runtime'
 import {
@@ -4671,12 +4672,10 @@ export function connectPanePty(
         startupGridSettleHandle = null
         connect()
       },
-      requestFrame: (callback) => requestAnimationFrame(callback),
-      cancelFrame: (handle) => {
-        if (typeof cancelAnimationFrame === 'function') {
-          cancelAnimationFrame(handle)
-        }
-      }
+      // Why not bare rAF: this branch already cancelled the connect fallback timer
+      // below, so a starved rAF would strand the pane with no PTY forever (ORCA-279).
+      requestFrame: startupGridFrameScheduler.requestFrame,
+      cancelFrame: startupGridFrameScheduler.cancelFrame
     })
     if (!settledSynchronously) {
       startupGridSettleHandle = handle
