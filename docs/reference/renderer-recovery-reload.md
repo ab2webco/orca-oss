@@ -66,6 +66,125 @@ Both produce the same Playwright message, so the message alone decides nothing.
 The last row is the honest default. Do not upgrade it to "product bug" or downgrade it to
 "flaky" without one of the rows above.
 
+## Reading the automated evidence (ORCA-280)
+
+The second row above used to require a human to notice `Target crashed` in a job log by hand —
+nobody did, which is why every occurrence of this failure was undiagnosable after the fact. As of
+ORCA-280, every E2E test reports this automatically. On any non-passing test, the `electronApp`
+fixture (`tests/e2e/helpers/orca-app.ts`) reads `<userData>/crash-reports.json` — written
+unconditionally by `CrashReportStore`, unlike the NDJSON trace sink, which `initObservability()`
+disables in CI — before deleting the userData dir, via
+`tests/e2e/helpers/renderer-recovery-evidence.ts`. It prints one line to the job log:
+
+```
+[renderer-recovery-evidence] <spec> > <test> :: <detail>
+```
+
+and attaches the full `RendererRecoveryEvidence` object as `renderer-recovery-evidence.json`.
+Playwright inlines small attachments as base64 directly in `tests/test-results/e2e-report.json`,
+which CI already uploads on every run (`always()`), so no extra artifact wiring was needed.
+
+`detail` lands on one of four outcomes:
+
+| outcome | meaning |
+| --- | --- |
+| `did not fire` | no renderer-source crash record exists — no crash evidence at all |
+| `LIKELY` | a renderer crash record exists with a recoverable `reason`; the reload almost certainly ran but nothing on disk directly proves it — **this is the normal shape for a single-crash test failure** |
+| `CONFIRMED` | a `renderer_recovery_reload` breadcrumb was found — direct proof, but this breadcrumb is only carried inside a *later* crash record in the same run, so it requires a second crash to appear at all |
+| `did NOT run` (crash recorded) | the recorded reason is `integrity-failure`, the one reason `shouldRecoverRendererAfterProcessGone` always refuses |
+
+Two things that are not obvious from the source and were confirmed empirically (ORCA-280, via
+`window.webContents.forcefullyCrashRenderer()` in the `@ondemand`-tagged
+`tests/e2e/renderer-recovery-evidence-repro.spec.ts`):
+
+- `forcefullyCrashRenderer()` reports `reason: 'killed'` on macOS, not `'crashed'` (not yet checked
+  on Linux CI — it may differ there). A persisted `'killed'` record still counts as LIKELY:
+  `shouldRecordProcessGoneCrash` only ever drops a `'killed'` event before it reaches disk when
+  `expectedTeardown` was `'app-shutdown'` or `'renderer-reload'`, so any `'killed'` record that *is*
+  on disk already implies the one `expectedTeardown` value (`'none'`) that
+  `shouldRecoverRendererAfterProcessGone` returns true for. LIKELY is still an inference, not a
+  guarantee, on top of that: `scheduleRendererRecovery` (createMainWindow.ts) can still skip the
+  reload after this check passes — `windowClosing`, `getIsQuitting()`, or a tripped circuit breaker
+  (3 recoveries per 60s) all bail out — so a crash record from, say, a 4th crash in one run can be
+  LIKELY-classified but not actually have reloaded.
+- `TestInfo.titlePath` is a property (`Array<string>`), not a method — an early version of this
+  hook called it as one and only failed silently inside the hook's own try/catch, never in the
+  test. If evidence is missing for a real failure, check the job log for
+  `[renderer-recovery-evidence] failed to collect evidence:` first.
+
+Coverage: specs that launch their own `ElectronApplication` outside the `electronApp` fixture
+(`orca-restart.ts`'s `createRestartSession`, `paired-electron-client.ts`'s
+`launchPairedElectronClient`) originally bypassed this hook entirely — a real assertion failure in
+`paired-remote-terminal-host-restart-background-sync.spec.ts` on PR #160 produced no evidence line
+at all, which is silence indistinguishable from "no crash".
+
+The first fix for this used `reportRendererRecoveryEvidence(..., { force: true })` from
+`dispose()`, on the theory that `dispose()` runs inside the *test's own* `finally` block — not
+Playwright fixture teardown — so `testInfo.status` is never finalized there for a normal
+(non-soft) failed `expect()`/`expect.poll()` (it only `throw`s; status stays `'passed'` until that
+propagates all the way out of the test function). That diagnosis was correct, but `force: true`
+was the wrong fix: it reports on *every* test using these two helpers, pass or fail — verified on
+PR #160's own CI, where three passing specs each printed a `did not fire` line. A signal that
+fires on everything carries exactly as little information as one that fires on nothing.
+
+The actual fix separates *reading* the evidence (which must happen in `dispose()`, before it
+deletes `userDataDir`) from *deciding whether to report it* (which needs the status that is only
+reliable once Playwright has finalized it, i.e. in fixture teardown):
+
+- `queueRendererRecoveryEvidence(testInfo, evidence)` — called from `dispose()`, reads the
+  evidence eagerly and appends it to a `WeakMap<TestInfo, evidence[]>` keyed by the test's own
+  `TestInfo` object (chosen because these helpers are called with only `testInfo`, not a fixture
+  object — adding a callback parameter would mean touching 30+ existing call sites).
+- `flushQueuedRendererRecoveryEvidence(testInfo)` — called from a new `{ auto: true }` fixture in
+  `orca-app.ts` (`flushRendererRecoveryEvidenceQueue`), so it runs for *every* test regardless of
+  whether that test requests `electronApp` at all. Reports the queued evidence only if
+  `testInfo.status` is not `'passed'`/`'skipped'`. Auto fixtures still tear down after the test
+  function's promise has settled like any other fixture, and queuing always finishes inside the
+  test's own code (strictly before any fixture teardown starts), so by the time this flush runs,
+  the queue is already complete and the status is already final — regardless of teardown ordering
+  relative to other fixtures.
+
+Verified both directions with a throwaway spec run against a real built Electron app: a passing
+test using `createRestartSession` produced zero `[renderer-recovery-evidence]` lines; a failing one
+produced exactly one.
+
+## The first classified occurrence (ORCA-280)
+
+PR #160's own CI run put this to use immediately. Three of the four failing shards were genuine,
+unrelated bugs (left alone — see their own issues); the other two were this failure class, and the
+hook gave a direct answer for both:
+
+```
+[renderer-recovery-evidence] combined-diff-invalidation-freeze-repro.spec.ts > ... :: renderer_recovery_reload: did not fire — crash-reports.json was never written to the E2E user-data dir, so Orca never recorded a renderer process-gone event.
+```
+
+Same verdict for `large-diff-freeze-repro.spec.ts`. Both stacks pointed at the identical shape: an
+`expect.poll(() => orcaPage.evaluate(...))` inside a locally-defined `addAndActivateRepo` helper,
+polling `fetchWorktrees` right after adding an isolated repo. No renderer crash — row 4, the
+"genuinely transient navigation" case this doc always allowed for.
+
+The first fix patched that one `page.evaluate` per spec, swallowing only a narrow
+`isExecutionContextDestroyedError`. That approach did not generalize: `source-control-large-file-count.spec.ts`
+turned out to have the *identical* duplicated `addAndActivateRepo`, and failed with the exact same
+verdict on a later run, and `combined-diff-scroll-restore.spec.ts` had it too, silently, without ever
+having failed yet. Per-spec patches don't help the next spec that copies the same helper.
+
+The actual fix consolidates on `tests/e2e/helpers/isolated-diff-repo-activation.ts`'s
+`addAndActivateIsolatedRepo` / `evaluateThroughContextSwaps` — a pre-existing, more complete version
+of the same idea (already used by `inline-diff-deleted-line-render-budget.spec.ts`) that retries any
+transient context-teardown error (`Execution context was destroyed`, `Target closed`, `Target page,
+context or browser has been closed`, `frame was detached`) across *all three* evaluates in the
+repo-activation sequence, not just the polled one, up to its own bounded deadline. All four specs
+with the duplicated helper (`combined-diff-invalidation-freeze-repro.spec.ts`,
+`large-diff-freeze-repro.spec.ts`, `combined-diff-scroll-restore.spec.ts`,
+`source-control-large-file-count.spec.ts`) now call the shared helper instead of carrying their own
+copy, so the next spec that needs this exact repo-activation pattern inherits the tolerance by
+importing it rather than pasting it. `setup-script-import.spec.ts` has a same-named
+`addAndActivateRepo` but a different shape (a single un-polled `evaluate`, not vulnerable to this
+class) and was left alone. In every case, only a thrown context-teardown error is retried — a failed
+assertion (the freeze budgets, loaded-row counts the specs exist to check) still fails the test
+immediately.
+
 ## Why one failure looks like four small ones
 
 Per spec this mode reads as 4/37, 2/37, 2/11 and 1/33 — four minor rows nobody prioritises.
