@@ -21,9 +21,14 @@
  * record when `expectedTeardown` is `'app-shutdown'` or `'renderer-reload'`;
  * a `'killed'` record that made it to disk therefore already implies
  * `expectedTeardown === 'none'`, which is exactly the case
- * `shouldRecoverRendererAfterProcessGone` recovers from (empirically verified
- * in ORCA-280 via `forcefullyCrashRenderer()`, which reports `reason: 'killed'`
- * and does recover). Two confidence tiers follow:
+ * `shouldRecoverRendererAfterProcessGone` returns true for (empirically
+ * verified on macOS in ORCA-280 via `forcefullyCrashRenderer()`, which
+ * reports `reason: 'killed'` there and does recover; not yet checked on
+ * Linux CI). LIKELY is still an inference on top of that: `scheduleRendererRecovery`
+ * (createMainWindow.ts) can bail after this check passes — `windowClosing`,
+ * `getIsQuitting()`, or a tripped circuit breaker (3 recoveries/60s) — so a
+ * LIKELY-classified record does not *guarantee* the reload ran. Two
+ * confidence tiers follow:
  *   - CONFIRMED: a `renderer_recovery_reload` breadcrumb was found. This
  *     breadcrumb is only carried on disk inside a *later* crash record's
  *     `breadcrumbs` snapshot (durable-crash-breadcrumb.ts), so it requires a

@@ -97,11 +97,16 @@ Two things that are not obvious from the source and were confirmed empirically (
 `window.webContents.forcefullyCrashRenderer()` in the `@ondemand`-tagged
 `tests/e2e/renderer-recovery-evidence-repro.spec.ts`):
 
-- `forcefullyCrashRenderer()` reports `reason: 'killed'`, not `'crashed'`. A persisted `'killed'`
-  record still counts as LIKELY: `shouldRecordProcessGoneCrash` only ever drops a `'killed'` event
-  before it reaches disk when `expectedTeardown` was `'app-shutdown'` or `'renderer-reload'`, so any
-  `'killed'` record that *is* on disk already implies the one `expectedTeardown` value
-  (`'none'`) that `shouldRecoverRendererAfterProcessGone` recovers from.
+- `forcefullyCrashRenderer()` reports `reason: 'killed'` on macOS, not `'crashed'` (not yet checked
+  on Linux CI — it may differ there). A persisted `'killed'` record still counts as LIKELY:
+  `shouldRecordProcessGoneCrash` only ever drops a `'killed'` event before it reaches disk when
+  `expectedTeardown` was `'app-shutdown'` or `'renderer-reload'`, so any `'killed'` record that *is*
+  on disk already implies the one `expectedTeardown` value (`'none'`) that
+  `shouldRecoverRendererAfterProcessGone` returns true for. LIKELY is still an inference, not a
+  guarantee, on top of that: `scheduleRendererRecovery` (createMainWindow.ts) can still skip the
+  reload after this check passes — `windowClosing`, `getIsQuitting()`, or a tripped circuit breaker
+  (3 recoveries per 60s) all bail out — so a crash record from, say, a 4th crash in one run can be
+  LIKELY-classified but not actually have reloaded.
 - `TestInfo.titlePath` is a property (`Array<string>`), not a method — an early version of this
   hook called it as one and only failed silently inside the hook's own try/catch, never in the
   test. If evidence is missing for a real failure, check the job log for
