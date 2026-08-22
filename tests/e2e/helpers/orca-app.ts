@@ -173,7 +173,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
       await provideFixture()
       await flushQueuedRendererRecoveryEvidence(testInfo)
     },
-    { auto: true, scope: 'test' }
+    { scope: 'test' } // TEMP ORCA-280 diagnostic: auto disabled to isolate selector_not_found
   ],
 
   // Why: Windows keeps watched worktrees locked until Electron and its
