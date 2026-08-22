@@ -221,6 +221,17 @@ export async function reportRendererRecoveryEvidence(
   }
 }
 
+/** electronApp fixture teardown convenience: this test may also have queued
+ *  evidence via a second app it launched itself (createRestartSession /
+ *  launchPairedElectronClient); flush both from the one reliable call site. */
+export async function reportAndFlushRendererRecoveryEvidence(
+  userDataDir: string,
+  testInfo: TestInfo
+): Promise<void> {
+  await reportRendererRecoveryEvidence(userDataDir, testInfo)
+  await flushQueuedRendererRecoveryEvidence(testInfo)
+}
+
 // Why a WeakMap and not a fixture-provided register callback: helpers like
 // createRestartSession/launchPairedElectronClient are called with only
 // `testInfo`, not the fixture object, and adding a callback parameter would

@@ -7,6 +7,7 @@ import {
   formatRendererRecoveryEvidenceLine,
   queueRendererRecoveryEvidence,
   readRendererRecoveryEvidence,
+  reportAndFlushRendererRecoveryEvidence,
   reportRendererRecoveryEvidence,
   type RendererRecoveryEvidence
 } from './renderer-recovery-evidence'
@@ -226,7 +227,7 @@ describe('queueRendererRecoveryEvidence / flushQueuedRendererRecoveryEvidence', 
     // Why status starts 'passed' then flips: this mirrors the real timing —
     // queuing happens mid-test (status not yet finalized), Playwright then
     // finalizes status once the test function's promise settles, and only
-    // then does the auto fixture's teardown call flush.
+    // then does the named fixture's teardown call flush.
     queueRendererRecoveryEvidence(asTestInfo, evidence())
     testInfo.status = 'failed'
     await flushQueuedRendererRecoveryEvidence(asTestInfo)
@@ -248,6 +249,53 @@ describe('queueRendererRecoveryEvidence / flushQueuedRendererRecoveryEvidence', 
     const { testInfo, attachCalls } = fakeTestInfo('failed')
     const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
     await flushQueuedRendererRecoveryEvidence(asTestInfo)
+    expect(attachCalls).toHaveLength(0)
+  })
+})
+
+describe('reportAndFlushRendererRecoveryEvidence', () => {
+  let userDataDir: string
+
+  beforeEach(() => {
+    userDataDir = mkdtempSync(path.join(os.tmpdir(), 'renderer-recovery-evidence-'))
+  })
+
+  afterEach(() => {
+    rmSync(userDataDir, { recursive: true, force: true })
+  })
+
+  it('reports both the direct evidence and anything queued, on a failed test', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('failed')
+    const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
+    queueRendererRecoveryEvidence(asTestInfo, {
+      rendererCrashRecorded: false,
+      recoveryReloadConfirmed: false,
+      recoveryReloadLikely: false,
+      crashReasons: [],
+      rendererCrashRecordCount: 0,
+      recoveryBreadcrumbCount: 0,
+      detail: 'queued-evidence-marker'
+    })
+    await reportAndFlushRendererRecoveryEvidence(userDataDir, asTestInfo)
+    expect(attachCalls).toHaveLength(2)
+    const bodies = attachCalls.map((call) => call.body)
+    expect(bodies.some((body) => body.includes('did not fire'))).toBe(true)
+    expect(bodies.some((body) => body.includes('queued-evidence-marker'))).toBe(true)
+  })
+
+  it('reports nothing on a passed test even with evidence queued', async () => {
+    const { testInfo, attachCalls } = fakeTestInfo('passed')
+    const asTestInfo = testInfo as unknown as Parameters<typeof queueRendererRecoveryEvidence>[0]
+    queueRendererRecoveryEvidence(asTestInfo, {
+      rendererCrashRecorded: false,
+      recoveryReloadConfirmed: false,
+      recoveryReloadLikely: false,
+      crashReasons: [],
+      rendererCrashRecordCount: 0,
+      recoveryBreadcrumbCount: 0,
+      detail: 'queued-evidence-marker'
+    })
+    await reportAndFlushRendererRecoveryEvidence(userDataDir, asTestInfo)
     expect(attachCalls).toHaveLength(0)
   })
 })
