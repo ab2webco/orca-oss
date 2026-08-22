@@ -116,6 +116,9 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).toContain(
       'full access to your files, network, and other processes'
     )
+    expect(document.body.textContent).toContain(
+      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
+    )
     expect(document.querySelector('[role="dialog"]')?.classList).toContain('plugin-security-chrome')
     expect(document.activeElement?.textContent).toContain('Keep Disabled')
   })
@@ -136,6 +139,7 @@ describe('PluginConsentDialog', () => {
       "These permissions limit how the plugin uses Orca's API. This plugin has no background worker."
     )
     expect(document.body.textContent).not.toContain('full access to your files')
+    expect(document.body.textContent).not.toContain('connect to any host on the internet')
   })
 
   it('describes inert content without pretending it requested permissions', async () => {

@@ -193,6 +193,9 @@ describe('PluginMarketplaceBrowser', () => {
       'Read the name, branch, and terminal list of your focused worktree'
     )
     expect(document.body.textContent).toContain('full access to your files, network')
+    expect(document.body.textContent).toContain(
+      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
+    )
     expect(document.querySelector('[role="dialog"]')?.classList).toContain('plugin-security-chrome')
 
     await act(async () => button('Install plugin').click())
@@ -204,6 +207,22 @@ describe('PluginMarketplaceBrowser', () => {
       resolvedCommit: PLUGIN_COMMIT
     })
     expect(onInstalled).toHaveBeenCalledWith(listing.pluginKey)
+    act(() => root.unmount())
+  })
+
+  it('omits the worker network note for a panel-only preview with no worker', async () => {
+    installApi({
+      previewMarketplacePlugin: vi.fn().mockResolvedValue({
+        ...preview,
+        manifest: { ...preview.manifest, main: undefined }
+      })
+    })
+    const { root } = await renderBrowser()
+
+    await act(async () => button('Install').click())
+
+    expect(document.body.textContent).not.toContain('full access to your files')
+    expect(document.body.textContent).not.toContain('connect to any host on the internet')
     act(() => root.unmount())
   })
 
