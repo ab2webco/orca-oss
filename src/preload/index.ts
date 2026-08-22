@@ -33,6 +33,7 @@ import type { ProjectExecutionRuntimeResolution } from '../shared/project-execut
 import type { StartupCommandDelivery } from '../shared/codex-startup-delivery'
 import type {
   AgentProviderSessionMetadata,
+  ResumableTuiAgent,
   SleepingAgentLaunchConfig
 } from '../shared/agent-session-resume'
 import type { MobileRelayStatus } from '../shared/mobile-relay-status'
@@ -212,7 +213,10 @@ import type {
   AgentStatusIpcPayload,
   MigrationUnsupportedPtyEntry
 } from '../shared/agent-status-types'
-import type { AgentSessionLogPaneReading } from '../shared/agent-session-log-state'
+import type {
+  AgentSessionLogPaneReading,
+  AgentSessionLogReading
+} from '../shared/agent-session-log-state'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -5077,7 +5081,12 @@ const api = {
 
   agentSessionLog: {
     readPanes: (paneKeys: string[]): Promise<AgentSessionLogPaneReading[]> =>
-      ipcRenderer.invoke('agentSessionLog:readPanes', paneKeys)
+      ipcRenderer.invoke('agentSessionLog:readPanes', paneKeys),
+    readForIdentity: (identity: {
+      agent: ResumableTuiAgent
+      providerSession: AgentProviderSessionMetadata
+    }): Promise<AgentSessionLogReading> =>
+      ipcRenderer.invoke('agentSessionLog:readForIdentity', identity)
   },
 
   agentStatus: {

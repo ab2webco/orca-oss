@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
 import {
   MAX_AGENT_SESSION_LOG_PANES,
+  normalizeAgentSessionLogIdentityRequest,
   normalizeAgentSessionLogPaneKeys,
   readAgentSessionLogPanes
 } from './agent-session-log-panes'
@@ -86,5 +87,46 @@ describe('readAgentSessionLogPanes', () => {
     expect(readAgentSessionLogState).toHaveBeenCalledWith(
       expect.objectContaining({ includeActivity: true })
     )
+  })
+})
+
+describe('normalizeAgentSessionLogIdentityRequest', () => {
+  it('accepts a resumable agent with a valid provider session', () => {
+    expect(
+      normalizeAgentSessionLogIdentityRequest({
+        agent: 'codex',
+        providerSession: { key: 'session_id', id: 'sess-1' }
+      })
+    ).toEqual({
+      agent: 'codex',
+      providerSession: { key: 'session_id', id: 'sess-1' }
+    })
+  })
+
+  it('rejects a non-resumable or missing agent', () => {
+    expect(
+      normalizeAgentSessionLogIdentityRequest({
+        agent: 'not-a-real-agent',
+        providerSession: { key: 'session_id', id: 'sess-1' }
+      })
+    ).toBeNull()
+    expect(
+      normalizeAgentSessionLogIdentityRequest({
+        providerSession: { key: 'session_id', id: 'sess-1' }
+      })
+    ).toBeNull()
+  })
+
+  it('rejects a malformed or missing provider session', () => {
+    expect(normalizeAgentSessionLogIdentityRequest({ agent: 'codex' })).toBeNull()
+    expect(
+      normalizeAgentSessionLogIdentityRequest({ agent: 'codex', providerSession: { id: 'x' } })
+    ).toBeNull()
+  })
+
+  it('rejects non-object and null requests', () => {
+    expect(normalizeAgentSessionLogIdentityRequest(null)).toBeNull()
+    expect(normalizeAgentSessionLogIdentityRequest('codex')).toBeNull()
+    expect(normalizeAgentSessionLogIdentityRequest(undefined)).toBeNull()
   })
 })
