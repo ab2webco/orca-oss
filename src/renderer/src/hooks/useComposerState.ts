@@ -23,7 +23,7 @@ import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agen
 import { filterEnabledTuiAgents, isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
 import { repoIsRemote } from '../../../shared/agent-launch-remote'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
-import { resolveNativeChatLaunchSessionOptions } from '@/components/native-chat/native-chat-session-option-enrichment'
+import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
 import {
   resolveTuiAgentLaunchArgs,
@@ -150,7 +150,9 @@ import {
   toLinearLinkedWorkItem
 } from '@/components/sidebar/folder-workspace-composer-helpers'
 import { useFolderWorkspaceComposerPathStatus } from '@/components/sidebar/folder-workspace-composer-path-status'
+import { resolveFolderWorkspaceLaunchDraft } from '@/components/sidebar/folder-workspace-linked-startup-plan'
 import { submitFolderWorkspaceCreate } from '@/components/sidebar/folder-workspace-composer-submit'
+import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import {
   getRepoExecutionHostId,
@@ -3476,6 +3478,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         const smartGitHubResolution = smartGitHubSettlement.value
         const smartGitHubMetadata =
           smartGitHubResolution.kind === 'none' ? null : smartGitHubResolution
+        const submitLinkedWorkItem = smartGitHubMetadata?.linkedWorkItem ?? linkedWorkItem
         const agent =
           requestedAgent && isTuiAgentEnabled(requestedAgent, disabledTuiAgents)
             ? requestedAgent
@@ -3483,11 +3486,15 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         if (isSubmissionCancelled()) {
           return
         }
+        const folderLaunchDraftText =
+          agent && submitLinkedWorkItem
+            ? resolveFolderWorkspaceLaunchDraft(submitLinkedWorkItem, note)
+            : null
         const folderWorkspaceCreated = await submitFolderWorkspaceCreate({
           projectGroup: selectedProjectGroup,
           name: smartGitHubMetadata?.workspaceName ?? name,
           lastAutoName: lastAutoNameRef.current,
-          linkedWorkItem: smartGitHubMetadata?.linkedWorkItem ?? linkedWorkItem,
+          linkedWorkItem: submitLinkedWorkItem,
           linkedTaskSourceContext: taskSourceContext,
           note,
           quickAgent: agent,
@@ -3498,7 +3505,21 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             : undefined,
           agentEnv: agent ? resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv) : undefined,
           sessionOptions: agent
-            ? resolveNativeChatLaunchSessionOptions(settings?.nativeChatSessionOptions, agent)
+            ? resolveInitialNativeChatSessionOptions(
+                {
+                  experimentalNativeChat: settings?.experimentalNativeChat,
+                  openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+                  nativeChatSessionOptions: settings?.nativeChatSessionOptions
+                },
+                {
+                  agent,
+                  ...(folderLaunchDraftText
+                    ? { promptDelivery: 'draft' as const, launchDraftText: folderLaunchDraftText }
+                    : {}),
+                  nativeChatTranscriptIsLocalReadable:
+                    isNativeChatTranscriptLocalReadable(folderTargetConnectionId)
+                }
+              )
             : undefined,
           terminalWindowsShell: settings?.terminalWindowsShell,
           isRemote: folderTargetIsRemote,
@@ -3545,6 +3566,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       createFolderWorkspace,
       disabledTuiAgents,
       folderCreateDisabled,
+      folderTargetConnectionId,
       folderTargetIsRemote,
       folderTargetRuntimeEnvironmentId,
       folderSourceRepos.length,
@@ -3560,7 +3582,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       settings?.agentDefaultArgs,
       settings?.agentDefaultEnv,
       settings?.autoRenameBranchFromWork,
+      settings?.experimentalNativeChat,
       settings?.nativeChatSessionOptions,
+      settings?.openAgentTabsInChatByDefault,
       settings?.terminalWindowsShell,
       taskSourceContext,
       telemetrySource
@@ -3811,9 +3835,18 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         cmdOverrides: settings?.agentCmdOverrides ?? {},
         agentArgs: resolveTuiAgentLaunchArgs(tuiAgent, settings?.agentDefaultArgs),
         agentEnv: resolveTuiAgentLaunchEnv(tuiAgent, settings?.agentDefaultEnv),
-        sessionOptions: resolveNativeChatLaunchSessionOptions(
-          settings?.nativeChatSessionOptions,
-          tuiAgent
+        sessionOptions: resolveInitialNativeChatSessionOptions(
+          {
+            experimentalNativeChat: settings?.experimentalNativeChat,
+            openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+            nativeChatSessionOptions: settings?.nativeChatSessionOptions
+          },
+          {
+            agent: tuiAgent,
+            nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
+              selectedRepo.connectionId
+            )
+          }
         ),
         platform: selectedRepoAgentLaunchPlatform,
         shell: selectedRepoStartupShell,
@@ -4032,7 +4065,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     settings?.agentDefaultEnv,
     launchPromptTemplates,
     settings?.autoRenameBranchFromWork,
+    settings?.experimentalNativeChat,
     settings?.nativeChatSessionOptions,
+    settings?.openAgentTabsInChatByDefault,
     smartNameMode,
     setSidebarOpen,
     setupDecision,
@@ -4378,6 +4413,25 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             trimmedNote,
             getLaunchPromptTemplateForProvider(launchPromptTemplates, submitLinkedWorkItemProvider)
           )
+        const quickSessionOptions =
+          agent === null
+            ? undefined
+            : resolveInitialNativeChatSessionOptions(
+                {
+                  experimentalNativeChat: settings?.experimentalNativeChat,
+                  openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
+                  nativeChatSessionOptions: settings?.nativeChatSessionOptions
+                },
+                {
+                  agent,
+                  ...(quickDraftPrompt
+                    ? { promptDelivery: 'draft' as const, launchDraftText: quickDraftPrompt }
+                    : {}),
+                  nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
+                    selectedRepo.connectionId
+                  )
+                }
+              )
         const draftLaunchPlan =
           agent === null || !quickDraftPrompt
             ? null
@@ -4387,10 +4441,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
                 cmdOverrides: settings?.agentCmdOverrides ?? {},
                 agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
                 agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
-                sessionOptions: resolveNativeChatLaunchSessionOptions(
-                  settings?.nativeChatSessionOptions,
-                  agent
-                ),
+                sessionOptions: quickSessionOptions,
                 platform: selectedRepoAgentLaunchPlatform,
                 shell: selectedRepoStartupShell,
                 isRemote: selectedRepoIsRemote
@@ -4419,10 +4470,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             cmdOverrides: settings?.agentCmdOverrides ?? {},
             agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
             agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
-            sessionOptions: resolveNativeChatLaunchSessionOptions(
-              settings?.nativeChatSessionOptions,
-              agent
-            ),
+            sessionOptions: quickSessionOptions,
             platform: selectedRepoAgentLaunchPlatform,
             shell: selectedRepoStartupShell,
             isRemote: selectedRepoIsRemote,
@@ -4635,7 +4683,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       settings?.agentDefaultEnv,
       launchPromptTemplates,
       settings?.autoRenameBranchFromWork,
+      settings?.experimentalNativeChat,
       settings?.nativeChatSessionOptions,
+      settings?.openAgentTabsInChatByDefault,
       smartNameMode,
       sourceIntentBlocksCreate,
       disabledTuiAgents,

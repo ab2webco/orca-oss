@@ -1,12 +1,16 @@
-import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import { isMainWindowVisible, onMainWindowBecameVisible } from '../window/main-window-visibility'
 import type {
   WorktreeBaseRepoWatchConfig,
   WorktreeBaseWatchTarget
 } from './worktree-base-directory-event-filter'
 import { startGitCommonWatch } from './worktree-git-common-watch'
+import {
+  diffBase,
+  dirSignature,
+  hasGitMarker,
+  snapshotBase
+} from './worktree-base-directory-snapshot'
 
 export type WorktreeBasePollEvent = { type: 'create' | 'update' | 'delete'; path: string }
 
@@ -68,6 +72,8 @@ export type WorktreeBasePollerOptions = {
   /** Test hook: called when a marker leaves the fast-probe window. Closes the
    *  probe episode a budget assertion has to count, one marker at a time. */
   onPendingMarkerRetired?: (path: string) => void
+  /** Test hook: awaited with the tick after a full scan's listings, to land a racing write. */
+  onSnapshotTaken?: (tick: number) => void | Promise<void>
   /** Test hook: overrides the fast-probe window. */
   pendingMarkerMaxTicks?: number
 }
@@ -93,107 +99,6 @@ export const WORKTREE_BASE_BACKSTOP_TICKS = 15
 // backstop scan cover the pathological case.
 const PENDING_MARKER_MAX_TICKS = 300
 
-function statSignature(s: { mtimeMs: number; ctimeMs: number; ino: number }): string {
-  return `${s.mtimeMs}:${s.ctimeMs}:${s.ino}`
-}
-
-async function dirSignature(path: string): Promise<string> {
-  try {
-    return statSignature(await stat(path))
-  } catch {
-    return 'missing'
-  }
-}
-
-async function hasGitMarker(dir: string): Promise<boolean> {
-  try {
-    await stat(join(dir, '.git'))
-    return true
-  } catch {
-    return false
-  }
-}
-
-type BaseSnapshot = {
-  // worktree-candidate dir → whether its `.git` completion marker exists
-  markers: Map<string, boolean>
-  // dirs whose listing determines the candidate set: the root plus any
-  // nested repo containers. Their stat signatures gate the next full scan.
-  gateDirs: string[]
-}
-
-// Depth-1 worktree dirs (flat layout), plus depth-2 dirs under each nested
-// repo's container, mirroring what worktree-base-directory-event-filter
-// matches: `<wt>/.git` completion markers and `<wt>` deletions.
-async function snapshotBase(
-  rootPath: string,
-  repos: ReadonlyMap<string, WorktreeBaseRepoWatchConfig>
-): Promise<BaseSnapshot> {
-  const markers = new Map<string, boolean>()
-  const gateDirs = [rootPath]
-  const configs = [...repos.values()]
-  const includeFlat = configs.some((config) => !config.nestWorkspaces)
-  const nestedRepoNames = new Set(
-    configs
-      .filter((config) => config.nestWorkspaces)
-      .map((config) => normalizeRuntimePathForComparison(config.repoName))
-  )
-
-  let rootEntries
-  try {
-    rootEntries = await readdir(rootPath, { withFileTypes: true })
-  } catch {
-    // Root vanished: an empty snapshot diffs into delete events for every
-    // previously-known worktree dir, matching the old watcher's error path.
-    return { markers, gateDirs }
-  }
-
-  const candidates: string[] = []
-  for (const entry of rootEntries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-      continue
-    }
-    const entryPath = join(rootPath, entry.name)
-    if (includeFlat) {
-      candidates.push(entryPath)
-    }
-    if (nestedRepoNames.has(normalizeRuntimePathForComparison(entry.name))) {
-      gateDirs.push(entryPath)
-      let subEntries
-      try {
-        subEntries = await readdir(entryPath, { withFileTypes: true })
-      } catch {
-        subEntries = []
-      }
-      for (const sub of subEntries) {
-        if (sub.isDirectory() || sub.isSymbolicLink()) {
-          candidates.push(join(entryPath, sub.name))
-        }
-      }
-    }
-  }
-
-  for (const dir of candidates) {
-    markers.set(dir, await hasGitMarker(dir))
-  }
-  return { markers, gateDirs }
-}
-
-function diffBase(prev: BaseSnapshot, next: BaseSnapshot): WorktreeBasePollEvent[] {
-  const events: WorktreeBasePollEvent[] = []
-  for (const [dir, marker] of next.markers) {
-    if (marker && prev.markers.get(dir) !== true) {
-      events.push({ type: 'create', path: join(dir, '.git') })
-    }
-  }
-  for (const dir of prev.markers.keys()) {
-    if (!next.markers.has(dir)) {
-      events.push({ type: 'delete', path: dir })
-    }
-  }
-  return events
-}
-
 async function startBasePoller(
   target: WorktreeBaseWatchTarget,
   getRepos: () => ReadonlyMap<string, WorktreeBaseRepoWatchConfig>,
@@ -206,7 +111,6 @@ async function startBasePoller(
   let ticking = false
   let tickCount = 0
   let snapshot = await snapshotBase(target.path, getRepos())
-  let gateSignatures = await Promise.all(snapshot.gateDirs.map(dirSignature))
   let timer: ReturnType<typeof setTimeout> | null = null
   let parkedWhileHidden = false
   const pendingMarkerMaxTicks = options.pendingMarkerMaxTicks ?? PENDING_MARKER_MAX_TICKS
@@ -221,7 +125,7 @@ async function startBasePoller(
   const fullScan = async (): Promise<void> => {
     options.onFullScan?.()
     const next = await snapshotBase(target.path, getRepos())
-    const nextSignatures = await Promise.all(next.gateDirs.map(dirSignature))
+    await options.onSnapshotTaken?.(tickCount)
     if (disposed) {
       return
     }
@@ -239,7 +143,6 @@ async function startBasePoller(
       }
     }
     snapshot = next
-    gateSignatures = nextSignatures
     if (events.length > 0) {
       onEvents(events)
     }
@@ -278,8 +181,8 @@ async function startBasePoller(
     // are untouched, skip the readdir + per-candidate stat fan-out entirely.
     const signatures = await Promise.all(snapshot.gateDirs.map(dirSignature))
     const gateChanged =
-      signatures.length !== gateSignatures.length ||
-      signatures.some((sig, index) => sig !== gateSignatures[index])
+      signatures.length !== snapshot.gateSignatures.length ||
+      signatures.some((sig, index) => sig !== snapshot.gateSignatures[index])
     if (gateChanged) {
       await fullScan()
       return

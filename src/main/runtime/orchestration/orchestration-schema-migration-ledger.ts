@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 29
+export const ORCHESTRATION_SCHEMA_VERSION = 30
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -99,5 +99,12 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     upstreamVersion: 25,
     summary: 'active Dispatch handle lookup',
     effects: ['index:idx_dispatch_active_assignee_handle']
+  },
+  {
+    version: 30,
+    lineage: 'upstream-renumbered',
+    upstreamVersion: 26,
+    summary: 'indexed mutation receipt capacity',
+    effects: ['step:migrateMutationReceiptCapacity']
   }
 ]

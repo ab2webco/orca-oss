@@ -113,7 +113,7 @@ export function resolveOrchestrationMigrationStartVersion(
 ): number {
   // Why this runs before the newer-build guard below: both lineages ship
   // appId com.stablyai.orca, so they share userData/orchestration.db. A stamp of
-  // 23–25 written by an upstream build would otherwise skip the lab's v23–v27 and
+  // 23–26 written by an upstream build would otherwise skip the lab's v23–v27 and
   // leave the code selecting envelope_contract, monitor_deadline_at,
   // turn_accepted_at and composer_ready_proven off tables that never got them —
   // and the failure surfaces far from the migration that caused it. Rewinding to
