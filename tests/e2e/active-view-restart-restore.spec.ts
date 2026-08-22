@@ -29,8 +29,10 @@ function seededRepoPathOrSkip(): string {
   return repoPath
 }
 
-test('restores the active top-level view (Tasks) after an app restart', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('restores the active top-level view (Tasks) after an app restart', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = seededRepoPathOrSkip()
   const session = createRestartSession(testInfo)

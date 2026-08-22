@@ -20,8 +20,10 @@ import type {
 
 test.describe.configure({ mode: 'serial' })
 
-test('durable whole-tab close removes a split tab across restart', async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both Electron launches and intentionally opts out of the default app fixture.
-{}, testInfo) => {
+test('durable whole-tab close removes a split tab across restart', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
   if (!repoPath || !existsSync(repoPath)) {
     test.skip(true, 'Global setup did not produce a seeded test repo')

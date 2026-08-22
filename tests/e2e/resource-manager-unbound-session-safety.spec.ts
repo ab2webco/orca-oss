@@ -73,8 +73,10 @@ async function collectBoundSessionIds(page: Page): Promise<string[]> {
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Resource Manager unbound-session safety', () => {
-  test('a warm-reattached session is bound after restore, so orphan cleanup cannot target it', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('a warm-reattached session is bound after restore, so orphan cleanup cannot target it', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()
     if (!repoPath || !existsSync(repoPath)) {
       test.skip(true, 'Global setup did not produce a seeded test repo')

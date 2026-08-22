@@ -53,8 +53,10 @@ async function bootstrapLaunch(
 
 test.describe.configure({ mode: 'serial' })
 
-test('preserves a live daemon PTY when the daemon launch identity is stale', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('preserves a live daemon PTY when the daemon launch identity is stale', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()
   if (!repoPath || !existsSync(repoPath)) {
     test.skip(true, 'Global setup did not produce a seeded test repo')

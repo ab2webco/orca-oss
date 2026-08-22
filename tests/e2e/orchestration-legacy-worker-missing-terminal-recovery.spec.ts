@@ -180,8 +180,10 @@ test.afterAll(() => {
   rmSync(fakeCliDir, { recursive: true, force: true })
 })
 
-test('a missing legacy worker cannot spawn a replacement during restart recovery', async (// oxlint-disable-next-line no-empty-pattern -- This restart test owns both Electron launches.
-{}, testInfo) => {
+test('a missing legacy worker cannot spawn a replacement during restart recovery', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   rmSync(spawnLedgerPath, { force: true })
   rmSync(interruptionLedgerPath, { force: true })

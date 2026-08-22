@@ -197,8 +197,10 @@ async function expectRestoredPaneAcceptsInput(page: Page, context: string): Prom
 
 test.describe.configure({ mode: 'serial' })
 
-test('restored pane accepts typing after a clean restart with a live daemon session', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('restored pane accepts typing after a clean restart with a live daemon session', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = seededRepoPathOrSkip()
   const session = createRestartSession(testInfo)
@@ -231,8 +233,10 @@ test('restored pane accepts typing after a clean restart with a live daemon sess
   }
 })
 
-test('restored pane recovers input after the daemon un-wedges', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('restored pane recovers input after the daemon un-wedges', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.skip(process.platform === 'win32', 'SIGSTOP/SIGCONT are POSIX-only')
   test.setTimeout(300_000)
   const repoPath = seededRepoPathOrSkip()
@@ -298,8 +302,10 @@ test('restored pane recovers input after the daemon un-wedges', async (// oxlint
   }
 })
 
-test('cold-restored pane accepts typing after the daemon died between launches', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('cold-restored pane accepts typing after the daemon died between launches', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = seededRepoPathOrSkip()
   const session = createRestartSession(testInfo)

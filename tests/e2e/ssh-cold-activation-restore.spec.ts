@@ -210,8 +210,10 @@ test.describe('SSH cold activation restore', () => {
     }
   })
 
-  test('reclaims the authenticated PTY owner immediately after a full app restart', async (// oxlint-disable-next-line no-empty-pattern -- This restart test owns both Electron launches.
-  {}, testInfo) => {
+  test('reclaims the authenticated PTY owner immediately after a full app restart', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     test.setTimeout(300_000)
     const restart = createRestartSession(testInfo)
     let target: DockerSshRelayTarget | null = null

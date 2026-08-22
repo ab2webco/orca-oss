@@ -118,35 +118,53 @@ Coverage: specs that launch their own `ElectronApplication` outside the `electro
 `paired-remote-terminal-host-restart-background-sync.spec.ts` on PR #160 produced no evidence line
 at all, which is silence indistinguishable from "no crash".
 
-The first fix for this used `reportRendererRecoveryEvidence(..., { force: true })` from
-`dispose()`, on the theory that `dispose()` runs inside the *test's own* `finally` block — not
-Playwright fixture teardown — so `testInfo.status` is never finalized there for a normal
-(non-soft) failed `expect()`/`expect.poll()` (it only `throw`s; status stays `'passed'` until that
-propagates all the way out of the test function). That diagnosis was correct, but `force: true`
-was the wrong fix: it reports on *every* test using these two helpers, pass or fail — verified on
-PR #160's own CI, where three passing specs each printed a `did not fire` line. A signal that
-fires on everything carries exactly as little information as one that fires on nothing.
+Two earlier fixes for this each turned out wrong, both caught on real CI, not by reasoning:
 
-The actual fix separates *reading* the evidence (which must happen in `dispose()`, before it
-deletes `userDataDir`) from *deciding whether to report it* (which needs the status that is only
-reliable once Playwright has finalized it, i.e. in fixture teardown):
+1. `reportRendererRecoveryEvidence(..., { force: true })` from `dispose()` — correct diagnosis
+   (`dispose()` runs inside the test's own `finally`, not fixture teardown, so `testInfo.status`
+   is never finalized there for a normal failed `expect()`), wrong fix: it reported on *every*
+   test using these helpers, pass or fail — three passing specs each printed a `did not fire`
+   line on PR #160's CI. A signal that fires on everything carries as little information as one
+   that fires on nothing.
+2. Queue-and-flush via a `{ auto: true }` fixture (`flushRendererRecoveryEvidenceQueue` in
+   `orca-app.ts`) fixed that, but PR #160 merged with a temporary diagnostic still active
+   disabling `auto`, because `terminal-tab-close-restart-persistence.spec.ts` — a test that
+   requests *no* other fixture — started throwing `selector_not_found` from `terminal.split`
+   (`src/cli/runtime/client.ts:130`), a completely different subsystem, and it correlated 2-for-2
+   with the `auto: true` commit against 0-for-2 before it. Disabling `auto` on that same commit
+   closed the branch at 44 pass / 0 fail. **No mechanism was found** connecting Playwright's
+   fixture setup (`fixtureRunner.js` `resolveParametersForFunction` — auto fixtures are collected
+   and set up before any test-requested ones) to an RPC race in a separately-launched Electron
+   subprocess's terminal-handle registry. The fix does not depend on finding one: stop being an
+   `auto` fixture.
 
-- `queueRendererRecoveryEvidence(testInfo, evidence)` — called from `dispose()`, reads the
-  evidence eagerly and appends it to a `WeakMap<TestInfo, evidence[]>` keyed by the test's own
-  `TestInfo` object (chosen because these helpers are called with only `testInfo`, not a fixture
-  object — adding a callback parameter would mean touching 30+ existing call sites).
-- `flushQueuedRendererRecoveryEvidence(testInfo)` — called from a new `{ auto: true }` fixture in
-  `orca-app.ts` (`flushRendererRecoveryEvidenceQueue`), so it runs for *every* test regardless of
-  whether that test requests `electronApp` at all. Reports the queued evidence only if
-  `testInfo.status` is not `'passed'`/`'skipped'`. Auto fixtures still tear down after the test
-  function's promise has settled like any other fixture, and queuing always finishes inside the
-  test's own code (strictly before any fixture teardown starts), so by the time this flush runs,
-  the queue is already complete and the status is already final — regardless of teardown ordering
-  relative to other fixtures.
+The final design keeps the queue-and-flush split — reading the evidence in `dispose()` (before it
+deletes `userDataDir`) separately from deciding whether to report it (which needs status that is
+only reliable once Playwright has finalized it) — but the flush is now a **named fixture a test
+must request explicitly**, not automatic:
 
-Verified both directions with a throwaway spec run against a real built Electron app: a passing
-test using `createRestartSession` produced zero `[renderer-recovery-evidence]` lines; a failing one
-produced exactly one.
+- `queueRendererRecoveryEvidence(testInfo, evidence)` — unchanged: called from `dispose()`, reads
+  the evidence eagerly and appends it to a `WeakMap<TestInfo, evidence[]>` keyed by the test's own
+  `TestInfo` object.
+- `flushRendererRecoveryEvidenceQueue` — a `{ scope: 'test' }` (not `auto`) fixture in
+  `orca-app.ts`. Every spec whose test body calls `createRestartSession`/`launchPairedElectronClient`
+  without also using `electronApp`/`orcaPage` now destructures this fixture by name (with a
+  `void flushRendererRecoveryEvidenceQueue` line, since the value itself is unused — matching the
+  existing `registerPostElectronShutdownCleanup` pattern). Requesting it is what makes Playwright
+  instantiate it for that one test; every other test's fixture graph is untouched.
+- `reportAndFlushRendererRecoveryEvidence(userDataDir, testInfo)` — the `electronApp` fixture's own
+  teardown now calls this instead of `reportRendererRecoveryEvidence` directly, so a test that uses
+  `electronApp` *and* launches a second app via one of the bypass helpers still gets both evidence
+  sources reported from the one teardown that reliably sees the finalized status.
+
+Two specs (`plugin-marketplace-content.spec.ts`, `plugin-startup-budget.spec.ts`) import `test`
+directly from `@stablyai/playwright-test` rather than `./helpers/orca-app`, so no fixture defined
+there — old or new — ever reached them. That gap predates all of this and is not fixed here.
+
+Verified both directions with throwaway specs run against a real built Electron app: a passing
+test using `createRestartSession` alone produced zero `[renderer-recovery-evidence]` lines and a
+failing one produced exactly one; a test combining `electronApp` with a second `createRestartSession`
+launch produced two lines (one per source) only on failure.
 
 ## The first classified occurrence (ORCA-280)
 

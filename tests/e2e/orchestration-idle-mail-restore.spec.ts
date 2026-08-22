@@ -73,8 +73,10 @@ async function waitForObservedTitle(
     .toBe(title)
 }
 
-test('keeps mail pending across a restart and delivers it when the agent reports live', async (// oxlint-disable-next-line no-empty-pattern -- this spec owns both Electron launches and opts out of the shared app fixture.
-{}, testInfo) => {
+test('keeps mail pending across a restart and delivers it when the agent reports live', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = existsSync(TEST_REPO_PATH_FILE)
     ? readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()

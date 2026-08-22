@@ -302,8 +302,10 @@ async function moveHostAwayFromWorktree(page: Page, targetWorktreeId: string): P
   return alternateWorktreeId
 }
 
-test('foregrounds a preserved daemon PTY after the paired host relaunches', async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both host launches.
-{}, testInfo) => {
+test('foregrounds a preserved daemon PTY after the paired host relaunches', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(360_000)
   const repoPath = seededRepoPathOrSkip()
   writeFileSync(backlogPath, '')

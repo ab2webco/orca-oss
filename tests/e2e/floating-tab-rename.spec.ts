@@ -184,8 +184,10 @@ test('Electron serializes native Unicode rename aliases', async ({ orcaPage }) =
   ])
 })
 
-test('floating workspace Markdown renames survive an app restart', async (// oxlint-disable-next-line no-empty-pattern -- This persistence test owns both Electron launches.
-{}, testInfo) => {
+test('floating workspace Markdown renames survive an app restart', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const session = createRestartSession(testInfo)
   let firstApp: ElectronApplication | null = null

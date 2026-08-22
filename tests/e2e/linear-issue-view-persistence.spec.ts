@@ -489,8 +489,10 @@ test.describe('Linear issue view persistence', () => {
   })
 })
 
-test('restores Linear view preferences after an app restart', async (// oxlint-disable-next-line no-empty-pattern -- Playwright fixture opt-out
-{}, testInfo) => {
+test('restores Linear view preferences after an app restart', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = seededRepoPathOrSkip()
   const session = createRestartSession(testInfo)
