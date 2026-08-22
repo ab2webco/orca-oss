@@ -266,7 +266,7 @@ describe('buildPluginList declared settings', () => {
     const userDataPath = await mkdtemp(join(tmpdir(), 'orca-projection-settings-'))
     try {
       const service = serviceWith(discovered(settingsManifest), {
-        activation: 'enabled',
+        activation: 'approved',
         worker: { state: 'running', restarts: 0 },
         userDataPath
       })
