@@ -22,7 +22,7 @@ function status(overrides: Partial<AgentStatusIpcPayload>): AgentStatusIpcPayloa
     receivedAt: 10,
     stateStartedAt: 5,
     agentType: 'claude',
-    providerSession: { id: 'session-1' },
+    providerSession: { key: 'session_id', id: 'session-1' },
     ...overrides
   } as AgentStatusIpcPayload
 }
@@ -60,9 +60,9 @@ describe('readAgentSessionLogPanes', () => {
       activity: { lastAssistantText: args.sessionId, pendingToolName: null, atMs: 1, textBeyondScan: false }
     }))
     const readings = await readAgentSessionLogPanes([paneKey(1), paneKey(2)], [
-      status({ paneKey: paneKey(1), receivedAt: 10, providerSession: { id: 'old' } }),
-      status({ paneKey: paneKey(1), receivedAt: 20, providerSession: { id: 'newest' } }),
-      status({ paneKey: paneKey(2), receivedAt: 5, providerSession: { id: 'other' } })
+      status({ paneKey: paneKey(1), receivedAt: 10, providerSession: { key: 'session_id', id: 'old' } }),
+      status({ paneKey: paneKey(1), receivedAt: 20, providerSession: { key: 'session_id', id: 'newest' } }),
+      status({ paneKey: paneKey(2), receivedAt: 5, providerSession: { key: 'session_id', id: 'other' } })
     ])
     expect(readings.map((reading) => reading.paneKey)).toEqual([paneKey(1), paneKey(2)])
     expect(readings[0].sessionId).toBe('newest')

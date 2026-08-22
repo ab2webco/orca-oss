@@ -131,7 +131,8 @@ describe('agentGridDotState', () => {
   })
 
   it('falls back to the hook state when the log is unreadable', () => {
-    expect(agentGridDotState(null, card({ dotState: 'interrupted' }))).toBe('interrupted')
+    expect(agentGridDotState(null, card({ dotState: 'blocked' }))).toBe('blocked')
+    expect(agentGridDotState(null, card({ dotState: 'idle' }))).toBe('idle')
   })
 })
 
@@ -172,5 +173,23 @@ describe('buildAgentGrid', () => {
     const byPane = new Map(grid[0].cells.map((cell) => [cell.card.paneKey, cell]))
     expect(byPane.get('a')?.activityText).toBe('log a')
     expect(byPane.get('b')?.activityText).toBe('hook b')
+  })
+})
+
+describe('hook text fallback', () => {
+  it('treats blank hook text as no text, so the cell names its reason instead', () => {
+    const cell = buildAgentGridCell(
+      card({ task: '   ', lastAgentMessage: '' }),
+      reading({ read: false, reason: 'session-log-unreadable' })
+    )
+    expect(cell).toMatchObject({ activityText: null, activitySource: 'none' })
+  })
+
+  it('prefers an ask summary over the older assistant message', () => {
+    const cell = buildAgentGridCell(
+      card({ askSummary: 'needs a decision', lastAgentMessage: 'earlier' }),
+      undefined
+    )
+    expect(cell.activityText).toBe('needs a decision')
   })
 })

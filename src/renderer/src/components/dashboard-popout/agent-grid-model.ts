@@ -78,7 +78,7 @@ export function buildAgentGridCell(
   const logState = session?.read === true ? session.state : null
   const activity = session?.read === true ? session.activity : undefined
   const logText = activity?.lastAssistantText ?? null
-  const hookText = card.askSummary ?? card.lastAgentMessage ?? card.task ?? null
+  const hookText = nonBlank(card.askSummary) ?? nonBlank(card.lastAgentMessage) ?? nonBlank(card.task)
   const activityText = logText ?? hookText ?? null
   return {
     card,
@@ -119,6 +119,13 @@ export function buildAgentGrid(
   return [...projects.values()].sort(
     (a, b) => a.repoName.localeCompare(b.repoName) || a.repoId.localeCompare(b.repoId)
   )
+}
+
+/** Blank hook text is no text: it would render an empty line where the cell
+ *  should say why it has nothing to show. */
+function nonBlank(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 function compareCells(a: AgentGridCellModel, b: AgentGridCellModel): number {

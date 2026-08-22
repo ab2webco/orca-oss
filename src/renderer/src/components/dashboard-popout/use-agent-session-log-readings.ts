@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AgentSessionLogPaneReading } from '../../../../shared/agent-session-log-state'
 
 /** Measured over 7 and 12 live transcripts: a batch costs ~1.5-1.7 ms median,
@@ -9,6 +9,10 @@ export type AgentSessionLogReadPanes = (paneKeys: string[]) => Promise<AgentSess
 
 /**
  * Polls the batch session-log reader for the panes on screen.
+ *
+ * The pane set travels as a sorted primitive so the effect owns it outright:
+ * holding it in a ref would mean writing that ref during render, which React
+ * may replay or discard.
  *
  * Deliberately not gated on document visibility or a paint callback: the E2E
  * window is never shown, and such a gate would make the grid look permanently
@@ -21,25 +25,24 @@ export function useAgentSessionLogReadings(
   const [readings, setReadings] = useState<ReadonlyMap<string, AgentSessionLogPaneReading>>(
     () => new Map()
   )
-  const signature = [...paneKeys].sort().join(' ')
-  const paneKeysRef = useRef(paneKeys)
-  paneKeysRef.current = paneKeys
+  const signature = paneKeys.toSorted().join(' ')
   const readPanes = options.readPanes
   const intervalMs = options.intervalMs ?? AGENT_SESSION_LOG_POLL_MS
 
   useEffect(() => {
-    let cancelled = false
+    const panes = signature === '' ? [] : signature.split(' ')
     // ?. shields the pop-out from dev-HMR preload skew: the renderer reloads hot,
     // the preload only on app restart, so the channel can be missing.
     const read = readPanes ?? window.api.agentSessionLog?.readPanes
-    if (!read || paneKeysRef.current.length === 0) {
+    if (!read || panes.length === 0) {
       setReadings(new Map())
       return undefined
     }
+    let cancelled = false
     const tick = async (): Promise<void> => {
       let next: AgentSessionLogPaneReading[]
       try {
-        next = await read([...paneKeysRef.current])
+        next = await read([...panes])
       } catch {
         return
       }

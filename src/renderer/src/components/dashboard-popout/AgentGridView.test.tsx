@@ -11,6 +11,7 @@ import type {
 import type { DashboardCard, DashboardSnapshot } from '../../../../shared/dashboard-snapshot'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { i18n } from '@/i18n/i18n'
+import { EMPTY_DASHBOARD_FILTERS } from './agent-board-filtering'
 import { AgentGridView } from './AgentGridView'
 
 vi.mock('./AgentDashboardToolbar', () => ({
@@ -24,6 +25,7 @@ function card(overrides: Partial<DashboardCard> = {}): DashboardCard {
     agentType: 'claude',
     bucket: 'working',
     dotState: 'working',
+    task: 'the task',
     repoId: 'r1',
     worktreeId: 'w1',
     tabId: 'tab1',
@@ -69,7 +71,7 @@ function renderGrid(
       cards={cards}
       query=""
       onQueryChange={vi.fn()}
-      filters={{}}
+      filters={EMPTY_DASHBOARD_FILTERS}
       onFiltersChange={vi.fn()}
       searchInputRef={createRef<HTMLInputElement>()}
       now={120_000}
@@ -128,7 +130,7 @@ describe('AgentGridView', () => {
   })
 
   it('names why a cell is blank instead of leaving it empty', async () => {
-    renderGrid([card({ paneKey: 'p1' })], [
+    renderGrid([card({ paneKey: 'p1', task: '' })], [
       {
         paneKey: 'p1',
         agent: null,
