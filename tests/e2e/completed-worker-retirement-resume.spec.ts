@@ -28,7 +28,9 @@ const test = base.extend({
   launchEnv: [completedWorkerLaunchEnv, { option: true }]
 })
 
-test.describe.configure({ mode: 'serial' })
+// TEMP-DIAG(ORCA-279): serial mode skips the second close mode as soon as the first
+// fails, which is why 'worker-release' has never actually been observed on Linux.
+test.describe.configure({ mode: 'default' })
 
 test.afterAll(() => {
   cleanupCompletedWorkerFixture()
@@ -480,7 +482,42 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(targetWorktreeId)
     await waitForActiveTerminalManager(orcaPage)
-    await waitForActivePanePtyId(orcaPage)
+    // TEMP-DIAG(ORCA-279): read the pane-connect decision trail the renderer already
+    // records under VITE_EXPOSE_STORE, so the CI-only bind failure names its own branch.
+    try {
+      await waitForActivePanePtyId(orcaPage)
+    } finally {
+      const diag = await orcaPage.evaluate((worktreeId) => {
+        const state = window.__store?.getState()
+        const tabs = state?.tabsByWorktree?.[worktreeId] ?? []
+        const resolvedTabId =
+          state?.activeTabType === 'terminal'
+            ? state?.activeTabId
+            : (state?.activeTabIdByWorktree?.[worktreeId] ?? tabs[0]?.id ?? null)
+        const manager = resolvedTabId ? window.__paneManagers?.get(resolvedTabId) : null
+        const connectTrail =
+          (globalThis as unknown as { __ptyConnectDiag?: string[] }).__ptyConnectDiag ?? []
+        return {
+          resolvedTabId,
+          tabs: tabs.map((tab) => ({ id: tab.id, ptyId: tab.ptyId ?? null })),
+          panes: (manager?.getPanes?.() ?? []).map((pane) => ({
+            ptyId: pane.container?.dataset?.ptyId ?? null,
+            width: pane.container?.offsetWidth ?? null,
+            height: pane.container?.offsetHeight ?? null
+          })),
+          ptyIdsByTabId: state?.ptyIdsByTabId ?? {},
+          pendingStartupByTabId: state?.pendingStartupByTabId ?? {},
+          automaticAgentResumeClaimsByTabId: state?.automaticAgentResumeClaimsByTabId ?? {},
+          sleepingAgentSessionsByPaneKey: state?.sleepingAgentSessionsByPaneKey ?? {},
+          agentStatusPaneKeys: Object.keys(state?.agentStatusByPaneKey ?? {}),
+          connectTrail: connectTrail.slice(-40)
+        }
+      }, targetWorktreeId)
+      console.log(`ORCA279_DIAG ${JSON.stringify(diag)}`)
+      console.log(
+        `ORCA279_LEDGER ${JSON.stringify(readCompletedWorkerLedger().map((e) => e.event))}`
+      )
+    }
     const activatedPane = await waitForActivePaneHookDescriptor(orcaPage)
     expect(activatedPane.worktreeId).toBe(targetWorktreeId)
     const activatedResolved = await client.call<{ terminal: { handle: string } }>(
