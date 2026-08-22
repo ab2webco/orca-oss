@@ -161,11 +161,29 @@ hook gave a direct answer for both:
 Same verdict for `large-diff-freeze-repro.spec.ts`. Both stacks pointed at the identical shape: an
 `expect.poll(() => orcaPage.evaluate(...))` inside a locally-defined `addAndActivateRepo` helper,
 polling `fetchWorktrees` right after adding an isolated repo. No renderer crash — row 4, the
-"genuinely transient navigation" case this doc always allowed for. Per "Why the test dies instead of
-retrying" above, the fix was to make that one `page.evaluate` swallow only
-`isExecutionContextDestroyedError` (`tests/e2e/helpers/execution-context-destroyed.ts`) and let the
-poll retry, while any other thrown error still fails the test immediately — the assertions the specs
-exist to make (freeze budgets, loaded-row counts) were not touched.
+"genuinely transient navigation" case this doc always allowed for.
+
+The first fix patched that one `page.evaluate` per spec, swallowing only a narrow
+`isExecutionContextDestroyedError`. That approach did not generalize: `source-control-large-file-count.spec.ts`
+turned out to have the *identical* duplicated `addAndActivateRepo`, and failed with the exact same
+verdict on a later run, and `combined-diff-scroll-restore.spec.ts` had it too, silently, without ever
+having failed yet. Per-spec patches don't help the next spec that copies the same helper.
+
+The actual fix consolidates on `tests/e2e/helpers/isolated-diff-repo-activation.ts`'s
+`addAndActivateIsolatedRepo` / `evaluateThroughContextSwaps` — a pre-existing, more complete version
+of the same idea (already used by `inline-diff-deleted-line-render-budget.spec.ts`) that retries any
+transient context-teardown error (`Execution context was destroyed`, `Target closed`, `Target page,
+context or browser has been closed`, `frame was detached`) across *all three* evaluates in the
+repo-activation sequence, not just the polled one, up to its own bounded deadline. All four specs
+with the duplicated helper (`combined-diff-invalidation-freeze-repro.spec.ts`,
+`large-diff-freeze-repro.spec.ts`, `combined-diff-scroll-restore.spec.ts`,
+`source-control-large-file-count.spec.ts`) now call the shared helper instead of carrying their own
+copy, so the next spec that needs this exact repo-activation pattern inherits the tolerance by
+importing it rather than pasting it. `setup-script-import.spec.ts` has a same-named
+`addAndActivateRepo` but a different shape (a single un-polled `evaluate`, not vulnerable to this
+class) and was left alone. In every case, only a thrown context-teardown error is retried — a failed
+assertion (the freeze budgets, loaded-row counts the specs exist to check) still fails the test
+immediately.
 
 ## Why one failure looks like four small ones
 
