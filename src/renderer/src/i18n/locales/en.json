@@ -16092,7 +16092,8 @@
         "logUnreadable": "Session log unreadable",
         "beyondScan": "Turn start beyond the scan",
         "textBeyondScan": "Last message beyond the scan"
-      }
+      },
+      "agentCount": "{{count}} agents"
     }
   },
   "dashboard": {

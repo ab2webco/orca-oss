@@ -10,6 +10,7 @@ import type {
 } from '../shared/global-config-sync'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type {
+  AgentDashboardPopoutView,
   DashboardRevealAgentArgs,
   DashboardSleepWorkspaceArgs,
   DashboardSnapshot,
@@ -212,7 +213,6 @@ import type {
   MigrationUnsupportedPtyEntry
 } from '../shared/agent-status-types'
 import type { AgentSessionLogPaneReading } from '../shared/agent-session-log-state'
-import type { AgentDashboardPopoutView } from '../shared/dashboard-snapshot'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'

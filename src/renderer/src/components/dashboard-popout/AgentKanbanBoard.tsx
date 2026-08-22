@@ -24,7 +24,7 @@ import './agent-board-transitions.css'
 import { translate } from '@/i18n/i18n'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { AgentDashboardViewToggle } from './AgentDashboardViewToggle'
-import { type AgentDashboardView } from './agent-dashboard-view'
+import type { AgentDashboardView } from './agent-dashboard-view'
 
 export type { AgentDashboardView }
 

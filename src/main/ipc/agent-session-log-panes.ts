@@ -36,7 +36,7 @@ export async function readAgentSessionLogPanes(
   paneKeys: readonly string[],
   statuses: readonly AgentStatusIpcPayload[]
 ): Promise<AgentSessionLogPaneReading[]> {
-  const readings: AgentSessionLogPaneReading[] = new Array(paneKeys.length)
+  const readings: AgentSessionLogPaneReading[] = Array.from({ length: paneKeys.length })
   let next = 0
   const worker = async (): Promise<void> => {
     for (let index = next++; index < paneKeys.length; index = next++) {
