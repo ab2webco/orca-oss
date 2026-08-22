@@ -155,8 +155,10 @@ test.afterAll(() => {
 
 for (const contractVersion of [LEGACY_CONTRACT_VERSION, CURRENT_CONTRACT_VERSION]) {
   const contractLabel = contractVersion === LEGACY_CONTRACT_VERSION ? 'legacy' : 'current'
-  test(`adopts one live ${contractLabel} worker after restart without replaying resume`, async (// oxlint-disable-next-line no-empty-pattern -- This lifecycle test owns both Electron launches and intentionally opts out of the default app fixture.
-  {}, testInfo) => {
+  test(`adopts one live ${contractLabel} worker after restart without replaying resume`, async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     test.setTimeout(300_000)
     resetWorkerRestartLedgers()
     const repoPath = existsSync(TEST_REPO_PATH_FILE)

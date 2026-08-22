@@ -206,8 +206,10 @@ async function expectSavedLayoutToContainTitle(
 }
 
 test.describe('Terminal restart persistence', () => {
-  test('scrollback survives clean quit and relaunch', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('scrollback survives clean quit and relaunch', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = seededRepoPathOrSkip()
 
     const session = createRestartSession(testInfo)
@@ -262,8 +264,10 @@ test.describe('Terminal restart persistence', () => {
     }
   })
 
-  test('daemon snapshot relaunch preserves the cursor on the shell prompt', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('daemon snapshot relaunch preserves the cursor on the shell prompt', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = seededRepoPathOrSkip()
 
     const session = createRestartSession(testInfo)
@@ -328,8 +332,10 @@ test.describe('Terminal restart persistence', () => {
     }
   })
 
-  test('active worktree and terminal tab count survive restart', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('active worktree and terminal tab count survive restart', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = seededRepoPathOrSkip()
 
     const session = createRestartSession(testInfo)
@@ -389,8 +395,10 @@ test.describe('Terminal restart persistence', () => {
     }
   })
 
-  test('restored Set Title pane label survives agent title churn', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('restored Set Title pane label survives agent title churn', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = seededRepoPathOrSkip()
 
     const session = createRestartSession(testInfo)
@@ -458,8 +466,10 @@ test.describe('Terminal restart persistence', () => {
     }
   })
 
-  test('idle session does not spam session.set writes', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('idle session does not spam session.set writes', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = seededRepoPathOrSkip()
 
     const session = createRestartSession(testInfo)

@@ -196,8 +196,10 @@ test.afterAll(() => {
   rmSync(fakeCliDir, { recursive: true, force: true })
 })
 
-test('the dispatched preamble reaches an unmarked agent process stdin', async (// oxlint-disable-next-line no-empty-pattern -- This spec owns its Electron launch.
-{}, testInfo) => {
+test('the dispatched preamble reaches an unmarked agent process stdin', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(240_000)
   rmSync(ledgerPath, { force: true })
   const repoPath = existsSync(TEST_REPO_PATH_FILE)

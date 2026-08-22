@@ -45,8 +45,10 @@ import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Resource Usage warm-reattach', () => {
-  test('warm-reattached local PTY is included in snapshot with non-null pid and is not flagged remote', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('warm-reattached local PTY is included in snapshot with non-null pid and is not flagged remote', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()
     if (!repoPath || !existsSync(repoPath)) {
       test.skip(true, 'Global setup did not produce a seeded test repo')
