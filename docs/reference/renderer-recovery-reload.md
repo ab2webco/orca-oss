@@ -116,18 +116,37 @@ Coverage: specs that launch their own `ElectronApplication` outside the `electro
 (`orca-restart.ts`'s `createRestartSession`, `paired-electron-client.ts`'s
 `launchPairedElectronClient`) originally bypassed this hook entirely — a real assertion failure in
 `paired-remote-terminal-host-restart-background-sync.spec.ts` on PR #160 produced no evidence line
-at all, which is silence indistinguishable from "no crash". Both helpers now call
-`reportRendererRecoveryEvidence` from their own dispose/cleanup, but **always with
-`{ force: true }`**, not the status-gated default the `electronApp` fixture uses. That is not a
-style choice: `dispose()` runs inside the *test's own* `finally` block, not as Playwright fixture
-teardown. A regular (non-soft) failed `expect()`/`expect.poll()` only calls `throw error` — it does
-not update `testInfo.status` until the exception has propagated all the way out of the test
-function, which is *after* the test's own `finally` has already run. Only fixture teardown (which
-runs once that propagation is complete) reliably sees the finalized status; verified empirically by
-gating one of these calls on status, confirming zero output for a real failing `expect()`, then
-switching to `force: true` and confirming the line appears. The tradeoff: these two helpers report
-on every test, pass or fail — a small cost (37 specs, one small file read each) accepted because a
-gate that reads stale status would silently do nothing, which is worse than a passing-path cost.
+at all, which is silence indistinguishable from "no crash".
+
+The first fix for this used `reportRendererRecoveryEvidence(..., { force: true })` from
+`dispose()`, on the theory that `dispose()` runs inside the *test's own* `finally` block — not
+Playwright fixture teardown — so `testInfo.status` is never finalized there for a normal
+(non-soft) failed `expect()`/`expect.poll()` (it only `throw`s; status stays `'passed'` until that
+propagates all the way out of the test function). That diagnosis was correct, but `force: true`
+was the wrong fix: it reports on *every* test using these two helpers, pass or fail — verified on
+PR #160's own CI, where three passing specs each printed a `did not fire` line. A signal that
+fires on everything carries exactly as little information as one that fires on nothing.
+
+The actual fix separates *reading* the evidence (which must happen in `dispose()`, before it
+deletes `userDataDir`) from *deciding whether to report it* (which needs the status that is only
+reliable once Playwright has finalized it, i.e. in fixture teardown):
+
+- `queueRendererRecoveryEvidence(testInfo, evidence)` — called from `dispose()`, reads the
+  evidence eagerly and appends it to a `WeakMap<TestInfo, evidence[]>` keyed by the test's own
+  `TestInfo` object (chosen because these helpers are called with only `testInfo`, not a fixture
+  object — adding a callback parameter would mean touching 30+ existing call sites).
+- `flushQueuedRendererRecoveryEvidence(testInfo)` — called from a new `{ auto: true }` fixture in
+  `orca-app.ts` (`flushRendererRecoveryEvidenceQueue`), so it runs for *every* test regardless of
+  whether that test requests `electronApp` at all. Reports the queued evidence only if
+  `testInfo.status` is not `'passed'`/`'skipped'`. Auto fixtures still tear down after the test
+  function's promise has settled like any other fixture, and queuing always finishes inside the
+  test's own code (strictly before any fixture teardown starts), so by the time this flush runs,
+  the queue is already complete and the status is already final — regardless of teardown ordering
+  relative to other fixtures.
+
+Verified both directions with a throwaway spec run against a real built Electron app: a passing
+test using `createRestartSession` produced zero `[renderer-recovery-evidence]` lines; a failing one
+produced exactly one.
 
 ## The first classified occurrence (ORCA-280)
 
