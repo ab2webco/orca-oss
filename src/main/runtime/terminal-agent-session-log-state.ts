@@ -36,6 +36,27 @@ export function selectAgentSessionIdentity(
   return best
 }
 
+/** Same selection keyed by pane alone: the dashboard joins on paneKey and has no
+ *  terminal handle for a card. */
+export function selectAgentSessionIdentityForPane(
+  paneKey: string,
+  statuses: readonly AgentStatusIpcPayload[]
+): AgentSessionIdentity | null {
+  let best: AgentSessionIdentity | null = null
+  let bestAt = -1
+  for (const entry of statuses) {
+    if (entry.paneKey !== paneKey || entry.receivedAt <= bestAt) {
+      continue
+    }
+    if (!entry.agentType || !entry.providerSession?.id) {
+      continue
+    }
+    best = { agent: entry.agentType, providerSession: entry.providerSession }
+    bestAt = entry.receivedAt
+  }
+  return best
+}
+
 export async function readTerminalAgentSessionLogState(
   handle: string,
   identity: AgentSessionIdentity | null

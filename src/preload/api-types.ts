@@ -12,6 +12,7 @@ import type { NativeFileDropPayload } from '../shared/native-file-drop'
 import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type { BrowserFindSource } from '../shared/browser-find-source'
 import type {
+  AgentDashboardPopoutView,
   DashboardRevealAgentArgs,
   DashboardSleepWorkspaceArgs,
   DashboardSnapshot,
@@ -409,6 +410,7 @@ import type {
   AgentStatusIpcPayload,
   MigrationUnsupportedPtyEntry
 } from '../shared/agent-status-types'
+import type { AgentSessionLogPaneReading } from '../shared/agent-session-log-state'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -2773,7 +2775,7 @@ export type PreloadApi = {
     ) => Promise<OnboardingState>
   }
   dashboard: {
-    openPopout: (view?: 'board' | 'map') => Promise<void>
+    openPopout: (view?: AgentDashboardPopoutView) => Promise<void>
     publishSnapshot: (snapshot: DashboardSnapshot) => Promise<void>
     getPopoutOpen: () => Promise<boolean>
     onPopoutOpenChanged: (callback: (open: boolean) => void) => () => void
@@ -2784,7 +2786,7 @@ export type PreloadApi = {
     onSleepWorkspace: (callback: (args: DashboardSleepWorkspaceArgs) => void) => () => void
     requestSnapshot: () => Promise<void>
     onSnapshot: (callback: (snapshot: DashboardSnapshot) => void) => () => void
-    onViewRequested: (callback: (view: 'board' | 'map') => void) => () => void
+    onViewRequested: (callback: (view: AgentDashboardPopoutView) => void) => () => void
     revealAgent: (args: DashboardRevealAgentArgs) => Promise<void>
     ackAgent: (paneKey: string) => Promise<void>
     spawnAgent: (args: DashboardSpawnAgentArgs) => Promise<void>
@@ -3896,6 +3898,11 @@ export type PreloadApi = {
     refresh: () => Promise<PluginHostListEntry[]>
     /** Fires whenever installed plugins, worker states, panels, or content packs change. */
     onChanged: (callback: (event: PluginChangeEvent) => void) => () => void
+  }
+  agentSessionLog: {
+    /** Batch pane → session-log reading: agent state and what it is doing, read
+     *  from the transcript rather than a terminal buffer. One call per tick. */
+    readPanes: (paneKeys: string[]) => Promise<AgentSessionLogPaneReading[]>
   }
   agentStatus: {
     /** Listen for agent status updates forwarded from native hook receivers. */

@@ -16040,7 +16040,8 @@
     "view": {
       "label": "Dashboard view",
       "board": "Dashboard",
-      "map": "Agent Map"
+      "map": "Agent Map",
+      "grid": "Grid"
     },
     "map": {
       "host": {
@@ -16078,6 +16079,21 @@
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
       "noWorkspaceAgents": "No agents in this workspace."
+    },
+    "grid": {
+      "empty": "No agents to show",
+      "agentCount_one": "{{count}} agent",
+      "agentCount_other": "{{count}} agents",
+      "noMessageYet": "No message yet",
+      "unread": {
+        "agentUnsupported": "No readable session log",
+        "sessionUnknown": "Session not identified yet",
+        "logMissing": "Session log not found",
+        "logUnreadable": "Session log unreadable",
+        "beyondScan": "Turn start beyond the scan",
+        "textBeyondScan": "Last message beyond the scan"
+      },
+      "agentCount": "{{count}} agents"
     }
   },
   "dashboard": {
