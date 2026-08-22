@@ -1,4 +1,4 @@
-import { useEffect, useState, type MutableRefObject } from 'react'
+import { useState, type MutableRefObject } from 'react'
 import type { PluginHostListEntry } from '../../../../preload/api-types'
 import { translate } from '@/i18n/i18n'
 import type { PluginSettingsFormState } from './PluginSettingsForm'
@@ -29,20 +29,26 @@ export function usePluginSettingsEditor(
   const [savingByPlugin, setSavingByPlugin] = useState<Record<string, Set<string>>>({})
   const [errorsByPlugin, setErrorsByPlugin] = useState<Record<string, Record<string, string>>>({})
 
-  useEffect(() => {
+  // Why: adjusting this during render (not in an effect) discards the stale commit outright
+  // instead of painting the previous pane's state for one frame before an effect corrects it.
+  const [prevMounted, setPrevMounted] = useState(mounted)
+  const [prevPlugins, setPrevPlugins] = useState(plugins)
+  if (mounted !== prevMounted || plugins !== prevPlugins) {
+    setPrevMounted(mounted)
+    setPrevPlugins(plugins)
     if (!mounted) {
       setOpenSettings(new Set())
       setSavingByPlugin({})
       setErrorsByPlugin({})
-      return
+    } else {
+      const installedKeys = new Set(plugins.map((plugin) => plugin.pluginKey))
+      setOpenSettings(
+        (current) => new Set([...current].filter((pluginKey) => installedKeys.has(pluginKey)))
+      )
+      setSavingByPlugin((current) => withoutUninstalled(current, installedKeys))
+      setErrorsByPlugin((current) => withoutUninstalled(current, installedKeys))
     }
-    const installedKeys = new Set(plugins.map((plugin) => plugin.pluginKey))
-    setOpenSettings(
-      (current) => new Set([...current].filter((pluginKey) => installedKeys.has(pluginKey)))
-    )
-    setSavingByPlugin((current) => withoutUninstalled(current, installedKeys))
-    setErrorsByPlugin((current) => withoutUninstalled(current, installedKeys))
-  }, [mounted, plugins])
+  }
 
   const markSaving = (pluginKey: string, key: string, saving: boolean): void => {
     setSavingByPlugin((current) => {
