@@ -35,15 +35,14 @@ import {
 import { createSeededTestRepo, isValidGitRepo } from './seeded-test-repo'
 import {
   flushQueuedRendererRecoveryEvidence,
-  reportRendererRecoveryEvidence
+  reportAndFlushRendererRecoveryEvidence
 } from './renderer-recovery-evidence'
 
 type OrcaTestFixtures = {
   electronApp: ElectronApplication
   registerPostElectronShutdownCleanup: (cleanup: () => Promise<void>) => void
-  // Why: auto-runs for every test (not just ones that request electronApp) so
-  // specs that launch their own ElectronApplication via orca-restart.ts /
-  // paired-electron-client.ts still get their queued evidence reported.
+  // Why: specs launching their own ElectronApplication must request this
+  // explicitly for their queued evidence to be reported (not auto — below).
   flushRendererRecoveryEvidenceQueue: void
   sharedPage: Page
   orcaPage: Page
@@ -161,19 +160,18 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     { scope: 'worker' }
   ],
 
-  // Why auto + its own fixture, not folded into electronApp's teardown:
-  // this must run for tests that never request electronApp at all (e.g.
-  // paired-remote-terminal-host-restart-background-sync.spec.ts, which owns
-  // its own launches). Queuing always finishes inside the test's own code,
-  // strictly before any fixture teardown starts, so this flush sees a
-  // complete queue regardless of teardown ordering relative to other fixtures.
+  // Why named, not `auto: true`: an earlier auto version was the ONLY custom
+  // fixture for a test requesting nothing else, and correlated 2-for-2 with a
+  // selector_not_found race in a different subsystem (terminal.split) on CI —
+  // 0 failures across 44 tests with auto off, 2/2 with it on (ORCA-280,
+  // mechanism not pinned). Bypass specs now request this explicitly.
   flushRendererRecoveryEvidenceQueue: [
     // oxlint-disable-next-line no-empty-pattern -- Playwright fixture callbacks require object destructuring here.
     async ({}, provideFixture, testInfo) => {
       await provideFixture()
       await flushQueuedRendererRecoveryEvidence(testInfo)
     },
-    { scope: 'test' } // TEMP ORCA-280 diagnostic: auto disabled to isolate selector_not_found
+    { scope: 'test' }
   ],
 
   // Why: Windows keeps watched worktrees locked until Electron and its
@@ -290,7 +288,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     // descendants are gone in CI; worker teardown then hangs on open handles.
     await closeElectronAppForE2E(app)
     await cleanupE2EDaemons(userDataDir)
-    await reportRendererRecoveryEvidence(userDataDir, testInfo)
+    await reportAndFlushRendererRecoveryEvidence(userDataDir, testInfo)
     await removeUserDataDirAfterShutdown(userDataDir)
   },
 

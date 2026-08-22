@@ -158,8 +158,10 @@ function parseStreamingFrame(content: string | null, marker: string): number | n
   return digits ? Number(digits) : null
 }
 
-test('repairs duplicate persisted PTY renderers before streaming tab reveal', async (// oxlint-disable-next-line no-empty-pattern -- this restart test owns its Electron launches.
-{}, testInfo) => {
+test('repairs duplicate persisted PTY renderers before streaming tab reveal', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   const repoPath = existsSync(TEST_REPO_PATH_FILE)
     ? readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
     : ''

@@ -47,8 +47,10 @@ import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-
 test.describe.configure({ mode: 'serial' })
 
 test.describe('reattach mouse-mode leak', () => {
-  test('warm reattach disarms mouse modes a killed TUI left armed', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('warm reattach disarms mouse modes a killed TUI left armed', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     // Why: arms the leak with a POSIX `printf` builtin; the reset logic under
     // test is platform-agnostic, so skipping Windows here loses no coverage.
     test.skip(process.platform === 'win32', 'Uses a POSIX printf to arm mouse reporting')

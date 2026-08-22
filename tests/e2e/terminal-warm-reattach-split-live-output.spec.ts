@@ -152,8 +152,10 @@ async function probePane(page: Page, tabId: string, ptyId: string): Promise<Pane
 
 test.describe.configure({ mode: 'serial' })
 
-test('restored hidden split drains live alternate-screen output without a click @headful', async (// oxlint-disable-next-line no-empty-pattern -- This restart test owns both app launches.
-{}, testInfo) => {
+test('restored hidden split drains live alternate-screen output without a click @headful', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   test.skip(process.platform === 'win32', 'The streaming fixture uses a POSIX shell command')
   const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()

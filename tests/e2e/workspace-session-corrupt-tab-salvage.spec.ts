@@ -64,8 +64,10 @@ async function expectSurvivingTabsVisible(page: Page): Promise<void> {
   }
 }
 
-test('keeps valid terminal tabs visible after a corrupt sibling record on restart', async (// oxlint-disable-next-line no-empty-pattern -- this restart test owns its Electron launches.
-{}, testInfo) => {
+test('keeps valid terminal tabs visible after a corrupt sibling record on restart', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   test.setTimeout(300_000)
   const repoPath = existsSync(TEST_REPO_PATH_FILE)
     ? readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()

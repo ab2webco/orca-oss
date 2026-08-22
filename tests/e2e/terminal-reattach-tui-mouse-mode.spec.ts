@@ -150,8 +150,10 @@ async function dragAcrossTuiRows(page: Page, screen: TerminalSurface['screen']):
 test.describe.configure({ mode: 'serial' })
 
 test.describe('terminal reattach mouse mode', () => {
-  test('live TUI keeps mouse tracking after an app restart reattach instead of falling back to drag selection', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-  {}, testInfo) => {
+  test('live TUI keeps mouse tracking after an app restart reattach instead of falling back to drag selection', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
     const repoPath = createIsolatedProofRepo()
     const session = createRestartSession(testInfo)
     let firstApp: ElectronApplication | null = null

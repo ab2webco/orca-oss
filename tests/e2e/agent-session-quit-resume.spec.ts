@@ -64,8 +64,10 @@ function readDaemonPid(userDataDir: string): number {
 
 test.describe.configure({ mode: 'serial' })
 
-test('resumes an agent session after quit when its daemon PTY died while the app was closed', async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
-{}, testInfo) => {
+test('resumes an agent session after quit when its daemon PTY died while the app was closed', async ({
+  flushRendererRecoveryEvidenceQueue
+}, testInfo) => {
+  void flushRendererRecoveryEvidenceQueue
   const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()
   if (!repoPath || !existsSync(repoPath)) {
     test.skip(true, 'Global setup did not produce a seeded test repo')
