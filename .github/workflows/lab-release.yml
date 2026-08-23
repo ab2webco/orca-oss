@@ -514,9 +514,47 @@ jobs:
             echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
             echo
             if [[ -n "$prev_tag" ]]; then
-              echo "## Cambios desde ${prev_tag}"
+              # Why split by type: the raw log is up to 50 subjects of chores,
+              # tests and syncs, which buries the handful a user would notice.
+              # Why upstream first: a cherry-pick from upstream also reads as a
+              # fix, and listing it twice overstates what the lab wrote.
+              subjects="$(git log --no-merges --pretty='%s' "${prev_tag}..${tag}")"
+              upstream="$(printf '%s\n' "$subjects" \
+                | grep -E '^chore\(sync\)|cherry-pick.*upstream|upstream.*cherry-pick' || true)"
+              rest="$(printf '%s\n' "$subjects" \
+                | grep -vE '^chore\(sync\)|cherry-pick.*upstream|upstream.*cherry-pick' || true)"
+              feats="$(printf '%s\n' "$rest" | grep -E '^feat' \
+                | sed -E 's/^feat(\([^)]*\))?!?: //' || true)"
+              fixes="$(printf '%s\n' "$rest" | grep -E '^fix' \
+                | sed -E 's/^fix(\([^)]*\))?!?: //' || true)"
+              total="$(printf '%s\n' "$subjects" | grep -c . || true)"
+              if [[ -n "$feats" ]]; then
+                echo "## Novedades"
+                echo
+                printf '%s\n' "$feats" | sed 's/^/- /'
+                echo
+              fi
+              if [[ -n "$fixes" ]]; then
+                echo "## Arreglos"
+                echo
+                printf '%s\n' "$fixes" | sed 's/^/- /'
+                echo
+              fi
+              if [[ -n "$upstream" ]]; then
+                echo "## Desde Orca oficial"
+                echo
+                echo "Lo que llega de upstream (stablyai/orca), ya integrado y verificado en el lab."
+                echo
+                printf '%s\n' "$upstream" \
+                  | sed -E 's/^(chore|fix|feat|refactor|perf)(\([^)]*\))?!?: //' | sed 's/^/- /'
+                echo
+              fi
+              echo "<details>"
+              echo "<summary>Detalle tecnico — ${total} commits desde ${prev_tag}</summary>"
               echo
               git log --no-merges --pretty='- %s' "${prev_tag}..${tag}" | head -50
+              echo
+              echo "</details>"
               echo
             fi
             echo "## Instalación en macOS"
