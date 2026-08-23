@@ -6411,6 +6411,15 @@ export function registerPtyHandlers(
         }
       }
     ) => {
+      console.error(
+        `[pty-spawn-barrier] ${JSON.stringify({
+          stage: 'handler-entry',
+          connectionId: args.connectionId ?? null,
+          worktreeId: args.worktreeId ?? null,
+          sessionId: args.sessionId ?? null,
+          launchAgent: args.launchAgent ?? null
+        })}`
+      )
       const codexHomeLaunchStartedAt = !args.connectionId ? new Date() : undefined
       const codexHomeLaunchStartedSequence = !args.connectionId ? ++ptyLifecycleSequence : undefined
       const initialLeafId =
@@ -6447,7 +6456,21 @@ export function registerPtyHandlers(
       const spawnTiming = createPtySpawnTiming()
       const startupPromise = getLocalPtyStartupPromise(args.connectionId)
       if (startupPromise) {
+        console.error(
+          `[pty-spawn-barrier] ${JSON.stringify({
+            stage: 'await-start',
+            worktreeId: args.worktreeId ?? null,
+            sessionId: args.sessionId ?? null
+          })}`
+        )
         await startupPromise
+        console.error(
+          `[pty-spawn-barrier] ${JSON.stringify({
+            stage: 'await-end',
+            worktreeId: args.worktreeId ?? null,
+            sessionId: args.sessionId ?? null
+          })}`
+        )
       }
       // Why: honor the fallback only for fresh local spawns — reattach needs exact cwd and SSH can't probe the local filesystem.
       const requestedMissingCwdFallback =

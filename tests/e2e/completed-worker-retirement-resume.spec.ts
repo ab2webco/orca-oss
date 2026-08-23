@@ -40,6 +40,12 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     electronApp
   }) => {
     test.setTimeout(180_000)
+    electronApp.process().stderr?.on('data', (chunk: Buffer) => {
+      const output = chunk.toString().trimEnd()
+      if (output.includes('[pty-spawn-barrier]')) {
+        console.error(`[pty-spawn-barrier-app] ${output}`)
+      }
+    })
     clearCompletedWorkerLedger()
     await waitForSessionReady(orcaPage)
     const coordinatorWorktreeId = await waitForActiveWorktree(orcaPage)
