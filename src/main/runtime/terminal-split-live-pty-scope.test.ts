@@ -4,6 +4,8 @@ import { OrcaRuntimeService } from './orca-runtime'
 const REPO_ID = 'repo-1'
 const WORKTREE_PATH = '/tmp/orca-live-pty-worktree'
 const WORKTREE_ID = `${REPO_ID}::${WORKTREE_PATH}`
+const OTHER_WORKTREE_PATH = '/tmp/orca-other-worktree'
+const OTHER_WORKTREE_ID = `${REPO_ID}::${OTHER_WORKTREE_PATH}`
 const TAB_ID = '11111111-1111-4111-8111-111111111111'
 const LEAF_ID = '22222222-2222-4222-8222-222222222222'
 
@@ -24,8 +26,8 @@ function makeStore() {
   }
 }
 
-describe('terminal split live PTY launch scope', () => {
-  it('splits a listed live PTY when the worktree catalog temporarily omits its worktree', async () => {
+describe('terminal list/split worktree resolution authority', () => {
+  it('keeps a listed live PTY actionable when the split catalog omits its target worktree', async () => {
     const spawn = vi.fn(async () => ({ id: 'pty-split' }))
     const revealTerminalSession = vi.fn(async () => ({ tabId: TAB_ID }))
     const runtime = new OrcaRuntimeService(makeStore() as never)
@@ -55,7 +57,14 @@ describe('terminal split live PTY launch scope', () => {
     const internals = runtime as unknown as {
       listResolvedWorktrees: () => Promise<unknown[]>
     }
-    vi.spyOn(internals, 'listResolvedWorktrees').mockResolvedValue([])
+    vi.spyOn(internals, 'listResolvedWorktrees').mockResolvedValue([
+      {
+        id: OTHER_WORKTREE_ID,
+        path: OTHER_WORKTREE_PATH,
+        repoId: REPO_ID,
+        branch: 'other'
+      }
+    ])
 
     const [listed] = (await runtime.listTerminals(`id:${WORKTREE_ID}`)).terminals
     expect(listed).toMatchObject({
