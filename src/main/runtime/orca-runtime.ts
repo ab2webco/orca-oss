@@ -28754,7 +28754,9 @@ export class OrcaRuntimeService {
       throw new Error('runtime_unavailable')
     }
     const direction = opts.direction ?? 'horizontal'
-    const workspace = await this.resolveTerminalWorkspaceLaunchScope(`id:${source.worktreeId}`)
+    const workspace = source.parentPty
+      ? await this.resolveLivePtyWorkspaceLaunchScope(source.parentPty)
+      : await this.resolveTerminalWorkspaceLaunchScope(`id:${source.worktreeId}`)
     const leafId = randomUUID()
     const preAllocatedHandle = this.createPreAllocatedTerminalHandle()
     const paneKey = makePaneKey(source.parentTabId, leafId)
@@ -29736,6 +29738,23 @@ export class OrcaRuntimeService {
       id: worktree.id,
       path: worktree.path,
       connectionId: repo?.connectionId ?? null,
+      repo,
+      folderWorkspace: null
+    }
+  }
+
+  private async resolveLivePtyWorkspaceLaunchScope(
+    pty: RuntimePtyWorktreeRecord
+  ): Promise<TerminalWorkspaceLaunchScope> {
+    const worktree = this.buildResolvedWorktreeFromId(pty.worktreeId)
+    const repo = worktree ? (this.store?.getRepo(worktree.repoId) ?? null) : null
+    if (!worktree || !repo) {
+      return await this.resolveTerminalWorkspaceLaunchScope(`id:${pty.worktreeId}`)
+    }
+    return {
+      id: pty.worktreeId,
+      path: worktree.path,
+      connectionId: pty.connectionId,
       repo,
       folderWorkspace: null
     }
