@@ -4,6 +4,7 @@ import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
 import { agentGridDisplayDotState, agentGridStateLabel } from './agent-grid-buckets'
+import { agentModelLabel, formatContextTokens } from './agent-model-label'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
@@ -43,6 +44,7 @@ export const AgentGridCell = memo(function AgentGridCell({
   const title = card.conversationName || card.worktreeName
   const ago = formatAgo(cell.activeSinceMs, now)
   const needsAttention = cell.dotState === 'blocked' || cell.dotState === 'waiting'
+  const contextTokens = formatContextTokens(cell.modelUsage?.contextTokens)
   return (
     <button
       type="button"
@@ -77,8 +79,19 @@ export const AgentGridCell = memo(function AgentGridCell({
         <GitBranch className="size-3 shrink-0" aria-hidden />
         <span className="truncate">{card.worktreeName}</span>
         <span aria-hidden="true">·</span>
-        {/* No agent icon here: the title row already carries it. */}
-        <span className="shrink-0">{formatAgentTypeLabel(card.agentType)}</span>
+        {/* No agent icon here: the title row already carries it. The model when
+            the log names it, since that is what the agent is actually running. */}
+        <span className="shrink-0">
+          {agentModelLabel(cell.modelUsage?.model) ?? formatAgentTypeLabel(card.agentType)}
+        </span>
+        {contextTokens ? (
+          <>
+            <span aria-hidden>·</span>
+            <span className="shrink-0 tabular-nums" title={`${cell.modelUsage?.contextTokens}`}>
+              {contextTokens}
+            </span>
+          </>
+        ) : null}
         {cell.pendingToolName ? (
           <span className="ml-auto flex min-w-0 shrink items-center gap-0.5 text-foreground/80">
             <Hammer className="size-3 shrink-0" />
