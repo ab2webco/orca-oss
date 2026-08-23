@@ -1,4 +1,4 @@
-import type { AgentDotState } from '@/components/AgentStateDot'
+import { agentStateLabel, type AgentDotState } from '@/components/AgentStateDot'
 import type { DashboardBucket } from '../../../../shared/dashboard-snapshot'
 
 /**
@@ -33,4 +33,16 @@ export function agentGridBucketForDotState(
     case 'permission':
       return 'attention'
   }
+}
+
+/**
+ * The word a cell shows for its state.
+ *
+ * Why not the raw dot state: the strip counts a finished-and-seen agent as
+ * idle, so the cell calling it Done was the same two-vocabulary mismatch one
+ * level down. Precision is kept everywhere else — a failed agent still says
+ * Failed rather than its bucket (ORCA-234).
+ */
+export function agentGridStateLabel(state: AgentDotState, unseen: boolean): string {
+  return agentStateLabel(state === 'done' && !unseen ? 'idle' : state)
 }

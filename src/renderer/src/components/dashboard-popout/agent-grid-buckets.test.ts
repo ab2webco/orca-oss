@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agentGridBucketForDotState } from './agent-grid-buckets'
+import { agentGridBucketForDotState, agentGridStateLabel } from './agent-grid-buckets'
 
 describe('agentGridBucketForDotState', () => {
   it('groups every attention state under one bucket', () => {
@@ -21,5 +21,17 @@ describe('agentGridBucketForDotState', () => {
 
   it('calls a finished agent you have already seen idle, like the board does', () => {
     expect(agentGridBucketForDotState('done', false)).toBe('idle')
+  })
+})
+
+describe('agentGridStateLabel', () => {
+  it('says Idle for a finished agent you have seen, matching the strip', () => {
+    expect(agentGridStateLabel('done', false)).toBe('Idle')
+    expect(agentGridStateLabel('done', true)).toBe('Done')
+  })
+
+  it('keeps the precise word for everything else', () => {
+    expect(agentGridStateLabel('failed', false)).toBe('Failed')
+    expect(agentGridStateLabel('blocked', false)).toBe('Blocked')
   })
 })

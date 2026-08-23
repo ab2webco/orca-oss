@@ -2,7 +2,9 @@ import { memo } from 'react'
 import { Hammer, Inbox } from 'lucide-react'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
+import { GitBranch } from 'lucide-react'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
+import { agentGridStateLabel } from './agent-grid-buckets'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
@@ -70,11 +72,13 @@ export const AgentGridCell = memo(function AgentGridCell({
             needsAttention ? 'text-foreground' : 'text-muted-foreground'
           )}
         >
-          {agentStateLabel(cell.dotState)}
+          {agentGridStateLabel(cell.dotState, card.unseen)}
         </span>
         <span aria-hidden>·</span>
+        <GitBranch className="size-3 shrink-0" aria-hidden />
         <span className="truncate">{card.worktreeName}</span>
         <span aria-hidden="true">·</span>
+        {/* No agent icon here: the title row already carries it. */}
         <span className="shrink-0">{formatAgentTypeLabel(card.agentType)}</span>
         {cell.pendingToolName ? (
           <span className="ml-auto flex min-w-0 shrink items-center gap-0.5 text-foreground/80">
