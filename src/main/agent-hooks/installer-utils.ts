@@ -16,30 +16,15 @@ import { grantDirAcl, isPermissionError } from '../win32-utils'
 import { POSIX_HOOK_STDIN_DRAIN_COMMAND } from './hook-stdin-contract'
 import { resolveHooksJsonWritePath } from './hook-config-write-path'
 import { writeRollingFileBackup } from '../rolling-file-backup'
+import type { HookCommandConfig, HookDefinition, HooksConfig } from './hook-config-types'
+import { hookHasManagedCommand as hookMatchesManagedCommand } from './managed-hook-command-recognition'
 
-export type HookCommandConfig = {
-  type: 'command'
-  command: string
-  args?: string[]
-  timeout?: number
-  async?: boolean
-  statusMessage?: string
-  [key: string]: unknown
-}
-
-export type HookDefinition = {
-  matcher?: string
-  command?: string
-  bash?: string
-  powershell?: string
-  hooks?: HookCommandConfig[]
-  [key: string]: unknown
-}
-
-export type HooksConfig = {
-  hooks?: Record<string, HookDefinition[]>
-  [key: string]: unknown
-}
+export type { HookCommandConfig, HookDefinition, HooksConfig } from './hook-config-types'
+export {
+  createManagedCommandMatcher,
+  hookDefinitionHasManagedCommand,
+  hookHasManagedCommand
+} from './managed-hook-command-recognition'
 
 // Why: host-level backstop timeout for status hooks, independent of the curl --max-time and Copilot's timeoutSec (#4633).
 export const MANAGED_HOOK_TIMEOUT_SECONDS = 10
@@ -64,41 +49,6 @@ export {
   readHooksJsonWithRaw,
   type HooksJsonSnapshot
 } from './hooks-json-read'
-
-// Why: match by script file name, not exact command, so a fresh install sweeps stale entries from old/parallel installs.
-export function createManagedCommandMatcher(
-  scriptFileName: string
-): (command: string | undefined) => boolean {
-  const scriptStem = scriptFileName.replace(/\.(?:cmd|ps1|sh)$/, '')
-  // Why: installs use .cmd/.ps1 (Windows) or .sh (SSH/POSIX); match all so a platform switch still sweeps stale hooks.
-  const needles = [
-    `agent-hooks/${scriptFileName}`,
-    `agent-hooks/${scriptStem}.cmd`,
-    `agent-hooks/${scriptStem}.ps1`,
-    `agent-hooks/${scriptStem}.sh`
-  ]
-  return (command) => {
-    if (!command) {
-      return false
-    }
-    const decodedCommand = decodePowerShellEncodedCommand(command)
-    const searchText = decodedCommand ? `${command}\n${decodedCommand}` : command
-    const normalizedCommand = searchText.replaceAll('\\', '/')
-    return needles.some((needle) => normalizedCommand.includes(needle))
-  }
-}
-
-function decodePowerShellEncodedCommand(command: string): string | null {
-  const match = command.match(/\s-EncodedCommand\s+(\S+)/i)
-  if (!match) {
-    return null
-  }
-  try {
-    return Buffer.from(match[1], 'base64').toString('utf16le')
-  } catch {
-    return null
-  }
-}
 
 // Why: prod/dev/parallel Orca instances must write the same managed entry, not race between per-userData script paths.
 export function getSharedManagedScriptPath(scriptFileName: string): string {
@@ -207,7 +157,7 @@ export function removeManagedCommands(
     const hasNestedHooks = Array.isArray(definition.hooks)
     const hasManagedNestedHook =
       hasNestedHooks &&
-      definition.hooks!.some((hook) => hookHasManagedCommand(hook, isManagedCommand))
+      definition.hooks!.some((hook) => hookMatchesManagedCommand(hook, isManagedCommand))
 
     if (directManagedKeys.length === 0 && !hasManagedNestedHook) {
       return [definition]
@@ -220,7 +170,7 @@ export function removeManagedCommands(
 
     if (hasManagedNestedHook) {
       const filteredHooks = definition.hooks!.filter(
-        (hook) => !hookHasManagedCommand(hook, isManagedCommand)
+        (hook) => !hookMatchesManagedCommand(hook, isManagedCommand)
       )
       if (filteredHooks.length > 0) {
         nextDefinition.hooks = filteredHooks
@@ -238,24 +188,6 @@ export function removeManagedCommands(
 
     return [nextDefinition]
   })
-}
-
-function hookHasManagedCommand(hook: HookCommandConfig, matches: (value?: string) => boolean) {
-  const args = Array.isArray(hook.args) ? hook.args : []
-  return matches(hook.command) || args.some((arg) => typeof arg === 'string' && matches(arg))
-}
-
-export function hookDefinitionHasManagedCommand(
-  definition: HookDefinition,
-  isManagedCommand: (command: string | undefined) => boolean
-): boolean {
-  return (
-    isManagedCommand(definition.command) ||
-    isManagedCommand(definition.bash) ||
-    isManagedCommand(definition.powershell) ||
-    (Array.isArray(definition.hooks) &&
-      definition.hooks.some((hook) => hookHasManagedCommand(hook, isManagedCommand)))
-  )
 }
 
 // Why: temp+rename so concurrent writers can't leave a torn script for an in-flight /bin/sh to source.

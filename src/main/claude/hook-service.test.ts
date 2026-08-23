@@ -53,6 +53,32 @@ describe('getWindowsManagedLifecycleHook', () => {
     expect(hook.args?.at(-1)).toBe('%USERPROFILE%\\.orca\\agent-hooks\\claude-hook.cmd')
     expect(hook.args).not.toContain(scriptPath)
   })
+
+  // Why here and not only under Windows: this shape is what breaks a command-only
+  // recognizer, and a platform-gated assertion never runs on the machines that write it.
+  it('is recognized as managed even though its command names conhost, not the script', () => {
+    const hook = getWindowsManagedLifecycleHook(
+      'C:\\Users\\dev\\.orca\\agent-hooks\\claude-hook.cmd'
+    )
+
+    expect(isClaudeManagedCommand(hook.command)).toBe(false)
+    expect(hasManagedCommand(hook, isClaudeManagedCommand)).toBe(true)
+  })
+
+  it("does not claim another installer's conhost invocation", () => {
+    const theirs = {
+      command: 'C:\\Windows\\System32\\conhost.exe',
+      args: [
+        '--headless',
+        'C:\\Windows\\System32\\cmd.exe',
+        '/d',
+        '/c',
+        '%USERPROFILE%\\hooks\\theirs.cmd'
+      ]
+    }
+
+    expect(hasManagedCommand(theirs, isClaudeManagedCommand)).toBe(false)
+  })
 })
 
 type FakeFs = {
@@ -758,7 +784,7 @@ describe('ClaudeHookService.ensureInjectedVaultInstrumentation', () => {
         skipDangerousModePermissionPrompt?: boolean
         theme?: string
         env?: Record<string, string>
-        hooks?: Record<string, { hooks: { command: string }[] }[]>
+        hooks?: Record<string, { hooks: TestHook[] }[]>
         statusLine?: { type: string; command: string }
       }
       // Existing keys — including a custom-endpoint env token — must survive untouched.
@@ -768,7 +794,9 @@ describe('ClaudeHookService.ensureInjectedVaultInstrumentation', () => {
         ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
         ANTHROPIC_AUTH_TOKEN: 't'
       })
-      expect(isClaudeManagedCommand(parsed.hooks!.Stop[0].hooks[0].command)).toBe(true)
+      // Why the hook, not its command: the vault gets the same getManagedLifecycleHook shape as
+      // install(), which on Windows is conhost.exe with the script in args.
+      expect(hasManagedCommand(parsed.hooks!.Stop[0].hooks[0], isClaudeManagedCommand)).toBe(true)
       expect(parsed.statusLine?.command).toContain('claude-statusline')
       // The shared scripts the vault points at are written under ~/.orca.
       expect(existsSync(join(tmpHome, '.orca', 'agent-hooks', CLAUDE_SCRIPT_FILE_NAME))).toBe(true)
@@ -789,10 +817,10 @@ describe('ClaudeHookService.ensureInjectedVaultInstrumentation', () => {
       const merged = new ClaudeHookService().ensureInjectedVaultInstrumentation(null)
       expect(merged).not.toBeNull()
       const parsed = JSON.parse(merged!) as {
-        hooks: Record<string, { hooks: { command: string }[] }[]>
+        hooks: Record<string, { hooks: TestHook[] }[]>
         statusLine: { command: string }
       }
-      expect(isClaudeManagedCommand(parsed.hooks.Stop[0].hooks[0].command)).toBe(true)
+      expect(hasManagedCommand(parsed.hooks.Stop[0].hooks[0], isClaudeManagedCommand)).toBe(true)
       expect(parsed.statusLine.command).toContain('claude-statusline')
     } finally {
       vi.unstubAllEnvs()
