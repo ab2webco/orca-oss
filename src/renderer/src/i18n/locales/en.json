@@ -15977,6 +15977,7 @@
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
       "noMessageYet": "No message yet",
+      "terminalUnreadable": "Terminal output unavailable",
       "unread": {
         "agentUnsupported": "No readable session log",
         "sessionUnknown": "Session not identified yet",

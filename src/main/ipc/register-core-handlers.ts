@@ -30,7 +30,8 @@ import { registerNotificationHandlers } from './notifications'
 import { registerNotebookHandlers } from './notebook'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerDashboardPopoutHandlers } from './dashboard-popout'
-import { registerTerminalPreviewHandlers } from './terminal-preview'
+import { isTerminalPreviewRenderer, registerTerminalPreviewHandlers } from './terminal-preview'
+import { registerAgentTerminalTailHandlers } from './agent-terminal-tail'
 import { registerDeveloperPermissionHandlers } from './developer-permissions'
 import { registerComputerUsePermissionHandlers } from './computer-use-permissions'
 import {
@@ -172,6 +173,7 @@ export function registerCoreHandlers(
   registerOnboardingHandlers(store)
   registerDashboardPopoutHandlers(store, keybindings)
   registerTerminalPreviewHandlers(runtime)
+  registerAgentTerminalTailHandlers(runtime, isTerminalPreviewRenderer)
   registerDeveloperPermissionHandlers()
   // Why: diagnostics handlers are wired alongside telemetry but the two
   // lanes never share a code path — `ipc/diagnostics.ts` imports only from

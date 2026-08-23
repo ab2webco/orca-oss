@@ -12195,6 +12195,27 @@ export class OrcaRuntimeService {
     return buildVisibleSnapshotReadFallback(read, lines, opts.limit)
   }
 
+  /**
+   * Plain-text tail of a pty's live screen, by ptyId, for the dashboard grid.
+   * Reads the emulator main already keeps rather than standing up a new one,
+   * so N cells cost N buffer reads and no ANSI transport (ORCA-234).
+   *
+   * Null distinguishes "nothing here can be read" from an empty screen: the
+   * grid cell must say which, not render both as a blank box (ORCA-191).
+   */
+  async readTerminalVisibleLines(ptyId: string, limit: number): Promise<string[] | null> {
+    const lineLimit = Math.max(1, Math.floor(limit))
+    const visibleState = await this.readVisibleTerminalState(ptyId)
+    const lines =
+      visibleState && visibleState.lines.length > 0
+        ? visibleState.lines
+        : await this.readRendererVisibleSnapshotLines(ptyId)
+    if (lines.length > 0) {
+      return lines.slice(-lineLimit)
+    }
+    return visibleState ? [] : null
+  }
+
   private async readProviderTerminalTailLines(
     ptyId: string,
     limit: number | undefined

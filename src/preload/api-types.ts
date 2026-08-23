@@ -415,6 +415,7 @@ import type {
   AgentSessionLogPaneReading,
   AgentSessionLogReading
 } from '../shared/agent-session-log-state'
+import type { AgentTerminalTailPtyReading } from '../shared/agent-terminal-tail'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -3851,6 +3852,11 @@ export type PreloadApi = {
     refresh: () => Promise<PluginHostListEntry[]>
     /** Fires whenever installed plugins, worker states, panels, or content packs change. */
     onChanged: (callback: (event: PluginChangeEvent) => void) => () => void
+  }
+  agentTerminalTail: {
+    /** Batch ptyId → plain-text tail of each pane's live screen. One call per
+     *  tick for the whole grid; main reads the emulator it already keeps. */
+    readPtys: (ptyIds: string[], lines?: number) => Promise<AgentTerminalTailPtyReading[]>
   }
   agentSessionLog: {
     /** Batch pane → session-log reading: agent state and what it is doing, read

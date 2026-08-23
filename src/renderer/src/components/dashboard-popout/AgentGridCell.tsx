@@ -1,13 +1,13 @@
 import { memo } from 'react'
-import { Hammer, Inbox, TriangleAlert } from 'lucide-react'
+import { Hammer, Inbox } from 'lucide-react'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import type { AgentSessionLogUnreadReason } from '../../../../shared/agent-session-log-state'
+import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
 import type { AgentGridCellModel } from './agent-grid-model'
+import { AgentGridCellTerminalTail } from './AgentGridCellTerminalTail'
 
 /** Coarse "N ago" — the grid is scanned, not read. */
 function formatAgo(atMs: number, now: number): string {
@@ -27,27 +27,14 @@ function formatAgo(atMs: number, now: number): string {
     : translate('dashboardPopout.card.time.days', '{{count}}d', { count: Math.floor(hours / 24) })
 }
 
-function unreadReasonLabel(reason: AgentSessionLogUnreadReason): string {
-  switch (reason) {
-    case 'agent-unsupported':
-      return translate('dashboardPopout.grid.unread.agentUnsupported', 'No readable session log')
-    case 'agent-session-unknown':
-      return translate('dashboardPopout.grid.unread.sessionUnknown', 'Session not identified yet')
-    case 'session-log-missing':
-      return translate('dashboardPopout.grid.unread.logMissing', 'Session log not found')
-    case 'session-log-unreadable':
-      return translate('dashboardPopout.grid.unread.logUnreadable', 'Session log unreadable')
-    case 'turn-boundary-beyond-scan':
-      return translate('dashboardPopout.grid.unread.beyondScan', 'Turn start beyond the scan')
-  }
-}
-
 export const AgentGridCell = memo(function AgentGridCell({
   cell,
+  tail,
   now,
   onReveal
 }: {
   cell: AgentGridCellModel
+  tail: AgentTerminalTailReading | undefined
   now: number
   onReveal: (cell: AgentGridCellModel) => void
 }): React.JSX.Element {
@@ -63,7 +50,7 @@ export const AgentGridCell = memo(function AgentGridCell({
       data-dot-state={cell.dotState}
       aria-label={`${title} — ${agentStateLabel(cell.dotState)}`}
       className={cn(
-        'flex h-full min-h-[104px] w-full flex-col gap-1.5 rounded-md border bg-card p-2 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'flex h-full w-full min-w-0 flex-col gap-1.5 overflow-hidden rounded-md border bg-card p-2 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         needsAttention ? 'border-ring' : 'border-border'
       )}
     >
@@ -79,56 +66,22 @@ export const AgentGridCell = memo(function AgentGridCell({
         <span className="truncate">{card.worktreeName}</span>
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{formatAgentTypeLabel(card.agentType)}</span>
+        {cell.pendingToolName ? (
+          <span className="ml-auto flex min-w-0 shrink items-center gap-0.5 text-foreground/80">
+            <Hammer className="size-3 shrink-0" />
+            <span className="truncate font-mono">{cell.pendingToolName}</span>
+          </span>
+        ) : null}
         {cell.queuedInput > 0 ? (
-          <span className="ml-auto flex shrink-0 items-center gap-0.5">
+          <span
+            className={cn('flex shrink-0 items-center gap-0.5', cell.pendingToolName ? '' : 'ml-auto')}
+          >
             <Inbox className="size-3" />
             {cell.queuedInput}
           </span>
         ) : null}
       </div>
-      {cell.pendingToolName ? (
-        <div className="flex items-center gap-1 text-[11px] text-foreground/80">
-          <Hammer className="size-3 shrink-0" />
-          <span className="truncate font-mono">{cell.pendingToolName}</span>
-        </div>
-      ) : null}
-      <AgentGridCellBody cell={cell} />
+      <AgentGridCellTerminalTail cell={cell} tail={tail} />
     </button>
   )
 })
-
-function AgentGridCellBody({ cell }: { cell: AgentGridCellModel }): React.JSX.Element {
-  if (cell.activityText) {
-    return (
-      <p
-        className="line-clamp-3 text-[12px] leading-snug text-muted-foreground"
-        data-activity-source={cell.activitySource}
-      >
-        {cell.activityText}
-      </p>
-    )
-  }
-  // Why a visible reason and not a blank cell: "cannot read this agent" and
-  // "this agent has said nothing" must never look identical (ORCA-191).
-  const reason = cell.textBeyondScan
-    ? translate('dashboardPopout.grid.unread.textBeyondScan', 'Last message beyond the scan')
-    : cell.unreadReason
-      ? unreadReasonLabel(cell.unreadReason)
-      : translate('dashboardPopout.grid.noMessageYet', 'No message yet')
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <p
-          className="flex items-center gap-1 text-[12px] text-muted-foreground/70 italic"
-          data-activity-source="none"
-        >
-          <TriangleAlert className="size-3 shrink-0" />
-          <span className="truncate">{reason}</span>
-        </p>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={4}>
-        {reason}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
