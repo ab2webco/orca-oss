@@ -193,9 +193,9 @@ describe('PluginMarketplaceBrowser', () => {
     expect(document.body.textContent).toContain(
       'Read the name, branch, and terminal list of your focused worktree'
     )
-    expect(document.body.textContent).toContain('full access to your files, network')
+    expect(document.body.textContent).toContain('can read its plugin files')
     expect(document.body.textContent).toContain(
-      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
+      'Network access is blocked because this plugin does not request net:fetch.'
     )
     expect(document.querySelector('[role="dialog"]')?.classList).toContain('plugin-security-chrome')
 

@@ -183,6 +183,7 @@ module.exports = {
     'out/main/daemon-entry.js',
     'out/main/session-scanner-service-entry.js',
     'out/main/plugin-host-entry.js',
+    'out/main/plugin-host-preload.js',
     'out/main/computer-sidecar.js',
     'out/main/parcel-watcher-process-entry.js',
     'out/main/chunks/**',

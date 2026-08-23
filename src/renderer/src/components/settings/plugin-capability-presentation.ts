@@ -37,6 +37,8 @@ export function pluginCapabilityDescription(kind: string, fallback: string): str
         'auto.components.settings.PluginConsentDialog.capability.settingsOwn',
         "Read and change the plugin's own settings"
       )
+    case 'net:fetch':
+      return fallback
     default:
       return fallback
   }

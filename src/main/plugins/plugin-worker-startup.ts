@@ -13,6 +13,7 @@ export type PluginWorkerSpawnSpec = {
   mainEntry: string
   manifestRevision?: string
   grantedCapabilities: readonly PluginCapabilityKind[]
+  networkHosts?: readonly string[]
 }
 
 export type PluginWorkerFactory = (options: {
@@ -21,6 +22,7 @@ export type PluginWorkerFactory = (options: {
   mainEntry: string
   entryPath: string
   grantedCapabilities: readonly PluginCapabilityKind[]
+  networkHosts?: readonly string[]
   executeHostCall: PluginWorkerHostCallExecutor
   log: PluginWorkerLogSink
   signal: AbortSignal
@@ -58,6 +60,7 @@ export async function startPluginWorkerAttempt(options: {
       mainEntry: options.spec.mainEntry,
       entryPath: options.entryPath,
       grantedCapabilities: options.spec.grantedCapabilities,
+      networkHosts: options.spec.networkHosts,
       executeHostCall: options.executeHostCall,
       log: options.log,
       signal: options.signal

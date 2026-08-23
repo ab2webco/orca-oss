@@ -171,6 +171,12 @@ describe('electron-builder config', () => {
     )
   })
 
+  it('unpacks the plugin worker entry and its network preload', () => {
+    expect(electronBuilderConfig.asarUnpack).toEqual(
+      expect.arrayContaining(['out/main/plugin-host-entry.js', 'out/main/plugin-host-preload.js'])
+    )
+  })
+
   it('keeps the worker-thread hang watchdog inside app.asar', () => {
     expect(electronBuilderConfig.asarUnpack).not.toContain(
       'out/main/main-thread-hang-watchdog-entry.js'

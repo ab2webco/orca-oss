@@ -252,6 +252,22 @@ export function PluginSettingsRow({
                 'No description provided.'
               )}
           </p>
+          {plugin.hasWorker ? (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {plugin.capabilities.some((capability) => capability.kind === 'net:fetch')
+                  ? translate(
+                      'auto.components.settings.PluginSettingsRow.networkRestricted',
+                      'Network access is restricted to the hosts declared by this plugin.'
+                    )
+                  : translate(
+                      'auto.components.settings.PluginSettingsRow.networkBlocked',
+                      'Network access is blocked because this plugin does not declare net:fetch.'
+                    )}
+              </span>
+            </p>
+          ) : null}
           {plugin.blockedByKillList ? (
             <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-destructive">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />

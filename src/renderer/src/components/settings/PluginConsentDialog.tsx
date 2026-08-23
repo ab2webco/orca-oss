@@ -202,12 +202,19 @@ export function PluginConsentDialog({
               <span>
                 {plugin.hasWorker
                   ? `${translate(
-                      'auto.components.settings.PluginConsentDialog.warning',
-                      "These permissions limit how the plugin uses Orca's API. Its worker still runs as a normal process on your computer with full access to your files, network, and other processes."
-                    )} ${translate(
-                      'auto.components.settings.PluginConsentDialog.networkAccessNote',
-                      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
-                    )}`
+                      'auto.components.settings.PluginConsentDialog.workerSandboxWarning',
+                      "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls."
+                    )} ${
+                      plugin.capabilities.some((capability) => capability.kind === 'net:fetch')
+                        ? translate(
+                            'auto.components.settings.PluginConsentDialog.networkRestrictedNote',
+                            'Network requests are restricted to the hosts declared above.'
+                          )
+                        : translate(
+                            'auto.components.settings.PluginConsentDialog.networkBlockedNote',
+                            'Network access is blocked because this plugin does not request net:fetch.'
+                          )
+                    }`
                   : hasInstructionalContent(plugin)
                     ? translate(
                         'auto.components.settings.PluginConsentDialog.instructionalWarning',

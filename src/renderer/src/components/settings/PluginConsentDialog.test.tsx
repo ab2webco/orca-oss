@@ -113,14 +113,33 @@ describe('PluginConsentDialog', () => {
       )
     ).toBe(true)
     expect(document.body.textContent).toContain('Run a background worker process')
+    expect(document.body.textContent).toContain('can read its plugin files')
     expect(document.body.textContent).toContain(
-      'full access to your files, network, and other processes'
-    )
-    expect(document.body.textContent).toContain(
-      'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
+      'Network access is blocked because this plugin does not request net:fetch.'
     )
     expect(document.querySelector('[role="dialog"]')?.classList).toContain('plugin-security-chrome')
     expect(document.activeElement?.textContent).toContain('Keep Disabled')
+  })
+
+  it('shows the declared network scope during re-consent', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        needsReconsent: true,
+        capabilities: [
+          {
+            kind: 'net:fetch',
+            description: 'Connect to these network hosts: hooks.example.com'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.body.textContent).toContain('Connect to these network hosts: hooks.example.com')
+    expect(document.body.textContent).toContain(
+      'Network requests are restricted to the hosts declared above.'
+    )
   })
 
   it('explains that panel-only plugins have no worker process', async () => {

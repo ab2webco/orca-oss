@@ -15,7 +15,10 @@ class FakeChild extends EventEmitter {
   kill = vi.fn()
 }
 
-function start(child: FakeChild, options: { eventTimeoutMs?: number } = {}) {
+function start(
+  child: FakeChild,
+  options: { eventTimeoutMs?: number; networkHosts?: readonly string[] } = {}
+) {
   processMocks.fork.mockReturnValue(child)
   return startPluginWorker({
     pluginId: 'orca-samples.demo',
@@ -38,7 +41,7 @@ afterEach(() => {
 })
 
 describe('startPluginWorker', () => {
-  it('does not inherit Orca execArgv', async () => {
+  it('starts with the permission model and network preload instead of inheriting execArgv', async () => {
     const child = new FakeChild()
     const pending = start(child)
     child.emit('message', { type: 'ready', commands: [] })
@@ -47,7 +50,34 @@ describe('startPluginWorker', () => {
     expect(processMocks.fork).toHaveBeenCalledWith(
       '/host.js',
       [],
-      expect.objectContaining({ execArgv: [] })
+      expect.objectContaining({
+        execArgv: [
+          '--preserve-symlinks',
+          '--preserve-symlinks-main',
+          '--permission',
+          '--allow-fs-read=/plugin',
+          '--allow-fs-read=/',
+          '--require',
+          '/plugin-host-preload.js'
+        ]
+      })
+    )
+  })
+
+  it('passes only the consented network host scope to the preload', async () => {
+    const child = new FakeChild()
+    const pending = start(child, { networkHosts: ['api.example.com'] })
+    child.emit('message', { type: 'ready', commands: [] })
+    await pending
+
+    expect(processMocks.fork).toHaveBeenCalledWith(
+      '/host.js',
+      [],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          ORCA_PLUGIN_NET_FETCH_HOSTS: '["api.example.com"]'
+        })
+      })
     )
   })
 

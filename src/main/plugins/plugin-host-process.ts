@@ -12,6 +12,7 @@ import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel-bridge'
 import { buildPluginWorkerEnv } from './plugin-worker-env'
 import { pipePluginWorkerOutput } from './plugin-worker-output-buffer'
+import { buildPluginWorkerSandboxArgs } from './plugin-worker-sandbox-args'
 
 // Grace between the shutdown message and SIGKILL: long enough for plugin
 // cleanup, short enough that disable/quit never feels stuck.
@@ -48,6 +49,7 @@ export type StartPluginWorkerOptions = {
   /** Absolute path to the compiled plugin-host-entry.js, resolved by caller. */
   entryPath: string
   grantedCapabilities: readonly PluginCapabilityKind[]
+  networkHosts?: readonly string[]
   executeHostCall: PluginWorkerHostCallExecutor
   log: PluginWorkerLogSink
   readyTimeoutMs?: number
@@ -84,15 +86,16 @@ export async function startPluginWorker(
   const invokeTimeoutMs = options.invokeTimeoutMs ?? PLUGIN_WORKER_INVOKE_TIMEOUT_MS
   const eventTimeoutMs = options.eventTimeoutMs ?? PLUGIN_WORKER_EVENT_TIMEOUT_MS
   const tag = `[plugin:${pluginId}]`
-
   const child: ChildProcess = fork(entryPath, [], {
     // Why: ELECTRON_RUN_AS_NODE makes the forked Electron binary behave as
     // plain Node. The env is a scrubbed allowlist — never ...process.env,
     // which can carry shell-exported secrets into third-party code.
-    env: buildPluginWorkerEnv(),
-    // Why: inspector/loader flags from Orca's own launch must never execute
-    // inside third-party plugin workers.
-    execArgv: [],
+    env: {
+      ...buildPluginWorkerEnv(),
+      ORCA_PLUGIN_NET_FETCH_HOSTS: JSON.stringify(options.networkHosts ?? [])
+    },
+    // Why: never inherit Orca's flags; only this fixed sandbox may run here.
+    execArgv: buildPluginWorkerSandboxArgs(rootDir, entryPath),
     // Why: the protocol permits structured-clone values. Node's default JSON
     // fork serialization rejects BigInt, cycles, maps, and typed arrays.
     serialization: 'advanced',

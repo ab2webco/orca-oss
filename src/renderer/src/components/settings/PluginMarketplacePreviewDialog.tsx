@@ -219,7 +219,12 @@ export function PluginMarketplacePreviewDialog({
                   <div key={capability.kind} className="flex items-start gap-2 text-sm leading-6">
                     <Check className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
                     <span>
-                      {pluginCapabilityDescription(capability.kind, capability.kind)}{' '}
+                      {pluginCapabilityDescription(
+                        capability.kind,
+                        capability.kind === 'net:fetch'
+                          ? `Connect to these network hosts: ${capability.hosts.join(', ')}`
+                          : capability.kind
+                      )}{' '}
                       <span className="font-mono text-[11px] text-muted-foreground">
                         ({capability.kind})
                       </span>
@@ -233,13 +238,20 @@ export function PluginMarketplacePreviewDialog({
                 <AlertTriangle className="mt-1 size-4 shrink-0" />
                 <span>
                   {translate(
-                    'auto.components.settings.PluginMarketplacePreviewDialog.workerWarning',
-                    "Capabilities limit how this plugin uses Orca's API. Its worker still runs as a normal process on this computer with full access to your files, network, and other processes."
+                    'auto.components.settings.PluginMarketplacePreviewDialog.workerSandboxWarning',
+                    "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls."
                   )}{' '}
-                  {translate(
-                    'auto.components.settings.PluginMarketplacePreviewDialog.networkAccessNote',
-                    'It can connect to any host on the internet. Orca does not currently restrict or monitor plugin network access.'
-                  )}
+                  {preview.manifest.capabilities.some(
+                    (capability) => capability.kind === 'net:fetch'
+                  )
+                    ? translate(
+                        'auto.components.settings.PluginMarketplacePreviewDialog.networkRestrictedNote',
+                        'Network requests are restricted to the hosts declared above.'
+                      )
+                    : translate(
+                        'auto.components.settings.PluginMarketplacePreviewDialog.networkBlockedNote',
+                        'Network access is blocked because this plugin does not request net:fetch.'
+                      )}
                 </span>
               </div>
             ) : null}
