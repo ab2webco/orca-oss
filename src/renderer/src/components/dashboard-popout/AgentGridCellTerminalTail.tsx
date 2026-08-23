@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { TriangleAlert } from 'lucide-react'
 import type { AgentSessionLogUnreadReason } from '../../../../shared/agent-session-log-state'
+import { cn } from '@/lib/utils'
 import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
 import type { AgentGridCellModel } from './agent-grid-model'
 
@@ -111,7 +112,27 @@ export function AgentGridCellTerminalTail({
         data-terminal-tail={cell.card.ptyId}
         className="overflow-hidden font-mono text-[12px] leading-[1.35] text-foreground/80"
       >
-        {tail.lines.join('\n')}
+        {tail.segments && tail.segments.length > 0
+          ? tail.segments.map((row, rowIndex) => (
+              <div key={rowIndex} data-tail-row={rowIndex}>
+                {row.length === 0 ? '\u00a0' : null}
+                {row.map((segment, index) => (
+                  <span
+                    key={index}
+                    data-tail-color={segment.color}
+                    style={
+                      segment.color === 'default'
+                        ? undefined
+                        : { color: `var(--agent-tail-${segment.color})` }
+                    }
+                    className={cn(segment.bold && 'font-semibold', segment.dim && 'opacity-60')}
+                  >
+                    {segment.text}
+                  </span>
+                ))}
+              </div>
+            ))
+          : tail.lines.join('\n')}
       </pre>
     </div>
   )

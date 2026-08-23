@@ -48,7 +48,8 @@ export function normalizeAgentTerminalTailRequest(
 }
 
 export function createAgentTerminalTailReader(
-  runtime: Pick<OrcaRuntimeService, 'readTerminalVisibleLines'>,
+  runtime: Pick<OrcaRuntimeService, 'readTerminalVisibleLines'> &
+    Partial<Pick<OrcaRuntimeService, 'readTerminalVisibleSegments'>>,
   now: () => number = Date.now
 ): (ptyIds: readonly string[], lines: number) => Promise<AgentTerminalTailPtyReading[]> {
   const cache = new Map<string, CachedTail>()
@@ -61,16 +62,27 @@ export function createAgentTerminalTailReader(
       now() - cached.readAtMs < AGENT_TERMINAL_TAIL_MIN_READ_INTERVAL_MS
     ) {
       return cached.tail.read
-        ? { read: true, lines: cached.tail.lines.slice(-lines) }
+        ? {
+            read: true,
+            lines: cached.tail.lines.slice(-lines),
+            ...(cached.tail.segments ? { segments: cached.tail.segments.slice(-lines) } : {})
+          }
         : cached.tail
     }
     let tail: AgentTerminalTailReading
     try {
       const read = await runtime.readTerminalVisibleLines(ptyId, lines)
+      // Why after the lines: colour is an enrichment, and a pane whose emulator
+      // is not here still has a readable tail.
+      const segments = await runtime.readTerminalVisibleSegments?.(ptyId, lines)
       tail =
         read === null
           ? { read: false, reason: 'terminal-unreadable' }
-          : { read: true, lines: boundAgentTerminalTailLines(read, lines) }
+          : {
+              read: true,
+              lines: boundAgentTerminalTailLines(read, lines),
+              ...(segments && segments.length > 0 ? { segments: segments.slice(-lines) } : {})
+            }
     } catch {
       tail = { read: false, reason: 'terminal-unreadable' }
     }

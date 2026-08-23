@@ -1,6 +1,11 @@
 import './xterm-env-polyfill'
 import { Terminal } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
+import {
+  coalesceTerminalLineSegments,
+  terminalLineColorForAnsiIndex,
+  type TerminalLineSegment
+} from '../../shared/terminal-line-segments'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { activateOrcaTerminalUnicodeProvider } from '../../shared/terminal-unicode-provider'
 import {
@@ -309,6 +314,45 @@ export class HeadlessEmulator {
       lines.push(buffer.getLine(row)?.translateToString(true) ?? '')
     }
     return lines
+  }
+
+  /**
+   * Tail rows as coloured runs, read from the buffer's own cell attributes.
+   *
+   * Why cells and not a serialize(): the ANSI string would have to be parsed
+   * again by whoever renders it, and an escape that survived would print
+   * literally in a DOM text node (ORCA-234).
+   */
+  getBufferTailSegments(limit: number): TerminalLineSegment[][] {
+    const buffer = this.terminal.buffer.active
+    const start = Math.max(0, buffer.length - Math.max(0, Math.floor(limit)))
+    const rows: TerminalLineSegment[][] = []
+    const cell = buffer.getNullCell()
+    for (let row = start; row < buffer.length; row += 1) {
+      const line = buffer.getLine(row)
+      if (!line) {
+        rows.push([])
+        continue
+      }
+      const runs: TerminalLineSegment[] = []
+      for (let column = 0; column < line.length; column += 1) {
+        line.getCell(column, cell)
+        const chars = cell.getChars()
+        if (chars === '' && cell.getWidth() === 0) {
+          continue
+        }
+        runs.push({
+          text: chars === '' ? ' ' : chars,
+          color: cell.isFgDefault()
+            ? 'default'
+            : terminalLineColorForAnsiIndex(cell.isFgPalette() ? cell.getFgColor() : undefined),
+          bold: cell.isBold() !== 0,
+          dim: cell.isDim() !== 0
+        })
+      }
+      rows.push(coalesceTerminalLineSegments(runs))
+    }
+    return rows
   }
 
   getCwd(): string | null {
