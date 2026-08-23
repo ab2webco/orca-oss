@@ -15003,10 +15003,10 @@
       "description": "The dashboard could not finish rendering. Retry to remount it, or reopen it."
     },
     "bucket": {
-      "attention": "Needs You",
-      "working": "Working",
-      "idle": "Idle",
-      "empty": "None",
+      "attention": "Te necesita",
+      "working": "Trabajando",
+      "idle": "Inactivo",
+      "empty": "Ninguno",
       "done": "Finalizado"
     },
     "title": "Agents",
@@ -15086,6 +15086,12 @@
       "fit": "Ajustar",
       "projectCount": "{{agents}} agentes · {{workspaces}} espacios de trabajo",
       "agentCount": "{{count}} agentes"
+    },
+    "state": {
+      "blocked": "Bloqueado",
+      "waiting": "Esperando tu respuesta",
+      "interrupted": "Interrumpido",
+      "failed": "Falló"
     }
   },
   "dashboard": {

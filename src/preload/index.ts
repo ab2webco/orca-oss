@@ -217,6 +217,7 @@ import type {
   AgentSessionLogPaneReading,
   AgentSessionLogReading
 } from '../shared/agent-session-log-state'
+import type { AgentTerminalTailPtyReading } from '../shared/agent-terminal-tail'
 import type { AgentInterruptInferenceRequest } from '../shared/agent-interrupt-intent'
 import type { AgentQuestionAnsweredInferenceRequest } from '../shared/agent-question-answered-intent'
 import type { TerminalSideEffectBatch } from '../shared/terminal-side-effect-facts'
@@ -5037,6 +5038,14 @@ const api = {
       ipcRenderer.on('mobile:unpairedDeviceAuthFailure', listener)
       return () => ipcRenderer.removeListener('mobile:unpairedDeviceAuthFailure', listener)
     }
+  },
+
+  agentTerminalTail: {
+    readPtys: (
+      ptyIds: string[],
+      lines?: number
+    ): Promise<AgentTerminalTailPtyReading[]> =>
+      ipcRenderer.invoke('agentTerminalTail:readPtys', { ptyIds, lines })
   },
 
   agentSessionLog: {

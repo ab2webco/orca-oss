@@ -2,12 +2,14 @@
 
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
 import { createRef } from 'react'
 import type {
   AgentSessionLogPaneReading,
   AgentSessionLogReading
 } from '../../../../shared/agent-session-log-state'
+import type { AgentTerminalTailPtyReading } from '../../../../shared/agent-terminal-tail'
 import type { DashboardCard, DashboardSnapshot } from '../../../../shared/dashboard-snapshot'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { i18n } from '@/i18n/i18n'
@@ -17,6 +19,33 @@ import { AgentGridView } from './AgentGridView'
 vi.mock('./AgentDashboardToolbar', () => ({
   AgentDashboardToolbar: () => <div data-testid="toolbar" />
 }))
+
+/** The pop-out's own default is 960px wide; 24px of it is the scroll padding. */
+const POPOUT_DEFAULT_CONTENT_WIDTH = 936
+const WIDE_WINDOW_CONTENT_WIDTH = 1416
+
+function stubMeasuredWidth(width: number): void {
+  class ImmediateResizeObserver {
+    constructor(private readonly callback: () => void) {}
+    observe(): void {
+      this.callback()
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  vi.stubGlobal('ResizeObserver', ImmediateResizeObserver)
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+    width,
+    height: 600,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: 600,
+    x: 0,
+    y: 0,
+    toJSON: () => ({})
+  })
+}
 
 function card(overrides: Partial<DashboardCard> = {}): DashboardCard {
   return {
@@ -56,63 +85,256 @@ function working(text: string, tool: string | null): AgentSessionLogReading {
   }
 }
 
+function awaitingInput(): AgentSessionLogReading {
+  return {
+    read: true,
+    state: 'awaiting-input',
+    lastTurnAtMs: 60_000,
+    queuedInput: { supported: true, pending: 0 },
+    unparsedRecords: 0,
+    activity: {
+      lastAssistantText: 'ready',
+      pendingToolName: null,
+      atMs: 60_000,
+      textBeyondScan: false
+    }
+  }
+}
+
 function renderGrid(
   cards: DashboardCard[],
-  readings: AgentSessionLogPaneReading[]
-): { readPanes: ReturnType<typeof vi.fn> } {
+  readings: AgentSessionLogPaneReading[],
+  tails: AgentTerminalTailPtyReading[] = [],
+  overrides: { onOpenTerminal?: (card: DashboardCard) => void } = {}
+): {
+  readPanes: ReturnType<typeof vi.fn>
+  readPtys: ReturnType<typeof vi.fn>
+  onRevealAgent: ReturnType<typeof vi.fn>
+} {
   const snapshot: DashboardSnapshot = { generatedAt: 1, cards }
   const readPanes = vi.fn(async () => readings)
+  const readPtys = vi.fn(async () => tails)
+  const onRevealAgent = vi.fn()
   // The pop-out wraps every view in one provider; the cell's truncation
   // tooltips need it here too.
   render(
     <TooltipProvider>
       <AgentGridView
-      snapshot={snapshot}
-      cards={cards}
-      query=""
-      onQueryChange={vi.fn()}
-      filters={EMPTY_DASHBOARD_FILTERS}
-      onFiltersChange={vi.fn()}
-      searchInputRef={createRef<HTMLInputElement>()}
-      now={120_000}
-      onRevealAgent={vi.fn()}
-      readPanes={readPanes}
+        snapshot={snapshot}
+        cards={cards}
+        query=""
+        onQueryChange={vi.fn()}
+        filters={EMPTY_DASHBOARD_FILTERS}
+        onFiltersChange={vi.fn()}
+        searchInputRef={createRef<HTMLInputElement>()}
+        now={120_000}
+        onRevealAgent={onRevealAgent}
+        onOpenTerminal={overrides.onOpenTerminal}
+        readPanes={readPanes}
+        readPtys={readPtys}
         pollIntervalMs={1_000_000}
       />
     </TooltipProvider>
   )
-  return { readPanes }
+  return { readPanes, readPtys, onRevealAgent }
+}
+
+function gridTracks(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('[data-agent-grid-columns]')].map(
+    (grid) => grid.style.gridTemplateColumns
+  )
 }
 
 describe('AgentGridView', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en')
+    stubMeasuredWidth(POPOUT_DEFAULT_CONTENT_WIDTH)
   })
   afterEach(() => {
     cleanup()
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
-  // The whole point of the ticket: reading one agent must not require opening
-  // anything, so every cell's content is on screen at the same time.
-  it('shows what every agent is doing at once, with no dialog in the way', async () => {
-    const cards = [
-      card({ paneKey: 'p1', worktreeName: 'wt-one' }),
-      card({ paneKey: 'p2', worktreeName: 'wt-two' }),
-      card({ paneKey: 'p3', worktreeName: 'wt-three', repoId: 'r2', repoName: 'Beta' })
-    ]
-    renderGrid(cards, [
-      { paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('rewriting the parser', 'Edit') },
-      { paneKey: 'p2', agent: 'claude', sessionId: 's2', session: working('waiting on CI', null) },
-      { paneKey: 'p3', agent: 'codex', sessionId: 's3', session: working('reading the config', 'Read') }
-    ])
+  // The reported failure: at the pop-out's own default width every agent got a
+  // row of its own, so eight agents were eight rows to scroll (ORCA-234).
+  it('lays several cells across one row at the pop-out default width', async () => {
+    renderGrid([card({ paneKey: 'p1' }), card({ paneKey: 'p2' }), card({ paneKey: 'p3' })], [])
+    await screen.findByText('Alpha')
+    const grid = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
+    expect(Number(grid?.dataset.agentGridColumns)).toBeGreaterThanOrEqual(2)
+    expect(grid?.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
+  })
 
-    await waitFor(() => expect(screen.getByText('rewriting the parser')).toBeInTheDocument())
-    expect(screen.getByText('waiting on CI')).toBeInTheDocument()
-    expect(screen.getByText('reading the config')).toBeInTheDocument()
-    expect(screen.getByText('Edit')).toBeInTheDocument()
-    expect(screen.getByText('Read')).toBeInTheDocument()
+  it('adds columns when the pop-out is widened', async () => {
+    stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
+    renderGrid(
+      [
+        card({ paneKey: 'p1' }),
+        card({ paneKey: 'p2' }),
+        card({ paneKey: 'p3' }),
+        card({ paneKey: 'p4' })
+      ],
+      []
+    )
+    await screen.findByText('Alpha')
+    expect(gridTracks()).toEqual(['repeat(4, minmax(0, 1fr))'])
+  })
+
+  // The owner's report: one agent in a wide pop-out sat in a narrow column with
+  // the rest of the row empty, which is where the tail is least readable.
+  it('opens the terminal dialog on a cell click, and falls back to the pane', async () => {
+    const onOpenTerminal = vi.fn()
+    const { onRevealAgent } = renderGrid([card({ paneKey: 'p1' })], [], [], { onOpenTerminal })
+    await screen.findByText('Alpha')
+    const cell = document.querySelector<HTMLElement>('[data-pane-key="p1"]')
+    fireEvent.click(cell as HTMLElement)
+    expect(onOpenTerminal).toHaveBeenCalledTimes(1)
+    expect(onRevealAgent).not.toHaveBeenCalled()
+  })
+
+  it('counts the state buckets above the grid, from the same state the cell shows', async () => {
+    renderGrid(
+      [card({ paneKey: 'p1' }), card({ paneKey: 'p2' }), card({ paneKey: 'p3' })],
+      [
+        { paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('one', null) },
+        { paneKey: 'p2', agent: 'claude', sessionId: 's2', session: working('two', null) },
+        {
+          paneKey: 'p3',
+          agent: 'claude',
+          sessionId: 's3',
+          session: awaitingInput()
+        }
+      ]
+    )
+    await screen.findByText('Alpha')
+    const strip = document.querySelector<HTMLElement>('[aria-pressed]')?.parentElement
+    // The strip splits them the way the cells do, and the four counts add up to
+    // the agents on screen — a bucket left out is how the numbers stopped
+    // matching the total before.
+    await waitFor(() => expect(strip?.textContent).toContain('Working2'))
+    const counts = [...(strip?.textContent ?? '').matchAll(/(\d+)/g)].map((m) => Number(m[1]))
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBe(3)
+  })
+
+  it('keeps the rows readable and lets the page scroll with several projects', async () => {
+    // The owner's report: two projects had no scroll, so the panes below the
+    // fold were unreachable.
+    renderGrid(
+      [
+        card({ paneKey: 'p1', repoId: 'r1', repoName: 'One' }),
+        card({ paneKey: 'p2', repoId: 'r2', repoName: 'Two' }),
+        card({ paneKey: 'p3', repoId: 'r3', repoName: 'Three' })
+      ],
+      []
+    )
+    await screen.findByText('One')
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-agent-grid-columns]')].map(
+      (grid) => Number.parseInt(grid.style.gridAutoRows, 10)
+    )
+    expect(rows).toHaveLength(3)
+    // Everything renders: no page to flip to reach the other project.
+    // Same height for every section, and never below the readable floor.
+    expect(new Set(rows).size).toBe(1)
+    expect(rows[0]).toBeGreaterThanOrEqual(200)
+    const scroller = document.querySelector<HTMLElement>('.overflow-y-auto')
+    expect(scroller).not.toBeNull()
+  })
+
+  it('hides a project\u2019s cells behind the eye on its heading', async () => {
+    renderGrid(
+      [
+        card({ paneKey: 'p1', repoId: 'r1', repoName: 'One' }),
+        card({ paneKey: 'p2', repoId: 'r2', repoName: 'Two' })
+      ],
+      []
+    )
+    await screen.findByText('One')
+    expect(document.querySelectorAll('[data-agent-grid-columns]')).toHaveLength(2)
+    fireEvent.click(document.querySelector('[data-repo-collapse="r1"]') as HTMLElement)
+    expect(document.querySelectorAll('[data-agent-grid-columns]')).toHaveLength(1)
+    // The heading stays, so the project is hidden rather than gone.
+    expect(screen.getByText('One')).toBeInTheDocument()
+  })
+
+  it('never opens more tracks than there are agents', async () => {
+    stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
+    renderGrid([card({ paneKey: 'p1' })], [])
+    await screen.findByText('Alpha')
+    expect(gridTracks()).toEqual(['repeat(1, minmax(0, 1fr))'])
+  })
+
+  it('gives every cell the same share of the height instead of a fixed box', async () => {
+    renderGrid([card({ paneKey: 'p1' }), card({ paneKey: 'p2' }), card({ paneKey: 'p3' })], [])
+    await screen.findByText('Alpha')
+    const grid = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
+    // Two across at the default width, so three agents need two equal rows.
+    expect(grid?.dataset.agentGridRows).toBe('2')
+    // Rows share the height, with a floor so a host that gives the grid no
+    // definite height still renders readable cells instead of collapsing them.
+    // Uniform rows sized from the viewport below the grid, shared by every
+    // section on the page — so several projects scroll instead of being squashed.
+    expect(grid?.dataset.agentGridRows).toBe('2')
+    expect(grid?.style.gridAutoRows).toMatch(/^\d+px$/)
+  })
+
+  // The whole point of the ticket: what each agent is DOING, which is terminal
+  // output, not a prose summary of it.
+  it('shows the live terminal of every agent at once, with no dialog in the way', async () => {
+    const cards = [
+      card({ paneKey: 'p1', ptyId: 'pty-1', worktreeName: 'wt-one' }),
+      card({ paneKey: 'p2', ptyId: 'pty-2', worktreeName: 'wt-two' })
+    ]
+    renderGrid(
+      cards,
+      [{ paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('prose summary', 'Edit') }],
+      [
+        { ptyId: 'pty-1', tail: { read: true, lines: ['$ npm test', '  12 passed'] } },
+        { ptyId: 'pty-2', tail: { read: true, lines: ['Running eslint…'] } }
+      ]
+    )
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-terminal-tail="pty-1"]')).not.toBeNull()
+    )
+    // Raw text, indentation intact — a terminal line reads wrong once collapsed.
+    expect(document.querySelector('[data-terminal-tail="pty-1"]')?.textContent).toBe(
+      '$ npm test\n  12 passed'
+    )
+    expect(document.querySelector('[data-terminal-tail="pty-2"]')?.textContent).toBe(
+      'Running eslint…'
+    )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the session-log status signal beside the terminal', async () => {
+    renderGrid(
+      [card({ paneKey: 'p1', ptyId: 'pty-1' })],
+      [{ paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('prose', 'Edit') }],
+      [{ ptyId: 'pty-1', tail: { read: true, lines: ['building…'] } }]
+    )
+    await waitFor(() => expect(screen.getByText('building…')).toBeInTheDocument())
+    // In-flight tool from the transcript, and the state the dot renders.
+    expect(screen.getByText('Edit')).toBeInTheDocument()
+    expect(document.querySelector('[data-dot-state="working"]')).not.toBeNull()
+  })
+
+  it('names a closed pane instead of leaving its cell blank', async () => {
+    renderGrid([card({ paneKey: 'p1', ptyId: undefined, task: '' })], [])
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("No live terminal — this agent's pane has closed.").length
+      ).toBeGreaterThan(0)
+    )
+  })
+
+  it('names an unreadable terminal instead of leaving its cell blank', async () => {
+    renderGrid([card({ paneKey: 'p1', ptyId: 'pty-1', task: '' })], [], [
+      { ptyId: 'pty-1', tail: { read: false, reason: 'terminal-unreadable' } }
+    ])
+    await waitFor(() =>
+      expect(screen.getAllByText('Terminal output unavailable').length).toBeGreaterThan(0)
+    )
   })
 
   it('groups the cells under their project', async () => {
@@ -124,13 +346,26 @@ describe('AgentGridView', () => {
     renderGrid(cards, [])
     const alpha = (await screen.findByText('Alpha')).closest('section')
     const beta = screen.getByText('Beta').closest('section')
-    expect(within(alpha as HTMLElement).getAllByRole('button')).toHaveLength(2)
-    expect(within(beta as HTMLElement).getAllByRole('button')).toHaveLength(1)
+    // Cells, not every button: the heading carries a hide control of its own.
+    expect((alpha as HTMLElement).querySelectorAll('[data-pane-key]')).toHaveLength(2)
+    expect((beta as HTMLElement).querySelectorAll('[data-pane-key]')).toHaveLength(1)
     expect(within(alpha as HTMLElement).getByText('2 agents')).toBeInTheDocument()
+    // Each project lays its own agents out in a grid, not a column.
+    // The second project has a single agent, so it gets a single full-width track.
+    expect(gridTracks()).toEqual(['repeat(2, minmax(0, 1fr))', 'repeat(1, minmax(0, 1fr))'])
   })
 
-  it('names why a cell is blank instead of leaving it empty', async () => {
-    renderGrid([card({ paneKey: 'p1', task: '' })], [
+  it('falls back to the session log while no terminal has been read', async () => {
+    renderGrid(
+      [card({ paneKey: 'p1', ptyId: 'pty-1' })],
+      [{ paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('rewriting the parser', null) }],
+      []
+    )
+    await waitFor(() => expect(screen.getByText('rewriting the parser')).toBeInTheDocument())
+  })
+
+  it('names why the session log is unreadable when there is no terminal either', async () => {
+    renderGrid([card({ paneKey: 'p1', ptyId: undefined, task: '' })], [
       {
         paneKey: 'p1',
         agent: null,
@@ -139,14 +374,26 @@ describe('AgentGridView', () => {
       }
     ])
     await waitFor(() =>
-      expect(screen.getAllByText('Session not identified yet').length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("No live terminal — this agent's pane has closed.").length
+      ).toBeGreaterThan(0)
     )
   })
 
-  it('asks for every visible pane in one batch call', async () => {
-    const cards = [card({ paneKey: 'p1' }), card({ paneKey: 'p2' })]
-    const { readPanes } = renderGrid(cards, [])
+  it('asks for every visible pane and pty in one batch call each', async () => {
+    const cards = [
+      card({ paneKey: 'p1', ptyId: 'pty-1' }),
+      card({ paneKey: 'p2', ptyId: 'pty-2' })
+    ]
+    const { readPanes, readPtys } = renderGrid(cards, [])
     await waitFor(() => expect(readPanes).toHaveBeenCalledTimes(1))
     expect(readPanes).toHaveBeenCalledWith(['p1', 'p2'])
+    await waitFor(() => expect(readPtys).toHaveBeenCalledTimes(1))
+    // The budget follows the cell it has to fit, so it is neither the old fixed
+    // 8 nor past the contract's cap.
+    const [ids, lines] = readPtys.mock.calls[0] as [string[], number]
+    expect(ids).toEqual(['pty-1', 'pty-2'])
+    expect(lines).toBeGreaterThan(8)
+    expect(lines).toBeLessThanOrEqual(AGENT_TERMINAL_TAIL_MAX_LINES)
   })
 })

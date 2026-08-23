@@ -15075,6 +15075,12 @@
       "fit": "全体表示",
       "projectCount": "{{agents}}件の Agent · {{workspaces}}件のワークスペース",
       "agentCount": "{{count}}件の Agent"
+    },
+    "state": {
+      "blocked": "ブロック中",
+      "waiting": "入力待ち",
+      "interrupted": "中断",
+      "failed": "失敗"
     }
   },
   "dashboard": {

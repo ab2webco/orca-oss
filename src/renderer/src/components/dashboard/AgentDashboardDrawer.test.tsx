@@ -62,6 +62,7 @@ afterEach(() => {
 })
 
 describe('AgentDashboardDrawer', () => {
+
   it('derives no dashboard snapshot while closed', () => {
     render(<AgentDashboardDrawer statusBarVisible />)
 
@@ -91,7 +92,9 @@ describe('AgentDashboardDrawer', () => {
     expect(mocks.boardProps).toBeNull()
 
     act(() => useAppStore.setState({ agentDashboardDrawerOpen: true }))
-    expect(mocks.boardProps?.initialView).toBe('board')
+    // The owner's default is the live-terminal grid; the board columns stay one
+    // click away in the header (ORCA-234).
+    expect(mocks.boardProps?.initialView).toBe('grid')
     expect(mocks.boardProps?.workspaceContextMenusEnabled).toBeUndefined()
     const onOpenMap = mocks.boardProps?.onOpenMap
     expect(onOpenMap).toBeTypeOf('function')

@@ -20,7 +20,7 @@ function isValidPtyId(value: unknown): value is string {
 // Why: the preview dialog has two hosts — the pop-out window and the main
 // renderer's in-window overlay. The trusted UI renderer already has full PTY
 // access through the regular terminal channels, so admitting it adds no reach.
-function isTerminalPreviewRenderer(sender: WebContents): boolean {
+export function isTerminalPreviewRenderer(sender: WebContents): boolean {
   return isDashboardPopoutRenderer(sender) || isTrustedUIRenderer(sender)
 }
 /** Pop-out terminal transport with an atomic snapshot/live boundary. */
