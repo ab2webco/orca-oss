@@ -10203,7 +10203,7 @@ describe('registerPtyHandlers', () => {
       pid: 12345
     }
     spawnMock.mockReturnValue(proc)
-    const store = { persistPtyBinding: vi.fn(() => false) }
+    const store = { persistPtyBinding: vi.fn(() => false), getWorktreeMeta: vi.fn(() => null) }
     let controller: RuntimeSpawnController | null = null
     const runtime = {
       setPtyController: vi.fn((value) => {

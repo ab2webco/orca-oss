@@ -7,15 +7,20 @@ import {
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
 import { isPlaneProjectSwitcherEnabled } from './task-page-plane-scope'
-import type { PlaneProject, PlaneWorkspace } from '../../../shared/plane-types'
+import type {
+  PlaneProject,
+  PlaneProjectSelection,
+  PlaneWorkspace,
+  PlaneWorkspaceSelection
+} from '../../../shared/plane-types'
 
 type TaskPagePlaneScopeSwitcherProps = {
   workspaces: readonly PlaneWorkspace[]
-  selectedWorkspaceId: string | 'all'
+  selectedWorkspaceId: PlaneWorkspaceSelection
   onWorkspaceChange: (value: string) => void
   projects: readonly PlaneProject[]
   projectsLoading: boolean
-  selectedProjectId: string | 'all'
+  selectedProjectId: PlaneProjectSelection
   onProjectChange: (value: string) => void
 }
 

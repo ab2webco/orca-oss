@@ -38,7 +38,7 @@ describe('`account list` per-terminal Claude account', () => {
     ORCA_PANE_KEY: process.env.ORCA_PANE_KEY
   }
 
-  function context(flags: Map<string, string | boolean> = new Map()): HandlerContext {
+  function context(flags = new Map<string, string | boolean>()): HandlerContext {
     return { client, cwd: process.cwd(), flags, json: false, rawArgs: [] }
   }
 

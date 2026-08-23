@@ -28,7 +28,7 @@ describe('normalizeWorkspaceLinkedItem', () => {
     const normalized = normalizeWorkspaceLinkedItem({ ...planeItem, planeIdentifier: '   ' })
 
     expect(normalized).not.toBeNull()
-    expect(Object.prototype.hasOwnProperty.call(normalized, 'planeIdentifier')).toBe(false)
+    expect(Object.hasOwn(normalized ?? {}, 'planeIdentifier')).toBe(false)
   })
 
   it('keeps the other supported providers normalizing unchanged', () => {

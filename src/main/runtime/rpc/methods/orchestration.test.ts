@@ -1071,7 +1071,7 @@ describe('orchestration RPC methods', () => {
         })
       })) as { lifecycle?: { action: string } }
 
-      expect(result.lifecycle).toBeUndefined()
+      expect(result.lifecycle).toMatchObject({ action: 'completed' })
       expect(db.getTask(task.id)?.status).toBe('completed')
       expect(JSON.parse(db.getTask(task.id)?.result ?? '{}').envelope).toMatchObject({
         status: 'success'
