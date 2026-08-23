@@ -15012,10 +15012,10 @@
       "description": "看板未能完成渲染。请重试以重新挂载，或重新打开。"
     },
     "bucket": {
-      "attention": "Needs You",
-      "working": "Working",
-      "idle": "Idle",
-      "empty": "None",
+      "attention": "需要你",
+      "working": "进行中",
+      "idle": "空闲",
+      "empty": "无",
       "done": "已完成"
     },
     "title": "Agents",

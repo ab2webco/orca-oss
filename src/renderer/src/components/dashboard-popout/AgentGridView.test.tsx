@@ -208,7 +208,10 @@ describe('AgentGridView', () => {
     expect(grid?.dataset.agentGridRows).toBe('2')
     // Rows share the height, with a floor so a host that gives the grid no
     // definite height still renders readable cells instead of collapsing them.
-    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(320px, 1fr))')
+    // Rows share whatever height the grid was given; the height itself comes
+    // from the viewport below the grid's top edge, not from a fixed cell box.
+    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(0, 1fr))')
+    expect(grid?.style.height).not.toBe('')
     expect(grid?.style.gridAutoRows).toBe('')
   })
 

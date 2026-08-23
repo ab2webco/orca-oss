@@ -2,9 +2,14 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentStateDot } from '@/components/AgentStateDot'
+import { dashboardBucketLabel } from '../dashboard/dashboard-bucket-label'
 import { RepoIconGlyph } from '@/components/repo/repo-icon'
 import { translate } from '@/i18n/i18n'
-import type { DashboardCard, DashboardSnapshot } from '../../../../shared/dashboard-snapshot'
+import type {
+  DashboardBucket,
+  DashboardCard,
+  DashboardSnapshot
+} from '../../../../shared/dashboard-snapshot'
 import { AgentDashboardToolbar } from './AgentDashboardToolbar'
 import { AgentGridCell } from './AgentGridCell'
 import { buildAgentGrid, type AgentGridCellModel } from './agent-grid-model'
@@ -23,7 +28,7 @@ import {
   resolveAgentGridPage
 } from './agent-grid-paging'
 import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
-import { useAgentGridSize } from './use-agent-grid-width'
+import { useAgentGridAvailableHeight, useAgentGridSize } from './use-agent-grid-width'
 import type { DashboardFilters } from './agent-board-filtering'
 import type { AgentRevealArgs } from './AgentTerminalDialog'
 import {
@@ -75,13 +80,20 @@ export function AgentGridView({
   const readings = useAgentSessionLogReadings(paneKeys, { readPanes, intervalMs: pollIntervalMs })
   const projects = useMemo(() => buildAgentGrid(cards, readings), [cards, readings])
   const gridRef = useRef<HTMLDivElement>(null)
-  const { width: measuredWidth, height: measuredHeight } = useAgentGridSize(gridRef)
+  const { width: measuredWidth } = useAgentGridSize(gridRef)
+  const measuredHeight = useAgentGridAvailableHeight(gridRef)
   const gridWidth = measuredWidth || AGENT_GRID_FALLBACK_WIDTH
   const [pageSize, setPageSize] = useState(AGENT_GRID_DEFAULT_PAGE_SIZE)
   const [requestedPage, setRequestedPage] = useState(0)
-  const flatCells = useMemo(
+  const [bucketFilter, setBucketFilter] = useState<DashboardBucket | null>(null)
+  const allCells = useMemo(
     () => projects.flatMap((project) => project.cells.map((cell) => ({ project, cell }))),
     [projects]
+  )
+  const flatCells = useMemo(
+    () =>
+      bucketFilter ? allCells.filter((entry) => entry.cell.card.bucket === bucketFilter) : allCells,
+    [allCells, bucketFilter]
   )
   const page = useMemo(
     () => resolveAgentGridPage(flatCells, pageSize, requestedPage),
@@ -106,11 +118,11 @@ export function AgentGridView({
   }, [page.visible])
   const bucketTotals = useMemo(() => {
     const totals = { attention: 0, working: 0, done: 0, idle: 0 }
-    for (const entry of flatCells) {
+    for (const entry of allCells) {
       totals[entry.cell.card.bucket] += 1
     }
     return totals
-  }, [flatCells])
+  }, [allCells])
   const tallestRows = visibleSections.reduce(
     (rows, section) =>
       Math.max(rows, resolveAgentGridRows(section.cells.length, resolveAgentGridColumns(gridWidth, section.cells.length))),
@@ -170,21 +182,36 @@ export function AgentGridView({
         searchInputRef={searchInputRef}
       />
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-          {flatCells.length > 1 ? (
+          {allCells.length > 1 ? (
             <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
               <span className="mr-3 flex items-center gap-2.5">
                 {(
                   [
-                    ['attention', 'waiting', 'dashboardPopout.bucket.attention', 'Needs You'],
-                    ['working', 'working', 'dashboardPopout.bucket.working', 'Working'],
-                    ['done', 'done', 'dashboardPopout.bucket.done', 'Done']
+                    ['attention', 'waiting'],
+                    ['working', 'working'],
+                    ['done', 'done']
                   ] as const
-                ).map(([bucket, dot, key, fallback]) => (
-                  <span key={bucket} className="flex items-center gap-1">
+                ).map(([bucket, dot]) => (
+                  <button
+                    key={bucket}
+                    type="button"
+                    aria-pressed={bucketFilter === bucket}
+                    disabled={bucketTotals[bucket] === 0 && bucketFilter !== bucket}
+                    onClick={() => {
+                      setBucketFilter((current) => (current === bucket ? null : bucket))
+                      setRequestedPage(0)
+                    }}
+                    className={cn(
+                      'flex items-center gap-1 rounded px-1.5 py-0.5 disabled:opacity-40',
+                      bucketFilter === bucket
+                        ? 'bg-accent text-foreground'
+                        : 'hover:bg-accent/60 hover:text-foreground'
+                    )}
+                  >
                     <AgentStateDot state={dot} size="sm" />
-                    <span>{translate(key, fallback)}</span>
+                    <span>{dashboardBucketLabel(bucket)}</span>
                     <span className="tabular-nums text-foreground">{bucketTotals[bucket]}</span>
-                  </span>
+                  </button>
                 ))}
               </span>
               {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
@@ -264,10 +291,14 @@ export function AgentGridView({
                 <div
                   data-agent-grid-columns={columns}
                   data-agent-grid-rows={rows}
-                  className="grid min-h-0 flex-1"
+                  className="grid min-h-0"
                   style={{
+                    height:
+                      measuredHeight > 0
+                        ? `${Math.max(minCellHeight, measuredHeight / visibleSections.length - 28)}px`
+                        : undefined,
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${rows}, minmax(${minCellHeight}px, 1fr))`,
+                    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
                     gap: `${AGENT_GRID_CELL_GAP}px`
                   }}
                 >

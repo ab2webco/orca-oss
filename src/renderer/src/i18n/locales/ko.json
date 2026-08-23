@@ -15014,10 +15014,10 @@
       "description": "The dashboard could not finish rendering. Retry to remount it, or reopen it."
     },
     "bucket": {
-      "attention": "Needs You",
-      "working": "Working",
-      "idle": "Idle",
-      "empty": "None",
+      "attention": "확인 필요",
+      "working": "작업 중",
+      "idle": "유휴",
+      "empty": "없음",
       "done": "완료"
     },
     "title": "Agents",
