@@ -29,7 +29,9 @@ describe('agent dashboard performance isolation', () => {
 
     expect(board).toContain("import('./AgentDashboardMapView')")
     expect(board).not.toMatch(/from ['"].\/(?:AgentMap|useAgentMap|agent-map-)/)
-    expect(drawer).toContain('initialView="board"')
+    // The guard is about the map, not which of the other views opens: the
+    // drawer must never mount the map in the main renderer (ORCA-234).
+    expect(drawer).not.toContain('initialView="map"')
     expect(drawer).toContain("openPopout?.('map')")
     expect(drawer).toContain('onOpenMap={handleOpenMap}')
   })

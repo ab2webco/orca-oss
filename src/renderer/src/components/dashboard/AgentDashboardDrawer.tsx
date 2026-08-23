@@ -70,7 +70,9 @@ function AgentDashboardDrawerBody({
   return (
     <AgentKanbanBoard
       snapshot={snapshot}
-      initialView="board"
+      // Why grid: the owner's default is the live-terminal grid; the board's
+      // columns stay one click away in the header (ORCA-234).
+      initialView="grid"
       // Why: bg-transparent lets the sheet's worktree-sidebar surface through
       // so the board reads as the same companion panel as the workspace board.
       containerClassName="h-full w-full bg-transparent"
