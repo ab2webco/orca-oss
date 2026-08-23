@@ -22,6 +22,8 @@ export type AgentGridCellModel = {
   dotState: AgentDotState
   /** The line the cell shows: assistant prose, or the hook fallback. */
   activityText: string | null
+  /** Newest turn's model id and prompt size, when the log carried them. */
+  modelUsage: { model: string | null; contextTokens: number } | null
   /** Tool with no result behind it yet. */
   pendingToolName: string | null
   activitySource: AgentGridActivitySource
@@ -85,6 +87,7 @@ export function buildAgentGridCell(
     logState,
     dotState: agentGridDotState(logState, card),
     activityText,
+    modelUsage: session?.read === true ? (session.modelUsage ?? null) : null,
     pendingToolName: activity?.pendingToolName ?? null,
     activitySource: logText ? 'session-log' : activityText ? 'hook' : 'none',
     unreadReason: session?.read === false ? session.reason : null,

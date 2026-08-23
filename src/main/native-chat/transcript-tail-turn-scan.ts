@@ -12,6 +12,7 @@ import type { NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import { MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES } from './transcript-tail-reader'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import type { NativeChatTurnLifecycleDecoder } from './transcript-turn-lifecycle'
+import { decodeTranscriptModelUsage, type TranscriptModelUsage } from './transcript-model-usage'
 import {
   decodeTranscriptQueuedInput,
   type TranscriptQueuedInputOperation
@@ -37,6 +38,8 @@ export type TranscriptTailTurnScan = {
   reachedCeiling: boolean
   /** Only collected when the caller passed an activity decoder. */
   activity: AgentSessionLogActivity | null
+  /** Newest assistant turn's model and context size, when the tail had one. */
+  modelUsage: TranscriptModelUsage | null
 }
 
 export async function scanTranscriptTailForTurn(
@@ -52,7 +55,8 @@ export async function scanTranscriptTailForTurn(
     queuedOperations: [],
     unparsedRecords: 0,
     reachedCeiling: false,
-    activity: null
+    activity: null,
+    modelUsage: null
   }
   if (size === 0) {
     return finish()
@@ -135,6 +139,9 @@ export async function scanTranscriptTailForTurn(
       // lifecycle row IS the last assistant row, so deferring this would leave
       // every idle agent's cell blank.
       collectActivity(line, fallbackId)
+      // First one wins: walking backwards, that is the newest turn. Stopping
+      // here keeps this free — the scan was reading the row anyway.
+      scan.modelUsage ??= decodeTranscriptModelUsage(line)
       const lifecycle = decodeLifecycle(line, fallbackId)
       if (lifecycle) {
         scan.lifecycle = lifecycle

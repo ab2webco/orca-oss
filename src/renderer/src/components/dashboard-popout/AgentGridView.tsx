@@ -124,6 +124,10 @@ export function AgentGridView({
     }
     return [...byRepo.values()]
   }, [flatCells])
+  // Why quantized: AgentGridCell is memo'd but `now` ticks every second, so a
+  // raw clock re-rendered every cell on every tick and the memo bought nothing.
+  // The cells only print a coarse "N ago", which 15s cannot make wrong.
+  const coarseNow = Math.floor(now / 15_000) * 15_000
   const bucketTotals = useMemo(() => {
     const totals = { attention: 0, working: 0, done: 0, idle: 0 }
     for (const entry of allCells) {
@@ -305,7 +309,7 @@ export function AgentGridView({
                     <AgentGridCell
                       cell={cell}
                       tail={cell.card.ptyId ? tails.get(cell.card.ptyId) : undefined}
-                      now={now}
+                      now={coarseNow}
                       onReveal={handleReveal}
                     />
                     </div>

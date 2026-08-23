@@ -65,6 +65,7 @@ export async function readAgentSessionLogState(
     lifecycle: scan.lifecycle,
     queuedInput: resolveQueuedInput(args.agent, scan),
     unparsedRecords: scan.unparsedRecords,
+    modelUsage: scan.modelUsage,
     scanReachedCeiling: scan.reachedCeiling,
     ...(scan.activity ? { activity: scan.activity } : {})
   })

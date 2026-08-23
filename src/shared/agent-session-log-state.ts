@@ -61,6 +61,8 @@ export type AgentSessionLogReading =
       queuedInput: AgentSessionLogQueuedInput
       /** Records the tail scan could not parse. Non-zero is degradation, not failure. */
       unparsedRecords: number
+      /** Newest turn's model id and prompt size, when the tail carried them. */
+      modelUsage?: { model: string | null; contextTokens: number }
       /** Absent when the caller did not ask for activity. */
       activity?: AgentSessionLogActivity
     }
@@ -75,6 +77,8 @@ export type AgentSessionLogPaneReading = {
 }
 
 export type AgentSessionLogFoldInput = {
+  /** Newest turn's model id and prompt size; omitted when the tail had none. */
+  modelUsage?: { model: string | null; contextTokens: number } | null
   /** Newest turn boundary in the scanned window, if the log had one. */
   lifecycle: NativeChatTurnLifecycle | null
   queuedInput: AgentSessionLogQueuedInput
