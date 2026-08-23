@@ -1,6 +1,8 @@
 import './xterm-env-polyfill'
 import { Terminal } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
+import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
+import { readBufferTailLines, readBufferTailSegments } from './terminal-buffer-tail-segments'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { activateOrcaTerminalUnicodeProvider } from '../../shared/terminal-unicode-provider'
 import {
@@ -302,13 +304,12 @@ export class HeadlessEmulator {
   }
 
   getBufferTailLines(limit: number): string[] {
-    const buffer = this.terminal.buffer.active
-    const start = Math.max(0, buffer.length - Math.max(0, Math.floor(limit)))
-    const lines: string[] = []
-    for (let row = start; row < buffer.length; row += 1) {
-      lines.push(buffer.getLine(row)?.translateToString(true) ?? '')
-    }
-    return lines
+    return readBufferTailLines(this.terminal.buffer.active, limit)
+  }
+
+  /** Tail rows as coloured runs, read from the buffer's own cell attributes. */
+  getBufferTailSegments(limit: number): TerminalLineSegment[][] {
+    return readBufferTailSegments(this.terminal.buffer.active, limit)
   }
 
   getCwd(): string | null {

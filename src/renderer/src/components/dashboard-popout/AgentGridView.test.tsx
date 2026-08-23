@@ -257,6 +257,33 @@ describe('AgentGridView', () => {
     expect(screen.getByText('One')).toBeInTheDocument()
   })
 
+  it('paints the tail with the colours the pane reported', async () => {
+    renderGrid(
+      [card({ paneKey: 'p1', ptyId: 'pty-1' })],
+      [],
+      [
+        {
+          ptyId: 'pty-1',
+          tail: {
+            read: true,
+            lines: ['ok FAIL done'],
+            segments: [
+              [
+                { text: 'ok ', color: 'default', bold: false, dim: false },
+                { text: 'FAIL', color: 'red', bold: true, dim: false }
+              ]
+            ]
+          }
+        }
+      ]
+    )
+    await screen.findByText('FAIL')
+    const painted = document.querySelector<HTMLElement>('[data-tail-color="red"]')
+    expect(painted?.textContent).toBe('FAIL')
+    // The escape never reaches the DOM: the colour arrives as data, not markup.
+    expect(document.querySelector('[data-terminal-tail]')?.innerHTML).not.toContain('[31m')
+  })
+
   it('never opens more tracks than there are agents', async () => {
     stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
     renderGrid([card({ paneKey: 'p1' })], [])

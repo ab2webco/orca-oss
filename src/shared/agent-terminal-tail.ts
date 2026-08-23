@@ -1,4 +1,6 @@
-// ─── Plain-text tail of an agent pane's live screen ─────────────────────────
+import type { TerminalLineSegment } from './terminal-line-segments'
+
+// ─── Tail of an agent pane's live screen ────────────────────────────────────
 // The dashboard grid shows what an agent is DOING, which is its terminal, not a
 // prose summary of it. Text rather than ANSI because a cell is ~320px wide: an
 // xterm must be built at the pty's real grid (80-240 cols) and scaled to fit,
@@ -23,7 +25,13 @@ export type AgentTerminalTailUnreadReason =
   | 'terminal-unreadable'
 
 export type AgentTerminalTailReading =
-  | { read: true; lines: string[] }
+  | {
+      read: true
+      lines: string[]
+      /** Coloured runs per line, when the pane's emulator lives in main. Absent
+       *  means no colour was available, never that the line was blank. */
+      segments?: TerminalLineSegment[][]
+    }
   | { read: false; reason: AgentTerminalTailUnreadReason }
 
 export type AgentTerminalTailPtyReading = {

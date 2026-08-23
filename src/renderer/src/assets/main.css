@@ -168,6 +168,16 @@
   --input: #e5e5e5;
   --ring: #a1a1a1;
   --terminal-pane-locate: var(--color-blue-600);
+  /* Agent-grid tail: the eight ANSI hues, from the app palette. The pop-out has
+     no store, so it cannot read the user's terminal theme (ORCA-234). */
+  --agent-tail-black: var(--color-zinc-500);
+  --agent-tail-red: var(--color-red-600);
+  --agent-tail-green: var(--color-green-600);
+  --agent-tail-yellow: var(--color-amber-600);
+  --agent-tail-blue: var(--color-blue-600);
+  --agent-tail-magenta: var(--color-violet-600);
+  --agent-tail-cyan: var(--color-cyan-600);
+  --agent-tail-white: var(--color-zinc-700);
   --ai-action-accent: var(--color-violet-500);
   --status-success: #15803d;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
@@ -266,6 +276,14 @@
   --accent: #404040;
   --accent-foreground: #fafafa;
   --destructive: #ff6568;
+  --agent-tail-black: var(--color-zinc-400);
+  --agent-tail-red: var(--color-red-400);
+  --agent-tail-green: var(--color-green-400);
+  --agent-tail-yellow: var(--color-amber-300);
+  --agent-tail-blue: var(--color-blue-400);
+  --agent-tail-magenta: var(--color-violet-400);
+  --agent-tail-cyan: var(--color-cyan-300);
+  --agent-tail-white: var(--color-zinc-200);
   --destructive-foreground: #df2225;
   --border: rgb(255 255 255 / 0.07);
   --input: rgb(255 255 255 / 0.15);
