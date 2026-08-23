@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentStateDot } from '@/components/AgentStateDot'
 import { dashboardBucketLabel } from '../dashboard/dashboard-bucket-label'
+import { agentGridBucketForDotState } from './agent-grid-buckets'
 import { RepoIconGlyph } from '@/components/repo/repo-icon'
 import { translate } from '@/i18n/i18n'
 import type {
@@ -25,7 +26,7 @@ import {
 import {
   AGENT_GRID_DEFAULT_PAGE_SIZE,
   AGENT_GRID_PAGE_SIZE_OPTIONS
-} from './agent-grid-paging'
+} from './agent-grid-visible-count'
 import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
 import { useAgentGridAvailableHeight, useAgentGridSize } from './use-agent-grid-width'
 import type { DashboardFilters } from './agent-board-filtering'
@@ -96,7 +97,13 @@ export function AgentGridView({
   )
   const flatCells = useMemo(
     () =>
-      bucketFilter ? allCells.filter((entry) => entry.cell.card.bucket === bucketFilter) : allCells,
+      bucketFilter
+        ? allCells.filter(
+            (entry) =>
+              agentGridBucketForDotState(entry.cell.dotState, entry.cell.card.unseen) ===
+              bucketFilter
+          )
+        : allCells,
     [allCells, bucketFilter]
   )
 
@@ -120,7 +127,7 @@ export function AgentGridView({
   const bucketTotals = useMemo(() => {
     const totals = { attention: 0, working: 0, done: 0, idle: 0 }
     for (const entry of allCells) {
-      totals[entry.cell.card.bucket] += 1
+      totals[agentGridBucketForDotState(entry.cell.dotState, entry.cell.card.unseen)] += 1
     }
     return totals
   }, [allCells])
@@ -194,7 +201,8 @@ export function AgentGridView({
                   [
                     ['attention', 'waiting'],
                     ['working', 'working'],
-                    ['done', 'done']
+                    ['done', 'done'],
+                    ['idle', 'idle']
                   ] as const
                 ).map(([bucket, dot]) => (
                   <button

@@ -85,6 +85,22 @@ function working(text: string, tool: string | null): AgentSessionLogReading {
   }
 }
 
+function awaitingInput(): AgentSessionLogReading {
+  return {
+    read: true,
+    state: 'awaiting-input',
+    lastTurnAtMs: 60_000,
+    queuedInput: { supported: true, pending: 0 },
+    unparsedRecords: 0,
+    activity: {
+      lastAssistantText: 'ready',
+      pendingToolName: null,
+      atMs: 60_000,
+      textBeyondScan: false
+    }
+  }
+}
+
 function renderGrid(
   cards: DashboardCard[],
   readings: AgentSessionLogPaneReading[],
@@ -177,20 +193,28 @@ describe('AgentGridView', () => {
     expect(onRevealAgent).not.toHaveBeenCalled()
   })
 
-  it('counts the state buckets above the grid, like the board columns do', async () => {
+  it('counts the state buckets above the grid, from the same state the cell shows', async () => {
     renderGrid(
+      [card({ paneKey: 'p1' }), card({ paneKey: 'p2' }), card({ paneKey: 'p3' })],
       [
-        card({ paneKey: 'p1', bucket: 'working' }),
-        card({ paneKey: 'p2', bucket: 'attention' }),
-        card({ paneKey: 'p3', bucket: 'working' })
-      ],
-      []
+        { paneKey: 'p1', agent: 'claude', sessionId: 's1', session: working('one', null) },
+        { paneKey: 'p2', agent: 'claude', sessionId: 's2', session: working('two', null) },
+        {
+          paneKey: 'p3',
+          agent: 'claude',
+          sessionId: 's3',
+          session: awaitingInput()
+        }
+      ]
     )
     await screen.findByText('Alpha')
-    const strip = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
-      ?.parentElement?.parentElement?.previousElementSibling
-    expect(strip?.textContent).toContain('Needs You1')
-    expect(strip?.textContent).toContain('Working2')
+    const strip = document.querySelector<HTMLElement>('[aria-pressed]')?.parentElement
+    // The strip splits them the way the cells do, and the four counts add up to
+    // the agents on screen — a bucket left out is how the numbers stopped
+    // matching the total before.
+    await waitFor(() => expect(strip?.textContent).toContain('Working2'))
+    const counts = [...(strip?.textContent ?? '').matchAll(/(\d+)/g)].map((m) => Number(m[1]))
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBe(3)
   })
 
   it('keeps the rows readable and lets the page scroll with several projects', async () => {

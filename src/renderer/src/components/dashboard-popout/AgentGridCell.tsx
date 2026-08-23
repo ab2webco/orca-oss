@@ -3,7 +3,6 @@ import { Hammer, Inbox } from 'lucide-react'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
-import { dashboardBucketLabel } from '../dashboard/dashboard-bucket-label'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
@@ -71,7 +70,7 @@ export const AgentGridCell = memo(function AgentGridCell({
             needsAttention ? 'text-foreground' : 'text-muted-foreground'
           )}
         >
-          {dashboardBucketLabel(card.bucket)}
+          {agentStateLabel(cell.dotState)}
         </span>
         <span aria-hidden>·</span>
         <span className="truncate">{card.worktreeName}</span>
