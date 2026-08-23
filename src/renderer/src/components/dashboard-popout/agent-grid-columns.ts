@@ -50,7 +50,7 @@ export function resolveAgentGridRows(cellCount: number, columns: number): number
 /** Header rows above the tail inside a cell, plus its padding. */
 const AGENT_GRID_CELL_CHROME_HEIGHT = 76
 /** Line box of the 11px monospace tail. */
-const AGENT_GRID_TAIL_LINE_HEIGHT = 15
+const AGENT_GRID_TAIL_LINE_HEIGHT = 16
 
 /**
  * Tail lines a cell of `cellHeight` can show without clipping.
@@ -65,4 +65,24 @@ export function resolveAgentGridTailLines(cellHeight: number, maxLines: number):
   }
   const fits = Math.floor((cellHeight - AGENT_GRID_CELL_CHROME_HEIGHT) / AGENT_GRID_TAIL_LINE_HEIGHT)
   return Math.min(maxLines, Math.max(4, fits))
+}
+
+/**
+ * Floor for a cell's height, by how many share the grid.
+ *
+ * Why a floor and not only `1fr`: `1fr` distributes free space, and a host that
+ * gives the grid no definite height has none to distribute — the cells then
+ * collapse to their content, which is the unreadable state the owner reported.
+ */
+export function resolveAgentGridMinCellHeight(cellCount: number): number {
+  if (!Number.isFinite(cellCount) || cellCount <= 2) {
+    return 420
+  }
+  if (cellCount <= 4) {
+    return 320
+  }
+  if (cellCount <= 6) {
+    return 260
+  }
+  return 200
 }

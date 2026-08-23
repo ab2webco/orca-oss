@@ -109,7 +109,7 @@ export function AgentGridCellTerminalTail({
           their own, and `pre` already clips what the cell cannot fit. */}
       <pre
         data-terminal-tail={cell.card.ptyId}
-        className="overflow-hidden font-mono text-[10px] leading-[1.35] text-foreground/80"
+        className="overflow-hidden font-mono text-[12px] leading-[1.35] text-foreground/80"
       >
         {tail.lines.join('\n')}
       </pre>

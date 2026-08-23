@@ -11,6 +11,7 @@ import {
   AGENT_GRID_CELL_GAP,
   AGENT_GRID_FALLBACK_WIDTH,
   resolveAgentGridColumns,
+  resolveAgentGridMinCellHeight,
   resolveAgentGridRows,
   resolveAgentGridTailLines
 } from './agent-grid-columns'
@@ -43,6 +44,9 @@ export type AgentGridViewProps = {
   searchInputRef: React.RefObject<HTMLInputElement | null>
   now: number
   onRevealAgent: (args: AgentRevealArgs) => void
+  /** Opens the board's live-terminal dialog for a cell. Without it a click
+   *  falls back to focusing the pane, which is what the grid did before. */
+  onOpenTerminal?: (card: DashboardCard) => void
   /** Test seam: the batch session-log reader and its cadence. */
   readPanes?: AgentSessionLogReadPanes
   /** Test seam: the batch terminal-tail reader. */
@@ -62,7 +66,8 @@ export function AgentGridView({
   onRevealAgent,
   readPanes,
   readPtys,
-  pollIntervalMs
+  pollIntervalMs,
+  onOpenTerminal
 }: AgentGridViewProps): React.JSX.Element {
   const paneKeys = useMemo(() => cards.map((card) => card.paneKey), [cards])
   const readings = useAgentSessionLogReadings(paneKeys, { readPanes, intervalMs: pollIntervalMs })
@@ -128,6 +133,10 @@ export function AgentGridView({
   const handleReveal = useCallback(
     (cell: AgentGridCellModel) => {
       const { card } = cell
+      if (onOpenTerminal) {
+        onOpenTerminal(card)
+        return
+      }
       onRevealAgent({
         repoId: card.repoId,
         worktreeId: card.worktreeId,
@@ -136,7 +145,7 @@ export function AgentGridView({
         leafId: card.leafId
       })
     },
-    [onRevealAgent]
+    [onOpenTerminal, onRevealAgent]
   )
 
   return (
@@ -212,6 +221,7 @@ export function AgentGridView({
             visibleSections.map((project) => {
               const columns = resolveAgentGridColumns(gridWidth, project.cells.length)
               const rows = resolveAgentGridRows(project.cells.length, columns)
+              const minCellHeight = resolveAgentGridMinCellHeight(project.cells.length)
               return (
               <section key={project.repoId} className="flex min-h-0 flex-1 flex-col gap-2">
                 <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
@@ -232,7 +242,7 @@ export function AgentGridView({
                   className="grid min-h-0 flex-1"
                   style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+                    gridTemplateRows: `repeat(${rows}, minmax(${minCellHeight}px, 1fr))`,
                     gap: `${AGENT_GRID_CELL_GAP}px`
                   }}
                 >

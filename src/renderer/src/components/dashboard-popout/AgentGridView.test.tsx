@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
 import { createRef } from 'react'
 import type {
@@ -88,11 +88,17 @@ function working(text: string, tool: string | null): AgentSessionLogReading {
 function renderGrid(
   cards: DashboardCard[],
   readings: AgentSessionLogPaneReading[],
-  tails: AgentTerminalTailPtyReading[] = []
-): { readPanes: ReturnType<typeof vi.fn>; readPtys: ReturnType<typeof vi.fn> } {
+  tails: AgentTerminalTailPtyReading[] = [],
+  overrides: { onOpenTerminal?: (card: DashboardCard) => void } = {}
+): {
+  readPanes: ReturnType<typeof vi.fn>
+  readPtys: ReturnType<typeof vi.fn>
+  onRevealAgent: ReturnType<typeof vi.fn>
+} {
   const snapshot: DashboardSnapshot = { generatedAt: 1, cards }
   const readPanes = vi.fn(async () => readings)
   const readPtys = vi.fn(async () => tails)
+  const onRevealAgent = vi.fn()
   // The pop-out wraps every view in one provider; the cell's truncation
   // tooltips need it here too.
   render(
@@ -106,14 +112,15 @@ function renderGrid(
         onFiltersChange={vi.fn()}
         searchInputRef={createRef<HTMLInputElement>()}
         now={120_000}
-        onRevealAgent={vi.fn()}
+        onRevealAgent={onRevealAgent}
+        onOpenTerminal={overrides.onOpenTerminal}
         readPanes={readPanes}
         readPtys={readPtys}
         pollIntervalMs={1_000_000}
       />
     </TooltipProvider>
   )
-  return { readPanes, readPtys }
+  return { readPanes, readPtys, onRevealAgent }
 }
 
 function gridTracks(): string[] {
@@ -160,6 +167,16 @@ describe('AgentGridView', () => {
 
   // The owner's report: one agent in a wide pop-out sat in a narrow column with
   // the rest of the row empty, which is where the tail is least readable.
+  it('opens the terminal dialog on a cell click, and falls back to the pane', async () => {
+    const onOpenTerminal = vi.fn()
+    const { onRevealAgent } = renderGrid([card({ paneKey: 'p1' })], [], [], { onOpenTerminal })
+    await screen.findByText('Alpha')
+    const cell = document.querySelector<HTMLElement>('[data-pane-key="p1"]')
+    fireEvent.click(cell as HTMLElement)
+    expect(onOpenTerminal).toHaveBeenCalledTimes(1)
+    expect(onRevealAgent).not.toHaveBeenCalled()
+  })
+
   it('never opens more tracks than there are agents', async () => {
     stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
     renderGrid([card({ paneKey: 'p1' })], [])
@@ -173,7 +190,9 @@ describe('AgentGridView', () => {
     const grid = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
     // Two across at the default width, so three agents need two equal rows.
     expect(grid?.dataset.agentGridRows).toBe('2')
-    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(0, 1fr))')
+    // Rows share the height, with a floor so a host that gives the grid no
+    // definite height still renders readable cells instead of collapsing them.
+    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(320px, 1fr))')
     expect(grid?.style.gridAutoRows).toBe('')
   })
 

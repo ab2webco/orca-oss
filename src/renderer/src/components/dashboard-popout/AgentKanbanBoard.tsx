@@ -341,6 +341,7 @@ export function AgentKanbanBoard({
         {view === 'grid' ? (
           <Suspense fallback={null}>
             <AgentGridView
+              onOpenTerminal={setOpenedCard}
               snapshot={snapshot}
               cards={filteredCards}
               query={query}
@@ -402,7 +403,7 @@ export function AgentKanbanBoard({
             </div>
           </>
         )}
-        {view === 'board' ? (
+        {view === 'board' || view === 'grid' ? (
           <AgentTerminalDialog
             card={dialogCard}
             onOpenChange={handleDialogOpenChange}
