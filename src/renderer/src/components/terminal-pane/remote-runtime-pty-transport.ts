@@ -804,9 +804,11 @@ export function createRemoteRuntimePtyTransport(
       const epoch = recovery.isActive ? recovery.currentEpoch : recovery.begin()
       if (
         !recovery.schedule(epoch, () => {
+          // Carry the caller's notifySpawn: the abandoned attempt never reached the
+          // spawn notify, so the retry owes the pane the same binding signal.
           void attachHostSessionMirror(
             options,
-            false,
+            notifySpawn,
             expectedAttachGeneration,
             expectedLifecycleEpoch
           )
