@@ -3,6 +3,7 @@ import {
   AGENT_GRID_CELL_GAP,
   AGENT_GRID_MAX_COLUMNS,
   AGENT_GRID_MIN_CELL_WIDTH,
+  resolveAgentGridCellSpans,
   resolveAgentGridColumns
 } from './agent-grid-columns'
 
@@ -45,5 +46,22 @@ describe('resolveAgentGridColumns', () => {
     expect(resolveAgentGridColumns(-40)).toBe(1)
     expect(resolveAgentGridColumns(Number.NaN)).toBe(1)
     expect(resolveAgentGridColumns(120)).toBe(1)
+  })
+})
+
+describe('resolveAgentGridCellSpans', () => {
+  it('gives a lone cell in the last row the whole row', () => {
+    // The owner's report: three agents across two tracks left a visible hole.
+    expect(resolveAgentGridCellSpans(3, 2)).toEqual([1, 1, 2])
+  })
+
+  it('splits an incomplete last row evenly, remainder first', () => {
+    expect(resolveAgentGridCellSpans(5, 3)).toEqual([1, 1, 1, 2, 1])
+    expect(resolveAgentGridCellSpans(2, 3)).toEqual([2, 1])
+  })
+
+  it('leaves full rows alone', () => {
+    expect(resolveAgentGridCellSpans(4, 2)).toEqual([1, 1, 1, 1])
+    expect(resolveAgentGridCellSpans(1, 1)).toEqual([1])
   })
 })

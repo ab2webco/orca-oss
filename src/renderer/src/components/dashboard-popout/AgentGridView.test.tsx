@@ -177,6 +177,22 @@ describe('AgentGridView', () => {
     expect(onRevealAgent).not.toHaveBeenCalled()
   })
 
+  it('counts the state buckets above the grid, like the board columns do', async () => {
+    renderGrid(
+      [
+        card({ paneKey: 'p1', bucket: 'working' }),
+        card({ paneKey: 'p2', bucket: 'attention' }),
+        card({ paneKey: 'p3', bucket: 'working' })
+      ],
+      []
+    )
+    await screen.findByText('Alpha')
+    const strip = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
+      ?.parentElement?.parentElement?.previousElementSibling
+    expect(strip?.textContent).toContain('Needs You1')
+    expect(strip?.textContent).toContain('Working2')
+  })
+
   it('never opens more tracks than there are agents', async () => {
     stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
     renderGrid([card({ paneKey: 'p1' })], [])

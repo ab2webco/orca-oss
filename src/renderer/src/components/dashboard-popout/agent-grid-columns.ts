@@ -86,3 +86,24 @@ export function resolveAgentGridMinCellHeight(cellCount: number): number {
   }
   return 200
 }
+
+/**
+ * Column span per cell so a partly filled last row leaves no hole.
+ *
+ * Why spans and not a smaller column count: the full rows above should keep
+ * their width. Only the remainder row widens, and it widens evenly — three
+ * agents across two tracks give the third the whole row rather than half of it.
+ */
+export function resolveAgentGridCellSpans(cellCount: number, columns: number): number[] {
+  if (!Number.isFinite(cellCount) || cellCount <= 0) {
+    return []
+  }
+  const tracks = Number.isFinite(columns) && columns > 0 ? Math.floor(columns) : 1
+  const lastRowCount = cellCount % tracks === 0 ? tracks : cellCount % tracks
+  const fullRowCells = cellCount - lastRowCount
+  const base = Math.floor(tracks / lastRowCount)
+  const remainder = tracks % lastRowCount
+  return Array.from({ length: cellCount }, (_, index) =>
+    index < fullRowCells ? 1 : base + (index - fullRowCells < remainder ? 1 : 0)
+  )
+}

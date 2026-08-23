@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AgentStateDot } from '@/components/AgentStateDot'
 import { RepoIconGlyph } from '@/components/repo/repo-icon'
 import { translate } from '@/i18n/i18n'
 import type { DashboardCard, DashboardSnapshot } from '../../../../shared/dashboard-snapshot'
@@ -10,6 +11,7 @@ import { buildAgentGrid, type AgentGridCellModel } from './agent-grid-model'
 import {
   AGENT_GRID_CELL_GAP,
   AGENT_GRID_FALLBACK_WIDTH,
+  resolveAgentGridCellSpans,
   resolveAgentGridColumns,
   resolveAgentGridMinCellHeight,
   resolveAgentGridRows,
@@ -102,6 +104,13 @@ export function AgentGridView({
     }
     return [...byRepo.values()]
   }, [page.visible])
+  const bucketTotals = useMemo(() => {
+    const totals = { attention: 0, working: 0, done: 0, idle: 0 }
+    for (const entry of flatCells) {
+      totals[entry.cell.card.bucket] += 1
+    }
+    return totals
+  }, [flatCells])
   const tallestRows = visibleSections.reduce(
     (rows, section) =>
       Math.max(rows, resolveAgentGridRows(section.cells.length, resolveAgentGridColumns(gridWidth, section.cells.length))),
@@ -163,6 +172,21 @@ export function AgentGridView({
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
           {flatCells.length > 1 ? (
             <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <span className="mr-3 flex items-center gap-2.5">
+                {(
+                  [
+                    ['attention', 'waiting', 'dashboardPopout.bucket.attention', 'Needs You'],
+                    ['working', 'working', 'dashboardPopout.bucket.working', 'Working'],
+                    ['done', 'done', 'dashboardPopout.bucket.done', 'Done']
+                  ] as const
+                ).map(([bucket, dot, key, fallback]) => (
+                  <span key={bucket} className="flex items-center gap-1">
+                    <AgentStateDot state={dot} size="sm" />
+                    <span>{translate(key, fallback)}</span>
+                    <span className="tabular-nums text-foreground">{bucketTotals[bucket]}</span>
+                  </span>
+                ))}
+              </span>
               {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -222,6 +246,7 @@ export function AgentGridView({
               const columns = resolveAgentGridColumns(gridWidth, project.cells.length)
               const rows = resolveAgentGridRows(project.cells.length, columns)
               const minCellHeight = resolveAgentGridMinCellHeight(project.cells.length)
+              const spans = resolveAgentGridCellSpans(project.cells.length, columns)
               return (
               <section key={project.repoId} className="flex min-h-0 flex-1 flex-col gap-2">
                 <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
@@ -246,14 +271,19 @@ export function AgentGridView({
                     gap: `${AGENT_GRID_CELL_GAP}px`
                   }}
                 >
-                  {project.cells.map((cell) => (
-                    <AgentGridCell
+                  {project.cells.map((cell, index) => (
+                    <div
                       key={cell.card.paneKey}
+                      className="min-h-0 min-w-0"
+                      style={{ gridColumn: `span ${spans[index] ?? 1}` }}
+                    >
+                    <AgentGridCell
                       cell={cell}
                       tail={cell.card.ptyId ? tails.get(cell.card.ptyId) : undefined}
                       now={now}
                       onReveal={handleReveal}
                     />
+                    </div>
                   ))}
                 </div>
               </section>
