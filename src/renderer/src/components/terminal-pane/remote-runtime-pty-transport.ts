@@ -777,20 +777,63 @@ export function createRemoteRuntimePtyTransport(
       !destroyed &&
       (expectedAttachGeneration === undefined || expectedAttachGeneration === attachGeneration) &&
       (expectedLifecycleEpoch === undefined || expectedLifecycleEpoch === lifecycleEpoch)
+    // Why: a give-up that returns silently leaves the `connecting` latch set by
+    // connect/attach, pinning the pane at "connecting" with no error and no retry
+    // (ORCA-278). Only the still-current attach may clear it; a superseded one must
+    // not clobber its successor's latch.
+    const abandonAttach = (): undefined => {
+      if (isCurrent() && connecting) {
+        connecting = false
+        emitRecoveryState()
+      }
+      return undefined
+    }
+    // Why: the bounded handle wait ends "unknown", not "gone" — a relaunched host that
+    // is slow to republish. Retrying inside the recovery budget keeps the pane healable
+    // without mutating the mirror; the budget's own cutoff ends it at 'disconnected'.
+    const retryMirrorAttachLater = (): undefined => {
+      if (!isCurrent()) {
+        return undefined
+      }
+      if (!recovery.isActive && recovery.currentPhase !== 'idle') {
+        // A budget already ran and ended; a give-up here must not open a second one.
+        connecting = false
+        emitRecoveryState()
+        return undefined
+      }
+      const epoch = recovery.isActive ? recovery.currentEpoch : recovery.begin()
+      if (
+        !recovery.schedule(epoch, () => {
+          void attachHostSessionMirror(
+            options,
+            false,
+            expectedAttachGeneration,
+            expectedLifecycleEpoch
+          )
+        })
+      ) {
+        connecting = false
+      }
+      emitRecoveryState()
+      return undefined
+    }
     const hostTabId = toHostSessionTabId(tabId)
     const hostHandle = await waitForHostSessionHandleWithRecovery(hostTabId, isCurrent)
-    if (hostHandle === undefined || !isCurrent()) {
+    if (!isCurrent()) {
       return undefined
+    }
+    if (hostHandle === undefined) {
+      return retryMirrorAttachLater()
     }
     if (hostHandle === null) {
       surfaceErrorMessage('Remote terminal was closed.')
-      return undefined
+      return abandonAttach()
     }
     if (!hostHandle || !isCurrent()) {
       if (isCurrent()) {
         surfaceErrorMessage('Remote terminal was closed.')
       }
-      return undefined
+      return abandonAttach()
     }
 
     if (leafId && worktreeId && !resolvePaneUnavailable) {
@@ -816,7 +859,7 @@ export function createRemoteRuntimePtyTransport(
     }
 
     if (!isCurrent() || recovery.currentPhase === 'disconnected') {
-      return undefined
+      return abandonAttach()
     }
     handle = hostHandle
     remotePtyId = toRemoteRuntimePtyId(hostHandle, currentRuntimeEnvironmentId)
@@ -838,7 +881,7 @@ export function createRemoteRuntimePtyTransport(
       }
     }
     if (!connected || !remotePtyId || !isCurrent()) {
-      return undefined
+      return abandonAttach()
     }
 
     return {
