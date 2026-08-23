@@ -406,7 +406,7 @@ export function AccountsPane({
     useState<CodexRateLimitAccountsState>(emptyCodexAccountsState)
   const [codexAccountsLoaded, setCodexAccountsLoaded] = useState(false)
   const [codexAction, setCodexAction] = useState<
-    'idle' | 'adding' | `reauth:${string}` | `remove:${string}` | `select:${string | 'system'}`
+    'idle' | 'adding' | `reauth:${string}` | `remove:${string}` | `select:${string}`
   >('idle')
   const [claudeAccounts, setClaudeAccounts] =
     useState<ClaudeRateLimitAccountsState>(emptyClaudeAccountsState)
@@ -418,7 +418,7 @@ export function AccountsPane({
     | `reauth:${string}`
     | `remove:${string}`
     | `reassign:${string}`
-    | `select:${string | 'system'}`
+    | `select:${string}`
   >('idle')
   const [addEndpointOpen, setAddEndpointOpen] = useState(false)
   // null = the dialog is in add mode; an id = editing that endpoint account.
