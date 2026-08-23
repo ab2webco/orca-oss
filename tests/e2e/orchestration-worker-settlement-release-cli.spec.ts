@@ -28,10 +28,12 @@ process.stdin.on('data', (chunk) => {
   const encoded = input.match(/ORCA_E2E_WORKER_DONE:([A-Za-z0-9+/=]+)/)?.[1]
   if (!encoded || !capability) return
   const request = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))
+  // Why the capability and not just --from: Orca attests the caller by pane and process
+  // incarnation, so a claimed sender handle is routing metadata and cannot be the violation.
   const args = [
     'orchestration', 'send',
     '--from', request.mismatch ? 'term_foreign' : process.env.ORCA_TERMINAL_HANDLE,
-    '--dispatch-capability', capability,
+    '--dispatch-capability', request.mismatch ? 'dcap_never_minted' : capability,
     '--to', request.coordinator,
     '--type', 'worker_done',
     '--subject', request.mismatch ? 'wrong sender' : 'completed',
@@ -39,6 +41,12 @@ process.stdin.on('data', (chunk) => {
     '--task-id', request.taskId,
     '--dispatch-id', request.dispatchId,
     '--outcome', 'succeeded',
+    // Why: worker_done carries the typed envelope contract; --outcome alone is not a report.
+    '--envelope', JSON.stringify({
+      status: 'success',
+      summary: 'Compiled CLI E2E worker completion.',
+      verification: [{ claim: 'e2e settled the dispatch', evidence: 'CLI exit 0', level: 'live' }]
+    }),
     '--json'
   ]
   const result = spawnSync(process.execPath, [process.env.ORCA_E2E_CLI_ENTRY, ...args], {
