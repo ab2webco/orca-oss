@@ -63,6 +63,16 @@ export const AgentGridCell = memo(function AgentGridCell({
         ) : null}
       </div>
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        {/* The dot alone reads as decoration at cell size; the word is the state. */}
+        <span
+          className={cn(
+            'shrink-0 font-medium',
+            needsAttention ? 'text-foreground' : 'text-muted-foreground'
+          )}
+        >
+          {agentStateLabel(cell.dotState)}
+        </span>
+        <span aria-hidden>·</span>
         <span className="truncate">{card.worktreeName}</span>
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{formatAgentTypeLabel(card.agentType)}</span>

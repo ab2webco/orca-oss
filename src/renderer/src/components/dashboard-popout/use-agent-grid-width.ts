@@ -26,3 +26,32 @@ export function useAgentGridWidth(ref: RefObject<HTMLElement | null>): number {
 
   return width
 }
+
+/** Measured content box of the grid's container. Zero until the observer reports. */
+export function useAgentGridSize(ref: RefObject<HTMLElement | null>): {
+  width: number
+  height: number
+} {
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return undefined
+    }
+    const measure = (): void => {
+      const box = element.getBoundingClientRect()
+      setSize((current) =>
+        current.width === box.width && current.height === box.height
+          ? current
+          : { width: box.width, height: box.height }
+      )
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+
+  return size
+}

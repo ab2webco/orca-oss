@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
 import { createRef } from 'react'
 import type {
   AgentSessionLogPaneReading,
@@ -144,16 +145,36 @@ describe('AgentGridView', () => {
 
   it('adds columns when the pop-out is widened', async () => {
     stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
-    renderGrid([card({ paneKey: 'p1' }), card({ paneKey: 'p2' })], [])
+    renderGrid(
+      [
+        card({ paneKey: 'p1' }),
+        card({ paneKey: 'p2' }),
+        card({ paneKey: 'p3' }),
+        card({ paneKey: 'p4' })
+      ],
+      []
+    )
     await screen.findByText('Alpha')
     expect(gridTracks()).toEqual(['repeat(4, minmax(0, 1fr))'])
   })
 
-  it('gives every cell the same box so the rows read as a grid', async () => {
-    renderGrid([card({ paneKey: 'p1' }), card({ paneKey: 'p2' })], [])
+  // The owner's report: one agent in a wide pop-out sat in a narrow column with
+  // the rest of the row empty, which is where the tail is least readable.
+  it('never opens more tracks than there are agents', async () => {
+    stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
+    renderGrid([card({ paneKey: 'p1' })], [])
+    await screen.findByText('Alpha')
+    expect(gridTracks()).toEqual(['repeat(1, minmax(0, 1fr))'])
+  })
+
+  it('gives every cell the same share of the height instead of a fixed box', async () => {
+    renderGrid([card({ paneKey: 'p1' }), card({ paneKey: 'p2' }), card({ paneKey: 'p3' })], [])
     await screen.findByText('Alpha')
     const grid = document.querySelector<HTMLElement>('[data-agent-grid-columns]')
-    expect(grid?.style.gridAutoRows).toBe('216px')
+    // Two across at the default width, so three agents need two equal rows.
+    expect(grid?.dataset.agentGridRows).toBe('2')
+    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(0, 1fr))')
+    expect(grid?.style.gridAutoRows).toBe('')
   })
 
   // The whole point of the ticket: what each agent is DOING, which is terminal
@@ -228,10 +249,8 @@ describe('AgentGridView', () => {
     expect(within(beta as HTMLElement).getAllByRole('button')).toHaveLength(1)
     expect(within(alpha as HTMLElement).getByText('2 agents')).toBeInTheDocument()
     // Each project lays its own agents out in a grid, not a column.
-    expect(gridTracks()).toEqual([
-      'repeat(2, minmax(0, 1fr))',
-      'repeat(2, minmax(0, 1fr))'
-    ])
+    // The second project has a single agent, so it gets a single full-width track.
+    expect(gridTracks()).toEqual(['repeat(2, minmax(0, 1fr))', 'repeat(1, minmax(0, 1fr))'])
   })
 
   it('falls back to the session log while no terminal has been read', async () => {
@@ -268,6 +287,7 @@ describe('AgentGridView', () => {
     await waitFor(() => expect(readPanes).toHaveBeenCalledTimes(1))
     expect(readPanes).toHaveBeenCalledWith(['p1', 'p2'])
     await waitFor(() => expect(readPtys).toHaveBeenCalledTimes(1))
-    expect(readPtys).toHaveBeenCalledWith(['pty-1', 'pty-2'], 8)
+    // The 600px-tall stub leaves room for more lines than the contract's cap.
+    expect(readPtys).toHaveBeenCalledWith(['pty-1', 'pty-2'], AGENT_TERMINAL_TAIL_MAX_LINES)
   })
 })

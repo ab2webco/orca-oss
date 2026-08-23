@@ -7,6 +7,16 @@ import {
 } from './agent-grid-columns'
 
 describe('resolveAgentGridColumns', () => {
+
+  it('never opens more tracks than there are cards', () => {
+    // A single agent in a wide pop-out is where the tail is least readable.
+    expect(resolveAgentGridColumns(1400, 1)).toBe(1)
+    expect(resolveAgentGridColumns(1400, 2)).toBe(2)
+  })
+
+  it('still fills the width when there are more cards than tracks', () => {
+    expect(resolveAgentGridColumns(1400, 99)).toBe(resolveAgentGridColumns(1400))
+  })
   // The reported failure: the pop-out's own default width rendered ONE column,
   // so eight agents were eight rows to scroll (ORCA-234).
   it('puts several cells on a row at the pop-out default width', () => {
