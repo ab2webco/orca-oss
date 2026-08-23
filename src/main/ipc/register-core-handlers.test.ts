@@ -58,6 +58,8 @@ const {
   registerDashboardPopoutHandlersMock,
   isDashboardPopoutRendererMock,
   registerTerminalPreviewHandlersMock,
+  registerAgentTerminalTailHandlersMock,
+  isTerminalPreviewRendererStub,
   registerSpeechHandlersMock,
   registerSkillsHandlersMock,
   registerWorkspaceSpaceHandlersMock,
@@ -124,6 +126,8 @@ const {
   registerDashboardPopoutHandlersMock: vi.fn(),
   isDashboardPopoutRendererMock: vi.fn(),
   registerTerminalPreviewHandlersMock: vi.fn(),
+  registerAgentTerminalTailHandlersMock: vi.fn(),
+  isTerminalPreviewRendererStub: vi.fn(() => true),
   registerSpeechHandlersMock: vi.fn(),
   registerSkillsHandlersMock: vi.fn(),
   registerWorkspaceSpaceHandlersMock: vi.fn(),
@@ -165,7 +169,12 @@ vi.mock('../window/dashboard-popout-window', () => ({
 }))
 
 vi.mock('./terminal-preview', () => ({
-  registerTerminalPreviewHandlers: registerTerminalPreviewHandlersMock
+  registerTerminalPreviewHandlers: registerTerminalPreviewHandlersMock,
+  isTerminalPreviewRenderer: isTerminalPreviewRendererStub
+}))
+
+vi.mock('./agent-terminal-tail', () => ({
+  registerAgentTerminalTailHandlers: registerAgentTerminalTailHandlersMock
 }))
 
 vi.mock('./speech', () => ({
@@ -443,6 +452,7 @@ describe('registerCoreHandlers', () => {
     registerExportHandlersMock.mockReset()
     registerDashboardPopoutHandlersMock.mockReset()
     registerTerminalPreviewHandlersMock.mockReset()
+    registerAgentTerminalTailHandlersMock.mockReset()
     registerSpeechHandlersMock.mockReset()
     registerSkillsHandlersMock.mockReset()
     registerWorkspaceSpaceHandlersMock.mockReset()
@@ -532,6 +542,11 @@ describe('registerCoreHandlers', () => {
     expect(registerComputerUsePermissionHandlersMock).toHaveBeenCalled()
     expect(registerDashboardPopoutHandlersMock).toHaveBeenCalledWith(store, undefined)
     expect(registerTerminalPreviewHandlersMock).toHaveBeenCalledWith(runtime)
+    // The tail channel carries terminal CONTENT, so it must be gated.
+    expect(registerAgentTerminalTailHandlersMock).toHaveBeenCalledWith(
+      runtime,
+      isTerminalPreviewRendererStub
+    )
     expect(registerSettingsHandlersMock).toHaveBeenCalledWith(store, agentAwakeService)
     expect(registerSkillsHandlersMock).toHaveBeenCalledWith(store)
     expect(registerWorkspaceSpaceHandlersMock).toHaveBeenCalledWith(store)

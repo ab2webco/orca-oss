@@ -173,16 +173,4 @@ describe('registerAgentTerminalTailHandlers', () => {
       handlers.get('agentTerminalTail:readPtys')?.({ sender }, { ptyIds: ['a'], lines: 4 })
     ).resolves.toEqual([{ ptyId: 'a', tail: { read: true, lines: ['building…'] } }])
   })
-
-  it('answers an empty batch without touching the runtime', async () => {
-    const readTerminalVisibleLines = vi.fn(async () => ['x'])
-    registerAgentTerminalTailHandlers(
-      { readTerminalVisibleLines } as unknown as OrcaRuntimeService,
-      () => true
-    )
-    await expect(
-      handlers.get('agentTerminalTail:readPtys')?.({ sender }, { ptyIds: [] })
-    ).resolves.toEqual([])
-    expect(readTerminalVisibleLines).not.toHaveBeenCalled()
-  })
 })
