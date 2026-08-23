@@ -4,7 +4,7 @@ import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent, formatAgentTypeLabel } from '@/lib/agent-status'
 import { GitBranch } from 'lucide-react'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
-import { agentGridStateLabel } from './agent-grid-buckets'
+import { agentGridDisplayDotState, agentGridStateLabel } from './agent-grid-buckets'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AgentTerminalTailReading } from '../../../../shared/agent-terminal-tail'
@@ -57,7 +57,7 @@ export const AgentGridCell = memo(function AgentGridCell({
       )}
     >
       <div className="flex items-center gap-1.5">
-        <AgentStateDot state={cell.dotState} size="sm" />
+        <AgentStateDot state={agentGridDisplayDotState(cell.dotState, card.unseen)} size="sm" />
         <AgentIcon agent={agentTypeToIconAgent(card.agentType)} size={14} />
         <span className="truncate text-[13px] font-medium">{title}</span>
         {ago ? (

@@ -15086,6 +15086,12 @@
       "fit": "Ajustar",
       "projectCount": "{{agents}} agentes · {{workspaces}} espacios de trabajo",
       "agentCount": "{{count}} agentes"
+    },
+    "state": {
+      "blocked": "Bloqueado",
+      "waiting": "Esperando tu respuesta",
+      "interrupted": "Interrumpido",
+      "failed": "Falló"
     }
   },
   "dashboard": {

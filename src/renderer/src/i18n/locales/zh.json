@@ -15095,6 +15095,12 @@
       "fit": "适应",
       "projectCount": "{{agents}} 个智能体 · {{workspaces}} 个工作区",
       "agentCount": "{{count}} 个智能体"
+    },
+    "state": {
+      "blocked": "已阻塞",
+      "waiting": "等待输入",
+      "interrupted": "已中断",
+      "failed": "失败"
     }
   },
   "dashboard": {

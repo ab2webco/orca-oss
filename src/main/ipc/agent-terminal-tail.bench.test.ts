@@ -88,7 +88,6 @@ describe.skipIf(!benchEnabled)('agent terminal tail cost', () => {
 
       const liveRead = summarize(liveReadSamples)
       const perCellTerminal = summarize(perCellTerminalSamples)
-      // eslint-disable-next-line no-console
       console.log(
         JSON.stringify(
           {

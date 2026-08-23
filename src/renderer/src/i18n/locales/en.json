@@ -15987,6 +15987,12 @@
         "textBeyondScan": "Last message beyond the scan"
       },
       "agentCount": "{{count}} agents"
+    },
+    "state": {
+      "blocked": "Blocked",
+      "waiting": "Waiting for input",
+      "interrupted": "Interrupted",
+      "failed": "Failed"
     }
   },
   "dashboard": {

@@ -15097,6 +15097,12 @@
       "fit": "맞춤",
       "projectCount": "에이전트 {{agents}}개 · 작업 공간 {{workspaces}}개",
       "agentCount": "에이전트 {{count}}개"
+    },
+    "state": {
+      "blocked": "차단됨",
+      "waiting": "입력 대기",
+      "interrupted": "중단됨",
+      "failed": "실패"
     }
   },
   "dashboard": {

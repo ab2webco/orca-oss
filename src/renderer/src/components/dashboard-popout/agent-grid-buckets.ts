@@ -1,4 +1,6 @@
-import { agentStateLabel, type AgentDotState } from '@/components/AgentStateDot'
+import type { AgentDotState } from '@/components/AgentStateDot'
+import { translate } from '@/i18n/i18n'
+import { dashboardBucketLabel } from '../dashboard/dashboard-bucket-label'
 import type { DashboardBucket } from '../../../../shared/dashboard-snapshot'
 
 /**
@@ -35,14 +37,36 @@ export function agentGridBucketForDotState(
   }
 }
 
+/** Dot state the cell shows: the board's seen rule, applied once. */
+export function agentGridDisplayDotState(state: AgentDotState, unseen: boolean): AgentDotState {
+  return state === 'done' && !unseen ? 'idle' : state
+}
+
 /**
- * The word a cell shows for its state.
+ * The word a cell shows for its state, translated.
  *
- * Why not the raw dot state: the strip counts a finished-and-seen agent as
- * idle, so the cell calling it Done was the same two-vocabulary mismatch one
- * level down. Precision is kept everywhere else — a failed agent still says
- * Failed rather than its bucket (ORCA-234).
+ * Why not `agentStateLabel`: that one is the accessible label and returns raw
+ * English, so a Spanish window read "Idle" beside a strip that said Inactivo.
+ * The three bucket-shaped states reuse the strip's own keys, so the two can
+ * never drift apart again (ORCA-234).
  */
 export function agentGridStateLabel(state: AgentDotState, unseen: boolean): string {
-  return agentStateLabel(state === 'done' && !unseen ? 'idle' : state)
+  const display = agentGridDisplayDotState(state, unseen)
+  switch (display) {
+    case 'working':
+      return dashboardBucketLabel('working')
+    case 'done':
+      return dashboardBucketLabel('done')
+    case 'idle':
+      return dashboardBucketLabel('idle')
+    case 'blocked':
+      return translate('dashboardPopout.state.blocked', 'Blocked')
+    case 'waiting':
+    case 'permission':
+      return translate('dashboardPopout.state.waiting', 'Waiting for input')
+    case 'interrupted':
+      return translate('dashboardPopout.state.interrupted', 'Interrupted')
+    case 'failed':
+      return translate('dashboardPopout.state.failed', 'Failed')
+  }
 }
