@@ -123,16 +123,27 @@ export function AgentGridView({
     }
     return totals
   }, [allCells])
-  const tallestRows = visibleSections.reduce(
+  // Rows across every section on the page: one project fills the viewport, and
+  // several fall back to the floor and let the page scroll (ORCA-234).
+  const totalRows = visibleSections.reduce(
     (rows, section) =>
-      Math.max(rows, resolveAgentGridRows(section.cells.length, resolveAgentGridColumns(gridWidth, section.cells.length))),
-    1
+      rows +
+      resolveAgentGridRows(
+        section.cells.length,
+        resolveAgentGridColumns(gridWidth, section.cells.length)
+      ),
+    0
   )
+  const sectionChrome = 28 * visibleSections.length
+  const rowHeight =
+    measuredHeight > 0 && totalRows > 0
+      ? Math.max(
+          resolveAgentGridMinCellHeight(page.visible.length),
+          (measuredHeight - sectionChrome) / totalRows
+        )
+      : 0
   // Height is shared by the sections, so the shortest cell decides the tail budget.
-  const cellHeight = measuredHeight
-    ? (measuredHeight - (visibleSections.length - 1) * 24) / Math.max(1, tallestRows) -
-      (tallestRows - 1) * AGENT_GRID_CELL_GAP
-    : 0
+  const cellHeight = rowHeight
   const tailLines = resolveAgentGridTailLines(cellHeight, AGENT_TERMINAL_TAIL_MAX_LINES)
   // Only what this page renders: an off-page pane costs a terminal read per tick.
   const visiblePtyKey = page.visible
@@ -181,7 +192,7 @@ export function AgentGridView({
         onFiltersChange={onFiltersChange}
         searchInputRef={searchInputRef}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+      <div className="scrollbar-sleek flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
           {allCells.length > 1 ? (
             <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
               <span className="mr-3 flex items-center gap-2.5">
@@ -275,7 +286,7 @@ export function AgentGridView({
               const minCellHeight = resolveAgentGridMinCellHeight(project.cells.length)
               const spans = resolveAgentGridCellSpans(project.cells.length, columns)
               return (
-              <section key={project.repoId} className="flex min-h-0 flex-1 flex-col gap-2">
+              <section key={project.repoId} className="flex shrink-0 flex-col gap-2">
                 <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
                   <RepoIconGlyph
                     repoIcon={snapshot.repoIconsByRepoId?.[project.repoId] ?? null}
@@ -291,14 +302,10 @@ export function AgentGridView({
                 <div
                   data-agent-grid-columns={columns}
                   data-agent-grid-rows={rows}
-                  className="grid min-h-0"
+                  className="grid"
                   style={{
-                    height:
-                      measuredHeight > 0
-                        ? `${Math.max(minCellHeight, measuredHeight / visibleSections.length - 28)}px`
-                        : undefined,
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+                    gridAutoRows: rowHeight > 0 ? `${Math.round(rowHeight)}px` : `${minCellHeight}px`,
                     gap: `${AGENT_GRID_CELL_GAP}px`
                   }}
                 >

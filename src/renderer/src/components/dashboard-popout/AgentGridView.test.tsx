@@ -193,6 +193,29 @@ describe('AgentGridView', () => {
     expect(strip?.textContent).toContain('Working2')
   })
 
+  it('keeps the rows readable and lets the page scroll with several projects', async () => {
+    // The owner's report: two projects had no scroll, so the panes below the
+    // fold were unreachable.
+    renderGrid(
+      [
+        card({ paneKey: 'p1', repoId: 'r1', repoName: 'One' }),
+        card({ paneKey: 'p2', repoId: 'r2', repoName: 'Two' }),
+        card({ paneKey: 'p3', repoId: 'r3', repoName: 'Three' })
+      ],
+      []
+    )
+    await screen.findByText('One')
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-agent-grid-columns]')].map(
+      (grid) => Number.parseInt(grid.style.gridAutoRows, 10)
+    )
+    expect(rows).toHaveLength(3)
+    // Same height for every section, and never below the readable floor.
+    expect(new Set(rows).size).toBe(1)
+    expect(rows[0]).toBeGreaterThanOrEqual(200)
+    const scroller = document.querySelector<HTMLElement>('.overflow-y-auto')
+    expect(scroller).not.toBeNull()
+  })
+
   it('never opens more tracks than there are agents', async () => {
     stubMeasuredWidth(WIDE_WINDOW_CONTENT_WIDTH)
     renderGrid([card({ paneKey: 'p1' })], [])
@@ -208,11 +231,10 @@ describe('AgentGridView', () => {
     expect(grid?.dataset.agentGridRows).toBe('2')
     // Rows share the height, with a floor so a host that gives the grid no
     // definite height still renders readable cells instead of collapsing them.
-    // Rows share whatever height the grid was given; the height itself comes
-    // from the viewport below the grid's top edge, not from a fixed cell box.
-    expect(grid?.style.gridTemplateRows).toBe('repeat(2, minmax(0, 1fr))')
-    expect(grid?.style.height).not.toBe('')
-    expect(grid?.style.gridAutoRows).toBe('')
+    // Uniform rows sized from the viewport below the grid, shared by every
+    // section on the page — so several projects scroll instead of being squashed.
+    expect(grid?.dataset.agentGridRows).toBe('2')
+    expect(grid?.style.gridAutoRows).toMatch(/^\d+px$/)
   })
 
   // The whole point of the ticket: what each agent is DOING, which is terminal
