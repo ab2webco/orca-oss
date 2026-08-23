@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentStateDot } from '@/components/AgentStateDot'
 import { dashboardBucketLabel } from '../dashboard/dashboard-bucket-label'
@@ -24,8 +24,7 @@ import {
 } from './agent-grid-columns'
 import {
   AGENT_GRID_DEFAULT_PAGE_SIZE,
-  AGENT_GRID_PAGE_SIZE_OPTIONS,
-  resolveAgentGridPage
+  AGENT_GRID_PAGE_SIZE_OPTIONS
 } from './agent-grid-paging'
 import { AGENT_TERMINAL_TAIL_MAX_LINES } from '../../../../shared/agent-terminal-tail'
 import { useAgentGridAvailableHeight, useAgentGridSize } from './use-agent-grid-width'
@@ -84,8 +83,13 @@ export function AgentGridView({
   const measuredHeight = useAgentGridAvailableHeight(gridRef)
   const gridWidth = measuredWidth || AGENT_GRID_FALLBACK_WIDTH
   const [pageSize, setPageSize] = useState(AGENT_GRID_DEFAULT_PAGE_SIZE)
-  const [requestedPage, setRequestedPage] = useState(0)
   const [bucketFilter, setBucketFilter] = useState<DashboardBucket | null>(null)
+  const [collapsedRepoIds, setCollapsedRepoIds] = useState<readonly string[]>([])
+  const toggleRepoCollapsed = useCallback((repoId: string) => {
+    setCollapsedRepoIds((current) =>
+      current.includes(repoId) ? current.filter((id) => id !== repoId) : [...current, repoId]
+    )
+  }, [])
   const allCells = useMemo(
     () => projects.flatMap((project) => project.cells.map((cell) => ({ project, cell }))),
     [projects]
@@ -95,14 +99,11 @@ export function AgentGridView({
       bucketFilter ? allCells.filter((entry) => entry.cell.card.bucket === bucketFilter) : allCells,
     [allCells, bucketFilter]
   )
-  const page = useMemo(
-    () => resolveAgentGridPage(flatCells, pageSize, requestedPage),
-    [flatCells, pageSize, requestedPage]
-  )
-  // Sections keep the project grouping, but only for what this page shows.
+
+  // Sections keep the project grouping; everything renders and the page scrolls.
   const visibleSections = useMemo(() => {
     const byRepo = new Map<string, { repoId: string; repoName: string; cells: AgentGridCellModel[] }>()
-    for (const entry of page.visible) {
+    for (const entry of flatCells) {
       const existing = byRepo.get(entry.project.repoId)
       if (existing) {
         existing.cells.push(entry.cell)
@@ -115,7 +116,7 @@ export function AgentGridView({
       })
     }
     return [...byRepo.values()]
-  }, [page.visible])
+  }, [flatCells])
   const bucketTotals = useMemo(() => {
     const totals = { attention: 0, working: 0, done: 0, idle: 0 }
     for (const entry of allCells) {
@@ -125,30 +126,23 @@ export function AgentGridView({
   }, [allCells])
   // Rows across every section on the page: one project fills the viewport, and
   // several fall back to the floor and let the page scroll (ORCA-234).
-  const totalRows = visibleSections.reduce(
-    (rows, section) =>
-      rows +
-      resolveAgentGridRows(
-        section.cells.length,
-        resolveAgentGridColumns(gridWidth, section.cells.length)
-      ),
-    0
+  // The chosen count is how many fill the viewport at once; the rest scroll.
+  const rowsOnScreen = Math.max(
+    1,
+    resolveAgentGridRows(pageSize, resolveAgentGridColumns(gridWidth, pageSize))
   )
-  const sectionChrome = 28 * visibleSections.length
   const rowHeight =
-    measuredHeight > 0 && totalRows > 0
+    measuredHeight > 0
       ? Math.max(
-          resolveAgentGridMinCellHeight(page.visible.length),
-          (measuredHeight - sectionChrome) / totalRows
+          resolveAgentGridMinCellHeight(pageSize),
+          (measuredHeight - 28 * Math.max(1, visibleSections.length)) / rowsOnScreen
         )
       : 0
   // Height is shared by the sections, so the shortest cell decides the tail budget.
   const cellHeight = rowHeight
   const tailLines = resolveAgentGridTailLines(cellHeight, AGENT_TERMINAL_TAIL_MAX_LINES)
   // Only what this page renders: an off-page pane costs a terminal read per tick.
-  const visiblePtyKey = page.visible
-    .map((entry) => entry.cell.card.ptyId ?? '')
-    .join('\u0000')
+  const visiblePtyKey = flatCells.map((entry) => entry.cell.card.ptyId ?? '').join('\u0000')
   // Keyed by the joined ids: a fresh array each render would resubscribe the
   // batch reader and double its IPC per tick.
   const visiblePtyIds = useMemo(
@@ -210,7 +204,6 @@ export function AgentGridView({
                     disabled={bucketTotals[bucket] === 0 && bucketFilter !== bucket}
                     onClick={() => {
                       setBucketFilter((current) => (current === bucket ? null : bucket))
-                      setRequestedPage(0)
                     }}
                     className={cn(
                       'flex items-center gap-1 rounded px-1.5 py-0.5 disabled:opacity-40',
@@ -233,7 +226,6 @@ export function AgentGridView({
                   aria-pressed={option === pageSize}
                   onClick={() => {
                     setPageSize(option)
-                    setRequestedPage(0)
                   }}
                   className={cn(
                     'rounded px-1.5 py-0.5 tabular-nums',
@@ -245,31 +237,6 @@ export function AgentGridView({
                   {option}
                 </button>
               ))}
-              {page.pageCount > 1 ? (
-                <span className="ml-auto flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label={`${page.pageIndex}`}
-                    disabled={page.pageIndex === 0}
-                    onClick={() => setRequestedPage(page.pageIndex - 1)}
-                    className="rounded p-0.5 disabled:opacity-40 hover:bg-accent/60"
-                  >
-                    <ChevronLeft className="size-3.5" />
-                  </button>
-                  <span className="tabular-nums">
-                    {page.pageIndex + 1}/{page.pageCount}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`${page.pageIndex + 2}`}
-                    disabled={page.pageIndex >= page.pageCount - 1}
-                    onClick={() => setRequestedPage(page.pageIndex + 1)}
-                    className="rounded p-0.5 disabled:opacity-40 hover:bg-accent/60"
-                  >
-                    <ChevronRight className="size-3.5" />
-                  </button>
-                </span>
-              ) : null}
             </div>
           ) : null}
         {/* Measured here, not on the scroll box: this is the element the tracks
@@ -285,6 +252,7 @@ export function AgentGridView({
               const rows = resolveAgentGridRows(project.cells.length, columns)
               const minCellHeight = resolveAgentGridMinCellHeight(project.cells.length)
               const spans = resolveAgentGridCellSpans(project.cells.length, columns)
+              const collapsed = collapsedRepoIds.includes(project.repoId)
               return (
               <section key={project.repoId} className="flex shrink-0 flex-col gap-2">
                 <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
@@ -298,7 +266,18 @@ export function AgentGridView({
                       count: project.cells.length
                     })}
                   </span>
+                  <button
+                    type="button"
+                    data-repo-collapse={project.repoId}
+                    aria-pressed={collapsed}
+                    aria-label={project.repoName}
+                    onClick={() => toggleRepoCollapsed(project.repoId)}
+                    className="rounded p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  >
+                    {collapsed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
                 </h2>
+                {collapsed ? null : (
                 <div
                   data-agent-grid-columns={columns}
                   data-agent-grid-rows={rows}
@@ -324,6 +303,7 @@ export function AgentGridView({
                     </div>
                   ))}
                 </div>
+                )}
               </section>
               )
             })

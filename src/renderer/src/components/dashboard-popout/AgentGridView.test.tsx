@@ -209,11 +209,28 @@ describe('AgentGridView', () => {
       (grid) => Number.parseInt(grid.style.gridAutoRows, 10)
     )
     expect(rows).toHaveLength(3)
+    // Everything renders: no page to flip to reach the other project.
     // Same height for every section, and never below the readable floor.
     expect(new Set(rows).size).toBe(1)
     expect(rows[0]).toBeGreaterThanOrEqual(200)
     const scroller = document.querySelector<HTMLElement>('.overflow-y-auto')
     expect(scroller).not.toBeNull()
+  })
+
+  it('hides a project\u2019s cells behind the eye on its heading', async () => {
+    renderGrid(
+      [
+        card({ paneKey: 'p1', repoId: 'r1', repoName: 'One' }),
+        card({ paneKey: 'p2', repoId: 'r2', repoName: 'Two' })
+      ],
+      []
+    )
+    await screen.findByText('One')
+    expect(document.querySelectorAll('[data-agent-grid-columns]')).toHaveLength(2)
+    fireEvent.click(document.querySelector('[data-repo-collapse="r1"]') as HTMLElement)
+    expect(document.querySelectorAll('[data-agent-grid-columns]')).toHaveLength(1)
+    // The heading stays, so the project is hidden rather than gone.
+    expect(screen.getByText('One')).toBeInTheDocument()
   })
 
   it('never opens more tracks than there are agents', async () => {
@@ -305,8 +322,9 @@ describe('AgentGridView', () => {
     renderGrid(cards, [])
     const alpha = (await screen.findByText('Alpha')).closest('section')
     const beta = screen.getByText('Beta').closest('section')
-    expect(within(alpha as HTMLElement).getAllByRole('button')).toHaveLength(2)
-    expect(within(beta as HTMLElement).getAllByRole('button')).toHaveLength(1)
+    // Cells, not every button: the heading carries a hide control of its own.
+    expect((alpha as HTMLElement).querySelectorAll('[data-pane-key]')).toHaveLength(2)
+    expect((beta as HTMLElement).querySelectorAll('[data-pane-key]')).toHaveLength(1)
     expect(within(alpha as HTMLElement).getByText('2 agents')).toBeInTheDocument()
     // Each project lays its own agents out in a grid, not a column.
     // The second project has a single agent, so it gets a single full-width track.
@@ -347,7 +365,11 @@ describe('AgentGridView', () => {
     await waitFor(() => expect(readPanes).toHaveBeenCalledTimes(1))
     expect(readPanes).toHaveBeenCalledWith(['p1', 'p2'])
     await waitFor(() => expect(readPtys).toHaveBeenCalledTimes(1))
-    // The 600px-tall stub leaves room for more lines than the contract's cap.
-    expect(readPtys).toHaveBeenCalledWith(['pty-1', 'pty-2'], AGENT_TERMINAL_TAIL_MAX_LINES)
+    // The budget follows the cell it has to fit, so it is neither the old fixed
+    // 8 nor past the contract's cap.
+    const [ids, lines] = readPtys.mock.calls[0] as [string[], number]
+    expect(ids).toEqual(['pty-1', 'pty-2'])
+    expect(lines).toBeGreaterThan(8)
+    expect(lines).toBeLessThanOrEqual(AGENT_TERMINAL_TAIL_MAX_LINES)
   })
 })
