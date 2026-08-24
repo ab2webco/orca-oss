@@ -156,13 +156,17 @@ async function settledCellHeight(page: Page, differentFrom?: number): Promise<nu
   return height
 }
 
-/** Laid-out width of a cell, polled through the same ResizeObserver settle. */
-async function measureFirstCellWidth(page: Page): Promise<number> {
-  const box = await gridCells(page).first().boundingBox()
-  if (!box) {
-    throw new Error('Grid cell has no layout box')
+/** NARROWEST laid-out cell width, not `.first()`: a one-agent project spans its
+ *  whole row, so the first cell is the widest on the page and hides a squeezed
+ *  multi-track section entirely — measured 784 while three tracks sat at 256. */
+async function measureNarrowestCellWidth(page: Page): Promise<number> {
+  const widths = await gridCells(page).evaluateAll((nodes) =>
+    nodes.map((node) => node.getBoundingClientRect().width)
+  )
+  if (widths.length === 0) {
+    throw new Error('Grid rendered no cell to measure')
   }
-  return box.width
+  return Math.min(...widths)
 }
 
 async function settledCellWidth(page: Page, differentFrom?: number): Promise<number> {
@@ -170,7 +174,7 @@ async function settledCellWidth(page: Page, differentFrom?: number): Promise<num
   await expect
     .poll(
       async () => {
-        width = await measureFirstCellWidth(page)
+        width = await measureNarrowestCellWidth(page)
         return differentFrom === undefined ? width > 0 : Math.abs(width - differentFrom) > 1
       },
       { timeout: 15_000, message: 'Grid never settled on a measured cell width' }
