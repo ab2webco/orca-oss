@@ -218,7 +218,10 @@ export function AgentDashboardDrawer({
             top: WORKSPACE_TOP_CHROME_HEIGHT,
             bottom: drawerBottom,
             height: 'auto',
-            width: `min(calc(100vw - ${drawerLeftCss}), 1294px)`
+            // Why no ceiling: this sheet hosts the terminal grid, and a cap here
+            // bound the cells to ~314px on a maximized window — the measured
+            // cause of ORCA-286, ahead of the grid's own max-width.
+            width: `calc(100vw - ${drawerLeftCss})`
           } as React.CSSProperties
         }
         data-agent-dashboard-sheet=""
