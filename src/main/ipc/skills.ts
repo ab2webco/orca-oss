@@ -18,6 +18,7 @@ import { SkillUnrecognizedRepair } from '../skills/skill-unrecognized-repair'
 import { skillUpdateFailedNames } from '../skills/skill-update-outcome'
 import { readGloballyUpdatableSkillLocks } from '../skills/skill-update-registration'
 import {
+  clearSkillDiscoveryCaches,
   discoverSkillsOnTarget,
   resolveSkillDiscoveryTarget
 } from '../skills/skill-discovery-target'
@@ -35,6 +36,9 @@ export function registerSkillsHandlers(store: Store): void {
     // Why: per-skill outcomes come from re-hashing what is actually on disk, not
     // from scraping stdout.
     rescanOutdatedNames: async (names) => {
+      // Why: the run just rewrote skill packages on this host. Clients that never
+      // send `refresh` (older builds) would otherwise read a pre-run scan.
+      clearSkillDiscoveryCaches()
       // The lock read is fresh on purpose: the run just rewrote it, and the
       // verdict accepts unrecognized content only when disk matches that record.
       const [inventory, globalSkillLocks] = await Promise.all([
@@ -57,7 +61,12 @@ export function registerSkillsHandlers(store: Store): void {
     'skills:discover',
     async (_event, target?: SkillDiscoveryTarget): Promise<SkillDiscoveryResult> => {
       const parsedTarget = target ? SkillDiscoveryTargetSchema.parse(target) : undefined
-      return discoverSkillsOnTarget(resolveSkillDiscoveryTarget(parsedTarget), store.getRepos())
+      return discoverSkillsOnTarget(
+        resolveSkillDiscoveryTarget(parsedTarget),
+        store.getRepos(),
+        // Why: only a caller that knows disk changed may bypass the shared scans.
+        { refresh: parsedTarget?.refresh === true }
+      )
     }
   )
 

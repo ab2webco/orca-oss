@@ -1296,7 +1296,8 @@ describe('createPtySubprocess', () => {
 
     const env = spawnMock.mock.calls.at(-1)?.[2].env
     expect(env.NODE_ENV).toBeUndefined()
-    expect(env.PATH).toBe(process.env.PATH)
+    const expectedEnv = { PATH: process.env.PATH ?? '' }
+    expect(env.PATH).toBe(expectedEnv.PATH)
   })
 
   it('keeps an explicitly requested NODE_ENV for daemon PTY shells', () => {
@@ -2259,6 +2260,7 @@ describe('createPtySubprocess', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    const expectedEnv = { PATH: process.env.PATH ?? '' }
 
     Object.defineProperty(process, 'platform', { value: 'win32' })
     try {
@@ -2270,7 +2272,7 @@ describe('createPtySubprocess', () => {
     }
 
     const env = spawnMock.mock.calls.at(-1)![2].env
-    expect(env.PATH).toBe(process.env.PATH)
+    expect(env.PATH).toBe(expectedEnv.PATH)
   })
 
   it('preserves a duplicated path block supplied by main', () => {

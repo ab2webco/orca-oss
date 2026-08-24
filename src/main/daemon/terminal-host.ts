@@ -59,7 +59,7 @@ export class TerminalHost {
         if (options.agentSessionGeneration && this.sessions.get(options.sessionId)?.isAlive) {
           throw new Error('agent_session_claim_unavailable')
         }
-        return await createOrAttachTerminalSession(options, {
+        const result = await createOrAttachTerminalSession(options, {
           sessions: this.sessions,
           sessionTeardown: this.sessionTeardown,
           killedTombstones: this.killedTombstones,
@@ -76,6 +76,7 @@ export class TerminalHost {
           onStartupCommandStateChange: (sessionId, state) =>
             this.onStartupCommandStateChange?.(sessionId, state)
         })
+        return result
       }
     })
   }
@@ -118,7 +119,7 @@ export class TerminalHost {
     return Promise.resolve(killed)
   }
 
-  // Why: dispose a dead session's emulator so exited terminals don't pin ~5000 rows of scrollback for the daemon's life.
+  // Why: dispose a dead session's emulator so exited terminals don't pin their scrollback window for the daemon's life.
   private reapSession(sessionId: string): void {
     const session = this.sessions.get(sessionId)
     if (!session || session.isAlive) {
@@ -134,8 +135,13 @@ export class TerminalHost {
   }
 
   detach(sessionId: string, token: symbol): void {
-    const session = this.sessions.get(sessionId)
-    session?.detachClient(token)
+    this.detachClients([{ sessionId, token }])
+  }
+
+  detachClients(attachments: readonly { sessionId: string; token: symbol }[]): void {
+    for (const { sessionId, token } of attachments) {
+      this.sessions.get(sessionId)?.detachClient(token)
+    }
   }
 
   async getCwd(sessionId: string): Promise<string | null> {

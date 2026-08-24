@@ -80,6 +80,7 @@ describe('Electron runtime package contract', () => {
       'build:linux',
       'test:e2e',
       'test:e2e:terminal-rendering-golden',
+      'test:e2e:posix-profile-index-golden',
       'test:e2e:terminal-rendering-release-evidence',
       'test:e2e:headful'
     ]

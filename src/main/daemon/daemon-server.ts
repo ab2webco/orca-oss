@@ -185,6 +185,7 @@ export class DaemonServer {
   })
   private streamClientIdBySessionId = new Map<string, string>()
   private startupCommandWithheldSessionIds = new Set<string>()
+  private attachTokenBySessionId = new Map<string, symbol>()
   private lastInputAtBySessionId = new Map<string, number>()
   private pendingPtySpawnPreparations = new Map<string, Set<PendingPtySpawnPreparation>>()
   private historySeedTransfers = new TerminalHistorySeedTransferRegistry()
@@ -230,7 +231,18 @@ export class DaemonServer {
       spawnSubprocess: opts.spawnSubprocess,
       onStartupCommandStateChange: (sessionId, state) =>
         this.emitStartupCommandDelivery(sessionId, state),
-      ...(opts.onPtySessionExit ? { onSessionReaped: opts.onPtySessionExit } : {})
+      // Why host-level and not the attach callback: a session whose client transport already dropped
+      // has no attachment left to fire exit bookkeeping, and the daemon must still notice it can idle.
+      onSessionReaped: (sessionId) => {
+        this.streamClientIdBySessionId.delete(sessionId)
+        this.attachTokenBySessionId.delete(sessionId)
+        this.lastInputAtBySessionId.delete(sessionId)
+        this.startupCommandWithheldSessionIds.delete(sessionId)
+        this.transientFactRelay.onSessionExit(sessionId)
+        this.streamDataBatcher.refreshSessionDroppability(sessionId)
+        opts.onPtySessionExit?.(sessionId)
+        this.reevaluateIdleShutdown()
+      }
     })
     this.ptySpawnHealthCheck = opts.ptySpawnHealthCheck ?? checkPtySpawnHealth
     this.preparePtySpawn = opts.preparePtySpawn ?? (() => Promise.resolve())
@@ -795,6 +807,7 @@ export class DaemonServer {
       this.historySeedTransfers.clearOwner(clientId)
       const wasFullyAuthenticated = client.authenticatedPairEstablished
       this.streamDataBatcher.clear(clientId)
+      this.detachClientSessions(clientId)
       client.streamSocket?.destroy()
       this.clients.delete(clientId)
       this.recordFullyAuthenticatedDisconnect(wasFullyAuthenticated)
@@ -832,6 +845,7 @@ export class DaemonServer {
       // Why: a preflight that outlives its output channel would create an unattached daemon PTY.
       this.cancelPendingPtySpawnPreparationsForClient(client.clientId)
       this.streamDataBatcher.clear(client.clientId)
+      this.detachClientSessions(client.clientId)
       client.streamSocket = null
     }
 
@@ -955,6 +969,36 @@ export class DaemonServer {
         }
       }
     }
+  }
+
+  private detachClientSessions(clientId: string): void {
+    const attachments: { sessionId: string; token: symbol }[] = []
+    for (const [sessionId, attachedClientId] of this.streamClientIdBySessionId) {
+      if (attachedClientId !== clientId) {
+        continue
+      }
+      const token = this.attachTokenBySessionId.get(sessionId)
+      if (token) {
+        attachments.push({ sessionId, token })
+      }
+      this.streamClientIdBySessionId.delete(sessionId)
+      this.attachTokenBySessionId.delete(sessionId)
+    }
+    if (attachments.length > 0) {
+      this.host.detachClients(attachments)
+    }
+  }
+
+  private detachSessionForClient(sessionId: string, clientId: string): void {
+    if (this.streamClientIdBySessionId.get(sessionId) !== clientId) {
+      return
+    }
+    const token = this.attachTokenBySessionId.get(sessionId)
+    if (token) {
+      this.host.detach(sessionId, token)
+    }
+    this.streamClientIdBySessionId.delete(sessionId)
+    this.attachTokenBySessionId.delete(sessionId)
   }
 
   private async routeRequest(clientId: string, request: DaemonRequest): Promise<unknown> {
@@ -1097,6 +1141,7 @@ export class DaemonServer {
                 this.streamDataBatcher.refreshSessionDroppability(routedSessionId)
                 this.streamClientIdBySessionId.delete(routedSessionId)
                 this.startupCommandWithheldSessionIds.delete(routedSessionId)
+                this.attachTokenBySessionId.delete(routedSessionId)
                 this.lastInputAtBySessionId.delete(routedSessionId)
                 this.reevaluateIdleShutdown()
               }
@@ -1107,6 +1152,14 @@ export class DaemonServer {
           this.reevaluateIdleShutdown()
         }
         routedSessionId = result.agentSessionEnsure?.owner.ptyId ?? p.sessionId
+        if (
+          this.clients.get(clientId) !== client ||
+          !client.authenticatedPairEstablished ||
+          client.streamSocket === null
+        ) {
+          this.host.detach(routedSessionId, result.attachToken)
+          throw new TerminalAttachCanceledError(routedSessionId)
+        }
         this.streamClientIdBySessionId.set(routedSessionId, clientId)
         // Why re-emit on attach: a main that reconnects to a preserved daemon
         // would otherwise never learn this pane's launch command is still
@@ -1114,6 +1167,7 @@ export class DaemonServer {
         if (this.startupCommandWithheldSessionIds.has(routedSessionId)) {
           this.emitStartupCommandDelivery(routedSessionId, 'withheld')
         }
+        this.attachTokenBySessionId.set(routedSessionId, result.attachToken)
         this.streamDataBatcher.refreshSessionDroppability(routedSessionId)
         // Why an attach-time marker: background resync can precede this attach, so scan suppression must start at the new stream's head.
         if (this.transientFactRelay.isBackgrounded(routedSessionId)) {
@@ -1260,7 +1314,7 @@ export class DaemonServer {
         return {}
 
       case 'detach':
-        // Note: detach token handling simplified — full impl would track tokens per client
+        this.detachSessionForClient(request.payload.sessionId, clientId)
         this.log.log('session-detached', {
           sessionId: request.payload.sessionId
         })

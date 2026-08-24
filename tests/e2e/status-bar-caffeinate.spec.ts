@@ -47,18 +47,18 @@ test('shows Caffeinate mode and Agent activity in the status bar', async ({
   }
   await orcaPage.getByRole('menuitemradio', { name: /^Agent/ }).click()
 
-  const autoInactiveStatus = orcaPage.getByRole('button', {
+  const agentInactiveStatus = orcaPage.getByRole('button', {
     name: 'Caffeinate, Agent · Inactive'
   })
-  await expect(autoInactiveStatus).toBeVisible()
+  await expect(agentInactiveStatus).toBeVisible()
 
   const paneKey = `e2e-caffeinate-tab:${randomUUID()}`
   await postCodexHookEvent(electronApp, paneKey, 'UserPromptSubmit')
-  const autoActiveStatus = orcaPage.getByRole('button', {
+  const agentActiveStatus = orcaPage.getByRole('button', {
     name: 'Caffeinate, Agent · Active'
   })
-  await expect(autoActiveStatus).toBeVisible()
-  await expect(autoActiveStatus).toHaveText('Agent')
+  await expect(agentActiveStatus).toBeVisible()
+  await expect(agentActiveStatus).toHaveText('Agent')
 
   const proofPath = process.env.ORCA_CAFFEINATE_PROOF_PATH
   if (proofPath) {
@@ -66,5 +66,5 @@ test('shows Caffeinate mode and Agent activity in the status bar', async ({
   }
 
   await postCodexHookEvent(electronApp, paneKey, 'Stop')
-  await expect(autoInactiveStatus).toBeVisible()
+  await expect(agentInactiveStatus).toBeVisible()
 })

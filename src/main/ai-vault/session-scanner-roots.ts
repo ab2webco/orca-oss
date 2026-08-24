@@ -1,6 +1,6 @@
-import { realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { uniqueExistingClaudeProjectRoots } from './claude-project-root-dedup'
 import { normalizeAgentSessionsDir } from './session-scanner-values'
 
 // The default local roots for the two agents whose subagent transcripts are
@@ -23,32 +23,14 @@ export function claudeProjectsRootDirs(args: {
   // Why deduped by realpath: once a managed vault's projects/ is a link to the
   // shared transcript store, several roots resolve to one directory and every
   // session would be listed once per account.
-  return uniqueExistingRoots([
+  const localRoots = uniqueExistingClaudeProjectRoots([
     args.claudeProjectsDir ?? CLAUDE_PROJECTS_DIR,
-    ...(args.additionalClaudeProjectsDirs ?? []),
-    ...(args.wslHomeDirs ?? []).map((homeDir) => join(homeDir, '.claude', 'projects'))
+    ...(args.additionalClaudeProjectsDirs ?? [])
   ])
-}
-
-/** Collapses roots that resolve to the same directory, keeping first-seen order
- *  and passing through paths that do not exist yet. */
-function uniqueExistingRoots(rootDirs: readonly string[]): string[] {
-  const seen = new Set<string>()
-  const unique: string[] = []
-  for (const rootDir of rootDirs) {
-    let key = rootDir
-    try {
-      key = realpathSync(rootDir)
-    } catch {
-      key = rootDir
-    }
-    if (seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    unique.push(rootDir)
-  }
-  return unique
+  return [
+    ...localRoots,
+    ...(args.wslHomeDirs ?? []).map((homeDir) => join(homeDir, '.claude', 'projects'))
+  ]
 }
 
 // The local host and each WSL distro's OMP sessions root. Callers reading OMP

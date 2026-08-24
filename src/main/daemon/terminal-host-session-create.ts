@@ -10,6 +10,7 @@ import type { CreateOrAttachResult } from './terminal-host-create-contract'
 import type { TerminalHostOptions } from './terminal-host-options'
 import type { TerminalHostTombstones } from './terminal-host-tombstones'
 import type { TerminalSessionTeardown } from './terminal-session-teardown'
+import { resolveDaemonSessionScrollbackRows } from './daemon-session-scrollback-window'
 import { SessionNotFoundError } from './types'
 import { resolveWslSessionContext } from './wsl-session-context'
 
@@ -122,6 +123,7 @@ export async function createOrAttachTerminalSession(
     startupCommandRequiresShellReady: opts.startupCommandRequiresShellReady === true,
     onStartupCommandStateChange: (state) =>
       deps.onStartupCommandStateChange?.(opts.sessionId, state),
+    scrollback: resolveDaemonSessionScrollbackRows(),
     historySeedChunks: opts.historySeedChunks,
     ...(opts.startupIngress ? { startupIngress: opts.startupIngress } : {}),
     wslDistro,

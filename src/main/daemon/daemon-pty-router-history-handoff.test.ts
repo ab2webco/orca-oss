@@ -8,6 +8,7 @@ import { DaemonServer } from './daemon-server'
 import { getDaemonSocketPath } from './daemon-spawner'
 import { TERMINAL_HISTORY_INLINE_SEED_CODE_UNITS } from './terminal-history-seed-chunks'
 import { HISTORY_SEED_TRANSFER_PROTOCOL_VERSION } from './daemon-protocol-version'
+import { DAEMON_SESSION_SCROLLBACK_ROWS } from './daemon-session-scrollback-window'
 import type { DaemonFileLog } from './daemon-file-log'
 import type { SubprocessHandle } from './session'
 
@@ -94,6 +95,7 @@ describe('DaemonPtyRouter history handoff', () => {
     }
     await Promise.all([legacyServer?.shutdown(), currentServer?.shutdown()])
     rmSync(testDir, { recursive: true, force: true })
+    vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
@@ -102,8 +104,14 @@ describe('DaemonPtyRouter history handoff', () => {
   it('moves a slept v29 session to the seed-transfer daemon with its full large history', async () => {
     const sessionId = 'large-legacy-session'
     const marker = 'V29-HISTORY-HANDOFF-MARKER'
+    // Why: this fixture plays an OLD daemon binary, whose sessions retained ~5000 rows. New code
+    // applies the flat window at session create, which would shrink the history below the chunked
+    // seed threshold and silently skip the transfer path this test exists to cover.
+    vi.stubEnv('ORCA_DAEMON_SESSION_SCROLLBACK_ROWS', '5000')
     await legacyAdapter.spawn({ sessionId, cols: 400, rows: 24 })
     legacySubprocess.emitData(`${'x'.repeat(TERMINAL_HISTORY_INLINE_SEED_CODE_UNITS + 1)}${marker}`)
+    // Keep only the played legacy session deep; the receiving daemon must use today's flat window.
+    vi.stubEnv('ORCA_DAEMON_SESSION_SCROLLBACK_ROWS', String(DAEMON_SESSION_SCROLLBACK_ROWS))
     router = new DaemonPtyRouter({ current: currentAdapter, legacy: [legacyAdapter] })
     await router.discoverLegacySessions()
     const client = (

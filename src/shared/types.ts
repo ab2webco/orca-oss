@@ -113,6 +113,18 @@ export type IssueSourcePreference = 'upstream' | 'origin' | 'auto'
 export type { ForkSyncMode, GitForkSyncExpectedUpstream, GitForkSyncResult } from './git-fork-sync'
 export type ExternalWorktreeVisibility = 'hide' | 'show'
 
+export type BuiltInWorktreeVisibilitySourceId = 'claude' | 'gsd'
+
+export type CustomWorktreeVisibilitySource = {
+  id: string
+  rootPath: string
+}
+
+export type WorktreeVisibilitySourcePreferences = {
+  builtIn?: Partial<Record<BuiltInWorktreeVisibilitySourceId, ExternalWorktreeVisibility>>
+  custom?: Record<string, ExternalWorktreeVisibility>
+}
+
 export type ProjectProviderIdentity = {
   provider: 'github'
   owner: string
@@ -291,6 +303,12 @@ export type Repo = {
   externalWorktreeInboxBaselinePaths?: string[]
   /** External worktree paths explicitly imported while global visibility stays hide. */
   importedExternalWorktreePaths?: string[]
+  /** Opt-in repo policy for coding-agent scratch worktrees; absent means hide. */
+  agentWorktreeVisibility?: ExternalWorktreeVisibility
+  /** User-defined roots classified independently from ordinary external worktrees. */
+  customWorktreeVisibilitySources?: CustomWorktreeVisibilitySource[]
+  /** Per-source visibility; absent built-ins inherit the legacy agent policy. */
+  worktreeVisibilitySourcePreferences?: WorktreeVisibilitySourcePreferences
   /** User permanently opted out of the new-external-worktree inbox for this repo. */
   externalWorktreeDiscoverySuppressedAt?: number
   /** Paths (relative to the primary checkout) that should be APFS clone-copied
@@ -359,6 +377,7 @@ export type FolderWorkspace = {
   lastActivityAt: number
   createdAt: number
   updatedAt: number
+  diffComments?: DiffComment[]
 }
 
 export type WorkspaceLinkedItem = {
@@ -756,6 +775,10 @@ export type DetectedWorktree = Worktree & {
   ownership: WorktreeOwnership
   selectedCheckout: boolean
   visible: boolean
+  /** Optional additive source identity; older hosts omit it. */
+  visibilitySource?:
+    | { kind: 'built-in'; id: BuiltInWorktreeVisibilitySourceId }
+    | { kind: 'custom'; id: string }
 }
 
 export type DetectedWorktreeListResult = {
@@ -3699,7 +3722,6 @@ export type TopLevelView =
   | 'activity'
   | 'automations'
   | 'space'
-  | 'skills'
   | 'artifacts'
   | 'mobile'
 
@@ -3969,6 +3991,14 @@ export type PersistedState = {
   projectHostSetups: ProjectHostSetup[]
   projectGroups: ProjectGroup[]
   folderWorkspaces: FolderWorkspace[]
+  /** Folder-workspace review notes, keyed by FolderWorkspace.id. Top-level, NOT nested in
+   *  folderWorkspaces[]: normalizeFolderWorkspaces rebuilds each record field-by-field, so an
+   *  older build drops nested fields, while unknown top-level keys round-trip untouched.
+   *
+   *  WRITE-ONLY PROJECTION. FolderWorkspace.diffComments is the single in-memory home; load()
+   *  hydrates from this key and then deletes it from Store state, and buildStateToSave() is the
+   *  only producer of it. Never read Store.state.folderWorkspaceDiffComments outside load(). */
+  folderWorkspaceDiffComments?: Record<string, DiffComment[]>
   /** Sparse-checkout presets keyed by repoId. */
   sparsePresetsByRepo: Record<string, SparsePreset[]>
   /** Per paired device last tab selection by worktree; keeps mobile navigation across host restarts. */

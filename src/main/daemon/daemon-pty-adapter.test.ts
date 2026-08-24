@@ -639,6 +639,42 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       }
     })
 
+    it('respawns after a retired daemon regardless of how the connection ended', async () => {
+      // Why this shape: the daemon retires when its last authenticated client drops, and that drop
+      // is often our own disconnect() — which observes no socket close. Once the token read stops
+      // preempting the connect, the retired endpoint fails as a connect and isDaemonGoneError
+      // classifies it, so recovery no longer depends on having witnessed the drop.
+      let respawnServer: DaemonServer | undefined
+      const respawn = vi.fn(async () => {
+        respawnServer = new DaemonServer({
+          socketPath,
+          tokenPath,
+          spawnSubprocess: () => createMockSubprocess()
+        })
+        await respawnServer.start()
+      })
+      const healingAdapter = new DaemonPtyAdapter({ socketPath, tokenPath, respawn })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        const { id } = await healingAdapter.spawn({ cols: 80, rows: 24 })
+        const client = (healingAdapter as unknown as { client: DaemonClient }).client
+
+        client.disconnect()
+        await server.shutdown()
+        expect(existsSync(tokenPath)).toBe(false)
+        expect(client.hasObservedAuthenticatedDisconnect()).toBe(false)
+
+        await expect(
+          healingAdapter.spawn({ sessionId: id, cols: 80, rows: 24 })
+        ).resolves.toMatchObject({ id })
+        expect(respawn).toHaveBeenCalledTimes(1)
+      } finally {
+        warn.mockRestore()
+        healingAdapter.dispose()
+        await respawnServer?.shutdown()
+      }
+    })
+
     it('does not spawn a daemon per keystroke after respawn fails', async () => {
       const respawn = vi.fn(async () => {
         throw new Error('daemon unavailable')
@@ -2725,7 +2761,8 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
 
         expect(checkpointSpy).toHaveBeenCalledWith(
           id,
-          expect.objectContaining({ snapshotAnsi: expect.stringContaining('latest before sleep') })
+          expect.objectContaining({ snapshotAnsi: expect.stringContaining('latest before sleep') }),
+          { pendingOutputSeq: expect.any(Number) }
         )
         expect(existsSync(join(historyDir, getHistorySessionDirName(id)))).toBe(true)
 
@@ -2858,7 +2895,8 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
 
       expect(checkpointSpy).toHaveBeenCalledWith(
         id,
-        expect.objectContaining({ snapshotAnsi: expect.stringContaining('fresh output') })
+        expect.objectContaining({ snapshotAnsi: expect.stringContaining('fresh output') }),
+        { pendingOutputSeq: expect.any(Number) }
       )
       expect(existsSync(join(historyDir, getHistorySessionDirName(id)))).toBe(true)
     })
@@ -2874,14 +2912,18 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
         env: { SHELL: '/bin/zsh' },
         sessionId: 'sleep-checkpoint-tail'
       })
-      const appendSpy = vi.spyOn(historyAdapter.getHistoryManager()!, 'appendIncrements')
+      const checkpointSpy = vi.spyOn(historyAdapter.getHistoryManager()!, 'checkpoint')
 
       lastSubprocess._simulateData('\x1b]777;orca-shell-ready')
       await historyAdapter.shutdown(id, { immediate: true, keepHistory: true })
 
-      expect(appendSpy).toHaveBeenCalledWith(id, expect.any(Number), [
-        { kind: 'output', data: '\x1b]777;orca-shell-ready' }
-      ])
+      expect(checkpointSpy).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({
+          pendingEscapeTailAnsi: expect.stringContaining('\x1b]777;orca-shell-ready')
+        }),
+        { pendingOutputSeq: expect.any(Number) }
+      )
     })
 
     it('returns cold restore data when disk history has unclean shutdown', async () => {
@@ -3269,7 +3311,8 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
         expect(appendSpy).not.toHaveBeenCalled()
         expect(checkpointSpy).toHaveBeenCalledWith(
           sessionId,
-          expect.objectContaining({ snapshotAnsi: expect.stringContaining('revived session') })
+          expect.objectContaining({ snapshotAnsi: expect.stringContaining('revived session') }),
+          { pendingOutputSeq: expect.any(Number) }
         )
 
         // Subsequent ticks return to incremental appends.
@@ -3328,8 +3371,8 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       }
       const result = await historyAdapter.spawn({ cols: 80, rows: 24, sessionId })
       expect(result.isReattach).toBe(true)
-      expect(internals.sessionsNeedingFullCheckpoint.has(sessionId)).toBe(true)
-      expect(internals.lastFullCheckpointAt.has(sessionId)).toBe(false)
+      expect(internals.sessionsNeedingFullCheckpoint.has(sessionId)).toBe(false)
+      expect(internals.lastFullCheckpointAt.has(sessionId)).toBe(true)
     })
 
     it('skips the cold-restore replay when the daemon session is still alive', async () => {
@@ -3340,20 +3383,17 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       await first.disconnectOnly()
 
       historyAdapter = new DaemonPtyAdapter({ socketPath, tokenPath, historyPath: historyDir })
-      const reader = (historyAdapter as unknown as { historyReader: HistoryReader }).historyReader
-      const detectSpy = vi.spyOn(reader, 'detectColdRestore')
       const result = await historyAdapter.spawn({ cols: 80, rows: 24, sessionId })
 
       expect(result.isReattach).toBe(true)
       expect(result.coldRestore).toBeUndefined()
-      expect(detectSpy).not.toHaveBeenCalled()
-      // The unmanaged-reattach re-anchor must survive the skipped detect.
+      // The unmanaged-reattach re-anchor must survive a live remount overlay.
       const internals = historyAdapter as unknown as {
         sessionsNeedingFullCheckpoint: Set<string>
         lastFullCheckpointAt: Map<string, number>
       }
-      expect(internals.sessionsNeedingFullCheckpoint.has(sessionId)).toBe(true)
-      expect(internals.lastFullCheckpointAt.has(sessionId)).toBe(false)
+      expect(internals.sessionsNeedingFullCheckpoint.has(sessionId)).toBe(false)
+      expect(internals.lastFullCheckpointAt.has(sessionId)).toBe(true)
     })
 
     it('does not probe session aliveness when there is no restorable history', async () => {

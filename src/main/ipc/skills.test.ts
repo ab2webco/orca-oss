@@ -32,7 +32,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../skills/discovery', () => ({
-  discoverSkills: discoverSkillsMock
+  discoverSkills: discoverSkillsMock,
+  clearSkillRootScanCache: vi.fn()
 }))
 
 vi.mock('../skills/skill-discovery-wsl', () => ({
@@ -151,7 +152,7 @@ describe('registerSkillsHandlers', () => {
       }
     })
 
-    expect(discoverSkillsMock).toHaveBeenCalledWith({ repos })
+    expect(discoverSkillsMock).toHaveBeenCalledWith({ repos, refresh: false })
     expect(getWslHomeMock).not.toHaveBeenCalled()
   })
 
@@ -160,7 +161,11 @@ describe('registerSkillsHandlers', () => {
 
     await handler(null, { cwd: '/repo/worktree' })
 
-    expect(discoverSkillsMock).toHaveBeenCalledWith({ repos: [], cwd: '/repo/worktree' })
+    expect(discoverSkillsMock).toHaveBeenCalledWith({
+      repos: [],
+      cwd: '/repo/worktree',
+      refresh: false
+    })
   })
 
   it('uses the selected project WSL distro for skill discovery', async () => {
