@@ -13,7 +13,7 @@ const GENERIC_TERM_FAMILIES = [
     renderings: {
       ko: ['에이전트'],
       ja: ['エージェント'],
-      zh: ['代理', '智能体'],
+      zh: ['智能体'],
       es: ['Agente', 'agente', 'Agentes', 'agentes']
     }
   },

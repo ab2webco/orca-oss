@@ -137,7 +137,6 @@ export const LOCALE_PHRASE_FIXES = {
     { pattern: /公关/g, replacement: 'PR', whenEnIncludes: 'PR' },
     { pattern: /虎鲸:\/\//g, replacement: 'orca://', whenEnIncludes: 'orca://' },
     { pattern: /代理商/g, replacement: '代理', whenEnIncludes: 'agent' },
-    { pattern: /智能体/g, replacement: '代理', whenEnIncludes: 'agent' },
     { pattern: /分支机构/g, replacement: '分支', whenEnIncludes: 'ranch' },
     { pattern: /座席/g, replacement: '代理', whenEnIncludes: 'agent' },
     { pattern: /汽车/g, replacement: '自动', whenEnIncludes: 'Auto' },
@@ -158,6 +157,11 @@ export const LOCALE_PHRASE_FIXES = {
     { pattern: /快捷方式/g, replacement: '快捷键', whenEnIncludes: 'Shortcuts' },
     { pattern: /入职清单/g, replacement: '入门清单', whenEnIncludes: 'Onboarding checklist' },
     { pattern: /发射代理/g, replacement: '启动代理', whenEnIncludes: 'Launch agent' },
+    {
+      pattern: /代理/g,
+      replacement: '智能体',
+      whenEnIncludes: 'agent'
+    },
     { pattern: /地位/g, replacement: '状态', whenEnIncludes: 'Status' },
     { pattern: /受让人/g, replacement: '负责人', whenEnIncludes: 'assignee' },
     { pattern: /开放工作区/g, replacement: '打开工作区', whenEnIncludes: 'Open workspace' },
