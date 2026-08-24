@@ -7,9 +7,8 @@ import { z } from 'zod'
  * API). Electron-free: shared by desktop main, headless serve, the relay
  * conformance path, and tests.
  *
- * v0 is a closed set of unscoped kinds so a typo (or a capability from a newer
- * Orca) fails manifest validation instead of silently granting nothing.
- * Scoped kinds (net:fetch hosts, process:exec globs) arrive in later phases.
+ * A typo (or a capability from a newer Orca) fails manifest validation instead
+ * of silently granting nothing.
  */
 
 export const PLUGIN_CAPABILITY_KINDS = [
@@ -19,14 +18,68 @@ export const PLUGIN_CAPABILITY_KINDS = [
   'storage',
   'secrets',
   'events:subscribe',
-  'settings:own'
+  'settings:own',
+  'net:fetch'
 ] as const
 
 export type PluginCapabilityKind = (typeof PLUGIN_CAPABILITY_KINDS)[number]
 
-// Strict object (not a bare enum) so scoped fields can be added per-kind later
-// without changing the manifest shape.
-export const pluginCapabilitySchema = z.object({ kind: z.enum(PLUGIN_CAPABILITY_KINDS) }).strict()
+const PLUGIN_UNSCOPED_CAPABILITY_KINDS = PLUGIN_CAPABILITY_KINDS.filter(
+  (kind) => kind !== 'net:fetch'
+) as Exclude<PluginCapabilityKind, 'net:fetch'>[]
+
+function normalizeNetworkHost(input: string): string | null {
+  const value = input.trim().toLowerCase()
+  if (value === '*') {
+    return value
+  }
+  const wildcard = value.startsWith('*.')
+  const candidate = wildcard ? value.slice(2) : value
+  if (!candidate || candidate.includes('/') || candidate.includes('@')) {
+    return null
+  }
+  try {
+    const parsed = new URL(`https://${candidate}`)
+    if (parsed.port || parsed.search || parsed.hash || parsed.pathname !== '/') {
+      return null
+    }
+    const hostname = parsed.hostname.toLowerCase()
+    if (wildcard && (!hostname.includes('.') || hostname.startsWith('['))) {
+      return null
+    }
+    return wildcard ? `*.${hostname}` : hostname
+  } catch {
+    return null
+  }
+}
+
+export const pluginNetworkHostSchema = z
+  .string()
+  .max(255)
+  .transform((value, context) => {
+    const normalized = normalizeNetworkHost(value)
+    if (!normalized) {
+      context.addIssue({ code: 'custom', message: 'must be a hostname or wildcard hostname' })
+      return z.NEVER
+    }
+    return normalized
+  })
+
+const unscopedPluginCapabilitySchema = z
+  .object({ kind: z.enum(PLUGIN_UNSCOPED_CAPABILITY_KINDS) })
+  .strict()
+
+const networkFetchCapabilitySchema = z
+  .object({
+    kind: z.literal('net:fetch'),
+    hosts: z.array(pluginNetworkHostSchema).min(1).max(64)
+  })
+  .strict()
+
+export const pluginCapabilitySchema = z.discriminatedUnion('kind', [
+  unscopedPluginCapabilitySchema,
+  networkFetchCapabilitySchema
+])
 
 export type PluginCapability = z.infer<typeof pluginCapabilitySchema>
 
@@ -40,7 +93,15 @@ export const PLUGIN_CAPABILITY_DESCRIPTIONS: Record<PluginCapabilityKind, string
   secrets: "Store and read secrets in the plugin's own encrypted vault",
   'events:subscribe':
     'Get notified when worktrees are created or removed and when agent status changes',
-  'settings:own': "Read and change the plugin's own settings"
+  'settings:own': "Read and change the plugin's own settings",
+  'net:fetch': 'Connect to the declared network hosts'
+}
+
+export function describePluginCapability(capability: PluginCapability): string {
+  if (capability.kind === 'net:fetch') {
+    return `Connect to these network hosts: ${capability.hosts.join(', ')}`
+  }
+  return PLUGIN_CAPABILITY_DESCRIPTIONS[capability.kind]
 }
 
 /**
@@ -50,7 +111,21 @@ export const PLUGIN_CAPABILITY_DESCRIPTIONS: Record<PluginCapabilityKind, string
  * same grant.
  */
 export function canonicalizeCapabilitySet(capabilities: readonly PluginCapability[]): string {
-  const encoded = capabilities.map((capability) =>
+  const networkHosts = [
+    ...new Set(
+      capabilities
+        .filter((capability) => capability.kind === 'net:fetch')
+        .flatMap((capability) => capability.hosts)
+        .map((host) => normalizeNetworkHost(host) ?? host)
+    )
+  ].sort()
+  const normalizedCapabilities: PluginCapability[] = capabilities.filter(
+    (capability) => capability.kind !== 'net:fetch'
+  )
+  if (networkHosts.length > 0) {
+    normalizedCapabilities.push({ kind: 'net:fetch', hosts: networkHosts })
+  }
+  const encoded = normalizedCapabilities.map((capability) =>
     JSON.stringify(
       Object.fromEntries(Object.entries(capability).sort(([a], [b]) => a.localeCompare(b)))
     )
