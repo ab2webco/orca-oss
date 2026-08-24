@@ -5957,7 +5957,39 @@
           "e5b5f3d6b9": "Cámara",
           "cc8151d9fa": "Entrada de voz, transcripción, grabación de audio, sox, ffmpeg y CLI de Whisper.",
           "16381e040a": "Micrófono",
-          "dac08ec03e": "Trabajando..."
+          "dac08ec03e": "Trabajando...",
+          "statusGranted": "Concedido",
+          "statusDenied": "Denegado",
+          "statusNotRequested": "No solicitado",
+          "statusRestricted": "Restringido",
+          "statusUnsupported": "Solo macOS",
+          "statusEntitled": "Con permiso",
+          "statusCheckManually": "Comprobar manualmente",
+          "statusManagedByMacOS": "Gestionado por macOS",
+          "actionRequest": "Solicitar",
+          "actionRequestAccess": "Solicitar acceso",
+          "actionTriggerPrompt": "Provocar el aviso",
+          "actionOpenSettings": "Abrir Ajustes",
+          "localNetworkOpenSettings": "Abrir Ajustes del Sistema",
+          "localNetworkOpenSystemSettings": "Abrir Ajustes del Sistema",
+          "openSettingsFailed": "No se pudieron abrir los Ajustes del Sistema",
+          "localNetworkPromptCheck": "Buscar un aviso de macOS",
+          "localNetworkPromptGuidance": "Si aparece un aviso, elige Permitir. Si no aparece ninguno, abre Ajustes del Sistema y activa Orca en Privacidad y seguridad → Red local.",
+          "connectionTestTitle": "Probar la conexión",
+          "connectionTestAction": "Probar conexión",
+          "connectionTestDescription": "Indica un servicio de otro dispositivo de tu red local. Orca prueba la misma ruta de red que usan las herramientas de terminal.",
+          "connectionTestHost": "Host",
+          "connectionTestPort": "Puerto",
+          "connectionTestRunning": "Probando...",
+          "connectionTestLastVerified": "Última comprobación",
+          "connectionTestNotYetVerified": "No hay ninguna prueba correcta guardada.",
+          "connectionTestInvalidTarget": "Indica un nombre de host o una IP privada de tu red y un puerto entre 1 y 65535.",
+          "connectionTestFailed": "No se pudo completar la prueba de conexión.",
+          "connectionTestRefused": "El host respondió, pero el puerto rechazó la conexión.",
+          "connectionTestTimeout": "Se agotó el tiempo de conexión. Comprueba el destino, el servicio y los ajustes de Red local de macOS.",
+          "connectionTestUnreachable": "No se pudo alcanzar el destino.",
+          "connectionTestUnresolved": "No se pudo resolver el nombre de host.",
+          "connectionTestUnsupported": "La prueba de conexión está disponible en la app de escritorio de macOS."
         },
         "ExperimentalPane": {
           "9762364929": "Usa APFS clone-copy en macOS cuando sea posible; si no, crea symlinks de las carpetas o archivos configurados en los worktrees creados.",
@@ -10002,7 +10034,6 @@
           "subtitle": "{{value0}} v{{value1}} · {{value2}}",
           "reconsent": "Los permisos, el nivel de confianza del proceso o el contenido instructivo cambiaron desde la última revisión de este plugin. Revísalo de nuevo antes de ejecutarlo.",
           "capabilities": "Este plugin puede",
-          "warning": "Estos permisos limitan cómo usa el plugin la API de Orca. Su proceso se ejecuta como un proceso normal en tu equipo, con acceso completo a tus archivos, red y otros procesos.",
           "instructionalWarning": "Este plugin no tiene ningún proceso en segundo plano. Aun así, su contenido instructivo puede provocar acciones cuando tú o un agente lo usen. Revisa las instrucciones y los comandos siguientes antes de habilitarlo.",
           "panelWarning": "Estos permisos limitan cómo usa el plugin la API de Orca. Este plugin no tiene ningún proceso en segundo plano.",
           "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API.",
@@ -10118,7 +10149,6 @@
           "includes": "Incluye",
           "noContributions": "Solo metadatos del manifiesto",
           "capabilities": "Acceso solicitado",
-          "workerWarning": "Las capacidades limitan cómo usa este plugin la API de Orca. Su proceso sigue ejecutándose como un proceso normal en este ordenador, con acceso completo a tus archivos, red y otros procesos.",
           "blocked": "La lista de seguridad de Orca bloquea este plugin: {{value0}}",
           "current": "Este contenido exacto del plugin ya está instalado.",
           "close": "Close",
@@ -10495,6 +10525,11 @@
         },
         "artifacts": {
           "allowPublishingDescription": "Publica archivos HTML y Markdown como enlaces que cualquiera con la URL puede abrir. El contenido de los archivos se sube a {{host}}, que opera Orca upstream; esta compilación no lo aloja. Los enlaces existentes se mantienen hasta que los elimines desde Artifacts."
+        },
+        "ReleaseChannelSection": {
+          "hourlyWarning": "Las compilaciones horarias son solo para macOS y salen directamente de main sin pasar por ningún test. Ten a mano una compilación estable.",
+          "dailyWarning": "Las compilaciones diarias son solo para macOS y salen directamente de main sin pasar por ningún test. Ten a mano una compilación estable.",
+          "adhocWarning": "Las compilaciones adhoc son solo para macOS y provienen de una rama que aún no se ha integrado. Quien la generó puede abandonarla: ten a mano una compilación estable."
         }
       },
       "right": {
@@ -14774,6 +14809,9 @@
         "ArtifactPublishButton": {
           "confirmDescription": "Esto sube el archivo actual a {{host}} y crea un enlace que cualquiera con la URL puede ver."
         }
+      },
+      "BrowserPane": {
+        "streamCapabilityUnsupported": "El entorno de ejecución seleccionado no admite la transmisión remota del navegador."
       }
     },
     "i18n": {

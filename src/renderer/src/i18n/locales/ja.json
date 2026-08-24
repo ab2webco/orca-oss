@@ -5931,7 +5931,39 @@
           "e5b5f3d6b9": "カメラ",
           "cc8151d9fa": "音声入力、文字起こし、オーディオ録音、sox、ffmpeg、および Whisper CLI。",
           "16381e040a": "マイクロフォン",
-          "dac08ec03e": "処理中…"
+          "dac08ec03e": "処理中…",
+          "statusGranted": "許可済み",
+          "statusDenied": "拒否",
+          "statusNotRequested": "未要求",
+          "statusRestricted": "制限あり",
+          "statusUnsupported": "macOS のみ",
+          "statusEntitled": "権限あり",
+          "statusCheckManually": "手動で確認",
+          "statusManagedByMacOS": "macOS が管理",
+          "actionRequest": "要求",
+          "actionRequestAccess": "アクセスを要求",
+          "actionTriggerPrompt": "確認を表示させる",
+          "actionOpenSettings": "設定を開く",
+          "localNetworkOpenSettings": "システム設定を開く",
+          "localNetworkOpenSystemSettings": "システム設定を開く",
+          "openSettingsFailed": "システム設定を開けませんでした",
+          "localNetworkPromptCheck": "macOS の確認を探す",
+          "localNetworkPromptGuidance": "確認が表示されたら「許可」を選んでください。表示されない場合は、システム設定を開き、「プライバシーとセキュリティ」→「ローカルネットワーク」で Orca を有効にしてください。",
+          "connectionTestTitle": "接続をテスト",
+          "connectionTestAction": "接続をテスト",
+          "connectionTestDescription": "ローカルネットワーク上のほかのデバイスのサービスを入力してください。Orca はターミナルツールと同じネットワーク経路をテストします。",
+          "connectionTestHost": "ホスト",
+          "connectionTestPort": "ポート",
+          "connectionTestRunning": "テスト中...",
+          "connectionTestLastVerified": "最終確認",
+          "connectionTestNotYetVerified": "成功したテストは保存されていません。",
+          "connectionTestInvalidTarget": "ホスト名またはプライベート LAN の IP と、1 から 65535 までのポートを入力してください。",
+          "connectionTestFailed": "接続テストを完了できませんでした。",
+          "connectionTestRefused": "ホストは応答しましたが、ポートが接続を拒否しました。",
+          "connectionTestTimeout": "接続がタイムアウトしました。宛先、サービス、macOS の「ローカルネットワーク」設定を確認してください。",
+          "connectionTestUnreachable": "宛先に到達できませんでした。",
+          "connectionTestUnresolved": "ホスト名を解決できませんでした。",
+          "connectionTestUnsupported": "接続テストは macOS のデスクトップアプリで利用できます。"
         },
         "ExperimentalPane": {
           "9762364929": "可能な場合は macOS で APFS clone-copy を使用し、それ以外の場合は設定済みのフォルダーまたはファイルを作成済みワークツリーへシンボリックリンクします。",
@@ -9991,7 +10023,6 @@
           "subtitle": "{{value0}} v{{value1}} · {{value2}}",
           "reconsent": "前回このプラグインを確認してから、権限、ワーカーの信頼レベル、または指示コンテンツが変更されました。実行する前にもう一度確認してください。",
           "capabilities": "このプラグインに許可する操作",
-          "warning": "これらの権限は、プラグインが Orca APIを使用する方法を制限します。ワーカーは引き続きコンピュータで通常のプロセスとして実行され、ファイル、ネットワーク、その他のプロセスへの完全なアクセス権を持ちます。",
           "instructionalWarning": "このプラグインにはワーカープロセスがありません。それでも、ユーザーや Agent が使用したときに、記載された手順が操作を引き起こす可能性があります。有効にする前に、以下の手順とコマンドを確認してください。",
           "panelWarning": "これらの権限は、プラグインが Orca APIを使用する方法を制限します。このプラグインにはバックグラウンドワーカーがありません。",
           "declarativeWarning": "このプラグインは検証されたコンテンツのみを提供します。バックグラウンドワーカーを実行せず、Orca APIへのアクセスを受け取りません。",
@@ -10107,7 +10138,6 @@
           "includes": "内容",
           "noContributions": "マニフェストのメタデータのみ",
           "capabilities": "要求するアクセス権",
-          "workerWarning": "機能はこのプラグインが Orca APIを使用する方法を制限します。ワーカーは引き続きコンピュータで通常のプロセスとして実行され、ファイル、ネットワーク、その他のプロセスへの完全なアクセス権を持ちます。",
           "blocked": "Orca の安全リストがこのプラグインをブロック: {{value0}}",
           "current": "このプラグインと完全に同じ内容がすでにインストールされています。",
           "close": "閉じる",
@@ -10484,6 +10514,11 @@
         },
         "artifacts": {
           "allowPublishingDescription": "HTML と Markdown のファイルを、URL を知っている人なら誰でも開けるリンクとして公開します。ファイルの内容は {{host}} にアップロードされます。これは上流の Orca が運用しており、このビルドがホストしているわけではありません。作成済みのリンクは Artifacts から削除するまで残ります。"
+        },
+        "ReleaseChannelSection": {
+          "hourlyWarning": "毎時ビルドは macOS 専用で、テストを通さずに main から直接公開されます。安定版ビルドも用意しておいてください。",
+          "dailyWarning": "毎日ビルドは macOS 専用で、テストを通さずに main から直接公開されます。安定版ビルドも用意しておいてください。",
+          "adhocWarning": "アドホックビルドは macOS 専用で、まだ取り込まれていないブランチから作られます。作成者が放棄する可能性があるため、安定版ビルドも用意しておいてください。"
         }
       },
       "right": {
@@ -14763,6 +14798,9 @@
         "ArtifactPublishButton": {
           "confirmDescription": "現在のファイルを {{host}} にアップロードし、URL を知っている人なら誰でも閲覧できるリンクを作成します。"
         }
+      },
+      "BrowserPane": {
+        "streamCapabilityUnsupported": "選択したランタイムはリモートブラウザストリーミングに対応していません。"
       }
     },
     "i18n": {
