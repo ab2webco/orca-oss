@@ -35,6 +35,10 @@ const WIDE_WINDOW_WIDTH = 2800
  *  same value and the growth clause fails. A narrow sample under a ceiling still
  *  grows a little, and the control passes; verified, it did. */
 const PAST_CEILING_WINDOW_WIDTH = 2000
+/** Narrow enough that four cells cannot all keep a readable track, so the column
+ *  count has to give — but not so narrow that even one track breaks its floor,
+ *  which resolveAgentGridColumns deliberately allows. */
+const NARROW_WINDOW_WIDTH = 1100
 
 const WAITING_AGENT = 'Grid waiting agent'
 const WORKING_AGENT = 'Grid working agent'
@@ -174,6 +178,17 @@ async function settledCellWidth(page: Page, differentFrom?: number): Promise<num
   return width
 }
 
+/** Widest column count any section resolved. Not `.first()`: a project with one
+ *  agent is capped at one track by cell count, so it never reflects the width. */
+async function readGridColumns(page: Page): Promise<number> {
+  const counts = await page
+    .locator('[data-agent-grid-columns]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => Number((node as HTMLElement).dataset.agentGridColumns ?? '0'))
+    )
+  return Math.max(0, ...counts)
+}
+
 /** The strip's own numbers, read off the buttons the user sees. */
 async function readBucketCounts(
   page: Page
@@ -304,13 +319,21 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
     'the narrow window must already clear the min track, or Math.max is what moved'
   ).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
   expect(wideCellWidth).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
-  // The floor stays a floor: a track never drops under the minimum, the column
-  // count drops instead.
-  const columns = Number(
-    await page.locator('[data-agent-grid-columns]').first().getAttribute('data-agent-grid-columns')
+  // The floor stays a floor: narrowing the window drops the COLUMN COUNT and
+  // leaves the track above the minimum. Without this, removing the ceilings could
+  // ship a grid that just shrinks its cells into unreadable slivers instead.
+  const wideColumns = await readGridColumns(page)
+  await resizeWindow(electronApp, NARROW_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  const narrowedCellWidth = await settledCellWidth(page, wideCellWidth)
+  const narrowColumns = await readGridColumns(page)
+
+  expect(narrowColumns, 'a narrower window must drop tracks, not squeeze them').toBeLessThan(
+    wideColumns
   )
-  expect(columns).toBeGreaterThanOrEqual(1)
-  expect(wideCellWidth).toBeGreaterThanOrEqual(AGENT_GRID_MIN_CELL_WIDTH)
+  expect(
+    narrowedCellWidth,
+    'the surviving track must still be wide enough to read a tail'
+  ).toBeGreaterThanOrEqual(AGENT_GRID_MIN_CELL_WIDTH)
 
   // ── The strip counts what it shows, and filters to it ────────────────────
   const totalCells = await gridCells(page).count()
