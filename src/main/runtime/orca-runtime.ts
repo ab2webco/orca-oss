@@ -11,6 +11,7 @@ import {
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
+import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree-sort-order-update'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { sortDirEntries } from '../../shared/file-name-sort'
@@ -12285,6 +12286,35 @@ export class OrcaRuntimeService {
       lines = await this.readRendererVisibleSnapshotLines(ptyId)
     }
     return lines.length > 0 ? buildPreview(lines, '') : preview
+  }
+
+  /**
+   * Tail rows as coloured runs, or null when this pane has no emulator here.
+   *
+   * Why null and not plain rows: a provider- or SSH-hosted pane's screen lives
+   * on the host, and rebuilding an emulator per tick to colour eight lines is
+   * not worth it. The caller shows the uncoloured tail instead (ORCA-234).
+   */
+  async readTerminalVisibleSegments(
+    ptyId: string,
+    limit: number
+  ): Promise<TerminalLineSegment[][] | null> {
+    const state = this.headlessTerminals.get(ptyId)
+    if (!state) {
+      return null
+    }
+    const generation = this.getPtyLifecycleGeneration(ptyId)
+    await state.writeChain
+    if (
+      this.headlessTerminals.get(ptyId) !== state ||
+      this.getPtyLifecycleGeneration(ptyId) !== generation
+    ) {
+      return null
+    }
+    const rows = state.emulator
+      .getBufferTailSegments(Math.max(1, Math.floor(limit)) * 2)
+      .filter((row) => row.length > 0)
+    return rows.slice(-Math.max(1, Math.floor(limit)))
   }
 
   private async readVisibleTerminalState(

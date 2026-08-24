@@ -898,6 +898,149 @@ describe('createRemoteRuntimePtyTransport', () => {
     )
   })
 
+  it('does not strand a web mirror at connecting when the host handle never turns ready', async () => {
+    vi.useFakeTimers()
+    try {
+      const pendingSurface = (tabId: string, leafId: string) => ({
+        ok: true,
+        result: {
+          worktree: 'id:wt-1',
+          publicationEpoch: 'epoch-1',
+          snapshotVersion: 1,
+          activeGroupId: 'group-1',
+          activeTabId: `${tabId}::${leafId}`,
+          activeTabType: 'terminal',
+          // Why 'pending': the relaunched host republishes the surface before its PTY handle is back.
+          tabs: [
+            {
+              type: 'terminal',
+              id: `${tabId}::${leafId}`,
+              parentTabId: tabId,
+              leafId,
+              title: 'Terminal',
+              isActive: true,
+              status: 'pending'
+            }
+          ]
+        }
+      })
+      runtimeCall.mockImplementation(async (request: { method: string; params?: unknown }) => {
+        if (request.method === 'session.tabs.activate') {
+          const params = request.params as { tabId: string; leafId?: string }
+          return pendingSurface(params.tabId, params.leafId ?? 'pane:1')
+        }
+        if (request.method === 'session.tabs.list') {
+          return pendingSurface('host-tab-1', 'pane:1')
+        }
+        throw new Error(`Unexpected method ${request.method}`)
+      })
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const recoveryPhases: string[] = []
+      const onError = vi.fn()
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'web-terminal-host-tab-1',
+        leafId: 'pane:1'
+      })
+
+      transport.attach({
+        existingPtyId: 'remote:env-1@@terminal-1',
+        cols: 80,
+        rows: 24,
+        callbacks: {
+          onError,
+          onRecoveryStateChange: (state) => recoveryPhases.push(state.phase)
+        }
+      })
+      // Past HOST_SESSION_ATTACH_TIMEOUT_MS, so the bounded attach wait has given up.
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(recoveryPhases[0]).toBe('connecting')
+      expect(transport.getRecoveryState?.().phase).not.toBe('connecting')
+      transport.destroy?.()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reattaches a web mirror whose host handle turns ready after the bounded attach wait', async () => {
+    vi.useFakeTimers()
+    try {
+      const healthyRuntimeCall = runtimeCall.getMockImplementation()
+      let handleReady = false
+      const pendingSurface = (tabId: string, leafId: string) => ({
+        ok: true,
+        result: {
+          worktree: 'id:wt-1',
+          publicationEpoch: 'epoch-1',
+          snapshotVersion: 1,
+          activeGroupId: 'group-1',
+          activeTabId: `${tabId}::${leafId}`,
+          activeTabType: 'terminal',
+          tabs: [
+            {
+              type: 'terminal',
+              id: `${tabId}::${leafId}`,
+              parentTabId: tabId,
+              leafId,
+              title: 'Terminal',
+              isActive: true,
+              status: 'pending'
+            }
+          ]
+        }
+      })
+      runtimeCall.mockImplementation(async (request: { method: string; params?: unknown }) => {
+        if (handleReady) {
+          return healthyRuntimeCall?.(
+            request.method === 'session.tabs.list'
+              ? {
+                  method: 'session.tabs.activate',
+                  params: { tabId: 'host-tab-1', leafId: 'pane:1' }
+                }
+              : request
+          )
+        }
+        if (request.method === 'session.tabs.activate') {
+          const params = request.params as { tabId: string; leafId?: string }
+          return pendingSurface(params.tabId, params.leafId ?? 'pane:1')
+        }
+        if (request.method === 'session.tabs.list') {
+          return pendingSurface('host-tab-1', 'pane:1')
+        }
+        return healthyRuntimeCall?.(request)
+      })
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'web-terminal-host-tab-1',
+        leafId: 'pane:1'
+      })
+
+      transport.attach({
+        existingPtyId: 'remote:env-1@@terminal-1',
+        cols: 80,
+        rows: 24,
+        callbacks: {}
+      })
+      // The relaunched host outlasts HOST_SESSION_ATTACH_TIMEOUT_MS before republishing.
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(runtimeSubscribe).not.toHaveBeenCalled()
+
+      handleReady = true
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(runtimeSubscribe).toHaveBeenCalled()
+      expect(latestSubscribePayload().terminal).toBe('terminal-1')
+      emitSnapshot(latestSubscribePayload().streamId, 'restored')
+
+      expect(transport.getRecoveryState?.().phase).toBe('connected')
+      transport.destroy?.()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps web mirror inventory and subscription failures inside one recovery budget', async () => {
     vi.useFakeTimers()
     try {
