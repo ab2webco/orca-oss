@@ -10017,7 +10017,10 @@
             "eventsSubscribe": "워크트리가 생성 또는 제거되거나 에이전트 상태가 변경될 때 알림 받기",
             "settingsOwn": "플러그인 자체 설정 읽기 및 변경"
           },
-          "decisionFailed": "권한 결정을 저장할 수 없습니다. 다시 시도하세요."
+          "decisionFailed": "권한 결정을 저장할 수 없습니다. 다시 시도하세요.",
+          "workerSandboxWarning": "이 워커는 플러그인 파일과 Orca가 런타임에 허용한 파일을 읽을 수 있습니다. Orca의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.",
+          "networkRestrictedNote": "네트워크 요청은 위에 선언된 호스트로 제한됩니다.",
+          "networkBlockedNote": "이 플러그인이 net:fetch를 요청하지 않으므로 네트워크 접근이 차단됩니다."
         },
         "PluginConsentProvenance": {
           "official": "공식",
@@ -10121,7 +10124,10 @@
           "close": "닫기",
           "cancel": "취소",
           "update": "플러그인 업데이트",
-          "install": "플러그인 설치"
+          "install": "플러그인 설치",
+          "workerSandboxWarning": "이 워커는 플러그인 파일과 Orca가 런타임에 허용한 파일을 읽을 수 있습니다. Orca의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.",
+          "networkRestrictedNote": "네트워크 요청은 위에 선언된 호스트로 제한됩니다.",
+          "networkBlockedNote": "이 플러그인이 net:fetch를 요청하지 않으므로 네트워크 접근이 차단됩니다."
         },
         "PluginMarketplaceSourceDialog": {
           "addFailed": "이 마켓플레이스를 추가하지 못했습니다. Git URL, ref 및 Git 자격 증명을 확인하세요.",
@@ -10204,7 +10210,10 @@
           "remove": "제거",
           "disableLabel": "{{value0}} 비활성화",
           "enableLabel": "{{value0}} 활성화",
-          "invalidPluginError": "플러그인 매니페스트 또는 설치된 파일이 올바르지 않습니다. 수정한 후 새로 고치세요."
+          "invalidPluginError": "플러그인 매니페스트 또는 설치된 파일이 올바르지 않습니다. 수정한 후 새로 고치세요.",
+          "configure": "설정",
+          "networkRestricted": "네트워크 접근은 이 플러그인이 선언한 호스트로 제한됩니다.",
+          "networkBlocked": "이 플러그인이 net:fetch를 선언하지 않으므로 네트워크 접근이 차단됩니다."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "생성",

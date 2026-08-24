@@ -10460,7 +10460,10 @@
             "eventsSubscribe": "Get notified when worktrees are created or removed and when agent status changes",
             "settingsOwn": "Read and change the plugin's own settings"
           },
-          "decisionFailed": "Could not save the permission decision. Try again."
+          "decisionFailed": "Could not save the permission decision. Try again.",
+          "workerSandboxWarning": "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls.",
+          "networkRestrictedNote": "Network requests are restricted to the hosts declared above.",
+          "networkBlockedNote": "Network access is blocked because this plugin does not request net:fetch."
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -10565,7 +10568,10 @@
           "close": "Close",
           "cancel": "Cancel",
           "update": "Update plugin",
-          "install": "Install plugin"
+          "install": "Install plugin",
+          "workerSandboxWarning": "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls.",
+          "networkRestrictedNote": "Network requests are restricted to the hosts declared above.",
+          "networkBlockedNote": "Network access is blocked because this plugin does not request net:fetch."
         },
         "PluginMarketplaceSourceDialog": {
           "addFailed": "Could not add this marketplace. Check the Git URL, ref, and your Git credentials.",
@@ -10652,7 +10658,9 @@
           "invalidPluginError": "The plugin manifest or installed files are invalid. Fix the plugin, then refresh.",
           "needsSetup": "Needs setup",
           "finishSetup": "Finish setup",
-          "configure": "Configure"
+          "configure": "Configure",
+          "networkRestricted": "Network access is restricted to the hosts declared by this plugin.",
+          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",

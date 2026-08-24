@@ -15,6 +15,7 @@ import {
 
 const workspaceRead: PluginCapability = { kind: 'workspace:read' }
 const storage: PluginCapability = { kind: 'storage' }
+const network: PluginCapability = { kind: 'net:fetch', hosts: ['api.example.com'] }
 
 describe('fingerprintPluginConsent', () => {
   it('drops malformed persisted consent identities and oversized fingerprints', () => {
@@ -64,15 +65,48 @@ describe('fingerprintPluginConsent', () => {
     expect(fingerprintPluginConsent({ main: undefined, capabilities })).toBe(legacy)
   })
 
-  // Regression guard (ORCA-277 item 3): the consent surface now shows a
-  // runtime note about unrestricted plugin network access, but that note is
-  // UI copy, not a capability. Pin the canonical encoding so a future change
-  // to plugin-capabilities.ts that accidentally alters ordering/shape is
-  // caught here rather than silently re-prompting every installed plugin.
+  // Legacy manifests keep their consent identity until they request net:fetch.
   it('keeps the canonical capability-set encoding stable', () => {
     expect(canonicalizeCapabilitySet([workspaceRead, storage])).toBe(
       '["{\\"kind\\":\\"storage\\"}","{\\"kind\\":\\"workspace:read\\"}"]'
     )
+  })
+
+  it('canonicalizes network host scopes as a set', () => {
+    expect(
+      canonicalizeCapabilitySet([
+        { kind: 'net:fetch', hosts: ['API.EXAMPLE.COM', 'hooks.example.com', 'api.example.com'] }
+      ])
+    ).toBe(
+      canonicalizeCapabilitySet([
+        { kind: 'net:fetch', hosts: ['hooks.example.com'] },
+        { kind: 'net:fetch', hosts: ['api.example.com'] }
+      ])
+    )
+  })
+
+  it('requires re-consent when a plugin adds network access', () => {
+    const legacy = fingerprintPluginConsent({ main: 'worker.js', capabilities: [storage] })
+    const withNetwork = fingerprintPluginConsent({
+      main: 'worker.js',
+      capabilities: [storage, network]
+    })
+    const lists = {
+      pluginConsents: { 'fabolivar.agent-done-webhook': legacy },
+      disabledPlugins: []
+    }
+
+    expect(withNetwork).not.toBe(legacy)
+    expect(getPluginActivationState('fabolivar.agent-done-webhook', withNetwork, lists)).toBe(
+      'pending'
+    )
+    expect(needsReconsent('fabolivar.agent-done-webhook', withNetwork, lists)).toBe(true)
+    expect(
+      getPluginActivationState('fabolivar.agent-done-webhook', withNetwork, {
+        ...lists,
+        pluginConsents: { 'fabolivar.agent-done-webhook': withNetwork }
+      })
+    ).toBe('approved')
   })
 
   it('requires re-consent when instructional content bytes change', () => {
