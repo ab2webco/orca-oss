@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -138,9 +137,9 @@ describe('Require fish 4+ gate message', () => {
   }
 
   function runGate({ fishVersion, sourceStatus }) {
-    const dir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-gate-'))
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-gate-'))
     // A fake `fish` so the gate sees the version we are testing.
-    fsSync.writeFileSync(
+    writeFileSync(
       path.join(dir, 'fish'),
       fishVersion === null
         ? '#!/usr/bin/env bash\nexit 127\n'
@@ -148,7 +147,7 @@ describe('Require fish 4+ gate message', () => {
       { mode: 0o755 }
     )
     if (sourceStatus !== null) {
-      fsSync.writeFileSync(path.join(dir, 'fish4-source-status'), `${sourceStatus}\n`, 'utf8')
+      writeFileSync(path.join(dir, 'fish4-source-status'), `${sourceStatus}\n`, 'utf8')
     }
     try {
       const out = execFileSync('bash', ['-c', gateScript()], {
