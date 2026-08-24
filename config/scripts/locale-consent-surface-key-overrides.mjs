@@ -8,12 +8,6 @@
 // the pane the user is actually looking at.
 
 export const CONSENT_SURFACE_KEY_OVERRIDES = {
-  'auto.components.settings.PluginConsentDialog.networkAccessNote': {
-    es: 'Puede conectarse a cualquier host de internet. Por ahora, Orca no restringe ni supervisa el acceso a la red de los plugins.',
-    ja: 'インターネット上の任意のホストに接続できます。現在、Orca はプラグインのネットワークアクセスを制限も監視もしていません。',
-    ko: '인터넷의 모든 호스트에 연결할 수 있습니다. 현재 Orca는 플러그인의 네트워크 접근을 제한하거나 감시하지 않습니다.',
-    zh: '它可以连接到互联网上的任何主机。Orca 目前不会限制或监控插件的网络访问。'
-  },
   'auto.components.BrowserPane.streamCapabilityUnsupported': {
     es: 'El entorno de ejecución seleccionado no admite la transmisión remota del navegador.',
     ja: '選択したランタイムはリモートブラウザストリーミングに対応していません。',

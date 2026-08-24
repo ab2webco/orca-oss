@@ -10035,7 +10035,6 @@
           "subtitle": "{{value0}} v{{value1}} · {{value2}}",
           "reconsent": "自你上次检查此插件以来，权限、工作进程信任级别或指令内容已更改。请在运行前重新检查。",
           "capabilities": "此插件可以",
-          "warning": "这些权限限制插件使用 Orca API 的方式。其工作进程仍作为普通进程在你的计算机上运行，可以完全访问文件、网络和其他进程。",
           "instructionalWarning": "此插件没有工作进程。但当你或智能体使用其指令内容时，仍可能触发操作。启用前请检查以下指令和命令。",
           "panelWarning": "这些权限限制插件使用 Orca API 的方式。此插件没有后台工作进程。",
           "declarativeWarning": "此插件仅贡献经过验证的内容。它不运行后台工作进程，也不接收对 Orca API 的访问。",
@@ -10053,8 +10052,7 @@
           "decisionFailed": "无法保存权限决定。请重试。",
           "workerSandboxWarning": "此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。",
           "networkRestrictedNote": "网络请求仅限于上方声明的主机。",
-          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。",
-          "networkAccessNote": "它可以连接到互联网上的任何主机。Orca 目前不会限制或监控插件的网络访问。"
+          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。"
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -10152,7 +10150,6 @@
           "includes": "包含",
           "noContributions": "仅包含清单元数据",
           "capabilities": "请求的访问权限",
-          "workerWarning": "权限会限制此插件使用 Orca API 的方式，但其工作进程仍会作为此计算机上的普通进程运行，并可完全访问你的文件、网络和其他进程。",
           "blocked": "Orca 安全列表已阻止此插件：{{value0}}",
           "current": "已安装内容完全相同的插件。",
           "close": "关闭",
