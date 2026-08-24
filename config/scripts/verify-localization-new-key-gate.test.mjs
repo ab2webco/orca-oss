@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -166,5 +167,28 @@ describe('localization new-key gate exit code', () => {
       { es: {}, ja: {}, ko: {}, zh: {} }
     )
     expect(runGate(root, baseSha).status).toBe(0)
+  })
+})
+
+// The gate landed in `pnpm lint` but not in pr.yml, so it ran locally and not in
+// CI — a verifier that finds everything and blocks nothing, this ticket's own
+// defect in the wiring. pr-workflow-lint-parity catches a MISSING step; this
+// covers the part it cannot see: that the step gets the base ref it needs to
+// tell a new key from old debt.
+describe('pr.yml wiring', () => {
+  const workflow = readFileSync(
+    path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'pr.yml'),
+    'utf8'
+  )
+
+  it('runs the gate as a PR step', () => {
+    expect(workflow).toContain('pnpm run verify:localization-new-keys')
+  })
+
+  it('hands the step the pull request base, or every key reads as pre-existing', () => {
+    const step = workflow.slice(workflow.indexOf('pnpm run verify:localization-new-keys'))
+    expect(step).toMatch(
+      /ORCA_LOCALIZATION_GATE_BASE:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha/
+    )
   })
 })
