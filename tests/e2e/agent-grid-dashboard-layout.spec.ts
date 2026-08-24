@@ -4,7 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
-import { resolveAgentGridMinCellHeight } from '../../src/renderer/src/components/dashboard-popout/agent-grid-columns'
+import {
+  AGENT_GRID_MIN_CELL_WIDTH,
+  resolveAgentGridMinCellHeight
+} from '../../src/renderer/src/components/dashboard-popout/agent-grid-columns'
 import {
   execInTerminal,
   splitActiveTerminalPane,
@@ -24,6 +27,14 @@ const SINGLE_ROW_PAGE_SIZE = 1
 const SHORT_WINDOW_HEIGHT = 800
 const TALL_WINDOW_HEIGHT = 1100
 const WINDOW_WIDTH = 1500
+/** Past the 1294px the drawer sheet used to cap itself at, so a reintroduced
+ *  ceiling cannot pass by accident. */
+const WIDE_WINDOW_WIDTH = 2800
+/** Both sample widths clear BOTH ceilings this fixes — the sheet's old 1294px and
+ *  the grid's own 1600px — so restoring either pins the two measurements to the
+ *  same value and the growth clause fails. A narrow sample under a ceiling still
+ *  grows a little, and the control passes; verified, it did. */
+const PAST_CEILING_WINDOW_WIDTH = 2000
 
 const WAITING_AGENT = 'Grid waiting agent'
 const WORKING_AGENT = 'Grid working agent'
@@ -140,6 +151,29 @@ async function settledCellHeight(page: Page, differentFrom?: number): Promise<nu
   return height
 }
 
+/** Laid-out width of a cell, polled through the same ResizeObserver settle. */
+async function measureFirstCellWidth(page: Page): Promise<number> {
+  const box = await gridCells(page).first().boundingBox()
+  if (!box) {
+    throw new Error('Grid cell has no layout box')
+  }
+  return box.width
+}
+
+async function settledCellWidth(page: Page, differentFrom?: number): Promise<number> {
+  let width = 0
+  await expect
+    .poll(
+      async () => {
+        width = await measureFirstCellWidth(page)
+        return differentFrom === undefined ? width > 0 : Math.abs(width - differentFrom) > 1
+      },
+      { timeout: 15_000, message: 'Grid never settled on a measured cell width' }
+    )
+    .toBe(true)
+  return width
+}
+
 /** The strip's own numbers, read off the buttons the user sees. */
 async function readBucketCounts(
   page: Page
@@ -247,6 +281,36 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
     floor
   )
   expect(tallHeight).toBeGreaterThan(floor)
+
+  // ── The grid takes the width it is given ─────────────────────────────────
+  // Same two clauses as the height, for the same reason: growth alone passes a
+  // grid pinned to its minimum track, so both measurements must clear the floor
+  // too (ORCA-286).
+  // Both widths sit ABOVE the ceiling this fixes, so a reintroduced cap pins the
+  // two measurements to the same value and the growth clause fails. Measuring
+  // from WINDOW_WIDTH would leave the narrow one below the cap, where a capped
+  // grid still grows a little and the control passes — verified, it did.
+  await resizeWindow(electronApp, PAST_CEILING_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  const narrowCellWidth = await settledCellWidth(page)
+  await resizeWindow(electronApp, WIDE_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  const wideCellWidth = await settledCellWidth(page, narrowCellWidth)
+
+  expect(
+    wideCellWidth,
+    'a wider window must widen the cells, not centre them behind empty margins'
+  ).toBeGreaterThan(narrowCellWidth + 1)
+  expect(
+    narrowCellWidth,
+    'the narrow window must already clear the min track, or Math.max is what moved'
+  ).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
+  expect(wideCellWidth).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
+  // The floor stays a floor: a track never drops under the minimum, the column
+  // count drops instead.
+  const columns = Number(
+    await page.locator('[data-agent-grid-columns]').first().getAttribute('data-agent-grid-columns')
+  )
+  expect(columns).toBeGreaterThanOrEqual(1)
+  expect(wideCellWidth).toBeGreaterThanOrEqual(AGENT_GRID_MIN_CELL_WIDTH)
 
   // ── The strip counts what it shows, and filters to it ────────────────────
   const totalCells = await gridCells(page).count()

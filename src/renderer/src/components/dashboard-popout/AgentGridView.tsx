@@ -252,8 +252,11 @@ export function AgentGridView({
           </div>
         ) : null}
         {/* Measured here, not on the scroll box: this is the element the tracks
-            are laid out in, so its width is the one the column count answers. */}
-        <div ref={gridRef} className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+            are laid out in, so its width is the one the column count answers.
+            No max-width: a reading measure would centre the grid and leave the
+            margins the owner reported; width is what makes a tail legible, and
+            the column count already caps how wide a cell gets (ORCA-286). */}
+        <div ref={gridRef} className="flex w-full flex-col gap-4">
           {projects.length === 0 ? (
             <p className="p-6 text-center text-[13px] text-muted-foreground">
               {translate('dashboardPopout.grid.empty', 'No agents to show')}
