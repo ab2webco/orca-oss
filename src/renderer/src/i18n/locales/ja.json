@@ -10006,7 +10006,10 @@
             "eventsSubscribe": "ワークツリーが作成または削除され、Agent ステータスが変更されたときに通知を受ける",
             "settingsOwn": "プラグイン自身の設定を読み取り、変更する"
           },
-          "decisionFailed": "権限の選択を保存できませんでした。再試行してください。"
+          "decisionFailed": "権限の選択を保存できませんでした。再試行してください。",
+          "workerSandboxWarning": "このワーカーは、プラグインのファイルと Orca がランタイムに許可したファイルを読み取れます。Orca の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。",
+          "networkRestrictedNote": "ネットワークリクエストは上記で宣言されたホストに制限されます。",
+          "networkBlockedNote": "このプラグインが net:fetch を要求していないため、ネットワークアクセスはブロックされています。"
         },
         "PluginConsentProvenance": {
           "official": "公式",
@@ -10110,7 +10113,10 @@
           "close": "閉じる",
           "cancel": "キャンセル",
           "update": "プラグインを更新",
-          "install": "プラグインをインストール"
+          "install": "プラグインをインストール",
+          "workerSandboxWarning": "このワーカーは、プラグインのファイルと Orca がランタイムに許可したファイルを読み取れます。Orca の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。",
+          "networkRestrictedNote": "ネットワークリクエストは上記で宣言されたホストに制限されます。",
+          "networkBlockedNote": "このプラグインが net:fetch を要求していないため、ネットワークアクセスはブロックされています。"
         },
         "PluginMarketplaceSourceDialog": {
           "addFailed": "このマーケットプレイスを追加できませんでした。Git URL、ref、Git 認証情報を確認してください。",
@@ -10193,7 +10199,10 @@
           "remove": "削除",
           "disableLabel": "{{value0}}を無効にする",
           "enableLabel": "{{value0}} を有効化",
-          "invalidPluginError": "プラグインのマニフェストまたはインストール済みファイルが無効です。修正してから更新してください。"
+          "invalidPluginError": "プラグインのマニフェストまたはインストール済みファイルが無効です。修正してから更新してください。",
+          "configure": "設定",
+          "networkRestricted": "ネットワークアクセスは、このプラグインが宣言したホストに制限されています。",
+          "networkBlocked": "このプラグインが net:fetch を宣言していないため、ネットワークアクセスはブロックされています。"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "作成",

@@ -114,7 +114,10 @@ test('runs hello-orca panel, command, and event behind visible consent', async (
     const consent = orcaPage.getByRole('dialog', { name: 'Review permissions' })
     await expect(consent).toBeVisible()
     await expect(consent).toContainText('Local folder')
-    await expect(consent).toContainText('full access to your files, network, and other processes')
+    // Both halves, because ORCA-277 made them separate claims: the worker's
+    // remaining reach, and the network state it is actually held to.
+    await expect(consent).toContainText('can read its plugin files')
+    await expect(consent).toContainText('does not request net:fetch')
     await expect(consent.getByRole('button', { name: 'Keep Disabled' })).toBeFocused()
     await consent.getByRole('button', { name: 'Enable plugin' }).click()
     await expect(consent).toBeHidden()

@@ -35,10 +35,7 @@ import {
   useAgentSessionLogReadings,
   type AgentSessionLogReadPanes
 } from './use-agent-session-log-readings'
-import {
-  useAgentTerminalTails,
-  type AgentTerminalTailReadPtys
-} from './use-agent-terminal-tails'
+import { useAgentTerminalTails, type AgentTerminalTailReadPtys } from './use-agent-terminal-tails'
 
 export type AgentGridViewProps = {
   snapshot: DashboardSnapshot
@@ -109,7 +106,10 @@ export function AgentGridView({
 
   // Sections keep the project grouping; everything renders and the page scrolls.
   const visibleSections = useMemo(() => {
-    const byRepo = new Map<string, { repoId: string; repoName: string; cells: AgentGridCellModel[] }>()
+    const byRepo = new Map<
+      string,
+      { repoId: string; repoName: string; cells: AgentGridCellModel[] }
+    >()
     for (const entry of flatCells) {
       const existing = byRepo.get(entry.project.repoId)
       if (existing) {
@@ -198,62 +198,65 @@ export function AgentGridView({
         searchInputRef={searchInputRef}
       />
       <div className="scrollbar-sleek flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-          {allCells.length > 1 ? (
-            <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="mr-3 flex items-center gap-2.5">
-                {(
-                  [
-                    ['attention', 'waiting'],
-                    ['working', 'working'],
-                    ['done', 'done'],
-                    ['idle', 'idle']
-                  ] as const
-                ).map(([bucket, dot]) => (
-                  <button
-                    key={bucket}
-                    type="button"
-                    aria-pressed={bucketFilter === bucket}
-                    disabled={bucketTotals[bucket] === 0 && bucketFilter !== bucket}
-                    onClick={() => {
-                      setBucketFilter((current) => (current === bucket ? null : bucket))
-                    }}
-                    className={cn(
-                      'flex items-center gap-1 rounded px-1.5 py-0.5 disabled:opacity-40',
-                      bucketFilter === bucket
-                        ? 'bg-accent text-foreground'
-                        : 'hover:bg-accent/60 hover:text-foreground'
-                    )}
-                  >
-                    <AgentStateDot state={dot} size="sm" />
-                    <span>{dashboardBucketLabel(bucket)}</span>
-                    <span className="tabular-nums text-foreground">{bucketTotals[bucket]}</span>
-                  </button>
-                ))}
-              </span>
-              {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
+        {allCells.length > 1 ? (
+          <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="mr-3 flex items-center gap-2.5">
+              {(
+                [
+                  ['attention', 'waiting'],
+                  ['working', 'working'],
+                  ['done', 'done'],
+                  ['idle', 'idle']
+                ] as const
+              ).map(([bucket, dot]) => (
                 <button
-                  key={option}
+                  key={bucket}
                   type="button"
-                  aria-label={`${option}`}
-                  aria-pressed={option === pageSize}
+                  aria-pressed={bucketFilter === bucket}
+                  disabled={bucketTotals[bucket] === 0 && bucketFilter !== bucket}
                   onClick={() => {
-                    setPageSize(option)
+                    setBucketFilter((current) => (current === bucket ? null : bucket))
                   }}
                   className={cn(
-                    'rounded px-1.5 py-0.5 tabular-nums',
-                    option === pageSize
+                    'flex items-center gap-1 rounded px-1.5 py-0.5 disabled:opacity-40',
+                    bucketFilter === bucket
                       ? 'bg-accent text-foreground'
                       : 'hover:bg-accent/60 hover:text-foreground'
                   )}
                 >
-                  {option}
+                  <AgentStateDot state={dot} size="sm" />
+                  <span>{dashboardBucketLabel(bucket)}</span>
+                  <span className="tabular-nums text-foreground">{bucketTotals[bucket]}</span>
                 </button>
               ))}
-            </div>
-          ) : null}
+            </span>
+            {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-label={`${option}`}
+                aria-pressed={option === pageSize}
+                onClick={() => {
+                  setPageSize(option)
+                }}
+                className={cn(
+                  'rounded px-1.5 py-0.5 tabular-nums',
+                  option === pageSize
+                    ? 'bg-accent text-foreground'
+                    : 'hover:bg-accent/60 hover:text-foreground'
+                )}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {/* Measured here, not on the scroll box: this is the element the tracks
-            are laid out in, so its width is the one the column count answers. */}
-        <div ref={gridRef} className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+            are laid out in, so its width is the one the column count answers.
+            No max-width: a reading measure would centre the grid and leave the
+            margins the owner reported; width is what makes a tail legible, and
+            the column count already caps how wide a cell gets (ORCA-286). */}
+        <div ref={gridRef} className="flex w-full flex-col gap-4">
           {projects.length === 0 ? (
             <p className="p-6 text-center text-[13px] text-muted-foreground">
               {translate('dashboardPopout.grid.empty', 'No agents to show')}
@@ -266,57 +269,59 @@ export function AgentGridView({
               const spans = resolveAgentGridCellSpans(project.cells.length, columns)
               const collapsed = collapsedRepoIds.includes(project.repoId)
               return (
-              <section key={project.repoId} className="flex shrink-0 flex-col gap-2">
-                <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
-                  <RepoIconGlyph
-                    repoIcon={snapshot.repoIconsByRepoId?.[project.repoId] ?? null}
-                    iconClassName="size-3.5"
-                  />
-                  <span className="truncate">{project.repoName}</span>
-                  <span className="font-normal tracking-normal normal-case">
-                    {translate('dashboardPopout.grid.agentCount', '{{count}} agents', {
-                      count: project.cells.length
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    data-repo-collapse={project.repoId}
-                    aria-pressed={collapsed}
-                    aria-label={project.repoName}
-                    onClick={() => toggleRepoCollapsed(project.repoId)}
-                    className="rounded p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                  >
-                    {collapsed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                  </button>
-                </h2>
-                {collapsed ? null : (
-                <div
-                  data-agent-grid-columns={columns}
-                  data-agent-grid-rows={rows}
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                    gridAutoRows: rowHeight > 0 ? `${Math.round(rowHeight)}px` : `${minCellHeight}px`,
-                    gap: `${AGENT_GRID_CELL_GAP}px`
-                  }}
-                >
-                  {project.cells.map((cell, index) => (
-                    <div
-                      key={cell.card.paneKey}
-                      className="min-h-0 min-w-0"
-                      style={{ gridColumn: `span ${spans[index] ?? 1}` }}
-                    >
-                    <AgentGridCell
-                      cell={cell}
-                      tail={cell.card.ptyId ? tails.get(cell.card.ptyId) : undefined}
-                      now={coarseNow}
-                      onReveal={handleReveal}
+                <section key={project.repoId} className="flex shrink-0 flex-col gap-2">
+                  <h2 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+                    <RepoIconGlyph
+                      repoIcon={snapshot.repoIconsByRepoId?.[project.repoId] ?? null}
+                      iconClassName="size-3.5"
                     />
+                    <span className="truncate">{project.repoName}</span>
+                    <span className="font-normal tracking-normal normal-case">
+                      {translate('dashboardPopout.grid.agentCount', '{{count}} agents', {
+                        count: project.cells.length
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      data-repo-collapse={project.repoId}
+                      aria-pressed={collapsed}
+                      aria-label={project.repoName}
+                      onClick={() => toggleRepoCollapsed(project.repoId)}
+                      className="rounded p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    >
+                      {collapsed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  </h2>
+                  {collapsed ? null : (
+                    <div
+                      data-agent-grid-columns={columns}
+                      data-agent-grid-rows={rows}
+                      className="grid"
+                      style={{
+                        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                        gridAutoRows:
+                          rowHeight > 0 ? `${Math.round(rowHeight)}px` : `${minCellHeight}px`,
+                        gap: `${AGENT_GRID_CELL_GAP}px`
+                      }}
+                    >
+                      {project.cells.map((cell, index) => (
+                        <div
+                          key={cell.card.paneKey}
+                          data-agent-grid-cell={cell.card.paneKey}
+                          className="min-h-0 min-w-0"
+                          style={{ gridColumn: `span ${spans[index] ?? 1}` }}
+                        >
+                          <AgentGridCell
+                            cell={cell}
+                            tail={cell.card.ptyId ? tails.get(cell.card.ptyId) : undefined}
+                            now={coarseNow}
+                            onReveal={handleReveal}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                )}
-              </section>
+                  )}
+                </section>
               )
             })
           )}

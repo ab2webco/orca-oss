@@ -1,5 +1,5 @@
 import {
-  PLUGIN_CAPABILITY_DESCRIPTIONS,
+  describePluginCapability,
   type PluginCapabilityKind
 } from '../../shared/plugins/plugin-capabilities'
 import { needsReconsent } from '../../shared/plugins/plugin-consent-state'
@@ -189,7 +189,7 @@ export async function buildPluginList(
         bundled,
         capabilities: plugin.manifest.capabilities.map((capability) => ({
           kind: capability.kind,
-          description: PLUGIN_CAPABILITY_DESCRIPTIONS[capability.kind]
+          description: describePluginCapability(capability)
         })),
         panels: plugin.manifest.contributes.panels.map((panel) => ({
           id: panel.id,

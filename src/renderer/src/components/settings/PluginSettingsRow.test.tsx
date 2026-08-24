@@ -155,6 +155,19 @@ async function renderRow(
 }
 
 describe('PluginSettingsRow declared settings', () => {
+  it('explains why an installed worker without net:fetch cannot use the network', async () => {
+    const { container, unmount } = await renderRow({
+      ...configurable,
+      hasWorker: true,
+      capabilities: []
+    })
+
+    expect(container.textContent).toContain(
+      'Network access is blocked because this plugin does not declare net:fetch.'
+    )
+    unmount()
+  })
+
   it('marks an unconfigured plugin as needing setup instead of running', async () => {
     const { container, unmount } = await renderRow(configurable)
     expect(container.textContent).toContain('Needs setup')

@@ -174,6 +174,12 @@ describe('electron-builder config', () => {
     )
   })
 
+  it('unpacks the plugin worker entry and its network preload', () => {
+    expect(electronBuilderConfig.asarUnpack).toEqual(
+      expect.arrayContaining(['out/main/plugin-host-entry.js', 'out/main/plugin-host-preload.js'])
+    )
+  })
+
   // Why: the scanner service is forked with ELECTRON_RUN_AS_NODE, so asar is
   // invisible to it and a packed worker entry fails closed — dropping every
   // OpenCode session in packaged builds while dev stays green. Three legs must

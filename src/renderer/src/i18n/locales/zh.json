@@ -10018,7 +10018,10 @@
             "eventsSubscribe": "在创建或移除工作树以及智能体状态变化时接收通知",
             "settingsOwn": "读取和更改插件自己的设置"
           },
-          "decisionFailed": "无法保存权限决定。请重试。"
+          "decisionFailed": "无法保存权限决定。请重试。",
+          "workerSandboxWarning": "此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。",
+          "networkRestrictedNote": "网络请求仅限于上方声明的主机。",
+          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。"
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -10122,7 +10125,10 @@
           "close": "关闭",
           "cancel": "取消",
           "update": "更新插件",
-          "install": "安装插件"
+          "install": "安装插件",
+          "workerSandboxWarning": "此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。",
+          "networkRestrictedNote": "网络请求仅限于上方声明的主机。",
+          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。"
         },
         "PluginMarketplaceSourceDialog": {
           "addFailed": "无法添加此插件市场。请检查 Git URL、ref 和 Git 凭据。",
@@ -10205,7 +10211,10 @@
           "remove": "移除",
           "disableLabel": "停用 {{value0}}",
           "enableLabel": "启用 {{value0}}",
-          "invalidPluginError": "插件清单或已安装文件无效。请修复插件后刷新。"
+          "invalidPluginError": "插件清单或已安装文件无效。请修复插件后刷新。",
+          "configure": "配置",
+          "networkRestricted": "网络访问仅限于此插件声明的主机。",
+          "networkBlocked": "由于此插件未声明 net:fetch，网络访问已被阻止。"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "创建",

@@ -22,6 +22,30 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
 }
 
 describe('pluginManifestSchema boundaries', () => {
+  it('accepts scoped network access and rejects invalid host scopes', () => {
+    expect(
+      parsePluginManifest(
+        manifest({
+          main: 'worker.js',
+          capabilities: [{ kind: 'net:fetch', hosts: ['api.example.com', '*.hooks.example.com'] }]
+        })
+      ).ok
+    ).toBe(true)
+    expect(
+      parsePluginManifest(
+        manifest({ main: 'worker.js', capabilities: [{ kind: 'net:fetch', hosts: [] }] })
+      ).ok
+    ).toBe(false)
+    expect(
+      parsePluginManifest(
+        manifest({
+          main: 'worker.js',
+          capabilities: [{ kind: 'net:fetch', hosts: ['https://api.example.com'] }]
+        })
+      ).ok
+    ).toBe(false)
+  })
+
   it('accepts documented dotted command namespaces with camel-case actions', () => {
     const result = parsePluginManifest(
       manifest({
