@@ -13,6 +13,13 @@
     --stale: #9aa2a8;
     --shadow: rgba(20, 23, 26, 0.06);
 
+    /* Estados del panel de agentes. Valores tomados de AgentStateDot.tsx /
+       AgentWorkingSpinner.tsx para que el sitio y la app digan lo mismo. */
+    --st-working: #eab308;
+    --st-attention: #f59e0b;
+    --st-done: #10b981;
+    --st-idle: #737373;
+
     --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Mono", Menlo, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
@@ -246,6 +253,84 @@
   .state dd { margin: 0; }
   .state.before dd { color: var(--stale); text-decoration: line-through; text-decoration-thickness: 1px; }
   .state.after dd { color: var(--true); }
+
+  /* ---------- board (panel de agentes) ---------- */
+
+  .board { padding: clamp(3rem, 7vw, 5rem) 0; }
+
+  .board-lede {
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 1.25rem 0 0;
+  }
+
+  .board-plate {
+    margin-top: 2.5rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    padding: clamp(1rem, 3vw, 1.75rem);
+  }
+
+  /* El esquema es ancho por naturaleza. En pantallas angostas desplaza dentro
+     de su caja en vez de encogerse hasta que el texto deja de leerse — el mismo
+     trato que .table-scroll. */
+  .board-plate { overflow-x: auto; }
+  .board-plate svg { display: block; width: 100%; min-width: 52rem; height: auto; }
+
+  .board-note {
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 1rem 0 0;
+    max-width: 68ch;
+  }
+
+  .board-note b { color: var(--ink); font-weight: 600; }
+
+  .board-figs {
+    display: grid;
+    gap: 2.5rem;
+    margin-top: 3rem;
+  }
+
+  @media (min-width: 52rem) {
+    .board-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem; }
+  }
+
+  .board-facts {
+    display: grid;
+    gap: 0;
+    margin-top: 3rem;
+    border-top: 1px solid var(--hairline);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 52rem) {
+    .board-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .board-fact {
+    padding: 1.25rem 1.5rem 1.25rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .board-fact dt {
+    font-family: var(--mono);
+    font-size: 1.375rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  .board-fact dd {
+    margin: 0.5rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--muted);
+    max-width: 24ch;
+  }
 
   /* ---------- diagram band ---------- */
 
@@ -643,6 +728,227 @@
     </div>
   </section>
 
+  <section class="board band">
+    <p class="eyebrow">El panel de agentes</p>
+    <h2>Todos los agentes en una pantalla, con el tail de cada uno.</h2>
+    <p class="board-lede">
+      El panel abre en su propia ventana y pone una celda por agente, con las últimas líneas de
+      su terminal en vivo. Arriba, una tira cuenta cuántos hay en cada estado y filtra al hacer
+      click. Cada proyecto se colapsa con el ojito y dice cuántos agentes tiene.
+    </p>
+
+    <div class="board-plate">
+      <svg viewBox="0 0 960 296" role="img" aria-label="Esquema del panel: una tira de cuatro estados con sus conteos, un proyecto abierto con tres celdas de agente que muestran modelo, contexto y tail coloreado, y debajo un segundo proyecto colapsado">
+
+        <!-- tira de estados -->
+        <g font-family="ui-monospace, monospace" font-size="11">
+          <rect x="-4" y="2" width="118" height="22" rx="3" fill="currentColor" fill-opacity="0.08" />
+          <circle cx="8" cy="13" r="4.5" fill="var(--st-attention)" />
+          <text x="20" y="17" fill="currentColor" fill-opacity="0.62">Te necesita</text>
+          <text x="100" y="17" fill="currentColor" fill-opacity="0.95">2</text>
+
+          <path d="M137.18 9.82 A4.5 4.5 0 1 1 130.82 9.82" fill="none" stroke="var(--st-working)" stroke-width="2" stroke-linecap="round" />
+          <text x="146" y="17" fill="currentColor" fill-opacity="0.62">Trabajando</text>
+          <text x="220" y="17" fill="currentColor" fill-opacity="0.95">3</text>
+
+          <circle cx="254" cy="13" r="4.5" fill="none" stroke="var(--st-done)" stroke-width="1.4" />
+          <polyline points="251.6,13 253.4,15 256.6,10.8" fill="none" stroke="var(--st-done)" stroke-width="1.4" />
+          <text x="266" y="17" fill="currentColor" fill-opacity="0.62">Finalizado</text>
+          <text x="340" y="17" fill="currentColor" fill-opacity="0.95">1</text>
+
+          <circle cx="374" cy="13" r="4.5" fill="var(--st-idle)" fill-opacity="0.4" />
+          <text x="386" y="17" fill="currentColor" fill-opacity="0.62">Inactivo</text>
+          <text x="446" y="17" fill="currentColor" fill-opacity="0.95">2</text>
+        </g>
+
+        <!-- cabecera de proyecto, abierto -->
+        <g font-family="ui-monospace, monospace" font-size="10">
+          <rect x="0" y="44" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-opacity="0.4" />
+          <text x="17" y="52" fill="currentColor" fill-opacity="0.6" letter-spacing="0.5">ORCA-OSS</text>
+          <text x="86" y="52" fill="currentColor" fill-opacity="0.34">3 agentes</text>
+          <g stroke="currentColor" stroke-opacity="0.45" fill="none" stroke-width="1.2">
+            <path d="M146 48.5 c3.5,-4 9.5,-4 13,0 c-3.5,4 -9.5,4 -13,0 z" />
+            <circle cx="152.5" cy="48.5" r="1.6" />
+          </g>
+        </g>
+
+        <!-- celdas -->
+        <g stroke="currentColor" stroke-opacity="0.2" fill="none">
+          <rect x="0.5" y="64.5" width="313" height="175" />
+          <rect x="322.5" y="64.5" width="313" height="175" />
+          <rect x="644.5" y="64.5" width="313" height="175" />
+          <line x1="0" y1="114" x2="314" y2="114" />
+          <line x1="322" y1="114" x2="636" y2="114" />
+          <line x1="644" y1="114" x2="958" y2="114" />
+        </g>
+
+        <!-- celda 1: trabajando -->
+        <path d="M21.54 78.46 A5 5 0 1 1 14.46 78.46" fill="none" stroke="var(--st-working)" stroke-width="2" stroke-linecap="round" />
+        <g font-family="ui-monospace, monospace" font-size="10.5">
+          <text x="32" y="86" fill="currentColor" fill-opacity="0.85">feat/agent-grid</text>
+          <text x="12" y="105" fill="currentColor" fill-opacity="0.5">Opus 5</text>
+          <text x="70" y="105" fill="currentColor" fill-opacity="0.34">ctx 128.4k</text>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="9.5">
+          <text x="12" y="132"><tspan fill="var(--true)">$</tspan><tspan fill="currentColor" fill-opacity="0.5"> npm test -- grid</tspan></text>
+          <text x="12" y="148" fill="currentColor" fill-opacity="0.42">RUN  v3.2.4</text>
+          <text x="12" y="164"><tspan fill="var(--st-done)">✓</tspan><tspan fill="currentColor" fill-opacity="0.42"> agent-grid-columns  14</tspan></text>
+          <text x="12" y="180"><tspan fill="var(--st-done)">✓</tspan><tspan fill="currentColor" fill-opacity="0.42"> agent-grid-buckets   9</tspan></text>
+          <text x="12" y="196" fill="currentColor" fill-opacity="0.42">…</text>
+          <text x="12" y="212"><tspan fill="var(--st-working)">▍</tspan></text>
+        </g>
+
+        <!-- celda 2: te necesita -->
+        <circle cx="340" cy="82" r="5" fill="var(--st-attention)" />
+        <g font-family="ui-monospace, monospace" font-size="10.5">
+          <text x="354" y="86" fill="currentColor" fill-opacity="0.85">fix/tail-window</text>
+          <text x="334" y="105" fill="currentColor" fill-opacity="0.5">Sonnet 5</text>
+          <text x="400" y="105" fill="currentColor" fill-opacity="0.34">ctx 61.2k</text>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="9.5">
+          <text x="334" y="132" fill="currentColor" fill-opacity="0.42">Reescribo el ancla del tail</text>
+          <text x="334" y="148" fill="currentColor" fill-opacity="0.42">sobre el cursor?</text>
+          <text x="334" y="172"><tspan fill="var(--st-attention)">❯</tspan><tspan fill="currentColor" fill-opacity="0.55"> 1. Sí, aplicar</tspan></text>
+          <text x="334" y="188" fill="currentColor" fill-opacity="0.35">  2. No, mostrar el diff</text>
+        </g>
+
+        <!-- celda 3: finalizado -->
+        <circle cx="662" cy="82" r="5" fill="none" stroke="var(--st-done)" stroke-width="1.6" />
+        <polyline points="659.3,82 661.4,84.4 665,79.6" fill="none" stroke="var(--st-done)" stroke-width="1.6" />
+        <g font-family="ui-monospace, monospace" font-size="10.5">
+          <text x="676" y="86" fill="currentColor" fill-opacity="0.85">chore/i18n-drift</text>
+          <text x="656" y="105" fill="currentColor" fill-opacity="0.5">GPT 5.6</text>
+          <text x="716" y="105" fill="currentColor" fill-opacity="0.34">ctx 24.8k</text>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="9.5">
+          <text x="656" y="132" fill="currentColor" fill-opacity="0.42">5 catálogos alineados</text>
+          <text x="656" y="148"><tspan fill="var(--true)">+</tspan><tspan fill="currentColor" fill-opacity="0.42"> 12 claves</tspan></text>
+          <text x="656" y="164"><tspan fill="var(--stale)">-</tspan><tspan fill="currentColor" fill-opacity="0.42"> 3 claves</tspan></text>
+          <text x="656" y="188" fill="currentColor" fill-opacity="0.4">Listo. Nada que revisar.</text>
+        </g>
+
+        <!-- segundo proyecto, colapsado -->
+        <g font-family="ui-monospace, monospace" font-size="10">
+          <rect x="0" y="264" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-opacity="0.4" />
+          <text x="17" y="272" fill="currentColor" fill-opacity="0.6" letter-spacing="0.5">ORCA-MOBILE</text>
+          <text x="106" y="272" fill="currentColor" fill-opacity="0.34">2 agentes</text>
+          <g stroke="currentColor" stroke-opacity="0.45" fill="none" stroke-width="1.2">
+            <path d="M166 268.5 c3.5,-4 9.5,-4 13,0 c-3.5,4 -9.5,4 -13,0 z" />
+            <circle cx="172.5" cy="268.5" r="1.6" />
+            <line x1="165" y1="274" x2="180" y2="263" />
+          </g>
+        </g>
+        <line x1="0" y1="288" x2="958" y2="288" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="4 4" />
+      </svg>
+    </div>
+
+    <p class="board-note">
+      <b>Esquema, no captura.</b> Las cuatro palabras de la tira —Te necesita, Trabajando,
+      Finalizado, Inactivo— son las que muestra la app en español, y salen del mismo módulo que
+      la celda usa para nombrar su estado. Un agente que terminó y ya miraste cuenta como
+      inactivo, no como resultado pendiente de leer.
+    </p>
+
+    <div class="board-figs">
+
+      <figure>
+        <svg viewBox="0 0 320 200" role="img" aria-label="Tres anchos de ventana. La celda mide siempre lo mismo y entra tres, dos y una vez; lo que baja es el conteo de columnas">
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.4">
+            <text x="0" y="14">ventana ancha</text>
+            <text x="0" y="82">ventana media</text>
+            <text x="0" y="150">ventana angosta</text>
+          </g>
+
+          <g stroke="currentColor" stroke-opacity="0.22" fill="currentColor" fill-opacity="0.05">
+            <rect x="0.5" y="20.5" width="76" height="32" />
+            <rect x="84.5" y="20.5" width="76" height="32" />
+            <rect x="168.5" y="20.5" width="76" height="32" />
+            <rect x="0.5" y="88.5" width="76" height="32" />
+            <rect x="84.5" y="88.5" width="76" height="32" />
+            <rect x="0.5" y="156.5" width="76" height="32" />
+          </g>
+
+          <g font-family="ui-monospace, monospace" font-size="7" fill="currentColor" fill-opacity="0.38" text-anchor="middle">
+            <text x="38" y="40">320</text>
+            <text x="122" y="40">320</text>
+            <text x="206" y="40">320</text>
+            <text x="38" y="108">320</text>
+            <text x="122" y="108">320</text>
+            <text x="38" y="176">320</text>
+          </g>
+
+          <g font-family="ui-monospace, monospace" font-size="8" fill="var(--true)">
+            <text x="256" y="40">3 col</text>
+            <text x="172" y="108">2 col</text>
+            <text x="88" y="176">1 col</text>
+          </g>
+        </svg>
+        <figcaption>
+          <b>Caen las columnas, no la celda</b>
+          El conteo se calcula en JS sobre el ancho medido del contenedor, no con
+          <code>auto-fill</code>. Una celda no baja de 320 px: primero se pierde una columna.
+          El tope son 8.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="0 0 320 200" role="img" aria-label="Tres agentes en dos columnas. Arriba, la tercera celda ocupa media fila y deja un hueco; abajo, se reparte la fila entera">
+          <g font-family="ui-monospace, monospace" font-size="8" fill="currentColor" fill-opacity="0.4">
+            <text x="0" y="14">columna fija</text>
+            <text x="0" y="116">lo que hace</text>
+          </g>
+
+          <g stroke="currentColor" stroke-opacity="0.22" fill="currentColor" fill-opacity="0.05">
+            <rect x="0.5" y="20.5" width="72" height="26" />
+            <rect x="78.5" y="20.5" width="72" height="26" />
+            <rect x="0.5" y="52.5" width="72" height="26" />
+            <rect x="0.5" y="122.5" width="72" height="26" />
+            <rect x="78.5" y="122.5" width="72" height="26" />
+          </g>
+
+          <g stroke="var(--stale)" stroke-opacity="0.55" fill="none" stroke-dasharray="3 3">
+            <rect x="78.5" y="52.5" width="72" height="26" />
+          </g>
+          <text x="162" y="70" font-family="ui-monospace, monospace" font-size="7.5" fill="var(--stale)">media fila vacía</text>
+
+          <g stroke="var(--true)" stroke-opacity="0.6" fill="var(--true)" fill-opacity="0.08">
+            <rect x="0.5" y="154.5" width="150" height="26" />
+          </g>
+          <text x="162" y="172" font-family="ui-monospace, monospace" font-size="7.5" fill="var(--true)">el sobrante, parejo</text>
+
+          <g font-family="ui-monospace, monospace" font-size="7" fill="currentColor" fill-opacity="0.4">
+            <text x="8" y="37">1</text>
+            <text x="86" y="37">2</text>
+            <text x="8" y="69">3</text>
+            <text x="8" y="139">1</text>
+            <text x="86" y="139">2</text>
+            <text x="8" y="171">3</text>
+          </g>
+        </svg>
+        <figcaption>
+          <b>La última fila no deja hueco</b>
+          Las filas llenas conservan su ancho; sólo la última reparte el sobrante entre las
+          celdas que quedaron, y lo reparte parejo.
+        </figcaption>
+      </figure>
+
+    </div>
+
+    <dl class="board-facts">
+      <div class="board-fact"><dt>320 px</dt><dd>ancho mínimo de celda: ~46 columnas de tail legible</dd></div>
+      <div class="board-fact"><dt>8</dt><dd>columnas como tope; más deja de escanearse y pasa a ser planilla</dd></div>
+      <div class="board-fact"><dt>4–8</dt><dd>líneas de tail por celda, según lo que entra sin recortar</dd></div>
+      <div class="board-fact"><dt>4</dt><dd>estados en la tira, con el mismo criterio que usa la celda</dd></div>
+    </dl>
+
+    <p class="board-note">
+      <b>El tail sale de la pantalla real del pane, no se re-tinta.</b> Cada línea viaja partida
+      en tramos que ya traen su color, porque un escape ANSI que llegara hasta acá se imprimiría
+      literal. Y la ventana del tail se ancla en el cursor, no en el largo del buffer: un pane
+      quieto con una grilla más alta que la ventana devolvía vacío.
+    </p>
+  </section>
+
   <section class="figure-band band">
     <p class="eyebrow">Cómo se ve</p>
     <h2>Seis cosas que el oficial no hace.</h2>
@@ -976,6 +1282,17 @@
     <h2>Lo demás que trae el lab.</h2>
 
     <div class="inv-grid">
+
+      <div class="inv">
+        <h3>Un plugin sale sólo a los hosts que declaró</h3>
+        <p>
+          La red es una capacidad con alcance: el manifiesto declara <code>net:fetch</code> y la
+          lista de hosts, y consientes esa lista, no un permiso general. Un pedido a un host que
+          no está declarado se rechaza en el host del plugin, no en el plugin. Si no pidió la
+          capacidad, la pantalla lo dice: <em>«El acceso a la red está bloqueado porque este
+          plugin no solicita net:fetch»</em>.
+        </p>
+      </div>
 
       <div class="inv">
         <h3>Plane, integrado de verdad</h3>
