@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
+import type { TerminalLayoutSnapshot } from '../../shared/types'
 import { OrcaRuntimeService } from './orca-runtime'
 
 const REPO_ID = 'repo-1'
@@ -8,6 +10,40 @@ const OTHER_WORKTREE_PATH = '/tmp/orca-other-worktree'
 const OTHER_WORKTREE_ID = `${REPO_ID}::${OTHER_WORKTREE_PATH}`
 const TAB_ID = '11111111-1111-4111-8111-111111111111'
 const LEAF_ID = '22222222-2222-4222-8222-222222222222'
+
+function sourceLayout(): TerminalLayoutSnapshot {
+  return {
+    root: { type: 'leaf', leafId: LEAF_ID },
+    activeLeafId: LEAF_ID,
+    expandedLeafId: null,
+    ptyIdsByLeafId: { [LEAF_ID]: 'pty-source' }
+  }
+}
+
+function sourceProjection(): RuntimeMobileSessionTabsSnapshot {
+  const layout = sourceLayout()
+  return {
+    worktree: WORKTREE_ID,
+    publicationEpoch: 'live-pty-scope',
+    snapshotVersion: 1,
+    activeGroupId: 'group-1',
+    activeTabId: `${TAB_ID}::${LEAF_ID}`,
+    activeTabType: 'terminal',
+    tabGroups: [{ id: 'group-1', activeTabId: TAB_ID, tabOrder: [TAB_ID] }],
+    tabs: [
+      {
+        type: 'terminal',
+        id: `${TAB_ID}::${LEAF_ID}`,
+        parentTabId: TAB_ID,
+        leafId: LEAF_ID,
+        ptyId: 'pty-source',
+        title: 'Live terminal',
+        parentLayout: layout,
+        isActive: true
+      }
+    ]
+  }
+}
 
 function makeStore() {
   const repo = {
@@ -52,7 +88,11 @@ describe('terminal list/split worktree resolution authority', () => {
       terminalDriverChanged: vi.fn()
     })
     runtime.attachWindow(1)
-    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    runtime.syncWindowGraph(1, {
+      tabs: [],
+      leaves: [],
+      mobileSessionTabs: [sourceProjection()]
+    })
     runtime.registerPty('pty-source', WORKTREE_ID, null, { tabId: TAB_ID, leafId: LEAF_ID })
     const internals = runtime as unknown as {
       listResolvedWorktrees: () => Promise<unknown[]>

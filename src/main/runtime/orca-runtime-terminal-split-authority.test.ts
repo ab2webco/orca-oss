@@ -81,6 +81,7 @@ function createHarness(includeSource = true) {
   const store = {
     getRepos: () => [repo],
     getRepo: (id: string) => (id === REPO_ID ? repo : undefined),
+    getWorktreeMeta: () => undefined,
     getWorkspaceSession: () => session,
     setWorkspaceSession: (next: WorkspaceSessionState) => {
       session = next
@@ -93,15 +94,6 @@ function createHarness(includeSource = true) {
     .fn()
     .mockRejectedValue(new Error(`Terminal tab ${TAB_ID} not found`))
   const runtime = new OrcaRuntimeService(store as never)
-  Object.assign(runtime, {
-    resolveTerminalWorkspaceLaunchScope: vi.fn(async () => ({
-      id: WORKTREE_ID,
-      path: '/workspace',
-      connectionId: null,
-      repo,
-      folderWorkspace: null
-    }))
-  })
   runtime.setPtyController({
     spawn,
     write: () => true,
