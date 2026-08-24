@@ -230,15 +230,11 @@ jobs:
           # PR. Every fish outcome is judged by the version gate below instead, so only
           # the zsh install (which has no such gate) stays fatal here.
           sudo apt-get update || true
-          # Why retry only here: adding the PPA is the network-flaky step, and the
-          # version gate below is fatal, so a transient Launchpad blip would
-          # otherwise red a required check on PRs unrelated to shells.
-          for attempt in 1 2 3; do
-            sudo add-apt-repository -y ppa:fish-shell/release-4 && break
-            echo "add-apt-repository attempt ${attempt} failed; retrying" >&2
-            sudo add-apt-repository -y -r ppa:fish-shell/release-4 || true
-            sleep 5
-          done
+          # Why a script and not an inline loop: the retry/backoff and the
+          # "source unavailable" outcome are the thing under test, and a workflow
+          # step cannot be exercised without pushing a commit (ORCA-287).
+          export ORCA_FISH4_SOURCE_STATUS_FILE="${RUNNER_TEMP}/fish4-source-status"
+          bash config/scripts/enable-fish4-apt-source.sh || true
           sudo apt-get update || true
           # Why both shells on one line: pr-workflow-parallelism.test.mjs parses only the
           # first install command in this step to prove the lane really installs them.
@@ -248,16 +244,9 @@ jobs:
       # ORCA_REQUIRE_FISH re-checks this at test time; this step just fails in seconds
       # instead of after a full dependency install.
       - name: Require fish 4+
-        run: |
-          version="$(fish --version 2>/dev/null || true)"
-          major="${version##*version }"
-          major="${major%%.*}"
-          case "$major" in '' | *[!0-9]*) major=0 ;; esac
-          echo "${version:-<fish not installed>}"
-          if [ "$major" -lt 4 ]; then
-            echo "::error::shell contracts needs fish 4+ (DECSET 2031 arming, #9993) but got '${version:-none}'. Fix the ppa:fish-shell/release-4 install rather than letting the fish lane skip." >&2
-            exit 1
-          fi
+        run: bash config/scripts/require-fish4.sh
+        env:
+          ORCA_FISH4_SOURCE_STATUS_FILE: ${{ runner.temp }}/fish4-source-status
 
       - uses: ./.github/actions/install-node-dependencies
         with:
