@@ -4,7 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
-import { resolveAgentGridMinCellHeight } from '../../src/renderer/src/components/dashboard-popout/agent-grid-columns'
+import {
+  AGENT_GRID_MIN_CELL_WIDTH,
+  resolveAgentGridMinCellHeight
+} from '../../src/renderer/src/components/dashboard-popout/agent-grid-columns'
 import {
   execInTerminal,
   splitActiveTerminalPane,
@@ -24,11 +27,24 @@ const SINGLE_ROW_PAGE_SIZE = 1
 const SHORT_WINDOW_HEIGHT = 800
 const TALL_WINDOW_HEIGHT = 1100
 const WINDOW_WIDTH = 1500
+/** Past the 1294px the drawer sheet used to cap itself at, so a reintroduced
+ *  ceiling cannot pass by accident. */
+const WIDE_WINDOW_WIDTH = 2800
+/** Both sample widths clear BOTH ceilings this fixes — the sheet's old 1294px and
+ *  the grid's own 1600px — so restoring either pins the two measurements to the
+ *  same value and the growth clause fails. A narrow sample under a ceiling still
+ *  grows a little, and the control passes; verified, it did. */
+const PAST_CEILING_WINDOW_WIDTH = 2000
+/** Narrow enough that the four-cell section cannot keep four readable tracks, so
+ *  the column count has to give: at AGENT_GRID_MIN_CELL_WIDTH 320 and gap 8 this
+ *  fits three. Wider would keep four and the clause would prove nothing. */
+const NARROW_WINDOW_WIDTH = 1100
 
 const WAITING_AGENT = 'Grid waiting agent'
 const WORKING_AGENT = 'Grid working agent'
 const DONE_AGENT = 'Grid done agent'
 const SECOND_PROJECT_AGENT = 'Second project agent'
+const FOURTH_TRACK_AGENT = 'Grid fourth track agent'
 const TAIL_MARKER = 'ORCA_TAIL_COLOUR'
 /** Enough polls of the 1.5s batch tail reader to outlive the first read: the
  *  ORCA-285 regression only shows from the second one on. */
@@ -140,6 +156,40 @@ async function settledCellHeight(page: Page, differentFrom?: number): Promise<nu
   return height
 }
 
+/** Laid-out width of a cell, polled through the same ResizeObserver settle. */
+async function measureFirstCellWidth(page: Page): Promise<number> {
+  const box = await gridCells(page).first().boundingBox()
+  if (!box) {
+    throw new Error('Grid cell has no layout box')
+  }
+  return box.width
+}
+
+async function settledCellWidth(page: Page, differentFrom?: number): Promise<number> {
+  let width = 0
+  await expect
+    .poll(
+      async () => {
+        width = await measureFirstCellWidth(page)
+        return differentFrom === undefined ? width > 0 : Math.abs(width - differentFrom) > 1
+      },
+      { timeout: 15_000, message: 'Grid never settled on a measured cell width' }
+    )
+    .toBe(true)
+  return width
+}
+
+/** Widest column count any section resolved. Not `.first()`: a project with one
+ *  agent is capped at one track by cell count, so it never reflects the width. */
+async function readGridColumns(page: Page): Promise<number> {
+  const counts = await page
+    .locator('[data-agent-grid-columns]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => Number((node as HTMLElement).dataset.agentGridColumns ?? '0'))
+    )
+  return Math.max(0, ...counts)
+}
+
 /** The strip's own numbers, read off the buttons the user sees. */
 async function readBucketCounts(
   page: Page
@@ -182,8 +232,12 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
   await ensureTerminalVisible(page)
   await splitActiveTerminalPane(page, 'vertical')
   await splitActiveTerminalPane(page, 'horizontal')
-  await waitForPaneCount(page, 3)
-  const snapshot = await waitForPaneIdentitySnapshot(page, 3)
+  // Why four and not three: resolveAgentGridColumns caps at the cell count, so a
+  // three-cell section resolves three tracks at every width and the floor clause
+  // below cannot tell a dropped track from a squeezed one (ORCA-286).
+  await splitActiveTerminalPane(page, 'vertical')
+  await waitForPaneCount(page, 4)
+  const snapshot = await waitForPaneIdentitySnapshot(page, 4)
 
   const panes: SeededPane[] = snapshot.panes
     .filter((pane): pane is typeof pane & { ptyId: string } => Boolean(pane.ptyId))
@@ -192,7 +246,7 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
       leafId: pane.leafId,
       ptyId: pane.ptyId
     }))
-  expect(panes.length, 'the grid needs three live panes to seed three buckets').toBe(3)
+  expect(panes.length, 'the grid needs four live panes: three buckets plus a track').toBe(4)
 
   // Distinct buckets so the strip has something to count and something to filter to.
   // Written while the terminal is the visible surface: a hidden pane behind the
@@ -215,6 +269,7 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
   await seedAgentStatus(page, panes[0].paneKey, 'blocked', WAITING_AGENT)
   await seedAgentStatus(page, panes[1].paneKey, 'working', WORKING_AGENT)
   await seedAgentStatus(page, panes[2].paneKey, 'done', DONE_AGENT)
+  await seedAgentStatus(page, panes[3].paneKey, 'working', FOURTH_TRACK_AGENT)
 
   const secondProjectPaneKey = `${secondSnapshot.tabId}:${secondSnapshot.panes[0].leafId}`
   await seedAgentStatus(page, secondProjectPaneKey, 'working', SECOND_PROJECT_AGENT)
@@ -225,7 +280,7 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
       timeout: 30_000,
       message: 'Agent grid never rendered a cell per seeded agent'
     })
-    .toBe(4)
+    .toBe(5)
 
   // ── The grid takes the height it is given ────────────────────────────────
   await page
@@ -247,6 +302,48 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
     floor
   )
   expect(tallHeight).toBeGreaterThan(floor)
+
+  // ── The grid takes the width it is given ─────────────────────────────────
+  // Same two clauses as the height, for the same reason: growth alone passes a
+  // grid pinned to its minimum track, so both measurements must clear the floor
+  // too (ORCA-286).
+  // Both widths sit ABOVE the ceiling this fixes, so a reintroduced cap pins the
+  // two measurements to the same value and the growth clause fails. Measuring
+  // from WINDOW_WIDTH would leave the narrow one below the cap, where a capped
+  // grid still grows a little and the control passes — verified, it did.
+  await resizeWindow(electronApp, PAST_CEILING_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  const narrowCellWidth = await settledCellWidth(page)
+  await resizeWindow(electronApp, WIDE_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  const wideCellWidth = await settledCellWidth(page, narrowCellWidth)
+
+  expect(
+    wideCellWidth,
+    'a wider window must widen the cells, not centre them behind empty margins'
+  ).toBeGreaterThan(narrowCellWidth + 1)
+  expect(
+    narrowCellWidth,
+    'the narrow window must already clear the min track, or Math.max is what moved'
+  ).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
+  expect(wideCellWidth).toBeGreaterThan(AGENT_GRID_MIN_CELL_WIDTH)
+  // The floor stays a floor: narrowing the window drops the COLUMN COUNT and
+  // leaves the track above the minimum. Without this, removing the ceilings could
+  // ship a grid that just shrinks its cells into unreadable slivers instead.
+  const wideColumns = await readGridColumns(page)
+  await resizeWindow(electronApp, NARROW_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
+  // Polled, not read once: a track's width shrinks the instant the box does, but
+  // the column count is React state behind the ResizeObserver, so a single read
+  // races the re-render and sees the old count.
+  await expect
+    .poll(() => readGridColumns(page), {
+      timeout: 15_000,
+      message: 'a narrower window must drop tracks, not squeeze them'
+    })
+    .toBeLessThan(wideColumns)
+  const narrowedCellWidth = await settledCellWidth(page)
+  expect(
+    narrowedCellWidth,
+    'the surviving track must still be wide enough to read a tail'
+  ).toBeGreaterThanOrEqual(AGENT_GRID_MIN_CELL_WIDTH)
 
   // ── The strip counts what it shows, and filters to it ────────────────────
   const totalCells = await gridCells(page).count()
