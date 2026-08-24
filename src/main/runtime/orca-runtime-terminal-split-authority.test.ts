@@ -11,6 +11,7 @@ const TAB_ID = 'tab-remote'
 const SOURCE_LEAF_ID = '11111111-1111-4111-8111-111111111111'
 const SOURCE_PTY_ID = 'pty-source'
 const SPLIT_PTY_ID = 'pty-split'
+const SOURCE_CONNECTION_ID = 'ssh-source'
 
 function sourceLayout(): TerminalLayoutSnapshot {
   return {
@@ -69,7 +70,10 @@ function remoteSnapshot(): RuntimeMobileSessionTabsSnapshot {
   }
 }
 
-function createHarness(includeSource = true) {
+function createHarness(
+  includeSource = true,
+  options: { attachedSourcePendingPtyBinding?: boolean } = {}
+) {
   let session = persistedSession(includeSource)
   const repo = {
     id: REPO_ID,
@@ -81,6 +85,7 @@ function createHarness(includeSource = true) {
   const store = {
     getRepos: () => [repo],
     getRepo: (id: string) => (id === REPO_ID ? repo : undefined),
+    getWorktreeMeta: () => undefined,
     getWorkspaceSession: () => session,
     setWorkspaceSession: (next: WorkspaceSessionState) => {
       session = next
@@ -93,15 +98,6 @@ function createHarness(includeSource = true) {
     .fn()
     .mockRejectedValue(new Error(`Terminal tab ${TAB_ID} not found`))
   const runtime = new OrcaRuntimeService(store as never)
-  Object.assign(runtime, {
-    resolveTerminalWorkspaceLaunchScope: vi.fn(async () => ({
-      id: WORKTREE_ID,
-      path: '/workspace',
-      connectionId: null,
-      repo,
-      folderWorkspace: null
-    }))
-  })
   runtime.setPtyController({
     spawn,
     write: () => true,
@@ -109,12 +105,29 @@ function createHarness(includeSource = true) {
     getForegroundProcess: async () => null
   })
   runtime.setNotifier({ revealTerminalSession } as never)
+  if (options.attachedSourcePendingPtyBinding) {
+    runtime.attachWindow(1)
+  }
+  const sourceTab = {
+    tabId: TAB_ID,
+    worktreeId: WORKTREE_ID,
+    title: 'Remote terminal',
+    activeLeafId: SOURCE_LEAF_ID,
+    layout: sourceLayout().root
+  }
+  const sourceLeaf = {
+    tabId: TAB_ID,
+    worktreeId: WORKTREE_ID,
+    leafId: SOURCE_LEAF_ID,
+    paneRuntimeId: 1,
+    ptyId: null
+  }
   runtime.syncWindowGraph(1, {
-    tabs: [],
-    leaves: [],
+    tabs: options.attachedSourcePendingPtyBinding ? [sourceTab] : [],
+    leaves: options.attachedSourcePendingPtyBinding ? [sourceLeaf] : [],
     mobileSessionTabs: includeSource ? [remoteSnapshot()] : []
   })
-  runtime.registerPty(SOURCE_PTY_ID, WORKTREE_ID, null, {
+  runtime.registerPty(SOURCE_PTY_ID, WORKTREE_ID, SOURCE_CONNECTION_ID, {
     tabId: TAB_ID,
     leafId: SOURCE_LEAF_ID
   })
@@ -139,6 +152,56 @@ function createHarness(includeSource = true) {
 }
 
 describe('remote runtime terminal split authority', () => {
+  it('reveals a committed split when the attached source leaf has not bound its PTY yet', async () => {
+    const harness = createHarness(true, { attachedSourcePendingPtyBinding: true })
+    harness.revealTerminalSession.mockResolvedValue({ tabId: TAB_ID })
+
+    const split = await harness.runtime.splitTerminal(harness.handle, { direction: 'vertical' })
+
+    const internals = harness.runtime as unknown as {
+      getLivePtyForHandle: (handle: string) => {
+        pty: { ptyId: string; worktreeId: string; connectionId: string | null }
+      } | null
+    }
+    expect(internals.getLivePtyForHandle(split.handle)?.pty).toMatchObject({
+      ptyId: SPLIT_PTY_ID,
+      worktreeId: WORKTREE_ID,
+      connectionId: SOURCE_CONNECTION_ID
+    })
+    const persistedLayout = harness.getSession().terminalLayoutsByTabId[TAB_ID]
+    expect(persistedLayout?.root).toMatchObject({ type: 'split', direction: 'vertical' })
+    expect(Object.values(persistedLayout!.ptyIdsByLeafId!)).toEqual(
+      expect.arrayContaining([SOURCE_PTY_ID, SPLIT_PTY_ID])
+    )
+    expect(Object.keys(persistedLayout!.ptyIdsByLeafId!)).toHaveLength(2)
+    const siblingSurfaces = harness
+      .getSnapshot()!
+      .tabs.filter(
+        (tab): tab is Extract<typeof tab, { type: 'terminal' }> =>
+          tab.type === 'terminal' && tab.parentTabId === TAB_ID
+      )
+    expect(siblingSurfaces).toHaveLength(2)
+    const splitSurface = siblingSurfaces.find((tab) => tab.ptyId === SPLIT_PTY_ID)
+    expect(new Set(siblingSurfaces.map((tab) => tab.leafId)).size).toBe(2)
+    expect(splitSurface?.parentLayout?.root).toMatchObject({
+      type: 'split',
+      direction: 'vertical'
+    })
+    expect(splitSurface?.parentLayout?.ptyIdsByLeafId).toEqual(
+      expect.objectContaining({ [SOURCE_LEAF_ID]: SOURCE_PTY_ID })
+    )
+    await vi.waitFor(() => {
+      expect(harness.revealTerminalSession).toHaveBeenCalledWith(
+        WORKTREE_ID,
+        expect.objectContaining({
+          ptyId: SPLIT_PTY_ID,
+          leafId: splitSurface?.leafId,
+          splitFromLeafId: SOURCE_LEAF_ID
+        })
+      )
+    })
+  })
+
   it('splits a persisted tab without consulting an unmounted host renderer', async () => {
     const harness = createHarness()
 

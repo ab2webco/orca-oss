@@ -28853,7 +28853,9 @@ export class OrcaRuntimeService {
       throw new Error('runtime_unavailable')
     }
     const direction = opts.direction ?? 'horizontal'
-    const workspace = await this.resolveTerminalWorkspaceLaunchScope(`id:${source.worktreeId}`)
+    const workspace = source.parentPty
+      ? await this.resolveLivePtyWorkspaceLaunchScope(source.parentPty)
+      : await this.resolveTerminalWorkspaceLaunchScope(`id:${source.worktreeId}`)
     // Why: only the PTY-backed path has a durable source binding to adjudicate — the
     // leaf-only path splits a renderer leaf main never persisted, so there is nothing
     // to revalidate and no expectedSourceBinding to send.
@@ -28987,7 +28989,7 @@ export class OrcaRuntimeService {
             sourcePtyId
           )
         : null
-    if (sourcePersisted && committedSourceAuthority?.rendererMounted) {
+    if (sourcePersisted && committedSourceAuthority?.rendererSourcePresent) {
       // Why: renderer adoption is a projection after the durable main commit; rejection cannot undo it.
       void revealSplit().catch(() => undefined)
     }
@@ -29007,6 +29009,7 @@ export class OrcaRuntimeService {
   ): {
     persisted: boolean
     rendererMounted: boolean
+    rendererSourcePresent: boolean
     persistedWorktreeId: string | null
     persistedIncarnationId: string | null
   } | null {
@@ -29035,17 +29038,18 @@ export class OrcaRuntimeService {
     )
     const rendererTab = this.tabs.get(tabId)
     const rendererLeaf = this.leaves.get(this.getLeafKey(tabId, leafId))
-    const rendererMounted = Boolean(
+    const rendererSourcePresent = Boolean(
       rendererTab &&
       rendererLeaf &&
       runtimeWorktreeIdsEqual(rendererTab.worktreeId, worktreeId) &&
-      runtimeWorktreeIdsEqual(rendererLeaf.worktreeId, worktreeId) &&
-      rendererLeaf.ptyId === ptyId
+      runtimeWorktreeIdsEqual(rendererLeaf.worktreeId, worktreeId)
     )
+    const rendererMounted = rendererSourcePresent && rendererLeaf?.ptyId === ptyId
     if (persisted && persistedLayout) {
       return {
         persisted: true,
         rendererMounted,
+        rendererSourcePresent,
         persistedWorktreeId: sessionWorktreeId,
         persistedIncarnationId
       }
@@ -29068,6 +29072,7 @@ export class OrcaRuntimeService {
     return {
       persisted: false,
       rendererMounted,
+      rendererSourcePresent,
       persistedWorktreeId: null,
       persistedIncarnationId: null
     }
@@ -29972,6 +29977,23 @@ export class OrcaRuntimeService {
       id: worktree.id,
       path: worktree.path,
       connectionId: repo?.connectionId ?? null,
+      repo,
+      folderWorkspace: null
+    }
+  }
+
+  private async resolveLivePtyWorkspaceLaunchScope(
+    pty: RuntimePtyWorktreeRecord
+  ): Promise<TerminalWorkspaceLaunchScope> {
+    const worktree = this.buildResolvedWorktreeFromId(pty.worktreeId)
+    const repo = worktree ? (this.store?.getRepo(worktree.repoId) ?? null) : null
+    if (!worktree || !repo) {
+      return await this.resolveTerminalWorkspaceLaunchScope(`id:${pty.worktreeId}`)
+    }
+    return {
+      id: pty.worktreeId,
+      path: worktree.path,
+      connectionId: pty.connectionId,
       repo,
       folderWorkspace: null
     }
