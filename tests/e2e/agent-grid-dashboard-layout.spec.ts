@@ -287,39 +287,6 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
   const colouredPaneKey = panes[0].paneKey
   const colouredTail = cell(page, colouredPaneKey).locator('[data-terminal-tail]')
   await expect(colouredTail).toContainText(TAIL_MARKER, { timeout: 30_000 })
-  // ORCA-281 TEMPORARY DIAGNOSTIC — remove before merge. Separates "this pane has
-  // no coloured segments at all" from "it has them and the marker run lost its
-  // colour" from "it kept the colour and the DOM split the text".
-  const tailProbe = await page.evaluate(
-    async ({ ptyId, marker }) => {
-      const readings = await window.api.agentTerminalTail?.readPtys([ptyId], 24)
-      const tail = readings?.[0]?.tail
-      const rows = tail && tail.read ? (tail.segments ?? []) : []
-      return {
-        read: tail?.read ?? null,
-        hasSegmentsField: tail && tail.read ? tail.segments !== undefined : null,
-        segmentRowCount: rows.length,
-        markerRows: rows
-          .filter((row) => row.some((segment) => segment.text.includes(marker)))
-          .map((row) => row.map((segment) => ({ c: segment.color, t: segment.text.slice(0, 48) }))),
-        lastLines: tail && tail.read ? tail.lines.slice(-3) : null,
-        colouredNodesInWholeGrid: document.querySelectorAll('[data-tail-color]').length,
-        cellsWithTail: document.querySelectorAll('[data-terminal-tail]').length
-      }
-    },
-    { ptyId: panes[0].ptyId, marker: TAIL_MARKER }
-  )
-  console.log('[TAIL-PROBE]', JSON.stringify(tailProbe))
-  const domProbe = await cell(page, colouredPaneKey)
-    .locator('[data-tail-color]')
-    .evaluateAll((nodes) =>
-      nodes.map((node) => ({
-        c: (node as HTMLElement).dataset.tailColor,
-        t: (node.textContent ?? '').slice(0, 48)
-      }))
-    )
-  console.log('[TAIL-DOM]', JSON.stringify(domProbe))
-
   const paintedColours = await cell(page, colouredPaneKey)
     .locator('[data-tail-color]')
     .evaluateAll((nodes) =>
