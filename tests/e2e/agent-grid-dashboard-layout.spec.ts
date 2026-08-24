@@ -305,6 +305,22 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
   // two measurements to the same value and the growth clause fails. Measuring
   // from WINDOW_WIDTH would leave the narrow one below the cap, where a capped
   // grid still grows a little and the control passes — verified, it did.
+  // ORCA-286 TEMPORARY DIAGNOSTIC — remove before merge.
+  for (const requested of [PAST_CEILING_WINDOW_WIDTH, WIDE_WINDOW_WIDTH]) {
+    await resizeWindow(electronApp, requested, TALL_WINDOW_HEIGHT)
+    await page.waitForTimeout(1_200)
+    const got = await page.evaluate(() => ({
+      inner: window.innerWidth,
+      screen: window.screen.width,
+      avail: window.screen.availWidth
+    }))
+    const display = await electronApp.evaluate(({ screen }) => {
+      const primary = screen.getPrimaryDisplay()
+      return { work: primary.workAreaSize.width, bounds: primary.bounds.width }
+    })
+    console.log(`[SIZE-PROBE] requested=${requested} ${JSON.stringify({ ...got, ...display })}`)
+  }
+
   await resizeWindow(electronApp, PAST_CEILING_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
   const narrowCellWidth = await settledCellWidth(page)
   await resizeWindow(electronApp, WIDE_WINDOW_WIDTH, TALL_WINDOW_HEIGHT)
