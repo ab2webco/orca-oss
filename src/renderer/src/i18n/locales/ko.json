@@ -5942,7 +5942,39 @@
           "e5b5f3d6b9": "카메라",
           "cc8151d9fa": "음성 입력, 전사, 오디오 녹음, sox, ffmpeg 및 Whisper CLI.",
           "16381e040a": "마이크",
-          "dac08ec03e": "작업 중..."
+          "dac08ec03e": "작업 중...",
+          "statusGranted": "허용됨",
+          "statusDenied": "거부됨",
+          "statusNotRequested": "요청하지 않음",
+          "statusRestricted": "제한됨",
+          "statusUnsupported": "macOS 전용",
+          "statusEntitled": "권한 있음",
+          "statusCheckManually": "직접 확인",
+          "statusManagedByMacOS": "macOS에서 관리",
+          "actionRequest": "요청",
+          "actionRequestAccess": "접근 요청",
+          "actionTriggerPrompt": "권한 요청 띄우기",
+          "actionOpenSettings": "설정 열기",
+          "localNetworkOpenSettings": "시스템 설정 열기",
+          "localNetworkOpenSystemSettings": "시스템 설정 열기",
+          "openSettingsFailed": "시스템 설정을 열 수 없습니다",
+          "localNetworkPromptCheck": "macOS 권한 요청 확인",
+          "localNetworkPromptGuidance": "권한 요청이 표시되면 “허용”을 선택하세요. 표시되지 않으면 시스템 설정을 열고 “개인 정보 보호 및 보안” → “로컬 네트워크”에서 Orca를 켜세요.",
+          "connectionTestTitle": "연결 테스트",
+          "connectionTestAction": "연결 테스트",
+          "connectionTestDescription": "로컬 네트워크의 다른 기기에 있는 서비스를 입력하세요. Orca는 터미널 도구가 사용하는 것과 같은 네트워크 경로를 테스트합니다.",
+          "connectionTestHost": "호스트",
+          "connectionTestPort": "포트",
+          "connectionTestRunning": "테스트 중...",
+          "connectionTestLastVerified": "마지막 확인",
+          "connectionTestNotYetVerified": "성공한 테스트가 저장되지 않았습니다.",
+          "connectionTestInvalidTarget": "호스트 이름 또는 사설 LAN IP와 1에서 65535 사이의 포트를 입력하세요.",
+          "connectionTestFailed": "연결 테스트를 완료할 수 없습니다.",
+          "connectionTestRefused": "호스트는 응답했지만 포트에서 연결을 거부했습니다.",
+          "connectionTestTimeout": "연결이 시간 초과되었습니다. 대상, 서비스, macOS의 “로컬 네트워크” 설정을 확인하세요.",
+          "connectionTestUnreachable": "대상에 연결할 수 없습니다.",
+          "connectionTestUnresolved": "호스트 이름을 확인할 수 없습니다.",
+          "connectionTestUnsupported": "연결 테스트는 macOS 데스크톱 앱에서 사용할 수 있습니다."
         },
         "ExperimentalPane": {
           "9762364929": "가능하면 macOS에서 APFS clone-copy를 사용하고, 그렇지 않으면 구성된 폴더나 파일을 생성된 작업 트리에 심볼릭 링크합니다.",
@@ -10020,7 +10052,8 @@
           "decisionFailed": "권한 결정을 저장할 수 없습니다. 다시 시도하세요.",
           "workerSandboxWarning": "이 워커는 플러그인 파일과 Orca가 런타임에 허용한 파일을 읽을 수 있습니다. Orca의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.",
           "networkRestrictedNote": "네트워크 요청은 위에 선언된 호스트로 제한됩니다.",
-          "networkBlockedNote": "이 플러그인이 net:fetch를 요청하지 않으므로 네트워크 접근이 차단됩니다."
+          "networkBlockedNote": "이 플러그인이 net:fetch를 요청하지 않으므로 네트워크 접근이 차단됩니다.",
+          "networkAccessNote": "인터넷의 모든 호스트에 연결할 수 있습니다. 현재 Orca는 플러그인의 네트워크 접근을 제한하거나 감시하지 않습니다."
         },
         "PluginConsentProvenance": {
           "official": "공식",
@@ -10495,6 +10528,11 @@
         },
         "artifacts": {
           "allowPublishingDescription": "HTML 및 Markdown 파일을 URL을 아는 누구나 열 수 있는 링크로 게시합니다. 파일 내용은 {{host}}에 업로드되며, 이 서버는 업스트림 Orca가 운영합니다. 이 빌드가 호스팅하지 않습니다. 기존 링크는 Artifacts에서 삭제할 때까지 유지됩니다."
+        },
+        "ReleaseChannelSection": {
+          "hourlyWarning": "시간별 빌드는 macOS 전용이며 테스트 없이 main에서 바로 배포됩니다. 안정 빌드를 함께 준비해 두세요.",
+          "dailyWarning": "일별 빌드는 macOS 전용이며 테스트 없이 main에서 바로 배포됩니다. 안정 빌드를 함께 준비해 두세요.",
+          "adhocWarning": "애드혹 빌드는 macOS 전용이며 아직 병합되지 않은 브랜치에서 만들어집니다. 만든 사람이 중단할 수 있으니 안정 빌드를 함께 준비해 두세요."
         }
       },
       "right": {
@@ -14785,6 +14823,9 @@
         "ArtifactPublishButton": {
           "confirmDescription": "현재 파일을 {{host}}에 업로드하고 URL을 아는 누구나 볼 수 있는 링크를 만듭니다."
         }
+      },
+      "BrowserPane": {
+        "streamCapabilityUnsupported": "선택한 런타임은 원격 브라우저 스트리밍을 지원하지 않습니다."
       }
     },
     "i18n": {

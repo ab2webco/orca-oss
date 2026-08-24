@@ -5943,7 +5943,39 @@
           "e5b5f3d6b9": "相机",
           "cc8151d9fa": "语音输入、转录、录音、sox、ffmpeg 和 Whisper CLI。",
           "16381e040a": "麦克风",
-          "dac08ec03e": "处理中..."
+          "dac08ec03e": "处理中...",
+          "statusGranted": "已授予",
+          "statusDenied": "已拒绝",
+          "statusNotRequested": "未请求",
+          "statusRestricted": "受限",
+          "statusUnsupported": "仅 macOS",
+          "statusEntitled": "已具备权限",
+          "statusCheckManually": "手动检查",
+          "statusManagedByMacOS": "由 macOS 管理",
+          "actionRequest": "请求",
+          "actionRequestAccess": "请求访问权限",
+          "actionTriggerPrompt": "触发提示",
+          "actionOpenSettings": "打开设置",
+          "localNetworkOpenSettings": "打开系统设置",
+          "localNetworkOpenSystemSettings": "打开系统设置",
+          "openSettingsFailed": "无法打开系统设置",
+          "localNetworkPromptCheck": "查看 macOS 提示",
+          "localNetworkPromptGuidance": "如果出现提示，请选择“允许”。如果没有出现提示，请打开系统设置，在“隐私与安全性”→“本地网络”中启用 Orca。",
+          "connectionTestTitle": "测试连接",
+          "connectionTestAction": "测试连接",
+          "connectionTestDescription": "请输入本地网络中其他设备上的服务。Orca 会测试终端工具使用的同一网络路径。",
+          "connectionTestHost": "主机",
+          "connectionTestPort": "端口",
+          "connectionTestRunning": "正在测试...",
+          "connectionTestLastVerified": "上次验证",
+          "connectionTestNotYetVerified": "没有保存成功的测试记录。",
+          "connectionTestInvalidTarget": "请输入主机名或专用局域网 IP，以及 1 到 65535 之间的端口。",
+          "connectionTestFailed": "无法完成连接测试。",
+          "connectionTestRefused": "主机已响应，但该端口拒绝了连接。",
+          "connectionTestTimeout": "连接超时。请检查目标、服务以及 macOS 的“本地网络”设置。",
+          "connectionTestUnreachable": "无法访问目标。",
+          "connectionTestUnresolved": "无法解析主机名。",
+          "connectionTestUnsupported": "连接测试仅在 macOS 桌面应用中可用。"
         },
         "ExperimentalPane": {
           "9762364929": "在可能时在 macOS 上使用 APFS clone-copy；否则，将配置的文件夹或文件符号链接到创建的工作树中。",
@@ -10021,7 +10053,8 @@
           "decisionFailed": "无法保存权限决定。请重试。",
           "workerSandboxWarning": "此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。",
           "networkRestrictedNote": "网络请求仅限于上方声明的主机。",
-          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。"
+          "networkBlockedNote": "由于此插件未请求 net:fetch，网络访问已被阻止。",
+          "networkAccessNote": "它可以连接到互联网上的任何主机。Orca 目前不会限制或监控插件的网络访问。"
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -10504,6 +10537,11 @@
         },
         "artifacts": {
           "allowPublishingDescription": "将 HTML 和 Markdown 文件发布为任何知道 URL 的人都能打开的链接。文件内容会上传到 {{host}}，该服务由上游 Orca 运营，并非由此构建版本托管。已有链接会一直保留，直到你在 Artifacts 中删除它们。"
+        },
+        "ReleaseChannelSection": {
+          "hourlyWarning": "每小时构建仅适用于 macOS，直接从 main 发布且不经过测试。请备好一个稳定版构建。",
+          "dailyWarning": "每日构建仅适用于 macOS，直接从 main 发布且不经过测试。请备好一个稳定版构建。",
+          "adhocWarning": "临时构建仅适用于 macOS，来自尚未合入的分支。创建者可能会放弃它，请备好一个稳定版构建。"
         }
       },
       "right": {
@@ -14783,6 +14821,9 @@
         "ArtifactPublishButton": {
           "confirmDescription": "这会将当前文件上传到 {{host}}，并创建一个任何知道该 URL 的人都能查看的链接。"
         }
+      },
+      "BrowserPane": {
+        "streamCapabilityUnsupported": "所选运行时不支持远程浏览器串流。"
       }
     },
     "i18n": {
