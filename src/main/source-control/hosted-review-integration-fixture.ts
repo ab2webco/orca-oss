@@ -116,7 +116,7 @@ export function useHostedReviewIntegrationFixtures(): {
   const active: FixtureResources[] = []
 
   afterEach(async () => {
-    const pending = active.splice(0, active.length)
+    const pending = active.splice(0)
     _resetGitHubHostAuthCache()
     _resetOriginGitHubApiRepositoryCache()
     await Promise.all(pending.map(releaseFixture))

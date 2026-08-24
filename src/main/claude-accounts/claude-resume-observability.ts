@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   createManagedCommandMatcher,
+  hookDefinitionHasManagedCommand,
   isPlainObject,
   type HookDefinition
 } from '../agent-hooks/installer-utils'
@@ -43,12 +44,9 @@ export function settingsReportResumedClaudeSession(
     if (!isPlainObject(definition)) {
       return false
     }
-    if (isManagedCommand(definition.command)) {
-      return true
-    }
-    return Array.isArray(definition.hooks)
-      ? definition.hooks.some((hook) => isManagedCommand(hook?.command))
-      : false
+    // Why not a bare command test: on Windows the managed hook is the exec form
+    // (conhost.exe + the script in args), which a command-only match never sees.
+    return hookDefinitionHasManagedCommand(definition, isManagedCommand)
   })
 }
 

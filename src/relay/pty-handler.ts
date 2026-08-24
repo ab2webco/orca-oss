@@ -558,7 +558,7 @@ export class PtyHandler {
   }
 
   /** Register an env augmenter merged into every spawn env *after* process.env and renderer env.
-   *  Used by the relay-hook server to inject ORCA_AGENT_HOOK_* coords. See docs/design/agent-status-over-ssh.md §3. */
+   *  Used by the relay-hook server to inject ORCA_AGENT_HOOK_* coords: evaluated per spawn (not captured once), so a late or restarted hook-server bind still reaches the next PTY. */
   addEnvAugmenter(augmenter: PtyEnvAugmenter): () => void {
     this.envAugmenters.push(augmenter)
     return () => {
@@ -608,11 +608,7 @@ export class PtyHandler {
     for (const key of envToDelete) {
       delete result[key]
     }
-    if (
-      !envToDelete.includes('TERM') &&
-      rendererEnv &&
-      Object.prototype.hasOwnProperty.call(rendererEnv, 'TERM')
-    ) {
+    if (!envToDelete.includes('TERM') && rendererEnv && Object.hasOwn(rendererEnv, 'TERM')) {
       result.TERM = rendererEnv.TERM
     }
     // Why: node-pty defaults missing/empty TERM per-platform; normalize so POSIX and Windows children agree.
@@ -1432,7 +1428,7 @@ export class PtyHandler {
     const explicitTerm =
       !envToDelete.includes('TERM') &&
       env &&
-      Object.prototype.hasOwnProperty.call(env, 'TERM') &&
+      Object.hasOwn(env, 'TERM') &&
       typeof env.TERM === 'string' &&
       env.TERM.length > 0
         ? env.TERM

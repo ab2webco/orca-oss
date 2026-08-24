@@ -1,4 +1,5 @@
 import { getPlaneProjectIdForFetch } from './task-page-plane-scope'
+import type { PlaneWorkspaceSelection } from '../../../shared/plane-types'
 
 /**
  * Whether a Plane change announced by main affects what is currently on screen.
@@ -11,7 +12,7 @@ import { getPlaneProjectIdForFetch } from './task-page-plane-scope'
 export function shouldRefetchPlaneForChange(args: {
   /** Project the change targeted; null when the mutation is workspace-wide. */
   changedProjectId: string | null
-  workspaceSelection: string | 'all' | null | undefined
+  workspaceSelection: PlaneWorkspaceSelection | null | undefined
   projectSelection: string
 }): boolean {
   // A workspace-wide change gives no project to compare, so always refetch.

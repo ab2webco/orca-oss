@@ -137,7 +137,7 @@ describe('orchestration federation', () => {
     const attachment = workerDb.getRemoteDispatchAttachment(dispatch.id)
     expect(attachment).toMatchObject({
       task_id: task.id,
-      protocol_version: 2,
+      protocol_version: 3,
       state: 'ready',
       worktree_id: 'repo::windows-worktree',
       terminal_handle: 'term_windows_worker'
@@ -299,11 +299,8 @@ describe('orchestration federation', () => {
         })
       }
     })
-    expect(sent).toMatchObject({
-      ok: true,
-      result: { relay: { dispatchId: dispatch.id, accepted: true } }
-    })
-    expect(homeDb.getTask(task.id)?.status).toBe('dispatched')
+    expect(sent).toMatchObject({ ok: true, result: { lifecycle: { action: 'completed' } } })
+    expect(homeDb.getTask(task.id)?.status).toBe('completed')
 
     await homeRuntime.syncOrchestrationFederation()
 
