@@ -115,45 +115,29 @@ describe('enable-fish4-apt-source', () => {
 // The other half of ORCA-287: the version gate must SAY which failure it is.
 // Extracted from pr.yml and run as a shell fragment, so the two branches are
 // exercised rather than eyeballed in YAML.
-describe('Require fish 4+ gate message', () => {
-  const workflow = readFileSync(
-    path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'pr.yml'),
-    'utf8'
-  )
+describe('require-fish4 gate', () => {
+  const GATE = path.resolve(import.meta.dirname, 'require-fish4.sh')
 
-  function gateScript() {
-    const marker = '      - name: Require fish 4+\n        run: |\n'
-    const start = workflow.indexOf(marker)
-    expect(start, 'the Require fish 4+ step must exist').toBeGreaterThan(-1)
-    const body = workflow.slice(start + marker.length)
-    const lines = []
-    for (const line of body.split('\n')) {
-      if (line.trim() !== '' && !line.startsWith('          ')) {
-        break
-      }
-      lines.push(line.slice(10))
-    }
-    return lines.join('\n')
-  }
-
+  // Why the version is INJECTED and not a fake `fish` on PATH: the first version of
+  // this suite shelled out to whatever `fish` resolved to, so it passed on machines
+  // without fish and failed on a machine with 3.7 — i.e. it did not cover the case
+  // the ticket is about, a runner that HAS fish 3.7 and whose apt source failed.
   function runGate({ fishVersion, sourceStatus }) {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-gate-'))
-    // A fake `fish` so the gate sees the version we are testing.
-    writeFileSync(
-      path.join(dir, 'fish'),
-      fishVersion === null
-        ? '#!/usr/bin/env bash\nexit 127\n'
-        : `#!/usr/bin/env bash\necho 'fish, version ${fishVersion}'\n`,
-      { mode: 0o755 }
-    )
+    const statusFile = path.join(dir, 'fish4-source-status')
     if (sourceStatus !== null) {
-      writeFileSync(path.join(dir, 'fish4-source-status'), `${sourceStatus}\n`, 'utf8')
+      writeFileSync(statusFile, `${sourceStatus}\n`, 'utf8')
     }
+    const versionCommand = fishVersion === null ? 'false' : `echo fish, version ${fishVersion}`
     try {
-      const out = execFileSync('bash', ['-c', gateScript()], {
+      const out = execFileSync('bash', ['-c', `bash ${JSON.stringify(GATE)} 2>&1`], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, RUNNER_TEMP: dir }
+        env: {
+          ...process.env,
+          ORCA_FISH4_VERSION_COMMAND: versionCommand,
+          ORCA_FISH4_SOURCE_STATUS_FILE: statusFile
+        }
       })
       return { status: 0, output: out }
     } catch (error) {
@@ -161,12 +145,19 @@ describe('Require fish 4+ gate message', () => {
     }
   }
 
-  it('names the infrastructure when the apt source never came up', () => {
+  // The ticket's actual scenario: fish 3.7 IS installed and the apt source failed.
+  it('names the infrastructure when fish 3.7 is present and the source never came up', () => {
     const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'unavailable' })
     expect(status).toBe(1)
+    expect(output).toContain('fish, version 3.7.0')
     expect(output).toContain('INFRASTRUCTURE, not this PR')
-    expect(output).toContain('ORCA-287')
-    // The contract wording must NOT appear, or the reader is back to guessing.
+    expect(output).not.toContain('DECSET 2031')
+  })
+
+  it('names the infrastructure when fish is absent and the source never came up', () => {
+    const { status, output } = runGate({ fishVersion: null, sourceStatus: 'unavailable' })
+    expect(status).toBe(1)
+    expect(output).toContain('INFRASTRUCTURE, not this PR')
     expect(output).not.toContain('DECSET 2031')
   })
 
@@ -181,11 +172,21 @@ describe('Require fish 4+ gate message', () => {
     const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: null })
     expect(status).toBe(1)
     expect(output).toContain('status=unknown')
+    expect(output).toContain('INFRASTRUCTURE, not this PR')
   })
 
   it('passes on fish 4 without printing either diagnosis', () => {
     const { status, output } = runGate({ fishVersion: '4.0.2', sourceStatus: 'ppa' })
     expect(status).toBe(0)
     expect(output).not.toContain('::error::')
+  })
+
+  it('is the script pr.yml actually runs', () => {
+    const workflow = readFileSync(
+      path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'pr.yml'),
+      'utf8'
+    )
+    expect(workflow).toContain('bash config/scripts/require-fish4.sh')
+    expect(workflow).toMatch(/ORCA_FISH4_SOURCE_STATUS_FILE:[^\n]*fish4-source-status/)
   })
 })

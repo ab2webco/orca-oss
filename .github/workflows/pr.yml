@@ -244,25 +244,9 @@ jobs:
       # ORCA_REQUIRE_FISH re-checks this at test time; this step just fails in seconds
       # instead of after a full dependency install.
       - name: Require fish 4+
-        run: |
-          version="$(fish --version 2>/dev/null || true)"
-          major="${version##*version }"
-          major="${major%%.*}"
-          case "$major" in '' | *[!0-9]*) major=0 ;; esac
-          echo "${version:-<fish not installed>}"
-          if [ "$major" -lt 4 ]; then
-            # Why two messages: "could not fetch fish 4" and "fish 4 is here and
-            # the contract failed" are different diagnoses, and reading one red
-            # check used to mean opening the job log to tell them apart. The gate
-            # still fails closed either way (ORCA-287).
-            status="$(cat "${RUNNER_TEMP}/fish4-source-status" 2>/dev/null || echo unknown)"
-            if [ "$status" != 'ppa' ]; then
-              echo "::error::INFRASTRUCTURE, not this PR: the ppa:fish-shell/release-4 apt source could not be reached (status=${status}), so the runner kept '${version:-none}'. Launchpad's key API returns HTTP 500 intermittently - re-run this job. See ORCA-287." >&2
-              exit 1
-            fi
-            echo "::error::shell contracts needs fish 4+ (DECSET 2031 arming, #9993) but got '${version:-none}'. The apt source was reachable, so this is the fish install or the package itself, not a Launchpad outage." >&2
-            exit 1
-          fi
+        run: bash config/scripts/require-fish4.sh
+        env:
+          ORCA_FISH4_SOURCE_STATUS_FILE: ${{ runner.temp }}/fish4-source-status
 
       - uses: ./.github/actions/install-node-dependencies
         with:
