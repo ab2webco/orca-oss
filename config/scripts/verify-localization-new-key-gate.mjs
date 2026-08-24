@@ -67,6 +67,13 @@ export function isCriticalKey(key) {
   return CRITICAL_KEY_PATTERN.test(key)
 }
 
+export function combineParentCatalogKeys(...catalogs) {
+  if (catalogs.some((catalog) => catalog === null)) {
+    return null
+  }
+  return new Map(catalogs.flatMap((catalog) => [...catalog]))
+}
+
 /**
  * Keys a change adds, and which locales are missing them.
  *
@@ -153,12 +160,18 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2)) {
   let baseEnKeys = null
   if (base) {
     const mergeBase = runGit(root, ['merge-base', base, 'HEAD']).trim()
-    // syncAware: on a sync PR the pre-sync tip hides the fork's own additions,
-    // the same blind spot ORCA-205 found in the changed-code gate.
+    // A sync merge inherits existing debt from both parents; only keys absent from both are new.
     const comparisonBase = resolvePullRequestDiffBase(root, mergeBase, undefined, {
       syncAware: true
     })
-    baseEnKeys = readCatalogKeysAtRef(root, comparisonBase, EN_CATALOG)
+    const comparisonCatalog = readCatalogKeysAtRef(root, comparisonBase, EN_CATALOG)
+    baseEnKeys =
+      comparisonBase === mergeBase
+        ? comparisonCatalog
+        : combineParentCatalogKeys(
+            readCatalogKeysAtRef(root, mergeBase, EN_CATALOG),
+            comparisonCatalog
+          )
   }
   if (baseEnKeys === null) {
     console.log(

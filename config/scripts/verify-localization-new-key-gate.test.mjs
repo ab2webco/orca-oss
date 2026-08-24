@@ -5,7 +5,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { collectGateFindings, isCriticalKey } from './verify-localization-new-key-gate.mjs'
+import {
+  collectGateFindings,
+  combineParentCatalogKeys,
+  isCriticalKey
+} from './verify-localization-new-key-gate.mjs'
 
 const LOCALES = ['es', 'ja', 'ko', 'zh']
 
@@ -73,6 +77,24 @@ describe('localization new-key gate', () => {
     })
     expect(addedKeys).toEqual([])
     expect(addedUntranslated).toEqual([])
+  })
+
+  it('treats keys from either sync parent as pre-existing debt', () => {
+    const baseEnKeys = combineParentCatalogKeys(
+      new Map([['fork.only', 'Fork']]),
+      new Map([['upstream.only', 'Upstream']])
+    )
+    const { addedKeys } = collectGateFindings({
+      baseEnKeys,
+      headEnKeys: new Set(['fork.only', 'upstream.only']),
+      localeKeysByName: locales({})
+    })
+
+    expect(addedKeys).toEqual([])
+  })
+
+  it('fails safe when either sync parent catalog is unreadable', () => {
+    expect(combineParentCatalogKeys(new Map([['known', 'Known']]), null)).toBeNull()
   })
 
   it('recognizes the consent and warning surfaces, and leaves ordinary copy alone', () => {
