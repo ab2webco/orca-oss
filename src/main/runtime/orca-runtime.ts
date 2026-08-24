@@ -28989,7 +28989,7 @@ export class OrcaRuntimeService {
             sourcePtyId
           )
         : null
-    if (sourcePersisted && committedSourceAuthority?.rendererMounted) {
+    if (sourcePersisted && committedSourceAuthority?.rendererSourcePresent) {
       // Why: renderer adoption is a projection after the durable main commit; rejection cannot undo it.
       void revealSplit().catch(() => undefined)
     }
@@ -29009,6 +29009,7 @@ export class OrcaRuntimeService {
   ): {
     persisted: boolean
     rendererMounted: boolean
+    rendererSourcePresent: boolean
     persistedWorktreeId: string | null
     persistedIncarnationId: string | null
   } | null {
@@ -29037,17 +29038,18 @@ export class OrcaRuntimeService {
     )
     const rendererTab = this.tabs.get(tabId)
     const rendererLeaf = this.leaves.get(this.getLeafKey(tabId, leafId))
-    const rendererMounted = Boolean(
+    const rendererSourcePresent = Boolean(
       rendererTab &&
       rendererLeaf &&
       runtimeWorktreeIdsEqual(rendererTab.worktreeId, worktreeId) &&
-      runtimeWorktreeIdsEqual(rendererLeaf.worktreeId, worktreeId) &&
-      rendererLeaf.ptyId === ptyId
+      runtimeWorktreeIdsEqual(rendererLeaf.worktreeId, worktreeId)
     )
+    const rendererMounted = rendererSourcePresent && rendererLeaf?.ptyId === ptyId
     if (persisted && persistedLayout) {
       return {
         persisted: true,
         rendererMounted,
+        rendererSourcePresent,
         persistedWorktreeId: sessionWorktreeId,
         persistedIncarnationId
       }
@@ -29070,6 +29072,7 @@ export class OrcaRuntimeService {
     return {
       persisted: false,
       rendererMounted,
+      rendererSourcePresent,
       persistedWorktreeId: null,
       persistedIncarnationId: null
     }
