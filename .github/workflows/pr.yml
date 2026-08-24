@@ -83,6 +83,13 @@ jobs:
       - name: Verify localization coverage
         run: pnpm run verify:localization-coverage
 
+      # Why the base SHA: the gate blocks keys this PR ADDS, so it needs the
+      # merge target to diff against (ORCA-284).
+      - name: Verify no new untranslated keys
+        run: pnpm run verify:localization-new-keys
+        env:
+          ORCA_LOCALIZATION_GATE_BASE: ${{ github.event.pull_request.base.sha }}
+
       # Why: project-owned type declarations must live in .ts so tsc
       # actually checks them. TypeScript's skipLibCheck: true (inherited
       # from @electron-toolkit/tsconfig) silently widens unresolved names
