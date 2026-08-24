@@ -16,6 +16,7 @@ import {
   hasLifecycleAuthority,
   reconcileLifecycleMessage
 } from '../../orchestration/lifecycle-reconciliation'
+import { waitForFederatedLifecycleSettlement } from '../../orchestration/federation-lifecycle-settlement'
 import { abbreviateOrchestrationTasks } from '../../../../shared/orchestration-task-summary'
 import {
   ORCHESTRATION_LEGACY_RUN_ID,
@@ -33,7 +34,10 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
-import { ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
+import {
+  ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+} from '../../../../shared/protocol-version'
 
 const TASK_STATUSES: TaskStatus[] = [
   'pending',
@@ -93,6 +97,7 @@ const SendParams = z
     // Why: the launch token is the proof behind that pane key; without it the key is just a claim.
     senderLaunchToken: OptionalString,
     run: OptionalString,
+    waitForLifecycleSettlement: OptionalBoolean,
     devMode: OptionalBoolean
   })
   .superRefine((params, ctx) => {
@@ -403,7 +408,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         orchestrationCapability,
         legacyCoordinatorRunId,
         revalidateLegacyCoordinator,
-        orchestrationCompatibilityCallerAuthority
+        orchestrationCompatibilityCallerAuthority,
+        signal
       }
     ) => {
       const db = runtime.getOrchestrationDb()
@@ -464,6 +470,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             'Remote worker_done requires outcome=succeeded|failed.'
           )
         }
+        if (
+          outcome &&
+          remoteAttachment.protocol_version <
+            ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+        ) {
+          throw new OrchestrationError(
+            'capability_unsupported',
+            'The Run-home runtime cannot confirm worker_done settlement. Update it before retrying; no report was queued.'
+          )
+        }
         const relay = db.enqueueFederationRelay({
           dispatchId: remoteAttachment.dispatch_id,
           direction: 'to_home',
@@ -476,9 +492,20 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             priority: params.priority ?? 'normal',
             threadId: params.threadId ?? null,
             payload: params.payload ?? null
-          }),
-          settleRemoteOutcome: outcome
+          })
         })
+        const lifecycle = outcome
+          ? await waitForFederatedLifecycleSettlement(runtime, relay.dispatch_id, relay.sequence, {
+              timeoutMs: 30_000,
+              signal
+            })
+          : undefined
+        if (outcome && !lifecycle) {
+          throw new OrchestrationError(
+            'operation_unknown',
+            'worker_done was queued, but the Run-home runtime did not confirm settlement. Verify the Task and Dispatch before retrying.'
+          )
+        }
         return {
           relay: {
             messageId: relay.message_id,
@@ -487,9 +514,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             destination: 'run_home',
             accepted: true
           },
-          ...(outcome
-            ? { lifecycle: { action: outcome === 'succeeded' ? 'completed' : 'failed' } }
-            : {})
+          ...(lifecycle ? { lifecycle } : {})
         }
       }
       const routing = resolveMessageRun(runtime, {
@@ -654,6 +679,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             runtime.notifyMessageArrived(to, rejection.type)
             return { message: rejection, lifecycle: reconciled }
           }
+          runtime.notifyMessageArrived(to, msg.type)
+          return msg.type === 'worker_done'
+            ? { message: msg, lifecycle: reconciled }
+            : { message: msg }
         }
         runtime.notifyMessageArrived(to, msg.type)
         return { message: msg }

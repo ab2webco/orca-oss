@@ -1,11 +1,11 @@
 export const LEGACY_WORKTREE_META_CONCURRENCY = 8
 
 export function hasClaudeAccountPinUpdate(update: Readonly<Record<string, unknown>>): boolean {
-  return Object.prototype.hasOwnProperty.call(update, 'claudeAccountId')
+  return Object.hasOwn(update, 'claudeAccountId')
 }
 
 export function hasCodexAccountPinUpdate(update: Readonly<Record<string, unknown>>): boolean {
-  return Object.prototype.hasOwnProperty.call(update, 'codexAccountId')
+  return Object.hasOwn(update, 'codexAccountId')
 }
 
 /** Why: pre-account runtimes accept worktree.set but discard unknown pin

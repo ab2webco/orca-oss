@@ -1,7 +1,12 @@
 import { rmSync } from 'node:fs'
 import type { SFTPWrapper } from 'ssh2'
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
-import { readHooksJson, writeHooksJson, writeManagedScript } from '../agent-hooks/installer-utils'
+import {
+  buildManagedCommandHook,
+  readHooksJson,
+  writeHooksJson,
+  writeManagedScript
+} from '../agent-hooks/installer-utils'
 import {
   readHooksJsonRemote,
   writeHooksJsonRemote,
@@ -18,6 +23,7 @@ import {
   getManagedScriptFileName,
   getConfigPath,
   getManagedCommand,
+  getManagedLifecycleHook,
   getManagedScriptPath,
   getPosixManagedScriptFileName,
   getRemoteConfigPath,
@@ -25,6 +31,7 @@ import {
   getStatusLineInstallMarkerPath,
   getStatusLineScriptFileName,
   getStatusLineScriptPath,
+  hasSameManagedHookInvocation,
   removeManagedHooks,
   removeManagedStatusLine,
   type ClaudeCompatibleHookSettings,
@@ -94,7 +101,7 @@ export class ClaudeHookService {
     }
 
     // Why: report partial registration instead of a false installed state.
-    const command = getManagedCommand(scriptPath)
+    const expectedHook = getManagedLifecycleHook(scriptPath, this.options.settings)
     const missing: string[] = []
     let presentCount = 0
     for (const event of this.getLocalEligibleEvents()) {
@@ -102,7 +109,7 @@ export class ClaudeHookService {
         ? config.hooks![event.eventName]!
         : []
       const hasCommand = definitions.some((definition) =>
-        (definition.hooks ?? []).some((hook) => hook.command === command)
+        (definition.hooks ?? []).some((hook) => hasSameManagedHookInvocation(hook, expectedHook))
       )
       if (hasCommand) {
         presentCount += 1
@@ -152,10 +159,10 @@ export class ClaudeHookService {
       }
     }
 
-    const command = getManagedCommand(scriptPath)
+    const hook = getManagedLifecycleHook(scriptPath, this.options.settings)
     let nextConfig = applyManagedHooks(
       config,
-      command,
+      hook,
       getManagedScriptFileName(this.options.settings),
       this.getLocalEligibleEvents()
     )
@@ -191,7 +198,7 @@ export class ClaudeHookService {
     )
     let nextConfig = applyManagedHooks(
       config,
-      getManagedCommand(scriptPath),
+      getManagedLifecycleHook(scriptPath, this.options.settings),
       getManagedScriptFileName(this.options.settings)
     )
     // Why: the statusline usage feed is Claude-only — OpenClaude data would be misattributed.
@@ -245,14 +252,14 @@ export class ClaudeHookService {
         }
       }
 
-      // Why: the POSIX wrapper is identical regardless of where the script lands; only the path differs.
+      // Why: settings resolve HOME at runtime while SFTP still targets the discovered remote home.
       // Why: the remote's Claude version is unknown and unprobed here, so inject
       // only the always-safe base events — an older remote client would otherwise
       // reject the entire settings.json on a gated key.
-      const command = getRemoteManagedCommand(remoteScriptPath)
+      const hook = buildManagedCommandHook(getRemoteManagedCommand(remoteScriptPath))
       const nextConfig = applyManagedHooks(
         config,
-        command,
+        hook,
         remoteScriptFileName,
         resolveRemoteEligibleEvents(this.options.versionGated)
       )

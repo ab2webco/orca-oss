@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { AgentHookServer } from '../agent-hooks/server'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import { applyManagedHooks } from '../claude/hook-settings'
+import { buildManagedCommandHook } from '../agent-hooks/installer-utils'
 import {
   selectExactWorkerProviderSession,
   selectExactWorkerProviderSessionIdentity
@@ -61,7 +62,7 @@ describe('managed Claude hook events', () => {
   it('registers SessionStart so a resumed session reports its id before any turn', () => {
     // Why the default event set: vault instrumentation injects it ungated, which
     // is what a switched terminal's CLAUDE_CONFIG_DIR actually reads.
-    const config = applyManagedHooks({}, MANAGED_COMMAND)
+    const config = applyManagedHooks({}, buildManagedCommandHook(MANAGED_COMMAND))
 
     const sessionStart = config.hooks?.SessionStart
     expect(sessionStart).toBeDefined()

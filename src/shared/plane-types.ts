@@ -15,7 +15,11 @@ export type PlaneViewer = {
   avatarUrl?: string
 }
 
-export type PlaneWorkspaceSelection = string | 'all'
+/** A workspace id, or the 'all' sentinel meaning every connected workspace. */
+export type PlaneWorkspaceSelection = string
+
+/** A project id, or the 'all' sentinel meaning every project in scope. */
+export type PlaneProjectSelection = string
 
 export type PlaneConnectionStatus = {
   connected: boolean
