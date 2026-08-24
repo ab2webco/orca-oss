@@ -14,6 +14,11 @@ const SCRIPT = path.resolve(import.meta.dirname, 'enable-fish4-apt-source.sh')
 
 /** A stub `sudo` that fails `add-apt-repository -y ppa:...` the first
  *  `failuresBeforeSuccess` times and records every call. */
+async function fakeSudoDir(failuresBeforeSuccess) {
+  const made = await fakeSudo(failuresBeforeSuccess)
+  return { ...made, statusFile: path.join(made.dir, 'status') }
+}
+
 async function fakeSudo(failuresBeforeSuccess) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'orca-fish4-'))
   const callLog = path.join(dir, 'calls.log')
@@ -66,51 +71,91 @@ async function attemptsMade(counter) {
   return Number((await fs.readFile(counter, 'utf8')).trim())
 }
 
-describe('enable-fish4-apt-source', () => {
-  it('retries a 500 and succeeds once the source comes back', async () => {
-    const { dir, counter } = await fakeSudo(2)
-    const statusFile = path.join(dir, 'status')
-    const { status, output } = run(dir, statusFile)
+// Why a preflight and not a platform check: this suite drives the script against a
+// fake `sudo`, so it needs no apt — but a machine that cannot execute the harness
+// reports 127 (command not found) on every case, and six ambiguous reds cost two
+// people time. A stated skip is honest; `continue-on-error` would not be.
+// Deliberately keyed on the symptom: the missing command was never identified, and
+// guessing at a platform would skip environments where the suite does work.
+const harnessProbe = await (async () => {
+  const { dir, statusFile } = await fakeSudoDir(0)
+  try {
+    execFileSync('bash', ['-c', `bash ${JSON.stringify(SCRIPT)} >/dev/null 2>&1`], {
+      env: {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        ORCA_FISH4_SOURCE_STATUS_FILE: statusFile,
+        ORCA_FISH4_BACKOFF_SECONDS: '0'
+      }
+    })
+    return { usable: true, reason: '' }
+  } catch (error) {
+    if (error.status === 127) {
+      return {
+        usable: false,
+        reason:
+          'the fake-sudo harness cannot run here (exit 127, command not found) — this suite needs an apt-style environment, so CI is its gate'
+      }
+    }
+    // Any other status means the harness ran and the script decided something,
+    // which is exactly what the cases below assert on.
+    return { usable: true, reason: '' }
+  }
+})()
 
-    expect(status).toBe(0)
-    expect(await attemptsMade(counter)).toBe(3)
-    expect(output).toContain('attempt 1 failed')
-    expect(output).toContain('attempt 2 failed')
-    expect(await fs.readFile(statusFile, 'utf8')).toContain('ppa')
-  })
+if (!harnessProbe.usable) {
+  // Printed, not silent: a skipped suite that says nothing reads as coverage.
+  console.warn(`[enable-fish4-apt-source] skipped — ${harnessProbe.reason}`)
+}
 
-  it('reports the source unavailable after exhausting the backoff', async () => {
-    const { dir, counter } = await fakeSudo(Number.MAX_SAFE_INTEGER)
-    const statusFile = path.join(dir, 'status')
-    const { status } = run(dir, statusFile)
+describe.skipIf(!harnessProbe.usable)(
+  `enable-fish4-apt-source${harnessProbe.usable ? '' : ' (skipped: no apt-style harness)'}`,
+  () => {
+    it('retries a 500 and succeeds once the source comes back', async () => {
+      const { dir, counter } = await fakeSudo(2)
+      const statusFile = path.join(dir, 'status')
+      const { status, output } = run(dir, statusFile)
 
-    // EX_TEMPFAIL, distinct from a contract failure.
-    expect(status).toBe(75)
-    // Four backoff entries plus the attempt after the last wait: the old inline
-    // loop tried three times in 15s and all three landed in the same outage.
-    expect(await attemptsMade(counter)).toBe(5)
-    expect((await fs.readFile(statusFile, 'utf8')).trim()).toBe('unavailable')
-  })
+      expect(status).toBe(0)
+      expect(await attemptsMade(counter)).toBe(3)
+      expect(output).toContain('attempt 1 failed')
+      expect(output).toContain('attempt 2 failed')
+      expect(await fs.readFile(statusFile, 'utf8')).toContain('ppa')
+    })
 
-  it('drops the half-added PPA between attempts', async () => {
-    const { dir, callLog } = await fakeSudo(1)
-    const { status } = run(dir, path.join(dir, 'status'))
+    it('reports the source unavailable after exhausting the backoff', async () => {
+      const { dir, counter } = await fakeSudo(Number.MAX_SAFE_INTEGER)
+      const statusFile = path.join(dir, 'status')
+      const { status } = run(dir, statusFile)
 
-    expect(status).toBe(0)
-    // A failed add leaves its list entry behind, and the next apt-get update then
-    // exits non-zero for a reason unrelated to the PR.
-    expect(await fs.readFile(callLog, 'utf8')).toContain('add-apt-repository -y -r')
-  })
+      // EX_TEMPFAIL, distinct from a contract failure.
+      expect(status).toBe(75)
+      // Four backoff entries plus the attempt after the last wait: the old inline
+      // loop tried three times in 15s and all three landed in the same outage.
+      expect(await attemptsMade(counter)).toBe(5)
+      expect((await fs.readFile(statusFile, 'utf8')).trim()).toBe('unavailable')
+    })
 
-  it('does not retry a source that works on the first try', async () => {
-    const { dir, counter } = await fakeSudo(0)
-    const { status, output } = run(dir, path.join(dir, 'status'))
+    it('drops the half-added PPA between attempts', async () => {
+      const { dir, callLog } = await fakeSudo(1)
+      const { status } = run(dir, path.join(dir, 'status'))
 
-    expect(status).toBe(0)
-    expect(await attemptsMade(counter)).toBe(1)
-    expect(output).not.toContain('retrying')
-  })
-})
+      expect(status).toBe(0)
+      // A failed add leaves its list entry behind, and the next apt-get update then
+      // exits non-zero for a reason unrelated to the PR.
+      expect(await fs.readFile(callLog, 'utf8')).toContain('add-apt-repository -y -r')
+    })
+
+    it('does not retry a source that works on the first try', async () => {
+      const { dir, counter } = await fakeSudo(0)
+      const { status, output } = run(dir, path.join(dir, 'status'))
+
+      expect(status).toBe(0)
+      expect(await attemptsMade(counter)).toBe(1)
+      expect(output).not.toContain('retrying')
+    })
+  }
+)
 
 // The other half of ORCA-287: the version gate must SAY which failure it is.
 // Extracted from pr.yml and run as a shell fragment, so the two branches are
