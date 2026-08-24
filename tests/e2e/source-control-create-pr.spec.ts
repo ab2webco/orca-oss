@@ -32,20 +32,28 @@ async function openSourceControl(page: Page, expectedWorktreeId: string): Promis
           if (!state) {
             return false
           }
-          const activeWorktree = Object.values(state.worktreesByRepo)
+          if (state.activeWorktreeId !== expectedWorktreeId) {
+            state.setActiveWorktree(expectedWorktreeId)
+          }
+          state.setRightSidebarOpen(true)
+          state.setRightSidebarTab('source-control')
+          const current = window.__store.getState()
+          const activeWorktree = Object.values(current.worktreesByRepo)
             .flat()
             .some((entry) => entry.id === expectedWorktreeId)
           return (
             activeWorktree &&
-            state.activeWorktreeId === expectedWorktreeId &&
-            state.rightSidebarOpen &&
-            state.rightSidebarTab === 'source-control'
+            current.activeWorktreeId === expectedWorktreeId &&
+            current.rightSidebarOpen &&
+            current.rightSidebarTab === 'source-control'
           )
         }, expectedWorktreeId),
       { timeout: 5_000 }
     )
     .toBe(true)
-  await expect(page.getByRole('button', { name: /Source Control/ })).toBeVisible()
+  const sourceControlTab = page.getByRole('button', { name: /Source Control/ })
+  await expect(sourceControlTab).toBeVisible()
+  await sourceControlTab.click()
 }
 
 async function forceCreatePREligibleStatus(

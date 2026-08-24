@@ -8,11 +8,15 @@ import {
 import { isValidPtySize, normalizePtySize } from './daemon-pty-size'
 import { PostReadyFlushGate } from './post-ready-flush-gate'
 import {
-  createShellReadyScanState,
-  drainShellReadyHeldBytes,
-  scanForShellReady,
-  type ShellReadyScanState
-} from '../shell-ready-marker-scanner'
+  createShellStartupOutputScanState,
+  drainShellStartupOutputScanState,
+  scanShellStartupOutput,
+  type ShellStartupOutputScanState
+} from '../shell-startup-output-scanner'
+import {
+  createShellPromptReadinessProbe,
+  type ShellPromptReadinessProbe
+} from '../shell-prompt-readiness-probe'
 import { isPowerShellProcess } from '../../shared/shell-process-detection'
 import { killWithDescendantSweep } from '../pty-descendant-termination'
 import type { TuiAgent } from '../../shared/types'
@@ -61,6 +65,8 @@ export type SubprocessHandle = {
   /** Shell the subprocess actually spawned, after fallbacks. The host reconciles the caller's shell-ready
    *  assumption against it so a fallback shell without a ready marker never gates startup commands. */
   shellPath?: string
+  shellCwd?: string
+  shellPathEnv?: string
   /** Slave device path, so startup replies can read the line discipline's ECHO bit before
    *  writing. Absent on handles with no POSIX slave to read (ConPTY, tests). */
   slavePath?: string
@@ -139,7 +145,9 @@ export class Session {
   private preReadyStdinQueue: string[] = []
   private releaseStartupDeviceAttributesResponder: (() => void) | null = null
   private startupDeviceAttributesQueryFilter: StartupDeviceAttributesQueryFilter | null = null
-  private shellReadyScanState: ShellReadyScanState | null = null
+  private shellStartupOutputScanState: ShellStartupOutputScanState | null = null
+  private shellStartupPid: number | null = null
+  private shellPromptReadinessProbe: ShellPromptReadinessProbe | null = null
   private shellReadyTimer: ReturnType<typeof setTimeout> | null = null
   private killTimer: ReturnType<typeof setTimeout> | null = null
   private postReadyFlushGate: PostReadyFlushGate
@@ -187,7 +195,7 @@ export class Session {
     this.onStartupCommandStateChange = opts.onStartupCommandStateChange
     if (opts.shellReadySupported) {
       this._shellState = 'pending'
-      this.shellReadyScanState = createShellReadyScanState()
+      this.shellStartupOutputScanState = createShellStartupOutputScanState()
       // Why: `write` queues everything until the ready marker, including the renderer's DA1
       // reply — and a shell that withholds its first prompt until DA1 is answered (fish) then
       // never emits the marker that would release it. Answer from the daemon, past the queue.
@@ -213,6 +221,16 @@ export class Session {
       onEmission: (emission) => this.emitSubprocessOutput(emission),
       ...(echoProbe ? { echoProbe } : {})
     })
+    if (this._shellState === 'pending') {
+      this.shellPromptReadinessProbe = createShellPromptReadinessProbe({
+        slavePath: this.subprocess.slavePath,
+        shellPath: this.subprocess.shellPath,
+        shellCwd: this.subprocess.shellCwd,
+        shellPathEnv: this.subprocess.shellPathEnv,
+        getShellPid: () => this.shellStartupPid,
+        onPromptReady: () => this.onShellPromptReady()
+      })
+    }
     this.subprocess.onData((data) => this.handleSubprocessData(data))
     this.subprocess.onExit((code) => this.handleSubprocessExit(code))
   }
@@ -239,6 +257,11 @@ export class Session {
 
   get isAlive(): boolean {
     return this._state !== 'exited'
+  }
+
+  /** A viewing client is attached; a dropped transport must clear this or pause/resume semantics leak. */
+  get hasAttachedClients(): boolean {
+    return this.attachedClients.length > 0
   }
 
   get isTerminating(): boolean {
@@ -526,6 +549,7 @@ export class Session {
           ? [{ kind: 'output', data: releasedHeldBytes }]
           : []
         : records,
+      ...(includeSnapshot ? { drainedRecords: records } : {}),
       seq: this.pendingOutputSeq,
       overflowed,
       snapshot: includeSnapshot ? this.getSnapshot() : null
@@ -651,7 +675,9 @@ export class Session {
       clearTimeout(this.shellReadyTimer)
       this.shellReadyTimer = null
     }
-    this.shellReadyScanState = null
+    this.shellPromptReadinessProbe?.dispose()
+    this.shellPromptReadinessProbe = null
+    this.shellStartupOutputScanState = null
     this.preReadyStdinQueue = []
     this.postReadyFlushGate.clear()
     this.disposeSubprocessHandle()
@@ -700,10 +726,13 @@ export class Session {
     // 'timed_out' but a withheld launch command still needs the marker, which
     // arrives whenever the shell finally reaches its prompt (ORCA-210).
     let releaseStartupDeviceAttributes = false
-    if (this.shellReadyScanState) {
-      const scanned = scanForShellReady(this.shellReadyScanState, data)
+    if (this.shellStartupOutputScanState) {
+      const scanned = scanShellStartupOutput(this.shellStartupOutputScanState, data)
       data = scanned.output
-      if (scanned.matched) {
+      if (scanned.shellPid) {
+        this.shellStartupPid = scanned.shellPid
+      }
+      if (scanned.ready) {
         this.transitionToReady(scanned.postMarkerBytesObserved)
         releaseStartupDeviceAttributes = true
       } else {
@@ -714,6 +743,9 @@ export class Session {
     }
 
     this.startupIngress.accept(data)
+    if (this._shellState === 'pending' && data.length > 0) {
+      this.shellPromptReadinessProbe?.notifyOutput(data)
+    }
     if (releaseStartupDeviceAttributes) {
       this.releaseStartupDeviceAttributes()
     }
@@ -749,6 +781,8 @@ export class Session {
     }
 
     this.releaseStartupDeviceAttributes()
+    this.shellPromptReadinessProbe?.dispose()
+    this.shellPromptReadinessProbe = null
     this.releaseHeldShellReadyBytes()
     this.startupIngress.drainAndClose()
     this._exitCode = code
@@ -780,12 +814,12 @@ export class Session {
   }
 
   private releaseHeldShellReadyBytes({ keepScanning = false } = {}): string {
-    if (!this.shellReadyScanState) {
+    if (!this.shellStartupOutputScanState) {
       return ''
     }
-    const heldBytes = drainShellReadyHeldBytes(this.shellReadyScanState)
+    const heldBytes = drainShellStartupOutputScanState(this.shellStartupOutputScanState)
     if (!keepScanning) {
-      this.shellReadyScanState = null
+      this.shellStartupOutputScanState = null
     }
     // Why: scanning strips marker bytes before fan-out; if readiness never completes, release any held prefix before timeout/exit discards it.
     this.startupIngress.accept(heldBytes)
@@ -813,7 +847,9 @@ export class Session {
 
   private transitionToReady(postMarkerBytesObserved = false): void {
     this._shellState = 'ready'
-    this.shellReadyScanState = null
+    this.shellStartupOutputScanState = null
+    this.shellPromptReadinessProbe?.dispose()
+    this.shellPromptReadinessProbe = null
     if (this.shellReadyTimer) {
       clearTimeout(this.shellReadyTimer)
       this.shellReadyTimer = null
@@ -830,6 +866,8 @@ export class Session {
       return
     }
     this._shellState = 'timed_out'
+    this.shellPromptReadinessProbe?.dispose()
+    this.shellPromptReadinessProbe = null
     this.releaseStartupDeviceAttributes()
     // Why keep scanning: the marker is still the only proof the shell reached a
     // prompt, and it can arrive long after the budget — the moment the human
@@ -844,13 +882,25 @@ export class Session {
     }
   }
 
+  private onShellPromptReady(): void {
+    if (this._shellState !== 'pending') {
+      return
+    }
+    console.warn(
+      `[Session] ${this.sessionId}: shell-ready wrapper was replaced before its marker; releasing at the identified shell prompt. OSC 133 integration may be unavailable.`
+    )
+    this.releaseHeldShellReadyBytes()
+    this.transitionToReady(true)
+    this.releaseStartupDeviceAttributes()
+  }
+
   private flushPreReadyQueue({ includeStartupCommand = true } = {}): void {
     if (includeStartupCommand && this.pendingStartupCommand !== null) {
       const startupCommand = this.pendingStartupCommand
       const wasWithheld = this._startupCommandState === 'withheld'
       this.pendingStartupCommand = null
       this._startupCommandState = 'delivered'
-      this.shellReadyScanState = null
+      this.shellStartupOutputScanState = null
       this.subprocess.write(startupCommand)
       if (wasWithheld) {
         this.onStartupCommandStateChange?.('delivered')

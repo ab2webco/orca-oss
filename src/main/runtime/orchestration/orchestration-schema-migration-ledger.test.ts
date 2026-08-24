@@ -83,7 +83,7 @@ function findBlock(source: string, from: number, open: string, close: string): n
   return -1
 }
 
-const GATE_OPENER = /if \(current < (\d+)\b/g
+const GATE_OPENER = /if \(\s*current < (\d+)\b/g
 
 function parseGates(ladder: string): readonly LadderGate[] {
   const gates: LadderGate[] = []
@@ -113,7 +113,7 @@ describe('the orchestration migration ladder matches its ledger', () => {
   // Why: a parser that silently drops a gate stops guarding it, and every check
   // below would still pass.
   it('parses every gate in the ladder', () => {
-    const openers = [...readMigrationLadder().matchAll(/if \(current < \d/g)].length
+    const openers = [...readMigrationLadder().matchAll(/if \(\s*current < \d/g)].length
     expect(openers).toBeGreaterThan(20)
     expect(gates).toHaveLength(openers)
   })
