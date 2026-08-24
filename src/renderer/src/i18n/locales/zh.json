@@ -691,11 +691,11 @@
         "07ff1f8806": "自动切换已禁用。",
         "7e5d87791a": "由于账户认证位于远程主机上，SSH 终端不支持自动切换。",
         "d823b157d5": "未找到有可用额度的托管 {{value0}} 账户。",
-        "79751c2c2d": "无法为受限代理会话构建恢复命令。",
-        "13668a6034": "受限代理在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
+        "79751c2c2d": "无法为受限智能体会话构建恢复命令。",
+        "13668a6034": "受限智能体在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
         "9553d26436": "切换账户后终端未接受恢复命令。",
-        "13ccffb514": "恢复的代理未能及时接管终端。",
-        "65d1f14b75": "恢复的代理未接受 continue 命令。",
+        "13ccffb514": "恢复的智能体未能及时接管终端。",
+        "65d1f14b75": "恢复的智能体未接受 continue 命令。",
         "65e8e278a4": "无法检查托管账户：{{value0}}",
         "a939f58b30": "无法解析恢复平台：{{value0}}",
         "customEndpointSession": "此会话运行在自定义端点账户上；它的错误并非 Anthropic 账户限额。",
@@ -705,13 +705,13 @@
       },
       "agentRateLimitFailover": {
         "resumePlanFailed": "无法为故障转移会话构建恢复命令。",
-        "stopFailed": "受限代理在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
+        "stopFailed": "受限智能体在 Ctrl+C 后未退出，因此 Orca 未对终端做任何更改。",
         "pinFailed": "无法将故障转移账户分配给此工作树：{{value0}}",
         "launchPlanFailed": "无法为故障转移会话构建启动命令。"
       },
       "agentRateLimitFailBack": {
         "globalSelectionLabel": "全局账户选择",
-        "stopFailed": "端点代理在 Ctrl+C 后未退出，Orca 未改动该终端。",
+        "stopFailed": "端点智能体在 Ctrl+C 后未退出，Orca 未改动该终端。",
         "pinFailed": "无法在此工作树上恢复原始账户：{{value0}}",
         "launchPlanFailed": "无法为恢复的会话构建启动命令。",
         "resumePlanFailed": "无法为恢复的会话构建恢复命令。"
@@ -906,7 +906,7 @@
       },
       "useMacosTccPromptNotice": {
         "title": "看到“Orca 想要访问…”提示？",
-        "description": "当 Orca 中运行的代理或终端工具尝试访问受保护的文件时，macOS 可能会显示权限信息。请在“设置”中授予“完全磁盘访问权限”，以减少此类提示。",
+        "description": "当 Orca 中运行的智能体或终端工具尝试访问受保护的文件时，macOS 可能会显示权限信息。请在“设置”中授予“完全磁盘访问权限”，以减少此类提示。",
         "openSettings": "打开设置",
         "dismiss": "不再显示"
       }
@@ -3206,7 +3206,7 @@
             "splitTerminal": "拆分终端"
           },
           "TerminalTabLeadingIcon": {
-            "7ab2964bea": "未读的代理完成"
+            "7ab2964bea": "未读的智能体完成"
           }
         }
       },
@@ -5434,9 +5434,9 @@
           "codexConfigSyncMissingSource": "由于缺少 {{value0}}，Codex 仍在使用上次同步的设置。请恢复该文件以恢复同步。",
           "codexConfigSyncBlankSource": "由于 {{value0}} 为空，Codex 仍在使用上次同步的设置。同步文件夹完成下载前出现这种情况是正常的。",
           "codexConfigSyncUnreadableSource": "由于无法读取 {{value0}}，Codex 仍在使用上次同步的设置。请检查该文件的权限。",
-          "b28bb41f63": "自动切换受限代理",
+          "b28bb41f63": "自动切换受限智能体",
           "7d2634bfa1": "当正在运行的 Claude 或 Codex 会话达到账户限制时，Orca 可以切换到另一个托管账户并恢复同一会话。",
-          "5d6a7e20ef": "退出受限的 Claude 或 Codex 代理，选择有可用额度的托管账户，恢复提供商会话，然后发送 continue。",
+          "5d6a7e20ef": "退出受限的 Claude 或 Codex 智能体，选择有可用额度的托管账户，恢复提供商会话，然后发送 continue。",
           "0f9197cfde": "已启用",
           "a103114594": "启用",
           "worktreeUsageTitle": "工作树账户用量",
@@ -5455,7 +5455,7 @@
           "customEndpointOpusModelPlaceholder": "glm-5.2",
           "customEndpointSonnetModel": "Sonnet →",
           "customEndpointSonnetModelPlaceholder": "glm-5.1",
-          "customEndpointSubagentModel": "子代理 →",
+          "customEndpointSubagentModel": "子智能体 →",
           "customEndpointSubagentModelPlaceholder": "glm-5.1",
           "customEndpointSubmit": "添加端点",
           "customEndpointTierMappingDescription": "映射的层级可在会话中通过 /model opus|sonnet|haiku 切换；Haiku 还用于后台任务。",
@@ -5933,7 +5933,7 @@
           "e7bb06007c": "局域网",
           "4a73f5217a": "用于控制其他本地应用程序的脚本的 Apple 事件。",
           "e119f0d66b": "自动化",
-          "7ca17b62c8": "当 Orca 运行的代理读取其他应用的数据时，macOS 会显示 Orca，因为 Orca 是执行终端命令的进程。请为 Orca 授予此权限，以减少此类提示。然后退出并重新打开 Orca。",
+          "7ca17b62c8": "当 Orca 运行的智能体读取其他应用的数据时，macOS 会显示 Orca，因为 Orca 是执行终端命令的进程。请为 Orca 授予此权限，以减少此类提示。然后退出并重新打开 Orca。",
           "c566bca278": "完全磁盘访问权限",
           "9f35980756": "击键注入、窗口控制和 UI 自动化工具。",
           "5b2f22ca2d": "无障碍",
@@ -7780,7 +7780,7 @@
             "c1b5f9d7e0": "xai",
             "b0a4e8c6d9": "OAuth",
             "a9f3d7b5c8": "登录",
-            "0b0fd87891": "自动切换受限代理",
+            "0b0fd87891": "自动切换受限智能体",
             "3d76b94f10": "当活动账户达到限制时，在另一个托管账户上恢复 Claude 和 Codex 会话。",
             "worktreeUsageTitle": "工作树账户用量",
             "worktreeUsageDescription": "当聚焦的工作树绑定到托管账户时，在状态栏显示固定的 Claude 账户用量。",
@@ -10988,7 +10988,7 @@
             "c06193ef57": "无法复制{{value0}}",
             "d172a4f068": "提交哈希",
             "e283b50179": "提交信息",
-            "f394c6128a": "没有可用于解释此提交的代理",
+            "f394c6128a": "没有可用于解释此提交的智能体",
             "04a5d7239b": "此仓库没有受支持的网页远程库",
             "15b6e834ac": "无法在浏览器中打开提交",
             "d37e68f61d": "正在准备分支以供评审…",
@@ -11976,7 +11976,7 @@
           "ac80d97e02": "更改自定义文件",
           "56b836215c": "正在检查通知权限…",
           "fd84d3e9b8": "通知已启用",
-          "4f7bce5644": "当代理完成或终端需要处理时，macOS 会提醒你。",
+          "4f7bce5644": "当智能体完成或终端需要处理时，macOS 会提醒你。",
           "95d99b52fa": "允许 Orca 发送通知",
           "94562ba367": "macOS 正在请求权限。在对话框中点按允许，此步骤会自动更新。",
           "4f6a1da718": "打开系统设置",
@@ -14906,11 +14906,11 @@
         "thinking": "思考",
         "options": "选项",
         "sessionOptions": "会话选项",
-        "chooseInAgentPicker": "在代理选择器中选择…",
+        "chooseInAgentPicker": "在智能体选择器中选择…",
         "toggleOption": "切换{{value0}}",
         "pillAccessibleName": "{{value0}} {{value1}}",
         "valueUnknown": "当前值未知 — 请选择开或关",
-        "sentNotConfirmed": "已发送给代理 — 尚未确认",
+        "sentNotConfirmed": "已发送给智能体 — 尚未确认",
         "setWhenSessionStarts": "请在会话开始时设置。",
         "availableAfterSessionStarts": "会话开始后可用。",
         "optionUpdateFailed": "无法更新选项",
@@ -14932,8 +14932,8 @@
         "skillsUnavailableHost": "此主机不可用技能",
         "skillsLoadFailed": "无法从此主机加载技能",
         "retrySkills": "重试",
-        "skillCommandCollision": "也是技能名称 - 由代理决定",
-        "skillMultipleSources": "{{sourceCount}} 个来源 - 由代理解析",
+        "skillCommandCollision": "也是技能名称 - 由智能体决定",
+        "skillMultipleSources": "{{sourceCount}} 个来源 - 由智能体解析",
         "skillScopeProject": "项目",
         "skillScopePersonal": "个人",
         "skillScopeBuiltIn": "内置",
@@ -15076,7 +15076,7 @@
       "empty": "无",
       "done": "已完成"
     },
-    "title": "Agents",
+    "title": "智能体",
     "total": "{{count}} total",
     "card": {
       "you": "You",
@@ -15092,8 +15092,8 @@
         "merged": "已合并的评审",
         "closed": "已关闭的评审"
       },
-      "subagents_one": "{{count}} 个子代理",
-      "subagents_other": "{{count}} 个子代理"
+      "subagents_one": "{{count}} 个子智能体",
+      "subagents_other": "{{count}} 个子智能体"
     },
     "terminal": {
       "closed": "没有活动的终端 — 该智能体的窗格已关闭。",
