@@ -30,6 +30,10 @@ const WORKING_AGENT = 'Grid working agent'
 const DONE_AGENT = 'Grid done agent'
 const SECOND_PROJECT_AGENT = 'Second project agent'
 const TAIL_MARKER = 'ORCA_TAIL_COLOUR'
+/** Enough polls of the 1.5s batch tail reader to outlive the first read: the
+ *  ORCA-285 regression only shows from the second one on. */
+const TAIL_COLOUR_SAMPLES = 5
+const TAIL_COLOUR_SAMPLE_GAP_MS = 1_600
 
 type SeededPane = { paneKey: string; leafId: string; ptyId: string }
 
@@ -287,17 +291,27 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
   const colouredPaneKey = panes[0].paneKey
   const colouredTail = cell(page, colouredPaneKey).locator('[data-terminal-tail]')
   await expect(colouredTail).toContainText(TAIL_MARKER, { timeout: 30_000 })
-  const paintedColours = await cell(page, colouredPaneKey)
-    .locator('[data-tail-color]')
-    .evaluateAll((nodes) =>
-      nodes
-        .filter((node) => (node.textContent ?? '').includes('ORCA_TAIL_COLOUR'))
-        .map((node) => (node as HTMLElement).dataset.tailColor ?? '')
-    )
+  // Sampled, not read once: the ORCA-285 defect was that the FIRST read carried
+  // colour and every read after it did not, so a single check passed against the
+  // broken code. Each sample crosses a fresh poll of the batch tail reader.
+  const readMarkerColours = async (): Promise<string[]> =>
+    cell(page, colouredPaneKey)
+      .locator('[data-tail-color]')
+      .evaluateAll((nodes) =>
+        nodes
+          .filter((node) => (node.textContent ?? '').includes('ORCA_TAIL_COLOUR'))
+          .map((node) => (node as HTMLElement).dataset.tailColor ?? '')
+      )
+  const colourSamples: string[][] = []
+  for (let sample = 0; sample < TAIL_COLOUR_SAMPLES; sample += 1) {
+    colourSamples.push(await readMarkerColours())
+    await page.waitForTimeout(TAIL_COLOUR_SAMPLE_GAP_MS)
+  }
+  const sustained = colourSamples.filter((colours) => colours.includes('red')).length
   expect(
-    paintedColours,
-    'the marker line came from the pane emulator, so it must carry its colour'
-  ).toContain('red')
+    sustained,
+    `the marker keeps its colour on every poll, not just the first — samples: ${JSON.stringify(colourSamples)}`
+  ).toBe(TAIL_COLOUR_SAMPLES)
 
   // Every cell paints something: a blank box is how the grid failed before the
   // notice branch existed, and it is indistinguishable from "nothing to say".
