@@ -608,6 +608,8 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       get: () => ({
         platform: getBrowserPlatform(),
         osRelease: '',
+        arch: '',
+        shell: '',
         displayServer: null
       })
     },
@@ -1084,7 +1086,7 @@ function removeConflictingWebOverrides(
     const conflictingOverrides = new Set<KeybindingActionId>()
     for (const conflict of conflicts) {
       for (const actionId of conflict.actionIds) {
-        if (Object.prototype.hasOwnProperty.call(next, actionId)) {
+        if (Object.hasOwn(next, actionId)) {
           conflictingOverrides.add(actionId)
         }
       }
@@ -1875,8 +1877,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
       }),
     updateMeta: async ({ worktreeId, updates }) => {
       const rpcUpdates =
-        Object.prototype.hasOwnProperty.call(updates, 'pushTarget') &&
-        updates.pushTarget === undefined
+        Object.hasOwn(updates, 'pushTarget') && updates.pushTarget === undefined
           ? { ...updates, pushTarget: null }
           : updates
       const owned = await callRuntimeResultWithOwner<{ worktree: Worktree }>('worktree.set', {
@@ -1888,8 +1889,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
     updateMetaBatch: async ({ updates }) => {
       const runtimeUpdates = updates.map(({ worktreeId, updates: worktreeUpdates }) => ({
         worktree: toRuntimeWorktreeSelector(worktreeId),
-        ...(Object.prototype.hasOwnProperty.call(worktreeUpdates, 'pushTarget') &&
-        worktreeUpdates.pushTarget === undefined
+        ...(Object.hasOwn(worktreeUpdates, 'pushTarget') && worktreeUpdates.pushTarget === undefined
           ? { ...worktreeUpdates, pushTarget: null }
           : worktreeUpdates)
       }))

@@ -90,7 +90,7 @@ function parseGates(ladder: string): readonly LadderGate[] {
   for (const match of ladder.matchAll(GATE_OPENER)) {
     const conditionEnd = findBlock(ladder, match.index + 'if '.length, '(', ')')
     const bodyStart = ladder.indexOf('{', conditionEnd)
-    if (conditionEnd < 0 || bodyStart < 0) {
+    if (conditionEnd === -1 || bodyStart === -1) {
       continue
     }
     const bodyEnd = findBlock(ladder, bodyStart, '{', '}')

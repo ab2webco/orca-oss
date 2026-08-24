@@ -10,6 +10,7 @@ import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
 import { ORCHESTRATION_ASK_MAX_TIMEOUT_MS } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
 import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
+import { parseWorkerDoneEnvelope } from '../../orchestration/worker-done-envelope'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages belong to one exact Dispatch and cannot target a group address.`
@@ -449,7 +450,7 @@ describe('orchestration RPC methods', () => {
       )
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
 
-      await call('orchestration.send', {
+      const result = await call('orchestration.send', {
         from: 'term_worker',
         to: 'term_coord',
         subject: 'Done',
@@ -467,6 +468,7 @@ describe('orchestration RPC methods', () => {
 
       expect(db.getTask(task.id)?.status).toBe('completed')
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
+      expect(result).toMatchObject({ lifecycle: { action: 'completed' } })
     })
 
     it('rejects an identity-less lifecycle send resolved through the coordinator handle', async () => {
@@ -522,7 +524,7 @@ describe('orchestration RPC methods', () => {
       }
 
       expect(db.getTask(task.id)?.status).toBe('completed')
-      expect(result.lifecycle).toBeUndefined()
+      expect(result.lifecycle).toMatchObject({ action: 'completed' })
       expect(result.message).toMatchObject({
         type: 'worker_done',
         subject: 'Done'
@@ -531,6 +533,71 @@ describe('orchestration RPC methods', () => {
         expect.objectContaining({ id: result.message.id, type: 'worker_done' })
       ])
       expect(runtime.notifyMessageArrived).toHaveBeenCalledWith(`run:${activeRunId}`, 'worker_done')
+    })
+
+    // Twin of tests/e2e/orchestration-worker-settlement-release-cli.spec.ts, which drives the
+    // compiled CLI. These two run locally and are what a mutation in either gate trips.
+    it('settles a compiled-CLI worker_done only with the capability and the typed envelope', async () => {
+      setup()
+      const task = db.createTask({ spec: 'settlement work' })
+      const dispatch = db.createDispatchContext(task.id, 'term_worker', 'tab_worker:leaf_worker')
+      const capability = db.mintDispatchCapability({
+        dispatchId: dispatch.id,
+        paneKey: 'tab_worker:leaf_worker',
+        processIncarnation: 'runtime_test:term_worker:1'
+      })
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+        handle === 'term_worker' ? 'tab_worker:leaf_worker' : coordinatorPaneKey
+      )
+      vi.spyOn(runtime, 'getTerminalProcessIncarnation').mockImplementation((handle) =>
+        handle === 'term_worker' ? 'runtime_test:term_worker:1' : null
+      )
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+      vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+      const base = { taskId: task.id, dispatchId: dispatch.id, outcome: 'succeeded' }
+      // Mirrors the literal the e2e's fake CLI passes to --envelope; an invalid level or a
+      // stray key there would surface as invalid_envelope in CI and nowhere else.
+      const cliEnvelope = {
+        status: 'success',
+        summary: 'Compiled CLI E2E worker completion.',
+        verification: [{ claim: 'e2e settled the dispatch', evidence: 'CLI exit 0', level: 'live' }]
+      }
+      expect(parseWorkerDoneEnvelope(cliEnvelope).ok).toBe(true)
+
+      // The dispatch is briefed with the contract, so --outcome alone is not a report.
+      expect(db.getDispatchContextById(dispatch.id)?.envelope_contract).toBe(1)
+
+      ctx = { runtime, orchestrationCapability: 'dcap_never_minted' }
+      const wrongCapability = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'wrong sender',
+        type: 'worker_done',
+        payload: JSON.stringify({ ...base, envelope: SUCCESS_ENVELOPE })
+      })) as { lifecycle: { code?: string } }
+      expect(wrongCapability.lifecycle.code).toBe('dispatch_capability_invalid')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+
+      ctx = { runtime, orchestrationCapability: capability }
+      const noEnvelope = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'completed',
+        type: 'worker_done',
+        payload: JSON.stringify(base)
+      })) as { lifecycle: { code?: string } }
+      expect(noEnvelope.lifecycle.code).toBe('invalid_envelope')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+
+      const settled = (await call('orchestration.send', {
+        from: 'term_worker',
+        to: 'term_coord',
+        subject: 'completed',
+        type: 'worker_done',
+        payload: JSON.stringify({ ...base, envelope: SUCCESS_ENVELOPE })
+      })) as { lifecycle: { action: string } }
+      expect(settled.lifecycle).toMatchObject({ action: 'completed' })
+      expect(db.getTask(task.id)?.status).toBe('completed')
     })
 
     it('requires the minted capability, exact pane, and process incarnation', async () => {
@@ -1070,7 +1137,7 @@ describe('orchestration RPC methods', () => {
         })
       })) as { lifecycle?: { action: string } }
 
-      expect(result.lifecycle).toBeUndefined()
+      expect(result.lifecycle).toMatchObject({ action: 'completed' })
       expect(db.getTask(task.id)?.status).toBe('completed')
       expect(JSON.parse(db.getTask(task.id)?.result ?? '{}').envelope).toMatchObject({
         status: 'success'
@@ -1892,10 +1959,13 @@ describe('orchestration RPC methods', () => {
       })
     })
 
-    it('rejects invalid deps JSON', async () => {
+    it('rejects non-JSON deps', async () => {
       setup()
       await expect(
         call('orchestration.taskCreate', { spec: 'bad', deps: 'not-json' })
+      ).rejects.toThrow('Invalid --deps')
+      await expect(
+        call('orchestration.taskCreate', { spec: 'bad', deps: '[task_example]' })
       ).rejects.toThrow('Invalid --deps')
     })
   })

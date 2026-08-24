@@ -1,16 +1,20 @@
 // Why: daemons survive app updates, so wire behavior must be version-gated.
-// Why 33: two numbering lineages met here, and 31 collided the same way 30 and 27 did. The lab
-// claimed 26 for requireReattach and 27 for claim-ops + completion-process-inspection, then 30 to
-// sit above upstream's 27 (a DIFFERENT feature set), 28 (permanent macOS preflight rejections,
-// #9756) and 29 ('2031-unsubscribe' transient facts, #9993), then 31 for the merged daemon that
-// carries both sets. Upstream independently spent 30 on bounded-NDJSON history seed transfer, 31 on
-// stable-pane attach-only reattachment and 32 on the corrected snapshot serializer. A merged daemon
-// implements both sets, so it must sit above both lineages — reusing 32 would leave a running
-// lab-lineage 31 daemon indistinguishable from an upstream-lineage 31 one.
-export const PROTOCOL_VERSION = 33
+// Why 34: two numbering lineages met here and both spent 33. The lab claimed 26 for
+// requireReattach and 27 for claim-ops + completion-process-inspection, then 30 to sit above
+// upstream's 27 (a DIFFERENT feature set), 28 (permanent macOS preflight rejections, #9756) and
+// 29 ('2031-unsubscribe' transient facts, #9993), then 31 and 33 for the merged daemon carrying
+// both sets. Upstream independently spent 30 on bounded-NDJSON history seed transfer, 31 on
+// stable-pane attach-only reattachment, 32 on the corrected snapshot serializer and 33 on
+// selected-WSL POSIX cwd semantics. A merged daemon implements both sets, so it must sit above
+// both lineages — reusing 33 would leave a running lab-lineage 33 daemon indistinguishable from
+// an upstream-lineage 33 one.
+export const PROTOCOL_VERSION = 34
 // Why 26: the lab's requireReattach wire flag landed on upstream 25; older daemons (including
 // upstream 22-25) silently ignore it, so it needs its own gate.
 export const REQUIRED_REATTACH_PROTOCOL_VERSION = 26
+// Why 34, not upstream's 33: a lab-lineage v33 daemon has no selected-WSL POSIX cwd handling at
+// all, and both lineages share the daemon-v33.sock namespace, so 33 cannot prove support.
+export const WSL_POSIX_CWD_DAEMON_PROTOCOL_VERSION = 34
 // Stays at upstream's 32: the lab shipped no 32, so a daemon reporting 32 is necessarily
 // upstream-lineage and does carry the corrected serializer. Unambiguous, unlike the gates below.
 export const SNAPSHOT_SERIALIZER_FIDELITY_DAEMON_PROTOCOL_VERSION = 32
@@ -50,7 +54,7 @@ export const CLEAN_DISCONNECT_PROTOCOL_VERSION = 24
 export const MODE_2031_UNSUBSCRIBE_FACT_PROTOCOL_VERSION = 29
 export const PREVIOUS_DAEMON_PROTOCOL_VERSIONS = [
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-  28, 29, 30, 31, 32
+  28, 29, 30, 31, 32, 33
 ] as const
 
 export function supportsPtyStartupIngress(protocolVersion: number): boolean {

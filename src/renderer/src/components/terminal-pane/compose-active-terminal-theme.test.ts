@@ -127,9 +127,7 @@ describe('composeActiveTerminalTheme', () => {
     function luminance(rgb: { r: number; g: number; b: number }): number {
       const toLinear = (channel: number): number => {
         const normalized = channel / 255
-        return normalized <= 0.03928
-          ? normalized / 12.92
-          : Math.pow((normalized + 0.055) / 1.055, 2.4)
+        return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
       }
       return 0.2126 * toLinear(rgb.r) + 0.7152 * toLinear(rgb.g) + 0.0722 * toLinear(rgb.b)
     }

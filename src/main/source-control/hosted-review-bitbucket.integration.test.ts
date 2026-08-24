@@ -131,9 +131,11 @@ describe('Bitbucket hosted review integration', () => {
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
 
     const repoPath = await mkdtemp(join(tmpdir(), 'orca-bitbucket-review-recovery-'))
-    // Why restore this one key by hand: the case builds its own server outside the shared
-    // fixture, so nothing else owns the env it sets.
+    // Why restore these keys by hand: the case builds its own server outside the shared
+    // fixture, so nothing else owns the env it sets. The token is required — the client
+    // refuses to issue a request without a credential, so the 503 would never be reached.
     const previousApiBaseUrl = process.env.ORCA_BITBUCKET_API_BASE_URL
+    const previousAccessToken = process.env.ORCA_BITBUCKET_ACCESS_TOKEN
     try {
       const address = server.address()
       if (!address || typeof address === 'string') {
@@ -141,6 +143,7 @@ describe('Bitbucket hosted review integration', () => {
       }
 
       process.env.ORCA_BITBUCKET_API_BASE_URL = `http://127.0.0.1:${address.port}/2.0`
+      process.env.ORCA_BITBUCKET_ACCESS_TOKEN = 'local-token'
       await execFileAsync('git', ['init'], { cwd: repoPath })
       await execFileAsync('git', ['remote', 'add', 'origin', 'git@bitbucket.org:team/repo.git'], {
         cwd: repoPath
@@ -167,6 +170,11 @@ describe('Bitbucket hosted review integration', () => {
         delete process.env.ORCA_BITBUCKET_API_BASE_URL
       } else {
         process.env.ORCA_BITBUCKET_API_BASE_URL = previousApiBaseUrl
+      }
+      if (previousAccessToken === undefined) {
+        delete process.env.ORCA_BITBUCKET_ACCESS_TOKEN
+      } else {
+        process.env.ORCA_BITBUCKET_ACCESS_TOKEN = previousAccessToken
       }
       await rm(repoPath, { recursive: true, force: true })
       await new Promise<void>((resolve, reject) => {

@@ -123,10 +123,7 @@ export function isMobileTuiAgent(value: unknown): value is TuiAgent {
   // Why the label map and not the auto-pick order: the order is the fallback
   // priority and deliberately omits opt-in wrappers like claude-zai. Testing
   // against it would make a detected or user-disabled claude-zai unrecognizable.
-  return (
-    typeof value === 'string' &&
-    Object.prototype.hasOwnProperty.call(MOBILE_TUI_AGENT_LABELS, value)
-  )
+  return typeof value === 'string' && Object.hasOwn(MOBILE_TUI_AGENT_LABELS, value)
 }
 
 function normalizeDisabledMobileTuiAgents(value: unknown): TuiAgent[] {

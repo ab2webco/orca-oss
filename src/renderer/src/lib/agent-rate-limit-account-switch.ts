@@ -14,7 +14,10 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
-import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
+import {
+  resolveStartupShell,
+  type AgentStartupShell
+} from '../../../shared/tui-agent-startup-shell'
 import { buildAgentResumeStartupPlan, type AgentStartupPlan } from '@/lib/tui-agent-startup'
 import { deliverLaunchPromptToAgentTab } from '@/lib/agent-launch-prompt-delivery'
 import { appendTabToWorktreeOrder } from '@/lib/sleeping-agent-session-launch'
@@ -133,7 +136,7 @@ export async function runManagedAccountSwitchRelaunch(args: {
     agentEnv: resolveTuiAgentLaunchEnv('claude', args.settings?.agentDefaultEnv),
     platform: CLIENT_PLATFORM
   }
-  const buildResumePlan = (shell: 'posix' | 'powershell' | 'cmd'): AgentStartupPlan | null =>
+  const buildResumePlan = (shell: AgentStartupShell): AgentStartupPlan | null =>
     buildAgentResumeStartupPlan({
       agent: 'claude',
       providerSession: args.providerSession,
