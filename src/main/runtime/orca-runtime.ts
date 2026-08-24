@@ -29999,6 +29999,65 @@ export class OrcaRuntimeService {
     }
   }
 
+  private resolveLivePtyWorktree(pty: RuntimePtyWorktreeRecord): ResolvedWorktree | null {
+    if (parseWorkspaceKey(pty.worktreeId)?.type === 'folder') {
+      return null
+    }
+    const parsed = splitWorktreeIdForFilesystem(pty.worktreeId)
+    const repos = parsed
+      ? (this.store?.getRepos() ?? []).filter(
+          (repo) =>
+            repo.id === parsed.repoId &&
+            !isFolderRepo(repo) &&
+            (repo.connectionId ?? null) === pty.connectionId
+        )
+      : []
+    if (repos.length !== 1) {
+      return null
+    }
+    const repo = repos[0]
+    const metaHostId = this.store?.getWorktreeMeta(pty.worktreeId)?.hostId
+    if (metaHostId && metaHostId !== getRepoExecutionHostId(repo)) {
+      return null
+    }
+    return this.buildResolvedWorktreeFromId(pty.worktreeId, repo)
+  }
+
+  private resolveLiveTerminalWorktreeAuthority(handle: string): {
+    worktreeId: string
+    worktree: ResolvedWorktree | null
+  } | null {
+    const pty = this.resolveConnectedPtyForWorkspaceHandle(handle)
+    if (!pty) {
+      return null
+    }
+    return {
+      worktreeId: pty.worktreeId,
+      worktree: this.resolveLivePtyWorktree(pty)
+    }
+  }
+
+  private resolveConnectedPtyForWorkspaceHandle(handle: string): RuntimePtyWorktreeRecord | null {
+    const live = this.getLivePtyForHandle(handle)
+    if (live) {
+      return live.pty.connected && live.record.worktreeId === live.pty.worktreeId ? live.pty : null
+    }
+    try {
+      const { record, leaf } = this.getLiveLeafForHandle(handle)
+      const pty = leaf.ptyId ? this.ptysById.get(leaf.ptyId) : null
+      if (
+        !pty?.connected ||
+        record.worktreeId !== pty.worktreeId ||
+        leaf.worktreeId !== pty.worktreeId
+      ) {
+        return null
+      }
+      return pty
+    } catch {
+      return null
+    }
+  }
+
   private buildTerminalWorkspaceEnv(
     scope: TerminalWorkspaceLaunchScope,
     baseEnv: Record<string, string>,
@@ -30433,8 +30492,11 @@ export class OrcaRuntimeService {
       return null
     }
     try {
-      const terminal = await this.showTerminal(parentHandle)
-      const parent = await this.resolveWorktreeSelector(`id:${terminal.worktreeId}`)
+      const authority = this.resolveLiveTerminalWorktreeAuthority(parentHandle)
+      const parent = authority?.worktree
+      if (!parent) {
+        return null
+      }
       return {
         source: 'orchestration-context',
         parent: {
@@ -30556,12 +30618,15 @@ export class OrcaRuntimeService {
     return this.store as unknown as Store
   }
 
-  private buildResolvedWorktreeFromId(worktreeId: string): ResolvedWorktree | null {
+  private buildResolvedWorktreeFromId(
+    worktreeId: string,
+    resolvedRepo?: Repo
+  ): ResolvedWorktree | null {
     const parsed = splitWorktreeIdForFilesystem(worktreeId)
     if (!parsed?.repoId || !parsed.worktreePath) {
       return null
     }
-    const repo = this.store?.getRepos().find((entry) => entry.id === parsed.repoId)
+    const repo = resolvedRepo ?? this.store?.getRepos().find((entry) => entry.id === parsed.repoId)
     const git = {
       path: parsed.worktreePath,
       head: '',
@@ -34617,14 +34682,20 @@ export class OrcaRuntimeService {
     let worktree: ResolvedWorktree | null = null
     if (context?.terminalHandle) {
       try {
-        const terminal = await this.showTerminal(context.terminalHandle)
-        if (context.worktreeId && context.worktreeId !== terminal.worktreeId) {
+        const authority = this.resolveLiveTerminalWorktreeAuthority(context.terminalHandle)
+        if (!authority) {
+          throw new Error('terminal_handle_stale')
+        }
+        if (context.worktreeId && context.worktreeId !== authority.worktreeId) {
           throw new LinearAgentAccessError(
             'linear_permission_denied',
             'The provided Linear worktree context does not match the caller terminal.'
           )
         }
-        worktree = await this.resolveWorktreeSelector(`id:${terminal.worktreeId}`)
+        if (!authority.worktree) {
+          throw new Error('selector_not_found')
+        }
+        worktree = authority.worktree
       } catch (error) {
         if (error instanceof LinearAgentAccessError) {
           throw error
@@ -36869,11 +36940,11 @@ export class OrcaRuntimeService {
   ): Promise<ResolvedWorktree | null> {
     if (context?.terminalHandle) {
       try {
-        const terminal = await this.showTerminal(context.terminalHandle)
-        if (context.worktreeId && context.worktreeId !== terminal.worktreeId) {
+        const authority = this.resolveLiveTerminalWorktreeAuthority(context.terminalHandle)
+        if (!authority || (context.worktreeId && context.worktreeId !== authority.worktreeId)) {
           return null
         }
-        return await this.resolveWorktreeSelector(`id:${terminal.worktreeId}`)
+        return authority.worktree
       } catch {
         return null
       }
