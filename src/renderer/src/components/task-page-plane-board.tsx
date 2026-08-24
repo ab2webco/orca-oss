@@ -238,7 +238,7 @@ export function TaskPagePlaneBoard({
       }
       const from = columnStateIds.indexOf(activeStateId)
       const to = columnStateIds.indexOf(overStateId)
-      if (from < 0 || to < 0 || from === to) {
+      if (from === -1 || to === -1 || from === to) {
         return
       }
       const orderedStateIds = arrayMove(columnStateIds, from, to)

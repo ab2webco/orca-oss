@@ -61,6 +61,7 @@ import type {
   PtySpawnResult
 } from '../providers/types'
 import type { PtyProcessInspection } from '../providers/pty-process-inspection'
+import { parseTerminalKittyKeyboardFlags } from '../../shared/terminal-kitty-keyboard-flags'
 import { isShellProcess } from '../../shared/agent-detection'
 import { resolveWslSessionContext } from './wsl-session-context'
 import { normalizeWslColdRestoreCwd } from './wsl-cold-restore-cwd'
@@ -860,7 +861,11 @@ export class DaemonPtyAdapter implements IPtyProvider {
     const snapshotFrame = result.snapshot.snapshotAnsi
     const snapshotPayload = snapshotPrefix + snapshotFrame
     // Why kitty flags ride beside the payload, not inside it: the snapshot reaches renderer xterms where POST_REPLAY_REATTACH_RESET's kitty reset must win (terminal-query-authority.md §kitty).
-    const kittyKeyboardFlags = result.snapshot.modes.kittyKeyboardFlags
+    // Why known `0` is no longer dropped: the pane tracker must be able to tell
+    // "the app negotiated nothing" from "this reattach proved nothing".
+    const kittyKeyboardFlags = parseTerminalKittyKeyboardFlags(
+      result.snapshot.modes.kittyKeyboardFlags
+    )
     return {
       id: sessionId,
       ...incarnationResult(),
@@ -880,7 +885,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
           }
         : {}),
       ...(providerSequence ? { providerSequence } : {}),
-      ...(typeof kittyKeyboardFlags === 'number' && kittyKeyboardFlags > 0
+      ...(kittyKeyboardFlags !== undefined
         ? { snapshotKittyKeyboardFlags: kittyKeyboardFlags }
         : {}),
       isReattach: true,
@@ -1246,6 +1251,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
       if (!snapshot || typeof snapshot.outputSequence !== 'number') {
         return null
       }
+      const kittyKeyboardFlags = parseTerminalKittyKeyboardFlags(snapshot.modes.kittyKeyboardFlags)
       return {
         data: snapshot.rehydrateSequences + snapshot.snapshotAnsi,
         frameRestoreAnsi: snapshot.frameRestoreAnsi,
@@ -1258,6 +1264,9 @@ export class DaemonPtyAdapter implements IPtyProvider {
         source: 'headless',
         oscLinks: snapshot.oscLinks,
         alternateScreen: snapshot.modes.alternateScreen,
+        // Why known `0` is carried too: it proves the app negotiated nothing at
+        // this boundary, which is a different fact from a source that cannot say.
+        ...(kittyKeyboardFlags !== undefined ? { kittyKeyboardFlags } : {}),
         ...(snapshot.pendingEscapeTailAnsi
           ? { pendingEscapeTailAnsi: snapshot.pendingEscapeTailAnsi }
           : {})

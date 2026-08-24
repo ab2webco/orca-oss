@@ -215,7 +215,7 @@ test.describe('Source Control create pull request', () => {
     await expect(createButton).toBeVisible({ timeout: 10_000 })
     await expect(createButton).toBeEnabled()
     await expect(titleInput).toHaveValue('E2e secondary')
-    await expect(orcaPage.getByRole('textbox', { name: 'Pull request base branch' })).toHaveValue(
+    await expect(orcaPage.getByRole('combobox', { name: 'Pull request base branch' })).toHaveValue(
       'main'
     )
     await expect(descriptionInput).toHaveValue('')
@@ -277,7 +277,7 @@ test.describe('Source Control create pull request', () => {
     await expect(orcaPage.getByText(failureMessage)).toBeVisible()
     await expect(titleInput).toHaveValue('Failing PR from E2E')
     await expect(descriptionInput).toHaveValue('This draft should survive a failed create attempt.')
-    await expect(orcaPage.getByRole('textbox', { name: 'Pull request base branch' })).toHaveValue(
+    await expect(orcaPage.getByRole('combobox', { name: 'Pull request base branch' })).toHaveValue(
       'main'
     )
     await expect(createButton).toBeEnabled()

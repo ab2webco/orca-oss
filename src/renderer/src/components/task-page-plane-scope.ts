@@ -1,4 +1,4 @@
-import type { PlaneWorkspace } from '../../../shared/plane-types'
+import type { PlaneWorkspace, PlaneWorkspaceSelection } from '../../../shared/plane-types'
 
 export type PlaneDefaultSelection = { workspaceSlug: string; projectId: string } | null | undefined
 
@@ -36,7 +36,7 @@ export function resolveInitialPlaneProjectId(
 // projects" both collapse to an undefined projectId param — a single project
 // only ever scopes a fetch when both workspace and project are pinned.
 export function getPlaneProjectIdForFetch(
-  workspaceSelection: string | 'all' | null | undefined,
+  workspaceSelection: PlaneWorkspaceSelection | null | undefined,
   projectSelection: string
 ): string | undefined {
   if (!workspaceSelection || workspaceSelection === 'all') {
@@ -52,7 +52,7 @@ export function getPlaneProjectIdForFetch(
 // "all workspaces" is meaningless — the project switcher only makes sense
 // once a single workspace is selected.
 export function isPlaneProjectSwitcherEnabled(
-  workspaceSelection: string | 'all' | null | undefined
+  workspaceSelection: PlaneWorkspaceSelection | null | undefined
 ): boolean {
   return Boolean(workspaceSelection) && workspaceSelection !== 'all'
 }
