@@ -6,6 +6,23 @@ import {
 } from '../../shared/terminal-line-segments'
 
 /**
+ * First row of the tail window.
+ *
+ * Anchored on the cursor, not on `buffer.length`: a pane's grid can be taller
+ * than the window (the agent grid forwards a tall viewport), and `length` is then
+ * the whole grid while the content sits at its top. Ending the window at the
+ * buffer's end walked past every written row and returned nothing — a tail that
+ * read blank for an idle pane while its plain-text twin, which has a renderer
+ * fallback, kept working (ORCA-285).
+ */
+function tailWindow(buffer: IBuffer, limit: number): { start: number; end: number } {
+  const rows = Math.max(0, Math.floor(limit))
+  // +1 so the cursor's own row is inside the window: it holds the live prompt.
+  const end = Math.min(buffer.baseY + buffer.cursorY + 1, buffer.length)
+  return { start: Math.max(0, end - rows), end }
+}
+
+/**
  * Tail rows of a terminal buffer as coloured runs.
  *
  * Why cells and not a serialize(): the ANSI string would have to be parsed again
@@ -13,10 +30,10 @@ import {
  * DOM text node (ORCA-234).
  */
 export function readBufferTailSegments(buffer: IBuffer, limit: number): TerminalLineSegment[][] {
-  const start = Math.max(0, buffer.length - Math.max(0, Math.floor(limit)))
+  const { start, end } = tailWindow(buffer, limit)
   const rows: TerminalLineSegment[][] = []
   const cell = buffer.getNullCell()
-  for (let row = start; row < buffer.length; row += 1) {
+  for (let row = start; row < end; row += 1) {
     const line = buffer.getLine(row)
     if (!line) {
       rows.push([])
@@ -46,9 +63,9 @@ export function readBufferTailSegments(buffer: IBuffer, limit: number): Terminal
 
 /** Tail rows as plain text, for callers that do not paint colour. */
 export function readBufferTailLines(buffer: IBuffer, limit: number): string[] {
-  const start = Math.max(0, buffer.length - Math.max(0, Math.floor(limit)))
+  const { start, end } = tailWindow(buffer, limit)
   const lines: string[] = []
-  for (let row = start; row < buffer.length; row += 1) {
+  for (let row = start; row < end; row += 1) {
     lines.push(buffer.getLine(row)?.translateToString(true) ?? '')
   }
   return lines
