@@ -42650,25 +42650,15 @@ describe('OrcaRuntimeService', () => {
     })
     computeWorktreePathMock.mockReturnValue(childPath)
     ensurePathWithinWorkspaceMock.mockReturnValue(childPath)
-    vi.mocked(listWorktrees)
-      .mockResolvedValueOnce([
-        {
-          path: workerPath,
-          head: 'fed',
-          branch: 'feature/worker',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ])
-      .mockResolvedValueOnce([
-        {
-          path: childPath,
-          head: 'def',
-          branch: 'worker-child',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ])
+    vi.mocked(listWorktrees).mockResolvedValueOnce([
+      {
+        path: childPath,
+        head: 'def',
+        branch: 'worker-child',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
 
     const result = await runtime.createManagedWorktree({
       repoSelector: 'id:repo-1',
@@ -42748,25 +42738,15 @@ describe('OrcaRuntimeService', () => {
     })
     computeWorktreePathMock.mockReturnValue(childPath)
     ensurePathWithinWorkspaceMock.mockReturnValue(childPath)
-    vi.mocked(listWorktrees)
-      .mockResolvedValueOnce([
-        {
-          path: parentPath,
-          head: 'fed',
-          branch: 'feature/parent',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ])
-      .mockResolvedValueOnce([
-        {
-          path: childPath,
-          head: 'def',
-          branch: 'parent-child',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ])
+    vi.mocked(listWorktrees).mockResolvedValueOnce([
+      {
+        path: childPath,
+        head: 'def',
+        branch: 'parent-child',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
 
     const result = await runtime.createManagedWorktree({
       repoSelector: 'id:repo-1',
