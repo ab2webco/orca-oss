@@ -401,6 +401,24 @@
     max-width: 22ch;
   }
 
+  /* Misma tipografía de salvedad que .caveats p, sin su marco: acá no hay
+     bloque de salvedades, sólo una línea de corte bajo la banda. */
+  .numbers-asof {
+    margin: 2rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 62ch;
+  }
+
+  .numbers-asof code {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    background: var(--true-wash);
+    padding: 0.05em 0.3em;
+  }
+
   figcaption code {
     font-family: var(--mono);
     font-size: 0.8125rem;
@@ -1199,6 +1217,11 @@
       <div><dt>90</dt><dd>versiones publicadas del lab</dd></div>
       <div><dt>1.4.160</dt><dd>versión de upstream que ya trae, completa</dd></div>
     </dl>
+    <p class="numbers-asof">
+      Cifras al 24 de agosto de 2026, contadas sobre el repositorio. La última es la que reporta
+      el build publicado más reciente, <code>v1.4.160-lab.41</code>, del 23 de agosto;
+      <code>main</code> ya trae trabajo posterior a ese corte.
+    </p>
   </section>
 
   <section class="compare band">
