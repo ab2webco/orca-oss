@@ -26,7 +26,8 @@ const POST_V6_COLUMNS = [
 ] as const
 
 const VERSIONED_POST_V6_COLUMNS = [
-  { version: 31, table: 'federated_dispatches', column: 'to_home_acknowledged_sequence' }
+  { version: 31, table: 'federated_dispatches', column: 'to_home_acknowledged_sequence' },
+  { version: 32, table: 'dispatch_contexts', column: 'failure_provenance' }
 ] as const
 
 const POST_V6_INDEXES = [

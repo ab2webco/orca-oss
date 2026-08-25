@@ -1105,6 +1105,17 @@ export class OrchestrationDb {
       `)
       this.createUndeliveredInboxIndexIfPossible()
 
+      if (current < 32) {
+        // Why (ORCA-299): no backfill, and NULL is the conservative reading.
+        // Every row that already exists was failed by a path that did not
+        // record how it decided, so treating those as `evidence` keeps a real
+        // failure terminal. Defaulting them to `inferred_silence` would make
+        // every historical failure reopenable by one late heartbeat — the exact
+        // damage the distinction exists to prevent.
+        if (!this.hasColumn('dispatch_contexts', 'failure_provenance')) {
+          this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN failure_provenance TEXT')
+        }
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
     } catch (err) {
@@ -7124,7 +7135,8 @@ export class OrchestrationDb {
         .prepare(
           `UPDATE dispatch_contexts
            SET status = 'failed', last_failure = ?, completed_at = datetime('now'),
-               capability_revoked_at = COALESCE(capability_revoked_at, datetime('now'))
+               capability_revoked_at = COALESCE(capability_revoked_at, datetime('now')),
+               failure_provenance = 'inferred_silence'
            WHERE id = ? AND status = 'dispatched'`
         )
         .run(params.reason, params.dispatchId)
@@ -7169,6 +7181,100 @@ export class OrchestrationDb {
     }
   }
 
+  /**
+   * Whether this Dispatch was failed by *inferring* death from silence, rather
+   * than on evidence (ORCA-299).
+   *
+   * The distinction is persisted where the failure is decided, not reconstructed
+   * afterwards: `expireDispatchLifecycleDeadline` is the only writer of
+   * `inferred_silence`, and `failDispatch()` — an exit code, a reported error —
+   * writes `evidence`. It cannot be inferred from the surrounding columns
+   * instead: a Dispatch failed on evidence while its deadline was armed and
+   * unsignalled leaves exactly the same `monitor_deadline_at` /
+   * `first_lifecycle_signal_at` / `last_heartbeat_at` shape as an expiry, so
+   * reading those would resurrect real failures.
+   *
+   * NULL — every pre-migration row, and any path that does not say — reads as
+   * evidence, which is the conservative side.
+   */
+  isDispatchFailedByInference(dispatchId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS ok FROM dispatch_contexts
+          WHERE id = ?
+            AND status = 'failed'
+            AND failure_provenance = 'inferred_silence'`
+      )
+      .get(dispatchId) as { ok: number } | undefined
+    return Boolean(row)
+  }
+
+  /**
+   * Undoes a first-signal expiry that a live worker has just refuted (ORCA-299).
+   *
+   * A heartbeat from the assignee of an inference-failed Dispatch is not stale
+   * liveness — it is proof the verdict was wrong. Reversing every field the
+   * expiry wrote, in one transaction, is what keeps the two from settling into
+   * a half-failed state.
+   *
+   * `capability_revoked_at` is the field that actually matters. The expiry
+   * revokes the capability, and `verifyDispatchCapability` rejects every
+   * heartbeat and worker_done while it is set — so a reopen that restored only
+   * `status` would leave the worker just as mute as before. The hash is
+   * deliberately *not* rotated: the running worker holds the original, and
+   * minting a new one (as the assign paths do) would hand it a credential it
+   * can never receive.
+   *
+   * Not reversed: the `status` message the expiry already sent to the run, and
+   * the questions it closed. Both are history a coordinator has likely read;
+   * the reopen adds its own message rather than rewriting theirs.
+   */
+  reopenDispatchFailedByInference(params: {
+    dispatchId: string
+    reason: string
+  }): DispatchContextRow | undefined {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      if (!this.isDispatchFailedByInference(params.dispatchId)) {
+        this.db.exec('COMMIT')
+        return undefined
+      }
+      const restored = this.db
+        .prepare(
+          `UPDATE dispatch_contexts
+           SET status = 'dispatched', last_failure = NULL, completed_at = NULL,
+               capability_revoked_at = NULL, failure_provenance = NULL
+           WHERE id = ? AND status = 'failed'`
+        )
+        .run(params.dispatchId)
+      if (restored.changes !== 1) {
+        this.db.exec('COMMIT')
+        return undefined
+      }
+      this.db
+        .prepare(
+          `UPDATE worker_dispatches
+           SET state = 'ready', stage = 'reopened_after_false_deadline', last_error = ?,
+               updated_at = datetime('now')
+           WHERE dispatch_id = ?`
+        )
+        .run(params.reason, params.dispatchId)
+      // Why: the expiry parked the Task at `blocked`; leaving it there while the
+      // Dispatch is live again is the inconsistent half-state this reopen exists
+      // to avoid.
+      this.db
+        .prepare(
+          "UPDATE tasks SET status = 'dispatched' WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'blocked'"
+        )
+        .run(params.dispatchId)
+      this.db.exec('COMMIT')
+      return this.getDispatchContextById(params.dispatchId)
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).
   getStaleDispatches(thresholdIso: string): DispatchContextRow[] {
     return this.db
@@ -7197,6 +7303,7 @@ export class OrchestrationDb {
       .prepare(
         `UPDATE dispatch_contexts
          SET status = ?, failure_count = ?, last_failure = ?,
+             failure_provenance = 'evidence',
              completed_at = COALESCE(completed_at, datetime('now')),
              capability_revoked_at = COALESCE(capability_revoked_at, datetime('now'))
          WHERE id = ?`
