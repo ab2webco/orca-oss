@@ -196,6 +196,13 @@ jobs:
           name: e2e-build-out
           path: out/
 
+      # Why here and not in the build job: this is the only E2E job whose relay
+      # comes solely from the artifact — globalSetup rebuilds it in place wherever
+      # ORCA_E2E_SSH_DOCKER is set. A stripped .version surfaces as an SSH spec
+      # whose locator never resolves, so fail on the marker instead.
+      - name: Verify the relay bundle kept its version markers
+        run: node config/scripts/verify-relay-version-markers.mjs
+
       # Why: the Electron suite is wall-clock constrained on OSS runners, but
       # multiple Electron apps on one Xvfb VM contend on git/Chromium resources.
       # Sharding keeps each VM at one Playwright worker while splitting the

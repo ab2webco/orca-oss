@@ -125,6 +125,21 @@ describe('PR E2E gate contract', () => {
     expect(buildSteps[uploadStepIndex].with['include-hidden-files']).toBe(true)
   })
 
+  it('verifies the relay version markers survived the artifact round-trip', () => {
+    // Why assert the check and not trust the spec: a green SSH spec only proves
+    // the marker travelled on that run. This step proves the artifact carried it.
+    const shardSteps = e2eWorkflow.jobs.e2e.steps
+    const downloadIndex = shardSteps.findIndex((step) => step.name === 'Download E2E build output')
+    const verifyIndex = shardSteps.findIndex((step) =>
+      step.run?.includes('verify-relay-version-markers.mjs')
+    )
+    const runIndex = shardSteps.findIndex((step) => step.name?.startsWith('Run E2E tests'))
+
+    expect(downloadIndex).toBeGreaterThan(-1)
+    expect(verifyIndex).toBeGreaterThan(downloadIndex)
+    expect(runIndex).toBeGreaterThan(verifyIndex)
+  })
+
   it('keeps dedicated E2E workflows out of pull request CI', () => {
     const dedicatedWorkflows = [
       'golden-e2e-experiment.yml',
