@@ -125,6 +125,7 @@ const forgetRemovedForExecutionHostMock = vi.fn<
 const mockApi = {
   worktrees: {
     create: vi.fn(),
+    adoptProvisionedRoot: vi.fn(),
     prefetchCreateBase: vi.fn().mockResolvedValue(undefined),
     list: worktreeListMock,
     listDetected: listDetectedMock,
@@ -201,6 +202,8 @@ function resetRemoteRuntimeMocks() {
 // earlier describe would silently suppress a row here. Reset for every case, not just the fetch suites.
 beforeEach(() => {
   resetAuthoritativelyRemovedWorktreeMemoryForTests()
+  mockApi.worktrees.create.mockReset()
+  mockApi.worktrees.adoptProvisionedRoot.mockReset()
 })
 
 function createTestStore() {
@@ -4966,6 +4969,69 @@ describe('createWorktree base status merge', () => {
       workspaceStatus: 'in-review',
       pendingFirstAgentMessageRename: true
     })
+  })
+
+  it('adopts an explicit provisioned root without calling ordinary worktree create', async () => {
+    const store = createTestStore()
+    const adopted = makeWorktree({
+      id: 'repo1::/workspace/repo',
+      repoId: 'repo1',
+      path: '/workspace/repo',
+      hostId: 'ssh:runtime-ssh-runtime-1',
+      isMainWorktree: true,
+      ephemeralVmCheckoutMode: 'provisioned-root'
+    })
+    mockApi.worktrees.adoptProvisionedRoot.mockResolvedValue({ worktree: adopted })
+
+    await store
+      .getState()
+      .createWorktree(
+        'repo1',
+        'feature',
+        undefined,
+        'inherit',
+        undefined,
+        'sidebar',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          provisionedRoot: {
+            runtimeId: 'runtime-1',
+            executionHostId: 'ssh:runtime-ssh-runtime-1',
+            expectedPath: '/workspace/repo'
+          }
+        }
+      )
+
+    expect(mockApi.worktrees.adoptProvisionedRoot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoId: 'repo1',
+        runtimeId: 'runtime-1',
+        executionHostId: 'ssh:runtime-ssh-runtime-1',
+        expectedPath: '/workspace/repo'
+      })
+    )
+    expect(mockApi.worktrees.create).not.toHaveBeenCalled()
+    expect(store.getState().worktreesByRepo.repo1).toContainEqual(
+      expect.objectContaining({ id: adopted.id, ephemeralVmCheckoutMode: 'provisioned-root' })
+    )
   })
 
   it('stamps the owning runtime host onto worktrees created on a remote runtime', async () => {
@@ -10695,21 +10761,34 @@ describe('pending worktree creation state', () => {
     expect(store.getState().pendingWorktreeCreations.c1).toBeUndefined()
   })
 
-  it('removePendingWorktreeCreation cleans up a provisioned VM runtime', () => {
+  it('removePendingWorktreeCreation cleans up a provisioned-root setup and VM runtime', async () => {
     const store = createTestStore()
+    const deleteProjectHostSetup = vi.mocked(store.getState().deleteProjectHostSetup)
     store.getState().beginPendingWorktreeCreation(
       makePendingCreation('c1', {
         phase: 'fetching',
         request: {
           ...makePendingCreation('c1').request,
-          ephemeralVmRuntimeId: 'runtime-1'
+          ephemeralVmRuntimeId: 'runtime-1',
+          ephemeralVmCheckoutMode: 'provisioned-root',
+          workspaceRunContext: {
+            kind: 'workspace-run',
+            projectId: 'project-1',
+            hostId: 'ssh:runtime-ssh-1',
+            projectHostSetupId: 'setup-1',
+            repoId: 'repo-1',
+            path: '/workspace/repo'
+          }
         }
       })
     )
 
     store.getState().removePendingWorktreeCreation('c1')
 
-    expect(mockApi.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1' })
+    expect(deleteProjectHostSetup).toHaveBeenCalledWith({ setupId: 'setup-1' })
+    await vi.waitFor(() =>
+      expect(mockApi.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1' })
+    )
     expect(store.getState().pendingWorktreeCreations.c1).toBeUndefined()
   })
 

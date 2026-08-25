@@ -1,5 +1,6 @@
 import { getRepoExecutionHostId } from './execution-host'
-import { githubRepoIdentityKey, isDefaultGitHubHost } from './github-repository-identity-key'
+import { normalizeGitHubRemoteHost } from './git-remote-host-alias'
+import { githubRepoIdentityKey, isDefaultGitHubHost } from './github/repository-identity-key'
 import type {
   Project,
   ProjectHostSetup,
@@ -118,11 +119,6 @@ function getProjectId(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {
   return getProjectIdentityKey(repo)
-}
-
-function normalizeGitHubRemoteHost(host: string): string {
-  const normalizedHost = host.toLowerCase()
-  return normalizedHost === 'ssh.github.com' ? 'github.com' : normalizedHost
 }
 
 function isGitHubRemoteHost(host: string): boolean {

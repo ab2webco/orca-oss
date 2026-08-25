@@ -41,7 +41,7 @@ describe('agent map filtering', () => {
     const visible = filterAgentMapCards({
       cards: [hidden],
       enabledStates: new Set(['done']),
-      hostFilter: 'ssh'
+      enabledHosts: new Set(['ssh'])
     })
 
     expect(visible).toEqual([hidden])
@@ -49,14 +49,47 @@ describe('agent map filtering', () => {
       filterAgentMapCards({
         cards: [hidden],
         enabledStates: new Set(['idle']),
-        hostFilter: 'ssh'
+        enabledHosts: new Set(['ssh'])
       })
     ).toEqual([])
     expect(
       filterAgentMapCards({
         cards: [hidden],
         enabledStates: new Set(['done']),
-        hostFilter: 'local'
+        enabledHosts: new Set(['local'])
+      })
+    ).toEqual([])
+  })
+
+  it('keeps every selected host rather than one at a time', () => {
+    const local = card({ paneKey: 'local' })
+    const ssh = card({ paneKey: 'ssh', hostKind: 'ssh' })
+    const wsl = card({ paneKey: 'wsl', hostKind: 'wsl' })
+
+    expect(
+      filterAgentMapCards({
+        cards: [local, ssh, wsl],
+        enabledStates: new Set(['done']),
+        enabledHosts: new Set(['local', 'wsl'])
+      })
+    ).toEqual([local, wsl])
+  })
+
+  it('treats a missing hostKind as local', () => {
+    const legacy = card({ paneKey: 'legacy', hostKind: undefined })
+
+    expect(
+      filterAgentMapCards({
+        cards: [legacy],
+        enabledStates: new Set(['done']),
+        enabledHosts: new Set(['local'])
+      })
+    ).toEqual([legacy])
+    expect(
+      filterAgentMapCards({
+        cards: [legacy],
+        enabledStates: new Set(['done']),
+        enabledHosts: new Set(['ssh'])
       })
     ).toEqual([])
   })

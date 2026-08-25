@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION,
   AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION,
+  CODEX_SHELL_LAUNCH_PREFLIGHT_DAEMON_PROTOCOL_VERSION,
   COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION,
   GET_FOREGROUND_PROCESS_PROTOCOL_VERSION,
   HISTORY_SEED_TRANSFER_PROTOCOL_VERSION,
@@ -16,14 +17,15 @@ import {
 
 describe('daemon protocol version', () => {
   it('sits above both lineages only where the number is ambiguous', () => {
-    expect(PROTOCOL_VERSION).toBe(34)
-    // Both lineages reused 27, 30, 31 and 33 for different feature sets, so only the merged
+    expect(PROTOCOL_VERSION).toBe(35)
+    // Both lineages reused 27, 30, 31, 33 and 34 for different feature sets, so only the merged
     // daemon can prove it carries both. Seed transfer is carried by both at 31, and
     // inspectProcess is answered by both lineages from 30 up.
     expect(HISTORY_SEED_TRANSFER_PROTOCOL_VERSION).toBe(31)
     expect(COMPLETION_PROCESS_INSPECTION_PROTOCOL_VERSION).toBe(30)
     expect(STABLE_PANE_ATTACH_ONLY_DAEMON_PROTOCOL_VERSION).toBe(33)
     expect(WSL_POSIX_CWD_DAEMON_PROTOCOL_VERSION).toBe(34)
+    expect(CODEX_SHELL_LAUNCH_PREFLIGHT_DAEMON_PROTOCOL_VERSION).toBe(35)
     // Not bumped: the lab shipped no 29 or 32, so a daemon reporting either is
     // necessarily upstream-lineage and does carry the behavior. Raising them would
     // withhold the fix from a daemon that has it.
@@ -33,7 +35,7 @@ describe('daemon protocol version', () => {
     expect(AGENT_SESSION_CLAIM_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(AGENT_SESSION_CREATE_OPERATION_DAEMON_PROTOCOL_VERSION).toBe(27)
     expect(PREVIOUS_DAEMON_PROTOCOL_VERSIONS).toEqual(
-      Array.from({ length: 33 }, (_, index) => index + 1)
+      Array.from({ length: 34 }, (_, index) => index + 1)
     )
   })
 

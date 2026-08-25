@@ -59,7 +59,7 @@ import type {
   WorkspaceCreateTelemetrySource,
   ProjectGroup
 } from '../../../shared/types'
-import { githubRepoIdentityKey } from '../../../shared/github-repository-identity-key'
+import { githubRepoIdentityKey } from '../../../shared/github/repository-identity-key'
 import { isWorkspaceStatusId } from '../../../shared/workspace-statuses'
 import {
   CLIENT_PLATFORM,
@@ -4539,10 +4539,14 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           if (vmRecipeTrustDecision === 'skip') {
             return
           }
+          const selectedRecipe = ephemeralVmRecipes.find(
+            (recipe) => recipe.id === activeEphemeralVmRecipeId
+          )
           ephemeralVmRecipe = {
             sourceRepoId: repoId,
             recipeId: activeEphemeralVmRecipeId,
-            projectId: selectedWorkspaceTarget.target.projectId
+            projectId: selectedWorkspaceTarget.target.projectId,
+            ...(selectedRecipe?.checkoutMode ? { checkoutMode: selectedRecipe.checkoutMode } : {})
           }
         }
 
@@ -4701,6 +4705,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       setupConfig,
       setupPolicy,
       selectedRepoHookContextKey,
+      ephemeralVmRecipes,
       isProjectGroupTarget,
       submitFolderTarget,
       createMultiple,

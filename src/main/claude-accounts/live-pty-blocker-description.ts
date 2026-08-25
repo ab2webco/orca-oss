@@ -1,5 +1,5 @@
 import { parsePtySessionId } from '../../shared/pty-session-id-format'
-import { getWorktreePathBasenameFromId } from '../../shared/worktree-id'
+import { getWorktreePathBasenameFromId } from '../../shared/worktree/id'
 import {
   liveInjectedClaudePtyAccounts,
   liveSharedClaudePtyAccounts,

@@ -28,7 +28,7 @@ import {
   type WorktreeSlice
 } from './worktree-helpers'
 import { projectWorktreeTabModelReconciliation } from './tabs'
-import { splitWorktreeIdForFilesystem } from '../../../../shared/worktree-id'
+import { splitWorktreeIdForFilesystem } from '../../../../shared/worktree/id'
 import {
   remapClosedTerminalTabSnapshotCwds,
   type ClosedTerminalTabSnapshot
@@ -40,6 +40,7 @@ import {
 } from './stale-runtime-host-rows'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
+import { cleanupFailedEphemeralVmWorkspace } from '@/lib/ephemeral-vm-failed-create-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import { disposeRemovedWorktreeParkedTerminalWatchers } from '../../components/terminal-pane/terminal-parked-watcher-registry'
 import {
@@ -117,7 +118,7 @@ import {
   classifyWorktreeForceDeleteReason,
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
-} from '../../../../shared/worktree-removal'
+} from '../../../../shared/worktree/removal'
 import { FolderWorkspaceActivityPersistence } from './folder-workspace-activity-persistence'
 import {
   createDetectedWorktreeRefreshLeaseRegistry,
@@ -3934,6 +3935,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     const linkedWorkItem = options?.linkedWorkItem
     const linkedTaskSourceContext = options?.linkedTaskSourceContext
     const startupDraft = options?.startupDraft
+    const provisionedRoot = options?.provisionedRoot
     try {
       for (let attempt = 0; attempt < CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS; attempt += 1) {
         const candidateName = getClientWorktreeCreateCandidate(name, attempt)
@@ -4000,8 +4002,15 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
               'Update the remote runtime to link Jira'
             )
           }
-          const result =
-            target.kind === 'local'
+          if (provisionedRoot && target.kind !== 'local') {
+            throw new Error('Provisioned-root recipes currently require a direct SSH connection.')
+          }
+          const result = provisionedRoot
+            ? await window.api.worktrees.adoptProvisionedRoot({
+                ...createArgs,
+                ...provisionedRoot
+              })
+            : target.kind === 'local'
               ? await window.api.worktrees.create(createArgs)
               : await callRuntimeRpc<Awaited<ReturnType<typeof window.api.worktrees.create>>>(
                   target,
@@ -4161,40 +4170,38 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   },
 
   removePendingWorktreeCreation: (creationId, options) => {
+    let removedEntry: AppState['pendingWorktreeCreations'][string] | undefined
     set((s) => {
       const entry = s.pendingWorktreeCreations[creationId]
       if (!entry) {
         return {}
       }
-      const cleanupVm = options?.cleanupVm ?? true
-      if (
-        cleanupVm &&
-        entry.phase === 'provisioning-vm' &&
-        typeof window !== 'undefined' &&
-        window.api?.ephemeralVm?.cancelProvision
-      ) {
-        void window.api.ephemeralVm.cancelProvision({ provisionId: creationId }).catch(() => {
-          // Best effort: dismissing the pending surface shouldn't block on a finished or unreachable provisioning process.
-        })
-      }
-      if (
-        cleanupVm &&
-        entry.request.ephemeralVmRuntimeId &&
-        typeof window !== 'undefined' &&
-        window.api?.ephemeralVm?.cleanup
-      ) {
-        void window.api.ephemeralVm
-          .cleanup({ runtimeId: entry.request.ephemeralVmRuntimeId })
-          .catch(() => {
-            // Best effort: cancellation shouldn't block on provider cleanup; Settings still exposes retry/manual cleanup.
-          })
-      }
+      removedEntry = entry
       const { [creationId]: _removed, ...rest } = s.pendingWorktreeCreations
       return {
         pendingWorktreeCreations: rest,
         // Why: only clear the active surface if it pointed here, so dismissing a background creation doesn't yank the user away.
         ...(s.activePendingCreationId === creationId ? { activePendingCreationId: null } : {})
       }
+    })
+    if (!removedEntry || options?.cleanupVm === false || typeof window === 'undefined') {
+      return
+    }
+    if (removedEntry.phase === 'provisioning-vm' && window.api?.ephemeralVm?.cancelProvision) {
+      void window.api.ephemeralVm
+        .cancelProvision({ provisionId: creationId })
+        .catch(() => undefined)
+    }
+    if (!removedEntry.request.ephemeralVmRuntimeId || !window.api?.ephemeralVm?.cleanup) {
+      return
+    }
+    void cleanupFailedEphemeralVmWorkspace(removedEntry.request, {
+      deleteProjectHostSetup: (setupId) => get().deleteProjectHostSetup({ setupId }),
+      cleanupRuntime: (runtimeId) => window.api.ephemeralVm.cleanup({ runtimeId }),
+      reportSetupError: (error) =>
+        console.error('Failed to remove cancelled provisioned-root project setup:', error),
+      reportRuntimeError: (error) =>
+        console.error('Failed to clean up cancelled ephemeral VM runtime:', error)
     })
   },
 

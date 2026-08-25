@@ -15133,14 +15133,12 @@
     },
     "map": {
       "host": {
-        "all": "すべてのホスト",
         "local": "ローカル",
         "ssh": "SSH",
         "wsl": "WSL",
         "remote": "リモート"
       },
       "liveContainmentMap": "ライブ包含マップ",
-      "hostFilter": "ホストフィルター",
       "empty": "現在のフィルターに一致する Agent はありません。",
       "canvasLabel": "プロジェクト、ワークスペース、Agent の入れ子マップ",
       "zoomOut": "ズームアウト",

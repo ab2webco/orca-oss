@@ -15144,14 +15144,12 @@
     },
     "map": {
       "host": {
-        "all": "Todos los hosts",
         "local": "Local",
         "ssh": "SSH",
         "wsl": "WSL",
         "remote": "Remoto"
       },
       "liveContainmentMap": "Mapa de contención en vivo",
-      "hostFilter": "Filtro de host",
       "empty": "Ningún agente coincide con los filtros actuales.",
       "canvasLabel": "Mapa anidado de proyectos, espacios de trabajo y agentes",
       "zoomOut": "Alejar",

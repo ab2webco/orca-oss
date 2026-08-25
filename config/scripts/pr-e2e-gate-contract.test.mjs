@@ -91,7 +91,23 @@ describe('PR E2E gate contract', () => {
       (step) => step.name === 'Run changed E2E specs'
     )
     expect(changedRun.env.TEST_FILES_JSON).toBe('${{ inputs.test_files }}')
-    expect(changedRun.run).toContain('pnpm run test:e2e "${TEST_FILES[@]}" --workers=1')
+    expect(changedRun.run).toContain('grep -l \'@headful\' "${TEST_FILES[@]}"')
+    expect(changedRun.run).toContain('E2E_PROJECT_ARGS+=(--project=electron-headful)')
+    expect(changedRun.run).toContain(
+      'pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"'
+    )
+    // The fork has no dedicated live readiness lane, so filtering these out of
+    // changed-e2e would stop running them anywhere.
+    expect(changedRun.run).not.toContain('tests/e2e/paired-startup-exec-readiness.spec.ts')
+  })
+
+  it('installs zsh in every Linux lane that can run paired startup readiness', () => {
+    for (const jobName of ['e2e', 'changed-e2e']) {
+      const installStep = e2eWorkflow.jobs[jobName].steps.find((step) =>
+        step.name.startsWith('Install native build')
+      )
+      expect(installStep.run, jobName).toMatch(/\bzsh\b/)
+    }
   })
 
   it('keeps dedicated E2E workflows out of pull request CI', () => {

@@ -15155,14 +15155,12 @@
     },
     "map": {
       "host": {
-        "all": "모든 호스트",
         "local": "로컬",
         "ssh": "SSH",
         "wsl": "WSL",
         "remote": "원격"
       },
       "liveContainmentMap": "실시간 포함 관계 맵",
-      "hostFilter": "호스트 필터",
       "empty": "현재 필터와 일치하는 에이전트가 없습니다.",
       "canvasLabel": "프로젝트, 작업 공간, 에이전트의 중첩 맵",
       "zoomOut": "축소",

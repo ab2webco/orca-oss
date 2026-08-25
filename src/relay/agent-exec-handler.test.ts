@@ -27,11 +27,30 @@ function replaceProcessEnv(env: NodeJS.ProcessEnv): void {
   Object.assign(process.env, env)
 }
 
+const GUARD_OWNED_ENV_RE = /^(?:GIT_CONFIG_(?:COUNT|KEY_\d+|VALUE_\d+)|WSLENV)$/
+
 describe('AgentExecHandler', () => {
+  let ambientGuardEnv: Record<string, string | undefined> = {}
+
   beforeEach(() => {
     replaceProcessEnv(processEnvFixture)
     spawnMock.mockReset()
     execFileMock.mockReset()
+    // Why: the guard rewrites these, so an already-guarded runner (Orca guards
+    // its own agent terminals) would not see its ambient values passed through.
+    ambientGuardEnv = {}
+    for (const key of Object.keys(process.env).filter((name) => GUARD_OWNED_ENV_RE.test(name))) {
+      ambientGuardEnv[key] = process.env[key]
+      delete process.env[key]
+    }
+  })
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(ambientGuardEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      }
+    }
   })
 
   afterEach(() => {

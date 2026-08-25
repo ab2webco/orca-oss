@@ -6,6 +6,7 @@ import { DaemonClient } from './client'
 import { DAEMON_ENDPOINT_LOST_MESSAGE } from './daemon-endpoint-ownership'
 import {
   getMacDaemonSystemResolverHealth,
+  getMacDaemonTccAttributionHealth,
   parseDaemonPidFile,
   type ParsedDaemonPid
 } from './daemon-health'
@@ -140,11 +141,15 @@ export type DaemonPtyAdapterOptions = {
   protocolVersion?: number
   /** Directory for disk-based terminal history; when set, raw PTY output is written to disk for cold restore on daemon crash. */
   historyPath?: string
+  /** Runtime profile directory used to verify daemon TCC attribution. */
+  runtimeDir?: string
+  /** Current packaged version, or null for unpackaged builds. */
+  packagedAppVersion?: string | null
   /** Forks a fresh daemon after endpoint death or a confirmed resolver-health replacement. */
   respawn?: (reason: DaemonRespawnReason) => Promise<void | (() => void)>
 }
 
-export type DaemonRespawnReason = 'daemon_died' | 'unhealthy_resolver'
+export type DaemonRespawnReason = 'daemon_died' | 'unhealthy_resolver' | 'severed_tcc_attribution'
 
 export type DaemonIdentityChangeEvent = {
   previous: DaemonEndpointIdentity
@@ -201,6 +206,8 @@ export class DaemonPtyAdapter implements IPtyProvider {
   private historyManager: HistoryManager | null
   private historyReader: HistoryReader | null
   private respawnFn: DaemonPtyAdapterOptions['respawn'] | null
+  private runtimeDir: string | null
+  private packagedAppVersion: string | null
   private pendingRespawnAdoptionRelease: (() => void) | null = null
   private respawnAdoptionClosed = false
   // Why: concurrent spawn() calls hitting a dead daemon would each fork their own; this promise coalesces respawns so only the first forks and the rest await it.
@@ -313,6 +320,8 @@ export class DaemonPtyAdapter implements IPtyProvider {
     this.historyManager = opts.historyPath ? new HistoryManager(opts.historyPath) : null
     this.historyReader = opts.historyPath ? new HistoryReader(opts.historyPath) : null
     this.respawnFn = opts.respawn ?? null
+    this.runtimeDir = opts.runtimeDir ?? opts.profileScope ?? null
+    this.packagedAppVersion = opts.packagedAppVersion === undefined ? null : opts.packagedAppVersion
     this.supportsCheckpoints = this.protocolVersion >= 4
     this.supportsIncrementalCheckpoints = this.protocolVersion >= 13
     this.supportsProducerFlowControl = this.protocolVersion >= 19
@@ -494,6 +503,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
 
     if (opts.isNewSession) {
       await this.replaceUnhealthyMacResolverDaemonBeforeNewPty()
+      await this.replaceSeveredMacTccDaemonBeforeNewPty()
     }
 
     await this.ensureConnected()
@@ -2515,6 +2525,47 @@ export class DaemonPtyAdapter implements IPtyProvider {
       this.respawnPromise = this.doRespawn(
         '[daemon] macOS system resolver unavailable - respawning daemon',
         'unhealthy_resolver'
+      ).finally(() => {
+        this.respawnPromise = null
+      })
+    }
+    await this.respawnPromise
+  }
+
+  /** Replace a TCC-severed daemon only after its live sessions drain. */
+  private async replaceSeveredMacTccDaemonBeforeNewPty(): Promise<void> {
+    // Why no platform gate: getMacDaemonTccAttributionHealth returns 'unknown' off macOS.
+    if (!this.respawnFn || !this.runtimeDir) {
+      return
+    }
+
+    const health = await getMacDaemonTccAttributionHealth(
+      this.runtimeDir,
+      this.socketPath,
+      this.tokenPath,
+      this.packagedAppVersion,
+      this.protocolVersion
+    )
+    if (health !== 'severed') {
+      return
+    }
+
+    const daemonLiveSessionCount = await this.getDaemonLiveSessionCount()
+    const liveSessionCount = Math.max(this.activeSessionIds.size, daemonLiveSessionCount ?? 0)
+    if (daemonLiveSessionCount === null || liveSessionCount > 0) {
+      console.warn(
+        daemonLiveSessionCount === null
+          ? '[daemon] macOS TCC attribution severed - preserving daemon because live session state could not be verified'
+          : `[daemon] macOS TCC attribution severed - preserving daemon because it owns ${liveSessionCount} live session${liveSessionCount === 1 ? '' : 's'}; restart from Manage Sessions when ready`
+      )
+      return
+    }
+
+    this.fanoutSyntheticExits(-1)
+    if (!this.respawnPromise) {
+      this.respawnPromise = this.doRespawn(
+        '[daemon] macOS TCC attribution severed - respawning daemon under the current app binary',
+        'severed_tcc_attribution'
       ).finally(() => {
         this.respawnPromise = null
       })
