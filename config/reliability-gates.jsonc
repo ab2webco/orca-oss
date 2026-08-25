@@ -11,6 +11,176 @@
   },
   "gates": [
     {
+      "id": "terminal-session.shell-ready-exec-prompt-fallback",
+      "title": "Startup exec falls back to the identified shell's line editor",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "terminal-session-readiness",
+      "layer": "posix-pty-and-shell-startup",
+      "surfaces": ["queued terminal startup commands", "zsh, bash, and Fish startup output"],
+      "platforms": ["macos", "linux"],
+      "providers": ["local", "local-daemon", "ssh-daemon", "ssh-relay", "paired-runtime"],
+      "coveredPlatforms": ["macos", "linux"],
+      "coveredProviders": ["local", "local-daemon", "ssh-relay", "paired-runtime"],
+      "coverageNotes": "Real macOS node-pty integration covers zsh 5.9 .zshenv/.zprofile and bash 3.2 profile replacement shells, including exec -a names, same-shell and child-process silent reads, a blocking zle-line-init hook, non-shell readline replacements, and a non-shell image renamed zsh. A real Fish PTY proves marker stripping is byte-exact and does not render bracketed-paste control text. An Ubuntu 20.04 container confirms compatible zsh/bash termios. Deterministic owner contracts cover local, daemon, and SSH relay identity/readiness composition plus provider-owned delivery; explicit terminal-paste remains renderer-owned. Live isolated journeys cover a macOS headed desktop owner with paired web client, headless orca serve with paired web client, and a Docker Linux OpenSSH/Bash target with one readiness-time reconnect. Linux desktop, WSL/Windows, live zsh-over-SSH, and physical remote hosts remain gaps.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca/issues/13767",
+        "https://linear.app/stably/issue/STA-4067",
+        "https://linear.app/stably/issue/STA-4068",
+        "https://github.com/stablyai/orca/pull/14161"
+      ],
+      "invariant": "Shell startup scanning preserves every non-Orca output byte in order across arbitrary PTY chunk boundaries. Before user startup files run, the wrapper publishes its shell PID. If a later exec discards the ready marker, proof-based recovery releases queued startup input only after the launched shell's actual executable image with that exact PID owns the PTY foreground, emits its post-hook line-editor enable sequence, and exposes zle/readline termios; startup reads, line-init hooks, child foreground processes, and non-shell readline replacements cannot trigger that proof. The existing bounded compatibility timeout may enqueue input without proof, but must not publish readiness, lose or duplicate that input across reconnect, or execute it before the replacement shell can accept it.",
+      "oracle": "Split Fish output immediately after the ready marker and after the following ESC introducer; local and daemon owners must emit the exact ESC [ ? 2004 h bytes and headless xterm must not render literal control text. Run the real generated wrappers under node-pty with disposable zsh, bash, and Fish startup files. Plain and exec -a replacement shells must receive one queued command at their first completed line editor without waiting for the 15-second timeout. The identical oracle must time out without the startup identity and prompt fallback. Same-shell reads, child-process reads, a blocking zle-line-init hook, sqlite3, and sqlite3 renamed zsh must not trigger prompt fallback. Relay owner coverage must use the same lossless scanner composition and release through the same prompt contract.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts src/main/line-editor-ready-output-scanner.test.ts src/main/shell-startup-identity-scanner.test.ts src/main/shell-startup-output-scanner.test.ts src/main/shell-prompt-readiness-probe.test.ts src/shared/pty-slave-line-discipline-echo.test.ts src/shared/shell-process-readiness.test.ts src/main/daemon/session.test.ts src/main/daemon/shell-ready.test.ts src/main/providers/local-pty-shell-ready.test.ts src/main/providers/local-pty-provider.test.ts src/relay/pty-shell-launch.test.ts src/relay/pty-handler.test.ts",
+        "pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=1 src/main/daemon/shell-ready.test.ts src/main/shell-startup-output-scanner.test.ts",
+        "ORCA_E2E_SSH_DOCKER=1 SKIP_BUILD=1 pnpm exec playwright test tests/e2e/ssh-startup-exec-readiness.spec.ts --config tests/playwright.config.ts --project electron-headful --workers=1",
+        "ORCA_E2E_WEB_CLIENT=1 SKIP_BUILD=1 pnpm exec playwright test tests/e2e/paired-startup-exec-readiness.spec.ts --config tests/playwright.config.ts --project electron-headless --project electron-headful --workers=1"
+      ],
+      "testFiles": [
+        "src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts",
+        "src/main/line-editor-ready-output-scanner.test.ts",
+        "src/main/shell-startup-identity-scanner.test.ts",
+        "src/main/shell-startup-output-scanner.test.ts",
+        "src/main/shell-prompt-readiness-probe.test.ts",
+        "src/shared/pty-slave-line-discipline-echo.test.ts",
+        "src/shared/shell-process-readiness.test.ts",
+        "src/main/daemon/session.test.ts",
+        "src/main/daemon/shell-ready.test.ts",
+        "src/main/providers/local-pty-shell-ready.test.ts",
+        "src/main/providers/local-pty-provider.test.ts",
+        "src/relay/pty-shell-launch.test.ts",
+        "src/relay/pty-handler.test.ts",
+        "tests/e2e/ssh-startup-exec-readiness.spec.ts",
+        "tests/e2e/paired-startup-exec-readiness.spec.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/main/shell-startup-output-scanner.test.ts",
+          "assertions": [
+            "Fish bracketed-paste output stays byte-exact across marker and ESC chunk splits",
+            "every byte after readiness is preserved across every chunk boundary, even when it resembles an identity marker",
+            "pre-ready identity and readiness markers strip across every chunk boundary without reordering prompt output",
+            "incomplete scanner prefixes drain in byte order"
+          ]
+        },
+        {
+          "file": "src/main/daemon/session.test.ts",
+          "assertions": [
+            "daemon output is byte-exact for both Fish chunk splits",
+            "headless xterm never renders literal bracketed-paste control text"
+          ]
+        },
+        {
+          "file": "src/main/providers/local-pty-provider.test.ts",
+          "assertions": ["local PTY output is byte-exact for both Fish chunk splits"]
+        },
+        {
+          "file": "src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts",
+          "assertions": [
+            "real zsh .zshenv/.zprofile and bash profile replacement shells receive queued input exactly once",
+            "same-shell raw silent reads retain queued input",
+            "child-process raw silent reads retain queued input while the identified shell is not foreground",
+            "a blocking zle-line-init read retains queued input until the hook completes",
+            "sqlite3 and a sqlite3 image renamed zsh cannot impersonate the launched shell executable path",
+            "zsh configurations without a line-editor enable sequence retain the existing timeout backstop"
+          ]
+        },
+        {
+          "file": "src/relay/pty-handler.test.ts",
+          "assertions": [
+            "the SSH relay owner strips startup identity and releases provider-delivered input through prompt readiness",
+            "renderer-owned SSH delivery receives the existing ready marker after authoritative relay prompt readiness",
+            "normal renderer-owned ready markers pass through unchanged and retain no readiness state"
+          ]
+        },
+        {
+          "file": "tests/e2e/ssh-startup-exec-readiness.spec.ts",
+          "assertions": [
+            "a Docker Linux OpenSSH/Bash replacement shell retains one compatibility-fallback input across reconnect without executing it before the blocked replacement can accept it",
+            "the owning terminal handle and raw PTY identity remain singular and stable",
+            "painted output, authoritative terminal output, and the first interactive input each appear exactly once"
+          ]
+        },
+        {
+          "file": "tests/e2e/paired-startup-exec-readiness.spec.ts",
+          "assertions": [
+            "a headed desktop owner and paired client recover startup exec on one stable owning PTY",
+            "an isolated headless orca serve owner provides the same exact-once output and input contract"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-08-12",
+          "runner": "manual",
+          "platform": "linux",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=1 src/main/daemon/shell-ready.test.ts src/main/shell-startup-output-scanner.test.ts",
+          "result": "passed",
+          "durationSeconds": 7,
+          "summary": "A clean Debian 12 arm64 container with real Fish 3.6 and node-pty passed exact marker-stripped output plus headless-xterm rendering."
+        },
+        {
+          "date": "2026-08-12",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts src/main/line-editor-ready-output-scanner.test.ts src/main/shell-startup-identity-scanner.test.ts src/main/shell-startup-output-scanner.test.ts src/main/shell-prompt-readiness-probe.test.ts src/shared/pty-slave-line-discipline-echo.test.ts src/shared/shell-process-readiness.test.ts src/main/daemon/session.test.ts src/main/daemon/shell-ready.test.ts src/main/providers/local-pty-shell-ready.test.ts src/main/providers/local-pty-provider.test.ts src/relay/pty-shell-launch.test.ts src/relay/pty-handler.test.ts",
+          "result": "passed",
+          "durationSeconds": 6,
+          "summary": "473 tests passed with one local Fish skip, including every-boundary scanner composition, real exec, silent-read, line-init-hook, renamed-image, disabled-bracketed-paste, and relay-owner oracles."
+        },
+        {
+          "date": "2026-08-12",
+          "runner": "local",
+          "platform": "linux",
+          "command": "ORCA_E2E_SSH_DOCKER=1 SKIP_BUILD=1 pnpm exec playwright test tests/e2e/ssh-startup-exec-readiness.spec.ts --config tests/playwright.config.ts --project electron-headful --workers=1",
+          "result": "passed",
+          "durationSeconds": 17,
+          "summary": "The live OpenSSH/Bash relay journey crossed the bounded compatibility fallback while rc-file exec was blocked, proved one queued command echo with no command execution, then passed a disconnect/reconnect with exact-once startup output/input and stable pane plus owner PTY identities."
+        },
+        {
+          "date": "2026-08-12",
+          "runner": "local",
+          "platform": "macos",
+          "command": "ORCA_E2E_WEB_CLIENT=1 SKIP_BUILD=1 pnpm exec playwright test tests/e2e/paired-startup-exec-readiness.spec.ts --config tests/playwright.config.ts --project electron-headless --project electron-headful --workers=1",
+          "result": "passed",
+          "durationSeconds": 14,
+          "summary": "The shared oracle passed a headed desktop owner plus paired web client and an isolated headless orca serve owner plus paired web client."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 120,
+        "scope": "focused local wrapper contracts plus isolated SSH and paired live journeys"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "Fresh deterministic and isolated live runs pass locally; CI and soak history have not started."
+      },
+      "redGreenEvidence": {
+        "status": "complete",
+        "evidence": "Daemon oracle SHA-256 b13b08006a38b2adc2acb51ae9342909514e55ab4822fac4fbb76cd49b344cc6 was byte-identical across runs: affected baseline 09ec516ae5 failed 4 of 14, while pre-PR main bc2e30000b and this PR passed 14 of 14. The unchanged live SSH oracle failed on bc2e30000b and with the ownership change reverted because the ledger stayed pending after reconnect, then passed on this PR. Fish chunk oracle patch SHA-256 fd49a4d3d91bd5f0d10c1b1f44f4cfbd92cef9155a5505b415c8680184cdc765 was also byte-identical: scan target e4c278eb52, main 150cc6f50c, and candidate ae7f30318a with shared scanner integration disabled failed only the ESC-introducer split in local and daemon owners, while ae7f30318a passed all 163 cases plus headless-xterm rendering."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "Two bounded linear scans partition identity ownership at the exact ready-marker boundary and retain only the existing bounded prefixes. The normal ready-marker path cancels before external probing. A missing marker triggers a debounced stty read only after a line-editor enable sequence, followed by narrow PID status and executable-image inspection only when termios matches. Slow ordinary startup output triggers zero probes; rejected protocol emissions are capped at four probes per startup. There is no per-command hook or steady-state polling."
+      },
+      "promotionCriteria": [
+        "Collect CI and soak history for the Docker SSH and paired live journeys.",
+        "Collect CI and soak history without unexplained flakes.",
+        "Keep same-shell, child-process, line-init-hook, and non-shell readline contracts green."
+      ],
+      "knownGaps": [
+        "The fallback requires a readable POSIX PTY slave; WSL through wsl.exe, ConPTY, and native Windows retain the existing timeout backstop.",
+        "The live SSH journey covers Docker Linux OpenSSH with Bash, not zsh, WSL, Windows SSH, a Linux desktop renderer, or a physical remote host.",
+        "An exec integration that forks a replacement shell instead of retaining the identified shell PID retains the existing timeout backstop.",
+        "A zsh configuration that disables bracketed-paste output emits no safe post-hook protocol signal and retains the existing timeout backstop.",
+        "The pre-existing timeout backstop can still deliver queued input to a non-shell replacement after it expires; this fallback prevents indefinite startup hangs and is unchanged by the prompt fallback.",
+        "The fallback restores safe startup-command delivery but cannot recreate OSC 133 hooks or overlay restores already discarded by exec.",
+        "Startup code running in the launched shell can deliberately spoof the public line-editor enable sequence after configuring matching termios; the existing timeout path already trusts a public OSC marker from the same startup code."
+      ],
+      "demotionRule": "Keep experimental or demote if prompt fallback enters a normal, child, or line-init read; a non-shell executable triggers prompt fallback; the identified shell PID is not foreground; delivery duplicates; ordinary startup output spawns probes; probe attempts exceed four; or the focused gate flakes without an identified harness defect."
+    },
+    {
       "id": "editor.restored-sibling-owner-reparent",
       "title": "Restored sibling tabs migrate filesystem authority before becoming editable",
       "maturity": "experimental",

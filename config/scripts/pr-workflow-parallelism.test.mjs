@@ -8,6 +8,7 @@ const dependencyAction = parse(
 )
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 const shellContractFiles = [
+  'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
   'src/main/daemon/session-startup-command-gate-real-shell.test.ts',
   'src/main/daemon/shell-ready.test.ts',
   'src/main/providers/local-pty-shell-ready.test.ts',
@@ -92,6 +93,9 @@ describe('PR workflow parallelism', () => {
       expect(shellPackages).toContain(shell)
     }
     expect(shellInstall.with['native-runtime']).toBe('node')
+    // Why: these drive real PTYs against real shells, so a parallel worker pool
+    // makes them contend for the same startup files and read as flakes.
+    expect(shellStep.run).toContain('--maxWorkers=1')
     for (const testFile of nativeShellContractFiles) {
       expect(shellStep.run).toContain(testFile)
     }

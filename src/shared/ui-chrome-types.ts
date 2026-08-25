@@ -84,7 +84,7 @@ export type TaskResumeState = {
   planeQuery?: string
   // Why: workspace scope persists at the connection layer (planeStatus), but
   // the project-level "all projects" vs single-project scope is a per-session
-  // Tasks concept that must survive a resume/reopen.
+  // Tasks concept (see mem #2205) that must survive a resume/reopen.
   planeProjectId?: string
 }
 
