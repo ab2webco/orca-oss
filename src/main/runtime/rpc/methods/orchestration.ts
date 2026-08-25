@@ -644,9 +644,35 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         if (msg.type === 'escalation' && dispatch && hasLifecycleAuthority(dispatch, msg)) {
           db.recordDispatchLifecycleSignal(dispatch.id, msg.created_at)
         }
-        if ((msg.type === 'worker_done' || msg.type === 'heartbeat') && dispatch?.capability_hash) {
-          const authority = db.verifyDispatchCapability({
+        // Why (ORCA-299): the first-signal expiry revokes the capability, and the
+        // check below rejects every heartbeat and worker_done while that is set —
+        // so the reopen has to land *before* it, or a live worker refuting the
+        // verdict never reaches reconciliation at all. Reconciliation still owns
+        // the decision; this only lets the message get there. The guard is not
+        // widened: reopening requires the inference marker and the assignee's own
+        // pane, both checked inside.
+        if (
+          (msg.type === 'worker_done' || msg.type === 'heartbeat') &&
+          dispatch &&
+          dispatch.capability_revoked_at &&
+          hasLifecycleAuthority(dispatch, msg) &&
+          db.isDispatchFailedByInference(dispatch.id)
+        ) {
+          db.reopenDispatchFailedByInference({
             dispatchId: dispatch.id,
+            reason: `Reopened by ${msg.type} from ${msg.from_handle}: the worker refuted the first-signal deadline.`
+          })
+        }
+        const capabilityDispatch =
+          dispatch && dispatch.capability_revoked_at
+            ? (db.getDispatchContextById(dispatch.id) ?? dispatch)
+            : dispatch
+        if (
+          (msg.type === 'worker_done' || msg.type === 'heartbeat') &&
+          capabilityDispatch?.capability_hash
+        ) {
+          const authority = db.verifyDispatchCapability({
+            dispatchId: capabilityDispatch.id,
             capability: orchestrationCapability,
             paneKey: senderPaneKey,
             processIncarnation:

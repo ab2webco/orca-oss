@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 31
+export const ORCHESTRATION_SCHEMA_VERSION = 32
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -113,5 +113,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     upstreamVersion: 27,
     summary: 'durable federation acknowledgments',
     effects: ['column:federated_dispatches.to_home_acknowledged_sequence']
+  },
+  {
+    version: 32,
+    lineage: 'lab',
+    summary: 'dispatch failure provenance (ORCA-299)',
+    effects: ['column:dispatch_contexts.failure_provenance']
   }
 ]

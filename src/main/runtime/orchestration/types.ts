@@ -18,6 +18,16 @@ export type MessageDeliveryContract = 'legacy_direct' | 'current_delivery' | 'au
 
 export type TaskStatus = 'pending' | 'ready' | 'dispatched' | 'completed' | 'failed' | 'blocked'
 
+/**
+ * Why a Dispatch is `failed` (ORCA-299).
+ *
+ * `inferred_silence` is written by the first-signal deadline scan and nowhere
+ * else: it is the one path that concludes death from an absence of signal, so it
+ * is the one whose verdict a live worker can refute. Every other failure path
+ * has something reported — an exit code, an error — and stays terminal.
+ */
+export type DispatchFailureProvenance = 'inferred_silence' | 'evidence'
+
 export type DispatchStatus = 'pending' | 'dispatched' | 'completed' | 'failed' | 'circuit_broken'
 
 export type WorkerReportOutcome = 'succeeded' | 'failed'
@@ -271,6 +281,13 @@ export type DispatchContextRow = {
   capability_hash: string | null
   process_incarnation: string | null
   capability_revoked_at: string | null
+  /**
+   * How this Dispatch's failure was decided (ORCA-299). NULL on every row
+   * written before migration 32 and by any path that does not say — which is
+   * read as `evidence`, the conservative side: a failure we cannot prove was a
+   * guess must never be reopened by a late heartbeat.
+   */
+  failure_provenance: DispatchFailureProvenance | null
   status: DispatchStatus
   failure_count: number
   last_failure: string | null

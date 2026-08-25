@@ -571,3 +571,180 @@ describe('lifecycle reconciliation', () => {
     expect(db.getMessageById(lateHeartbeat.id)?.delivered_at).not.toBeNull()
   })
 })
+
+// ORCA-299: a Dispatch failed by *inferring* death from silence can be refuted
+// by the worker it declared dead. One failed on evidence cannot — that is the
+// distinction the whole fix rests on, so both fixtures differ only in how the
+// failure was produced.
+describe('reopening a Dispatch failed by inference', () => {
+  let db: OrchestrationDb
+
+  afterEach(() => db?.close())
+
+  const LEAF_LIVE = '33333333-3333-4333-8333-333333333333'
+  const LEAF_OTHER = '44444444-4444-4444-9444-444444444444'
+  const PANE = `tab_w:${LEAF_LIVE}`
+
+  function dispatchFailedBySilence(): { taskId: string; dispatchId: string } {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker', PANE)
+    db.mintDispatchCapability({
+      dispatchId: dispatch.id,
+      paneKey: PANE,
+      processIncarnation: 'inc_1'
+    })
+    db.armDispatchLifecycleDeadline(dispatch.id, 0)
+    const expired = db.expireDispatchLifecycleDeadline({
+      dispatchId: dispatch.id,
+      nowIso: new Date(Date.now() + 60_000).toISOString(),
+      reason: 'no lifecycle signal',
+      subject: 'Dispatch failed: no lifecycle signal'
+    })
+    expect(expired.expired).toBe(true)
+    return { taskId: task.id, dispatchId: dispatch.id }
+  }
+
+  function dispatchFailedOnEvidence(): { taskId: string; dispatchId: string } {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker', PANE)
+    db.mintDispatchCapability({
+      dispatchId: dispatch.id,
+      paneKey: PANE,
+      processIncarnation: 'inc_1'
+    })
+    // The evidence path: an exit code, not a guess about silence.
+    db.failDispatch(dispatch.id, 'worker exited with code 1')
+    expect(db.getDispatchContextById(dispatch.id)?.status).toBe('failed')
+    return { taskId: task.id, dispatchId: dispatch.id }
+  }
+
+  function lateHeartbeat(dispatchId: string, paneKey: string = PANE) {
+    return db.insertMessage({
+      from: 'term_worker',
+      to: 'term_coordinator',
+      subject: 'still working',
+      type: 'heartbeat',
+      payload: JSON.stringify({ dispatchId }),
+      senderPaneKey: paneKey
+    })
+  }
+
+  it('reopens on a late heartbeat from the assignee', () => {
+    const { taskId, dispatchId } = dispatchFailedBySilence()
+    const logs: string[] = []
+
+    const result = reconcileLifecycleMessage(db, lateHeartbeat(dispatchId), (l) => logs.push(l))
+
+    expect(result).toMatchObject({ action: 'heartbeat_recorded', dispatchId, reopened: true })
+    const reopened = db.getDispatchContextById(dispatchId)
+    expect(reopened?.status).toBe('dispatched')
+    expect(reopened?.last_failure).toBeNull()
+    expect(reopened?.completed_at).toBeNull()
+    // The field that actually gags the worker: while it is set, every heartbeat
+    // and worker_done is rejected before reconciliation ever sees it.
+    expect(reopened?.capability_revoked_at).toBeNull()
+    // ...and the capability itself is NOT rotated: the running worker holds the
+    // original and could never be handed a new one.
+    expect(reopened?.capability_hash).toBe(db.getDispatchContextById(dispatchId)?.capability_hash)
+    expect(db.getTask(taskId)?.status).toBe('dispatched')
+    expect(logs.some((l) => l.includes('reopened dispatch'))).toBe(true)
+  })
+
+  // THE control. A Dispatch failed on evidence must stay failed, or this fix
+  // turns every reported failure into a resurrectable one.
+  it('does NOT reopen a Dispatch that failed on evidence', () => {
+    const { taskId, dispatchId } = dispatchFailedOnEvidence()
+    const logs: string[] = []
+
+    const result = reconcileLifecycleMessage(db, lateHeartbeat(dispatchId), (l) => logs.push(l))
+
+    expect(result).toEqual({ action: 'suppressed' })
+    expect(db.getDispatchContextById(dispatchId)?.status).toBe('failed')
+    expect(db.getDispatchContextById(dispatchId)?.last_failure).toBe('worker exited with code 1')
+    expect(db.getTask(taskId)?.status).not.toBe('dispatched')
+    expect(logs.some((l) => l.includes('on reported evidence'))).toBe(true)
+  })
+
+  // Migration 32 adds the column with no backfill, so every Dispatch that
+  // failed before it has NULL provenance. That has to read as evidence: the
+  // other default would make every historical failure reopenable by one late
+  // heartbeat.
+  it('does NOT reopen a pre-migration failure with no recorded provenance', () => {
+    const { taskId, dispatchId } = dispatchFailedBySilence()
+    const sqlite = (
+      db as unknown as { db: { prepare: (q: string) => { run: (...a: unknown[]) => void } } }
+    ).db
+    sqlite
+      .prepare('UPDATE dispatch_contexts SET failure_provenance = NULL WHERE id = ?')
+      .run(dispatchId)
+
+    const result = reconcileLifecycleMessage(db, lateHeartbeat(dispatchId))
+
+    expect(result).toEqual({ action: 'suppressed' })
+    expect(db.getDispatchContextById(dispatchId)?.status).toBe('failed')
+    expect(db.getTask(taskId)?.status).not.toBe('dispatched')
+  })
+
+  it('does NOT reopen on a heartbeat from a different pane', () => {
+    const { dispatchId } = dispatchFailedBySilence()
+    const logs: string[] = []
+
+    const result = reconcileLifecycleMessage(
+      db,
+      lateHeartbeat(dispatchId, `tab_w:${LEAF_OTHER}`),
+      (l) => logs.push(l)
+    )
+
+    expect(result).toMatchObject({ action: 'rejected', code: 'sender_not_assignee' })
+    expect(db.getDispatchContextById(dispatchId)?.status).toBe('failed')
+    expect(db.getDispatchContextById(dispatchId)?.capability_revoked_at).not.toBeNull()
+  })
+
+  it('accepts worker_done from the assignee of a Dispatch failed by silence', () => {
+    const { taskId, dispatchId } = dispatchFailedBySilence()
+    const message = db.insertMessage({
+      from: 'term_worker',
+      to: 'term_coordinator',
+      subject: 'Done',
+      type: 'worker_done',
+      payload: JSON.stringify({
+        taskId,
+        dispatchId,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
+      senderPaneKey: PANE
+    })
+
+    expect(reconcileLifecycleMessage(db, message).action).toBe('completed')
+    expect(db.getTask(taskId)?.status).toBe('completed')
+  })
+
+  it('tells the coordinator why a worker_done cannot settle an evidence-failed Dispatch', () => {
+    const { taskId, dispatchId } = dispatchFailedOnEvidence()
+    const logs: string[] = []
+    const message = db.insertMessage({
+      from: 'term_worker',
+      to: 'term_coordinator',
+      subject: 'Done',
+      type: 'worker_done',
+      payload: JSON.stringify({
+        taskId,
+        dispatchId,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
+      senderPaneKey: PANE
+    })
+
+    const result = reconcileLifecycleMessage(db, message, (l) => logs.push(l))
+
+    expect(result).toMatchObject({ action: 'rejected', code: 'inactive_dispatch' })
+    // Requirement 3: the reason names the provenance, so the coordinator does
+    // not have to go read the Dispatch to learn nothing can be done.
+    expect(logs.join('\n')).toContain('on reported evidence')
+    expect(db.getTask(taskId)?.status).not.toBe('completed')
+  })
+})

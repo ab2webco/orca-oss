@@ -1,6 +1,5 @@
 import type { OrchestrationDb } from './db'
 import type { MessageRow, WorkerReportOutcome } from './types'
-import { parsePaneKey } from '../../../shared/stable-pane-id'
 import {
   noopLifecycleLog,
   rejectLifecycleMessage,
@@ -9,33 +8,14 @@ import {
   type LifecycleRejectionResult
 } from './lifecycle-rejection'
 import { enforceEnvelopeContract } from './worker-done-envelope-contract'
+import {
+  hasLifecycleAuthority,
+  buildLifecycleAuthorityRejectionReason
+} from './lifecycle-authority'
+import { reviveInferenceFailedDispatch } from './dispatch-inference-revival'
 
 export type { LifecycleRejectionCode, LifecycleRejectionResult }
-
-// Why: the tab half can change on pane break-out, while opaque legacy keys
-// have no safe equivalence beyond exact equality.
-function isSamePane(assigneePaneKey: string, senderPaneKey: string): boolean {
-  if (assigneePaneKey === senderPaneKey) {
-    return true
-  }
-  const assigneeLeaf = parsePaneKey(assigneePaneKey)?.leafId
-  const senderLeaf = parsePaneKey(senderPaneKey)?.leafId
-  return Boolean(assigneeLeaf && senderLeaf && assigneeLeaf === senderLeaf)
-}
-
-export function hasLifecycleAuthority(
-  dispatch: { assignee_handle: string | null; assignee_pane_key: string | null },
-  msg: MessageRow
-): boolean {
-  if (dispatch.assignee_pane_key) {
-    return Boolean(
-      msg.sender_pane_key && isSamePane(dispatch.assignee_pane_key, msg.sender_pane_key)
-    )
-  }
-  // Why: rows created before pane identity existed can only use the exact
-  // handle recorded at dispatch; payload knowledge alone is not authority.
-  return dispatch.assignee_handle === msg.from_handle
-}
+export { hasLifecycleAuthority } from './lifecycle-authority'
 
 export type LifecycleReconciliationResult =
   | { action: 'ignored' }
@@ -46,7 +26,8 @@ export type LifecycleReconciliationResult =
   | LifecycleRejectionResult
   | { action: 'completed'; taskId: string; dispatchId: string }
   | { action: 'failed'; taskId: string; dispatchId: string }
-  | { action: 'heartbeat_recorded'; dispatchId: string }
+  // `reopened` marks a beat that also undid a false first-signal expiry (ORCA-299).
+  | { action: 'heartbeat_recorded'; dispatchId: string; reopened?: true }
 
 function parseObjectPayload(msg: MessageRow, onInvalidJson: () => void): Record<string, unknown> {
   if (!msg.payload) {
@@ -136,10 +117,21 @@ function reconcileHeartbeatMessage(
 
   const dispatch = db.getDispatchContextById(dispatchId)
   if (!dispatch || dispatch.status !== 'dispatched') {
+    const revived = reviveInferenceFailedDispatch(db, msg, dispatchId, dispatch, onLog, 'Heartbeat')
+    if (revived.action === 'rejected') {
+      return revived.result
+    }
+    if (revived.action === 'revived') {
+      // Why: the beat that refuted the verdict is still a beat — recording it
+      // is what stops the deadline monitor from expiring the Dispatch again on
+      // the next scan.
+      db.recordHeartbeat(dispatchId, msg.created_at)
+      return { action: 'heartbeat_recorded', dispatchId, reopened: true }
+    }
     // Why: an in-flight heartbeat can arrive after completion; retain it for
     // audit history without surfacing obsolete liveness to the coordinator.
     db.markAsReadAndDelivered([msg.id])
-    onLog(`Heartbeat for inactive dispatch ${dispatchId} suppressed`)
+    onLog(`Heartbeat for inactive dispatch ${dispatchId} suppressed: ${revived.explanation}`)
     return { action: 'suppressed' }
   }
 
@@ -252,6 +244,37 @@ function reconcileWorkerDoneMessage(
     db.convertLifecycleMessageToRejection(msg.id, 'sender_not_assignee', reason)
     return { action: 'rejected', code: 'sender_not_assignee', reason }
   }
+  // Why failed-only and not `status !== 'dispatched'`: settleWorkerReport owns
+  // the settled cases, including the idempotent replay of an identical terminal
+  // outcome on a completed Dispatch — intercepting those here would turn that
+  // replay into a rejection. A *failed* Dispatch is the one case where the
+  // worker needs either a reopen or a reason it can act on.
+  if (dispatch.status === 'failed' || dispatch.status === 'circuit_broken') {
+    const revived = reviveInferenceFailedDispatch(
+      db,
+      msg,
+      dispatchId,
+      dispatch,
+      onLog,
+      'worker_done'
+    )
+    if (revived.action === 'rejected') {
+      return revived.result
+    }
+    if (revived.action === 'not_revivable') {
+      // Why (requirement 3): settleWorkerReport would reject this anyway, but
+      // with a reason about the settle attempt rather than about why the
+      // Dispatch is unreachable. A worker that delivered deserves to be told
+      // which of the two it is.
+      return rejectLifecycleMessage(
+        db,
+        msg,
+        'inactive_dispatch',
+        `worker_done cannot settle inactive dispatch ${dispatchId}: ${revived.explanation}.`,
+        onLog
+      )
+    }
+  }
   const envelopeCheck = enforceEnvelopeContract(db, msg, dispatch, outcome, payload.envelope, onLog)
   if (envelopeCheck.action === 'rejected') {
     return envelopeCheck
@@ -297,18 +320,6 @@ function reconcileWorkerDoneMessage(
   }
   onLog(`Task ${taskId} completed by worker report`)
   return { action: 'completed', taskId, dispatchId }
-}
-
-function buildLifecycleAuthorityRejectionReason(
-  dispatchId: string,
-  dispatch: { assignee_handle: string | null; assignee_pane_key: string | null },
-  msg: MessageRow
-): string {
-  return (
-    `dispatch ${dispatchId} expected handle ${dispatch.assignee_handle ?? '<unknown>'}, ` +
-    `pane ${dispatch.assignee_pane_key ?? '<legacy>'}; received handle ${msg.from_handle}, ` +
-    `pane ${msg.sender_pane_key ?? '<missing>'}`
-  )
 }
 
 function suppressEarlierHeartbeats(
