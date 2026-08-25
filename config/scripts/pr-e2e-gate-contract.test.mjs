@@ -110,6 +110,18 @@ describe('PR E2E gate contract', () => {
     }
   })
 
+  it('packages the relay before uploading the shared E2E build output', () => {
+    const buildSteps = e2eWorkflow.jobs.build.steps
+    const buildStepIndex = buildSteps.findIndex(
+      (step) => step.name === 'Build Electron app for E2E'
+    )
+    const uploadStepIndex = buildSteps.findIndex((step) => step.name === 'Upload E2E build output')
+
+    expect(buildStepIndex).toBeGreaterThan(-1)
+    expect(uploadStepIndex).toBeGreaterThan(buildStepIndex)
+    expect(buildSteps[buildStepIndex].run).toContain('pnpm run build:relay')
+  })
+
   it('keeps dedicated E2E workflows out of pull request CI', () => {
     const dedicatedWorkflows = [
       'golden-e2e-experiment.yml',

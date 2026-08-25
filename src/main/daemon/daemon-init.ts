@@ -1001,7 +1001,10 @@ export async function initDaemonPtyProvider(
     await newAdapter.establishLifecycleLease()
     releaseDaemonAdoptionLease(newSpawner.getHandle())
 
-    legacyAdapters = await createLegacyDaemonAdapters(runtimeDir)
+    legacyAdapters = await createLegacyDaemonAdapters(
+      runtimeDir,
+      app.isPackaged ? app.getVersion() : null
+    )
     routedAdapter =
       launchMode === 'degraded-new-pty-fallback'
         ? new DegradedDaemonPtyProvider({
@@ -1469,6 +1472,7 @@ function legacyDaemonProcessMayBeAlive(runtimeDir: string, protocolVersion: numb
 // Why: callers that own an isolated runtime namespace must keep discovery history out of app userData.
 export async function createLegacyDaemonAdapters(
   runtimeDir: string,
+  packagedAppVersion: string | null,
   historyPath = getHistoryDir()
 ): Promise<DaemonPtyAdapter[]> {
   const adapters: DaemonPtyAdapter[] = []
@@ -1500,7 +1504,7 @@ export async function createLegacyDaemonAdapters(
         pidPath: getDaemonPidPath(runtimeDir, protocolVersion),
         profileScope: runtimeDir,
         runtimeDir,
-        packagedAppVersion: app.isPackaged ? app.getVersion() : null,
+        packagedAppVersion,
         protocolVersion,
         historyPath
       })
