@@ -1,9 +1,33 @@
-import type { IBuffer } from '@xterm/headless'
+import type { IBuffer, IBufferCell } from '@xterm/headless'
 import {
   coalesceTerminalLineSegments,
   terminalLineColorForAnsiIndex,
+  terminalLineColorForRgb,
+  type TerminalLineColor,
   type TerminalLineSegment
 } from '../../shared/terminal-line-segments'
+
+/**
+ * A cell's foreground as one of the eight tones the grid paints.
+ *
+ * Order matters: `isFgDefault` first, because a cell can carry attributes with
+ * no colour of its own. The RGB arm is the one ORCA-296 added — it used to fall
+ * through to `undefined`, which the mapper reads as 'default', so every
+ * truecolor span in an agent pane rendered white.
+ */
+function cellForegroundColor(cell: IBufferCell): TerminalLineColor {
+  if (cell.isFgDefault()) {
+    return 'default'
+  }
+  if (cell.isFgPalette()) {
+    return terminalLineColorForAnsiIndex(cell.getFgColor())
+  }
+  if (cell.isFgRGB()) {
+    // In RGB mode getFgColor() is packed 0xRRGGBB, not an index.
+    return terminalLineColorForRgb(cell.getFgColor())
+  }
+  return 'default'
+}
 
 /**
  * First row of the tail window.
@@ -49,9 +73,7 @@ export function readBufferTailSegments(buffer: IBuffer, limit: number): Terminal
       }
       runs.push({
         text: chars === '' ? ' ' : chars,
-        color: cell.isFgDefault()
-          ? 'default'
-          : terminalLineColorForAnsiIndex(cell.isFgPalette() ? cell.getFgColor() : undefined),
+        color: cellForegroundColor(cell),
         bold: cell.isBold() !== 0,
         dim: cell.isDim() !== 0
       })

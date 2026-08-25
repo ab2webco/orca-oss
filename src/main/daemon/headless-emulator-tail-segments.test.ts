@@ -3,6 +3,8 @@ import { HeadlessEmulator } from './headless-emulator'
 
 const ESC = '\u001b'
 const sgr = (params: string): string => `${ESC}[${params}m`
+/** 24-bit foreground: the shape Claude Code and Codex actually emit. */
+const sgrRgb = (r: number, g: number, b: number): string => sgr(`38;2;${r};${g};${b}`)
 
 let emulator: HeadlessEmulator | null = null
 
@@ -26,6 +28,40 @@ describe('HeadlessEmulator.getBufferTailSegments', () => {
       ['FAIL', 'red'],
       [' done', 'default']
     ])
+  })
+
+  // ORCA-296: agents paint their TUIs in 24-bit colour, not in the 16-colour
+  // palette, so this is the only shape that exercises the branch the product
+  // fails on. A palette fixture (`sgr('31')`) passes either way — which is why
+  // the ORCA-281 E2E was green while the grid read white in the real app.
+  it('reports the colour a truecolor escape asked for', async () => {
+    // 0xcc0000 on purpose: read as a palette index it would be 13369344 % 8 = 0,
+    // i.e. 'black'. Only a reader that treats it as packed RGB says 'red'.
+    const term = await render(`ok ${sgrRgb(0xcc, 0x00, 0x00)}FAIL${sgr('0')} done`)
+    const row = term.getBufferTailSegments(4).find((r) => r.length > 0) ?? []
+    expect(row.map((s) => [s.text, s.color])).toEqual([
+      ['ok ', 'default'],
+      ['FAIL', 'red'],
+      [' done', 'default']
+    ])
+  })
+
+  it('gives a truecolor cell and its palette twin the same tone', async () => {
+    // The two paths are pinned to one policy, so a TUI that paints xterm's own
+    // red and one that sends SGR 31 cannot disagree about what the user sees.
+    const term = await render(
+      `${sgrRgb(0x4e, 0x9a, 0x06)}rgb${sgr('0')} ${sgr('32')}pal${sgr('0')}`
+    )
+    const row = term.getBufferTailSegments(4).find((r) => r.length > 0) ?? []
+    expect(row.find((s) => s.text === 'rgb')?.color).toBe('green')
+    expect(row.find((s) => s.text === 'pal')?.color).toBe('green')
+  })
+
+  it('folds a bright truecolor hue onto its plain tone', async () => {
+    // Same rule the palette path already documents for 8-15.
+    const term = await render(`${sgrRgb(0xef, 0x29, 0x29)}bright${sgr('0')}`)
+    const row = term.getBufferTailSegments(4).find((r) => r.length > 0) ?? []
+    expect(row.find((s) => s.text === 'bright')?.color).toBe('red')
   })
 
   it('never leaks an escape into the text', async () => {
