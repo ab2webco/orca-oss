@@ -67,6 +67,7 @@ function createSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings
     markdownReviewToolsEnabled: true,
     terminalFontSize: 14,
     terminalFontFamily: 'JetBrains Mono',
+    terminalFontWeightBold: 700,
     terminalFontWeight: 500,
     terminalLineHeight: 1,
     terminalScrollSensitivity: 1.15,

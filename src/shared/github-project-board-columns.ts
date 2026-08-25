@@ -1,9 +1,9 @@
-import { groupRowsByField, sortRows } from './github-project-group-sort'
+import { groupRowsByField, sortRows } from './github/project-group-sort'
 import type {
   GitHubProjectField,
   GitHubProjectRow,
   GitHubProjectTable
-} from './github-project-types'
+} from './github/project-types'
 
 export type GitHubProjectBoardColumn = {
   key: string

@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type {
-  ClaudeLivePtyAccountInfo,
-  ClaudeManagedAccountSummary,
-  ClaudeRateLimitAccountsState,
-  ClaudeSessionFailoverCopyResult,
-  CodexRateLimitAccountsState
-} from '../../../shared/types'
+import type { ClaudeManagedAccountSummary, ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../../shared/types'
+import type { ClaudeLivePtyAccountInfo, ClaudeSessionFailoverCopyResult } from '../../../shared/managed-account-types'
 import type { PreloadApi } from '../../../preload/api-types'
 import type { RateLimitState, ProviderRateLimits } from '../../../shared/rate-limit-types'
 

@@ -1,8 +1,5 @@
 import type { ClaudeTerminalSwitchReadiness } from '../../shared/claude-terminal-account-switch'
-import type {
-  ClaudeTerminalAccountOwnership,
-  ClaudeTerminalAccountReport
-} from '../../shared/types'
+import type { ClaudeTerminalAccountOwnership, ClaudeTerminalAccountReport } from '../../shared/managed-account-types'
 
 /**
  * The live-pty gate's view of one PTY, read through an interface so the

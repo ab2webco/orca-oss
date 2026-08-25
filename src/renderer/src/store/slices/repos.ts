@@ -47,13 +47,10 @@ import { normalizeRepoBadgeColor } from '../../../../shared/repo-badge-color'
 import { applyManualRepoOrder, getManualRepoOrder } from '../../../../shared/manual-repo-order'
 import { getProjectGroupSubtreeIds } from '../../../../shared/project-groups'
 import { isPathInsideOrEqual } from '../../../../shared/cross-platform-path'
-import { getRepoIdFromWorktreeId } from '../../../../shared/worktree-id'
+import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
+import { structuralValuesEqual } from '../../../../shared/structural-value-equality'
 import { selectProjectGroupRemovalTargets } from './project-group-removal-targets'
-import {
-  areValuesEqual,
-  reconcileCatalogRows,
-  reconcileFetchedRepos
-} from './repo-identity-reconcile'
+import { reconcileCatalogRows, reconcileFetchedRepos } from './repo-identity-reconcile'
 import { retainValidFilterRepoIds } from './repo-filter-selection'
 import {
   mergeSshRepoReadoptions,
@@ -97,7 +94,7 @@ import { isRemovedRuntimeHostId } from './stale-runtime-host-rows'
 import {
   normalizeCustomWorktreeVisibilitySources,
   normalizeWorktreeVisibilitySourcePreferences
-} from '../../../../shared/worktree-visibility-sources'
+} from '../../../../shared/worktree/visibility-sources'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
@@ -675,10 +672,13 @@ function getMergedSourceRepoIdsForHostRefresh(
   reposById: ReadonlyMap<string, readonly Repo[]>,
   hostId: string
 ): string[] {
+  // Why: current-first keeps the order independent of which host refreshed. Prefixing the
+  // cross-host remainder made it a function of hostId, so a cross-host project's ids oscillated
+  // between refreshes and the projects reconcile could never reuse the row.
   return [
     ...new Set([
-      ...getSourceRepoIdsOutsideHost(previous, reposById, hostId),
-      ...getCurrentSourceRepoIds(current, new Set(reposById.keys()))
+      ...getCurrentSourceRepoIds(current, new Set(reposById.keys())),
+      ...getSourceRepoIdsOutsideHost(previous, reposById, hostId)
     ])
   ]
 }
@@ -1022,7 +1022,7 @@ function mergeByIdentity<T>(
       changed = true
       continue
     }
-    if (areValuesEqual(merged[index], entry)) {
+    if (structuralValuesEqual(merged[index], entry)) {
       continue
     }
     merged[index] = entry
@@ -1043,7 +1043,8 @@ function unchangedMergeSource<T>(
 
 // Why: the sidebar effect watching these catalog arrays is the only thing that refills the
 // folder path-status cache, so a no-op refetch must not wipe it — nothing would repopulate it.
-function catalogRowsUnchanged<T>(next: readonly T[], previous: readonly T[]): boolean {
+// Element identity only; `structuralValuesEqual` is the structural counterpart.
+function arrayElementsUnchanged<T>(next: readonly T[], previous: readonly T[]): boolean {
   return (
     next === previous ||
     (next.length === previous.length && next.every((row, index) => row === previous[index]))
@@ -1061,19 +1062,10 @@ function mergeFetchedReposForHost(
     const existingHostId = getRepoExecutionHostId(repo)
     return existingHostId !== hostId || fetchedIdentities.has(getRepoHostIdentity(repo))
   })
-  const merged = [...preserved]
-  const indexByIdentity = new Map(merged.map((repo, index) => [getRepoHostIdentity(repo), index]))
-  for (const repo of fetchedWithProjectGroups) {
-    const identity = getRepoHostIdentity(repo)
-    const existingIndex = indexByIdentity.get(identity)
-    if (existingIndex === undefined) {
-      indexByIdentity.set(identity, merged.length)
-      merged.push(repo)
-      continue
-    }
-    merged[existingIndex] = repo
-  }
-  return reconcileFetchedRepos(previous, merged)
+  return reconcileFetchedRepos(
+    previous,
+    mergeByIdentity(preserved, fetchedWithProjectGroups, getRepoHostIdentity)
+  )
 }
 
 function applyInheritedProjectGroups(previous: readonly Repo[], fetched: readonly Repo[]): Repo[] {
@@ -2135,7 +2127,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
           ...reconcileReadoptedSshWorktreeState(s, s.pendingSshRepoReadoptions),
           ...mergedProjectCompatibility,
-          ...(catalogRowsUnchanged(prunedRepos, s.repos)
+          ...(arrayElementsUnchanged(prunedRepos, s.repos)
             ? {}
             : { folderWorkspacePathStatuses: {} }),
           activeRepoId: s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
@@ -2288,7 +2280,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
           ...reconcileReadoptedSshWorktreeState(s, s.pendingSshRepoReadoptions),
           ...mergedProjectCompatibility,
-          ...(catalogRowsUnchanged(finalizedRepos, s.repos)
+          ...(arrayElementsUnchanged(finalizedRepos, s.repos)
             ? {}
             : { folderWorkspacePathStatuses: {} }),
           activeRepoId: s.activeRepoId,
@@ -2377,7 +2369,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const { projectGroups } = mergeFetchedProjectGroupCatalog(catalog, current.projectGroups)
         return {
           projectGroups,
-          ...(catalogRowsUnchanged(projectGroups, current.projectGroups)
+          ...(arrayElementsUnchanged(projectGroups, current.projectGroups)
             ? {}
             : { folderWorkspacePathStatuses: {} })
         }
@@ -2400,7 +2392,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const { projectGroups } = mergeFetchedProjectGroupCatalog(catalog, s.projectGroups)
         return {
           projectGroups,
-          ...(catalogRowsUnchanged(projectGroups, s.projectGroups)
+          ...(arrayElementsUnchanged(projectGroups, s.projectGroups)
             ? {}
             : { folderWorkspacePathStatuses: {} })
         }
@@ -2464,7 +2456,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         )
         return {
           folderWorkspaces,
-          ...(catalogRowsUnchanged(folderWorkspaces, current.folderWorkspaces)
+          ...(arrayElementsUnchanged(folderWorkspaces, current.folderWorkspaces)
             ? {}
             : { folderWorkspacePathStatuses: {} })
         }
@@ -2502,7 +2494,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         )
         return {
           folderWorkspaces,
-          ...(catalogRowsUnchanged(folderWorkspaces, current.folderWorkspaces)
+          ...(arrayElementsUnchanged(folderWorkspaces, current.folderWorkspaces)
             ? {}
             : { folderWorkspacePathStatuses: {} })
         }
@@ -3399,10 +3391,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     } catch (err) {
       console.error('Failed to delete project host setup:', err)
       const message = err instanceof Error ? err.message : String(err)
-      toast.error(translate('auto.store.slices.repos.c6e022ddfc', 'Failed to add project'), {
-        description: message,
-        duration: ERROR_TOAST_DURATION
-      })
+      toast.error(
+        translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
+        {
+          description: message,
+          duration: ERROR_TOAST_DURATION
+        }
+      )
       return null
     }
   },

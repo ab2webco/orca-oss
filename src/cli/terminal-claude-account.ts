@@ -1,4 +1,4 @@
-import type { ClaudeTerminalAccountOwnership, ClaudeTerminalAccountReport } from '../shared/types'
+import type { ClaudeTerminalAccountOwnership, ClaudeTerminalAccountReport } from '../shared/managed-account-types'
 import type { RuntimeClient } from './runtime-client'
 import { resolveCallerTerminalIdentity } from './caller-terminal-identity'
 

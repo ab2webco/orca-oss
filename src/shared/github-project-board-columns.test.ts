@@ -4,7 +4,7 @@ import type {
   GitHubProjectRow,
   GitHubProjectTable,
   GitHubProjectView
-} from './github-project-types'
+} from './github/project-types'
 import { buildGitHubProjectBoardColumns } from './github-project-board-columns'
 
 const statusField: GitHubProjectField = {

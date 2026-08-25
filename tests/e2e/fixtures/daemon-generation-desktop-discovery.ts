@@ -28,7 +28,7 @@ export async function createDesktopDiscoveredDaemonRouter(options: {
   })
   // Why: exercise the desktop startup scanner itself, including versioned
   // named-pipe probing and legacy-adapter construction, not a fixture copy.
-  const legacy = await createLegacyDaemonAdapters(options.daemonDir, options.historyDir)
+  const legacy = await createLegacyDaemonAdapters(options.daemonDir, null, options.historyDir)
   const discoveredProtocols = legacy.map((adapter) => adapter.protocolVersion)
   const expectedProtocols = options.generations
     .filter((generation) => generation.protocolVersion !== options.currentProtocolVersion)

@@ -1,5 +1,5 @@
 import { parsePtySessionId } from '../../shared/pty-session-id-format'
-import { splitWorktreeId } from '../../shared/worktree-id'
+import { splitWorktreeId } from '../../shared/worktree/id'
 import type {
   ClaudeAccountBlockingTerminal,
   ClaudeAccountWorktreeUsage,

@@ -1,8 +1,9 @@
 import { getRepoExecutionHostId, normalizeExecutionHostId } from './execution-host'
+import { getRepoHostIdentityForParts } from './repo-host-identity'
 import type { ManualRepoOrderEntry, Repo } from './types'
 
 function getEntryKey(entry: ManualRepoOrderEntry): string {
-  return `${entry.hostId}\0${entry.repoId}`
+  return getRepoHostIdentityForParts(entry.repoId, entry.hostId)
 }
 
 export function normalizeManualRepoOrder(value: unknown): ManualRepoOrderEntry[] {

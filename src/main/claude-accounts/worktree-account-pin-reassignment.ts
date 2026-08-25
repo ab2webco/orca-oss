@@ -1,4 +1,4 @@
-import { getRepoIdFromWorktreeId } from '../../shared/worktree-id'
+import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 
 export type ClaudeWorktreePinSource = {
   claudeAccountId?: string | null

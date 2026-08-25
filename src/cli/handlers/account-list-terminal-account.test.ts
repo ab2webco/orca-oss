@@ -3,7 +3,7 @@ import { ACCOUNT_HANDLERS } from './account'
 import type { HandlerContext } from '../dispatch'
 import type { RuntimeClient } from '../runtime-client'
 import { RuntimeClientError } from '../runtime-client'
-import type { ClaudeTerminalAccountReport } from '../../shared/types'
+import type { ClaudeTerminalAccountReport } from '../../shared/managed-account-types'
 
 const PANE_HANDLE = 'orca-terminal-7'
 

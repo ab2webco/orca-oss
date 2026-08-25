@@ -14,7 +14,7 @@ import {
   type LinearGroupBy,
   type LinearOrderBy,
   type LinearViewMode
-} from '../../../shared/linear-issue-view-resume-state'
+} from '../../../shared/linear/issue-view-resume-state'
 import { getTaskPresetQuery } from '../../../shared/task-preset-query'
 import type { TaskProvider, TaskViewPresetId } from '../../../shared/types'
 import type { PlaneWorkItemFilter } from '../../../shared/plane-types'
@@ -53,7 +53,7 @@ export type {
   LinearGroupBy,
   LinearOrderBy,
   LinearViewMode
-} from '../../../shared/linear-issue-view-resume-state'
+} from '../../../shared/linear/issue-view-resume-state'
 
 export function LinearIcon({ className }: { className?: string }): React.JSX.Element {
   return (

@@ -19,7 +19,7 @@ vi.mock('./project-view/internals', async (importOriginal) => ({
 import {
   GITHUB_PROJECT_REF_INPUT_MAX_BYTES,
   GITHUB_PROJECT_REF_INPUT_TOO_LARGE_ERROR
-} from '../../shared/github-project-ref-input'
+} from '../../shared/github/project-ref-input'
 import {
   PROJECT_VIEW_OWNER_CACHE_MAX_ENTRIES,
   _getProjectViewCacheSizesForTests,

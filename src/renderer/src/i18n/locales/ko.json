@@ -615,7 +615,8 @@
         "wakeEphemeralVmFailed": "임시 VM 워크트리 활성화 실패"
       },
       "ephemeralVmWorkspaceTarget": {
-        "projectRootRegistrationFailed": "런타임에서 레시피로 생성된 프로젝트 루트 등록 실패"
+        "projectRootRegistrationFailed": "런타임에서 레시피로 생성된 프로젝트 루트 등록 실패",
+        "provisionedRootRequiresSsh": "프로비저닝된 루트 레시피는 현재 직접 SSH 연결이 필요합니다."
       },
       "blocked": {
         "notification": {
@@ -766,6 +767,9 @@
         "lan": "사설 LAN 주소",
         "public": "공용 주소",
         "custom": "사용자 지정 호스트 이름"
+      },
+      "ephemeralVmWorktreeCreation": {
+        "sparseCheckoutUnsupported": "프로비저닝된 루트 레시피는 스파스 체크아웃을 지원하지 않습니다."
       }
     },
     "hooks": {
@@ -909,6 +913,12 @@
         "description": "Orca에서 실행 중인 에이전트나 터미널 도구가 보호된 파일에 접근하려고 하면 macOS 권한 메시지가 표시될 수 있습니다. 이러한 요청을 줄이려면 설정에서 전체 디스크 접근 권한을 허용하세요.",
         "openSettings": "설정 열기",
         "dismiss": "다시 표시하지 않기"
+      },
+      "useMacTccAttributionSeveredNotice": {
+        "title": "macOS 권한이 Orca 터미널에 적용되지 않을 수 있습니다",
+        "description": "실행 중인 Orca 터미널은 이전 Orca 설치가 시작한 데몬에서 호스팅됩니다. macOS가 Orca의 접근성, 자동화 또는 보호된 파일 권한을 이 터미널에 적용하지 않을 수 있습니다. 접근을 복원하려면 세션 관리에서 데몬을 다시 시작하세요. 실행 중인 Orca 터미널이 모두 닫힙니다.",
+        "openManageSessions": "세션 관리 열기",
+        "dismiss": "닫기"
       }
     },
     "components": {
@@ -2835,7 +2845,8 @@
             "e4aa243f8c": "데몬 재시작",
             "a7e2fd2699": "이슈 등록",
             "5c8ce20be6": "문제가 계속되면",
-            "cc6d997c65": "오래된 데몬 상태를 지우려면 여기에서 terminal 데몬을 다시 시작하세요."
+            "cc6d997c65": "오래된 데몬 상태를 지우려면 여기에서 terminal 데몬을 다시 시작하세요.",
+            "sessionUnavailable": "Orca가 호스트에서 이 창의 터미널 세션에 다시 연결하지 못했습니다. 계속하려면 새 터미널을 여세요."
           },
           "TerminalPane": {
             "ac112e9036": "제목 삭제",
@@ -10541,6 +10552,10 @@
           "hourlyWarning": "시간별 빌드는 macOS 전용이며 테스트 없이 main에서 바로 배포됩니다. 안정 빌드를 함께 준비해 두세요.",
           "dailyWarning": "일별 빌드는 macOS 전용이며 테스트 없이 main에서 바로 배포됩니다. 안정 빌드를 함께 준비해 두세요.",
           "adhocWarning": "애드혹 빌드는 macOS 전용이며 아직 병합되지 않은 브랜치에서 만들어집니다. 만든 사람이 중단할 수 있으니 안정 빌드를 함께 준비해 두세요."
+        },
+        "TerminalAdvancedTypographyControls": {
+          "f5fa1a08f1": "굵은 글꼴 두께",
+          "0e0d1ee15a": "글꼴 두께와 별도로 조정됩니다. 일부 글꼴은 여러 값을 하나의 자형에 매핑하므로, 굵게가 바뀌지 않아 보이면 글꼴 두께를 낮추거나 다른 글꼴을 선택하세요."
         }
       },
       "right": {
@@ -15135,7 +15150,8 @@
       "project": "프로젝트",
       "workspaceStatus": "워크스페이스 상태",
       "reviewStatus": "PR / MR 상태",
-      "clearAll": "모든 필터 지우기"
+      "clearAll": "모든 필터 지우기",
+      "removeChip": "{{filter}} 제거"
     },
     "search": {
       "placeholder": "워크트리, 프로젝트 또는 에이전트 검색…",
@@ -15155,21 +15171,51 @@
     },
     "map": {
       "host": {
-        "all": "모든 호스트",
         "local": "로컬",
         "ssh": "SSH",
         "wsl": "WSL",
         "remote": "원격"
       },
       "liveContainmentMap": "실시간 포함 관계 맵",
-      "hostFilter": "호스트 필터",
       "empty": "현재 필터와 일치하는 에이전트가 없습니다.",
       "canvasLabel": "프로젝트, 작업 공간, 에이전트의 중첩 맵",
       "zoomOut": "축소",
       "zoomIn": "확대",
       "fit": "맞춤",
       "projectCount": "에이전트 {{agents}}개 · 작업 공간 {{workspaces}}개",
-      "agentCount": "에이전트 {{count}}개"
+      "agentCount": "에이전트 {{count}}개",
+      "filters": {
+        "orchestrationLinksHidden": "오케스트레이션 링크 숨김",
+        "title": "맵 컨트롤",
+        "reset": "재설정",
+        "ofTotalAgents": "{{total}}개 에이전트 중 표시됨",
+        "quickViews": "빠른 보기",
+        "agents": "에이전트",
+        "time": "시간",
+        "lifespan": "세션 지속 시간",
+        "sinceMessage": "마지막 메시지 이후",
+        "timeInState": "현재 상태 유지 시간",
+        "timeMinimum": "{{label}} 최소",
+        "timeMaximum": "{{label}} 최대",
+        "timeAny": "제한 없음",
+        "timeRangeCount": "범위 {{count}}개",
+        "resetRanges": "범위 재설정",
+        "summaryAll": "모두",
+        "summaryCount": "{{total}}개 중 {{shown}}개",
+        "summarySelected": "{{count}}개 선택됨",
+        "workspace": "워크스페이스",
+        "stateChip": "상태: {{states}}"
+      },
+      "quickView": {
+        "everything": "전체",
+        "attention": "확인 필요",
+        "stuck": "멈춤",
+        "unread": "읽지 않음",
+        "recent": "최근 30분",
+        "longRunning": "장시간 실행",
+        "stale": "3일 이상 정체",
+        "orchestration": "오케스트레이션"
+      }
     },
     "state": {
       "blocked": "차단됨",

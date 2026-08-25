@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines */
-import { ipcMain, type BrowserWindow } from 'electron'
+import { app, ipcMain, type BrowserWindow } from 'electron'
 import { readFile, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
@@ -13,7 +13,7 @@ import { isFolderRepo } from '../../shared/repo-kind'
 import { readBranchRenameFailureOutputForDisplay } from '../agent-hooks/branch-rename-failure-output'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { inspectSetupScriptImportCandidates } from '../../shared/setup-script-imports'
-import { planWorktreeSortOrderUpdates } from '../../shared/worktree-sort-order-update'
+import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
 import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-projection'
 import { TaskSourceContextSchema } from '../../shared/task-source-context-schema'
 import { WorkspaceLinkedItemSchema } from '../../shared/workspace-linked-item-schema'
@@ -24,6 +24,7 @@ import { isPathInsideOrEqual, isWindowsAbsolutePathLike } from '../../shared/cro
 import { deleteWorktreeHistoryDir } from '../terminal-history-deletion'
 import type {
   AutomationWorkspaceProvenance,
+  AdoptProvisionedRootArgs,
   CliWorkspaceProvenance,
   CreateWorktreeArgs,
   CreateWorktreeResult,
@@ -41,7 +42,7 @@ import type {
   WorkspaceLineage,
   WorktreeMeta
 } from '../../shared/types'
-import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
+import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
 import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
@@ -70,11 +71,11 @@ import {
   buildKnownOrcaWorkspaceLayouts,
   isLegacyRepoForExternalWorktreeVisibility,
   toDetectedWorktree
-} from '../../shared/worktree-ownership'
+} from '../../shared/worktree/ownership'
 import {
   createWorktreeVisibilitySourceMatcher,
   normalizeCustomWorktreeVisibilitySources
-} from '../../shared/worktree-visibility-sources'
+} from '../../shared/worktree/visibility-sources'
 import {
   assertWorktreeCleanForRemoval,
   forceDeleteLocalBranch,
@@ -151,6 +152,7 @@ import {
 } from '../ssh/ssh-provider-authority'
 import { createSenderScopedRequestCancellations } from './sender-scoped-request-cancellation'
 import { preservedBranchCleanupScopeKey } from '../../shared/preserved-branch-cleanup'
+import { adoptProvisionedRootSshCheckout } from '../provisioned-root-ssh-adoption'
 
 type CreateWorktreeArgsWithSystemProvenance = CreateWorktreeArgs & {
   automationProvenance?: AutomationWorkspaceProvenance
@@ -242,7 +244,7 @@ import {
   FOLDER_WORKSPACE_INSTANCE_SEPARATOR,
   getRepoIdFromWorktreeId,
   getWorktreePathBasenameFromId
-} from '../../shared/worktree-id'
+} from '../../shared/worktree/id'
 import { prefetchWorktreeCreateBase } from '../worktree-create-base-prefetch'
 import {
   getLocalProjectGitExecOptions,
@@ -1844,6 +1846,7 @@ export function registerWorktreeHandlers(
   ipcMain.removeHandler('worktrees:forgetRemovedForExecutionHost')
   ipcMain.removeHandler('worktrees:cancelListDetected')
   ipcMain.removeHandler('worktrees:create')
+  ipcMain.removeHandler('worktrees:adoptProvisionedRoot')
   ipcMain.removeHandler('worktrees:prefetchCreateBase')
   ipcMain.removeHandler('worktrees:resolvePrBase')
   ipcMain.removeHandler('worktrees:resolveMrBase')
@@ -2280,6 +2283,62 @@ export function registerWorktreeHandlers(
           branch: result.worktree.branch
         })
 
+        return result
+      })
+    }
+  )
+
+  ipcMain.handle(
+    'worktrees:adoptProvisionedRoot',
+    async (_event, rawArgs: AdoptProvisionedRootArgs): Promise<CreateWorktreeResult> => {
+      const args = normalizeLinkedWorkItemFields(rawArgs)
+      return withWorktreeSpan({ stage: 'create' }, async () => {
+        const repo = findExactRepoOwner(store, args.repoId, args.executionHostId)
+        if (!repo || isFolderRepo(repo)) {
+          throw new Error('Provisioned-root repository ownership is missing or ambiguous.')
+        }
+        const sourceParse = workspaceSourceSchema.safeParse(args.telemetrySource)
+        const source: WorkspaceSource = sourceParse.success ? sourceParse.data : 'unknown'
+        const automationProvenance = resolveAutomationWorkspaceProvenance({
+          authority: runtime,
+          repoSelector: args.repoId,
+          repo,
+          request: args.automationProvenanceRequest
+        })
+        let result: CreateWorktreeResult
+        try {
+          result = await adoptProvisionedRootSshCheckout({
+            userDataPath: app.getPath('userData'),
+            request: { ...args, automationProvenance },
+            repo,
+            store,
+            isRepoCurrent: () => isCapturedRepoCurrent(store, repo, args.executionHostId)
+          })
+        } catch (error) {
+          settleAutomationWorkspaceProvenanceRequestOnFailure(
+            args.automationProvenanceRequest,
+            error
+          )
+          track('workspace_create_failed', {
+            source,
+            error_class: classifyWorkspaceCreateError(error),
+            ...getCohortAtEmit()
+          })
+          throw error
+        }
+        finishAutomationWorkspaceProvenanceRequest(args.automationProvenanceRequest)
+        track('workspace_created', {
+          source,
+          from_existing_branch: false,
+          ...getCohortAtEmit()
+        })
+        notifyWorktreesChanged(mainWindow, repo.id)
+        options?.onWorktreeLifecycle?.({
+          kind: 'created',
+          worktreeId: result.worktree.id,
+          path: result.worktree.path,
+          branch: result.worktree.branch
+        })
         return result
       })
     }

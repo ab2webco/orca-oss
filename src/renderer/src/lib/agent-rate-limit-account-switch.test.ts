@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type {
-  ClaudeManagedAccountSummary,
-  ClaudeSessionFailoverCopyResult
-} from '../../../shared/types'
+import type { ClaudeManagedAccountSummary } from '../../../shared/types'
+import type { ClaudeSessionFailoverCopyResult } from '../../../shared/managed-account-types'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
 
 const callRuntimeRpc = vi.fn<(...args: unknown[]) => Promise<unknown>>()

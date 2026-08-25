@@ -11,7 +11,7 @@ import type {
   GitHubProjectRow,
   GitHubProjectTable,
   GitHubProjectView
-} from '../../../../shared/github-project-types'
+} from '../../../../shared/github/project-types'
 import ProjectBoardView from './ProjectBoardView'
 
 afterEach(cleanup)

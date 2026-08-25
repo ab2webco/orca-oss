@@ -140,7 +140,6 @@ describe('openWorkspaceBrowserTab', () => {
       defaultBrowserSessionProfileId: 'client-profile',
       defaultBrowserSessionProfileIdByHostId: {}
     }
-
     await openWorkspaceBrowserTab({
       workspaceId: WORKSPACE_ID,
       url: 'https://example.com/pinned',

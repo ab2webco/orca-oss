@@ -172,7 +172,7 @@ import type {
 import type { WorkspaceSpaceScanProgress } from '../shared/workspace-space-types'
 import type { WorkspaceCleanupScanProgress } from '../shared/workspace-cleanup'
 import type { WorkspacePortAdvertisedUrlChangedEvent } from '../shared/workspace-ports'
-import type { GhAuthDiagnostic } from '../shared/github-auth-types'
+import type { GhAuthDiagnostic } from '../shared/github/auth-types'
 import type { TaskSourceContext } from '../shared/task-source-context'
 import type {
   AddIssueCommentBySlugArgs,
@@ -201,7 +201,7 @@ import type {
   UpdateIssueTypeBySlugArgs,
   UpdatePullRequestBySlugArgs,
   UpdateProjectItemFieldArgs
-} from '../shared/github-project-types'
+} from '../shared/github/project-types'
 import {
   richMarkdownContextMenuCommandChannel,
   richMarkdownContextMenuTargetChannel,
@@ -823,6 +823,8 @@ const api = {
     listAll: () => ipcRenderer.invoke('worktrees:listAll'),
 
     create: (args) => ipcRenderer.invoke('worktrees:create', args),
+
+    adoptProvisionedRoot: (args) => ipcRenderer.invoke('worktrees:adoptProvisionedRoot', args),
 
     onCreateProgress: (
       callback: (data: { creationId?: string; phase: 'fetching' | 'creating' }) => void
@@ -3927,6 +3929,7 @@ const api = {
         requestId: string
         url: string
         worktreeId?: string
+        browserPageId?: string
         sessionProfileId?: string | null
         sessionPartition?: string
         activate?: boolean
@@ -3938,6 +3941,7 @@ const api = {
           requestId: string
           url: string
           worktreeId?: string
+          browserPageId?: string
           sessionProfileId?: string | null
           sessionPartition?: string
           activate?: boolean
@@ -3986,7 +3990,11 @@ const api = {
       ipcRenderer.on('browser:requestTabClose', listener)
       return () => ipcRenderer.removeListener('browser:requestTabClose', listener)
     },
-    replyTabClose: (reply: { requestId: string; error?: string }): void => {
+    replyTabClose: (reply: {
+      requestId: string
+      error?: string
+      code?: 'browser_tab_not_found'
+    }): void => {
       ipcRenderer.send('browser:tabCloseReply', reply)
     },
     onNewTerminalTab: (callback: () => void): (() => void) => {

@@ -14,7 +14,7 @@ import type {
   GitHubProjectFieldMutationValue,
   GitHubProjectRow,
   GitHubProjectTable
-} from '../../../../shared/github-project-types'
+} from '../../../../shared/github/project-types'
 
 type Props = {
   table: GitHubProjectTable

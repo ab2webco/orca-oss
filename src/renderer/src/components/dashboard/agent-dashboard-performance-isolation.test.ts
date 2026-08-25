@@ -26,9 +26,11 @@ describe('agent dashboard performance isolation', () => {
   it('keeps map computation out of the main-renderer drawer', () => {
     const board = source('components/dashboard-popout/AgentKanbanBoard.tsx')
     const drawer = source('components/dashboard/AgentDashboardDrawer.tsx')
+    const toolbar = source('components/dashboard-popout/AgentDashboardToolbar.tsx')
 
     expect(board).toContain("import('./AgentDashboardMapView')")
     expect(board).not.toMatch(/from ['"].\/(?:AgentMap|useAgentMap|agent-map-)/)
+    expect(toolbar).not.toMatch(/from ['"].\/(?:AgentMap|useAgentMap|agent-map-)/)
     // The guard is about the map, not which of the other views opens: the
     // drawer must never mount the map in the main renderer (ORCA-234).
     expect(drawer).not.toContain('initialView="map"')

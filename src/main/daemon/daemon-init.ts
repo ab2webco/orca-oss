@@ -955,7 +955,9 @@ export async function initDaemonPtyProvider(
       socketPath: info.socketPath,
       tokenPath: info.tokenPath,
       pidPath: getDaemonPidPath(runtimeDir),
-      profileScope: runtimeDir
+      profileScope: runtimeDir,
+      runtimeDir,
+      packagedAppVersion: app.isPackaged ? app.getVersion() : null
     })
     releaseDaemonAdoptionLease(newSpawner.getHandle())
     await abortedStartupAdapter.disconnectOnly()
@@ -967,6 +969,8 @@ export async function initDaemonPtyProvider(
     tokenPath: info.tokenPath,
     pidPath: getDaemonPidPath(runtimeDir),
     profileScope: runtimeDir,
+    runtimeDir,
+    packagedAppVersion: app.isPackaged ? app.getVersion() : null,
     historyPath: getHistoryDir(),
     // Why: on daemon death, ensureConnected() detects the dead socket and calls this to fork a replacement before retrying.
     respawn: async (reason: DaemonRespawnReason) => {
@@ -981,9 +985,9 @@ export async function initDaemonPtyProvider(
         if (!restartInFlight) {
           trackDaemonRetired('died_respawn')
         }
-      } else if (reason === 'unhealthy_resolver') {
+      } else if (reason === 'unhealthy_resolver' || reason === 'severed_tcc_attribution') {
         // Must reach the launcher below without an await in between; see the consume site.
-        attributedReplaceReason = 'unhealthy_resolver'
+        attributedReplaceReason = reason
       }
       newSpawner.resetHandle()
       await newSpawner.ensureRunning()
@@ -997,7 +1001,10 @@ export async function initDaemonPtyProvider(
     await newAdapter.establishLifecycleLease()
     releaseDaemonAdoptionLease(newSpawner.getHandle())
 
-    legacyAdapters = await createLegacyDaemonAdapters(runtimeDir)
+    legacyAdapters = await createLegacyDaemonAdapters(
+      runtimeDir,
+      app.isPackaged ? app.getVersion() : null
+    )
     routedAdapter =
       launchMode === 'degraded-new-pty-fallback'
         ? new DegradedDaemonPtyProvider({
@@ -1275,6 +1282,8 @@ async function runRestartDaemon(): Promise<RestartDaemonResult> {
     tokenPath: info.tokenPath,
     pidPath: getDaemonPidPath(runtimeDir),
     profileScope: runtimeDir,
+    runtimeDir,
+    packagedAppVersion: app.isPackaged ? app.getVersion() : null,
     historyPath: getHistoryDir(),
     respawn: async (reason: DaemonRespawnReason) => {
       // Why: attribute rather than emit — the launcher below is the one that completes the
@@ -1288,9 +1297,9 @@ async function runRestartDaemon(): Promise<RestartDaemonResult> {
         if (!restartInFlight) {
           trackDaemonRetired('died_respawn')
         }
-      } else if (reason === 'unhealthy_resolver') {
+      } else if (reason === 'unhealthy_resolver' || reason === 'severed_tcc_attribution') {
         // Must reach the launcher below without an await in between; see the consume site.
-        attributedReplaceReason = 'unhealthy_resolver'
+        attributedReplaceReason = reason
       }
       currentSpawner.resetHandle()
       await currentSpawner.ensureRunning()
@@ -1463,6 +1472,7 @@ function legacyDaemonProcessMayBeAlive(runtimeDir: string, protocolVersion: numb
 // Why: callers that own an isolated runtime namespace must keep discovery history out of app userData.
 export async function createLegacyDaemonAdapters(
   runtimeDir: string,
+  packagedAppVersion: string | null,
   historyPath = getHistoryDir()
 ): Promise<DaemonPtyAdapter[]> {
   const adapters: DaemonPtyAdapter[] = []
@@ -1493,6 +1503,8 @@ export async function createLegacyDaemonAdapters(
         tokenPath,
         pidPath: getDaemonPidPath(runtimeDir, protocolVersion),
         profileScope: runtimeDir,
+        runtimeDir,
+        packagedAppVersion,
         protocolVersion,
         historyPath
       })

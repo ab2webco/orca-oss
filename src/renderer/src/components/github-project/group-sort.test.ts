@@ -8,8 +8,8 @@ import type {
   GitHubProjectSort,
   GitHubProjectTable,
   GitHubProjectView
-} from '../../../../shared/github-project-types'
-import { groupRows, groupRowsByField, sortRows } from '../../../../shared/github-project-group-sort'
+} from '../../../../shared/github/project-types'
+import { groupRows, groupRowsByField, sortRows } from '../../../../shared/github/project-group-sort'
 
 const singleSelectField: GitHubProjectField = {
   kind: 'single-select',

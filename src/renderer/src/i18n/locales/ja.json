@@ -615,7 +615,8 @@
         "wakeEphemeralVmFailed": "一時的なVMワークスペースの起動に失敗しました"
       },
       "ephemeralVmWorkspaceTarget": {
-        "projectRootRegistrationFailed": "レシピによって作成されたプロジェクトルートをランタイムに登録できませんでした。"
+        "projectRootRegistrationFailed": "レシピによって作成されたプロジェクトルートをランタイムに登録できませんでした。",
+        "provisionedRootRequiresSsh": "プロビジョニング済みルートのレシピには、現時点では直接の SSH 接続が必要です。"
       },
       "blocked": {
         "notification": {
@@ -766,6 +767,9 @@
         "lan": "プライベート LAN アドレス",
         "public": "パブリックアドレス",
         "custom": "カスタムホスト名"
+      },
+      "ephemeralVmWorktreeCreation": {
+        "sparseCheckoutUnsupported": "プロビジョニング済みルートのレシピはスパースチェックアウトに対応していません。"
       }
     },
     "hooks": {
@@ -909,6 +913,12 @@
         "description": "Orca で実行中の Agent やターミナルツールが保護されたファイルにアクセスしようとすると、macOS の権限メッセージが表示されることがあります。これらの確認を減らすには、設定でフルディスクアクセスを許可してください。",
         "openSettings": "設定を開く",
         "dismiss": "今後表示しない"
+      },
+      "useMacTccAttributionSeveredNotice": {
+        "title": "macOS の権限が Orca のターミナルに適用されない可能性があります",
+        "description": "実行中の Orca ターミナルは、以前の Orca インストールが起動したデーモン上でホストされています。macOS が Orca のアクセシビリティ、オートメーション、保護されたファイルの権限をこれらに適用しない場合があります。アクセスを復元するには、セッション管理からデーモンを再起動してください。実行中の Orca ターミナルはすべて閉じられます。",
+        "openManageSessions": "セッション管理を開く",
+        "dismiss": "閉じる"
       }
     },
     "components": {
@@ -2835,7 +2845,8 @@
             "e4aa243f8c": "デーモンを再起動します",
             "a7e2fd2699": "Issue を登録",
             "5c8ce20be6": "この状態が続く場合は、",
-            "cc6d997c65": "ここからターミナルデーモンを再起動して、古いデーモン状態をクリアします。"
+            "cc6d997c65": "ここからターミナルデーモンを再起動して、古いデーモン状態をクリアします。",
+            "sessionUnavailable": "Orca はホスト上のこのペインのターミナルセッションに再接続できませんでした。続行するには新しいターミナルを開いてください。"
           },
           "TerminalPane": {
             "ac112e9036": "タイトルを削除",
@@ -10530,6 +10541,10 @@
           "hourlyWarning": "毎時ビルドは macOS 専用で、テストを通さずに main から直接公開されます。安定版ビルドも用意しておいてください。",
           "dailyWarning": "毎日ビルドは macOS 専用で、テストを通さずに main から直接公開されます。安定版ビルドも用意しておいてください。",
           "adhocWarning": "アドホックビルドは macOS 専用で、まだ取り込まれていないブランチから作られます。作成者が放棄する可能性があるため、安定版ビルドも用意しておいてください。"
+        },
+        "TerminalAdvancedTypographyControls": {
+          "f5fa1a08f1": "太字のフォントウェイト",
+          "0e0d1ee15a": "フォントウェイトとは独立して調整できます。フォントによっては複数の値が同じ字面に割り当てられるため、太字が変わらないように見える場合はフォントウェイトを下げるか、別のフォントを選んでください。"
         }
       },
       "right": {
@@ -15113,7 +15128,8 @@
       "project": "プロジェクト",
       "workspaceStatus": "ワークスペースのステータス",
       "reviewStatus": "PR / MR ステータス",
-      "clearAll": "すべてのフィルターをクリア"
+      "clearAll": "すべてのフィルターをクリア",
+      "removeChip": "{{filter}} を削除"
     },
     "search": {
       "placeholder": "ワークツリー、プロジェクト、Agent を検索…",
@@ -15133,21 +15149,51 @@
     },
     "map": {
       "host": {
-        "all": "すべてのホスト",
         "local": "ローカル",
         "ssh": "SSH",
         "wsl": "WSL",
         "remote": "リモート"
       },
       "liveContainmentMap": "ライブ包含マップ",
-      "hostFilter": "ホストフィルター",
       "empty": "現在のフィルターに一致する Agent はありません。",
       "canvasLabel": "プロジェクト、ワークスペース、Agent の入れ子マップ",
       "zoomOut": "ズームアウト",
       "zoomIn": "ズームイン",
       "fit": "全体表示",
       "projectCount": "{{agents}}件の Agent · {{workspaces}}件のワークスペース",
-      "agentCount": "{{count}}件の Agent"
+      "agentCount": "{{count}}件の Agent",
+      "filters": {
+        "orchestrationLinksHidden": "オーケストレーションのリンクを非表示",
+        "title": "マップコントロール",
+        "reset": "リセット",
+        "ofTotalAgents": "{{total}} 件中の表示",
+        "quickViews": "クイックビュー",
+        "agents": "Agent",
+        "time": "時間",
+        "lifespan": "セッションの経過時間",
+        "sinceMessage": "最後のメッセージから",
+        "timeInState": "現在の状態での経過時間",
+        "timeMinimum": "{{label}} の最小値",
+        "timeMaximum": "{{label}} の最大値",
+        "timeAny": "指定なし",
+        "timeRangeCount": "{{count}} 件の範囲",
+        "resetRanges": "範囲をリセット",
+        "summaryAll": "全て",
+        "summaryCount": "{{total}} 件中 {{shown}} 件",
+        "summarySelected": "{{count}} 件選択中",
+        "workspace": "ワークスペース",
+        "stateChip": "状態: {{states}}"
+      },
+      "quickView": {
+        "everything": "すべて",
+        "attention": "対応が必要",
+        "stuck": "停滞中",
+        "unread": "未読",
+        "recent": "直近 30 分",
+        "longRunning": "長時間実行",
+        "stale": "3 日以上停滞",
+        "orchestration": "オーケストレーション"
+      }
     },
     "state": {
       "blocked": "ブロック中",

@@ -168,7 +168,6 @@ inline src/main/window/attach-main-window-services.ts
 inline src/main/window/createMainWindow.test.ts
 inline src/main/window/createMainWindow.ts
 inline src/main/workspace-space-analysis.ts
-inline src/preload/api-types.ts
 inline src/preload/index.ts
 inline src/relay/agent-hook-server.ts
 inline src/relay/dispatcher.ts
@@ -319,7 +318,7 @@ inline src/shared/agent-hook-listener.ts
 inline src/shared/automation-schedules.ts
 inline src/shared/commit-message-agent-spec.ts
 inline src/shared/constants.ts
-inline src/shared/github-project-types.ts
+inline src/shared/github/project-types.ts
 inline src/shared/keybindings.test.ts
 inline src/shared/keybindings.ts
 inline src/shared/marine-creatures.ts
@@ -328,7 +327,6 @@ inline src/shared/runtime-types.ts
 inline src/shared/source-control-ai.ts
 inline src/shared/telemetry-events.ts
 inline src/shared/text-search.ts
-inline src/shared/types.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
 mobile-config app/h/*/files/*.tsx

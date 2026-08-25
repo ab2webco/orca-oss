@@ -88,7 +88,11 @@ jobs:
         run: |
           npx electron-vite build --mode e2e
           pnpm run build:web-from-renderer
+          pnpm run build:relay
 
+      # Why include-hidden-files: the relay's per-platform .version marker is a
+      # dotfile, and upload-artifact drops those by default. Without it the shard
+      # gets relay.js but no marker, and SSH specs fail on "missing its version marker".
       - name: Upload E2E build output
         uses: actions/upload-artifact@v7
         with:
@@ -96,6 +100,7 @@ jobs:
           path: out/
           retention-days: 1
           if-no-files-found: error
+          include-hidden-files: true
 
   e2e:
     name: e2e ${{ matrix.shard_name }}
@@ -191,6 +196,13 @@ jobs:
           name: e2e-build-out
           path: out/
 
+      # Why here and not in the build job: this is the only E2E job whose relay
+      # comes solely from the artifact — globalSetup rebuilds it in place wherever
+      # ORCA_E2E_SSH_DOCKER is set. A stripped .version surfaces as an SSH spec
+      # whose locator never resolves, so fail on the marker instead.
+      - name: Verify the relay bundle kept its version markers
+        run: node config/scripts/verify-relay-version-markers.mjs
+
       # Why: the Electron suite is wall-clock constrained on OSS runners, but
       # multiple Electron apps on one Xvfb VM contend on git/Chromium resources.
       # Sharding keeps each VM at one Playwright worker while splitting the
@@ -277,8 +289,18 @@ jobs:
           PROJECT: ${{ inputs.project }}
         run: |
           mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
-          xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 \
-            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 ${PROJECT:+--project "$PROJECT"}
+          E2E_ENV=(SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1)
+          if printf '%s\n' "${TEST_FILES[@]}" | grep -qx 'tests/e2e/ephemeral-vm-provisioned-root.spec.ts'; then
+            E2E_ENV+=(ORCA_E2E_SSH_DOCKER=1)
+          fi
+          E2E_PROJECT_ARGS=()
+          if [ -n "$PROJECT" ]; then
+            E2E_PROJECT_ARGS+=(--project "$PROJECT")
+          elif grep -l '@headful' "${TEST_FILES[@]}" >/dev/null; then
+            E2E_PROJECT_ARGS+=(--project=electron-headful)
+          fi
+          xvfb-run --auto-servernum env "${E2E_ENV[@]}" \
+            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"
 
       - name: Upload E2E JSON report
         if: always()

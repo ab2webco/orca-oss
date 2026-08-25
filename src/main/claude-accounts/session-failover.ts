@@ -1,6 +1,7 @@
 import { chmodSync, copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ClaudeManagedAccount, ClaudeSessionFailoverCopyResult } from '../../shared/types'
+import type { ClaudeManagedAccount } from '../../shared/types'
+import type { ClaudeSessionFailoverCopyResult } from '../../shared/managed-account-types'
 import { resolveOwnedClaudeManagedAuthPath } from './managed-auth-path'
 import {
   findSessionProjectDir,
