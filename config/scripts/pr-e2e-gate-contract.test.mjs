@@ -120,6 +120,9 @@ describe('PR E2E gate contract', () => {
     expect(buildStepIndex).toBeGreaterThan(-1)
     expect(uploadStepIndex).toBeGreaterThan(buildStepIndex)
     expect(buildSteps[buildStepIndex].run).toContain('pnpm run build:relay')
+    // The relay's .version marker is a dotfile; without this flag the shard
+    // downloads relay.js with no marker and every SSH spec fails on it.
+    expect(buildSteps[uploadStepIndex].with['include-hidden-files']).toBe(true)
   })
 
   it('keeps dedicated E2E workflows out of pull request CI', () => {
