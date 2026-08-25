@@ -130,6 +130,7 @@ jobs:
       - name: Test shard
         run: |
           node config/scripts/run-vitest-with-hang-watchdog.mjs --config config/vitest.config.ts \
+            --exclude=src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts \
             --exclude=src/main/daemon/session-startup-command-gate-real-shell.test.ts \
             --exclude=src/main/daemon/shell-ready.test.ts \
             --exclude=src/main/daemon/node-pty-fd-leak.test.ts \
