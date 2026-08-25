@@ -18,8 +18,7 @@ import {
   expect as playwrightExpect,
   _electron as electron,
   type Page,
-  type ElectronApplication,
-  type TestInfo
+  type ElectronApplication
 } from '@stablyai/playwright-test'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
@@ -37,6 +36,10 @@ import {
   flushQueuedRendererRecoveryEvidence,
   reportAndFlushRendererRecoveryEvidence
 } from './renderer-recovery-evidence'
+import { recordPageContextLoss, reportPageContextLoss } from './page-context-loss-evidence'
+import { forwardElectronProcessLogs, shouldLaunchHeadful } from './electron-test-logging'
+
+export { forwardElectronProcessLogs }
 
 type OrcaTestFixtures = {
   electronApp: ElectronApplication
@@ -104,36 +107,6 @@ async function removeUserDataDirAfterShutdown(userDataDir: string): Promise<void
       await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
     }
   }
-}
-
-function shouldLaunchHeadful(testInfo: TestInfo): boolean {
-  // Why: ORCA_E2E_FORCE_HEADFUL lets a developer watch any spec in a real
-  // window without retagging it `@headful` or switching projects.
-  if (process.env.ORCA_E2E_FORCE_HEADFUL === '1') {
-    return true
-  }
-  return testInfo.project.metadata.orcaHeadful === true
-}
-
-// Why: exported so specs that launch their own ElectronApplication outside
-// this fixture (e.g. multi-instance lifecycle tests) can still opt into the
-// same ORCA_E2E_FORWARD_APP_LOGS-gated stdout/stderr capture.
-export function forwardElectronProcessLogs(app: ElectronApplication, testInfo: TestInfo): void {
-  if (process.env.ORCA_E2E_FORWARD_APP_LOGS !== '1') {
-    return
-  }
-
-  const child = app.process()
-  const prefix = `[electron:${testInfo.title}]`
-  child.stdout?.on('data', (chunk: Buffer) => {
-    console.log(`${prefix} stdout: ${chunk.toString().trimEnd()}`)
-  })
-  child.stderr?.on('data', (chunk: Buffer) => {
-    console.error(`${prefix} stderr: ${chunk.toString().trimEnd()}`)
-  })
-  child.on('exit', (code, signal) => {
-    console.log(`${prefix} exit: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
-  })
 }
 
 /**
@@ -301,11 +274,14 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
 
   // Test-scoped: grab the first BrowserWindow, add the test repo, and wait
   // until the session is fully ready with a worktree active.
-  sharedPage: async ({ electronApp, seedTestRepo, testRepoPath }, provideFixture) => {
+  sharedPage: async ({ electronApp, seedTestRepo, testRepoPath }, provideFixture, testInfo) => {
     // Why: the Electron app may take a while to create the first window,
     // especially on cold start with no prior dev userData. Isolated per-test
     // profiles make late-suite launches slower, so use the full test budget.
     const page = await electronApp.firstWindow({ timeout: 120_000 })
+    // ORCA-300: attached before the first wait so a startup navigation is inside
+    // the record rather than before it.
+    recordPageContextLoss(page, electronApp)
     await page.waitForLoadState('domcontentloaded')
 
     // Wait for the store to be available
@@ -318,6 +294,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
         { timeout: 30_000 }
       )
       await provideFixture(page)
+      await reportPageContextLoss(page, electronApp, testInfo)
       return
     }
 
@@ -455,6 +432,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     })
 
     await provideFixture(page)
+    await reportPageContextLoss(page, electronApp, testInfo)
   },
 
   // Test-scoped: each test gets the shared page
