@@ -13,7 +13,8 @@ import {
 } from '../../shared/claude-account-worktree-usage'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import type { GlobalConfigSyncSelection } from '../../shared/global-config-sync'
-import type { ClaudeLivePtyAccountInfo, GlobalSettings } from '../../shared/types'
+import type { GlobalSettings } from '../../shared/types'
+import type { ClaudeLivePtyAccountInfo } from '../../shared/managed-account-types'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,

@@ -1,4 +1,4 @@
-import type { ClaudeVaultSettingInheritanceKey } from '../../shared/types'
+import type { ClaudeVaultSettingInheritanceKey } from '../../shared/managed-account-types'
 
 // A pinned session runs Claude against an isolated CLAUDE_CONFIG_DIR vault, so
 // `~/.claude/settings.json` is never read there. These helpers pick the keys that

@@ -2,8 +2,10 @@ import type {
   AgentSessionLogPaneReading,
   AgentSessionLogReading
 } from '../../shared/agent-session-log-state'
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
-import type { ResumableTuiAgent } from '../../shared/agent-session-resume'
+import type {
+  AgentProviderSessionMetadata,
+  ResumableTuiAgent
+} from '../../shared/agent-session-resume'
 
 export type AgentSessionLogApi = {
   /** Batch pane → session-log reading: agent state and what it is doing, read

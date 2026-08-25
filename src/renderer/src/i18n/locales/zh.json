@@ -615,7 +615,8 @@
         "wakeEphemeralVmFailed": "唤醒临时虚拟机工作区失败"
       },
       "ephemeralVmWorkspaceTarget": {
-        "projectRootRegistrationFailed": "在运行时上注册环境模板创建的项目根目录失败"
+        "projectRootRegistrationFailed": "在运行时上注册环境模板创建的项目根目录失败",
+        "provisionedRootRequiresSsh": "预置根目录配方目前需要直接的 SSH 连接。"
       },
       "blocked": {
         "notification": {
@@ -766,6 +767,9 @@
         "lan": "专用 LAN 地址",
         "public": "公网地址",
         "custom": "自定义主机名"
+      },
+      "ephemeralVmWorktreeCreation": {
+        "sparseCheckoutUnsupported": "预置根目录配方不支持稀疏检出。"
       }
     },
     "hooks": {
@@ -909,6 +913,12 @@
         "description": "当 Orca 中运行的智能体或终端工具尝试访问受保护的文件时，macOS 可能会显示权限信息。请在“设置”中授予“完全磁盘访问权限”，以减少此类提示。",
         "openSettings": "打开设置",
         "dismiss": "不再显示"
+      },
+      "useMacTccAttributionSeveredNotice": {
+        "title": "macOS 权限可能无法应用到 Orca 终端",
+        "description": "正在运行的 Orca 终端由此前某次 Orca 安装启动的守护进程托管。macOS 可能不会将 Orca 的辅助功能、自动化或受保护文件权限应用到这些终端。请在“管理会话”中重启守护进程以恢复访问权限。此操作会关闭所有正在运行的 Orca 终端。",
+        "openManageSessions": "打开管理会话",
+        "dismiss": "关闭"
       }
     },
     "components": {
@@ -2847,7 +2857,8 @@
             "e4aa243f8c": "重新启动守护进程",
             "a7e2fd2699": "提交议题",
             "5c8ce20be6": "如果这种情况持续存在，请",
-            "cc6d997c65": "从此处重新启动终端守护进程以清除失效的守护进程状态。"
+            "cc6d997c65": "从此处重新启动终端守护进程以清除失效的守护进程状态。",
+            "sessionUnavailable": "Orca 无法重新连接到主机上此窗格的终端会话。请打开新终端以继续。"
           },
           "TerminalPane": {
             "ac112e9036": "删除标题",
@@ -10550,6 +10561,10 @@
           "hourlyWarning": "每小时构建仅适用于 macOS，直接从 main 发布且不经过测试。请备好一个稳定版构建。",
           "dailyWarning": "每日构建仅适用于 macOS，直接从 main 发布且不经过测试。请备好一个稳定版构建。",
           "adhocWarning": "临时构建仅适用于 macOS，来自尚未合入的分支。创建者可能会放弃它，请备好一个稳定版构建。"
+        },
+        "TerminalAdvancedTypographyControls": {
+          "f5fa1a08f1": "粗体字重",
+          "0e0d1ee15a": "可独立于字重进行调整。某些字体会把多个值映射到同一字形，如果粗体看起来没有变化，请调低字重或改用其他字体。"
         }
       },
       "right": {
@@ -15133,7 +15148,8 @@
       "project": "项目",
       "workspaceStatus": "工作区状态",
       "reviewStatus": "PR / MR 状态",
-      "clearAll": "清除所有筛选条件"
+      "clearAll": "清除所有筛选条件",
+      "removeChip": "移除 {{filter}}"
     },
     "search": {
       "placeholder": "搜索工作树、项目或智能体…",
@@ -15165,7 +15181,39 @@
       "zoomIn": "放大",
       "fit": "适应",
       "projectCount": "{{agents}} 个智能体 · {{workspaces}} 个工作区",
-      "agentCount": "{{count}} 个智能体"
+      "agentCount": "{{count}} 个智能体",
+      "filters": {
+        "orchestrationLinksHidden": "已隐藏编排连线",
+        "title": "地图控件",
+        "reset": "重置",
+        "ofTotalAgents": "共 {{total}} 个智能体中显示",
+        "quickViews": "快速视图",
+        "agents": "智能体",
+        "time": "时间",
+        "lifespan": "会话时长",
+        "sinceMessage": "自上条消息起",
+        "timeInState": "当前状态持续时间",
+        "timeMinimum": "{{label}}最小值",
+        "timeMaximum": "{{label}}最大值",
+        "timeAny": "不限",
+        "timeRangeCount": "{{count}} 个范围",
+        "resetRanges": "重置范围",
+        "summaryAll": "全部",
+        "summaryCount": "{{total}} 个中的 {{shown}} 个",
+        "summarySelected": "已选择 {{count}} 个",
+        "workspace": "工作区",
+        "stateChip": "状态：{{states}}"
+      },
+      "quickView": {
+        "everything": "全部",
+        "attention": "需要处理",
+        "stuck": "卡住",
+        "unread": "未读",
+        "recent": "最近 30 分钟",
+        "longRunning": "长时间运行",
+        "stale": "停滞超过 3 天",
+        "orchestration": "编排"
+      }
     },
     "state": {
       "blocked": "已阻塞",

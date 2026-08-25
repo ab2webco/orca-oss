@@ -1,9 +1,9 @@
 import {
   CLAUDE_FAILOVER_ORIGIN_SHARED,
   type ClaudeManagedAccountSummary,
-  type ClaudeSessionFailoverCopyResult,
   type GlobalSettings
 } from '../../../shared/types'
+import type { ClaudeSessionFailoverCopyResult } from '../../../shared/managed-account-types'
 import { resolveFailoverOriginResetsAt } from '@/lib/agent-rate-limit-fail-back'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
 import {

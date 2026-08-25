@@ -1,10 +1,5 @@
-import type {
-  ClaudeManagedAccountAuthMethod,
-  ClaudeRateLimitAccountsState,
-  ClaudeTerminalAccountReport,
-  ClaudeTerminalAccountUnknownReason,
-  CodexRateLimitAccountsState
-} from '../shared/types'
+import type { ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../shared/types'
+import type { ClaudeManagedAccountAuthMethod, ClaudeTerminalAccountReport, ClaudeTerminalAccountUnknownReason } from '../shared/managed-account-types'
 import type { ClaudeTerminalAccountSwitchFailureReason } from '../shared/claude-terminal-account-switch'
 import { formatVaultSettingsInheritance } from './account-settings-inheritance-format'
 import type { ClaudeAccountAuthVerdict } from '../shared/claude-account-auth-verdict'

@@ -1,6 +1,6 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
-import type { ClaudeLivePtyAccountInfo } from '../../../shared/types'
+import type { ClaudeLivePtyAccountInfo } from '../../../shared/managed-account-types'
 import { useAppStore } from '@/store'
 import type { AutoSwitchAccountCandidate } from './agent-rate-limit-auto-switch'
 import type { AccountsSnapshotResult } from './agent-rate-limit-account-snapshot'

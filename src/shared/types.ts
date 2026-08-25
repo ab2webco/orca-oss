@@ -253,26 +253,6 @@ export type {
   JiraViewer
 } from './jira-types'
 
-export type {
-  PlaneComment,
-  PlaneConnectArgs,
-  PlaneConnectionStatus,
-  PlaneCreateWorkItemArgs,
-  PlaneCreateWorkItemResult,
-  PlaneLabel,
-  PlaneMutationResult,
-  PlaneProject,
-  PlaneState,
-  PlaneUser,
-  PlaneViewer,
-  PlaneWorkItem,
-  PlaneWorkItemFilter,
-  PlaneWorkItemPriority,
-  PlaneWorkItemUpdate,
-  PlaneWorkspace,
-  PlaneWorkspaceSelection
-} from './plane-types'
-
 // Linear
 
 export type { LinearViewer, LinearWorkspace } from './linear/workspace-types'
@@ -363,19 +343,6 @@ export type { CodexManagedAccountRuntimeSelection } from './managed-account-type
 export type { ClaudeManagedAccount, ClaudeManagedAccountSummary } from './managed-account-types'
 export type { ClaudeRateLimitAccountsState } from './managed-account-types'
 export type { ClaudeManagedAccountRuntimeSelection } from './managed-account-types'
-export type { ClaudeManagedAccountAuthMethod } from './managed-account-types'
-export type { ClaudeLivePtyAccountBinding, ClaudeLivePtyAccountInfo } from './managed-account-types'
-export type { ClaudeLiveSharedPtyAccountBinding } from './managed-account-types'
-export type { CodexDirectedPtyAccountBinding } from './managed-account-types'
-export type { ClaudeTerminalAccountUnknownReason } from './managed-account-types'
-export type { ClaudeTerminalAccountOwnership, ClaudeTerminalAccountReport } from './managed-account-types'
-export type { ClaudeVaultSettingInheritanceKey } from './managed-account-types'
-export type { ClaudeVaultSettingInheritanceState } from './managed-account-types'
-export type { ClaudeVaultSettingInheritance } from './managed-account-types'
-export type { ClaudeVaultSettingsInheritanceReport } from './managed-account-types'
-export type { ManagedPtyAccountOwner } from './managed-account-types'
-export type { ClaudeSessionFailoverCopyFailureReason } from './managed-account-types'
-export type { ClaudeSessionFailoverCopyResult } from './managed-account-types'
 
 export type { ChangelogRelease, ChangelogData, UpdateCheckOptions } from './update-status-types'
 export type { UpdateSource, LinuxRootPackageType } from './update-status-types'

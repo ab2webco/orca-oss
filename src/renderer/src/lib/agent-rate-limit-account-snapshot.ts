@@ -1,5 +1,5 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
-import type { ManagedPtyAccountOwner } from '../../../shared/types'
+import type { ManagedPtyAccountOwner } from '../../../shared/managed-account-types'
 import { useAppStore } from '@/store'
 import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'

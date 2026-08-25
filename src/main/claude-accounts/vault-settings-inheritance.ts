@@ -1,10 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type {
-  ClaudeVaultSettingInheritance,
-  ClaudeVaultSettingInheritanceKey,
-  ClaudeVaultSettingsInheritanceReport
-} from '../../shared/types'
+import type { ClaudeVaultSettingInheritance, ClaudeVaultSettingInheritanceKey, ClaudeVaultSettingsInheritanceReport } from '../../shared/managed-account-types'
 import { ensureVaultOutputStyleLinks, outputStyleResolvesInVault } from './vault-output-styles'
 import {
   INHERITABLE_VAULT_SETTING_KEYS,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { ClaudeLiveSharedPtyAccountBinding } from '../../shared/types'
+import type { ClaudeLiveSharedPtyAccountBinding } from '../../shared/managed-account-types'
 import { getClaudeLivePtyPersistence } from './claude-live-pty-persistence'
 import * as ownershipEpoch from './live-pty-ownership-epoch'
 import {

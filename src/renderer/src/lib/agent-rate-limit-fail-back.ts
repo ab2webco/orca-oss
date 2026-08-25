@@ -1,10 +1,10 @@
 import {
   CLAUDE_FAILOVER_ORIGIN_SHARED,
   type ClaudeManagedAccountSummary,
-  type ClaudeSessionFailoverCopyResult,
   type GlobalSettings,
   type Worktree
 } from '../../../shared/types'
+import type { ClaudeSessionFailoverCopyResult } from '../../../shared/managed-account-types'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
 import {

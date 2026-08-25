@@ -1,6 +1,6 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
-import type { ClaudeLivePtyAccountInfo, ManagedPtyAccountOwner } from '../../../shared/types'
+import type { ClaudeLivePtyAccountInfo, ManagedPtyAccountOwner } from '../../../shared/managed-account-types'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv

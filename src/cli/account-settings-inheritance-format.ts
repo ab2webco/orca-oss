@@ -1,7 +1,4 @@
-import type {
-  ClaudeVaultSettingInheritance,
-  ClaudeVaultSettingsInheritanceReport
-} from '../shared/types'
+import type { ClaudeVaultSettingInheritance, ClaudeVaultSettingsInheritanceReport } from '../shared/managed-account-types'
 
 // Why this is printed unasked, next to the account: until ORCA-189 a home setting
 // that did not reach a managed vault produced no signal anywhere — the menu showed

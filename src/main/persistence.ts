@@ -40,45 +40,8 @@ import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { normalizeAutomationPrecheck } from '../shared/automation-precheck'
 import { normalizeProxyUrl } from '../shared/network-proxy'
 import { normalizeKagiSessionLink } from '../shared/browser-url'
-import type {
-  PersistedState,
-  Project,
-  ProjectUpdateArgs,
-  ProjectHostSetup,
-  ProjectHostSetupCreateArgs,
-  ProjectHostSetupCreateResult,
-  ProjectHostSetupDeleteArgs,
-  ProjectHostSetupDeleteResult,
-  ProjectHostSetupUpdateArgs,
-  ProjectHostSetupUpdateResult,
-  RepoProjectHostSetupMethod,
-  Repo,
-  ProjectGroup,
-  FolderWorkspace,
-  SparsePreset,
-  PersistedMobileClientTabSelections,
-  WorktreeMeta,
-  WorktreeLineage,
-  WorkspaceLineage,
-  WorkspaceKey,
-  GlobalSettings,
-  OrcaWorkspaceLayout,
-  NotificationSettings,
-  OnboardingChecklistState,
-  OnboardingOutcome,
-  OnboardingState,
-  LegacyPaneKeyAliasEntry,
-  TerminalPaneLayoutNode,
-  TerminalLayoutSnapshot,
-  TerminalTab,
-  WorkspaceSessionPatch,
-  WorkspaceSessionState,
-  ClaudeLivePtyAccountBinding,
-  ClaudeLiveSharedPtyAccountBinding,
-  CodexDirectedPtyAccountBinding,
-  PlaneViewMode,
-  RateLimitFailBackMode
-} from '../shared/types'
+import type { PersistedState, Project, ProjectUpdateArgs, ProjectHostSetup, ProjectHostSetupCreateArgs, ProjectHostSetupCreateResult, ProjectHostSetupDeleteArgs, ProjectHostSetupDeleteResult, ProjectHostSetupUpdateArgs, ProjectHostSetupUpdateResult, RepoProjectHostSetupMethod, Repo, ProjectGroup, FolderWorkspace, SparsePreset, PersistedMobileClientTabSelections, WorktreeMeta, WorktreeLineage, WorkspaceLineage, WorkspaceKey, GlobalSettings, OrcaWorkspaceLayout, NotificationSettings, OnboardingChecklistState, OnboardingOutcome, OnboardingState, LegacyPaneKeyAliasEntry, TerminalPaneLayoutNode, TerminalLayoutSnapshot, TerminalTab, WorkspaceSessionPatch, WorkspaceSessionState, PlaneViewMode, RateLimitFailBackMode } from '../shared/types'
+import type { ClaudeLivePtyAccountBinding, ClaudeLiveSharedPtyAccountBinding, CodexDirectedPtyAccountBinding } from '../shared/managed-account-types'
 import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
   normalizeProjectRuntimePreference
