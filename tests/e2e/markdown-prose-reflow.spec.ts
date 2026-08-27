@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
@@ -18,6 +19,7 @@ const HARD_WRAPPED_MARKDOWN =
 type ReflowMetrics = {
   hardBreakCount: number
   lineCount: number
+  modelHardBreakCount: number
   paragraphCount: number
   sourceLineCount: number
   textContent: string
@@ -25,8 +27,14 @@ type ReflowMetrics = {
 }
 
 type PageEditorDocNode = {
+  descendants?: (callback: (node: PageEditorDocNode, pos: number) => boolean | void) => void
   textContent?: string
   type?: { name?: string }
+}
+
+type HardWrappedFixture = {
+  filePath: string
+  sentinel: string
 }
 
 type PageRichMarkdownEditorElement = Element & {
@@ -46,34 +54,61 @@ type PageRichMarkdownEditorElement = Element & {
 async function openHardWrappedFixture(
   page: Parameters<typeof waitForRichMarkdownEditor>[0],
   testInfo: { workerIndex: number }
-): Promise<string> {
+): Promise<HardWrappedFixture> {
   const context = await getActiveWorktreeContext(page)
+  const sentinel = `prose-reflow-${randomUUID()}`
   const filePath = await createMarkdownFixture(
     context,
     'prose-reflow',
     testInfo.workerIndex,
-    HARD_WRAPPED_MARKDOWN
+    HARD_WRAPPED_MARKDOWN.replace(
+      'delivery becomes universal.',
+      `delivery becomes universal. ${sentinel}`
+    )
   )
   await openMarkdownFixture(page, context, filePath)
-  await waitForRichMarkdownEditor(page)
-  return filePath
+  const editor = await waitForRichMarkdownEditor(page)
+  await expect(editor).toContainText(sentinel)
+  return { filePath, sentinel }
 }
 
 async function getGoalParagraphMetrics(
-  page: Parameters<typeof waitForRichMarkdownEditor>[0]
+  page: Parameters<typeof waitForRichMarkdownEditor>[0],
+  sentinel: string
 ): Promise<ReflowMetrics> {
-  return page.evaluate(() => {
-    const editor = document.querySelector('.rich-markdown-editor')
+  return page.evaluate((sentinel) => {
+    const editor = Array.from(document.querySelectorAll('.rich-markdown-editor')).find(
+      (candidate) => candidate.textContent?.includes(sentinel)
+    ) as PageRichMarkdownEditorElement | undefined
     if (!editor) {
-      throw new Error('Rich markdown editor was not mounted')
+      throw new Error('The hydrated rich markdown editor was not mounted')
     }
 
     const paragraphs = Array.from(editor.querySelectorAll('p')).filter((paragraph) =>
-      paragraph.textContent?.includes('launch-lifetime')
+      paragraph.textContent?.includes(sentinel)
     )
     const paragraph = paragraphs[0]
     if (!paragraph) {
       throw new Error('Hard-wrapped paragraph was not rendered')
+    }
+
+    let modelHardBreakCount: number | null = null
+    editor.editor?.state?.doc?.descendants?.((node) => {
+      if (node.type?.name !== 'paragraph' || !node.textContent?.includes(sentinel)) {
+        return true
+      }
+
+      modelHardBreakCount = 0
+      node.descendants?.((descendant) => {
+        if (descendant.type?.name === 'hardBreak') {
+          modelHardBreakCount = (modelHardBreakCount ?? 0) + 1
+        }
+        return true
+      })
+      return false
+    })
+    if (modelHardBreakCount === null) {
+      throw new Error('Hard-wrapped paragraph was not found in the editor model')
     }
 
     const range = document.createRange()
@@ -91,23 +126,25 @@ async function getGoalParagraphMetrics(
     return {
       hardBreakCount: paragraph.querySelectorAll('br').length,
       lineCount: lineTops.length,
+      modelHardBreakCount,
       paragraphCount: paragraphs.length,
       sourceLineCount: paragraph.textContent?.split('\n').length ?? 0,
       textContent: paragraph.textContent ?? '',
       whiteSpace: window.getComputedStyle(paragraph).whiteSpace
     }
-  })
+  }, sentinel)
 }
 
 async function placeCaretAtGoalParagraphEnd(
-  page: Parameters<typeof waitForRichMarkdownEditor>[0]
+  page: Parameters<typeof waitForRichMarkdownEditor>[0],
+  sentinel: string
 ): Promise<void> {
-  await page.evaluate(() => {
-    const editorElement = document.querySelector(
-      '.rich-markdown-editor'
-    ) as PageRichMarkdownEditorElement | null
+  await page.evaluate((sentinel) => {
+    const editorElement = Array.from(document.querySelectorAll('.rich-markdown-editor')).find(
+      (candidate) => candidate.textContent?.includes(sentinel)
+    ) as PageRichMarkdownEditorElement | undefined
     const paragraph = Array.from(editorElement?.querySelectorAll('p') ?? []).find((candidate) =>
-      candidate.textContent?.includes('launch-lifetime')
+      candidate.textContent?.includes(sentinel)
     ) as
       | (HTMLParagraphElement & {
           pmViewDesc?: {
@@ -122,16 +159,17 @@ async function placeCaretAtGoalParagraphEnd(
 
     editorElement.editor.commands.setTextSelection?.(selectionPosition)
     editorElement.editor.commands.focus?.()
-  })
+  }, sentinel)
 }
 
 async function placeCaretAtHeadingStart(
-  page: Parameters<typeof waitForRichMarkdownEditor>[0]
+  page: Parameters<typeof waitForRichMarkdownEditor>[0],
+  sentinel: string
 ): Promise<void> {
-  await page.evaluate(() => {
-    const editorElement = document.querySelector(
-      '.rich-markdown-editor'
-    ) as PageRichMarkdownEditorElement | null
+  await page.evaluate((sentinel) => {
+    const editorElement = Array.from(document.querySelectorAll('.rich-markdown-editor')).find(
+      (candidate) => candidate.textContent?.includes(sentinel)
+    ) as PageRichMarkdownEditorElement | undefined
     const editor = editorElement?.editor
     let selectionPosition: number | null = null
     editor?.state?.doc?.descendants?.((node, pos) => {
@@ -148,7 +186,7 @@ async function placeCaretAtHeadingStart(
 
     editor.commands.setTextSelection?.(selectionPosition)
     editor.commands.focus?.()
-  })
+  }, sentinel)
 }
 
 test.describe('Markdown prose reflow', () => {
@@ -162,8 +200,9 @@ test.describe('Markdown prose reflow', () => {
     let filePath: string | null = null
 
     try {
-      filePath = await openHardWrappedFixture(orcaPage, testInfo)
-      const metrics = await getGoalParagraphMetrics(orcaPage)
+      const fixture = await openHardWrappedFixture(orcaPage, testInfo)
+      filePath = fixture.filePath
+      const metrics = await getGoalParagraphMetrics(orcaPage, fixture.sentinel)
 
       expect(metrics.paragraphCount).toBe(1)
       expect(metrics.sourceLineCount).toBe(4)
@@ -180,14 +219,16 @@ test.describe('Markdown prose reflow', () => {
     let filePath: string | null = null
 
     try {
-      filePath = await openHardWrappedFixture(orcaPage, testInfo)
-      await placeCaretAtGoalParagraphEnd(orcaPage)
+      const fixture = await openHardWrappedFixture(orcaPage, testInfo)
+      filePath = fixture.filePath
+      await placeCaretAtGoalParagraphEnd(orcaPage, fixture.sentinel)
       await orcaPage.keyboard.press('Enter')
       await orcaPage.keyboard.press('Backspace')
 
-      const metrics = await getGoalParagraphMetrics(orcaPage)
+      const metrics = await getGoalParagraphMetrics(orcaPage, fixture.sentinel)
 
       expect(metrics.hardBreakCount).toBe(0)
+      expect(metrics.modelHardBreakCount).toBe(0)
       expect(metrics.paragraphCount).toBe(1)
       expect(metrics.sourceLineCount).toBe(4)
       expect(metrics.whiteSpace).toBe('normal')
@@ -203,16 +244,18 @@ test.describe('Markdown prose reflow', () => {
     let filePath: string | null = null
 
     try {
-      filePath = await openHardWrappedFixture(orcaPage, testInfo)
-      await placeCaretAtGoalParagraphEnd(orcaPage)
+      const fixture = await openHardWrappedFixture(orcaPage, testInfo)
+      filePath = fixture.filePath
+      await placeCaretAtGoalParagraphEnd(orcaPage, fixture.sentinel)
       await orcaPage.keyboard.press('Enter')
       await orcaPage.keyboard.type('/')
       await orcaPage.keyboard.press('Backspace')
       await orcaPage.keyboard.press('Backspace')
 
-      const metrics = await getGoalParagraphMetrics(orcaPage)
+      const metrics = await getGoalParagraphMetrics(orcaPage, fixture.sentinel)
 
       expect(metrics.hardBreakCount).toBe(0)
+      expect(metrics.modelHardBreakCount).toBe(0)
       expect(metrics.paragraphCount).toBe(1)
       expect(metrics.sourceLineCount).toBe(4)
       expect(metrics.whiteSpace).toBe('normal')
@@ -228,13 +271,15 @@ test.describe('Markdown prose reflow', () => {
     let filePath: string | null = null
 
     try {
-      filePath = await openHardWrappedFixture(orcaPage, testInfo)
-      await placeCaretAtHeadingStart(orcaPage)
+      const fixture = await openHardWrappedFixture(orcaPage, testInfo)
+      filePath = fixture.filePath
+      await placeCaretAtHeadingStart(orcaPage, fixture.sentinel)
       await orcaPage.keyboard.press('Backspace')
 
-      const metrics = await getGoalParagraphMetrics(orcaPage)
+      const metrics = await getGoalParagraphMetrics(orcaPage, fixture.sentinel)
 
       expect(metrics.hardBreakCount).toBe(0)
+      expect(metrics.modelHardBreakCount).toBe(0)
       expect(metrics.paragraphCount).toBe(1)
       expect(metrics.sourceLineCount).toBe(4)
       expect(metrics.whiteSpace).toBe('normal')
