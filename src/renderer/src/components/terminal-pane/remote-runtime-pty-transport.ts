@@ -41,7 +41,10 @@ import {
   runtimeTerminalErrorMessage,
   toRemoteRuntimePtyId
 } from '../../runtime/runtime-terminal-stream'
-import { recordRemoteTerminalInputDelivery } from '../../runtime/remote-terminal-input-delivery-probe'
+import {
+  DETACHED_TRANSPORT_INPUT_KEY,
+  recordRemoteTerminalInputDelivery
+} from '../../runtime/remote-terminal-input-delivery-probe'
 import {
   getRemoteRuntimeTerminalMultiplexer,
   REMOTE_TERMINAL_SNAPSHOT_TOO_LARGE,
@@ -1247,6 +1250,7 @@ export function createRemoteRuntimePtyTransport(
   async function sendInputAcceptedToRuntime(data: string): Promise<boolean> {
     const targetHandle = handle
     if (!connected || !targetHandle || recoveryBlocksIo()) {
+      recordBlockedInput(targetHandle, data.length)
       return false
     }
     if (!data) {
@@ -1300,6 +1304,16 @@ export function createRemoteRuntimePtyTransport(
     }
   }
 
+  // Why: input dropped by the io gate leaves no other trace; a null handle still
+  // needs a bucket or the loss reads as "nothing was ever typed".
+  function recordBlockedInput(targetHandle: string | null, chars: number): void {
+    recordRemoteTerminalInputDelivery(
+      targetHandle ?? DETACHED_TRANSPORT_INPUT_KEY,
+      recoveryBlocksIo() ? 'io-recovery' : 'io-disconnected',
+      chars
+    )
+  }
+
   function notifyWriteUnavailable(): void {
     if (!destroyed) {
       storedCallbacks.onWriteUnavailable?.()
@@ -1310,9 +1324,7 @@ export function createRemoteRuntimePtyTransport(
     const targetHandle = handle
     const targetLifecycleEpoch = lifecycleEpoch
     if (!connected || !targetHandle || recoveryBlocksIo()) {
-      if (targetHandle) {
-        recordRemoteTerminalInputDelivery(targetHandle, 'io-blocked', text.length)
-      }
+      recordBlockedInput(targetHandle, text.length)
       return
     }
     const stream = getCurrentMultiplexedStream(targetHandle)
@@ -2393,6 +2405,7 @@ export function createRemoteRuntimePtyTransport(
 
     sendInput(data: string): boolean {
       if (!connected || !handle || recoveryBlocksIo()) {
+        recordBlockedInput(handle, data.length)
         return false
       }
       if (!data) {
@@ -2406,6 +2419,7 @@ export function createRemoteRuntimePtyTransport(
     sendInputImmediate(data: string): boolean {
       const targetHandle = handle
       if (!connected || !targetHandle || recoveryBlocksIo()) {
+        recordBlockedInput(targetHandle, data.length)
         return false
       }
       if (!data) {

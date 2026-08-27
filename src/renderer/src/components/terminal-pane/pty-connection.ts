@@ -98,6 +98,8 @@ import {
   requestTerminalPaneRecovery
 } from './terminal-pane-recovery'
 import { shouldDropQuarantinedTerminalInput } from './terminal-input-quarantine'
+import { recordRemoteTerminalInputDelivery } from '../../runtime/remote-terminal-input-delivery-probe'
+import type { RemoteTerminalInputDeliverySite } from '../../../../shared/remote-terminal-input-delivery'
 import {
   isDocumentVisibilityProvenStale,
   registerStaleDocumentVisibilityRecovery
@@ -4121,6 +4123,11 @@ export function connectPanePty(
     }
   )
 
+  // Why: these guards discard a keystroke with no trace anywhere; the interactivity specs read the tally.
+  const recordDroppedPaneInput = (site: RemoteTerminalInputDeliverySite, data: string): void => {
+    recordRemoteTerminalInputDelivery(transport.getPtyId() ?? deps.tabId, site, data.length)
+  }
+
   const forwardPtyInput = (data: string): void => {
     // Why: xterm auto-replies to embedded query sequences (DA1, DECRQM,
     // OSC 10/11, focus, CPR) via onData. When we replay recorded PTY bytes
@@ -4130,6 +4137,7 @@ export function connectPanePty(
     // engage the guard via replayIntoTerminal; here we drop everything
     // xterm emits while the guard is active. See replay-guard.ts.
     if (isPaneReplaying(deps.replayingPanesRef, pane.id)) {
+      recordDroppedPaneInput('pane-replaying', data)
       return
     }
     const currentPtyId = transport.getPtyId()
@@ -4146,6 +4154,7 @@ export function connectPanePty(
         panePtyId: currentPtyId
       })
     ) {
+      recordDroppedPaneInput('codex-stale', data)
       clearPendingTerminalInputIntent()
       return
     }
@@ -4153,6 +4162,7 @@ export function connectPanePty(
     // PTY, desktop keystrokes must not reach the shell; the visible overlay's
     // explicit Take back action owns restoring desktop input and dimensions.
     if (currentPtyId && isPtyLocked(currentPtyId)) {
+      recordDroppedPaneInput('pty-locked', data)
       clearPendingTerminalInputIntent()
       return
     }
@@ -4184,6 +4194,7 @@ export function connectPanePty(
     // of the interrupted line would be submitted by the user's own Enter and a
     // compound command could run its surviving half (#10065 follow-up).
     if (shouldDropQuarantinedTerminalInput(deps.tabId, data)) {
+      recordDroppedPaneInput('input-quarantined', data)
       clearPendingTerminalInputIntent()
       return
     }

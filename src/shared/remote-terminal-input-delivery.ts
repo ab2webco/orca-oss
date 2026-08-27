@@ -10,7 +10,12 @@ export type RemoteTerminalInputDeliverySite =
   | 'claim-discarded'
   | 'rpc-fallback'
   | 'rpc-refused'
-  | 'io-blocked'
+  | 'io-disconnected'
+  | 'io-recovery'
+  | 'pane-replaying'
+  | 'codex-stale'
+  | 'pty-locked'
+  | 'input-quarantined'
 
 export type RemoteTerminalInputDeliveryEvent = {
   site: RemoteTerminalInputDeliverySite

@@ -266,6 +266,8 @@ type ScenarioResult = {
   /** Where the client's own writes ended. Empty means the keystrokes never
    *  reached this terminal's transport at all. */
   inputDelivery: RemoteTerminalInputDeliveryReport | null
+  /** Writes the pane dropped before they reached the transport. */
+  inputDeliveryPane: RemoteTerminalInputDeliveryReport | null
   /** Non-empty when the keystrokes were attributed to a different terminal. */
   inputDeliveryElsewhere: string[]
   diagnostics: unknown
@@ -275,17 +277,31 @@ async function resetInputDeliveryProbe(page: Page): Promise<void> {
   await page.evaluate(() => window.__remoteTerminalInputDelivery?.reset())
 }
 
+/** The pane-level guards attribute by pty id, the transport by terminal handle;
+ *  a keystroke can die under either, so read both. */
 async function readInputDelivery(
   page: Page,
+  webTabId: string,
   terminal: string
-): Promise<{ report: RemoteTerminalInputDeliveryReport | null; elsewhere: string[] }> {
-  return page.evaluate((handle) => {
-    const snapshot = window.__remoteTerminalInputDelivery?.snapshot() ?? {}
-    return {
-      report: snapshot[handle] ?? null,
-      elsewhere: Object.keys(snapshot).filter((key) => key !== handle)
-    }
-  }, terminal)
+): Promise<{
+  report: RemoteTerminalInputDeliveryReport | null
+  paneReport: RemoteTerminalInputDeliveryReport | null
+  elsewhere: string[]
+}> {
+  return page.evaluate(
+    ({ handle, webTabId }) => {
+      const snapshot = window.__remoteTerminalInputDelivery?.snapshot() ?? {}
+      const manager = window.__paneManagers?.get(webTabId)
+      const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
+      const ptyId = pane?.container?.dataset?.ptyId ?? null
+      return {
+        report: snapshot[handle] ?? null,
+        paneReport: ptyId ? (snapshot[ptyId] ?? null) : null,
+        elsewhere: Object.keys(snapshot).filter((key) => key !== handle && key !== ptyId)
+      }
+    },
+    { handle: terminal, webTabId }
+  )
 }
 
 /** Types a unique marker into the revealed pane and records whether the host
@@ -312,7 +328,7 @@ async function probeInteractivity(
     LIVE_PAINT_BUDGET_MS
   )
   const paneGrid = await readActivePaneGrid(page, target.webTabId)
-  const inputDelivery = await readInputDelivery(page, target.terminal)
+  const inputDelivery = await readInputDelivery(page, target.webTabId, target.terminal)
   const diagnostics = await readPaneDiagnostics(page, worktreeId, target.webTabId)
   let paintedAfterFlip = paintedLive
   if (!paintedLive) {
@@ -335,6 +351,7 @@ async function probeInteractivity(
     paneGrid,
     ptyGrid: readPtyGridFromContent(sink),
     inputDelivery: inputDelivery.report,
+    inputDeliveryPane: inputDelivery.paneReport,
     inputDeliveryElsewhere: inputDelivery.elsewhere,
     diagnostics
   }
@@ -356,7 +373,10 @@ function describeInteractivityFailure(result: ScenarioResult): string {
     return `${result.name}: revealed pane never restored its buffer, so nothing was typed into a live pane`
   }
   if (!result.hostReceivedInput) {
-    const sites = Object.entries(result.inputDelivery?.totals ?? {})
+    const sites = [
+      ...Object.entries(result.inputDeliveryPane?.totals ?? {}),
+      ...Object.entries(result.inputDelivery?.totals ?? {})
+    ]
       .map(([site, chars]) => `${site}=${chars}`)
       .join(',')
     return `${result.name}: typed input never reached the host PTY (client delivery: ${sites || 'nothing recorded for this terminal'}; other terminals with writes: ${result.inputDeliveryElsewhere.length})`

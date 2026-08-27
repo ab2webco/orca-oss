@@ -9,6 +9,9 @@ import type {
 // Why: bounded so a chatty terminal cannot grow the probe without limit.
 const MAX_EVENTS_PER_TERMINAL = 32
 
+/** Bucket for input dropped after the transport lost its handle — the loss has no terminal to name. */
+export const DETACHED_TRANSPORT_INPUT_KEY = '<detached-transport>'
+
 const reports = new Map<string, RemoteTerminalInputDeliveryReport>()
 
 function cloneReport(report: RemoteTerminalInputDeliveryReport): RemoteTerminalInputDeliveryReport {
