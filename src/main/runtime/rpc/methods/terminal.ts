@@ -123,6 +123,12 @@ type TerminalViewportClient = {
   type?: 'mobile' | 'desktop'
 }
 
+type DroppedClientInputReason =
+  | 'connection-closed'
+  | 'stream-detached'
+  | 'input-locked'
+  | 'viewport-claim-refused'
+
 type TerminalMultiplexStream = {
   streamId: number
   terminal: string
@@ -2164,11 +2170,29 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         unregisterControlHandler()
         resolveMultiplex()
       }
+      // Why: each of these paths discards a keystroke the client's own send reported as delivered.
+      const logDroppedClientInput = (
+        stream: TerminalMultiplexStream,
+        reason: DroppedClientInputReason
+      ): void => {
+        if (stream.loggedInputDrop) {
+          return
+        }
+        stream.loggedInputDrop = true
+        console.warn('[terminal:multiplex] dropped client input', {
+          reason,
+          streamId: stream.streamId,
+          terminal: stream.terminal
+        })
+      }
       const handleSlotFrame = (
         stream: TerminalMultiplexStream,
         frame: TerminalStreamFrame
       ): void => {
         if (closed || streams.get(stream.streamId) !== stream) {
+          if (frame.opcode === TerminalStreamOpcode.Input) {
+            logDroppedClientInput(stream, closed ? 'connection-closed' : 'stream-detached')
+          }
           return
         }
         if (frame.opcode === TerminalStreamOpcode.Unsubscribe) {
@@ -2201,6 +2225,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
             return
           }
           if (isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)) {
+            logDroppedClientInput(stream, 'input-locked')
             return
           }
           // Mobile already has the higher-priority floor, so a rejected desktop claim must not suppress later phone input.
@@ -2208,14 +2233,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           void inputClaimTail.then(async (claimed) => {
             const locked = isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)
             if (!claimed || locked) {
-              if (!stream.loggedInputDrop) {
-                stream.loggedInputDrop = true
-                console.warn('[terminal:multiplex] dropped client input', {
-                  reason: locked ? 'input-locked' : 'viewport-claim-refused',
-                  streamId: stream.streamId,
-                  terminal: stream.terminal
-                })
-              }
+              logDroppedClientInput(stream, locked ? 'input-locked' : 'viewport-claim-refused')
               return
             }
             const outcome = await sendTerminalStreamInput(runtime, {
