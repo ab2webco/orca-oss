@@ -29,6 +29,10 @@ import {
   createRemoteTerminalStreamWatchdog,
   type RemoteTerminalStreamWatchdog
 } from './remote-terminal-stream-watchdog'
+import {
+  exposeRemoteTerminalInputDeliveryProbe,
+  recordRemoteTerminalInputDelivery
+} from './remote-terminal-input-delivery-probe'
 
 type RuntimeEnvironmentSubscriptionHandle = {
   unsubscribe: () => void
@@ -464,7 +468,15 @@ class RemoteRuntimeTerminalMultiplexer {
 
     const stream: RemoteRuntimeMultiplexedTerminal = {
       streamId,
-      sendInput: (text) => this.isRegisteredStream(state) && this.sendInput(state, text),
+      sendInput: (text) => {
+        const sent = this.isRegisteredStream(state) && this.sendInput(state, text)
+        recordRemoteTerminalInputDelivery(
+          state.terminal,
+          sent ? 'stream-frame' : 'stream-refused',
+          text.length
+        )
+        return sent
+      },
       resize: (cols, rows) =>
         this.isRegisteredStream(state) &&
         this.sendFrame(
@@ -1457,6 +1469,7 @@ export function getRemoteRuntimeTerminalMultiplexer(
   environmentId: string
 ): RemoteRuntimeTerminalMultiplexer {
   exposeE2eRemoteTerminalMultiplexAckGate()
+  exposeRemoteTerminalInputDeliveryProbe()
   let multiplexer = multiplexers.get(environmentId)
   if (multiplexer && !multiplexer.matchesCurrentEnvironmentRevision()) {
     multiplexer.closeForEnvironmentReplacement()

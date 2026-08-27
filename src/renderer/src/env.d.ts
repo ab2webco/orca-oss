@@ -5,6 +5,7 @@ import type { OnboardingFeatureSetupDeps } from '@/components/onboarding/onboard
 import type { languages } from 'monaco-editor'
 import type { MonacoE2EProbe } from './components/editor/monaco-e2e-probe'
 import type { TerminalWorktreeParkingDebugVerdict } from './components/terminal-pane/terminal-parking-e2e-overrides'
+import type { RemoteTerminalInputDeliveryProbe } from '../../shared/remote-terminal-input-delivery'
 
 declare module 'monaco-editor/esm/vs/basic-languages/python/python.js' {
   export const conf: languages.LanguageConfiguration
@@ -76,6 +77,7 @@ declare global {
       worktreeVerdicts: () => TerminalWorktreeParkingDebugVerdict[]
     }
     __monacoEditorE2E?: MonacoE2EProbe
+    __remoteTerminalInputDelivery?: RemoteTerminalInputDeliveryProbe
     __e2ePtyAppliedSizeReadDelayMs?: number
   }
 }

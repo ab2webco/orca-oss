@@ -142,6 +142,8 @@ type TerminalMultiplexStream = {
   outputPaused: boolean
   supportsDesktopViewportClaims: boolean
   desktopClaimTail: Promise<boolean>
+  // Why: a swallowed keystroke is invisible to the client, so log the first one per stream instead of nothing.
+  loggedInputDrop: boolean
   // Whether THIS stream registered the width driver, so detach won't release a peer stream's floor.
   registeredRemoteDesktopDriver: boolean
   remoteDesktopSubscriptionKey: string
@@ -2204,7 +2206,16 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           // Mobile already has the higher-priority floor, so a rejected desktop claim must not suppress later phone input.
           const inputClaimTail = stream.isMobile ? Promise.resolve(true) : stream.desktopClaimTail
           void inputClaimTail.then(async (claimed) => {
-            if (!claimed || isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)) {
+            const locked = isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)
+            if (!claimed || locked) {
+              if (!stream.loggedInputDrop) {
+                stream.loggedInputDrop = true
+                console.warn('[terminal:multiplex] dropped client input', {
+                  reason: locked ? 'input-locked' : 'viewport-claim-refused',
+                  streamId: stream.streamId,
+                  terminal: stream.terminal
+                })
+              }
               return
             }
             const outcome = await sendTerminalStreamInput(runtime, {
@@ -2558,6 +2569,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           outputPaused: false,
           supportsDesktopViewportClaims: request.capabilities?.desktopViewportClaims === 1,
           desktopClaimTail: Promise.resolve(true),
+          loggedInputDrop: false,
           registeredRemoteDesktopDriver: false,
           // Why: streamId is client-local, so key the width floor by connectionId or two connections sharing stream 1 for one PTY clobber each other's floor.
           remoteDesktopSubscriptionKey,

@@ -29,6 +29,7 @@ import {
   HOST_TERMINAL_SURFACE_SEPARATOR,
   toWebTerminalSurfaceTabId
 } from '../../src/shared/terminal-surface-id'
+import type { RemoteTerminalInputDeliveryReport } from '../../src/shared/remote-terminal-input-delivery'
 import { expect, test } from './helpers/orca-app'
 import {
   createRuntimeDesktopPairingOffer,
@@ -262,7 +263,29 @@ type ScenarioResult = {
   paintedAfterFlip: boolean
   paneGrid: { cols: number; rows: number } | null
   ptyGrid: { cols: number; rows: number } | null
+  /** Where the client's own writes ended. Empty means the keystrokes never
+   *  reached this terminal's transport at all. */
+  inputDelivery: RemoteTerminalInputDeliveryReport | null
+  /** Non-empty when the keystrokes were attributed to a different terminal. */
+  inputDeliveryElsewhere: string[]
   diagnostics: unknown
+}
+
+async function resetInputDeliveryProbe(page: Page): Promise<void> {
+  await page.evaluate(() => window.__remoteTerminalInputDelivery?.reset())
+}
+
+async function readInputDelivery(
+  page: Page,
+  terminal: string
+): Promise<{ report: RemoteTerminalInputDeliveryReport | null; elsewhere: string[] }> {
+  return page.evaluate((handle) => {
+    const snapshot = window.__remoteTerminalInputDelivery?.snapshot() ?? {}
+    return {
+      report: snapshot[handle] ?? null,
+      elsewhere: Object.keys(snapshot).filter((key) => key !== handle)
+    }
+  }, terminal)
 }
 
 /** Types a unique marker into the revealed pane and records whether the host
@@ -278,6 +301,7 @@ async function probeInteractivity(
   const token = `probe-${name}`
   // Why: a human types once the pane looks restored; typing earlier would race the reattach.
   const restoredBuffer = await waitForPaneMarker(page, target.webTabId, 'READY:', REVEAL_BUDGET_MS)
+  await resetInputDeliveryProbe(page)
   await focusActiveTerminalInput(page)
   await page.keyboard.type(token)
   await page.keyboard.press('Enter')
@@ -288,6 +312,7 @@ async function probeInteractivity(
     LIVE_PAINT_BUDGET_MS
   )
   const paneGrid = await readActivePaneGrid(page, target.webTabId)
+  const inputDelivery = await readInputDelivery(page, target.terminal)
   const diagnostics = await readPaneDiagnostics(page, worktreeId, target.webTabId)
   let paintedAfterFlip = paintedLive
   if (!paintedLive) {
@@ -309,6 +334,8 @@ async function probeInteractivity(
     paintedAfterFlip,
     paneGrid,
     ptyGrid: readPtyGridFromContent(sink),
+    inputDelivery: inputDelivery.report,
+    inputDeliveryElsewhere: inputDelivery.elsewhere,
     diagnostics
   }
 }
@@ -320,6 +347,21 @@ async function expectStillMounted(page: Page, webTabId: string, label: string): 
     await page.evaluate((id) => window.__paneManagers?.has(id) ?? false, webTabId),
     `${label} parked before the reveal it is supposed to survive`
   ).toBe(true)
+}
+
+/** Names the losing half so the message cannot blame the paint for an input
+ *  that never reached the host (and vice versa). */
+function describeInteractivityFailure(result: ScenarioResult): string {
+  if (!result.restoredBuffer) {
+    return `${result.name}: revealed pane never restored its buffer, so nothing was typed into a live pane`
+  }
+  if (!result.hostReceivedInput) {
+    const sites = Object.entries(result.inputDelivery?.totals ?? {})
+      .map(([site, chars]) => `${site}=${chars}`)
+      .join(',')
+    return `${result.name}: typed input never reached the host PTY (client delivery: ${sites || 'nothing recorded for this terminal'}; other terminals with writes: ${result.inputDeliveryElsewhere.length})`
+  }
+  return `${result.name}: the host received the input but the revealed pane never painted it (painted after tab flip: ${result.paintedAfterFlip})`
 }
 
 /** Logged unconditionally: on failure this line is the whole diagnosis. */
@@ -456,7 +498,7 @@ test('paired client keeps revealed remote terminals interactive', async ({
           hostReceivedInput: result.hostReceivedInput,
           paintedLive: result.paintedLive
         },
-        `${result.name}: revealed pane was not interactive (painted after tab flip: ${result.paintedAfterFlip})`
+        describeInteractivityFailure(result)
       ).toEqual({
         scenario: result.name,
         restoredBuffer: true,

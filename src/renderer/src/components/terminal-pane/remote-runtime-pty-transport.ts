@@ -41,6 +41,7 @@ import {
   runtimeTerminalErrorMessage,
   toRemoteRuntimePtyId
 } from '../../runtime/runtime-terminal-stream'
+import { recordRemoteTerminalInputDelivery } from '../../runtime/remote-terminal-input-delivery-probe'
 import {
   getRemoteRuntimeTerminalMultiplexer,
   REMOTE_TERMINAL_SNAPSHOT_TOO_LARGE,
@@ -346,6 +347,9 @@ export function createRemoteRuntimePtyTransport(
   const viewportClaimReadyWaiters = new Set<(ready: boolean) => void>()
   const clearPendingViewportClaim = (): void => {
     pendingViewportClaim = false
+    if (pendingClaimInput && handle) {
+      recordRemoteTerminalInputDelivery(handle, 'claim-discarded', pendingClaimInput.length)
+    }
     pendingClaimInput = ''
     for (const resolve of viewportClaimReadyWaiters) {
       resolve(false)
@@ -1306,17 +1310,25 @@ export function createRemoteRuntimePtyTransport(
     const targetHandle = handle
     const targetLifecycleEpoch = lifecycleEpoch
     if (!connected || !targetHandle || recoveryBlocksIo()) {
+      if (targetHandle) {
+        recordRemoteTerminalInputDelivery(targetHandle, 'io-blocked', text.length)
+      }
       return
     }
     const stream = getCurrentMultiplexedStream(targetHandle)
+    if (!stream) {
+      recordRemoteTerminalInputDelivery(targetHandle, 'stream-absent', text.length)
+    }
     if (stream?.sendInput(text)) {
       return
     }
     if (pendingViewportClaim) {
       // Why: a claim during subscribe/reconnect has no stream record yet; hold its input so the stream emits claim+input in one order.
       pendingClaimInput += text
+      recordRemoteTerminalInputDelivery(targetHandle, 'claim-held', text.length)
       return
     }
+    recordRemoteTerminalInputDelivery(targetHandle, 'rpc-fallback', text.length)
     void callRuntime<{ send: RuntimeTerminalSend }>('terminal.send', {
       terminal: targetHandle,
       text,
@@ -1330,10 +1342,12 @@ export function createRemoteRuntimePtyTransport(
           handle === targetHandle &&
           result.send.accepted !== true
         ) {
+          recordRemoteTerminalInputDelivery(targetHandle, 'rpc-refused', text.length)
           notifyWriteUnavailable()
         }
       })
       .catch((error) => {
+        recordRemoteTerminalInputDelivery(targetHandle, 'rpc-refused', text.length)
         if (lifecycleEpoch !== targetLifecycleEpoch || handle !== targetHandle) {
           return
         }
@@ -1971,6 +1985,7 @@ export function createRemoteRuntimePtyTransport(
       const queuedInput = pendingClaimInput
       pendingClaimInput = ''
       if (queuedInput) {
+        recordRemoteTerminalInputDelivery(subscribedHandle, 'claim-flushed', queuedInput.length)
         nextStream.sendInput(queuedInput)
       }
       for (const resolve of viewportClaimReadyWaiters) {
@@ -2405,13 +2420,18 @@ export function createRemoteRuntimePtyTransport(
       const pending = inputBatcher.takePending()
       const text = `${pending}${data}`
       const stream = getCurrentMultiplexedStream(targetHandle)
+      if (!stream) {
+        recordRemoteTerminalInputDelivery(targetHandle, 'stream-absent', text.length)
+      }
       if (stream?.sendInput(text)) {
         return true
       }
       if (pendingViewportClaim) {
         pendingClaimInput += text
+        recordRemoteTerminalInputDelivery(targetHandle, 'claim-held', text.length)
         return true
       }
+      recordRemoteTerminalInputDelivery(targetHandle, 'rpc-fallback', text.length)
       void callRuntime('terminal.send', {
         terminal: targetHandle,
         text,
