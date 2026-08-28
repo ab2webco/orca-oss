@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { childSpawnMock, resolveCodexCommandMock, ptySpawnMock } = vi.hoisted(() => ({
   childSpawnMock: vi.fn(),
@@ -30,10 +33,30 @@ function makeDisposable() {
 }
 
 describe('fetchCodexRateLimits PTY settle timers', () => {
+  // Why: the fetcher reads $CODEX_HOME/auth.json and, when it finds a token,
+  // sends it as a Bearer header to chatgpt.com — so on any machine with a Codex
+  // account these tests took the backend path, asserted against that account's
+  // live quota, and shipped a real access token off the box. CI has no auth.json
+  // and stayed green, which is why it survived. Refusing the call keeps the run
+  // hermetic and fails loudly if a code change reaches for the network again.
+  const fetchMock = vi.fn(() => {
+    throw new Error('codex-fetcher unit tests must not reach the network')
+  })
+
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    // A CODEX_HOME with no auth.json is what a CI runner looks like, and it is
+    // the only reason CI stayed green while every developer machine did not.
+    vi.stubEnv('CODEX_HOME', join(tmpdir(), `orca-codex-home-absent-${randomUUID()}`))
+    vi.stubGlobal('fetch', fetchMock)
     resolveCodexCommandMock.mockReturnValue('codex')
+  })
+
+  afterEach(() => {
+    expect(fetchMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('coalesces the PTY fallback status settle timer while output keeps streaming', async () => {
