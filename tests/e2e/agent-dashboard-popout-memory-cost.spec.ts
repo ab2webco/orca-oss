@@ -20,6 +20,10 @@ const POPOUT_SETTLE_MS = 3_000
 const LAUNCH_SETTLE_TIMEOUT_MS = 90_000
 const LAUNCH_SETTLE_INTERVAL_MS = 2_000
 const LAUNCH_SETTLE_TOLERANCE = 0.04
+// Why three and not two: two consecutive reads agreeing is a coin flip while the
+// app is still shedding, and one run that "settled" on its second read then drifted
+// 243 MB between the two closed phases — more than either delta it reported.
+const LAUNCH_SETTLE_STABLE_READS = 3
 
 type PopoutPhase = 'closed-1' | 'open-1' | 'closed-2' | 'open-2'
 
@@ -79,14 +83,18 @@ async function samplePhase(
 async function waitForLaunchMemoryToSettle(page: Page): Promise<number[]> {
   const trace: number[] = []
   const deadline = Date.now() + LAUNCH_SETTLE_TIMEOUT_MS
+  let stable = 0
   let previous: number | null = null
   while (Date.now() < deadline) {
     const total = await page.evaluate(
       async () => (await window.api.memory.getSnapshot()).app.memory
     )
     trace.push(total)
-    // Settled means the last two reads agree; still-falling launch memory does not.
-    if (previous !== null && Math.abs(total - previous) <= previous * LAUNCH_SETTLE_TOLERANCE) {
+    stable =
+      previous !== null && Math.abs(total - previous) <= previous * LAUNCH_SETTLE_TOLERANCE
+        ? stable + 1
+        : 0
+    if (stable >= LAUNCH_SETTLE_STABLE_READS - 1) {
       return trace
     }
     previous = total
@@ -186,11 +194,15 @@ test('@ondemand measures what the Agent Dashboard popout costs, with the session
     expect(median(phase.map((sample) => sample.rendererProcesses))).toBe(closedProcesses + 1)
   }
 
+  // Why the renderer bucket and not the app total: the popout is its own
+  // renderer process, so its cost lands here, while the app total also carries
+  // main and utility movement that kept drifting hundreds of MB after the
+  // settle gate and swamped the signal.
   const pairDeltas = [
-    medianOf(open1, 'appTotalBytes') - medianOf(closed1, 'appTotalBytes'),
-    medianOf(open2, 'appTotalBytes') - medianOf(closed2, 'appTotalBytes')
+    medianOf(open1, 'appRendererBytes') - medianOf(closed1, 'appRendererBytes'),
+    medianOf(open2, 'appRendererBytes') - medianOf(closed2, 'appRendererBytes')
   ]
-  const driftBytes = medianOf(closed2, 'appTotalBytes') - medianOf(closed1, 'appTotalBytes')
+  const driftBytes = medianOf(closed2, 'appRendererBytes') - medianOf(closed1, 'appRendererBytes')
   console.log(
     `[dashboard-popout-cost] ${JSON.stringify({
       sessionCount: all[0]?.sessionCount ?? null,
@@ -199,10 +211,16 @@ test('@ondemand measures what the Agent Dashboard popout costs, with the session
       // Drift across the two closed phases. If it is the size of the deltas, the
       // deltas are drift and the run says nothing about the popout.
       closedDriftMb: toMb(driftBytes),
-      rendererDeltaMb: [
-        toMb(medianOf(open1, 'appRendererBytes') - medianOf(closed1, 'appRendererBytes')),
-        toMb(medianOf(open2, 'appRendererBytes') - medianOf(closed2, 'appRendererBytes'))
+      appTotalDeltaMb: [
+        toMb(medianOf(open1, 'appTotalBytes') - medianOf(closed1, 'appTotalBytes')),
+        toMb(medianOf(open2, 'appTotalBytes') - medianOf(closed2, 'appTotalBytes'))
       ],
+      medianRendererMb: {
+        closed1: toMb(medianOf(closed1, 'appRendererBytes')),
+        open1: toMb(medianOf(open1, 'appRendererBytes')),
+        closed2: toMb(medianOf(closed2, 'appRendererBytes')),
+        open2: toMb(medianOf(open2, 'appRendererBytes'))
+      },
       medianTotalMb: {
         closed1: toMb(medianOf(closed1, 'appTotalBytes')),
         open1: toMb(medianOf(open1, 'appTotalBytes')),
@@ -212,4 +230,14 @@ test('@ondemand measures what the Agent Dashboard popout costs, with the session
       samples: all
     })}`
   )
+  // Why this fails the run instead of annotating it: drift at or above the
+  // smallest delta means the deltas are drift, and a measurement that cannot
+  // answer its question has to say so rather than print a number that reads as
+  // an answer.
+  expect(
+    Math.abs(driftBytes),
+    `closed-phase drift ${toMb(driftBytes)}MB is not smaller than the deltas ${pairDeltas
+      .map(toMb)
+      .join('/')}MB — this run cannot separate the popout from the app's own movement`
+  ).toBeLessThan(Math.min(...pairDeltas.map((delta) => Math.abs(delta))))
 })
