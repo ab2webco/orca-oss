@@ -26,6 +26,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
 
   const offer = await createRuntimeDesktopPairingOffer(orcaPage)
   let client: PairedElectronClient | null = null
+  const clientConsole: string[] = []
   try {
     client = await launchPairedElectronClient(offer, testInfo, 'Remote HTML focus')
     const page = client.page
@@ -98,8 +99,6 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       },
       { environmentId: client.environmentId, worktreeId }
     )
-    await openPreviewToSide.click()
-
     // Why the extra fields: three nulls cannot say whether nothing was created,
     // something was created under a url this predicate does not match, or the
     // host RPC simply failed — and the last one is an observation failure wearing
@@ -108,13 +107,16 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
     // a silent bail on the session gate, a thrown availability assert, or a failed
     // RPC — surfaces as the same single toast, so a hang and an outright refusal
     // look identical from the store alone (ORCA-305).
-    const clientConsole: string[] = []
+    // Why before the click: subscribing after it loses every line the open path
+    // emits (ORCA-305).
     page.on('console', (message) => {
       const text = message.text()
       if (/web-runtime-session|browser|preview|runtime/i.test(text)) {
         clientConsole.push(`${message.type()}:${text.slice(0, 200)}`)
       }
     })
+    await openPreviewToSide.click()
+
     let ownershipSamples = 0
     // Why measured on success too: a red costs a whole sharded run and only pays
     // out when it happens to fire. Convergence timing on every run says whether
@@ -594,6 +596,9 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       page.locator(`[data-tab-group-body-id="${sourceGroupId}"] .monaco-editor`)
     ).toBeVisible()
   } finally {
+    // Why on teardown too: a run that leaves the ownership poll on its first
+    // sample never reaches that poll's log line (ORCA-305).
+    console.log(`[html-focus] client-console ${JSON.stringify(clientConsole.slice(-12))}`)
     await client?.dispose()
   }
 })
