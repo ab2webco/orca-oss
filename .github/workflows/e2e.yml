@@ -296,8 +296,17 @@ jobs:
           E2E_PROJECT_ARGS=()
           if [ -n "$PROJECT" ]; then
             E2E_PROJECT_ARGS+=(--project "$PROJECT")
-          elif grep -l '@headful' "${TEST_FILES[@]}" >/dev/null; then
-            E2E_PROJECT_ARGS+=(--project=electron-headful)
+          else
+            # Why added and not chosen between: test:e2e already pins
+            # electron-headless, whose grepInvert drops both tags, so a changed
+            # spec carrying one collects zero tests and the job dies on
+            # "No tests found" — green nowhere, red here.
+            if grep -l '@headful' "${TEST_FILES[@]}" >/dev/null; then
+              E2E_PROJECT_ARGS+=(--project=electron-headful)
+            fi
+            if grep -l '@ondemand' "${TEST_FILES[@]}" >/dev/null; then
+              E2E_PROJECT_ARGS+=(--project=electron-ondemand)
+            fi
           fi
           xvfb-run --auto-servernum env "${E2E_ENV[@]}" \
             pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"
