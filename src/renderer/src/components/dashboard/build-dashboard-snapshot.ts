@@ -43,13 +43,8 @@ import {
   collectActiveDashboardWorkspaces,
   dashboardCardMapWorkspaceMetadata
 } from './dashboard-snapshot-workspaces'
-import {
-  boundedLabel,
-  boundedLabelOrUndefined,
-  nonEmpty,
-  rowConversationName,
-  rowTask
-} from './dashboard-card-labels'
+import { boundedLabel, nonEmpty, rowTask } from './dashboard-card-labels'
+import { resolveDashboardAgentRowLabels } from '../agent-row-label-resolution'
 import {
   buildDashboardWorktreeLaunchOptions,
   type DashboardLaunchDetectionState
@@ -156,6 +151,10 @@ export function buildDashboardSnapshot(
           EMPTY_WORKTREE_AGENT_ORCHESTRATION,
         now
       })
+    )
+    const labelsByPaneKey = resolveDashboardAgentRowLabels(
+      rows.filter((row) => row.rowSource !== 'subagent'),
+      generatedTitlesEnabled
     )
     const subagentsByParentPaneKey = includeCardDetails
       ? new Map<string, DashboardCardSubagent[]>()
@@ -303,7 +302,7 @@ export function buildDashboardSnapshot(
         // board and the sidebar bold/mute the same agents at the same time.
         unseen,
         askSummary: bucket === 'attention' ? (row.entry.interactivePrompt ?? undefined) : undefined,
-        conversationName: boundedLabelOrUndefined(rowConversationName(row, generatedTitlesEnabled)),
+        conversationName: labelsByPaneKey.get(row.paneKey),
         ...(terminalInput ? { terminalInput } : {})
       })
     }

@@ -46,11 +46,12 @@ function makeAgent(
   }
 }
 
-function renderRow(agent: DashboardAgentRowData): string {
+function renderRow(agent: DashboardAgentRowData, label?: string): string {
   return renderToStaticMarkup(
     <TooltipProvider>
       <DashboardAgentRow
         agent={agent}
+        label={label}
         onDismiss={vi.fn()}
         onActivate={vi.fn()}
         now={NOW}
@@ -126,6 +127,21 @@ function classTokensForTaggedElement(markup: string, dataAttribute: string): str
 }
 
 describe('DashboardAgentRow', () => {
+  it('does not repeat a resolved primary as the assistant message', () => {
+    const repeated = renderRow(
+      makeAgent({}, { lastAssistantMessage: 'Repeated result' }),
+      'Repeated result'
+    )
+    const distinct = renderRow(
+      makeAgent({}, { lastAssistantMessage: 'Distinct result' }),
+      'Resolved primary'
+    )
+
+    expect(repeated.match(/>Repeated result</g)).toHaveLength(1)
+    expect(distinct).toContain('>Resolved primary</span>')
+    expect(distinct).toContain('>Distinct result</span>')
+  })
+
   it('renders orchestration task preview instead of the raw dispatch preamble prompt', () => {
     const markup = renderRow(
       makeAgent(

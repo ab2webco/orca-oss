@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils'
 import { getAgentDotState } from './worktree-card-agent-summary'
 import { translate } from '@/i18n/i18n'
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
-import { useAgentRowConversationName } from '@/components/dashboard/use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 
@@ -28,11 +27,8 @@ function formatShortTimeAgo(ts: number, now: number): string {
   return `${Math.floor(hours / 24)}d`
 }
 
-function getCompactAgentPrimary(
-  agent: DashboardAgentRowData,
-  conversationName: string | null
-): string {
-  const prompt = conversationName ?? getAgentRowPrimaryText(agent.entry)
+function getCompactAgentPrimary(agent: DashboardAgentRowData): string {
+  const prompt = getAgentRowPrimaryText(agent.entry)
   return prompt || agentStateLabel(getAgentDotState(agent))
 }
 
@@ -80,6 +76,7 @@ function stopActivationKeyPropagation(e: React.KeyboardEvent): void {
 
 type CompactAgentRowProps = {
   agent: DashboardAgentRowData
+  label?: string
   now: number
   onActivate: (tabId: string, paneKey: string) => void
   // Why: send-popover target mode temporarily turns compact sidebar rows into
@@ -98,6 +95,7 @@ type CompactAgentRowProps = {
 
 export const CompactAgentRow = React.memo(function CompactAgentRow({
   agent,
+  label,
   now,
   onActivate,
   sendTargetStatus,
@@ -120,10 +118,10 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
   // "?" glyph. Nesting under the parent already conveys identity.
   const hideIcon = hideIdentityIcon || agent.rowSource === 'subagent'
   const dotState = getAgentDotState(agent)
-  const conversationName = useAgentRowConversationName(agent)
-  const primary = getCompactAgentPrimary(agent, conversationName)
+  const primary = label ?? getCompactAgentPrimary(agent)
   const isLineageChild = agent.lineage?.depth === 1
-  const secondary = getCompactAgentSecondary(agent)
+  const rawSecondary = getCompactAgentSecondary(agent)
+  const secondary = rawSecondary === primary ? '' : rawSecondary
   const model = agent.entry.model?.trim() ?? ''
   const shortTime = getCompactAgentTime(agent, now)
   const cacheTimer = usePromptCacheCountdownForPane(agent.paneKey, cacheTimerActive)

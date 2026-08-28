@@ -26,6 +26,7 @@ import { DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE } from '../../../../shared/constant
 import { revealElementInScrollContainer } from './worktree-sidebar-reveal'
 import { useWorktreeAgentExpansionState } from './worktree-card-agents-expansion-state'
 import { translate } from '@/i18n/i18n'
+import { resolveRenderedAgentRowLabels } from '../agent-row-label-resolution'
 
 export const SUPPRESS_WORKTREE_LIST_SCROLL_ADJUSTMENT_EVENT =
   'orca-suppress-worktree-list-scroll-adjustment'
@@ -78,6 +79,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
 }: BodyProps) {
   const agentActivityDisplayMode =
     useAppStore((s) => s.agentActivityDisplayMode) ?? DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE
+  const generatedTitlesEnabled = useAppStore((s) => s.settings?.tabAutoGenerateTitle === true)
   const dropAgentStatus = useAppStore((s) => s.dropAgentStatus)
   const dismissRetainedAgent = useAppStore((s) => s.dismissRetainedAgent)
   const { targetMode: agentSendPopoverTargetMode, agentStatusEpoch } = useAppStore(
@@ -88,6 +90,10 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
   const sendPromptToSidebarAgentTarget = useAppStore((s) => s.sendPromptToSidebarAgentTarget)
   const focusedAgentPaneKey = useFocusedAgentPaneKey(worktreeId)
   const compactAgentListRootRef = useRef<HTMLDivElement | null>(null)
+  const labelsByPaneKey = useMemo(
+    () => resolveRenderedAgentRowLabels(agents, generatedTitlesEnabled),
+    [agents, generatedTitlesEnabled]
+  )
 
   // Why: derive per-agent unvisited flags from the ack map so rows bold on first appearance and mute once the tab is visited.
   const acknowledgedAgentsByPaneKey = useAppStore((s) => s.acknowledgedAgentsByPaneKey)
@@ -260,6 +266,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
       <React.Fragment key={agent.paneKey}>
         <DashboardAgentRow
           agent={agent}
+          label={labelsByPaneKey.get(agent.paneKey)}
           onDismiss={handleDismissAgent}
           onActivate={
             agent.rowSource === 'retained' ? handleActivateRetainedAgent : handleActivateAgentTab
@@ -321,6 +328,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
       <React.Fragment key={agent.paneKey}>
         <CompactAgentRow
           agent={agent}
+          label={labelsByPaneKey.get(agent.paneKey)}
           now={now}
           onActivate={
             agent.rowSource === 'retained' ? handleActivateRetainedAgent : handleActivateAgentTab

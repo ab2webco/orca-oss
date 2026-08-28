@@ -11,7 +11,6 @@ import { DashboardAgentRowToolStep } from './DashboardAgentRowToolStep'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
 import type { DashboardAgentRow as DashboardAgentRowData } from './useDashboardData'
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
-import { useAgentRowConversationName } from './use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from './agent-finished-timestamp'
 
 // Why: narrow the dashboard's rollup states to shared dot states, defaulting unknowns to 'idle' so a row never crashes.
@@ -53,6 +52,7 @@ function stateDotTooltipLabel(agent: DashboardAgentRowData, dotState: AgentDotSt
 
 type Props = {
   agent: DashboardAgentRowData
+  label?: string
   onDismiss: (paneKey: string) => void
   /** Navigate to this agent's tab; paneKey lets the caller mark-visit the exact clicked row. */
   onActivate: (tabId: string, paneKey: string) => void
@@ -83,6 +83,7 @@ type Props = {
 
 const DashboardAgentRow = React.memo(function DashboardAgentRow({
   agent,
+  label,
   onDismiss,
   onActivate,
   now,
@@ -139,8 +140,7 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
   )
   const startedAt = agent.startedAt > 0 ? agent.startedAt : null
   const doneAt = lastEnteredDoneAt(agent)
-  const conversationName = useAgentRowConversationName(agent)
-  const prompt = conversationName ?? getAgentRowPrimaryText(agent.entry)
+  const prompt = label ?? getAgentRowPrimaryText(agent.entry)
   // Why: prompt is '' when unknown, so fall back to the state label to keep the row labeled.
   const displayLabel = prompt || agentStateLabel(asDotState(agent.state))
   const model = agent.entry.model?.trim() ?? ''
@@ -148,7 +148,8 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
   const isWorking = agent.state === 'working'
   const toolName = isWorking ? (agent.entry.toolName?.trim() ?? '') : ''
   const toolInput = isWorking ? (agent.entry.toolInput?.trim() ?? '') : ''
-  const lastAssistantMessage = agent.entry.lastAssistantMessage?.trim() ?? ''
+  const rawAssistantMessage = agent.entry.lastAssistantMessage?.trim() ?? ''
+  const lastAssistantMessage = rawAssistantMessage === displayLabel ? '' : rawAssistantMessage
   const isInterrupted = agent.entry.interrupted === true
   const lineage = agent.lineage
   const isLineageChild = lineage?.depth === 1

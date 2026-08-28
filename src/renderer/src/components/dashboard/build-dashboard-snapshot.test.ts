@@ -335,6 +335,58 @@ describe('buildDashboardSnapshot', () => {
     expect(unnamed.cards[0].conversationName).toBeUndefined()
   })
 
+  it.each(['identical', 'distinct'] as const)(
+    'keeps bounded labels distinct for panes with %s overlong prompts',
+    (kind) => {
+      const paneKeys = [PANE_KEY, CHILD_PANE_KEY, GRANDCHILD_PANE_KEY]
+      const overlongPrompt = 'x'.repeat(DASHBOARD_MAX_LABEL_LENGTH + 100)
+      const snapshot = buildDashboardSnapshot(
+        baseState({
+          tabsByWorktree: { w1: [{ ...tab(), customTitle: 'Shared conversation' }] },
+          agentStatusByPaneKey: Object.fromEntries(
+            paneKeys.map((paneKey, index) => [
+              paneKey,
+              entry({
+                paneKey,
+                prompt: kind === 'distinct' ? `${overlongPrompt}-${index}` : overlongPrompt,
+                updatedAt: NOW - index
+              })
+            ])
+          ),
+          terminalLayoutsByTabId: {
+            [TAB_ID]: {
+              root: {
+                type: 'split',
+                direction: 'vertical',
+                first: { type: 'leaf', leafId: LEAF_ID },
+                second: {
+                  type: 'split',
+                  direction: 'vertical',
+                  first: { type: 'leaf', leafId: CHILD_LEAF_ID },
+                  second: { type: 'leaf', leafId: GRANDCHILD_LEAF_ID }
+                }
+              },
+              activeLeafId: LEAF_ID,
+              expandedLeafId: null,
+              ptyIdsByLeafId: {
+                [LEAF_ID]: 'pty1',
+                [CHILD_LEAF_ID]: 'pty-child',
+                [GRANDCHILD_LEAF_ID]: 'pty-grandchild'
+              }
+            }
+          },
+          ptyIdsByTabId: { [TAB_ID]: ['pty1', 'pty-child', 'pty-grandchild'] }
+        }),
+        NOW
+      )
+
+      const labels = snapshot.cards.map((card) => card.conversationName ?? '')
+      expect(labels.every((label) => label.length === DASHBOARD_MAX_LABEL_LENGTH)).toBe(true)
+      expect(new Set(labels).size).toBe(3)
+      expect(labels.map((label) => label.slice(-3))).toEqual(['(1)', '(2)', '(3)'])
+    }
+  )
+
   // Why: `orca terminal rename --title` is unbounded, and the main-process
   // validator drops any card whose label exceeds the shared bound.
   it('truncates labels to the length the snapshot validator accepts', () => {
