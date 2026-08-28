@@ -9,6 +9,14 @@ import {
 } from './helpers/paired-electron-client'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
+// The runtime RPC envelope types `result` as unknown; this is the shape
+// `session.tabs.list` returns, narrowed once at the boundary.
+type SessionTabsListResult = {
+  activeTabId?: string | null
+  tabGroups?: { id: string; tabOrder: string[] }[]
+  tabs: { browserPageId?: string | null; id: string; type: string; url: string }[]
+}
+
 const FIXTURE_NAME = 'paired-html-focus.html'
 
 test('keeps remote HTML preview placement and focuses it only after a click', async ({
@@ -26,6 +34,12 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
 
   const offer = await createRuntimeDesktopPairingOffer(orcaPage)
   let client: PairedElectronClient | null = null
+  const requireClient = (): PairedElectronClient => {
+    if (!client) {
+      throw new Error('paired client is not launched')
+    }
+    return client
+  }
   try {
     client = await launchPairedElectronClient(offer, testInfo, 'Remote HTML focus')
     const page = client.page
@@ -54,7 +68,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       ({ environmentId, worktreeId }) => {
         window.__store?.getState().setActiveWorktree(worktreeId, `runtime:${environmentId}`)
       },
-      { environmentId: client.environmentId, worktreeId }
+      { environmentId: requireClient().environmentId, worktreeId }
     )
     await openFileExplorer(page)
     const fixtureRow = page.locator('[data-file-explorer-row]').filter({ hasText: FIXTURE_NAME })
@@ -92,11 +106,13 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
           ).length,
           clientWorkspaces: (state?.browserTabsByWorktree[worktreeId] ?? []).length,
           host: response.ok
-            ? response.result.tabs.filter((tab) => tab.type === 'browser').length
+            ? (response.result as SessionTabsListResult).tabs.filter(
+                (tab) => tab.type === 'browser'
+              ).length
             : -1
         }
       },
-      { environmentId: client.environmentId, worktreeId }
+      { environmentId: requireClient().environmentId, worktreeId }
     )
     await openPreviewToSide.click()
 
@@ -126,7 +142,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
               })
               const hostHasHtml =
                 response.ok &&
-                response.result.tabs.some(
+                (response.result as SessionTabsListResult).tabs.some(
                   (tab) => tab.type === 'browser' && tab.url.endsWith(`/${fixtureName}`)
                 )
               return {
@@ -165,17 +181,21 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
             )
             .map((tab) => ({ groupId: tab.groupId, id: tab.id })),
           hostTabIds: response.ok
-            ? response.result.tabs
+            ? (response.result as SessionTabsListResult).tabs
                 .filter((tab) => tab.type === 'browser' && tab.url.endsWith(`/${fixtureName}`))
                 .map((tab) => tab.id)
             : [],
-          hostTabGroups: response.ok ? (response.result.tabGroups ?? []) : [],
+          hostTabGroups: response.ok
+            ? ((response.result as SessionTabsListResult).tabGroups ?? [])
+            : [],
           totalClientUnified: (state?.unifiedTabsByWorktree[worktreeId] ?? []).filter(
             (tab) => tab.contentType === 'browser'
           ).length,
           totalClientWorkspaces: (state?.browserTabsByWorktree[worktreeId] ?? []).length,
           totalHost: response.ok
-            ? response.result.tabs.filter((tab) => tab.type === 'browser').length
+            ? (response.result as SessionTabsListResult).tabs.filter(
+                (tab) => tab.type === 'browser'
+              ).length
             : -1
         }
       },
@@ -270,11 +290,12 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 return false
               }
               return (
-                response.result.tabs.find((tab) => tab.id === response.result.activeTabId)?.type ===
-                'terminal'
+                (response.result as SessionTabsListResult).tabs.find(
+                  (tab) => tab.id === (response.result as SessionTabsListResult).activeTabId
+                )?.type === 'terminal'
               )
             },
-            { environmentId: client.environmentId, worktreeId }
+            { environmentId: requireClient().environmentId, worktreeId }
           ),
         { timeout: 30_000, message: 'host never accepted terminal activation' }
       )
@@ -288,7 +309,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
           timeoutMs: 15_000
         })
         const tab = response.ok
-          ? response.result.tabs.find(
+          ? (response.result as SessionTabsListResult).tabs.find(
               (candidate) =>
                 candidate.type === 'browser' && candidate.url.endsWith(`/${fixtureName}`)
             )
@@ -349,7 +370,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 )
               })
             },
-            { browserTabId: tabIds.browserId, environmentId: client.environmentId }
+            { browserTabId: tabIds.browserId, environmentId: requireClient().environmentId }
           ),
         { timeout: 30_000, message: 'client lost remote browser ownership before activation' }
       )
@@ -378,7 +399,9 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 (tab) => tab.id === activeGroup?.activeTabId
               )
               const hostActive = response.ok
-                ? response.result.tabs.find((tab) => tab.id === response.result.activeTabId)
+                ? (response.result as SessionTabsListResult).tabs.find(
+                    (tab) => tab.id === (response.result as SessionTabsListResult).activeTabId
+                  )
                 : null
               return {
                 activeGroupType: activeUnified?.contentType ?? null,
@@ -424,7 +447,9 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                   (tab) => tab.id === workspaceId
                 ),
                 hostTabPresent: response.ok
-                  ? response.result.tabs.some((tab) => tab.id === hostTabId)
+                  ? (response.result as SessionTabsListResult).tabs.some(
+                      (tab) => tab.id === hostTabId
+                    )
                   : true,
                 sourceGroupPresent: (state?.groupsByWorktree[worktreeId] ?? []).some(
                   (group) => group.id === sourceGroupId

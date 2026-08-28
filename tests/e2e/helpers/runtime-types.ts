@@ -1,3 +1,4 @@
+import type { StoreApi } from 'zustand'
 import type { AppState } from '../../../src/renderer/src/store/types'
 import type { OpenFile, RightSidebarTab } from '../../../src/renderer/src/store/slices/editor'
 import type { ManagedPane } from '../../../src/renderer/src/lib/pane-manager/pane-manager-types'
@@ -9,10 +10,14 @@ import type {
   WorkspaceVisibleTabType
 } from '../../../src/shared/types'
 
-export type AppStore = {
-  getState(): AppState
-}
+// Why the real store type: the app assigns the whole zustand store to
+// window.__store (store/index.ts), so declaring only getState made every spec
+// that calls setState typecheck against a shape the runtime never had.
+export type AppStore = StoreApi<AppState>
 
+// Why no __paneManagers here: src/renderer/src/env.d.ts already declares it as
+// the real Map<string, PaneManager>, and re-declaring a narrower shape shadowed
+// every method the specs actually call.
 export type PaneManagerLike = {
   getActivePane?(): ManagedPane | null
   getPanes?(): ManagedPane[]
@@ -46,7 +51,6 @@ declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
   interface Window {
     __store?: AppStore
-    __paneManagers?: Map<string, PaneManagerLike>
   }
 }
 

@@ -1,13 +1,23 @@
 {
   // Why: tests/ was in no tsconfig project, so type-aware lint resolved every
-  // node type to an error type that silently disables the rules it feeds.
+  // node type to an error type (ORCA-310) and `npm run typecheck` never read
+  // the E2E suite at all — a missing import surfaced only as a runtime
+  // ReferenceError deep inside a sharded job (ORCA-318).
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
       "@/*": ["../src/renderer/src/*"],
       "@renderer/*": ["../src/renderer/src/*"]
     },
     "noEmit": true
   },
-  "include": ["./**/*.ts", "./**/*.tsx"]
+  // The renderer files these specs import carry vite ambient types and build
+  // constants; without them the src side reports errors its own project does not.
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../src/renderer/src/env.d.ts",
+    "../src/types/build-constants.d.ts"
+  ]
 }
