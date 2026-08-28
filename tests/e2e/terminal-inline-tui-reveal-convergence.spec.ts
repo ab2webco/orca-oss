@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PNG } from 'pngjs'
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
@@ -17,6 +16,13 @@ import {
   waitForPaneIdentitySnapshot
 } from './helpers/terminal'
 import { waitForTabParked } from './helpers/terminal-hidden-parking'
+import {
+  CONVERGED,
+  advancementSample,
+  heartbeatLagVerdict,
+  parkedHeartbeatBaseline,
+  readHeartbeat
+} from './inline-tui-heartbeat'
 
 // Field bug (v1.4.144-rc.4): switching back to a workspace whose Codex TUI kept
 // streaming while hidden shows a mostly-blank terminal — live block (input box)
@@ -62,14 +68,6 @@ function latestFrame(text: string): number {
     latest = Math.max(latest, Number(match[1]))
   }
   return latest
-}
-
-function heartbeatFrame(heartbeatPath: string): number {
-  try {
-    return Number(readFileSync(heartbeatPath, 'utf8').trim())
-  } catch {
-    return -1
-  }
 }
 
 // Why the pane resolves by tab (not a captured ptyId): agent quick-launch
@@ -374,8 +372,13 @@ async function assertRevealConvergence(
   const { tabId, heartbeatPath } = setup
 
   // Premise: the fixture kept streaming while hidden.
-  const heartbeatAtReveal = heartbeatFrame(heartbeatPath)
-  expect(heartbeatAtReveal, 'fixture stopped streaming while hidden').toBeGreaterThan(5)
+  const heartbeatAtReveal = readHeartbeat(heartbeatPath)
+  if (heartbeatAtReveal.kind !== 'frame') {
+    throw new Error(
+      `${label}: fixture heartbeat unreadable at reveal (${heartbeatAtReveal.reason})`
+    )
+  }
+  expect(heartbeatAtReveal.frame, 'fixture stopped streaming while hidden').toBeGreaterThan(5)
 
   let lastProbe: RevealProbe | null = null
   await expect
@@ -392,19 +395,18 @@ async function assertRevealConvergence(
         if (!screen.includes(INPUT_BOX_MARKER)) {
           return 'input-box-row-missing'
         }
-        const visibleFrame = latestFrame(screen)
-        const liveFrame = heartbeatFrame(heartbeatPath)
-        if (visibleFrame < 0 || liveFrame - visibleFrame > MAX_VISIBLE_FRAME_LAG) {
-          return `stale-frame visible=${visibleFrame} live=${liveFrame}`
-        }
-        return 'converged'
+        return heartbeatLagVerdict(
+          latestFrame(screen),
+          readHeartbeat(heartbeatPath),
+          MAX_VISIBLE_FRAME_LAG
+        )
       },
       {
         timeout: 20_000,
         message: `${label}: revealed pane did not converge to the live inline TUI without a resize`
       }
     )
-    .toBe('converged')
+    .toBe(CONVERGED)
     .catch(async (error) => {
       testInfo.annotations.push({
         type: `${label}-divergence-probe`,
@@ -523,9 +525,9 @@ async function withCpuThrottle<T>(page: Page, rate: number, run: () => Promise<T
 }
 
 async function streamWhileParked(setup: StreamingTabSetup, minFrames: number): Promise<void> {
-  const heartbeatBefore = heartbeatFrame(setup.heartbeatPath)
+  const heartbeatBefore = await parkedHeartbeatBaseline(setup.heartbeatPath)
   await expect
-    .poll(() => heartbeatFrame(setup.heartbeatPath), {
+    .poll(() => advancementSample(readHeartbeat(setup.heartbeatPath), heartbeatBefore), {
       timeout: 60_000,
       message: 'fixture did not keep streaming while hidden/parked'
     })
