@@ -127,6 +127,51 @@ let pendingWebRuntimeSplitMirrorTelemetryId = 0
 const pendingRuntimeWorktreeRecoveryRefreshes = new Map<string, symbol>()
 const RUNTIME_WORKTREE_RECOVERY_REFRESH_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000] as const
 
+// Why a window and not one read: tabCreate answers before the host webview
+// registers, so the next snapshot may legitimately not carry the tab yet, and a
+// single instant verdict closed tabs the client was about to own (ORCA-305).
+const WEB_RUNTIME_BROWSER_MATERIALIZATION_SETTLE_MS = 5_000
+
+async function waitForMaterializedWebRuntimeBrowserPage(args: {
+  environmentId: string
+  worktreeId: string
+  remotePageId: string
+  expectedGroupId?: string
+}): Promise<boolean> {
+  const isMaterialized = (): boolean =>
+    hasMaterializedWebRuntimeBrowserPage(
+      useAppStore.getState(),
+      args.environmentId,
+      args.worktreeId,
+      args.remotePageId,
+      args.expectedGroupId
+    )
+  if (isMaterialized()) {
+    return true
+  }
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const finish = (value: boolean): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timer)
+      unsubscribe()
+      resolve(value)
+    }
+    const unsubscribe = useAppStore.subscribe(() => {
+      if (isMaterialized()) {
+        finish(true)
+      }
+    })
+    const timer = setTimeout(
+      () => finish(isMaterialized()),
+      WEB_RUNTIME_BROWSER_MATERIALIZATION_SETTLE_MS
+    )
+  })
+}
+
 function captureRuntimeEnvironmentCall(
   environmentId: string,
   expectedEnvironmentPairingRevision = getRuntimeEnvironmentRevision(environmentId)
@@ -615,6 +660,8 @@ export async function createWebRuntimeSessionBrowserTab(args: {
         errorMode: 'throw'
       })
     } catch (error) {
+      // Why instant here and settled below: this path already holds a failed
+      // refresh, so waiting adds no signal.
       if (
         !hasMaterializedWebRuntimeBrowserPage(
           useAppStore.getState(),
@@ -628,13 +675,12 @@ export async function createWebRuntimeSessionBrowserTab(args: {
       }
     }
     if (
-      !hasMaterializedWebRuntimeBrowserPage(
-        useAppStore.getState(),
+      !(await waitForMaterializedWebRuntimeBrowserPage({
         environmentId,
-        args.worktreeId,
-        created.browserPageId,
-        args.clientTargetGroupId ?? args.targetGroupId
-      )
+        worktreeId: args.worktreeId,
+        remotePageId: created.browserPageId,
+        expectedGroupId: args.clientTargetGroupId ?? args.targetGroupId
+      }))
     ) {
       throw new Error('The created browser tab did not materialize in the client.')
     }

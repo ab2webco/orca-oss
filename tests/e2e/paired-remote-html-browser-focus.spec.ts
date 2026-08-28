@@ -34,6 +34,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
 
   const offer = await createRuntimeDesktopPairingOffer(orcaPage)
   let client: PairedElectronClient | null = null
+  const clientConsole: string[] = []
   const requireClient = (): PairedElectronClient => {
     if (!client) {
       throw new Error('paired client is not launched')
@@ -114,20 +115,43 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       },
       { environmentId: requireClient().environmentId, worktreeId }
     )
+    // Why the extra fields: three nulls cannot say whether nothing was created,
+    // something was created under a url this predicate does not match, or the
+    // host RPC simply failed — and the last one is an observation failure wearing
+    // product clothing. Each stage reports separately (ORCA-305).
+    // Why the console and the toast: every failure of the preview-open command —
+    // a silent bail on the session gate, a thrown availability assert, or a failed
+    // RPC — surfaces as the same single toast, so a hang and an outright refusal
+    // look identical from the store alone (ORCA-305).
+    // Why before the click: subscribing after it loses every line the open path
+    // emits (ORCA-305).
+    page.on('console', (message) => {
+      const text = message.text()
+      if (/web-runtime-session|browser|preview|runtime/i.test(text)) {
+        clientConsole.push(`${message.type()}:${text.slice(0, 200)}`)
+      }
+    })
     await openPreviewToSide.click()
 
+    let ownershipSamples = 0
+    // Why measured on success too: a red costs a whole sharded run and only pays
+    // out when it happens to fire. Convergence timing on every run says whether
+    // this is a hang that never completes or a distribution whose tail crosses
+    // the budget — and those need different fixes (ORCA-305).
+    const ownershipBudgetMs = 60_000
+    const ownershipStartedAt = Date.now()
+    const ownershipStageFirstSeenMs: Record<string, number> = {}
     await expect
       .poll(
-        () =>
-          page.evaluate(
-            async ({ environmentId, fixtureName, worktreeId }) => {
+        async () => {
+          const probe = await page.evaluate(
+            async ({ environmentId, fixtureName, worktreeId, sourceTabId }) => {
               const state = window.__store?.getState()
               if (!state) {
                 return null
               }
-              const browser = (state.browserTabsByWorktree[worktreeId] ?? []).find((tab) =>
-                tab.url.endsWith(`/${fixtureName}`)
-              )
+              const clientBrowsers = state.browserTabsByWorktree[worktreeId] ?? []
+              const browser = clientBrowsers.find((tab) => tab.url.endsWith(`/${fixtureName}`))
               const browserPage = browser
                 ? (state.browserPagesByWorkspace[browser.id] ?? [])[0]
                 : null
@@ -140,27 +164,84 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 params: { worktree: `id:${worktreeId}` },
                 timeoutMs: 15_000
               })
-              const hostHasHtml =
-                response.ok &&
-                (response.result as SessionTabsListResult).tabs.some(
-                  (tab) => tab.type === 'browser' && tab.url.endsWith(`/${fixtureName}`)
-                )
+              const hostBrowserUrls = response.ok
+                ? (response.result as SessionTabsListResult).tabs
+                    .filter((tab) => tab.type === 'browser')
+                    .map((tab) => tab.url)
+                : []
+              const activeGroupId = state.activeGroupIdByWorktree[worktreeId]
+              const activeGroup = (state.groupsByWorktree[worktreeId] ?? []).find(
+                (candidate) => candidate.id === activeGroupId
+              )
               return {
                 browserRuntimeEnvironmentId: browserPage?.browserRuntimeEnvironmentId ?? null,
                 handleEnvironmentId: handle?.environmentId ?? null,
                 handleRemotePageId: handle?.remotePageId ?? null,
-                hostHasHtml
+                hostHasHtml: hostBrowserUrls.some((url) => url.endsWith(`/${fixtureName}`)),
+                hasWorkspace: Boolean(browser),
+                hasPage: Boolean(browserPage),
+                hasHandle: Boolean(handle),
+                clientBrowserUrls: clientBrowsers.map((tab) => tab.url),
+                hostBrowserUrls,
+                clientUnified: (state.unifiedTabsByWorktree[worktreeId] ?? []).filter(
+                  (tab) => tab.contentType === 'browser'
+                ).length,
+                clientWorkspaces: clientBrowsers.length,
+                hostTabsOk: response.ok,
+                hostTabsError: response.ok ? null : response.error.message,
+                sourceEditorStillActive: activeGroup?.activeTabId === sourceTabId,
+                previewOpenFailedToast: document.body.innerText.includes(
+                  'Unable to open this file in Orca Browser.'
+                )
               }
             },
-            { environmentId: client!.environmentId, fixtureName: FIXTURE_NAME, worktreeId }
-          ),
-        { timeout: 60_000, message: 'remote HTML browser ownership never converged' }
+            {
+              environmentId: client!.environmentId,
+              fixtureName: FIXTURE_NAME,
+              worktreeId,
+              sourceTabId: sourceEditor.tabId
+            }
+          )
+          ownershipSamples += 1
+          const elapsedMs = Date.now() - ownershipStartedAt
+          for (const [stage, ready] of [
+            ['workspace', probe?.hasWorkspace],
+            ['page', probe?.hasPage],
+            ['handle', probe?.hasHandle],
+            ['host', probe?.hostHasHtml]
+          ] as const) {
+            if (ready === true && ownershipStageFirstSeenMs[stage] === undefined) {
+              ownershipStageFirstSeenMs[stage] = elapsedMs
+            }
+          }
+          // Why logged and not only returned: this gate asserts with toMatchObject,
+          // which prints only the compared keys — the extra stages would never
+          // reach the failure output (ORCA-305).
+          console.log(
+            `[html-focus] ownership ${JSON.stringify({ ...probe, baseline: browserBaseline, ownershipSamples, clientConsole: clientConsole.slice(-6) })}`
+          )
+          return probe === null ? null : { ...probe, baseline: browserBaseline, ownershipSamples }
+        },
+        {
+          timeout: 60_000,
+          message:
+            'remote HTML preview never became a client-owned browser page — read the received object: workspace/page/handle are the client stages, hostTabsOk splits an RPC failure from a host that has no tab, and the url lists split "nothing created" from "created but unmatched"'
+        }
       )
       .toMatchObject({
         browserRuntimeEnvironmentId: client.environmentId,
         handleEnvironmentId: client.environmentId,
         hostHasHtml: true
       })
+    console.log(
+      `[html-focus] ownership-converged ${JSON.stringify({
+        samples: ownershipSamples,
+        elapsedMs: Date.now() - ownershipStartedAt,
+        budgetMs: ownershipBudgetMs,
+        usedPctOfBudget: Math.round(((Date.now() - ownershipStartedAt) / ownershipBudgetMs) * 100),
+        stageFirstSeenMs: ownershipStageFirstSeenMs
+      })}`
+    )
     const htmlTabInventory = await page.evaluate(
       async ({ environmentId, fixtureName, worktreeId }) => {
         const state = window.__store?.getState()
@@ -377,10 +458,14 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       .toBe(true)
     await page.locator(`[data-tab-id="${tabIds.browserId}"]`).click()
 
+    // Why the projection: this gate asserts with toEqual, which fails on any extra
+    // key, so the diagnostics ride a log line instead of the compared object.
+    const clickBudgetMs = 30_000
+    const clickStartedAt = Date.now()
     await expect
       .poll(
-        () =>
-          page.evaluate(
+        async () => {
+          const probe = await page.evaluate(
             async ({ environmentId, fixtureName, worktreeId }) => {
               const state = window.__store?.getState()
               if (!state) {
@@ -403,18 +488,76 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                     (tab) => tab.id === (response.result as SessionTabsListResult).activeTabId
                   )
                 : null
+              const browser = (state.browserTabsByWorktree[worktreeId] ?? []).find((tab) =>
+                tab.url.endsWith(`/${fixtureName}`)
+              )
+              const browserPage = browser
+                ? (state.browserPagesByWorkspace[browser.id] ?? [])[0]
+                : null
               return {
                 activeGroupType: activeUnified?.contentType ?? null,
                 activeTabType: state.activeTabTypeByWorktree[worktreeId] ?? null,
                 hostActiveHtml:
-                  hostActive?.type === 'browser' && hostActive.url.endsWith(`/${fixtureName}`)
+                  hostActive?.type === 'browser' && hostActive.url.endsWith(`/${fixtureName}`),
+                // Why: 'the client went back to editor' has to say which half moved —
+                // the group's own active tab, the worktree-wide tab type, or the
+                // browser workspace losing its page/handle underneath (ORCA-305).
+                activeUnifiedId: activeUnified?.id ?? null,
+                activeGroupId: state.activeGroupIdByWorktree[worktreeId] ?? null,
+                groupTabTypes: (state.unifiedTabsByWorktree[worktreeId] ?? []).map(
+                  (tab) =>
+                    `${tab.contentType}:${tab.id === activeGroup?.activeTabId ? 'active' : 'idle'}`
+                ),
+                activeBrowserTabId: state.activeBrowserTabIdByWorktree[worktreeId] ?? null,
+                activeBrowserTabIdFlat: state.activeBrowserTabId ?? null,
+                stillHasWorkspace: Boolean(browser),
+                stillHasPage: Boolean(browserPage),
+                stillHasHandle: Boolean(
+                  browserPage && state.remoteBrowserPageHandlesByPageId[browserPage.id]
+                ),
+                hostActiveType: hostActive?.type ?? null,
+                hostTabsOk: response.ok,
+                // Why per group: 'the client went back to the editor' and 'focus
+                // moved to the editor's group while the browser stayed active in
+                // its own' produce the same worktree-level reading (ORCA-314).
+                groups: (state.groupsByWorktree[worktreeId] ?? []).map((group) => {
+                  const activeItem = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
+                    (tab) => tab.id === group.activeTabId
+                  )
+                  return `${group.id === state.activeGroupIdByWorktree[worktreeId] ? 'FOCUSED' : 'idle'}:${activeItem?.contentType ?? 'none'}`
+                }),
+                browserTabGroup:
+                  (state.groupsByWorktree[worktreeId] ?? []).findIndex((group) =>
+                    (state.unifiedTabsByWorktree[worktreeId] ?? []).some(
+                      (tab) =>
+                        tab.contentType === 'browser' &&
+                        tab.entityId === browser?.id &&
+                        tab.id === group.activeTabId
+                    )
+                  ) ?? -1
               }
             },
             { environmentId: client!.environmentId, fixtureName: FIXTURE_NAME, worktreeId }
-          ),
+          )
+          console.log(`[html-focus] click-authority ${JSON.stringify(probe)}`)
+          return probe === null
+            ? null
+            : {
+                activeGroupType: probe.activeGroupType,
+                activeTabType: probe.activeTabType,
+                hostActiveHtml: probe.hostActiveHtml
+              }
+        },
         { timeout: 30_000, message: 'browser click did not remain authoritative' }
       )
       .toEqual({ activeGroupType: 'browser', activeTabType: 'browser', hostActiveHtml: true })
+    console.log(
+      `[html-focus] click-authority-converged ${JSON.stringify({
+        elapsedMs: Date.now() - clickStartedAt,
+        budgetMs: clickBudgetMs,
+        usedPctOfBudget: Math.round(((Date.now() - clickStartedAt) / clickBudgetMs) * 100)
+      })}`
+    )
     await expect(page.getByTestId('remote-browser-frame')).toBeVisible()
 
     const browserTab = page.locator(`[data-tab-id="${tabIds.browserId}"]`)
@@ -480,6 +623,9 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       page.locator(`[data-tab-group-body-id="${sourceGroupId}"] .monaco-editor`)
     ).toBeVisible()
   } finally {
+    // Why on teardown too: a run that leaves the ownership poll on its first
+    // sample never reaches that poll's log line (ORCA-305).
+    console.log(`[html-focus] client-console ${JSON.stringify(clientConsole.slice(-12))}`)
     await client?.dispose()
   }
 })
