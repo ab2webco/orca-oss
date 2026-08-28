@@ -36,6 +36,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/artifacts.js')).ARTIFACT_HANDLERS
   },
   {
+    name: 'dashboard-popout',
+    keys: ['dashboard popout get', 'dashboard popout open', 'dashboard popout close'],
+    load: async () => (await import('./handlers/dashboard-popout.js')).DASHBOARD_POPOUT_HANDLERS
+  },
+  {
     name: 'automations',
     keys: [
       'automations list',
