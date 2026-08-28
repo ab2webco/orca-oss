@@ -73,6 +73,48 @@ export function isPaneReplaying(ref: ReplayingPanesRef, paneId: number): boolean
   return (ref.current.get(paneId) ?? 0) > 0
 }
 
+// Why bounded: a wedged guard holds for its whole stall window, and an unbounded
+// hold would let a leaning key fill memory before the release ever runs.
+const MAX_DEFERRED_REPLAY_INPUT_CHARS = 4_096
+
+type DeferredReplayInput = { text: string; forward: (data: string) => void }
+
+const deferredReplayInputByPane = new Map<number, DeferredReplayInput>()
+
+/**
+ * Holds real keystrokes typed while the guard is engaged and delivers them when
+ * it releases. The guard exists for the emulator's own replies to replayed
+ * queries; a keystroke that merely arrived during the parse is the user's, and
+ * dropping it is the "can't type after reconnecting" report (ORCA-295).
+ */
+export function deferInputDuringReplay(
+  paneId: number,
+  data: string,
+  forward: (data: string) => void
+): boolean {
+  const pending = deferredReplayInputByPane.get(paneId)
+  const held = pending?.text ?? ''
+  if (held.length + data.length > MAX_DEFERRED_REPLAY_INPUT_CHARS) {
+    return false
+  }
+  deferredReplayInputByPane.set(paneId, { text: held + data, forward })
+  return true
+}
+
+/** Drops anything held for a pane that is going away, so its forward cannot outlive it. */
+export function clearDeferredReplayInput(paneId: number): void {
+  deferredReplayInputByPane.delete(paneId)
+}
+
+function flushDeferredReplayInput(paneId: number): void {
+  const pending = deferredReplayInputByPane.get(paneId)
+  if (!pending) {
+    return
+  }
+  deferredReplayInputByPane.delete(paneId)
+  pending.forward(pending.text)
+}
+
 type ReplayGuardWriteTarget = Pick<ManagedPane['terminal'], 'write'>
 type ReplayGuardWriteCallbacks = {
   onParsed: () => void
@@ -107,6 +149,7 @@ function engageReplayGuard(
     const remaining = (map.get(paneId) ?? 1) - 1
     if (remaining <= 0) {
       map.delete(paneId)
+      flushDeferredReplayInput(paneId)
     } else {
       map.set(paneId, remaining)
     }

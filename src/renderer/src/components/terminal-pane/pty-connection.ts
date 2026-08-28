@@ -82,6 +82,8 @@ import { shouldClaimRemoteDesktopViewport } from './remote-desktop-viewport-clai
 import { getAppliedSizeReadE2eDelayMs } from './pty-applied-size-read-e2e-delay'
 import { createPtySizeReassertion } from './pty-size-reassertion'
 import {
+  clearDeferredReplayInput,
+  deferInputDuringReplay,
   isPaneReplaying,
   replayIntoTerminal,
   replayIntoTerminalAsync,
@@ -4129,6 +4131,14 @@ export function connectPanePty(
     }
   )
 
+  // Why: only what the emulator itself can emit from replayed bytes may be
+  // dropped — the guard's window is bounded by parse completion, not by how long
+  // the user waits to type, so a slow replay would otherwise eat real keys.
+  const isEmulatorReplayEcho = (data: string): boolean =>
+    isTerminalQueryReply(data) ||
+    data === TERMINAL_FOCUS_IN_SEQUENCE ||
+    data === TERMINAL_FOCUS_OUT_SEQUENCE
+
   // Why: these guards discard a keystroke with no trace anywhere; the interactivity specs read the tally.
   const recordDroppedPaneInput = (site: RemoteTerminalInputDeliverySite, data: string): void => {
     recordRemoteTerminalInputDelivery(transport.getPtyId() ?? deps.tabId, site, data.length)
@@ -4143,7 +4153,11 @@ export function connectPanePty(
     // engage the guard via replayIntoTerminal; here we drop everything
     // xterm emits while the guard is active. See replay-guard.ts.
     if (isPaneReplaying(deps.replayingPanesRef, pane.id)) {
-      recordDroppedPaneInput('pane-replaying', data)
+      // Why held and not forwarded: the adopted shell must see nothing until the
+      // replay finishes painting, but the user's keys are theirs to keep.
+      if (isEmulatorReplayEcho(data) || !deferInputDuringReplay(pane.id, data, forwardPtyInput)) {
+        recordDroppedPaneInput('pane-replaying', data)
+      }
       return
     }
     const currentPtyId = transport.getPtyId()
@@ -9574,6 +9588,7 @@ export function connectPanePty(
       }
       imeCompositionRouteDisposable.dispose()
       onDataDisposable.dispose()
+      clearDeferredReplayInput(pane.id)
       userInputActivityDisposable?.dispose()
       terminalCapabilityRepliesDisposable.dispose()
       onResizeDisposable.dispose()

@@ -5775,6 +5775,58 @@ describe('connectPanePty', () => {
     expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(1, stablePtyId)
   })
 
+  it('holds a keystroke typed during a replay and delivers it on release', async () => {
+    // ORCA-295: the guard exists for xterm's own replies to replayed queries.
+    // Nothing may reach the shell mid-replay, but the user's keys are not the
+    // emulator's and must survive the wait.
+    const { connectPanePty } = await import('./pty-connection')
+    const { isPaneReplaying, replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+    expect(isPaneReplaying(replayingPanesRef, 1)).toBe(true)
+
+    // The emulator's own DA1 answer to a replayed query is discarded outright.
+    emit('\x1b[?1;2c')
+    // The user types while the replay is still parsing.
+    emit('l')
+    emit('s')
+    emit('\r')
+    expect(transport.sendInput).not.toHaveBeenCalled()
+
+    // Replay parsed: the guard releases and hands over what it was holding.
+    parseCallbacks.shift()?.()
+    expect(transport.sendInput).toHaveBeenCalledWith('ls\r')
+    expect(transport.sendInput).not.toHaveBeenCalledWith('\x1b[?1;2c')
+  })
+
   it('drops xterm onData while pane is replaying restored bytes', async () => {
     // Regression: during replay, xterm auto-replies to embedded queries (DA1/DECRQM/OSC/CPR) via onData must not reach transport.sendInput or they land as stray chars on the prompt. See replay-guard.ts.
     const { connectPanePty } = await import('./pty-connection')
