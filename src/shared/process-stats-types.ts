@@ -75,12 +75,21 @@ export type MemorySnapshot = {
   host: HostMemory
   /** Per-process byte metric used by app, session, worktree, history, and totalMemory values. */
   processMemoryMetric: ProcessMemoryMetric
-  /** Names the metric the footprint fields carry, or null where the platform has no equivalent. */
-  processFootprintMetric: ProcessFootprintMetric | null
+  /**
+   * Names the metric the footprint fields carry, or null where the platform has
+   * no equivalent.
+   *
+   * Why optional and not required: this snapshot crosses the paired client-to-host
+   * boundary, where mixed versions are the normal state. A host predating these
+   * fields sends none of them, and a reader that required them would be broken
+   * against every such host — Rule 1 of docs/reference/remote-wire-compatibility.md.
+   * Absent means the same as null: this producer reports no footprint.
+   */
+  processFootprintMetric?: ProcessFootprintMetric | null
   /** Sum of the footprint metric over the app's own processes. Null when unavailable — never 0. */
-  appFootprint: number | null
+  appFootprint?: number | null
   /** Sum of the footprint metric over app plus every tracked session. Null when unavailable. */
-  totalFootprint: number | null
+  totalFootprint?: number | null
   /** Sum of app + all tracked worktree sessions. Percent of a single core, so may exceed 100 on multi-core machines. */
   totalCpu: number
   /** Sum of per-process samples. Shared pages may repeat, so this can exceed host.totalMemory. */
