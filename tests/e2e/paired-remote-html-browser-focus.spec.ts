@@ -356,10 +356,12 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
       .toBe(true)
     await page.locator(`[data-tab-id="${tabIds.browserId}"]`).click()
 
+    // Why the projection: this gate asserts with toEqual, which fails on any extra
+    // key, so the diagnostics ride a log line instead of the compared object.
     await expect
       .poll(
-        () =>
-          page.evaluate(
+        async () => {
+          const probe = await page.evaluate(
             async ({ environmentId, fixtureName, worktreeId }) => {
               const state = window.__store?.getState()
               if (!state) {
@@ -408,11 +410,38 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                   browserPage && state.remoteBrowserPageHandlesByPageId[browserPage.id]
                 ),
                 hostActiveType: hostActive?.type ?? null,
-                hostTabsOk: response.ok
+                hostTabsOk: response.ok,
+                // Why per group: 'the client went back to the editor' and 'focus
+                // moved to the editor's group while the browser stayed active in
+                // its own' produce the same worktree-level reading (ORCA-314).
+                groups: (state.groupsByWorktree[worktreeId] ?? []).map((group) => {
+                  const activeItem = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
+                    (tab) => tab.id === group.activeTabId
+                  )
+                  return `${group.id === state.activeGroupIdByWorktree[worktreeId] ? 'FOCUSED' : 'idle'}:${activeItem?.contentType ?? 'none'}`
+                }),
+                browserTabGroup:
+                  (state.groupsByWorktree[worktreeId] ?? []).findIndex((group) =>
+                    (state.unifiedTabsByWorktree[worktreeId] ?? []).some(
+                      (tab) =>
+                        tab.contentType === 'browser' &&
+                        tab.entityId === browser?.id &&
+                        tab.id === group.activeTabId
+                    )
+                  ) ?? -1
               }
             },
             { environmentId: client!.environmentId, fixtureName: FIXTURE_NAME, worktreeId }
-          ),
+          )
+          console.log(`[html-focus] click-authority ${JSON.stringify(probe)}`)
+          return probe === null
+            ? null
+            : {
+                activeGroupType: probe.activeGroupType,
+                activeTabType: probe.activeTabType,
+                hostActiveHtml: probe.hostActiveHtml
+              }
+        },
         { timeout: 30_000, message: 'browser click did not remain authoritative' }
       )
       .toEqual({ activeGroupType: 'browser', activeTabType: 'browser', hostActiveHtml: true })
