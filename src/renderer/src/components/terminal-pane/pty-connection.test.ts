@@ -5828,8 +5828,10 @@ describe('connectPanePty', () => {
   })
 
   it('never flushes coalesced emulator replies to the shell after a replay', async () => {
-    // The write queue coalesces consecutive replies into one onData payload, so a
-    // whole-payload reply grammar misses them and the hold would leak them.
+    // Contract guard, not a reproduction: xterm emits one event per reply today
+    // (pinned in terminal-query-reply.test.ts). Holding what the classifier
+    // rejects would write a missed reply to the shell, so the classifier must
+    // see replies anywhere in a payload rather than only as the whole of it.
     const { connectPanePty } = await import('./pty-connection')
     const { replayIntoTerminal } = await import('./replay-guard')
 
@@ -5871,6 +5873,50 @@ describe('connectPanePty', () => {
 
     expect(transport.sendInput).not.toHaveBeenCalled()
     expect(transport.sendInputImmediate).not.toHaveBeenCalled()
+  })
+
+  it('drops a modified F3 typed during a replay, the documented CPR collision', async () => {
+    // xterm encodes Shift+F3 as CSI 1;2R, byte-identical to a cursor position
+    // report. It is dropped rather than held — the same outcome as before this
+    // change, and the alternative is writing a real CPR onto the prompt.
+    const { connectPanePty } = await import('./pty-connection')
+    const { replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+    emit('\x1b[1;2R')
+    emit('ls')
+    parseCallbacks.shift()?.()
+
+    expect(transport.sendInput).toHaveBeenCalledWith('ls')
+    expect(transport.sendInput).not.toHaveBeenCalledWith('\x1b[1;2R')
   })
 
   it('drops xterm onData while pane is replaying restored bytes', async () => {

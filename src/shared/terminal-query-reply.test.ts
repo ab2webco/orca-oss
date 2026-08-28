@@ -153,3 +153,30 @@ describe('containsTerminalQueryReply', () => {
     expect(containsTerminalQueryReply('\x1b[97;5u')).toBe(false)
   })
 })
+
+describe('what xterm actually emits', () => {
+  // Why measured and not assumed: callers that drop a whole onData payload need
+  // to know a payload never mixes a reply with typed bytes (ORCA-295).
+  it('emits one event per reply and never merges them with typed bytes', async () => {
+    const terminal = new Terminal()
+    const events: string[] = []
+    const disposable = terminal.onData((data) => events.push(data))
+    try {
+      await new Promise<void>((resolve) => terminal.write('\x1b[c\x1b[c', resolve))
+      expect(events).toEqual(['\x1b[?1;2c', '\x1b[?1;2c'])
+
+      events.length = 0
+      await new Promise<void>((resolve) => terminal.write('\x1b[6n\x1b[?2026$p\x1b[c', resolve))
+      expect(events).toEqual(['\x1b[1;1R', '\x1b[?2026;2$y', '\x1b[?1;2c'])
+
+      events.length = 0
+      terminal.input('l')
+      await new Promise<void>((resolve) => terminal.write('\x1b[6n', resolve))
+      terminal.input('s')
+      expect(events).toEqual(['l', '\x1b[1;1R', 's'])
+    } finally {
+      disposable.dispose()
+      terminal.dispose()
+    }
+  })
+})

@@ -4137,9 +4137,11 @@ export function connectPanePty(
   // Why: only what the emulator itself can emit from replayed bytes may be
   // dropped — the guard's window is bounded by parse completion, not by how long
   // the user waits to type, so a slow replay would otherwise eat real keys.
-  // Why the peeling predicate and not the whole-payload one: a missed reply is
-  // now held and later written to the shell, which is the leak this guard exists
-  // to stop, and the write queue delivers consecutive replies as one payload.
+  // Why the peeling predicate and not the whole-payload one: holding inverts which
+  // error is dangerous — a missed reply is no longer dropped but written to the
+  // shell on release. xterm emits one event per reply (pinned in
+  // terminal-query-reply.test.ts), so this only guards a payload shape it does
+  // not produce today; the cost is one regex scan of a keystroke.
   const isEmulatorReplayEcho = (data: string): boolean =>
     containsTerminalQueryReply(data) ||
     data.includes(TERMINAL_FOCUS_IN_SEQUENCE) ||
