@@ -71,9 +71,31 @@ describe('plane-format', () => {
     expect(output).not.toContain('second line')
   })
 
-  it('formats an empty list and a populated list', () => {
-    expect(formatPlaneList([])).toBe('No Plane work items found.')
-    expect(formatPlaneList([workItem()])).toContain('PROJ-12')
+  it('names the filter in effect when the list is empty', () => {
+    expect(formatPlaneList([], { filter: 'all', matched: 0 })).toBe(
+      'No Plane work items found (--filter all). Pass --filter everything to include every state.'
+    )
+    expect(formatPlaneList([], { filter: 'everything', matched: 0 })).toBe(
+      'No Plane work items found (--filter everything).'
+    )
+  })
+
+  it('closes a complete list with its count and filter', () => {
+    const output = formatPlaneList([workItem()], { filter: 'all', matched: 1 })
+    expect(output).toContain('PROJ-12')
+    expect(output.trimEnd().endsWith('1 item (--filter all).')).toBe(true)
+    expect(output).not.toContain('Showing')
+  })
+
+  it('says how much a truncated list left out', () => {
+    const output = formatPlaneList([workItem()], { filter: 'everything', matched: 298 })
+    expect(
+      output
+        .trimEnd()
+        .endsWith(
+          'Showing 1 of 298 matched items (--filter everything) \u2014 raise --limit for the rest.'
+        )
+    ).toBe(true)
   })
 
   it('formats projects, states, labels, and members', () => {

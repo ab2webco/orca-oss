@@ -151,6 +151,8 @@ export async function resolvePlaneWorkItemUuid(
 // while both files stay under the per-file line cap.
 export { readPlaneBody } from './plane-body-input'
 
+export const PLANE_LIST_DEFAULT_FILTER: PlaneWorkItemFilter = 'all'
+
 const PLANE_LIST_FILTERS: readonly PlaneWorkItemFilter[] = [
   'everything',
   'assigned',
@@ -189,7 +191,9 @@ export function getPlaneStateGroupFlag(
 }
 
 export function getPlaneListFilter(flags: Map<string, string | boolean>): PlaneWorkItemFilter {
-  const filter = getOptionalStringFlag(flags, 'filter') ?? 'assigned'
+  // Why 'all' (open items): the board default must show work that is still open,
+  // and an assignee-scoped default hides every unassigned open ticket.
+  const filter = getOptionalStringFlag(flags, 'filter') ?? PLANE_LIST_DEFAULT_FILTER
   if ((PLANE_LIST_FILTERS as readonly string[]).includes(filter)) {
     return filter as PlaneWorkItemFilter
   }
