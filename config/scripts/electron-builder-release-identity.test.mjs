@@ -1,10 +1,6 @@
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import {
-  withAdhocEnv,
-  withEnv,
-  withHourlyEnv
-} from './electron-builder-build-env-fixture.mjs'
+import { withAdhocEnv, withEnv, withHourlyEnv } from './electron-builder-build-env-fixture.mjs'
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
@@ -41,20 +37,34 @@ describe('electron-builder release identity', () => {
   // src/main/update-feed-target.ts and src/shared/release-channel.ts.
   // Upstream isolates each dev channel's tags in its own repo because the main repo's
   // releases atom feed exposes only its 10 newest entries; the fork publishes no
-  // hourly/adhoc tags, so both stay in the one repo and are downgraded to prereleases.
-  it('publishes to the fork and keeps hourly builds out of the Latest pointer', () => {
-    withHourlyEnv((config) => {
-      expect(config.publish).toMatchObject({
-        owner: 'ab2webco',
-        repo: 'orca-oss',
-        releaseType: 'prerelease'
+  // hourly/adhoc tags, so both stay in the one repo.
+  // Every build is born a prerelease, dev channel or not: the release is created by
+  // whichever platform job publishes first, so anything else hands Latest to a tag
+  // whose other platforms have not uploaded yet. lab-release's finalize is the only
+  // thing that clears the flag, and only after every manifest is verified.
+  it('publishes to the fork, and no build is born holding the Latest pointer', () => {
+    // Why the whole matrix rather than hourly plus the default: the config now
+    // answers with one literal, so asserting hourly alone would pass for a reason
+    // that has nothing to do with hourly and could not fail if a later branch
+    // singled it out. Every environment that used to choose a different branch is
+    // named here, so reintroducing one fails on that name.
+    const environments = [
+      ['default', {}],
+      ['hourly', { ORCA_MAC_HOURLY: '1' }],
+      ['daily', { ORCA_MAC_DAILY: '1' }],
+      ['adhoc', { ORCA_MAC_ADHOC: '1' }],
+      ['mac release', { ORCA_MAC_RELEASE: '1' }],
+      ['lab release candidate', { ORCA_LAB_RELEASE_CANDIDATE: '1' }]
+    ]
+    for (const [name, env] of environments) {
+      withEnv(env, (config) => {
+        expect(config.publish, `${name} build`).toMatchObject({
+          owner: 'ab2webco',
+          repo: 'orca-oss',
+          releaseType: 'prerelease'
+        })
       })
-    })
-    expect(electronBuilderConfig.publish).toMatchObject({
-      owner: 'ab2webco',
-      repo: 'orca-oss',
-      releaseType: 'release'
-    })
+    }
   })
 
   // Why: a release candidate must be born a prerelease — finalize's --prerelease

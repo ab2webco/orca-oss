@@ -7,9 +7,13 @@ const require = createRequire(import.meta.url)
 export const MUTABLE_BUILD_ENV = [
   'ORCA_MAC_HOURLY',
   'ORCA_MAC_ADHOC',
+  // Why listed with the rest: the config reads it, so leaving it out let a set
+  // value leak into every case the harness claimed to isolate.
+  'ORCA_MAC_DAILY',
   'ORCA_MAC_RELEASE',
   'ORCA_HOURLY_BUILD_VERSION',
   'ORCA_ADHOC_BUILD_VERSION',
+  'ORCA_DAILY_BUILD_VERSION',
   'ORCA_LOCAL_BUILD_VERSION',
   // Why: listed so withEnv clears and restores it too — otherwise a set value
   // leaks into every later case and silently turns releases into prereleases.
