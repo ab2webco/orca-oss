@@ -29,6 +29,9 @@ jobs:
 
       - uses: ./.github/actions/install-node-dependencies
 
+      - name: Check E2E spec coverage
+        run: pnpm run check:e2e-spec-coverage
+
       - name: Lint
         run: pnpm exec oxlint --format github
 
