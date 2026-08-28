@@ -15,6 +15,8 @@ function verdict(over: Partial<Parameters<typeof evaluateDiffBurstBudget>[0]> = 
     baselineP95Ms: 5,
     burstP95Ms: 5,
     burstMaxLagMs: 2_234,
+    burstSampleCount: 326,
+    expectedSampleCount: 360,
     p95AllowanceMs: P95_ALLOWANCE_MS,
     freezeCeilingMs: FREEZE_CEILING_MS,
     ...over
@@ -45,11 +47,32 @@ describe('evaluateDiffBurstBudget', () => {
     expect(verdict({ burstMaxLagMs: FREEZE_CEILING_MS + 0.1 }).kind).toBe('freeze')
   })
 
-  it('catches the original bug: sustained blocking with an idle floor near zero', () => {
-    // The regression this spec exists for reported burst p95 3963ms.
-    const result = verdict({ baselineP95Ms: 0.1, burstP95Ms: 3_963 })
+  it('catches the recorded STA-3420 signature by p95', () => {
+    // The regression reported p95 3963ms and 16 samples in 23s against 360.
+    const result = verdict({ baselineP95Ms: 0.1, burstP95Ms: 3_963, burstSampleCount: 16 })
     expect(result.kind).toBe('sustained-blocking')
     expect(result.kind !== 'within-budget' && result.reason).toContain('3963.0ms')
+  })
+
+  it('catches the same signature by sample coverage even if p95 were healthy', () => {
+    // Two independent detectors, so neither carries the regression alone.
+    const result = verdict({ baselineP95Ms: 0.1, burstP95Ms: 1, burstSampleCount: 16 })
+    expect(result.kind).toBe('starved-sampler')
+    expect(result.kind !== 'within-budget' && result.reason).toContain('16 of 360')
+  })
+
+  // A known and accepted limit, written down rather than discovered later: the
+  // peak clause is a catastrophic-freeze detector, not a regression detector.
+  // The commit that fixed STA-3420 measured that the peak "reproduces identically
+  // with invalidation disabled" (034fa50970), so it never had this sensitivity.
+  it('does NOT fire on a 5s peak with a healthy p95 and full coverage', () => {
+    expect(verdict({ burstMaxLagMs: 5_000, burstP95Ms: 1, burstSampleCount: 326 }).kind).toBe(
+      'within-budget'
+    )
+    // What would have to be true for the peak clause to be the one that fires.
+    expect(verdict({ burstMaxLagMs: 12_000, burstP95Ms: 1, burstSampleCount: 326 }).kind).toBe(
+      'freeze'
+    )
   })
 
   // The discriminator: the same near-ceiling inputs, judged by the statistic

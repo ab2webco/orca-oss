@@ -303,13 +303,15 @@ test.describe('Combined diff invalidation freeze repro (STA-3420)', () => {
       // Why: before the fix this window blocked continuously — p95 3963ms, 16 samples in 23s.
       // Every limit rides the identical idle window so a slow machine's floor can't fail the test;
       // the allowances on top are what the burst itself is permitted to add.
-      expect(measurement.burst.sampleCount).toBeGreaterThanOrEqual(
-        Math.min(measurement.baseline.sampleCount, measurement.expectedSampleCount) * 0.85
-      )
       const verdict = evaluateDiffBurstBudget({
         baselineP95Ms: measurement.baseline.p95LagMs,
         burstP95Ms: measurement.burst.p95LagMs,
         burstMaxLagMs: measurement.burst.maxLagMs,
+        burstSampleCount: measurement.burst.sampleCount,
+        expectedSampleCount: Math.min(
+          measurement.baseline.sampleCount,
+          measurement.expectedSampleCount
+        ),
         p95AllowanceMs: BURST_P95_ALLOWANCE_MS,
         freezeCeilingMs: BURST_FREEZE_CEILING_MS
       })
