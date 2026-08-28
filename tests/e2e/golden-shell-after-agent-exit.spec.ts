@@ -2,8 +2,8 @@ import { expect, test } from './helpers/orca-app'
 import {
   configureGoldenStubAgent,
   getGoldenStubAgentLaunchEnv,
-  GOLDEN_STUB_EXIT_MARKER,
-  launchGoldenStubAgentFromNewTab
+  launchGoldenStubAgentFromNewTab,
+  submitGoldenStubExit
 } from './helpers/golden-stub-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForRestoredTerminalInputReady } from './helpers/restored-terminal-input-readiness'
@@ -33,9 +33,7 @@ test('opens a clean live shell after an agent exits', async ({ orcaPage }) => {
   await configureGoldenStubAgent(orcaPage)
   await launchGoldenStubAgentFromNewTab(orcaPage)
 
-  await orcaPage.keyboard.type('exit')
-  await orcaPage.keyboard.press('Enter')
-  await waitForTerminalOutput(orcaPage, GOLDEN_STUB_EXIT_MARKER, 15_000)
+  await submitGoldenStubExit(orcaPage)
 
   const tabsBeforeShell = await orcaPage.locator('[data-testid="sortable-tab"]').count()
   await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })

@@ -166,7 +166,7 @@ orca plane list --filter assigned --limit 10 --json
 orca plane list --filter done --project <projectId> --json
 ```
 
-`--filter assigned`, `created`, and `done` resolve against the connected Plane user; `everything`/`all` return the full open-and-closed set.
+`list` defaults to `--filter all`, which is **open items only** (state groups backlog, unstarted, started) — not the whole board. `--filter everything` is the full open-and-closed set; `done` is completed plus cancelled; `assigned` and `created` are scoped to the connected Plane user, so they hide work assigned to nobody. Every list prints its effective filter and, when `--limit` truncated it, how many matched items were left out.
 
 ## Creating And Editing Projects
 

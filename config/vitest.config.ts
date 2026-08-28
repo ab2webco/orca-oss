@@ -21,6 +21,9 @@ export default defineConfig({
     // Why: happy-dom drops MutationObserver callbacks on GC; keep them alive like a browser does.
     setupFiles: [
       resolve('config/scripts/happy-dom-mutation-observer-retention.ts'),
+      // Why in setupFiles and not a separate script: a guard nobody remembers to
+      // run is not a guard. This one runs in the same command as the tests.
+      resolve('config/scripts/vitest-non-loopback-fetch-guard.ts'),
       // Only under the hang watchdog: it costs every worker a signal handler and
       // is read exactly once, when the run is already declared wedged.
       ...(process.env.ORCA_VITEST_HANG_JOURNAL

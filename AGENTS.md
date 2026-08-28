@@ -4,12 +4,18 @@ All UI work — layout, color, typography, spacing, component selection, UX beha
 
 ## Electron UI Validation
 
-Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
+Reuse the E2E harness for rendered Orca UI checks — run one spec under `tests/e2e/` and read its
+screenshots — rather than a bespoke launcher. Do not use computer-use for Orca UI validation.
+The procedure, including how to seed a provider-backed screen and why a screenshot of a screen
+that does not scroll proves nothing, is in
+[`docs/reference/rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md).
 
 # Style
+
 ## Concise/Brief Non-obviosu comments ONLY
-  * DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
-  * BE CONCISE. 1 LINE if possible
+
+- DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
+- BE CONCISE. 1 LINE if possible
 
 ## Lint Rules: Do Not Disable Max Lines
 
@@ -27,8 +33,12 @@ El board de Plane (proyecto Orca Lab) es la fuente de las tareas. Si el trabajo 
 creá el ticket antes de empezar. El ciclo completo, las guardas del harness en `.claude/` y la falla
 real que originó cada una están en [`docs/reference/working-process.md`](./docs/reference/working-process.md).
 
-Dos que valen antes de reportar algo como verde: el exit code de `npm test` miente — leé la línea
-`Tests …`; y un test que pasa igual contra el código viejo no prueba nada.
+Dos que valen antes de reportar algo como verde: leé la línea `Tests …` de `npm test`, no su exit
+code — no porque el exit code mienta, sino porque un pipe lo descarta (`npm test | tail` devuelve el
+status de `tail`, siempre 0), y filtrar por pipe es como se lee una corrida de 5000 archivos. Corré
+sin pipe, o `set -o pipefail`, cuando lo que estás midiendo es el exit code
+([detalle](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status));
+y un test que pasa igual contra el código viejo no prueba nada.
 
 # Verification
 
@@ -45,6 +55,7 @@ Two that bite most often:
 - **A red timing budget is usually not a slow product.** `expect(latencyMs).toBeLessThan(N)` measures the product plus the cost of whatever the test does to observe it, and a poll-based measurement can only report values on its backoff grid. Four of these went red here in two nights with no product change behind any of them. Before blaming the code, run the three checks in [`docs/reference/timing-budget-assertions.md`](./docs/reference/timing-budget-assertions.md) — and read it before writing a new threshold.
 
 # Considerations
+
 ## Worktree Safety
 
 Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.

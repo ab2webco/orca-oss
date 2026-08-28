@@ -10,9 +10,18 @@ import { expect, test, type TestInfo } from '@stablyai/playwright-test'
 import { fingerprintPluginConsent } from '../../src/shared/plugins/plugin-consent-fingerprint'
 import { pluginManifestSchema } from '../../src/shared/plugins/plugin-manifest'
 import { createRestartSession } from './helpers/orca-restart'
+import { evaluateStartupBudget } from './plugin-startup-budget-verdict'
 
 const PLUGIN_COUNT = 20
-const SAMPLE_COUNT = 3
+// Why 16 and not 3: a single launch carries ~64ms of run-to-run spread, so at
+// three samples a side the 50ms budget sits one standard error from zero — it
+// fires on noise and still misses most real regressions. 16 keeps the loop
+// inside the existing 240s timeout at the ~4.0s launch cadence CI sustains.
+const SAMPLE_COUNT = 16
+// The first Electron launch of a session pays cold-start cost the rest do not,
+// and it would otherwise always land on the baseline side and flatter it.
+const WARMUP_LAUNCHES = 1
+const STARTUP_BUDGET_MS = 50
 
 type StartupSample = {
   readyToShowMs: number
@@ -118,11 +127,6 @@ async function launchSample(
   }
 }
 
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right)
-  return sorted[Math.floor(sorted.length / 2)]!
-}
-
 // oxlint-disable-next-line no-empty-pattern -- Playwright passes fixtures before testInfo.
 test('keeps real Electron launch stable with 20 approved inert plugins', async ({}, testInfo) => {
   test.setTimeout(240_000)
@@ -131,6 +135,10 @@ test('keeps real Electron launch stable with 20 approved inert plugins', async (
   const populated: StartupSample[] = []
   let markerPaths: string[] = []
   try {
+    for (let warmup = 0; warmup < WARMUP_LAUNCHES; warmup += 1) {
+      seedPlugins(session.userDataDir, 0)
+      await launchSample(session, 0, testInfo)
+    }
     for (let sample = 0; sample < SAMPLE_COUNT; sample += 1) {
       seedPlugins(session.userDataDir, 0)
       baseline.push(await launchSample(session, 0, testInfo))
@@ -142,9 +150,15 @@ test('keeps real Electron launch stable with 20 approved inert plugins', async (
     // complement measures the user-visible launch delta because background
     // discovery completion overlaps unrelated main-process startup work.
     expect(populated.every((sample) => Number.isFinite(sample.pluginDurationMs))).toBe(true)
-    expect(median(populated.map((sample) => sample.readyToShowMs))).toBeLessThanOrEqual(
-      median(baseline.map((sample) => sample.readyToShowMs)) + 50
-    )
+    const verdict = evaluateStartupBudget({
+      baselineMs: baseline.map((sample) => sample.readyToShowMs),
+      populatedMs: populated.map((sample) => sample.readyToShowMs),
+      budgetMs: STARTUP_BUDGET_MS
+    })
+    // Why annotated on green too: without the value in the run, the only way to
+    // tell a real regression from a slow runner is to re-run and watch by hand.
+    testInfo.annotations.push({ type: 'plugin-startup-budget', description: verdict.description })
+    expect(verdict.withinBudget, verdict.description).toBe(true)
     expect(markerPaths.every((markerPath) => !existsSync(markerPath))).toBe(true)
   } finally {
     await session.dispose()

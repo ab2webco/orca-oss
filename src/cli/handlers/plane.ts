@@ -107,9 +107,10 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     printResult({ ...response, result: view }, json, formatPlaneWorkItem)
   },
   'plane list': async ({ flags, client, json }) => {
+    const filter = getPlaneListFilter(flags)
     const response = await client.call<PlaneWorkItem[]>('plane.listWorkItems', {
       projectId: getOptionalStringFlag(flags, 'project'),
-      filter: getPlaneListFilter(flags),
+      filter,
       workspaceId: getOptionalStringFlag(flags, 'workspace')
     })
     const limit = getOptionalPositiveIntegerFlag(flags, 'limit')
@@ -124,7 +125,9 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
         (priorityFilter === undefined || (item.priority ?? 'none').toLowerCase() === priorityFilter)
     )
     const items = limit === undefined ? filtered : filtered.slice(0, limit)
-    printResult({ ...response, result: items }, json, formatPlaneList)
+    printResult({ ...response, result: items }, json, (rows) =>
+      formatPlaneList(rows, { filter, matched: filtered.length })
+    )
   },
   'plane search': async ({ flags, client, json }) => {
     const response = await client.call<PlaneWorkItem[]>('plane.searchWorkItems', {
