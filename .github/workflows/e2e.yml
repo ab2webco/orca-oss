@@ -90,6 +90,9 @@ jobs:
           pnpm run build:web-from-renderer
           pnpm run build:relay
 
+      - name: Check E2E spec coverage
+        run: pnpm run check:e2e-spec-coverage
+
       # Why include-hidden-files: the relay's per-platform .version marker is a
       # dotfile, and upload-artifact drops those by default. Without it the shard
       # gets relay.js but no marker, and SSH specs fail on "missing its version marker".
