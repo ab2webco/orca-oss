@@ -1,5 +1,8 @@
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { childSpawnMock, resolveCodexCommandMock, ptySpawnMock } = vi.hoisted(() => ({
   childSpawnMock: vi.fn(),
@@ -56,10 +59,25 @@ function makeRpcChild() {
 }
 
 describe('fetchCodexRateLimits auth errors', () => {
+  // Same leak as codex-fetcher-pty-settle (ORCA-312), and quieter: these four
+  // passed either way, so nothing on screen said the run had just sent a real
+  // access token to chatgpt.com.
+  const fetchMock = vi.fn(() => {
+    throw new Error('codex-fetcher unit tests must not reach the network')
+  })
+
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    vi.stubEnv('CODEX_HOME', join(tmpdir(), `orca-codex-home-absent-${randomUUID()}`))
+    vi.stubGlobal('fetch', fetchMock)
     resolveCodexCommandMock.mockReturnValue('codex')
+  })
+
+  afterEach(() => {
+    expect(fetchMock).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('returns Codex RPC auth refresh errors without masking them behind PTY fallback', async () => {
