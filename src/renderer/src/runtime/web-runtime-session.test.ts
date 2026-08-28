@@ -1208,6 +1208,45 @@ describe('createWebRuntimeSessionBrowserTab', () => {
     ])
   })
 
+  // Why: the refresh resolving is not proof the store applied its snapshot — it
+  // returns without applying when the pairing revision moved (ORCA-305).
+  it('keeps the host tab when the page materializes a tick after the refresh resolves', async () => {
+    // The store notification is the late snapshot landing; focusOnCreate is false,
+    // so the settle is the only subscriber.
+    const storeListeners: (() => void)[] = []
+    mocks.subscribe.mockImplementation((listener: () => void) => {
+      storeListeners.push(listener)
+      return vi.fn()
+    })
+    mocks.hasMaterializedWebRuntimeBrowserPage.mockReturnValueOnce(false).mockReturnValue(true)
+    const runtimeCall = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'create',
+        ok: true,
+        result: { browserPageId: 'remote-browser-page-1' }
+      })
+      .mockResolvedValueOnce({ id: 'list', ok: true, result: makeSnapshot() })
+      .mockResolvedValue({ id: 'close', ok: true, result: { closed: true } })
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
+
+    const created = createWebRuntimeSessionBrowserTab({
+      worktreeId: WORKTREE_ID,
+      clientTargetGroupId: 'client-preview-group',
+      clientTargetGroupCreated: true,
+      focusOnCreate: false
+    })
+    await vi.waitFor(() => expect(storeListeners).toHaveLength(1))
+    storeListeners[0]!()
+
+    await expect(created).resolves.toBe(true)
+    expect(runtimeCall.mock.calls.map(([request]) => request.method)).toEqual([
+      'browser.tabCreate',
+      'session.tabs.list'
+    ])
+    expect(mocks.closeEmptyGroup).not.toHaveBeenCalled()
+  })
+
   it('keeps the requested worktree selected while the browser snapshot catches up', async () => {
     const snapshot = makeSnapshot()
     const setStateResults: unknown[] = []
