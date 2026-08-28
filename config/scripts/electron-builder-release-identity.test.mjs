@@ -48,15 +48,17 @@ describe('electron-builder release identity', () => {
     // that has nothing to do with hourly and could not fail if a later branch
     // singled it out. Every environment that used to choose a different branch is
     // named here, so reintroducing one fails on that name.
+    // Why objects and not tuples: a mixed tuple infers `name` as a union with the
+    // env object, so the label it carries is not known to be a string.
     const environments = [
-      ['default', {}],
-      ['hourly', { ORCA_MAC_HOURLY: '1' }],
-      ['daily', { ORCA_MAC_DAILY: '1' }],
-      ['adhoc', { ORCA_MAC_ADHOC: '1' }],
-      ['mac release', { ORCA_MAC_RELEASE: '1' }],
-      ['lab release candidate', { ORCA_LAB_RELEASE_CANDIDATE: '1' }]
+      { name: 'default', env: {} },
+      { name: 'hourly', env: { ORCA_MAC_HOURLY: '1' } },
+      { name: 'daily', env: { ORCA_MAC_DAILY: '1' } },
+      { name: 'adhoc', env: { ORCA_MAC_ADHOC: '1' } },
+      { name: 'mac release', env: { ORCA_MAC_RELEASE: '1' } },
+      { name: 'lab release candidate', env: { ORCA_LAB_RELEASE_CANDIDATE: '1' } }
     ]
-    for (const [name, env] of environments) {
+    for (const { name, env } of environments) {
       withEnv(env, (config) => {
         expect(config.publish, `${name} build`).toMatchObject({
           owner: 'ab2webco',
