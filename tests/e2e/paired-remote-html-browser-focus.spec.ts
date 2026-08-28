@@ -104,6 +104,17 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
     // something was created under a url this predicate does not match, or the
     // host RPC simply failed — and the last one is an observation failure wearing
     // product clothing. Each stage reports separately (ORCA-305).
+    // Why the console and the toast: every failure of the preview-open command —
+    // a silent bail on the session gate, a thrown availability assert, or a failed
+    // RPC — surfaces as the same single toast, so a hang and an outright refusal
+    // look identical from the store alone (ORCA-305).
+    const clientConsole: string[] = []
+    page.on('console', (message) => {
+      const text = message.text()
+      if (/web-runtime-session|browser|preview|runtime/i.test(text)) {
+        clientConsole.push(`${message.type()}:${text.slice(0, 200)}`)
+      }
+    })
     let ownershipSamples = 0
     // Why measured on success too: a red costs a whole sharded run and only pays
     // out when it happens to fire. Convergence timing on every run says whether
@@ -158,7 +169,10 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 clientWorkspaces: clientBrowsers.length,
                 hostTabsOk: response.ok,
                 hostTabsError: response.ok ? null : response.error.message,
-                sourceEditorStillActive: activeGroup?.activeTabId === sourceTabId
+                sourceEditorStillActive: activeGroup?.activeTabId === sourceTabId,
+                previewOpenFailedToast: document.body.innerText.includes(
+                  'Unable to open this file in Orca Browser.'
+                )
               }
             },
             {
@@ -184,7 +198,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
           // which prints only the compared keys — the extra stages would never
           // reach the failure output (ORCA-305).
           console.log(
-            `[html-focus] ownership ${JSON.stringify({ ...probe, baseline: browserBaseline, ownershipSamples })}`
+            `[html-focus] ownership ${JSON.stringify({ ...probe, baseline: browserBaseline, ownershipSamples, clientConsole: clientConsole.slice(-6) })}`
           )
           return probe === null ? null : { ...probe, baseline: browserBaseline, ownershipSamples }
         },
