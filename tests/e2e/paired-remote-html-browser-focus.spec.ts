@@ -100,22 +100,18 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
     )
     await openPreviewToSide.click()
 
-    // Why the extra fields: three nulls cannot say whether nothing was created,
-    // something was created under a url this predicate does not match, or the
-    // host RPC simply failed — and the last one is an observation failure wearing
-    // product clothing. Each stage reports separately (ORCA-305).
-    let ownershipSamples = 0
     await expect
       .poll(
-        async () => {
-          const probe = await page.evaluate(
-            async ({ environmentId, fixtureName, worktreeId, sourceTabId }) => {
+        () =>
+          page.evaluate(
+            async ({ environmentId, fixtureName, worktreeId }) => {
               const state = window.__store?.getState()
               if (!state) {
                 return null
               }
-              const clientBrowsers = state.browserTabsByWorktree[worktreeId] ?? []
-              const browser = clientBrowsers.find((tab) => tab.url.endsWith(`/${fixtureName}`))
+              const browser = (state.browserTabsByWorktree[worktreeId] ?? []).find((tab) =>
+                tab.url.endsWith(`/${fixtureName}`)
+              )
               const browserPage = browser
                 ? (state.browserPagesByWorkspace[browser.id] ?? [])[0]
                 : null
@@ -128,47 +124,21 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 params: { worktree: `id:${worktreeId}` },
                 timeoutMs: 15_000
               })
-              const hostBrowserUrls = response.ok
-                ? response.result.tabs.filter((tab) => tab.type === 'browser').map((tab) => tab.url)
-                : []
-              const activeGroupId = state.activeGroupIdByWorktree[worktreeId]
-              const activeGroup = (state.groupsByWorktree[worktreeId] ?? []).find(
-                (candidate) => candidate.id === activeGroupId
-              )
+              const hostHasHtml =
+                response.ok &&
+                response.result.tabs.some(
+                  (tab) => tab.type === 'browser' && tab.url.endsWith(`/${fixtureName}`)
+                )
               return {
                 browserRuntimeEnvironmentId: browserPage?.browserRuntimeEnvironmentId ?? null,
                 handleEnvironmentId: handle?.environmentId ?? null,
                 handleRemotePageId: handle?.remotePageId ?? null,
-                hostHasHtml: hostBrowserUrls.some((url) => url.endsWith(`/${fixtureName}`)),
-                hasWorkspace: Boolean(browser),
-                hasPage: Boolean(browserPage),
-                hasHandle: Boolean(handle),
-                clientBrowserUrls: clientBrowsers.map((tab) => tab.url),
-                hostBrowserUrls,
-                clientUnified: (state.unifiedTabsByWorktree[worktreeId] ?? []).filter(
-                  (tab) => tab.contentType === 'browser'
-                ).length,
-                clientWorkspaces: clientBrowsers.length,
-                hostTabsOk: response.ok,
-                hostTabsError: response.ok ? null : response.error.message,
-                sourceEditorStillActive: activeGroup?.activeTabId === sourceTabId
+                hostHasHtml
               }
             },
-            {
-              environmentId: client!.environmentId,
-              fixtureName: FIXTURE_NAME,
-              worktreeId,
-              sourceTabId: sourceEditor.tabId
-            }
-          )
-          ownershipSamples += 1
-          return probe === null ? null : { ...probe, baseline: browserBaseline, ownershipSamples }
-        },
-        {
-          timeout: 60_000,
-          message:
-            'remote HTML preview never became a client-owned browser page — read the received object: workspace/page/handle are the client stages, hostTabsOk splits an RPC failure from a host that has no tab, and the url lists split "nothing created" from "created but unmatched"'
-        }
+            { environmentId: client!.environmentId, fixtureName: FIXTURE_NAME, worktreeId }
+          ),
+        { timeout: 60_000, message: 'remote HTML browser ownership never converged' }
       )
       .toMatchObject({
         browserRuntimeEnvironmentId: client.environmentId,
