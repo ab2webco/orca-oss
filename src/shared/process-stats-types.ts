@@ -18,6 +18,15 @@ export type UsageValues = {
 
 export type ProcessMemoryMetric = 'rss' | 'working-set'
 
+/**
+ * The second metric, reported next to `memory` and never in place of it: macOS
+ * accounts a process by phys_footprint, which counts the compressed and swapped
+ * pages `memory` loses, so the two diverge exactly as pressure rises. Swapping
+ * the existing field would silently invalidate every number already recorded
+ * against it (ORCA-325).
+ */
+export type ProcessFootprintMetric = 'phys-footprint'
+
 export type HostAvailableMemorySource = 'memory-pressure' | 'proc-meminfo' | 'free-memory'
 
 /** The top-level cpu/memory are the sum of main + renderer + other. */
@@ -66,6 +75,12 @@ export type MemorySnapshot = {
   host: HostMemory
   /** Per-process byte metric used by app, session, worktree, history, and totalMemory values. */
   processMemoryMetric: ProcessMemoryMetric
+  /** Names the metric the footprint fields carry, or null where the platform has no equivalent. */
+  processFootprintMetric: ProcessFootprintMetric | null
+  /** Sum of the footprint metric over the app's own processes. Null when unavailable — never 0. */
+  appFootprint: number | null
+  /** Sum of the footprint metric over app plus every tracked session. Null when unavailable. */
+  totalFootprint: number | null
   /** Sum of app + all tracked worktree sessions. Percent of a single core, so may exceed 100 on multi-core machines. */
   totalCpu: number
   /** Sum of per-process samples. Shared pages may repeat, so this can exceed host.totalMemory. */

@@ -317,7 +317,11 @@ describe('collectMemorySnapshot', () => {
       expect(execFileMock).toHaveBeenCalledTimes(count)
       return
     }
-    expect(execMock).toHaveBeenCalledTimes(count)
+    // Why the ps calls and not every exec: what these cases pin is how many
+    // process enumerations a sweep performs, and counting raw execs made that
+    // number depend on which other commands a snapshot happens to issue.
+    const psCalls = execMock.mock.calls.filter(([cmd]) => String(cmd).startsWith('ps '))
+    expect(psCalls).toHaveLength(count)
   }
 
   it('uses one CIM process for Windows memory and CPU sampling', async () => {
@@ -535,6 +539,23 @@ describe('collectMemorySnapshot', () => {
     const snapshot = await collectMemorySnapshot(emptyStore)
 
     expect(snapshot.worktrees[0].sessions[0]).toMatchObject({ cpu: 0, memory: 1024 * 1024 })
+  })
+
+  // Why this control: the footprint sweep shells out, and this is the tool you
+  // reach for while the machine is thrashing. A snapshot that waits on it is a
+  // worse diagnostic than one that says it has no number — and null must reach
+  // the reader as null, never as 0, which would compare as healthy.
+  it('still completes, reporting no footprint, when the sweep gives nothing back', async () => {
+    mockPsResponse('10 1 0 1024')
+    listRegisteredPtysMock.mockReturnValue([])
+    const { collectMemorySnapshot } = await loadCollector()
+
+    const snapshot = await collectMemorySnapshot(emptyStore)
+
+    expect(snapshot.processMemoryMetric).toBe('rss')
+    expect(snapshot.processFootprintMetric).toBeNull()
+    expect(snapshot.appFootprint).toBeNull()
+    expect(snapshot.totalFootprint).toBeNull()
   })
 
   it('uses Typeperf during the CIM retry cooldown', async () => {
