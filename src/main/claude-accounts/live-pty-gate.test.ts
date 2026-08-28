@@ -480,6 +480,19 @@ describe('Claude live PTY gate', () => {
     }
   })
 
+  it('keeps the gate while allowing a global switch to leave outgoing pinned PTYs running', () => {
+    markInjectedClaudePtySpawned('injected-pty', 'account-a')
+    try {
+      expect(() => beginManagedClaudeAccountMutation('account-a')).toThrow('assigned worktree')
+      expect(() =>
+        beginManagedClaudeAccountMutation('account-a', { allowLiveInjectedPtys: true })
+      ).not.toThrow()
+    } finally {
+      endManagedClaudeAccountMutation('account-a')
+      markClaudePtyExited('injected-pty')
+    }
+  })
+
   it('prevents shared preparation from racing an injected reservation', () => {
     const reservationId = reserveInjectedClaudeAccountLaunch('account-a')
     try {

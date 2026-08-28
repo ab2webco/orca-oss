@@ -2,6 +2,8 @@ export type ManagedClaudeAccountMutationIntent = 'shared-auth' | 'account-record
 
 export type ManagedClaudeAccountMutationOptions = {
   allowLiveSharedPtys?: boolean
+  /** Global selection may leave already-pinned PTYs on the outgoing account running. */
+  allowLiveInjectedPtys?: boolean
   intent?: ManagedClaudeAccountMutationIntent
 }
 
