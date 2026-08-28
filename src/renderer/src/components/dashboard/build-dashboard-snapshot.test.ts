@@ -383,9 +383,7 @@ describe('buildDashboardSnapshot', () => {
       const labels = snapshot.cards.map((card) => card.conversationName ?? '')
       expect(labels.every((label) => label.length === DASHBOARD_MAX_LABEL_LENGTH)).toBe(true)
       expect(new Set(labels).size).toBe(3)
-      expect(labels.map((label) => label.slice(-3))).toEqual(
-        kind === 'distinct' ? ['xxx', '(1)', '(2)'] : ['(1)', '(2)', '(3)']
-      )
+      expect(labels.map((label) => label.slice(-3))).toEqual(['(1)', '(2)', '(3)'])
     }
   )
 

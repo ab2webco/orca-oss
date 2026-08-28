@@ -52,7 +52,10 @@ function withoutBlanks(value: string): string {
   return value.trim()
 }
 
-function boundDashboardLabel(label: string): string {
+function boundDashboardLabel(label: string, suffix = ''): string {
+  if (suffix) {
+    return `${label.slice(0, DASHBOARD_MAX_LABEL_LENGTH - suffix.length)}${suffix}`
+  }
   if (label.length <= DASHBOARD_MAX_LABEL_LENGTH) {
     return label
   }
@@ -150,11 +153,43 @@ export function resolveDashboardAgentRowLabels(
   }
   const resolved = resolveAgentRowLabels(inputs)
   const labels = new Map<string, string>()
+  const groups = new Map<string, AgentRowLabelInput[]>()
   for (const input of inputs) {
-    const label =
-      groupSizes.get(input.groupKey) === 1 ? input.conversationName : resolved.get(input.paneKey)
-    if (label) {
-      labels.set(input.paneKey, boundDashboardLabel(label))
+    const group = groups.get(input.groupKey)
+    if (group) {
+      group.push(input)
+    } else {
+      groups.set(input.groupKey, [input])
+    }
+  }
+  for (const [groupKey, group] of groups) {
+    const boundedByPane = new Map<string, string>()
+    const counts = new Map<string, number>()
+    for (const input of group) {
+      const raw =
+        groupSizes.get(groupKey) === 1 ? input.conversationName : resolved.get(input.paneKey)
+      const bounded = raw ? boundDashboardLabel(raw) : ''
+      boundedByPane.set(input.paneKey, bounded)
+      if (bounded) {
+        counts.set(bounded, (counts.get(bounded) ?? 0) + 1)
+      }
+    }
+    const occurrences = new Map<string, number>()
+    const used = new Set<string>()
+    for (const input of group) {
+      const base = boundedByPane.get(input.paneKey) ?? ''
+      if (!base) {
+        continue
+      }
+      let nth = (occurrences.get(base) ?? 0) + 1
+      let label = counts.get(base) === 1 ? base : boundDashboardLabel(base, ` (${nth})`)
+      while (used.has(label)) {
+        nth += 1
+        label = boundDashboardLabel(base, ` (${nth})`)
+      }
+      occurrences.set(base, nth)
+      used.add(label)
+      labels.set(input.paneKey, label)
     }
   }
   return labels
