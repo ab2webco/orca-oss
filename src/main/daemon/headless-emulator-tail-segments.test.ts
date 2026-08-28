@@ -164,6 +164,38 @@ describe('HeadlessEmulator.getBufferTailSegments', () => {
     expect(lines.at(-1)).toBe('Deciphering...')
   })
 
+  it('keeps the blank line a transcript uses to separate turns', async () => {
+    // The gap above a composer is waste; a single blank between two turns is the
+    // separation a reader scans by, and compressing it would show the grid
+    // something the terminal never drew.
+    emulator = new HeadlessEmulator({ cols: 40, rows: 24, scrollback: 200 })
+    const transcript = ['turn one', '', 'turn two', '', 'turn three'].join('\r\n')
+    await emulator.write(`${transcript}${ESC}[24;1HDeciphering...`)
+    expect(emulator.getBufferTailLines(8).map((line) => line.trim())).toEqual([
+      'turn one',
+      '',
+      'turn two',
+      '',
+      'turn three',
+      '',
+      'Deciphering...'
+    ])
+  })
+
+  it('spends one row on a run of blanks, however tall the run is', async () => {
+    emulator = new HeadlessEmulator({ cols: 40, rows: 24, scrollback: 200 })
+    // Four blank rows between two turns: still one row of separation, not four.
+    const transcript = ['turn one', '', '', '', '', 'turn two'].join('\r\n')
+    await emulator.write(`${transcript}${ESC}[24;1HDeciphering...`)
+    expect(emulator.getBufferTailLines(8).map((line) => line.trim())).toEqual([
+      'turn one',
+      '',
+      'turn two',
+      '',
+      'Deciphering...'
+    ])
+  })
+
   it('leaves a blank screen blank instead of resurrecting scrollback', async () => {
     emulator = new HeadlessEmulator({ cols: 40, rows: 8, scrollback: 200 })
     // Old output, then a cleared screen: the pane the user is looking at is empty.

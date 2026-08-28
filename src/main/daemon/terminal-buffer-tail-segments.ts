@@ -29,6 +29,9 @@ function cellForegroundColor(cell: IBufferCell): TerminalLineColor {
   return 'default'
 }
 
+/** How much of the budget one run of blank rows may spend. */
+const MAX_BLANK_RUN_ROWS = 1
+
 function isBlankRow(buffer: IBuffer, row: number): boolean {
   return (buffer.getLine(row)?.translateToString(true) ?? '').trim().length === 0
 }
@@ -52,10 +55,12 @@ function hasContentOnScreen(buffer: IBuffer, end: number): boolean {
  * read blank for an idle pane while its plain-text twin, which has a renderer
  * fallback, kept working (ORCA-285).
  *
- * Blank rows do not consume the budget. A TUI parks its composer at the foot and
- * leaves the screen above it empty, so the rows immediately before the cursor are
- * that gap and the conversation sits above it — the window rendered a nearly
- * empty cell while the terminal showed a full screen (ORCA-306).
+ * A run of blank rows spends at most one row of the budget. A TUI parks its
+ * composer at the foot and leaves the screen above it empty, so the rows before
+ * the cursor are that hole and the conversation sits above it — the window
+ * rendered a nearly empty cell while the terminal showed a full screen
+ * (ORCA-306). Collapsing the run rather than dropping every blank keeps the
+ * single blank line between two turns, which is the separation a reader scans by.
  */
 function tailRows(buffer: IBuffer, limit: number): number[] {
   const rows = Math.max(0, Math.floor(limit))
@@ -73,11 +78,21 @@ function tailRows(buffer: IBuffer, limit: number): number[] {
     ? Math.max(0, anchored - Math.max(0, buffer.length - buffer.baseY))
     : anchored
   const selected: number[] = []
+  let blankRun = 0
   for (let row = end - 1; row >= floor && selected.length < rows; row -= 1) {
     if (isBlankRow(buffer, row)) {
-      continue
+      blankRun += 1
+      if (blankRun > MAX_BLANK_RUN_ROWS) {
+        continue
+      }
+    } else {
+      blankRun = 0
     }
     selected.push(row)
+  }
+  // A blank at the oldest edge separates nothing inside the window.
+  while (selected.length > 0 && isBlankRow(buffer, selected.at(-1) ?? 0)) {
+    selected.pop()
   }
   return selected.toReversed()
 }
