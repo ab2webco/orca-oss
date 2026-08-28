@@ -21,6 +21,7 @@ import {
   waitForActiveTerminalManager
 } from './helpers/terminal'
 import { describeRestoreSample, measureHiddenOutputRestoreLatency } from './hidden-restore-latency'
+import { hiddenRestoreWithinBudget } from './hidden-restore-tail-window'
 
 type HiddenPressurePane = {
   ptyId: string
