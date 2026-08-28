@@ -12,6 +12,7 @@
 const fs = require('node:fs')
 
 const heartbeatPath = process.argv[2]
+const heartbeatTemporaryPath = heartbeatPath ? `${heartbeatPath}.${process.pid}.tmp` : null
 const TICK_MS = 60
 const HISTORY_LINES_PER_SECOND = Math.max(0, Number(process.argv[3]) || 4)
 const BLOCK_ROWS = 6
@@ -79,9 +80,10 @@ function tick() {
   out += liveBlock()
   out += '\x1b[?25h\x1b[?2026l'
   process.stdout.write(out)
-  if (heartbeatPath) {
+  if (heartbeatTemporaryPath) {
     try {
-      fs.writeFileSync(heartbeatPath, String(frame))
+      fs.writeFileSync(heartbeatTemporaryPath, String(frame))
+      fs.renameSync(heartbeatTemporaryPath, heartbeatPath)
     } catch {
       // heartbeat is best-effort; the stream itself is the product
     }

@@ -1,0 +1,13 @@
+{
+  // Why: tests/ was in no tsconfig project, so type-aware lint resolved every
+  // node type to an error type that silently disables the rules it feeds.
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["../src/renderer/src/*"],
+      "@renderer/*": ["../src/renderer/src/*"]
+    },
+    "noEmit": true
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}
