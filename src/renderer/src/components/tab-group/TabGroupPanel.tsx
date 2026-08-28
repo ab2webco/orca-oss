@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { useDroppable } from '@dnd-kit/core'
 import { Ellipsis, X } from 'lucide-react'
@@ -18,6 +18,11 @@ import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { resolveGroupTabFromVisibleId } from './tab-group-visible-id'
 import { getTabPaneBodyDroppableId, type HoveredTabInsertion } from './useTabDragSplit'
 import { tabGroupBodyAnchorName } from './tab-group-body-anchor'
+import {
+  installGroupFocusIntentKeyWatch,
+  mayClaimGroupFocusFromDomFocus,
+  recordGroupPointerFocusIntent
+} from './group-focus-intent'
 import { translate } from '@/i18n/i18n'
 
 const EditorPanel = lazy(() => import('../editor/EditorPanel'))
@@ -59,6 +64,9 @@ export default function TabGroupPanel({
   const sidebarOpen = useAppStore((state) => state.sidebarOpen)
 
   const model = useTabGroupWorkspaceModel({ groupId, worktreeId })
+  // Why here and not in the module: one watch per mounted panel is idempotent for
+  // intent, and the effect ties its lifetime to the renderer that reads it.
+  useEffect(() => installGroupFocusIntentKeyWatch(window), [])
   const { activeTab, browserItems, commands, editorItems, tabBarOrder, terminalTabs } = model
   const { setNodeRef: setBodyDropRef } = useDroppable({
     id: getTabPaneBodyDroppableId(groupId),
@@ -202,9 +210,19 @@ export default function TabGroupPanel({
             } ${isFocused ? '' : 'opacity-95'}`
           : ''
       }`}
-      onPointerDown={commands.focusGroup}
+      onPointerDown={() => {
+        recordGroupPointerFocusIntent(groupId)
+        commands.focusGroup()
+      }}
       // Why: keyboard/AT focus can enter a split group without a pointer event, so sync group focus to DOM focus for global shortcuts.
-      onFocusCapture={commands.focusGroup}
+      // Why gated: a pane refocusing itself raises the same event, and Monaco's
+      // self-refocus used it to steal focus back from a tab the user had just
+      // clicked in another group (ORCA-314).
+      onFocusCapture={() => {
+        if (mayClaimGroupFocusFromDomFocus(groupId)) {
+          commands.focusGroup()
+        }
+      }}
     >
       {/* Why: each split group needs its own tab row because multiple groups can show at once but the titlebar has only one shared center slot. */}
       {/* Why: macOS hiddenInset titleBarStyle makes -webkit-app-region: drag the only way to move the window from this tab row. */}
