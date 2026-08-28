@@ -29,8 +29,24 @@ function cellForegroundColor(cell: IBufferCell): TerminalLineColor {
   return 'default'
 }
 
+/** How much of the budget one run of blank rows may spend. */
+const MAX_BLANK_RUN_ROWS = 1
+
+function isBlankRow(buffer: IBuffer, row: number): boolean {
+  return (buffer.getLine(row)?.translateToString(true) ?? '').trim().length === 0
+}
+
+function hasContentOnScreen(buffer: IBuffer, end: number): boolean {
+  for (let row = Math.max(0, buffer.baseY); row < end; row += 1) {
+    if (!isBlankRow(buffer, row)) {
+      return true
+    }
+  }
+  return false
+}
+
 /**
- * First row of the tail window.
+ * Rows the tail window returns, oldest first.
  *
  * Anchored on the cursor, not on `buffer.length`: a pane's grid can be taller
  * than the window (the agent grid forwards a tall viewport), and `length` is then
@@ -38,12 +54,47 @@ function cellForegroundColor(cell: IBufferCell): TerminalLineColor {
  * buffer's end walked past every written row and returned nothing — a tail that
  * read blank for an idle pane while its plain-text twin, which has a renderer
  * fallback, kept working (ORCA-285).
+ *
+ * A run of blank rows spends at most one row of the budget. A TUI parks its
+ * composer at the foot and leaves the screen above it empty, so the rows before
+ * the cursor are that hole and the conversation sits above it — the window
+ * rendered a nearly empty cell while the terminal showed a full screen
+ * (ORCA-306). Collapsing the run rather than dropping every blank keeps the
+ * single blank line between two turns, which is the separation a reader scans by.
  */
-function tailWindow(buffer: IBuffer, limit: number): { start: number; end: number } {
+function tailRows(buffer: IBuffer, limit: number): number[] {
   const rows = Math.max(0, Math.floor(limit))
   // +1 so the cursor's own row is inside the window: it holds the live prompt.
   const end = Math.min(buffer.baseY + buffer.cursorY + 1, buffer.length)
-  return { start: Math.max(0, end - rows), end }
+  if (rows === 0 || end <= 0) {
+    return []
+  }
+  const anchored = Math.max(0, end - rows)
+  // Why only when the screen has something on it: a pane whose screen is empty
+  // is empty, and walking up would present its scrollback as the current view.
+  // Why one screen of headroom: a gap a TUI draws cannot outgrow the screen it
+  // draws on, and an unbounded walk would read the whole scrollback each poll.
+  const floor = hasContentOnScreen(buffer, end)
+    ? Math.max(0, anchored - Math.max(0, buffer.length - buffer.baseY))
+    : anchored
+  const selected: number[] = []
+  let blankRun = 0
+  for (let row = end - 1; row >= floor && selected.length < rows; row -= 1) {
+    if (isBlankRow(buffer, row)) {
+      blankRun += 1
+      if (blankRun > MAX_BLANK_RUN_ROWS) {
+        continue
+      }
+    } else {
+      blankRun = 0
+    }
+    selected.push(row)
+  }
+  // A blank at the oldest edge separates nothing inside the window.
+  while (selected.length > 0 && isBlankRow(buffer, selected.at(-1) ?? 0)) {
+    selected.pop()
+  }
+  return selected.toReversed()
 }
 
 /**
@@ -54,10 +105,9 @@ function tailWindow(buffer: IBuffer, limit: number): { start: number; end: numbe
  * DOM text node (ORCA-234).
  */
 export function readBufferTailSegments(buffer: IBuffer, limit: number): TerminalLineSegment[][] {
-  const { start, end } = tailWindow(buffer, limit)
   const rows: TerminalLineSegment[][] = []
   const cell = buffer.getNullCell()
-  for (let row = start; row < end; row += 1) {
+  for (const row of tailRows(buffer, limit)) {
     const line = buffer.getLine(row)
     if (!line) {
       rows.push([])
@@ -83,12 +133,8 @@ export function readBufferTailSegments(buffer: IBuffer, limit: number): Terminal
   return rows
 }
 
-/** Tail rows as plain text, for callers that do not paint colour. */
+/** Tail rows as plain text, for callers that do not paint colour. Blank rows are
+ *  skipped, so the result is up to `limit` rows that carry something. */
 export function readBufferTailLines(buffer: IBuffer, limit: number): string[] {
-  const { start, end } = tailWindow(buffer, limit)
-  const lines: string[] = []
-  for (let row = start; row < end; row += 1) {
-    lines.push(buffer.getLine(row)?.translateToString(true) ?? '')
-  }
-  return lines
+  return tailRows(buffer, limit).map((row) => buffer.getLine(row)?.translateToString(true) ?? '')
 }
