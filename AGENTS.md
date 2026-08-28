@@ -4,7 +4,11 @@ All UI work — layout, color, typography, spacing, component selection, UX beha
 
 ## Electron UI Validation
 
-Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
+Reuse the E2E harness for rendered Orca UI checks — run one spec under `tests/e2e/` and read its
+screenshots — rather than a bespoke launcher. Do not use computer-use for Orca UI validation.
+The procedure, including how to seed a provider-backed screen and why a screenshot of a screen
+that does not scroll proves nothing, is in
+[`docs/reference/rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md).
 
 # Style
 
