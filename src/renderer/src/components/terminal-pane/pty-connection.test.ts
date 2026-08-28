@@ -5827,6 +5827,52 @@ describe('connectPanePty', () => {
     expect(transport.sendInput).not.toHaveBeenCalledWith('\x1b[?1;2c')
   })
 
+  it('never flushes coalesced emulator replies to the shell after a replay', async () => {
+    // The write queue coalesces consecutive replies into one onData payload, so a
+    // whole-payload reply grammar misses them and the hold would leak them.
+    const { connectPanePty } = await import('./pty-connection')
+    const { replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+
+    // Two DA1 answers to two replayed queries, delivered as one payload.
+    emit('\x1b[?1;2c\x1b[?1;2c')
+    // A DECRPM report riding behind a cursor-position report.
+    emit('\x1b[3;1R\x1b[?2026;2$y')
+    parseCallbacks.shift()?.()
+
+    expect(transport.sendInput).not.toHaveBeenCalled()
+    expect(transport.sendInputImmediate).not.toHaveBeenCalled()
+  })
+
   it('drops xterm onData while pane is replaying restored bytes', async () => {
     // Regression: during replay, xterm auto-replies to embedded queries (DA1/DECRQM/OSC/CPR) via onData must not reach transport.sendInput or they land as stray chars on the prompt. See replay-guard.ts.
     const { connectPanePty } = await import('./pty-connection')

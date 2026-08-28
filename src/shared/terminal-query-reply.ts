@@ -47,7 +47,38 @@ const COOKED_ECHO_RISK_PRIVATE_DSR_PREFIX_RE = new RegExp('^\\u001b\\[\\?[0-9;]*
 const COOKED_ECHO_RISK_OSC_PREFIX_RE = new RegExp(
   '^\\u001b\\][0-9]+;[^\\u0007\\u001b]*(?:\\u0007|\\u001b\\\\)'
 )
+// Prefix forms of the same grammars. The write queue coalesces consecutive
+// replies into one onData payload, which no anchored whole-payload match can
+// recognise, so a caller that must never leak a reply peels instead.
+const QUERY_REPLY_PREFIX_RES = [
+  new RegExp('^\\u001b\\[\\??[0-9;]*[Rn]'),
+  new RegExp('^\\u001b\\[[?>=]?[0-9;]*c'),
+  new RegExp('^\\u001b\\[[468];[0-9]+;[0-9]+t'),
+  new RegExp('^\\u001b\\[\\??[0-9;]*\\$y'),
+  new RegExp('^\\u001b\\[\\?[0-9]+u'),
+  new RegExp('^\\u001b\\][0-9]+;[^\\u0007\\u001b]*(?:\\u0007|\\u001b\\\\)'),
+  new RegExp('^\\u001bP(?:[01]\\$r[^\\u001b]*|>\\|[^\\u001b]*)\\u001b\\\\')
+]
 /* oxlint-enable no-control-regex */
+
+/**
+ * True when any part of `data` is a reply the emulator synthesized — one whole
+ * reply, several coalesced into a single payload, or one spliced onto other
+ * bytes. Use this where a missed reply would reach the shell; use
+ * {@link isTerminalQueryReply} where a misread keystroke is the worse outcome.
+ */
+export function containsTerminalQueryReply(data: string): boolean {
+  for (let index = 0; index < data.length; index += 1) {
+    if (data[index] !== ESC) {
+      continue
+    }
+    const slice = data.slice(index)
+    if (QUERY_REPLY_PREFIX_RES.some((pattern) => pattern.test(slice))) {
+      return true
+    }
+  }
+  return false
+}
 
 /**
  * True when `data` (from xterm.onData) is a synthetic reply the emulator

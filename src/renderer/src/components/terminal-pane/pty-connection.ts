@@ -36,7 +36,10 @@ import {
   takeCurrentTerminalDeliveryCredit
 } from '@/lib/pane-manager/terminal-delivery-credit'
 import { serializeWithAbsoluteCursor } from '../../../../shared/terminal-serialize-absolute-cursor'
-import { isTerminalQueryReply } from '../../../../shared/terminal-query-reply'
+import {
+  containsTerminalQueryReply,
+  isTerminalQueryReply
+} from '../../../../shared/terminal-query-reply'
 import type { PtyBufferSnapshot, PtyConnectResult, PtyReplayDataMeta } from './pty-transport'
 import type { IpcPtyTransportOptions, PtyTransportRecoveryState } from './pty-transport-types'
 import { createIpcPtyTransport } from './pty-transport'
@@ -4134,10 +4137,13 @@ export function connectPanePty(
   // Why: only what the emulator itself can emit from replayed bytes may be
   // dropped — the guard's window is bounded by parse completion, not by how long
   // the user waits to type, so a slow replay would otherwise eat real keys.
+  // Why the peeling predicate and not the whole-payload one: a missed reply is
+  // now held and later written to the shell, which is the leak this guard exists
+  // to stop, and the write queue delivers consecutive replies as one payload.
   const isEmulatorReplayEcho = (data: string): boolean =>
-    isTerminalQueryReply(data) ||
-    data === TERMINAL_FOCUS_IN_SEQUENCE ||
-    data === TERMINAL_FOCUS_OUT_SEQUENCE
+    containsTerminalQueryReply(data) ||
+    data.includes(TERMINAL_FOCUS_IN_SEQUENCE) ||
+    data.includes(TERMINAL_FOCUS_OUT_SEQUENCE)
 
   // Why: these guards discard a keystroke with no trace anywhere; the interactivity specs read the tally.
   const recordDroppedPaneInput = (site: RemoteTerminalInputDeliverySite, data: string): void => {

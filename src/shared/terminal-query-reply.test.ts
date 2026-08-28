@@ -1,6 +1,7 @@
 import { Terminal } from '@xterm/headless'
 import { describe, expect, it } from 'vitest'
 import {
+  containsTerminalQueryReply,
   extractOnlyCookedEchoSafeQueryReplies,
   isTerminalQueryReply,
   needsCookedEchoSafeQueryReply
@@ -123,5 +124,32 @@ describe('isTerminalQueryReply', () => {
     // Incomplete / non-terminated OSC and DCS must not match.
     expect(isTerminalQueryReply('\x1b]11;rgb:2828/2c2c/3434')).toBe(false)
     expect(isTerminalQueryReply('\x1bP1$r2 q')).toBe(false)
+  })
+})
+
+describe('containsTerminalQueryReply', () => {
+  it('sees replies the whole-payload grammar misses', () => {
+    // Consecutive replies coalesced into one onData payload.
+    expect(containsTerminalQueryReply('\x1b[?1;2c\x1b[?1;2c')).toBe(true)
+    expect(containsTerminalQueryReply('\x1b[3;1R\x1b[?2026;2$y')).toBe(true)
+    expect(containsTerminalQueryReply('\x1b]11;rgb:2828/2c2c/3434\x07\x1b[?1;2c')).toBe(true)
+    // A reply spliced onto other bytes, in either order.
+    expect(containsTerminalQueryReply('ls\x1b[3;1R')).toBe(true)
+    expect(containsTerminalQueryReply('\x1b[3;1Rls')).toBe(true)
+  })
+
+  it('agrees with the whole-payload grammar on a single reply', () => {
+    for (const reply of ['\x1b[3;1R', '\x1b[?1;2c', '\x1b[?2026;2$y', '\x1b[?5u']) {
+      expect(containsTerminalQueryReply(reply)).toBe(true)
+    }
+  })
+
+  it('leaves ordinary typed input alone', () => {
+    expect(containsTerminalQueryReply('ls -la\r')).toBe(false)
+    expect(containsTerminalQueryReply('\x1b')).toBe(false)
+    expect(containsTerminalQueryReply('\x1b[A')).toBe(false)
+    expect(containsTerminalQueryReply('\x1b[200~pasted\x1b[201~')).toBe(false)
+    // Kitty-protocol keystrokes carry no `?`.
+    expect(containsTerminalQueryReply('\x1b[97;5u')).toBe(false)
   })
 })
