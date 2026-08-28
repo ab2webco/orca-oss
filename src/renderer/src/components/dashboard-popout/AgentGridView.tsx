@@ -197,9 +197,15 @@ export function AgentGridView({
         onFiltersChange={onFiltersChange}
         searchInputRef={searchInputRef}
       />
-      <div className="scrollbar-sleek flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+      <div
+        data-agent-grid-scroll-container
+        className="scrollbar-sleek flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+      >
         {allCells.length > 1 ? (
-          <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+          <div
+            data-agent-grid-controls
+            className="sticky top-0 z-10 flex shrink-0 items-center gap-1 bg-background text-[11px] text-muted-foreground"
+          >
             <span className="mr-3 flex items-center gap-2.5">
               {(
                 [
