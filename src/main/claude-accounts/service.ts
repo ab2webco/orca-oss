@@ -1123,7 +1123,10 @@ export class ClaudeAccountService {
     // Why: runtime sync can read back and rewrite the account being switched
     // away from, so pinned launches must exclude that account for the full switch.
     return outgoingAccountId
-      ? runManagedClaudeAccountMutation(outgoingAccountId, applySelection, true)
+      ? runManagedClaudeAccountMutation(outgoingAccountId, applySelection, {
+          allowLiveSharedPtys: true,
+          allowLiveInjectedPtys: true
+        })
       : applySelection()
   }
 

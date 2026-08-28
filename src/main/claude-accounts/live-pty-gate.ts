@@ -283,7 +283,7 @@ export function beginManagedClaudeAccountMutation(
   options: ManagedClaudeAccountMutationOptions = {}
 ): void {
   if (
-    hasLiveInjectedClaudePtysForAccount(accountId) ||
+    (!options.allowLiveInjectedPtys && hasLiveInjectedClaudePtysForAccount(accountId)) ||
     (!options.allowLiveSharedPtys && hasLiveSharedClaudePtysForAccount(accountId))
   ) {
     throw createAccountMutationBlockError(accountId, !options.allowLiveSharedPtys)

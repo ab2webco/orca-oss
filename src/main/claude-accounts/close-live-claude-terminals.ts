@@ -63,7 +63,7 @@ export async function closeLiveClaudeTerminalsForAccount(
     // Why: a terminal or launch reservation for this account raced in after we
     // enumerated; refuse rather than delete credentials a live CLI still holds.
     throw new Error(
-      'This Claude account is in use by an assigned worktree. Close its Claude terminal before changing the account.'
+      'A Claude terminal started using this account while the change was in progress. Try again after it exits.'
     )
   }
 }

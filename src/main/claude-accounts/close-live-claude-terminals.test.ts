@@ -17,7 +17,8 @@ const PTY_IDS = [
   'injected-other',
   'shared-a',
   'shared-null',
-  'shared-unknown'
+  'shared-unknown',
+  'injected-late'
 ] as const
 
 describe('closeLiveClaudeTerminalsForAccount', () => {
@@ -67,6 +68,18 @@ describe('closeLiveClaudeTerminalsForAccount', () => {
       closeLiveClaudeTerminalsForAccount('account-a', terminate)
     ).resolves.toBeUndefined()
     expect(terminate).not.toHaveBeenCalled()
+  })
+
+  it('reports a race distinctly when another terminal appears during closing', async () => {
+    markInjectedClaudePtySpawned('injected-a', 'account-a')
+    const terminate = vi.fn(async (_ptyId: string) => {
+      markInjectedClaudePtySpawned('injected-late', 'account-a')
+      return true
+    })
+
+    await expect(closeLiveClaudeTerminalsForAccount('account-a', terminate)).rejects.toThrow(
+      'started using this account while the change was in progress'
+    )
   })
 })
 
