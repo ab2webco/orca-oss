@@ -24,6 +24,7 @@ import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 /** One page-size choice with rowsOnScreen === 1, so a cell's height is the whole
  *  measured budget and the two window heights cannot be confused with the floor. */
 const SINGLE_ROW_PAGE_SIZE = 1
+const STICKY_CONTROLS_PAGE_SIZE = 9
 const SHORT_WINDOW_HEIGHT = 800
 const TALL_WINDOW_HEIGHT = 1100
 const WINDOW_WIDTH = 1500
@@ -285,6 +286,72 @@ test('agent grid fills its height, filters by bucket, collapses a project and pa
       message: 'Agent grid never rendered a cell per seeded agent'
     })
     .toBe(5)
+
+  // ── Sticky controls stay visible without reducing the grid viewport ─────
+  await page
+    .getByRole('button', { name: `${STICKY_CONTROLS_PAGE_SIZE}`, exact: true })
+    .first()
+    .click()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const scroller = document.querySelector<HTMLElement>('[data-agent-grid-scroll-container]')
+          if (!scroller) {
+            return 0
+          }
+          scroller.scrollTop = 0
+          const viewport = scroller.getBoundingClientRect()
+          const tops = new Set<number>()
+          for (const cell of document.querySelectorAll<HTMLElement>('[data-agent-grid-cell]')) {
+            const box = cell.getBoundingClientRect()
+            if (box.bottom > viewport.top && box.top < viewport.bottom) {
+              tops.add(Math.round(box.top))
+            }
+          }
+          return tops.size
+        }),
+      { timeout: 15_000, message: 'the sticky control check needs at least three visible rows' }
+    )
+    .toBeGreaterThanOrEqual(3)
+  const stickyControls = page.locator('[data-agent-grid-controls]')
+  await expect(stickyControls).toBeVisible()
+  const scrollProbe = await page.evaluate(() => {
+    const scroller = document.querySelector<HTMLElement>('[data-agent-grid-scroll-container]')
+    const controls = document.querySelector<HTMLElement>('[data-agent-grid-controls]')
+    if (!scroller || !controls) {
+      return null
+    }
+    const visibleGridRows = (): number => {
+      const viewport = scroller.getBoundingClientRect()
+      const tops = new Set<number>()
+      for (const cell of document.querySelectorAll<HTMLElement>('[data-agent-grid-cell]')) {
+        const box = cell.getBoundingClientRect()
+        if (box.bottom > viewport.top && box.top < viewport.bottom) {
+          tops.add(Math.round(box.top))
+        }
+      }
+      return tops.size
+    }
+    if (scroller.scrollHeight <= scroller.clientHeight) {
+      return { overflowing: false as const }
+    }
+    scroller.scrollTop = 0
+    const top = controls.getBoundingClientRect().top
+    const rowsAtTop = visibleGridRows()
+    scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight
+    const bottom = controls.getBoundingClientRect().top
+    const rowsAtBottom = visibleGridRows()
+    return { overflowing: true as const, top, bottom, rowsAtTop, rowsAtBottom }
+  })
+  expect(
+    scrollProbe,
+    'the seeded agents must overflow the grid before testing stickiness'
+  ).not.toBeNull()
+  expect(scrollProbe?.overflowing).toBe(true)
+  expect(Math.abs((scrollProbe?.top ?? 0) - (scrollProbe?.bottom ?? 0))).toBeLessThan(1)
+  expect(scrollProbe?.rowsAtTop).toBeGreaterThanOrEqual(3)
+  expect(scrollProbe?.rowsAtBottom).toBeGreaterThanOrEqual(scrollProbe?.rowsAtTop ?? 0)
 
   // ── The grid takes the height it is given ────────────────────────────────
   await page
