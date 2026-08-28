@@ -63,17 +63,6 @@ function boundDashboardLabel(label: string, suffix = ''): string {
   return `${label.slice(0, DASHBOARD_MAX_LABEL_LENGTH - ordinal.length)}${ordinal}`
 }
 
-function hasDuplicateOrBlank(values: readonly string[]): boolean {
-  const seen = new Set<string>()
-  for (const value of values) {
-    if (value === '' || seen.has(value)) {
-      return true
-    }
-    seen.add(value)
-  }
-  return false
-}
-
 function resolveLabelGroup(rows: readonly AgentRowLabelInput[]): Map<string, string> {
   const labels = new Map<string, string>()
   if (rows.length === 1) {
@@ -86,27 +75,33 @@ function resolveLabelGroup(rows: readonly AgentRowLabelInput[]): Map<string, str
   }
 
   const own = rows.map((row) => withoutBlanks(row.ownText))
-  if (!hasDuplicateOrBlank(own)) {
-    rows.forEach((row, index) => labels.set(row.paneKey, own[index]!))
-    return labels
-  }
-
+  const base = rows.map(
+    (row, index) => withoutBlanks(row.conversationName ?? '') || own[index] || row.agentType
+  )
   const counts = new Map<string, number>()
+  base.forEach((value) => {
+    counts.set(value, (counts.get(value) ?? 0) + 1)
+  })
+  const candidateCounts = new Map<string, number>()
   rows.forEach((row, index) => {
-    const base = own[index] || withoutBlanks(row.conversationName ?? '') || row.agentType
-    counts.set(base, (counts.get(base) ?? 0) + 1)
+    const preferred = base[index]!
+    const candidate = counts.get(preferred) === 1 ? preferred : own[index] || preferred
+    candidateCounts.set(candidate, (candidateCounts.get(candidate) ?? 0) + 1)
   })
   const occurrences = new Map<string, number>()
   const used = new Set<string>()
   rows.forEach((row, index) => {
-    const base = own[index] || withoutBlanks(row.conversationName ?? '') || row.agentType
-    let nth = (occurrences.get(base) ?? 0) + 1
-    let label = counts.get(base) === 1 ? base : `${base} (${nth})`
+    const ownText = own[index]!
+    const preferred = base[index]!
+    // Keep a pane's real title unless that title collides; then use its own text.
+    const candidate = counts.get(preferred) === 1 ? preferred : ownText || preferred
+    let nth = (occurrences.get(candidate) ?? 0) + 1
+    let label = candidateCounts.get(candidate) === 1 ? candidate : `${candidate} (${nth})`
     while (used.has(label)) {
       nth += 1
-      label = `${base} (${nth})`
+      label = `${candidate} (${nth})`
     }
-    occurrences.set(base, nth)
+    occurrences.set(candidate, nth)
     used.add(label)
     labels.set(row.paneKey, label)
   })

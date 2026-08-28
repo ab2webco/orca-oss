@@ -103,6 +103,33 @@ describe('resolveAgentRowLabels', () => {
     ).toEqual(['First conversation', 'Second conversation'])
   })
 
+  it('preserves a distinct title while disambiguating colliding titles', () => {
+    const labels = labelsOf([
+      {
+        paneKey: 'p:parent',
+        groupKey: 'tab-mixed',
+        conversationName: 'Parent Terminal',
+        ownText: 'parent prompt',
+        agentType: 'claude'
+      },
+      {
+        paneKey: 'p:child-a',
+        groupKey: 'tab-mixed',
+        conversationName: 'Shared conversation',
+        ownText: 'same prompt',
+        agentType: 'claude'
+      },
+      {
+        paneKey: 'p:child-b',
+        groupKey: 'tab-mixed',
+        conversationName: 'Shared conversation',
+        ownText: 'same prompt',
+        agentType: 'claude'
+      }
+    ])
+    expect(labels).toEqual(['Parent Terminal', 'same prompt (1)', 'same prompt (2)'])
+  })
+
   // The case the reviewer flagged as blocking: if every pane was dispatched from
   // one turn their own text collides too, and falling back to it alone would
   // rebuild the bug.
