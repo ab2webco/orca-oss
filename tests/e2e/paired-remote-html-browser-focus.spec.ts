@@ -105,6 +105,13 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
     // host RPC simply failed — and the last one is an observation failure wearing
     // product clothing. Each stage reports separately (ORCA-305).
     let ownershipSamples = 0
+    // Why measured on success too: a red costs a whole sharded run and only pays
+    // out when it happens to fire. Convergence timing on every run says whether
+    // this is a hang that never completes or a distribution whose tail crosses
+    // the budget — and those need different fixes (ORCA-305).
+    const ownershipBudgetMs = 60_000
+    const ownershipStartedAt = Date.now()
+    const ownershipStageFirstSeenMs: Record<string, number> = {}
     await expect
       .poll(
         async () => {
@@ -162,6 +169,17 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
             }
           )
           ownershipSamples += 1
+          const elapsedMs = Date.now() - ownershipStartedAt
+          for (const [stage, ready] of [
+            ['workspace', probe?.hasWorkspace],
+            ['page', probe?.hasPage],
+            ['handle', probe?.hasHandle],
+            ['host', probe?.hostHasHtml]
+          ] as const) {
+            if (ready === true && ownershipStageFirstSeenMs[stage] === undefined) {
+              ownershipStageFirstSeenMs[stage] = elapsedMs
+            }
+          }
           // Why logged and not only returned: this gate asserts with toMatchObject,
           // which prints only the compared keys — the extra stages would never
           // reach the failure output (ORCA-305).
@@ -181,6 +199,15 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
         handleEnvironmentId: client.environmentId,
         hostHasHtml: true
       })
+    console.log(
+      `[html-focus] ownership-converged ${JSON.stringify({
+        samples: ownershipSamples,
+        elapsedMs: Date.now() - ownershipStartedAt,
+        budgetMs: ownershipBudgetMs,
+        usedPctOfBudget: Math.round(((Date.now() - ownershipStartedAt) / ownershipBudgetMs) * 100),
+        stageFirstSeenMs: ownershipStageFirstSeenMs
+      })}`
+    )
     const htmlTabInventory = await page.evaluate(
       async ({ environmentId, fixtureName, worktreeId }) => {
         const state = window.__store?.getState()
@@ -394,6 +421,8 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
 
     // Why the projection: this gate asserts with toEqual, which fails on any extra
     // key, so the diagnostics ride a log line instead of the compared object.
+    const clickBudgetMs = 30_000
+    const clickStartedAt = Date.now()
     await expect
       .poll(
         async () => {
@@ -481,6 +510,13 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
         { timeout: 30_000, message: 'browser click did not remain authoritative' }
       )
       .toEqual({ activeGroupType: 'browser', activeTabType: 'browser', hostActiveHtml: true })
+    console.log(
+      `[html-focus] click-authority-converged ${JSON.stringify({
+        elapsedMs: Date.now() - clickStartedAt,
+        budgetMs: clickBudgetMs,
+        usedPctOfBudget: Math.round(((Date.now() - clickStartedAt) / clickBudgetMs) * 100)
+      })}`
+    )
     await expect(page.getByTestId('remote-browser-frame')).toBeVisible()
 
     const browserTab = page.locator(`[data-tab-id="${tabIds.browserId}"]`)
