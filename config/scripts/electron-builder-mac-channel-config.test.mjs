@@ -76,16 +76,16 @@ describe('electron-builder mac channel config', () => {
   // day there would evict every stable/RC entry. The fork publishes no dev tags
   // at all — every dev workflow is gated `github.repository == 'stablyai/orca'` —
   // so one repo costs it nothing, and pointing a channel at upstream's repo would
-  // publish lab artifacts outside the fork. What the fork does keep is the
-  // prerelease downgrade, which is what stops a dev build taking Latest.
+  // publish lab artifacts outside the fork. Every build is born a prerelease
+  // anyway — the release belongs to whichever platform job publishes first — so
+  // what this pins for the dev channels is the repo they land in.
   it('publishes hourly builds to the fork repo, born a prerelease', () => {
     withHourlyEnv((config) => {
       expect(config.publish).toMatchObject({ repo: 'orca-oss', releaseType: 'prerelease' })
     })
-    expect(electronBuilderConfig.publish).toMatchObject({
-      repo: 'orca-oss',
-      releaseType: 'release'
-    })
+    // The counterpart assertion — that no environment is born anything else —
+    // lives in electron-builder-release-identity.test.mjs, which owns the whole
+    // matrix. Repeating half of it here would drift.
   })
 
   it('stamps hourly packages with the hourly version', () => {

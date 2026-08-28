@@ -32,19 +32,6 @@ const devChannelBuildVersion = isMacHourly
     : isMacAdhoc
       ? process.env.ORCA_ADHOC_BUILD_VERSION
       : undefined
-// Why each dev channel gets its own repo rather than tagging into the main one:
-// the releases atom feed exposes only the 10 newest entries, so 24 hourly tags a
-// day would evict every stable/RC entry and strand users on a feed with nothing
-// to install. Keeping adhoc/daily separate from hourly too means a branch build
-// or a once-a-day cut cannot be picked up by someone who only meant to ride
-// main's hourlies.
-const devChannelRepo = isMacHourly
-  ? 'orca-hourly'
-  : isMacDaily
-    ? 'orca-daily'
-    : isMacAdhoc
-      ? 'orca-adhoc'
-      : null
 const appId = 'com.stablyai.orca'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
@@ -511,13 +498,12 @@ module.exports = {
     provider: 'github',
     owner: 'ab2webco',
     repo: 'orca-oss',
-    // Why: the release must be born a prerelease. finalize's --prerelease lands only after every
-    // platform job, and until then a full release holds GitHub's Latest pointer — which is how a
-    // release candidate reached installs that were never meant to see it. Dev-channel mac builds
-    // are prereleases for the same reason (upstream isolates each in its own repo; the lab
-    // publishes no hourly/adhoc tags, so devChannelRepo only downgrades the release type here).
-    releaseType:
-      process.env.ORCA_LAB_RELEASE_CANDIDATE === '1' || devChannelRepo ? 'prerelease' : 'release'
+    // Why always, and not only for RCs: the first platform job to publish creates the
+    // release, so a 'release' type hands GitHub's Latest pointer to a tag whose other
+    // platforms have not uploaded yet — and if one of them then fails, Latest keeps
+    // pointing at a release with no manifest for it. Born a prerelease; lab-release's
+    // finalize promotes it only after verify-release-update-manifests passes.
+    releaseType: 'prerelease'
   }
 }
 

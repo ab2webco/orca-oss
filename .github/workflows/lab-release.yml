@@ -498,6 +498,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Why it re-reads the release instead of trusting the platform jobs: a job
+      # can go green having uploaded only part of its output, and what breaks
+      # installs is not a red job — it is a Latest release whose manifest names
+      # an asset nobody uploaded.
+      # Why only on the promotion path: an RC never holds Latest, and widening
+      # this to RCs would change what a release candidate is allowed to publish.
+      - name: Verify every platform manifest landed
+        if: inputs.release_candidate != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          mkdir -p /tmp/release-manifests
+          for manifest in latest-mac.yml latest-linux.yml latest.yml; do
+            # Why || true: a missing manifest is what this check reports, not a
+            # download error that hides which one is missing.
+            gh release download "$tag" --pattern "$manifest" --dir /tmp/release-manifests || true
+          done
+          gh release view "$tag" --json assets --jq '.assets[].name' > /tmp/release-assets.txt
+          node config/scripts/verify-release-update-manifests.mjs \
+            --manifest-dir /tmp/release-manifests --assets-file /tmp/release-assets.txt
+
       - name: Set title, notes and Latest marker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -585,8 +607,11 @@ jobs:
             gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease --draft=false
             echo "Release $tag published as a release candidate (not Latest, no nudge)."
           else
-            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --latest --draft=false
-            echo "Release $tag published as Latest."
+            # Why --prerelease=false and not just --latest: the release is born a
+            # prerelease so no platform's absence can hold Latest, and this is the
+            # only place that clears it — after the manifest check above.
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease=false --latest --draft=false
+            echo "Release $tag promoted to Latest.""
           fi
 
       - name: Publish update nudge
