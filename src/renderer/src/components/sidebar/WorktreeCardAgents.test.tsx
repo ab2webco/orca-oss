@@ -38,7 +38,7 @@ function mockAgent({
   rowSource,
   state = 'working',
   startedAt,
-  prompt,
+  prompt = '',
   lastAssistantMessage,
   stateStartedAt = 1000,
   terminalHandle,

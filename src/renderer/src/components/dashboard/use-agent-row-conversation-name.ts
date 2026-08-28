@@ -1,7 +1,9 @@
-import { getAgentRowConversationName } from '../../../../shared/agent-row-conversation-name'
-import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
+import {
+  agentRowOwnsConversationName,
+  resolveAgentRowConversationName
+} from '../agent-row-label-resolution'
 import type { DashboardAgentRow } from './useDashboardData'
 
 type WorktreeTabs = NonNullable<AppState['tabsByWorktree'][string]>
@@ -25,12 +27,7 @@ function getIndexedTab(
 
 /** The row's conversation name, or null when nothing usable exists. */
 export function useAgentRowConversationName(agent: DashboardAgentRow): string | null {
-  const parentPaneKey = agent.entry.orchestration?.parentPaneKey
-  const usesParentTab =
-    agent.lineage?.depth === 1 &&
-    parentPaneKey !== undefined &&
-    parsePaneKey(parentPaneKey)?.tabId === agent.tab.id
-  const cannotOwnTabName = agent.rowSource === 'subagent' || usesParentTab
+  const cannotOwnTabName = !agentRowOwnsConversationName(agent)
   const generatedTitlesEnabled = useAppStore(
     (s) => !cannotOwnTabName && s.settings?.tabAutoGenerateTitle === true
   )
@@ -44,5 +41,5 @@ export function useAgentRowConversationName(agent: DashboardAgentRow): string | 
     return null
   }
   // Why: retained row snapshots need a fallback after their live tab disappears.
-  return getAgentRowConversationName(liveTab ?? agent.tab, agent.agentType, generatedTitlesEnabled)
+  return resolveAgentRowConversationName(agent, generatedTitlesEnabled, liveTab ?? agent.tab)
 }
