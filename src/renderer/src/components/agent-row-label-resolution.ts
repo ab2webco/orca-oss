@@ -83,7 +83,7 @@ function resolveLabelGroup(rows: readonly AgentRowLabelInput[]): Map<string, str
     counts.set(value, (counts.get(value) ?? 0) + 1)
   })
   const candidateCounts = new Map<string, number>()
-  rows.forEach((row, index) => {
+  rows.forEach((_, index) => {
     const preferred = base[index]!
     const candidate = counts.get(preferred) === 1 ? preferred : own[index] || preferred
     candidateCounts.set(candidate, (candidateCounts.get(candidate) ?? 0) + 1)
