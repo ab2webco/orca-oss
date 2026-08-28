@@ -34,6 +34,7 @@ import { listRegisteredPtys } from './pty-registry'
 import { enumerateWindowsProcessResources } from './windows-process-resource-collector'
 import { collectHostMemory, fallbackHostMemory } from './host-memory'
 import { getProcessMemoryMetric } from './process-memory-metric'
+import { collectMacFootprintByPid, sumFootprint } from './mac-footprint-sweep'
 
 export type MemorySnapshotStore = Pick<Store, 'getRepo' | 'getWorktreeMeta'>
 
@@ -98,6 +99,9 @@ function emptySnapshot(): MemorySnapshot {
     worktrees: [],
     host: fallbackHostMemory(),
     processMemoryMetric: getProcessMemoryMetric(),
+    processFootprintMetric: null,
+    appFootprint: null,
+    totalFootprint: null,
     totalCpu: 0,
     totalMemory: 0,
     collectedAt: Date.now()
@@ -335,7 +339,16 @@ function makeEmptyBucket(
 // ─── Main collection path ───────────────────────────────────────────
 
 async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> {
-  const [processIndex, host] = await Promise.all([enumerateProcesses(), collectHostMemory()])
+  const [processIndex, host, footprintByPid] = await Promise.all([
+    enumerateProcesses(),
+    collectHostMemory(),
+    // Why swept alongside and not instead: `memory` keeps meaning RSS, and every
+    // number already recorded against it stays comparable (ORCA-325).
+    // Why os.platform() and not the module default: the rest of this sweep reads
+    // the platform from here, and a footprint call that disagreed would shell out
+    // on a host that has no `top`.
+    collectMacFootprintByPid(os.platform())
+  ])
   const appBuckets = bucketElectronMetrics(processIndex)
   const ptys = listRegisteredPtys()
 
@@ -426,11 +439,21 @@ async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> 
     sessionMemoryTotal += wt.memory
   }
 
+  const appFootprint = sumFootprint(
+    footprintByPid,
+    app.getAppMetrics().map((proc) => proc.pid)
+  )
+  const sessionFootprint = sumFootprint(footprintByPid, claimed)
+
   return {
     app: { ...appBuckets, history: readHistory(APP_HISTORY_KEY) },
     worktrees,
     host,
     processMemoryMetric: getProcessMemoryMetric(),
+    processFootprintMetric: footprintByPid ? 'phys-footprint' : null,
+    appFootprint,
+    totalFootprint:
+      appFootprint === null || sessionFootprint === null ? null : appFootprint + sessionFootprint,
     totalCpu: appBuckets.cpu + sessionCpuTotal,
     totalMemory: appBuckets.memory + sessionMemoryTotal,
     collectedAt: now
