@@ -126,6 +126,52 @@ describe('HeadlessEmulator.getBufferTailSegments', () => {
     ).toBe('NEWEST')
   })
 
+  // ORCA-306: a TUI parks its composer at the foot and leaves the screen above
+  // it blank, so the rows immediately before the cursor are the gap, not the
+  // conversation. Anchoring on the cursor is still right — spending the window
+  // on blanks is not.
+  async function renderTuiWithGapAboveComposer(): Promise<HeadlessEmulator> {
+    emulator = new HeadlessEmulator({ cols: 40, rows: 24, scrollback: 200 })
+    const content = ['Advising using Opus 5', 'answer line one', 'answer line two'].join('\r\n')
+    // CUP to the last row: the composer sits at the foot, the rows between stay blank.
+    await emulator.write(`${content}${ESC}[24;1HDeciphering...`)
+    return emulator
+  }
+
+  it('spends the window on rows that carry content, not on the gap', async () => {
+    const term = await renderTuiWithGapAboveComposer()
+    const rows = term
+      .getBufferTailSegments(6)
+      .map((row) =>
+        row
+          .map((segment) => segment.text)
+          .join('')
+          .trim()
+      )
+      .filter((line) => line.length > 0)
+    expect(rows).toEqual([
+      'Advising using Opus 5',
+      'answer line one',
+      'answer line two',
+      'Deciphering...'
+    ])
+  })
+
+  it('keeps the cursor row in the window while skipping the gap', async () => {
+    const term = await renderTuiWithGapAboveComposer()
+    const lines = term.getBufferTailLines(6).map((line) => line.trim())
+    // The composer holds the live prompt; ORCA-285 put it inside the window.
+    expect(lines.at(-1)).toBe('Deciphering...')
+  })
+
+  it('leaves a blank screen blank instead of resurrecting scrollback', async () => {
+    emulator = new HeadlessEmulator({ cols: 40, rows: 8, scrollback: 200 })
+    // Old output, then a cleared screen: the pane the user is looking at is empty.
+    await emulator.write(`stale output line\r\n${ESC}[2J${ESC}[H`)
+    const lines = emulator.getBufferTailLines(6).filter((line) => line.trim().length > 0)
+    expect(lines).toEqual([])
+  })
+
   it('does not pad a row to the terminal width', async () => {
     const term = await render('short')
     const row = term.getBufferTailSegments(4).find((r) => r.length > 0) ?? []
