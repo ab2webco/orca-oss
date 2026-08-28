@@ -1,14 +1,3 @@
-// Why a cursor-anchored window: the restored scrollback can be far taller than
-// the grid, so a window measured from the buffer length reads rows the pty
-// never wrote. The newest output sits at the cursor.
-export function tailWindowStart(input: {
-  readonly baseY: number
-  readonly cursorY: number
-  readonly lineCount: number
-}): number {
-  return Math.max(0, input.baseY + input.cursorY - input.lineCount + 1)
-}
-
 export type RestoreLatencySample = {
   readonly elapsedMs: number
   readonly observerMs: number

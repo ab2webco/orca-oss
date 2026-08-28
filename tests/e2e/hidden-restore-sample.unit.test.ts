@@ -1,26 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  describeRestoreSample,
-  hiddenRestoreWithinBudget,
-  tailWindowStart
-} from './hidden-restore-tail-window'
-
-describe('tailWindowStart', () => {
-  it('anchors on the cursor so a scrollback taller than the window still reads the newest rows', () => {
-    // 8000 rows of restored scrollback, cursor on the last one, 200-row window.
-    expect(tailWindowStart({ baseY: 7960, cursorY: 39, lineCount: 200 })).toBe(7800)
-  })
-
-  it('never reads above the start of the buffer', () => {
-    expect(tailWindowStart({ baseY: 0, cursorY: 5, lineCount: 200 })).toBe(0)
-  })
-
-  it('follows the cursor rather than the bottom of the grid', () => {
-    // Same buffer, cursor parked mid-grid: the window must move with it.
-    expect(tailWindowStart({ baseY: 7960, cursorY: 10, lineCount: 200 })).toBe(7771)
-    expect(tailWindowStart({ baseY: 7960, cursorY: 39, lineCount: 200 })).toBe(7800)
-  })
-})
+import { describeRestoreSample, hiddenRestoreWithinBudget } from './hidden-restore-sample'
 
 describe('describeRestoreSample', () => {
   it('states what share of the measurement the observer paid for', () => {
