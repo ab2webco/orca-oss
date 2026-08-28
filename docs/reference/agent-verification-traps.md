@@ -35,7 +35,7 @@ is the record — the summary compresses away exactly the specificity you need t
 
 **What happened:** a worker's summary said "the early return that kills `repair`". Its report
 said the precise thing: `findTrustedCodexSessionResume` returns `null` for every non-empty
-stale `transcriptPath` *before* the block that constructs `repair`. The summary was checked,
+stale `transcriptPath` _before_ the block that constructs `repair`. The summary was checked,
 judged wrong, and publicly contradicted. The report was right.
 
 **Rule:** read `reportPath` before accepting, rejecting, or acting on a worker's conclusion.
@@ -86,6 +86,17 @@ managed agent terminals. Any test touching a code path that reads one must delet
 
 **Tell:** an assertion diff showing a real-looking UUID or handle you never wrote in the test.
 
+The worst case so far went past assertions and onto the network. `CODEX_HOME` is exported into
+managed agent terminals, and `codex-fetcher` resolves its home as
+`options?.codexHomePath ?? process.env.CODEX_HOME ?? join(homedir(), '.codex')` — so two rate-limit
+suites read the developer's real `auth.json` and sent that access token to `chatgpt.com`. CI has no
+`auth.json`, so CI stayed green and only developers saw red. Isolating `HOME` proves nothing when a
+more specific variable overrides it (ORCA-312).
+
+**Second tell, and the one that matters:** four of those ten tests failed; the other six reached the
+network and passed. A survey of which tests fail cannot find this class. Block the capability —
+stub `fetch` and assert it was never called — rather than reading the failures.
+
 ## 6. New tracked docs need a `.gitignore` allow-list entry
 
 `docs/**` is ignored with an explicit allow-list. A new file under `docs/reference/` is
@@ -109,9 +120,36 @@ npm run dev > /tmp/dev.log 2>&1 &
 The same applies to any `--wait`, `tail -f`, or watch command you filter through a
 head-terminated pipeline.
 
-## 8. "Flaky" is a hypothesis, not a verdict
+## 8. A pipeline reports the last command's exit status
 
-A test that fails in the full suite and passes in isolation has told you *where* the failure lives
+Different from #7: nothing is killed and no signal is involved. `cmd | tail` simply returns
+**`tail`'s** status, which is 0 whenever `tail` itself succeeds — so the failing command's exit
+code is discarded before you ever see it.
+
+```
+npx vitest run <failing file>          exit=1   Tests 1 failed (1)
+npm test -- <failing file>             exit=1   Tests 1 failed (1)
+npm test -- <failing file> 2>&1 | tail exit=0   <- the status of tail
+```
+
+This produced a real wrong conclusion here: a full `npm test` read through `| tail -30` reported
+`Tests 4 failed | 54543 passed` alongside `exit code 0`, which was filed as a bug against the test
+runner (ORCA-312). Unpiped, the same suite exits `1`. The runner was always honest.
+
+Read the `Tests …` summary line rather than the exit code — that habit is right, and it is right
+for this reason, not because vitest lies. When the exit code itself is what you are testing:
+
+```sh
+npm test > /tmp/test.log 2>&1        # then read the file
+set -o pipefail                      # or make the pipeline report the first failure
+```
+
+The same applies to `&&` chains inside an npm script: a project appended after a passing one still
+gates the whole script, but only if you are reading the script's own status and not a filter's.
+
+## 9. "Flaky" is a hypothesis, not a verdict
+
+A test that fails in the full suite and passes in isolation has told you _where_ the failure lives
 (shared load, ordering, timers), not that it is harmless. Dismissing it is how a real
 concurrency bug hides for months behind the word "flaky".
 
@@ -120,9 +158,9 @@ say so plainly and leave it tracked with the evidence you already gathered — t
 failure, the isolated pass, and the run conditions. Never let it disappear into a sentence.
 
 The same rule covers anything handed to you: a delegated worker's report, an upstream PR, another
-agent's "verified". Review it before building on it *or* contradicting it.
+agent's "verified". Review it before building on it _or_ contradicting it.
 
-## 9. A red check is not the same as a failed test
+## 10. A red check is not the same as a failed test
 
 `gh pr checks` prints `fail` for a job killed by `timeout-minutes`, a job whose setup step
 failed, and a job with a red assertion alike. Reading the check name tells you none of them
