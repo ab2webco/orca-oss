@@ -107,6 +107,10 @@ describe('orca plane CLI handlers', () => {
   })
 
   it('maps list with filter and applies client-side limit', async () => {
+    const logs: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((value: unknown) => {
+      logs.push(String(value))
+    })
     queueFixtures(callMock, okFixture('req', [workItem(), workItem({ id: 'wi2' })]))
     await main(['plane', 'list', '--filter', 'assigned', '--limit', '1', '--json'], '/tmp/repo')
     expect(callMock).toHaveBeenCalledWith('plane.listWorkItems', {
@@ -114,6 +118,50 @@ describe('orca plane CLI handlers', () => {
       filter: 'assigned',
       workspaceId: undefined
     })
+    const printed = JSON.parse(logs.join('\n')) as { result: { id: string }[] }
+    expect(printed.result.map((item) => item.id)).toEqual(['wi1'])
+  })
+
+  it('defaults to open work, not the viewer\u2019s assigned items', async () => {
+    queueFixtures(callMock, okFixture('req', [workItem()]))
+    await main(['plane', 'list', '--json'], '/tmp/repo')
+    expect(callMock).toHaveBeenCalledWith('plane.listWorkItems', {
+      projectId: undefined,
+      filter: 'all',
+      workspaceId: undefined
+    })
+  })
+
+  it('reports what --limit left out instead of ending on a bare row', async () => {
+    const logs: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((value: unknown) => {
+      logs.push(String(value))
+    })
+    queueFixtures(
+      callMock,
+      okFixture('req', [workItem(), workItem({ id: 'wi2' }), workItem({ id: 'wi3' })])
+    )
+    await main(['plane', 'list', '--limit', '1'], '/tmp/repo')
+    expect(logs.join('\n')).toContain(
+      'Showing 1 of 3 matched items (--filter all) \u2014 raise --limit for the rest.'
+    )
+  })
+
+  it('counts matched items after --state narrowing, not the whole fetch', async () => {
+    const logs: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((value: unknown) => {
+      logs.push(String(value))
+    })
+    queueFixtures(
+      callMock,
+      okFixture('req', [
+        workItem({ id: 'a', state: { id: 's0', name: 'Todo', group: 'unstarted' } }),
+        workItem({ id: 'b', state: { id: 's1', name: 'Done', group: 'completed' } }),
+        workItem({ id: 'c', state: { id: 's0', name: 'Todo', group: 'unstarted' } })
+      ])
+    )
+    await main(['plane', 'list', '--state', 'todo'], '/tmp/repo')
+    expect(logs.join('\n')).toContain('2 items (--filter all).')
   })
 
   it('filters list by --state and --priority client-side', async () => {

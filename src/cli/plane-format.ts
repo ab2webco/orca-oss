@@ -6,7 +6,8 @@ import type {
   PlaneUser,
   PlaneWorkItem,
   PlaneWorkItemLink,
-  PlaneWorkItemRelation
+  PlaneWorkItemRelation,
+  PlaneWorkItemFilter
 } from '../shared/plane-types'
 import type { PlaneCreatedWorkItem } from './plane-request-builders'
 
@@ -78,11 +79,26 @@ function formatWorkItemRow(item: PlaneWorkItem): string {
   return `${item.identifier.padEnd(12)} ${state.padEnd(16)} ${assigneeNames(item).padEnd(20)} ${item.title}`
 }
 
-export function formatPlaneList(items: PlaneWorkItem[]): string {
+// Why the counts travel with the rows: a truncated or narrowly filtered list is
+// indistinguishable from an empty board when only the rows are printed.
+export type PlaneListSummary = {
+  readonly filter: PlaneWorkItemFilter
+  readonly matched: number
+}
+
+function widerFilterHint(filter: PlaneWorkItemFilter): string {
+  return filter === 'everything' ? '' : ' Pass --filter everything to include every state.'
+}
+
+export function formatPlaneList(items: PlaneWorkItem[], summary: PlaneListSummary): string {
   if (items.length === 0) {
-    return 'No Plane work items found.'
+    return `No Plane work items found (--filter ${summary.filter}).${widerFilterHint(summary.filter)}`
   }
-  return items.map(formatWorkItemRow).join('\n')
+  const footer =
+    items.length < summary.matched
+      ? `Showing ${items.length} of ${summary.matched} matched items (--filter ${summary.filter}) — raise --limit for the rest.`
+      : `${summary.matched} item${summary.matched === 1 ? '' : 's'} (--filter ${summary.filter}).`
+  return [...items.map(formatWorkItemRow), '', footer].join('\n')
 }
 
 export function formatPlaneSearch(items: PlaneWorkItem[]): string {
