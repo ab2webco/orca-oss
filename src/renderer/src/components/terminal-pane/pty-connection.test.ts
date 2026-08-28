@@ -5775,6 +5775,150 @@ describe('connectPanePty', () => {
     expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(1, stablePtyId)
   })
 
+  it('holds a keystroke typed during a replay and delivers it on release', async () => {
+    // ORCA-295: the guard exists for xterm's own replies to replayed queries.
+    // Nothing may reach the shell mid-replay, but the user's keys are not the
+    // emulator's and must survive the wait.
+    const { connectPanePty } = await import('./pty-connection')
+    const { isPaneReplaying, replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+    expect(isPaneReplaying(replayingPanesRef, 1)).toBe(true)
+
+    // The emulator's own DA1 answer to a replayed query is discarded outright.
+    emit('\x1b[?1;2c')
+    // The user types while the replay is still parsing.
+    emit('l')
+    emit('s')
+    emit('\r')
+    expect(transport.sendInput).not.toHaveBeenCalled()
+
+    // Replay parsed: the guard releases and hands over what it was holding.
+    parseCallbacks.shift()?.()
+    expect(transport.sendInput).toHaveBeenCalledWith('ls\r')
+    expect(transport.sendInput).not.toHaveBeenCalledWith('\x1b[?1;2c')
+  })
+
+  it('never flushes coalesced emulator replies to the shell after a replay', async () => {
+    // Contract guard, not a reproduction: xterm emits one event per reply today
+    // (pinned in terminal-query-reply.test.ts). Holding what the classifier
+    // rejects would write a missed reply to the shell, so the classifier must
+    // see replies anywhere in a payload rather than only as the whole of it.
+    const { connectPanePty } = await import('./pty-connection')
+    const { replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+
+    // Two DA1 answers to two replayed queries, delivered as one payload.
+    emit('\x1b[?1;2c\x1b[?1;2c')
+    // A DECRPM report riding behind a cursor-position report.
+    emit('\x1b[3;1R\x1b[?2026;2$y')
+    parseCallbacks.shift()?.()
+
+    expect(transport.sendInput).not.toHaveBeenCalled()
+    expect(transport.sendInputImmediate).not.toHaveBeenCalled()
+  })
+
+  it('drops a modified F3 typed during a replay, the documented CPR collision', async () => {
+    // xterm encodes Shift+F3 as CSI 1;2R, byte-identical to a cursor position
+    // report. It is dropped rather than held — the same outcome as before this
+    // change, and the alternative is writing a real CPR onto the prompt.
+    const { connectPanePty } = await import('./pty-connection')
+    const { replayIntoTerminal } = await import('./replay-guard')
+
+    const transport = createMockTransport('pty-live')
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+    }
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+    const replayingPanesRef = { current: new Map<number, number>() }
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ replayingPanesRef }) as never
+    )
+    await flushAsyncTicks()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    const emit = onDataHandler as (data: string) => void
+    transport.sendInput.mockClear()
+
+    const { parseCallbacks } = captureCallbackTerminalWrites(pane)
+    replayIntoTerminal(pane as never, replayingPanesRef, 'RESTORED-SNAPSHOT-BYTES')
+    emit('\x1b[1;2R')
+    emit('ls')
+    parseCallbacks.shift()?.()
+
+    expect(transport.sendInput).toHaveBeenCalledWith('ls')
+    expect(transport.sendInput).not.toHaveBeenCalledWith('\x1b[1;2R')
+  })
+
   it('drops xterm onData while pane is replaying restored bytes', async () => {
     // Regression: during replay, xterm auto-replies to embedded queries (DA1/DECRQM/OSC/CPR) via onData must not reach transport.sendInput or they land as stray chars on the prompt. See replay-guard.ts.
     const { connectPanePty } = await import('./pty-connection')
@@ -6512,6 +6656,42 @@ describe('connectPanePty', () => {
     // The terminator disarmed it, so the next real command reaches the shell.
     sendTerminalInputThroughPane(pane, 'ls\r')
     expect(transport.sendInput).toHaveBeenCalledWith('ls\r')
+    _resetTerminalPaneRecoveryForTests()
+  })
+
+  it('lets the successor pane type after a remote host rejected one write', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { _resetTerminalPaneRecoveryForTests } = await import('./terminal-pane-recovery')
+    _resetTerminalPaneRecoveryForTests()
+    const remountTerminalTabForRecovery = vi.fn<(tabId: string) => boolean>(() => true)
+    mockStoreState = { ...mockStoreState, remountTerminalTabForRecovery } as StoreState
+    const remotePtyId = 'remote:env-1@@term-1'
+    const transport = createMockTransport(remotePtyId)
+    let writeUnavailable: (() => void) | undefined
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      writeUnavailable = callbacks.onWriteUnavailable
+      return { id: remotePtyId }
+    })
+    transportFactoryQueue.push(transport)
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, createDeps() as never)
+    await flushAsyncTicks(6)
+    writeUnavailable?.()
+    await flushAsyncTicks(6)
+    expect(remountTerminalTabForRecovery).toHaveBeenCalledWith('tab-1')
+
+    // Why the successor and not the same pane: the remount replaces the xterm,
+    // and this one reattaches the SAME remote PTY — the host kept the shell, so
+    // there is no interrupted line to suppress and typing must reach it.
+    const successorTransport = createMockTransport(remotePtyId)
+    successorTransport.connect.mockImplementation(async () => ({ id: remotePtyId }))
+    transportFactoryQueue.push(successorTransport)
+    const successorPane = createPane(2)
+    connectPanePty(successorPane as never, createManager(2) as never, createDeps() as never)
+    await flushAsyncTicks(6)
+
+    sendTerminalInputThroughPane(successorPane, 'ls\r')
+    expect(successorTransport.sendInput).toHaveBeenCalledWith('ls\r')
     _resetTerminalPaneRecoveryForTests()
   })
 

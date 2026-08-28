@@ -36,7 +36,10 @@ import {
   takeCurrentTerminalDeliveryCredit
 } from '@/lib/pane-manager/terminal-delivery-credit'
 import { serializeWithAbsoluteCursor } from '../../../../shared/terminal-serialize-absolute-cursor'
-import { isTerminalQueryReply } from '../../../../shared/terminal-query-reply'
+import {
+  containsTerminalQueryReply,
+  isTerminalQueryReply
+} from '../../../../shared/terminal-query-reply'
 import type { PtyBufferSnapshot, PtyConnectResult, PtyReplayDataMeta } from './pty-transport'
 import type { IpcPtyTransportOptions, PtyTransportRecoveryState } from './pty-transport-types'
 import { createIpcPtyTransport } from './pty-transport'
@@ -82,6 +85,8 @@ import { shouldClaimRemoteDesktopViewport } from './remote-desktop-viewport-clai
 import { getAppliedSizeReadE2eDelayMs } from './pty-applied-size-read-e2e-delay'
 import { createPtySizeReassertion } from './pty-size-reassertion'
 import {
+  clearDeferredReplayInput,
+  deferInputDuringReplay,
   isPaneReplaying,
   replayIntoTerminal,
   replayIntoTerminalAsync,
@@ -97,7 +102,12 @@ import {
   registerTerminalPaneRecoveryInstance,
   requestTerminalPaneRecovery
 } from './terminal-pane-recovery'
-import { shouldDropQuarantinedTerminalInput } from './terminal-input-quarantine'
+import {
+  releaseTerminalInputQuarantineForReattachedPty,
+  shouldDropQuarantinedTerminalInput
+} from './terminal-input-quarantine'
+import { recordRemoteTerminalInputDelivery } from '../../runtime/remote-terminal-input-delivery-probe'
+import type { RemoteTerminalInputDeliverySite } from '../../../../shared/remote-terminal-input-delivery'
 import {
   isDocumentVisibilityProvenStale,
   registerStaleDocumentVisibilityRecovery
@@ -3038,6 +3048,9 @@ export function connectPanePty(
     registerSideEffectFactConsumerForPty(ptyId)
     syncHiddenRendererPtyDelivery()
     deps.syncPanePtyLayoutBinding(pane.id, ptyId)
+    // Why: the recovery that armed the quarantine guessed this shell was replaced;
+    // binding the same PTY here disproves that guess before the user types.
+    releaseTerminalInputQuarantineForReattachedPty(deps.tabId, ptyId)
     notifyCodexPaneBoundForStaleSweep(ptyId)
     const tabPtyIds = useAppStore.getState().ptyIdsByTabId?.[deps.tabId] ?? []
     const directSshRetryAttemptId =
@@ -4121,6 +4134,24 @@ export function connectPanePty(
     }
   )
 
+  // Why: only what the emulator itself can emit from replayed bytes may be
+  // dropped — the guard's window is bounded by parse completion, not by how long
+  // the user waits to type, so a slow replay would otherwise eat real keys.
+  // Why the peeling predicate and not the whole-payload one: holding inverts which
+  // error is dangerous — a missed reply is no longer dropped but written to the
+  // shell on release. xterm emits one event per reply (pinned in
+  // terminal-query-reply.test.ts), so this only guards a payload shape it does
+  // not produce today; the cost is one regex scan of a keystroke.
+  const isEmulatorReplayEcho = (data: string): boolean =>
+    containsTerminalQueryReply(data) ||
+    data.includes(TERMINAL_FOCUS_IN_SEQUENCE) ||
+    data.includes(TERMINAL_FOCUS_OUT_SEQUENCE)
+
+  // Why: these guards discard a keystroke with no trace anywhere; the interactivity specs read the tally.
+  const recordDroppedPaneInput = (site: RemoteTerminalInputDeliverySite, data: string): void => {
+    recordRemoteTerminalInputDelivery(transport.getPtyId() ?? deps.tabId, site, data.length)
+  }
+
   const forwardPtyInput = (data: string): void => {
     // Why: xterm auto-replies to embedded query sequences (DA1, DECRQM,
     // OSC 10/11, focus, CPR) via onData. When we replay recorded PTY bytes
@@ -4130,6 +4161,11 @@ export function connectPanePty(
     // engage the guard via replayIntoTerminal; here we drop everything
     // xterm emits while the guard is active. See replay-guard.ts.
     if (isPaneReplaying(deps.replayingPanesRef, pane.id)) {
+      // Why held and not forwarded: the adopted shell must see nothing until the
+      // replay finishes painting, but the user's keys are theirs to keep.
+      if (isEmulatorReplayEcho(data) || !deferInputDuringReplay(pane.id, data, forwardPtyInput)) {
+        recordDroppedPaneInput('pane-replaying', data)
+      }
       return
     }
     const currentPtyId = transport.getPtyId()
@@ -4146,6 +4182,7 @@ export function connectPanePty(
         panePtyId: currentPtyId
       })
     ) {
+      recordDroppedPaneInput('codex-stale', data)
       clearPendingTerminalInputIntent()
       return
     }
@@ -4153,6 +4190,7 @@ export function connectPanePty(
     // PTY, desktop keystrokes must not reach the shell; the visible overlay's
     // explicit Take back action owns restoring desktop input and dimensions.
     if (currentPtyId && isPtyLocked(currentPtyId)) {
+      recordDroppedPaneInput('pty-locked', data)
       clearPendingTerminalInputIntent()
       return
     }
@@ -4184,6 +4222,7 @@ export function connectPanePty(
     // of the interrupted line would be submitted by the user's own Enter and a
     // compound command could run its surviving half (#10065 follow-up).
     if (shouldDropQuarantinedTerminalInput(deps.tabId, data)) {
+      recordDroppedPaneInput('input-quarantined', data)
       clearPendingTerminalInputIntent()
       return
     }
@@ -8280,6 +8319,7 @@ export function connectPanePty(
       registerSideEffectFactConsumerForPty(ptyId)
       syncHiddenRendererPtyDelivery()
       deps.syncPanePtyLayoutBinding(pane.id, ptyId)
+      releaseTerminalInputQuarantineForReattachedPty(deps.tabId, ptyId)
       notifyCodexPaneBoundForStaleSweep(ptyId)
       if (capturedDirectSshRetryPtyAccepted && directSshRetryAttempt) {
         deps.updateTabPtyId(deps.tabId, ptyId, undefined, directSshRetryAttempt.attemptId)
@@ -9556,6 +9596,7 @@ export function connectPanePty(
       }
       imeCompositionRouteDisposable.dispose()
       onDataDisposable.dispose()
+      clearDeferredReplayInput(pane.id)
       userInputActivityDisposable?.dispose()
       terminalCapabilityRepliesDisposable.dispose()
       onResizeDisposable.dispose()

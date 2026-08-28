@@ -28,6 +28,9 @@ type QuarantineEntry = {
   /** null until the first quarantined byte, so the idle gate cannot fire on the
    *  re-attach delay itself. */
   lastInputAt: number | null
+  /** The PTY the interrupted line was typed into, or null when the caller could
+   *  not name one. A successor that reattaches this same PTY disarms it. */
+  ptyId: string | null
 }
 
 const quarantineByTabId = new Map<string, QuarantineEntry>()
@@ -39,7 +42,11 @@ function containsLineTerminator(data: string): boolean {
 /** Arm only when the endpoint stopped accepting writes and may have been
  *  replaced. A recovery that always keeps the same live shell has no mangled
  *  line to suppress, and quarantining there would eat a legitimate command. */
-export function armTerminalInputQuarantine(tabId: string, now: number = Date.now()): void {
+export function armTerminalInputQuarantine(
+  tabId: string,
+  now: number = Date.now(),
+  ptyId: string | null = null
+): void {
   // Prune first: entries are only meaningful for QUARANTINE_MAX_MS, and a tab
   // closed mid-quarantine would otherwise leave one behind forever.
   for (const [otherTabId, entry] of quarantineByTabId) {
@@ -47,7 +54,20 @@ export function armTerminalInputQuarantine(tabId: string, now: number = Date.now
       quarantineByTabId.delete(otherTabId)
     }
   }
-  quarantineByTabId.set(tabId, { armedAt: now, lastInputAt: null })
+  quarantineByTabId.set(tabId, { armedAt: now, lastInputAt: null, ptyId })
+}
+
+/**
+ * Disarms when the successor pane reattached the very PTY the quarantine was
+ * armed for. The endpoint was not replaced after all — the shell still holds
+ * the interrupted line, so there is no mangled tail to suppress and everything
+ * typed next is a real command (ORCA-295).
+ */
+export function releaseTerminalInputQuarantineForReattachedPty(tabId: string, ptyId: string): void {
+  const entry = quarantineByTabId.get(tabId)
+  if (entry?.ptyId === ptyId) {
+    quarantineByTabId.delete(tabId)
+  }
 }
 
 export function isTerminalInputQuarantined(tabId: string): boolean {

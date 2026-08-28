@@ -50,6 +50,7 @@ import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
 import {
   decodeTerminalStreamFrame,
+  TerminalStreamOpcode,
   type TerminalStreamFrame
 } from '../../shared/terminal-stream-protocol'
 import { createRuntimeTransportMetadata, getRuntimeSocketDirectories } from './runtime-socket-path'
@@ -537,6 +538,8 @@ export class OrcaRuntimeRpcServer {
     string,
     Map<number, (frame: TerminalStreamFrame) => void>
   >()
+  // Why: one line per stream is diagnosis; one per keystroke is a flood.
+  private readonly unroutedTerminalInputStreams = new Set<string>()
   private readonly wsDispatchAbortStates = new Map<
     WebSocket,
     { controllers: Set<AbortController>; abortOnClose: () => void }
@@ -1044,7 +1047,27 @@ export class OrcaRuntimeRpcServer {
     if (!frame) {
       return
     }
-    this.binaryStreamHandlers.get(connectionId)?.get(frame.streamId)?.(frame)
+    const handler = this.binaryStreamHandlers.get(connectionId)?.get(frame.streamId)
+    if (!handler) {
+      // Why: the sender saw a successful write; an unrouted input frame is a lost keystroke, not idle traffic.
+      if (frame.opcode === TerminalStreamOpcode.Input) {
+        this.warnOnceForUnroutedTerminalInput(connectionId, frame.streamId)
+      }
+      return
+    }
+    handler(frame)
+  }
+
+  private warnOnceForUnroutedTerminalInput(connectionId: string, streamId: number): void {
+    const key = `${connectionId}:${streamId}`
+    if (this.unroutedTerminalInputStreams.has(key)) {
+      return
+    }
+    this.unroutedTerminalInputStreams.add(key)
+    console.warn('[runtime] dropped client input for an unknown terminal stream', {
+      connectionId,
+      streamId
+    })
   }
 
   private registerWebSocketDispatchAbort(ws: WebSocket): {
@@ -1350,6 +1373,11 @@ export class OrcaRuntimeRpcServer {
         this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
         this.runtime.cancelMobileDictationForConnection(socket.connectionId)
         this.binaryStreamHandlers.delete(socket.connectionId)
+        for (const key of this.unroutedTerminalInputStreams) {
+          if (key.startsWith(`${socket.connectionId}:`)) {
+            this.unroutedTerminalInputStreams.delete(key)
+          }
+        }
         if (!hasOtherConnections) {
           this.runtime.onClientDisconnected(socket.device.deviceToken)
         }

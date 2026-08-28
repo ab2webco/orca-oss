@@ -123,6 +123,12 @@ type TerminalViewportClient = {
   type?: 'mobile' | 'desktop'
 }
 
+type DroppedClientInputReason =
+  | 'connection-closed'
+  | 'stream-detached'
+  | 'input-locked'
+  | 'viewport-claim-refused'
+
 type TerminalMultiplexStream = {
   streamId: number
   terminal: string
@@ -142,6 +148,8 @@ type TerminalMultiplexStream = {
   outputPaused: boolean
   supportsDesktopViewportClaims: boolean
   desktopClaimTail: Promise<boolean>
+  // Why: a swallowed keystroke is invisible to the client, so log the first one per stream instead of nothing.
+  loggedInputDrop: boolean
   // Whether THIS stream registered the width driver, so detach won't release a peer stream's floor.
   registeredRemoteDesktopDriver: boolean
   remoteDesktopSubscriptionKey: string
@@ -2162,11 +2170,29 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         unregisterControlHandler()
         resolveMultiplex()
       }
+      // Why: each of these paths discards a keystroke the client's own send reported as delivered.
+      const logDroppedClientInput = (
+        stream: TerminalMultiplexStream,
+        reason: DroppedClientInputReason
+      ): void => {
+        if (stream.loggedInputDrop) {
+          return
+        }
+        stream.loggedInputDrop = true
+        console.warn('[terminal:multiplex] dropped client input', {
+          reason,
+          streamId: stream.streamId,
+          terminal: stream.terminal
+        })
+      }
       const handleSlotFrame = (
         stream: TerminalMultiplexStream,
         frame: TerminalStreamFrame
       ): void => {
         if (closed || streams.get(stream.streamId) !== stream) {
+          if (frame.opcode === TerminalStreamOpcode.Input) {
+            logDroppedClientInput(stream, closed ? 'connection-closed' : 'stream-detached')
+          }
           return
         }
         if (frame.opcode === TerminalStreamOpcode.Unsubscribe) {
@@ -2199,12 +2225,15 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
             return
           }
           if (isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)) {
+            logDroppedClientInput(stream, 'input-locked')
             return
           }
           // Mobile already has the higher-priority floor, so a rejected desktop claim must not suppress later phone input.
           const inputClaimTail = stream.isMobile ? Promise.resolve(true) : stream.desktopClaimTail
           void inputClaimTail.then(async (claimed) => {
-            if (!claimed || isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)) {
+            const locked = isTerminalInputLockedForClient(runtime, stream.ptyId, stream.client)
+            if (!claimed || locked) {
+              logDroppedClientInput(stream, locked ? 'input-locked' : 'viewport-claim-refused')
               return
             }
             const outcome = await sendTerminalStreamInput(runtime, {
@@ -2558,6 +2587,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           outputPaused: false,
           supportsDesktopViewportClaims: request.capabilities?.desktopViewportClaims === 1,
           desktopClaimTail: Promise.resolve(true),
+          loggedInputDrop: false,
           registeredRemoteDesktopDriver: false,
           // Why: streamId is client-local, so key the width floor by connectionId or two connections sharing stream 1 for one PTY clobber each other's floor.
           remoteDesktopSubscriptionKey,

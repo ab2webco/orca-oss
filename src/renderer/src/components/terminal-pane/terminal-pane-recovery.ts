@@ -287,7 +287,7 @@ export async function requestTerminalPaneRecovery(request: RecoveryRequest): Pro
   if (request.endpointReplaced) {
     // Why here and not at request time: arming before the remount is certain
     // would suppress input on a pane that never recovered.
-    armTerminalInputQuarantine(request.tabId)
+    armTerminalInputQuarantine(request.tabId, Date.now(), request.ptyId ?? null)
   }
   // warn, not error: this is the recovery succeeding, and the breadcrumb below is
   // what diagnostics actually read. STA-2373 made this path routine (every daemon
