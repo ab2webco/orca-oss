@@ -97,7 +97,10 @@ import {
   registerTerminalPaneRecoveryInstance,
   requestTerminalPaneRecovery
 } from './terminal-pane-recovery'
-import { shouldDropQuarantinedTerminalInput } from './terminal-input-quarantine'
+import {
+  releaseTerminalInputQuarantineForReattachedPty,
+  shouldDropQuarantinedTerminalInput
+} from './terminal-input-quarantine'
 import { recordRemoteTerminalInputDelivery } from '../../runtime/remote-terminal-input-delivery-probe'
 import type { RemoteTerminalInputDeliverySite } from '../../../../shared/remote-terminal-input-delivery'
 import {
@@ -3040,6 +3043,9 @@ export function connectPanePty(
     registerSideEffectFactConsumerForPty(ptyId)
     syncHiddenRendererPtyDelivery()
     deps.syncPanePtyLayoutBinding(pane.id, ptyId)
+    // Why: the recovery that armed the quarantine guessed this shell was replaced;
+    // binding the same PTY here disproves that guess before the user types.
+    releaseTerminalInputQuarantineForReattachedPty(deps.tabId, ptyId)
     notifyCodexPaneBoundForStaleSweep(ptyId)
     const tabPtyIds = useAppStore.getState().ptyIdsByTabId?.[deps.tabId] ?? []
     const directSshRetryAttemptId =
@@ -8291,6 +8297,7 @@ export function connectPanePty(
       registerSideEffectFactConsumerForPty(ptyId)
       syncHiddenRendererPtyDelivery()
       deps.syncPanePtyLayoutBinding(pane.id, ptyId)
+      releaseTerminalInputQuarantineForReattachedPty(deps.tabId, ptyId)
       notifyCodexPaneBoundForStaleSweep(ptyId)
       if (capturedDirectSshRetryPtyAccepted && directSshRetryAttempt) {
         deps.updateTabPtyId(deps.tabId, ptyId, undefined, directSshRetryAttempt.attemptId)

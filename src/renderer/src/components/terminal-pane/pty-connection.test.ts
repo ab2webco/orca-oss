@@ -6515,6 +6515,42 @@ describe('connectPanePty', () => {
     _resetTerminalPaneRecoveryForTests()
   })
 
+  it('lets the successor pane type after a remote host rejected one write', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const { _resetTerminalPaneRecoveryForTests } = await import('./terminal-pane-recovery')
+    _resetTerminalPaneRecoveryForTests()
+    const remountTerminalTabForRecovery = vi.fn<(tabId: string) => boolean>(() => true)
+    mockStoreState = { ...mockStoreState, remountTerminalTabForRecovery } as StoreState
+    const remotePtyId = 'remote:env-1@@term-1'
+    const transport = createMockTransport(remotePtyId)
+    let writeUnavailable: (() => void) | undefined
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      writeUnavailable = callbacks.onWriteUnavailable
+      return { id: remotePtyId }
+    })
+    transportFactoryQueue.push(transport)
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, createDeps() as never)
+    await flushAsyncTicks(6)
+    writeUnavailable?.()
+    await flushAsyncTicks(6)
+    expect(remountTerminalTabForRecovery).toHaveBeenCalledWith('tab-1')
+
+    // Why the successor and not the same pane: the remount replaces the xterm,
+    // and this one reattaches the SAME remote PTY — the host kept the shell, so
+    // there is no interrupted line to suppress and typing must reach it.
+    const successorTransport = createMockTransport(remotePtyId)
+    successorTransport.connect.mockImplementation(async () => ({ id: remotePtyId }))
+    transportFactoryQueue.push(successorTransport)
+    const successorPane = createPane(2)
+    connectPanePty(successorPane as never, createManager(2) as never, createDeps() as never)
+    await flushAsyncTicks(6)
+
+    sendTerminalInputThroughPane(successorPane, 'ls\r')
+    expect(successorTransport.sendInput).toHaveBeenCalledWith('ls\r')
+    _resetTerminalPaneRecoveryForTests()
+  })
+
   it('recovers a wedged write pipeline after accepted input without renderer output', async () => {
     vi.useFakeTimers()
     const { connectPanePty } = await import('./pty-connection')

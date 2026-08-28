@@ -3,6 +3,7 @@ import {
   _resetTerminalInputQuarantineForTests,
   armTerminalInputQuarantine,
   isTerminalInputQuarantined,
+  releaseTerminalInputQuarantineForReattachedPty,
   shouldDropQuarantinedTerminalInput
 } from './terminal-input-quarantine'
 
@@ -95,6 +96,25 @@ describe('terminal input quarantine', () => {
     armTerminalInputQuarantine(TAB, 0)
     expect(shouldDropQuarantinedTerminalInput(TAB, 'a', 5_000)).toBe(false)
     expect(isTerminalInputQuarantined(TAB)).toBe(false)
+  })
+
+  it('disarms when the successor reattaches the same PTY', () => {
+    armTerminalInputQuarantine(TAB, 0, 'remote:env-1@@term-1')
+    releaseTerminalInputQuarantineForReattachedPty(TAB, 'remote:env-1@@term-1')
+    expect(isTerminalInputQuarantined(TAB)).toBe(false)
+    expect(shouldDropQuarantinedTerminalInput(TAB, 'ls\r', REATTACH_MS)).toBe(false)
+  })
+
+  it('stays armed when the successor bound a different PTY', () => {
+    armTerminalInputQuarantine(TAB, 0, 'remote:env-1@@term-1')
+    releaseTerminalInputQuarantineForReattachedPty(TAB, 'remote:env-1@@term-2')
+    expect(shouldDropQuarantinedTerminalInput(TAB, 'cho hi', REATTACH_MS)).toBe(true)
+  })
+
+  it('stays armed when the caller could not name the interrupted PTY', () => {
+    armTerminalInputQuarantine(TAB, 0)
+    releaseTerminalInputQuarantineForReattachedPty(TAB, 'remote:env-1@@term-1')
+    expect(shouldDropQuarantinedTerminalInput(TAB, 'cho hi', REATTACH_MS)).toBe(true)
   })
 
   it('keeps quarantine per tab', () => {
