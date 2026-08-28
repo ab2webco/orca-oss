@@ -162,6 +162,12 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
             }
           )
           ownershipSamples += 1
+          // Why logged and not only returned: this gate asserts with toMatchObject,
+          // which prints only the compared keys — the extra stages would never
+          // reach the failure output (ORCA-305).
+          console.log(
+            `[html-focus] ownership ${JSON.stringify({ ...probe, baseline: browserBaseline, ownershipSamples })}`
+          )
           return probe === null ? null : { ...probe, baseline: browserBaseline, ownershipSamples }
         },
         {
