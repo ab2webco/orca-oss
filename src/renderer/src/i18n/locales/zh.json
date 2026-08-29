@@ -232,7 +232,9 @@
         "workspace": {
           "cleanup": {
             "9d6e531da6": "工作区不再存在。",
-            "changedSinceConfirmation": "工作区在确认后发生了更改。请刷新并在删除前重新检查。"
+            "changedSinceConfirmation": "工作区在确认后发生了更改。请刷新并在删除前重新检查。",
+            "hostUnresolved": "Orca 无法确定哪个主机拥有此工作区。请刷新项目后重新查看。",
+            "hostCollision": "错误：此工作区在多个主机的相同路径下存在"
           }
         },
         "worktrees": {
@@ -1327,7 +1329,8 @@
         "moreWorkspaceActions": "更多议题工作区操作",
         "startNewWorkspace": "启动新工作区",
         "workspaceSection": "工作区",
-        "noWorkspaceYet": "暂无"
+        "noWorkspaceYet": "暂无",
+        "openOnLinear": "在 Linear 中打开"
       },
       "LinearItemDrawer": {
         "04008e6c46": "从议题开始工作区",
@@ -2628,7 +2631,7 @@
             "ee81adfcef": "查看",
             "4d0b72481c": "忽略",
             "9cc26c019d": "移除",
-            "0e2d235c63": "非活动工作区扫描已就绪",
+            "0e2d235c63": "工作区扫描已就绪",
             "4a35c08764": "查看",
             "47123d0108": "正在扫描非活动工作区。你可以关闭此窗口，稍后再回来查看。",
             "9a3be9f2df": "正在扫描非活动工作区。新结果会在完成时显示在这里。你可以关闭此窗口，稍后再回来查看。",
@@ -3263,7 +3266,7 @@
             "67c4ecda49": "强制退出该终端。窗格中所有未保存的工作都会丢失。这无法撤销。",
             "4bb076fa89": "强制结束",
             "996295bff2": "孤儿终端",
-            "92924a14e3": "查看非活跃工作区 ({{value0}})",
+            "92924a14e3": "清理工作区",
             "27a74f91f0": "现在没有任何运行",
             "1b24a32d3a": "内存",
             "298f4be7f2": "CPU",
@@ -4308,7 +4311,8 @@
           "d36883e046": "取消",
           "b79b39d865": "删除项目",
           "removeDescriptionSsh": "此操作仅将 {{name}} 从 Orca 中移除。文件仍保留在 {{host}} 上 — 重新添加该 SSH 主机即可恢复。",
-          "removeDescriptionLocal": "此操作仅将 {{name}} 从 Orca 中移除。文件仍保留在您的磁盘上。"
+          "removeDescriptionLocal": "此操作仅将 {{name}} 从 Orca 中移除。文件仍保留在您的磁盘上。",
+          "removeDescriptionVmRecipe": "这会从 Orca 中移除 {{name}}。其 VM 配方决定环境及其文件是否被永久删除。"
         },
         "ScrollToCurrentWorkspaceToolbarButton": {
           "23989bb663": "显示活动工作区"
@@ -4818,7 +4822,9 @@
           "noneFound": "未找到非 Orca 工作树",
           "tryDifferentSearch": "请尝试其他名称或路径。",
           "disableSource": "禁用来源后可单独管理其工作树。",
-          "appearWhenDetected": "Orca 检测到新工作树后，它们会显示在这里。"
+          "appearWhenDetected": "Orca 检测到新工作树后，它们会显示在这里。",
+          "openGlobalSettings": "在全局设置中管理",
+          "globalSettingsSources": "以下来源有全局设置，可在此处覆盖："
         },
         "WorktreeVisibilitySourceList": {
           "claude": "Claude Code",
@@ -4838,7 +4844,14 @@
           "addLocation": "添加位置",
           "worktreeRoot": "工作树根目录",
           "add": "添加",
-          "rootHelp": "Orca 会识别此文件夹下的工作树。"
+          "rootHelp": "Orca 会识别此文件夹下的工作树。",
+          "useGlobalFor": "为 {{value0}} 使用全局设置",
+          "useGlobal": "使用全局设置",
+          "visibility": "{{value0}} 的可见性",
+          "show": "显示",
+          "hide": "隐藏",
+          "overridingGlobal": "正在覆盖全局设置：{{value0}}",
+          "projectOnly": "仅在此项目中添加。"
         },
         "add": {
           "repo": {
@@ -6185,7 +6198,9 @@
           "5567191a6e": "浏览",
           "0e9fc0eadc": "工作区目录",
           "e2955d9ccb": "配置创建新工作区的位置。",
-          "7511097c5d": "工作区"
+          "7511097c5d": "工作区",
+          "externalWorktrees": "外部工作树",
+          "externalWorktreesDescription": "选择是否默认显示在 Orca 外部创建的工作树。"
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "应用更改",
@@ -6856,7 +6871,14 @@
           "projectRuntimeDescription": "选择此项目运行在 Windows 还是 WSL。",
           "hostStateDisconnected": "Disconnected",
           "hostStateUnknown": "Unknown",
-          "nestedHostLabel": "{{value0}} via {{value1}}"
+          "nestedHostLabel": "{{value0}} via {{value1}}",
+          "externalWorktrees": "外部工作树",
+          "externalWorktreesDescription": "覆盖是否为此项目显示在 Orca 外部创建的工作树。",
+          "externalWorktreesInherited": "正在使用全局设置：{{value0}}",
+          "show": "显示",
+          "hide": "隐藏",
+          "externalWorktreesGlobal": "全局默认值：{{value0}}",
+          "useGlobal": "使用全局设置"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "提示词模板",
@@ -8509,7 +8531,9 @@
             "editorFontFamilyDesc": "文件编辑器和差异视图使用的字体，留空则跟随终端字体。",
             "6e918a5bcc": "claude glm",
             "4880297fec": "z.ai",
-            "71bf3d35f5": "glm"
+            "71bf3d35f5": "glm",
+            "externalWorktrees": "外部工作树",
+            "externalWorktreesDescription": "选择是否默认显示在 Orca 外部创建的工作树。"
           }
         },
         "git": {
@@ -9003,7 +9027,9 @@
             "projectRuntimeDescription": "选择此项目运行在 Windows 还是 WSL。",
             "copy": "复制",
             "clone": "克隆",
-            "apfs": "apfs"
+            "apfs": "apfs",
+            "externalWorktrees": "外部工作树",
+            "externalWorktreesDescription": "覆盖是否为此项目显示在 Orca 外部创建的工作树。"
           }
         },
         "runtime": {
@@ -9814,7 +9840,11 @@
           "cloudVmTitle": "云虚拟机运行时",
           "cloudVmRefresh": "刷新云虚拟机运行时",
           "cloudVmLoading": "正在检查云虚拟机运行时…",
-          "cloudVmEmptyWithSetup": "还没有云虚拟机运行时。请在创建工作区时使用环境模板来创建。"
+          "cloudVmEmptyWithSetup": "还没有云虚拟机运行时。请在创建工作区时使用环境模板来创建。",
+          "stoppingCleanup": "正在停止…",
+          "stopCleanup": "停止清理",
+          "cleanupStopped": "已停止清理",
+          "stopCleanupFailed": "无法停止 Cloud VM 清理。"
         },
         "ephemeralVms": {
           "search": {
@@ -10565,6 +10595,21 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "粗体字重",
           "0e0d1ee15a": "可独立于字重进行调整。某些字体会把多个值映射到同一字形，如果粗体看起来没有变化，请调低字重或改用其他字体。"
+        },
+        "GlobalWorktreeVisibilitySourcesSetting": {
+          "saveFailed": "无法保存可见性默认设置。",
+          "updateServerDefaults": "请更新此服务器以配置可见性默认设置。",
+          "updateServer": "请更新此服务器以配置来源默认设置。"
+        },
+        "shortcutDefinitionCatalog": {
+          "missionControlConflict": "已被调度中心拦截。在此重新映射，或在系统设置中更改。"
+        },
+        "EphemeralVmCleanupStopDialog": {
+          "title": "停止清理？",
+          "description": "VM 可能仍在运行并产生费用。你可以稍后重试清理。",
+          "cancel": "继续清理",
+          "stopping": "正在停止…",
+          "confirm": "停止清理"
         }
       },
       "right": {
@@ -11562,6 +11607,52 @@
                   "8f9a0b1c2d": "没有可提交的内容。分支已是最新状态。",
                   "h3i4j5k607": "正在检查此分支是否可以创建 {{value0}}…"
                 }
+              },
+              "commit": {
+                "area": {
+                  "cc5739bd1d": "正在生成提交信息…",
+                  "4cbd0cd9d2": "正在提交…",
+                  "e7876a2bde": "请至少暂存一个文件以生成信息。",
+                  "0904be2505": "清空信息即可重新生成。",
+                  "1ea9ba37aa": "在设置 -> Git -> 源代码管理 AI 中选择一个智能体。"
+                }
+              },
+              "conflict": {
+                "status": {
+                  "cards": {
+                    "5302a1ddba": "合并冲突",
+                    "7f3af87549": "变基冲突",
+                    "6a8e9ad490": "拣选冲突",
+                    "bdf8772106": "冲突",
+                    "edc2d82a2b": "合并进行中",
+                    "5c3707aa44": "变基进行中",
+                    "ffe53a1da6": "拣选进行中",
+                    "35eb76d323": "操作进行中"
+                  }
+                }
+              },
+              "content": {
+                "status": {
+                  "3f425c239c": "此分支没有变更",
+                  "640f6fdb36": "此工作区是干净的，并且此分支没有领先于 {{value0}} 的变更",
+                  "8deb86bbec": "基线",
+                  "978eba351e": "搜索文本过长",
+                  "0bce43409f": "请使用更短的文件筛选条件。",
+                  "1b6caf533d": "没有匹配的文件",
+                  "00c07771b7": "没有与 \"{{value0}}\" 匹配的已更改文件"
+                }
+              },
+              "diff": {
+                "comments": {
+                  "list": {
+                    "cefacd0ec7": "整个文件"
+                  }
+                }
+              },
+              "compare": {
+                "summary": {
+                  "dd72a6fd37": "领先 {{value2}} {{value0}} 个提交{{value1}}"
+                }
               }
             }
           },
@@ -11570,6 +11661,11 @@
               "control": {
                 "ai": {
                   "cfafa92509": "没有未解决的冲突需要发送。"
+                },
+                "bulk": {
+                  "actions": {
+                    "2f67630884": "批量暂存/取消暂存失败"
+                  }
                 }
               }
             }
@@ -15052,6 +15148,170 @@
         "presentation": {
           "gitlabMergeRequestNumber": "MR #{{value0}}",
           "githubPullRequestNumber": "PR #{{value0}}"
+        },
+        "browse": {
+          "measureSizesFailed": "无法扫描工作区大小",
+          "noSizes": "尚未测量任何工作区大小。",
+          "noSizesDescription": "测量磁盘用量后将显示大小。",
+          "notMeasured": "未测量",
+          "workspaceStatus": "工作区状态：{{value0}}",
+          "sizeOnDisk": "磁盘占用：{{value0}}",
+          "checkingGitRow": "正在检查 git 状态",
+          "openWorkspaceNamed": "打开 {{value0}}",
+          "openWorkspace": "打开工作区",
+          "selectedCount": "已选择 {{value0}} 个",
+          "measuringSizesProgress": "正在扫描 {{value0}}/{{value1}}",
+          "measuringSizes": "正在扫描大小",
+          "measureSizes": "扫描",
+          "measureSizesTitle": "扫描工作区大小",
+          "measureSizesDescription": "扫描磁盘用量，即可按大小比较、排序和筛选工作区。",
+          "sort": {
+            "lastActivity": "最近活动",
+            "lastVisited": "最近打开",
+            "created": "创建时间",
+            "size": "尺寸",
+            "name": "工作区",
+            "repo": "仓库",
+            "path": "路径",
+            "host": "主机",
+            "workspaceStatus": "状态",
+            "agent": "智能体",
+            "git": "Git",
+            "ahead": "领先",
+            "behind": "落后",
+            "branch": "分支",
+            "review": "评审",
+            "ticket": "工单",
+            "localContext": "打开的上下文",
+            "tier": "安全等级",
+            "blockerCount": "阻塞项"
+          },
+          "git": {
+            "clean": "干净",
+            "dirty": "未提交的更改",
+            "unpushed": "未推送的提交",
+            "unknown": "未检查"
+          },
+          "agent": {
+            "working": "进行中",
+            "permission": "等待你的操作",
+            "idle": "空闲"
+          },
+          "review": {
+            "open": "开放",
+            "draft": "草稿",
+            "merged": "合并",
+            "closed": "已关闭",
+            "unknown": "未知",
+            "otherProvider": "其他"
+          },
+          "ticket": {
+            "workItem": "工作项",
+            "linear": "Linear",
+            "issue": "议题"
+          },
+          "tier": {
+            "ready": "就绪",
+            "review": "需要检查",
+            "protected": "受保护"
+          },
+          "idleSignal": {
+            "lastVisited": "未打开",
+            "lastActivity": "无活动",
+            "created": "创建时间早于"
+          },
+          "triState": {
+            "any": "任意",
+            "only": "仅",
+            "exclude": "排除"
+          },
+          "presence": {
+            "any": "任意",
+            "some": "有",
+            "none": "无"
+          },
+          "blockerModeAny": "有任意项",
+          "blockerModeNone": "无",
+          "searchPlaceholder": "搜索名称、仓库、分支、路径、主机",
+          "searchLabel": "搜索工作区",
+          "filters": "筛选条件",
+          "showingCount": "显示 {{value1}} 个中的 {{value0}} 个",
+          "clearFilters": "清除筛选条件",
+          "checkingGit": "正在检查 git 状态：还剩 {{value0}} 个",
+          "updatedAgo": "更新于 {{value0}}",
+          "refreshing": "正在刷新…",
+          "refreshingProgress": "正在刷新 {{value0}}/{{value1}}",
+          "facet": {
+            "git": "Git",
+            "review": "评审",
+            "ticket": "工单",
+            "location": "位置",
+            "safety": "安全等级",
+            "activity": "活动",
+            "size": "磁盘占用",
+            "status": "工作区状态",
+            "agent": "智能体",
+            "context": "本地上下文"
+          },
+          "minAhead": "领先提交数 ≥",
+          "minBehind": "落后提交数 ≥",
+          "branchQuery": "分支名包含",
+          "prunable": "可清除",
+          "locked": "已锁定",
+          "reviewPresence": "PR / MR",
+          "reviewProvider": "提供方",
+          "ticketPresence": "关联的工单",
+          "host": "主机",
+          "repo": "仓库",
+          "pathPrefix": "路径开头为",
+          "tierField": "清理层级",
+          "blockerMode": "阻塞项匹配方式",
+          "blockers": "阻塞项",
+          "dismissed": "已忽略",
+          "selectableOnly": "仅显示我现在可以删除的工作区",
+          "idleSignalField": "空闲判定依据",
+          "idleMinDays": "空闲至少",
+          "days": "天",
+          "neverVisited": "从未打开",
+          "minSize": "至少",
+          "maxSize": "至多",
+          "includeUnsized": "包含未测量的工作区",
+          "matchStatusless": "包含没有状态的工作区",
+          "archived": "已归档",
+          "pinned": "已固定",
+          "unread": "未读",
+          "comment": "有评论",
+          "retainedDoneAgents": "已完成智能体的记录",
+          "contextPresence": "打开的标签页、终端、评论",
+          "completelyEmpty": "没有任何会丢失的内容",
+          "noWorkspaces": "未找到工作区。",
+          "noMatches": "没有工作区符合这些筛选条件。",
+          "noMatchesDescription": "所有工作区都在同一个列表中——请放宽某个分面或清除筛选条件。",
+          "selectionVanishedOne": "所选的 1 个工作区已不存在。",
+          "selectionVanished": "所选的 {{value0}} 个工作区已不存在。",
+          "selectAll": "选择所有匹配的工作区",
+          "sortByField": "按{{value0}}排序",
+          "sortBy": "排序方式"
+        },
+        "scan": {
+          "progress": "正在扫描工作区（{{value0}}/{{value1}}）",
+          "singleError": "无法检查 {{value0}}：{{value1}}。可能有工作区未列出。请刷新后重试。",
+          "moreErrors": "，另有 {{value0}} 个",
+          "multipleErrors": "无法检查 {{value0}} 个仓库（{{value1}}{{value2}}）。可能有工作区未列出。请刷新后重试。",
+          "noWorkspaces": "未找到工作区。",
+          "readyOneOne": "找到 1 个工作区，有 1 条清理建议。",
+          "readyOneMany": "找到 1 个工作区，有 {{value0}} 条清理建议。",
+          "readyManyOne": "找到 {{value0}} 个工作区，有 1 条清理建议。",
+          "readyManyMany": "找到 {{value0}} 个工作区，有 {{value1}} 条清理建议。",
+          "fallbackRepository": "某个仓库",
+          "gitListFailed": "Git 无法列出工作树"
+        },
+        "relativeTime": {
+          "never": "从未",
+          "justNow": "刚刚",
+          "minutesAgo": "{{value0}} 分钟前",
+          "hoursAgo": "{{value0}} 小时前",
+          "daysAgo": "{{value0}} 天前"
         }
       }
     },
@@ -15087,6 +15347,13 @@
         "subtitle": "Orca 暂停了自动恢复，因为无法确认此 Codex 会话属于当前选择的账户。下方的会话记录为只读——没有发送也没有丢失任何内容。要继续工作，请开始新的 Codex 会话，或切换到拥有此会话的账户。",
         "read-error": "Orca 也无法读取已保存的会话文件。文件可能已被移动或删除；自动恢复保持暂停状态，没有发送任何内容。",
         "read-empty": "找到了已保存的会话文件，但其中没有可读取的消息。"
+      }
+    },
+    "status": {
+      "bar": {
+        "workspaceSpace": {
+          "otherTopLevelItems": "其他顶层项目（{{value0}}）"
+        }
       }
     }
   },

@@ -232,7 +232,9 @@
         "workspace": {
           "cleanup": {
             "9d6e531da6": "워크스페이스가 더 이상 존재하지 않습니다.",
-            "changedSinceConfirmation": "확인 후 워크스페이스가 변경되었습니다. 제거하기 전에 새로 고쳐 검토하세요."
+            "changedSinceConfirmation": "확인 후 워크스페이스가 변경되었습니다. 제거하기 전에 새로 고쳐 검토하세요.",
+            "hostUnresolved": "이 워크스페이스를 소유한 호스트를 Orca가 확인할 수 없습니다. 프로젝트를 새로고침한 뒤 다시 검토하세요.",
+            "hostCollision": "오류: 이 워크스페이스가 여러 호스트의 동일한 경로에 존재합니다"
           }
         },
         "worktrees": {
@@ -1327,7 +1329,8 @@
         "moreWorkspaceActions": "이슈 워크스페이스 작업 더 보기",
         "startNewWorkspace": "새 워크스페이스 시작",
         "workspaceSection": "워크스페이스",
-        "noWorkspaceYet": "아직 없음"
+        "noWorkspaceYet": "아직 없음",
+        "openOnLinear": "Linear에서 열기"
       },
       "LinearItemDrawer": {
         "04008e6c46": "이슈에서 워크스페이스 시작",
@@ -2628,7 +2631,7 @@
             "ee81adfcef": "보기",
             "4d0b72481c": "무시",
             "9cc26c019d": "제거",
-            "0e2d235c63": "비활성 워크스페이스 스캔 준비됨",
+            "0e2d235c63": "워크스페이스 스캔 준비됨",
             "4a35c08764": "리뷰",
             "47123d0108": "비활성 워크스페이스를 검색 중입니다. 이것을 닫고 다시 오시면 됩니다.",
             "9a3be9f2df": "비활성 워크스페이스를 검색 중입니다. 완료되면 여기에 새 행이 나타납니다. 이것을 닫고 다시 오시면 됩니다.",
@@ -3251,7 +3254,7 @@
             "67c4ecda49": "이 terminal을 강제 종료합니다. 패널에서 저장하지 않은 작업은 모두 손실됩니다. 이 작업은 취소할 수 없습니다.",
             "4bb076fa89": "강제 종료",
             "996295bff2": "고아 terminal",
-            "92924a14e3": "비활성 워크스페이스 검토 ({{value0}})",
+            "92924a14e3": "워크스페이스 정리",
             "27a74f91f0": "지금은 실행 중인 항목이 없습니다.",
             "1b24a32d3a": "메모리",
             "298f4be7f2": "CPU",
@@ -4307,7 +4310,8 @@
           "d36883e046": "취소",
           "b79b39d865": "프로젝트 제거",
           "removeDescriptionSsh": "이 작업은 {{name}}을(를) Orca에서 제거만 합니다. 파일은 {{host}}에 그대로 남아 있으며, 해당 SSH 호스트를 다시 추가하면 복구할 수 있습니다.",
-          "removeDescriptionLocal": "이 작업은 {{name}}을(를) Orca에서 제거만 합니다. 파일은 디스크에 그대로 남아 있습니다."
+          "removeDescriptionLocal": "이 작업은 {{name}}을(를) Orca에서 제거만 합니다. 파일은 디스크에 그대로 남아 있습니다.",
+          "removeDescriptionVmRecipe": "{{name}}을(를) Orca에서 제거합니다. 환경과 파일을 영구적으로 삭제할지는 해당 VM 레시피가 결정합니다."
         },
         "ScrollToCurrentWorkspaceToolbarButton": {
           "23989bb663": "활성 워크스페이스로 이동"
@@ -4817,7 +4821,9 @@
           "noneFound": "Orca 외부 워크트리를 찾지 못했습니다",
           "tryDifferentSearch": "다른 이름이나 경로를 시도하세요.",
           "disableSource": "소스를 비활성화하면 워크트리를 개별적으로 관리할 수 있습니다.",
-          "appearWhenDetected": "Orca가 새 워크트리를 발견하면 여기에 표시됩니다."
+          "appearWhenDetected": "Orca가 새 워크트리를 발견하면 여기에 표시됩니다.",
+          "openGlobalSettings": "전역 설정에서 관리",
+          "globalSettingsSources": "다음 소스에는 여기에서 재정의할 수 있는 전역 설정이 있습니다:"
         },
         "WorktreeVisibilitySourceList": {
           "claude": "Claude Code",
@@ -4837,7 +4843,14 @@
           "addLocation": "위치 추가",
           "worktreeRoot": "워크트리 루트",
           "add": "추가",
-          "rootHelp": "Orca는 이 폴더 아래의 워크트리를 인식합니다."
+          "rootHelp": "Orca는 이 폴더 아래의 워크트리를 인식합니다.",
+          "useGlobalFor": "{{value0}}에 전역 설정 사용",
+          "useGlobal": "전역 사용",
+          "visibility": "{{value0}} 표시 설정",
+          "show": "표시",
+          "hide": "숨김",
+          "overridingGlobal": "전역 설정 재정의 중: {{value0}}",
+          "projectOnly": "이 프로젝트에만 추가되었습니다."
         },
         "add": {
           "repo": {
@@ -6184,7 +6197,9 @@
           "5567191a6e": "찾아보기",
           "0e9fc0eadc": "워크스페이스 디렉터리",
           "e2955d9ccb": "새 워크스페이스가 생성되는 위치를 구성합니다.",
-          "7511097c5d": "워크스페이스"
+          "7511097c5d": "워크스페이스",
+          "externalWorktrees": "외부 작업 트리",
+          "externalWorktreesDescription": "Orca 외부에서 만든 작업 트리를 기본적으로 표시할지 선택합니다."
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "변경 사항 적용",
@@ -6855,7 +6870,14 @@
           "projectRuntimeDescription": "이 프로젝트를 Windows에서 실행할지 WSL에서 실행할지 선택합니다.",
           "hostStateDisconnected": "Disconnected",
           "hostStateUnknown": "Unknown",
-          "nestedHostLabel": "{{value0}} via {{value1}}"
+          "nestedHostLabel": "{{value0}} via {{value1}}",
+          "externalWorktrees": "외부 작업 트리",
+          "externalWorktreesDescription": "이 프로젝트에서 Orca 외부 작업 트리를 표시할지 재정의합니다.",
+          "externalWorktreesInherited": "전역 설정 사용 중: {{value0}}",
+          "show": "표시",
+          "hide": "숨기기",
+          "externalWorktreesGlobal": "전역 기본값: {{value0}}",
+          "useGlobal": "전역 설정 사용"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "명령 템플릿",
@@ -8508,7 +8530,9 @@
             "editorFontFamilyDesc": "파일 편집기 및 diff 보기에서 사용되는 글꼴입니다. 비워두면 터미널 글꼴을 따릅니다.",
             "6e918a5bcc": "claude glm",
             "4880297fec": "z.ai",
-            "71bf3d35f5": "glm"
+            "71bf3d35f5": "glm",
+            "externalWorktrees": "외부 작업 트리",
+            "externalWorktreesDescription": "Orca 외부에서 만든 작업 트리를 기본적으로 표시할지 선택합니다."
           }
         },
         "git": {
@@ -9002,7 +9026,9 @@
             "projectRuntimeDescription": "이 프로젝트를 Windows에서 실행할지 WSL에서 실행할지 선택합니다.",
             "copy": "copy",
             "clone": "clone",
-            "apfs": "apfs"
+            "apfs": "apfs",
+            "externalWorktrees": "외부 작업 트리",
+            "externalWorktreesDescription": "이 프로젝트에서 Orca 외부 작업 트리를 표시할지 재정의합니다."
           }
         },
         "runtime": {
@@ -9813,7 +9839,11 @@
           "cloudVmTitle": "클라우드 VM 런타임",
           "cloudVmRefresh": "클라우드 VM 런타임 새로 고침",
           "cloudVmLoading": "클라우드 VM 런타임 확인 중…",
-          "cloudVmEmptyWithSetup": "아직 클라우드 VM 런타임이 없습니다. 환경 레시피를 사용해 워크스페이스에서 생성하세요."
+          "cloudVmEmptyWithSetup": "아직 클라우드 VM 런타임이 없습니다. 환경 레시피를 사용해 워크스페이스에서 생성하세요.",
+          "stoppingCleanup": "중지하는 중…",
+          "stopCleanup": "정리 중지",
+          "cleanupStopped": "정리를 중지했습니다",
+          "stopCleanupFailed": "Cloud VM 정리를 중지하지 못했습니다."
         },
         "ephemeralVms": {
           "search": {
@@ -10556,6 +10586,21 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "굵은 글꼴 두께",
           "0e0d1ee15a": "글꼴 두께와 별도로 조정됩니다. 일부 글꼴은 여러 값을 하나의 자형에 매핑하므로, 굵게가 바뀌지 않아 보이면 글꼴 두께를 낮추거나 다른 글꼴을 선택하세요."
+        },
+        "GlobalWorktreeVisibilitySourcesSetting": {
+          "saveFailed": "가시성 기본값을 저장할 수 없습니다.",
+          "updateServerDefaults": "표시 기본값을 구성하려면 이 서버를 업데이트하세요.",
+          "updateServer": "소스 기본값을 구성하려면 이 서버를 업데이트하세요."
+        },
+        "shortcutDefinitionCatalog": {
+          "missionControlConflict": "Mission Control에 의해 차단되었습니다. 여기에서 다시 매핑하거나 시스템 설정에서 변경하세요."
+        },
+        "EphemeralVmCleanupStopDialog": {
+          "title": "정리를 중지할까요?",
+          "description": "VM이 계속 실행되어 비용이 발생할 수 있습니다. 정리는 나중에 다시 시도할 수 있습니다.",
+          "cancel": "계속 정리",
+          "stopping": "중지하는 중…",
+          "confirm": "정리 중지"
         }
       },
       "right": {
@@ -11553,6 +11598,52 @@
                   "8f9a0b1c2d": "커밋할 항목이 없습니다. 브랜치가 최신 상태입니다.",
                   "h3i4j5k607": "이 브랜치에서 {{value0}}을(를) 만들 수 있는지 확인 중…"
                 }
+              },
+              "commit": {
+                "area": {
+                  "cc5739bd1d": "커밋 메시지를 생성하는 중…",
+                  "4cbd0cd9d2": "커밋을 진행하는 중…",
+                  "e7876a2bde": "메시지를 생성하려면 파일을 하나 이상 스테이징하세요.",
+                  "0904be2505": "다시 생성하려면 메시지를 지우세요.",
+                  "1ea9ba37aa": "설정 -> Git -> 소스 제어 AI에서 에이전트를 선택하세요."
+                }
+              },
+              "conflict": {
+                "status": {
+                  "cards": {
+                    "5302a1ddba": "병합 충돌",
+                    "7f3af87549": "리베이스 충돌",
+                    "6a8e9ad490": "체리픽 충돌",
+                    "bdf8772106": "충돌",
+                    "edc2d82a2b": "병합 진행 중",
+                    "5c3707aa44": "리베이스 진행 중",
+                    "ffe53a1da6": "체리픽 진행 중",
+                    "35eb76d323": "작업 진행 중"
+                  }
+                }
+              },
+              "content": {
+                "status": {
+                  "3f425c239c": "이 브랜치에 변경 사항이 없습니다",
+                  "640f6fdb36": "이 워크스페이스는 깨끗하며 이 브랜치는 {{value0}}보다 앞선 변경 사항이 없습니다",
+                  "8deb86bbec": "기준",
+                  "978eba351e": "검색 텍스트가 너무 깁니다",
+                  "0bce43409f": "더 짧은 파일 필터를 사용하세요.",
+                  "1b6caf533d": "일치하는 파일이 없습니다",
+                  "00c07771b7": "\"{{value0}}\"과(와) 일치하는 변경된 파일이 없습니다"
+                }
+              },
+              "diff": {
+                "comments": {
+                  "list": {
+                    "cefacd0ec7": "파일 전체"
+                  }
+                }
+              },
+              "compare": {
+                "summary": {
+                  "dd72a6fd37": "{{value2}}보다 {{value0}}개 커밋{{value1}} 앞섬"
+                }
               }
             }
           },
@@ -11561,6 +11652,11 @@
               "control": {
                 "ai": {
                   "cfafa92509": "보낼 해결되지 않은 충돌이 없습니다."
+                },
+                "bulk": {
+                  "actions": {
+                    "2f67630884": "일괄 스테이징/스테이징 해제에 실패했습니다"
+                  }
                 }
               }
             }
@@ -15054,6 +15150,170 @@
         "presentation": {
           "gitlabMergeRequestNumber": "MR #{{value0}}",
           "githubPullRequestNumber": "PR #{{value0}}"
+        },
+        "browse": {
+          "measureSizesFailed": "워크스페이스 크기를 스캔하지 못했습니다",
+          "noSizes": "아직 측정된 워크스페이스 크기가 없습니다.",
+          "noSizesDescription": "디스크 사용량을 측정하면 크기가 표시됩니다.",
+          "notMeasured": "측정되지 않음",
+          "workspaceStatus": "워크스페이스 상태: {{value0}}",
+          "sizeOnDisk": "디스크 크기: {{value0}}",
+          "checkingGitRow": "git 상태 확인 중",
+          "openWorkspaceNamed": "{{value0}} 열기",
+          "openWorkspace": "워크스페이스 열기",
+          "selectedCount": "{{value0}}개 선택됨",
+          "measuringSizesProgress": "스캔 중 {{value0}}/{{value1}}",
+          "measuringSizes": "크기 스캔 중",
+          "measureSizes": "스캔",
+          "measureSizesTitle": "워크스페이스 크기 스캔",
+          "measureSizesDescription": "디스크 사용량을 스캔하면 워크스페이스를 크기로 비교, 정렬, 필터링할 수 있습니다.",
+          "sort": {
+            "lastActivity": "마지막 활동",
+            "lastVisited": "마지막으로 연 시각",
+            "created": "생성됨",
+            "size": "크기",
+            "name": "워크스페이스",
+            "repo": "리포지토리",
+            "path": "경로",
+            "host": "호스트",
+            "workspaceStatus": "상태",
+            "agent": "에이전트",
+            "git": "Git",
+            "ahead": "앞섬",
+            "behind": "뒤처짐",
+            "branch": "브랜치",
+            "review": "리뷰",
+            "ticket": "티켓",
+            "localContext": "열린 컨텍스트",
+            "tier": "안전도",
+            "blockerCount": "차단 요소"
+          },
+          "git": {
+            "clean": "깨끗함",
+            "dirty": "커밋되지 않은 변경 사항",
+            "unpushed": "푸시되지 않은 커밋",
+            "unknown": "확인되지 않음"
+          },
+          "agent": {
+            "working": "작업 중",
+            "permission": "사용자 응답 대기 중",
+            "idle": "유휴"
+          },
+          "review": {
+            "open": "열림",
+            "draft": "초안",
+            "merged": "병합됨",
+            "closed": "닫힘",
+            "unknown": "알 수 없음",
+            "otherProvider": "기타"
+          },
+          "ticket": {
+            "workItem": "작업 항목",
+            "linear": "Linear",
+            "issue": "이슈"
+          },
+          "tier": {
+            "ready": "준비됨",
+            "review": "검토 필요",
+            "protected": "보호됨"
+          },
+          "idleSignal": {
+            "lastVisited": "열지 않음",
+            "lastActivity": "활동 없음",
+            "created": "이전에 생성됨"
+          },
+          "triState": {
+            "any": "모두",
+            "only": "만",
+            "exclude": "제외"
+          },
+          "presence": {
+            "any": "모두",
+            "some": "있음",
+            "none": "없음"
+          },
+          "blockerModeAny": "하나라도 있음",
+          "blockerModeNone": "없음",
+          "searchPlaceholder": "이름, 리포지토리, 브랜치, 경로, 호스트로 검색",
+          "searchLabel": "워크스페이스 검색",
+          "filters": "필터",
+          "showingCount": "{{value1}}개 중 {{value0}}개 표시 중",
+          "clearFilters": "필터 지우기",
+          "checkingGit": "git 상태 확인 중: {{value0}}개 남음",
+          "updatedAgo": "{{value0}} 업데이트됨",
+          "refreshing": "새로고치는 중…",
+          "refreshingProgress": "새로고치는 중 {{value0}}/{{value1}}",
+          "facet": {
+            "git": "Git",
+            "review": "리뷰",
+            "ticket": "티켓",
+            "location": "위치",
+            "safety": "안전도",
+            "activity": "활동",
+            "size": "디스크 크기",
+            "status": "워크스페이스 상태",
+            "agent": "에이전트",
+            "context": "로컬 컨텍스트"
+          },
+          "minAhead": "앞선 커밋 수 ≥",
+          "minBehind": "뒤처진 커밋 수 ≥",
+          "branchQuery": "브랜치에 포함",
+          "prunable": "정리 가능",
+          "locked": "잠김",
+          "reviewPresence": "PR / MR",
+          "reviewProvider": "제공자",
+          "ticketPresence": "연결된 티켓",
+          "host": "호스트",
+          "repo": "리포지토리",
+          "pathPrefix": "경로 시작 문자열",
+          "tierField": "정리 등급",
+          "blockerMode": "차단 요소 일치 방식",
+          "blockers": "차단 요소",
+          "dismissed": "무시됨",
+          "selectableOnly": "지금 삭제할 수 있는 워크스페이스만",
+          "idleSignalField": "유휴 판단 기준",
+          "idleMinDays": "최소 유휴 기간",
+          "days": "일",
+          "neverVisited": "한 번도 열지 않음",
+          "minSize": "최소",
+          "maxSize": "최대",
+          "includeUnsized": "측정되지 않은 워크스페이스 포함",
+          "matchStatusless": "상태가 없는 워크스페이스 포함",
+          "archived": "보관됨",
+          "pinned": "고정됨",
+          "unread": "읽지 않음",
+          "comment": "댓글 있음",
+          "retainedDoneAgents": "완료된 에이전트 대화 기록",
+          "contextPresence": "열린 탭, 터미널, 댓글",
+          "completelyEmpty": "잃을 것이 없음",
+          "noWorkspaces": "워크스페이스를 찾을 수 없습니다.",
+          "noMatches": "이 필터와 일치하는 워크스페이스가 없습니다.",
+          "noMatchesDescription": "모든 워크스페이스가 하나의 목록에 있습니다. 패싯을 넓히거나 필터를 지우세요.",
+          "selectionVanishedOne": "선택한 워크스페이스 1개가 더 이상 존재하지 않습니다.",
+          "selectionVanished": "선택한 워크스페이스 {{value0}}개가 더 이상 존재하지 않습니다.",
+          "selectAll": "일치하는 워크스페이스 모두 선택",
+          "sortByField": "{{value0}} 기준 정렬",
+          "sortBy": "정렬 기준"
+        },
+        "scan": {
+          "progress": "워크스페이스 스캔 중 ({{value0}}/{{value1}})",
+          "singleError": "{{value0}}을(를) 확인하지 못했습니다: {{value1}}. 일부 워크스페이스가 누락되었을 수 있습니다. 새로고침하여 다시 시도하세요.",
+          "moreErrors": ", 외 {{value0}}개",
+          "multipleErrors": "리포지토리 {{value0}}개를 확인하지 못했습니다 ({{value1}}{{value2}}). 일부 워크스페이스가 누락되었을 수 있습니다. 새로고침하여 다시 시도하세요.",
+          "noWorkspaces": "워크스페이스를 찾을 수 없습니다.",
+          "readyOneOne": "워크스페이스 1개를 찾았으며 정리 제안은 1개입니다.",
+          "readyOneMany": "워크스페이스 1개를 찾았으며 정리 제안은 {{value0}}개입니다.",
+          "readyManyOne": "워크스페이스 {{value0}}개를 찾았으며 정리 제안은 1개입니다.",
+          "readyManyMany": "워크스페이스 {{value0}}개를 찾았으며 정리 제안은 {{value1}}개입니다.",
+          "fallbackRepository": "어떤 리포지토리",
+          "gitListFailed": "Git이 워크트리를 나열하지 못했습니다"
+        },
+        "relativeTime": {
+          "never": "없음",
+          "justNow": "방금 전",
+          "minutesAgo": "{{value0}}분 전",
+          "hoursAgo": "{{value0}}시간 전",
+          "daysAgo": "{{value0}}일 전"
         }
       }
     },
@@ -15089,6 +15349,13 @@
         "subtitle": "이 Codex 세션이 선택된 계정의 것인지 확인할 수 없어 Orca가 자동 재개를 일시 중지했습니다. 아래 대화 내용은 읽기 전용이며, 아무것도 전송되거나 손실되지 않았습니다. 계속 작업하려면 새 Codex 세션을 시작하거나 이 세션을 소유한 계정으로 전환하세요.",
         "read-error": "저장된 세션 파일도 읽을 수 없었습니다. 파일이 이동되었거나 삭제되었을 수 있습니다. 자동 재개는 중지된 상태이며 아무것도 전송되지 않았습니다.",
         "read-empty": "저장된 세션 파일을 찾았지만 읽을 수 있는 메시지가 없습니다."
+      }
+    },
+    "status": {
+      "bar": {
+        "workspaceSpace": {
+          "otherTopLevelItems": "기타 최상위 항목 ({{value0}})"
+        }
       }
     }
   },

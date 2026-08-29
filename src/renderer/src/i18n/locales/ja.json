@@ -232,7 +232,9 @@
         "workspace": {
           "cleanup": {
             "9d6e531da6": "ワークスペースはもう存在しません。",
-            "changedSinceConfirmation": "確認後にワークスペースが変更されました。削除する前に更新して確認してください。"
+            "changedSinceConfirmation": "確認後にワークスペースが変更されました。削除する前に更新して確認してください。",
+            "hostUnresolved": "このワークスペースを所有するホストを Orca が判別できません。プロジェクトを更新してから再度確認してください。",
+            "hostCollision": "エラー: このワークスペースは複数のホストの同じパスに存在します"
           }
         },
         "worktrees": {
@@ -1327,7 +1329,8 @@
         "moreWorkspaceActions": "Issue ワークスペースのその他の操作",
         "startNewWorkspace": "新規ワークスペースを開始",
         "workspaceSection": "ワークスペース",
-        "noWorkspaceYet": "まだありません"
+        "noWorkspaceYet": "まだありません",
+        "openOnLinear": "Linear で開く"
       },
       "LinearItemDrawer": {
         "04008e6c46": "Issue からワークスペースを開始",
@@ -2628,7 +2631,7 @@
             "ee81adfcef": "表示",
             "4d0b72481c": "無視",
             "9cc26c019d": "削除",
-            "0e2d235c63": "非アクティブなワークスペースのスキャン準備完了",
+            "0e2d235c63": "ワークスペースのスキャン準備完了",
             "4a35c08764": "レビュー",
             "47123d0108": "非アクティブなワークスペースをスキャンしています。これを閉じて戻ってきても構いません。",
             "9a3be9f2df": "非アクティブなワークスペースをスキャンしています。新規行が終了すると、ここに表示されます。これを閉じて戻ってきても構いません。",
@@ -3251,7 +3254,7 @@
             "67c4ecda49": "このターミナルを強制終了します。ペイン内の保存されていない作業はすべて失われます。これを元に戻すことはできません。",
             "4bb076fa89": "強制終了",
             "996295bff2": "孤立したターミナル",
-            "92924a14e3": "非アクティブなワークスペースを確認 ({{value0}})",
+            "92924a14e3": "ワークスペースを整理",
             "27a74f91f0": "現在何も実行されていません",
             "1b24a32d3a": "メモリ",
             "298f4be7f2": "CPU",
@@ -4296,7 +4299,8 @@
           "d36883e046": "キャンセル",
           "b79b39d865": "プロジェクトの削除",
           "removeDescriptionSsh": "この操作は {{name}} を Orca から削除するだけです。ファイルは {{host}} に残っており、その SSH ホストを再追加すれば復元できます。",
-          "removeDescriptionLocal": "この操作は {{name}} を Orca から削除するだけです。ファイルはディスクに残っています。"
+          "removeDescriptionLocal": "この操作は {{name}} を Orca から削除するだけです。ファイルはディスクに残っています。",
+          "removeDescriptionVmRecipe": "{{name}} を Orca から削除します。環境とそのファイルを完全に削除するかどうかは、その VM レシピによって決まります。"
         },
         "ScrollToCurrentWorkspaceToolbarButton": {
           "23989bb663": "アクティブなワークスペースを表示する"
@@ -4806,7 +4810,9 @@
           "noneFound": "Orca 以外のワークツリーは見つかりませんでした",
           "tryDifferentSearch": "別の名前またはパスをお試しください。",
           "disableSource": "ソースを無効にするとワークツリーを個別に管理できます。",
-          "appearWhenDetected": "Orca が新しいワークツリーを検出すると、ここに表示されます。"
+          "appearWhenDetected": "Orca が新しいワークツリーを検出すると、ここに表示されます。",
+          "openGlobalSettings": "グローバル設定で管理",
+          "globalSettingsSources": "これらのソースにはグローバル設定があり、ここで上書きできます:"
         },
         "WorktreeVisibilitySourceList": {
           "claude": "Claude Code",
@@ -4826,7 +4832,14 @@
           "addLocation": "場所を追加",
           "worktreeRoot": "ワークツリールート",
           "add": "追加",
-          "rootHelp": "Orca はこのフォルダー配下のワークツリーを認識します。"
+          "rootHelp": "Orca はこのフォルダー配下のワークツリーを認識します。",
+          "useGlobalFor": "{{value0}} にグローバル設定を使用",
+          "useGlobal": "グローバルを使用",
+          "visibility": "{{value0}} の表示設定",
+          "show": "表示",
+          "hide": "非表示",
+          "overridingGlobal": "グローバル設定を上書き中: {{value0}}",
+          "projectOnly": "このプロジェクトにのみ追加されています。"
         },
         "add": {
           "repo": {
@@ -6173,7 +6186,9 @@
           "5567191a6e": "ブラウズ",
           "0e9fc0eadc": "ワークスペースディレクトリ",
           "e2955d9ccb": "新規ワークスペースを作成する場所を構成します。",
-          "7511097c5d": "ワークスペース"
+          "7511097c5d": "ワークスペース",
+          "externalWorktrees": "外部ワークツリー",
+          "externalWorktreesDescription": "Orca 外で作成されたワークツリーをデフォルトで表示するかどうかを選択します。"
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "変更を適用する",
@@ -6881,7 +6896,14 @@
           "projectRuntimeDescription": "このプロジェクトを Windows と WSL のどちらで実行するかを選択します。",
           "hostStateDisconnected": "切断済み",
           "hostStateUnknown": "不明",
-          "nestedHostLabel": "{{value1}} 経由の {{value0}}"
+          "nestedHostLabel": "{{value1}} 経由の {{value0}}",
+          "externalWorktrees": "外部ワークツリー",
+          "externalWorktreesDescription": "このプロジェクトで Orca 外のワークツリーを表示するかどうかを上書きします。",
+          "externalWorktreesInherited": "グローバル設定を使用中: {{value0}}",
+          "show": "表示",
+          "hide": "非表示",
+          "externalWorktreesGlobal": "グローバルデフォルト: {{value0}}",
+          "useGlobal": "グローバル設定を使用"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "コマンドテンプレート",
@@ -8534,7 +8556,9 @@
             "editorFontFamilyDesc": "ファイルエディターと差分ビューで使用されるフォント。空の場合はターミナルフォントに従います。",
             "6e918a5bcc": "claude glm",
             "4880297fec": "z.ai",
-            "71bf3d35f5": "glm"
+            "71bf3d35f5": "glm",
+            "externalWorktrees": "外部ワークツリー",
+            "externalWorktreesDescription": "Orca 外で作成されたワークツリーをデフォルトで表示するかどうかを選択します。"
           }
         },
         "git": {
@@ -9028,7 +9052,9 @@
             "projectRuntimeDescription": "このプロジェクトを Windows と WSL のどちらで実行するかを選択します。",
             "copy": "コピー",
             "clone": "clone",
-            "apfs": "apfs"
+            "apfs": "apfs",
+            "externalWorktrees": "外部ワークツリー",
+            "externalWorktreesDescription": "このプロジェクトで Orca 外のワークツリーを表示するかどうかを上書きします。"
           }
         },
         "runtime": {
@@ -9802,7 +9828,11 @@
           "cloudVmTitle": "クラウド VM ランタイム",
           "cloudVmRefresh": "クラウド VM ランタイムを更新",
           "cloudVmLoading": "クラウド VM ランタイムを確認中…",
-          "cloudVmEmptyWithSetup": "クラウド VM ランタイムはまだありません。環境レシピを使用してワークスペースから作成してください。"
+          "cloudVmEmptyWithSetup": "クラウド VM ランタイムはまだありません。環境レシピを使用してワークスペースから作成してください。",
+          "stoppingCleanup": "停止中…",
+          "stopCleanup": "クリーンアップを停止",
+          "cleanupStopped": "クリーンアップを停止しました",
+          "stopCleanupFailed": "Cloud VM のクリーンアップを停止できませんでした。"
         },
         "ephemeralVms": {
           "search": {
@@ -10545,6 +10575,21 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "太字のフォントウェイト",
           "0e0d1ee15a": "フォントウェイトとは独立して調整できます。フォントによっては複数の値が同じ字面に割り当てられるため、太字が変わらないように見える場合はフォントウェイトを下げるか、別のフォントを選んでください。"
+        },
+        "GlobalWorktreeVisibilitySourcesSetting": {
+          "saveFailed": "表示設定のデフォルトを保存できませんでした。",
+          "updateServerDefaults": "表示のデフォルトを設定するには、このサーバーを更新してください。",
+          "updateServer": "ソースのデフォルトを設定するには、このサーバーを更新してください。"
+        },
+        "shortcutDefinitionCatalog": {
+          "missionControlConflict": "Mission Control によってブロックされています。ここで再割り当てするか、システム設定で変更してください。"
+        },
+        "EphemeralVmCleanupStopDialog": {
+          "title": "クリーンアップを停止しますか?",
+          "description": "VM が実行されたままになり、料金が発生する可能性があります。クリーンアップは後で再試行できます。",
+          "cancel": "クリーンアップを続ける",
+          "stopping": "停止中…",
+          "confirm": "クリーンアップを停止"
         }
       },
       "right": {
@@ -11542,6 +11587,52 @@
                   "8f9a0b1c2d": "コミットするものがありません。ブランチは最新です。",
                   "h3i4j5k607": "このブランチが {{value0}} を作成できるか確認中…"
                 }
+              },
+              "commit": {
+                "area": {
+                  "cc5739bd1d": "コミットメッセージを生成中…",
+                  "4cbd0cd9d2": "コミットを実行中…",
+                  "e7876a2bde": "メッセージを生成するには、少なくとも 1 つのファイルをステージしてください。",
+                  "0904be2505": "再生成するにはメッセージを消去してください。",
+                  "1ea9ba37aa": "設定 -> Git -> ソース管理 AI で Agent を選択してください。"
+                }
+              },
+              "conflict": {
+                "status": {
+                  "cards": {
+                    "5302a1ddba": "マージの競合",
+                    "7f3af87549": "リベースの競合",
+                    "6a8e9ad490": "チェリーピックの競合",
+                    "bdf8772106": "競合",
+                    "edc2d82a2b": "マージを実行中",
+                    "5c3707aa44": "リベースを実行中",
+                    "ffe53a1da6": "チェリーピックを実行中",
+                    "35eb76d323": "操作を実行中"
+                  }
+                }
+              },
+              "content": {
+                "status": {
+                  "3f425c239c": "このブランチに変更はありません",
+                  "640f6fdb36": "このワークスペースはクリーンで、このブランチは {{value0}} より先行する変更がありません",
+                  "8deb86bbec": "ベース",
+                  "978eba351e": "検索テキストが長すぎます",
+                  "0bce43409f": "より短いファイルフィルターを使用してください。",
+                  "1b6caf533d": "一致するファイルがありません",
+                  "00c07771b7": "\"{{value0}}\" に一致する変更済みファイルはありません"
+                }
+              },
+              "diff": {
+                "comments": {
+                  "list": {
+                    "cefacd0ec7": "ファイル全体"
+                  }
+                }
+              },
+              "compare": {
+                "summary": {
+                  "dd72a6fd37": "{{value2}} より {{value0}} コミット{{value1}}先行"
+                }
               }
             }
           },
@@ -11550,6 +11641,11 @@
               "control": {
                 "ai": {
                   "cfafa92509": "送信する未解決の競合はありません。"
+                },
+                "bulk": {
+                  "actions": {
+                    "2f67630884": "一括ステージ/アンステージに失敗しました"
+                  }
                 }
               }
             }
@@ -15032,6 +15128,170 @@
         "presentation": {
           "gitlabMergeRequestNumber": "MR #{{value0}}",
           "githubPullRequestNumber": "PR #{{value0}}"
+        },
+        "browse": {
+          "measureSizesFailed": "ワークスペースのサイズをスキャンできませんでした",
+          "noSizes": "ワークスペースのサイズはまだ測定されていません。",
+          "noSizesDescription": "ディスク使用量を測定するとサイズが表示されます。",
+          "notMeasured": "未測定",
+          "workspaceStatus": "ワークスペースの状態: {{value0}}",
+          "sizeOnDisk": "ディスク上のサイズ: {{value0}}",
+          "checkingGitRow": "git の状態を確認中",
+          "openWorkspaceNamed": "{{value0}} を開く",
+          "openWorkspace": "ワークスペースを開く",
+          "selectedCount": "{{value0}} 件選択中",
+          "measuringSizesProgress": "スキャン中 {{value0}}/{{value1}}",
+          "measuringSizes": "サイズをスキャン中",
+          "measureSizes": "スキャン",
+          "measureSizesTitle": "ワークスペースのサイズをスキャン",
+          "measureSizesDescription": "ディスク使用量をスキャンして、ワークスペースをサイズで比較・並べ替え・絞り込みできます。",
+          "sort": {
+            "lastActivity": "最終アクティビティ",
+            "lastVisited": "最終オープン",
+            "created": "作成日時",
+            "size": "サイズ",
+            "name": "ワークスペース",
+            "repo": "リポジトリ",
+            "path": "パス",
+            "host": "ホスト",
+            "workspaceStatus": "状態",
+            "agent": "Agent",
+            "git": "Git",
+            "ahead": "先行",
+            "behind": "遅れ",
+            "branch": "ブランチ",
+            "review": "レビュー",
+            "ticket": "チケット",
+            "localContext": "開いているコンテキスト",
+            "tier": "安全度",
+            "blockerCount": "ブロッカー"
+          },
+          "git": {
+            "clean": "クリーン",
+            "dirty": "未コミットの変更",
+            "unpushed": "未プッシュのコミット",
+            "unknown": "未確認"
+          },
+          "agent": {
+            "working": "作業中",
+            "permission": "あなたの操作待ち",
+            "idle": "アイドル"
+          },
+          "review": {
+            "open": "オープン",
+            "draft": "下書き",
+            "merged": "マージ済み",
+            "closed": "クローズ",
+            "unknown": "不明",
+            "otherProvider": "その他"
+          },
+          "ticket": {
+            "workItem": "作業アイテム",
+            "linear": "Linear",
+            "issue": "Issue"
+          },
+          "tier": {
+            "ready": "準備完了",
+            "review": "要レビュー",
+            "protected": "保護済み"
+          },
+          "idleSignal": {
+            "lastVisited": "未オープン",
+            "lastActivity": "アクティビティなし",
+            "created": "作成日がこれ以前"
+          },
+          "triState": {
+            "any": "すべて",
+            "only": "のみ",
+            "exclude": "除外"
+          },
+          "presence": {
+            "any": "すべて",
+            "some": "あり",
+            "none": "なし"
+          },
+          "blockerModeAny": "いずれかあり",
+          "blockerModeNone": "なし",
+          "searchPlaceholder": "名前、リポジトリ、ブランチ、パス、ホストで検索",
+          "searchLabel": "ワークスペースを検索",
+          "filters": "フィルター",
+          "showingCount": "{{value1}} 件中 {{value0}} 件を表示",
+          "clearFilters": "フィルターをクリア",
+          "checkingGit": "git の状態を確認中: 残り {{value0}}",
+          "updatedAgo": "更新 {{value0}}",
+          "refreshing": "更新中…",
+          "refreshingProgress": "更新中 {{value0}}/{{value1}}",
+          "facet": {
+            "git": "Git",
+            "review": "レビュー",
+            "ticket": "チケット",
+            "location": "場所",
+            "safety": "安全度",
+            "activity": "アクティビティ",
+            "size": "ディスク上のサイズ",
+            "status": "ワークスペースの状態",
+            "agent": "Agent",
+            "context": "ローカルコンテキスト"
+          },
+          "minAhead": "先行コミット数 ≥",
+          "minBehind": "遅れコミット数 ≥",
+          "branchQuery": "ブランチ名に含む",
+          "prunable": "プルーン可能",
+          "locked": "ロック済み",
+          "reviewPresence": "PR / MR",
+          "reviewProvider": "プロバイダー",
+          "ticketPresence": "リンク済みチケット",
+          "host": "ホスト",
+          "repo": "リポジトリ",
+          "pathPrefix": "パスの先頭が一致",
+          "tierField": "クリーンアップ区分",
+          "blockerMode": "ブロッカーの一致条件",
+          "blockers": "ブロッカー",
+          "dismissed": "無視済み",
+          "selectableOnly": "今すぐ削除できるワークスペースのみ",
+          "idleSignalField": "アイドル判定の基準",
+          "idleMinDays": "アイドル期間が最低",
+          "days": "日",
+          "neverVisited": "一度も開いていない",
+          "minSize": "最小",
+          "maxSize": "最大",
+          "includeUnsized": "未測定のワークスペースを含める",
+          "matchStatusless": "状態のないワークスペースを含める",
+          "archived": "アーカイブ済み",
+          "pinned": "ピン留め済み",
+          "unread": "未読",
+          "comment": "コメントあり",
+          "retainedDoneAgents": "完了した Agent のトランスクリプト",
+          "contextPresence": "開いているタブ・ターミナル・コメント",
+          "completelyEmpty": "失うものが何もない",
+          "noWorkspaces": "ワークスペースが見つかりません。",
+          "noMatches": "これらのフィルターに一致するワークスペースはありません。",
+          "noMatchesDescription": "すべてのワークスペースは 1 つのリストにあります。ファセットを広げるか、フィルターをクリアしてください。",
+          "selectionVanishedOne": "選択したワークスペース 1 件は存在しなくなりました。",
+          "selectionVanished": "選択したワークスペース {{value0}} 件は存在しなくなりました。",
+          "selectAll": "一致するワークスペースをすべて選択",
+          "sortByField": "{{value0}} で並べ替え",
+          "sortBy": "並べ替え"
+        },
+        "scan": {
+          "progress": "ワークスペースをスキャン中 ({{value0}}/{{value1}})",
+          "singleError": "{{value0}} を確認できませんでした: {{value1}}。一部のワークスペースが表示されていない可能性があります。更新して再試行してください。",
+          "moreErrors": "、他 {{value0}} 件",
+          "multipleErrors": "{{value0}} 件のリポジトリを確認できませんでした ({{value1}}{{value2}})。一部のワークスペースが表示されていない可能性があります。更新して再試行してください。",
+          "noWorkspaces": "ワークスペースが見つかりません。",
+          "readyOneOne": "ワークスペース 1 件が見つかり、クリーンアップの提案は 1 件です。",
+          "readyOneMany": "ワークスペース 1 件が見つかり、クリーンアップの提案は {{value0}} 件です。",
+          "readyManyOne": "ワークスペース {{value0}} 件が見つかり、クリーンアップの提案は 1 件です。",
+          "readyManyMany": "ワークスペース {{value0}} 件が見つかり、クリーンアップの提案は {{value1}} 件です。",
+          "fallbackRepository": "あるリポジトリ",
+          "gitListFailed": "Git がワークツリーを一覧表示できませんでした"
+        },
+        "relativeTime": {
+          "never": "なし",
+          "justNow": "たった今",
+          "minutesAgo": "{{value0}} 分前",
+          "hoursAgo": "{{value0}} 時間前",
+          "daysAgo": "{{value0}} 日前"
         }
       }
     },
@@ -15067,6 +15327,13 @@
         "subtitle": "この Codex セッションが選択中のアカウントのものであることを確認できなかったため、Orca は自動再開を一時停止しました。以下のトランスクリプトは読み取り専用です。何も送信されておらず、失われてもいません。作業を続けるには、新しい Codex セッションを開始するか、このセッションを所有するアカウントに切り替えてください。",
         "read-error": "保存されたセッションファイルも読み取れませんでした。移動または削除された可能性があります。自動再開は停止したままで、何も送信されていません。",
         "read-empty": "保存されたセッションファイルは見つかりましたが、読み取り可能なメッセージが含まれていません。"
+      }
+    },
+    "status": {
+      "bar": {
+        "workspaceSpace": {
+          "otherTopLevelItems": "その他のトップレベル項目 ({{value0}})"
+        }
       }
     }
   },
