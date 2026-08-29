@@ -3400,6 +3400,8 @@ export class OrcaRuntimeService {
   private readonly canRecoverPersistentLocalPtysFn: () => boolean
   private readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
   private readonly getDesktopWindowStatusFn: () => RuntimeDesktopWindowStatus
+  private readonly getDashboardPopoutOpenFn: (() => boolean) | null
+  private readonly setDashboardPopoutOpenFn: ((open: boolean) => void) | null
   private readonly prepareAiVaultSessionResumeFn:
     | ((args: AiVaultPrepareSessionResumeArgs) => Promise<AiVaultPrepareSessionResumeResult>)
     | null
@@ -3486,6 +3488,8 @@ export class OrcaRuntimeService {
       ) => Promise<AiVaultPrepareSessionResumeResult>
       buildAgentHookPtyEnv?: () => Record<string, string>
       getDesktopWindowStatus?: () => RuntimeDesktopWindowStatus
+      getDashboardPopoutOpen?: () => boolean
+      setDashboardPopoutOpen?: (open: boolean) => void
       agentSessionClaimSigner?: AgentSessionClaimSigner
       orchestrationEnvironmentTransport?: OrchestrationEnvironmentTransport
     }
@@ -3513,6 +3517,8 @@ export class OrcaRuntimeService {
     this.retireAgentHookCompatibilityAuthorityFn =
       deps?.retireAgentHookCompatibilityAuthority ?? null
     this.canRecoverPersistentLocalPtysFn = deps?.canRecoverPersistentLocalPtys ?? (() => true)
+    this.getDashboardPopoutOpenFn = deps?.getDashboardPopoutOpen ?? null
+    this.setDashboardPopoutOpenFn = deps?.setDashboardPopoutOpen ?? null
     // Why: configure the shared AiVault scan cache from a serve-mode-reachable
     // seam so the aiVault.listSessions RPC includes managed-Codex + WSL sessions
     // even on headless `orca serve` hosts where registerCoreHandlers never runs.
@@ -3615,6 +3621,40 @@ export class OrcaRuntimeService {
     }
     this.store.updateUI(updates)
     return this.store.getUI()
+  }
+
+  getDashboardPopoutOpen(): boolean {
+    const settings = this.store?.getSettings() as
+      | { experimentalAgentDashboardPopout?: boolean }
+      | undefined
+    if (settings?.experimentalAgentDashboardPopout !== true) {
+      return false
+    }
+    if (!this.getDashboardPopoutOpenFn) {
+      throw new Error('runtime_unavailable')
+    }
+    return this.getDashboardPopoutOpenFn()
+  }
+
+  setDashboardPopoutOpen(open: boolean): { open: boolean; changed: boolean } {
+    const settings = this.store?.getSettings() as
+      | { experimentalAgentDashboardPopout?: boolean }
+      | undefined
+    if (settings?.experimentalAgentDashboardPopout !== true) {
+      const error = new Error(
+        'The Agent Dashboard popout feature is disabled in this Orca host.'
+      )
+      Object.assign(error, { code: 'dashboard_popout_disabled' })
+      throw error
+    }
+    if (!this.getDashboardPopoutOpenFn || !this.setDashboardPopoutOpenFn) {
+      throw new Error('runtime_unavailable')
+    }
+    const wasOpen = this.getDashboardPopoutOpenFn()
+    if (wasOpen !== open) {
+      this.setDashboardPopoutOpenFn(open)
+    }
+    return { open: this.getDashboardPopoutOpenFn(), changed: wasOpen !== open }
   }
 
   recordFeatureInteraction(id: FeatureInteractionId): PersistedUIState {
