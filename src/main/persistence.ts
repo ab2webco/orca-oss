@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: persistence keeps schema defaults, migration, and load/save/flush in one file so the storage contract reviews as a unit. */
 import { app } from 'electron'
+import { mergeWorkspaceCleanupUIState } from '../shared/workspace-cleanup-ui-state'
 import {
   readFileSync,
   writeFileSync,
@@ -6382,6 +6383,11 @@ export class Store {
     const nextUI = {
       ...currentUI,
       ...durableUpdates,
+      // Why: a peer publishing dismissals only must not erase the browse state.
+      workspaceCleanup: mergeWorkspaceCleanupUIState(
+        currentUI.workspaceCleanup,
+        durableUpdates.workspaceCleanup
+      ),
       groupBy: durableUpdates.groupBy
         ? normalizeGroupBy(durableUpdates.groupBy)
         : normalizeGroupBy(this.state.ui?.groupBy),

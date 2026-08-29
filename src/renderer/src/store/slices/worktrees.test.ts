@@ -31,6 +31,7 @@ import type {
   ListDetectedWorktreesArgs
 } from '../../../../shared/detected-worktree-provider-contract'
 import type { DirectSshAuthority, SshProviderEpoch } from '../../../../shared/ssh-types'
+import type { Project, ProjectHostSetup } from '../../../../shared/project-types'
 import {
   beginHugeRepoWarningProbe,
   clearHugeRepoWarningDismissalsForTests,
@@ -10766,7 +10767,10 @@ describe('pending worktree creation state', () => {
     const deleteProjectHostSetup = vi.mocked(store.getState().deleteProjectHostSetup)
     // Upstream #14476 aborts runtime cleanup unless the host rollback is confirmed,
     // so this path needs a confirmed deletion; the shared mock resolves null.
-    deleteProjectHostSetup.mockResolvedValueOnce({ setupId: 'setup-1' })
+    deleteProjectHostSetup.mockResolvedValueOnce({
+      project: { id: 'project-1' } as Project,
+      setup: { id: 'setup-1' } as ProjectHostSetup
+    })
     store.getState().beginPendingWorktreeCreation(
       makePendingCreation('c1', {
         phase: 'fetching',
