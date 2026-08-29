@@ -77,6 +77,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports',
@@ -114,6 +115,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports',
@@ -142,6 +144,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'automation',
       'cli',
@@ -175,6 +178,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'ports',
       'inline-agents'
@@ -265,6 +269,7 @@ describe('Store', () => {
       'unread',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr',
       'comment',
       'ports'
@@ -303,6 +308,7 @@ describe('Store', () => {
       'issue',
       'linear-issue',
       'jira-issue',
+      'plane-issue',
       'pr',
       'ports',
       'inline-agents'
@@ -335,6 +341,7 @@ describe('Store', () => {
       'unread',
       'issue',
       'linear-issue',
+      'plane-issue',
       'pr'
     ])
     expect(store.getUI().worktreeCardProperties).not.toContain('jira-issue')

@@ -88,6 +88,10 @@ export function formatCliError(error: unknown, context: CliErrorContext = {}): s
     }
   }
   if (error instanceof RuntimeClientError && error.code === 'runtime_unavailable') {
+    // Why: a mutation carries its own retry token; the generic advice would bury it.
+    if (hasOrchestrationRequestId(error.data)) {
+      return message
+    }
     return `${message}\nOrca is not running. Run 'orca open' first.`
   }
   // Why: error-specific recovery must win over the generic computer fallback.
@@ -184,4 +188,12 @@ export function formatCliStatus(status: CliStatusResult): string {
 
 export function formatStatus(status: CliStatusResult): string {
   return formatCliStatus(status)
+}
+
+function hasOrchestrationRequestId(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    typeof (data as { orchestrationRequestId?: unknown }).orchestrationRequestId === 'string'
+  )
 }

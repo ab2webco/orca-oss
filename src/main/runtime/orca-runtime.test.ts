@@ -460,29 +460,49 @@ vi.mock('../agent-trust-presets', () => ({
   markCursorWorkspaceTrusted: markCursorWorkspaceTrustedMock
 }))
 
+// Upstream #14703 split hooks.ts; mock each real module, not the retired barrel.
 vi.mock('../hooks', () => ({
-  buildPosixRunnerScript: (script: string) => `#!/usr/bin/env bash\nset -e\n${script}\n`,
-  buildWindowsRunnerScript: (script: string) => `@echo off\r\n${script}\r\n`,
-  createSetupRunnerScript: vi.fn(),
   getEffectiveHooks: vi.fn().mockReturnValue(null),
+  loadHooks: vi.fn().mockReturnValue(null),
+  runHook: vi.fn().mockResolvedValue({ success: true, output: '' }),
+  hasHooksFile: vi.fn().mockReturnValue(false),
+  hasUnrecognizedOrcaYamlKeys: vi.fn().mockReturnValue(false),
+  parseOrcaYaml: vi.fn().mockReturnValue(null)
+}))
+
+vi.mock('../setup-runner-script-text', () => ({
+  buildPosixRunnerScript: (script: string) => `#!/usr/bin/env bash\nset -e\n${script}\n`,
+  buildWindowsRunnerScript: (script: string) => `@echo off\r\n${script}\r\n`
+}))
+
+vi.mock('../worktree-runner-script', () => ({
+  createSetupRunnerScript: vi.fn(),
+  createIssueCommandRunnerScript: vi.fn(),
+  resolveSetupRunnerShell: vi.fn().mockReturnValue(undefined)
+}))
+
+vi.mock('../effective-hook-config', () => ({
   getEffectiveHooksFromConfig: vi.fn().mockReturnValue(null),
   getDefaultTabCommandTrustContent: vi.fn(
     (hooks: { scripts?: { setup?: string } } | null) => hooks?.scripts?.setup?.trim() ?? ''
   ),
   getDefaultTabsLaunch: vi.fn().mockReturnValue(undefined),
+  getEffectiveSetupRunPolicy: vi.fn().mockReturnValue('auto'),
+  shouldRunSetupForCreate: vi
+    .fn()
+    .mockImplementation((_repo: never, decision: string) => decision === 'run')
+}))
+
+vi.mock('../setup-hook-env-vars', () => ({
   getSetupRunnerEnvVars: (_repo: never, worktreePath: string) => ({
     ORCA_ROOT_PATH: '/remote/repo',
     ORCA_WORKTREE_PATH: worktreePath
-  }),
-  loadHooks: vi.fn().mockReturnValue(null),
-  resolveSetupRunnerShell: vi.fn().mockReturnValue(undefined),
-  runHook: vi.fn().mockResolvedValue({ success: true, output: '' }),
-  shouldRunSetupForCreate: vi
-    .fn()
-    .mockImplementation((_repo: never, decision: string) => decision === 'run'),
-  getEffectiveSetupRunPolicy: vi.fn().mockReturnValue('auto'),
-  hasHooksFile: vi.fn().mockReturnValue(false),
-  parseOrcaYaml: vi.fn().mockReturnValue(null)
+  })
+}))
+
+vi.mock('../issue-command-file', () => ({
+  readIssueCommand: vi.fn(),
+  writeIssueCommand: vi.fn()
 }))
 
 vi.mock('../ipc/worktree-logic', async (importOriginal) => {
@@ -495,10 +515,18 @@ vi.mock('../ipc/worktree-logic', async (importOriginal) => {
 })
 
 vi.mock('../ipc/filesystem-auth', () => ({
-  invalidateAuthorizedRootsCache: invalidateAuthorizedRootsCacheMock,
-  isENOENT: (error: unknown) =>
-    Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'),
   resolveAuthorizedPath: vi.fn(async (pathValue: string) => pathValue)
+}))
+
+vi.mock('../ipc/filesystem-path-containment', () => ({
+  isENOENT: (error: unknown) =>
+    Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+}))
+
+vi.mock('../ipc/registered-worktree-roots-cache', () => ({
+  invalidateAuthorizedRootsCache: invalidateAuthorizedRootsCacheMock,
+  registerWorktreeRootsForRepo: vi.fn(),
+  resolveRegisteredWorktreePath: vi.fn()
 }))
 
 vi.mock('../worktree-root-preparation', () => ({
@@ -3878,7 +3906,11 @@ describe('OrcaRuntimeService', () => {
     expect(fsProvider.stat).toHaveBeenCalledWith(folderPath)
     expect(fsProvider.readDir).toHaveBeenCalledWith('/srv/platform/src')
     expect(fsProvider.stat).toHaveBeenCalledWith('/srv/platform/src/app.ts')
-    expect(fsProvider.readFile).toHaveBeenCalledWith('/srv/platform/src/app.ts')
+    // Upstream #14XXX caps remote preview reads at the transport budget.
+    expect(fsProvider.readFile).toHaveBeenCalledWith('/srv/platform/src/app.ts', {
+      maxTextBytes: 512 * 1024,
+      maxBinaryBytes: 10 * 1024 * 1024
+    })
   })
 
   it('lists persisted SSH worktrees while the git provider is unavailable', async () => {

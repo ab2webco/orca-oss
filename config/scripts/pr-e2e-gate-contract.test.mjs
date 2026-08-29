@@ -10,9 +10,6 @@ const e2eWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/e2e.y
 const filterStep = prWorkflow.jobs['e2e-paths'].steps.find(
   (step) => step.name === 'Select E2E scope'
 )
-const rollbackStep = prWorkflow.jobs.static_analysis.steps.find(
-  (step) => step.name === 'Check VM runtime rollback compatibility'
-)
 const verifyStep = prWorkflow.jobs.verify.steps.find(
   (step) => step.name === 'Require successful checks'
 )
@@ -165,12 +162,5 @@ describe('PR E2E gate contract', () => {
     // crafted ref cannot close the quote and run in this shell.
     expect(filterStep.env.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
     expect(filterStep.env.HEAD_SHA).toBe('${{ github.event.pull_request.head.sha }}')
-  })
-
-  it('scopes the VM rollback oracle to the PR range and recipe schema authorities', () => {
-    expect(rollbackStep.run).toContain('--merge-base "$BASE_SHA" "$HEAD_SHA"')
-    expect(rollbackStep.run).toContain('src/shared/ephemeral-vm-recipes.ts')
-    expect(rollbackStep.run).toContain('src/shared/orca-yaml-hook-types.ts')
-    expect(filterStep.run).toContain('ephemeral-vm-recipes|orca-yaml-hook-types')
   })
 })

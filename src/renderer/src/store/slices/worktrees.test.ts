@@ -10764,6 +10764,9 @@ describe('pending worktree creation state', () => {
   it('removePendingWorktreeCreation cleans up a provisioned-root setup and VM runtime', async () => {
     const store = createTestStore()
     const deleteProjectHostSetup = vi.mocked(store.getState().deleteProjectHostSetup)
+    // Upstream #14476 aborts runtime cleanup unless the host rollback is confirmed,
+    // so this path needs a confirmed deletion; the shared mock resolves null.
+    deleteProjectHostSetup.mockResolvedValueOnce({ setupId: 'setup-1' })
     store.getState().beginPendingWorktreeCreation(
       makePendingCreation('c1', {
         phase: 'fetching',

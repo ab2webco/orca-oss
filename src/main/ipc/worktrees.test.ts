@@ -190,21 +190,35 @@ vi.mock('./ssh', () => ({
   getActiveMultiplexer: getActiveMultiplexerMock
 }))
 
+// Upstream #14703 split hooks.ts; mock each real module, not the retired barrel.
 vi.mock('../hooks', () => ({
-  buildPosixRunnerScript: buildPosixRunnerScriptMock,
-  buildWindowsRunnerScript: buildWindowsRunnerScriptMock,
-  createIssueCommandRunnerScript: createIssueCommandRunnerScriptMock,
-  createSetupRunnerScript: createSetupRunnerScriptMock,
   getEffectiveHooks: getEffectiveHooksMock,
-  getEffectiveHooksFromConfig: getEffectiveHooksFromConfigMock,
-  getDefaultTabsLaunch: getDefaultTabsLaunchMock,
-  getSetupRunnerEnvVars: getSetupRunnerEnvVarsMock,
   loadHooks: loadHooksMock,
   parseOrcaYaml: parseOrcaYamlMock,
-  resolveSetupRunnerShell: resolveSetupRunnerShellMock,
   runHook: runHookMock,
   hasHooksFile: hasHooksFileMock,
+  hasUnrecognizedOrcaYamlKeys: vi.fn(() => false)
+}))
+
+vi.mock('../setup-runner-script-text', () => ({
+  buildPosixRunnerScript: buildPosixRunnerScriptMock,
+  buildWindowsRunnerScript: buildWindowsRunnerScriptMock
+}))
+
+vi.mock('../worktree-runner-script', () => ({
+  createIssueCommandRunnerScript: createIssueCommandRunnerScriptMock,
+  createSetupRunnerScript: createSetupRunnerScriptMock,
+  resolveSetupRunnerShell: resolveSetupRunnerShellMock
+}))
+
+vi.mock('../effective-hook-config', () => ({
+  getEffectiveHooksFromConfig: getEffectiveHooksFromConfigMock,
+  getDefaultTabsLaunch: getDefaultTabsLaunchMock,
   shouldRunSetupForCreate: shouldRunSetupForCreateMock
+}))
+
+vi.mock('../setup-hook-env-vars', () => ({
+  getSetupRunnerEnvVars: getSetupRunnerEnvVarsMock
 }))
 
 vi.mock('./worktree-logic', async (importOriginal) => {
