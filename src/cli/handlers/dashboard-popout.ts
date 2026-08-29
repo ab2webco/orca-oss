@@ -33,16 +33,20 @@ async function callDashboardPopout<TResult>(
 }
 
 export const DASHBOARD_POPOUT_HANDLERS: Record<string, CommandHandler> = {
-  'dashboard popout get': async ({ client, json }) => {
+  'dashboard popout show': async ({ client, json }) => {
     const result = await callDashboardPopout<DashboardPopoutResult>(client, 'dashboardPopout.get')
     printResult(result, json, formatState)
   },
   'dashboard popout open': async ({ client, json }) => {
-    const result = await callDashboardPopout<DashboardPopoutResult>(client, 'dashboardPopout.set', { open: true })
+    const result = await callDashboardPopout<DashboardPopoutResult>(client, 'dashboardPopout.set', {
+      open: true
+    })
     printResult(result, json, formatState)
   },
   'dashboard popout close': async ({ client, json }) => {
-    const result = await callDashboardPopout<DashboardPopoutResult>(client, 'dashboardPopout.set', { open: false })
+    const result = await callDashboardPopout<DashboardPopoutResult>(client, 'dashboardPopout.set', {
+      open: false
+    })
     printResult(result, json, formatState)
   }
 }

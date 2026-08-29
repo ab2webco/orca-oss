@@ -37,7 +37,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'dashboard-popout',
-    keys: ['dashboard popout get', 'dashboard popout open', 'dashboard popout close'],
+    keys: ['dashboard popout show', 'dashboard popout open', 'dashboard popout close'],
     load: async () => (await import('./handlers/dashboard-popout.js')).DASHBOARD_POPOUT_HANDLERS
   },
   {

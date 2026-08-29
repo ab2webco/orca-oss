@@ -29,6 +29,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   'cookie',
   'dblclick',
   'diagnostics',
+  'dashboard',
   'dialog',
   'download',
   'drag',

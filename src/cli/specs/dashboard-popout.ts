@@ -3,9 +3,9 @@ import { GLOBAL_FLAGS } from '../args'
 
 export const DASHBOARD_POPOUT_COMMAND_SPECS: CommandSpec[] = [
   {
-    path: ['dashboard', 'popout', 'get'],
+    path: ['dashboard', 'popout', 'show'],
     summary: 'Read whether the Agent Dashboard popout is open',
-    usage: 'orca dashboard popout get [--json]',
+    usage: 'orca dashboard popout show [--json]',
     allowedFlags: [...GLOBAL_FLAGS]
   },
   {
