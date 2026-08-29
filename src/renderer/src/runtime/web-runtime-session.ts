@@ -29,7 +29,8 @@ import type {
   RuntimeCreateAgentSessionResult,
   RuntimeEnsureAgentSessionResult
 } from '../../../shared/agent-session-host-authority'
-import type { TerminalPaneLayoutNode, TuiAgent } from '../../../shared/types'
+import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import { createBrowserUuid } from '../lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
 import { useAppStore } from '../store'

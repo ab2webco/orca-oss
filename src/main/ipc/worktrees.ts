@@ -22,26 +22,36 @@ import { getProjectGroupSubtreeIds } from '../../shared/project-groups'
 import { projectResolvedWorktreeLineage } from '../../shared/resolved-worktree-lineage'
 import { isPathInsideOrEqual, isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
 import { deleteWorktreeHistoryDir } from '../terminal-history-deletion'
+import {
+  pruneWorkspaceCleanupScanSnapshot,
+  pruneWorkspaceCleanupScanSnapshots
+} from '../workspace-cleanup-scan-snapshot'
+import {
+  pruneWorkspaceSpaceAnalysisSnapshot,
+  pruneWorkspaceSpaceAnalysisSnapshots
+} from '../workspace-space-analysis-snapshot'
+import { recordWorkspaceCleanupRemovalSnapshotPrune } from '../workspace-cleanup-removal-snapshot-prune'
+import type { OrcaHooks } from '../../shared/orca-yaml-hook-types'
+import type { Repo } from '../../shared/repo-types'
 import type {
-  AutomationWorkspaceProvenance,
   AdoptProvisionedRootArgs,
-  CliWorkspaceProvenance,
   CreateWorktreeArgs,
   CreateWorktreeResult,
+  ForceDeleteWorktreeBranchResult,
+  RemoveWorktreeResult
+} from '../../shared/worktree/create-types'
+import type { WorkspaceLineage, WorktreeLineage } from '../../shared/worktree/lineage-types'
+import type { WorktreeMeta } from '../../shared/worktree/meta-types'
+import type {
+  AutomationWorkspaceProvenance,
+  CliWorkspaceProvenance,
   DetectedWorktree,
   DetectedWorktreeListResult,
-  ForceDeleteWorktreeBranchResult,
   GitHubPrStartPoint,
   GitPushTarget,
   GitWorktreeInfo,
-  OrcaHooks,
-  Repo,
-  RemoveWorktreeResult,
-  Worktree,
-  WorktreeLineage,
-  WorkspaceLineage,
-  WorktreeMeta
-} from '../../shared/types'
+  Worktree
+} from '../../shared/worktree/types'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree/removal'
 import {
   getRepoExecutionHostId,
@@ -74,7 +84,7 @@ import {
 } from '../../shared/worktree/ownership'
 import {
   createWorktreeVisibilitySourceMatcher,
-  normalizeCustomWorktreeVisibilitySources
+  resolveCustomWorktreeVisibilitySources
 } from '../../shared/worktree/visibility-sources'
 import {
   assertWorktreeCleanForRemoval,
@@ -95,19 +105,17 @@ import { listRepoWorktrees } from '../repo-worktrees'
 import { getSshGitProvider, requireSshGitProvider } from '../providers/ssh-git-dispatch'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
-  createIssueCommandRunnerScript,
   getEffectiveHooks,
-  getEffectiveHooksFromConfig,
-  getSetupRunnerEnvVars,
   loadHooks,
   parseOrcaYaml,
-  readIssueCommand,
-  resolveSetupRunnerShell,
   runHook,
   hasHooksFile,
-  hasUnrecognizedOrcaYamlKeys,
-  writeIssueCommand
+  hasUnrecognizedOrcaYamlKeys
 } from '../hooks'
+import { createIssueCommandRunnerScript, resolveSetupRunnerShell } from '../worktree-runner-script'
+import { getSetupRunnerEnvVars } from '../setup-hook-env-vars'
+import { getEffectiveHooksFromConfig } from '../effective-hook-config'
+import { readIssueCommand, writeIssueCommand } from '../issue-command-file'
 import {
   mergeWorktree,
   parseWorktreeId,
@@ -116,6 +124,8 @@ import {
   isOrphanCompatiblePreflightError,
   isOrphanedWorktreeError
 } from './worktree-logic'
+import { getRetiredNameRegistryForRepo } from '../worktree-name-retirement'
+import { EMPTY_RETIRED_NAME_REGISTRY } from '../../shared/worktree/retired-name-registry'
 import { dedupeWorktreesByPath } from './worktree-path-comparison'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import {
@@ -126,11 +136,11 @@ import {
   notifyWorktreesChanged
 } from './worktree-remote'
 import { registerWorktreeChangeInvalidator } from './worktree-change-invalidators'
+import { isENOENT } from './filesystem-path-containment'
 import {
   invalidateAuthorizedRootsCache,
-  isENOENT,
   registerWorktreeRootsForRepo
-} from './filesystem-auth'
+} from './registered-worktree-roots-cache'
 import type { OrcaRuntimeService, RuntimeWorktreeLifecycleEvent } from '../runtime/orca-runtime'
 import { killAllProcessesForWorktree } from '../runtime/worktree-teardown'
 import { clearProviderPtyState, getLocalPtyProvider, getSshPtyProvider } from './pty'
@@ -166,6 +176,7 @@ type RemoveWorktreeArgs = {
   /** Explicit Force Delete only — `force` alone is set by the ordinary confirmation (#11960). */
   allowUnverifiedPtyStop?: boolean
   skipArchive?: boolean
+  snapshotPruneBatchId?: string
 }
 
 type DetectedWorktreeRequestArgs = { repoId: string } | ListDetectedWorktreesArgs
@@ -330,7 +341,8 @@ function resolveWorktreeRemovalOwnerHostId(
 function removeWorktreeMetadataAndTransientState(
   store: Store,
   worktreeId: string,
-  hostId?: ExecutionHostId
+  hostId?: ExecutionHostId,
+  snapshotPruneBatchId?: string
 ): void {
   // Why: worktree IDs are path-derived and reusable; drop process-local caches before the same ID can map to a new workspace.
   if (hostId) {
@@ -345,6 +357,18 @@ function removeWorktreeMetadataAndTransientState(
   deleteWorktreeHistoryDir(worktreeId)
   // Why: release the removed worktree's PR-refresh aliases so coalesced queue entries don't retain it all session (memory creep).
   pruneWorktreePRRefreshAliases(worktreeId)
+  // Why: removed workspaces must never resurrect from the persisted cleanup/space scan snapshots.
+  const snapshotDirectory = store.getProfileStorageDirectory()
+  if (snapshotPruneBatchId) {
+    recordWorkspaceCleanupRemovalSnapshotPrune(snapshotDirectory, {
+      batchId: snapshotPruneBatchId,
+      worktreeId,
+      executionHostId: hostId
+    })
+    return
+  }
+  void pruneWorkspaceCleanupScanSnapshot(snapshotDirectory, worktreeId, hostId)
+  void pruneWorkspaceSpaceAnalysisSnapshot(snapshotDirectory, worktreeId, hostId)
 }
 
 function getProjectHostSetupMetaUpdates(
@@ -862,7 +886,7 @@ function buildDetectedGitWorktrees(
   )
   const worktreeVisibilitySourceMatcher = createWorktreeVisibilitySourceMatcher(
     [repo.path, ...liveWorktrees.map((worktree) => worktree.path)],
-    normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+    resolveCustomWorktreeVisibilitySources(repo, settings.worktreeVisibilityDefaults)
   )
   const detected = liveWorktrees.map((gitWorktree) => {
     const worktreeId = `${repo.id}::${gitWorktree.path}`
@@ -1023,7 +1047,7 @@ function buildFolderDetectedWorktrees(store: Store, repo: Repo): DetectedWorktre
   const worktrees = listFolderWorkspaces(store, repo)
   const worktreeVisibilitySourceMatcher = createWorktreeVisibilitySourceMatcher(
     [repo.path, ...worktrees.map((worktree) => worktree.path)],
-    normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+    resolveCustomWorktreeVisibilitySources(repo, settings.worktreeVisibilityDefaults)
   )
   return worktrees.map((worktree) =>
     toDetectedWorktree({
@@ -1113,7 +1137,7 @@ function buildDisconnectedDetectedWorktrees(
   const settings = store.getSettings()
   const worktreeVisibilitySourceMatcher = createWorktreeVisibilitySourceMatcher(
     [repo.path, ...worktrees.map((worktree) => worktree.path)],
-    normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+    resolveCustomWorktreeVisibilitySources(repo, settings.worktreeVisibilityDefaults)
   )
   const detected = worktrees.map((worktree) => {
     const meta = store.getWorktreeMeta(worktree.id)
@@ -1841,6 +1865,7 @@ export function registerWorktreeHandlers(
   // Remove previously registered handlers so re-register works when macOS re-activates and creates a new window.
   ipcMain.removeHandler('worktrees:listAll')
   ipcMain.removeHandler('worktrees:list')
+  ipcMain.removeHandler('worktrees:listRetiredNames')
   ipcMain.removeHandler('worktrees:listDetected')
   ipcMain.removeHandler('worktrees:listKnownForExecutionHost')
   ipcMain.removeHandler('worktrees:forgetRemovedForExecutionHost')
@@ -1927,6 +1952,14 @@ export function registerWorktreeHandlers(
     })
 
     return results.flat()
+  })
+
+  ipcMain.handle('worktrees:listRetiredNames', async (_event, args: { repoId: string }) => {
+    const repo = store.getRepo(args.repoId)
+    if (!repo) {
+      return EMPTY_RETIRED_NAME_REGISTRY
+    }
+    return getRetiredNameRegistryForRepo(store, repo, store.getRepos(), store.getSettings())
   })
 
   ipcMain.handle('worktrees:list', async (_event, args: { repoId: string }) => {
@@ -2090,6 +2123,15 @@ export function registerWorktreeHandlers(
         }
         store.removeWorktreeMeta(worktreeId, requestedExecutionHostId)
         forgottenWorktreeIds.push(worktreeId)
+      }
+      if (forgottenWorktreeIds.length > 0) {
+        const snapshotDirectory = store.getProfileStorageDirectory()
+        const targets = forgottenWorktreeIds.map((worktreeId) => ({
+          worktreeId,
+          executionHostId: requestedExecutionHostId
+        }))
+        void pruneWorkspaceCleanupScanSnapshots(snapshotDirectory, targets)
+        void pruneWorkspaceSpaceAnalysisSnapshots(snapshotDirectory, targets)
       }
       return { forgottenWorktreeIds }
     }
@@ -2508,7 +2550,12 @@ export function registerWorktreeHandlers(
               })
             })
             await withWorktreeRemoveStageSpan('metadata_purge', 'folder', async () => {
-              removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+              removeWorktreeMetadataAndTransientState(
+                store,
+                args.worktreeId,
+                removalHostId,
+                args.snapshotPruneBatchId
+              )
             })
             preservedBranchCleanupByScope.delete(
               preservedBranchCleanupScopeKey({ worktreeId: args.worktreeId, hostId: removalHostId })
@@ -2620,7 +2667,12 @@ export function registerWorktreeHandlers(
                 invalidateAuthorizedRootsCache()
               }
               runtime.clearOptimisticReconcileToken(args.worktreeId)
-              removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+              removeWorktreeMetadataAndTransientState(
+                store,
+                args.worktreeId,
+                removalHostId,
+                args.snapshotPruneBatchId
+              )
               preservedBranchCleanupByScope.delete(
                 preservedBranchCleanupScopeKey({
                   worktreeId: args.worktreeId,
@@ -2670,7 +2722,12 @@ export function registerWorktreeHandlers(
                   localWorktreeGitOptions
                 )
                 runtime.clearOptimisticReconcileToken(args.worktreeId)
-                removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+                removeWorktreeMetadataAndTransientState(
+                  store,
+                  args.worktreeId,
+                  removalHostId,
+                  args.snapshotPruneBatchId
+                )
                 preservedBranchCleanupByScope.delete(
                   preservedBranchCleanupScopeKey({
                     worktreeId: args.worktreeId,
@@ -2707,7 +2764,12 @@ export function registerWorktreeHandlers(
                 invalidateAuthorizedRootsCache()
               }
               runtime.clearOptimisticReconcileToken(args.worktreeId)
-              removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+              removeWorktreeMetadataAndTransientState(
+                store,
+                args.worktreeId,
+                removalHostId,
+                args.snapshotPruneBatchId
+              )
               preservedBranchCleanupByScope.delete(
                 preservedBranchCleanupScopeKey({
                   worktreeId: args.worktreeId,
@@ -2767,7 +2829,12 @@ export function registerWorktreeHandlers(
               removedPushTarget
             )
             runtime.clearOptimisticReconcileToken(args.worktreeId)
-            removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+            removeWorktreeMetadataAndTransientState(
+              store,
+              args.worktreeId,
+              removalHostId,
+              args.snapshotPruneBatchId
+            )
             invalidateAuthorizedRootsCache()
             notifyWorktreesChanged(mainWindow, repoId)
             return removalResult ?? {}
@@ -2866,7 +2933,12 @@ export function registerWorktreeHandlers(
             )
             runtime.clearOptimisticReconcileToken(args.worktreeId)
             await withWorktreeRemoveStageSpan('metadata_purge', 'remote', async () => {
-              removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+              removeWorktreeMetadataAndTransientState(
+                store,
+                args.worktreeId,
+                removalHostId,
+                args.snapshotPruneBatchId
+              )
             })
             notifyWorktreesChanged(mainWindow, repoId)
             return removalResult ?? {}
@@ -3012,7 +3084,12 @@ export function registerWorktreeHandlers(
                   localWorktreeGitOptions
                 )
                 runtime.clearOptimisticReconcileToken(args.worktreeId)
-                removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+                removeWorktreeMetadataAndTransientState(
+                  store,
+                  args.worktreeId,
+                  removalHostId,
+                  args.snapshotPruneBatchId
+                )
                 preservedBranchCleanupByScope.delete(
                   preservedBranchCleanupScopeKey({
                     worktreeId: args.worktreeId,
@@ -3049,7 +3126,12 @@ export function registerWorktreeHandlers(
           )
           runtime.clearOptimisticReconcileToken(args.worktreeId)
           await withWorktreeRemoveStageSpan('metadata_purge', 'local', async () => {
-            removeWorktreeMetadataAndTransientState(store, args.worktreeId, removalHostId)
+            removeWorktreeMetadataAndTransientState(
+              store,
+              args.worktreeId,
+              removalHostId,
+              args.snapshotPruneBatchId
+            )
           })
           await withWorktreeRemoveStageSpan('cache_invalidation', 'local', async () => {
             invalidateAuthorizedRootsCache()
@@ -3081,7 +3163,7 @@ export function registerWorktreeHandlers(
     'worktrees:forgetLocal',
     async (
       _event,
-      args: Pick<RemoveWorktreeArgs, 'worktreeId' | 'hostId'>
+      args: Pick<RemoveWorktreeArgs, 'worktreeId' | 'hostId' | 'snapshotPruneBatchId'>
     ): Promise<RemoveWorktreeResult> => {
       const { repoId } = parseWorktreeId(args.worktreeId)
       const repo = getRepoForWorktreeRemoval(store, repoId, args.hostId)
@@ -3143,7 +3225,12 @@ export function registerWorktreeHandlers(
 
         runtime.clearOptimisticReconcileToken(args.worktreeId)
         // The resolved owner, not args.hostId: an orphan forget with no hostId still has to purge its SSH/runtime partition.
-        removeWorktreeMetadataAndTransientState(store, args.worktreeId, ownerHost?.id)
+        removeWorktreeMetadataAndTransientState(
+          store,
+          args.worktreeId,
+          ownerHost?.id,
+          args.snapshotPruneBatchId
+        )
         // Why: cached roots outlive the forgotten workspace, so an ownerless path stays filesystem-authorized until a rebuild.
         invalidateAuthorizedRootsCache()
         if (ownerHost?.id) {

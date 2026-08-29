@@ -10,7 +10,7 @@ import { TERMINAL_HISTORY_INLINE_SEED_CODE_UNITS } from './terminal-history-seed
 import { HISTORY_SEED_TRANSFER_PROTOCOL_VERSION } from './daemon-protocol-version'
 import { DAEMON_SESSION_SCROLLBACK_ROWS } from './daemon-session-scrollback-window'
 import type { DaemonFileLog } from './daemon-file-log'
-import type { SubprocessHandle } from './session'
+import type { SubprocessHandle } from './session-subprocess-handle'
 
 function createMockSubprocess(): SubprocessHandle & {
   emitData: (data: string) => void

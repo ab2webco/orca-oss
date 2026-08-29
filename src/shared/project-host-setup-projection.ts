@@ -1,13 +1,9 @@
 import { getRepoExecutionHostId } from './execution-host'
 import { normalizeGitHubRemoteHost } from './git-remote-host-alias'
 import { githubRepoIdentityKey, isDefaultGitHubHost } from './github/repository-identity-key'
-import type {
-  Project,
-  ProjectHostSetup,
-  ProjectProviderIdentity,
-  Repo,
-  WorktreeMeta
-} from './types'
+import type { Project, ProjectHostSetup, ProjectProviderIdentity } from './project-types'
+import type { Repo } from './repo-types'
+import type { WorktreeMeta } from './worktree/meta-types'
 
 type ProjectAccumulator = {
   project: Project
@@ -18,7 +14,7 @@ export type ProjectHostSetupProjection = {
   setups: readonly ProjectHostSetup[]
 }
 
-function getProjectProviderIdentity(
+export function getProjectProviderIdentity(
   repo: Pick<Repo, 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): ProjectProviderIdentity | null {
   const owner = typeof repo.upstream?.owner === 'string' ? repo.upstream.owner.trim() : ''

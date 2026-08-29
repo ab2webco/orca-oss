@@ -1,10 +1,10 @@
+import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
+import type { TuiAgent } from '../../shared/tui-agent'
 import type {
-  PersistedUIState,
-  TuiAgent,
   WorktreeDefaultTabsLaunch,
   WorktreeSetupLaunch,
   WorktreeStartupLaunch
-} from '../../shared/types'
+} from '../../shared/worktree/launch-types'
 import type { FeatureInteractionId } from '../../shared/feature-interactions'
 import type { KeybindingActionId } from '../../shared/keybindings'
 import type { BrowserFindSource } from '../../shared/browser-find-source'

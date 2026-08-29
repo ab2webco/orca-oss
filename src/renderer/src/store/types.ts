@@ -33,6 +33,7 @@ import type { RuntimeDetectedAgentsSlice } from './slices/runtime-detected-agent
 import type { WorktreeNavHistorySlice } from './slices/worktree-nav-history'
 import type { DictationSlice } from './slices/dictation'
 import type { WorkspaceCleanupSlice } from './slices/workspace-cleanup'
+import type { WorkspaceCleanupBrowseSlice } from './slices/workspace-cleanup-browse'
 import type { RuntimeStatusSlice } from './slices/runtime-status'
 import type { PullRequestGenerationSlice } from './slices/pull-request-generation'
 import type { CommitMessageGenerationSlice } from './slices/commit-message-generation'
@@ -78,6 +79,7 @@ export type AppState = RepoSlice &
   WorktreeNavHistorySlice &
   DictationSlice &
   WorkspaceCleanupSlice &
+  WorkspaceCleanupBrowseSlice &
   RuntimeStatusSlice &
   PullRequestGenerationSlice &
   CommitMessageGenerationSlice &

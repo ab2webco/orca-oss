@@ -8,26 +8,24 @@ import type {
 import type { AgentSessionLogReading } from './agent-session-log-state'
 import type { ComposerReadyState } from './composer-ready-observation'
 import type {
-  BaseRefSearchResult,
-  BrowserCookieImportResult,
   BrowserCertificateFailure,
+  BrowserCookieImportResult,
   BrowserLoadError,
   BrowserSessionProfile,
-  BrowserSessionProfileSource,
-  CreateWorktreeResult,
-  GitWorktreeInfo,
-  RemoveWorktreeResult,
-  Repo,
-  TabGroupLayoutNode,
-  TerminalColorOverrides,
-  TerminalLayoutSnapshot,
-  TuiAgent,
-  Worktree,
-  WorktreeLineage,
+  BrowserSessionProfileSource
+} from './browser-workspace-types'
+import type { BaseRefSearchResult, Repo } from './repo-types'
+import type { TabGroupLayoutNode } from './tab-types'
+import type { TerminalColorOverrides } from './terminal-color-overrides'
+import type { TerminalLayoutSnapshot, TerminalPaneLayoutNode } from './terminal-tab-types'
+import type { TuiAgent } from './tui-agent'
+import type { CreateWorktreeResult, RemoveWorktreeResult } from './worktree/create-types'
+import type {
   WorkspaceLineage,
-  WorktreeLineageWarning,
-  TerminalPaneLayoutNode
-} from './types'
+  WorktreeLineage,
+  WorktreeLineageWarning
+} from './worktree/lineage-types'
+import type { GitWorktreeInfo, Worktree } from './worktree/types'
 import type {
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult
@@ -152,6 +150,11 @@ export type RuntimeSyncWindowGraph = {
   /** Worktrees the renderer is still publishing unchanged; main must keep their
    *  stored snapshots alive instead of pruning them as removed. */
   unchangedMobileSessionWorktrees?: string[]
+}
+
+export type RuntimeRendererSyncWindowGraph = RuntimeSyncWindowGraph & {
+  /** Unique to one renderer document; a reload must publish from a new generation. */
+  rendererGeneration: string
 }
 
 export type RuntimeNativeChatLaunchDraftResolution = {

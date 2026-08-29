@@ -35,11 +35,8 @@ import { isTerminalPreviewRenderer, registerTerminalPreviewHandlers } from './te
 import { registerAgentTerminalTailHandlers } from './agent-terminal-tail'
 import { registerDeveloperPermissionHandlers } from './developer-permissions'
 import { registerComputerUsePermissionHandlers } from './computer-use-permissions'
-import {
-  setTrustedBrowserRendererWebContentsId,
-  setAgentBrowserBridgeRef,
-  registerBrowserHandlers
-} from './browser'
+import { setAgentBrowserBridgeRef, registerBrowserHandlers } from './browser'
+import { setTrustedBrowserRendererWebContentsId } from './browser-renderer-trust'
 import { registerSessionHandlers } from './session'
 import { registerSettingsHandlers } from './settings'
 import { registerDiagnosticsHandlers } from './diagnostics'

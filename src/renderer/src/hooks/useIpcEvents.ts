@@ -29,9 +29,9 @@ import { nextEditorFontZoomLevel, computeEditorFontSize } from '@/lib/editor-fon
 import { canConnectSshStatus } from '@/ssh/ssh-connection-recoverability'
 import type {
   TerminalLayoutSnapshot,
-  TerminalPaneLayoutNode,
-  UpdateStatus
-} from '../../../shared/types'
+  TerminalPaneLayoutNode
+} from '../../../shared/terminal-tab-types'
+import type { UpdateStatus } from '../../../shared/update-status-types'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { DirectSshAuthority, SshConnectionState } from '../../../shared/ssh-types'
 import {
@@ -941,14 +941,20 @@ export function useIpcEvents(): void {
         // Why: the host emits one reposChanged for group/folder-workspace edits too, so those
         // catalogs go stale without this; groups first because folder workspaces resolve owners from them.
         const runtimeOwner = { runtimeEnvironmentId: environmentId }
-        await useAppStore.getState().fetchProjectGroups(runtimeOwner)
-        await useAppStore.getState().fetchFolderWorkspaces(runtimeOwner)
-        await refreshRuntimeProjectWorktreesAndLineage(
-          environmentId,
-          repos,
-          (repoId, options) => useAppStore.getState().fetchWorktrees(repoId, options),
-          (options) => useAppStore.getState().fetchWorktreeLineage(options)
-        )
+        // Why: catalogs and worktrees are independent; serializing them put two 15s RPC
+        // timeouts ahead of worktree/lineage convergence on a wedged host.
+        await Promise.all([
+          (async () => {
+            await useAppStore.getState().fetchProjectGroups(runtimeOwner)
+            await useAppStore.getState().fetchFolderWorkspaces(runtimeOwner)
+          })(),
+          refreshRuntimeProjectWorktreesAndLineage(
+            environmentId,
+            repos,
+            (repoId, options) => useAppStore.getState().fetchWorktrees(repoId, options),
+            (options) => useAppStore.getState().fetchWorktreeLineage(options)
+          )
+        ])
       },
       onError: (error) => {
         console.error('Failed to refresh runtime projects:', error)
@@ -1252,16 +1258,31 @@ export function useIpcEvents(): void {
         if (!store.settings) {
           return
         }
+        const { worktreeVisibilityDefaults, ...activeOwnerUpdates } = updates
+        const settingsUpdates = store.settings.activeRuntimeEnvironmentId
+          ? activeOwnerUpdates
+          : updates
         useAppStore.setState({
           settings: {
             ...store.settings,
-            ...updates,
+            ...settingsUpdates,
             notifications: {
               ...store.settings.notifications,
               ...updates.notifications
             }
-          }
+          },
+          ...(worktreeVisibilityDefaults
+            ? {
+                worktreeVisibilityDefaultsByHost: {
+                  ...store.worktreeVisibilityDefaultsByHost,
+                  local: worktreeVisibilityDefaults
+                }
+              }
+            : {})
         })
+        if ('worktreeVisibilityDefaults' in updates) {
+          void store.fetchAllWorktrees({ visibilityOwnerHostId: 'local' })
+        }
       })
     )
 
@@ -2034,33 +2055,36 @@ export function useIpcEvents(): void {
     // Why: during an in-place renderer reload an older preload can linger; keep this listener additive at that seam.
     if (window.api.ui.onTerminalTabCloseRequest) {
       unsubs.push(
-        window.api.ui.onTerminalTabCloseRequest(({ requestId, tabId }) => {
-          let responded = false
-          const respond = (error?: string): void => {
-            if (responded) {
-              return
+        window.api.ui.onTerminalTabCloseRequest(
+          ({ requestId, tabId, localPtyTeardownOwnedExternally }) => {
+            let responded = false
+            const respond = (error?: string): void => {
+              if (responded) {
+                return
+              }
+              responded = true
+              window.api.ui.respondTerminalTabClose({ requestId, ...(error ? { error } : {}) })
             }
-            responded = true
-            window.api.ui.respondTerminalTabClose({ requestId, ...(error ? { error } : {}) })
+            closeTerminalTab(tabId, {
+              rejectPinned: true,
+              ...(localPtyTeardownOwnedExternally ? { localPtyTeardownOwnedExternally: true } : {}),
+              onCancel: () => respond('terminal_tab_pinned'),
+              onClosed: () => {
+                void (async () => {
+                  const state = useAppStore.getState()
+                  await persistWorkspaceSessionByHost(
+                    window.api.session,
+                    buildWorkspaceSessionPayload(state),
+                    state
+                  )
+                  respond()
+                })().catch((error: unknown) => {
+                  respond(error instanceof Error ? error.message : 'terminal_tab_close_failed')
+                })
+              }
+            })
           }
-          closeTerminalTab(tabId, {
-            rejectPinned: true,
-            onCancel: () => respond('terminal_tab_pinned'),
-            onClosed: () => {
-              void (async () => {
-                const state = useAppStore.getState()
-                await persistWorkspaceSessionByHost(
-                  window.api.session,
-                  buildWorkspaceSessionPayload(state),
-                  state
-                )
-                respond()
-              })().catch((error: unknown) => {
-                respond(error instanceof Error ? error.message : 'terminal_tab_close_failed')
-              })
-            }
-          })
-        })
+        )
       )
     }
 

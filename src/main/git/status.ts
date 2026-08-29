@@ -4,18 +4,20 @@ import { readFile, stat } from 'node:fs/promises'
 import * as path from 'node:path'
 import type {
   GitBranchChangeEntry,
-  GitBranchChangeStatus,
   GitBranchCompareResult,
   GitBranchCompareSummary,
   GitCommitCompareResult,
+  GitDiffResult
+} from '../../shared/git-diff-compare-types'
+import type {
+  GitBranchChangeStatus,
   GitConflictKind,
   GitConflictOperation,
-  GitDiffResult,
   GitFileStatus,
   GitStatusEntry,
   GitStatusResult,
   GitUpstreamStatus
-} from '../../shared/types'
+} from '../../shared/git-status-types'
 import type { CommitMessageDraftContext } from '../../shared/commit-message-generation'
 import {
   getEffectiveGitUpstreamStatus,
