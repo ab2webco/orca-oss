@@ -264,7 +264,7 @@ import {
   invalidateAuthorizedRootsCache,
   registerWorktreeRootsForRepo,
   resolveRegisteredWorktreePath
-} from './filesystem-auth'
+} from './registered-worktree-roots-cache'
 import { _resetTracerForTests, setActiveSink } from '../observability/tracer'
 import type { RedactableSpan } from '../observability/redactor'
 import {

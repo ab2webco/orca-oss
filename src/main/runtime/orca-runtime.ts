@@ -189,8 +189,95 @@ import type {
   AutomationWorkspaceMode
 } from '../../shared/automations-types'
 import { createStartupAgentRefusedError } from './startup-agent-refused-error'
-import type { AutomationWorkspaceProvenance, CliWorkspaceProvenance, BaseRefSearchResult, CreateWorktreeResult, DetectedWorktree, DetectedWorktreeListResult, ForceDeleteWorktreeBranchResult, GitHubPrStartPoint, GitPushTarget, BranchPrefixStrategy, GitWorktreeInfo, GitHubCreateIssueFields, GitHubOwnerRepo, GlobalSettings, LinkedPlaneWorkItem, PersistedUIState, Project, ProjectUpdateArgs, ProjectHostSetup, ProjectHostSetupCloneArgs, ProjectHostSetupCreateArgs, ProjectHostSetupCreateResult, ProjectHostSetupDeleteArgs, ProjectHostSetupDeleteResult, ProjectHostSetupExistingFolderArgs, ProjectHostSetupResult, ProjectHostSetupUpdateArgs, ProjectHostSetupUpdateResult, Repo, RemoveWorktreeResult, StatsSummary, Worktree, WorktreeLineage, WorkspaceLineage, WorkspaceKey, WorktreeLineageWarning, WorktreeMeta, WorktreeBaseStatusEvent, WorktreeRemoteBranchConflictEvent, WorktreeStartupLaunch, LinearCustomViewModel, JiraConnectArgs, JiraCreateIssueArgs, JiraIssueFilter, JiraIssueUpdate, JiraSiteSelection, LinearIssueUpdate, LinearProjectSummary, LinearWorkspaceSelection, NestedRepoScanResult, ProjectGroup, FolderWorkspace, ProjectGroupImportMode, ProjectGroupImportResult, MemorySnapshot, Tab, TabGroupLayoutNode, TerminalQuickCommand, TerminalLayoutSnapshot, TerminalPaneLayoutNode, TerminalTab, TuiAgent, WorkspaceCreateTelemetrySource, WorkspaceSessionState, WorkspaceLinkedItem, DirEntry, FilesystemPathFlavor, GitHubIssueUpdate, GitHubPullRequestStateUpdate, GitHubPRFile, GitHubPRReviewCommentInput, GitHubReactionContent, GitLabIssueUpdate, GitLabMRInlineCommentInput, GitLabProjectRef, GitLabWorkItem, ListWorkItemsResult, MRListState, PRRefreshOutcome, ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../shared/types'
-import type { ClaudeTerminalAccountReport, ClaudeTerminalAccountOwnership, ClaudeVaultSettingsInheritanceReport, ManagedPtyAccountOwner } from '../../shared/managed-account-types'
+import type {
+  AutomationWorkspaceProvenance,
+  CliWorkspaceProvenance,
+  BaseRefSearchResult,
+  CreateWorktreeResult,
+  DetectedWorktree,
+  DetectedWorktreeListResult,
+  ForceDeleteWorktreeBranchResult,
+  GitHubPrStartPoint,
+  GitPushTarget,
+  BranchPrefixStrategy,
+  GitWorktreeInfo,
+  GitHubCreateIssueFields,
+  GitHubOwnerRepo,
+  GlobalSettings,
+  LinkedPlaneWorkItem,
+  PersistedUIState,
+  Project,
+  ProjectUpdateArgs,
+  ProjectHostSetup,
+  ProjectHostSetupCloneArgs,
+  ProjectHostSetupCreateArgs,
+  ProjectHostSetupCreateResult,
+  ProjectHostSetupDeleteArgs,
+  ProjectHostSetupDeleteResult,
+  ProjectHostSetupExistingFolderArgs,
+  ProjectHostSetupResult,
+  ProjectHostSetupUpdateArgs,
+  ProjectHostSetupUpdateResult,
+  Repo,
+  RemoveWorktreeResult,
+  StatsSummary,
+  Worktree,
+  WorktreeLineage,
+  WorkspaceLineage,
+  WorkspaceKey,
+  WorktreeLineageWarning,
+  WorktreeMeta,
+  WorktreeBaseStatusEvent,
+  WorktreeRemoteBranchConflictEvent,
+  WorktreeStartupLaunch,
+  LinearCustomViewModel,
+  JiraConnectArgs,
+  JiraCreateIssueArgs,
+  JiraIssueFilter,
+  JiraIssueUpdate,
+  JiraSiteSelection,
+  LinearIssueUpdate,
+  LinearProjectSummary,
+  LinearWorkspaceSelection,
+  NestedRepoScanResult,
+  ProjectGroup,
+  FolderWorkspace,
+  ProjectGroupImportMode,
+  ProjectGroupImportResult,
+  MemorySnapshot,
+  Tab,
+  TabGroupLayoutNode,
+  TerminalQuickCommand,
+  TerminalLayoutSnapshot,
+  TerminalPaneLayoutNode,
+  TerminalTab,
+  TuiAgent,
+  WorkspaceCreateTelemetrySource,
+  WorkspaceSessionState,
+  WorkspaceLinkedItem,
+  DirEntry,
+  FilesystemPathFlavor,
+  GitHubIssueUpdate,
+  GitHubPullRequestStateUpdate,
+  GitHubPRFile,
+  GitHubPRReviewCommentInput,
+  GitHubReactionContent,
+  GitLabIssueUpdate,
+  GitLabMRInlineCommentInput,
+  GitLabProjectRef,
+  GitLabWorkItem,
+  ListWorkItemsResult,
+  MRListState,
+  PRRefreshOutcome,
+  ClaudeRateLimitAccountsState,
+  CodexRateLimitAccountsState
+} from '../../shared/types'
+import type {
+  ClaudeTerminalAccountReport,
+  ClaudeTerminalAccountOwnership,
+  ClaudeVaultSettingsInheritanceReport,
+  ManagedPtyAccountOwner
+} from '../../shared/managed-account-types'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
@@ -884,7 +971,7 @@ import type {
   UpdateIssueTypeBySlugArgs,
   UpdateProjectItemFieldArgs,
   UpdatePullRequestBySlugArgs
-} from '../../shared/github/project-types'
+} from '../../shared/github/project-request-types'
 import {
   getBaseRefDefault,
   getDefaultRemote,
@@ -918,23 +1005,24 @@ import {
   removeWorktree
 } from '../git/worktree'
 import type { AddWorktreeOptions, AddWorktreeResult } from '../git/worktree'
-import { isENOENT, invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { isENOENT } from '../ipc/filesystem-path-containment'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
-  createSetupRunnerScript,
-  getDefaultTabCommandTrustContent,
-  getDefaultTabsLaunch,
   getEffectiveHooks,
-  getEffectiveSetupRunPolicy,
   hasUnrecognizedOrcaYamlKeys,
   hasHooksFile,
   loadHooks,
   parseOrcaYaml,
-  readIssueCommand,
-  resolveSetupRunnerShell,
-  runHook,
-  shouldRunSetupForCreate,
-  writeIssueCommand
+  runHook
 } from '../hooks'
+import { createSetupRunnerScript, resolveSetupRunnerShell } from '../worktree-runner-script'
+import {
+  getDefaultTabCommandTrustContent,
+  getDefaultTabsLaunch,
+  getEffectiveSetupRunPolicy,
+  shouldRunSetupForCreate
+} from '../effective-hook-config'
+import { readIssueCommand, writeIssueCommand } from '../issue-command-file'
 import {
   DEFAULT_REPO_BADGE_COLOR,
   FLOATING_TERMINAL_WORKTREE_ID,
@@ -1197,6 +1285,7 @@ type RuntimeStore = {
   getSettings(): {
     workspaceDir: string
     nestWorkspaces: boolean
+    worktreeVisibilityDefaults?: GlobalSettings['worktreeVisibilityDefaults']
     refreshLocalBaseRefOnWorktreeCreate: boolean
     localBaseRefSuggestionDismissed?: boolean
     branchPrefix: string
@@ -3647,6 +3736,7 @@ export class OrcaRuntimeService {
     // Read-only on purpose: clients preflight the publish capability here, but SettingsUpdate
     // still omits the key so no RPC caller can grant it to itself.
     | 'artifactSharingEnabled'
+    | 'worktreeVisibilityDefaults'
   > {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
@@ -3671,7 +3761,8 @@ export class OrcaRuntimeService {
       minimaxGroupId: settings.minimaxGroupId ?? '',
       minimaxUsageModels: settings.minimaxUsageModels ?? 'general',
       prBotAuthorOverrides: settings.prBotAuthorOverrides ?? [],
-      artifactSharingEnabled: isArtifactSharingEnabled(settings)
+      artifactSharingEnabled: isArtifactSharingEnabled(settings),
+      worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults
     }
   }
 

@@ -4355,9 +4355,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         backendOwnsPtyTeardown: true
       })
       // Why: dispose the SSH relay AFTER terminal teardown so a still-mounted pane can't hit a gone relay and toast "SSH not active".
-      const destroyedRuntimeSshTargetIds = await cleanupEphemeralVmRuntimesForDeleted({
-        workspaceIds: [worktreeId]
-      })
+      const { destroyedSshTargetIds: destroyedRuntimeSshTargetIds } =
+        await cleanupEphemeralVmRuntimesForDeleted({
+          workspaceIds: [worktreeId]
+        })
       // Remove the orphaned project for the destroyed SSH target so it can't surface as a dead project in the composer.
       await purgeOrphanedRuntimeSshProjects(get, destroyedRuntimeSshTargetIds)
       const tabs = get().tabsByWorktree[worktreeId] ?? []

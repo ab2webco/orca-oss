@@ -13,8 +13,7 @@ import {
   parseGitHubIssueOrPRLink,
   normalizeGitHubLinkQuery
 } from '@/lib/github-links'
-import { activateAndRevealWorktree } from '@/lib/worktree-activation'
-import type { AgentStartedTelemetry } from '@/lib/worktree-startup-payload'
+import { activateAndRevealWorktree, type AgentStartedTelemetry } from '@/lib/worktree-activation'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import {
   findPendingLinkedWorkItemCreationId,
@@ -40,27 +39,26 @@ import {
   normalizeTaskSourceContext,
   type TaskSourceContext
 } from '../../../shared/task-source-context'
-import type { GitHubRepositoryIdentity } from '../../../shared/github/pull-request-types'
-import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
-import type { GitLabWorkItem } from '../../../shared/gitlab-types'
-import type { JiraIssue } from '../../../shared/jira-types'
-import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type {
+  GitHubRepositoryIdentity,
+  GitHubWorkItem,
+  GitHubPrStartPoint,
+  GitPushTarget,
+  GitLabWorkItem,
+  JiraIssue,
+  LinearIssue,
   OrcaHooks,
   RepoHookSettings,
   SetupAgentStartupPolicy,
-  SetupRunPolicy
-} from '../../../shared/orca-yaml-hook-types'
-import type { ProjectGroup } from '../../../shared/project-group-types'
-import type { TuiAgent } from '../../../shared/tui-agent'
-import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
-import type { SetupDecision, SparsePreset } from '../../../shared/worktree/create-types'
-import type { WorktreeMeta } from '../../../shared/worktree/meta-types'
-import type {
-  GitHubPrStartPoint,
-  GitPushTarget,
-  WorkspaceStatus
-} from '../../../shared/worktree/types'
+  SetupDecision,
+  SetupRunPolicy,
+  SparsePreset,
+  TuiAgent,
+  WorktreeMeta,
+  WorkspaceStatus,
+  WorkspaceCreateTelemetrySource,
+  ProjectGroup
+} from '../../../shared/types'
 import { githubRepoIdentityKey } from '../../../shared/github/repository-identity-key'
 import { isWorkspaceStatusId } from '../../../shared/workspace-statuses'
 import {
@@ -166,7 +164,6 @@ import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overr
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
 import { getSuggestedCreatureName } from '@/components/sidebar/worktree-name-suggestions'
-import { useRetiredWorktreeNames } from '@/hooks/useRetiredWorktreeNames'
 import type { SmartWorkspaceNameSelection } from '@/components/new-workspace/SmartWorkspaceNameField'
 import {
   isBlockingJiraUrlIntent,
@@ -1626,19 +1623,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const shouldWaitForSetupCheck = Boolean(selectedRepo) && selectedRepoIsGit && isSetupCheckPending
 
   // Why: blank name with no other seed → globally-unique creature name so workspaces don't collide across repos or on a literal default.
-  // Retired names are excluded too, so a recreated workspace never reuses a deleted one's path.
-  const retiredNamesRefreshKey = useMemo(
-    () =>
-      (worktreesByRepo[repoId] ?? [])
-        .map((worktree) => worktree.path)
-        .sort()
-        .join('\0'),
-    [repoId, worktreesByRepo]
-  )
-  const retiredWorktreeNames = useRetiredWorktreeNames(repoId, retiredNamesRefreshKey)
   const fallbackCreatureName = useMemo(
-    () => getSuggestedCreatureName(worktreesByRepo, undefined, retiredWorktreeNames),
-    [worktreesByRepo, retiredWorktreeNames]
+    () => getSuggestedCreatureName(worktreesByRepo),
+    [worktreesByRepo]
   )
   const workspaceSeedName = useMemo(
     () =>
@@ -3682,12 +3669,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       if (!workspaceName) {
         return
       }
-      // Why: only a name Orca generated may be retired — the creature pool contains ordinary words
-      // ("orca", "runner", "molly") a user can type deliberately and expect to reuse.
-      // The identity check is what a linked PR/issue seed makes necessary here; mobile's blank-create
-      // path (NewWorktreeModal, `nameWasGenerated: !trimmedName`) has no other seed, so it can't
-      // share this expression. Same rule, two submit paths — change both together.
-      const nameWasGenerated = !name.trim() && workspaceName === fallbackCreatureName
       const submitBaseBranch =
         smartGitHubResolution.kind === 'pr-start-point'
           ? smartGitHubResolution.baseBranch
@@ -3946,7 +3927,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           ...(linkedPlaneWorkItem ? { linkedPlaneWorkItem } : {}),
           linkedWorkItem: toFolderWorkspaceLinkedTask(submitLinkedWorkItem),
           linkedTaskSourceContext: taskSourceContext,
-          nameWasGenerated,
           ...(!backendStartup && startupPlan?.draftPrompt
             ? { startupDraft: startupPlan.draftPrompt }
             : {})
@@ -4103,7 +4083,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     sourceIntentBlocksCreate,
     taskSourceContext,
     workspaceSeedName,
-    fallbackCreatureName,
     isProjectGroupTarget,
     submitFolderTarget,
     setPlaneProjectRepoLink
@@ -4244,8 +4223,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         if (!workspaceName) {
           return
         }
-        // Why: only a name Orca generated may be retired — see the full-composer submit path.
-        const nameWasGenerated = !name.trim() && workspaceName === fallbackCreatureName
         const smartSubmitBaseBranch =
           smartGitHubResolution.kind === 'pr-start-point'
             ? smartGitHubResolution.baseBranch
@@ -4586,7 +4563,6 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           linkedTaskSourceContext: taskSourceContext,
           ...(workspaceRunContext ? { workspaceRunContext } : {}),
           name: workspaceName,
-          ...(nameWasGenerated ? { nameWasGenerated: true } : {}),
           ...(createDisplayName ? { displayName: createDisplayName } : {}),
           ...(selectedRepoIsGit && submitBaseBranch ? { baseBranch: submitBaseBranch } : {}),
           ...(selectedRepoIsGit && submitCompareBaseRef

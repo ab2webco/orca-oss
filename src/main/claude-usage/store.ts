@@ -14,7 +14,8 @@ import type {
 import type { AutomationRunUsage } from '../../shared/automations-types'
 import type { Store } from '../persistence'
 import type { ClaudeUsagePersistedState } from './types'
-import { getSessionProjectLabel, scanClaudeUsageFiles } from './scanner'
+import { scanClaudeUsageFiles } from './scanner'
+import { getSessionProjectLabel } from './usage-aggregation'
 import {
   formatLocalDay,
   getLocalUsageDay,

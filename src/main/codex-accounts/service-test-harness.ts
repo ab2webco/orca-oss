@@ -154,7 +154,9 @@ export function createSettings(overrides: Partial<GlobalSettings> = {}): GlobalS
     leftSidebarAppearanceMode: overrides.leftSidebarAppearanceMode ?? 'default',
     appFontFamily,
     agentStatusHooksEnabled,
-    tabAutoGenerateTitle
+    tabAutoGenerateTitle,
+    enableGitHubAttribution: overrides.enableGitHubAttribution ?? false,
+    visibleTaskProvidersDefaultedForPlane: overrides.visibleTaskProvidersDefaultedForPlane ?? false
   }
 }
 

@@ -40,8 +40,47 @@ import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { normalizeAutomationPrecheck } from '../shared/automation-precheck'
 import { normalizeProxyUrl } from '../shared/network-proxy'
 import { normalizeKagiSessionLink } from '../shared/browser-url'
-import type { PersistedState, Project, ProjectUpdateArgs, ProjectHostSetup, ProjectHostSetupCreateArgs, ProjectHostSetupCreateResult, ProjectHostSetupDeleteArgs, ProjectHostSetupDeleteResult, ProjectHostSetupUpdateArgs, ProjectHostSetupUpdateResult, RepoProjectHostSetupMethod, Repo, ProjectGroup, FolderWorkspace, SparsePreset, PersistedMobileClientTabSelections, WorktreeMeta, WorktreeLineage, WorkspaceLineage, WorkspaceKey, GlobalSettings, OrcaWorkspaceLayout, NotificationSettings, OnboardingChecklistState, OnboardingOutcome, OnboardingState, LegacyPaneKeyAliasEntry, TerminalPaneLayoutNode, TerminalLayoutSnapshot, TerminalTab, WorkspaceSessionPatch, WorkspaceSessionState, PlaneViewMode, RateLimitFailBackMode } from '../shared/types'
-import type { ClaudeLivePtyAccountBinding, ClaudeLiveSharedPtyAccountBinding, CodexDirectedPtyAccountBinding } from '../shared/managed-account-types'
+import type {
+  PersistedState,
+  Project,
+  ProjectUpdateArgs,
+  ProjectHostSetup,
+  ProjectHostSetupCreateArgs,
+  ProjectHostSetupCreateResult,
+  ProjectHostSetupDeleteArgs,
+  ProjectHostSetupDeleteResult,
+  ProjectHostSetupUpdateArgs,
+  ProjectHostSetupUpdateResult,
+  RepoProjectHostSetupMethod,
+  Repo,
+  ProjectGroup,
+  FolderWorkspace,
+  SparsePreset,
+  PersistedMobileClientTabSelections,
+  WorktreeMeta,
+  WorktreeLineage,
+  WorkspaceLineage,
+  WorkspaceKey,
+  GlobalSettings,
+  OrcaWorkspaceLayout,
+  NotificationSettings,
+  OnboardingChecklistState,
+  OnboardingOutcome,
+  OnboardingState,
+  LegacyPaneKeyAliasEntry,
+  TerminalPaneLayoutNode,
+  TerminalLayoutSnapshot,
+  TerminalTab,
+  WorkspaceSessionPatch,
+  WorkspaceSessionState,
+  PlaneViewMode,
+  RateLimitFailBackMode
+} from '../shared/types'
+import type {
+  ClaudeLivePtyAccountBinding,
+  ClaudeLiveSharedPtyAccountBinding,
+  CodexDirectedPtyAccountBinding
+} from '../shared/managed-account-types'
 import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
   normalizeProjectRuntimePreference
@@ -5092,11 +5131,9 @@ export class Store {
         | 'symlinkPaths'
         | 'issueSourcePreference'
         | 'forkSyncMode'
-        | 'externalWorktreeVisibility'
         | 'externalWorktreeVisibilityPromptDismissedAt'
         | 'externalWorktreeInboxBaselinePaths'
         | 'importedExternalWorktreePaths'
-        | 'agentWorktreeVisibility'
         | 'customWorktreeVisibilitySources'
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
@@ -5104,6 +5141,9 @@ export class Store {
         | 'projectHostSetupMethod'
       >
     > & {
+      // null clears the per-repo override so the global visibility default applies again.
+      externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
+      agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
     },
@@ -5972,6 +6012,11 @@ export class Store {
         delete this.state.workspaceLineageByChildKey[childKey as WorkspaceKey]
       }
     }
+  }
+
+  /** Directory holding orca-data.json; snapshot files live beside it. */
+  getProfileStorageDirectory(): string {
+    return dirname(this.dataFile)
   }
 
   // ── Settings ───────────────────────────────────────────────────────

@@ -169,7 +169,7 @@ test.describe('Terminal Panes', () => {
           (element) => element.textContent?.includes(title)
         )
         const titleDragHandle =
-          titleBar.querySelector<HTMLElement>('.pane-title-drag-handle') ?? null
+          titleBar?.querySelector<HTMLElement>('.pane-title-drag-handle') ?? null
         const pane = document.querySelector<HTMLElement>(`.pane[data-leaf-id="${titledLeafId}"]`)
         if (!titleBar || !pane || !titleDragHandle) {
           return null

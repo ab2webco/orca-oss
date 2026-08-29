@@ -82,6 +82,7 @@ describe('registerPtyHandlers', () => {
               userDataPath: '/tmp/orca-user-data',
               selectedCodexHomePath: null,
               agentStatusHooksEnabled: false,
+              githubAttributionEnabled: false,
               isWsl: context?.isWsl,
               wslDistro: context?.wslDistro
             })

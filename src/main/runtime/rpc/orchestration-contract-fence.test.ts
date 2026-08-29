@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
@@ -72,7 +73,7 @@ describe('orchestration contract fence', () => {
         }
       })
       expect(effect).not.toHaveBeenCalled()
-      const callerFingerprint = database.getOrCreateLocalMutationCallerFingerprint()
+      const callerFingerprint = createHash('sha256').update('caller-token').digest('hex')
       expect(database.getMutationReceipt(callerFingerprint, 'mutation_1')).toBeUndefined()
     }
   )

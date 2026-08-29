@@ -3,7 +3,7 @@ import * as pty from 'node-pty'
 import { statSync } from 'node:fs'
 import { release } from 'node:os'
 import { delimiter, win32 as pathWin32 } from 'node:path'
-import type { SubprocessHandle } from './session-subprocess-handle'
+import type { SubprocessHandle } from './session'
 import { DaemonProtocolError } from './types'
 import {
   getAttributionShellLaunchConfig,
@@ -20,10 +20,7 @@ import {
 import { wrapShellSpawnForMacosTccAttribution } from '../providers/macos-tcc-login-shell'
 import { signalPosixPtyForegroundGroup } from '../pty/posix-pty-foreground-group'
 import { readPtsName } from '../pty/node-pty-pts-name'
-import {
-  ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV,
-  resolveWindowsShellLaunchArgs
-} from '../providers/windows-shell-args'
+import { resolveWindowsShellLaunchArgs } from '../providers/windows-shell-args'
 import {
   resolveEffectiveWindowsPowerShell,
   shouldProbeWindowsPowerShellAvailability,
@@ -72,7 +69,7 @@ import { parsePtySessionId } from './pty-session-id'
 import { getAgentForegroundContextPaths } from '../providers/agent-foreground-context-paths'
 import { assertSafeAgentStartupCwd, resolveSafePtyDefaultCwd } from '../providers/pty-default-cwd'
 import { ORCA_HERMES_STARTUP_QUERY_ENV } from '../../shared/hermes-startup-query'
-import type { TuiAgent } from '../../shared/tui-agent'
+import type { TuiAgent } from '../../shared/types'
 import {
   expandWindowsEnvironmentVariables,
   expandWindowsPathEnvironmentVariables
@@ -697,13 +694,6 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
           }) ?? shellPath)
         : shellPath
     }
-    if (
-      pathWin32.basename(shellPath).toLowerCase() === 'cmd.exe' &&
-      env.ORCA_CODEX_LAUNCH_PREFLIGHT
-    ) {
-      // Why: node-pty backslash-escapes argv quotes; expand the quote inside cmd.exe instead.
-      env[ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV] = '"'
-    }
     // Why: a bare `pwsh.exe` resolves to the Store App Execution Alias stub whose launch fails with ERROR_ACCESS_DENIED (5).
     windowsFallbackAttempts = buildWindowsPowerShellSpawnAttempts({
       shellPath,
@@ -725,8 +715,7 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
         spawnCwd,
         getDefaultCwd(),
         resolvedWslContext,
-        opts.command,
-        env.ORCA_CODEX_LAUNCH_PREFLIGHT
+        opts.command
       )
       shellArgs = resolved.shellArgs
       spawnCwd = resolved.effectiveCwd
@@ -757,8 +746,7 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
               {
                 distro: codexHomeWslInfo.distro
               },
-              opts.command,
-              env.ORCA_CODEX_LAUNCH_PREFLIGHT
+              opts.command
             )
             shellArgs = resolved.shellArgs
             spawnCwd = resolved.effectiveCwd

@@ -84,7 +84,6 @@
 1 tests/e2e/terminal-opencode-emoji-table-rendering.spec.ts
 4 tests/e2e/terminal-osc8-cold-park-restore.spec.ts
 2 tests/e2e/terminal-pane-divider-capture-loss.spec.ts
-1 tests/e2e/terminal-panes.spec.ts
 6 tests/e2e/terminal-raster-artifact-analysis.ts
 3 tests/e2e/terminal-raw-emoji-table-scroll-restore.spec.ts
 5 tests/e2e/terminal-shortcuts.spec.ts

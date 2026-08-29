@@ -6,13 +6,12 @@ import { OrchestrationDb } from '../../orchestration/db'
 import type { OrchestrationEnvironmentTransport } from '../../orchestration/environment-transport'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
-import { fingerprintAuthenticatedPairingCredential } from '../orchestration-mutation-executor'
+import { authenticatedCallerFingerprint } from '../orchestration-mutation-executor'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 describe('orchestration federation control mail', () => {
   const homeToken = 'run-home-device-token'
-  const homeFingerprint = fingerprintAuthenticatedPairingCredential(homeToken)
   const workerToken = 'worker-local-token'
   const workerPeerFingerprint = 'worker-peer'
   const coordinatorPaneKey = 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
@@ -57,17 +56,14 @@ describe('orchestration federation control mail', () => {
             _meta: { runtimeId: workerRuntime.getRuntimeId() }
           }
         }
-        const response = (await workerDispatcher.dispatch(
-          {
-            id: `remote_${method}`,
-            authToken: homeToken,
-            method,
-            params,
-            orchestrationContractVersion: envelope?.orchestrationContractVersion,
-            orchestrationRequestId: envelope?.orchestrationRequestId
-          },
-          { authenticatedCallerFingerprint: homeFingerprint }
-        )) as RuntimeRpcResponse<unknown>
+        const response = (await workerDispatcher.dispatch({
+          id: `remote_${method}`,
+          authToken: homeToken,
+          method,
+          params,
+          orchestrationContractVersion: envelope?.orchestrationContractVersion,
+          orchestrationRequestId: envelope?.orchestrationRequestId
+        })) as RuntimeRpcResponse<unknown>
         return response
       }
     }
@@ -104,6 +100,11 @@ describe('orchestration federation control mail', () => {
     dispatchId = started.dispatch.id
     homeDb.markWorkerDispatchReady(dispatchId)
 
+    const homeFingerprint = authenticatedCallerFingerprint({
+      id: 'home',
+      authToken: homeToken,
+      method: 'orchestration.federationImport'
+    })
     workerDb.createRemoteDispatchAttachment({
       dispatchId,
       taskId: task.id,
@@ -182,7 +183,9 @@ describe('orchestration federation control mail', () => {
     const waiting = workerDispatcher.dispatch(checkRequest('wait-for-control', true))
     await Promise.resolve()
 
-    const imported = await dispatchImport(importRequest('import-control', 1, 'relay-control'))
+    const imported = await workerDispatcher.dispatch(
+      importRequest('import-control', 1, 'relay-control')
+    )
 
     expect(imported).toMatchObject({
       ok: true,
@@ -199,8 +202,8 @@ describe('orchestration federation control mail', () => {
   })
 
   it('accepts a repeated import after a lost acknowledgment without duplicating mail', async () => {
-    const first = await dispatchImport(importRequest('first-import', 1, 'relay-control'))
-    const repeated = await dispatchImport(
+    const first = await workerDispatcher.dispatch(importRequest('first-import', 1, 'relay-control'))
+    const repeated = await workerDispatcher.dispatch(
       importRequest('repeated-import', 1, 'different-message-id')
     )
 
@@ -257,7 +260,7 @@ describe('orchestration federation control mail', () => {
     expect(workerDb.getUnreadMessages(`dispatch:${dispatchId}`)).toHaveLength(0)
     expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(1)
     await expect(
-      dispatchImport(importRequest('late-direct-import', 1, 'late-control'))
+      workerDispatcher.dispatch(importRequest('late-direct-import', 1, 'late-control'))
     ).resolves.toMatchObject({
       ok: false,
       error: { code: 'dispatch_inactive' }
@@ -275,7 +278,9 @@ describe('orchestration federation control mail', () => {
     const statusWaiter = workerDispatcher.dispatch(checkRequest('wait-status', true, 30, 'status'))
     await Promise.resolve()
 
-    await dispatchImport(importRequest('import-escalation', 1, 'relay-escalation', 'escalation'))
+    await workerDispatcher.dispatch(
+      importRequest('import-escalation', 1, 'relay-escalation', 'escalation')
+    )
 
     await expect(escalationWaiter).resolves.toMatchObject({
       ok: true,
@@ -338,11 +343,5 @@ describe('orchestration federation control mail', () => {
         ]
       }
     }
-  }
-
-  function dispatchImport(request: RpcRequest) {
-    return workerDispatcher.dispatch(request, {
-      authenticatedCallerFingerprint: homeFingerprint
-    })
   }
 })

@@ -93,12 +93,8 @@ export class DaemonPtyRouter implements IPtyProvider {
     return await this.ownerResolver.probe(id)
   }
 
-  write(id: string, data: string): boolean {
-    return this.adapterFor(id).write(id, data)
-  }
-
-  writeWithSettlement(id: string, data: string): Promise<boolean> {
-    return this.adapterFor(id).writeWithSettlement(id, data)
+  write(id: string, data: string): void {
+    this.adapterFor(id).write(id, data)
   }
 
   resize(id: string, cols: number, rows: number): void {

@@ -11,12 +11,11 @@ import {
   app,
   powerMonitor
 } from 'electron'
-export { getBashShellReadyRcfileContent } from '../providers/local-pty-shell-ready-bash-rcfile'
+export { getBashShellReadyRcfileContent } from '../providers/local-pty-shell-ready'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { PtyBindingSourceExpectation, Store } from '../persistence'
 import { retireTerminalSurfaceFromPersistence } from '../runtime/mobile-session-terminal-persistence-retirement'
-import type { GlobalSettings } from '../../shared/global-settings-types'
-import type { TuiAgent } from '../../shared/tui-agent'
+import type { GlobalSettings, TuiAgent } from '../../shared/types'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import { terminalOutputBacklogCapChars } from '../../shared/terminal-scrollback-policy'
@@ -1967,9 +1966,8 @@ export function buildPtyHostEnv(
       hooksEnabled: opts.codexStatusHooksEnabled ?? opts.agentStatusHooksEnabled,
       isPackaged: opts.isPackaged,
       isWsl: opts.isWsl,
-      managedHomePath: opts.selectedCodexHomePath,
       userDataPath: opts.userDataPath,
-      resourcesPath: opts.resourcesPath
+      managedHomePath: opts.selectedCodexHomePath
     })
     if (preflightCommand) {
       baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT = preflightCommand
@@ -6036,17 +6034,8 @@ export function registerPtyHandlers(
     },
     write: (ptyId, data) => {
       try {
-        return getProviderForPty(ptyId).write(ptyId, data) !== false
-      } catch {
-        return false
-      }
-    },
-    writeWithSettlement: async (ptyId, data) => {
-      try {
-        const provider = getProviderForPty(ptyId)
-        return provider.writeWithSettlement
-          ? await provider.writeWithSettlement(ptyId, data)
-          : provider.write(ptyId, data) !== false
+        getProviderForPty(ptyId).write(ptyId, data)
+        return true
       } catch {
         return false
       }

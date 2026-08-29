@@ -4,12 +4,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { DaemonClient } from './client'
 import { DAEMON_ENDPOINT_LOST_MESSAGE } from './daemon-endpoint-ownership'
-import {
-  getMacDaemonSystemResolverHealth,
-  getMacDaemonTccAttributionHealth,
-  parseDaemonPidFile,
-  type ParsedDaemonPid
-} from './daemon-health'
+import { getMacDaemonSystemResolverHealth } from './daemon-health'
+import { getMacDaemonTccAttributionHealth } from './daemon-tcc-attribution'
+import { parseDaemonPidFile, type ParsedDaemonPid } from './daemon-pid-file-parse'
 import {
   HistoryManager,
   type HistoryCheckpointResult,
@@ -207,7 +204,6 @@ export class DaemonPtyAdapter implements IPtyProvider {
   private historyReader: HistoryReader | null
   private respawnFn: DaemonPtyAdapterOptions['respawn'] | null
   private runtimeDir: string | null
-  private packagedAppVersion: string | null
   private pendingRespawnAdoptionRelease: (() => void) | null = null
   private respawnAdoptionClosed = false
   // Why: concurrent spawn() calls hitting a dead daemon would each fork their own; this promise coalesces respawns so only the first forks and the rest await it.
@@ -321,7 +317,6 @@ export class DaemonPtyAdapter implements IPtyProvider {
     this.historyReader = opts.historyPath ? new HistoryReader(opts.historyPath) : null
     this.respawnFn = opts.respawn ?? null
     this.runtimeDir = opts.runtimeDir ?? opts.profileScope ?? null
-    this.packagedAppVersion = opts.packagedAppVersion === undefined ? null : opts.packagedAppVersion
     this.supportsCheckpoints = this.protocolVersion >= 4
     this.supportsIncrementalCheckpoints = this.protocolVersion >= 13
     this.supportsProducerFlowControl = this.protocolVersion >= 19
@@ -2543,7 +2538,6 @@ export class DaemonPtyAdapter implements IPtyProvider {
       this.runtimeDir,
       this.socketPath,
       this.tokenPath,
-      this.packagedAppVersion,
       this.protocolVersion
     )
     if (health !== 'severed') {

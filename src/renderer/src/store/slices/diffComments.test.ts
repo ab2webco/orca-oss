@@ -151,10 +151,12 @@ import { createTaskCreationDraftsSlice } from './task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createClaudeAccountRosterSlice } from './claude-account-roster'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
+import { createWorkspaceCleanupBrowseSlice } from './workspace-cleanup-browse'
 
 function createTestStore() {
   return create<AppState>()((...a) => ({
     ...createRepoSlice(...a),
+    ...createWorkspaceCleanupBrowseSlice(...a),
     ...createSparsePresetsSlice(...a),
     ...createWorktreeSlice(...a),
     ...createTerminalSlice(...a),
