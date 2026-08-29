@@ -315,6 +315,7 @@ describe('registerPtyHandlers', () => {
     }
     const store = {
       upsertSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       removeSshRemotePtyLease: vi.fn(),
       markSshRemotePtyLease: vi.fn()

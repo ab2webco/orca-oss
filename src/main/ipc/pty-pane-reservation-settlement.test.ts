@@ -116,6 +116,7 @@ describe('registerPtyHandlers', () => {
         session = next
       }),
       flushOrThrow: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       upsertSshRemotePtyLease: vi.fn(),
       removeSshRemotePtyLease: vi.fn(),
@@ -381,6 +382,7 @@ describe('registerPtyHandlers', () => {
       getProfiles: vi.fn()
     } as never)
     const store = {
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn()
     }
     let controller: RuntimeSpawnController | null = null
@@ -475,6 +477,7 @@ describe('registerPtyHandlers', () => {
     } as never)
     const store = {
       upsertSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       removeSshRemotePtyLease: vi.fn(),
       markSshRemotePtyLease: vi.fn()

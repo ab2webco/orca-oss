@@ -114,6 +114,7 @@ describe('registerPtyHandlers', () => {
           [paneKey]: 'inc-stale-owner'
         }
       })),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(() => true)
     }
 
@@ -278,6 +279,7 @@ describe('registerPtyHandlers', () => {
           session = next
         }),
         flushOrThrow: vi.fn(),
+        getWorktreeMeta: vi.fn(() => undefined),
         persistPtyBinding: vi.fn(),
         getFolderWorkspace: vi.fn(() => ({
           id: 'dead-persisted-owner',
@@ -438,6 +440,7 @@ describe('registerPtyHandlers', () => {
         session = next
       }),
       flushOrThrow: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),

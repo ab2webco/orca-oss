@@ -108,6 +108,7 @@ describe('registerPtyHandlers', () => {
     } as never)
     const store = {
       upsertSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       removeSshRemotePtyLease: vi.fn(),
       markSshRemotePtyLease: vi.fn()
@@ -211,6 +212,7 @@ describe('registerPtyHandlers', () => {
     } as never)
     const store = {
       upsertSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(() => {
         throw new Error('disk full')
       }),

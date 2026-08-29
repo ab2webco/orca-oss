@@ -87,7 +87,8 @@ export function createDaemonActiveProviderFixtures(ctx: {
           localWindowsRuntimePreference: args.projectRuntimePreference
         }
       ]),
-      getSettings: vi.fn(() => settings)
+      getSettings: vi.fn(() => settings),
+      getWorktreeMeta: vi.fn(() => undefined)
     }
   }
 

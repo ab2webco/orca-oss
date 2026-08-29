@@ -3661,7 +3661,9 @@ describe('registerPtyHandlers', () => {
       const env = await spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
       expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
-      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBe('orca')
+      // Why: the preflight now carries the CLI's verified absolute path, and this suite
+      // stages no launcher on disk. The bundled-path case lives in pty-spawn-env-terminal-basics.
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBeUndefined()
     })
 
     it('does not install the Codex launch preflight when Codex hooks are disabled', async () => {

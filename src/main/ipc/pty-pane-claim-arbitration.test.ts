@@ -116,6 +116,7 @@ describe('registerPtyHandlers', () => {
       }): Promise<{ id: string }>
     }
     const store = {
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn()
     }
     let controller: RuntimeSpawnController | null = null
@@ -188,7 +189,7 @@ describe('registerPtyHandlers', () => {
       pid: 12345
     }
     spawnMock.mockReturnValue(proc)
-    const store = { persistPtyBinding: vi.fn(() => false) }
+    const store = { getWorktreeMeta: vi.fn(() => undefined), persistPtyBinding: vi.fn(() => false) }
     let controller: RuntimeSpawnController | null = null
     const runtime = {
       setPtyController: vi.fn((value) => {
@@ -278,6 +279,7 @@ describe('registerPtyHandlers', () => {
     })
     setLocalPtyProvider(provider as never)
     registerPtyHandlers(mainWindow as never, runtime, undefined, undefined, undefined, {
+      getWorktreeMeta: () => undefined,
       persistPtyBinding
     } as never)
     const controller = (
@@ -445,6 +447,7 @@ describe('registerPtyHandlers', () => {
       getProfiles: vi.fn()
     } as never)
     const store = {
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn()
     }
     let controller: RuntimeSpawnController | null = null

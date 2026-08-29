@@ -77,7 +77,7 @@ describe('registerPtyHandlers', () => {
       }),
       authoritativeOwnerListings: false
     })
-    const store = { persistPtyBinding: vi.fn() }
+    const store = { getWorktreeMeta: vi.fn(() => undefined), persistPtyBinding: vi.fn() }
     setLocalPtyProvider(provider as never)
     registerPtyHandlers(
       mainWindow as never,

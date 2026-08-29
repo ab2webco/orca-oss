@@ -107,6 +107,7 @@ describe('registerPtyHandlers', () => {
         session = next
       }),
       flushOrThrow: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
@@ -228,6 +229,7 @@ describe('registerPtyHandlers', () => {
         session = next
       }),
       flushOrThrow: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),
@@ -351,6 +353,7 @@ describe('registerPtyHandlers', () => {
         session = next
       }),
       flushOrThrow: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       getFolderWorkspace: vi.fn(() => undefined),
       getFolderWorkspaces: vi.fn(() => []),

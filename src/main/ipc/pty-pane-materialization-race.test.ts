@@ -175,6 +175,7 @@ describe('registerPtyHandlers', () => {
       getProfiles: vi.fn()
     } as never)
     const store = {
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn()
     }
     let registeredPane: { ptyId: string; tabId: string; leafId: string } | null = null
@@ -370,6 +371,7 @@ describe('registerPtyHandlers', () => {
         projectGroupId: 'folder-group'
       }
       const store = {
+        getWorktreeMeta: vi.fn(() => undefined),
         persistPtyBinding: vi.fn(),
         getFolderWorkspace: vi.fn(() => folderWorkspace),
         getFolderWorkspaces: vi.fn(() => [folderWorkspace]),

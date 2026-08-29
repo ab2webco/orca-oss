@@ -390,6 +390,7 @@ describe('registerPtyHandlers', () => {
       getForegroundProcess: vi.fn(async () => null)
     } as never)
     registerPtyHandlers(mainWindow as never, runtime, undefined, undefined, undefined, {
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn()
     } as never)
 

@@ -370,6 +370,7 @@ describe('registerPtyHandlers', () => {
   it('ignores fire-and-forget IPC for detached SSH PTYs without a provider', async () => {
     const store = {
       upsertSshRemotePtyLease: vi.fn(),
+      getWorktreeMeta: vi.fn(() => undefined),
       persistPtyBinding: vi.fn(),
       markSshRemotePtyLease: vi.fn()
     }

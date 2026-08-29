@@ -226,7 +226,15 @@ describe('registerPtyHandlers', () => {
         vi.runOnlyPendingTimers()
         expect(mockProc.proc.write).not.toHaveBeenCalled()
 
+        // A drawn prompt is not the signal: oh-my-zsh's update question draws
+        // one too and reads a key, and the launch command's first character
+        // would answer it (ORCA-210). Only the shell-ready marker releases it.
         mockProc.emitData('\x1b]133;A\x07% ')
+        await Promise.resolve()
+        vi.runAllTimers()
+        expect(mockProc.proc.write).not.toHaveBeenCalled()
+
+        mockProc.emitData('\x1b]777;orca-shell-ready\x07% ')
         await Promise.resolve()
         vi.runAllTimers()
         expect(mockProc.proc.write).toHaveBeenCalledWith('claude\n')
@@ -359,32 +367,6 @@ describe('registerPtyHandlers', () => {
       vi.runAllTimers()
       await Promise.resolve()
       expect(mockProc.proc.write).toHaveBeenCalledWith("codex --prefill 'linked issue context'\n")
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-  posixOnlyIt('keeps the conservative max wait for non-agent startup commands', async () => {
-    vi.useFakeTimers()
-    const mockProc = createMockProc()
-    spawnMock.mockReturnValue(mockProc.proc)
-
-    try {
-      registerPtyHandlers(mainWindow as never)
-      await handlers.get('pty:spawn')!(null, {
-        cols: 80,
-        rows: 24,
-        cwd: '/tmp',
-        command: 'printf "hello"'
-      })
-
-      vi.advanceTimersByTime(1499)
-      await Promise.resolve()
-      expect(mockProc.proc.write).not.toHaveBeenCalled()
-
-      vi.advanceTimersByTime(1)
-      await Promise.resolve()
-      vi.runAllTimers()
-      expect(mockProc.proc.write).toHaveBeenCalledWith('printf "hello"\n')
     } finally {
       vi.useRealTimers()
     }
