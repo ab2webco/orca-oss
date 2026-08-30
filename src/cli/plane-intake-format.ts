@@ -20,3 +20,7 @@ export function formatPlaneIntakeList(items: PlaneIntakeIssue[]): string {
 export function formatPlaneIntakeCreated(item: PlaneIntakeIssue): string {
   return `Created intake item ${item.id}: ${item.title}`
 }
+
+export function formatPlaneIntakeEnabled(result: { enabled: boolean }): string {
+  return `Intake is now ${result.enabled ? 'enabled' : 'disabled'} for this project.`
+}

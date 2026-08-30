@@ -787,7 +787,8 @@ import {
 import { createWorkItem as createPlaneWorkItem } from '../plane/plane-work-item-create'
 import {
   createIntakeIssue as createPlaneIntakeIssue,
-  listIntakeIssues as listPlaneIntakeIssues
+  listIntakeIssues as listPlaneIntakeIssues,
+  setIntakeEnabled as setPlaneIntakeEnabled
 } from '../plane/plane-intake'
 import { stripAiAttribution } from '../plane/plane-attribution-strip'
 import {
@@ -847,6 +848,7 @@ import type {
   PlaneListIntakeIssuesArgs,
   PlanePlanningContainerArgs,
   PlanePlanningWorkItemsArgs,
+  PlaneSetIntakeEnabledArgs,
   PlaneUnlinkCurrentWorkItemResult,
   PlaneUpdateProjectArgs,
   PlaneUpdateStateArgs,
@@ -37506,6 +37508,10 @@ export class OrcaRuntimeService {
       ...args,
       description: this.stripTicketAttribution(args.description)
     })
+  }
+
+  planeSetIntakeEnabled(args: PlaneSetIntakeEnabledArgs): ReturnType<typeof setPlaneIntakeEnabled> {
+    return setPlaneIntakeEnabled(args)
   }
 
   planeListIntakeIssues(args: PlaneListIntakeIssuesArgs): ReturnType<typeof listPlaneIntakeIssues> {

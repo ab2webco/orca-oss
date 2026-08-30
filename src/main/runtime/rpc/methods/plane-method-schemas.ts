@@ -101,6 +101,12 @@ export const CreateIntakeIssue = z.object({
   priority: z.enum(VALID_PRIORITIES).optional()
 })
 
+export const SetIntakeEnabled = z.object({
+  projectId: requiredString('Project is required'),
+  enabled: z.boolean(),
+  workspaceId: OptionalString
+})
+
 export const AddWorkItemComment = z.object({
   projectId: requiredString('Project is required'),
   workItemId: requiredString('Work item ID is required'),

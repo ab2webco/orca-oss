@@ -205,6 +205,16 @@ export type PlaneCreateIntakeIssueResult =
   | { ok: true; intakeIssue: PlaneIntakeIssue }
   | { ok: false; error: string }
 
+export type PlaneSetIntakeEnabledArgs = {
+  projectId: string
+  enabled: boolean
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneSetIntakeEnabledResult =
+  | { ok: true; enabled: boolean }
+  | { ok: false; error: string }
+
 export type PlaneMutationResult = { ok: true } | { ok: false; error: string }
 
 // Plane's fixed set of state groups a column can belong to.

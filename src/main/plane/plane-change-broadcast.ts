@@ -15,6 +15,7 @@ const PLANE_CHANGED_CHANNEL = 'plane:changed'
 const PLANE_MUTATION_METHOD_NAMES = new Set([
   'plane.createWorkItem',
   'plane.createIntakeIssue',
+  'plane.setIntakeEnabled',
   'plane.updateWorkItem',
   'plane.deleteWorkItem',
   'plane.addWorkItemComment',

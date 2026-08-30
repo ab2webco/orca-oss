@@ -1,4 +1,8 @@
-import type { PlaneCreateIntakeIssueResult, PlaneIntakeIssue } from '../../shared/plane-types'
+import type {
+  PlaneCreateIntakeIssueResult,
+  PlaneIntakeIssue,
+  PlaneSetIntakeEnabledResult
+} from '../../shared/plane-types'
 import type { CommandHandler } from '../dispatch'
 import {
   getOptionalPositiveIntegerFlag,
@@ -6,7 +10,11 @@ import {
   getRequiredStringFlag
 } from '../flags'
 import { printResult } from '../format'
-import { formatPlaneIntakeCreated, formatPlaneIntakeList } from '../plane-intake-format'
+import {
+  formatPlaneIntakeCreated,
+  formatPlaneIntakeEnabled,
+  formatPlaneIntakeList
+} from '../plane-intake-format'
 import {
   getPlanePriorityFlag,
   readPlaneBody,
@@ -15,6 +23,30 @@ import {
 import { RuntimeClientError } from '../runtime-client'
 
 const PLANE_WRITE_TIMEOUT_MS = 75_000
+
+const setIntakeEnabled: (
+  context: Parameters<CommandHandler>[0],
+  enabled: boolean
+) => Promise<void> = async ({ flags, client, json }, enabled) => {
+  rejectAllWorkspaceForPlaneWrite(flags)
+  const response = await client.call<PlaneSetIntakeEnabledResult>(
+    'plane.setIntakeEnabled',
+    {
+      projectId: getRequiredStringFlag(flags, 'project'),
+      enabled,
+      workspaceId: getOptionalStringFlag(flags, 'workspace')
+    },
+    { timeoutMs: PLANE_WRITE_TIMEOUT_MS }
+  )
+  if (!response.result.ok) {
+    throw new RuntimeClientError('plane_write_failed', response.result.error)
+  }
+  printResult(
+    { ...response, result: { enabled: response.result.enabled } },
+    json,
+    formatPlaneIntakeEnabled
+  )
+}
 
 export const PLANE_INTAKE_HANDLERS: Record<string, CommandHandler> = {
   'plane intake create': async ({ flags, client, cwd, json }) => {
@@ -47,5 +79,7 @@ export const PLANE_INTAKE_HANDLERS: Record<string, CommandHandler> = {
     const limit = getOptionalPositiveIntegerFlag(flags, 'limit')
     const items = limit === undefined ? response.result : response.result.slice(0, limit)
     printResult({ ...response, result: items }, json, formatPlaneIntakeList)
-  }
+  },
+  'plane intake enable': async (context) => setIntakeEnabled(context, true),
+  'plane intake disable': async (context) => setIntakeEnabled(context, false)
 }

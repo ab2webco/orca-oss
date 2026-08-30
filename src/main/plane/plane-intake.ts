@@ -19,6 +19,8 @@ import type {
   PlaneIntakeIssue,
   PlaneIntakeIssueStatus,
   PlaneListIntakeIssuesArgs,
+  PlaneSetIntakeEnabledArgs,
+  PlaneSetIntakeEnabledResult,
   PlaneWorkItemPriority
 } from '../../shared/plane-types'
 
@@ -27,6 +29,25 @@ const PRIORITIES = new Set<PlaneWorkItemPriority>(['none', 'low', 'medium', 'hig
 
 function intakeBase(client: PlaneClientForWorkspace, projectId: string): string {
   return `/api/v1/workspaces/${encodeURIComponent(client.workspaceSlug)}/projects/${encodeURIComponent(projectId)}/intake-issues/`
+}
+
+function projectPath(client: PlaneClientForWorkspace, projectId: string): string {
+  return `/api/v1/workspaces/${encodeURIComponent(client.workspaceSlug)}/projects/${encodeURIComponent(projectId)}/`
+}
+
+// Plane renamed the flag in v0.24 and made `inbox_view` a read-only response
+// alias, then dropped it in v0.26. DRF silently discards both read-only and
+// unknown keys, so sending the pair is safe on every version and the read-back
+// below is what proves which one the server honoured.
+function intakeFlagBody(enabled: boolean): PlaneRecord {
+  return { intake_view: enabled, inbox_view: enabled }
+}
+
+function readIntakeFlag(project: PlaneRecord): boolean | undefined {
+  if (typeof project.intake_view === 'boolean') {
+    return project.intake_view
+  }
+  return typeof project.inbox_view === 'boolean' ? project.inbox_view : undefined
 }
 
 function pagedQuery(cursor: string | undefined): string {
@@ -107,6 +128,41 @@ export async function createIntakeIssue(
   } catch (error) {
     clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to create intake item.')
+  } finally {
+    release()
+  }
+}
+
+export async function setIntakeEnabled(
+  args: PlaneSetIntakeEnabledArgs
+): Promise<PlaneSetIntakeEnabledResult> {
+  const client = resolveClient(args.workspaceId)
+  if (!client) {
+    return { ok: false, error: 'Not connected to Plane.' }
+  }
+  await acquire()
+  try {
+    const updated = await planeRequest<PlaneRecord>(client, projectPath(client, args.projectId), {
+      method: 'PATCH',
+      body: JSON.stringify(intakeFlagBody(args.enabled))
+    })
+    const flag = readIntakeFlag(updated)
+    if (flag === undefined) {
+      return {
+        ok: false,
+        error: 'Plane accepted the update but reported no intake flag, so it could not be confirmed.'
+      }
+    }
+    if (flag !== args.enabled) {
+      return {
+        ok: false,
+        error: `Plane kept intake ${flag ? 'enabled' : 'disabled'}; this version may not accept the flag.`
+      }
+    }
+    return { ok: true, enabled: flag }
+  } catch (error) {
+    clearWorkspaceTokenOnAuthError(client, error)
+    return toMutationError(error, 'Failed to change the intake setting.')
   } finally {
     release()
   }

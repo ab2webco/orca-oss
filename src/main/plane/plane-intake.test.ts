@@ -132,4 +132,54 @@ describe('Plane intake client', () => {
       '/api/v1/workspaces/acme/projects/project-1/intake-issues/?per_page=100&cursor=next'
     )
   })
+
+  it('enables intake by patching the project with both flag spellings', async () => {
+    const { setIntakeEnabled } = await import('./plane-intake')
+    planeRequestMock.mockResolvedValue({ id: 'project-1', intake_view: true })
+
+    const result = await setIntakeEnabled({ projectId: 'project-1', enabled: true })
+
+    expect(result).toEqual({ ok: true, enabled: true })
+    expect(planeRequestMock).toHaveBeenCalledWith(
+      planeClient,
+      '/api/v1/workspaces/acme/projects/project-1/',
+      expect.objectContaining({ method: 'PATCH' })
+    )
+    const [, , init] = planeRequestMock.mock.calls[0]
+    expect(JSON.parse((init as { body: string }).body)).toEqual({
+      intake_view: true,
+      inbox_view: true
+    })
+  })
+
+  // Why this one carries the feature: a Plane version that does not accept the
+  // flag drops it and still answers 200 with the project, so the response alone
+  // is indistinguishable from success.
+  it('fails when the server answers 200 without honouring the flag', async () => {
+    const { setIntakeEnabled } = await import('./plane-intake')
+    planeRequestMock.mockResolvedValue({ id: 'project-1', intake_view: false })
+
+    const result = await setIntakeEnabled({ projectId: 'project-1', enabled: true })
+
+    expect(result.ok).toBe(false)
+  })
+
+  it('fails when the project carries no intake flag at all', async () => {
+    const { setIntakeEnabled } = await import('./plane-intake')
+    planeRequestMock.mockResolvedValue({ id: 'project-1', name: 'Orca Lab' })
+
+    const result = await setIntakeEnabled({ projectId: 'project-1', enabled: true })
+
+    expect(result.ok).toBe(false)
+  })
+
+  it('reads the legacy flag when a pre-0.26 server answers with it', async () => {
+    const { setIntakeEnabled } = await import('./plane-intake')
+    planeRequestMock.mockResolvedValue({ id: 'project-1', inbox_view: true })
+
+    await expect(setIntakeEnabled({ projectId: 'project-1', enabled: true })).resolves.toEqual({
+      ok: true,
+      enabled: true
+    })
+  })
 })

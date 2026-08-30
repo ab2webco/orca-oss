@@ -1,5 +1,5 @@
 import { defineMethod, type RpcMethod } from '../core'
-import { CreateIntakeIssue, ListIntakeIssues } from './plane-method-schemas'
+import { CreateIntakeIssue, ListIntakeIssues, SetIntakeEnabled } from './plane-method-schemas'
 
 export const PLANE_INTAKE_METHODS: RpcMethod[] = [
   defineMethod({
@@ -21,6 +21,16 @@ export const PLANE_INTAKE_METHODS: RpcMethod[] = [
         workspaceId: params.workspaceId,
         description: params.description,
         priority: params.priority
+      })
+  }),
+  defineMethod({
+    name: 'plane.setIntakeEnabled',
+    params: SetIntakeEnabled,
+    handler: async (params, { runtime }) =>
+      runtime.planeSetIntakeEnabled({
+        projectId: params.projectId.trim(),
+        enabled: params.enabled,
+        workspaceId: params.workspaceId
       })
   })
 ]
