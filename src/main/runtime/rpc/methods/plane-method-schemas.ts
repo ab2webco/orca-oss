@@ -88,6 +88,19 @@ export const CreateWorkItem = z.object({
   parentId: z.union([z.string(), z.null()]).optional()
 })
 
+export const ListIntakeIssues = z.object({
+  projectId: requiredString('Project is required'),
+  workspaceId: OptionalString
+})
+
+export const CreateIntakeIssue = z.object({
+  projectId: requiredString('Project is required'),
+  title: requiredString('Title is required'),
+  workspaceId: OptionalString,
+  description: OptionalPlainString,
+  priority: z.enum(VALID_PRIORITIES).optional()
+})
+
 export const AddWorkItemComment = z.object({
   projectId: requiredString('Project is required'),
   workItemId: requiredString('Work item ID is required'),
