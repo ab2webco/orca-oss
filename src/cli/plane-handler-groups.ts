@@ -34,7 +34,7 @@ export const PLANE_HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'plane-intake',
-    keys: ['plane intake create', 'plane intake list'],
+    keys: ['plane intake create', 'plane intake disable', 'plane intake enable', 'plane intake list'],
     load: async () => (await import('./handlers/plane-intake.js')).PLANE_INTAKE_HANDLERS
   },
   {
