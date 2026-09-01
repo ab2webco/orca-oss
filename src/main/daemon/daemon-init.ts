@@ -983,7 +983,7 @@ export async function initDaemonPtyProvider(
         if (!restartInFlight) {
           trackDaemonRetired('died_respawn')
         }
-      } else if (reason === 'unhealthy_resolver' || reason === 'severed_tcc_attribution') {
+      } else {
         // Must reach the launcher below without an await in between; see the consume site.
         attributedReplaceReason = reason
       }
@@ -1294,7 +1294,7 @@ async function runRestartDaemon(): Promise<RestartDaemonResult> {
         if (!restartInFlight) {
           trackDaemonRetired('died_respawn')
         }
-      } else if (reason === 'unhealthy_resolver' || reason === 'severed_tcc_attribution') {
+      } else {
         // Must reach the launcher below without an await in between; see the consume site.
         attributedReplaceReason = reason
       }
