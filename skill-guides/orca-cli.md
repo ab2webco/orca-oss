@@ -226,7 +226,7 @@ ORCA automations remove <automationId> --json
 
 Schedules accept `hourly`, `daily`, `weekdays`, `weekly`, 5-field cron, or RRULE. Use `--time <HH:MM>` with `daily`/`weekdays`/`weekly`, and `--day <0-6>` only with `weekly` where Sunday is `0`.
 
-Use `--repo <selector>` for a new worktree per run, or `--workspace <selector>` / `--workspace-mode existing` for an existing Orca worktree. `--repo` and `--workspace` are mutually exclusive. Use `--reuse-session` only for existing-workspace automations; if the previous terminal is gone, Orca falls back to a fresh session. Prefer `--disabled` while testing setup.
+Use `--repo <selector>` for a new worktree per run, or `--workspace <selector>` / `--workspace-mode existing` for an existing Orca worktree. `--repo` and `--workspace` are mutually exclusive. Use `--reuse-session` only for existing-workspace automations; if the previous terminal is gone, Orca falls back to a fresh session. Prefer `--disabled` while testing setup. Add `--target-pane <paneKey>` with `--reuse-session` to send runs to a specific open agent pane (pane keys appear as `terminalPaneKey` in `ORCA automations runs --json`); if that pane is gone at run time, Orca falls back to the previous automation session or a fresh one, and `--target-pane ""` clears a saved target.
 
 ## Artifacts
 

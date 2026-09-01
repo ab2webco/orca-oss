@@ -33,6 +33,7 @@ import {
 import {
   getOptionalPositiveIntegerFlag,
   getOptionalStringFlag,
+  getPresentStringFlag,
   getRequiredStringFlag
 } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
@@ -251,6 +252,16 @@ function getReuseSessionFlag(flags: Map<string, string | boolean>): boolean | un
   return undefined
 }
 
+function getTargetPaneFlag(flags: Map<string, string | boolean>): string | null | undefined {
+  const value = getPresentStringFlag(flags, 'target-pane', { allowEmpty: true })
+  if (value === undefined) {
+    return undefined
+  }
+  const trimmed = value.trim()
+  // Why: an empty value clears a saved target pane.
+  return trimmed ? trimmed : null
+}
+
 function getPrecheckFlag(
   flags: Map<string, string | boolean>
 ): AutomationPrecheck | null | undefined {
@@ -454,6 +465,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       workspaceMode,
       baseBranch: getOptionalStringFlag(flags, 'base-branch'),
       reuseSession: getReuseSessionFlag(flags),
+      targetPaneKey: getTargetPaneFlag(flags),
       timezone: getOptionalStringFlag(flags, 'timezone'),
       enabled: getEnabledFlag(flags),
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
@@ -479,6 +491,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
         workspaceMode: getWorkspaceModeFlag(flags),
         baseBranch: getOptionalStringFlag(flags, 'base-branch'),
         reuseSession: getReuseSessionFlag(flags),
+        targetPaneKey: getTargetPaneFlag(flags),
         timezone: getOptionalStringFlag(flags, 'timezone'),
         enabled: getEnabledFlag(flags),
         missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),

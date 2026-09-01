@@ -16,16 +16,25 @@ export function findReusableAutomationSession(args: {
   worktreeId: string
   currentRunId: string
   runs: AutomationRun[]
+  targetPaneKey?: string | null
   state: Pick<
     AppState,
     'agentStatusByPaneKey' | 'ptyIdsByTabId' | 'terminalLayoutsByTabId' | 'unifiedTabsByWorktree'
   >
 }): ReusableAutomationSession | null {
-  const { automationId, agentId, worktreeId, currentRunId, runs, state } = args
+  const { automationId, agentId, worktreeId, currentRunId, runs, targetPaneKey, state } = args
   const worktreeTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
   const terminalTabIds = new Set(
     worktreeTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
   )
+  // Why: an explicitly configured pane wins; when it is gone or not reusable
+  // the search falls back to run history, never to a scanned substitute pane.
+  if (targetPaneKey) {
+    const configured = findReusableConfiguredPane({ state, terminalTabIds, agentId, targetPaneKey })
+    if (configured) {
+      return configured
+    }
+  }
   const candidates = runs
     .filter(
       (run) =>
@@ -45,6 +54,34 @@ export function findReusableAutomationSession(args: {
     }
   }
   return null
+}
+
+function findReusableConfiguredPane({
+  state,
+  terminalTabIds,
+  agentId,
+  targetPaneKey
+}: {
+  state: Pick<AppState, 'agentStatusByPaneKey' | 'ptyIdsByTabId' | 'terminalLayoutsByTabId'>
+  terminalTabIds: Set<string>
+  agentId: TuiAgent
+  targetPaneKey: string
+}): ReusableAutomationSession | null {
+  const parsed = parsePaneKey(targetPaneKey)
+  if (!parsed || !terminalTabIds.has(parsed.tabId)) {
+    return null
+  }
+  const entry = state.agentStatusByPaneKey[targetPaneKey]
+  if (!entry || !isReusableAgentStatus(entry, agentId)) {
+    return null
+  }
+  // Why: a user-opened pane has no run record, so its PTY identity must come
+  // from the live layout instead of run history.
+  const ptyId = state.terminalLayoutsByTabId[parsed.tabId]?.ptyIdsByLeafId?.[parsed.leafId]
+  if (!ptyId || !state.ptyIdsByTabId[parsed.tabId]?.includes(ptyId)) {
+    return null
+  }
+  return { tabId: parsed.tabId, ptyId, paneKey: targetPaneKey }
 }
 
 function findReusableExactRunPane({

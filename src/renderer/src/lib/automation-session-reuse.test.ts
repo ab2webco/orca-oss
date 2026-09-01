@@ -193,6 +193,139 @@ describe('automation session reuse', () => {
     expect(session).toBeNull()
   })
 
+  it('prefers the configured target pane over run history', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: splitPaneKey,
+      runs: [run({ id: 'run-new', terminalSessionId: 'tab-1', createdAt: 2 })],
+      state: {
+        agentStatusByPaneKey: {
+          [paneKey]: status(),
+          [splitPaneKey]: status({ paneKey: splitPaneKey })
+        },
+        ptyIdsByTabId: { 'tab-1': ['pty-1', 'pty-right'] },
+        terminalLayoutsByTabId: {
+          'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1', [splitLeafId]: 'pty-right' } }
+        },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toEqual({ tabId: 'tab-1', ptyId: 'pty-right', paneKey: splitPaneKey })
+  })
+
+  it('reuses a configured user-opened pane with no run history', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: paneKey,
+      runs: [],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status() },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toEqual({ tabId: 'tab-1', ptyId: 'pty-1', paneKey })
+  })
+
+  it('falls back to run history when the configured pane is gone', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: 'tab-closed:33333333-3333-4333-8333-333333333333',
+      runs: [run({ id: 'run-new', terminalSessionId: 'tab-1', createdAt: 2 })],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status() },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toEqual({ tabId: 'tab-1', ptyId: 'pty-1', paneKey })
+  })
+
+  it('does not use a configured pane from a tab outside the worktree', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: `tab-other:${leafId}`,
+      runs: [],
+      state: {
+        agentStatusByPaneKey: {
+          [`tab-other:${leafId}`]: status({ paneKey: `tab-other:${leafId}` })
+        },
+        ptyIdsByTabId: { 'tab-other': ['pty-x'] },
+        terminalLayoutsByTabId: { 'tab-other': { ptyIdsByLeafId: { [leafId]: 'pty-x' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toBeNull()
+  })
+
+  it('does not use a configured pane whose PTY is no longer live', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: paneKey,
+      runs: [],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status() },
+        ptyIdsByTabId: { 'tab-1': ['pty-other'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toBeNull()
+  })
+
+  it('does not use a configured pane whose agent is not reusable', () => {
+    const session = findReusableAutomationSession({
+      automationId: 'auto-1',
+      agentId: 'claude',
+      worktreeId: 'wt-1',
+      currentRunId: 'run-current',
+      targetPaneKey: paneKey,
+      runs: [],
+      state: {
+        agentStatusByPaneKey: { [paneKey]: status({ state: 'blocked' }) },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+        terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
+        unifiedTabsByWorktree: {
+          'wt-1': [{ contentType: 'terminal', entityId: 'tab-1' }]
+        }
+      } as never
+    })
+
+    expect(session).toBeNull()
+  })
+
   function reuseWithStatus(overrides: Partial<AgentStatusEntry>) {
     return findReusableAutomationSession({
       automationId: 'auto-1',

@@ -14205,6 +14205,13 @@
           "4bdce31f37": "Ayuda para la reutilización de sesiones",
           "5ad314118e": "Sesión"
         },
+        "AutomationTargetPaneField": {
+          "bf9bd09d7c": "Panel objetivo",
+          "dbb80ca24e": "Ayuda del panel objetivo",
+          "1286051832": "Envía las ejecuciones con reutilización a este panel de agente abierto. Si ya no existe al ejecutarse, Orca vuelve a la sesión de automatización anterior o a una nueva.",
+          "55c1ce2470": "Automático",
+          "064973b416": "Panel guardado (no abierto)"
+        },
         "AutomationsPage": {
           "2695883141": "borrar",
           "c3a28c9793": "Seleccione una automatización para ver las ejecuciones.",

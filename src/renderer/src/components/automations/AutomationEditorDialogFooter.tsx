@@ -16,6 +16,7 @@ import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { Field } from './automation-page-parts'
 import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
 import { AutomationSessionField } from './AutomationSessionField'
+import { AutomationTargetPaneField } from './AutomationTargetPaneField'
 import { AutomationSetupDecisionField } from './AutomationSetupDecisionField'
 import { CreateFromPicker } from './CreateFromPicker'
 import { WorkspaceCombobox } from './WorkspaceCombobox'
@@ -172,7 +173,13 @@ export function AutomationEditorDialogFooter({
                   value={draft.workspaceId}
                   triggerClassName={`min-w-0 ${pickerTriggerClassName}`}
                   onValueChange={(workspaceId) =>
-                    onDraftChange((current) => ({ ...current, workspaceId }))
+                    onDraftChange((current) => ({
+                      ...current,
+                      workspaceId,
+                      // Why: a pane key is bound to one workspace; keeping it would silently save a target that can never resolve.
+                      targetPaneKey:
+                        workspaceId === current.workspaceId ? current.targetPaneKey : ''
+                    }))
                   }
                 />
               ) : (
@@ -238,6 +245,13 @@ export function AutomationEditorDialogFooter({
               toggleItemClassName={modeToggleItemClassName}
               onDraftChange={onDraftChange}
             />
+            {isHermesTarget ? null : (
+              <AutomationTargetPaneField
+                draft={draft}
+                pickerTriggerClassName={pickerTriggerClassName}
+                onDraftChange={onDraftChange}
+              />
+            )}
             {isHermesTarget ? null : scheduleField}
             <AutomationMissedRunGraceField
               draft={draft}

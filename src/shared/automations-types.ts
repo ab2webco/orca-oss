@@ -114,6 +114,9 @@ export type Automation = {
   baseBranch: string | null
   setupDecision?: SetupDecision
   reuseSession: boolean
+  /** Why: a user-picked live pane to receive reuse runs; null means reuse the
+   *  previous automation session. Resolvable only in the renderer store. */
+  targetPaneKey?: string | null
   timezone: string
   rrule: string
   dtstart: number
@@ -173,6 +176,7 @@ export type AutomationCreateInput = {
   baseBranch?: string | null
   setupDecision?: SetupDecision
   reuseSession?: boolean
+  targetPaneKey?: string | null
   timezone: string
   rrule: string
   dtstart: number
@@ -195,6 +199,7 @@ export type AutomationUpdateInput = Partial<
     | 'baseBranch'
     | 'setupDecision'
     | 'reuseSession'
+    | 'targetPaneKey'
     | 'timezone'
     | 'rrule'
     | 'dtstart'

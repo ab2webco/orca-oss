@@ -15000,6 +15000,13 @@
           "4bdce31f37": "Session reuse help",
           "5ad314118e": "Session"
         },
+        "AutomationTargetPaneField": {
+          "bf9bd09d7c": "Target pane",
+          "dbb80ca24e": "Target pane help",
+          "1286051832": "Send reuse runs to this open agent pane. If it is gone at run time, Orca falls back to the previous automation session or a fresh one.",
+          "55c1ce2470": "Automatic",
+          "064973b416": "Saved pane (not open)"
+        },
         "AutomationsPage": {
           "2695883141": "delete",
           "c3a28c9793": "Select an automation to view runs.",

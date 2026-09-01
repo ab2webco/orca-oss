@@ -16,9 +16,13 @@ sweep_line() {
   prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup 2>/dev/null) || prs='[]'
   local states='[.statusCheckRollup[]?|(.conclusion//.state)]'
 
-  green=$(jq -r "[.[]|select(($states|index(\"FAILURE\")|not) and ($states|index(\"PENDING\")|not) and (.mergeStateStatus!=\"DIRTY\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
+  # Green means every check is conclusively good. A running check reports IN_PROGRESS or
+  # QUEUED with no conclusion, so an allowlist is the only safe polarity — a denylist of
+  # FAILURE/PENDING called a PR mergeable while its E2E shards were still running.
+  local settled='["SUCCESS","SKIPPED","NEUTRAL"]'
+  green=$(jq -r "[.[]|select(([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)==0 and (.mergeStateStatus!=\"DIRTY\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
   red=$(jq -r "[.[]|select($states|index(\"FAILURE\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
-  pending=$(jq -r "[.[]|select($states|index(\"PENDING\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
+  pending=$(jq -r "[.[]|select(($states|index(\"FAILURE\")|not) and (([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)>0))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
 
   # Leftover means: no open PR AND nothing unpushed to show for it. A worker still
   # committing has neither, and main never has a PR — flagging either is noise that
@@ -37,7 +41,10 @@ sweep_line() {
   done < <(git worktree list --porcelain 2>/dev/null |
     awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print p, $2}')
 
-  board=$(orca plane list --project "$PROJECT" --json 2>/dev/null | jq -r '[..|objects|select(.identifier?)]|length' 2>/dev/null)
+  # Why `.ok` and not just the count: a failed call still returns parseable JSON with no
+  # work items in it, so counting alone renders an outage as a board with zero items open.
+  board=$(orca plane list --project "$PROJECT" --json 2>/dev/null |
+    jq -r 'if .ok then ([..|objects|select(.identifier?)]|length|tostring) else empty end' 2>/dev/null)
 
   echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | leftover-worktrees:${stale:-none} | board-open:${board:-?}"
 }
@@ -53,7 +60,15 @@ if [ "${1:-}" = "--once" ]; then
   exit 0
 fi
 
-while true; do
+if [ "${1:-}" = "--tick" ]; then
   sweep_line
+  exit 0
+fi
+
+# Why a child per tick instead of calling sweep_line directly: bash parses the script once
+# at start, so a long-lived loop keeps running the version it was launched with. Editing
+# this file then silently changed nothing until someone restarted the monitor — twice.
+while true; do
+  bash "${BASH_SOURCE[0]}" --tick
   sleep "$INTERVAL"
 done

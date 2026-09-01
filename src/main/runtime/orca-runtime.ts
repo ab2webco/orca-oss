@@ -3979,6 +3979,9 @@ export class OrcaRuntimeService {
     if (!this.store?.createAutomation) {
       throw new Error('runtime_unavailable')
     }
+    if (input.targetPaneKey && !input.reuseSession) {
+      throw new Error('A target pane requires session reuse.')
+    }
     const target = await this.resolveAutomationTarget(input)
     if (input.reuseSession && target.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
@@ -3996,6 +3999,7 @@ export class OrcaRuntimeService {
       baseBranch: input.baseBranch,
       setupDecision: input.setupDecision,
       reuseSession: input.reuseSession,
+      targetPaneKey: input.targetPaneKey,
       timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       rrule: input.rrule,
       dtstart: input.dtstart,
@@ -4037,6 +4041,10 @@ export class OrcaRuntimeService {
     if (hasRuntimeAutomationUpdateValue(updates, 'reuseSession')) {
       patch.reuseSession = updates.reuseSession
     }
+    if (Object.hasOwn(updates, 'targetPaneKey')) {
+      // Why: null must reach the store — it clears a saved target pane.
+      patch.targetPaneKey = updates.targetPaneKey ?? null
+    }
     if (hasRuntimeAutomationUpdateValue(updates, 'timezone')) {
       patch.timezone = updates.timezone
     }
@@ -4070,6 +4078,9 @@ export class OrcaRuntimeService {
     }
     if (!targetChanged && patch.reuseSession && current.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
+    }
+    if (patch.targetPaneKey && !(patch.reuseSession ?? current.reuseSession)) {
+      throw new Error('A target pane requires session reuse.')
     }
     return this.store.updateAutomation(id, patch)
   }

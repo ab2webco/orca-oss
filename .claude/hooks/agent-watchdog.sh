@@ -10,7 +10,7 @@
 #   ORCA_WATCHDOG_INTERVAL   seconds between ticks (default 1800)
 #   ORCA_WATCHDOG_STALL      ticks without progress before escalating (default 2)
 #   ORCA_WATCHDOG_PROBE      command run in the worktree; its stdout is the progress
-#                            fingerprint (default: HEAD sha + working-tree line count)
+#                            fingerprint (default: HEAD sha + a hash of the working diff)
 #   ORCA_WATCHDOG_ASK        message sent to a stalled worktree's terminal (default: none)
 set -uo pipefail
 
@@ -20,10 +20,15 @@ STALL="${ORCA_WATCHDOG_STALL:-2}"
 ASK="${ORCA_WATCHDOG_ASK:-}"
 STATE="$ROOT/.git/orca-watchdog-state"
 
-# Both halves matter: commits alone miss an agent editing without committing, and a dirty
-# count alone misses one that commits and then idles.
+# Both halves matter: commits alone miss an agent editing without committing, and the diff
+# alone misses one that commits and then idles. It hashes the diff rather than counting
+# files because a worker editing one file over and over holds the count at 1 forever, and a
+# count-based fingerprint then reads steady work as a stall.
 default_probe() {
-  echo "$(git rev-parse HEAD 2>/dev/null) $(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  echo "$(git rev-parse HEAD 2>/dev/null) $({
+    git status --porcelain 2>/dev/null
+    git diff HEAD 2>/dev/null
+  } | shasum | cut -d' ' -f1)"
 }
 
 fingerprint() {
@@ -55,27 +60,65 @@ ask_terminal() {
   echo "asked"
 }
 
+# A dead session and a session that has not started yet both show zero commits and a clean
+# tree, so git cannot separate them — an ORCA-333 worker sat dead on an expired login for an
+# hour looking exactly like one warming up, while `orca account list` still reported the
+# account authenticated. Reading the pane for a known death marker is sound in this
+# direction only: the string being present proves death, and the app failing to answer
+# merely falls through to the stall counter.
+dead_marker() {
+  local handle
+  handle=$(orca terminal list --json 2>/dev/null |
+    jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null)
+  [ -z "$handle" ] && return 1
+  orca terminal read --terminal "$handle" --json 2>/dev/null |
+    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low" |
+    head -1
+}
+
 tick() {
   local reported=0
   while read -r path; do
     [ -d "$path" ] || continue
     [ "$path" = "$ROOT" ] && continue
 
-    local now prev count key branch
+    local now prev count asks key branch threshold dead
+    key=$(basename "$path")
+    dead=$(dead_marker "$path")
+    if [ -n "$dead" ]; then
+      echo "WATCHDOG muerto | $key | $dead"
+      reported=1
+      continue
+    fi
     key=$(basename "$path")
     branch=$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)
     now=$(cd "$path" && fingerprint)
-    prev=$(read_state "$key")
-    count=${prev##*|}
-    [ "${prev%|*}" = "$now" ] && count=$((count + 1)) || count=0
-    write_state "$key" "$now|$count"
 
-    if [ "$count" -ge "$STALL" ]; then
-      local asked=""
-      [ "$count" -eq "$STALL" ] && asked=$(ask_terminal "$path")
-      echo "WATCHDOG stalled | $key | branch:${branch:-?} | ticks:$count ${asked:+| $asked}"
+    # State is count|asks|fingerprint — counters first because the fingerprint contains
+    # spaces and would otherwise have to be parsed around.
+    prev=$(read_state "$key")
+    count=$(cut -d'|' -f1 <<<"$prev"); count=${count:-0}
+    asks=$(cut -d'|' -f2 <<<"$prev"); asks=${asks:-0}
+    if [ "$(cut -d'|' -f3- <<<"$prev")" = "$now" ]; then
+      count=$((count + 1))
+    else
+      count=0
+      asks=0
+    fi
+
+    # Why the doubling: git cannot see a long reasoning phase, so a thinking agent keeps
+    # crossing the threshold. Each unanswered ask widens the window rather than repeating
+    # the question every tick; any real progress resets both counters.
+    threshold=$((STALL << asks))
+    if [ "$count" -ge "$threshold" ]; then
+      local asked
+      asked=$(ask_terminal "$path")
+      asks=$((asks + 1))
+      count=0
+      echo "WATCHDOG stalled | $key | branch:${branch:-?} | sin avance ${threshold} ticks | preguntas:${asks}${asked:+ | $asked}"
       reported=1
     fi
+    write_state "$key" "$count|$asks|$now"
   done < <(git -C "$ROOT" worktree list --porcelain 2>/dev/null | sed -n 's|^worktree ||p')
 
   [ "$reported" -eq 0 ] && echo "WATCHDOG $(date '+%H:%M') | todos los worktrees avanzando"

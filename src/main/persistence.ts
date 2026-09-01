@@ -1085,11 +1085,13 @@ function normalizeAutomationSessionReuse(automation: Automation): Automation {
     automation.workspaceMode,
     automation.setupDecision
   )
+  const reuseSession = automation.workspaceMode === 'existing' && automation.reuseSession === true
   return {
     ...automation,
     precheck: normalizeAutomationPrecheck(automation.precheck),
     setupDecision,
-    reuseSession: automation.workspaceMode === 'existing' && automation.reuseSession === true
+    reuseSession,
+    targetPaneKey: reuseSession ? (automation.targetPaneKey ?? null) : null
   }
 }
 
@@ -5588,6 +5590,10 @@ export class Store {
         input.setupDecision
       ),
       reuseSession: input.workspaceMode === 'existing' ? (input.reuseSession ?? false) : false,
+      targetPaneKey:
+        input.workspaceMode === 'existing' && input.reuseSession === true
+          ? (input.targetPaneKey ?? null)
+          : null,
       timezone: input.timezone,
       rrule: input.rrule,
       dtstart: input.dtstart,
@@ -5619,6 +5625,14 @@ export class Store {
     const dtstart = updates.dtstart ?? current.dtstart
     const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
     const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+    const nextWorkspaceId =
+      workspaceMode === 'existing'
+        ? Object.hasOwn(updates, 'workspaceId')
+          ? (updates.workspaceId ?? null)
+          : current.workspaceId
+        : null
+    const nextReuseSession =
+      workspaceMode === 'existing' ? (updates.reuseSession ?? current.reuseSession ?? false) : false
     const updated: Automation = {
       ...current,
       ...updates,
@@ -5642,12 +5656,7 @@ export class Store {
       executionTargetId: executionTargetType === 'ssh' ? (repo?.connectionId ?? '') : 'local',
       schedulerOwner,
       workspaceMode,
-      workspaceId:
-        workspaceMode === 'existing'
-          ? Object.hasOwn(updates, 'workspaceId')
-            ? (updates.workspaceId ?? null)
-            : current.workspaceId
-          : null,
+      workspaceId: nextWorkspaceId,
       baseBranch:
         workspaceMode === 'new_per_run'
           ? Object.hasOwn(updates, 'baseBranch')
@@ -5660,10 +5669,16 @@ export class Store {
             ? normalizeAutomationSetupDecisionForWorkspaceMode(workspaceMode, updates.setupDecision)
             : normalizeAutomationSetupDecisionForWorkspaceMode(workspaceMode, current.setupDecision)
           : undefined,
-      reuseSession:
-        workspaceMode === 'existing'
-          ? (updates.reuseSession ?? current.reuseSession ?? false)
-          : false,
+      reuseSession: nextReuseSession,
+      // Why: a pane key is bound to one workspace, so repointing the automation
+      // must drop it rather than leave a target that can never resolve.
+      targetPaneKey: !nextReuseSession
+        ? null
+        : Object.hasOwn(updates, 'targetPaneKey')
+          ? (updates.targetPaneKey ?? null)
+          : nextWorkspaceId !== current.workspaceId
+            ? null
+            : (current.targetPaneKey ?? null),
       rrule,
       dtstart,
       nextRunAt: scheduleChanged

@@ -1,0 +1,1 @@
+# Test files allowed to lose cases, with why. One path per line.
