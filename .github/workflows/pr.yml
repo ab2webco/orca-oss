@@ -69,6 +69,9 @@ jobs:
       - name: Enforce max-lines ratchet
         run: pnpm run check:max-lines-ratchet
 
+      - name: Parse the shell in every workflow run block
+        run: pnpm run check:workflow-run-shell
+
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
 
