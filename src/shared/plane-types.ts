@@ -176,6 +176,45 @@ export type PlaneCreateWorkItemResult =
   | { ok: true; id: string; identifier: string; url: string }
   | { ok: false; error: string }
 
+export type PlaneIntakeIssueStatus = -2 | -1 | 0 | 1 | 2 | 'unknown'
+
+export type PlaneIntakeIssue = {
+  id: string
+  workItemId: string
+  title: string
+  description?: string
+  priority?: PlaneWorkItemPriority
+  status: PlaneIntakeIssueStatus
+  createdAt: string
+}
+
+export type PlaneCreateIntakeIssueArgs = {
+  projectId: string
+  title: string
+  workspaceId?: PlaneWorkspaceSelection | null
+  description?: string
+  priority?: PlaneWorkItemPriority
+}
+
+export type PlaneListIntakeIssuesArgs = {
+  projectId: string
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneCreateIntakeIssueResult =
+  | { ok: true; intakeIssue: PlaneIntakeIssue }
+  | { ok: false; error: string }
+
+export type PlaneSetIntakeEnabledArgs = {
+  projectId: string
+  enabled: boolean
+  workspaceId?: PlaneWorkspaceSelection | null
+}
+
+export type PlaneSetIntakeEnabledResult =
+  | { ok: true; enabled: boolean }
+  | { ok: false; error: string }
+
 export type PlaneMutationResult = { ok: true } | { ok: false; error: string }
 
 // Plane's fixed set of state groups a column can belong to.

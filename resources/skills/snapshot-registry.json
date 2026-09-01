@@ -1750,17 +1750,17 @@
     "orca-plane": [
       {
         "releaseRevision": 1,
-        "packageDigest": "b072cd5f9b659b6b2d5bfe715fdadba9314f00d51bcdf628f4042a0bd25d46fe",
-        "gitTreeSha": "8f11f88085141503c1b9100a1b03a635e4453712",
+        "packageDigest": "f6e92c995552cdd621839932ace55bf39c03dc1fc75a7f5f6b52d15381da5814",
+        "gitTreeSha": "aab7962750abd0c4cee5235a35bc203b3f930d82",
         "files": [
           {
             "path": "SKILL.md",
-            "size": 3757,
+            "size": 3783,
             "executable": false,
             "classification": "text",
-            "exactSha256": "566b27d527c8d001d037c6d6b21c4a57f40e1097f8c01b15559af1c064483aee",
-            "textNormalizedSha256": "566b27d527c8d001d037c6d6b21c4a57f40e1097f8c01b15559af1c064483aee",
-            "identitySha256": "566b27d527c8d001d037c6d6b21c4a57f40e1097f8c01b15559af1c064483aee"
+            "exactSha256": "d887f4e2b56c64cb5c9a646377f558cb5df7e996a3d1b3305f70637bf67a6e27",
+            "textNormalizedSha256": "d887f4e2b56c64cb5c9a646377f558cb5df7e996a3d1b3305f70637bf67a6e27",
+            "identitySha256": "d887f4e2b56c64cb5c9a646377f558cb5df7e996a3d1b3305f70637bf67a6e27"
           }
         ]
       }

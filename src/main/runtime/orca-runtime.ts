@@ -785,6 +785,11 @@ import {
   searchWorkItems as searchPlaneWorkItems
 } from '../plane/work-items'
 import { createWorkItem as createPlaneWorkItem } from '../plane/plane-work-item-create'
+import {
+  createIntakeIssue as createPlaneIntakeIssue,
+  listIntakeIssues as listPlaneIntakeIssues,
+  setIntakeEnabled as setPlaneIntakeEnabled
+} from '../plane/plane-intake'
 import { stripAiAttribution } from '../plane/plane-attribution-strip'
 import {
   addWorkItemComment as addPlaneWorkItemComment,
@@ -829,6 +834,7 @@ import type {
   PlaneAddRelationArgs,
   PlaneConnectArgs,
   PlaneArchiveProjectArgs,
+  PlaneCreateIntakeIssueArgs,
   PlaneCreateLabelArgs,
   PlaneCreateProjectArgs,
   PlaneCreateStateArgs,
@@ -839,8 +845,10 @@ import type {
   PlaneDeleteStateArgs,
   PlaneDeleteWorkItemArgs,
   PlaneLinkCurrentWorkItemResult,
+  PlaneListIntakeIssuesArgs,
   PlanePlanningContainerArgs,
   PlanePlanningWorkItemsArgs,
+  PlaneSetIntakeEnabledArgs,
   PlaneUnlinkCurrentWorkItemResult,
   PlaneUpdateProjectArgs,
   PlaneUpdateStateArgs,
@@ -37497,6 +37505,23 @@ export class OrcaRuntimeService {
 
   planeCreateWorkItem(args: PlaneCreateWorkItemArgs): ReturnType<typeof createPlaneWorkItem> {
     return createPlaneWorkItem({
+      ...args,
+      description: this.stripTicketAttribution(args.description)
+    })
+  }
+
+  planeSetIntakeEnabled(args: PlaneSetIntakeEnabledArgs): ReturnType<typeof setPlaneIntakeEnabled> {
+    return setPlaneIntakeEnabled(args)
+  }
+
+  planeListIntakeIssues(args: PlaneListIntakeIssuesArgs): ReturnType<typeof listPlaneIntakeIssues> {
+    return listPlaneIntakeIssues(args)
+  }
+
+  planeCreateIntakeIssue(
+    args: PlaneCreateIntakeIssueArgs
+  ): ReturnType<typeof createPlaneIntakeIssue> {
+    return createPlaneIntakeIssue({
       ...args,
       description: this.stripTicketAttribution(args.description)
     })
