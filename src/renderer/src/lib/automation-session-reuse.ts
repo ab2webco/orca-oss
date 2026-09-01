@@ -75,8 +75,14 @@ function findReusableExactRunPane({
   return { tabId: parsed.tabId, ptyId: run.terminalPtyId, paneKey: run.terminalPaneKey }
 }
 
+// `working` reuses: the paste queues behind the running turn, as it does when a person
+// types while an agent works. `blocked` and `waiting` sit at a prompt expecting a specific
+// answer, so a pasted automation prompt would be submitted as that answer.
 function isReusableAgentStatus(entry: AgentStatusEntry, agentId: TuiAgent): boolean {
-  if (entry.state !== 'done') {
+  if (entry.state !== 'done' && entry.state !== 'working') {
+    return false
+  }
+  if (entry.interactivePrompt != null) {
     return false
   }
   return !entry.agentType || entry.agentType === 'unknown' || entry.agentType === agentId
