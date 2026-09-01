@@ -16,9 +16,13 @@ sweep_line() {
   prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup 2>/dev/null) || prs='[]'
   local states='[.statusCheckRollup[]?|(.conclusion//.state)]'
 
-  green=$(jq -r "[.[]|select(($states|index(\"FAILURE\")|not) and ($states|index(\"PENDING\")|not) and (.mergeStateStatus!=\"DIRTY\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
+  # Green means every check is conclusively good. A running check reports IN_PROGRESS or
+  # QUEUED with no conclusion, so an allowlist is the only safe polarity — a denylist of
+  # FAILURE/PENDING called a PR mergeable while its E2E shards were still running.
+  local settled='["SUCCESS","SKIPPED","NEUTRAL"]'
+  green=$(jq -r "[.[]|select(([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)==0 and (.mergeStateStatus!=\"DIRTY\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
   red=$(jq -r "[.[]|select($states|index(\"FAILURE\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
-  pending=$(jq -r "[.[]|select($states|index(\"PENDING\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
+  pending=$(jq -r "[.[]|select(($states|index(\"FAILURE\")|not) and (([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)>0))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
 
   # Leftover means: no open PR AND nothing unpushed to show for it. A worker still
   # committing has neither, and main never has a PR — flagging either is noise that
