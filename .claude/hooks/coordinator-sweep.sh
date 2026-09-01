@@ -41,7 +41,10 @@ sweep_line() {
   done < <(git worktree list --porcelain 2>/dev/null |
     awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print p, $2}')
 
-  board=$(orca plane list --project "$PROJECT" --json 2>/dev/null | jq -r '[..|objects|select(.identifier?)]|length' 2>/dev/null)
+  # Why `.ok` and not just the count: a failed call still returns parseable JSON with no
+  # work items in it, so counting alone renders an outage as a board with zero items open.
+  board=$(orca plane list --project "$PROJECT" --json 2>/dev/null |
+    jq -r 'if .ok then ([..|objects|select(.identifier?)]|length|tostring) else empty end' 2>/dev/null)
 
   echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | leftover-worktrees:${stale:-none} | board-open:${board:-?}"
 }
