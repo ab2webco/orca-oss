@@ -64,6 +64,15 @@ describe('orchestration RPC methods', () => {
         accepted: true,
         bytesWritten: 1
       })
+      // Why (ORCA-208): `dispatch_input` reports `accepted` only on a proven
+      // composer, so the healthy path has to prove one.
+      vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+        ready: true,
+        proven: true,
+        state: 'ready',
+        signal: 'codex-composer-prompt',
+        waitedMs: 42
+      })
     }
 
     it('starts a fresh agent in the coordinator current worktree', async () => {

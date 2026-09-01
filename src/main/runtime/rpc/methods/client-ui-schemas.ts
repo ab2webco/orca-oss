@@ -23,6 +23,7 @@ import { GitHubProjectSettings } from './client-github-project-schemas'
 import { ClientUiWorkspaceFilterFields } from './client-ui-workspace-filter-fields'
 import { TaskResumeState } from './task-resume-state-schema'
 import { omitUndefinedValues, tolerateUnknownValues } from './ui-update-value-tolerance'
+import { WorktreeVisibilityDefaultsUpdate } from './worktree-visibility-defaults-schema'
 
 const NullableString = z.string().nullable()
 const StringArray = z.array(z.string())
@@ -118,6 +119,7 @@ export const PRBotAuthorOverrideUpdate = z
   .strict()
 export const SettingsUpdate = z
   .object({
+    worktreeVisibilityDefaults: WorktreeVisibilityDefaultsUpdate.optional(),
     defaultTuiAgent: z
       .unknown()
       .transform((value) =>
