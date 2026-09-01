@@ -27,6 +27,7 @@
     "test": "node config/scripts/ensure-native-runtime.mjs --runtime=node && vitest run --config config/vitest.config.ts",
     "test:repro:remote-agent-session": "pnpm run build:cli && pnpm run build:electron-vite && node config/scripts/remote-agent-session-authority-repro.mjs",
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
+    "check:test-case-deletion": "node config/scripts/check-test-case-deletion.mjs",
     "check:workflow-run-shell": "node config/scripts/check-workflow-run-shell-syntax.mjs",
     "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",
     "check:feature-wall-assets": "node config/scripts/check-feature-wall-assets.mjs",
