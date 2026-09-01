@@ -66,21 +66,36 @@ tick() {
     [ -d "$path" ] || continue
     [ "$path" = "$ROOT" ] && continue
 
-    local now prev count key branch
+    local now prev count asks key branch threshold
     key=$(basename "$path")
     branch=$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)
     now=$(cd "$path" && fingerprint)
-    prev=$(read_state "$key")
-    count=${prev##*|}
-    [ "${prev%|*}" = "$now" ] && count=$((count + 1)) || count=0
-    write_state "$key" "$now|$count"
 
-    if [ "$count" -ge "$STALL" ]; then
-      local asked=""
-      [ "$count" -eq "$STALL" ] && asked=$(ask_terminal "$path")
-      echo "WATCHDOG stalled | $key | branch:${branch:-?} | ticks:$count ${asked:+| $asked}"
+    # State is count|asks|fingerprint — counters first because the fingerprint contains
+    # spaces and would otherwise have to be parsed around.
+    prev=$(read_state "$key")
+    count=$(cut -d'|' -f1 <<<"$prev"); count=${count:-0}
+    asks=$(cut -d'|' -f2 <<<"$prev"); asks=${asks:-0}
+    if [ "$(cut -d'|' -f3- <<<"$prev")" = "$now" ]; then
+      count=$((count + 1))
+    else
+      count=0
+      asks=0
+    fi
+
+    # Why the doubling: git cannot see a long reasoning phase, so a thinking agent keeps
+    # crossing the threshold. Each unanswered ask widens the window rather than repeating
+    # the question every tick; any real progress resets both counters.
+    threshold=$((STALL << asks))
+    if [ "$count" -ge "$threshold" ]; then
+      local asked
+      asked=$(ask_terminal "$path")
+      asks=$((asks + 1))
+      count=0
+      echo "WATCHDOG stalled | $key | branch:${branch:-?} | sin avance ${threshold} ticks | preguntas:${asks}${asked:+ | $asked}"
       reported=1
     fi
+    write_state "$key" "$count|$asks|$now"
   done < <(git -C "$ROOT" worktree list --porcelain 2>/dev/null | sed -n 's|^worktree ||p')
 
   [ "$reported" -eq 0 ] && echo "WATCHDOG $(date '+%H:%M') | todos los worktrees avanzando"
