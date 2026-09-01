@@ -5126,6 +5126,56 @@ describe('orca cli worktree awareness', () => {
     })
   })
 
+  it('passes the automation target pane flag through create and edit', async () => {
+    queueFixtures(
+      callMock,
+      worktreeListFixture([buildWorktree('/tmp/repo/feature', 'feature/foo', 'abc', 'repo-1')]),
+      okFixture('req_create', {
+        automation: { id: 'auto-1', name: 'Daily review' }
+      }),
+      okFixture('req_edit', {
+        automation: { id: 'auto-1', name: 'Daily review' }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'automations',
+        'create',
+        '--name',
+        'Daily review',
+        '--trigger',
+        'daily',
+        '--prompt',
+        'Review open changes',
+        '--provider',
+        'codex',
+        '--workspace',
+        'current',
+        '--reuse-session',
+        '--target-pane',
+        'tab-1:leaf-1',
+        '--json'
+      ],
+      '/tmp/repo/feature/src'
+    )
+    await main(['automations', 'edit', 'auto-1', '--target-pane', '', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'automation.create',
+      expect.objectContaining({
+        reuseSession: true,
+        targetPaneKey: 'tab-1:leaf-1'
+      })
+    )
+    expect(callMock).toHaveBeenNthCalledWith(3, 'automation.update', {
+      id: 'auto-1',
+      updates: expect.objectContaining({ targetPaneKey: null })
+    })
+  })
+
   it('rejects conflicting automation session reuse flags', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

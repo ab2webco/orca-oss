@@ -873,4 +873,14 @@ describe('useAutomationDispatchEvents setup launch', () => {
     expect(mockReleaseTerminalOwnership).toHaveBeenCalledOnce()
     expect(mockFinalizeTerminalOwnership).not.toHaveBeenCalled()
   })
+
+  it('passes the configured target pane to the reuse search', async () => {
+    mockFindReusableAutomationSession.mockReturnValue(null)
+
+    await registerAndDispatch(makeAutomation({ reuseSession: true, targetPaneKey: 'tab-1:leaf-1' }))
+
+    expect(mockFindReusableAutomationSession).toHaveBeenCalledWith(
+      expect.objectContaining({ targetPaneKey: 'tab-1:leaf-1' })
+    )
+  })
 })
