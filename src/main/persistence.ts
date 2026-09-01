@@ -9,6 +9,7 @@ import {
   renameSync,
   unlinkSync,
   copyFileSync,
+  rmSync,
   statSync,
   realpathSync
 } from 'node:fs'
@@ -554,10 +555,26 @@ export function migrateMobilePairingDataToCanonicalUserDataPath(sourceUserDataDi
   }
 
   mkdirSync(targetUserDataDir, { recursive: true })
-  for (const { sourcePath, targetPath } of migrations) {
-    copyFileSync(sourcePath, targetPath)
-    // Why: copyFileSync drops Windows ACLs, so re-assert current-user-only on these credential copies (device tokens, E2EE key).
-    hardenExistingSecureFile(targetPath)
+  const copied: string[] = []
+  try {
+    for (const { sourcePath, targetPath } of migrations) {
+      copyFileSync(sourcePath, targetPath)
+      copied.push(targetPath)
+      // Why: copyFileSync drops Windows ACLs, so re-assert current-user-only on these credential copies (device tokens, E2EE key).
+      hardenExistingSecureFile(targetPath)
+    }
+  } catch (error) {
+    // Why: a half-copied pair mixes devices with the wrong key, and the existing-target guard above would block the retry.
+    let cleanupFailed = false
+    for (const targetPath of copied) {
+      try {
+        rmSync(targetPath, { force: true })
+      } catch {
+        cleanupFailed = true
+      }
+    }
+    if (cleanupFailed) throw error
+    console.error('[persistence] Failed to migrate mobile pairing files forward:', error)
   }
 }
 
