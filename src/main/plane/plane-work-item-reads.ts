@@ -154,6 +154,60 @@ export async function getViewer(
   }
 }
 
+// Client-scoped variants take no acquire(): work-item reference resolution
+// calls them while its caller already holds the concurrency gate.
+export async function listStatesForClient(
+  client: PlaneClientForWorkspace,
+  projectId: string
+): Promise<PlaneState[]> {
+  const budget = new IntegrationPaginationBudget()
+  const raws = await fetchAllPlanePages<PlaneRecord>(
+    (cursor) =>
+      planeRequest<PlanePage<PlaneRecord>>(
+        client,
+        `${workspacePath(client, `/projects/${encodeURIComponent(projectId)}/states/`)}?${pagedQuery(cursor)}`
+      ),
+    budget,
+    INTEGRATION_PAGINATION_MAX_PAGES
+  )
+  return raws.map(mapPlaneState).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+}
+
+export async function listLabelsForClient(
+  client: PlaneClientForWorkspace,
+  projectId: string
+): Promise<PlaneLabel[]> {
+  const budget = new IntegrationPaginationBudget()
+  const raws = await fetchAllPlanePages<PlaneRecord>(
+    (cursor) =>
+      planeRequest<PlanePage<PlaneRecord>>(
+        client,
+        `${workspacePath(client, `/projects/${encodeURIComponent(projectId)}/labels/`)}?${pagedQuery(cursor)}`
+      ),
+    budget,
+    INTEGRATION_PAGINATION_MAX_PAGES
+  )
+  return raws.map(mapPlaneLabel)
+}
+
+export async function listProjectMembersForClient(
+  client: PlaneClientForWorkspace,
+  projectId: string
+): Promise<PlaneUser[]> {
+  const raws = await planeRequest<PlaneRecord[]>(
+    client,
+    workspacePath(client, `/projects/${encodeURIComponent(projectId)}/members/`)
+  )
+  return raws.map(mapPlaneProjectMember).filter((user): user is PlaneUser => !!user)
+}
+
+export async function listWorkspaceMembersForClient(
+  client: PlaneClientForWorkspace
+): Promise<PlaneUser[]> {
+  const raws = await planeRequest<PlaneRecord[]>(client, workspacePath(client, '/members/'))
+  return raws.map(mapPlaneUser).filter((user): user is PlaneUser => !!user)
+}
+
 export async function listStates(
   projectId: string,
   workspaceId?: PlaneWorkspaceSelection | null
@@ -164,17 +218,7 @@ export async function listStates(
   }
   await acquire()
   try {
-    const budget = new IntegrationPaginationBudget()
-    const raws = await fetchAllPlanePages<PlaneRecord>(
-      (cursor) =>
-        planeRequest<PlanePage<PlaneRecord>>(
-          entry,
-          `${workspacePath(entry, `/projects/${encodeURIComponent(projectId)}/states/`)}?${pagedQuery(cursor)}`
-        ),
-      budget,
-      INTEGRATION_PAGINATION_MAX_PAGES
-    )
-    return raws.map(mapPlaneState).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+    return await listStatesForClient(entry, projectId)
   } catch (error) {
     clearWorkspaceTokenOnAuthError(entry, error)
     console.warn('[plane] listStates failed:', boundedIntegrationErrorLog(error))
@@ -194,17 +238,7 @@ export async function listLabels(
   }
   await acquire()
   try {
-    const budget = new IntegrationPaginationBudget()
-    const raws = await fetchAllPlanePages<PlaneRecord>(
-      (cursor) =>
-        planeRequest<PlanePage<PlaneRecord>>(
-          entry,
-          `${workspacePath(entry, `/projects/${encodeURIComponent(projectId)}/labels/`)}?${pagedQuery(cursor)}`
-        ),
-      budget,
-      INTEGRATION_PAGINATION_MAX_PAGES
-    )
-    return raws.map(mapPlaneLabel)
+    return await listLabelsForClient(entry, projectId)
   } catch (error) {
     clearWorkspaceTokenOnAuthError(entry, error)
     console.warn('[plane] listLabels failed:', boundedIntegrationErrorLog(error))
@@ -226,11 +260,7 @@ async function listProjectMembers(
   }
   await acquire()
   try {
-    const raws = await planeRequest<PlaneRecord[]>(
-      entry,
-      workspacePath(entry, `/projects/${encodeURIComponent(projectId)}/members/`)
-    )
-    return raws.map(mapPlaneProjectMember).filter((user): user is PlaneUser => !!user)
+    return await listProjectMembersForClient(entry, projectId)
   } catch (error) {
     clearWorkspaceTokenOnAuthError(entry, error)
     console.warn('[plane] listProjectMembers failed:', boundedIntegrationErrorLog(error))
@@ -261,8 +291,7 @@ export async function listMembers(
     async (client) => {
       await acquire()
       try {
-        const raws = await planeRequest<PlaneRecord[]>(client, workspacePath(client, '/members/'))
-        return raws.map(mapPlaneUser).filter((user): user is PlaneUser => !!user)
+        return await listWorkspaceMembersForClient(client)
       } catch (error) {
         clearWorkspaceTokenOnAuthError(client, error)
         console.warn('[plane] listMembers failed:', boundedIntegrationErrorLog(error))
