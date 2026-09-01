@@ -211,7 +211,7 @@ export function GlobalConfigSyncDialog({
             )}
           </div>
         ) : (
-          <ScrollArea className="max-h-[360px] pr-3">
+          <ScrollArea className="pr-3" viewportClassName="max-h-[360px]">
             <div className="flex flex-col gap-5">
               <ConfigSection
                 icon={<PlugZap className="size-3.5" />}

@@ -24,7 +24,10 @@ export function DeleteWorktreeTargetPreview({
 }): JSX.Element | null {
   if (isBatchDelete) {
     return (
-      <ScrollArea className="max-h-48 rounded-md border border-border/70 bg-muted/35 text-xs">
+      <ScrollArea
+        className="rounded-md border border-border/70 bg-muted/35 text-xs"
+        viewportClassName="max-h-48"
+      >
         <div className="space-y-1 px-3 py-2">
           {worktrees.map((item) => {
             const itemDeleteState = deleteStateByWorktreeId[item.id]

@@ -159,7 +159,7 @@ export function ClaudeAccountReassignDialog({
                       'Worktrees using this account'
                     )}
                   </Label>
-                  <ScrollArea className="max-h-44 rounded-md border px-3">
+                  <ScrollArea className="rounded-md border px-3" viewportClassName="max-h-44">
                     <ul className="divide-y">
                       {worktrees.map((worktree) => (
                         <WorktreeRow key={worktree.worktreeId} worktree={worktree} />
@@ -203,7 +203,9 @@ export function ClaudeAccountReassignDialog({
                 {translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.closeWarning',
                   'Orca will close the Claude terminal in {{worktrees}}. Those sessions end.',
-                  { worktrees: plan.liveWorktrees.map((worktree) => worktree.displayName).join(', ') }
+                  {
+                    worktrees: plan.liveWorktrees.map((worktree) => worktree.displayName).join(', ')
+                  }
                 )}
               </p>
             ) : null}
