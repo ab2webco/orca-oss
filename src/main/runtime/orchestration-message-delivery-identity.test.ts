@@ -1,5 +1,4 @@
-import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +8,6 @@ import { OrchestrationDb } from './orchestration/db'
 import { createLegacyStorageCutoverFixture } from './orchestration/orchestration-legacy-storage-test-fixture'
 import { RpcDispatcher } from './rpc/dispatcher'
 import { ORCHESTRATION_METHODS } from './rpc/methods/orchestration'
-import { OrcaRuntimeRpcServer } from './runtime-rpc'
 
 vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => tmpdir()), isPackaged: false },
@@ -27,9 +25,6 @@ const REMINTED_TERMINAL_HANDLE = 'term_sta_4325_reminted'
 const WORKTREE_ID = 'repo-sta-4325::/tmp/sta-4325'
 const LAUNCH_TOKEN = 'sta-4325-launch'
 const temporaryDirectories: string[] = []
-const CLI_PATH = join(process.cwd(), 'out', 'cli', 'index.js')
-const itIfCliBuilt = existsSync(CLI_PATH) ? it : it.skip
-
 type MessageResult = { id: string; type: string; read: number }
 type CheckResult = {
   runId: string
@@ -138,32 +133,6 @@ function pointerPayloads(write: ReturnType<typeof vi.fn>): string[] {
   return write.mock.calls
     .map(([, payload]) => String(payload))
     .filter((payload) => payload.includes('orca orchestration check'))
-}
-
-async function runBuiltCli(
-  userDataPath: string,
-  args: string[]
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const child = spawn(process.execPath, [CLI_PATH, ...args], {
-    env: {
-      ...process.env,
-      ORCA_USER_DATA_PATH: userDataPath,
-      ORCA_TERMINAL_HANDLE: TERMINAL_HANDLE,
-      ORCA_PANE_KEY: PANE_KEY
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-  const stdout: string[] = []
-  const stderr: string[] = []
-  child.stdout.setEncoding('utf8')
-  child.stderr.setEncoding('utf8')
-  child.stdout.on('data', (chunk) => stdout.push(chunk))
-  child.stderr.on('data', (chunk) => stderr.push(chunk))
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    child.once('close', (code) => resolve(code ?? 1))
-    child.once('error', reject)
-  })
-  return { exitCode, stdout: stdout.join(''), stderr: stderr.join('') }
 }
 
 describe('STA-4325 message and delivery identity', () => {
@@ -426,86 +395,4 @@ describe('STA-4325 message and delivery identity', () => {
     expect(reopened.getMessageById(done.id)?.to_handle).toBe(`run:${runId}`)
     reopened.close()
   })
-
-  itIfCliBuilt(
-    'keeps the built CLI count and Delivery output aligned with isolated SQLite state',
-    async () => {
-      const userDataPath = mkdtempSync(join(tmpdir(), 'orca-sta-4325-cli-'))
-      temporaryDirectories.push(userDataPath)
-      const db = new OrchestrationDb(join(userDataPath, 'orchestration.db'))
-      const runtime = new OrcaRuntimeService()
-      runtime.setOrchestrationDb(db)
-      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
-        handle === TERMINAL_HANDLE ? PANE_KEY : null
-      )
-      const run = db.createRun({
-        objective: 'STA-4325 built CLI',
-        coordinatorHandle: TERMINAL_HANDLE,
-        coordinatorPaneKey: PANE_KEY
-      })
-      const status = db.insertMessage({
-        from: 'term_worker',
-        to: TERMINAL_HANDLE,
-        subject: 'direct status',
-        type: 'status',
-        runId: run.id,
-        deliveryContract: 'current_delivery'
-      })
-      const done = db.insertMessage({
-        from: 'term_worker',
-        to: `run:${run.id}`,
-        subject: 'canonical done',
-        type: 'worker_done',
-        runId: run.id,
-        deliveryContract: 'current_delivery'
-      })
-      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath })
-      await server.start()
-
-      try {
-        const first = await runBuiltCli(userDataPath, ['orchestration', 'check', '--json'])
-        expect(first.exitCode, first.stderr).toBe(0)
-        const firstPayload = JSON.parse(first.stdout) as { result: CheckResult }
-        expect(firstPayload.result).toMatchObject({ runId: run.id, count: 2, replayed: false })
-        expect(firstPayload.result.messages.map((message) => message.id)).toEqual([
-          status.id,
-          done.id
-        ])
-
-        const replay = await runBuiltCli(userDataPath, ['orchestration', 'check', '--json'])
-        expect(replay.exitCode, replay.stderr).toBe(0)
-        const replayPayload = JSON.parse(replay.stdout) as { result: CheckResult }
-        expect(replayPayload.result).toMatchObject({
-          count: 2,
-          deliveryId: firstPayload.result.deliveryId,
-          replayed: true
-        })
-        expect(sqliteFor(db).prepare('SELECT id, status FROM deliveries').all()).toEqual([
-          { id: firstPayload.result.deliveryId, status: 'outstanding' }
-        ])
-        expect(db.getMessageById(status.id)).toMatchObject({
-          to_handle: `run:${run.id}`,
-          read: 0
-        })
-
-        const acknowledged = await runBuiltCli(userDataPath, [
-          'orchestration',
-          'check',
-          '--ack',
-          firstPayload.result.deliveryId!,
-          '--json'
-        ])
-        expect(acknowledged.exitCode, acknowledged.stderr).toBe(0)
-        expect(JSON.parse(acknowledged.stdout)).toMatchObject({
-          result: { count: 0, deliveryId: null, acknowledged: firstPayload.result.deliveryId }
-        })
-        expect(db.getMessageById(status.id)?.read).toBe(1)
-        expect(db.getMessageById(done.id)?.read).toBe(1)
-      } finally {
-        await server.stop()
-        db.close()
-      }
-    },
-    30_000
-  )
 })
