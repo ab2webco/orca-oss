@@ -71,7 +71,10 @@ import { GrokAccountsSection } from './GrokAccountsSection'
 import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
 import { ClaudeRefreshChainConflictNotice } from './ClaudeRefreshChainConflictNotice'
-import { classifyClaudeAccountBlock } from './claude-account-reassign-plan'
+import {
+  classifyClaudeAccountBlock,
+  resolveClaudeAccountBlockMode
+} from './claude-account-reassign-plan'
 import { useClaudeAccountReassign } from './use-claude-account-reassign'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
@@ -882,7 +885,7 @@ export function AccountsPane({
       if (blockedAccountId && classifyClaudeAccountBlock(description) !== null) {
         claudeReassign.open({
           accountId: blockedAccountId,
-          mode: 'unblock',
+          mode: resolveClaudeAccountBlockMode(action, blockedAccountId),
           runtime: actionRuntime,
           retry: operation
         })

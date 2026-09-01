@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifyClaudeAccountBlock,
-  planClaudeAccountReassignment
+  planClaudeAccountReassignment,
+  resolveClaudeAccountBlockMode
 } from './claude-account-reassign-plan'
 import type { ClaudeAccountWorktreeUsageReport } from '../../../../shared/claude-account-worktree-usage'
 
@@ -41,7 +42,9 @@ describe('classifyClaudeAccountBlock', () => {
       )
     ).toBe('launching')
     expect(
-      classifyClaudeAccountBlock('This Claude account is being launched globally. Try again when it finishes.')
+      classifyClaudeAccountBlock(
+        'This Claude account is being launched globally. Try again when it finishes.'
+      )
     ).toBe('launching')
   })
 
@@ -89,5 +92,16 @@ describe('planClaudeAccountReassignment', () => {
       planClaudeAccountReassignment(report({ pendingGlobalLaunchCount: 1 })).waitingOnLaunch
     ).toBe(true)
     expect(planClaudeAccountReassignment(report()).waitingOnLaunch).toBe(false)
+  })
+})
+
+describe('resolveClaudeAccountBlockMode', () => {
+  it('keeps the pins when the blocked operation was this account’s own re-auth', () => {
+    expect(resolveClaudeAccountBlockMode('reauth:account-a', 'account-a')).toBe('reauth')
+  })
+
+  it('still reassigns for a blocked selection or a re-auth of another account', () => {
+    expect(resolveClaudeAccountBlockMode('select:account-a', 'account-a')).toBe('unblock')
+    expect(resolveClaudeAccountBlockMode('reauth:account-b', 'account-a')).toBe('unblock')
   })
 })

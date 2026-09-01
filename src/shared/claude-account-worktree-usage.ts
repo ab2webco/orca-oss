@@ -34,14 +34,29 @@ export type ClaudeAccountWorktreeUsageReport = {
   supported: boolean
 }
 
-export type ClaudeWorktreeAccountReassignment = {
+type ClaudeWorktreeAccountRequestBase = {
   fromAccountId: string
-  /** null means the system default Claude login. */
-  toAccountId: string | null
   closeLiveTerminals: boolean
   /** Accounts other than `fromAccountId` whose live terminals also block. */
   closeLiveTerminalAccountIds?: readonly string[]
 }
+
+/**
+ * Why a discriminated union and not an optional `keepPins` flag: every layer
+ * between the dialog and the service rebuilds this request field by field, so a
+ * dropped flag would read as "reassign to null" and unpin every worktree — the
+ * one outcome a re-auth must never produce. A missing discriminant cannot.
+ */
+export type ClaudeWorktreeAccountReassignment = ClaudeWorktreeAccountRequestBase &
+  (
+    | {
+        intent: 'reassign'
+        /** null means the system default Claude login. */
+        toAccountId: string | null
+      }
+    /** Close the blocking terminals and leave every pin exactly where it is. */
+    | { intent: 'keep-pins' }
+  )
 
 export function emptyClaudeAccountWorktreeUsageReport(
   accountId: string,

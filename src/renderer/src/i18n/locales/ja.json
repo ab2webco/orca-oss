@@ -10438,7 +10438,11 @@
           "cancel": "Cancel",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "実行中の Claude ターミナルを閉じて {{account}} に再ログインしますか？",
+          "reauthDescription": "実行中の Claude CLI がこのアカウントの使い捨てリフレッシュチェーンを保持しているため、Orca はまずそれらのターミナルを閉じます。すべてのワークツリーはこのアカウントのままで、サインイン後に Orca はこのアカウントのために閉じたターミナルを開き直します。",
+          "reauthWorktreesLabel": "Orca が閉じて開き直すターミナル",
+          "confirmReauth": "閉じてサインイン"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "これらのアカウントは記録上同じリフレッシュチェーンを共有しています",
@@ -10545,6 +10549,9 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "太字のフォントウェイト",
           "0e0d1ee15a": "フォントウェイトとは独立して調整できます。フォントによっては複数の値が同じ字面に割り当てられるため、太字が変わらないように見える場合はフォントウェイトを下げるか、別のフォントを選んでください。"
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "サインインは完了しましたが、Orca は {{worktrees}} の Claude ターミナルを開き直せませんでした。タブバーから起動し直してください。"
         }
       },
       "right": {

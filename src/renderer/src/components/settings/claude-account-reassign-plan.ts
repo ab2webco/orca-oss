@@ -30,6 +30,18 @@ export function classifyClaudeAccountBlock(message: string): ClaudeAccountBlockR
   return null
 }
 
+/**
+ * What the reassign dialog should offer for a refused operation. Signing back
+ * in to the same account only needs its live terminals closed, so it keeps
+ * every pin; any other blocked operation still moves them.
+ */
+export function resolveClaudeAccountBlockMode(
+  action: string,
+  blockedAccountId: string
+): 'reauth' | 'unblock' {
+  return action === `reauth:${blockedAccountId}` ? 'reauth' : 'unblock'
+}
+
 export type ClaudeAccountReassignPlan = {
   /** Worktrees with a Claude CLI running right now — confirming closes these. */
   liveWorktrees: ClaudeAccountWorktreeUsage[]
