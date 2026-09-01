@@ -112,6 +112,7 @@ const AutomationCreate = z.object({
   baseBranch: OptionalPlainString,
   setupDecision: SetupDecision,
   reuseSession: OptionalBoolean,
+  targetPaneKey: OptionalNullablePlainString,
   timezone: OptionalString,
   rrule: AutomationSchedule,
   dtstart: requiredNumber('Missing trigger start time'),
@@ -133,6 +134,8 @@ const AutomationUpdateFields = z.object({
   baseBranch: OptionalNullablePlainString,
   setupDecision: SetupDecision,
   reuseSession: OptionalBoolean,
+  // Why: update patches distinguish omitted from null so callers can clear a saved target pane.
+  targetPaneKey: OptionalNullablePlainString,
   timezone: OptionalString,
   rrule: AutomationSchedule.optional(),
   dtstart: requiredNumber('Missing trigger start time').optional(),

@@ -42,6 +42,8 @@ export type AutomationDraft = {
   baseBranch: string
   setupDecision?: Extract<SetupDecision, 'run' | 'skip'>
   reuseSession: boolean
+  /** Empty string = automatic (reuse the previous automation session). */
+  targetPaneKey: string
   precheckCommand: string
   precheckTimeoutSeconds: string
   preset: AutomationSchedulePreset

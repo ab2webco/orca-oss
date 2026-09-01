@@ -503,6 +503,7 @@ export function useAutomationDispatchEvents(): void {
               worktreeId: worktree.id,
               currentRunId: run.id,
               runs: await window.api.automations.listRuns({ automationId: automation.id }),
+              targetPaneKey: automation.targetPaneKey ?? null,
               state: useAppStore.getState()
             })
             if (reusableSession) {

@@ -263,6 +263,7 @@ export default function AutomationsPage(): React.JSX.Element {
     baseBranch: '',
     setupDecision: undefined,
     reuseSession: false,
+    targetPaneKey: '',
     precheckCommand: '',
     precheckTimeoutSeconds: '60',
     preset: 'weekdays',
@@ -1053,7 +1054,8 @@ export default function AutomationsPage(): React.JSX.Element {
         agentId: 'hermes',
         workspaceMode: 'existing',
         setupDecision: undefined,
-        reuseSession: false
+        reuseSession: false,
+        targetPaneKey: ''
       }))
     }
   }, [])
@@ -1074,6 +1076,7 @@ export default function AutomationsPage(): React.JSX.Element {
       baseBranch: '',
       setupDecision: undefined,
       reuseSession: false,
+      targetPaneKey: '',
       precheckCommand: '',
       precheckTimeoutSeconds: '60',
       preset: 'weekdays',
@@ -1132,6 +1135,7 @@ export default function AutomationsPage(): React.JSX.Element {
         persistedSetupDecision: latest.setupDecision
       }),
       reuseSession: latest.workspaceMode === 'existing' && latest.reuseSession,
+      targetPaneKey: (latest.workspaceMode === 'existing' && latest.targetPaneKey) || '',
       precheckCommand: latest.precheck?.command ?? '',
       precheckTimeoutSeconds: String(latest.precheck?.timeoutSeconds ?? 60),
       preset: schedule?.preset ?? (hasCustomSchedule ? 'custom' : 'weekdays'),
@@ -1180,6 +1184,7 @@ export default function AutomationsPage(): React.JSX.Element {
       baseBranch: '',
       setupDecision: undefined,
       reuseSession: false,
+      targetPaneKey: '',
       precheckCommand: '',
       precheckTimeoutSeconds: '60',
       preset: hasCustomSchedule ? 'custom' : 'weekdays',
@@ -1441,6 +1446,10 @@ export default function AutomationsPage(): React.JSX.Element {
         baseBranch: draft.baseBranch.trim() || null,
         setupDecision,
         reuseSession: draft.workspaceMode === 'existing' && draft.reuseSession,
+        targetPaneKey:
+          draft.workspaceMode === 'existing' && draft.reuseSession
+            ? draft.targetPaneKey.trim() || null
+            : null,
         timezone,
         missedRunGraceMinutes
       }
@@ -1468,6 +1477,10 @@ export default function AutomationsPage(): React.JSX.Element {
             baseBranch: draft.baseBranch.trim() || null,
             setupDecision,
             reuseSession: draft.workspaceMode === 'existing' && draft.reuseSession,
+            targetPaneKey:
+              draft.workspaceMode === 'existing' && draft.reuseSession
+                ? draft.targetPaneKey.trim() || null
+                : null,
             timezone,
             rrule,
             dtstart: now,

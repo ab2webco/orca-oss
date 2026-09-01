@@ -2004,6 +2004,90 @@ describe('Store', () => {
     expect(reloaded.listAutomations()[0].reuseSession).toBe(false)
   })
 
+  it('persists a target pane only while session reuse is on', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+
+    const withTarget = store.createAutomation({
+      name: 'Digest',
+      prompt: 'Summarize changes',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      reuseSession: true,
+      targetPaneKey: 'tab1:leaf-1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+    const withoutReuse = store.createAutomation({
+      name: 'Fresh',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      reuseSession: false,
+      targetPaneKey: 'tab1:leaf-1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+
+    expect(withTarget.targetPaneKey).toBe('tab1:leaf-1')
+    expect(withoutReuse.targetPaneKey).toBeNull()
+    expect(store.updateAutomation(withTarget.id, { reuseSession: false }).targetPaneKey).toBeNull()
+  })
+
+  it('clears the target pane when the automation is repointed at another workspace', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const automation = store.createAutomation({
+      name: 'Digest',
+      prompt: 'Summarize changes',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      reuseSession: true,
+      targetPaneKey: 'tab1:leaf-1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+
+    const samePane = store.updateAutomation(automation.id, { workspaceId: 'wt1' })
+    expect(samePane.targetPaneKey).toBe('tab1:leaf-1')
+
+    const repointed = store.updateAutomation(automation.id, { workspaceId: 'wt2' })
+    expect(repointed.targetPaneKey).toBeNull()
+  })
+
+  it('normalizes a stored target pane away when reuse is off', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    store.createAutomation({
+      name: 'Digest',
+      prompt: 'Summarize changes',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'existing',
+      workspaceId: 'wt1',
+      reuseSession: true,
+      targetPaneKey: 'tab1:leaf-1',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+
+    const persisted = readDataFile() as { automations: Record<string, unknown>[] }
+    persisted.automations[0].reuseSession = false
+    writeDataFile(persisted)
+    const reloaded = await createStore()
+    expect(reloaded.listAutomations()[0].targetPaneKey).toBeNull()
+  })
+
   it('persists setup decisions only for new-per-run automations', async () => {
     const store = await createStore()
     store.addRepo(makeRepo())

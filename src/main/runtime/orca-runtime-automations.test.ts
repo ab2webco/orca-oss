@@ -199,6 +199,61 @@ describe('OrcaRuntimeService automation methods', () => {
     expect(store.createAutomation).not.toHaveBeenCalled()
   })
 
+  it('passes target pane updates through the shared store and allows clearing with null', async () => {
+    const existing = {
+      ...existingAutomation,
+      workspaceMode: 'existing',
+      workspaceId: 'repo-1::/tmp/orca',
+      baseBranch: null,
+      reuseSession: true,
+      targetPaneKey: 'tab-1:leaf-1'
+    } satisfies Automation
+    const store = makeStore([existing])
+    const runtime = new OrcaRuntimeService(store as never)
+
+    await runtime.updateAutomation('auto-1', { targetPaneKey: 'tab-2:leaf-2' })
+    expect(store.updateAutomation).toHaveBeenCalledWith('auto-1', {
+      targetPaneKey: 'tab-2:leaf-2'
+    })
+
+    await runtime.updateAutomation('auto-1', { targetPaneKey: null })
+    expect(store.updateAutomation).toHaveBeenCalledWith('auto-1', { targetPaneKey: null })
+  })
+
+  it('rejects a target pane without session reuse', async () => {
+    const store = makeStore()
+    const runtime = new OrcaRuntimeService(store as never)
+
+    await expect(
+      runtime.createAutomation({
+        name: 'Digest',
+        prompt: 'Summarize changes',
+        agentId: 'codex',
+        workspace: 'repo-1::/tmp/orca',
+        workspaceMode: 'existing',
+        targetPaneKey: 'tab-1:leaf-1',
+        rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+        dtstart: 1
+      })
+    ).rejects.toThrow('A target pane requires session reuse.')
+    expect(store.createAutomation).not.toHaveBeenCalled()
+
+    const existing = {
+      ...existingAutomation,
+      workspaceMode: 'existing',
+      workspaceId: 'repo-1::/tmp/orca',
+      baseBranch: null,
+      reuseSession: false
+    } satisfies Automation
+    const updateStore = makeStore([existing])
+    const updateRuntime = new OrcaRuntimeService(updateStore as never)
+
+    await expect(
+      updateRuntime.updateAutomation('auto-1', { targetPaneKey: 'tab-1:leaf-1' })
+    ).rejects.toThrow('A target pane requires session reuse.')
+    expect(updateStore.updateAutomation).not.toHaveBeenCalled()
+  })
+
   it('rejects repo-only updates for existing-workspace automations', async () => {
     const existing = {
       ...existingAutomation,

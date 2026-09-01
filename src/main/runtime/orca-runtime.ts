@@ -189,8 +189,95 @@ import type {
   AutomationWorkspaceMode
 } from '../../shared/automations-types'
 import { createStartupAgentRefusedError } from './startup-agent-refused-error'
-import type { AutomationWorkspaceProvenance, CliWorkspaceProvenance, BaseRefSearchResult, CreateWorktreeResult, DetectedWorktree, DetectedWorktreeListResult, ForceDeleteWorktreeBranchResult, GitHubPrStartPoint, GitPushTarget, BranchPrefixStrategy, GitWorktreeInfo, GitHubCreateIssueFields, GitHubOwnerRepo, GlobalSettings, LinkedPlaneWorkItem, PersistedUIState, Project, ProjectUpdateArgs, ProjectHostSetup, ProjectHostSetupCloneArgs, ProjectHostSetupCreateArgs, ProjectHostSetupCreateResult, ProjectHostSetupDeleteArgs, ProjectHostSetupDeleteResult, ProjectHostSetupExistingFolderArgs, ProjectHostSetupResult, ProjectHostSetupUpdateArgs, ProjectHostSetupUpdateResult, Repo, RemoveWorktreeResult, StatsSummary, Worktree, WorktreeLineage, WorkspaceLineage, WorkspaceKey, WorktreeLineageWarning, WorktreeMeta, WorktreeBaseStatusEvent, WorktreeRemoteBranchConflictEvent, WorktreeStartupLaunch, LinearCustomViewModel, JiraConnectArgs, JiraCreateIssueArgs, JiraIssueFilter, JiraIssueUpdate, JiraSiteSelection, LinearIssueUpdate, LinearProjectSummary, LinearWorkspaceSelection, NestedRepoScanResult, ProjectGroup, FolderWorkspace, ProjectGroupImportMode, ProjectGroupImportResult, MemorySnapshot, Tab, TabGroupLayoutNode, TerminalQuickCommand, TerminalLayoutSnapshot, TerminalPaneLayoutNode, TerminalTab, TuiAgent, WorkspaceCreateTelemetrySource, WorkspaceSessionState, WorkspaceLinkedItem, DirEntry, FilesystemPathFlavor, GitHubIssueUpdate, GitHubPullRequestStateUpdate, GitHubPRFile, GitHubPRReviewCommentInput, GitHubReactionContent, GitLabIssueUpdate, GitLabMRInlineCommentInput, GitLabProjectRef, GitLabWorkItem, ListWorkItemsResult, MRListState, PRRefreshOutcome, ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../shared/types'
-import type { ClaudeTerminalAccountReport, ClaudeTerminalAccountOwnership, ClaudeVaultSettingsInheritanceReport, ManagedPtyAccountOwner } from '../../shared/managed-account-types'
+import type {
+  AutomationWorkspaceProvenance,
+  CliWorkspaceProvenance,
+  BaseRefSearchResult,
+  CreateWorktreeResult,
+  DetectedWorktree,
+  DetectedWorktreeListResult,
+  ForceDeleteWorktreeBranchResult,
+  GitHubPrStartPoint,
+  GitPushTarget,
+  BranchPrefixStrategy,
+  GitWorktreeInfo,
+  GitHubCreateIssueFields,
+  GitHubOwnerRepo,
+  GlobalSettings,
+  LinkedPlaneWorkItem,
+  PersistedUIState,
+  Project,
+  ProjectUpdateArgs,
+  ProjectHostSetup,
+  ProjectHostSetupCloneArgs,
+  ProjectHostSetupCreateArgs,
+  ProjectHostSetupCreateResult,
+  ProjectHostSetupDeleteArgs,
+  ProjectHostSetupDeleteResult,
+  ProjectHostSetupExistingFolderArgs,
+  ProjectHostSetupResult,
+  ProjectHostSetupUpdateArgs,
+  ProjectHostSetupUpdateResult,
+  Repo,
+  RemoveWorktreeResult,
+  StatsSummary,
+  Worktree,
+  WorktreeLineage,
+  WorkspaceLineage,
+  WorkspaceKey,
+  WorktreeLineageWarning,
+  WorktreeMeta,
+  WorktreeBaseStatusEvent,
+  WorktreeRemoteBranchConflictEvent,
+  WorktreeStartupLaunch,
+  LinearCustomViewModel,
+  JiraConnectArgs,
+  JiraCreateIssueArgs,
+  JiraIssueFilter,
+  JiraIssueUpdate,
+  JiraSiteSelection,
+  LinearIssueUpdate,
+  LinearProjectSummary,
+  LinearWorkspaceSelection,
+  NestedRepoScanResult,
+  ProjectGroup,
+  FolderWorkspace,
+  ProjectGroupImportMode,
+  ProjectGroupImportResult,
+  MemorySnapshot,
+  Tab,
+  TabGroupLayoutNode,
+  TerminalQuickCommand,
+  TerminalLayoutSnapshot,
+  TerminalPaneLayoutNode,
+  TerminalTab,
+  TuiAgent,
+  WorkspaceCreateTelemetrySource,
+  WorkspaceSessionState,
+  WorkspaceLinkedItem,
+  DirEntry,
+  FilesystemPathFlavor,
+  GitHubIssueUpdate,
+  GitHubPullRequestStateUpdate,
+  GitHubPRFile,
+  GitHubPRReviewCommentInput,
+  GitHubReactionContent,
+  GitLabIssueUpdate,
+  GitLabMRInlineCommentInput,
+  GitLabProjectRef,
+  GitLabWorkItem,
+  ListWorkItemsResult,
+  MRListState,
+  PRRefreshOutcome,
+  ClaudeRateLimitAccountsState,
+  CodexRateLimitAccountsState
+} from '../../shared/types'
+import type {
+  ClaudeTerminalAccountReport,
+  ClaudeTerminalAccountOwnership,
+  ClaudeVaultSettingsInheritanceReport,
+  ManagedPtyAccountOwner
+} from '../../shared/managed-account-types'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
@@ -3649,9 +3736,7 @@ export class OrcaRuntimeService {
       | { experimentalAgentDashboardPopout?: boolean }
       | undefined
     if (settings?.experimentalAgentDashboardPopout !== true) {
-      const error = new Error(
-        'The Agent Dashboard popout feature is disabled in this Orca host.'
-      )
+      const error = new Error('The Agent Dashboard popout feature is disabled in this Orca host.')
       Object.assign(error, { code: 'dashboard_popout_disabled' })
       throw error
     }
@@ -3876,6 +3961,9 @@ export class OrcaRuntimeService {
     if (!this.store?.createAutomation) {
       throw new Error('runtime_unavailable')
     }
+    if (input.targetPaneKey && !input.reuseSession) {
+      throw new Error('A target pane requires session reuse.')
+    }
     const target = await this.resolveAutomationTarget(input)
     if (input.reuseSession && target.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
@@ -3893,6 +3981,7 @@ export class OrcaRuntimeService {
       baseBranch: input.baseBranch,
       setupDecision: input.setupDecision,
       reuseSession: input.reuseSession,
+      targetPaneKey: input.targetPaneKey,
       timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       rrule: input.rrule,
       dtstart: input.dtstart,
@@ -3934,6 +4023,10 @@ export class OrcaRuntimeService {
     if (hasRuntimeAutomationUpdateValue(updates, 'reuseSession')) {
       patch.reuseSession = updates.reuseSession
     }
+    if (Object.hasOwn(updates, 'targetPaneKey')) {
+      // Why: null must reach the store — it clears a saved target pane.
+      patch.targetPaneKey = updates.targetPaneKey ?? null
+    }
     if (hasRuntimeAutomationUpdateValue(updates, 'timezone')) {
       patch.timezone = updates.timezone
     }
@@ -3967,6 +4060,9 @@ export class OrcaRuntimeService {
     }
     if (!targetChanged && patch.reuseSession && current.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
+    }
+    if (patch.targetPaneKey && !(patch.reuseSession ?? current.reuseSession)) {
+      throw new Error('A target pane requires session reuse.')
     }
     return this.store.updateAutomation(id, patch)
   }

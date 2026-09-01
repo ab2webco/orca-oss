@@ -220,6 +220,7 @@ export function formatAutomationShow(result: { automation: Automation }): string
     `workspaceId: ${automation.workspaceId ?? 'null'}`,
     `baseBranch: ${automation.baseBranch ?? 'null'}`,
     `reuseSession: ${automation.reuseSession}`,
+    `targetPane: ${automation.targetPaneKey ?? 'null'}`,
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
     `prompt: ${automation.prompt}`
   ].join('\n')
