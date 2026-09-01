@@ -60,13 +60,36 @@ ask_terminal() {
   echo "asked"
 }
 
+# A dead session and a session that has not started yet both show zero commits and a clean
+# tree, so git cannot separate them — an ORCA-333 worker sat dead on an expired login for an
+# hour looking exactly like one warming up, while `orca account list` still reported the
+# account authenticated. Reading the pane for a known death marker is sound in this
+# direction only: the string being present proves death, and the app failing to answer
+# merely falls through to the stall counter.
+dead_marker() {
+  local handle
+  handle=$(orca terminal list --json 2>/dev/null |
+    jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null)
+  [ -z "$handle" ] && return 1
+  orca terminal read --terminal "$handle" --json 2>/dev/null |
+    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low" |
+    head -1
+}
+
 tick() {
   local reported=0
   while read -r path; do
     [ -d "$path" ] || continue
     [ "$path" = "$ROOT" ] && continue
 
-    local now prev count asks key branch threshold
+    local now prev count asks key branch threshold dead
+    key=$(basename "$path")
+    dead=$(dead_marker "$path")
+    if [ -n "$dead" ]; then
+      echo "WATCHDOG muerto | $key | $dead"
+      reported=1
+      continue
+    fi
     key=$(basename "$path")
     branch=$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)
     now=$(cd "$path" && fingerprint)
