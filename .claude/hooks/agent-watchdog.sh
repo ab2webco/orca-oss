@@ -68,12 +68,28 @@ ask_terminal() {
 # merely falls through to the stall counter.
 dead_marker() {
   local handle
-  handle=$(orca terminal list --json 2>/dev/null |
-    jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null)
+  handle=$(handle_for "$1")
   [ -z "$handle" ] && return 1
   orca terminal read --terminal "$handle" --json 2>/dev/null |
     grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low|Failed to start turn|invalid cwd" |
     head -1
+}
+
+handle_for() {
+  orca terminal list --json 2>/dev/null |
+    jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null
+}
+
+# `orca terminal state` reads the agent's own session log rather than the screen buffer, so
+# it answers where `terminal list` could not: lastOutputAt was two hours stale and preview
+# byte-identical for a pane that was mid-turn. `awaiting-input` means the agent finished and
+# is waiting on a human — idle, not dead, and the thing to report rather than a stall.
+agent_state() {
+  local handle
+  handle=$(handle_for "$1")
+  [ -z "$handle" ] && return 1
+  orca terminal state --terminal "$handle" --json 2>/dev/null |
+    jq -r '.result.agentSession.session.state // empty' 2>/dev/null
 }
 
 tick() {
@@ -110,6 +126,23 @@ tick() {
     # crossing the threshold. Each unanswered ask widens the window rather than repeating
     # the question every tick; any real progress resets both counters.
     threshold=$((STALL << asks))
+    # Three outcomes, and only the third is a stall. `awaiting-input` means the agent
+    # finished and nobody told it what is next — the coordinator's fault, not the worker's.
+    # `working` means git simply cannot see a reasoning phase, so the alarm is wrong. Any
+    # other answer, including none, falls through to the progress counter.
+    local reported_state
+    reported_state=$(agent_state "$path")
+    if [ "$reported_state" = "awaiting-input" ]; then
+      echo "WATCHDOG esperando instrucciones | $key | branch:${branch:-?}"
+      reported=1
+      write_state "$key" "0|0|$now"
+      continue
+    fi
+    if [ "$reported_state" = "working" ]; then
+      write_state "$key" "$count|$asks|$now"
+      continue
+    fi
+
     if [ "$count" -ge "$threshold" ]; then
       local asked
       asked=$(ask_terminal "$path")
