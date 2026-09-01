@@ -1713,6 +1713,7 @@ describe('OrcaRuntimeService', () => {
     } as never)
 
     expect(runtime.getClientSettings()).toMatchObject({
+      worktreeVisibilityDefaults: { external: 'hide' },
       experimentalNewWorktreeCardStyle: true,
       compactWorktreeCards: true,
       minimaxGroupId: 'group-42',
@@ -1836,6 +1837,23 @@ describe('OrcaRuntimeService', () => {
       minimaxGroupId: 'group-42',
       minimaxUsageModels: 'general,abab6.5'
     })
+  })
+
+  it('broadcasts visibility default changes to paired clients', async () => {
+    let settings = { ...store.getSettings(), worktreeVisibilityDefaults: { external: 'hide' } }
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => settings,
+      updateSettings: (updates: Partial<typeof settings>) => {
+        settings = { ...settings, ...updates }
+      }
+    } as never)
+    const events: unknown[] = []
+    runtime.onClientEvent((event) => events.push(event))
+
+    await runtime.updateClientSettings({ worktreeVisibilityDefaults: { external: 'show' } })
+
+    expect(events).toContainEqual({ type: 'reposChanged' })
   })
 
   it('reconciles hooks only when paired-client hook settings change', async () => {
@@ -8421,11 +8439,10 @@ describe('OrcaRuntimeService', () => {
       expect(added).toEqual([
         expect.objectContaining({
           badgeColor: DEFAULT_REPO_BADGE_COLOR,
-          externalWorktreeVisibility: 'hide',
           externalWorktreeVisibilityLegacy: false
         })
       ])
-      expect(repo.externalWorktreeVisibility).toBe('hide')
+      expect(repo.externalWorktreeVisibility).toBeUndefined()
       expect(prepareLocalWorktreeRootForRepoMock).toHaveBeenCalledWith(colorStore, repo)
     } finally {
       spawnSpy.mockRestore()
@@ -37043,6 +37060,61 @@ describe('OrcaRuntimeService', () => {
 
     expect(target).toMatchObject({
       worktree: { path: scratchPath },
+      relativePath: 'src/app.ts'
+    })
+  })
+
+  it('applies global custom-source visibility to mobile summaries and file resolution', async () => {
+    const globalRoot = '/tmp/global-worktrees'
+    const globalWorktreePath = `${globalRoot}/review`
+    vi.mocked(listWorktrees).mockResolvedValue([
+      {
+        path: TEST_REPO_PATH,
+        head: 'main',
+        branch: 'main',
+        isBare: false,
+        isMainWorktree: true
+      },
+      {
+        path: globalWorktreePath,
+        head: 'review',
+        branch: 'feature/review',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    const repo = {
+      ...store.getRepos()[0],
+      externalWorktreeVisibility: 'hide' as const,
+      externalWorktreeVisibilityLegacy: false
+    }
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getRepos: () => [repo],
+      getRepo: () => repo,
+      getSettings: () => ({
+        ...store.getSettings(),
+        worktreeVisibilityDefaults: {
+          external: 'hide' as const,
+          customSources: [{ id: 'global', rootPath: globalRoot }],
+          sourcePreferences: { custom: { global: 'show' as const } }
+        }
+      })
+    } as never)
+
+    const summaries = await runtime.getWorktreePs()
+    const target = await (
+      runtime as unknown as {
+        resolveKnownWorkspaceFileTarget: (
+          path: string,
+          executionHostId: 'local'
+        ) => Promise<{ worktree: { path: string }; relativePath: string } | null>
+      }
+    ).resolveKnownWorkspaceFileTarget(`${globalWorktreePath}/src/app.ts`, 'local')
+
+    expect(summaries.worktrees.map((worktree) => worktree.path)).toContain(globalWorktreePath)
+    expect(target).toMatchObject({
+      worktree: { path: globalWorktreePath },
       relativePath: 'src/app.ts'
     })
   })

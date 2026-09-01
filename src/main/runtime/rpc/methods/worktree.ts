@@ -1,14 +1,11 @@
 import { defineMethod, type RpcMethod } from '../core'
-import { resolveWorktreeCatalogSnapshot } from '../worktree-catalog-snapshot'
 import { WORKTREE_CREATE_METHOD } from './worktree-create-method'
 import { resolveRuntimeNavigationTarget } from '../../../../shared/runtime-navigation'
 import {
   WorktreeDetectedListParams,
   WorktreeActivate,
   WorktreeForceDeleteBranch,
-  WorktreeListParams,
   WorktreePrefetchCreateBase,
-  WorktreePsParams,
   WorktreeRemove,
   WorktreeResolveMrBase,
   WorktreeResolvePrBase,
@@ -18,34 +15,14 @@ import {
   WorktreeSortOrder,
   WorktreeTeardownMissingTerminalsParams
 } from './worktree-schemas'
+import { WORKTREE_CATALOG_METHODS } from './worktree-catalog-methods'
 
 export const WORKTREE_METHODS: RpcMethod[] = [
-  defineMethod({
-    name: 'worktree.ps',
-    params: WorktreePsParams,
-    handler: async (params, { runtime }) => {
-      const result = await runtime.getWorktreePs(params.limit)
-      // Why: callers that never send the field get the byte-exact legacy response.
-      if (params.afterSnapshotId === undefined) {
-        return result
-      }
-      return resolveWorktreeCatalogSnapshot(result, params.afterSnapshotId)
-    }
-  }),
-  defineMethod({
-    name: 'worktree.list',
-    params: WorktreeListParams,
-    handler: async (params, { runtime }) => runtime.listManagedWorktrees(params.repo, params.limit)
-  }),
+  ...WORKTREE_CATALOG_METHODS,
   defineMethod({
     name: 'worktree.listRetiredNames',
     params: WorktreeDetectedListParams,
     handler: async (params, { runtime }) => runtime.listRetiredWorktreeNames(params.repo)
-  }),
-  defineMethod({
-    name: 'worktree.detectedList',
-    params: WorktreeDetectedListParams,
-    handler: async (params, { runtime }) => runtime.listDetectedManagedWorktrees(params.repo)
   }),
   defineMethod({
     name: 'worktree.teardownMissingTerminals',
