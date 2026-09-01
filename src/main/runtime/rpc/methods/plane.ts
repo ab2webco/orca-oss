@@ -24,6 +24,7 @@ import {
 import { PLANE_EXTENDED_METHODS } from './plane-extended'
 import { PLANE_PLANNING_METHODS } from './plane-planning'
 import { PLANE_PROJECT_METHODS } from './plane-project'
+import { PLANE_INTAKE_METHODS } from './plane-intake'
 
 const PLANE_BASE_METHODS: RpcMethod[] = [
   defineMethod({
@@ -241,5 +242,6 @@ export const PLANE_METHODS: RpcMethod[] = [
   ...PLANE_BASE_METHODS,
   ...PLANE_EXTENDED_METHODS,
   ...PLANE_PLANNING_METHODS,
-  ...PLANE_PROJECT_METHODS
+  ...PLANE_PROJECT_METHODS,
+  ...PLANE_INTAKE_METHODS
 ]

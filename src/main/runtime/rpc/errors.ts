@@ -40,6 +40,7 @@ export function errorResponse(
 // change user-visible error codes.
 const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'runtime_unavailable',
+  'dashboard_popout_disabled',
   'selector_not_found',
   'selector_ambiguous',
   'terminal_handle_stale',
@@ -85,6 +86,7 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'peer_changed',
   'remote_runtime_unavailable',
   'runtime_timeout',
+  'dashboard_popout_disabled',
   'invalid_runtime_response',
   'capability_unsupported',
   'relay_quota_exceeded',

@@ -611,7 +611,7 @@ jobs:
             # prerelease so no platform's absence can hold Latest, and this is the
             # only place that clears it — after the manifest check above.
             gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease=false --latest --draft=false
-            echo "Release $tag promoted to Latest.""
+            echo "Release $tag promoted to Latest."
           fi
 
       - name: Publish update nudge

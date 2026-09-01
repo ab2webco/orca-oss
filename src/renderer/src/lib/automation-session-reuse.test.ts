@@ -193,15 +193,15 @@ describe('automation session reuse', () => {
     expect(session).toBeNull()
   })
 
-  it('rejects sessions that are not idle in a live agent pane', () => {
-    const session = findReusableAutomationSession({
+  function reuseWithStatus(overrides: Partial<AgentStatusEntry>) {
+    return findReusableAutomationSession({
       automationId: 'auto-1',
       agentId: 'claude',
       worktreeId: 'wt-1',
       currentRunId: 'run-current',
       runs: [run({ id: 'run-new', terminalSessionId: 'tab-1', createdAt: 2 })],
       state: {
-        agentStatusByPaneKey: { [paneKey]: status({ state: 'working' }) },
+        agentStatusByPaneKey: { [paneKey]: status(overrides) },
         ptyIdsByTabId: { 'tab-1': ['pty-1'] },
         terminalLayoutsByTabId: { 'tab-1': { ptyIdsByLeafId: { [leafId]: 'pty-1' } } },
         unifiedTabsByWorktree: {
@@ -209,7 +209,23 @@ describe('automation session reuse', () => {
         }
       } as never
     })
+  }
 
-    expect(session).toBeNull()
+  // A busy agent used to fall through to a fresh session, which is the pane a scheduled
+  // nudge most often needs to reach — the paste queues behind the running turn.
+  it('reuses a working agent so the prompt queues behind its turn', () => {
+    expect(reuseWithStatus({ state: 'working' })).toEqual({
+      tabId: 'tab-1',
+      ptyId: 'pty-1',
+      paneKey
+    })
+  })
+
+  // Why these stay rejected: the pane is sitting at a prompt expecting one specific
+  // answer, so a pasted automation prompt would be submitted as that answer.
+  it('rejects a pane that is waiting on a person', () => {
+    expect(reuseWithStatus({ state: 'blocked' })).toBeNull()
+    expect(reuseWithStatus({ state: 'waiting' })).toBeNull()
+    expect(reuseWithStatus({ interactivePrompt: 'Allow this command?' })).toBeNull()
   })
 })

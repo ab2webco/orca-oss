@@ -212,6 +212,8 @@ import {
 } from './window/attach-main-window-services'
 import { createMainWindow, loadMainWindow } from './window/createMainWindow'
 import {
+  closeDashboardPopout,
+  createOrFocusDashboardPopout,
   getDashboardPopoutWindow,
   zoomDashboardPopoutIfFocused
 } from './window/dashboard-popout-window'
@@ -2685,6 +2687,14 @@ void app.whenReady().then(async () => {
       }
     },
     getDesktopWindowStatus: getDesktopWindowStatus,
+    getDashboardPopoutOpen: () => getDashboardPopoutWindow() !== null,
+    setDashboardPopoutOpen: (open) => {
+      if (open) {
+        createOrFocusDashboardPopout(store)
+      } else {
+        closeDashboardPopout()
+      }
+    },
     // Why: worktree.ps pulls hook-reported agent status (same source as the desktop sidebar) at query time so mobile shows the same agents.
     getAgentStatusSnapshot: () =>
       agentHookServer.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),

@@ -29,6 +29,7 @@ describe('isPlaneMutationMethod', () => {
   it('announces the mutations that change what a Plane view renders', () => {
     for (const method of [
       'plane.createWorkItem',
+      'plane.createIntakeIssue',
       'plane.updateWorkItem',
       'plane.deleteWorkItem',
       'plane.addWorkItemComment',
@@ -47,6 +48,7 @@ describe('isPlaneMutationMethod', () => {
     // again — an endless loop on every board render.
     for (const method of [
       'plane.listWorkItems',
+      'plane.listIntakeIssues',
       'plane.getWorkItem',
       'plane.searchWorkItems',
       'plane.listStates',
