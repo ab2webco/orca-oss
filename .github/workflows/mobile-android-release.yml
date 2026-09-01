@@ -67,14 +67,28 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build Android release APK
-        run: cd android && ./gradlew assembleRelease
+      # Why both: Play accepts only an App Bundle for new apps, while the APK stays the
+      # sideload path for testers who are not on Play yet.
+      - name: Build Android release bundle and APK
+        run: cd android && ./gradlew bundleRelease assembleRelease
 
-      - name: Upload APK artifact
+      # Why this and not "an artifact exists": a build that silently falls back to the
+      # debug keystore still produces an installable file, and Play rejects it on upload.
+      # The signer is the thing worth asserting.
+      - name: Report the bundle signer
+        run: |
+          set -euo pipefail
+          bundle=$(ls android/app/build/outputs/bundle/release/*.aab)
+          echo "bundle: $bundle"
+          keytool -printcert -jarfile "$bundle" | sed -n '1,12p'
+
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: orca-mobile-apk
-          path: mobile/android/app/build/outputs/apk/release/*.apk
+          name: orca-mobile-android
+          path: |
+            mobile/android/app/build/outputs/bundle/release/*.aab
+            mobile/android/app/build/outputs/apk/release/*.apk
 
       - name: Ensure GitHub release tag
         if: steps.release.outputs.publish_release == 'true' && !startsWith(github.ref, 'refs/tags/mobile-android-v')
@@ -102,6 +116,7 @@ jobs:
             gh release upload "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber \
+              android/app/build/outputs/bundle/release/*.aab \
               android/app/build/outputs/apk/release/*.apk
           else
             gh release create "$tag" \
@@ -110,5 +125,6 @@ jobs:
               --prerelease \
               --latest=false \
               --generate-notes \
+              android/app/build/outputs/bundle/release/*.aab \
               android/app/build/outputs/apk/release/*.apk
           fi
