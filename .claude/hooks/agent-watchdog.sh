@@ -22,8 +22,14 @@ STATE="$ROOT/.git/orca-watchdog-state"
 
 # Both halves matter: commits alone miss an agent editing without committing, and a dirty
 # count alone misses one that commits and then idles.
+# Hashing the diff, not counting files: a worker editing one file over and over holds the
+# count at 1 forever, so a count-based fingerprint calls steady work a stall. Found by
+# running this against a live worker that was editing and had not committed yet.
 default_probe() {
-  echo "$(git rev-parse HEAD 2>/dev/null) $(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  echo "$(git rev-parse HEAD 2>/dev/null) $({
+    git status --porcelain 2>/dev/null
+    git diff HEAD 2>/dev/null
+  } | shasum | cut -d' ' -f1)"
 }
 
 fingerprint() {
