@@ -10538,6 +10538,11 @@
           "description": "ターミナル、Markdown、エディターの http(s) リンクを Orca の組み込みブラウザで開きます。{{shortcut}} は常にシステムブラウザを使用します。",
           "descriptionBase": "ターミナル、Markdown、エディターの http(s) リンクを Orca の組み込みブラウザで開きます。"
         },
+        "TerminalTccAttributionNotice": {
+          "body": "ターミナルデーモンは既に存在しない Orca のインストールから起動されたため、macOS はそのコマンドを Orca に帰属できません。アクセシビリティと自動化の権限は警告なく無視されます (osascript がエラー -25211 で失敗します)。デーモンを再起動すると解決しますが、実行中のターミナルセッションは閉じられます。",
+          "openManageSessions": "セッション管理を開く",
+          "title": "macOS の権限がターミナルに届いていません"
+        },
         "artifacts": {
           "allowPublishingDescription": "HTML と Markdown のファイルを、URL を知っている人なら誰でも開けるリンクとして公開します。ファイルの内容は {{host}} にアップロードされます。これは上流の Orca が運用しており、このビルドがホストしているわけではありません。作成済みのリンクは Artifacts から削除するまで残ります。"
         },
