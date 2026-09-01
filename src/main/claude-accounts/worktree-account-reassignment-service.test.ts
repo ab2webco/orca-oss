@@ -84,6 +84,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
     await service.reassignWorktreeAccountPins({
       fromAccountId: 'account-a',
+      intent: 'reassign',
       toAccountId: 'account-b',
       closeLiveTerminals: false
     })
@@ -95,10 +96,15 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('clears the pins when the destination is the system default', async () => {
     const { store, worktreeMeta } = createStore()
-    const service = buildService(store, () => {}, async () => true)
+    const service = buildService(
+      store,
+      () => {},
+      async () => true
+    )
 
     await service.reassignWorktreeAccountPins({
       fromAccountId: 'account-a',
+      intent: 'reassign',
       toAccountId: null,
       closeLiveTerminals: false
     })
@@ -114,6 +120,7 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
     await service.reassignWorktreeAccountPins({
       fromAccountId: 'account-a',
+      intent: 'reassign',
       toAccountId: 'account-b',
       closeLiveTerminals: true
     })
@@ -123,11 +130,16 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('refuses a destination that does not exist', async () => {
     const { store } = createStore()
-    const service = buildService(store, () => {}, async () => true)
+    const service = buildService(
+      store,
+      () => {},
+      async () => true
+    )
 
     await expect(
       service.reassignWorktreeAccountPins({
         fromAccountId: 'account-a',
+        intent: 'reassign',
         toAccountId: 'account-missing',
         closeLiveTerminals: false
       })
@@ -136,11 +148,16 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('refuses reassigning an account onto itself', async () => {
     const { store } = createStore()
-    const service = buildService(store, () => {}, async () => true)
+    const service = buildService(
+      store,
+      () => {},
+      async () => true
+    )
 
     await expect(
       service.reassignWorktreeAccountPins({
         fromAccountId: 'account-a',
+        intent: 'reassign',
         toAccountId: 'account-a',
         closeLiveTerminals: false
       })
@@ -149,11 +166,16 @@ describe('ClaudeAccountService worktree reassignment', () => {
 
   it('keeps a live injected session on its original account after the pin moves', async () => {
     const { store } = createStore()
-    const service = buildService(store, () => {}, async () => true)
+    const service = buildService(
+      store,
+      () => {},
+      async () => true
+    )
     markInjectedClaudePtySpawned(PTY_A, 'account-a')
 
     await service.reassignWorktreeAccountPins({
       fromAccountId: 'account-a',
+      intent: 'reassign',
       toAccountId: 'account-b',
       closeLiveTerminals: false
     })
@@ -165,9 +187,74 @@ describe('ClaudeAccountService worktree reassignment', () => {
     )
   })
 
+  it('closes the live terminal of the account it is re-authenticating', async () => {
+    const { store } = createStore()
+    const closed: string[] = []
+    const service = buildService(
+      store,
+      () => {},
+      async (ptyId) => {
+        closed.push(ptyId)
+        return true
+      }
+    )
+    markInjectedClaudePtySpawned(PTY_A, 'account-a')
+
+    await service.reassignWorktreeAccountPins({
+      fromAccountId: 'account-a',
+      intent: 'keep-pins',
+      closeLiveTerminals: true
+    })
+
+    expect(closed).toEqual([PTY_A])
+  })
+
+  it('leaves every pin on the account it is re-authenticating', async () => {
+    const { store, worktreeMeta, commits } = createStore()
+    const onPinsChanged = vi.fn()
+    const service = buildService(store, onPinsChanged, async () => true)
+    markInjectedClaudePtySpawned(PTY_A, 'account-a')
+
+    await service.reassignWorktreeAccountPins({
+      fromAccountId: 'account-a',
+      intent: 'keep-pins',
+      closeLiveTerminals: true
+    })
+
+    expect(worktreeMeta[WORKTREE_A].claudeAccountId).toBe('account-a')
+    expect(worktreeMeta[WORKTREE_B].claudeAccountId).toBe('account-a')
+    // Why both: an unchanged pin map also describes a reassignment that never
+    // ran, so the absent commit is what proves the write was skipped on purpose.
+    expect(commits).toEqual([])
+    expect(onPinsChanged).not.toHaveBeenCalled()
+  })
+
+  it('refuses the re-auth when a live terminal will not die', async () => {
+    const { store, worktreeMeta } = createStore()
+    const service = buildService(
+      store,
+      () => {},
+      async () => false
+    )
+    markInjectedClaudePtySpawned(PTY_A, 'account-a')
+
+    await expect(
+      service.reassignWorktreeAccountPins({
+        fromAccountId: 'account-a',
+        intent: 'keep-pins',
+        closeLiveTerminals: true
+      })
+    ).rejects.toThrow('could not be closed')
+    expect(worktreeMeta[WORKTREE_A].claudeAccountId).toBe('account-a')
+  })
+
   it('reports which worktrees hold the account and which are live', () => {
     const { store } = createStore()
-    const service = buildService(store, () => {}, async () => true)
+    const service = buildService(
+      store,
+      () => {},
+      async () => true
+    )
     markInjectedClaudePtySpawned(PTY_A, 'account-a')
 
     const report = service.getAccountWorktreeUsageReport('account-a')

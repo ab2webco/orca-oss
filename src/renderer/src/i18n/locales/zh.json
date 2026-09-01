@@ -10450,7 +10450,11 @@
           "cancel": "取消",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "关闭正在运行的 Claude 终端并重新登录 {{account}}？",
+          "reauthDescription": "正在运行的 Claude CLI 占用着该账户的一次性刷新链，因此 Orca 会先关闭这些终端。所有工作树仍保留在该账户上，登录完成后 Orca 会重新打开为该账户关闭的终端。",
+          "reauthWorktreesLabel": "Orca 将关闭并重新打开的终端",
+          "confirmReauth": "关闭并登录"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "这些账户共享同一条已记录的刷新链",
@@ -10565,6 +10569,9 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "粗体字重",
           "0e0d1ee15a": "可独立于字重进行调整。某些字体会把多个值映射到同一字形，如果粗体看起来没有变化，请调低字重或改用其他字体。"
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "已登录，但 Orca 无法重新打开 {{worktrees}} 中的 Claude 终端。请从标签栏重新启动。"
         }
       },
       "right": {
