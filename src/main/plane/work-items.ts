@@ -18,13 +18,17 @@ import { getCachedViewer, getPlaneWorkspaceId, setCachedViewer } from './plane-w
 import { filterNeedsViewer, filterPlaneWorkItems } from './plane-work-item-filter'
 import { applyPlaneQuery, parsePlaneQuery, queryNeedsViewer } from './plane-pql-filter'
 import { runBoundedIntegrationFanout } from '../integration-fanout'
-import { boundedIntegrationErrorLog } from '../integration-error-message'
 import {
   INTEGRATION_PAGINATION_MAX_ITEMS,
   INTEGRATION_PAGINATION_MAX_PAGES,
   IntegrationPaginationBudget
 } from '../integration-pagination-budget'
 import { fetchAllPlanePages, type PlanePage } from './plane-cursor-pagination'
+import { fetchAcrossClients } from './plane-work-item-fanout'
+import {
+  resolveWorkItemReferences,
+  type PlaneWorkItemReferenceMaps
+} from './plane-work-item-reference-resolution'
 import { listProjectsForClient } from './plane-work-item-reads'
 import { mapPlaneWorkItem } from './plane-work-item-mappers'
 import type {
@@ -34,6 +38,10 @@ import type {
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
 
+// Retrieve-only: expanding a single row is cheaper than three reference
+// lists. The list path deliberately sends no expand — Plane resolves it per
+// row server-side, so list latency grew linearly with item count (ORCA-333) —
+// and resolves bare UUIDs via resolveWorkItemReferences instead.
 const WORK_ITEM_EXPAND = 'assignees,labels,state'
 // PROJECT-N: uppercase alnum prefix + dash + sequence number.
 const IDENTIFIER_RE = /^[A-Z0-9]+-\d+$/
@@ -53,7 +61,7 @@ export function workItemsBase(
 }
 
 function listQuery(pql: string | undefined, cursor: string | undefined): string {
-  const params = new URLSearchParams({ expand: WORK_ITEM_EXPAND, per_page: '100' })
+  const params = new URLSearchParams({ per_page: '100' })
   if (pql) {
     params.set('pql', pql)
   }
@@ -73,7 +81,8 @@ async function buildProjectsById(
 function toWorkItem(
   raw: PlaneRecord,
   client: PlaneClientForWorkspace,
-  projectsById: Map<string, PlaneProject>
+  projectsById: Map<string, PlaneProject>,
+  references?: PlaneWorkItemReferenceMaps
 ): PlaneWorkItem {
   const rawProjectId = typeof raw.project === 'string' ? raw.project : ''
   const project = projectsById.get(rawProjectId) ?? {
@@ -84,7 +93,10 @@ function toWorkItem(
   return mapPlaneWorkItem(raw, {
     baseUrl: client.baseUrl,
     workspaceSlug: client.workspaceSlug,
-    project
+    project,
+    labelsById: references?.labelNamesById,
+    statesById: references?.statesById,
+    usersById: references?.usersById
   })
 }
 
@@ -104,7 +116,8 @@ async function fetchProjectWorkItems(
     budget,
     INTEGRATION_PAGINATION_MAX_PAGES
   )
-  return raws.map((raw) => toWorkItem(raw, client, projectsById))
+  const references = await resolveWorkItemReferences(client, projectId, raws)
+  return raws.map((raw) => toWorkItem(raw, client, projectsById, references))
 }
 
 // Fetches work items for one connected Plane workspace. Plane's public REST API
@@ -126,58 +139,6 @@ async function fetchWorkItemsForClient(
     (pid) => fetchProjectWorkItems(client, pid, pql, projectsById),
     (items) => items
   )
-  return fanout.results.flat()
-}
-
-function shouldSurfaceFailure(
-  selection: PlaneWorkspaceSelection | null | undefined,
-  entryCount: number
-): boolean {
-  return selection !== 'all' && entryCount <= 1
-}
-
-// Fans out across connected Plane workspaces (getClients), bounded at
-// MAX_CONCURRENT=4 by runBoundedIntegrationFanout, preserving entry order
-// and truncating deterministically via the shared pagination budget.
-// tolerateFailures mirrors Jira's multi-site search: a computed filter can
-// swallow a single failing connection under 'all', but raw caller PQL
-// (search) always surfaces its error so a bad query never fails silently.
-async function fetchAcrossClients(
-  entries: PlaneClientForWorkspace[],
-  selection: PlaneWorkspaceSelection | null | undefined,
-  load: (client: PlaneClientForWorkspace) => Promise<PlaneWorkItem[]>,
-  tolerateFailures: boolean
-): Promise<PlaneWorkItem[]> {
-  const surfaceFailure = !tolerateFailures || shouldSurfaceFailure(selection, entries.length)
-  const failures: Error[] = []
-  const fanout = await runBoundedIntegrationFanout(
-    entries,
-    async (client) => {
-      await acquire()
-      try {
-        return await load(client)
-      } catch (error) {
-        clearWorkspaceTokenOnAuthError(client, error)
-        if (surfaceFailure) {
-          throw error
-        }
-        console.warn('[plane] work item fan-out entry failed:', boundedIntegrationErrorLog(error))
-        failures.push(error instanceof Error ? error : new Error(String(error)))
-        return [] as PlaneWorkItem[]
-      } finally {
-        release()
-      }
-    },
-    (items) => items
-  )
-  if (fanout.truncated) {
-    console.warn(
-      '[plane] Cross-workspace work items exceeded their aggregate result budget; truncating.'
-    )
-  }
-  if (tolerateFailures && failures.length === entries.length && entries.length > 0) {
-    throw failures[0]
-  }
   return fanout.results.flat()
 }
 

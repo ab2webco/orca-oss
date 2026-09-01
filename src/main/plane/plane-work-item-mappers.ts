@@ -112,20 +112,22 @@ export function mapPlaneLabel(raw: unknown): PlaneLabel {
   }
 }
 
-function mapAssignees(value: unknown): PlaneUser[] {
+function mapAssignees(value: unknown, usersById: ReadonlyMap<string, PlaneUser>): PlaneUser[] {
   if (!Array.isArray(value)) {
     return []
   }
   return value
     .map((entry) =>
-      typeof entry === 'string' ? { id: entry, displayName: entry } : mapPlaneUser(entry)
+      typeof entry === 'string'
+        ? (usersById.get(entry) ?? { id: entry, displayName: entry })
+        : mapPlaneUser(entry)
     )
     .filter((user): user is PlaneUser => !!user)
 }
 
-// Labels usually arrive as full expanded objects (expand=labels), but the
-// API tolerates falling back to bare UUIDs; labelsById resolves those to a
-// readable name instead of surfacing a raw UUID in the UI.
+// List rows carry bare label UUIDs (list sends no expand, ORCA-333) while
+// retrieve rows still arrive expanded; labelsById resolves the bare form to
+// a readable name instead of surfacing a raw UUID in the UI.
 function mapLabelNames(value: unknown, labelsById: ReadonlyMap<string, string>): string[] {
   if (!Array.isArray(value)) {
     return []
@@ -160,6 +162,8 @@ export type MapPlaneWorkItemContext = {
   workspaceId?: string
   project: PlaneProject
   labelsById?: ReadonlyMap<string, string>
+  statesById?: ReadonlyMap<string, PlaneState>
+  usersById?: ReadonlyMap<string, PlaneUser>
 }
 
 // Shown when `actor` carries nothing to identify the author with, so the field
@@ -190,7 +194,16 @@ export function mapPlaneComment(raw: unknown): PlaneComment {
 
 export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): PlaneWorkItem {
   const item = asRecord(raw)
-  const state = mapPlaneState(item.state)
+  // A bare-UUID state (list rows) resolves through statesById; an unresolved
+  // one keeps its id so downstream diffs still see the real state reference.
+  const state =
+    typeof item.state === 'string'
+      ? (ctx.statesById?.get(item.state) ?? {
+          id: item.state,
+          name: 'Unknown',
+          group: 'backlog'
+        })
+      : mapPlaneState(item.state)
   const sequenceId = asFiniteNumber(item.sequence_id)
   const identifier = `${ctx.project.identifier}-${sequenceId}`
   const parent = item.parent
@@ -207,7 +220,7 @@ export function mapPlaneWorkItem(raw: unknown, ctx: MapPlaneWorkItemContext): Pl
     state,
     labels: mapLabelNames(item.labels, ctx.labelsById ?? new Map()),
     labelIds: mapLabelIds(item.labels),
-    assignees: mapAssignees(item.assignees),
+    assignees: mapAssignees(item.assignees, ctx.usersById ?? new Map()),
     priority: asPriority(item.priority),
     parentId: typeof parent === 'string' ? parent : null,
     // Why undefined and not '': these are optional in Plane, and an empty string
