@@ -262,10 +262,10 @@ describe('registerPtyHandlers', () => {
               command
             })
 
+            mockProc.emitData('\x1b]777;orca-shell-ready\x07user@host % ')
             await Promise.resolve()
-            vi.runAllTimers()
+            vi.advanceTimersByTime(30)
             await Promise.resolve()
-            vi.runAllTimers()
 
             expect(mockProc.proc.write).toHaveBeenCalledWith(`${command}\n`)
             expect(spawned.agentResumeUnavailable).toBeUndefined()

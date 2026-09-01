@@ -449,12 +449,12 @@ describe('registerPtyHandlers', () => {
         expect(spawnOptions.env.ORCA_AGENT_HOOK_PORT).toBe('5678')
         expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
-      it('asks surviving pre-upgrade daemons to delete legacy attribution env', async () => {
+      it('preserves active attribution env for surviving daemons', async () => {
         const spawnOptions = await daemonSpawnAndGetOptions({})
 
-        expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining([...LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS])
-        )
+        for (const key of LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS) {
+          expect(spawnOptions.envToDelete).not.toContain(key)
+        }
         expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GIT')
         expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GH')
       })
@@ -494,7 +494,7 @@ describe('registerPtyHandlers', () => {
         expect(spawnOptions.env.ORCA_AGENT_HOOK_PORT).toBe('5678')
         expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
-      it('asks surviving pre-upgrade daemons to delete legacy attribution env for runtime PTYs', async () => {
+      it('preserves active attribution env for runtime-created daemon PTYs', async () => {
         type RuntimeSpawnController = {
           spawn(args: {
             cols: number
@@ -519,9 +519,9 @@ describe('registerPtyHandlers', () => {
         await controller.spawn({ cols: 80, rows: 24, worktreeId: 'wt-runtime', env: {} })
 
         const spawnOptions = daemonSpawn.mock.calls.at(-1)?.[0] as DaemonSpawnCall
-        expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining([...LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS])
-        )
+        for (const key of LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS) {
+          expect(spawnOptions.envToDelete).not.toContain(key)
+        }
         expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GIT')
         expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GH')
       })

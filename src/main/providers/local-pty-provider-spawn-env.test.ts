@@ -286,7 +286,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_STALE_TEST_ENV).toBeUndefined()
     })
 
-    it('does not re-promote a legacy attribution path for Agent Teams', async () => {
+    it('preserves the active attribution path for Agent Teams', async () => {
       await provider.spawn({
         cols: 80,
         rows: 24,
@@ -296,7 +296,9 @@ describe('LocalPtyProvider', () => {
         }
       })
 
-      expect(spawnMock.mock.calls.at(-1)?.[2].env.PATH).toBe('/usr/bin')
+      expect(spawnMock.mock.calls.at(-1)?.[2].env.PATH).toBe(
+        '/tmp/orca-terminal-attribution/posix:/usr/bin'
+      )
     })
 
     it('drops stale inherited Git config indices behind a smaller explicit count', async () => {

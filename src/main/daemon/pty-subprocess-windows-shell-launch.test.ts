@@ -230,12 +230,9 @@ describe('createPtySubprocess', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'cmd.exe',
-      [
-        '/K',
-        'chcp 65001 > nul & if defined ORCA_CODEX_LAUNCH_PREFLIGHT call %ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE%%ORCA_CODEX_LAUNCH_PREFLIGHT%%ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE% agent hooks prepare-codex > nul 2>&1'
-      ],
+      ['/K', 'chcp 65001 > nul'],
       expect.objectContaining({
-        env: expect.objectContaining({ ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE: '"' })
+        env: expect.objectContaining({ ORCA_CODEX_LAUNCH_PREFLIGHT: CODEX_LAUNCH_PREFLIGHT })
       })
     )
   })
@@ -296,10 +293,7 @@ describe('createPtySubprocess', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'cmd.exe',
-      [
-        '/K',
-        'chcp 65001 > nul & if defined ORCA_CODEX_LAUNCH_PREFLIGHT call %ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE%%ORCA_CODEX_LAUNCH_PREFLIGHT%%ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE% agent hooks prepare-codex > nul 2>&1'
-      ],
+      ['/K', 'chcp 65001 > nul'],
       expect.any(Object)
     )
     expect(handle!.startupCommandDeliveredInShellArgs).toBeUndefined()
@@ -329,12 +323,7 @@ describe('createPtySubprocess', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'C:\\PortableGit\\bin\\bash.exe',
-      [
-        '-c',
-        expect.stringMatching(
-          /^chcp\.com 65001 >\/dev\/null 2>&1; exec "\$BASH" --rcfile '.*shell-ready\/bash\/rcfile' -i$/
-        )
-      ],
+      ['-c', 'chcp.com 65001 >/dev/null 2>&1; exec "$BASH" --login -i'],
       expect.objectContaining({
         cwd: 'C:\\Users\\jin\\repo',
         env: expect.objectContaining({

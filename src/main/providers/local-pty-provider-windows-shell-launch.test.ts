@@ -554,12 +554,7 @@ describe('LocalPtyProvider', () => {
 
       expect(spawnMock).toHaveBeenCalledWith(
         'C:\\Program Files\\Git\\bin\\bash.exe',
-        [
-          '-c',
-          expect.stringMatching(
-            /^chcp\.com 65001 >\/dev\/null 2>&1; exec "\$BASH" --rcfile '.*shell-ready\/bash\/rcfile' -i$/
-          )
-        ],
+        ['-c', 'chcp.com 65001 >/dev/null 2>&1; exec "$BASH" --login -i'],
         expect.objectContaining({
           cwd: 'C:\\Users\\jin\\repo',
           env: expect.objectContaining({
@@ -571,7 +566,7 @@ describe('LocalPtyProvider', () => {
       )
     })
 
-    it('runs the Codex preflight once in the cmd.exe startup chain', async () => {
+    it('keeps the Codex preflight out of the cmd.exe shell bootstrap', async () => {
       const platform = Object.getOwnPropertyDescriptor(process, 'platform')
       Object.defineProperty(process, 'platform', { value: 'win32' })
       provider.configure({
@@ -592,14 +587,10 @@ describe('LocalPtyProvider', () => {
 
       expect(spawnMock).toHaveBeenCalledWith(
         'cmd.exe',
-        [
-          '/K',
-          'chcp 65001 > nul & if defined ORCA_CODEX_LAUNCH_PREFLIGHT call %ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE%%ORCA_CODEX_LAUNCH_PREFLIGHT%%ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE% agent hooks prepare-codex > nul 2>&1'
-        ],
+        ['/K', 'chcp 65001 > nul'],
         expect.objectContaining({
           env: expect.objectContaining({
-            ORCA_CODEX_LAUNCH_PREFLIGHT: CODEX_LAUNCH_PREFLIGHT,
-            ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE: '"'
+            ORCA_CODEX_LAUNCH_PREFLIGHT: CODEX_LAUNCH_PREFLIGHT
           })
         })
       )

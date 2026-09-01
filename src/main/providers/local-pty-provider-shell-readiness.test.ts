@@ -224,10 +224,12 @@ describe('LocalPtyProvider', () => {
       expect(received.join('')).toBe('\x1b[?2004hfish> ')
     })
 
-    it('releases held marker-prefix bytes when local shell readiness times out', async () => {
+    it('releases held marker-prefix bytes but withholds startup when shell readiness times out', async () => {
       vi.useFakeTimers()
       const onData = vi.fn()
+      const onBackgroundStreamEvent = vi.fn()
       provider.configure({ onData })
+      provider.onBackgroundStreamEvent(onBackgroundStreamEvent)
       try {
         await provider.spawn({ cols: 80, rows: 24, command: 'printf ready' })
         const dataCallback = mockProc.onData.mock.calls[0]?.[0] as (data: string) => void
@@ -247,7 +249,10 @@ describe('LocalPtyProvider', () => {
 
         vi.advanceTimersByTime(200)
         await Promise.resolve()
-        expect(mockProc.write).toHaveBeenCalledWith('printf ready\n')
+        expect(mockProc.write).not.toHaveBeenCalled()
+        expect(onBackgroundStreamEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'startupCommandDelivery', state: 'withheld' })
+        )
       } finally {
         vi.useRealTimers()
       }

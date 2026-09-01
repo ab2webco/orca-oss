@@ -157,12 +157,12 @@ describe('LocalPtyProvider', () => {
   describe('write', () => {
     it('writes data to the PTY process', async () => {
       const { id } = await provider.spawn({ cols: 80, rows: 24 })
-      expect(provider.write(id, 'hello')).toBe(true)
+      provider.write(id, 'hello')
       expect(mockProc.write).toHaveBeenCalledWith('hello')
     })
 
     it('is a no-op for unknown PTY ids', () => {
-      expect(provider.write('nonexistent', 'hello')).toBe(false)
+      provider.write('nonexistent', 'hello')
       expect(mockProc.write).not.toHaveBeenCalled()
     })
   })
