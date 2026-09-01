@@ -57,7 +57,15 @@ if [ "${1:-}" = "--once" ]; then
   exit 0
 fi
 
-while true; do
+if [ "${1:-}" = "--tick" ]; then
   sweep_line
+  exit 0
+fi
+
+# Why a child per tick instead of calling sweep_line directly: bash parses the script once
+# at start, so a long-lived loop keeps running the version it was launched with. Editing
+# this file then silently changed nothing until someone restarted the monitor — twice.
+while true; do
+  bash "${BASH_SOURCE[0]}" --tick
   sleep "$INTERVAL"
 done
