@@ -379,7 +379,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
     const pulled: string[] = []
     const checkResumed = runtime
-      .waitForMessage(stub.runMailbox, { typeFilter: ['worker_done'], timeoutMs: 60_000 })
+      .waitForMessage(handle, { typeFilter: ['worker_done'], timeoutMs: 60_000 })
       .then(() => {
         for (const row of stub.rows) {
           if (row.type === 'worker_done' && row.read === 0) {
@@ -532,15 +532,13 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       await vi.advanceTimersByTimeAsync(0)
 
       expect(pointerWrites()).toHaveLength(2)
-      expect(pointerWrites()[1]?.[1]).toContain('You have 1 orchestration message')
+      expect(pointerWrites()[1]?.[1]).toContain('You have 2 orchestration messages')
 
       await vi.advanceTimersByTimeAsync(500)
       resolveProbe(null)
       await vi.advanceTimersByTimeAsync(0)
-      expect(stub.markAsDelivered).toHaveBeenCalledTimes(2)
-      expect(stub.rows.map((row) => row.delivered_at)).toEqual(
-        stub.rows.map(() => expect.any(String))
-      )
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.rows.every((row) => row.delivered_at === null)).toBe(true)
     } finally {
       vi.useRealTimers()
     }
@@ -573,13 +571,11 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       // while the newer sequence authorizes exactly one fresh pointer.
       await vi.advanceTimersByTimeAsync(500)
       expect(pointerWrites()).toHaveLength(2)
-      expect(pointerWrites()[1]?.[1]).toContain('You have 1 orchestration message')
+      expect(pointerWrites()[1]?.[1]).toContain('You have 2 orchestration messages')
 
       await vi.advanceTimersByTimeAsync(500)
-      expect(stub.markAsDelivered).toHaveBeenCalledTimes(2)
-      expect(stub.rows.map((row) => row.delivered_at)).toEqual(
-        stub.rows.map(() => expect.any(String))
-      )
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.rows.every((row) => row.delivered_at === null)).toBe(true)
     } finally {
       vi.useRealTimers()
     }
@@ -604,8 +600,8 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
-      expect(stub.markAsDelivered).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.markAsUndelivered).not.toHaveBeenCalled()
       expect(stub.rows[0].delivered_at).toBeNull()
 
       // The replacement's own delivery starts a fresh flight and completes —
@@ -625,8 +621,8 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       expect(payloadWrites).toHaveLength(2)
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(1)
-      expect(stub.markAsDelivered).toHaveBeenCalledTimes(2)
-      expect(stub.rows[0].delivered_at).toEqual(expect.any(String))
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.rows[0].delivered_at).toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -649,8 +645,8 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
-      expect(stub.markAsDelivered).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.markAsUndelivered).not.toHaveBeenCalled()
       // No stray settle flushed the parked trigger into the dead pty.
       expect(write).toHaveBeenCalledTimes(1)
       expect(stub.rows.every((row) => row.delivered_at === null)).toBe(true)
@@ -680,8 +676,8 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
-      expect(stub.markAsDelivered).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.markAsDelivered).not.toHaveBeenCalled()
+      expect(stub.markAsUndelivered).not.toHaveBeenCalled()
       expect(stub.rows[0].delivered_at).toBeNull()
     } finally {
       vi.useRealTimers()

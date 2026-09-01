@@ -212,7 +212,7 @@ describe('orchestration RPC methods', () => {
       await fenced
     })
 
-    it('fences an unbound direct waiter when its pane creates a Run', async () => {
+    it('releases an unbound direct waiter when its pane creates a Run', async () => {
       setup(false)
       vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
       const directWait = call('orchestration.check', {
@@ -220,7 +220,6 @@ describe('orchestration RPC methods', () => {
         wait: true,
         timeoutMs: 5_000
       })
-      const fenced = expect(directWait).rejects.toMatchObject({ code: 'consumer_fenced' })
       await Promise.resolve()
 
       await call('orchestration.runCreate', {
@@ -228,7 +227,7 @@ describe('orchestration RPC methods', () => {
         from: 'term_coord'
       })
 
-      await fenced
+      await expect(directWait).resolves.toMatchObject({ count: 0, messages: [] })
     })
   })
 

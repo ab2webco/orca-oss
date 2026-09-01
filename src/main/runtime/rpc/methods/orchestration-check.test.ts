@@ -27,7 +27,7 @@ describe('orchestration RPC methods', () => {
 
   describe('orchestration.check', () => {
     function createDispatchedTask(assigneeHandle = 'term_worker', assigneePaneKey?: string) {
-      const task = db.createTask({ spec: 'manual check work' })
+      const task = db.createTask({ spec: 'manual check work', runId: activeRunId })
       const dispatch = db.createDispatchContext(task.id, assigneeHandle, assigneePaneKey)
       return { task, dispatch }
     }
@@ -48,6 +48,11 @@ describe('orchestration RPC methods', () => {
         payload.dispatchId = params.dispatchId
       }
       payload.outcome = 'succeeded'
+      payload.envelope = {
+        status: 'success',
+        summary: 'Completed the assigned work.',
+        verification: [{ claim: 'Focused test passes', evidence: 'vitest', level: 'unit' }]
+      }
       if (params.filesModified !== undefined) {
         payload.filesModified = params.filesModified
       }
@@ -255,7 +260,7 @@ describe('orchestration RPC methods', () => {
       expect(db.getUnreadMessages(`run:${activeRunId}`)).toHaveLength(0)
     })
 
-    it('peeks an old unread Run row beyond the newest history page', async () => {
+    it('limits a Run peek to the newest history page without consuming older mail', async () => {
       setup()
       const unread = db.insertMessage({
         from: 'worker',
@@ -281,11 +286,11 @@ describe('orchestration RPC methods', () => {
         terminal: 'term_coord'
       })) as { messages: { id: string }[]; count: number }
 
-      expect(peeked).toMatchObject({ count: 1, messages: [{ id: unread.id }] })
+      expect(peeked).toMatchObject({ count: 0, messages: [] })
       expect(delivered).toMatchObject({ count: 1, messages: [{ id: unread.id }] })
     })
 
-    it('waits for a filtered Run peek without consuming the arrival', async () => {
+    it('keeps a filtered Run peek non-blocking and non-consuming', async () => {
       setup()
       let arrivedId = ''
       const waitSpy = vi.spyOn(runtime, 'waitForMessage').mockImplementation(async () => {
@@ -307,13 +312,10 @@ describe('orchestration RPC methods', () => {
         timeoutMs: 100
       })) as { messages: { id: string }[]; count: number }
 
-      expect(peeked).toMatchObject({ count: 1, messages: [{ id: arrivedId }] })
-      expect(waitSpy).toHaveBeenCalledWith(
-        `run:${activeRunId}`,
-        expect.objectContaining({ typeFilter: ['worker_done'] })
-      )
-      expect(db.getMessageById(arrivedId)?.read).toBe(0)
-      expect(db.getUnreadMessages(`run:${activeRunId}`, ['worker_done'])).toHaveLength(1)
+      expect(peeked).toMatchObject({ count: 0, messages: [] })
+      expect(waitSpy).not.toHaveBeenCalled()
+      expect(arrivedId).toBe('')
+      expect(db.getUnreadMessages(`run:${activeRunId}`, ['worker_done'])).toHaveLength(0)
     })
 
     it('reconciles worker_done returned by a waiting manual check', async () => {

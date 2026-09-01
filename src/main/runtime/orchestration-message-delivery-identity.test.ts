@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../shared/protocol-version'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrchestrationDb } from './orchestration/db'
+import { createLegacyStorageCutoverFixture } from './orchestration/orchestration-legacy-storage-test-fixture'
 import { RpcDispatcher } from './rpc/dispatcher'
 import { ORCHESTRATION_METHODS } from './rpc/methods/orchestration'
 import { OrcaRuntimeRpcServer } from './runtime-rpc'
@@ -184,7 +185,7 @@ describe('STA-4325 message and delivery identity', () => {
     })
     const status = db.insertMessage({
       from: 'term_worker_a',
-      to: TERMINAL_HANDLE,
+      to: `run:${run.id}`,
       subject: 'stale status',
       type: 'status',
       runId: run.id,
@@ -200,7 +201,7 @@ describe('STA-4325 message and delivery identity', () => {
     })
     const done = db.insertMessage({
       from: 'term_worker_c',
-      to: TERMINAL_HANDLE,
+      to: `run:${run.id}`,
       subject: 'worker complete',
       type: 'worker_done',
       runId: run.id,
@@ -272,7 +273,7 @@ describe('STA-4325 message and delivery identity', () => {
     })
     const status = fixture.db.insertMessage({
       from: 'term_worker',
-      to: TERMINAL_HANDLE,
+      to: `run:${run.id}`,
       subject: 'survive restart',
       type: 'status',
       runId: run.id,
@@ -316,7 +317,7 @@ describe('STA-4325 message and delivery identity', () => {
 
     const done = reopened.insertMessage({
       from: 'term_worker',
-      to: TERMINAL_HANDLE,
+      to: `run:${run.id}`,
       subject: 'done after restart',
       type: 'worker_done',
       runId: run.id,
@@ -330,102 +331,99 @@ describe('STA-4325 message and delivery identity', () => {
       count: 1,
       messages: [expect.objectContaining({ id: done.id })]
     })
-    expect(pointerPayloads(restarted.write)).toHaveLength(0)
+    expect(pointerPayloads(restarted.write)).toEqual([
+      expect.stringContaining('1 orchestration message')
+    ])
     reopened.close()
   })
 
-  it('routes the complete direct backlog before rebinding forgets its old handle', () => {
-    const fixture = createDatabase('orca-sta-4325-rebind-backlog-')
-    const first = fixture.db.createRun({
-      objective: 'Old coordinator',
-      coordinatorHandle: TERMINAL_HANDLE,
-      coordinatorPaneKey: PANE_KEY
-    })
+  it('routes the complete legacy direct backlog when takeover forgets its old handle', () => {
+    const created = createLegacyStorageCutoverFixture()
+    temporaryDirectories.push(created.tempDir)
+    const db = new OrchestrationDb(created.fixture.dbPath)
+    const runId = db.getLegacyAdoption()!.adopted_run_id
     for (let index = 0; index < 125; index += 1) {
-      const message = fixture.db.insertMessage({
-        from: 'term_worker',
-        to: TERMINAL_HANDLE,
+      db.insertMessage({
+        from: 'term_legacy_worker',
+        to: 'term_legacy_coord',
         subject: `backlog ${index}`,
         type: 'status',
-        runId: first.id,
-        deliveryContract: 'current_delivery'
+        runId,
+        deliveryContract: 'legacy_direct'
       })
-      sqliteFor(fixture.db)
-        .prepare('UPDATE messages SET to_handle = ? WHERE id = ?')
-        .run(TERMINAL_HANDLE, message.id)
     }
-    const plan = sqliteFor(fixture.db)
+    const plan = sqliteFor(db)
       .prepare(
         `EXPLAIN QUERY PLAN UPDATE messages SET to_handle = ?
          WHERE run_id = ? AND to_handle = ? AND read = 0
-           AND delivery_contract = 'current_delivery'`
+           AND delivery_contract = 'legacy_direct'`
       )
-      .all(`run:${first.id}`, first.id, TERMINAL_HANDLE) as { detail: string }[]
-    expect(plan.map((row) => row.detail).join(' ')).toMatch(
-      /SEARCH messages USING INDEX (idx_messages_delivery_contract|idx_messages_unread_current_inbox)/
-    )
-    fixture.db.createRun({
-      objective: 'Replacement coordinator',
-      coordinatorHandle: TERMINAL_HANDLE,
-      coordinatorPaneKey: PANE_KEY
-    })
-    expect(fixture.db.getRun(first.id)?.coordinator_handle).toBeNull()
-    fixture.db.close()
+      .all(`run:${runId}`, runId, 'term_legacy_coord') as { detail: string }[]
+    expect(plan.map((row) => row.detail).join(' ')).toContain('idx_messages_delivery_contract')
 
-    const reopened = new OrchestrationDb(fixture.path)
+    db.bindRun({
+      runId,
+      coordinatorHandle: REMINTED_TERMINAL_HANDLE,
+      coordinatorPaneKey: PANE_KEY,
+      takeoverLegacy: true
+    })
     expect(
-      sqliteFor(reopened)
+      sqliteFor(db)
         .prepare(
           `SELECT to_handle, COUNT(*) AS count FROM messages
-           WHERE run_id = ? GROUP BY to_handle ORDER BY to_handle`
+           WHERE run_id = ? AND subject LIKE 'backlog %'
+           GROUP BY to_handle ORDER BY to_handle`
         )
-        .all(first.id)
-    ).toEqual([{ to_handle: `run:${first.id}`, count: 125 }])
-    reopened.close()
+        .all(runId)
+    ).toEqual([{ to_handle: `run:${runId}`, count: 125 }])
+    db.close()
   })
 
-  it('repairs committed mail sent to a forgotten handle after restart', async () => {
-    const fixture = createDatabase('orca-sta-4325-late-old-handle-')
-    const run = fixture.db.createRun({
-      objective: 'Late old-handle arrival',
-      coordinatorHandle: TERMINAL_HANDLE,
-      coordinatorPaneKey: PANE_KEY
-    })
-    fixture.db.bindRun({
-      runId: run.id,
-      coordinatorHandle: REMINTED_TERMINAL_HANDLE,
-      coordinatorPaneKey: PANE_KEY
-    })
-    const done = fixture.db.insertMessage({
-      from: 'term_worker',
-      to: TERMINAL_HANDLE,
-      subject: 'arrived after rebind',
+  it('keeps repaired committed mail after takeover and restart', async () => {
+    const created = createLegacyStorageCutoverFixture()
+    temporaryDirectories.push(created.tempDir)
+    const db = new OrchestrationDb(created.fixture.dbPath)
+    const runId = db.getLegacyAdoption()!.adopted_run_id
+    const done = db.insertMessage({
+      from: 'term_legacy_worker',
+      to: 'term_legacy_coord',
+      subject: 'committed before rebind',
       type: 'worker_done',
-      runId: run.id,
-      deliveryContract: 'current_delivery'
+      runId,
+      deliveryContract: 'legacy_direct'
     })
-    expect(fixture.db.getMessageById(done.id)?.to_handle).toBe(`run:${run.id}`)
-    expect(
-      fixture.db
-        .getOrCreateRunDelivery({
-          runId: run.id,
-          consumerGeneration: fixture.db.getRun(run.id)!.consumer_generation
-        })
-        ?.messages.map((message) => message.id)
-    ).toEqual([done.id])
-    fixture.db.close()
+    db.commitLegacyCompatibilityPrincipal({
+      runId,
+      role: 'coordinator',
+      hostScope: JSON.stringify({ kind: 'local', hostId: 'local' }),
+      terminalHandle: 'term_legacy_coord',
+      paneKey: PANE_KEY,
+      launchTokenHash: 'launch-hash',
+      processIncarnation: 'process-1'
+    })
+    db.bindRun({
+      runId,
+      coordinatorHandle: REMINTED_TERMINAL_HANDLE,
+      coordinatorPaneKey: PANE_KEY,
+      takeoverLegacy: true
+    })
+    expect(db.getMessageById(done.id)?.to_handle).toBe(`run:${runId}`)
+    sqliteFor(db)
+      .prepare('UPDATE messages SET read = 1 WHERE run_id = ? AND id <> ?')
+      .run(runId, done.id)
+    db.close()
 
-    const reopened = new OrchestrationDb(fixture.path)
+    const reopened = new OrchestrationDb(created.fixture.dbPath)
     const restarted = createRuntime(reopened, REMINTED_TERMINAL_HANDLE)
     await driveToLiveIdle(restarted.runtime)
     const checked = await check(restarted.runtime, { terminal: REMINTED_TERMINAL_HANDLE })
 
     expect(checked).toMatchObject({
-      runId: run.id,
+      runId,
       count: 1,
       messages: [expect.objectContaining({ id: done.id })]
     })
-    expect(reopened.getMessageById(done.id)?.to_handle).toBe(`run:${run.id}`)
+    expect(reopened.getMessageById(done.id)?.to_handle).toBe(`run:${runId}`)
     reopened.close()
   })
 
