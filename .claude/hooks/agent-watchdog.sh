@@ -10,7 +10,7 @@
 #   ORCA_WATCHDOG_INTERVAL   seconds between ticks (default 1800)
 #   ORCA_WATCHDOG_STALL      ticks without progress before escalating (default 2)
 #   ORCA_WATCHDOG_PROBE      command run in the worktree; its stdout is the progress
-#                            fingerprint (default: HEAD sha + working-tree line count)
+#                            fingerprint (default: HEAD sha + a hash of the working diff)
 #   ORCA_WATCHDOG_ASK        message sent to a stalled worktree's terminal (default: none)
 set -uo pipefail
 
@@ -20,11 +20,10 @@ STALL="${ORCA_WATCHDOG_STALL:-2}"
 ASK="${ORCA_WATCHDOG_ASK:-}"
 STATE="$ROOT/.git/orca-watchdog-state"
 
-# Both halves matter: commits alone miss an agent editing without committing, and a dirty
-# count alone misses one that commits and then idles.
-# Hashing the diff, not counting files: a worker editing one file over and over holds the
-# count at 1 forever, so a count-based fingerprint calls steady work a stall. Found by
-# running this against a live worker that was editing and had not committed yet.
+# Both halves matter: commits alone miss an agent editing without committing, and the diff
+# alone misses one that commits and then idles. It hashes the diff rather than counting
+# files because a worker editing one file over and over holds the count at 1 forever, and a
+# count-based fingerprint then reads steady work as a stall.
 default_probe() {
   echo "$(git rev-parse HEAD 2>/dev/null) $({
     git status --porcelain 2>/dev/null
