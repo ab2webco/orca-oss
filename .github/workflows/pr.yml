@@ -72,6 +72,11 @@ jobs:
       - name: Parse the shell in every workflow run block
         run: pnpm run check:workflow-run-shell
 
+      # Why the base SHA: the gate compares case counts against the merge target, so it
+      # needs the same ref the other changed-line gates use (ORCA-269).
+      - name: Reject silently deleted test cases
+        run: pnpm run check:test-case-deletion -- "${{ github.event.pull_request.base.sha }}"
+
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
 
