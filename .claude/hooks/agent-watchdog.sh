@@ -71,13 +71,24 @@ dead_marker() {
   handle=$(handle_for "$1")
   [ -z "$handle" ] && return 1
   orca terminal read --terminal "$handle" --json 2>/dev/null |
-    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low|Failed to start turn|invalid cwd" |
+    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low|Failed to start turn|invalid cwd|purchase more credits|out of credits" |
     head -1
 }
 
+# A worktree usually holds a shell pane and an agent pane, and the first running one is
+# often the shell — whose session state is empty, which read as "no answer" and silently
+# skipped every check below.
 handle_for() {
-  orca terminal list --json 2>/dev/null |
-    jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null
+  local handle
+  for handle in $(orca terminal list --json 2>/dev/null |
+    jq -r --arg p "$1" '.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")|.handle' 2>/dev/null); do
+    if orca terminal state --terminal "$handle" --json 2>/dev/null |
+      jq -e '.result.agentSession.session.state // empty' >/dev/null 2>&1; then
+      echo "$handle"
+      return 0
+    fi
+  done
+  return 1
 }
 
 # `orca terminal state` reads the agent's own session log rather than the screen buffer, so
