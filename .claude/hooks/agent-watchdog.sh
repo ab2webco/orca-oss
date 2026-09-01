@@ -72,7 +72,7 @@ dead_marker() {
     jq -r --arg p "$1" '[.result.terminals[]?|select(.worktreePath==$p and .liveness=="running")][0].handle // empty' 2>/dev/null)
   [ -z "$handle" ] && return 1
   orca terminal read --terminal "$handle" --json 2>/dev/null |
-    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low" |
+    grep -oiE "Login expired|Please run /login|usage limit reached|Credit balance too low|Failed to start turn|invalid cwd" |
     head -1
 }
 
