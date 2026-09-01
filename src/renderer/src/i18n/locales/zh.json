@@ -10558,6 +10558,11 @@
           "accessHint": "允许麦克风访问以列出输入设备。",
           "allowAccess": "允许访问"
         },
+        "TerminalTccAttributionNotice": {
+          "body": "终端守护进程由一个已不存在的 Orca 安装启动，因此 macOS 无法将其命令归属于 Orca——辅助功能和自动化权限会被静默忽略（osascript 报错 -25211）。重启守护进程可以解决此问题；正在运行的终端会话将会关闭。",
+          "openManageSessions": "打开会话管理",
+          "title": "macOS 权限未能送达终端"
+        },
         "artifacts": {
           "allowPublishingDescription": "将 HTML 和 Markdown 文件发布为任何知道 URL 的人都能打开的链接。文件内容会上传到 {{host}}，该服务由上游 Orca 运营，并非由此构建版本托管。已有链接会一直保留，直到你在 Artifacts 中删除它们。"
         },
