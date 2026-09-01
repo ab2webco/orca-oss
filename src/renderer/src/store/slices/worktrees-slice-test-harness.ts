@@ -65,6 +65,15 @@ export const forgetRemovedForExecutionHostMock = vi.fn<
   ) => Promise<ForgetRemovedWorktreesForExecutionHostResult>
 >(async () => ({ forgottenWorktreeIds: [] }))
 
+const updateMetaMock =
+  stubMock<[{ worktreeId: string; updates: Partial<WorktreeMeta> }]>().mockResolvedValue(undefined)
+
+const updateMetaBatchMock = vi.fn<
+  (args: { updates: { worktreeId: string; updates: Partial<WorktreeMeta> }[] }) => Promise<void>
+>(async ({ updates }) => {
+  await Promise.all(updates.map((update) => updateMetaMock(update)))
+})
+
 export const mockApi = {
   worktrees: {
     create: stubMock(),
@@ -81,10 +90,8 @@ export const mockApi = {
     forceDeletePreservedBranch: stubMock().mockResolvedValue({ deleted: true }),
     resolvePrBase: stubMock(),
     resolveMrBase: stubMock(),
-    updateMeta:
-      stubMock<[{ worktreeId: string; updates: Partial<WorktreeMeta> }]>().mockResolvedValue(
-        undefined
-      ),
+    updateMeta: updateMetaMock,
+    updateMetaBatch: updateMetaBatchMock,
     updateLineage: stubMock().mockResolvedValue(null)
   },
   pty: {
