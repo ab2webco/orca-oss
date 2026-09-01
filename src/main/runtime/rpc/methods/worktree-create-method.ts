@@ -32,6 +32,7 @@ export const WORKTREE_CREATE_METHOD: RpcMethod = defineMethod({
         const result = await runtime.createManagedWorktree({
           repoSelector: params.repo,
           name: params.name ?? '',
+          ...(params.nameWasGenerated === true ? { nameWasGenerated: true } : {}),
           baseBranch: params.baseBranch,
           compareBaseRef: params.compareBaseRef,
           branchNameOverride: params.branchNameOverride,

@@ -64,6 +64,8 @@ import { legacyBaseRefSearchResult } from '../../../shared/base-ref-search-resul
 import { EMPTY_PTY_MAIN_DELIVERY_DIAGNOSTICS } from '../../../shared/pty-delivery-diagnostics'
 import { createE2EConfig } from '../../../shared/e2e-config'
 import { relativePathInsideRoot } from '../../../shared/cross-platform-path'
+import { readRetiredNameRegistryForRepo } from '../../../shared/worktree/retired-name-cache'
+import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../shared/worktree/retired-name-registry'
 import {
   applyPRBotAuthorOverride,
   normalizePRBotAuthorOverrides
@@ -1779,6 +1781,16 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         withRuntimeWorktreeOwner(worktree, owned.hostId)
       )
     },
+    listRetiredNames: async ({ repoId }) => {
+      try {
+        return readRetiredNameRegistryForRepo(
+          await callRuntimeResult<unknown>('worktree.listRetiredNames', { repo: repoId }),
+          repoId
+        )
+      } catch {
+        return EMPTY_RETIRED_NAME_REGISTRY
+      }
+    },
     listDetected: async ({ repoId }) => callRuntimeDetectedWorktrees(repoId),
     listAll: () => listAllRuntimeWorktrees(),
     create: async (args) => {
@@ -1786,6 +1798,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
       const owned = await callRuntimeResultWithOwner<{ worktree: Worktree }>('worktree.create', {
         repo: args.repoId,
         name: args.name,
+        ...(args.nameWasGenerated === true ? { nameWasGenerated: true } : {}),
         baseBranch: args.baseBranch,
         compareBaseRef: args.compareBaseRef,
         branchNameOverride: args.branchNameOverride,

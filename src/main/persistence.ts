@@ -178,6 +178,15 @@ import {
   pruneAutomationRuns
 } from '../shared/automation-run-retention'
 import { pruneWorkspaceSessionBrowserHistory } from '../shared/workspace-session-browser-history'
+import { normalizeRetirableGeneratedName } from './worktree-name-retirement'
+import {
+  addRetiredNames,
+  clampExhaustedTiers,
+  compactRetiredNames,
+  EMPTY_RETIRED_NAME_REGISTRY,
+  isEmptyRetiredNameRegistry,
+  type RetiredNameRegistry
+} from '../shared/worktree/retired-name-registry'
 import {
   FOLDER_WORKSPACE_INSTANCE_SEPARATOR,
   getRepoIdFromWorktreeId,
@@ -2315,6 +2324,43 @@ const MAX_CLAUDE_LIVE_PTY_SESSION_IDS = 200
 // Why: bound removed-SSH-target history so remove/re-add churn can't grow the file unbounded.
 const MAX_REMOVED_SSH_TARGET_TOMBSTONES = 50
 
+function normalizeRetiredNameRegistry(row: unknown): RetiredNameRegistry {
+  const isPlainArray = Array.isArray(row)
+  const rawRow = row as { exhaustedTiers?: unknown; names?: unknown } | null | undefined
+  const rawNames = isPlainArray ? row : Array.isArray(rawRow?.names) ? rawRow.names : []
+  const names = new Set<string>()
+  for (const entry of rawNames) {
+    if (typeof entry !== 'string') {
+      continue
+    }
+    const normalized = normalizeRetirableGeneratedName(entry)
+    if (normalized) {
+      names.add(normalized)
+    }
+  }
+  return compactRetiredNames({
+    exhaustedTiers: isPlainArray ? 0 : clampExhaustedTiers(rawRow?.exhaustedTiers),
+    names: [...names]
+  })
+}
+
+function normalizeRetiredNameRegistryMap(value: unknown): Record<string, RetiredNameRegistry> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  const byRepo: Record<string, RetiredNameRegistry> = {}
+  for (const [repoId, row] of Object.entries(value as Record<string, unknown>)) {
+    if (!repoId) {
+      continue
+    }
+    const registry = normalizeRetiredNameRegistry(row)
+    if (!isEmptyRetiredNameRegistry(registry)) {
+      byRepo[repoId] = registry
+    }
+  }
+  return byRepo
+}
+
 function normalizeClaudeLivePtySessionIds(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return []
@@ -3920,6 +3966,12 @@ export class Store {
                 (alias): alias is string => typeof alias === 'string'
               )
             : [],
+          retiredWorktreeNamesByRepo: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByRepo
+          ),
+          retiredWorktreeNamesByNamespace: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByNamespace
+          ),
           sshRemotePtyLeases: (parsed.sshRemotePtyLeases ?? [])
             .map(normalizeSshRemotePtyLease)
             .filter((lease): lease is SshRemotePtyLease => lease !== null),
@@ -4959,6 +5011,7 @@ export class Store {
     this.syncProjectHostSetupCompatibilityState()
     // Why: presets are repo-scoped and unreachable once the repo is gone, so drop them with it.
     delete this.state.sparsePresetsByRepo[id]
+    delete this.state.retiredWorktreeNamesByRepo?.[id]
     this.pruneWorktreeStateForRepo(id, null)
     this.state.workspaceSession = removeRepoFromWorkspaceSession(this.state.workspaceSession, id)
     this.state.workspaceSessionsByHostId = removeRepoFromHostWorkspaceSessions(
@@ -4977,6 +5030,7 @@ export class Store {
     // Why: presets are repo-id-scoped (not host-scoped); drop them only when the last host's copy is gone.
     if (!idStillPresent) {
       delete this.state.sparsePresetsByRepo[id]
+      delete this.state.retiredWorktreeNamesByRepo?.[id]
     }
     this.syncProjectHostSetupCompatibilityState()
     // Why: prune only this host's worktree metas if the id survives elsewhere; otherwise prune everything (matches removeProject).
@@ -5394,6 +5448,77 @@ export class Store {
   setMobileClientTabSelections(next: PersistedMobileClientTabSelections): void {
     this.state.mobileClientTabSelectionsByDeviceId = next
     this.scheduleSave()
+  }
+
+  getRetiredWorktreeNameRegistry(repoId: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByRepo?.[repoId]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  getRetiredWorktreeNameRegistryForNamespace(namespaceKey: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByNamespace?.[namespaceKey]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  addRetiredWorktreeName(repoId: string, name: string): void {
+    const normalized = normalizeRetirableGeneratedName(name)
+    if (!repoId || !normalized) {
+      return
+    }
+    this.applyRetiredWorktreeNames(repoId, [normalized])
+  }
+
+  mergeRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    if (!repoId) {
+      return false
+    }
+    const normalized = new Set<string>()
+    for (const name of names) {
+      const candidate = normalizeRetirableGeneratedName(name)
+      if (candidate) {
+        normalized.add(candidate)
+      }
+    }
+    return normalized.size > 0 && this.applyRetiredWorktreeNames(repoId, normalized)
+  }
+
+  mergeRetiredWorktreeNamesForNamespace(namespaceKey: string, names: Iterable<string>): boolean {
+    if (!namespaceKey) {
+      return false
+    }
+    const normalized = new Set<string>()
+    for (const name of names) {
+      const candidate = normalizeRetirableGeneratedName(name)
+      if (candidate) {
+        normalized.add(candidate)
+      }
+    }
+    const next = addRetiredNames(
+      this.getRetiredWorktreeNameRegistryForNamespace(namespaceKey),
+      normalized
+    )
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByNamespace ??= {}
+    this.state.retiredWorktreeNamesByNamespace[namespaceKey] = next
+    this.scheduleSave()
+    return true
+  }
+
+  private applyRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    const next = addRetiredNames(this.getRetiredWorktreeNameRegistry(repoId), names)
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByRepo ??= {}
+    this.state.retiredWorktreeNamesByRepo[repoId] = next
+    this.scheduleSave()
+    return true
   }
 
   getSparsePresets(repoId: string): SparsePreset[] {

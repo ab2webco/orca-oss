@@ -47,6 +47,7 @@ export const WorktreeCreate = z
       .transform((v) => (typeof v === 'string' ? v : ''))
       .pipe(z.string().min(1, 'Missing repo selector')),
     name: OptionalString,
+    nameWasGenerated: z.boolean().optional(),
     baseBranch: OptionalString,
     compareBaseRef: OptionalString,
     branchNameOverride: OptionalString,

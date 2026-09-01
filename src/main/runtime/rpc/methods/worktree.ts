@@ -38,6 +38,11 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     handler: async (params, { runtime }) => runtime.listManagedWorktrees(params.repo, params.limit)
   }),
   defineMethod({
+    name: 'worktree.listRetiredNames',
+    params: WorktreeDetectedListParams,
+    handler: async (params, { runtime }) => runtime.listRetiredWorktreeNames(params.repo)
+  }),
+  defineMethod({
     name: 'worktree.detectedList',
     params: WorktreeDetectedListParams,
     handler: async (params, { runtime }) => runtime.listDetectedManagedWorktrees(params.repo)

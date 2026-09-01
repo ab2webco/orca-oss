@@ -9,6 +9,7 @@ import type {
   ProviderRequestId
 } from '../../shared/detected-worktree-provider-contract'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import type { RetiredNameRegistry } from '../../shared/worktree/retired-name-registry'
 import type {
   FolderWorkspacePathStatus,
   FolderWorkspacePathStatusRequest
@@ -39,6 +40,7 @@ import type {
 
 export type WorktreeApi = {
   list: (args: { repoId: string }) => Promise<Worktree[]>
+  listRetiredNames: (args: { repoId: string }) => Promise<RetiredNameRegistry>
   listDetected: {
     (
       args: ListDetectedWorktreesArgs
