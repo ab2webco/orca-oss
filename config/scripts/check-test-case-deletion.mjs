@@ -6,7 +6,10 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const baseRef = process.argv[2] ?? 'origin/main'
+// An empty argv slot reaches here as '' from `pnpm run … -- "$SHA"` when the SHA is
+// missing, and `git diff '' ...HEAD` answers with its usage text rather than an error.
+const requestedRef = (process.argv[2] ?? '').trim()
+const baseRef = requestedRef === '' ? 'origin/main' : requestedRef
 const allowlistPath = fileURLToPath(new URL('../deleted-test-cases.txt', import.meta.url))
 const CASE = /^\s*(?:it|test)(?:\.\w+)?\s*\(/gm
 
@@ -25,6 +28,16 @@ function git(args) {
 
 function countCases(source) {
   return (source.match(CASE) ?? []).length
+}
+
+// Why skip rather than fail: a checkout without the merge target — a fork clone, a shallow
+// CI fetch — cannot compute a comparison, and a gate that fails there teaches people to
+// pass it a ref at random until it goes quiet.
+try {
+  git(['rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`])
+} catch {
+  console.log(`Test case deletion check skipped — ${baseRef} is not present in this checkout.`)
+  process.exit(0)
 }
 
 const changed = git(['diff', '--name-only', '--diff-filter=MD', `${baseRef}...HEAD`])
