@@ -255,6 +255,143 @@ describe('orchestration RPC methods', () => {
       expect(db.getUnreadMessages(`run:${activeRunId}`)).toHaveLength(0)
     })
 
+    it('peeks an old unread Run row beyond the newest history page', async () => {
+      setup()
+      const unread = db.insertMessage({
+        from: 'worker',
+        to: `run:${activeRunId}`,
+        subject: 'old unread',
+        runId: activeRunId
+      })
+      for (let index = 0; index < 100; index += 1) {
+        const read = db.insertMessage({
+          from: 'worker',
+          to: `run:${activeRunId}`,
+          subject: `new read ${index}`,
+          runId: activeRunId
+        })
+        db.markAsRead([read.id])
+      }
+
+      const peeked = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        peek: true
+      })) as { messages: { id: string }[]; count: number }
+      const delivered = (await call('orchestration.check', {
+        terminal: 'term_coord'
+      })) as { messages: { id: string }[]; count: number }
+
+      expect(peeked).toMatchObject({ count: 1, messages: [{ id: unread.id }] })
+      expect(delivered).toMatchObject({ count: 1, messages: [{ id: unread.id }] })
+    })
+
+    it('waits for a filtered Run peek without consuming the arrival', async () => {
+      setup()
+      let arrivedId = ''
+      const waitSpy = vi.spyOn(runtime, 'waitForMessage').mockImplementation(async () => {
+        arrivedId = db.insertMessage({
+          from: 'worker',
+          to: `run:${activeRunId}`,
+          subject: 'peeked completion',
+          type: 'worker_done',
+          runId: activeRunId
+        }).id
+        return 'notified'
+      })
+
+      const peeked = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        peek: true,
+        wait: true,
+        types: 'worker_done',
+        timeoutMs: 100
+      })) as { messages: { id: string }[]; count: number }
+
+      expect(peeked).toMatchObject({ count: 1, messages: [{ id: arrivedId }] })
+      expect(waitSpy).toHaveBeenCalledWith(
+        `run:${activeRunId}`,
+        expect.objectContaining({ typeFilter: ['worker_done'] })
+      )
+      expect(db.getMessageById(arrivedId)?.read).toBe(0)
+      expect(db.getUnreadMessages(`run:${activeRunId}`, ['worker_done'])).toHaveLength(1)
+    })
+
+    it('reconciles worker_done returned by a waiting manual check', async () => {
+      setup()
+      const { task, dispatch } = createDispatchedTask()
+      vi.spyOn(runtime, 'waitForMessage').mockImplementation(async () => {
+        insertWorkerDone({
+          taskId: task.id,
+          dispatchId: dispatch.id,
+          filesModified: ['src/file.ts']
+        })
+        return 'notified'
+      })
+
+      const result = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        wait: true,
+        timeoutMs: 100,
+        types: 'worker_done,escalation,decision_gate'
+      })) as { count: number; messages: { type: string }[]; deliveryId: string }
+
+      expect(result.count).toBe(1)
+      expect(result.messages[0].type).toBe('worker_done')
+      expect(db.getTask(task.id)?.status).toBe('completed')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
+      expect(db.getUnreadMessages(`run:${activeRunId}`)).toHaveLength(1)
+      const taskList = (await call('orchestration.taskList', {})) as {
+        tasks: {
+          id: string
+          status: string
+          assignee_handle?: string | null
+          dispatch_id?: string | null
+        }[]
+      }
+      const listedTask = taskList.tasks.find((t) => t.id === task.id)
+      expect(listedTask?.status).toBe('completed')
+      expect(listedTask).not.toHaveProperty('assignee_handle')
+      expect(listedTask).not.toHaveProperty('dispatch_id')
+      const shownDispatch = (await call('orchestration.dispatchShow', {
+        task: task.id
+      })) as { dispatch: { status: string } | null }
+      expect(shownDispatch.dispatch?.status).toBe('completed')
+
+      const completedAt = db.getTask(task.id)?.completed_at
+      const taskResult = db.getTask(task.id)?.result
+      const repeated = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        types: 'worker_done'
+      })) as { count: number; deliveryId: string }
+      expect(repeated.count).toBe(1)
+      expect(repeated.deliveryId).toBe(result.deliveryId)
+      const acknowledged = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        ack: repeated.deliveryId,
+        types: 'worker_done'
+      })) as { count: number }
+      expect(acknowledged.count).toBe(0)
+      expect(db.getTask(task.id)?.completed_at).toBe(completedAt)
+      expect(db.getTask(task.id)?.result).toBe(taskResult)
+    })
+
+    it('keeps check --all read-only while lifecycle settles at acceptance', async () => {
+      setup()
+      const { task, dispatch } = createDispatchedTask()
+      insertWorkerDone({ taskId: task.id, dispatchId: dispatch.id })
+
+      const result = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        all: true,
+        types: 'worker_done'
+      })) as { count: number }
+
+      expect(result.count).toBe(1)
+      expect(db.getTask(task.id)?.status).toBe('completed')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
+      expect(db.getUnreadMessages(`run:${activeRunId}`, ['worker_done'])).toHaveLength(1)
+    })
+
     it('does not complete worker_done missing taskId or dispatchId', async () => {
       setup()
       const { task, dispatch } = createDispatchedTask()
@@ -269,6 +406,27 @@ describe('orchestration RPC methods', () => {
       expect(result.count).toBe(2)
       expect(db.getTask(task.id)?.status).toBe('dispatched')
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+    })
+
+    it('completes worker_done by payload IDs when the sender handle changed', async () => {
+      setup()
+      const leafId = '11111111-1111-4111-8111-111111111111'
+      const { task, dispatch } = createDispatchedTask('term_owner', `tab_before:${leafId}`)
+      insertWorkerDone({
+        from: 'term_reminted',
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        senderPaneKey: `tab_after:${leafId}`
+      })
+
+      const result = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        types: 'worker_done'
+      })) as { count: number }
+
+      expect(result.count).toBe(1)
+      expect(db.getTask(task.id)?.status).toBe('completed')
+      expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
     })
 
     it('does not complete worker_done for a stale inactive dispatch', async () => {
