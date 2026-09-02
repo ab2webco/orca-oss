@@ -30452,6 +30452,18 @@ export class OrcaRuntimeService {
     this.refreshWritableFlags()
   }
 
+  /** A renderer that died mid-reload never rebuilds its graph, so the
+   *  markGraphReady that markRendererReloading waits for can never arrive.
+   *  Fail closed on the spot instead of leaving CLI calls against a graph that
+   *  is not coming back. */
+  markGraphReloadFailed(windowId: number, reason: string): void {
+    if (windowId !== this.authoritativeWindowId) {
+      return
+    }
+    console.error(`[runtime] renderer graph reload failed (${reason}); failing closed.`)
+    this.markGraphUnavailable(windowId)
+  }
+
   markGraphUnavailable(windowId: number): void {
     if (windowId !== this.authoritativeWindowId) {
       return

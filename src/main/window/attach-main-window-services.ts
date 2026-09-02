@@ -515,6 +515,11 @@ function registerRuntimeWindowLifecycle(
   mainWindow.webContents.on('did-start-loading', () => {
     runtime.markRendererReloading(mainWindow.id)
   })
+  // Why: markRendererReloading waits for the rebuilt graph, and a gone process
+  // never sends one — without this the runtime stays "reloading" forever.
+  mainWindow.webContents.on('render-process-gone', () => {
+    runtime.markGraphReloadFailed(mainWindow.id, 'renderer-process-gone')
+  })
   mainWindow.on('closed', () => {
     runtime.markGraphUnavailable(mainWindow.id)
     if (activeRuntimeNotifierToken === notifierToken) {
