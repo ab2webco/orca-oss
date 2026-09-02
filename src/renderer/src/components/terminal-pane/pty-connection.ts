@@ -7426,7 +7426,8 @@ export function connectPanePty(
               snapshot.alternateScreen !== true && snapshot.data === '' && !snapshot.scrollbackAnsi
             if (!snapshotCarriesNoImage) {
               for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot, {
-                skipAltFrame: skippedAltFrame
+                skipAltFrame: skippedAltFrame,
+                paneOnAlternateScreen: pane.terminal.buffer.active.type === 'alternate'
               })) {
                 writeReplayData(replayChunk)
               }
@@ -8187,7 +8188,9 @@ export function connectPanePty(
                 snapshotSeq: snapshot.seq
               })
               // Why keep a too-wide frame: preconnect SSH has no live repaint owner or post-restore fit.
-              for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot)) {
+              for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot, {
+                paneOnAlternateScreen: pane.terminal.buffer.active.type === 'alternate'
+              })) {
                 writeReplayData(replayChunk)
               }
               writeReplayData(reattachReplayResetSequence(modelData))
@@ -8489,7 +8492,8 @@ export function connectPanePty(
               skipAltFrame: shouldSkipAltFrameForWidthMismatch(
                 modelCols,
                 readProposedTerminalCols(pane)
-              )
+              ),
+              paneOnAlternateScreen: pane.terminal.buffer.active.type === 'alternate'
             })) {
               writeReplayData(replayChunk)
             }

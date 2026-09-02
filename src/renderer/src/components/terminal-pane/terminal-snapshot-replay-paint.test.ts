@@ -1,12 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { Terminal } from '@xterm/headless'
-import { RESET_AFTER_BYTE_GAP } from '../../../../shared/terminal-mode-reset-profiles'
+import {
+  ABORT_TRUNCATED_CONTROL_STRING,
+  buildSnapshotReplayPrologue,
+  RESET_AFTER_BYTE_GAP
+} from '../../../../shared/terminal-mode-reset-profiles'
 import {
   buildMainModelSnapshotReplayWrites,
   hasPositiveTerminalDimensions,
   resolvePositiveTerminalDimensions,
   shouldSkipAltFrameForWidthMismatch
 } from './terminal-snapshot-replay-paint'
+
+// Built, never re-spelled: re-typing the prologue literals is what drifted the
+// parity fixtures away from production twice (#12101).
+const NORMAL_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({
+  targetAlternateScreen: false,
+  paneOnAlternateScreen: false
+})}`
+// The alt return inside a scrollback rebuild: the head already left the pane on normal.
+const ALT_ENTRY_PROLOGUE = buildSnapshotReplayPrologue({
+  targetAlternateScreen: true,
+  paneOnAlternateScreen: false
+})
+const ALT_HEAD_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${ALT_ENTRY_PROLOGUE}`
 
 function writeTerminal(terminal: Terminal, data: string): Promise<void> {
   return new Promise((resolve) => terminal.write(data, resolve))
@@ -66,7 +83,7 @@ describe('resolvePositiveTerminalDimensions', () => {
 describe('buildMainModelSnapshotReplayWrites', () => {
   it('clears normal buffer + scrollback before a normal-buffer snapshot', () => {
     expect(buildMainModelSnapshotReplayWrites({ data: 'shell-output' })).toEqual([
-      `${RESET_AFTER_BYTE_GAP}\x1b[2J\x1b[3J\x1b[H`,
+      NORMAL_PROLOGUE,
       'shell-output'
     ])
   })
@@ -82,18 +99,13 @@ describe('buildMainModelSnapshotReplayWrites', () => {
         alternateScreen: true,
         scrollbackAnsi: 'normal-history'
       })
-    ).toEqual([
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049l\x1b[2J\x1b[3J\x1b[H`,
-      'normal-history',
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`,
-      'alt-frame'
-    ])
+    ).toEqual([NORMAL_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'alt-frame'])
   })
 
   it('enters a cleared alt screen when no split scrollback is available', () => {
     expect(
       buildMainModelSnapshotReplayWrites({ data: 'alt-frame', alternateScreen: true })
-    ).toEqual([`${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`, 'alt-frame'])
+    ).toEqual([ALT_HEAD_PROLOGUE, 'alt-frame'])
   })
 })
 
@@ -182,12 +194,7 @@ describe('buildMainModelSnapshotReplayWrites alt-frame skip', () => {
         },
         { skipAltFrame: true }
       )
-    ).toEqual([
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049l\x1b[2J\x1b[3J\x1b[H`,
-      'normal-history',
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`,
-      'complete-live-state'
-    ])
+    ).toEqual([NORMAL_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'complete-live-state'])
   })
 
   it('still enters a cleared alt screen when skipping without split scrollback', () => {
@@ -202,7 +209,7 @@ describe('buildMainModelSnapshotReplayWrites alt-frame skip', () => {
         },
         { skipAltFrame: true }
       )
-    ).toEqual([`${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`, 'complete-live-state'])
+    ).toEqual([ALT_HEAD_PROLOGUE, 'complete-live-state'])
   })
 
   it('keeps composed data when an older producer omits the mode boundary', () => {
@@ -211,13 +218,13 @@ describe('buildMainModelSnapshotReplayWrites alt-frame skip', () => {
         { data: 'legacy-modes-and-frame', alternateScreen: true },
         { skipAltFrame: true }
       )
-    ).toEqual([`${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`, 'legacy-modes-and-frame'])
+    ).toEqual([ALT_HEAD_PROLOGUE, 'legacy-modes-and-frame'])
   })
 
   it('never drops a normal-buffer snapshot, whose rows reflow correctly', () => {
     expect(
       buildMainModelSnapshotReplayWrites({ data: 'shell-output' }, { skipAltFrame: true })
-    ).toEqual([`${RESET_AFTER_BYTE_GAP}\x1b[2J\x1b[3J\x1b[H`, 'shell-output'])
+    ).toEqual([NORMAL_PROLOGUE, 'shell-output'])
   })
 
   // STA-4042: a replay only runs because renderer-bound bytes were dropped, so

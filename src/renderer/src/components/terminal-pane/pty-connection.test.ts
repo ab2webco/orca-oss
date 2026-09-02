@@ -3,6 +3,8 @@ import type * as React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Terminal } from '@xterm/headless'
 import {
+  ABORT_TRUNCATED_CONTROL_STRING,
+  buildSnapshotReplayPrologue,
   POST_REPLAY_LIVE_AGENT_REATTACH_RESET,
   POST_REPLAY_LIVE_AGENT_SNAPSHOT_RESET,
   POST_REPLAY_LIVE_SNAPSHOT_RESET,
@@ -32,6 +34,17 @@ import {
   resetAgentStartupDelayedDeliveryForTests
 } from '@/lib/agent-startup-delayed-delivery'
 import type { PaneForegroundAgentEntry } from '@/store/slices/pane-foreground-agent'
+
+// Built, never re-spelled: the replay prologue is a shared contract and typing
+// its literals here is what drifted them from production before (#12101).
+const NORMAL_BUFFER_REPLAY_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue(
+  { targetAlternateScreen: false, paneOnAlternateScreen: false }
+)}`
+// The alt return inside a scrollback rebuild: the head already left the pane on normal.
+const ALT_BUFFER_REPLAY_PROLOGUE = buildSnapshotReplayPrologue({
+  targetAlternateScreen: true,
+  paneOnAlternateScreen: false
+})
 
 const { resetAndRefreshAllTerminalWebglAtlases, scheduleTerminalWebglAtlasRecovery } = vi.hoisted(
   () => ({
@@ -15766,7 +15779,7 @@ describe('connectPanePty', () => {
     expect(getMainBufferSnapshot).toHaveBeenCalledWith('pty-id', { scrollbackRows: 5000 })
     expect(pane.terminal.resize).toHaveBeenCalledWith(100, 30)
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      `${RESET_AFTER_BYTE_GAP}\x1b[2J\x1b[3J\x1b[H`,
+      NORMAL_BUFFER_REPLAY_PROLOGUE,
       expect.any(Function)
     )
     expect(pane.terminal.write).toHaveBeenCalledWith('snapshot-state\r\n', expect.any(Function))
@@ -15819,7 +15832,7 @@ describe('connectPanePty', () => {
 
     expect(getMainBufferSnapshot).toHaveBeenCalledWith('pty-id', { scrollbackRows: 5000 })
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049l\x1b[2J\x1b[3J\x1b[H`,
+      NORMAL_BUFFER_REPLAY_PROLOGUE,
       expect.any(Function)
     )
     expect(pane.terminal.write).toHaveBeenCalledWith(
@@ -15827,16 +15840,16 @@ describe('connectPanePty', () => {
       expect.any(Function)
     )
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      `${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`,
+      ALT_BUFFER_REPLAY_PROLOGUE,
       expect.any(Function)
     )
     const writes = (pane.terminal.write as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => call[0]
     )
     expect(writes.indexOf('preserved-shell-history\r\n')).toBeLessThan(
-      writes.indexOf(`${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`)
+      writes.indexOf(ALT_BUFFER_REPLAY_PROLOGUE)
     )
-    expect(writes.indexOf(`${RESET_AFTER_BYTE_GAP}\x1b[?1049h\x1b[2J\x1b[H`)).toBeLessThan(
+    expect(writes.indexOf(ALT_BUFFER_REPLAY_PROLOGUE)).toBeLessThan(
       writes.indexOf('altscreen-snapshot\r\n')
     )
     expect(pane.terminal.write).toHaveBeenCalledWith('altscreen-snapshot\r\n', expect.any(Function))
