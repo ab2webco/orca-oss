@@ -7755,6 +7755,13 @@ export function connectPanePty(
         if (hiddenOutputRestoreInFlight === trackedHiddenOutputRestore) {
           hiddenOutputRestoreInFlight = null
         }
+        // Why the hard stop: after dispose the task body exits on its first
+        // `while (!disposed)` check, so re-arming from here resolves and re-runs
+        // this handler every microtask turn — a self-feeding promise chain that
+        // took ~4GB in ~12s. Nothing may be re-armed for a torn-down binding.
+        if (disposed) {
+          return
+        }
         if (hiddenOutputRestorePendingChunks.length > 0 || hiddenOutputRestorePendingOverflow) {
           hiddenOutputRestoreNeeded = true
           armHiddenOutputRestoreForegroundDeadline()
