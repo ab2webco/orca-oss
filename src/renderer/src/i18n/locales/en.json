@@ -203,7 +203,8 @@
       "064bd07810": "Go back",
       "ce37cf5279": "Toggle sidebar ({{value0}})",
       "e4b9e7dff7": "Toggle sidebar",
-      "pluginCommandFailed": "Could not run the plugin command."
+      "pluginCommandFailed": "Could not run the plugin command.",
+      "byAb2WebBadge": "by Ab2Web"
     },
     "web": {
       "WebConnect": {
