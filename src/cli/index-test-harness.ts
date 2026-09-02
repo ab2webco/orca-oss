@@ -93,6 +93,7 @@ export function useWorktreeAwarenessEnvironment(mocks: WorktreeAwarenessMocks): 
   const originalEnvironment = process.env.ORCA_ENVIRONMENT
   const originalWorkspaceId = process.env.ORCA_WORKSPACE_ID
   const originalWorktreeId = process.env.ORCA_WORKTREE_ID
+  const originalAgentLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
 
   beforeEach(() => {
     mocks.callMock.mockReset()
@@ -102,8 +103,12 @@ export function useWorktreeAwarenessEnvironment(mocks: WorktreeAwarenessMocks): 
     delete process.env.ORCA_WORKSPACE_ID
     delete process.env.ORCA_WORKTREE_ID
     // Isolate the pane key so claude-teams tests that set it don't leak a
-    // senderPaneKey into later orchestration.send assertions.
+    // senderPaneKey into later orchestration.send assertions. The launch token
+    // is the same trap one field over: a managed agent pane exports it, so a
+    // suite run from inside Orca sends a real senderLaunchToken
+    // (docs/reference/agent-verification-traps.md §5).
     delete process.env.ORCA_PANE_KEY
+    delete process.env.ORCA_AGENT_LAUNCH_TOKEN
     mocks.serveOrcaAppMock.mockReset()
     mocks.getDefaultUserDataPathMock.mockClear()
     mocks.addEnvironmentFromPairingCodeMock.mockReset()
@@ -172,6 +177,11 @@ export function useWorktreeAwarenessEnvironment(mocks: WorktreeAwarenessMocks): 
       delete process.env.ORCA_WORKTREE_ID
     } else {
       process.env.ORCA_WORKTREE_ID = originalWorktreeId
+    }
+    if (originalAgentLaunchToken === undefined) {
+      delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+    } else {
+      process.env.ORCA_AGENT_LAUNCH_TOKEN = originalAgentLaunchToken
     }
   })
 }
