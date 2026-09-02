@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { UPDATE_FEED_LATEST_DOWNLOAD_URL } from './update-feed-target'
 
 const {
   appMock,
@@ -151,7 +152,7 @@ describe('updater', () => {
       expect(autoUpdaterMock.disableDifferentialDownload).toBe(false)
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -194,7 +195,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -234,7 +235,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -291,7 +292,7 @@ describe('updater', () => {
       expect(send).toHaveBeenCalledWith('updater:status', { state: 'not-available' })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
@@ -337,7 +338,7 @@ describe('updater', () => {
       })
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: UPDATE_FEED_LATEST_DOWNLOAD_URL
       })
     }
   )
