@@ -205,7 +205,7 @@ function createRuntimeHome() {
   return {
     syncForCurrentSelection: vi.fn(),
     clearLastWrittenAuthJson: vi.fn(),
-    prepareForRateLimitFetch: vi.fn(() => null)
+    prepareForRateLimitFetch: vi.fn(() => ({ kind: 'ready' as const, codexHomePath: null }))
   }
 }
 
@@ -2816,7 +2816,7 @@ describe('CodexAccountService config sync', () => {
       consumeCodexRateLimitResetCredit: consume
     }
     const runtimeHome = createRuntimeHome()
-    runtimeHome.prepareForRateLimitFetch.mockReturnValue(null)
+    runtimeHome.prepareForRateLimitFetch.mockReturnValue({ kind: 'ready', codexHomePath: null })
     const { CodexAccountService } = await import('./service')
     const service = new CodexAccountService(
       createStore(settings) as never,

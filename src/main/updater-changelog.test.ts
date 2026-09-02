@@ -133,6 +133,32 @@ describe('summarizeReleaseBody', () => {
   it('returns empty when the notes are only headings and asides', () => {
     expect(summarizeReleaseBody('# Orca Lab v1.4.161\n\n> internal aside\n')).toBe('')
   })
+
+  // Why this shape: the workflow split one `Cambios desde` section into these three, and
+  // the card silently fell back to the lead paragraph — the build's boilerplate — on every
+  // release until the headings matched again.
+  it('reads the sections the release workflow writes today, across all of them', () => {
+    const body = [
+      '# Orca Lab v1.4.160-lab.47',
+      '',
+      'Build del laboratorio de Ab2Web basado en Orca.',
+      '',
+      '> La versión interna es `1.4.160-lab.47`.',
+      '',
+      '## Novedades',
+      '',
+      '- read the agent session state',
+      '',
+      '## Arreglos',
+      '',
+      '- cap the scroll viewport',
+      ''
+    ].join('\n')
+
+    expect(summarizeReleaseBody(body)).toBe(
+      'read the agent session state · cap the scroll viewport'
+    )
+  })
 })
 
 describe('fetchChangelog', () => {

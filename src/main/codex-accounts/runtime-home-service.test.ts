@@ -1063,7 +1063,10 @@ describe('CodexRuntimeHomeService', () => {
     expect(service.beginHostSystemDefaultSessionMigrationLaunch(getRuntimeCodexHomePath())).toBe(
       true
     )
-    expect(service.prepareForRateLimitFetch()).toBe(getRuntimeCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getRuntimeCodexHomePath()
+    })
     expect(service.getHostCodexHomePathsForSessionDiscovery()).toEqual([getRuntimeCodexHomePath()])
     expect(existsSync(getRuntimeCodexHomePath())).toBe(true)
   })
@@ -1130,13 +1133,19 @@ describe('CodexRuntimeHomeService', () => {
     try {
       // Background fetchers prefer ambient CODEX_HOME when passed null, so an
       // explicit path proves nested Orca launches cannot poll the managed home.
-      expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+      expect(service.prepareForRateLimitFetch()).toEqual({
+        kind: 'ready',
+        codexHomePath: getSystemCodexHomePath()
+      })
       process.env.CODEX_HOME = getSystemCodexHomePath()
       delete process.env.ORCA_CODEX_HOME
       expect(service.isHostSystemDefaultRealHome()).toBe(true)
       process.env.CODEX_HOME = join(testState.fakeHomeDir, 'user-owned-codex-home')
       expect(service.isHostSystemDefaultRealHome()).toBe(false)
-      expect(service.prepareForRateLimitFetch()).toBe(getRuntimeCodexHomePath())
+      expect(service.prepareForRateLimitFetch()).toEqual({
+        kind: 'ready',
+        codexHomePath: getRuntimeCodexHomePath()
+      })
     } finally {
       if (previousCodexHome === undefined) {
         delete process.env.CODEX_HOME
@@ -1196,7 +1205,10 @@ describe('CodexRuntimeHomeService', () => {
 
       service.reconcileLegacySharedHomeForRetainedPanes()
       expect(service.prepareForCodexLaunch()).toBeNull()
-      expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+      expect(service.prepareForRateLimitFetch()).toEqual({
+        kind: 'ready',
+        codexHomePath: getSystemCodexHomePath()
+      })
 
       expect(syncLegacySharedCodexConfigForRetainedPanes).not.toHaveBeenCalled()
       expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(retainedAuth)
@@ -1441,7 +1453,10 @@ describe('CodexRuntimeHomeService', () => {
     setShellStartupEnvProbeSupportedForTest(true)
     writeFileSync(getSystemCodexAuthPath(), refreshedSystemAuth, 'utf-8')
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(refreshedSystemAuth)
   })
 
@@ -1529,9 +1544,15 @@ describe('CodexRuntimeHomeService', () => {
     service.syncForCurrentSelection()
     writeFileSync(getSystemCodexAuthPath(), refreshedSystemAuth, 'utf-8')
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(systemAuth)
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(refreshedSystemAuth)
   })
 
@@ -1550,7 +1571,10 @@ describe('CodexRuntimeHomeService', () => {
     writeFileSync(getRuntimeCodexAuthPath(), retainedAuth, 'utf-8')
     writeFileSync(getSystemCodexAuthPath(), refreshedSystemAuth, 'utf-8')
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(retainedAuth)
     expect(readFileSync(getSystemCodexAuthPath(), 'utf-8')).toBe(refreshedSystemAuth)
   })
@@ -1568,7 +1592,10 @@ describe('CodexRuntimeHomeService', () => {
     writeFileSync(getRuntimeCodexAuthPath(), retainedAuth, 'utf-8')
     rmSync(getSystemCodexAuthPath())
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(existsSync(getRuntimeCodexAuthPath())).toBe(false)
   })
 
@@ -1594,7 +1621,10 @@ describe('CodexRuntimeHomeService', () => {
 
     setShellStartupEnvProbeSupportedForTest(true)
     writeFileSync(getSystemCodexAuthPath(), refreshedSystemAuth, 'utf-8')
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(refreshedSystemAuth)
   })
 
@@ -1634,7 +1664,10 @@ describe('CodexRuntimeHomeService', () => {
 
     setShellStartupEnvProbeSupportedForTest(true)
     rmSync(getSystemCodexAuthPath())
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(retainedAuth)
   })
 
@@ -1653,7 +1686,10 @@ describe('CodexRuntimeHomeService', () => {
 
     setShellStartupEnvProbeSupportedForTest(true)
     writeFileSync(getSystemCodexAuthPath(), refreshedSystemAuth, 'utf-8')
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(systemAuth)
   })
 
@@ -1668,11 +1704,17 @@ describe('CodexRuntimeHomeService', () => {
     setShellStartupEnvProbeSupportedForTest(true)
     const service = new CodexRuntimeHomeService(store as never)
     rmSync(getSystemCodexAuthPath())
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(existsSync(getRuntimeCodexAuthPath())).toBe(false)
 
     writeFileSync(getSystemCodexAuthPath(), reloginAuth, 'utf-8')
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(reloginAuth)
   })
 
@@ -1706,7 +1748,10 @@ describe('CodexRuntimeHomeService', () => {
 
       expect(existsSync(getRuntimeCodexAuthPath())).toBe(false)
       writeFileSync(getSystemCodexAuthPath(), reloginAuth, 'utf-8')
-      expect(restartedService.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+      expect(restartedService.prepareForRateLimitFetch()).toEqual({
+        kind: 'ready',
+        codexHomePath: getSystemCodexHomePath()
+      })
       expect(readFileSync(getRuntimeCodexAuthPath(), 'utf-8')).toBe(reloginAuth)
     }
   )
@@ -1970,7 +2015,7 @@ describe('CodexRuntimeHomeService', () => {
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
     const service = new CodexRuntimeHomeService(store as never)
 
-    expect(service.prepareForRateLimitFetch()).toBe(home1)
+    expect(service.prepareForRateLimitFetch()).toEqual({ kind: 'ready', codexHomePath: home1 })
   })
 
   it('preserves a managed selection whose auth.json is temporarily missing', async () => {
@@ -2002,7 +2047,7 @@ describe('CodexRuntimeHomeService', () => {
     const service = new CodexRuntimeHomeService(store as never)
 
     expect(service.prepareForCodexLaunch()).toBe(brokenHome)
-    expect(service.prepareForRateLimitFetch()).toBe(brokenHome)
+    expect(service.prepareForRateLimitFetch()).toEqual({ kind: 'ready', codexHomePath: brokenHome })
     expect(store.getSettings().activeCodexManagedAccountId).toBe('account-1')
   })
 
@@ -2184,12 +2229,18 @@ describe('CodexRuntimeHomeService', () => {
     settings.activeCodexManagedAccountIdsByRuntime = { host: null, wsl: {} }
     const syncSpy = vi.spyOn(service, 'syncForCurrentSelection')
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(readFileSync(join(managedHomePath, 'auth.json'), 'utf-8')).toBe(managedAuth)
     expect(readFileSync(getSystemCodexAuthPath(), 'utf-8')).toBe(systemAuth)
     expect(syncSpy).not.toHaveBeenCalled()
 
-    expect(service.prepareForRateLimitFetch()).toBe(getSystemCodexHomePath())
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: getSystemCodexHomePath()
+    })
     expect(service.prepareForCodexLaunch()).toBeNull()
     expect(syncSpy).not.toHaveBeenCalled()
   })
@@ -2259,7 +2310,10 @@ describe('CodexRuntimeHomeService', () => {
     expect(warnSpy).not.toHaveBeenCalled()
 
     expect(service.isHostSystemDefaultRealHome()).toBe(false)
-    expect(service.prepareForRateLimitFetch()).toBe(managedHomePath1)
+    expect(service.prepareForRateLimitFetch()).toEqual({
+      kind: 'ready',
+      codexHomePath: managedHomePath1
+    })
     expect(service.prepareForCodexLaunch()).toBe(managedHomePath1)
     expect(existsSync(join(managedHomePath1, 'auth.json'))).toBe(false)
 
@@ -2745,10 +2799,14 @@ describe('CodexRuntimeHomeService', () => {
       expect(readFileSync(join(wslRuntimeHomePath, 'auth.json'), 'utf-8')).toBe(
         '{"account":"wsl"}\n'
       )
-      expect(service.prepareForRateLimitFetch()).toBe(getRuntimeCodexHomePath())
-      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toBe(
-        wslRuntimeHomePath
-      )
+      expect(service.prepareForRateLimitFetch()).toEqual({
+        kind: 'ready',
+        codexHomePath: getRuntimeCodexHomePath()
+      })
+      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toEqual({
+        kind: 'ready',
+        codexHomePath: wslRuntimeHomePath
+      })
     } finally {
       if (originalPlatform) {
         Object.defineProperty(process, 'platform', originalPlatform)
@@ -3241,8 +3299,14 @@ describe('CodexRuntimeHomeService', () => {
       const target = { runtime: 'wsl' as const, wslDistro: 'Ubuntu' }
       const expectedHome = join(wslHome, '.codex')
 
-      expect(service.prepareForRateLimitFetch(target)).toBe(expectedHome)
-      expect(service.prepareForRateLimitFetch(target)).toBe(expectedHome)
+      expect(service.prepareForRateLimitFetch(target)).toEqual({
+        kind: 'ready',
+        codexHomePath: expectedHome
+      })
+      expect(service.prepareForRateLimitFetch(target)).toEqual({
+        kind: 'ready',
+        codexHomePath: expectedHome
+      })
       expect(syncWslRuntime).not.toHaveBeenCalled()
     } finally {
       if (originalPlatform) {
@@ -3315,9 +3379,10 @@ describe('CodexRuntimeHomeService', () => {
       const { CodexRuntimeHomeService } = await import('./runtime-home-service')
       const service = new CodexRuntimeHomeService(store as never)
 
-      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: null })).toBe(
-        join(wslHome, '.local', 'share', 'orca', 'codex-runtime-home', 'home')
-      )
+      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: null })).toEqual({
+        kind: 'ready',
+        codexHomePath: join(wslHome, '.local', 'share', 'orca', 'codex-runtime-home', 'home')
+      })
       expect(readFileSync(runtimeAuthPath, 'utf-8')).toBe(ubuntuAuth)
     } finally {
       if (originalPlatform) {
@@ -3371,9 +3436,10 @@ describe('CodexRuntimeHomeService', () => {
     try {
       const { CodexRuntimeHomeService } = await import('./runtime-home-service')
       const service = new CodexRuntimeHomeService(store as never)
-      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toBe(
-        systemCodexHomePath
-      )
+      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toEqual({
+        kind: 'ready',
+        codexHomePath: systemCodexHomePath
+      })
       expect(readFileSync(join(managedHomePath, 'auth.json'), 'utf-8')).toBe(managedAuth)
       const externallyRefreshedAuth = createCodexAuthJson(
         'wsl@example.com',
@@ -3382,9 +3448,10 @@ describe('CodexRuntimeHomeService', () => {
         3_000
       )
       writeFileSync(join(systemCodexHomePath, 'auth.json'), externallyRefreshedAuth, 'utf-8')
-      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toBe(
-        systemCodexHomePath
-      )
+      expect(service.prepareForRateLimitFetch({ runtime: 'wsl', wslDistro: 'Ubuntu' })).toEqual({
+        kind: 'ready',
+        codexHomePath: systemCodexHomePath
+      })
       expect(readFileSync(join(systemCodexHomePath, 'auth.json'), 'utf-8')).toBe(
         externallyRefreshedAuth
       )

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
-import { RateLimitService } from './service'
+import { RateLimitService, type InactiveCodexAccountInfo } from './service'
 import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
 import { fetchCodexRateLimits } from './codex-fetcher'
 import {
@@ -84,7 +84,10 @@ describe('RateLimitService', () => {
 
   it('aborts inactive Codex preview fetches on stop', async () => {
     const service = new RateLimitService()
-    const account = { id: 'account-1', managedHomePath: '/tmp/account-1/home' }
+    const account: InactiveCodexAccountInfo = {
+      id: 'account-1',
+      resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-1/home' })
+    }
     const capturedSignals: { codex?: AbortSignal } = {}
     service.setInactiveCodexAccountsResolver(() => [account])
     vi.mocked(fetchCodexRateLimits).mockImplementation(
@@ -116,7 +119,7 @@ describe('RateLimitService', () => {
     const wslCodexHome =
       '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
     service.setInactiveCodexAccountsResolver(() => [
-      { id: 'account-1', managedHomePath: wslCodexHome }
+      { id: 'account-1', resolveHome: () => ({ kind: 'ready', managedHomePath: wslCodexHome }) }
     ])
     vi.mocked(fetchCodexRateLimits).mockResolvedValueOnce(okProvider('codex', 33, Date.now()))
 
@@ -181,7 +184,7 @@ describe('RateLimitService', () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
     service.setInactiveCodexAccountsResolver(() => [
-      { id: 'account-1', managedHomePath: '/tmp/account-1/home' }
+      { id: 'account-1', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-1/home' }) }
     ])
     vi.mocked(fetchCodexRateLimits).mockReturnValueOnce(accountFetch.promise)
 
@@ -198,21 +201,21 @@ describe('RateLimitService', () => {
   it('keeps sibling inactive Codex preview fetches alive when one account is evicted', async () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
-    let inactiveAccounts = [
-      { id: 'account-a', managedHomePath: '/tmp/account-a/home' },
-      { id: 'account-b', managedHomePath: '/tmp/account-b/home' }
+    let inactiveAccounts: InactiveCodexAccountInfo[] = [
+      { id: 'account-a', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-a/home' }) },
+      { id: 'account-b', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-b/home' }) }
     ]
     service.setInactiveCodexAccountsResolver(() => inactiveAccounts)
     vi.mocked(fetchCodexRateLimits).mockReturnValueOnce(accountFetch.promise)
 
     const fetchOnOpen = service.fetchInactiveCodexAccountsOnOpen()
     await Promise.resolve()
+    // Why: probes are staggered, so only the first account is in flight this tick.
     expect(service.getState().inactiveCodexAccounts).toEqual([
-      { accountId: 'account-a', rateLimits: null, updatedAt: 0, isFetching: true },
-      { accountId: 'account-b', rateLimits: null, updatedAt: 0, isFetching: true }
+      { accountId: 'account-a', rateLimits: null, updatedAt: 0, isFetching: true }
     ])
 
-    inactiveAccounts = [{ id: 'account-a', managedHomePath: '/tmp/account-a/home' }]
+    inactiveAccounts = [{ id: 'account-a', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-a/home' }) }]
     service.evictInactiveCodexCache('account-b')
     accountFetch.resolve(okProvider('codex', 64, Date.now()))
     await fetchOnOpen
@@ -234,9 +237,12 @@ describe('RateLimitService', () => {
   it('does not recache an inactive Codex account that becomes active during fetch-on-open', async () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
-    let inactiveAccounts = [{ id: 'account-b', managedHomePath: '/tmp/account-b/home' }]
+    let inactiveAccounts: InactiveCodexAccountInfo[] = [{ id: 'account-b', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-b/home' }) }]
     service.setInactiveCodexAccountsResolver(() => inactiveAccounts)
-    service.setCodexHomePathResolver(() => '/tmp/account-b/home')
+    service.setCodexHomePathResolver(() => ({
+      kind: 'ready',
+      codexHomePath: '/tmp/account-b/home'
+    }))
     vi.mocked(fetchCodexRateLimits)
       .mockReturnValueOnce(accountFetch.promise)
       .mockResolvedValueOnce(okProvider('codex', 7, Date.now()))
@@ -258,7 +264,7 @@ describe('RateLimitService', () => {
   it('keeps the inactive Codex debounce across an account switch instead of re-probing', async () => {
     const service = new RateLimitService()
     service.setInactiveCodexAccountsResolver(() => [
-      { id: 'account-b', managedHomePath: '/tmp/account-b/home' }
+      { id: 'account-b', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-b/home' }) }
     ])
     vi.mocked(fetchCodexRateLimits).mockImplementation(async () => okProvider('codex', 10))
 
@@ -280,8 +286,8 @@ describe('RateLimitService', () => {
     try {
       const service = new RateLimitService()
       service.setInactiveCodexAccountsResolver(() => [
-        { id: 'account-a', managedHomePath: '/tmp/account-a/home' },
-        { id: 'account-b', managedHomePath: '/tmp/account-b/home' }
+        { id: 'account-a', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-a/home' }) },
+        { id: 'account-b', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/account-b/home' }) }
       ])
       vi.mocked(fetchCodexRateLimits).mockImplementation(async () => okProvider('codex', 5))
 
