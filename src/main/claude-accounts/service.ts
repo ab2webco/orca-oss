@@ -330,21 +330,25 @@ export class ClaudeAccountService {
     })
   }
 
-  /** Move every worktree pinned to one account onto another (or the system
-   *  default), optionally closing the live terminals that block the move. */
+  /** Close the live terminals that block an account change, then either move
+   *  every pin onto another account (or the system default) or leave the pins
+   *  untouched — a re-auth of the same account needs the close, not the move. */
   async reassignWorktreeAccountPins(
     request: ClaudeWorktreeAccountReassignment
   ): Promise<ClaudeRateLimitAccountsState> {
-    const toAccountId = this.resolveReassignmentDestination(
-      request.fromAccountId,
-      request.toAccountId
-    )
+    const toAccountId =
+      request.intent === 'keep-pins'
+        ? null
+        : this.resolveReassignmentDestination(request.fromAccountId, request.toAccountId)
     return this.serializeMutation(async () => {
       if (request.closeLiveTerminals) {
         await this.closeLiveClaudeTerminals([
           request.fromAccountId,
           ...(request.closeLiveTerminalAccountIds ?? [])
         ])
+      }
+      if (request.intent === 'keep-pins') {
+        return this.getSnapshot()
       }
       const plan = planClaudeWorktreePinReassignment(
         this.store.getAllWorktreeMeta(),

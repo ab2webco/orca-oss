@@ -10479,7 +10479,11 @@
           "cancel": "Cancel",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "¿Cerrar las terminales de Claude activas y volver a iniciar sesión en {{account}}?",
+          "reauthDescription": "Una CLI de Claude activa posee la cadena de actualización de un solo uso de esta cuenta, así que Orca cierra primero esas terminales. Cada worktree sigue en esta cuenta y Orca vuelve a abrir las terminales que cerró para ella cuando hayas iniciado sesión.",
+          "reauthWorktreesLabel": "Terminales que Orca cerrará y volverá a abrir",
+          "confirmReauth": "Cerrar e iniciar sesión"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "Estas cuentas comparten una cadena de refresh registrada",
@@ -10575,6 +10579,11 @@
           "description": "Abre los enlaces http(s) del terminal, Markdown y el editor en el navegador integrado de Orca. {{shortcut}} siempre usa el navegador del sistema.",
           "descriptionBase": "Abre los enlaces http(s) del terminal, Markdown y el editor en el navegador integrado de Orca."
         },
+        "TerminalTccAttributionNotice": {
+          "body": "El daemon de terminales lo inició una instalación de Orca que ya no existe, así que macOS no puede atribuirle sus comandos a Orca: los permisos de Accesibilidad y Automatización se ignoran en silencio (osascript falla con el error -25211). Reiniciar el daemon lo soluciona; las sesiones de terminal abiertas se cerrarán.",
+          "openManageSessions": "Abrir Administrar sesiones",
+          "title": "Los permisos de macOS no están llegando a las terminales"
+        },
         "artifacts": {
           "allowPublishingDescription": "Publica archivos HTML y Markdown como enlaces que cualquiera con la URL puede abrir. El contenido de los archivos se sube a {{host}}, que opera Orca upstream; esta compilación no lo aloja. Los enlaces existentes se mantienen hasta que los elimines desde Artifacts."
         },
@@ -10601,6 +10610,9 @@
           "cancel": "Seguir limpiando",
           "stopping": "Deteniendo…",
           "confirm": "Detener limpieza"
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "Sesión iniciada, pero Orca no pudo volver a abrir la terminal de Claude en {{worktrees}}. Iniciala de nuevo desde la barra de pestañas."
         }
       },
       "right": {

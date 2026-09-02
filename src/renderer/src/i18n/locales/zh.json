@@ -10480,7 +10480,11 @@
           "cancel": "取消",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "关闭正在运行的 Claude 终端并重新登录 {{account}}？",
+          "reauthDescription": "正在运行的 Claude CLI 占用着该账户的一次性刷新链，因此 Orca 会先关闭这些终端。所有工作树仍保留在该账户上，登录完成后 Orca 会重新打开为该账户关闭的终端。",
+          "reauthWorktreesLabel": "Orca 将关闭并重新打开的终端",
+          "confirmReauth": "关闭并登录"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "这些账户共享同一条已记录的刷新链",
@@ -10584,6 +10588,11 @@
           "accessHint": "允许麦克风访问以列出输入设备。",
           "allowAccess": "允许访问"
         },
+        "TerminalTccAttributionNotice": {
+          "body": "终端守护进程由一个已不存在的 Orca 安装启动，因此 macOS 无法将其命令归属于 Orca——辅助功能和自动化权限会被静默忽略（osascript 报错 -25211）。重启守护进程可以解决此问题；正在运行的终端会话将会关闭。",
+          "openManageSessions": "打开会话管理",
+          "title": "macOS 权限未能送达终端"
+        },
         "artifacts": {
           "allowPublishingDescription": "将 HTML 和 Markdown 文件发布为任何知道 URL 的人都能打开的链接。文件内容会上传到 {{host}}，该服务由上游 Orca 运营，并非由此构建版本托管。已有链接会一直保留，直到你在 Artifacts 中删除它们。"
         },
@@ -10610,6 +10619,9 @@
           "cancel": "继续清理",
           "stopping": "正在停止…",
           "confirm": "停止清理"
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "已登录，但 Orca 无法重新打开 {{worktrees}} 中的 Claude 终端。请从标签栏重新启动。"
         }
       },
       "right": {

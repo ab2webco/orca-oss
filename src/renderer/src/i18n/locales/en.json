@@ -10908,7 +10908,11 @@
           "cancel": "Cancel",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "Close the live Claude terminals and sign back in to {{account}}?",
+          "reauthDescription": "A live Claude CLI owns this account’s single-use refresh chain, so Orca closes those terminals first. Every worktree stays on this account, and Orca reopens the terminals it closed for it once you are signed in.",
+          "reauthWorktreesLabel": "Terminals Orca will close and reopen",
+          "confirmReauth": "Close & sign in"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "These accounts share a recorded refresh chain",
@@ -11223,6 +11227,9 @@
         },
         "shortcutDefinitionCatalog": {
           "missionControlConflict": "Blocked by Mission Control. Remap here or change it in System Settings."
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "Signed in, but Orca could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar."
         }
       },
       "right": {

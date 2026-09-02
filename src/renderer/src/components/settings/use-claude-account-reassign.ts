@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import type { ClaudeRateLimitAccountsState, GlobalSettings } from '../../../../shared/types'
 import {
   emptyClaudeAccountWorktreeUsageReport,
@@ -9,16 +10,23 @@ import {
   reassignClaudeWorktreeAccounts,
   removeClaudeProviderAccount
 } from '@/runtime/runtime-provider-accounts-client'
+import {
+  reopenClaudeTerminalsAfterReauth,
+  type ClaudeReauthReopenOutcome
+} from '@/lib/claude-reauth-terminal-reopen'
+import { translate } from '@/i18n/i18n'
 import type { ProviderAccountRuntimeView } from './provider-account-visibility'
 import type { ClaudeAccountReassignConfirmation } from './ClaudeAccountReassignDialog'
+import { planClaudeAccountReassignment } from './claude-account-reassign-plan'
 
 type ReassignSettings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
 
 export type ClaudeAccountReassignTarget = {
   accountId: string
   /** `remove` deletes the account once its worktrees move; `unblock` only moves
-   *  them and then replays the operation the live-PTY gate refused. */
-  mode: 'remove' | 'unblock'
+   *  them and then replays the operation the live-PTY gate refused; `reauth`
+   *  closes what blocks, keeps every pin, and reopens the closed terminals. */
+  mode: 'remove' | 'unblock' | 'reauth'
   runtime: ProviderAccountRuntimeView
   retry: (() => Promise<ClaudeRateLimitAccountsState>) | null
 }
@@ -42,6 +50,21 @@ type UseClaudeAccountReassignOptions = {
     operation: () => Promise<ClaudeRateLimitAccountsState>,
     runtime: ProviderAccountRuntimeView
   ) => Promise<void>
+}
+
+/** The sign-in already landed, so a worktree we could not relaunch is a notice,
+ *  never a failure of the operation the user asked for. */
+function reportClaudeReauthReopenFailures(outcome: ClaudeReauthReopenOutcome): void {
+  if (outcome.failedWorktreeIds.length === 0) {
+    return
+  }
+  toast.warning(
+    translate(
+      'auto.components.settings.useClaudeAccountReassign.reopenFailed',
+      'Signed in, but Orca could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar.',
+      { worktrees: outcome.failedWorktreeIds.join(', ') }
+    )
+  )
 }
 
 /**
@@ -97,6 +120,14 @@ export function useClaudeAccountReassign({
         return
       }
       const { accountId, mode, runtime, retry } = target
+      // Why read it now: closing the dialog drops the report, and after the
+      // terminals die nothing else remembers which worktrees to reopen.
+      const closedWorktreeIds =
+        confirmation.intent === 'keep-pins' && report
+          ? planClaudeAccountReassignment(report).liveWorktrees.map(
+              (worktree) => worktree.worktreeId
+            )
+          : []
       setTarget(null)
       const closeOptions = {
         closeLiveTerminals: confirmation.closeLiveTerminals,
@@ -110,20 +141,31 @@ export function useClaudeAccountReassign({
             // asking it to land them keeps both writes on one crash boundary.
             return removeClaudeProviderAccount(settings, accountId, {
               ...closeOptions,
-              reassignPinnedTo: confirmation.toAccountId
+              reassignPinnedTo: confirmation.intent === 'reassign' ? confirmation.toAccountId : null
             })
           }
           const reassigned = await reassignClaudeWorktreeAccounts(settings, {
             fromAccountId: accountId,
-            toAccountId: confirmation.toAccountId,
+            ...(confirmation.intent === 'keep-pins'
+              ? { intent: 'keep-pins' as const }
+              : {
+                  intent: 'reassign' as const,
+                  toAccountId: confirmation.toAccountId
+                }),
             ...closeOptions
           })
-          return retry ? retry() : reassigned
+          const next = retry ? await retry() : reassigned
+          // Why after the retry resolves: a terminal spawned earlier takes a
+          // launch reservation and the close gate refuses the re-auth outright.
+          if (confirmation.intent === 'keep-pins') {
+            reportClaudeReauthReopenFailures(reopenClaudeTerminalsAfterReauth(closedWorktreeIds))
+          }
+          return next
         },
         runtime
       )
     },
-    [runAction, settings, target]
+    [report, runAction, settings, target]
   )
 
   return { target, report, destination, setDestination, open, close, confirm }

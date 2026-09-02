@@ -10479,7 +10479,11 @@
           "cancel": "취소",
           "confirmRemove": "Reassign & remove",
           "confirmUnblock": "Reassign & continue",
-          "confirmPlainRemove": "Remove Account"
+          "confirmPlainRemove": "Remove Account",
+          "reauthTitle": "실행 중인 Claude 터미널을 닫고 {{account}}에 다시 로그인할까요?",
+          "reauthDescription": "실행 중인 Claude CLI가 이 계정의 일회용 갱신 체인을 점유하고 있어 Orca가 해당 터미널을 먼저 닫습니다. 모든 워크트리는 이 계정에 그대로 남으며, 로그인하면 Orca가 이 계정을 위해 닫았던 터미널을 다시 엽니다.",
+          "reauthWorktreesLabel": "Orca가 닫았다가 다시 열 터미널",
+          "confirmReauth": "닫고 로그인"
         },
         "ClaudeRefreshChainConflictNotice": {
           "title": "이 계정들은 기록된 리프레시 체인을 공유합니다",
@@ -10575,6 +10579,11 @@
           "description": "터미널, Markdown, 편집기의 http(s) 링크를 Orca 내장 브라우저에서 엽니다. {{shortcut}}을(를) 누르면 항상 시스템 브라우저를 사용합니다.",
           "descriptionBase": "터미널, Markdown, 편집기의 http(s) 링크를 Orca 내장 브라우저에서 엽니다."
         },
+        "TerminalTccAttributionNotice": {
+          "body": "터미널 데몬이 더 이상 존재하지 않는 Orca 설치본에서 시작되어 macOS가 해당 명령을 Orca로 귀속하지 못합니다. 손쉬운 사용 및 자동화 권한이 조용히 무시됩니다(osascript가 -25211 오류로 실패). 데몬을 다시 시작하면 해결되지만 실행 중인 터미널 세션은 닫힙니다.",
+          "openManageSessions": "세션 관리 열기",
+          "title": "macOS 권한이 터미널에 전달되지 않습니다"
+        },
         "artifacts": {
           "allowPublishingDescription": "HTML 및 Markdown 파일을 URL을 아는 누구나 열 수 있는 링크로 게시합니다. 파일 내용은 {{host}}에 업로드되며, 이 서버는 업스트림 Orca가 운영합니다. 이 빌드가 호스팅하지 않습니다. 기존 링크는 Artifacts에서 삭제할 때까지 유지됩니다."
         },
@@ -10601,6 +10610,9 @@
           "cancel": "계속 정리",
           "stopping": "중지하는 중…",
           "confirm": "정리 중지"
+        },
+        "useClaudeAccountReassign": {
+          "reopenFailed": "로그인은 됐지만 Orca가 {{worktrees}}의 Claude 터미널을 다시 열지 못했습니다. 탭 바에서 다시 시작하세요."
         }
       },
       "right": {

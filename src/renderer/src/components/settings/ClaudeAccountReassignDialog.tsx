@@ -35,12 +35,15 @@ export type ClaudeAccountReassignDestination = {
 }
 
 export type ClaudeAccountReassignConfirmation = {
-  toAccountId: string | null
   /** False when nothing is live, so a runtime without a PTY terminator is never
    *  asked to close terminals that do not exist. */
   closeLiveTerminals: boolean
   closeLiveTerminalAccountIds: string[]
-}
+} & (
+  | { intent: 'reassign'; toAccountId: string | null }
+  /** Re-auth of this same account: close what blocks, move nothing. */
+  | { intent: 'keep-pins' }
+)
 
 export type ClaudeAccountReassignDialogProps = {
   open: boolean
@@ -52,8 +55,9 @@ export type ClaudeAccountReassignDialogProps = {
   destinations: readonly ClaudeAccountReassignDestination[]
   destination: string | null
   onDestinationChange: (accountId: string | null) => void
-  /** `remove` deletes the account after reassigning; `unblock` only reassigns. */
-  mode: 'remove' | 'unblock'
+  /** `remove` deletes the account after reassigning; `unblock` only reassigns;
+   *  `reauth` closes the blocking terminals and keeps every pin. */
+  mode: 'remove' | 'unblock' | 'reauth'
   submitting: boolean
   onConfirm: (confirmation: ClaudeAccountReassignConfirmation) => void
   /** Resolves the email/label of an account that blocks from outside this one. */
@@ -81,6 +85,27 @@ function WorktreeRow({ worktree }: { worktree: ClaudeAccountWorktreeUsage }): Re
   )
 }
 
+function WorktreeList({
+  label,
+  worktrees
+}: {
+  label: string
+  worktrees: readonly ClaudeAccountWorktreeUsage[]
+}): React.JSX.Element {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <ScrollArea className="rounded-md border px-3" viewportClassName="max-h-44">
+        <ul className="divide-y">
+          {worktrees.map((worktree) => (
+            <WorktreeRow key={worktree.worktreeId} worktree={worktree} />
+          ))}
+        </ul>
+      </ScrollArea>
+    </div>
+  )
+}
+
 export function ClaudeAccountReassignDialog({
   open,
   onOpenChange,
@@ -95,10 +120,13 @@ export function ClaudeAccountReassignDialog({
   resolveAccountLabel
 }: ClaudeAccountReassignDialogProps): React.JSX.Element {
   const plan = report ? planClaudeAccountReassignment(report) : null
-  const worktrees = report?.worktrees ?? []
+  const isReauth = mode === 'reauth'
+  // Why only the live ones for a re-auth: a pin holds no refresh chain, so it
+  // never blocks and naming it would ask about worktrees nothing happens to.
+  const worktrees = isReauth ? (plan?.liveWorktrees ?? []) : (report?.worktrees ?? [])
   // Why: with nothing pinned there is no reassignment to make — the dialog is
   // then just the ordinary destructive removal confirmation.
-  const showReassignment = worktrees.length > 0
+  const showReassignment = !isReauth && worktrees.length > 0
   const blockingLabels = (plan?.blockingAccountIds ?? []).map(resolveAccountLabel)
   const blockingWorktreeNames = (report?.blockedByOtherAccounts ?? [])
     .map((terminal) => terminal.displayName)
@@ -109,34 +137,45 @@ export function ClaudeAccountReassignDialog({
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
-            {mode === 'unblock'
+            {isReauth
               ? translate(
-                  'auto.components.settings.ClaudeAccountReassignDialog.unblockTitle',
-                  'Reassign the worktrees using {{account}}?',
+                  'auto.components.settings.ClaudeAccountReassignDialog.reauthTitle',
+                  'Close the live Claude terminals and sign back in to {{account}}?',
                   { account: accountLabel }
                 )
-              : showReassignment
+              : mode === 'unblock'
                 ? translate(
-                    'auto.components.settings.ClaudeAccountReassignDialog.removeTitle',
-                    'Remove {{account}} and reassign its worktrees?',
+                    'auto.components.settings.ClaudeAccountReassignDialog.unblockTitle',
+                    'Reassign the worktrees using {{account}}?',
                     { account: accountLabel }
                   )
-                : translate(
-                    'auto.components.settings.ClaudeAccountReassignDialog.plainRemoveTitle',
-                    'Remove {{account}}?',
-                    { account: accountLabel }
-                  )}
+                : showReassignment
+                  ? translate(
+                      'auto.components.settings.ClaudeAccountReassignDialog.removeTitle',
+                      'Remove {{account}} and reassign its worktrees?',
+                      { account: accountLabel }
+                    )
+                  : translate(
+                      'auto.components.settings.ClaudeAccountReassignDialog.plainRemoveTitle',
+                      'Remove {{account}}?',
+                      { account: accountLabel }
+                    )}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'remove' && !showReassignment
+            {isReauth
               ? translate(
-                  'auto.components.settings.ClaudeAccountReassignDialog.plainRemoveDescription',
-                  'Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.'
+                  'auto.components.settings.ClaudeAccountReassignDialog.reauthDescription',
+                  'A live Claude CLI owns this account’s single-use refresh chain, so Orca closes those terminals first. Every worktree stays on this account, and Orca reopens the terminals it closed for it once you are signed in.'
                 )
-              : translate(
-                  'auto.components.settings.ClaudeAccountReassignDialog.description',
-                  'A pinned Claude CLI owns this account’s single-use refresh chain, so Orca cannot change it underneath a running session. Pick where these worktrees go and Orca closes the live terminals first.'
-                )}
+              : mode === 'remove' && !showReassignment
+                ? translate(
+                    'auto.components.settings.ClaudeAccountReassignDialog.plainRemoveDescription',
+                    'Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.'
+                  )
+                : translate(
+                    'auto.components.settings.ClaudeAccountReassignDialog.description',
+                    'A pinned Claude CLI owns this account’s single-use refresh chain, so Orca cannot change it underneath a running session. Pick where these worktrees go and Orca closes the live terminals first.'
+                  )}
           </DialogDescription>
         </DialogHeader>
 
@@ -150,23 +189,24 @@ export function ClaudeAccountReassignDialog({
           </div>
         ) : (
           <div className="space-y-4">
+            {isReauth && worktrees.length > 0 ? (
+              <WorktreeList
+                label={translate(
+                  'auto.components.settings.ClaudeAccountReassignDialog.reauthWorktreesLabel',
+                  'Terminals Orca will close and reopen'
+                )}
+                worktrees={worktrees}
+              />
+            ) : null}
             {showReassignment ? (
               <>
-                <div className="space-y-1.5">
-                  <Label>
-                    {translate(
-                      'auto.components.settings.ClaudeAccountReassignDialog.worktreesLabel',
-                      'Worktrees using this account'
-                    )}
-                  </Label>
-                  <ScrollArea className="rounded-md border px-3" viewportClassName="max-h-44">
-                    <ul className="divide-y">
-                      {worktrees.map((worktree) => (
-                        <WorktreeRow key={worktree.worktreeId} worktree={worktree} />
-                      ))}
-                    </ul>
-                  </ScrollArea>
-                </div>
+                <WorktreeList
+                  label={translate(
+                    'auto.components.settings.ClaudeAccountReassignDialog.worktreesLabel',
+                    'Worktrees using this account'
+                  )}
+                  worktrees={worktrees}
+                />
                 <div className="space-y-1.5">
                   <Label htmlFor="claude-reassign-destination">
                     {translate(
@@ -198,7 +238,7 @@ export function ClaudeAccountReassignDialog({
               </>
             ) : null}
 
-            {plan && plan.liveWorktrees.length > 0 ? (
+            {!isReauth && plan && plan.liveWorktrees.length > 0 ? (
               <p className="text-sm text-destructive">
                 {translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.closeWarning',
@@ -249,27 +289,34 @@ export function ClaudeAccountReassignDialog({
             disabled={report === null || submitting}
             onClick={() =>
               onConfirm({
-                toAccountId: destination,
+                ...(isReauth
+                  ? { intent: 'keep-pins' as const }
+                  : { intent: 'reassign' as const, toAccountId: destination }),
                 closeLiveTerminals: plan?.closesTerminals ?? false,
                 closeLiveTerminalAccountIds: plan?.blockingAccountIds ?? []
               })
             }
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
-            {mode === 'unblock'
+            {isReauth
               ? translate(
-                  'auto.components.settings.ClaudeAccountReassignDialog.confirmUnblock',
-                  'Reassign & continue'
+                  'auto.components.settings.ClaudeAccountReassignDialog.confirmReauth',
+                  'Close & sign in'
                 )
-              : showReassignment
+              : mode === 'unblock'
                 ? translate(
-                    'auto.components.settings.ClaudeAccountReassignDialog.confirmRemove',
-                    'Reassign & remove'
+                    'auto.components.settings.ClaudeAccountReassignDialog.confirmUnblock',
+                    'Reassign & continue'
                   )
-                : translate(
-                    'auto.components.settings.ClaudeAccountReassignDialog.confirmPlainRemove',
-                    'Remove Account'
-                  )}
+                : showReassignment
+                  ? translate(
+                      'auto.components.settings.ClaudeAccountReassignDialog.confirmRemove',
+                      'Reassign & remove'
+                    )
+                  : translate(
+                      'auto.components.settings.ClaudeAccountReassignDialog.confirmPlainRemove',
+                      'Remove Account'
+                    )}
           </Button>
         </DialogFooter>
       </DialogContent>

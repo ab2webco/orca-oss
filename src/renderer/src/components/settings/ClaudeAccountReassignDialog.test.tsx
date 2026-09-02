@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render as renderComponent } from '@testing-library/react'
+import { cleanup, render as renderComponent, screen } from '@testing-library/react'
 import { i18n } from '../../i18n/i18n'
 import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
 import type { ClaudeAccountWorktreeUsageReport } from '../../../../shared/claude-account-worktree-usage'
@@ -91,7 +91,9 @@ describe('ClaudeAccountReassignDialog', () => {
   it('names the other account and worktree that keeps the change blocked', () => {
     const markup = render({
       report: report({
-        worktrees: [{ worktreeId: 'repo::a', displayName: 'feature-login', hasLiveTerminal: false }],
+        worktrees: [
+          { worktreeId: 'repo::a', displayName: 'feature-login', hasLiveTerminal: false }
+        ],
         blockedByOtherAccounts: [
           {
             ptyId: 'repo::c@@pane-1',
@@ -118,10 +120,81 @@ describe('ClaudeAccountReassignDialog', () => {
     expect(
       render({
         report: report({
-          worktrees: [{ worktreeId: 'repo::a', displayName: 'feature-login', hasLiveTerminal: false }]
+          worktrees: [
+            { worktreeId: 'repo::a', displayName: 'feature-login', hasLiveTerminal: false }
+          ]
         })
       })
     ).toContain('Reassign these worktrees to')
+  })
+
+  describe('re-authenticating the same account', () => {
+    const fourteenWorktrees = Array.from({ length: 14 }, (_, index) => ({
+      worktreeId: `repo::w${index}`,
+      displayName: index < 2 ? `live-${index}` : `pinned-${index}`,
+      hasLiveTerminal: index < 2
+    }))
+
+    it('names only the worktrees that actually block', () => {
+      const markup = render({
+        mode: 'reauth',
+        report: report({ worktrees: fourteenWorktrees, liveTerminalCount: 2 })
+      })
+
+      expect(markup).toContain('live-0')
+      expect(markup).toContain('live-1')
+      expect(markup).not.toContain('pinned-2')
+      expect(markup).not.toContain('pinned-13')
+    })
+
+    it('asks for no destination and says the pins stay', () => {
+      const markup = render({
+        mode: 'reauth',
+        report: report({ worktrees: fourteenWorktrees, liveTerminalCount: 2 })
+      })
+
+      expect(markup).not.toContain('Reassign these worktrees to')
+      expect(markup).toContain('Every worktree stays on this account')
+      expect(markup).toContain('Close & sign in')
+    })
+
+    it('confirms as keep-pins, never as a reassignment', () => {
+      const onConfirm = vi.fn()
+      render({
+        mode: 'reauth',
+        onConfirm,
+        report: report({ worktrees: fourteenWorktrees, liveTerminalCount: 2 })
+      })
+
+      screen.getByRole('button', { name: /Close & sign in/ }).click()
+
+      expect(onConfirm).toHaveBeenCalledWith({
+        intent: 'keep-pins',
+        closeLiveTerminals: true,
+        closeLiveTerminalAccountIds: []
+      })
+    })
+  })
+
+  it('still confirms a removal as a reassignment', () => {
+    const onConfirm = vi.fn()
+    render({
+      mode: 'remove',
+      destination: 'account-b',
+      onConfirm,
+      report: report({
+        worktrees: [{ worktreeId: 'repo::a', displayName: 'feature-login', hasLiveTerminal: false }]
+      })
+    })
+
+    screen.getByRole('button', { name: /Reassign & remove/ }).click()
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      intent: 'reassign',
+      toAccountId: 'account-b',
+      closeLiveTerminals: false,
+      closeLiveTerminalAccountIds: []
+    })
   })
 
   it('falls back to the plain removal confirmation when nothing uses the account', () => {

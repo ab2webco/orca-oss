@@ -100,13 +100,27 @@ export function registerClaudeAccountHandlers(
   )
   ipcMain.handle(
     'claudeAccounts:reassignWorktrees',
-    (_event, args: ClaudeWorktreeAccountReassignment) =>
-      claudeAccounts.reassignWorktreeAccountPins({
+    (_event, args: ClaudeWorktreeAccountReassignment) => {
+      const base = {
         fromAccountId: args.fromAccountId,
-        toAccountId: args.toAccountId ?? null,
         closeLiveTerminals: args.closeLiveTerminals === true,
         closeLiveTerminalAccountIds: args.closeLiveTerminalAccountIds
+      }
+      if (args.intent === 'keep-pins') {
+        return claudeAccounts.reassignWorktreeAccountPins({ ...base, intent: 'keep-pins' })
+      }
+      // Why not default to `reassign`: this handler rebuilds the request field by
+      // field, so an absent discriminant would silently unpin every worktree to the
+      // system default. Refusing is the only safe reading of a missing intent.
+      if (args.intent !== 'reassign') {
+        throw new Error('Unknown Claude worktree reassignment intent.')
+      }
+      return claudeAccounts.reassignWorktreeAccountPins({
+        ...base,
+        intent: 'reassign',
+        toAccountId: args.toAccountId ?? null
       })
+    }
   )
   ipcMain.handle('claudeAccounts:previewGlobalConfig', () =>
     claudeAccounts.buildGlobalConfigSyncInventory()
