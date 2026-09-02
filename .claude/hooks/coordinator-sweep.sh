@@ -12,7 +12,7 @@ INTERVAL="${ORCA_SWEEP_INTERVAL:-1800}"
 sweep_line() {
   cd "$ROOT" 2>/dev/null || { echo "SWEEP: repo missing at $ROOT"; return; }
 
-  local prs green red pending stale board
+  local prs green red pending dirty stale board
   prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup 2>/dev/null) || prs='[]'
   local states='[.statusCheckRollup[]?|(.conclusion//.state)]'
 
@@ -41,12 +41,16 @@ sweep_line() {
   done < <(git worktree list --porcelain 2>/dev/null |
     awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print p, $2}')
 
+  # A conflicted PR has no failing check and no passing one, so every bucket above misses it
+  # — it reads as "nothing to do" while being unmergeable.
+  dirty=$(jq -r '[.[]|select(.mergeStateStatus=="DIRTY")|"#\(.number)"]|join(" ")' <<<"$prs" 2>/dev/null)
+
   # Why `.ok` and not just the count: a failed call still returns parseable JSON with no
   # work items in it, so counting alone renders an outage as a board with zero items open.
   board=$(orca plane list --project "$PROJECT" --json 2>/dev/null |
     jq -r 'if .ok then ([..|objects|select(.identifier?)]|length|tostring) else empty end' 2>/dev/null)
 
-  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | leftover-worktrees:${stale:-none} | board-open:${board:-?}"
+  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | board-open:${board:-?}"
 }
 
 if [ "${1:-}" = "--once" ]; then
