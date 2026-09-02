@@ -573,7 +573,9 @@ export function migrateMobilePairingDataToCanonicalUserDataPath(sourceUserDataDi
         cleanupFailed = true
       }
     }
-    if (cleanupFailed) throw error
+    if (cleanupFailed) {
+      throw error
+    }
     console.error('[persistence] Failed to migrate mobile pairing files forward:', error)
   }
 }
