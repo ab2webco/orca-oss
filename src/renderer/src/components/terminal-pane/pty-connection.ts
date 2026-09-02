@@ -7186,13 +7186,12 @@ export function connectPanePty(
         // Why: this abandon declares the bytes unrecoverable, so a repaint armed by earlier live
         // backpressure must not outlive it — it would re-open recovery and banner a second time.
         clearHiddenOutputRestoreFloodRepaintTimer()
+        // Grounds the gap itself, so no second reset belongs after it.
         writeRestoreUnavailableWarning()
-      }
-      // Why not an else: the unavailable warning is plain text and carries no SGR
-      // of its own, so folding the reset into the other branch skipped it on the
-      // primary abandon path — the one that declares the bytes unrecoverable.
-      // Guarded only against the remote re-arm, which writes its own reset.
-      if (!rearmedRemoteRestore) {
+      } else if (!rearmedRemoteRestore) {
+        // A quiet abandon still drains queued foreground under whatever pen the
+        // gap stranded, and skips the warning that would have grounded it. The
+        // remote re-arm is excluded because it writes its own reset.
         writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       }
       if (hadPendingOverflow) {
@@ -7431,6 +7430,11 @@ export function connectPanePty(
               })) {
                 writeReplayData(replayChunk)
               }
+            } else {
+              // The repaint is skipped, but the gap still stranded a pen and
+              // nothing here repaints over what is still running — ground it
+              // with the live-path constant.
+              writeReplayData(RESET_AFTER_BYTE_GAP)
             }
             // Why: live agents own ?25l/?1004h; a forced ?1004l here would silence focus events until restart (agents enable focus reporting only at startup).
             writeReplayData(
