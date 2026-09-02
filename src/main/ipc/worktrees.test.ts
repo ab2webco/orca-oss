@@ -315,6 +315,9 @@ describe('registerWorktreeHandlers', () => {
   }
   const ipcEvent = { sender: { id: 1 } }
   const store = {
+    // Mirrors worktrees-test-ipc-surface: the removal-snapshot paths read the
+    // profile directory to locate the prune targets.
+    getProfileStorageDirectory: vi.fn(() => '/profile-a'),
     getRepos: vi.fn(),
     getRepo: vi.fn(),
     getProjects: vi.fn(),
