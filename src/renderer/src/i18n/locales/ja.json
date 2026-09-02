@@ -3387,7 +3387,9 @@
             "worktreeAccountLabel": "ワークツリーのアカウント",
             "worktreeAccountUsageNote": "フォーカス中のワークツリーに固定されたアカウントの使用量を表示しています。",
             "worktreeEndpointAccountUsageNote": "カスタムエンドポイントアカウント — 使用量トラッキングは利用できません。",
-            "floatingTerminalNewActivity": "{{label}}、新規アクティビティ"
+            "floatingTerminalNewActivity": "{{label}}、新規アクティビティ",
+            "codexSignInSuccess": "Codex にサインインしました",
+            "codexSignInError": "Codex のサインインに失敗しました。もう一度お試しください。"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "アカウントを接続する",
@@ -5443,6 +5445,7 @@
           "codexSystemDefaultNeedsSignIn": "{{value0}} の Codex サインインが見つかりません。",
           "codexConfigSyncMissingSource": "{{value0}} が見つからないため、Codex は最後に同期した設定を使い続けています。同期を再開するには、そのファイルを復元してください。",
           "codexConfigSyncBlankSource": "{{value0}} が空のため、Codex は最後に同期した設定を使い続けています。同期フォルダーのダウンロードが完了するまでは正常な状態です。",
+          "codexConfigSyncManagedHomeUnavailable": "Orca は現在このアカウントの Codex ファイルを読み取れないため、設定が同期されていない可能性があります。ウイルス対策ソフトやバックアップツールによる一時的なロックが原因で、通常は自動的に解消されます。",
           "codexConfigSyncUnreadableSource": "{{value0}} を読み取れなかったため、Codex は最後に同期した設定を使い続けています。そのファイルの権限を確認してください。",
           "b28bb41f63": "制限された Agent の自動切り替え",
           "7d2634bfa1": "実行中の Claude または Codex セッションがアカウント制限に達したとき、Orca は別の管理アカウントに切り替えて同じセッションを再開できます。",

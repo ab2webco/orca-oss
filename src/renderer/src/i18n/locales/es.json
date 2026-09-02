@@ -3387,7 +3387,9 @@
             "worktreeAccountLabel": "Cuenta del worktree",
             "worktreeAccountUsageNote": "Se muestra el uso de la cuenta fijada al worktree enfocado.",
             "worktreeEndpointAccountUsageNote": "Cuenta de endpoint personalizado — el seguimiento de uso no está disponible.",
-            "floatingTerminalNewActivity": "{{label}}, nueva actividad"
+            "floatingTerminalNewActivity": "{{label}}, nueva actividad",
+            "codexSignInSuccess": "Sesión iniciada en Codex",
+            "codexSignInError": "No se pudo iniciar sesión en Codex. Inténtalo de nuevo."
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "Conectar una cuenta",
@@ -5469,6 +5471,7 @@
           "codexSystemDefaultNeedsSignIn": "No se encontró ningún inicio de sesión de Codex para {{value0}}.",
           "codexConfigSyncMissingSource": "Codex is still using the settings it last synced because {{value0}} is missing. Restore that file to resume syncing.",
           "codexConfigSyncBlankSource": "Codex is still using the settings it last synced because {{value0}} is empty. That is expected while a synced folder finishes downloading.",
+          "codexConfigSyncManagedHomeUnavailable": "Orca no pudo leer los archivos de Codex de esta cuenta en este momento, por lo que es posible que la configuración no se esté sincronizando. Normalmente se resuelve solo: un antivirus o una herramienta de copia de seguridad puede bloquearlos brevemente.",
           "codexConfigSyncUnreadableSource": "Codex is still using the settings it last synced because {{value0}} could not be read. Check that file's permissions.",
           "b28bb41f63": "Cambio automático de agentes limitados",
           "7d2634bfa1": "Cuando una sesión activa de Claude o Codex alcanza el límite de una cuenta, Orca puede cambiar a otra cuenta administrada y reanudar la misma sesión.",
