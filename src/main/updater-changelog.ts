@@ -14,11 +14,12 @@ const FETCH_TIMEOUT_MS = 5000
 const MAX_DESCRIPTION_BULLETS = 4
 const MAX_DESCRIPTION_LENGTH = 280
 
-// Why: `.github/workflows/lab-release.yml` writes every release body with a
-// `## Cambios desde <prev tag>` section holding one `- <commit subject>` line
-// per change. That section is the only part of the notes worth surfacing —
-// the rest is the same boilerplate on every release.
-const CHANGES_HEADING = /^##\s+Cambios desde\b/
+// Why three headings: `.github/workflows/lab-release.yml` used to write one
+// `## Cambios desde <prev tag>` section and now splits the same lines across
+// `## Novedades`, `## Arreglos` and `## Desde Orca oficial` (`:556-568`). The
+// old pattern stopped matching, so every card fell through to the lead
+// paragraph — which is the build's boilerplate description, on every release.
+const CHANGES_HEADING = /^##\s+(Cambios desde\b|Novedades\s*$|Arreglos\s*$|Desde Orca oficial\s*$)/
 const NEXT_HEADING = /^#{1,6}\s/
 const BULLET = /^[-*]\s+(.+)$/
 
@@ -61,10 +62,15 @@ export function summarizeReleaseBody(body: string): string {
   const lines = body.split('\n')
   const changesStart = lines.findIndex((line) => CHANGES_HEADING.test(line.trim()))
   if (changesStart !== -1) {
+    // Why not stop at the next heading: the sections are siblings, so breaking
+    // there would surface only whichever one happens to come first.
     const bullets: string[] = []
     for (const line of lines.slice(changesStart + 1)) {
       const trimmed = line.trim()
       if (NEXT_HEADING.test(trimmed)) {
+        if (CHANGES_HEADING.test(trimmed)) {
+          continue
+        }
         break
       }
       const bullet = trimmed.match(BULLET)
