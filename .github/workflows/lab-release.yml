@@ -533,7 +533,7 @@ jobs:
           {
             echo "# ${title}"
             echo
-            echo "Build del laboratorio de Ab2Web basado en Orca (upstream stablyai/orca) más las funcionalidades propias del lab. Se distingue por el distintivo \"by Ab2Web\" en la barra de título."
+            echo "Build del laboratorio de Ab2Web basado en Orca (upstream stablyai/orca) más las funcionalidades propias del lab."
             echo
             echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
             echo
