@@ -283,7 +283,9 @@ describe('AgentHookServer listener replay', () => {
         })
 
       await postHook({ hook_event_name: 'UserPromptSubmit', prompt: 'first launch' })
-      server.retirePaneAuthority(PANE)
+      // Why: the agent exiting leaves the pane reusable; 'pane-closed' is the renderer
+      // saying the tab is gone, and that one stays suppressed (ORCA-169).
+      server.retirePaneAuthority(PANE, 'agent-exited')
 
       // Why: `claude --resume` in the reused shell pane emits only SessionStart while idle;
       // without the un-retire the resumed session stays rowless until a prompt (STA-3386).

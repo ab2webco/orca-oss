@@ -159,7 +159,8 @@ describe('AgentHookServer ingestRemote', () => {
           id: 'pi-session-1',
           transcriptPath: '/tmp/pi-session-1.jsonl'
         },
-        payload: { state: 'done', prompt: '', agentType: 'claude' }
+        // Why: claude now holds a session-only row, so the invalid case is an agent that cannot.
+        payload: { state: 'done', prompt: '', agentType: 'codex' }
       },
       'conn-1'
     )
