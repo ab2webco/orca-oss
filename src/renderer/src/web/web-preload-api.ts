@@ -725,11 +725,29 @@ function createWebPreloadApi(): Partial<PreloadApi> {
             )
           )
         }
-        const next = mergeSettings(getStoredSettings(), sanitizedUpdates, {
+        const paired = Boolean(requireActiveEnvironmentOrNull())
+        const visibilityUpdate = paired ? sanitizedUpdates.worktreeVisibilityDefaults : undefined
+        // Host-owned while paired: keep it out of the local durable settings so a
+        // later offline read cannot answer with a default the host never had.
+        const localUpdates = { ...sanitizedUpdates }
+        if (paired) {
+          delete localUpdates.worktreeVisibilityDefaults
+        }
+        const next = mergeSettings(getStoredSettings(), localUpdates, {
           preserveAutoRenameBranchFromWorkUpdate: 'autoRenameBranchFromWork' in sanitizedUpdates
         })
         writeStoredSettings(next)
-        return syncRuntimeBackedSettings(sanitizedUpdates, next)
+        const synced = await syncRuntimeBackedSettings(localUpdates, next)
+        if (!paired) {
+          return synced
+        }
+        if (visibilityUpdate === undefined || pairedRuntimeVisibilityDefaults === null) {
+          return withPairedVisibilityMirror(synced)
+        }
+        return {
+          ...synced,
+          worktreeVisibilityDefaults: await pushPairedVisibilityDefaults(visibilityUpdate)
+        }
       },
       setActiveRuntimeEnvironmentPreference: async ({ environmentId }) => {
         const requestedEnvironmentId = environmentId?.trim() || null
@@ -3885,6 +3903,24 @@ function writeStoredSettings(
   writeJson(SETTINGS_STORAGE_KEY, durable)
 }
 
+type WorktreeVisibilityDefaults = GlobalSettings['worktreeVisibilityDefaults']
+
+// Why mirrored, never persisted: only the paired host can see the sources these
+// defaults describe, so a web client that stored them would keep answering with
+// a value the host ignores. Null also encodes "this host never reported the
+// field", which is how an older host is detected — the update is additive and
+// must not be sent to one that cannot apply it.
+let pairedRuntimeVisibilityDefaults: WorktreeVisibilityDefaults | null = null
+
+function withPairedVisibilityMirror(settings: GlobalSettings): GlobalSettings {
+  if (pairedRuntimeVisibilityDefaults) {
+    return { ...settings, worktreeVisibilityDefaults: pairedRuntimeVisibilityDefaults }
+  }
+  const mirrored = { ...settings }
+  delete mirrored.worktreeVisibilityDefaults
+  return mirrored
+}
+
 async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
   const local = getStoredSettings()
   if (!requireActiveEnvironmentOrNull()) {
@@ -3920,13 +3956,47 @@ async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
     if (typeof result.settings.artifactSharingEnabled === 'boolean') {
       runtimeSettings.artifactSharingEnabled = result.settings.artifactSharingEnabled
     }
+    const reportedVisibilityDefaults =
+      typeof result.settings.worktreeVisibilityDefaults === 'object' &&
+      result.settings.worktreeVisibilityDefaults !== null
+        ? result.settings.worktreeVisibilityDefaults
+        : null
     const next = mergeSettings(local, runtimeSettings)
     writeStoredSettings(next)
-    return next
+    // Why re-checked: the host can be unpaired while this read is in flight, and
+    // a mirror of a host that is gone would outlive its authority.
+    if (!requireActiveEnvironmentOrNull()) {
+      pairedRuntimeVisibilityDefaults = null
+      return next
+    }
+    pairedRuntimeVisibilityDefaults = reportedVisibilityDefaults
+    return withPairedVisibilityMirror(next)
   } catch {
     // Why: unpaired/offline web clients keep a local settings fallback.
     return local
   }
+}
+
+// Why not folded into syncRuntimeBackedSettings: that path swallows transport
+// failures so an offline client keeps its local settings, but a visibility write
+// has no local half to fall back to — reporting success would show the user a
+// default the host never accepted.
+async function pushPairedVisibilityDefaults(
+  update: WorktreeVisibilityDefaults
+): Promise<WorktreeVisibilityDefaults> {
+  const payload = { ...pairedRuntimeVisibilityDefaults, ...update }
+  const result = await callRuntimeResult<{ settings: Partial<GlobalSettings> }>(
+    'settings.update',
+    { worktreeVisibilityDefaults: payload },
+    15_000
+  )
+  const applied =
+    typeof result.settings.worktreeVisibilityDefaults === 'object' &&
+    result.settings.worktreeVisibilityDefaults !== null
+      ? result.settings.worktreeVisibilityDefaults
+      : payload
+  pairedRuntimeVisibilityDefaults = applied
+  return applied
 }
 
 async function syncRuntimeBackedSettings(
