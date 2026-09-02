@@ -340,6 +340,7 @@ import {
 } from '../../../../shared/claude-auth-failure-detection'
 import { notifyClaudeAuthFailure } from './claude-auth-failure-notice'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
+import { resolveDraftPasteReadyTimeoutMs } from '../../../../shared/draft-paste-ready-timeout'
 import { createDraftPasteReadyScanner } from '../../../../shared/draft-paste-ready-scanner'
 import { sendAgentDraftPasteContent } from '@/lib/agent-draft-paste-content'
 import { writeTerminalPastePtyInput } from './terminal-pty-paste-writer'
@@ -378,7 +379,6 @@ const STARTUP_DRAFT_PASTE_QUIET_MS = 1500
 // contain private repo/user names; the terminal itself shows where it opened.
 export const STARTUP_CWD_FALLBACK_NOTICE =
   '\r\n[Orca opened this terminal at the workspace root because its saved start folder no longer exists.]\r\n'
-const STARTUP_DRAFT_PASTE_TIMEOUT_MS = 8000
 const HIDDEN_OUTPUT_RESTORE_PENDING_CHARS = 512 * 1024
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MS = 50
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MAX = 3
@@ -5045,7 +5045,10 @@ export function connectPanePty(
       startupDraftHardTimer = setTimeout(() => {
         startupDraftHardTimer = null
         void deliverStartupDraftIfAgentOwnsPty()
-      }, STARTUP_DRAFT_PASTE_TIMEOUT_MS)
+        // Per agent, never a flat 8s: a cold Codex composer can mount well past
+        // that, and firing early pastes the draft into a shell that is not
+        // listening yet.
+      }, resolveDraftPasteReadyTimeoutMs(startupDraftAgent))
     }
     const armStartupDraftQuietTimer = (): void => {
       if (!startupDraftReadyScanner || startupDraftPasteSettled) {
