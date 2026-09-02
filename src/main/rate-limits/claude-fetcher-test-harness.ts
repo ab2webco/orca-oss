@@ -47,14 +47,17 @@ export function primeClaudeFetcherMocks(mocks: ClaudeFetcherHoistedMocks): void 
   vi.mocked(writeManagedClaudeKeychainCredentials).mockResolvedValue()
   mocks.appGetPathMock.mockReturnValue('/tmp/orca-claude-fetcher-test')
   mocks.resolveProxyMock.mockResolvedValue('DIRECT')
-  mocks.netFetchMock.mockResolvedValue(
-    new Response(
-      JSON.stringify({
-        five_hour: { utilization: 12 },
-        seven_day: { utilization: 34 }
-      }),
-      { status: 200 }
-    )
+  // Why: a single Response instance is consumed by the first read; a second fetch in the
+  // same flow then throws "Body has already been read". Build a fresh one per call.
+  mocks.netFetchMock.mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify({
+          five_hour: { utilization: 12 },
+          seven_day: { utilization: 34 }
+        }),
+        { status: 200 }
+      )
   )
   vi.mocked(fetchViaPty).mockResolvedValue({
     provider: 'claude',

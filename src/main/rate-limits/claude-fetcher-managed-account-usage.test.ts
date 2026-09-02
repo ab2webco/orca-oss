@@ -122,6 +122,7 @@ describe('fetchClaudeRateLimits', () => {
       JSON.stringify({
         claudeAiOauth: {
           accessToken: 'inactive-token',
+          refreshToken: 'inactive-refresh',
           expiresAt: Date.now() + 60_000
         }
       }),
@@ -172,6 +173,7 @@ describe('fetchClaudeRateLimits', () => {
     const credentialsJson = JSON.stringify({
       claudeAiOauth: {
         accessToken: 'managed-keychain-token',
+        refreshToken: 'managed-keychain-refresh',
         expiresAt: Date.now() + 60_000
       }
     })
