@@ -138,8 +138,7 @@
       "064bd07810": "返回",
       "ce37cf5279": "切换侧边栏 ({{value0}})",
       "e4b9e7dff7": "切换侧边栏",
-      "pluginCommandFailed": "无法运行插件命令。",
-      "byAb2WebBadge": "by Ab2Web"
+      "pluginCommandFailed": "无法运行插件命令。"
     },
     "web": {
       "WebConnect": {
