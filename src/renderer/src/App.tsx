@@ -21,6 +21,7 @@ import {
   PanelRight
 } from 'lucide-react'
 import logo from '../../../resources/logo.svg'
+import labMark from '../../../resources/logo-orca-lab.svg'
 import { SYNC_FIT_PANES_EVENT, TOGGLE_TERMINAL_PANE_EXPAND_EVENT } from '@/constants/terminal'
 import { syncZoomCSSVar } from '@/lib/ui-zoom'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
@@ -2114,12 +2115,10 @@ function App(): React.JSX.Element {
                     className="titlebar-app-name"
                     aria-label={translate('auto.App.5096cbbc86', 'Orca')}
                   >
+                    {/* Why: brand marker so modified (Ab2Web lab) builds are visually distinguishable from official Orca. */}
+                    <img src={labMark} alt="" aria-hidden className="titlebar-app-name-mark" />
                     <span className="titlebar-app-name-main">
                       {translate('auto.App.5096cbbc86', 'Orca')}
-                    </span>
-                    {/* Why: brand marker so modified (Ab2Web lab) builds are visually distinguishable from official Orca. */}
-                    <span className="titlebar-app-name-sub">
-                      {translate('auto.App.byAb2WebBadge', 'by Ab2Web')}
                     </span>
                   </div>
                 </ContextMenuTrigger>
