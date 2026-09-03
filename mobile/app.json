@@ -80,6 +80,7 @@
     "plugins": [
       "expo-router",
       "./plugins/android-respect-rotation-lock.js",
+      "./plugins/android-upload-signing.js",
       [
         "expo-splash-screen",
         {

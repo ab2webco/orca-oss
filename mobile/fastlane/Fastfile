@@ -29,6 +29,8 @@ WORKSPACE = File.join(MOBILE_ROOT, "ios", "Orca.xcworkspace")
 BUILD_OUTPUT_DIRECTORY = File.join(MOBILE_ROOT, "build")
 SCHEME = "Orca"
 BUNDLE_ID = "com.ab2web.orca.mobile"
+ANDROID_BUNDLE_PATH = File.join(MOBILE_ROOT, "android", "app", "build", "outputs", "bundle", "release", "app-release.aab")
+PLAY_TRACK = "internal".freeze
 # Why an env var: "peeps" is upstream's tester group, and a fork publishing to its own
 # App Store Connect has no such group — the upload succeeds and only distribution fails.
 TESTFLIGHT_GROUPS = (ENV["TESTFLIGHT_GROUPS"].to_s.strip.empty? ? "peeps" : ENV["TESTFLIGHT_GROUPS"])
@@ -282,6 +284,29 @@ platform :ios do
     distribute_testflight(
       version: current_mobile_version(config),
       build_number: config.fetch("expo").fetch("ios").fetch("buildNumber"),
+    )
+  end
+end
+
+platform :android do
+  desc "Upload the release App Bundle to the Play internal track"
+  lane :publish_internal do
+    UI.user_error!("Missing #{ANDROID_BUNDLE_PATH}; run bundleRelease first") unless File.exist?(ANDROID_BUNDLE_PATH)
+
+    supply(
+      package_name: BUNDLE_ID,
+      aab: ANDROID_BUNDLE_PATH,
+      track: PLAY_TRACK,
+      # Why json_key_data: the service-account key stays a CI env var and is never
+      # written to disk in the workspace.
+      json_key_data: ENV.fetch("PLAY_SERVICE_ACCOUNT_JSON"),
+      # Internal testers should get the build without a manual rollout step.
+      release_status: "completed",
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
     )
   end
 end
