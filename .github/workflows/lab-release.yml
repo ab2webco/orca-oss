@@ -537,6 +537,19 @@ jobs:
             echo
             echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
             echo
+            # Why every release until it stops mattering: macOS pins the signing team in the
+            # installed copy's designated requirement, so a build from the previous team can
+            # never be replaced by the updater — and those users cannot receive an in-app
+            # notice either. The release page is the only place they will read this.
+            echo "## macOS: si tu copia es anterior, esta actualización se instala a mano"
+            echo
+            echo "macOS solo deja que una app se reemplace a sí misma con un build que satisfaga el requisito de firma de la copia instalada, y ese requisito fija el equipo de desarrollo. Orca Lab ahora se firma con el equipo propio \`44FZN9TC23\`; las copias firmadas con el equipo anterior no pueden actualizarse solas y el actualizador las rechaza."
+            echo
+            echo "Para saber cuál tienes: \`codesign -dv /Applications/Orca.app\` y mira el campo \`TeamIdentifier\`. Si no dice \`44FZN9TC23\`, descarga el disco de abajo y arrastra Orca sobre la copia en Aplicaciones. **Es una sola vez**: desde ese build las actualizaciones automáticas vuelven a funcionar."
+            echo
+            echo "- Apple Silicon — \`orca-macos-arm64.dmg\`"
+            echo "- Intel — \`orca-macos-x64.dmg\`"
+            echo
             if [[ -n "$prev_tag" ]]; then
               # Why split by type: the raw log is up to 50 subjects of chores,
               # tests and syncs, which buries the handful a user would notice.
