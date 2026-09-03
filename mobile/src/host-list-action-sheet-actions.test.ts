@@ -5,7 +5,8 @@ import type { ConnectionState, HostProfile } from './transport/types'
 vi.mock('lucide-react-native', () => ({
   Edit3: vi.fn(),
   PowerOff: vi.fn(),
-  RefreshCw: vi.fn()
+  RefreshCw: vi.fn(),
+  Users: vi.fn()
 }))
 
 const HOST: HostProfile = {
@@ -22,6 +23,7 @@ function build(overrides: { state?: ConnectionState; hasEverConnected?: boolean 
     onDismiss: vi.fn(),
     onReconnect: vi.fn(),
     onDisconnect: vi.fn(),
+    onOpenAccounts: vi.fn(),
     onEdit: vi.fn(),
     onRemove: vi.fn()
   }
@@ -69,6 +71,7 @@ describe('getHostListActionSheetActions', () => {
     expect(build({ state: 'reconnecting' }).actions.map((action) => action.label)).toEqual([
       'Reconnect',
       'Disconnect',
+      'Accounts',
       'Edit host',
       'Remove'
     ])
@@ -93,9 +96,26 @@ describe('getHostListActionSheetActions', () => {
         onDismiss: vi.fn(),
         onReconnect: vi.fn(),
         onDisconnect: vi.fn(),
-        onEdit: vi.fn(),
+        onOpenAccounts: vi.fn(),
+    onEdit: vi.fn(),
         onRemove: vi.fn()
       })
     ).toEqual([])
+  })
+
+  it('offers Accounts on a live host, so the screen has a route the snapshot cannot remove', () => {
+    const { actions, spies } = build({ state: 'connected' })
+    const accounts = actions.find((action) => action.label === 'Accounts')
+    expect(accounts).toBeDefined()
+    accounts?.onPress()
+    // Why both: presenting a second drawer into a live Modal freezes iOS, so the
+    // sheet must close before the route opens.
+    expect(spies.onDismiss).toHaveBeenCalledOnce()
+    expect(spies.onOpenAccounts).toHaveBeenCalledWith(HOST.id)
+  })
+
+  it('hides Accounts on a host that is not live, because the screen would have nothing to read', () => {
+    const { actions } = build({ state: 'disconnected' })
+    expect(actions.some((action) => action.label === 'Accounts')).toBe(false)
   })
 })

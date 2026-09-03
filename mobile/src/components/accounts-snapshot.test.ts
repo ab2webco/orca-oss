@@ -131,4 +131,31 @@ describe('decodeAccountsSnapshot', () => {
 
     expect(() => decodeAccountsSnapshot(snapshot)).toThrow('Invalid accounts snapshot from host')
   })
+
+  function withClaudeAccount(authMethod: unknown, email = 'a@example.com'): unknown {
+    const raw = makeSnapshot() as {
+      claude: { accounts: Record<string, unknown>[] }
+    }
+    raw.claude.accounts.push({ id: 'claude-a', email, authMethod })
+    return raw
+  }
+
+  it('accepts a custom-endpoint account, which the host union has and this schema did not', () => {
+    const snapshot = decodeAccountsSnapshot(withClaudeAccount('custom-endpoint'))
+    expect(snapshot.claude.accounts[0]?.authMethod).toBe('custom-endpoint')
+  })
+
+  it('degrades an unrecognised authMethod instead of dropping every account', () => {
+    // Why: one custom-endpoint account rejected the whole array and took the other five
+    // with it. A client must never require an enum value it does not know.
+    const snapshot = decodeAccountsSnapshot(withClaudeAccount('device-code-from-a-later-release'))
+    expect(snapshot.claude.accounts[0]?.authMethod).toBe('unknown')
+    expect(snapshot.claude.accounts).toHaveLength(1)
+  })
+
+  it('names the failing field, so a schema drift is not read as a host with no accounts', () => {
+    expect(() => decodeAccountsSnapshot(withClaudeAccount('unknown', ''))).toThrow(
+      /claude\.accounts\.0\.email/
+    )
+  })
 })
