@@ -156,4 +156,28 @@ describe('interrupted agent resume preservation', () => {
       providerSession: { key: 'session_id', id: PROVIDER_SESSION_ID }
     })
   })
+  // A runtime-driven close (`orca terminal close`, worker release, a paired phone)
+  // reaches the renderer as an explicit tab close since #14590, with the pane's
+  // status still live. It tears the tab down like a user close but is not the user
+  // vouching that the agent finished, so resume authority has to survive it.
+  it('keeps a genuinely completed agent through a runtime-initiated close', () => {
+    const store = seedInterruptedWorker(liveStatus('done'))
+
+    store.getState().closeTab(TAB_ID, { runtimeInitiated: true })
+
+    expect(store.getState().tabsByWorktree[WORKTREE_ID]).toEqual([])
+    expect(store.getState().sleepingAgentSessionsByPaneKey[PANE_KEY]).toMatchObject({
+      providerSession: { key: 'session_id', id: PROVIDER_SESSION_ID }
+    })
+  })
+
+  // The control for the case above: the same pane, same status, closed by the user,
+  // still retires. Without this the new flag could be preserving everything.
+  it("still retires a genuinely completed agent on the user's own close", () => {
+    const store = seedInterruptedWorker(liveStatus('done'))
+
+    store.getState().closeTab(TAB_ID)
+
+    expect(store.getState().sleepingAgentSessionsByPaneKey[PANE_KEY]).toBeUndefined()
+  })
 })

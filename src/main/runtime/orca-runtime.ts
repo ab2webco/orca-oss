@@ -24,6 +24,7 @@ import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-lis
 import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
 import { parseFileUriPathParts } from '../daemon/osc7-file-uri'
 import type { AgentStatus } from '../../shared/agent-detection'
+import type { TerminalTabCloseOrigin } from '../../shared/terminal-tab-close'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalOscColorQueryReplyColors } from '../../shared/terminal-osc-color-reply'
 import type { TerminalOutputSourceRange } from '../../shared/terminal-output-source-range'
@@ -2189,7 +2190,7 @@ type RuntimeNotifier = {
   closeTerminal(tabId: string, paneRuntimeId?: number): void
   closeTerminalTab?(
     tabId: string,
-    options?: { localPtyTeardownOwnedExternally?: boolean }
+    options?: { localPtyTeardownOwnedExternally?: boolean; origin?: TerminalTabCloseOrigin }
   ): Promise<void>
   sleepWorktree(worktreeId: string): void
   // Why: a phone opening a worktree wakes its slept agents by asking the host
@@ -8269,6 +8270,9 @@ export class OrcaRuntimeService {
       expectedTerminalHandle?: string
       clientNavigationId?: string
       localPtyTeardownOwnedExternally?: boolean
+      /** Absent means the phone's own user closed it; `runtime` marks a close the
+       *  CLI or an RPC caller drove through this surface. */
+      origin?: TerminalTabCloseOrigin
     } = {}
   ): Promise<RuntimeMobileSessionTabCloseResult> {
     const graphEpoch = options.clientNavigationId ? this.captureReadyGraphEpoch() : null
@@ -8423,9 +8427,12 @@ export class OrcaRuntimeService {
         try {
           await (options.localPtyTeardownOwnedExternally
             ? this.notifier.closeTerminalTab(tab.parentTabId, {
-                localPtyTeardownOwnedExternally: true
+                localPtyTeardownOwnedExternally: true,
+                origin: options.origin ?? 'runtime'
               })
-            : this.notifier.closeTerminalTab(tab.parentTabId))
+            : this.notifier.closeTerminalTab(tab.parentTabId, {
+                origin: options.origin ?? 'runtime'
+              }))
         } finally {
           releasePublicationThrottle()
         }
@@ -29195,7 +29202,8 @@ export class OrcaRuntimeService {
         const ptyIdsToKill = this.getPtyIdsForExplicitTabClose(pty.pty.worktreeId, tabId)
         try {
           await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
-            localPtyTeardownOwnedExternally: true
+            localPtyTeardownOwnedExternally: true,
+            origin: 'runtime'
           })
         } catch (error) {
           if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
@@ -29208,7 +29216,10 @@ export class OrcaRuntimeService {
       }
       if (siblingCount <= 1 && !surface && pty.pty.tabId && this.notifier?.closeTerminalTab) {
         const ptyIdsToKill = this.getPtyIdsForExplicitTabClose(pty.pty.worktreeId, tabId)
-        await this.notifier.closeTerminalTab(tabId, { localPtyTeardownOwnedExternally: true })
+        await this.notifier.closeTerminalTab(tabId, {
+          localPtyTeardownOwnedExternally: true,
+          origin: 'runtime'
+        })
         const ptyKilled = await this.stopExplicitlyClosedTabPtys(ptyIdsToKill, pty.pty.ptyId)
         return { handle, tabId, ptyKilled }
       }
@@ -29218,7 +29229,9 @@ export class OrcaRuntimeService {
         if (surface) {
           // Why: paired viewers keep ended streams mounted until the HUB publishes removal, so explicit close uses the durable host-tab transaction instead of viewer-local exit handling.
           try {
-            await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId)
+            await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
+              origin: 'runtime'
+            })
           } catch (error) {
             if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
               throw error
@@ -29243,7 +29256,8 @@ export class OrcaRuntimeService {
           : []
     if (siblingCount <= 1 && this.notifier?.closeTerminalTab) {
       await this.notifier.closeTerminalTab(leaf.tabId, {
-        localPtyTeardownOwnedExternally: true
+        localPtyTeardownOwnedExternally: true,
+        origin: 'runtime'
       })
     }
     const ptyKilled = leaf.ptyId
@@ -29327,7 +29341,10 @@ export class OrcaRuntimeService {
       const ptyIds = this.getPtyIdsInTab(pty.pty.worktreeId, tabId)
       // Why: a handle-addressed CLI/automation close is an explicit intent, so
       // it must stay destructive under the non-user close adjudication gate.
-      await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, { reason: 'user' })
+      await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
+        reason: 'user',
+        origin: 'runtime'
+      })
       const ptyKilled = await this.stopPtysAndWait(ptyIds)
       this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
       return { handle, tabId, closeMode: 'tab', ptyKilled }
@@ -29335,7 +29352,10 @@ export class OrcaRuntimeService {
     this.assertGraphReady()
     const { leaf } = this.getLiveLeafForHandle(handle)
     const ptyIds = this.getPtyIdsInTab(leaf.worktreeId, leaf.tabId)
-    await this.closeMobileSessionTab(`id:${leaf.worktreeId}`, leaf.tabId, { reason: 'user' })
+    await this.closeMobileSessionTab(`id:${leaf.worktreeId}`, leaf.tabId, {
+      reason: 'user',
+      origin: 'runtime'
+    })
     const ptyKilled = await this.stopPtysAndWait(ptyIds)
     this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
     return { handle, tabId: leaf.tabId, closeMode: 'tab', ptyKilled }

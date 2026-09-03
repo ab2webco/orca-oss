@@ -649,6 +649,10 @@ export type TerminalSlice = {
     opts?: {
       recordInteraction?: boolean
       reason?: TerminalTabCloseReason
+      /** The CLI, an RPC caller or a paired phone drove this close. It tears the
+       *  tab down like a user close but carries no user judgement about the
+       *  pane's agent, so it never retires resume authority (ORCA-272). */
+      runtimeInitiated?: boolean
       captureRecentlyClosed?: boolean
       remoteCloseOwnedByHost?: boolean
       localPtyTeardownOwnedExternally?: boolean
@@ -1572,6 +1576,11 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   closeTab: (tabId, opts) => {
     const closeReason = opts?.reason ?? 'user'
     const retiresSession = closeReason === 'user' || closeReason === 'cleanup'
+    // Why separate from retiresSession: teardown is the same either way — the PTYs
+    // must die — but only a close the user actually performed is evidence about the
+    // agent. Since #14590 a CLI close reaches this renderer as an explicit tab close
+    // with the pane's status still live, so without this it reads as user intent.
+    const retiresAgentSessions = retiresSession && opts?.runtimeInitiated !== true
     // Why: a close is not evidence an agent finished (ORCA-272) — snapshot the tab's
     // sleeping records now, before anything mutates them. A live/retained hook status that
     // is genuinely 'done' (not an interrupt-synthesized one — see
@@ -1581,7 +1590,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     // working/blocked/waiting, interrupted, or no status at all) go through the async
     // session-log authority; everything else survives the close so the user can resume it.
     const knownDoneSleepingAgentPaneKeys = new Set<string>()
-    const sleepingAgentSessionsPendingCloseCheck = retiresSession
+    const sleepingAgentSessionsPendingCloseCheck = retiresAgentSessions
       ? selectSleepingAgentSessionsOwnedByTab(get().sleepingAgentSessionsByPaneKey, tabId).filter(
           ({ paneKey }) => {
             const liveEntry = get().agentStatusByPaneKey[paneKey]

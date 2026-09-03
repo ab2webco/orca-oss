@@ -2056,7 +2056,7 @@ export function useIpcEvents(): void {
     if (window.api.ui.onTerminalTabCloseRequest) {
       unsubs.push(
         window.api.ui.onTerminalTabCloseRequest(
-          ({ requestId, tabId, localPtyTeardownOwnedExternally }) => {
+          ({ requestId, tabId, localPtyTeardownOwnedExternally, origin }) => {
             let responded = false
             const respond = (error?: string): void => {
               if (responded) {
@@ -2068,6 +2068,9 @@ export function useIpcEvents(): void {
             closeTerminalTab(tabId, {
               rejectPinned: true,
               ...(localPtyTeardownOwnedExternally ? { localPtyTeardownOwnedExternally: true } : {}),
+              // Why: the tab still tears down like a user close, but a runtime-driven
+              // one is not the user vouching that this pane's agent finished.
+              ...(origin === 'runtime' ? { runtimeInitiated: true } : {}),
               onCancel: () => respond('terminal_tab_pinned'),
               onClosed: () => {
                 void (async () => {
