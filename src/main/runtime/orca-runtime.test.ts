@@ -1001,6 +1001,24 @@ const TEST_REPO_ID = 'repo-1'
 const TEST_REPO_PATH = '/tmp/repo'
 const TEST_WORKTREE_PATH = '/tmp/worktree-a'
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
+
+/**
+ * Asserts the invariant, not the argument shape: a close the runtime relays to the
+ * renderer must be marked `runtime`, because an unmarked one is indistinguishable
+ * from Cmd+W and retires the pane's resume authority (ORCA-272). Checks EVERY
+ * recorded call, so a second path that forgets the origin fails here even when the
+ * one this test drove is correct.
+ */
+function expectRuntimeDrivenTabClose(
+  relay: ReturnType<typeof vi.fn>,
+  tabId: string,
+  expectedOptions: Record<string, unknown> = {}
+): void {
+  expect(relay).toHaveBeenCalledWith(tabId, { ...expectedOptions, origin: 'runtime' })
+  for (const [, options] of relay.mock.calls as [string, { origin?: string } | undefined][]) {
+    expect(options?.origin).toBe('runtime')
+  }
+}
 const TEST_FOLDER_PROJECT_GROUP_ID = 'folder-project-group-1'
 const TEST_FOLDER_WORKSPACE_ID = 'folder-workspace-1'
 const TEST_FOLDER_WORKSPACE_KEY = `folder:${TEST_FOLDER_WORKSPACE_ID}`
@@ -29441,7 +29459,7 @@ describe('OrcaRuntimeService', () => {
       settled = true
     })
 
-    await vi.waitFor(() => expect(closeTerminalTab).toHaveBeenCalledWith('host-tab'))
+    await vi.waitFor(() => expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab'))
     expect(settled).toBe(false)
 
     acknowledged.resolve()
@@ -29530,7 +29548,7 @@ describe('OrcaRuntimeService', () => {
       reason: 'user',
       clientNavigationId: 'device-a'
     })
-    await vi.waitFor(() => expect(closeTerminalTab).toHaveBeenCalledWith('host-tab'))
+    await vi.waitFor(() => expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab'))
     expect(setBackgroundThrottling.mock.calls).toEqual([[false]])
 
     acknowledged.resolve()
@@ -29610,7 +29628,7 @@ describe('OrcaRuntimeService', () => {
       reason: 'user',
       clientNavigationId: 'device-a'
     })
-    await vi.waitFor(() => expect(closeTerminalTab).toHaveBeenCalledWith('host-tab'))
+    await vi.waitFor(() => expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab'))
     const session = getSession()
     setSession({
       ...session,
@@ -31631,7 +31649,7 @@ describe('OrcaRuntimeService', () => {
       ptyKilled: true
     })
 
-    expect(closeTerminalTab).toHaveBeenCalledWith('host-tab', {
+    expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab', {
       localPtyTeardownOwnedExternally: true
     })
     expect(closeTerminal).toHaveBeenCalledWith('host-tab')
@@ -31703,7 +31721,7 @@ describe('OrcaRuntimeService', () => {
       runtime.closeMobileSessionTab(`id:${TEST_WORKTREE_ID}`, 'host-tab')
     ).rejects.toThrow('terminal_tab_pinned')
 
-    expect(closeTerminalTab).toHaveBeenCalledWith('host-tab')
+    expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab')
     expect(closeTerminal).not.toHaveBeenCalled()
     expect(kill).not.toHaveBeenCalled()
     expect(getSession().tabsByWorktree[TEST_WORKTREE_ID]).toHaveLength(1)
@@ -33072,7 +33090,7 @@ describe('OrcaRuntimeService', () => {
       })
 
       // Legacy whole-parent relay: the renderer close transaction still runs.
-      expect(closeTerminalTab).toHaveBeenCalledWith('host-tab')
+      expectRuntimeDrivenTabClose(closeTerminalTab, 'host-tab')
     })
 
     it('keeps a reasonless legacy close and republishes its live mirror', async () => {

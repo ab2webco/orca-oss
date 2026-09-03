@@ -85,7 +85,8 @@ function createHarness(
   const acknowledged = makeDeferred()
   let closeTerminalTabError: Error | null = null
   const closeTerminal = vi.fn()
-  const closeTerminalTab = vi.fn(() =>
+  // Typed params so the recorded calls stay inspectable without a cast.
+  const closeTerminalTab = vi.fn((_tabId: string, _options?: { origin?: string }) =>
     closeTerminalTabError ? Promise.reject(closeTerminalTabError) : acknowledged.promise
   )
   const kill = vi.fn(() => true)
@@ -303,9 +304,16 @@ describe('terminal close and handle incarnation continuity', () => {
 
     await vi.waitFor(() =>
       expect(harness.closeTerminalTab).toHaveBeenCalledWith(TAB_ID, {
-        localPtyTeardownOwnedExternally: true
+        localPtyTeardownOwnedExternally: true,
+        // Why asserted here and not just carried: an unmarked relay is
+        // indistinguishable from Cmd+W in the renderer and retires the pane's
+        // resume authority (ORCA-272). This close is the CLI's, not the user's.
+        origin: 'runtime'
       })
     )
+    expect(
+      harness.closeTerminalTab.mock.calls.every(([, options]) => options?.origin === 'runtime')
+    ).toBe(true)
     expect(settled).toBe(false)
     expect(harness.getSession().tabsByWorktree[WORKTREE_ID]).toHaveLength(1)
 
