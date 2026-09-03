@@ -118,6 +118,15 @@ jobs:
           # Allow codesign/xcodebuild to use the key without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          # Why assert the type: a Developer ID certificate imports cleanly and only
+          # fails later as fastlane's generic "no matching identity for type AppStore".
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+            grep -qE "Apple Distribution|iPhone Distribution"; then
+            echo "::error::IOS_DIST_CERT_P12 carries no App Store distribution identity."
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              sed 's/[0-9A-F]\{40\}/<hash>/'
+            exit 1
+          fi
           # Put our keychain in the search list so xcodebuild can find the identity.
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           rm -f "$CERT_PATH"
