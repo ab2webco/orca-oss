@@ -1987,6 +1987,8 @@ export function buildPtyHostEnv(
       hooksEnabled: opts.codexStatusHooksEnabled ?? opts.agentStatusHooksEnabled,
       isPackaged: opts.isPackaged,
       isWsl: opts.isWsl,
+      userDataPath: opts.userDataPath,
+      resourcesPath: opts.resourcesPath,
       managedHomePath: opts.selectedCodexHomePath
     })
     if (preflightCommand) {

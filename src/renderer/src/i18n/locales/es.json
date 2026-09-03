@@ -232,7 +232,9 @@
         "workspace": {
           "cleanup": {
             "9d6e531da6": "El espacio de trabajo ya no existe.",
-            "changedSinceConfirmation": "El espacio de trabajo cambió después de la confirmación. Actualiza para revisarlo antes de eliminarlo."
+            "changedSinceConfirmation": "El espacio de trabajo cambió después de la confirmación. Actualiza para revisarlo antes de eliminarlo.",
+            "hostUnresolved": "Orca no puede determinar qué host es dueño de este espacio de trabajo. Actualizá los proyectos y revisalo de nuevo.",
+            "hostCollision": "Error: este espacio de trabajo existe en varios hosts en la misma ruta"
           }
         },
         "worktrees": {
@@ -1327,7 +1329,8 @@
         "moreWorkspaceActions": "Más acciones del espacio de trabajo del issue",
         "startNewWorkspace": "Iniciar un espacio de trabajo nuevo",
         "workspaceSection": "Espacio de trabajo",
-        "noWorkspaceYet": "Ninguno todavía"
+        "noWorkspaceYet": "Ninguno todavía",
+        "openOnLinear": "Abrir en Linear"
       },
       "LinearItemDrawer": {
         "04008e6c46": "Iniciar espacio de trabajo desde el issue",
@@ -2628,7 +2631,7 @@
             "ee81adfcef": "Ver",
             "4d0b72481c": "Ignorar",
             "9cc26c019d": "Eliminar",
-            "0e2d235c63": "Escaneo del espacio de trabajo inactivo listo",
+            "0e2d235c63": "Escaneo de espacios de trabajo listo",
             "4a35c08764": "Revisar",
             "47123d0108": "Escaneando espacios de trabajo inactivos. Puedes cerrar esto y volver.",
             "9a3be9f2df": "Escaneando espacios de trabajo inactivos. Aquí aparecen nuevas filas a medida que terminan. Puedes cerrar esto y volver.",
@@ -3251,7 +3254,7 @@
             "67c4ecda49": "Fuerza el cierre de este terminal. Cualquier trabajo sin guardar en el panel se perderá. Esto no se puede deshacer.",
             "4bb076fa89": "Terminar",
             "996295bff2": "terminal huérfano",
-            "92924a14e3": "Revisar espacios de trabajo inactivos ({{value0}})",
+            "92924a14e3": "Limpiar espacios de trabajo",
             "27a74f91f0": "No hay nada ejecutándose ahora mismo",
             "1b24a32d3a": "Memoria",
             "298f4be7f2": "CPU",
@@ -4328,7 +4331,8 @@
           "d36883e046": "Cancelar",
           "b79b39d865": "Quitar proyecto",
           "removeDescriptionSsh": "Esto solo elimina {{name}} de Orca. Sus archivos permanecen en {{host}}; vuelve a añadir ese host SSH para recuperarlo.",
-          "removeDescriptionLocal": "Esto solo elimina {{name}} de Orca. Sigue estando en tu disco."
+          "removeDescriptionLocal": "Esto solo elimina {{name}} de Orca. Sigue estando en tu disco.",
+          "removeDescriptionVmRecipe": "Esto quita {{name}} de Orca. Su receta de VM determina si el entorno y sus archivos se eliminan de forma permanente."
         },
         "ScrollToCurrentWorkspaceToolbarButton": {
           "23989bb663": "Mostrar espacio de trabajo activo"
@@ -4838,7 +4842,9 @@
           "noneFound": "No se encontraron worktrees ajenos a Orca",
           "tryDifferentSearch": "Prueba con otro nombre o ruta.",
           "disableSource": "Desactiva una fuente para gestionar sus worktrees individualmente.",
-          "appearWhenDetected": "Los worktrees nuevos aparecerán aquí cuando Orca los detecte."
+          "appearWhenDetected": "Los worktrees nuevos aparecerán aquí cuando Orca los detecte.",
+          "openGlobalSettings": "Gestionar en Ajustes globales",
+          "globalSettingsSources": "Estas fuentes tienen una configuración global que puedes anular aquí:"
         },
         "WorktreeVisibilitySourceList": {
           "claude": "Claude Code",
@@ -4858,7 +4864,14 @@
           "addLocation": "Añadir ubicación",
           "worktreeRoot": "Raíz de worktrees",
           "add": "Añadir",
-          "rootHelp": "Orca reconocerá los worktrees dentro de esta carpeta."
+          "rootHelp": "Orca reconocerá los worktrees dentro de esta carpeta.",
+          "useGlobalFor": "Usar la configuración global para {{value0}}",
+          "useGlobal": "Usar global",
+          "visibility": "Visibilidad de {{value0}}",
+          "show": "Mostrar",
+          "hide": "Ocultar",
+          "overridingGlobal": "Anulando la configuración global: {{value0}}",
+          "projectOnly": "Añadida solo en este proyecto."
         },
         "add": {
           "repo": {
@@ -6202,7 +6215,9 @@
           "5567191a6e": "Examinar",
           "0e9fc0eadc": "Directorio de espacio de trabajo",
           "e2955d9ccb": "Configura dónde se crean nuevos espacios de trabajo.",
-          "7511097c5d": "Espacio de trabajo"
+          "7511097c5d": "Espacio de trabajo",
+          "externalWorktrees": "Worktrees externos",
+          "externalWorktreesDescription": "Elige si los worktrees creados fuera de Orca aparecen de forma predeterminada."
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "Aplicar cambios",
@@ -6873,7 +6888,14 @@
           "projectRuntimeDescription": "Elige si este proyecto se ejecuta en Windows o WSL.",
           "hostStateDisconnected": "Disconnected",
           "hostStateUnknown": "Unknown",
-          "nestedHostLabel": "{{value0}} via {{value1}}"
+          "nestedHostLabel": "{{value0}} via {{value1}}",
+          "externalWorktrees": "Worktrees externos",
+          "externalWorktreesDescription": "Sobrescribe si los worktrees creados fuera de Orca aparecen en este proyecto.",
+          "externalWorktreesInherited": "Usando el valor global: {{value0}}",
+          "show": "Mostrar",
+          "hide": "Ocultar",
+          "externalWorktreesGlobal": "Valor global predeterminado: {{value0}}",
+          "useGlobal": "Usar valor global"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "Plantilla de comando",
@@ -8526,7 +8548,9 @@
             "editorFontFamilyDesc": "Fuente utilizada por los editores de archivos y vistas de diferencias. Dejar vacío para seguir la fuente de la terminal.",
             "6e918a5bcc": "claude glm",
             "4880297fec": "z.ai",
-            "71bf3d35f5": "glm"
+            "71bf3d35f5": "glm",
+            "externalWorktrees": "Worktrees externos",
+            "externalWorktreesDescription": "Elige si los worktrees creados fuera de Orca aparecen de forma predeterminada."
           }
         },
         "git": {
@@ -9020,7 +9044,9 @@
             "projectRuntimeDescription": "Elige si este proyecto se ejecuta en Windows o WSL.",
             "copy": "copy",
             "clone": "clone",
-            "apfs": "apfs"
+            "apfs": "apfs",
+            "externalWorktrees": "Worktrees externos",
+            "externalWorktreesDescription": "Sobrescribe si los worktrees creados fuera de Orca aparecen en este proyecto."
           }
         },
         "runtime": {
@@ -9816,7 +9842,11 @@
           "cloudVmTitle": "Runtimes de VM en la nube",
           "cloudVmRefresh": "Actualizar runtimes de VM en la nube",
           "cloudVmLoading": "Comprobando runtimes de VM en la nube…",
-          "cloudVmEmptyWithSetup": "Aún no hay runtimes de VM en la nube. Crea uno desde un espacio de trabajo mediante una receta de entorno."
+          "cloudVmEmptyWithSetup": "Aún no hay runtimes de VM en la nube. Crea uno desde un espacio de trabajo mediante una receta de entorno.",
+          "stoppingCleanup": "Deteniendo…",
+          "stopCleanup": "Detener limpieza",
+          "cleanupStopped": "Limpieza detenida",
+          "stopCleanupFailed": "No se pudo detener la limpieza de la Cloud VM."
         },
         "ephemeralVms": {
           "search": {
@@ -10568,6 +10598,21 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "Grosor de fuente en negrita",
           "0e0d1ee15a": "Se ajusta de forma independiente al Grosor de fuente. Algunas fuentes asignan varios valores a un mismo trazo, así que bajá el Grosor de fuente o elegí otra fuente si la negrita no parece cambiar."
+        },
+        "GlobalWorktreeVisibilitySourcesSetting": {
+          "saveFailed": "No se pudieron guardar los valores predeterminados de visibilidad.",
+          "updateServerDefaults": "Actualiza este servidor para configurar los valores predeterminados de visibilidad.",
+          "updateServer": "Actualiza este servidor para configurar los valores predeterminados de las fuentes."
+        },
+        "shortcutDefinitionCatalog": {
+          "missionControlConflict": "Bloqueado por Mission Control. Reasigna aquí o cámbialo en Ajustes del Sistema."
+        },
+        "EphemeralVmCleanupStopDialog": {
+          "title": "¿Detener la limpieza?",
+          "description": "La VM puede seguir en ejecución y generar cargos. Podés reintentar la limpieza más tarde.",
+          "cancel": "Seguir limpiando",
+          "stopping": "Deteniendo…",
+          "confirm": "Detener limpieza"
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "Sesión iniciada, pero Orca no pudo volver a abrir la terminal de Claude en {{worktrees}}. Iniciala de nuevo desde la barra de pestañas."
@@ -11568,6 +11613,52 @@
                   "8f9a0b1c2d": "No hay nada para hacer commit. La rama está actualizada.",
                   "h3i4j5k607": "Comprobando si esta rama puede crear un {{value0}}…"
                 }
+              },
+              "commit": {
+                "area": {
+                  "cc5739bd1d": "Generando mensaje de commit…",
+                  "4cbd0cd9d2": "Commit en curso…",
+                  "e7876a2bde": "Prepará al menos un archivo para generar un mensaje.",
+                  "0904be2505": "Borrá el mensaje para regenerarlo.",
+                  "1ea9ba37aa": "Elegí un agente en Ajustes -> Git -> IA de control de código fuente."
+                }
+              },
+              "conflict": {
+                "status": {
+                  "cards": {
+                    "5302a1ddba": "Conflictos de merge",
+                    "7f3af87549": "Conflictos de rebase",
+                    "6a8e9ad490": "Conflictos de cherry-pick",
+                    "bdf8772106": "Conflictos",
+                    "edc2d82a2b": "Merge en curso",
+                    "5c3707aa44": "Rebase en curso",
+                    "ffe53a1da6": "Cherry-pick en curso",
+                    "35eb76d323": "Operación en curso"
+                  }
+                }
+              },
+              "content": {
+                "status": {
+                  "3f425c239c": "Sin cambios en esta rama",
+                  "640f6fdb36": "Este espacio de trabajo está limpio y esta rama no tiene cambios por delante de {{value0}}",
+                  "8deb86bbec": "base",
+                  "978eba351e": "El texto de búsqueda es demasiado largo",
+                  "0bce43409f": "Usá un filtro de archivos más corto.",
+                  "1b6caf533d": "No hay archivos coincidentes",
+                  "00c07771b7": "Ningún archivo modificado coincide con \"{{value0}}\""
+                }
+              },
+              "diff": {
+                "comments": {
+                  "list": {
+                    "cefacd0ec7": "archivo completo"
+                  }
+                }
+              },
+              "compare": {
+                "summary": {
+                  "dd72a6fd37": "{{value0}} commit{{value1}} por delante de {{value2}}"
+                }
               }
             }
           },
@@ -11576,6 +11667,11 @@
               "control": {
                 "ai": {
                   "cfafa92509": "No hay conflictos sin resolver para enviar."
+                },
+                "bulk": {
+                  "actions": {
+                    "2f67630884": "Falló preparar/quitar en lote"
+                  }
                 }
               }
             }
@@ -15065,6 +15161,170 @@
         "presentation": {
           "gitlabMergeRequestNumber": "MR #{{value0}}",
           "githubPullRequestNumber": "PR #{{value0}}"
+        },
+        "browse": {
+          "measureSizesFailed": "No se pudieron escanear los tamaños de los espacios de trabajo",
+          "noSizes": "Todavía no se midió el tamaño de ningún espacio de trabajo.",
+          "noSizesDescription": "Los tamaños aparecen después de medir el uso de disco.",
+          "notMeasured": "Sin medir",
+          "workspaceStatus": "Estado del espacio de trabajo: {{value0}}",
+          "sizeOnDisk": "Tamaño en disco: {{value0}}",
+          "checkingGitRow": "Comprobando el estado de git",
+          "openWorkspaceNamed": "Abrir {{value0}}",
+          "openWorkspace": "Abrir espacio de trabajo",
+          "selectedCount": "{{value0}} seleccionados",
+          "measuringSizesProgress": "Escaneando {{value0}}/{{value1}}",
+          "measuringSizes": "Escaneando tamaños",
+          "measureSizes": "Escanear",
+          "measureSizesTitle": "Escanear tamaños de los espacios de trabajo",
+          "measureSizesDescription": "Escaneá el uso de disco para comparar, ordenar y filtrar espacios de trabajo por tamaño.",
+          "sort": {
+            "lastActivity": "Última actividad",
+            "lastVisited": "Última apertura",
+            "created": "Creado",
+            "size": "Tamaño",
+            "name": "Espacio de trabajo",
+            "repo": "Repositorio",
+            "path": "Ruta",
+            "host": "Host",
+            "workspaceStatus": "Estado",
+            "agent": "Agente",
+            "git": "Git",
+            "ahead": "Por delante",
+            "behind": "Por detrás",
+            "branch": "Rama",
+            "review": "Revisión",
+            "ticket": "Ticket",
+            "localContext": "Contexto abierto",
+            "tier": "Seguridad",
+            "blockerCount": "Bloqueos"
+          },
+          "git": {
+            "clean": "Limpio",
+            "dirty": "Cambios sin commitear",
+            "unpushed": "Commits sin pushear",
+            "unknown": "Sin comprobar"
+          },
+          "agent": {
+            "working": "Trabajando",
+            "permission": "Esperándote",
+            "idle": "Inactivo"
+          },
+          "review": {
+            "open": "Abierto",
+            "draft": "Borrador",
+            "merged": "Mergeado",
+            "closed": "Cerrado",
+            "unknown": "Desconocido",
+            "otherProvider": "Otro"
+          },
+          "ticket": {
+            "workItem": "Elemento de trabajo",
+            "linear": "Linear",
+            "issue": "Issue"
+          },
+          "tier": {
+            "ready": "Listo",
+            "review": "Necesita revisión",
+            "protected": "Protegido"
+          },
+          "idleSignal": {
+            "lastVisited": "Sin abrir",
+            "lastActivity": "Sin actividad",
+            "created": "Creado antes de"
+          },
+          "triState": {
+            "any": "Cualquiera",
+            "only": "Solo",
+            "exclude": "Excluir"
+          },
+          "presence": {
+            "any": "Cualquiera",
+            "some": "Tiene alguno",
+            "none": "No tiene ninguno"
+          },
+          "blockerModeAny": "Tiene alguno",
+          "blockerModeNone": "No tiene ninguno",
+          "searchPlaceholder": "Buscar por nombre, repo, rama, ruta, host",
+          "searchLabel": "Buscar espacios de trabajo",
+          "filters": "Filtros",
+          "showingCount": "Mostrando {{value0}} de {{value1}}",
+          "clearFilters": "Limpiar filtros",
+          "checkingGit": "Comprobando el estado de git: quedan {{value0}}",
+          "updatedAgo": "Actualizado {{value0}}",
+          "refreshing": "Actualizando…",
+          "refreshingProgress": "Actualizando {{value0}}/{{value1}}",
+          "facet": {
+            "git": "Git",
+            "review": "Revisión",
+            "ticket": "Tickets",
+            "location": "Ubicación",
+            "safety": "Seguridad",
+            "activity": "Actividad",
+            "size": "Tamaño en disco",
+            "status": "Estado del espacio de trabajo",
+            "agent": "Agente",
+            "context": "Contexto local"
+          },
+          "minAhead": "Commits por delante ≥",
+          "minBehind": "Commits por detrás ≥",
+          "branchQuery": "La rama contiene",
+          "prunable": "Podable",
+          "locked": "Bloqueado",
+          "reviewPresence": "PR / MR",
+          "reviewProvider": "Proveedor",
+          "ticketPresence": "Ticket vinculado",
+          "host": "Host",
+          "repo": "Repositorio",
+          "pathPrefix": "La ruta empieza con",
+          "tierField": "Nivel de limpieza",
+          "blockerMode": "Coincidencia de bloqueos",
+          "blockers": "Bloqueos",
+          "dismissed": "Ignorado",
+          "selectableOnly": "Solo espacios de trabajo que puedo borrar ahora",
+          "idleSignalField": "Señal de inactividad",
+          "idleMinDays": "Inactivo al menos",
+          "days": "días",
+          "neverVisited": "Nunca abierto",
+          "minSize": "Al menos",
+          "maxSize": "Como máximo",
+          "includeUnsized": "Incluir espacios de trabajo sin medir",
+          "matchStatusless": "Incluir espacios de trabajo sin estado",
+          "archived": "Archivado",
+          "pinned": "Fijado",
+          "unread": "No leído",
+          "comment": "Tiene comentario",
+          "retainedDoneAgents": "Transcripciones de agentes finalizados",
+          "contextPresence": "Pestañas, terminales y comentarios abiertos",
+          "completelyEmpty": "No queda nada que perder",
+          "noWorkspaces": "No se encontraron espacios de trabajo.",
+          "noMatches": "Ningún espacio de trabajo coincide con estos filtros.",
+          "noMatchesDescription": "Todos los espacios de trabajo están en una sola lista: ampliá una faceta o limpiá los filtros.",
+          "selectionVanishedOne": "1 espacio de trabajo seleccionado ya no existe.",
+          "selectionVanished": "{{value0}} espacios de trabajo seleccionados ya no existen.",
+          "selectAll": "Seleccionar todos los espacios de trabajo coincidentes",
+          "sortByField": "Ordenar por {{value0}}",
+          "sortBy": "Ordenar por"
+        },
+        "scan": {
+          "progress": "Escaneando espacios de trabajo ({{value0}}/{{value1}})",
+          "singleError": "No se pudo comprobar {{value0}}: {{value1}}. Puede que falten espacios de trabajo. Actualizá para reintentar.",
+          "moreErrors": ", +{{value0}} más",
+          "multipleErrors": "No se pudieron comprobar {{value0}} repositorios ({{value1}}{{value2}}). Puede que falten espacios de trabajo. Actualizá para reintentar.",
+          "noWorkspaces": "No se encontraron espacios de trabajo.",
+          "readyOneOne": "1 espacio de trabajo encontrado, con 1 sugerencia de limpieza.",
+          "readyOneMany": "1 espacio de trabajo encontrado, con {{value0}} sugerencias de limpieza.",
+          "readyManyOne": "{{value0}} espacios de trabajo encontrados, con 1 sugerencia de limpieza.",
+          "readyManyMany": "{{value0}} espacios de trabajo encontrados, con {{value1}} sugerencias de limpieza.",
+          "fallbackRepository": "un repositorio",
+          "gitListFailed": "Git no pudo listar los worktrees"
+        },
+        "relativeTime": {
+          "never": "Nunca",
+          "justNow": "Ahora mismo",
+          "minutesAgo": "hace {{value0}} min",
+          "hoursAgo": "hace {{value0}} h",
+          "daysAgo": "hace {{value0}} d"
         }
       }
     },
@@ -15100,6 +15360,13 @@
         "subtitle": "Orca pausó la reanudación automática porque no pudo confirmar que esta sesión de Codex pertenezca a la cuenta seleccionada. La transcripción de abajo es de solo lectura: no se envió ni se perdió nada. Para seguir trabajando, inicia una nueva sesión de Codex o cambia a la cuenta dueña de esta.",
         "read-error": "Orca tampoco pudo leer el archivo de sesión guardado. Puede haberse movido o eliminado; la reanudación automática siguió en pausa y no se envió nada.",
         "read-empty": "El archivo de sesión guardado se encontró, pero no contiene mensajes legibles."
+      }
+    },
+    "status": {
+      "bar": {
+        "workspaceSpace": {
+          "otherTopLevelItems": "Otros elementos de nivel superior ({{value0}})"
+        }
       }
     }
   },

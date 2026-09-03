@@ -14,7 +14,6 @@ import type {
   WorktreeLineage,
   WorkspaceLineage,
   ProjectHostSetup,
-  Repo,
   WorktreeMeta
 } from '../../../../shared/types'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
@@ -28,16 +27,13 @@ import {
   type WorktreeSlice
 } from './worktree-helpers'
 import { projectWorktreeTabModelReconciliation } from './tabs'
+import { createPurgeStaleRuntimeHostState } from './worktrees/teardown/purge-stale-runtime-host-state'
 import { splitWorktreeIdForFilesystem } from '../../../../shared/worktree/id'
 import {
   remapClosedTerminalTabSnapshotCwds,
   type ClosedTerminalTabSnapshot
 } from './recently-closed-tabs'
 import { findRepoForHost } from './repo-host-identity'
-import {
-  dropWorktreeRowsForRemovedRuntimeEnvironments,
-  isRemovedRuntimeHostId
-} from './stale-runtime-host-rows'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { cleanupFailedEphemeralVmWorkspace } from '@/lib/ephemeral-vm-failed-create-cleanup'
@@ -112,6 +108,7 @@ import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-w
 import {
   CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS,
   getClientWorktreeCreateCandidate,
+  getGeneratedWorktreeCreateRetryCandidate,
   isRetryableWorktreeCreateConflict
 } from '../../../../shared/new-workspace/worktree-create-retry-policy'
 import {
@@ -3938,7 +3935,9 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     const provisionedRoot = options?.provisionedRoot
     try {
       for (let attempt = 0; attempt < CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS; attempt += 1) {
-        const candidateName = getClientWorktreeCreateCandidate(name, attempt)
+        const candidateName = options?.nameWasGenerated
+          ? getGeneratedWorktreeCreateRetryCandidate(name, attempt)
+          : getClientWorktreeCreateCandidate(name, attempt)
         // Why: older runtimes reject exact PR branch overrides on collision, so retry both branch and worktree names.
         const candidateBranchNameOverride = branchNameOverride
           ? getClientWorktreeCreateCandidate(branchNameOverride, attempt)
@@ -3954,6 +3953,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           const createArgs = {
             repoId,
             name: candidateName,
+            ...(options?.nameWasGenerated ? { nameWasGenerated: true } : {}),
             baseBranch,
             ...(compareBaseRef ? { compareBaseRef } : {}),
             ...(candidateBranchNameOverride
@@ -4018,6 +4018,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                   {
                     repo: repoId,
                     name: candidateName,
+                    ...(options?.nameWasGenerated ? { nameWasGenerated: true } : {}),
                     baseBranch,
                     ...(compareBaseRef ? { compareBaseRef } : {}),
                     ...(candidateBranchNameOverride
@@ -4272,9 +4273,16 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             : { activeRuntimeEnvironmentId: null }
       )
       let removalResult: RemoveWorktreeResult
+      let snapshotPruneHandledByLocalMain = forgetLocalOnly || target.kind === 'local'
       try {
         removalResult = await (forgetLocalOnly
-          ? window.api.worktrees.forgetLocal({ worktreeId, hostId })
+          ? window.api.worktrees.forgetLocal({
+              worktreeId,
+              hostId,
+              ...(options?.snapshotPruneBatchId
+                ? { snapshotPruneBatchId: options.snapshotPruneBatchId }
+                : {})
+            })
           : target.kind === 'local'
             ? (removalGenerationGuard?.assertCurrent(),
               window.api.worktrees.remove({
@@ -4282,7 +4290,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                 hostId,
                 force,
                 allowUnverifiedPtyStop: options?.allowUnverifiedPtyStop === true,
-                skipArchive
+                skipArchive,
+                ...(options?.snapshotPruneBatchId
+                  ? { snapshotPruneBatchId: options.snapshotPruneBatchId }
+                  : {})
               }))
             : (removalGenerationGuard?.assertCurrent(),
               callRuntimeRpc<RemoveWorktreeResult>(
@@ -4312,7 +4323,14 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             removalGenerationGuard?.assertCurrent()
           }
           try {
-            removalResult = await window.api.worktrees.forgetLocal({ worktreeId, hostId })
+            removalResult = await window.api.worktrees.forgetLocal({
+              worktreeId,
+              hostId,
+              ...(options?.snapshotPruneBatchId
+                ? { snapshotPruneBatchId: options.snapshotPruneBatchId }
+                : {})
+            })
+            snapshotPruneHandledByLocalMain = true
           } catch (fallbackError) {
             // Preserve the remote verdict as fallback failure context.
             throw new Error(
@@ -4322,6 +4340,23 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           }
         } else {
           throw error
+        }
+      }
+
+      if (!snapshotPruneHandledByLocalMain) {
+        try {
+          await window.api.workspaceCleanup?.recordRemovalSnapshotPrune?.({
+            // Why: a single (unbatched) remote delete must still drop the row
+            // from the local persisted snapshots or it resurrects from cache;
+            // an unknown batch id degrades to an immediate one-off prune. The
+            // id must stay bounded — main rejects batch ids over 128 chars,
+            // so it cannot embed the unbounded worktreeId.
+            batchId: options?.snapshotPruneBatchId ?? `single-removal:${crypto.randomUUID()}`,
+            worktreeId,
+            ...(hostId ? { executionHostId: hostId } : {})
+          })
+        } catch (error) {
+          console.warn('Failed to record workspace cleanup snapshot prune:', error)
         }
       }
 
@@ -4355,9 +4390,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         backendOwnsPtyTeardown: true
       })
       // Why: dispose the SSH relay AFTER terminal teardown so a still-mounted pane can't hit a gone relay and toast "SSH not active".
-      const destroyedRuntimeSshTargetIds = await cleanupEphemeralVmRuntimesForDeleted({
-        workspaceIds: [worktreeId]
-      })
+      const { destroyedSshTargetIds: destroyedRuntimeSshTargetIds } =
+        await cleanupEphemeralVmRuntimesForDeleted({
+          workspaceIds: [worktreeId]
+        })
       // Remove the orphaned project for the destroyed SSH target so it can't surface as a dead project in the composer.
       await purgeOrphanedRuntimeSshProjects(get, destroyedRuntimeSshTargetIds)
       const tabs = get().tabsByWorktree[worktreeId] ?? []
@@ -6164,197 +6200,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     set((s) => buildWorktreePurgeState(s, purgeableWorktreeIds))
   },
 
-  purgeStaleRuntimeHostState: (removedEnvironmentIds) => {
-    const removed = new Set(removedEnvironmentIds)
-    if (removed.size === 0) {
-      return
-    }
-    set((s) => {
-      const repoIdsWithRemovedOwners = new Set<string>()
-      const survivingRepoIds = new Set<string>()
-      const repoIdsWithSurvivingOwners = new Set<string>()
-      const survivingRepos: Repo[] = []
-      for (const repo of s.repos) {
-        if (isRemovedRuntimeHostId(getRepoExecutionHostId(repo), removed)) {
-          repoIdsWithRemovedOwners.add(repo.id)
-        } else {
-          survivingRepos.push(repo)
-          survivingRepoIds.add(repo.id)
-          repoIdsWithSurvivingOwners.add(repo.id)
-        }
-      }
-      const reposChanged = survivingRepos.length !== s.repos.length
-
-      // Why: a repoId-less setup on the removed host can still split a surviving project group, so drop every setup it owns.
-      const survivingSetups: ProjectHostSetup[] = []
-      for (const setup of s.projectHostSetups) {
-        if (isRemovedRuntimeHostId(setup.hostId, removed)) {
-          if (setup.repoId) {
-            repoIdsWithRemovedOwners.add(setup.repoId)
-          }
-        } else {
-          survivingSetups.push(setup)
-          if (setup.repoId) {
-            repoIdsWithSurvivingOwners.add(setup.repoId)
-          }
-        }
-      }
-      const setupsChanged = survivingSetups.length !== s.projectHostSetups.length
-      const detectedRows: Record<string, DetectedWorktreeListResult['worktrees']> =
-        Object.fromEntries(
-          Object.entries(s.detectedWorktreesByRepo).map(([repoId, result]) => [
-            repoId,
-            result.worktrees
-          ])
-        )
-      // Why: repo/setup catalogs can lag session hydration, so hosted worktree rows are ownership evidence during that gap.
-      const recordWorktreeOwners = (
-        rowsByRepo: Record<
-          string,
-          readonly { hostId?: ExecutionHostId; runtimeOwnerEnvironmentId?: string }[]
-        >
-      ): void => {
-        for (const [repoId, rows] of Object.entries(rowsByRepo)) {
-          for (const row of rows) {
-            if (!row.hostId && !row.runtimeOwnerEnvironmentId) {
-              continue
-            }
-            const ownerWasRemoved = row.runtimeOwnerEnvironmentId
-              ? removed.has(row.runtimeOwnerEnvironmentId)
-              : isRemovedRuntimeHostId(row.hostId, removed)
-            const ownerSet = ownerWasRemoved ? repoIdsWithRemovedOwners : repoIdsWithSurvivingOwners
-            ownerSet.add(repoId)
-          }
-        }
-      }
-      recordWorktreeOwners(s.worktreesByRepo)
-      recordWorktreeOwners(detectedRows)
-
-      const sessionWorktreeIdsOwnedByRemovedHosts = new Set<string>()
-      let survivingRestoredSessionOwners = s.restoredRuntimeHostIdByWorkspaceSessionKey
-      for (const [workspaceKey, hostId] of Object.entries(
-        s.restoredRuntimeHostIdByWorkspaceSessionKey
-      )) {
-        const scope = parseWorkspaceKey(workspaceKey)
-        if (scope?.type === 'folder') {
-          continue
-        }
-        const worktreeId = scope?.type === 'worktree' ? scope.worktreeId : workspaceKey
-        const repoId = getRepoIdFromWorktreeId(worktreeId)
-        if (!isRemovedRuntimeHostId(hostId, removed)) {
-          // Why: restored sessions can be the only surviving-owner evidence before catalogs load.
-          repoIdsWithSurvivingOwners.add(repoId)
-          continue
-        }
-        sessionWorktreeIdsOwnedByRemovedHosts.add(worktreeId)
-        repoIdsWithRemovedOwners.add(repoId)
-        if (survivingRestoredSessionOwners === s.restoredRuntimeHostIdByWorkspaceSessionKey) {
-          survivingRestoredSessionOwners = { ...survivingRestoredSessionOwners }
-        }
-        delete survivingRestoredSessionOwners[workspaceKey]
-      }
-
-      // Why: legacy rows predate host stamps; every owner record must agree no host survives before an unhosted row is retired.
-      const repoIdsWithoutSurvivingOwners = new Set(repoIdsWithRemovedOwners)
-      for (const repoId of repoIdsWithSurvivingOwners) {
-        repoIdsWithoutSurvivingOwners.delete(repoId)
-      }
-
-      const worktreeDrop = dropWorktreeRowsForRemovedRuntimeEnvironments(
-        s.worktreesByRepo,
-        removed,
-        repoIdsWithoutSurvivingOwners
-      )
-      const detectedDrop = dropWorktreeRowsForRemovedRuntimeEnvironments(
-        detectedRows,
-        removed,
-        repoIdsWithoutSurvivingOwners
-      )
-
-      const worktreesChanged = worktreeDrop.rowsByRepo !== s.worktreesByRepo
-      const detectedChanged = detectedDrop.rowsByRepo !== detectedRows
-
-      const removedWorktreeIds = new Set([
-        ...worktreeDrop.removedWorktreeIds,
-        ...detectedDrop.removedWorktreeIds,
-        ...sessionWorktreeIdsOwnedByRemovedHosts
-      ])
-      // Why: terminal tabs hydrate before worktree metadata, so session-only ids for owner-less repos still need purging.
-      if (repoIdsWithoutSurvivingOwners.size > 0) {
-        for (const worktreeId of Object.keys(s.tabsByWorktree)) {
-          const scope = parseWorkspaceKey(worktreeId)
-          const rawWorktreeId = scope?.type === 'worktree' ? scope.worktreeId : worktreeId
-          if (
-            scope?.type !== 'folder' &&
-            repoIdsWithoutSurvivingOwners.has(getRepoIdFromWorktreeId(rawWorktreeId))
-          ) {
-            removedWorktreeIds.add(rawWorktreeId)
-          }
-        }
-      }
-      // Why: bare-id state follows an exact survivor unless the restored-session partition proves it belonged to the removed host.
-      for (const rows of Object.values(worktreeDrop.rowsByRepo)) {
-        for (const row of rows) {
-          if (!sessionWorktreeIdsOwnedByRemovedHosts.has(row.id)) {
-            removedWorktreeIds.delete(row.id)
-          }
-        }
-      }
-      for (const rows of Object.values(detectedDrop.rowsByRepo)) {
-        for (const row of rows) {
-          if (!sessionWorktreeIdsOwnedByRemovedHosts.has(row.id)) {
-            removedWorktreeIds.delete(row.id)
-          }
-        }
-      }
-      const purgeState =
-        removedWorktreeIds.size > 0 ? buildWorktreePurgeState(s, [...removedWorktreeIds]) : {}
-
-      const restoredSessionOwnersChanged =
-        survivingRestoredSessionOwners !== s.restoredRuntimeHostIdByWorkspaceSessionKey
-      if (
-        !reposChanged &&
-        !setupsChanged &&
-        !worktreesChanged &&
-        !detectedChanged &&
-        !restoredSessionOwnersChanged &&
-        removedWorktreeIds.size === 0
-      ) {
-        return s
-      }
-
-      const detectedWorktreesByRepo = detectedChanged
-        ? Object.fromEntries(
-            Object.entries(s.detectedWorktreesByRepo).map(([repoId, result]) => [
-              repoId,
-              { ...result, worktrees: detectedDrop.rowsByRepo[repoId] }
-            ])
-          )
-        : s.detectedWorktreesByRepo
-
-      const rowsChanged = worktreesChanged || detectedChanged
-      return {
-        ...purgeState,
-        ...(reposChanged ? { repos: survivingRepos } : {}),
-        ...(setupsChanged ? { projectHostSetups: survivingSetups } : {}),
-        ...(worktreesChanged ? { worktreesByRepo: worktreeDrop.rowsByRepo } : {}),
-        ...(detectedChanged ? { detectedWorktreesByRepo } : {}),
-        ...(restoredSessionOwnersChanged
-          ? { restoredRuntimeHostIdByWorkspaceSessionKey: survivingRestoredSessionOwners }
-          : {}),
-        ...(rowsChanged ? { sortEpoch: s.sortEpoch + 1 } : {}),
-        // Why: mirror validateRepoScopedUi so a filtered/active sidebar can't reference a purged repo id.
-        ...(reposChanged
-          ? {
-              activeRepoId:
-                s.activeRepoId && survivingRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
-              filterRepoIds: s.filterRepoIds.filter((repoId) => survivingRepoIds.has(repoId))
-            }
-          : {})
-      }
-    })
-  },
-
+  purgeStaleRuntimeHostState: createPurgeStaleRuntimeHostState(set, get),
   migrateWorktreeIdentity: (oldWorktreeId: string, newWorktreeId: string) => {
     if (oldWorktreeId === newWorktreeId) {
       return

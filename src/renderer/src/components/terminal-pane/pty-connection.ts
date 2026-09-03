@@ -340,6 +340,7 @@ import {
 } from '../../../../shared/claude-auth-failure-detection'
 import { notifyClaudeAuthFailure } from './claude-auth-failure-notice'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
+import { resolveDraftPasteReadyTimeoutMs } from '../../../../shared/draft-paste-ready-timeout'
 import { createDraftPasteReadyScanner } from '../../../../shared/draft-paste-ready-scanner'
 import { sendAgentDraftPasteContent } from '@/lib/agent-draft-paste-content'
 import { writeTerminalPastePtyInput } from './terminal-pty-paste-writer'
@@ -378,7 +379,6 @@ const STARTUP_DRAFT_PASTE_QUIET_MS = 1500
 // contain private repo/user names; the terminal itself shows where it opened.
 export const STARTUP_CWD_FALLBACK_NOTICE =
   '\r\n[Orca opened this terminal at the workspace root because its saved start folder no longer exists.]\r\n'
-const STARTUP_DRAFT_PASTE_TIMEOUT_MS = 8000
 const HIDDEN_OUTPUT_RESTORE_PENDING_CHARS = 512 * 1024
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MS = 50
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MAX = 3
@@ -5045,7 +5045,10 @@ export function connectPanePty(
       startupDraftHardTimer = setTimeout(() => {
         startupDraftHardTimer = null
         void deliverStartupDraftIfAgentOwnsPty()
-      }, STARTUP_DRAFT_PASTE_TIMEOUT_MS)
+        // Per agent, never a flat 8s: a cold Codex composer can mount well past
+        // that, and firing early pastes the draft into a shell that is not
+        // listening yet.
+      }, resolveDraftPasteReadyTimeoutMs(startupDraftAgent))
     }
     const armStartupDraftQuietTimer = (): void => {
       if (!startupDraftReadyScanner || startupDraftPasteSettled) {
@@ -7186,13 +7189,12 @@ export function connectPanePty(
         // Why: this abandon declares the bytes unrecoverable, so a repaint armed by earlier live
         // backpressure must not outlive it — it would re-open recovery and banner a second time.
         clearHiddenOutputRestoreFloodRepaintTimer()
+        // Grounds the gap itself, so no second reset belongs after it.
         writeRestoreUnavailableWarning()
-      }
-      // Why not an else: the unavailable warning is plain text and carries no SGR
-      // of its own, so folding the reset into the other branch skipped it on the
-      // primary abandon path — the one that declares the bytes unrecoverable.
-      // Guarded only against the remote re-arm, which writes its own reset.
-      if (!rearmedRemoteRestore) {
+      } else if (!rearmedRemoteRestore) {
+        // A quiet abandon still drains queued foreground under whatever pen the
+        // gap stranded, and skips the warning that would have grounded it. The
+        // remote re-arm is excluded because it writes its own reset.
         writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       }
       if (hadPendingOverflow) {
@@ -7430,6 +7432,11 @@ export function connectPanePty(
               })) {
                 writeReplayData(replayChunk)
               }
+            } else {
+              // The repaint is skipped, but the gap still stranded a pen and
+              // nothing here repaints over what is still running — ground it
+              // with the live-path constant.
+              writeReplayData(RESET_AFTER_BYTE_GAP)
             }
             // Why: live agents own ?25l/?1004h; a forced ?1004l here would silence focus events until restart (agents enable focus reporting only at startup).
             writeReplayData(
@@ -7749,6 +7756,13 @@ export function connectPanePty(
       trackedHiddenOutputRestore = hiddenOutputRestoreTask.finally(() => {
         if (hiddenOutputRestoreInFlight === trackedHiddenOutputRestore) {
           hiddenOutputRestoreInFlight = null
+        }
+        // Why the hard stop: after dispose the task body exits on its first
+        // `while (!disposed)` check, so re-arming from here resolves and re-runs
+        // this handler every microtask turn — a self-feeding promise chain that
+        // took ~4GB in ~12s. Nothing may be re-armed for a torn-down binding.
+        if (disposed) {
+          return
         }
         if (hiddenOutputRestorePendingChunks.length > 0 || hiddenOutputRestorePendingOverflow) {
           hiddenOutputRestoreNeeded = true

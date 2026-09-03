@@ -39,6 +39,10 @@ export type TuiAgentConfig = {
   preflightTrust?: 'cursor' | 'copilot' | 'codex'
   /** Renderer-specific signal that the composer is ready for paste, stronger than the default quiet-render window. */
   draftPasteReadySignal?: DraftPasteReadySignal
+  /** Hard deadline for the agent's composer readiness signal. */
+  draftPasteReadyTimeoutMs?: number
+  /** Windows INPUT_RECORD paste newline encoding; omitted agents keep the legacy path. */
+  windowsInputRecordPasteNewline?: 'alt-enter' | 'csi-u'
   /** Windows Shift+Enter encoding override; omitted agents keep the legacy Esc+CR path. */
   windowsShiftEnterEncoding?: 'csi-u'
   /** Ctrl+Enter encoding for agents that consume CSI-u without active kitty flags. */

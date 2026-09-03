@@ -29,6 +29,8 @@ on:
       - 'electron.vite.config.ts'
       - 'config/build-plugins/**'
       - 'src/main/daemon/**'
+      - 'src/main/providers/local-pty-provider.ts'
+      - 'src/main/providers/windows-shell-args.ts'
       - 'native/computer-use-macos/**'
       - 'native/computer-use-linux/**'
       - 'native/computer-use-windows/**'

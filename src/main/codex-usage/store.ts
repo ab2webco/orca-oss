@@ -16,6 +16,7 @@ import type { Store } from '../persistence'
 import type { CodexUsagePersistedState } from './types'
 import { CODEX_USAGE_SCHEMA_VERSION, codexUsageProvider } from './codex-usage-provider'
 import { getLocalUsageDay, getUsageRangeCutoff } from '../usage/usage-calendar-range'
+import { estimateCostUsd as estimateModelCostUsd } from './codex-usage-cost-estimate'
 import { UsageProviderStoreLifecycle } from '../usage/usage-provider-store-lifecycle'
 
 const SCHEMA_VERSION = CODEX_USAGE_SCHEMA_VERSION
@@ -23,111 +24,12 @@ const AUTOMATION_ATTRIBUTION_WINDOW_MS = 5 * 60_000
 
 let _codexUsageFile: string | null = null
 
-type TieredPrice = { threshold: number; price: number }
-type CodexModelPricing = {
-  input: number
-  cachedInput: number
-  output: number
-  longContext?: {
-    threshold: number
-    input: number
-    cachedInput: number
-    output: number
-  }
-  inputTiers?: TieredPrice[]
-  cachedInputTiers?: TieredPrice[]
-  outputTiers?: TieredPrice[]
-}
-
 type AutomationUsageLookupInput = {
   worktreeId: string | null
   terminalSessionId: string | null
   startedAt: number | null
   completedAt: number | null
 }
-
-const LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
-
-const MODEL_PRICING: Record<string, CodexModelPricing> = {
-  'gpt-5': { input: 1.25, cachedInput: 0.125, output: 10 },
-  'gpt-5.1': { input: 1.25, cachedInput: 0.125, output: 10 },
-  'gpt-5.1-codex': { input: 1.25, cachedInput: 0.125, output: 10 },
-  'gpt-5.1-codex-max': { input: 1.25, cachedInput: 0.125, output: 10 },
-  'gpt-5.2': { input: 1.75, cachedInput: 0.175, output: 14 },
-  'gpt-5.2-codex': { input: 1.75, cachedInput: 0.175, output: 14 },
-  'gpt-5.3': { input: 1.75, cachedInput: 0.175, output: 14 },
-  'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14 },
-  'gpt-5.3-codex-spark': { input: 1.75, cachedInput: 0.175, output: 14 },
-  'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.5 },
-  'gpt-5.4-nano': { input: 0.2, cachedInput: 0.02, output: 1.25 },
-  'gpt-5.4-pro': {
-    input: 30,
-    cachedInput: 30,
-    output: 180,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 60 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 60 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 270 }]
-  },
-  'gpt-5.4': {
-    input: 2.5,
-    cachedInput: 0.25,
-    output: 15,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 5 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 0.5 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 22.5 }]
-  },
-  'gpt-5.5-pro': {
-    input: 30,
-    cachedInput: 30,
-    output: 180,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 60 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 60 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 270 }]
-  },
-  'gpt-5.5': {
-    input: 5,
-    cachedInput: 0.5,
-    output: 30,
-    inputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 10 }],
-    cachedInputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 1 }],
-    outputTiers: [{ threshold: LONG_CONTEXT_THRESHOLD_TOKENS, price: 45 }]
-  },
-  'gpt-5.6-sol': {
-    input: 5,
-    cachedInput: 0.5,
-    output: 30,
-    longContext: {
-      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
-      input: 10,
-      cachedInput: 1,
-      output: 45
-    }
-  },
-  'gpt-5.6-terra': {
-    input: 2.5,
-    cachedInput: 0.25,
-    output: 15,
-    longContext: {
-      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
-      input: 5,
-      cachedInput: 0.5,
-      output: 22.5
-    }
-  },
-  'gpt-5.6-luna': {
-    input: 1,
-    cachedInput: 0.1,
-    output: 6,
-    longContext: {
-      threshold: LONG_CONTEXT_THRESHOLD_TOKENS,
-      input: 2,
-      cachedInput: 0.2,
-      output: 9
-    }
-  }
-}
-
-const REASONING_TIER_SUFFIXES = ['minimal', 'low', 'medium', 'high', 'xhigh', 'auto', 'none']
 
 function getDefaultState(): CodexUsagePersistedState {
   return {
@@ -182,104 +84,6 @@ function getCodexUsageFile(): string {
   return _codexUsageFile
 }
 
-function stripParenthesizedReasoningTier(model: string): string | null {
-  const match = model.match(/^(.*)\(([^()]*)\)$/)
-  if (!match) {
-    return model
-  }
-  const tier = match[2].trim().toLowerCase()
-  if (!REASONING_TIER_SUFFIXES.includes(tier)) {
-    return null
-  }
-  return match[1]
-}
-
-function stripDashReasoningTiers(model: string): string {
-  let current = model
-  for (let index = 0; index < 4; index++) {
-    const suffix = REASONING_TIER_SUFFIXES.find((tier) => current.endsWith(`-${tier}`))
-    if (!suffix) {
-      return current
-    }
-    current = current.slice(0, -suffix.length - 1)
-  }
-  return current
-}
-
-function normalizeModelForPricing(model: string | null): string | null {
-  if (!model) {
-    return null
-  }
-
-  const lower = stripParenthesizedReasoningTier(model.toLowerCase().trim())
-  if (!lower) {
-    return null
-  }
-
-  const normalized = stripDashReasoningTiers(lower)
-  if (normalized === 'gpt-5' || normalized === 'gpt-5-codex') {
-    return 'gpt-5'
-  }
-  if (normalized === 'gpt-5.1-codex-max' || normalized.startsWith('gpt-5.1-codex-max-')) {
-    return 'gpt-5.1-codex-max'
-  }
-  if (normalized === 'gpt-5.1-codex' || normalized.startsWith('gpt-5.1-codex-')) {
-    return 'gpt-5.1-codex'
-  }
-  if (normalized === 'gpt-5.1' || normalized.startsWith('gpt-5.1-')) {
-    return 'gpt-5.1'
-  }
-  if (normalized === 'gpt-5.2-codex' || normalized.startsWith('gpt-5.2-codex-')) {
-    return 'gpt-5.2-codex'
-  }
-  if (normalized === 'gpt-5.2' || normalized.startsWith('gpt-5.2-')) {
-    return 'gpt-5.2'
-  }
-  if (normalized === 'gpt-5.3-codex-spark' || normalized.startsWith('gpt-5.3-codex-spark-')) {
-    return 'gpt-5.3-codex-spark'
-  }
-  if (normalized === 'gpt-5.3-codex' || normalized.startsWith('gpt-5.3-codex-')) {
-    return 'gpt-5.3-codex'
-  }
-  if (normalized === 'gpt-5.3' || normalized.startsWith('gpt-5.3-')) {
-    return 'gpt-5.3'
-  }
-  if (normalized === 'gpt-5.4-mini' || normalized.startsWith('gpt-5.4-mini-')) {
-    return 'gpt-5.4-mini'
-  }
-  if (normalized === 'gpt-5.4-nano' || normalized.startsWith('gpt-5.4-nano-')) {
-    return 'gpt-5.4-nano'
-  }
-  if (normalized === 'gpt-5.4-pro' || normalized.startsWith('gpt-5.4-pro-')) {
-    return 'gpt-5.4-pro'
-  }
-  if (normalized === 'gpt-5.4' || normalized.startsWith('gpt-5.4-')) {
-    return 'gpt-5.4'
-  }
-  if (normalized === 'gpt-5.5-pro' || normalized.startsWith('gpt-5.5-pro-')) {
-    return 'gpt-5.5-pro'
-  }
-  if (normalized === 'gpt-5.5' || normalized.startsWith('gpt-5.5-')) {
-    return 'gpt-5.5'
-  }
-  if (normalized === 'gpt-5.6-sol' || normalized.startsWith('gpt-5.6-sol-')) {
-    return 'gpt-5.6-sol'
-  }
-  if (normalized === 'gpt-5.6-terra' || normalized.startsWith('gpt-5.6-terra-')) {
-    return 'gpt-5.6-terra'
-  }
-  if (normalized === 'gpt-5.6-luna' || normalized.startsWith('gpt-5.6-luna-')) {
-    return 'gpt-5.6-luna'
-  }
-  // Why: OpenAI routes the bare `gpt-5.6` alias to Sol. Match it exactly — a
-  // `gpt-5.6-` prefix match would swallow the tier IDs above and any future
-  // cheaper variant.
-  if (normalized === 'gpt-5.6') {
-    return 'gpt-5.6-sol'
-  }
-  return null
-}
-
 // Why: unpriced models are excluded from totals, so report each silent gap once.
 const unpricedModelsReported = new Set<string>()
 
@@ -297,58 +101,17 @@ function reportUnpricedModel(model: string | null): void {
   )
 }
 
-function calculateTieredCost(tokens: number, basePrice: number, tiers: TieredPrice[] = []): number {
-  let cost = 0
-  let lowerBound = 0
-  let activePrice = basePrice
-  for (const tier of tiers) {
-    if (tokens <= tier.threshold) {
-      return cost + Math.max(tokens - lowerBound, 0) * activePrice
-    }
-    cost += (tier.threshold - lowerBound) * activePrice
-    lowerBound = tier.threshold
-    activePrice = tier.price
-  }
-  return cost + Math.max(tokens - lowerBound, 0) * activePrice
-}
-
 function estimateCostUsd(
   model: string | null,
   inputTokens: number,
   cachedInputTokens: number,
   outputTokens: number
 ): number | null {
-  const normalized = normalizeModelForPricing(model)
-  if (!normalized) {
+  const cost = estimateModelCostUsd(model, inputTokens, cachedInputTokens, outputTokens)
+  if (cost === null) {
     reportUnpricedModel(model)
-    return null
   }
-  const pricing = MODEL_PRICING[normalized]
-  const longContext =
-    pricing.longContext && inputTokens > pricing.longContext.threshold ? pricing.longContext : null
-  const clampedCached = Math.min(cachedInputTokens, inputTokens)
-  // Why: Codex cached tokens are part of the input bucket. Charge uncached
-  // input on (input-cached) so cached tokens are not billed once at full input
-  // price and again at cache-read price.
-  const nonCachedInputTokens = Math.max(inputTokens - clampedCached, 0)
-  return (
-    (calculateTieredCost(
-      nonCachedInputTokens,
-      longContext?.input ?? pricing.input,
-      pricing.inputTiers
-    ) +
-      calculateTieredCost(
-        clampedCached,
-        longContext?.cachedInput ?? pricing.cachedInput,
-        pricing.cachedInputTiers
-      ) +
-      calculateTieredCost(
-        outputTokens,
-        longContext?.output ?? pricing.output,
-        pricing.outputTiers
-      )) /
-    1_000_000
-  )
+  return cost
 }
 
 type ScopedCodexUsageModelRow = {

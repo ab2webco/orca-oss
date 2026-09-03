@@ -6,7 +6,7 @@ import {
   listRecordedCodexPaneLanes
 } from '../codex/codex-pane-account-registry'
 import { forgetStaleCodexPanes, listStaleCodexPanes } from '../codex/codex-stale-pane-accounts'
-import type { GlobalSettings } from '../../shared/types'
+import type { GlobalSettings } from '../../shared/global-settings-types'
 
 export function registerCodexAccountHandlers(
   codexAccounts: CodexAccountService,

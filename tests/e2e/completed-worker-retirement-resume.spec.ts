@@ -401,11 +401,23 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
         processAction: 'closed_agent_terminal'
       })
     }
-    // Why the fork diverges from upstream (which expects `recoveryPresent: false`): both close
-    // modes reach the renderer as a bare `pty-exit` — main kills the PTY and its `ui:closeTerminal`
-    // echo lands after the pane unmounted — and by then neither the pane's agent status nor its
-    // runtime orchestration context survives to prove the worker finished. An interrupted agent is
-    // indistinguishable here, so resume authority is kept and only an explicit user release drops it.
+    // Why the fork diverges from upstream (which expects `recoveryPresent: false`) — read this,
+    // not the older rationale it replaces. The original reason was uncertainty: both close modes
+    // reached the renderer as a bare `pty-exit`, so nothing proved the worker had finished. That
+    // premise is FALSE since #14590 (2eb3e11327): closeTerminal now asks the renderer to close the
+    // tab before killing the PTY, so the pane's agent status is still live and the evidence does
+    // survive. ORCA-272's own known-done rule would therefore retire the record.
+    //
+    // What keeps the divergence is a second job the record was quietly doing: it is what seeds the
+    // pane on activation. `resumeSleepingAgentSessionsForWorktree` -> `launchSleepingAgentSession`
+    // calls `createTab`, and it is the only caller that does so here — #14590 also made hydration
+    // keep an explicitly empty tab row, and `shouldAutoCreateInitialTerminal` refuses to seed one
+    // when that row exists. Retire the record and this worktree gets no terminal at all on
+    // activation: no pane, no PaneManager, and the second half of this spec times out.
+    //
+    // So the record is kept for availability now, not for evidence. Retiring it needs the seeding
+    // gap closed first; the interrupted-agent protection it used to imply is pinned directly in
+    // src/renderer/src/store/slices/interrupted-agent-resume-preservation.test.ts instead.
     await expect
       .poll(() =>
         orcaPage.evaluate(() => {

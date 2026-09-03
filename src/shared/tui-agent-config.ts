@@ -75,7 +75,9 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     expectedProcess: 'codex',
     promptInjectionMode: 'argv',
     preflightTrust: 'codex',
-    draftPasteReadySignal: 'codex-composer-prompt'
+    windowsInputRecordPasteNewline: 'alt-enter',
+    draftPasteReadySignal: 'codex-composer-prompt',
+    draftPasteReadyTimeoutMs: 20_000
   },
   autohand: {
     detectCmd: 'autohand',

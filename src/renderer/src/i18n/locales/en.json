@@ -299,7 +299,9 @@
         "workspace": {
           "cleanup": {
             "9d6e531da6": "Workspace no longer exists.",
-            "changedSinceConfirmation": "Workspace changed after confirmation. Refresh to review it before removing."
+            "changedSinceConfirmation": "Workspace changed after confirmation. Refresh to review it before removing.",
+            "hostUnresolved": "Orca cannot tell which host owns this workspace. Refresh projects and review it again.",
+            "hostCollision": "Error: this workspace exists on multiple hosts at the same path"
           }
         },
         "worktrees": {
@@ -1455,7 +1457,8 @@
         "moreWorkspaceActions": "More issue workspace actions",
         "startNewWorkspace": "Start new workspace",
         "workspaceSection": "Workspace",
-        "noWorkspaceYet": "None yet"
+        "noWorkspaceYet": "None yet",
+        "openOnLinear": "Open on Linear"
       },
       "LinearItemDrawer": {
         "04008e6c46": "Start workspace from issue",
@@ -2781,7 +2784,7 @@
             "ee81adfcef": "View",
             "4d0b72481c": "Ignore",
             "9cc26c019d": "Remove",
-            "0e2d235c63": "Inactive workspace scan ready",
+            "0e2d235c63": "Workspace scan ready",
             "4a35c08764": "Review",
             "47123d0108": "Scanning inactive workspaces. You can close this and come back.",
             "9a3be9f2df": "Scanning inactive workspaces. New rows appear here as they finish. You can close this and come back.",
@@ -3451,7 +3454,7 @@
             "67c4ecda49": "Force-quits this terminal. Any unsaved work in the pane is lost. This can't be undone.",
             "4bb076fa89": "Kill",
             "996295bff2": "orphan terminal",
-            "92924a14e3": "Review inactive workspaces ({{value0}})",
+            "92924a14e3": "Clean up workspaces",
             "27a74f91f0": "Nothing running right now",
             "1b24a32d3a": "Memory",
             "298f4be7f2": "CPU",
@@ -4566,7 +4569,8 @@
           "d36883e046": "Cancel",
           "b79b39d865": "Remove Project",
           "removeDescriptionSsh": "This only removes {{name}} from Orca. Its files stay on {{host}} — re-add that SSH host to recover it.",
-          "removeDescriptionLocal": "This only removes {{name}} from Orca. It is still on your disk."
+          "removeDescriptionLocal": "This only removes {{name}} from Orca. It is still on your disk.",
+          "removeDescriptionVmRecipe": "This removes {{name}} from Orca. Its VM recipe determines whether the environment and its files are permanently deleted."
         },
         "ScrollToCurrentWorkspaceToolbarButton": {
           "23989bb663": "Reveal active workspace"
@@ -5093,7 +5097,9 @@
           "noneFound": "No non-Orca worktrees found",
           "tryDifferentSearch": "Try a different name or path.",
           "disableSource": "Disable a source to manage its worktrees individually.",
-          "appearWhenDetected": "New worktrees will appear here when Orca detects them."
+          "appearWhenDetected": "New worktrees will appear here when Orca detects them.",
+          "openGlobalSettings": "Manage in Global Settings",
+          "globalSettingsSources": "These sources have a global setting you can override here:"
         },
         "add": {
           "repo": {
@@ -5629,7 +5635,14 @@
           "addLocation": "Add location",
           "worktreeRoot": "Worktree root",
           "add": "Add",
-          "rootHelp": "Orca will recognize worktrees beneath this folder."
+          "rootHelp": "Orca will recognize worktrees beneath this folder.",
+          "useGlobalFor": "Use global for {{value0}}",
+          "useGlobal": "Use global",
+          "visibility": "Visibility for {{value0}}",
+          "show": "Show",
+          "hide": "Hide",
+          "overridingGlobal": "Overriding global setting: {{value0}}",
+          "projectOnly": "Added in this project only."
         }
       },
       "shared": {
@@ -6565,7 +6578,9 @@
           "7511097c5d": "Workspace",
           "31e300af1c": "Ask Before Deleting Artifacts",
           "fb29a73a17": "Show a confirmation dialog before deleting a shared artifact and breaking its public link.",
-          "bf46474e33": "Show a confirmation before deleting a shared artifact. Anyone holding its public link loses access."
+          "bf46474e33": "Show a confirmation before deleting a shared artifact. Anyone holding its public link loses access.",
+          "externalWorktrees": "External worktrees",
+          "externalWorktreesDescription": "Choose which worktrees created outside Orca appear by default on this host."
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "Apply Changes",
@@ -7297,7 +7312,14 @@
           "hostStateUnknown": "Unknown",
           "nestedHostLabel": "{{value0}} via {{value1}}",
           "hostStateWorkspaceWindowClosed": "Workspace window closed",
-          "hostWorkspaceWindowClosedHelp": "The server is reachable but its Orca window is closed. Open Orca on {{value0}} to use this setup."
+          "hostWorkspaceWindowClosedHelp": "The server is reachable but its Orca window is closed. Open Orca on {{value0}} to use this setup.",
+          "externalWorktrees": "External worktrees",
+          "externalWorktreesDescription": "Override whether worktrees created outside Orca appear for this project.",
+          "externalWorktreesInherited": "Using global: {{value0}}",
+          "show": "Show",
+          "hide": "Hide",
+          "externalWorktreesGlobal": "Global default: {{value0}}",
+          "useGlobal": "Use global"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "Command template",
@@ -8960,7 +8982,9 @@
             "editorFontFamilyDesc": "Font used by file editors and diff views. Leave empty to follow the terminal font.",
             "6e918a5bcc": "claude glm",
             "4880297fec": "z.ai",
-            "71bf3d35f5": "glm"
+            "71bf3d35f5": "glm",
+            "externalWorktrees": "External worktrees",
+            "externalWorktreesDescription": "Choose whether worktrees created outside Orca appear by default."
           }
         },
         "git": {
@@ -9458,7 +9482,9 @@
             "keepForkUpToDate": "Keep Fork Up to Date",
             "keepForkUpToDateDescription": "Safely fast-forward this fork from upstream.",
             "projectRuntime": "Project Runtime",
-            "projectRuntimeDescription": "Choose whether this project runs on Windows or WSL."
+            "projectRuntimeDescription": "Choose whether this project runs on Windows or WSL.",
+            "externalWorktrees": "External worktrees",
+            "externalWorktreesDescription": "Override whether worktrees created outside Orca appear for this project."
           }
         },
         "runtime": {
@@ -10241,7 +10267,11 @@
           "cloudVmTitle": "Cloud VM runtimes",
           "cloudVmRefresh": "Refresh Cloud VM runtimes",
           "cloudVmLoading": "Checking Cloud VM runtimes…",
-          "cloudVmEmptyWithSetup": "No Cloud VM runtimes yet. Create one from a workspace using an environment recipe."
+          "cloudVmEmptyWithSetup": "No Cloud VM runtimes yet. Create one from a workspace using an environment recipe.",
+          "stoppingCleanup": "Stopping…",
+          "stopCleanup": "Stop cleanup",
+          "cleanupStopped": "Cleanup stopped",
+          "stopCleanupFailed": "Couldn’t stop Cloud VM cleanup."
         },
         "ephemeralVms": {
           "search": {
@@ -11185,6 +11215,21 @@
         "TerminalAdvancedTypographyControls": {
           "f5fa1a08f1": "Bold Font Weight",
           "0e0d1ee15a": "Adjust independently from Font Weight. Some fonts map several values to one face, so lower Font Weight or choose another font if bold looks unchanged."
+        },
+        "EphemeralVmCleanupStopDialog": {
+          "title": "Stop cleanup?",
+          "description": "The VM may remain running and incur charges. You can retry cleanup later.",
+          "cancel": "Keep cleaning",
+          "stopping": "Stopping…",
+          "confirm": "Stop cleanup"
+        },
+        "GlobalWorktreeVisibilitySourcesSetting": {
+          "saveFailed": "Could not save visibility defaults.",
+          "updateServerDefaults": "Update this server to configure visibility defaults.",
+          "updateServer": "Update this server to configure source defaults."
+        },
+        "shortcutDefinitionCatalog": {
+          "missionControlConflict": "Blocked by Mission Control. Remap here or change it in System Settings."
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "Signed in, but Orca could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar."
@@ -12234,6 +12279,52 @@
                     }
                   }
                 }
+              },
+              "commit": {
+                "area": {
+                  "cc5739bd1d": "Generating commit message…",
+                  "4cbd0cd9d2": "Commit in progress…",
+                  "e7876a2bde": "Stage at least one file to generate a message.",
+                  "0904be2505": "Clear the message to regenerate.",
+                  "1ea9ba37aa": "Pick an agent in Settings -> Git -> Source Control AI."
+                }
+              },
+              "conflict": {
+                "status": {
+                  "cards": {
+                    "5302a1ddba": "Merge conflicts",
+                    "7f3af87549": "Rebase conflicts",
+                    "6a8e9ad490": "Cherry-pick conflicts",
+                    "bdf8772106": "Conflicts",
+                    "edc2d82a2b": "Merge in progress",
+                    "5c3707aa44": "Rebase in progress",
+                    "ffe53a1da6": "Cherry-pick in progress",
+                    "35eb76d323": "Operation in progress"
+                  }
+                }
+              },
+              "content": {
+                "status": {
+                  "3f425c239c": "No changes on this branch",
+                  "640f6fdb36": "This workspace is clean and this branch has no changes ahead of {{value0}}",
+                  "8deb86bbec": "base",
+                  "978eba351e": "Search text is too large",
+                  "0bce43409f": "Use a shorter file filter.",
+                  "1b6caf533d": "No matching files",
+                  "00c07771b7": "No changed files match \"{{value0}}\""
+                }
+              },
+              "diff": {
+                "comments": {
+                  "list": {
+                    "cefacd0ec7": "whole file"
+                  }
+                }
+              },
+              "compare": {
+                "summary": {
+                  "dd72a6fd37": "{{value0}} commit{{value1}} ahead of {{value2}}"
+                }
               }
             }
           },
@@ -12242,6 +12333,11 @@
               "control": {
                 "ai": {
                   "cfafa92509": "No unresolved conflicts to send."
+                },
+                "bulk": {
+                  "actions": {
+                    "2f67630884": "Bulk stage/unstage failed"
+                  }
                 }
               }
             }
@@ -16013,6 +16109,170 @@
         "presentation": {
           "gitlabMergeRequestNumber": "MR #{{value0}}",
           "githubPullRequestNumber": "PR #{{value0}}"
+        },
+        "browse": {
+          "measureSizesFailed": "Could not scan workspace sizes",
+          "noSizes": "No workspace sizes measured yet.",
+          "noSizesDescription": "Sizes appear after disk usage has been measured.",
+          "notMeasured": "Not measured",
+          "workspaceStatus": "Workspace status: {{value0}}",
+          "sizeOnDisk": "Size on disk: {{value0}}",
+          "checkingGitRow": "Checking git status",
+          "openWorkspaceNamed": "Open {{value0}}",
+          "openWorkspace": "Open workspace",
+          "selectedCount": "{{value0}} selected",
+          "measuringSizesProgress": "Scanning {{value0}}/{{value1}}",
+          "measuringSizes": "Scanning sizes",
+          "measureSizes": "Scan",
+          "measureSizesTitle": "Scan workspace sizes",
+          "measureSizesDescription": "Scan disk usage to compare, sort, and filter workspaces by size.",
+          "sort": {
+            "lastActivity": "Last activity",
+            "lastVisited": "Last opened",
+            "created": "Created",
+            "size": "Size",
+            "name": "Workspace",
+            "repo": "Repository",
+            "path": "Path",
+            "host": "Host",
+            "workspaceStatus": "Status",
+            "agent": "Agent",
+            "git": "Git",
+            "ahead": "Ahead",
+            "behind": "Behind",
+            "branch": "Branch",
+            "review": "Review",
+            "ticket": "Ticket",
+            "localContext": "Open context",
+            "tier": "Safety",
+            "blockerCount": "Blockers"
+          },
+          "git": {
+            "clean": "Clean",
+            "dirty": "Uncommitted changes",
+            "unpushed": "Unpushed commits",
+            "unknown": "Not checked"
+          },
+          "agent": {
+            "working": "Working",
+            "permission": "Waiting on you",
+            "idle": "Idle"
+          },
+          "review": {
+            "open": "Open",
+            "draft": "Draft",
+            "merged": "Merged",
+            "closed": "Closed",
+            "unknown": "Unknown",
+            "otherProvider": "Other"
+          },
+          "ticket": {
+            "workItem": "Work item",
+            "linear": "Linear",
+            "issue": "Issue"
+          },
+          "tier": {
+            "ready": "Ready",
+            "review": "Needs review",
+            "protected": "Protected"
+          },
+          "idleSignal": {
+            "lastVisited": "Not opened",
+            "lastActivity": "No activity",
+            "created": "Created before"
+          },
+          "triState": {
+            "any": "Any",
+            "only": "Only",
+            "exclude": "Exclude"
+          },
+          "presence": {
+            "any": "Any",
+            "some": "Has one",
+            "none": "Has none"
+          },
+          "blockerModeAny": "Has any",
+          "blockerModeNone": "Has none",
+          "searchPlaceholder": "Search name, repo, branch, path, host",
+          "searchLabel": "Search workspaces",
+          "filters": "Filters",
+          "showingCount": "Showing {{value0}} of {{value1}}",
+          "clearFilters": "Clear filters",
+          "checkingGit": "Checking git status: {{value0}} left",
+          "updatedAgo": "Updated {{value0}}",
+          "refreshing": "Refreshing…",
+          "refreshingProgress": "Refreshing {{value0}}/{{value1}}",
+          "facet": {
+            "git": "Git",
+            "review": "Review",
+            "ticket": "Tickets",
+            "location": "Location",
+            "safety": "Safety",
+            "activity": "Activity",
+            "size": "Size on disk",
+            "status": "Workspace status",
+            "agent": "Agent",
+            "context": "Local context"
+          },
+          "minAhead": "Commits ahead ≥",
+          "minBehind": "Commits behind ≥",
+          "branchQuery": "Branch contains",
+          "prunable": "Prunable",
+          "locked": "Locked",
+          "reviewPresence": "PR / MR",
+          "reviewProvider": "Provider",
+          "ticketPresence": "Linked ticket",
+          "host": "Host",
+          "repo": "Repository",
+          "pathPrefix": "Path starts with",
+          "tierField": "Cleanup tier",
+          "blockerMode": "Blocker match",
+          "blockers": "Blockers",
+          "dismissed": "Ignored",
+          "selectableOnly": "Only workspaces I can delete now",
+          "idleSignalField": "Idle signal",
+          "idleMinDays": "Idle for at least",
+          "days": "days",
+          "neverVisited": "Never opened",
+          "minSize": "At least",
+          "maxSize": "At most",
+          "includeUnsized": "Include unmeasured workspaces",
+          "matchStatusless": "Include workspaces with no status",
+          "archived": "Archived",
+          "pinned": "Pinned",
+          "unread": "Unread",
+          "comment": "Has comment",
+          "retainedDoneAgents": "Finished agent transcripts",
+          "contextPresence": "Open tabs, terminals, comments",
+          "completelyEmpty": "Nothing left to lose",
+          "noWorkspaces": "No workspaces found.",
+          "noMatches": "No workspaces match these filters.",
+          "noMatchesDescription": "Every workspace is in one list — widen a facet or clear the filters.",
+          "selectionVanishedOne": "1 selected workspace no longer exists.",
+          "selectionVanished": "{{value0}} selected workspaces no longer exist.",
+          "selectAll": "Select all matching workspaces",
+          "sortByField": "Sort by {{value0}}",
+          "sortBy": "Sort by"
+        },
+        "scan": {
+          "progress": "Scanning workspaces ({{value0}}/{{value1}})",
+          "singleError": "Could not check {{value0}}: {{value1}}. Some workspaces may be missing. Refresh to try again.",
+          "moreErrors": ", +{{value0}} more",
+          "multipleErrors": "Could not check {{value0}} repositories ({{value1}}{{value2}}). Some workspaces may be missing. Refresh to try again.",
+          "noWorkspaces": "No workspaces found.",
+          "readyOneOne": "1 workspace found, with 1 cleanup suggestion.",
+          "readyOneMany": "1 workspace found, with {{value0}} cleanup suggestions.",
+          "readyManyOne": "{{value0}} workspaces found, with 1 cleanup suggestion.",
+          "readyManyMany": "{{value0}} workspaces found, with {{value1}} cleanup suggestions.",
+          "fallbackRepository": "a repository",
+          "gitListFailed": "Git could not list worktrees"
+        },
+        "relativeTime": {
+          "never": "Never",
+          "justNow": "Just now",
+          "minutesAgo": "{{value0}}m ago",
+          "hoursAgo": "{{value0}}h ago",
+          "daysAgo": "{{value0}}d ago"
         }
       }
     },
@@ -16048,6 +16308,13 @@
         "subtitle": "Orca paused automatic resume because it could not confirm this Codex session belongs to the selected account. The transcript below is read-only — nothing was sent or lost. To keep working, start a new Codex session or switch to the account that owns this one.",
         "read-error": "Orca could not read the saved session file either. It may have been moved or deleted; automatic resume stayed paused and nothing was sent.",
         "read-empty": "The saved session file was found but contains no readable messages."
+      }
+    },
+    "status": {
+      "bar": {
+        "workspaceSpace": {
+          "otherTopLevelItems": "Other top-level items ({{value0}})"
+        }
       }
     }
   },

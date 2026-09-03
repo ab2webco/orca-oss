@@ -561,15 +561,16 @@ function App(): React.JSX.Element {
   const showFloatingTerminalButton =
     floatingTerminalEnabled &&
     (floatingTerminalTriggerLocation === 'floating-button' || !statusBarVisible)
-  const hasMountedTerminalWorkbenchRef = useRef(false)
-  if (activeWorktreeId !== null || backgroundTerminalMountRequested) {
-    hasMountedTerminalWorkbenchRef.current = true
+  const [hasMountedTerminalWorkbench, setHasMountedTerminalWorkbench] = useState(false)
+  const terminalWorkbenchRequested = activeWorktreeId !== null || backgroundTerminalMountRequested
+  // Why state and not a ref write: the latch has to be readable in this same render (an
+  // effect would unmount the panes for a frame and lose parked scrollback), and a render
+  // that React discards must not leave the latch set.
+  if (terminalWorkbenchRequested && !hasMountedTerminalWorkbench) {
+    setHasMountedTerminalWorkbench(true)
   }
   // Why: skip the terminal bundle on the landing path, but once mounted keep hidden panes alive through sleep/shutdown when activeWorktreeId briefly goes null.
-  const shouldMountTerminalWorkbench =
-    activeWorktreeId !== null ||
-    backgroundTerminalMountRequested ||
-    hasMountedTerminalWorkbenchRef.current
+  const shouldMountTerminalWorkbench = terminalWorkbenchRequested || hasMountedTerminalWorkbench
   // Why: visible worktree creation owns its faux tab strip start to finish; keep the previous workspace mounted for retention without real chrome.
   const creationLayoutActive = shouldShowWorktreeCreationSurface({
     activeView,
@@ -1594,21 +1595,25 @@ function App(): React.JSX.Element {
     workspaceChromeActive,
     creationLayoutActive
   })
-  // Window key listeners are global and long-lived: one registration, but the handler reads current shortcut state each key event.
-  globalShortcutStateRef.current = {
-    activeView,
-    activeWorktreeId,
-    actions,
-    floatingTerminalEnabled,
-    floatingTerminalOpen,
-    floatingVisibleTabCount,
-    keybindings,
-    pluginCommands,
-    terminalShortcutPolicy: settings?.terminalShortcutPolicy,
-    setFloatingTerminalOpenWithFocus,
-    workspaceChromeActive,
-    creationLayoutActive
-  }
+  // Window key listeners are global and long-lived: one registration, but the handler reads current shortcut state each
+  // Why useLayoutEffect: the write runs after commit and before paint, and no key event can
+  // be dispatched in that gap — so the handler never reads a render React discarded.
+  useLayoutEffect(() => {
+    globalShortcutStateRef.current = {
+      activeView,
+      activeWorktreeId,
+      actions,
+      floatingTerminalEnabled,
+      floatingTerminalOpen,
+      floatingVisibleTabCount,
+      keybindings,
+      pluginCommands,
+      terminalShortcutPolicy: settings?.terminalShortcutPolicy,
+      setFloatingTerminalOpenWithFocus,
+      workspaceChromeActive,
+      creationLayoutActive
+    }
+  })
 
   useEffect(() => {
     const doubleTapDetector = new ModifierDoubleTapDetector()

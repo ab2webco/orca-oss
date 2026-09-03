@@ -347,6 +347,7 @@ export class OrchestrationDb {
   // emptiness so the non-orchestration majority short-circuits the whole
   // per-terminal fan-out. Only createDispatchContext flips this false→true.
   private hasAnyDispatchContextsCache: boolean | undefined
+  private localMutationCallerFingerprint: string | undefined
 
   constructor(dbPath: (string & {}) | ':memory:') {
     this.db = new Database(dbPath)
@@ -428,6 +429,11 @@ export class OrchestrationDb {
         created_at          TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
         PRIMARY KEY (caller_fingerprint, request_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS mutation_caller_identities (
+        transport           TEXT PRIMARY KEY,
+        caller_fingerprint  TEXT NOT NULL UNIQUE
       );
 
       CREATE TABLE IF NOT EXISTS worker_dispatches (
@@ -1116,6 +1122,15 @@ export class OrchestrationDb {
           this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN failure_provenance TEXT')
         }
       }
+      if (current < 33) {
+        // Upstream's v28 (durable local mutation caller identity), renumbered.
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS mutation_caller_identities (
+            transport           TEXT PRIMARY KEY,
+            caller_fingerprint  TEXT NOT NULL UNIQUE
+          );
+        `)
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
     } catch (err) {
@@ -1523,6 +1538,34 @@ export class OrchestrationDb {
   }
 
   // ── Durable mutation receipts ──
+
+  getOrCreateLocalMutationCallerFingerprint(): string {
+    if (this.localMutationCallerFingerprint) {
+      return this.localMutationCallerFingerprint
+    }
+    const transport = 'local_authenticated_transport'
+    const existing = this.db
+      .prepare('SELECT caller_fingerprint FROM mutation_caller_identities WHERE transport = ?')
+      .get(transport) as { caller_fingerprint: string } | undefined
+    if (existing) {
+      this.localMutationCallerFingerprint = existing.caller_fingerprint
+      return this.localMutationCallerFingerprint
+    }
+    this.db
+      .prepare(
+        `INSERT OR IGNORE INTO mutation_caller_identities (transport, caller_fingerprint)
+         VALUES (?, ?)`
+      )
+      .run(transport, randomBytes(32).toString('hex'))
+    const created = this.db
+      .prepare('SELECT caller_fingerprint FROM mutation_caller_identities WHERE transport = ?')
+      .get(transport) as { caller_fingerprint: string } | undefined
+    if (!created) {
+      throw new Error('Failed to create the local orchestration mutation caller identity.')
+    }
+    this.localMutationCallerFingerprint = created.caller_fingerprint
+    return this.localMutationCallerFingerprint
+  }
 
   beginMutationReceipt(params: {
     callerFingerprint: string

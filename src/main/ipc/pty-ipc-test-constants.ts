@@ -1,7 +1,7 @@
 import { it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { join, posix } from 'node:path'
-import { getBundledLauncherPath } from '../cli/cli-installer'
+import { getBundledLauncherPath } from '../cli/bundled-cli-launcher-path'
 import { resolveWindowsShellLaunchArgs } from '../providers/windows-shell-args'
 
 /** The narrow slice of vitest's test API these suites use; keeps `it`/`it.skip` interchangeable. */

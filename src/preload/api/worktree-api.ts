@@ -9,6 +9,7 @@ import type {
   ProviderRequestId
 } from '../../shared/detected-worktree-provider-contract'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import type { RetiredNameRegistry } from '../../shared/worktree/retired-name-registry'
 import type {
   FolderWorkspacePathStatus,
   FolderWorkspacePathStatusRequest
@@ -39,6 +40,7 @@ import type {
 
 export type WorktreeApi = {
   list: (args: { repoId: string }) => Promise<Worktree[]>
+  listRetiredNames: (args: { repoId: string }) => Promise<RetiredNameRegistry>
   listDetected: {
     (
       args: ListDetectedWorktreesArgs
@@ -90,11 +92,13 @@ export type WorktreeApi = {
     // may waive the proof that every PTY stopped.
     allowUnverifiedPtyStop?: boolean
     skipArchive?: boolean
+    snapshotPruneBatchId?: string
   }) => Promise<RemoveWorktreeResult>
   // Forget a workspace from Orca only (no remote Git/FS work) — for workspaces pinned to a removed/disconnected SSH host.
   forgetLocal: (args: {
     worktreeId: string
     hostId?: ExecutionHostId
+    snapshotPruneBatchId?: string
   }) => Promise<RemoveWorktreeResult>
   forceDeletePreservedBranch: (args: {
     worktreeId: string

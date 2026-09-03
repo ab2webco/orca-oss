@@ -24,6 +24,7 @@ import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-lis
 import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
 import { parseFileUriPathParts } from '../daemon/osc7-file-uri'
 import type { AgentStatus } from '../../shared/agent-detection'
+import type { TerminalTabCloseOrigin } from '../../shared/terminal-tab-close'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalOscColorQueryReplyColors } from '../../shared/terminal-osc-color-reply'
 import type { TerminalOutputSourceRange } from '../../shared/terminal-output-source-range'
@@ -534,7 +535,7 @@ import {
 import { isAgentScratchRepoRootPath } from '../../shared/agent-scratch-worktrees'
 import {
   createWorktreeVisibilitySourceMatcher,
-  normalizeCustomWorktreeVisibilitySources,
+  resolveCustomWorktreeVisibilitySources,
   type WorktreeVisibilitySourceMatcher
 } from '../../shared/worktree/visibility-sources'
 import {
@@ -759,6 +760,14 @@ import {
 } from './repo-worktree-resolution-scan'
 import { readRepoWorktreeAdminFingerprint } from './repo-worktree-admin-fingerprint'
 import {
+  listStoredWorktreeRowsForRepo,
+  resolveRepoWorktreeRows,
+  resolveScopedWorktreeIdRow,
+  RESOLVED_WORKTREE_REPO_TIMEOUT_MS,
+  type RepoWorktreeRowDeps
+} from './repo-worktree-row-resolution'
+import { withTimeout } from '../../shared/promise-timeout-fallback'
+import {
   getLocalWorktreePathAccess,
   removeLocalWorktreePath,
   toLocalWorktreeRuntimePath
@@ -979,7 +988,7 @@ import type {
   UpdateIssueTypeBySlugArgs,
   UpdateProjectItemFieldArgs,
   UpdatePullRequestBySlugArgs
-} from '../../shared/github/project-types'
+} from '../../shared/github/project-request-types'
 import {
   getBaseRefDefault,
   getDefaultRemote,
@@ -1013,23 +1022,24 @@ import {
   removeWorktree
 } from '../git/worktree'
 import type { AddWorktreeOptions, AddWorktreeResult } from '../git/worktree'
-import { isENOENT, invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { isENOENT } from '../ipc/filesystem-path-containment'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
-  createSetupRunnerScript,
-  getDefaultTabCommandTrustContent,
-  getDefaultTabsLaunch,
   getEffectiveHooks,
-  getEffectiveSetupRunPolicy,
   hasUnrecognizedOrcaYamlKeys,
   hasHooksFile,
   loadHooks,
   parseOrcaYaml,
-  readIssueCommand,
-  resolveSetupRunnerShell,
-  runHook,
-  shouldRunSetupForCreate,
-  writeIssueCommand
+  runHook
 } from '../hooks'
+import { createSetupRunnerScript, resolveSetupRunnerShell } from '../worktree-runner-script'
+import {
+  getDefaultTabCommandTrustContent,
+  getDefaultTabsLaunch,
+  getEffectiveSetupRunPolicy,
+  shouldRunSetupForCreate
+} from '../effective-hook-config'
+import { readIssueCommand, writeIssueCommand } from '../issue-command-file'
 import {
   DEFAULT_REPO_BADGE_COLOR,
   FLOATING_TERMINAL_WORKTREE_ID,
@@ -1059,9 +1069,20 @@ import {
 } from '../ipc/worktree-remote'
 import {
   getBranchNameOverrideCandidate,
+  getGeneratedWorktreeCreateCandidate,
   getWorktreeCreateCandidate,
+  isGeneratedWorktreeCreateName,
   WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS
 } from '../worktree-create-candidates'
+import {
+  failedWorktreeCreationNeedsRetirement,
+  getRetiredNameRegistryForRepo,
+  retireGeneratedWorktreeName
+} from '../worktree-name-retirement'
+import {
+  createRetiredNameLookup,
+  type RetiredNameRegistry
+} from '../../shared/worktree/retired-name-registry'
 import { normalizeSparseDirectories } from '../ipc/sparse-checkout-directories'
 import type { PtyBindingSourceExpectation, Store } from '../persistence'
 import type { StatsCollector } from '../stats/collector'
@@ -1238,6 +1259,9 @@ export type CodexRateLimitResetRpcResult = {
 type RuntimeStore = {
   getRepos: Store['getRepos']
   getRepo: Store['getRepo']
+  addRetiredWorktreeName?: Store['addRetiredWorktreeName']
+  getRetiredWorktreeNameRegistry?: Store['getRetiredWorktreeNameRegistry']
+  mergeRetiredWorktreeNames?: Store['mergeRetiredWorktreeNames']
   addRepo: Store['addRepo']
   updateRepo: Store['updateRepo']
   getProjects?: Store['getProjects']
@@ -1292,6 +1316,7 @@ type RuntimeStore = {
   getSettings(): {
     workspaceDir: string
     nestWorkspaces: boolean
+    worktreeVisibilityDefaults?: GlobalSettings['worktreeVisibilityDefaults']
     refreshLocalBaseRefOnWorktreeCreate: boolean
     localBaseRefSuggestionDismissed?: boolean
     branchPrefix: string
@@ -2030,6 +2055,7 @@ const MOBILE_TERMINAL_SURFACE_TIMEOUT_MS = 10_000
 // Why: the split already failed; the caller waits on this teardown only to learn whether the
 // fallback kill is needed, so keep it short — an unreachable host must not stall the rejection.
 const REJECTED_SPLIT_PTY_STOP_TIMEOUT_MS = 2_000
+const EXPLICIT_TERMINAL_CLOSE_STOP_TIMEOUT_MS = 2_000
 const MOBILE_TERMINAL_READY_FALLBACK_MS = 1000
 const SSH_PANE_RECOVERY_GRACE_MS = 30_000
 // Why: long enough that a keystroke burst to a proven-dead leaf probes once,
@@ -2162,7 +2188,10 @@ type RuntimeNotifier = {
     content: string
   ): Promise<RuntimeMarkdownSaveTabResult>
   closeTerminal(tabId: string, paneRuntimeId?: number): void
-  closeTerminalTab?(tabId: string): Promise<void>
+  closeTerminalTab?(
+    tabId: string,
+    options?: { localPtyTeardownOwnedExternally?: boolean; origin?: TerminalTabCloseOrigin }
+  ): Promise<void>
   sleepWorktree(worktreeId: string): void
   // Why: a phone opening a worktree wakes its slept agents by asking the host
   // renderer to run its own navigation-free wake (experimental agent sleep);
@@ -2198,6 +2227,12 @@ type TerminalHandleRecord = {
   leafId: string
   ptyId: string | null
   ptyGeneration: number
+}
+
+type PtyIncarnationHandleRecord = {
+  handle: string
+  incarnationId: string
+  leafKey: string
 }
 
 export type OrchestrationCompatibilityTerminalAuthority = {
@@ -3045,6 +3080,7 @@ export class OrcaRuntimeService {
   private readonly lastPointedMessageSequenceByHandle = new Map<string, number>()
   // Why: a waiter can reserve an older row while a newer row advances the sequence watermark.
   private readonly pointedMessageIdsByHandle = new Map<string, Set<string>>()
+  private handleByPtyIncarnation = new Map<string, PtyIncarnationHandleRecord>()
   private readonly mailPointerRepointScheduler = new MailPointerRepointScheduler((handle) =>
     this.repointPendingMessagesForHandle(handle)
   )
@@ -3759,6 +3795,7 @@ export class OrcaRuntimeService {
 
   getClientSettings(): Pick<
     GlobalSettings,
+    | 'worktreeVisibilityDefaults'
     | 'defaultTuiAgent'
     | 'disabledTuiAgents'
     | 'agentCmdOverrides'
@@ -3780,12 +3817,14 @@ export class OrcaRuntimeService {
     // Read-only on purpose: clients preflight the publish capability here, but SettingsUpdate
     // still omits the key so no RPC caller can grant it to itself.
     | 'artifactSharingEnabled'
+    | 'worktreeVisibilityDefaults'
   > {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
     return {
+      worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
       defaultTuiAgent: settings.defaultTuiAgent ?? null,
       disabledTuiAgents: settings.disabledTuiAgents ?? [],
       agentCmdOverrides: settings.agentCmdOverrides ?? {},
@@ -3838,6 +3877,7 @@ export class OrcaRuntimeService {
   async updateClientSettings(
     updates: Pick<
       Partial<GlobalSettings>,
+      | 'worktreeVisibilityDefaults'
       | 'agentStatusHooksEnabled'
       | 'defaultTuiAgent'
       | 'disabledTuiAgents'
@@ -3859,6 +3899,7 @@ export class OrcaRuntimeService {
   ): Promise<
     Pick<
       GlobalSettings,
+      | 'worktreeVisibilityDefaults'
       | 'defaultTuiAgent'
       | 'disabledTuiAgents'
       | 'agentCmdOverrides'
@@ -3886,6 +3927,9 @@ export class OrcaRuntimeService {
     const before = beforeSettings.agentStatusHooksEnabled !== false
     this.store.updateSettings(updates, { notifyListeners: true })
     const settings = this.store.getSettings()
+    if (updates.worktreeVisibilityDefaults !== undefined) {
+      this.notifyReposChanged()
+    }
     if (
       (typeof updates.agentStatusHooksEnabled === 'boolean' &&
         before !== updates.agentStatusHooksEnabled) ||
@@ -6014,14 +6058,19 @@ export class OrcaRuntimeService {
     for (const oldLeafKey of this.leaves.keys()) {
       if (!nextLeaves.has(oldLeafKey)) {
         const oldLeaf = this.leaves.get(oldLeafKey)
+        const retainedIncarnation = oldLeaf?.ptyId
+          ? this.handleByPtyIncarnation.get(oldLeaf.ptyId)
+          : undefined
         if (
           preserveLivePtysDuringReload &&
           oldLeaf?.ptyId &&
-          this.handleByPtyId.has(oldLeaf.ptyId) &&
+          (this.handleByPtyId.has(oldLeaf.ptyId) ||
+            (retainedIncarnation &&
+              retainedIncarnation.incarnationId ===
+                this.ptysById.get(oldLeaf.ptyId)?.incarnationId)) &&
           !nextPtyIds.has(oldLeaf.ptyId)
         ) {
-          // Why: a CLI-created agent keeps using its exported handle even if
-          // the reloaded renderer has not rebound the pane yet.
+          // Why: the first reload graph can precede pane rebinding; the live PTY incarnation still owns its handle.
           nextLeaves.set(oldLeafKey, oldLeaf)
           nextPtyIds.add(oldLeaf.ptyId)
         } else if (oldLeaf?.ptyId && nextPtyIds.has(oldLeaf.ptyId)) {
@@ -6034,7 +6083,11 @@ export class OrcaRuntimeService {
           // no next owner — invalidate it so in-flight CLI waiters fail fast
           // instead of hanging on a dead leaf.
           const oldHandle = this.handleByLeafKey.get(oldLeafKey)
-          if (oldHandle !== undefined && oldHandle === this.handleByPtyId.get(oldLeaf.ptyId)) {
+          const incarnationHandle = retainedIncarnation?.handle
+          if (
+            oldHandle !== undefined &&
+            (oldHandle === this.handleByPtyId.get(oldLeaf.ptyId) || oldHandle === incarnationHandle)
+          ) {
             this.handleByLeafKey.delete(oldLeafKey)
           } else {
             this.invalidateLeafHandle(oldLeafKey)
@@ -6056,6 +6109,7 @@ export class OrcaRuntimeService {
 
     this.leaves = nextLeaves
     this.rebuildLeafPtyIndex()
+    this.reconcilePtyIncarnationHandles()
     // Why: the emitted client payload is a function of the stored snapshot AND
     // the tab/leaf graph (handles/titles/connected resolve from leaf state), so
     // a graph-only change — e.g. a restored leaf binding its ptyId while the
@@ -8215,6 +8269,10 @@ export class OrcaRuntimeService {
       expectedPublicationEpoch?: string
       expectedTerminalHandle?: string
       clientNavigationId?: string
+      localPtyTeardownOwnedExternally?: boolean
+      /** Absent means the phone's own user closed it; `runtime` marks a close the
+       *  CLI or an RPC caller drove through this surface. */
+      origin?: TerminalTabCloseOrigin
     } = {}
   ): Promise<RuntimeMobileSessionTabCloseResult> {
     const graphEpoch = options.clientNavigationId ? this.captureReadyGraphEpoch() : null
@@ -8367,7 +8425,14 @@ export class OrcaRuntimeService {
             ? this.rendererPublicationThrottle.acquire(win.webContents)
             : () => {}
         try {
-          await this.notifier.closeTerminalTab(tab.parentTabId)
+          await (options.localPtyTeardownOwnedExternally
+            ? this.notifier.closeTerminalTab(tab.parentTabId, {
+                localPtyTeardownOwnedExternally: true,
+                origin: options.origin ?? 'runtime'
+              })
+            : this.notifier.closeTerminalTab(tab.parentTabId, {
+                origin: options.origin ?? 'runtime'
+              }))
         } finally {
           releasePublicationThrottle()
         }
@@ -9565,13 +9630,17 @@ export class OrcaRuntimeService {
       }
     >()
     const resolvedWorktrees = await this.listResolvedWorktrees()
-    const visibilitySourceMatchersByRepoId =
-      this.buildRuntimeVisibilitySourceMatchersByRepoId(resolvedWorktrees)
+    const settings = this.store?.getSettings()
+    const visibilitySourceMatchersByRepoId = this.buildRuntimeVisibilitySourceMatchersByRepoId(
+      resolvedWorktrees,
+      settings?.worktreeVisibilityDefaults
+    )
     for (const worktree of resolvedWorktrees) {
       if (
         !this.isRuntimeWorktreeVisible(
           worktree,
-          visibilitySourceMatchersByRepoId.get(worktree.repoId)
+          visibilitySourceMatchersByRepoId.get(worktree.repoId),
+          settings
         )
       ) {
         continue
@@ -9667,6 +9736,12 @@ export class OrcaRuntimeService {
   }
 
   registerPreAllocatedHandleForPty(ptyId: string, handle: string): void {
+    const retained = this.handleByPtyIncarnation.get(ptyId)
+    if (retained?.handle === handle) {
+      this.handleByPtyIncarnation.delete(ptyId)
+    } else {
+      this.invalidatePtyIncarnationHandle(ptyId)
+    }
     this.handleByPtyId.set(ptyId, handle)
     for (const leaf of this.getLeavesForPty(ptyId)) {
       this.adoptPreAllocatedHandle(leaf)
@@ -9712,15 +9787,24 @@ export class OrcaRuntimeService {
   }
 
   private invalidateAllHandlesForPty(ptyId: string): void {
+    const incarnationHandle = this.handleByPtyIncarnation.get(ptyId)?.handle
+    const preallocatedHandle = this.handleByPtyId.get(ptyId)
+    this.invalidatePtyIncarnationHandle(ptyId)
     this.handleByPtyId.delete(ptyId)
     const invalidated = new Set<string>()
+    if (preallocatedHandle && preallocatedHandle !== incarnationHandle) {
+      invalidated.add(preallocatedHandle)
+    }
     for (const [handle, record] of this.handles) {
       if (record.ptyId === ptyId) {
         invalidated.add(handle)
         this.handles.delete(handle)
-        this.syntheticTerminalHandles.delete(handle)
-        this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
       }
+    }
+    for (const handle of invalidated) {
+      this.handles.delete(handle)
+      this.syntheticTerminalHandles.delete(handle)
+      this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
     }
     for (const [leafKey, handle] of this.handleByLeafKey) {
       if (invalidated.has(handle)) {
@@ -18985,7 +19069,10 @@ export class OrcaRuntimeService {
     })
   }
 
-  async getWorktreePs(limit = DEFAULT_WORKTREE_PS_LIMIT): Promise<{
+  async getWorktreePs(
+    limit = DEFAULT_WORKTREE_PS_LIMIT,
+    sourceDefaultsSupported = true
+  ): Promise<{
     worktrees: RuntimeWorktreePsSummary[]
     totalCount: number
     truncated: boolean
@@ -18994,11 +19081,25 @@ export class OrcaRuntimeService {
       throw new Error('invalid_limit')
     }
     const resolvedWorktreeSnapshot = await this.listResolvedWorktreeSnapshot()
+    const settings = this.store?.getSettings()
+    const visibilityDefaults = sourceDefaultsSupported
+      ? settings?.worktreeVisibilityDefaults
+      : settings?.worktreeVisibilityDefaults
+        ? { external: settings.worktreeVisibilityDefaults.external }
+        : undefined
+    const visibilitySettings = settings
+      ? { ...settings, worktreeVisibilityDefaults: visibilityDefaults }
+      : undefined
     const visibilitySourceMatchersByRepoId = this.buildRuntimeVisibilitySourceMatchersByRepoId(
-      resolvedWorktreeSnapshot.worktrees
+      resolvedWorktreeSnapshot.worktrees,
+      visibilityDefaults
     )
     const resolvedWorktrees = resolvedWorktreeSnapshot.worktrees.filter((worktree) =>
-      this.isRuntimeWorktreeVisible(worktree, visibilitySourceMatchersByRepoId.get(worktree.repoId))
+      this.isRuntimeWorktreeVisible(
+        worktree,
+        visibilitySourceMatchersByRepoId.get(worktree.repoId),
+        visibilitySettings
+      )
     )
     // Why: worktree.ps backs the mobile sidebar, so it must use the same
     // host-owned imported-worktree visibility gate as worktree.list/desktop.
@@ -20021,7 +20122,6 @@ export class OrcaRuntimeService {
           badgeColor: DEFAULT_REPO_BADGE_COLOR,
           addedAt: Date.now(),
           kind: 'git',
-          externalWorktreeVisibility: 'hide',
           externalWorktreeVisibilityLegacy: false,
           ...(group
             ? {
@@ -20158,12 +20258,7 @@ export class OrcaRuntimeService {
       ...detected,
       addedAt: Date.now(),
       kind,
-      ...(kind === 'git'
-        ? {
-            externalWorktreeVisibility: 'hide' as const,
-            externalWorktreeVisibilityLegacy: false
-          }
-        : {})
+      ...(kind === 'git' ? { externalWorktreeVisibilityLegacy: false } : {})
     }
     this.store.addRepo(repo)
     await prepareLocalWorktreeRootForRepo(this.store, repo)
@@ -20279,12 +20374,7 @@ export class OrcaRuntimeService {
       ...detected,
       addedAt: Date.now(),
       kind: repoKind,
-      ...(repoKind === 'git'
-        ? {
-            externalWorktreeVisibility: 'hide' as const,
-            externalWorktreeVisibilityLegacy: false
-          }
-        : {})
+      ...(repoKind === 'git' ? { externalWorktreeVisibilityLegacy: false } : {})
     }
     this.store.addRepo(repo)
     await prepareLocalWorktreeRootForRepo(this.store, repo)
@@ -20453,7 +20543,6 @@ export class OrcaRuntimeService {
       ...detected,
       addedAt: Date.now(),
       kind: 'git',
-      externalWorktreeVisibility: 'hide',
       externalWorktreeVisibilityLegacy: false
     }
     this.store.addRepo(repo)
@@ -20501,7 +20590,6 @@ export class OrcaRuntimeService {
         | 'kind'
         | 'symlinkPaths'
         | 'issueSourcePreference'
-        | 'externalWorktreeVisibility'
         | 'externalWorktreeVisibilityPromptDismissedAt'
         | 'externalWorktreeInboxBaselinePaths'
         | 'importedExternalWorktreePaths'
@@ -20512,6 +20600,7 @@ export class OrcaRuntimeService {
         | 'projectGroupOrder'
       >
     > & {
+      externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
     }
@@ -20523,6 +20612,9 @@ export class OrcaRuntimeService {
     const sanitizedUpdates = omitUndefinedProperties(updates)
     if ('worktreeBasePath' in updates && updates.worktreeBasePath === undefined) {
       sanitizedUpdates.worktreeBasePath = undefined
+    }
+    if ('externalWorktreeVisibility' in updates && updates.externalWorktreeVisibility === null) {
+      sanitizedUpdates.externalWorktreeVisibility = undefined
     }
     if (
       'externalWorktreeDiscoverySuppressedAt' in updates &&
@@ -22301,22 +22393,35 @@ export class OrcaRuntimeService {
 
   async listManagedWorktrees(
     repoSelector?: string,
-    limit = DEFAULT_WORKTREE_LIST_LIMIT
+    limit = DEFAULT_WORKTREE_LIST_LIMIT,
+    sourceDefaultsSupported = true
   ): Promise<RuntimeWorktreeListResult> {
     if (!Number.isInteger(limit) || limit <= 0) {
       throw new Error('invalid_limit')
     }
     const resolved = await this.listResolvedWorktrees()
     const repoId = repoSelector ? (await this.resolveRepoSelector(repoSelector)).id : null
-    const visibilitySourceMatchersByRepoId =
-      this.buildRuntimeVisibilitySourceMatchersByRepoId(resolved)
+    const settings = this.store?.getSettings()
+    const visibilityDefaults = sourceDefaultsSupported
+      ? settings?.worktreeVisibilityDefaults
+      : settings?.worktreeVisibilityDefaults
+        ? { external: settings.worktreeVisibilityDefaults.external }
+        : undefined
+    const visibilitySettings = settings
+      ? { ...settings, worktreeVisibilityDefaults: visibilityDefaults }
+      : undefined
+    const visibilitySourceMatchersByRepoId = this.buildRuntimeVisibilitySourceMatchersByRepoId(
+      resolved,
+      visibilityDefaults
+    )
     const worktrees = resolved.filter((worktree) => {
       if (repoId && worktree.repoId !== repoId) {
         return false
       }
       return this.isRuntimeWorktreeVisible(
         worktree,
-        visibilitySourceMatchersByRepoId.get(worktree.repoId)
+        visibilitySourceMatchersByRepoId.get(worktree.repoId),
+        visibilitySettings
       )
     })
     return {
@@ -22326,27 +22431,55 @@ export class OrcaRuntimeService {
     }
   }
 
+  async listRetiredWorktreeNames(repoSelector: string): Promise<{
+    retiredNamesByRepo: Record<string, readonly string[]>
+    retiredNameTiersByRepo: Record<string, number>
+  }> {
+    const store = this.requireStore()
+    const repo = await this.resolveRepoSelector(repoSelector)
+    const registry: RetiredNameRegistry = await getRetiredNameRegistryForRepo(
+      store,
+      repo,
+      store.getRepos(),
+      store.getSettings()
+    )
+    return {
+      retiredNamesByRepo: { [repo.id]: registry.names },
+      retiredNameTiersByRepo: { [repo.id]: registry.exhaustedTiers }
+    }
+  }
+
   async listDetectedManagedWorktrees(
     repoSelector: string,
-    connectionId?: string | null
+    connectionId?: string | null,
+    sourceDefaultsSupported = true
   ): Promise<DetectedWorktreeListResult> {
     return this.listDetectedWorktreesForResolvedRepo(
-      await this.resolveRepoSelectorForConnection(repoSelector, connectionId)
+      await this.resolveRepoSelectorForConnection(repoSelector, connectionId),
+      sourceDefaultsSupported
     )
   }
 
   private async listDetectedWorktreesForResolvedRepo(
-    repo: Repo
+    repo: Repo,
+    sourceDefaultsSupported = true
   ): Promise<DetectedWorktreeListResult> {
     const store = this.requireStore()
+    const settings = store.getSettings()
+    const visibilityDefaults = sourceDefaultsSupported
+      ? settings.worktreeVisibilityDefaults
+      : settings.worktreeVisibilityDefaults
+        ? { external: settings.worktreeVisibilityDefaults.external }
+        : undefined
+    const visibilitySettings = { ...settings, worktreeVisibilityDefaults: visibilityDefaults }
     if (isFolderRepo(repo)) {
       const worktrees = listRuntimeFolderWorkspaces(store, repo)
       const matcher = createWorktreeVisibilitySourceMatcher(
         [repo.path, ...worktrees.map((worktree) => worktree.path)],
-        normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+        resolveCustomWorktreeVisibilitySources(repo, visibilityDefaults)
       )
       const detected = worktrees.map((worktree) =>
-        this.toRuntimeDetectedWorktree(repo, worktree, matcher)
+        this.toRuntimeDetectedWorktree(repo, worktree, matcher, visibilitySettings)
       )
       return {
         repoId: repo.id,
@@ -22366,7 +22499,7 @@ export class OrcaRuntimeService {
     }
     const worktreeVisibilitySourceMatcher = createWorktreeVisibilitySourceMatcher(
       [repo.path, ...scan.worktrees.map((worktree) => worktree.path)],
-      normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+      resolveCustomWorktreeVisibilitySources(repo, visibilityDefaults)
     )
     const detected = scan.worktrees.map((gitWorktree) => {
       const worktreeId = `${repo.id}::${gitWorktree.path}`
@@ -22378,7 +22511,8 @@ export class OrcaRuntimeService {
       const detectedWorktree = this.toRuntimeDetectedWorktree(
         repo,
         worktree,
-        worktreeVisibilitySourceMatcher
+        worktreeVisibilitySourceMatcher,
+        visibilitySettings
       )
       if (scan.ok) {
         return detectedWorktree
@@ -22445,17 +22579,20 @@ export class OrcaRuntimeService {
 
   private isRuntimeWorktreeVisible(
     worktree: Worktree,
-    worktreeVisibilitySourceMatcher?: WorktreeVisibilitySourceMatcher
+    worktreeVisibilitySourceMatcher?: WorktreeVisibilitySourceMatcher,
+    settings?: ReturnType<RuntimeStore['getSettings']>
   ): boolean {
     const repo = this.store?.getRepo(worktree.repoId)
     if (!repo || !this.store) {
       return true
     }
-    return this.toRuntimeDetectedWorktree(repo, worktree, worktreeVisibilitySourceMatcher).visible
+    return this.toRuntimeDetectedWorktree(repo, worktree, worktreeVisibilitySourceMatcher, settings)
+      .visible
   }
 
   private buildRuntimeVisibilitySourceMatchersByRepoId(
-    worktrees: readonly Worktree[]
+    worktrees: readonly Worktree[],
+    visibilityDefaults?: GlobalSettings['worktreeVisibilityDefaults']
   ): Map<string, WorktreeVisibilitySourceMatcher> {
     const checkoutPathsByRepoId = new Map<string, string[]>()
     for (const worktree of worktrees) {
@@ -22470,7 +22607,7 @@ export class OrcaRuntimeService {
           repo.id,
           createWorktreeVisibilitySourceMatcher(
             [repo.path, ...(checkoutPathsByRepoId.get(repo.id) ?? [])],
-            normalizeCustomWorktreeVisibilitySources(repo.customWorktreeVisibilitySources) ?? []
+            resolveCustomWorktreeVisibilitySources(repo, visibilityDefaults)
           )
         ])
     )
@@ -22479,9 +22616,10 @@ export class OrcaRuntimeService {
   private toRuntimeDetectedWorktree(
     repo: Repo,
     worktree: Worktree,
-    worktreeVisibilitySourceMatcher?: WorktreeVisibilitySourceMatcher
+    worktreeVisibilitySourceMatcher?: WorktreeVisibilitySourceMatcher,
+    providedSettings?: ReturnType<RuntimeStore['getSettings']>
   ): DetectedWorktree {
-    const settings = this.store?.getSettings()
+    const settings = providedSettings ?? this.store?.getSettings()
     if (!settings) {
       return {
         ...worktree,
@@ -23176,6 +23314,7 @@ export class OrcaRuntimeService {
   async createManagedWorktree(args: {
     repoSelector: string
     name: string
+    nameWasGenerated?: boolean
     baseBranch?: string
     compareBaseRef?: string
     branchNameOverride?: string
@@ -23535,13 +23674,41 @@ export class OrcaRuntimeService {
     let branchConflictKind: 'local' | 'remote' | null = null
     let worktreePath = ''
     let worktreePathResolved = false
+    const shouldRetireGeneratedName =
+      args.nameWasGenerated === true && isGeneratedWorktreeCreateName(sanitizedName)
+    const retirementStore = this.requireStore()
+    const retiredNameRegistry = shouldRetireGeneratedName
+      ? await getRetiredNameRegistryForRepo(
+          retirementStore,
+          repo,
+          retirementStore.getRepos(),
+          settings
+        )
+      : null
+    const isRetiredName = retiredNameRegistry ? createRetiredNameLookup(retiredNameRegistry) : null
     // Why: runtime/mobile create-from-review callers should get a new workspace
     // even when the PR branch or review branch name is already in use.
-    for (let suffix = 1; suffix <= WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
-      effectiveSanitizedName = getWorktreeCreateCandidate(sanitizedName, suffix)
-      effectiveRequestedName = args.name.trim()
-        ? getWorktreeCreateCandidate(args.name, suffix)
-        : effectiveSanitizedName
+    for (
+      let suffix = 1, attempts = 0;
+      attempts < WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS;
+      suffix += 1
+    ) {
+      effectiveSanitizedName = shouldRetireGeneratedName
+        ? getGeneratedWorktreeCreateCandidate(
+            sanitizedName,
+            suffix,
+            retiredNameRegistry?.exhaustedTiers
+          )
+        : getWorktreeCreateCandidate(sanitizedName, suffix)
+      effectiveRequestedName = shouldRetireGeneratedName
+        ? effectiveSanitizedName
+        : args.name.trim()
+          ? getWorktreeCreateCandidate(args.name, suffix)
+          : effectiveSanitizedName
+      if (isRetiredName?.(effectiveSanitizedName)) {
+        continue
+      }
+      attempts += 1
       branchName = await resolveCreateBranchName(
         repo.path,
         selectedExistingLocalBranchName ??
@@ -23743,19 +23910,11 @@ export class OrcaRuntimeService {
       ...(suggestLocalBaseRefUpdate ? { suggestLocalBaseRefUpdate } : {})
     }
     const defaultAddWorktreeOption = addProjectGitOptions()
-    const addResult: AddWorktreeResult =
-      (await (sparseDirectories.length > 0
-        ? checkoutExistingBranch
-          ? addSparseWorktree(
-              repo.path,
-              worktreePath,
-              branchName,
-              sparseDirectories,
-              baseBranch,
-              settings.refreshLocalBaseRefOnWorktreeCreate,
-              addProjectGitOptions(existingBranchOption)
-            )
-          : suggestLocalBaseRefUpdate
+    let addResult: AddWorktreeResult
+    try {
+      addResult =
+        (await (sparseDirectories.length > 0
+          ? checkoutExistingBranch
             ? addSparseWorktree(
                 repo.path,
                 worktreePath,
@@ -23763,9 +23922,9 @@ export class OrcaRuntimeService {
                 sparseDirectories,
                 baseBranch,
                 settings.refreshLocalBaseRefOnWorktreeCreate,
-                addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
+                addProjectGitOptions(existingBranchOption)
               )
-            : remoteTrackingBaseOption
+            : suggestLocalBaseRefUpdate
               ? addSparseWorktree(
                   repo.path,
                   worktreePath,
@@ -23773,9 +23932,9 @@ export class OrcaRuntimeService {
                   sparseDirectories,
                   baseBranch,
                   settings.refreshLocalBaseRefOnWorktreeCreate,
-                  addProjectGitOptions(remoteTrackingBaseOption)
+                  addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
                 )
-              : defaultAddWorktreeOption
+              : remoteTrackingBaseOption
                 ? addSparseWorktree(
                     repo.path,
                     worktreePath,
@@ -23783,27 +23942,27 @@ export class OrcaRuntimeService {
                     sparseDirectories,
                     baseBranch,
                     settings.refreshLocalBaseRefOnWorktreeCreate,
-                    defaultAddWorktreeOption
+                    addProjectGitOptions(remoteTrackingBaseOption)
                   )
-                : addSparseWorktree(
-                    repo.path,
-                    worktreePath,
-                    branchName,
-                    sparseDirectories,
-                    baseBranch,
-                    settings.refreshLocalBaseRefOnWorktreeCreate
-                  )
-        : checkoutExistingBranch
-          ? addWorktree(
-              repo.path,
-              worktreePath,
-              branchName,
-              baseBranch,
-              settings.refreshLocalBaseRefOnWorktreeCreate,
-              false,
-              addProjectGitOptions(existingBranchOption)
-            )
-          : suggestLocalBaseRefUpdate
+                : defaultAddWorktreeOption
+                  ? addSparseWorktree(
+                      repo.path,
+                      worktreePath,
+                      branchName,
+                      sparseDirectories,
+                      baseBranch,
+                      settings.refreshLocalBaseRefOnWorktreeCreate,
+                      defaultAddWorktreeOption
+                    )
+                  : addSparseWorktree(
+                      repo.path,
+                      worktreePath,
+                      branchName,
+                      sparseDirectories,
+                      baseBranch,
+                      settings.refreshLocalBaseRefOnWorktreeCreate
+                    )
+          : checkoutExistingBranch
             ? addWorktree(
                 repo.path,
                 worktreePath,
@@ -23811,9 +23970,9 @@ export class OrcaRuntimeService {
                 baseBranch,
                 settings.refreshLocalBaseRefOnWorktreeCreate,
                 false,
-                addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
+                addProjectGitOptions(existingBranchOption)
               )
-            : remoteTrackingBaseOption
+            : suggestLocalBaseRefUpdate
               ? addWorktree(
                   repo.path,
                   worktreePath,
@@ -23821,9 +23980,9 @@ export class OrcaRuntimeService {
                   baseBranch,
                   settings.refreshLocalBaseRefOnWorktreeCreate,
                   false,
-                  addProjectGitOptions(remoteTrackingBaseOption)
+                  addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
                 )
-              : defaultAddWorktreeOption
+              : remoteTrackingBaseOption
                 ? addWorktree(
                     repo.path,
                     worktreePath,
@@ -23831,15 +23990,35 @@ export class OrcaRuntimeService {
                     baseBranch,
                     settings.refreshLocalBaseRefOnWorktreeCreate,
                     false,
-                    defaultAddWorktreeOption
+                    addProjectGitOptions(remoteTrackingBaseOption)
                   )
-                : addWorktree(
-                    repo.path,
-                    worktreePath,
-                    branchName,
-                    baseBranch,
-                    settings.refreshLocalBaseRefOnWorktreeCreate
-                  ))) ?? {}
+                : defaultAddWorktreeOption
+                  ? addWorktree(
+                      repo.path,
+                      worktreePath,
+                      branchName,
+                      baseBranch,
+                      settings.refreshLocalBaseRefOnWorktreeCreate,
+                      false,
+                      defaultAddWorktreeOption
+                    )
+                  : addWorktree(
+                      repo.path,
+                      worktreePath,
+                      branchName,
+                      baseBranch,
+                      settings.refreshLocalBaseRefOnWorktreeCreate
+                    ))) ?? {}
+    } catch (error) {
+      if (shouldRetireGeneratedName && failedWorktreeCreationNeedsRetirement(error)) {
+        await retireGeneratedWorktreeName(retirementStore, repo, settings, effectiveSanitizedName)
+      }
+      throw error
+    }
+
+    if (shouldRetireGeneratedName) {
+      await retireGeneratedWorktreeName(retirementStore, repo, settings, effectiveSanitizedName)
+    }
 
     let configuredPushTarget: GitPushTarget | undefined
     if (preparedPushTarget) {
@@ -24325,6 +24504,7 @@ export class OrcaRuntimeService {
     repo: Repo,
     args: {
       name: string
+      nameWasGenerated?: boolean
       baseBranch?: string
       compareBaseRef?: string
       branchNameOverride?: string
@@ -24379,6 +24559,7 @@ export class OrcaRuntimeService {
       {
         repoId: repo.id,
         name: args.name,
+        ...(args.nameWasGenerated === true ? { nameWasGenerated: true } : {}),
         ...(args.displayName ? { displayName: args.displayName } : {}),
         ...(args.baseBranch ? { baseBranch: args.baseBranch } : {}),
         ...(args.compareBaseRef ? { compareBaseRef: args.compareBaseRef } : {}),
@@ -28796,6 +28977,42 @@ export class OrcaRuntimeService {
     )
   }
 
+  private getPtyIdsForExplicitTabClose(worktreeId: string, tabId: string): string[] {
+    const ptyIds = new Set<string>()
+    for (const pty of this.ptysById.values()) {
+      if (pty.connected && pty.worktreeId === worktreeId && pty.tabId === tabId) {
+        ptyIds.add(pty.ptyId)
+      }
+    }
+    for (const leaf of this.leaves.values()) {
+      if (leaf.worktreeId === worktreeId && leaf.tabId === tabId && leaf.ptyId) {
+        ptyIds.add(leaf.ptyId)
+      }
+    }
+    return [...ptyIds]
+  }
+
+  private async stopExplicitlyClosedTabPtys(
+    ptyIds: readonly string[],
+    addressedPtyId: string
+  ): Promise<boolean> {
+    let addressedPtyStopped = false
+    const deadlineMs = Date.now() + EXPLICIT_TERMINAL_CLOSE_STOP_TIMEOUT_MS
+    for (const ptyId of ptyIds) {
+      let verifiedStopped = false
+      try {
+        verifiedStopped = (await this.ptyController?.stopAndWait?.(ptyId, { deadlineMs })) ?? false
+      } catch {
+        // Why: verified teardown is preferred, but its transport failure must not suppress the legacy provider kill.
+      }
+      const stopped = verifiedStopped || (this.ptyController?.kill(ptyId) ?? false)
+      if (ptyId === addressedPtyId) {
+        addressedPtyStopped = stopped
+      }
+    }
+    return addressedPtyStopped
+  }
+
   private resolveHandleForTab(tabId: string): string | null {
     for (const leaf of this.leaves.values()) {
       if (leaf.tabId === tabId && leaf.ptyId !== null) {
@@ -28981,12 +29198,40 @@ export class OrcaRuntimeService {
       const siblingCount = surface?.tab.parentLayout
         ? countTerminalLayoutLeaves(surface.tab.parentLayout.root)
         : this.countLeavesInTab(tabId)
+      if (siblingCount <= 1 && surface && this.tabs.has(tabId) && this.notifier?.closeTerminalTab) {
+        const ptyIdsToKill = this.getPtyIdsForExplicitTabClose(pty.pty.worktreeId, tabId)
+        try {
+          await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
+            localPtyTeardownOwnedExternally: true,
+            origin: 'runtime'
+          })
+        } catch (error) {
+          if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
+            throw error
+          }
+          this.notifier.closeTerminal?.(tabId)
+        }
+        const ptyKilled = await this.stopExplicitlyClosedTabPtys(ptyIdsToKill, pty.pty.ptyId)
+        return { handle, tabId, ptyKilled }
+      }
+      if (siblingCount <= 1 && !surface && pty.pty.tabId && this.notifier?.closeTerminalTab) {
+        const ptyIdsToKill = this.getPtyIdsForExplicitTabClose(pty.pty.worktreeId, tabId)
+        await this.notifier.closeTerminalTab(tabId, {
+          localPtyTeardownOwnedExternally: true,
+          origin: 'runtime'
+        })
+        const ptyKilled = await this.stopExplicitlyClosedTabPtys(ptyIdsToKill, pty.pty.ptyId)
+        return { handle, tabId, ptyKilled }
+      }
+      // Why: fork keeps verified teardown on the no-tab-notifier fallback; kill alone can return before the process exits.
       const ptyKilled = await this.stopPtyAndWait(pty.pty.ptyId)
       if (!ptyKilled || siblingCount <= 1) {
         if (surface) {
           // Why: paired viewers keep ended streams mounted until the HUB publishes removal, so explicit close uses the durable host-tab transaction instead of viewer-local exit handling.
           try {
-            await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId)
+            await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
+              origin: 'runtime'
+            })
           } catch (error) {
             if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
               throw error
@@ -29001,13 +29246,24 @@ export class OrcaRuntimeService {
     }
     this.assertGraphReady()
     const { leaf } = this.getLiveLeafForHandle(handle)
-    let ptyKilled = false
-    if (leaf.ptyId) {
-      ptyKilled = await this.stopPtyAndWait(leaf.ptyId)
-    }
     // Why: in a multi-pane tab, killing the PTY is enough (renderer's exit handler closes the pane); an extra IPC close would race it and close the whole tab.
     const siblingCount = this.countLeavesInTab(leaf.tabId)
-    if (!ptyKilled || siblingCount <= 1) {
+    const ptyIdsToKill =
+      siblingCount <= 1
+        ? this.getPtyIdsForExplicitTabClose(leaf.worktreeId, leaf.tabId)
+        : leaf.ptyId
+          ? [leaf.ptyId]
+          : []
+    if (siblingCount <= 1 && this.notifier?.closeTerminalTab) {
+      await this.notifier.closeTerminalTab(leaf.tabId, {
+        localPtyTeardownOwnedExternally: true,
+        origin: 'runtime'
+      })
+    }
+    const ptyKilled = leaf.ptyId
+      ? await this.stopExplicitlyClosedTabPtys(ptyIdsToKill, leaf.ptyId)
+      : false
+    if (siblingCount > 1 ? !ptyKilled : !this.notifier?.closeTerminalTab) {
       this.notifier?.closeTerminal(leaf.tabId, leaf.paneRuntimeId)
     }
     return { handle, tabId: leaf.tabId, ptyKilled }
@@ -29085,7 +29341,10 @@ export class OrcaRuntimeService {
       const ptyIds = this.getPtyIdsInTab(pty.pty.worktreeId, tabId)
       // Why: a handle-addressed CLI/automation close is an explicit intent, so
       // it must stay destructive under the non-user close adjudication gate.
-      await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, { reason: 'user' })
+      await this.closeMobileSessionTab(`id:${pty.pty.worktreeId}`, tabId, {
+        reason: 'user',
+        origin: 'runtime'
+      })
       const ptyKilled = await this.stopPtysAndWait(ptyIds)
       this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
       return { handle, tabId, closeMode: 'tab', ptyKilled }
@@ -29093,7 +29352,10 @@ export class OrcaRuntimeService {
     this.assertGraphReady()
     const { leaf } = this.getLiveLeafForHandle(handle)
     const ptyIds = this.getPtyIdsInTab(leaf.worktreeId, leaf.tabId)
-    await this.closeMobileSessionTab(`id:${leaf.worktreeId}`, leaf.tabId, { reason: 'user' })
+    await this.closeMobileSessionTab(`id:${leaf.worktreeId}`, leaf.tabId, {
+      reason: 'user',
+      origin: 'runtime'
+    })
     const ptyKilled = await this.stopPtysAndWait(ptyIds)
     this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
     return { handle, tabId: leaf.tabId, closeMode: 'tab', ptyKilled }
@@ -29332,9 +29594,17 @@ export class OrcaRuntimeService {
         // Best-effort fallback below preserves the original split authority error.
       }
       if (!stopped) {
-        this.ptyController.kill(result.id)
+        try {
+          this.ptyController.kill(result.id)
+        } catch {
+          // Best-effort cleanup; retirement below still runs and the original error still throws.
+        }
       }
-      this.ptyController.retireRejectedPty?.(result.id)
+      try {
+        this.ptyController.retireRejectedPty?.(result.id)
+      } catch {
+        // Best-effort cleanup; preserve the original split authority error.
+      }
       throw error
     }
     const committedSourceAuthority =
@@ -30174,15 +30444,22 @@ export class OrcaRuntimeService {
     if (this.graphStatus !== 'ready') {
       return
     }
-    // Why: a renderer reload tears down the live graph, so live handles must go stale immediately, not be reused against the rebuild.
+    // Why: the rebuilt graph decides whether an incarnation survived; do not stale proven process identities before that comparison.
     this.rendererGraphEpoch += 1
     this.graphStatus = 'reloading'
     this.setTerminalSideEffectConsumerAvailable(false)
     this.rememberDetachedPreAllocatedLeaves()
+    const retainedHandles = new Set([
+      ...this.handleByPtyId.values(),
+      ...[...this.handleByPtyIncarnation.values()].map((record) => record.handle)
+    ])
+    for (const handle of this.waitersByHandle.keys()) {
+      if (!retainedHandles.has(handle)) {
+        this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
+      }
+    }
     this.handles.clear()
     this.handleByLeafKey.clear()
-    // Why: handleByPtyId (pre-allocated CLI handles) survives reloads so CLI agents keep control; adoptPreAllocatedHandle re-links on the new graph.
-    this.rejectAllWaiters('terminal_handle_stale')
     this.refreshWritableFlags()
   }
 
@@ -30193,6 +30470,18 @@ export class OrcaRuntimeService {
     this.graphStatus = 'ready'
     this.setTerminalSideEffectConsumerAvailable(windowId !== HEADLESS_RUNTIME_WINDOW_ID)
     this.refreshWritableFlags()
+  }
+
+  /** A renderer that died mid-reload never rebuilds its graph, so the
+   *  markGraphReady that markRendererReloading waits for can never arrive.
+   *  Fail closed on the spot instead of leaving CLI calls against a graph that
+   *  is not coming back. */
+  markGraphReloadFailed(windowId: number, reason: string): void {
+    if (windowId !== this.authoritativeWindowId) {
+      return
+    }
+    console.error(`[runtime] renderer graph reload failed (${reason}); failing closed.`)
+    this.markGraphUnavailable(windowId)
   }
 
   markGraphUnavailable(windowId: number): void {
@@ -30212,6 +30501,7 @@ export class OrcaRuntimeService {
     this.leavesByPtyId.clear()
     this.handles.clear()
     this.handleByLeafKey.clear()
+    this.clearPtyIncarnationHandles()
     // Why: pre-allocated CLI handles must survive graph unavailability so they can be re-adopted on reconnect.
     this.rejectAllWaiters('terminal_handle_stale')
   }
@@ -30501,6 +30791,15 @@ export class OrcaRuntimeService {
 
   private async resolveWorktreeSelector(selector: string): Promise<ResolvedWorktree> {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(selector)
+    // Why only `id:`: every other selector kind is matched across the whole fleet, and their
+    // `selector_ambiguous` contract is defined over all repos. Scoping those would silently pick a
+    // winner where today they correctly refuse. An `id:` selector already names its repo.
+    if (explicitWorktreeId && !this.hasFreshResolvedWorktreeCache()) {
+      const scoped = await this.resolveExplicitWorktreeIdScoped(explicitWorktreeId)
+      if (scoped) {
+        return scoped
+      }
+    }
     const worktrees = await this.listResolvedWorktrees()
     let candidates: ResolvedWorktree[]
 
@@ -31094,6 +31393,11 @@ export class OrcaRuntimeService {
     return resolved
   }
 
+  /** A warm fleet snapshot already answers any selector for free, so scoped scanning must yield to it. */
+  private hasFreshResolvedWorktreeCache(): boolean {
+    return Boolean(this.resolvedWorktreeCache && this.resolvedWorktreeCache.expiresAt > Date.now())
+  }
+
   private async listResolvedWorktrees(): Promise<ResolvedWorktree[]> {
     return (await this.listResolvedWorktreeSnapshot()).worktrees
   }
@@ -31135,71 +31439,11 @@ export class OrcaRuntimeService {
         getAgentLaunchPlatformForRepo(repo, projectRuntimeByRepoId.get(repo.id))
       ])
     )
+    const deps = this.repoWorktreeRowDeps()
     const perRepoWorktrees = await Promise.all(
-      repos.map(async (repo) => {
-        if (isFolderRepo(repo)) {
-          return listRuntimeFolderWorkspaces(this.requireStore(), repo).map((worktree) => ({
-            ...worktree,
-            hostId: worktree.hostId ?? getRepoExecutionHostId(repo),
-            parentWorktreeId: null,
-            childWorktreeIds: [],
-            lineage: null,
-            git: {
-              path: worktree.path,
-              head: worktree.head,
-              branch: worktree.branch,
-              isBare: worktree.isBare,
-              isMainWorktree: worktree.isMainWorktree
-            },
-            displayName: worktree.displayName,
-            comment: worktree.comment
-          }))
-        }
-        // Why: mobile startup shares this path, so a slow repo scan degrades one repo's metadata instead of blocking all session loading.
-        // Why the catch: `withTimeout` resolves its fallback on rejection too, so the rejection must be absorbed first for `null` to mean
-        // "timed out" only. A stall never reached a verdict, so restore persisted rows instead of publishing a healthy-looking empty catalog;
-        // a rejection is a real answer and keeps its shipped zero-row semantics.
-        const scan: RuntimeWorktreeScanResult =
-          (await withTimeout<RuntimeWorktreeScanResult | null>(
-            this.listRepoWorktreesForResolution(repo, projectRuntimeByRepoId).catch(
-              () => ({ ok: false, worktrees: [] }) satisfies RuntimeWorktreeScanResult
-            ),
-            RESOLVED_WORKTREE_REPO_TIMEOUT_MS,
-            null
-          )) ?? { ok: false, worktrees: this.listStoredWorktreesForResolution(repo) }
-        const gitWorktrees = scan.worktrees
-        if (scan.ok) {
-          pruneLineageForMissingRepoWorktrees(this.requireStore(), repo, gitWorktrees)
-        }
-        return gitWorktrees.map((gitWorktree) => {
-          const worktreeId = `${repo.id}::${gitWorktree.path}`
-          // Why: lineage validation needs a durable instance ID even when the runtime sees a workspace before renderer discovery-stamp.
-          const existingMeta = metaById[worktreeId]
-          const meta =
-            existingMeta && existingMeta.instanceId
-              ? existingMeta
-              : this.store?.setWorktreeMeta(worktreeId, {})
-          const merged = {
-            ...mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
-            hostId: existingMeta?.hostId ?? meta?.hostId ?? getRepoExecutionHostId(repo)
-          }
-          return {
-            ...merged,
-            parentWorktreeId: null,
-            childWorktreeIds: [],
-            lineage: null,
-            git: {
-              path: gitWorktree.path,
-              head: gitWorktree.head,
-              branch: gitWorktree.branch,
-              isBare: gitWorktree.isBare,
-              isMainWorktree: gitWorktree.isMainWorktree
-            },
-            displayName: merged.displayName,
-            comment: merged.comment
-          }
-        })
-      })
+      repos.map(
+        async (repo) => await resolveRepoWorktreeRows(deps, repo, metaById, projectRuntimeByRepoId)
+      )
     )
     const worktrees = projectResolvedWorktreeLineage(
       perRepoWorktrees.flat(),
@@ -31216,6 +31460,26 @@ export class OrcaRuntimeService {
       }
     }
     return { worktrees, platformByRepoId }
+  }
+
+  /** Bind the runtime-owned scan cache and folder-workspace stamping into the row resolver. */
+  private repoWorktreeRowDeps(): RepoWorktreeRowDeps {
+    const store = this.requireStore()
+    return {
+      store,
+      scanRepo: (repo, projectRuntimeByRepoId) =>
+        this.listRepoWorktreesForResolution(repo, projectRuntimeByRepoId),
+      listFolderWorkspaces: (repo) => listRuntimeFolderWorkspaces(store, repo)
+    }
+  }
+
+  private async resolveExplicitWorktreeIdScoped(
+    worktreeId: string
+  ): Promise<ResolvedWorktree | null> {
+    if (!this.store) {
+      return null
+    }
+    return await resolveScopedWorktreeIdRow(this.repoWorktreeRowDeps(), worktreeId)
   }
 
   private async listRepoWorktreesForResolution(
@@ -31375,37 +31639,7 @@ export class OrcaRuntimeService {
   }
 
   private listStoredWorktreesForResolution(repo: Repo): GitWorktreeInfo[] {
-    const store = this.store
-    if (!store) {
-      return []
-    }
-    const expectedHostId = getRepoExecutionHostId(repo)
-    const repoOwnerCount = store.getRepos().filter((candidate) => candidate.id === repo.id).length
-    const byWorktreeId = new Map<string, GitWorktreeInfo>()
-    for (const [worktreeId, meta] of Object.entries(store.getAllWorktreeMeta())) {
-      const parsed = splitWorktreeId(worktreeId)
-      if (!parsed || parsed.repoId !== repo.id) {
-        continue
-      }
-      // Why: one repo id can be registered on several execution hosts, so a degraded host must not republish another host's rows (same gate as worktrees.ts).
-      if (meta.hostId ? meta.hostId !== expectedHostId : repoOwnerCount > 1) {
-        continue
-      }
-      // Why: keep persisted rows for any repo kind while its scan is unreachable or stalled, instead of zero rows (worktrees:list does the same for disconnected SSH).
-      byWorktreeId.set(worktreeId, {
-        path: parsed.worktreePath,
-        head: '',
-        branch: '',
-        isBare: false,
-        isMainWorktree: areWorktreePathsEqual(parsed.worktreePath, repo.path),
-        ...(meta.sparseDirectories !== undefined ||
-        meta.sparseBaseRef !== undefined ||
-        meta.sparsePresetId !== undefined
-          ? { isSparse: true }
-          : {})
-      })
-    }
-    return [...byWorktreeId.values()]
+    return this.store ? listStoredWorktreeRowsForRepo(this.requireStore(), repo) : []
   }
 
   private async getResolvedWorktreeMap(): Promise<Map<string, ResolvedWorktree>> {
@@ -31553,6 +31787,9 @@ export class OrcaRuntimeService {
 
     pty.worktreeId = worktreeId
     if (state.incarnationId !== undefined) {
+      if (pty.incarnationId && state.incarnationId && pty.incarnationId !== state.incarnationId) {
+        this.invalidatePtyIncarnationHandle(ptyId)
+      }
       pty.incarnationId = state.incarnationId
     }
     if (state.connectionId !== undefined) {
@@ -32002,6 +32239,7 @@ export class OrcaRuntimeService {
     this.agentStatusOscProcessorsByPtyId.delete(ptyId)
     this.terminalSpawnCommandsByPtyId.delete(ptyId)
     this.disposePtyTitleTracker(ptyId)
+    this.invalidatePtyIncarnationHandle(ptyId)
     this.oscTitleScanTailByPtyId.delete(ptyId)
     this.osc7ScanTailByPtyId.delete(ptyId)
     this.terminalCwdByPtyId.delete(ptyId)
@@ -34203,13 +34441,20 @@ export class OrcaRuntimeService {
     }
 
     const preAllocatedHandle = this.adoptPreAllocatedHandle(leaf)
-    const handle = preAllocatedHandle ?? `term_${randomUUID()}`
-    if (!preAllocatedHandle) {
-      this.syntheticTerminalHandles.add(handle)
+    if (preAllocatedHandle) {
+      return preAllocatedHandle
     }
-    if (this.handles.has(handle)) {
-      return handle
+    const incarnationId = leaf.ptyId ? (this.ptysById.get(leaf.ptyId)?.incarnationId ?? null) : null
+    const retained = leaf.ptyId ? this.handleByPtyIncarnation.get(leaf.ptyId) : undefined
+    if (retained && leaf.ptyId && retained.incarnationId !== incarnationId) {
+      this.invalidatePtyIncarnationHandle(leaf.ptyId)
+    } else if (retained) {
+      this.bindPtyIncarnationHandle(retained, leaf)
+      return retained.handle
     }
+
+    const handle = `term_${randomUUID()}`
+    this.syntheticTerminalHandles.add(handle)
     this.handles.set(handle, {
       handle,
       runtimeId: this.runtimeId,
@@ -34221,7 +34466,72 @@ export class OrcaRuntimeService {
       ptyGeneration: leaf.ptyGeneration
     })
     this.handleByLeafKey.set(leafKey, handle)
+    if (leaf.ptyId && incarnationId) {
+      this.handleByPtyIncarnation.set(leaf.ptyId, { handle, incarnationId, leafKey })
+    }
     return handle
+  }
+
+  private bindPtyIncarnationHandle(
+    retained: PtyIncarnationHandleRecord,
+    leaf: RuntimeLeafRecord
+  ): void {
+    const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
+    if (retained.leafKey !== leafKey) {
+      if (this.handleByLeafKey.get(retained.leafKey) === retained.handle) {
+        this.handleByLeafKey.delete(retained.leafKey)
+      }
+      retained.leafKey = leafKey
+    }
+    this.handles.set(retained.handle, {
+      handle: retained.handle,
+      runtimeId: this.runtimeId,
+      rendererGraphEpoch: this.rendererGraphEpoch,
+      worktreeId: leaf.worktreeId,
+      tabId: leaf.tabId,
+      leafId: leaf.leafId,
+      ptyId: leaf.ptyId,
+      ptyGeneration: leaf.ptyGeneration
+    })
+    this.handleByLeafKey.set(leafKey, retained.handle)
+  }
+
+  private invalidatePtyIncarnationHandle(ptyId: string): void {
+    const retained = this.handleByPtyIncarnation.get(ptyId)
+    if (!retained) {
+      return
+    }
+    this.handleByPtyIncarnation.delete(ptyId)
+    if (this.handleByLeafKey.get(retained.leafKey) === retained.handle) {
+      this.handleByLeafKey.delete(retained.leafKey)
+    }
+    this.handles.delete(retained.handle)
+    this.syntheticTerminalHandles.delete(retained.handle)
+    this.rejectWaitersForHandle(retained.handle, 'terminal_handle_stale')
+  }
+
+  private clearPtyIncarnationHandles(): void {
+    for (const retained of this.handleByPtyIncarnation.values()) {
+      this.syntheticTerminalHandles.delete(retained.handle)
+    }
+    this.handleByPtyIncarnation.clear()
+  }
+
+  private reconcilePtyIncarnationHandles(): void {
+    for (const [ptyId, retained] of this.handleByPtyIncarnation) {
+      const pty = this.ptysById.get(ptyId)
+      const leaves = this.getLeavesForPty(ptyId)
+      if (
+        !pty?.incarnationId ||
+        pty.incarnationId !== retained.incarnationId ||
+        leaves.length !== 1 ||
+        this.handleByPtyId.has(ptyId)
+      ) {
+        this.invalidatePtyIncarnationHandle(ptyId)
+        continue
+      }
+      this.bindPtyIncarnationHandle(retained, leaves[0])
+    }
   }
 
   private adoptPreAllocatedHandle(leaf: RuntimeLeafRecord): string | null {
@@ -34314,6 +34624,10 @@ export class OrcaRuntimeService {
         }
       }
     }
+    const record = this.handles.get(handle)
+    if (record?.ptyId && this.handleByPtyIncarnation.get(record.ptyId)?.handle === handle) {
+      this.handleByPtyIncarnation.delete(record.ptyId)
+    }
     this.handleByLeafKey.delete(leafKey)
     this.handles.delete(handle)
     this.syntheticTerminalHandles.delete(handle)
@@ -34366,10 +34680,17 @@ export class OrcaRuntimeService {
   }
 
   private resolveTuiIdleWaiters(leaf: RuntimeLeafRecord): void {
-    const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
-    if (!handle) {
+    const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
+    const candidateHandle =
+      this.handleByLeafKey.get(leafKey) ??
+      (leaf.ptyId
+        ? (this.handleByPtyId.get(leaf.ptyId) ??
+          this.handleByPtyIncarnation.get(leaf.ptyId)?.handle)
+        : undefined)
+    if (!candidateHandle || !this.waitersByHandle.has(candidateHandle)) {
       return
     }
+    const handle = this.issueHandle(leaf)
     const waiters = this.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
@@ -38276,7 +38597,6 @@ const WORKTREE_SCAN_AGENT_SCRATCH_TTL_MS = 5 * 60_000
 // edits are invisible to it and a tip living in packed-refs or reftable only gets an mtime + size
 // stamp, so a real scan still runs on this interval even while the probe reports "unchanged".
 export const WORKTREE_SCAN_ADMIN_RECONCILE_INTERVAL_MS = 5 * 60_000
-export const RESOLVED_WORKTREE_REPO_TIMEOUT_MS = 5000
 // Why reserved rather than spent on the probe: when the probe expires the caller still has to run
 // `git worktree list` and answer inside the same budget, so the fallback needs its own room. Sized
 // for a healthy Git on a busy host, well above the tens of milliseconds a warm list costs.
@@ -38373,21 +38693,6 @@ function getExplicitWorktreeIdSelector(selector: string | undefined): string | n
   }
   const id = selector.slice(3)
   return id.length > 0 ? id : null
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return new Promise<T>((resolve) => {
-    timeout = setTimeout(() => resolve(fallback), timeoutMs)
-    promise.then(
-      (value) => resolve(value),
-      () => resolve(fallback)
-    )
-  }).finally(() => {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  })
 }
 
 function withTimeoutResult<T>(

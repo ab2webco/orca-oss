@@ -1,6 +1,5 @@
 import {
   buildRegistry,
-  formatZodError,
   isStreamingMethod,
   type RpcAnyMethod,
   type RpcEnvelopeMeta,
@@ -14,12 +13,12 @@ import {
   resolveChangedProjectId
 } from '../../plane/plane-change-broadcast'
 import type { FeatureInteractionId } from '../../../shared/feature-interactions'
+import { resolveAuthenticatedCallerFingerprint } from './local-caller-fingerprint-scope'
 import { errorResponse, successResponse } from './errors'
 import { ALL_RPC_METHODS } from './methods'
 import { emulatorProbe, emulatorProbeError } from '../../emulator/emulator-probe'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import {
-  authenticatedCallerFingerprint,
   getOrchestrationMutationExecutor,
   type OrchestrationMutationExecutor,
   type DurableMutationInvocation
@@ -28,7 +27,8 @@ import { orchestrationMigrationFence } from './orchestration-contract-fence'
 import { recordRuntimeFeatureInteraction } from './runtime-feature-interaction'
 import { OrchestrationLegacyCompatibility } from './orchestration-legacy-compatibility'
 import type { RpcDispatchStreamingOptions } from './dispatcher-stream-options'
-import { invalidArgumentResponse, mapDispatcherError } from './dispatcher-error-response'
+import { mapDispatcherError } from './dispatcher-error-response'
+import { parseDispatchParams } from './dispatcher-params'
 
 export type DispatcherOptions = { runtime: OrcaRuntimeService; methods?: readonly RpcAnyMethod[] }
 
@@ -45,7 +45,10 @@ export class RpcDispatcher {
     this.legacyOrchestration = new OrchestrationLegacyCompatibility(runtime)
   }
 
-  async dispatch(request: RpcRequest, options?: { signal?: AbortSignal }): Promise<RpcResponse> {
+  async dispatch(
+    request: RpcRequest,
+    options?: { signal?: AbortSignal; authenticatedCallerFingerprint?: string }
+  ): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)
     if (!method) {
@@ -62,7 +65,7 @@ export class RpcDispatcher {
       return migrationFence
     }
 
-    const parsedParams = this.parseParams(request, method, meta)
+    const parsedParams = parseDispatchParams(request, method, meta)
     if (parsedParams.error) {
       return parsedParams.error
     }
@@ -93,6 +96,12 @@ export class RpcDispatcher {
         request,
         compatibility.legacyCoordinatorAuthority
       )
+      const authenticatedCallerFingerprint = resolveAuthenticatedCallerFingerprint(
+        request,
+        effectiveParams,
+        options?.authenticatedCallerFingerprint,
+        () => this.orchestrationMutations.getLocalAuthenticatedCallerFingerprint()
+      )
       const invoke = (mutation?: DurableMutationInvocation) => {
         const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
         return method.handler(effectiveParams, {
@@ -101,7 +110,7 @@ export class RpcDispatcher {
           requestId: request.id,
           orchestrationCapability: request.orchestrationCapability,
           authenticatedCallerFingerprint:
-            mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint(request),
+            mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
           recordMutationReceipt: mutation?.recordReceipt,
           orchestrationMutation: mutation?.identity,
           legacyCoordinatorRunId,
@@ -116,7 +125,7 @@ export class RpcDispatcher {
         request,
         effectiveParams,
         invoke,
-        legacyCoordinator?.mutationCallerFingerprint
+        legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
       )
       recordRuntimeFeatureInteraction(
         this.runtime,
@@ -129,7 +138,9 @@ export class RpcDispatcher {
       return successResponse(request.id, meta, result)
     } catch (error) {
       if (request.method.startsWith('emulator.')) {
-        emulatorProbeError(`rpc ${request.method}`, error, { params: request.params })
+        emulatorProbeError(`rpc ${request.method}`, error, {
+          params: request.params
+        })
       }
       return mapDispatcherError(request, meta, error)
     }
@@ -160,7 +171,7 @@ export class RpcDispatcher {
       return
     }
 
-    const parsedParams = this.parseParams(request, method, meta)
+    const parsedParams = parseDispatchParams(request, method, meta)
     if (parsedParams.error) {
       reply(JSON.stringify(parsedParams.error))
       return
@@ -182,6 +193,12 @@ export class RpcDispatcher {
           request,
           compatibility.legacyCoordinatorAuthority
         )
+        const authenticatedCallerFingerprint = resolveAuthenticatedCallerFingerprint(
+          request,
+          effectiveParams,
+          options?.authenticatedCallerFingerprint,
+          () => this.orchestrationMutations.getLocalAuthenticatedCallerFingerprint()
+        )
         const invoke = (mutation?: DurableMutationInvocation) => {
           const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
           return method.handler(effectiveParams, {
@@ -195,7 +212,7 @@ export class RpcDispatcher {
             clientCapabilities: options?.clientCapabilities,
             orchestrationCapability: request.orchestrationCapability,
             authenticatedCallerFingerprint:
-              mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint(request),
+              mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
             recordMutationReceipt: mutation?.recordReceipt,
             orchestrationMutation: mutation?.identity,
             pairing: options?.pairing,
@@ -213,7 +230,7 @@ export class RpcDispatcher {
           request,
           effectiveParams,
           invoke,
-          legacyCoordinator?.mutationCallerFingerprint
+          legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
         )
         recordRuntimeFeatureInteraction(
           this.runtime,
@@ -276,24 +293,6 @@ export class RpcDispatcher {
     }
   }
 
-  private parseParams(
-    request: RpcRequest,
-    method: RpcAnyMethod,
-    meta: RpcEnvelopeMeta
-  ): { value: unknown; error?: undefined } | { value?: undefined; error: RpcResponse } {
-    if (method.params === null) {
-      return { value: undefined }
-    }
-    const rawParams = request.params ?? {}
-    const result = method.params.safeParse(rawParams)
-    if (!result.success) {
-      return {
-        error: invalidArgumentResponse(request, meta, formatZodError(result.error))
-      }
-    }
-    return { value: result.data }
-  }
-
   private meta(): RpcEnvelopeMeta {
     return { runtimeId: this.runtime.getRuntimeId() }
   }
@@ -311,7 +310,10 @@ export class RpcDispatcher {
       return
     }
     try {
-      broadcastPlaneChange({ method, projectId: resolveChangedProjectId(rawParams) })
+      broadcastPlaneChange({
+        method,
+        projectId: resolveChangedProjectId(rawParams)
+      })
     } catch {
       // Best-effort: the mutation already succeeded, so a failed notice must not
       // turn into an RPC error.

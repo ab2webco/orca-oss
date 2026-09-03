@@ -202,6 +202,7 @@ export function AgentTerminalPreview({
       ptyId,
       container,
       getTerminal: () => terminal,
+      getTerminalInput: () => terminalInputRef.current,
       isDisposed: () => disposed
     })
 

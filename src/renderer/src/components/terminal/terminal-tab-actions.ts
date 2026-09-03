@@ -51,6 +51,8 @@ export function closeTerminalTab(
     skipRunningProcessConfirm?: boolean
     captureRecentlyClosed?: boolean
     localPtyTeardownOwnedExternally?: boolean
+    /** The CLI, an RPC caller or a paired phone drove this close, not the user. */
+    runtimeInitiated?: boolean
     precomputedRetirementPlan?: TerminalTabRetirementPlan
     precomputedCloseState?: PrecomputedTerminalCloseState
     onClosed?: () => void
@@ -73,6 +75,7 @@ export function closeTerminalTab(
         ...(options?.localPtyTeardownOwnedExternally
           ? { localPtyTeardownOwnedExternally: true }
           : {}),
+        ...(options?.runtimeInitiated ? { runtimeInitiated: true } : {}),
         ...(options?.precomputedRetirementPlan
           ? { precomputedRetirementPlan: options.precomputedRetirementPlan }
           : {})
@@ -171,6 +174,7 @@ export function closeTerminalTab(
       ...(options?.localPtyTeardownOwnedExternally
         ? { localPtyTeardownOwnedExternally: true }
         : {}),
+      ...(options?.runtimeInitiated ? { runtimeInitiated: true } : {}),
       ...(options?.precomputedRetirementPlan
         ? { precomputedRetirementPlan: options.precomputedRetirementPlan }
         : {})
@@ -207,6 +211,7 @@ export function closeTerminalTab(
       ...(options?.localPtyTeardownOwnedExternally
         ? { localPtyTeardownOwnedExternally: true }
         : {}),
+      ...(options?.runtimeInitiated ? { runtimeInitiated: true } : {}),
       ...(options?.precomputedRetirementPlan
         ? { precomputedRetirementPlan: options.precomputedRetirementPlan }
         : {})
@@ -249,6 +254,7 @@ export function closeTerminalTab(
       ? { captureRecentlyClosed: options.captureRecentlyClosed }
       : {}),
     ...(options?.localPtyTeardownOwnedExternally ? { localPtyTeardownOwnedExternally: true } : {}),
+    ...(options?.runtimeInitiated ? { runtimeInitiated: true } : {}),
     ...(options?.precomputedRetirementPlan
       ? { precomputedRetirementPlan: options.precomputedRetirementPlan }
       : {})

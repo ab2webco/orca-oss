@@ -4,18 +4,21 @@ import { readFile, stat } from 'node:fs/promises'
 import * as path from 'node:path'
 import type {
   GitBranchChangeEntry,
-  GitBranchChangeStatus,
   GitBranchCompareResult,
   GitBranchCompareSummary,
   GitCommitCompareResult,
+  GitDiffResult
+} from '../../shared/git-diff-compare-types'
+import type {
+  GitBranchChangeStatus,
   GitConflictKind,
   GitConflictOperation,
-  GitDiffResult,
   GitFileStatus,
   GitStatusEntry,
   GitStatusResult,
-  GitUpstreamStatus
-} from '../../shared/types'
+  GitUpstreamStatus,
+  UntrackedStatsCacheTally
+} from '../../shared/git-status-types'
 import type { CommitMessageDraftContext } from '../../shared/commit-message-generation'
 import {
   getEffectiveGitUpstreamStatus,
@@ -30,7 +33,6 @@ import {
   parseNumstat,
   type GitLineStats
 } from '../../shared/git-uncommitted-line-stats'
-import type { UntrackedStatsCacheTally } from '../../shared/git-status-types'
 import { decodeGitCQuotedPath } from '../../shared/git-cquoted-path'
 import {
   gitExecFileAsync,
@@ -181,7 +183,10 @@ function getCachedSubmodulePaths(cacheKey: string, now: number): string[] | null
 
 function rememberSubmodulePaths(cacheKey: string, paths: string[], now: number): void {
   submodulePathsCache.delete(cacheKey)
-  submodulePathsCache.set(cacheKey, { paths, expiresAt: now + SUBMODULE_PATHS_CACHE_TTL_MS })
+  submodulePathsCache.set(cacheKey, {
+    paths,
+    expiresAt: now + SUBMODULE_PATHS_CACHE_TTL_MS
+  })
   trimSubmodulePathsCache()
 }
 
@@ -463,7 +468,12 @@ function createBranchLineTotalInput(
   entries: GitStatusEntry[],
   options: GetStatusOptions,
   statusSucceeded: boolean
-): { mergeBase: string; compute: () => Promise<GitBranchLineTotal | undefined> } | undefined {
+):
+  | {
+      mergeBase: string
+      compute: () => Promise<GitBranchLineTotal | undefined>
+    }
+  | undefined {
   const mergeBase = readGitBranchLineTotalMergeBaseParam(options.branchLineTotalMergeBase)
   // Why: a failed status scan leaves the untracked list untrustworthy, so the
   // total would silently under-count rather than be absent.
@@ -1119,7 +1129,10 @@ export async function listSubmodulePaths(
   try {
     const { stdout } = await gitExecFileAsync(
       ['config', '--file', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$'],
-      { ...gitOptionsForWorktree(worktreePath, options), env: gitOptionalLocksDisabledEnv() }
+      {
+        ...gitOptionsForWorktree(worktreePath, options),
+        env: gitOptionalLocksDisabledEnv()
+      }
     )
     paths = stdout
       .split(/\r?\n/)
@@ -1976,7 +1989,10 @@ function buildDiffResult(
   }
 
   // Why: over the render limit, return metadata instead of huge text so the renderer can show fallback UI.
-  const largeDiffRenderLimit = getLargeDiffRenderLimit({ originalContent, modifiedContent })
+  const largeDiffRenderLimit = getLargeDiffRenderLimit({
+    originalContent,
+    modifiedContent
+  })
   if (largeDiffRenderLimit.limited) {
     return {
       kind: 'text',

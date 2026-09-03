@@ -46,19 +46,15 @@ import type {
   RemoteTrackingBase
 } from '../runtime/orca-runtime'
 import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-projection'
+import { getEffectiveHooks, loadHooks, parseOrcaYaml } from '../hooks'
+import { buildPosixRunnerScript, buildWindowsRunnerScript } from '../setup-runner-script-text'
+import { createSetupRunnerScript, resolveSetupRunnerShell } from '../worktree-runner-script'
 import {
-  buildPosixRunnerScript,
-  buildWindowsRunnerScript,
-  createSetupRunnerScript,
   getDefaultTabsLaunch,
-  getEffectiveHooks,
   getEffectiveHooksFromConfig,
-  getSetupRunnerEnvVars,
-  loadHooks,
-  parseOrcaYaml,
-  resolveSetupRunnerShell,
   shouldRunSetupForCreate
-} from '../hooks'
+} from '../effective-hook-config'
+import { getSetupRunnerEnvVars } from '../setup-hook-env-vars'
 import { requireSshGitProvider } from '../providers/ssh-git-dispatch'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import type { SshGitProvider } from '../providers/ssh-git-provider'
@@ -104,7 +100,8 @@ import {
   findRemoteForUrl,
   prepareWorktreePushTargetWithExec
 } from './worktree-push-target-setup'
-import { isENOENT, registerWorktreeRootsForRepo } from './filesystem-auth'
+import { isENOENT } from './filesystem-path-containment'
+import { registerWorktreeRootsForRepo } from './registered-worktree-roots-cache'
 import {
   createWorktreeCopiedPaths,
   createWorktreeLinkedPaths,
@@ -134,9 +131,17 @@ import {
 } from '../project-runtime-git-options'
 import {
   getBranchNameOverrideCandidate,
+  getGeneratedWorktreeCreateCandidate,
   getWorktreeCreateCandidate,
+  isGeneratedWorktreeCreateName,
   WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS
 } from '../worktree-create-candidates'
+import {
+  failedWorktreeCreationNeedsRetirement,
+  getRetiredNameRegistryForRepo,
+  retireGeneratedWorktreeName
+} from '../worktree-name-retirement'
+import { createRetiredNameLookup } from '../../shared/worktree/retired-name-registry'
 
 const SSH_WORKTREE_CREATE_FETCH_FRESHNESS_MS = 30_000
 const SSH_WORKTREE_CREATE_FETCH_CACHE_MAX = 512
@@ -1552,12 +1557,30 @@ export async function createRemoteWorktree(
   let selectedExistingLocalBranchName: string | null = null
   let lastBranchConflictKind: 'local' | 'remote' | null = null
   let remotePathResolved = false
+  const shouldRetireGeneratedName =
+    args.nameWasGenerated === true && isGeneratedWorktreeCreateName(sanitizedName)
+  const retiredNameRegistry = shouldRetireGeneratedName
+    ? await getRetiredNameRegistryForRepo(store, repo, store.getRepos(), settings)
+    : null
+  const isRetiredName = retiredNameRegistry ? createRetiredNameLookup(retiredNameRegistry) : null
   // Why: duplicate PR/MR checkouts still need a workspace; suffix branch/path while preserving review metadata and push target.
-  for (let suffix = 1; suffix <= WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
-    effectiveSanitizedName = getWorktreeCreateCandidate(sanitizedName, suffix)
-    effectiveRequestedName = args.name.trim()
-      ? getWorktreeCreateCandidate(args.name, suffix)
-      : effectiveSanitizedName
+  for (let suffix = 1, attempts = 0; attempts < WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
+    effectiveSanitizedName = shouldRetireGeneratedName
+      ? getGeneratedWorktreeCreateCandidate(
+          sanitizedName,
+          suffix,
+          retiredNameRegistry?.exhaustedTiers
+        )
+      : getWorktreeCreateCandidate(sanitizedName, suffix)
+    effectiveRequestedName = shouldRetireGeneratedName
+      ? effectiveSanitizedName
+      : args.name.trim()
+        ? getWorktreeCreateCandidate(args.name, suffix)
+        : effectiveSanitizedName
+    if (isRetiredName?.(effectiveSanitizedName)) {
+      continue
+    }
+    attempts += 1
     branchName = await resolveCreateBranchNameSsh(
       provider,
       repo.path,
@@ -1737,18 +1760,33 @@ export async function createRemoteWorktree(
       await provider.exec(['sparse-checkout', 'set', '--', ...sparseDirectories], remotePath)
       await provider.exec(['checkout', branchName], remotePath)
     } catch (err) {
+      let rollbackSucceeded = false
       if (!checkoutExistingBranch) {
-        await unsetRemoteWorktreeCreationBase(provider, remotePath, branchName)
+        try {
+          await unsetRemoteWorktreeCreationBase(provider, remotePath, branchName)
+        } catch (rollbackError) {
+          console.warn('[worktree-create] Failed to unset remote creation base:', rollbackError)
+        }
       }
-      await provider
-        .removeWorktree(remotePath, true, {
+      try {
+        await provider.removeWorktree(remotePath, true, {
           deleteBranch: !checkoutExistingBranch,
           // Why: sparse setup failed before any work happened, so rollback removes the just-created remote branch.
           forceBranchDelete: !checkoutExistingBranch
         })
-        .catch(() => undefined)
+        rollbackSucceeded = true
+      } catch (rollbackError) {
+        console.warn('[worktree-create] Failed to roll back remote sparse worktree:', rollbackError)
+      }
+      if (!rollbackSucceeded && shouldRetireGeneratedName) {
+        await retireGeneratedWorktreeName(store, repo, settings, effectiveSanitizedName)
+      }
       throw err
     }
+  }
+
+  if (shouldRetireGeneratedName) {
+    await retireGeneratedWorktreeName(store, repo, settings, effectiveSanitizedName)
   }
 
   // Re-list to get the created worktree info
@@ -2098,12 +2136,30 @@ export async function createLocalWorktree(
   let lastBranchConflictKind: 'local' | 'remote' | null = null
   let lastExistingPR: Awaited<ReturnType<typeof getPRForBranch>> | null = null
   let lastExistingReviewNumber: number | null = null
+  const shouldRetireGeneratedName =
+    args.nameWasGenerated === true && isGeneratedWorktreeCreateName(sanitizedName)
+  const retiredNameRegistry = shouldRetireGeneratedName
+    ? await getRetiredNameRegistryForRepo(store, repo, store.getRepos(), settings)
+    : null
+  const isRetiredName = retiredNameRegistry ? createRetiredNameLookup(retiredNameRegistry) : null
   // Why: a create-from-review branch override may already exist locally; suffix both branch and path instead of blocking the user.
-  for (let suffix = 1; suffix <= WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
-    effectiveSanitizedName = getWorktreeCreateCandidate(sanitizedName, suffix)
-    effectiveRequestedName = requestedName.trim()
-      ? getWorktreeCreateCandidate(requestedName, suffix)
-      : effectiveSanitizedName
+  for (let suffix = 1, attempts = 0; attempts < WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS; suffix += 1) {
+    effectiveSanitizedName = shouldRetireGeneratedName
+      ? getGeneratedWorktreeCreateCandidate(
+          sanitizedName,
+          suffix,
+          retiredNameRegistry?.exhaustedTiers
+        )
+      : getWorktreeCreateCandidate(sanitizedName, suffix)
+    effectiveRequestedName = shouldRetireGeneratedName
+      ? effectiveSanitizedName
+      : requestedName.trim()
+        ? getWorktreeCreateCandidate(requestedName, suffix)
+        : effectiveSanitizedName
+    if (isRetiredName?.(effectiveSanitizedName)) {
+      continue
+    }
+    attempts += 1
     lastExistingReviewNumber = null
 
     branchName = await resolveCreateBranchName(
@@ -2275,93 +2331,105 @@ export async function createLocalWorktree(
     ...remoteTrackingBaseOption,
     ...(suggestLocalBaseRefUpdate ? { suggestLocalBaseRefUpdate } : {})
   }
-  const addResult: AddWorktreeResult =
-    (await timing.time('git_worktree_add', async () => {
-      if (sparseDirectories.length > 0) {
-        if (checkoutExistingBranch) {
-          return addSparseWorktree(
-            repo.path,
-            worktreePath,
-            branchName,
-            sparseDirectories,
-            baseBranch,
-            settings.refreshLocalBaseRefOnWorktreeCreate,
-            addProjectGitOptions(existingBranchOption)
-          )
-        }
-        if (suggestLocalBaseRefUpdate) {
-          return addSparseWorktree(
-            repo.path,
-            worktreePath,
-            branchName,
-            sparseDirectories,
-            baseBranch,
-            settings.refreshLocalBaseRefOnWorktreeCreate,
-            addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
-          )
-        }
-        const sparseOptions = addProjectGitOptions(remoteTrackingBaseOption)
-        return sparseOptions
-          ? addSparseWorktree(
+  let addResult: AddWorktreeResult
+  try {
+    addResult =
+      (await timing.time('git_worktree_add', async () => {
+        if (sparseDirectories.length > 0) {
+          if (checkoutExistingBranch) {
+            return addSparseWorktree(
               repo.path,
               worktreePath,
               branchName,
               sparseDirectories,
               baseBranch,
               settings.refreshLocalBaseRefOnWorktreeCreate,
-              sparseOptions
+              addProjectGitOptions(existingBranchOption)
             )
-          : addSparseWorktree(
+          }
+          if (suggestLocalBaseRefUpdate) {
+            return addSparseWorktree(
               repo.path,
               worktreePath,
               branchName,
               sparseDirectories,
               baseBranch,
-              settings.refreshLocalBaseRefOnWorktreeCreate
+              settings.refreshLocalBaseRefOnWorktreeCreate,
+              addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
             )
-      }
+          }
+          const sparseOptions = addProjectGitOptions(remoteTrackingBaseOption)
+          return sparseOptions
+            ? addSparseWorktree(
+                repo.path,
+                worktreePath,
+                branchName,
+                sparseDirectories,
+                baseBranch,
+                settings.refreshLocalBaseRefOnWorktreeCreate,
+                sparseOptions
+              )
+            : addSparseWorktree(
+                repo.path,
+                worktreePath,
+                branchName,
+                sparseDirectories,
+                baseBranch,
+                settings.refreshLocalBaseRefOnWorktreeCreate
+              )
+        }
 
-      if (checkoutExistingBranch) {
-        return addWorktree(
-          repo.path,
-          worktreePath,
-          branchName,
-          baseBranch,
-          settings.refreshLocalBaseRefOnWorktreeCreate,
-          false,
-          addProjectGitOptions(existingBranchOption)
-        )
-      }
-      if (suggestLocalBaseRefUpdate) {
-        return addWorktree(
-          repo.path,
-          worktreePath,
-          branchName,
-          baseBranch,
-          settings.refreshLocalBaseRefOnWorktreeCreate,
-          false,
-          addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
-        )
-      }
-      const worktreeOptions = addProjectGitOptions(remoteTrackingBaseOption)
-      return worktreeOptions
-        ? addWorktree(
+        if (checkoutExistingBranch) {
+          return addWorktree(
             repo.path,
             worktreePath,
             branchName,
             baseBranch,
             settings.refreshLocalBaseRefOnWorktreeCreate,
             false,
-            worktreeOptions
+            addProjectGitOptions(existingBranchOption)
           )
-        : addWorktree(
+        }
+        if (suggestLocalBaseRefUpdate) {
+          return addWorktree(
             repo.path,
             worktreePath,
             branchName,
             baseBranch,
-            settings.refreshLocalBaseRefOnWorktreeCreate
+            settings.refreshLocalBaseRefOnWorktreeCreate,
+            false,
+            addProjectGitOptions({ ...remoteTrackingBaseOption, suggestLocalBaseRefUpdate })
           )
-    })) ?? {}
+        }
+        const worktreeOptions = addProjectGitOptions(remoteTrackingBaseOption)
+        return worktreeOptions
+          ? addWorktree(
+              repo.path,
+              worktreePath,
+              branchName,
+              baseBranch,
+              settings.refreshLocalBaseRefOnWorktreeCreate,
+              false,
+              worktreeOptions
+            )
+          : addWorktree(
+              repo.path,
+              worktreePath,
+              branchName,
+              baseBranch,
+              settings.refreshLocalBaseRefOnWorktreeCreate
+            )
+      })) ?? {}
+  } catch (error) {
+    if (shouldRetireGeneratedName && failedWorktreeCreationNeedsRetirement(error)) {
+      await retireGeneratedWorktreeName(store, repo, settings, effectiveSanitizedName)
+    }
+    throw error
+  }
+
+  if (shouldRetireGeneratedName) {
+    await retireGeneratedWorktreeName(store, repo, settings, effectiveSanitizedName)
+  }
 
   let configuredPushTarget: GitPushTarget | undefined
   if (preparedPushTarget) {

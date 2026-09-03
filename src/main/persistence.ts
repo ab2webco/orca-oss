@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: persistence keeps schema defaults, migration, and load/save/flush in one file so the storage contract reviews as a unit. */
 import { app } from 'electron'
+import { mergeWorkspaceCleanupUIState } from '../shared/workspace-cleanup-ui-state'
 import {
   readFileSync,
   writeFileSync,
@@ -8,6 +9,7 @@ import {
   renameSync,
   unlinkSync,
   copyFileSync,
+  rmSync,
   statSync,
   realpathSync
 } from 'node:fs'
@@ -177,6 +179,15 @@ import {
   pruneAutomationRuns
 } from '../shared/automation-run-retention'
 import { pruneWorkspaceSessionBrowserHistory } from '../shared/workspace-session-browser-history'
+import { normalizeRetirableGeneratedName } from './worktree-name-retirement'
+import {
+  addRetiredNames,
+  clampExhaustedTiers,
+  compactRetiredNames,
+  EMPTY_RETIRED_NAME_REGISTRY,
+  isEmptyRetiredNameRegistry,
+  type RetiredNameRegistry
+} from '../shared/worktree/retired-name-registry'
 import {
   FOLDER_WORKSPACE_INSTANCE_SEPARATOR,
   getRepoIdFromWorktreeId,
@@ -544,10 +555,28 @@ export function migrateMobilePairingDataToCanonicalUserDataPath(sourceUserDataDi
   }
 
   mkdirSync(targetUserDataDir, { recursive: true })
-  for (const { sourcePath, targetPath } of migrations) {
-    copyFileSync(sourcePath, targetPath)
-    // Why: copyFileSync drops Windows ACLs, so re-assert current-user-only on these credential copies (device tokens, E2EE key).
-    hardenExistingSecureFile(targetPath)
+  const copied: string[] = []
+  try {
+    for (const { sourcePath, targetPath } of migrations) {
+      copyFileSync(sourcePath, targetPath)
+      copied.push(targetPath)
+      // Why: copyFileSync drops Windows ACLs, so re-assert current-user-only on these credential copies (device tokens, E2EE key).
+      hardenExistingSecureFile(targetPath)
+    }
+  } catch (error) {
+    // Why: a half-copied pair mixes devices with the wrong key, and the existing-target guard above would block the retry.
+    let cleanupFailed = false
+    for (const targetPath of copied) {
+      try {
+        rmSync(targetPath, { force: true })
+      } catch {
+        cleanupFailed = true
+      }
+    }
+    if (cleanupFailed) {
+      throw error
+    }
+    console.error('[persistence] Failed to migrate mobile pairing files forward:', error)
   }
 }
 
@@ -2316,6 +2345,43 @@ const MAX_CLAUDE_LIVE_PTY_SESSION_IDS = 200
 // Why: bound removed-SSH-target history so remove/re-add churn can't grow the file unbounded.
 const MAX_REMOVED_SSH_TARGET_TOMBSTONES = 50
 
+function normalizeRetiredNameRegistry(row: unknown): RetiredNameRegistry {
+  const isPlainArray = Array.isArray(row)
+  const rawRow = row as { exhaustedTiers?: unknown; names?: unknown } | null | undefined
+  const rawNames = isPlainArray ? row : Array.isArray(rawRow?.names) ? rawRow.names : []
+  const names = new Set<string>()
+  for (const entry of rawNames) {
+    if (typeof entry !== 'string') {
+      continue
+    }
+    const normalized = normalizeRetirableGeneratedName(entry)
+    if (normalized) {
+      names.add(normalized)
+    }
+  }
+  return compactRetiredNames({
+    exhaustedTiers: isPlainArray ? 0 : clampExhaustedTiers(rawRow?.exhaustedTiers),
+    names: [...names]
+  })
+}
+
+function normalizeRetiredNameRegistryMap(value: unknown): Record<string, RetiredNameRegistry> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  const byRepo: Record<string, RetiredNameRegistry> = {}
+  for (const [repoId, row] of Object.entries(value as Record<string, unknown>)) {
+    if (!repoId) {
+      continue
+    }
+    const registry = normalizeRetiredNameRegistry(row)
+    if (!isEmptyRetiredNameRegistry(registry)) {
+      byRepo[repoId] = registry
+    }
+  }
+  return byRepo
+}
+
 function normalizeClaudeLivePtySessionIds(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return []
@@ -3921,6 +3987,12 @@ export class Store {
                 (alias): alias is string => typeof alias === 'string'
               )
             : [],
+          retiredWorktreeNamesByRepo: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByRepo
+          ),
+          retiredWorktreeNamesByNamespace: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByNamespace
+          ),
           sshRemotePtyLeases: (parsed.sshRemotePtyLeases ?? [])
             .map(normalizeSshRemotePtyLease)
             .filter((lease): lease is SshRemotePtyLease => lease !== null),
@@ -4960,6 +5032,7 @@ export class Store {
     this.syncProjectHostSetupCompatibilityState()
     // Why: presets are repo-scoped and unreachable once the repo is gone, so drop them with it.
     delete this.state.sparsePresetsByRepo[id]
+    delete this.state.retiredWorktreeNamesByRepo?.[id]
     this.pruneWorktreeStateForRepo(id, null)
     this.state.workspaceSession = removeRepoFromWorkspaceSession(this.state.workspaceSession, id)
     this.state.workspaceSessionsByHostId = removeRepoFromHostWorkspaceSessions(
@@ -4978,6 +5051,7 @@ export class Store {
     // Why: presets are repo-id-scoped (not host-scoped); drop them only when the last host's copy is gone.
     if (!idStillPresent) {
       delete this.state.sparsePresetsByRepo[id]
+      delete this.state.retiredWorktreeNamesByRepo?.[id]
     }
     this.syncProjectHostSetupCompatibilityState()
     // Why: prune only this host's worktree metas if the id survives elsewhere; otherwise prune everything (matches removeProject).
@@ -5133,11 +5207,9 @@ export class Store {
         | 'symlinkPaths'
         | 'issueSourcePreference'
         | 'forkSyncMode'
-        | 'externalWorktreeVisibility'
         | 'externalWorktreeVisibilityPromptDismissedAt'
         | 'externalWorktreeInboxBaselinePaths'
         | 'importedExternalWorktreePaths'
-        | 'agentWorktreeVisibility'
         | 'customWorktreeVisibilitySources'
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
@@ -5145,6 +5217,9 @@ export class Store {
         | 'projectHostSetupMethod'
       >
     > & {
+      // null clears the per-repo override so the global visibility default applies again.
+      externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
+      agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
     },
@@ -5394,6 +5469,77 @@ export class Store {
   setMobileClientTabSelections(next: PersistedMobileClientTabSelections): void {
     this.state.mobileClientTabSelectionsByDeviceId = next
     this.scheduleSave()
+  }
+
+  getRetiredWorktreeNameRegistry(repoId: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByRepo?.[repoId]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  getRetiredWorktreeNameRegistryForNamespace(namespaceKey: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByNamespace?.[namespaceKey]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  addRetiredWorktreeName(repoId: string, name: string): void {
+    const normalized = normalizeRetirableGeneratedName(name)
+    if (!repoId || !normalized) {
+      return
+    }
+    this.applyRetiredWorktreeNames(repoId, [normalized])
+  }
+
+  mergeRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    if (!repoId) {
+      return false
+    }
+    const normalized = new Set<string>()
+    for (const name of names) {
+      const candidate = normalizeRetirableGeneratedName(name)
+      if (candidate) {
+        normalized.add(candidate)
+      }
+    }
+    return normalized.size > 0 && this.applyRetiredWorktreeNames(repoId, normalized)
+  }
+
+  mergeRetiredWorktreeNamesForNamespace(namespaceKey: string, names: Iterable<string>): boolean {
+    if (!namespaceKey) {
+      return false
+    }
+    const normalized = new Set<string>()
+    for (const name of names) {
+      const candidate = normalizeRetirableGeneratedName(name)
+      if (candidate) {
+        normalized.add(candidate)
+      }
+    }
+    const next = addRetiredNames(
+      this.getRetiredWorktreeNameRegistryForNamespace(namespaceKey),
+      normalized
+    )
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByNamespace ??= {}
+    this.state.retiredWorktreeNamesByNamespace[namespaceKey] = next
+    this.scheduleSave()
+    return true
+  }
+
+  private applyRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    const next = addRetiredNames(this.getRetiredWorktreeNameRegistry(repoId), names)
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByRepo ??= {}
+    this.state.retiredWorktreeNamesByRepo[repoId] = next
+    this.scheduleSave()
+    return true
   }
 
   getSparsePresets(repoId: string): SparsePreset[] {
@@ -6028,6 +6174,11 @@ export class Store {
     }
   }
 
+  /** Directory holding orca-data.json; snapshot files live beside it. */
+  getProfileStorageDirectory(): string {
+    return dirname(this.dataFile)
+  }
+
   // ── Settings ───────────────────────────────────────────────────────
 
   getSettings(): GlobalSettings {
@@ -6391,6 +6542,11 @@ export class Store {
     const nextUI = {
       ...currentUI,
       ...durableUpdates,
+      // Why: a peer publishing dismissals only must not erase the browse state.
+      workspaceCleanup: mergeWorkspaceCleanupUIState(
+        currentUI.workspaceCleanup,
+        durableUpdates.workspaceCleanup
+      ),
       groupBy: durableUpdates.groupBy
         ? normalizeGroupBy(durableUpdates.groupBy)
         : normalizeGroupBy(this.state.ui?.groupBy),

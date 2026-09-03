@@ -312,10 +312,14 @@ describe('CodexUsageStore', () => {
     const summary = await store.getSummary('orca', '30d')
     const breakdown = await store.getBreakdown('orca', '30d', 'model')
 
-    expect(summary.estimatedCostUsd).toBeCloseTo(95.2)
-    expect(breakdown.find((row) => row.key === 'gpt-5.6-sol')?.estimatedCostUsd).toBeCloseTo(56)
-    expect(breakdown.find((row) => row.key === 'gpt-5.6-terra')?.estimatedCostUsd).toBeCloseTo(28)
-    expect(breakdown.find((row) => row.key === 'gpt-5.6-luna')?.estimatedCostUsd).toBeCloseTo(11.2)
+    expect(summary.estimatedCostUsd).toBeCloseTo(85.7208)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-sol')?.estimatedCostUsd).toBeCloseTo(50.424)
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-terra')?.estimatedCostUsd).toBeCloseTo(
+      25.212
+    )
+    expect(breakdown.find((row) => row.key === 'gpt-5.6-luna')?.estimatedCostUsd).toBeCloseTo(
+      10.0848
+    )
   })
 
   it('normalizes GPT-5.6 reasoning suffixes before pricing', async () => {

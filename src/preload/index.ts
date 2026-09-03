@@ -179,29 +179,31 @@ import type {
   ClearProjectItemFieldArgs,
   DeleteIssueCommentBySlugArgs,
   GetProjectViewTableArgs,
-  GetProjectViewTableResult,
-  GitHubProjectCommentMutationResult,
-  GitHubProjectMutationResult,
   ListAccessibleProjectsArgs,
-  ListAccessibleProjectsResult,
   ListAssignableUsersBySlugArgs,
-  ListAssignableUsersBySlugResult,
   ListIssueTypesBySlugArgs,
-  ListIssueTypesBySlugResult,
   ListLabelsBySlugArgs,
-  ListLabelsBySlugResult,
   ListProjectViewsArgs,
-  ListProjectViewsResult,
   ProjectWorkItemDetailsBySlugArgs,
-  ProjectWorkItemDetailsBySlugResult,
   ResolveProjectRefArgs,
-  ResolveProjectRefResult,
   UpdateIssueBySlugArgs,
   UpdateIssueCommentBySlugArgs,
   UpdateIssueTypeBySlugArgs,
   UpdatePullRequestBySlugArgs,
   UpdateProjectItemFieldArgs
-} from '../shared/github/project-types'
+} from '../shared/github/project-request-types'
+import type {
+  GetProjectViewTableResult,
+  GitHubProjectCommentMutationResult,
+  GitHubProjectMutationResult,
+  ListAccessibleProjectsResult,
+  ListAssignableUsersBySlugResult,
+  ListIssueTypesBySlugResult,
+  ListLabelsBySlugResult,
+  ListProjectViewsResult,
+  ProjectWorkItemDetailsBySlugResult,
+  ResolveProjectRefResult
+} from '../shared/github/project-result-types'
 import {
   richMarkdownContextMenuCommandChannel,
   richMarkdownContextMenuTargetChannel,
@@ -555,6 +557,7 @@ const api = {
     // Why: macOS input mode (or layout ID) so keyboard workarounds can tell CJK/compose layouts from US QWERTY (issue #1205); null on non-Darwin or read failure.
     getKeyboardInputSourceId: (): Promise<string | null> =>
       ipcRenderer.invoke('app:getKeyboardInputSourceId'),
+    getMacCapturedDigitRowChords: () => ipcRenderer.invoke('app:getMacCapturedDigitRowChords'),
     setUnreadDockBadgeCount: (count: number): Promise<void> =>
       ipcRenderer.invoke('app:setUnreadDockBadgeCount', count),
     getFloatingTerminalCwd: (args?: FloatingTerminalCwdRequest): Promise<string> =>
@@ -809,6 +812,7 @@ const api = {
 
   worktrees: {
     list: (args) => ipcRenderer.invoke('worktrees:list', args),
+    listRetiredNames: (args) => ipcRenderer.invoke('worktrees:listRetiredNames', args),
 
     listDetected: (args) => ipcRenderer.invoke('worktrees:listDetected', args),
 
@@ -939,12 +943,14 @@ const api = {
     dismiss: (args) => ipcRenderer.invoke('workspaceCleanup:dismiss', args),
     clearDismissals: () => ipcRenderer.invoke('workspaceCleanup:clearDismissals'),
     hasKillableLocalProcesses: (args) =>
-      ipcRenderer.invoke('workspaceCleanup:hasKillableLocalProcesses', args)
+      ipcRenderer.invoke('workspaceCleanup:hasKillableLocalProcesses', args),
+    getCachedScan: () => ipcRenderer.invoke('workspaceCleanup:getCachedScan')
   } satisfies PreloadApi['workspaceCleanup'],
 
   workspaceSpace: {
     analyze: () => ipcRenderer.invoke('workspaceSpace:analyze'),
     cancel: () => ipcRenderer.invoke('workspaceSpace:cancel'),
+    getCachedAnalysis: () => ipcRenderer.invoke('workspaceSpace:getCachedAnalysis'),
     onProgress: (callback) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
@@ -3316,6 +3322,7 @@ const api = {
     suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
     resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
     cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
+    stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
     getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args)
   } satisfies PreloadApi['ephemeralVm'],
 

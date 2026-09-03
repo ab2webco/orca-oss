@@ -499,7 +499,11 @@ function registerRuntimeWindowLifecycle(
         content
       }) as Promise<RuntimeMarkdownSaveTabResult>,
     closeTerminal: (tabId, paneRuntimeId) => send('ui:closeTerminal', { tabId, paneRuntimeId }),
-    closeTerminalTab: (tabId) => requestTerminalTabCloseFromRenderer(mainWindow, tabId),
+    // Why forward the options: dropping them silently discarded both the external
+    // teardown ownership and the close origin, so every relayed close reached the
+    // renderer looking like the user's own.
+    closeTerminalTab: (tabId, options) =>
+      requestTerminalTabCloseFromRenderer(mainWindow, tabId, options),
     sleepWorktree: (worktreeId) => send('ui:sleepWorktree', { worktreeId }),
     resumeSleepingAgents: (worktreeId) => send('ui:resumeSleepingAgents', { worktreeId }),
     terminalFitOverrideChanged: (ptyId, mode, cols, rows) =>
@@ -514,6 +518,11 @@ function registerRuntimeWindowLifecycle(
   // Why: fail closed during renderer reload so CLI calls can't act on stale terminal mappings.
   mainWindow.webContents.on('did-start-loading', () => {
     runtime.markRendererReloading(mainWindow.id)
+  })
+  // Why: markRendererReloading waits for the rebuilt graph, and a gone process
+  // never sends one — without this the runtime stays "reloading" forever.
+  mainWindow.webContents.on('render-process-gone', () => {
+    runtime.markGraphReloadFailed(mainWindow.id, 'renderer-process-gone')
   })
   mainWindow.on('closed', () => {
     runtime.markGraphUnavailable(mainWindow.id)
