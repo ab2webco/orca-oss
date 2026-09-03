@@ -29,7 +29,13 @@ WORKSPACE = File.join(MOBILE_ROOT, "ios", "Orca.xcworkspace")
 BUILD_OUTPUT_DIRECTORY = File.join(MOBILE_ROOT, "build")
 SCHEME = "Orca"
 BUNDLE_ID = "com.ab2web.orca.mobile"
-TESTFLIGHT_GROUPS = ["peeps"].freeze
+# Why an env var: "peeps" is upstream's tester group, and a fork publishing to its own
+# App Store Connect has no such group — the upload succeeds and only distribution fails.
+TESTFLIGHT_GROUPS = (ENV["TESTFLIGHT_GROUPS"].to_s.strip.empty? ? "peeps" : ENV["TESTFLIGHT_GROUPS"])
+  .split(",")
+  .map(&:strip)
+  .reject(&:empty?)
+  .freeze
 DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Mobile updates and fixes.".freeze
 TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS = 20 * 60
 
