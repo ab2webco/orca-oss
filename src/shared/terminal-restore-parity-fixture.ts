@@ -181,10 +181,10 @@ export function normalBufferStylesTrimmed(terminal: Terminal): string[] {
 // The harnesses replay into a fresh terminal, which starts on the normal
 // buffer, so that is the pane state they ground from.
 export const SNAPSHOT_REPLAY_PREAMBLE_NORMAL = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue(
-  { targetAlternateScreen: false }
+  { targetAlternateScreen: false, switchBuffer: false }
 )}`
 export const SNAPSHOT_REPLAY_PREAMBLE_ALT = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue(
-  { targetAlternateScreen: true }
+  { targetAlternateScreen: true, switchBuffer: true }
 )}`
 
 export { POST_REPLAY_LIVE_SNAPSHOT_RESET as POST_REPLAY_LIVE_SNAPSHOT_RESET_PARITY } from './terminal-mode-reset-profiles'

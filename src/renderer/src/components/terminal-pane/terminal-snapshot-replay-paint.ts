@@ -94,11 +94,16 @@ export function buildMainModelSnapshotReplayWrites(
   // Only the head write aborts the truncated control string: it grounds the
   // parser for everything after it, and a second CAN mid-sequence would abort
   // the prologue we just emitted.
-  const head = (targetAlternateScreen: boolean): string =>
-    `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({ targetAlternateScreen })}`
+  const head = (targetAlternateScreen: boolean, switchBuffer: boolean): string =>
+    `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({
+      targetAlternateScreen,
+      switchBuffer
+    })}`
 
   if (!snapshot.alternateScreen) {
-    return [head(false), snapshot.data]
+    // Lands wherever the pane is: yanking a live alt TUI to normal here is what
+    // stranded the revealed renderer (ORCA-269).
+    return [head(false, false), snapshot.data]
   }
   // Older snapshot producers do not expose the mode/frame boundary. Keep their
   // composed data rather than dropping terminal modes together with the frame.
@@ -111,11 +116,11 @@ export function buildMainModelSnapshotReplayWrites(
     // while active, then return to a clean alt frame. The head already put the
     // pane on the normal buffer, so the return switch grounds from there.
     return [
-      head(false),
+      head(false, true),
       snapshot.scrollbackAnsi,
-      buildSnapshotReplayPrologue({ targetAlternateScreen: true }),
+      buildSnapshotReplayPrologue({ targetAlternateScreen: true, switchBuffer: true }),
       ...altFrame
     ]
   }
-  return [head(true), ...altFrame]
+  return [head(true, true), ...altFrame]
 }

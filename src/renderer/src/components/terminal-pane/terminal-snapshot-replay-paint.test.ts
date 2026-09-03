@@ -16,9 +16,12 @@ const GROUND = '\x1b[0m\x0f\x1b(B\x1b[?6l\x1b[?7h\x1b[?45l\x1b[4l\x1b[r'
 const CLEAR_NORMAL = '\x1b[2J\x1b[3J\x1b[H'
 const CLEAR_ALT = '\x1b[2J\x1b[H'
 const SAVE = '\x1b7'
-// The switch is unconditional in both directions: it is what lands the pane on the
-// payload's buffer whichever one it started on.
-const NORMAL_PROLOGUE = `\x18${GROUND}\x1b[?1049l${GROUND}${CLEAR_NORMAL}${SAVE}`
+// A normal-buffer payload lands where the pane already is, so no ?1049 — yanking a
+// live alt TUI to normal here is what stranded the revealed renderer (ORCA-269).
+const NORMAL_PROLOGUE = `\x18${GROUND}${CLEAR_NORMAL}${SAVE}`
+// The scrollback rebuild is the one normal-buffer target that must switch: it leaves
+// the alt screen to replay history, then returns to it.
+const NORMAL_SWITCH_PROLOGUE = `\x18${GROUND}\x1b[?1049l${GROUND}${CLEAR_NORMAL}${SAVE}`
 const ALT_ENTRY_PROLOGUE = `${GROUND}\x1b[?1049h${GROUND}${CLEAR_ALT}${SAVE}`
 const ALT_HEAD_PROLOGUE = `\x18${ALT_ENTRY_PROLOGUE}`
 
@@ -96,7 +99,7 @@ describe('buildMainModelSnapshotReplayWrites', () => {
         alternateScreen: true,
         scrollbackAnsi: 'normal-history'
       })
-    ).toEqual([NORMAL_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'alt-frame'])
+    ).toEqual([NORMAL_SWITCH_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'alt-frame'])
   })
 
   it('enters a cleared alt screen when no split scrollback is available', () => {
@@ -191,7 +194,7 @@ describe('buildMainModelSnapshotReplayWrites alt-frame skip', () => {
         },
         { skipAltFrame: true }
       )
-    ).toEqual([NORMAL_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'complete-live-state'])
+    ).toEqual([NORMAL_SWITCH_PROLOGUE, 'normal-history', ALT_ENTRY_PROLOGUE, 'complete-live-state'])
   })
 
   it('still enters a cleared alt screen when skipping without split scrollback', () => {

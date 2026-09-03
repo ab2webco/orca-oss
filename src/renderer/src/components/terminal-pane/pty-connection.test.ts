@@ -38,14 +38,17 @@ import type { PaneForegroundAgentEntry } from '@/store/slices/pane-foreground-ag
 // Built, never re-spelled: the replay prologue is a shared contract and typing
 // its literals here is what drifted them from production before (#12101).
 const NORMAL_BUFFER_REPLAY_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue(
-  { targetAlternateScreen: false }
+  { targetAlternateScreen: false, switchBuffer: false }
 )}`
 // The alt return inside a scrollback rebuild: the head already left the pane on normal.
 // The head of a scrollback rebuild: it leaves the alt screen before replaying history.
 const NORMAL_BUFFER_SWITCH_REPLAY_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue(
-  { targetAlternateScreen: false }
+  { targetAlternateScreen: false, switchBuffer: true }
 )}`
-const ALT_BUFFER_REPLAY_PROLOGUE = buildSnapshotReplayPrologue({ targetAlternateScreen: true })
+const ALT_BUFFER_REPLAY_PROLOGUE = buildSnapshotReplayPrologue({
+  targetAlternateScreen: true,
+  switchBuffer: true
+})
 
 const { resetAndRefreshAllTerminalWebglAtlases, scheduleTerminalWebglAtlasRecovery } = vi.hoisted(
   () => ({

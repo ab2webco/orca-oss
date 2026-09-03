@@ -1,7 +1,6 @@
 import type * as React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  ABORT_TRUNCATED_CONTROL_STRING,
   buildSnapshotReplayPrologue,
   RESET_AFTER_BYTE_GAP
 } from '../../../../shared/terminal-mode-reset-profiles'
@@ -11,6 +10,12 @@ import {
   createDeferred
 } from './pty-connection-test-async'
 import { NORMAL_BUFFER_PROLOGUE } from './pty-connection-test-constants'
+
+// The scrollback rebuild's head: the one normal-buffer target that leaves alt.
+const NORMAL_BUFFER_SWITCH_PROLOGUE = `\x18${buildSnapshotReplayPrologue({
+  targetAlternateScreen: false,
+  switchBuffer: true
+})}`
 import { createRect } from './pty-connection-test-dom'
 import {
   createMockTransport,
@@ -450,56 +455,13 @@ describe('connectPanePty', () => {
   // and the pane mock is on the normal buffer everywhere else — so a stubbed
   // `() => false` would pass the whole suite. Put the pane on the alt screen and
   // pin that a normal-buffer snapshot really does emit the `?1049l` unstick.
-  it('emits the alt-screen unstick when the pane is on alt and the model is not', async () => {
-    const { connectPanePty } = await import('./pty-connection')
-    const transport = createMockTransport('pty-id')
-    const capturedDataCallback: {
-      current: ((data: string, meta?: { seq?: number; rawLength?: number }) => void) | null
-    } = { current: null }
-    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
-      capturedDataCallback.current = callbacks.onData ?? null
-      return 'pty-id'
-    })
-    transportFactoryQueue.push(transport)
-    const getMainBufferSnapshot = window.api.pty.getMainBufferSnapshot as unknown as ReturnType<
-      typeof vi.fn
-    >
-    const hidden = 'x'.repeat(2 * 1024 * 1024 + 1)
-    const live = 'visible-after\r\n'
-    getMainBufferSnapshot.mockResolvedValue({
-      data: 'snapshot-state\r\n',
-      cols: 100,
-      rows: 30,
-      seq: hidden.length + live.length
-    })
+  // The alt-screen unstick case that lived here is retired with the behaviour it
+  // pinned. A normal-buffer replay no longer emits `?1049l`, because that same write
+  // is correct for a pane STUCK on alt and wrong for one whose TUI is still live
+  // there, and nothing in this path tells the two apart — it stranded the revealed
+  // renderer in terminal-duplicate-pty-renderer-reveal (ORCA-269). main carries
+  // neither the behaviour nor this case; both arrived with the sync. Tracked.
 
-    const pane = createPane(1)
-    // The gap ate the TUI's own `?1049l`, so the renderer is still on alt.
-    pane.terminal.buffer.active.type = 'alternate'
-    const deps = createDeps({ isVisibleRef: { current: false } })
-    const disposable = connectPanePty(pane as never, createManager(1) as never, deps as never)
-    await flushAsyncTicks(6)
-
-    capturedDataCallback.current?.(hidden, { seq: hidden.length, rawLength: hidden.length })
-    ;(deps.isVisibleRef as { current: boolean }).current = true
-    capturedDataCallback.current?.(live, {
-      seq: hidden.length + live.length,
-      rawLength: live.length
-    })
-    await flushAsyncTicks(20)
-
-    const written = pane.terminal.write.mock.calls.map(([data]) => data as string)
-    const prologue = written.find((data) => data.startsWith(ABORT_TRUNCATED_CONTROL_STRING))
-    expect(prologue).toBeDefined()
-    // Why equality and not `not.toBe(NORMAL_BUFFER_PROLOGUE)`: that clause pinned a
-    // second, non-switching normal prologue, and there is no longer one — the single
-    // normal prologue carries the `?1049l`, which is what unsticks this pane.
-    expect(prologue).toBe(NORMAL_BUFFER_PROLOGUE)
-    expect(prologue).toContain('\x1b[?1049l')
-    disposable.dispose()
-  })
-
-  // Why: pins the switch-off hidden fallback chain — 2MB lossy cap drops the backlog, latches restore, and reveal repaints from the model snapshot.
   it('restores hidden backlog overflow from the main terminal snapshot on foreground output', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('pty-id')
@@ -593,23 +555,30 @@ describe('connectPanePty', () => {
     await flushAsyncTicks(20)
 
     expect(getMainBufferSnapshot).toHaveBeenCalledWith('pty-id', { scrollbackRows: 5000 })
-    expect(pane.terminal.write).toHaveBeenCalledWith(NORMAL_BUFFER_PROLOGUE, expect.any(Function))
+    expect(pane.terminal.write).toHaveBeenCalledWith(
+      NORMAL_BUFFER_SWITCH_PROLOGUE,
+      expect.any(Function)
+    )
     expect(pane.terminal.write).toHaveBeenCalledWith(
       'preserved-shell-history\r\n',
       expect.any(Function)
     )
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      buildSnapshotReplayPrologue({ targetAlternateScreen: true }),
+      buildSnapshotReplayPrologue({ targetAlternateScreen: true, switchBuffer: true }),
       expect.any(Function)
     )
     const writes = (pane.terminal.write as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => call[0]
     )
     expect(writes.indexOf('preserved-shell-history\r\n')).toBeLessThan(
-      writes.indexOf(buildSnapshotReplayPrologue({ targetAlternateScreen: true }))
+      writes.indexOf(
+        buildSnapshotReplayPrologue({ targetAlternateScreen: true, switchBuffer: true })
+      )
     )
     expect(
-      writes.indexOf(buildSnapshotReplayPrologue({ targetAlternateScreen: true }))
+      writes.indexOf(
+        buildSnapshotReplayPrologue({ targetAlternateScreen: true, switchBuffer: true })
+      )
     ).toBeLessThan(writes.indexOf('altscreen-snapshot\r\n'))
     expect(pane.terminal.write).toHaveBeenCalledWith('altscreen-snapshot\r\n', expect.any(Function))
     disposable.dispose()
