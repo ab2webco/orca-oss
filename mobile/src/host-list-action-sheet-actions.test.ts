@@ -97,7 +97,7 @@ describe('getHostListActionSheetActions', () => {
         onReconnect: vi.fn(),
         onDisconnect: vi.fn(),
         onOpenAccounts: vi.fn(),
-    onEdit: vi.fn(),
+        onEdit: vi.fn(),
         onRemove: vi.fn()
       })
     ).toEqual([])

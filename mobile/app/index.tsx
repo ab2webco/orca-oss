@@ -42,7 +42,12 @@ import {
   loadMobileOnboardingSteps,
   mobileOnboardingDestination
 } from '../src/onboarding/mobile-onboarding-plan'
-import type { ConnectionState, HostCatalogEntry, HostProfile, RpcResponse} from '../src/transport/types'
+import type {
+  ConnectionState,
+  HostCatalogEntry,
+  HostProfile,
+  RpcResponse
+} from '../src/transport/types'
 import { triggerMediumImpact } from '../src/platform/haptics'
 import { OrcaLogo } from '../src/components/OrcaLogo'
 import { MobileHostCard } from '../src/components/MobileHostCard'
