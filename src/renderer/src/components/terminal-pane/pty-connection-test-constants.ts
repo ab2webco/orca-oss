@@ -3,7 +3,7 @@ import {
   buildSnapshotReplayPrologue
 } from '../../../../shared/terminal-mode-reset-profiles'
 
-export const NORMAL_BUFFER_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({ targetAlternateScreen: false, paneOnAlternateScreen: false })}`
+export const NORMAL_BUFFER_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({ targetAlternateScreen: false })}`
 export const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 export const AGENT_TASK_COMPLETE_NOTIFICATION_GRACE_MS = 250
 export const AGENT_TASK_COMPLETE_NOTIFICATION_MAX_WAIT_MS = 1_500

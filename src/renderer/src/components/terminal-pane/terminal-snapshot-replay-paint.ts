@@ -89,16 +89,13 @@ export function buildMainModelSnapshotReplayWrites(
     alternateScreen?: boolean
     scrollbackAnsi?: string
   },
-  options: { skipAltFrame?: boolean; paneOnAlternateScreen?: boolean } = {}
+  options: { skipAltFrame?: boolean } = {}
 ): string[] {
   // Only the head write aborts the truncated control string: it grounds the
   // parser for everything after it, and a second CAN mid-sequence would abort
   // the prologue we just emitted.
   const head = (targetAlternateScreen: boolean): string =>
-    `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({
-      targetAlternateScreen,
-      paneOnAlternateScreen: options.paneOnAlternateScreen === true
-    })}`
+    `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({ targetAlternateScreen })}`
 
   if (!snapshot.alternateScreen) {
     return [head(false), snapshot.data]
@@ -116,10 +113,7 @@ export function buildMainModelSnapshotReplayWrites(
     return [
       head(false),
       snapshot.scrollbackAnsi,
-      buildSnapshotReplayPrologue({
-        targetAlternateScreen: true,
-        paneOnAlternateScreen: false
-      }),
+      buildSnapshotReplayPrologue({ targetAlternateScreen: true }),
       ...altFrame
     ]
   }

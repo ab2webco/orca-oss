@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Terminal } from '@xterm/headless'
-import {
-  ABORT_TRUNCATED_CONTROL_STRING,
-  buildSnapshotReplayPrologue,
-  RESET_AFTER_BYTE_GAP
-} from '../../../../shared/terminal-mode-reset-profiles'
+import { RESET_AFTER_BYTE_GAP } from '../../../../shared/terminal-mode-reset-profiles'
 import {
   buildMainModelSnapshotReplayWrites,
   hasPositiveTerminalDimensions,
@@ -12,18 +8,19 @@ import {
   shouldSkipAltFrameForWidthMismatch
 } from './terminal-snapshot-replay-paint'
 
-// Built, never re-spelled: re-typing the prologue literals is what drifted the
-// parity fixtures away from production twice (#12101).
-const NORMAL_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${buildSnapshotReplayPrologue({
-  targetAlternateScreen: false,
-  paneOnAlternateScreen: false
-})}`
-// The alt return inside a scrollback rebuild: the head already left the pane on normal.
-const ALT_ENTRY_PROLOGUE = buildSnapshotReplayPrologue({
-  targetAlternateScreen: true,
-  paneOnAlternateScreen: false
-})
-const ALT_HEAD_PROLOGUE = `${ABORT_TRUNCATED_CONTROL_STRING}${ALT_ENTRY_PROLOGUE}`
+// Spelled out, never built from buildSnapshotReplayPrologue: an expectation
+// derived from the function under test agrees with any change it makes, which is
+// how a wrong buffer switch shipped green (ORCA-269). Drift is the accepted cost
+// — these bytes are the contract, so a deliberate change edits them here too.
+const GROUND = '\x1b[0m\x0f\x1b(B\x1b[?6l\x1b[?7h\x1b[?45l\x1b[4l\x1b[r'
+const CLEAR_NORMAL = '\x1b[2J\x1b[3J\x1b[H'
+const CLEAR_ALT = '\x1b[2J\x1b[H'
+const SAVE = '\x1b7'
+// The switch is unconditional in both directions: it is what lands the pane on the
+// payload's buffer whichever one it started on.
+const NORMAL_PROLOGUE = `\x18${GROUND}\x1b[?1049l${GROUND}${CLEAR_NORMAL}${SAVE}`
+const ALT_ENTRY_PROLOGUE = `${GROUND}\x1b[?1049h${GROUND}${CLEAR_ALT}${SAVE}`
+const ALT_HEAD_PROLOGUE = `\x18${ALT_ENTRY_PROLOGUE}`
 
 function writeTerminal(terminal: Terminal, data: string): Promise<void> {
   return new Promise((resolve) => terminal.write(data, resolve))

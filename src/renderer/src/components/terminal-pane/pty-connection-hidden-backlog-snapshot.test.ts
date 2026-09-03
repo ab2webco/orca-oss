@@ -491,8 +491,11 @@ describe('connectPanePty', () => {
     const written = pane.terminal.write.mock.calls.map(([data]) => data as string)
     const prologue = written.find((data) => data.startsWith(ABORT_TRUNCATED_CONTROL_STRING))
     expect(prologue).toBeDefined()
+    // Why equality and not `not.toBe(NORMAL_BUFFER_PROLOGUE)`: that clause pinned a
+    // second, non-switching normal prologue, and there is no longer one — the single
+    // normal prologue carries the `?1049l`, which is what unsticks this pane.
+    expect(prologue).toBe(NORMAL_BUFFER_PROLOGUE)
     expect(prologue).toContain('\x1b[?1049l')
-    expect(prologue).not.toBe(NORMAL_BUFFER_PROLOGUE)
     disposable.dispose()
   })
 
@@ -596,21 +599,17 @@ describe('connectPanePty', () => {
       expect.any(Function)
     )
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      buildSnapshotReplayPrologue({ targetAlternateScreen: true, paneOnAlternateScreen: false }),
+      buildSnapshotReplayPrologue({ targetAlternateScreen: true }),
       expect.any(Function)
     )
     const writes = (pane.terminal.write as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => call[0]
     )
     expect(writes.indexOf('preserved-shell-history\r\n')).toBeLessThan(
-      writes.indexOf(
-        buildSnapshotReplayPrologue({ targetAlternateScreen: true, paneOnAlternateScreen: false })
-      )
+      writes.indexOf(buildSnapshotReplayPrologue({ targetAlternateScreen: true }))
     )
     expect(
-      writes.indexOf(
-        buildSnapshotReplayPrologue({ targetAlternateScreen: true, paneOnAlternateScreen: false })
-      )
+      writes.indexOf(buildSnapshotReplayPrologue({ targetAlternateScreen: true }))
     ).toBeLessThan(writes.indexOf('altscreen-snapshot\r\n'))
     expect(pane.terminal.write).toHaveBeenCalledWith('altscreen-snapshot\r\n', expect.any(Function))
     disposable.dispose()

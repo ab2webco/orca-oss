@@ -79,27 +79,25 @@ const SAVE_GROUNDED_CURSOR = '\x1b7'
  * serialized snapshot. Shared because the parity/fuzz harnesses replay the same
  * contract, and re-spelling the literals is what drifted them apart (#12101).
  *
- * The switch is conditional: `?1049` is not a no-op on the target buffer — xterm
- * skips only the swap and still runs restoreCursor() and the kitty flag swap, so
- * emitting it regardless parks a live agent's kitty flags.
+ * The `?1049` switch is unconditional, and the cost is deliberate: on the target
+ * buffer xterm skips the swap but still runs restoreCursor() and the kitty flag
+ * swap. Gating it on `terminal.buffer.active.type` was tried and is worse — that
+ * reads emulator state the replay is about to overwrite, so a stale read either
+ * paints an alt frame into the normal buffer (ORCA-269) or leaves a pane stuck on
+ * alt after the gap ate the TUI's own `?1049l`. Switching always is the only
+ * choice that lands the pane on the payload's buffer from either starting state.
  *
- * Grounding brackets a real switch because each side does a different job:
- * before, `?1049h`'s saveCursor() must bank grounded state (and the source
- * buffer's margins get grounded); after, `?1049l`'s restoreCursor() must not
- * reapply the old register over it.
+ * Grounding brackets the switch because each side does a different job: before,
+ * `?1049h`'s saveCursor() must bank grounded state (and the source buffer's
+ * margins get grounded); after, `?1049l`'s restoreCursor() must not reapply the
+ * old register over it.
  */
-export function buildSnapshotReplayPrologue(args: {
-  targetAlternateScreen: boolean
-  paneOnAlternateScreen: boolean
-}): string {
+export function buildSnapshotReplayPrologue(args: { targetAlternateScreen: boolean }): string {
   // Why explicit: `?1049h` does not clear the alt buffer (xterm's own
   // `1049 should clear altbuffer` FIXME); `\x1b[3J` is safe only for a
   // normal-buffer payload, which carries its own history.
   const clear = args.targetAlternateScreen ? '\x1b[2J\x1b[H' : '\x1b[2J\x1b[3J\x1b[H'
   const ground = `${REPLAY_BASELINE_TERMINAL_RESET}${REPLAY_BASELINE_BUFFER_RESET}`
-  if (args.paneOnAlternateScreen === args.targetAlternateScreen) {
-    return `${ground}${clear}${SAVE_GROUNDED_CURSOR}`
-  }
   const bufferSwitch = args.targetAlternateScreen ? '\x1b[?1049h' : '\x1b[?1049l'
   return `${ground}${bufferSwitch}${ground}${clear}${SAVE_GROUNDED_CURSOR}`
 }
