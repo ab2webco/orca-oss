@@ -1025,11 +1025,12 @@ html.native-shell .app-layout {
   flex: 0 0 auto;
 }
 
-/* Why: the mark is brand orange, so it must not inherit .titlebar-logo's light-mode invert. */
-.titlebar-app-name-mark {
+.titlebar-app-name-sub {
   flex: 0 0 auto;
-  height: 13px;
-  margin-right: 1px;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--muted-foreground);
+  transform: translateY(0.5px);
 }
 
 .titlebar-icon-button {
