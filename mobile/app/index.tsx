@@ -623,7 +623,7 @@ export default function HomeScreen() {
   // Why a separate list: the usage card is the only route to the accounts screen, so a
   // host whose snapshot was rejected has to say so instead of rendering nothing.
   const accountsFailures = useMemo(() => {
-    const items: Array<{ host: HostProfile; reason: string }> = []
+    const items: { host: HostProfile; reason: string }[] = []
     for (const host of sortedHosts) {
       const reason = accountsErrorByHost[host.id]
       if (hostStates[host.id] === 'connected' && reason) {
