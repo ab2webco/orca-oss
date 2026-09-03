@@ -39,6 +39,10 @@ const RemoveAccountParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })
 
+const ClaudeWorktreeUsageParams = z.object({
+  accountId: z.string().min(1, 'Missing accountId')
+})
+
 const GetPtyOwnerParams = z
   .object({
     ptyId: z.string().min(1, 'Missing ptyId'),
@@ -147,6 +151,14 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     name: 'accounts.selectClaude',
     params: SelectAccountParams,
     handler: async (params, { runtime }) => runtime.selectClaudeAccount(params.accountId)
+  }),
+  defineMethod({
+    // Why read-only and separate from the reassign it feeds on desktop: a
+    // refused switch names no holder, and a client that cannot close terminals
+    // still needs to say which worktree is in the way (ORCA-350).
+    name: 'accounts.claudeWorktreeUsage',
+    params: ClaudeWorktreeUsageParams,
+    handler: async (params, { runtime }) => runtime.getClaudeAccountWorktreeUsage(params.accountId)
   }),
   defineMethod({
     name: 'accounts.selectCodex',

@@ -15,6 +15,7 @@ import { loadHosts } from '../../../src/transport/host-store'
 import { useHostClient } from '../../../src/transport/client-context'
 import { colors, spacing } from '../../../src/theme/mobile-theme'
 import { styles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { describeClaudeSwitchRefusal } from '../../../src/accounts/claude-switch-refusal-detail'
 import { useNow } from '../../../src/hooks/use-now'
 import { ClaudeIcon, OpenAIIcon } from '../../../src/components/AgentIcons'
 import {
@@ -174,7 +175,16 @@ export default function AccountsScreen() {
           codexTarget?.runtime === 'wsl' ? { accountId, target: codexTarget } : { accountId }
         const res = await client.sendRequest(method, params)
         if (!res.ok) {
-          Alert.alert('Could not switch account', res.error.message)
+          Alert.alert(
+            'Could not switch account',
+            provider === 'claude'
+              ? await describeClaudeSwitchRefusal({
+                  client,
+                  accountId,
+                  hostMessage: res.error.message
+                })
+              : res.error.message
+          )
         } else {
           // Why: optimistic refresh — the streaming subscription will also
           // emit, but a one-shot keeps the UI responsive even if the stream

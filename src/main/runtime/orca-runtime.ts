@@ -279,6 +279,7 @@ import type {
   ClaudeVaultSettingsInheritanceReport,
   ManagedPtyAccountOwner
 } from '../../shared/managed-account-types'
+import type { ClaudeAccountWorktreeUsageReport } from '../../shared/claude-account-worktree-usage'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
@@ -13895,6 +13896,13 @@ export class OrcaRuntimeService {
       ...report,
       settingsInheritance: this.resolveVaultSettingsInheritance(report.ownership)
     }
+  }
+
+  /** Which worktrees and live terminals hold a Claude account. Reads this host's
+   *  own PTY registries, so a paired client gets the host's facts, not an empty
+   *  report — the renderer's remote shortcut is what returns `supported: false`. */
+  getClaudeAccountWorktreeUsage(accountId: string): ClaudeAccountWorktreeUsageReport {
+    return this.requireAccountServices().claudeAccounts.getAccountWorktreeUsageReport(accountId)
   }
 
   /**
