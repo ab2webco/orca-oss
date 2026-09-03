@@ -1,4 +1,4 @@
-import { Edit3, PowerOff, RefreshCw } from 'lucide-react-native'
+import { Edit3, PowerOff, RefreshCw, Users } from 'lucide-react-native'
 import type { ActionSheetAction } from './components/ActionSheetModal'
 import type { ConnectionState, HostProfile } from './transport/types'
 
@@ -13,6 +13,7 @@ export function getHostListActionSheetActions(args: {
   onDismiss: () => void
   onReconnect: (hostId: string) => void
   onDisconnect: (hostId: string) => void
+  onOpenAccounts: (hostId: string) => void
   onEdit: (hostId: string) => void
   onRemove: (host: HostProfile) => void
 }): ActionSheetAction[] {
@@ -43,6 +44,20 @@ export function getHostListActionSheetActions(args: {
             onPress: () => {
               args.onDismiss()
               args.onDisconnect(host.id)
+            }
+          }
+        ]
+      : []),
+    // Why here and not only the home card: that card renders off an accounts snapshot,
+    // so a host whose snapshot never arrives has no route to the screen at all.
+    ...(isLive
+      ? [
+          {
+            label: 'Accounts',
+            icon: Users,
+            onPress: () => {
+              args.onDismiss()
+              args.onOpenAccounts(host.id)
             }
           }
         ]

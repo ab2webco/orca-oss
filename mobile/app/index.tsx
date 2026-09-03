@@ -42,7 +42,12 @@ import {
   loadMobileOnboardingSteps,
   mobileOnboardingDestination
 } from '../src/onboarding/mobile-onboarding-plan'
-import type { ConnectionState, HostCatalogEntry, HostProfile } from '../src/transport/types'
+import type {
+  ConnectionState,
+  HostCatalogEntry,
+  HostProfile,
+  RpcResponse
+} from '../src/transport/types'
 import { triggerMediumImpact } from '../src/platform/haptics'
 import { OrcaLogo } from '../src/components/OrcaLogo'
 import { MobileHostCard } from '../src/components/MobileHostCard'
@@ -146,25 +151,64 @@ function fetchStats(
     .catch(() => {})
 }
 
+const ACCOUNTS_READ_DEADLINE_MS = 15_000
+
 function fetchAccountsSnapshot(
   client: RpcClient,
   hostId: string,
   setSnapshots: (
     updater: (prev: Record<string, AccountsSnapshot>) => Record<string, AccountsSnapshot>
   ) => void,
-  disposed: () => boolean
+  disposed: () => boolean,
+  onFailure: (hostId: string, reason: string | null) => void
 ) {
-  sendSingleFlightRequest(client, hostId, 'accounts.list')
+  // Why snapshot first: `accounts.list` refreshes provider usage before replying and
+  // never answers when one account's auth is broken, which left the home with no roster
+  // and no error. `accounts.list` stays the fallback so an older host still answers.
+  // Why a deadline and not just the client's: a host that never answers leaves the read
+  // pending forever, which is indistinguishable from "this desktop has no accounts" —
+  // the shape of this bug before it was found. A stall has to report as a stall.
+  const withDeadline = (request: Promise<RpcResponse>): Promise<RpcResponse> =>
+    Promise.race([
+      request,
+      new Promise<RpcResponse>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('the host did not answer in time')),
+          ACCOUNTS_READ_DEADLINE_MS
+        )
+      )
+    ])
+
+  withDeadline(sendSingleFlightRequest(client, hostId, 'accounts.snapshot'))
+    .then((snapshotResponse) =>
+      snapshotResponse.ok
+        ? snapshotResponse
+        : withDeadline(sendSingleFlightRequest(client, hostId, 'accounts.list'))
+    )
     .then((response) => {
-      if (disposed()) {
+      // Why not gated on `disposed()`: the effect that owns this read re-runs on every
+      // `allClients` identity change, so a read slower than that churn was cancelled
+      // before it could land — no roster, no error, nothing. The result is a fact about
+      // the host, not about this effect run, so it is recorded either way.
+      if (!response.ok) {
+        onFailure(hostId, response.error?.message ?? 'the host refused the request')
         return
       }
-      if (response.ok) {
+      try {
         const snapshot = decodeAccountsSnapshot(response.result)
         setSnapshots((prev) => ({ ...prev, [hostId]: snapshot }))
+        onFailure(hostId, null)
+      } catch (error) {
+        // Why surfaced and not swallowed: the usage card is the only route to the
+        // accounts screen, so a rejected payload used to read as "this host has none".
+        onFailure(hostId, error instanceof Error ? error.message : String(error))
       }
     })
-    .catch(() => {})
+    .catch((error: unknown) => {
+      if (!disposed()) {
+        onFailure(hostId, error instanceof Error ? error.message : String(error))
+      }
+    })
 }
 
 function fetchTaskProviders(
@@ -237,6 +281,7 @@ export default function HomeScreen() {
   const [statsByHost, setStatsByHost] = useState<Record<string, HomeStatsSummary>>({})
   const [worktreeInfo, setWorktreeInfo] = useState<Record<string, HostWorktreeInfo>>({})
   const [accountsByHost, setAccountsByHost] = useState<Record<string, AccountsSnapshot>>({})
+  const [accountsErrorByHost, setAccountsErrorByHost] = useState<Record<string, string>>({})
   const [taskProvidersByHost, setTaskProvidersByHost] = useState<Record<string, TaskProvider[]>>({})
   const [lastVisited, setLastVisited] = useState<{ hostId: string; worktreeId: string } | null>(
     null
@@ -347,7 +392,18 @@ export default function HomeScreen() {
         if (entry.client.getState() === 'connected') {
           fetchStats(entry.client, entry.hostId, setStatsByHost, () => stale)
           void fetchHomeHostWorktreeInfo(entry.client, entry.hostId, setWorktreeInfo, () => stale)
-          fetchAccountsSnapshot(entry.client, entry.hostId, setAccountsByHost, () => stale)
+          fetchAccountsSnapshot(
+            entry.client,
+            entry.hostId,
+            setAccountsByHost,
+            () => stale,
+            (hostId, reason) =>
+              setAccountsErrorByHost((prev) =>
+                reason === null
+                  ? Object.fromEntries(Object.entries(prev).filter(([key]) => key !== hostId))
+                  : { ...prev, [hostId]: reason }
+              )
+          )
           fetchTaskProviders(entry.client, entry.hostId, setTaskProvidersByHost, () => stale)
         }
       }
@@ -478,6 +534,21 @@ export default function HomeScreen() {
           fetchStats(entry.client, entry.hostId, setStatsByHost, () => false)
           void fetchHomeHostWorktreeInfo(entry.client, entry.hostId, setWorktreeInfo, () => false)
           fetchTaskProviders(entry.client, entry.hostId, setTaskProvidersByHost, () => false)
+          // Why accounts belong here too: this path already re-reads every other host
+          // card on reconnect, and leaving accounts out is why the usage section stayed
+          // empty on a connected host — the only route to the accounts screen with it.
+          fetchAccountsSnapshot(
+            entry.client,
+            entry.hostId,
+            setAccountsByHost,
+            () => false,
+            (hostId, reason) =>
+              setAccountsErrorByHost((prev) =>
+                reason === null
+                  ? Object.fromEntries(Object.entries(prev).filter(([key]) => key !== hostId))
+                  : { ...prev, [hostId]: reason }
+              )
+          )
         }
       } else {
         if (unsubNotif) {
@@ -554,6 +625,19 @@ export default function HomeScreen() {
   )
 
   // Why: only show Account usage for connected hosts; stale cached usage would imply live data.
+  // Why a separate list: the usage card is the only route to the accounts screen, so a
+  // host whose snapshot was rejected has to say so instead of rendering nothing.
+  const accountsFailures = useMemo(() => {
+    const items: { host: HostProfile; reason: string }[] = []
+    for (const host of sortedHosts) {
+      const reason = accountsErrorByHost[host.id]
+      if (hostStates[host.id] === 'connected' && reason) {
+        items.push({ host, reason })
+      }
+    }
+    return items
+  }, [sortedHosts, hostStates, accountsErrorByHost])
+
   const accountsHosts = useMemo(() => {
     const items: Array<{ host: HostProfile; snapshot: AccountsSnapshot }> = []
     for (const host of sortedHosts) {
@@ -855,6 +939,30 @@ export default function HomeScreen() {
               />
 
               {/* ─── Account usage ─── */}
+              {accountsFailures.length > 0 ? (
+                <>
+                  <Text style={[styles.sectionHeading, { marginTop: spacing.xl }]}>
+                    Account usage
+                  </Text>
+                  {accountsFailures.map(({ host, reason }) => (
+                    <Pressable
+                      key={host.id}
+                      style={({ pressed }) => [
+                        styles.accountsCard,
+                        pressed && styles.hostCardPressed
+                      ]}
+                      onPress={() => openMobileAccounts(host.id)}
+                    >
+                      <Text style={styles.accountsHostLabel} numberOfLines={1}>
+                        {host.name}
+                      </Text>
+                      <Text style={styles.accountsFailureText} numberOfLines={3}>
+                        {`Could not read accounts — ${reason}`}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
               {accountsHosts.length > 0 ? (
                 <>
                   <Text style={[styles.sectionHeading, { marginTop: spacing.xl }]}>
@@ -954,6 +1062,7 @@ export default function HomeScreen() {
             ? (hostLastConnected[actionTarget.id] ?? null) != null
             : false,
           onDismiss: () => setActionTarget(null),
+          onOpenAccounts: openMobileAccounts,
           onReconnect: (hostId) => void forceReconnectHost(hostId),
           onDisconnect: disconnectHostClient,
           onEdit: openMobileHostEdit,
@@ -1220,6 +1329,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
     gap: spacing.sm,
     marginBottom: spacing.sm
+  },
+  accountsFailureText: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary
   },
   accountsHostLabel: {
     fontSize: 11,

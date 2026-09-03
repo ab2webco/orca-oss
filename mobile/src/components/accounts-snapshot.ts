@@ -109,7 +109,14 @@ const ClaudeAccountSummarySchema = z
     email: z.string().min(1),
     managedAuthRuntime: z.enum(['host', 'wsl']).optional(),
     wslDistro: z.string().nullable().optional(),
-    authMethod: z.enum(['subscription-oauth', 'unknown']).optional(),
+    // Why `catch` and not just the third value: the host union already had
+    // 'custom-endpoint', and rejecting it blanked every account on the phone. A client
+    // must never require an enum value it does not know — the next one upstream adds
+    // would blank the roster again. Unknown degrades to 'unknown'.
+    authMethod: z
+      .enum(['subscription-oauth', 'custom-endpoint', 'unknown'])
+      .catch('unknown')
+      .optional(),
     organizationUuid: z.string().nullable().optional(),
     organizationName: z.string().nullable().optional(),
     createdAt: TimestampSchema.optional(),
@@ -230,7 +237,14 @@ export type AccountsSnapshot = z.infer<typeof AccountsSnapshotSchema>
 export function decodeAccountsSnapshot(value: unknown): AccountsSnapshot {
   const result = AccountsSnapshotSchema.safeParse(value)
   if (!result.success) {
-    throw new Error('Invalid accounts snapshot from host')
+    // Why the paths: a bare message left a schema drift between host and client
+    // indistinguishable from a host with no accounts, and the field is what tells
+    // you which side to fix.
+    const where = result.error.issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ')
+    throw new Error(`Invalid accounts snapshot from host — ${where}`)
   }
   return result.data
 }
