@@ -198,6 +198,25 @@ describe('board-state-guard', () => {
     expect(decision(output)).toBe('deny')
   })
 
+  // ORCA-362: el cuerpo de un PR de release LISTA sus tickets. Leido como texto
+  // del comando, la guarda atribuia el PR al primero mencionado y exigia moverlo.
+  it('ignores tickets named inside a heredoc body', () => {
+    const cwd = makeRepo('main')
+    const command = [
+      "cat > /tmp/body.md <<'BODY'",
+      'Entra ORCA-155 y tambien ORCA-347, los dos ya en Done.',
+      'BODY',
+      'gh pr merge 259 --squash'
+    ].join('\n')
+    const output = runHook({
+      command,
+      cwd,
+      prTitle: 'chore(release): lab.49 (ORCA-361)'
+    })
+    expect(decision(output)).toBeUndefined()
+    expect(output.systemMessage).toContain('ORCA-361')
+  })
+
   it('says nothing more to move when the merged ticket is already Done', () => {
     const cwd = makeRepo('fabolivark/orca-155-mobile-plane')
     const output = runHook({ command: 'gh pr merge 247 --squash', cwd, state: 'Done' })
