@@ -118,14 +118,13 @@ const SNAPSHOT = {
 } as const
 
 async function renderAccountsRoute(): Promise<ReactTestRenderer> {
-  let renderer: ReactTestRenderer | null = null
+  // Why no `| null` union: the changed-code gate resolves this type as `error` from the root
+  // project, and any union with it trips no-redundant-type-constituents.
+  let renderer!: ReactTestRenderer
   await act(async () => {
     renderer = create(createElement(AccountsScreen))
     await Promise.resolve()
   })
-  if (!renderer) {
-    throw new Error('Accounts route did not render')
-  }
   return renderer
 }
 
