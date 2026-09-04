@@ -72,6 +72,7 @@ import {
   normalizeVisibleTaskProviders,
   type TaskProvider
 } from '../src/tasks/mobile-task-providers'
+import { isPlaneSupportedByHost } from '../src/tasks/plane-mobile-task-source'
 import { useOpenMobileTasks } from '../src/tasks/use-open-mobile-tasks'
 import { useResponsiveLayout } from '../src/layout/responsive-layout'
 import { useOpenMobileSession } from '../src/session/use-open-mobile-session'
@@ -223,9 +224,10 @@ function fetchTaskProviders(
   Promise.all([
     sendSingleFlightRequest(client, hostId, 'settings.get'),
     sendSingleFlightRequest(client, hostId, 'preflight.check'),
-    sendSingleFlightRequest(client, hostId, 'linear.status')
+    sendSingleFlightRequest(client, hostId, 'linear.status'),
+    sendSingleFlightRequest(client, hostId, 'status.get')
   ])
-    .then(([settingsResponse, preflightResponse, linearResponse]) => {
+    .then(([settingsResponse, preflightResponse, linearResponse, statusResponse]) => {
       if (disposed()) {
         return
       }
@@ -237,6 +239,13 @@ function fetchTaskProviders(
         ? (preflightResponse.result as HomePreflightStatus)
         : null
       const linear = linearResponse.ok ? (linearResponse.result as HomeLinearStatus) : null
+      // Why: a host without the Plane RPC surface must not get a home-screen
+      // chip that opens Tasks and silently lands on GitHub instead.
+      const planeSupported = isPlaneSupportedByHost(
+        statusResponse.ok
+          ? (statusResponse.result as { capabilities?: string[] }).capabilities
+          : undefined
+      )
       const providers = filterAvailableTaskProviders(
         normalizeVisibleTaskProviders(settings.visibleTaskProviders),
         {
@@ -244,7 +253,10 @@ function fetchTaskProviders(
           linearConnected: linear?.connected === true
         }
       )
-      setProviders((prev) => ({ ...prev, [hostId]: providers }))
+      setProviders((prev) => ({
+        ...prev,
+        [hostId]: planeSupported ? providers : providers.filter((entry) => entry !== 'plane')
+      }))
     })
     .catch(() => {
       if (disposed()) {

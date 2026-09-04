@@ -8302,7 +8302,9 @@ export default function MobileTasksScreen() {
     return next
   }, [items, provider, reposById, taskSort])
   const displayedEntries = useMemo<TaskListEntry[]>(() => {
-    if (taskSort !== 'repository') {
+    // Plane keeps its board order, so the repository grouping below — which
+    // assumes sorted input — would emit a header per run of rows.
+    if (taskSort !== 'repository' || provider === 'plane') {
       return sortedItems.map((item) => ({ type: 'item', key: item.key, item }))
     }
     const entries: TaskListEntry[] = []
@@ -8321,7 +8323,7 @@ export default function MobileTasksScreen() {
       entries.push({ type: 'item', key: item.key, item })
     }
     return entries
-  }, [reposById, sortedItems, taskSort])
+  }, [provider, reposById, sortedItems, taskSort])
   const sortLabel = SORT_OPTIONS.find((option) => option.value === taskSort)?.label ?? 'Updated'
   const githubProjectFields = githubProjectTable?.selectedView.fields ?? []
   const githubProjectViewSort = githubProjectTable?.selectedView.sortByFields?.[0] ?? null
