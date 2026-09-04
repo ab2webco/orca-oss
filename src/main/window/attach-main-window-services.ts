@@ -78,6 +78,27 @@ export function ensureAutoUpdaterConfigured(): void {
   pendingAutoUpdaterSetup?.()
 }
 
+function isRendererDocumentNavigation(currentUrl: string, nextUrl: string): boolean {
+  try {
+    const current = new URL(currentUrl)
+    const next = new URL(nextUrl)
+    if (current.protocol === 'file:') {
+      return (
+        next.protocol === 'file:' &&
+        next.host === current.host &&
+        next.pathname === current.pathname
+      )
+    }
+    return (
+      (current.protocol === 'http:' || current.protocol === 'https:') &&
+      (next.protocol === 'http:' || next.protocol === 'https:') &&
+      next.origin === current.origin
+    )
+  } catch {
+    return false
+  }
+}
+
 let appReloadHandlerTokenCounter = 0
 let activeAppReloadHandlerToken: number | null = null
 let tccPromptHandlerTokenCounter = 0
@@ -515,9 +536,15 @@ function registerRuntimeWindowLifecycle(
     browserDriverChanged: (browserPageId, driver) =>
       send('runtime:browserDriverChanged', { browserPageId, driver })
   })
-  // Why: fail closed during renderer reload so CLI calls can't act on stale terminal mappings.
-  mainWindow.webContents.on('did-start-loading', () => {
-    runtime.markRendererReloading(mainWindow.id)
+  // Why: did-start-loading also fires for blocked links whose renderer document survives.
+  mainWindow.webContents.on('did-start-navigation', (_event, url, isSameDocument, isMainFrame) => {
+    if (
+      isMainFrame &&
+      !isSameDocument &&
+      isRendererDocumentNavigation(mainWindow.webContents.getURL(), url)
+    ) {
+      runtime.markRendererReloading(mainWindow.id)
+    }
   })
   // Why: markRendererReloading waits for the rebuilt graph, and a gone process
   // never sends one — without this the runtime stays "reloading" forever.
