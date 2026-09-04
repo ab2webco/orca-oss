@@ -52,13 +52,12 @@ function textOf(renderer: ReactTestRenderer): string {
     .join('\n')
 }
 
-function pressableLabelled(renderer: ReactTestRenderer, label: string): ReactTestInstance | null {
-  return (
-    renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.findAllByType('Text').some((text) => text.children.includes(label))) ??
-    null
-  )
+// Why an array, not `| null`: the changed-code gate resolves react-test-renderer types as
+// `error` from the root project, and a union with one trips no-redundant-type-constituents.
+function pressablesLabelled(renderer: ReactTestRenderer, label: string): ReactTestInstance[] {
+  return renderer.root
+    .findAllByType('Pressable')
+    .filter((node) => node.findAllByType('Text').some((text) => text.children.includes(label)))
 }
 
 describe('PlaneWorkItemDetail', () => {
@@ -75,10 +74,10 @@ describe('PlaneWorkItemDetail', () => {
   it('opens the url only when Open in Plane is pressed', () => {
     const { renderer, onOpenInBrowser, onCopyLink } = mount(planeItem(URL))
     expect(onOpenInBrowser).not.toHaveBeenCalled()
-    const open = pressableLabelled(renderer, 'Open in Plane')
-    expect(open).not.toBeNull()
+    const [open] = pressablesLabelled(renderer, 'Open in Plane')
+    expect(open).toBeDefined()
     act(() => {
-      open?.props.onPress()
+      open!.props.onPress()
     })
     expect(onOpenInBrowser).toHaveBeenCalledTimes(1)
     expect(onOpenInBrowser).toHaveBeenCalledWith(URL)
@@ -87,10 +86,10 @@ describe('PlaneWorkItemDetail', () => {
 
   it('copies the url when Copy link is pressed', () => {
     const { renderer, onCopyLink } = mount(planeItem(URL))
-    const copy = pressableLabelled(renderer, 'Copy link')
-    expect(copy).not.toBeNull()
+    const [copy] = pressablesLabelled(renderer, 'Copy link')
+    expect(copy).toBeDefined()
     act(() => {
-      copy?.props.onPress()
+      copy!.props.onPress()
     })
     expect(onCopyLink).toHaveBeenCalledWith(URL)
   })
@@ -98,8 +97,8 @@ describe('PlaneWorkItemDetail', () => {
   it('shows the fields without any open or copy action when the url is empty', () => {
     const { renderer, onOpenInBrowser } = mount(planeItem(''))
     expect(renderer.root.findAllByType('Pressable')).toHaveLength(0)
-    expect(pressableLabelled(renderer, 'Open in Plane')).toBeNull()
-    expect(pressableLabelled(renderer, 'Copy link')).toBeNull()
+    expect(pressablesLabelled(renderer, 'Open in Plane')).toHaveLength(0)
+    expect(pressablesLabelled(renderer, 'Copy link')).toHaveLength(0)
     expect(onOpenInBrowser).not.toHaveBeenCalled()
     const text = textOf(renderer)
     expect(text).toContain('ORCA-360')
