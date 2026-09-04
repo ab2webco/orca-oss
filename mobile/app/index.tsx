@@ -100,7 +100,8 @@ type HomeLinearStatus = {
 const TASK_PROVIDER_LABELS: Record<TaskProvider, string> = {
   github: 'GitHub',
   gitlab: 'GitLab',
-  linear: 'Linear'
+  linear: 'Linear',
+  plane: 'Plane'
 }
 
 function formatDuration(ms: number): string {

@@ -50,6 +50,17 @@ import { MobileWorkspaceNameInput } from '../../../src/components/MobileWorkspac
 import { MobileSearchField } from '../../../src/components/MobileSearchField'
 import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegments'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
+import { PickerListDrawer } from '../../../src/components/PickerListDrawer'
+import {
+  formatGitHubPRDelta,
+  getGitHubReviewerRows,
+  getGitHubReviewerSeedUsers,
+  getGitHubReviewSummary,
+  mergeGitHubAssignableUsers,
+  type GitHubAssignableUser,
+  type GitHubPRMergeableState,
+  type GitHubPRReviewSummary
+} from '../../../src/tasks/github-mobile-pr-review'
 import { TaskProviderLogo } from '../../../src/components/TaskProviderLogo'
 import {
   buildGitHubPrFileDiffPreview,
@@ -131,10 +142,45 @@ import {
 } from '../../../src/tasks/mobile-work-items'
 import {
   filterAvailableTaskProviders,
+  isTaskProvider,
   normalizeVisibleTaskProviders,
   resolveVisibleTaskProvider,
   type TaskProvider
 } from '../../../src/tasks/mobile-task-providers'
+import {
+  normalizePlaneFilter,
+  PLANE_FILTER_OPTIONS,
+  TASK_PROVIDER_OPTIONS
+} from '../../../src/tasks/task-source-picker-options'
+import { formatUpdatedAt, taskTime } from '../../../src/tasks/task-updated-at-time'
+import {
+  compareLinearIssues,
+  getLinearPriorityLabel,
+  groupLinearIssues,
+  type LinearGroupBy,
+  type LinearIssueSection,
+  type LinearOrderBy
+} from '../../../src/tasks/linear-mobile-issue-grouping'
+import {
+  fetchPlaneProjects,
+  fetchPlaneStates,
+  fetchPlaneStatus,
+  fetchPlaneWorkItems,
+  isPlaneSupportedByHost,
+  PLANE_HOST_UPDATE_REQUIRED_MESSAGE
+} from '../../../src/tasks/plane-mobile-task-source'
+import {
+  createPlaneTask,
+  filterPlaneWorkItemsByState,
+  reconcilePlaneStateSelection,
+  sortPlaneWorkItems,
+  type PlaneTaskItem
+} from '../../../src/tasks/plane-mobile-task-list'
+import type {
+  PlaneMobileProject,
+  PlaneMobileState
+} from '../../../src/tasks/plane-mobile-work-item-read'
+import type { PlaneWorkItemFilter } from '../../../../src/shared/plane-types'
 import { hasSettledHostRepoList } from '../../../src/tasks/host-repo-list'
 import { useHostRepoList } from '../../../src/tasks/use-host-repo-list'
 import { isHostedTaskRepo, reconcileRepoSelection } from '../../../src/tasks/hosted-repo-selection'
@@ -201,24 +247,6 @@ type GitHubWorkItem = {
   checksSummary?: ProviderCheckSummary
   mergeable?: GitHubPRMergeableState
   mergeStateStatus?: string | null
-}
-type GitHubAssignableUser = {
-  login: string
-  name?: string | null
-  avatarUrl?: string | null
-}
-type GitHubPRReviewSummary = {
-  login: string
-  state?: string | null
-  avatarUrl?: string | null
-}
-type GitHubPRMergeableState = 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
-
-type GitHubPRReviewerRow = {
-  login: string
-  name?: string | null
-  avatarUrl?: string | null
-  stateLabel: string
 }
 type GitHubRepoSources = {
   issues: GitHubOwnerRepo | null
@@ -418,8 +446,6 @@ type GitLabView = 'project' | 'todos'
 type GitLabFilter = 'opened' | 'merged' | 'closed' | 'all'
 type LinearFilter = 'assigned' | 'created' | 'all' | 'completed'
 type LinearViewMode = 'list' | 'board'
-type LinearGroupBy = 'none' | 'status' | 'assignee' | 'priority' | 'team'
-type LinearOrderBy = 'priority' | 'updated' | 'identifier'
 type LinearDisplayProperty = 'state' | 'priority' | 'assignee' | 'team' | 'labels' | 'updated'
 type TaskSort = 'updated' | 'repository'
 type DetailCommentGroup =
@@ -432,6 +458,10 @@ type TaskResumeState = {
   githubProjectHiddenFieldIdsByView?: Record<string, string[]>
   linearPreset?: LinearFilter
   linearQuery?: string
+  planePreset?: PlaneWorkItemFilter
+  planeQuery?: string
+  // '' means every project in scope; the host schema has no null for this key.
+  planeProjectId?: string
 }
 type RuntimeTaskSettings = {
   defaultTuiAgent?: TuiAgent | 'blank' | null
@@ -595,8 +625,11 @@ type TaskItem =
       updatedAt: string
       source: LinearIssue
     }
+  | PlaneTaskItem
 
-type ActionableTaskItem = Exclude<TaskItem, { provider: 'gitlabTodo' }>
+// Plane is read-only on mobile in this slice: rows list and open externally,
+// like GitLab todos, so they never reach the workspace-create paths.
+type ActionableTaskItem = Exclude<TaskItem, { provider: 'gitlabTodo' | 'plane' }>
 type HostedReviewMergeMethod = 'merge' | 'squash' | 'rebase'
 type HostedReviewItem =
   | Extract<TaskItem, { provider: 'github' }>
@@ -684,45 +717,6 @@ type ProjectRepoNotInOrcaPrompt = {
 type TaskListEntry =
   | { type: 'section'; key: string; label: string; color: string }
   | { type: 'item'; key: string; item: TaskItem }
-
-const PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
-  {
-    value: 'github',
-    label: 'GitHub',
-    subtitle: 'Issues and pull requests',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="github"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  },
-  {
-    value: 'gitlab',
-    label: 'GitLab',
-    subtitle: 'Issues and merge requests',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="gitlab"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  },
-  {
-    value: 'linear',
-    label: 'Linear',
-    subtitle: 'Assigned and team issues',
-    renderIcon: (selected) => (
-      <TaskProviderLogo
-        provider="linear"
-        size={16}
-        color={selected ? colors.textPrimary : colors.textSecondary}
-      />
-    )
-  }
-]
 
 const GITLAB_FILTER_OPTIONS: PickerOption<GitLabFilter>[] = [
   { value: 'opened', label: 'Open', subtitle: 'Open issues and merge requests' },
@@ -835,7 +829,6 @@ type ProjectSortOverride = { fieldId: string; direction: GitHubProjectSortDirect
 type ProjectListEntry =
   | { type: 'group'; group: ProjectGroup; collapsed: boolean }
   | { type: 'row'; row: GitHubProjectRow }
-type LinearIssueSection = { key: string; label: string; color: string; issues: LinearIssue[] }
 type LinearListEntry =
   | { type: 'section'; section: LinearIssueSection }
   | { type: 'issue'; issue: LinearIssue }
@@ -868,27 +861,6 @@ function isSuccess(response: unknown): response is RpcSuccess {
   return Boolean(response && typeof response === 'object' && (response as RpcSuccess).ok)
 }
 
-function taskTime(value: string): number {
-  const time = Date.parse(value)
-  return Number.isFinite(time) ? time : 0
-}
-
-function formatUpdatedAt(value: string): string {
-  const time = taskTime(value)
-  if (!time) {
-    return ''
-  }
-  const minutes = Math.max(0, Math.floor((Date.now() - time) / 60_000))
-  if (minutes < 60) {
-    return `${minutes}m`
-  }
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) {
-    return `${hours}h`
-  }
-  return `${Math.floor(hours / 24)}d`
-}
-
 function getTaskPresetQuery(preset: GitHubPreset): string {
   switch (preset) {
     case 'my-issues':
@@ -903,10 +875,6 @@ function getTaskPresetQuery(preset: GitHubPreset): string {
     default:
       return 'is:issue is:open'
   }
-}
-
-function isTaskProvider(value: unknown): value is TaskProvider {
-  return value === 'github' || value === 'gitlab' || value === 'linear'
 }
 
 function normalizeGitHubPreset(value: unknown): GitHubPreset {
@@ -1136,107 +1104,6 @@ function createLinearTask(issue: LinearIssue): TaskItem {
   }
 }
 
-const LINEAR_PRIORITY_LABELS: Record<number, string> = {
-  0: 'None',
-  1: 'Urgent',
-  2: 'High',
-  3: 'Medium',
-  4: 'Low'
-}
-
-function getLinearPriorityLabel(priority: number): string {
-  return LINEAR_PRIORITY_LABELS[priority] ?? `P${priority}`
-}
-
-function getLinearPriorityRank(priority: number): number {
-  return priority === 0 ? 5 : priority
-}
-
-function formatGitHubReviewState(state: string | null | undefined): string {
-  switch (state) {
-    case 'APPROVED':
-      return 'Approved'
-    case 'CHANGES_REQUESTED':
-      return 'Changes requested'
-    case 'COMMENTED':
-      return 'Commented'
-    case 'DISMISSED':
-      return 'Dismissed'
-    case 'PENDING':
-      return 'Pending'
-    default:
-      return 'Reviewed'
-  }
-}
-
-function getGitHubReviewerRows(item: {
-  reviewRequests?: GitHubAssignableUser[]
-  latestReviews?: GitHubPRReviewSummary[]
-}): GitHubPRReviewerRow[] {
-  const byLogin = new Map<string, GitHubPRReviewerRow>()
-  for (const user of item.reviewRequests ?? []) {
-    const login = user.login.trim()
-    if (!login) {
-      continue
-    }
-    byLogin.set(login.toLowerCase(), {
-      login,
-      name: user.name,
-      avatarUrl: user.avatarUrl,
-      stateLabel: 'Requested'
-    })
-  }
-  for (const review of item.latestReviews ?? []) {
-    const login = review.login.trim()
-    const key = login.toLowerCase()
-    if (!login || byLogin.has(key)) {
-      continue
-    }
-    byLogin.set(key, {
-      login,
-      name: null,
-      avatarUrl: review.avatarUrl,
-      stateLabel: formatGitHubReviewState(review.state)
-    })
-  }
-  return Array.from(byLogin.values())
-}
-
-function getGitHubReviewSummary(item: {
-  reviewDecision?: string | null
-  reviewRequests?: GitHubAssignableUser[]
-  latestReviews?: GitHubPRReviewSummary[]
-}): string {
-  if (item.reviewDecision === 'APPROVED') {
-    return 'Approved'
-  }
-  if (item.reviewDecision === 'CHANGES_REQUESTED') {
-    return 'Changes requested'
-  }
-  const rows = getGitHubReviewerRows(item)
-  if (rows.length === 0) {
-    return 'No reviewers'
-  }
-  if (rows.length === 1) {
-    return `${rows[0]!.login} - ${rows[0]!.stateLabel}`
-  }
-  return `${rows[0]!.login} +${rows.length - 1}`
-}
-
-function formatGitHubPRDelta(item: GitHubWorkItem): string | null {
-  const parts: string[] = []
-  if (typeof item.additions === 'number') {
-    parts.push(`+${item.additions}`)
-  }
-  if (typeof item.deletions === 'number') {
-    parts.push(`-${item.deletions}`)
-  }
-  if (typeof item.changedFiles === 'number') {
-    parts.push(`${item.changedFiles} ${item.changedFiles === 1 ? 'file' : 'files'}`)
-  }
-  return parts.length > 0 ? parts.join(' ') : null
-}
-
 function hostedBranchSummary(item: TaskItem): { head: string; base: string } | null {
   if (item.provider === 'github' && item.source.type === 'pr') {
     return {
@@ -1356,50 +1223,6 @@ function getHostedStateConfirmLabel(pending: PendingHostedStateChange): string {
   return `${hostedStateChangeAction(pending.nextState)} ${target.labelTarget}`
 }
 
-function mergeGitHubAssignableUsers(
-  users: GitHubAssignableUser[],
-  seeds: GitHubAssignableUser[]
-): GitHubAssignableUser[] {
-  const byLogin = new Map<string, GitHubAssignableUser>()
-  for (const user of [...users, ...seeds]) {
-    const login = user.login.trim()
-    if (!login || byLogin.has(login.toLowerCase())) {
-      continue
-    }
-    byLogin.set(login.toLowerCase(), { ...user, login })
-  }
-  return [...byLogin.values()]
-}
-
-function getGitHubReviewerSeedUsers(item: {
-  reviewRequests?: GitHubAssignableUser[]
-  latestReviews?: GitHubPRReviewSummary[]
-  author?: string | null
-}): GitHubAssignableUser[] {
-  const byLogin = new Map<string, GitHubAssignableUser>()
-  const add = (user: GitHubAssignableUser): void => {
-    const login = user.login.trim()
-    if (!login || byLogin.has(login.toLowerCase())) {
-      return
-    }
-    byLogin.set(login.toLowerCase(), { ...user, login })
-  }
-  for (const user of item.reviewRequests ?? []) {
-    add(user)
-  }
-  for (const review of item.latestReviews ?? []) {
-    add({
-      login: review.login,
-      name: null,
-      avatarUrl: review.avatarUrl ?? null
-    })
-  }
-  if (item.author) {
-    add({ login: item.author, name: null, avatarUrl: null })
-  }
-  return [...byLogin.values()]
-}
-
 function sameGitHubOwnerRepo(
   a: GitHubOwnerRepo | null | undefined,
   b: GitHubOwnerRepo | null | undefined
@@ -1422,73 +1245,6 @@ function hasGitHubIssueSourceChoice(sources: GitHubRepoSources | undefined): boo
 
 function issueSourceSlug(source: GitHubOwnerRepo | null | undefined): string {
   return source ? `${source.owner}/${source.repo}` : 'Unknown'
-}
-
-function compareLinearIssues(a: LinearIssue, b: LinearIssue, orderBy: LinearOrderBy): number {
-  if (orderBy === 'updated') {
-    return taskTime(b.updatedAt) - taskTime(a.updatedAt)
-  }
-  if (orderBy === 'identifier') {
-    return a.identifier.localeCompare(b.identifier, undefined, { numeric: true })
-  }
-  const priorityDelta = getLinearPriorityRank(a.priority) - getLinearPriorityRank(b.priority)
-  return priorityDelta || taskTime(b.updatedAt) - taskTime(a.updatedAt)
-}
-
-function getLinearIssueGroup(
-  issue: LinearIssue,
-  groupBy: LinearGroupBy
-): {
-  key: string
-  label: string
-  color: string
-} {
-  if (groupBy === 'status') {
-    return { key: `status:${issue.state.name}`, label: issue.state.name, color: issue.state.color }
-  }
-  if (groupBy === 'assignee') {
-    return {
-      key: `assignee:${issue.assignee?.id ?? issue.assignee?.displayName ?? 'unassigned'}`,
-      label: issue.assignee?.displayName ?? 'Unassigned',
-      color: colors.accentBlue
-    }
-  }
-  if (groupBy === 'priority') {
-    return {
-      key: `priority:${issue.priority}`,
-      label: getLinearPriorityLabel(issue.priority),
-      color: issue.priority === 1 ? colors.statusRed : colors.accentBlue
-    }
-  }
-  if (groupBy === 'team') {
-    return { key: `team:${issue.team.id}`, label: issue.team.name, color: issue.state.color }
-  }
-  return { key: 'all', label: 'Issues', color: colors.accentBlue }
-}
-
-function groupLinearIssues(
-  issues: LinearIssue[],
-  groupBy: LinearGroupBy,
-  orderBy: LinearOrderBy
-): LinearIssueSection[] {
-  const sorted = [...issues].sort((a, b) => compareLinearIssues(a, b, orderBy))
-  if (groupBy === 'none') {
-    return [{ key: 'all', label: 'Issues', color: colors.accentBlue, issues: sorted }]
-  }
-  const sections = new Map<
-    string,
-    { key: string; label: string; color: string; issues: LinearIssue[] }
-  >()
-  for (const issue of sorted) {
-    const group = getLinearIssueGroup(issue, groupBy)
-    const section = sections.get(group.key)
-    if (section) {
-      section.issues.push(issue)
-    } else {
-      sections.set(group.key, { ...group, issues: [issue] })
-    }
-  }
-  return [...sections.values()]
 }
 
 function linearIssueSecondaryParts(
@@ -1729,20 +1485,23 @@ function taskKindLabel(item: TaskItem): string {
   if (item.provider === 'gitlabTodo') {
     return `${gitLabTodoTargetLabel(item.source)} todo`
   }
+  if (item.provider === 'plane') {
+    return 'Plane work item'
+  }
   return 'Linear ticket'
 }
 
-function taskExternalOpenLabel(item: TaskItem): string {
+function taskExternalOpenLabel(item: ActionableTaskItem): string {
   if (item.provider === 'github') {
     return 'Open in GitHub'
   }
-  if (item.provider === 'gitlab' || item.provider === 'gitlabTodo') {
+  if (item.provider === 'gitlab') {
     return 'Open in GitLab'
   }
   return 'Open in Linear'
 }
 
-function taskStatusActionLabel(item: TaskItem): string {
+function taskStatusActionLabel(item: ActionableTaskItem): string {
   const verb =
     item.provider === 'github' || item.provider === 'gitlab'
       ? item.source.state === 'closed'
@@ -2044,6 +1803,10 @@ function taskRepositoryMeta(
       color: repoColor(item.source.projectPath)
     }
   }
+  if (item.provider === 'plane') {
+    const label = item.source.project.name || item.source.project.identifier || 'Plane'
+    return { key: item.source.project.id || label, label, color: repoColor(label) }
+  }
   return {
     key: item.source.team.id,
     label: item.source.team.name,
@@ -2095,6 +1858,17 @@ export default function MobileTasksScreen() {
     normalizeVisibleTaskProviders(undefined)
   )
   const [linearConnected, setLinearConnected] = useState(false)
+  const [planeSupported, setPlaneSupported] = useState(false)
+  const [planeConnected, setPlaneConnected] = useState(false)
+  const [planeWorkspaceId, setPlaneWorkspaceId] = useState<string | null>(null)
+  const [planeProjects, setPlaneProjects] = useState<PlaneMobileProject[]>([])
+  const [planeProjectId, setPlaneProjectId] = useState<string | null>(null)
+  const [planeStates, setPlaneStates] = useState<PlaneMobileState[]>([])
+  const [planeStateIds, setPlaneStateIds] = useState<Set<string>>(() => new Set())
+  const [planeFilter, setPlaneFilter] = useState<PlaneWorkItemFilter>('all')
+  const [showPlaneFilterPicker, setShowPlaneFilterPicker] = useState(false)
+  const [showPlaneProjectPicker, setShowPlaneProjectPicker] = useState(false)
+  const [showPlaneStatePicker, setShowPlaneStatePicker] = useState(false)
   const [githubMode, setGithubMode] = useState<'items' | 'project'>('items')
   const [githubKind, setGithubKind] = useState<GitHubTaskKind>('issues')
   const [githubPreset, setGithubPreset] = useState<GitHubPreset>('issues')
@@ -2990,10 +2764,17 @@ export default function MobileTasksScreen() {
         gitlabInstalled: preflight?.glab?.installed === true,
         linearConnected: linearIsConnected
       })
-      const nextVisibleProviders =
+      const planeIsSupported = isPlaneSupportedByHost(status.capabilities)
+      const withLinear =
         preferredProviders.includes('linear') && !availableProviders.includes('linear')
           ? [...availableProviders, 'linear' as const]
           : availableProviders
+      // Why: an older host answers status.get but refuses every plane.* call, so
+      // offering the tab there would only ever render a failed request.
+      const nextVisibleProviders = planeIsSupported
+        ? withLinear
+        : withLinear.filter((entry) => entry !== 'plane')
+      setPlaneSupported(planeIsSupported)
       setLinearConnected(linearIsConnected)
       if (!linearIsConnected) {
         setLinearWorkspaces([])
@@ -3018,11 +2799,18 @@ export default function MobileTasksScreen() {
           ? (resume.githubItemsQuery ?? '')
           : getTaskPresetQuery(preset)
       const nextLinearFilter = normalizeLinearFilter(resume.linearPreset)
+      const nextPlaneFilter = normalizePlaneFilter(resume.planePreset)
       const nextLinearQuery = resume.linearQuery ?? ''
       defaultRepoSelectionRef.current = settings.defaultRepoSelection ?? null
       defaultLinearTeamSelectionRef.current = settings.defaultLinearTeamSelection ?? null
       const nextQuery =
-        nextProvider === 'github' ? githubQuery : nextProvider === 'linear' ? nextLinearQuery : ''
+        nextProvider === 'github'
+          ? githubQuery
+          : nextProvider === 'linear'
+            ? nextLinearQuery
+            : nextProvider === 'plane'
+              ? (resume.planeQuery ?? '')
+              : ''
       const nextAppliedQuery =
         nextProvider === 'github'
           ? scopeGitHubTaskSearch(githubQuery, githubKindFromQuery(githubQuery, preset))
@@ -3035,6 +2823,8 @@ export default function MobileTasksScreen() {
       setGithubPreset(preset)
       setGithubKind(githubKindFromQuery(githubQuery, preset))
       setLinearFilter(nextLinearFilter)
+      setPlaneFilter(nextPlaneFilter)
+      setPlaneProjectId(resume.planeProjectId || null)
       setGithubProjectSettings(settings.githubProjects ?? EMPTY_GITHUB_PROJECT_SETTINGS)
       setQuery(nextQuery)
       setAppliedQuery(nextAppliedQuery)
@@ -3277,6 +3067,30 @@ export default function MobileTasksScreen() {
           setItems([])
           return
         }
+        if (provider === 'plane') {
+          if (!planeSupported) {
+            setItems([])
+            setError(PLANE_HOST_UPDATE_REQUIRED_MESSAGE)
+            return
+          }
+          if (!planeConnected) {
+            setItems([])
+            setError('Plane is not connected on this host. Connect it from the desktop app.')
+            return
+          }
+          const workItems = await fetchPlaneWorkItems(requestClient, {
+            query: appliedQuery,
+            filter: planeFilter,
+            projectId: planeProjectId,
+            workspaceId: planeWorkspaceId
+          })
+          if (!isCurrent()) {
+            return
+          }
+          const scoped = filterPlaneWorkItemsByState(workItems, planeStateIds)
+          setItems(sortPlaneWorkItems(scoped, planeStates).map(createPlaneTask))
+          return
+        }
         // Why: Linear issues do not need the repo list, only the composer does, so
         // start the fetch either way but never make Linear wait on it.
         const repoListRequest = repoListEnsureLoaded()
@@ -3458,6 +3272,13 @@ export default function MobileTasksScreen() {
       linearConnected,
       linearFilter,
       linearOrderBy,
+      planeConnected,
+      planeFilter,
+      planeProjectId,
+      planeStateIds,
+      planeStates,
+      planeSupported,
+      planeWorkspaceId,
       // resetGitHubItemsState is useCallback([]), so its identity never changes
       // and listing it here would only cost a line against the max-lines budget.
       repoListEnsureLoaded,
@@ -3956,6 +3777,17 @@ export default function MobileTasksScreen() {
   }, [appliedQuery, linearFilter, persistTaskResumeState, provider, taskUiReady])
 
   useEffect(() => {
+    if (!taskUiReady || provider !== 'plane') {
+      return
+    }
+    persistTaskResumeState({
+      planePreset: planeFilter,
+      planeQuery: appliedQuery.trim(),
+      planeProjectId: planeProjectId ?? ''
+    })
+  }, [appliedQuery, persistTaskResumeState, planeFilter, planeProjectId, provider, taskUiReady])
+
+  useEffect(() => {
     if (connState !== 'connected' || !taskStateHydrated) {
       return
     }
@@ -3970,6 +3802,67 @@ export default function MobileTasksScreen() {
       setError(err instanceof Error ? err.message : 'Failed to load Linear context')
     })
   }, [linearConnected, loadLinearContext, provider, taskStateHydrated])
+
+  useEffect(() => {
+    if (!client || !taskStateHydrated || provider !== 'plane' || !planeSupported) {
+      return
+    }
+    let stale = false
+    const loadPlaneContext = async (): Promise<void> => {
+      const status = await fetchPlaneStatus(client)
+      if (stale) {
+        return
+      }
+      setPlaneConnected(status.connected)
+      if (!status.connected) {
+        setPlaneProjects([])
+        setPlaneWorkspaceId(null)
+        return
+      }
+      const workspaceId =
+        status.selectedWorkspaceId ?? status.activeWorkspaceId ?? status.workspaces[0]?.id ?? null
+      setPlaneWorkspaceId(workspaceId)
+      const projects = await fetchPlaneProjects(client, workspaceId)
+      if (!stale) {
+        setPlaneProjects(projects)
+      }
+    }
+    void loadPlaneContext().catch((err) => {
+      if (!stale) {
+        setError(err instanceof Error ? err.message : 'Failed to load Plane context')
+      }
+    })
+    return () => {
+      stale = true
+    }
+  }, [client, planeSupported, provider, taskStateHydrated])
+
+  // Plane states are per-project, so the state filter only exists once the list
+  // is scoped to one project.
+  useEffect(() => {
+    if (!client || provider !== 'plane' || !planeProjectId) {
+      setPlaneStates([])
+      setPlaneStateIds((current) => (current.size === 0 ? current : new Set()))
+      return
+    }
+    let stale = false
+    void fetchPlaneStates(client, planeProjectId, planeWorkspaceId)
+      .then((states) => {
+        if (stale) {
+          return
+        }
+        setPlaneStates(states)
+        setPlaneStateIds((current) => reconcilePlaneStateSelection(current, states))
+      })
+      .catch(() => {
+        if (!stale) {
+          setPlaneStates([])
+        }
+      })
+    return () => {
+      stale = true
+    }
+  }, [client, planeProjectId, planeWorkspaceId, provider])
 
   useEffect(() => {
     if (!taskUiReady || provider !== 'github' || githubMode !== 'project') {
@@ -8336,7 +8229,7 @@ export default function MobileTasksScreen() {
   const showHeaderCreateTask =
     provider === 'linear' || (provider === 'github' && githubMode === 'items')
   const providerOptions = useMemo(
-    () => PROVIDER_OPTIONS.filter((option) => visibleProviders.includes(option.value)),
+    () => TASK_PROVIDER_OPTIONS.filter((option) => visibleProviders.includes(option.value)),
     [visibleProviders]
   )
   const selectedCreateRepo =
@@ -8395,6 +8288,11 @@ export default function MobileTasksScreen() {
     [workspaceRepos]
   )
   const sortedItems = useMemo(() => {
+    // Plane rows arrive in the project's own state order, so the generic
+    // repository/updated sort would throw that away.
+    if (provider === 'plane') {
+      return items
+    }
     const next = [...items]
     if (taskSort === 'repository') {
       next.sort((a, b) => compareTasksByRepository(a, b, reposById))
@@ -8402,7 +8300,7 @@ export default function MobileTasksScreen() {
       next.sort(compareTasksByUpdated)
     }
     return next
-  }, [items, reposById, taskSort])
+  }, [items, provider, reposById, taskSort])
   const displayedEntries = useMemo<TaskListEntry[]>(() => {
     if (taskSort !== 'repository') {
       return sortedItems.map((item) => ({ type: 'item', key: item.key, item }))
@@ -8490,6 +8388,34 @@ export default function MobileTasksScreen() {
     GITLAB_FILTER_OPTIONS.find((filter) => filter.value === gitlabFilter)?.label ?? 'Open'
   const linearFilterLabel =
     LINEAR_FILTER_OPTIONS.find((filter) => filter.value === linearFilter)?.label ?? 'All'
+  const planeFilterLabel =
+    PLANE_FILTER_OPTIONS.find((filter) => filter.value === planeFilter)?.label ?? 'All'
+  const planeProjectItems = useMemo(
+    () => [
+      { id: '', label: 'All projects', detail: `${planeProjects.length} projects` },
+      ...planeProjects.map((project) => ({
+        id: project.id,
+        label: project.name || project.identifier,
+        detail: project.identifier
+      }))
+    ],
+    [planeProjects]
+  )
+  const planeStateItems = useMemo(
+    () => [
+      { id: '', label: 'All states' },
+      ...planeStates.map((state) => ({
+        id: state.id,
+        label: state.name || state.group || state.id,
+        detail: state.group || undefined
+      }))
+    ],
+    [planeStates]
+  )
+  const planeProjectLabel =
+    planeProjectItems.find((entry) => entry.id === (planeProjectId ?? ''))?.label ?? 'All projects'
+  const planeStateLabel =
+    planeStateItems.find((entry) => planeStateIds.has(entry.id))?.label ?? 'All states'
   const linearViewLabel =
     LINEAR_VIEW_OPTIONS.find((option) => option.value === linearViewMode)?.label ?? 'List'
   const linearGroupLabel =
@@ -9046,7 +8972,37 @@ export default function MobileTasksScreen() {
             </>
           )}
 
-          {provider !== 'linear' && !(provider === 'github' && githubMode === 'project') ? (
+          {provider === 'plane' && planeSupported && planeConnected && (
+            <>
+              <Pressable
+                style={styles.segmentButton}
+                disabled={!taskUiReady}
+                onPress={() => taskUiReady && setShowPlaneProjectPicker(true)}
+              >
+                <Text style={styles.segmentSecondaryText}>{planeProjectLabel}</Text>
+              </Pressable>
+              {planeProjectId ? (
+                <Pressable
+                  style={styles.segmentButton}
+                  disabled={!taskUiReady}
+                  onPress={() => taskUiReady && setShowPlaneStatePicker(true)}
+                >
+                  <Text style={styles.segmentSecondaryText}>{planeStateLabel}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                style={styles.segmentButton}
+                disabled={!taskUiReady}
+                onPress={() => taskUiReady && setShowPlaneFilterPicker(true)}
+              >
+                <Text style={styles.segmentSecondaryText}>{planeFilterLabel}</Text>
+              </Pressable>
+            </>
+          )}
+
+          {provider !== 'linear' &&
+          provider !== 'plane' &&
+          !(provider === 'github' && githubMode === 'project') ? (
             <Pressable
               style={styles.segmentButton}
               disabled={!taskUiReady}
@@ -9698,6 +9654,12 @@ export default function MobileTasksScreen() {
                     void Linking.openURL(item.source.targetUrl)
                     return
                   }
+                  if (item.provider === 'plane') {
+                    if (item.source.url) {
+                      void Linking.openURL(item.source.url)
+                    }
+                    return
+                  }
                   setActionItem(item)
                 }}
               >
@@ -9829,6 +9791,11 @@ export default function MobileTasksScreen() {
           } else if (next === 'linear') {
             const nextQuery = resume.linearQuery ?? ''
             setLinearFilter(normalizeLinearFilter(resume.linearPreset))
+            setQuery(nextQuery)
+            setAppliedQuery(nextQuery.trim())
+          } else if (next === 'plane') {
+            const nextQuery = resume.planeQuery ?? ''
+            setPlaneFilter(normalizePlaneFilter(resume.planePreset))
             setQuery(nextQuery)
             setAppliedQuery(nextQuery.trim())
           } else {
@@ -10429,6 +10396,37 @@ export default function MobileTasksScreen() {
           persistTaskResumeState({ linearPreset: filter, linearQuery: '' })
         }}
         onClose={() => setShowLinearFilterPicker(false)}
+      />
+
+      <PickerModal
+        visible={taskUiReady && showPlaneFilterPicker}
+        title="Plane Filter"
+        options={PLANE_FILTER_OPTIONS}
+        selected={planeFilter}
+        onSelect={(filter) => {
+          setPlaneFilter(filter)
+          setQuery('')
+          setAppliedQuery('')
+        }}
+        onClose={() => setShowPlaneFilterPicker(false)}
+      />
+
+      <PickerListDrawer
+        visible={taskUiReady && showPlaneProjectPicker}
+        title="Plane Project"
+        items={planeProjectItems}
+        selectedId={planeProjectId ?? ''}
+        onSelect={(entry) => setPlaneProjectId(entry.id || null)}
+        onClose={() => setShowPlaneProjectPicker(false)}
+      />
+
+      <PickerListDrawer
+        visible={taskUiReady && showPlaneStatePicker}
+        title="Plane State"
+        items={planeStateItems}
+        selectedId={planeStateItems.find((entry) => planeStateIds.has(entry.id))?.id ?? ''}
+        onSelect={(entry) => setPlaneStateIds(entry.id ? new Set([entry.id]) : new Set())}
+        onClose={() => setShowPlaneStatePicker(false)}
       />
 
       <PickerModal

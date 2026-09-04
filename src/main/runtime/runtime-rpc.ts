@@ -328,6 +328,13 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'hostedReview.createStacked',
   'hostedReview.forBranch',
   'hostedReview.getCreationEligibility',
+  // Read-only Plane surface for the mobile Tasks tab (ORCA-155). Mobile renders
+  // a list, so nothing that writes to Plane belongs here.
+  'plane.status',
+  'plane.listProjects',
+  'plane.listWorkItems',
+  'plane.searchWorkItems',
+  'plane.listStates',
   'linear.getCustomView',
   'linear.getIssue',
   'linear.getProject',
