@@ -8225,7 +8225,7 @@ export default function MobileTasksScreen() {
       ? ((selectedCreateTarget as RepoSummary | null)?.displayName ?? 'Select target')
       : ((selectedCreateTarget as LinearTeam | null)?.name ?? 'Select target')
   const providerLabel =
-    provider === 'github' ? 'GitHub' : provider === 'gitlab' ? 'GitLab' : 'Linear'
+    TASK_PROVIDER_OPTIONS.find((option) => option.value === provider)?.label ?? 'GitHub'
   const showHeaderCreateTask =
     provider === 'linear' || (provider === 'github' && githubMode === 'items')
   const providerOptions = useMemo(
@@ -8608,9 +8608,7 @@ export default function MobileTasksScreen() {
         ? 'No matching tasks'
         : provider === 'github'
           ? 'No GitHub tasks'
-          : provider === 'gitlab'
-            ? 'No GitLab tasks'
-            : 'No Linear tasks'
+          : `No ${providerLabel} tasks`
   const isGithubProjectSearch = provider === 'github' && githubMode === 'project'
 
   return (
