@@ -33,7 +33,7 @@ function planeProjectLabel(project: PlaneTaskItem['source']['project']): string 
 export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied }: Props) {
   const work = item.source
   const url = work.url
-  const fields: Array<[string, string]> = [
+  const fields: [string, string][] = [
     ['Identifier', work.identifier || '—'],
     ['State', planeStateLabel(work.state)],
     ['Priority', PRIORITY_LABELS[work.priority]],
