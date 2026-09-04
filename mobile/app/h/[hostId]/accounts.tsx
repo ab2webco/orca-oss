@@ -46,6 +46,8 @@ export default function AccountsScreen() {
   const [hostName, setHostName] = useState<string>('')
   const [snapshot, setSnapshot] = useState<AccountsSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Why: a failed refresh must not blank a snapshot the user can still act on.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null)
   const [clockEnabled, setClockEnabled] = useState(false)
@@ -53,12 +55,14 @@ export default function AccountsScreen() {
   const acceptSnapshot = useCallback((nextSnapshot: AccountsSnapshot) => {
     setSnapshot(nextSnapshot)
     setError(null)
+    setRefreshError(null)
   }, [])
   const rejectInvalidSnapshot = useCallback(() => {
     // Why: a stale snapshot can expose a finite reset action for the wrong
     // account; fail closed if a host sends a shape this mobile cannot prove.
     setSnapshot(null)
     setError('Invalid accounts snapshot from host')
+    setRefreshError(null)
   }, [])
   const {
     supported: codexResetSupported,
@@ -129,28 +133,30 @@ export default function AccountsScreen() {
     return unsubscribe
   }, [acceptSnapshot, client, connState, rejectInvalidSnapshot])
 
+  const hasSnapshot = snapshot !== null
   const refresh = useCallback(async () => {
     if (!client) {
       return
     }
+    const reportFailure = hasSnapshot ? setRefreshError : setError
     setRefreshing(true)
     try {
       const res = await client.sendRequest('accounts.list')
       if (res.ok) {
         acceptSnapshot(decodeAccountsSnapshot(res.result))
       } else {
-        setError(res.error.message)
+        reportFailure(res.error.message)
       }
     } catch (e) {
       if (e instanceof Error && e.message === 'Invalid accounts snapshot from host') {
         rejectInvalidSnapshot()
       } else {
-        setError(e instanceof Error ? e.message : String(e))
+        reportFailure(e instanceof Error ? e.message : String(e))
       }
     } finally {
       setRefreshing(false)
     }
-  }, [acceptSnapshot, client, rejectInvalidSnapshot])
+  }, [acceptSnapshot, client, hasSnapshot, rejectInvalidSnapshot])
 
   const selectAccount = useCallback(
     async (provider: ProviderKey, accountId: string | null) => {
@@ -389,6 +395,11 @@ export default function AccountsScreen() {
           </View>
         ) : (
           <>
+            {refreshError ? (
+              <View style={styles.refreshErrorBanner}>
+                <Text style={styles.errorText}>Could not refresh accounts — {refreshError}</Text>
+              </View>
+            ) : null}
             {renderProviderSection('claude', 'Claude')}
             {renderProviderSection('codex', 'Codex')}
             <View style={styles.footerHint}>
