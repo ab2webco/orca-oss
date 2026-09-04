@@ -166,8 +166,8 @@ import {
   fetchPlaneStates,
   fetchPlaneStatus,
   fetchPlaneWorkItems,
-  isPlaneSupportedByHost,
-  PLANE_HOST_UPDATE_REQUIRED_MESSAGE
+  PLANE_HOST_UPDATE_REQUIRED_MESSAGE,
+  readPlaneAvailability
 } from '../../../src/tasks/plane-mobile-task-source'
 import {
   createPlaneTask,
@@ -2721,12 +2721,15 @@ export default function MobileTasksScreen() {
       }
       setTasksSupportState({ kind: 'supported', client })
       setError('')
-      const [settingsResponse, uiResponse, preflightResponse, linearStatusResponse] =
+      const [settingsResponse, uiResponse, preflightResponse, linearStatusResponse, planeState] =
         await Promise.all([
           client.sendRequest('settings.get'),
           client.sendRequest('ui.get'),
           client.sendRequest('preflight.check'),
-          client.sendRequest('linear.status')
+          client.sendRequest('linear.status'),
+          // Why: plane visibility needs the connection, so it must be known here
+          // rather than in the effect that only runs once plane is selected.
+          readPlaneAvailability(status.capabilities, () => client.sendRequest('plane.status'))
         ])
       if (stale) {
         return
@@ -2762,19 +2765,18 @@ export default function MobileTasksScreen() {
       const linearIsConnected = linearStatus?.connected === true
       const availableProviders = filterAvailableTaskProviders(preferredProviders, {
         gitlabInstalled: preflight?.glab?.installed === true,
-        linearConnected: linearIsConnected
+        linearConnected: linearIsConnected,
+        planeSupported: planeState.supported,
+        planeConnected: planeState.connected
       })
-      const planeIsSupported = isPlaneSupportedByHost(status.capabilities)
-      const withLinear =
+      // Why: Linear is re-added because mobile can connect it from this screen.
+      // Plane has no such flow here, so it stays hidden.
+      const nextVisibleProviders =
         preferredProviders.includes('linear') && !availableProviders.includes('linear')
           ? [...availableProviders, 'linear' as const]
           : availableProviders
-      // Why: an older host answers status.get but refuses every plane.* call, so
-      // offering the tab there would only ever render a failed request.
-      const nextVisibleProviders = planeIsSupported
-        ? withLinear
-        : withLinear.filter((entry) => entry !== 'plane')
-      setPlaneSupported(planeIsSupported)
+      setPlaneSupported(planeState.supported)
+      setPlaneConnected(planeState.connected)
       setLinearConnected(linearIsConnected)
       if (!linearIsConnected) {
         setLinearWorkspaces([])

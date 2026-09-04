@@ -72,7 +72,7 @@ import {
   normalizeVisibleTaskProviders,
   type TaskProvider
 } from '../src/tasks/mobile-task-providers'
-import { isPlaneSupportedByHost } from '../src/tasks/plane-mobile-task-source'
+import { readPlaneAvailability } from '../src/tasks/plane-mobile-task-source'
 import { useOpenMobileTasks } from '../src/tasks/use-open-mobile-tasks'
 import { useResponsiveLayout } from '../src/layout/responsive-layout'
 import { useOpenMobileSession } from '../src/session/use-open-mobile-session'
@@ -227,7 +227,7 @@ function fetchTaskProviders(
     sendSingleFlightRequest(client, hostId, 'linear.status'),
     sendSingleFlightRequest(client, hostId, 'status.get')
   ])
-    .then(([settingsResponse, preflightResponse, linearResponse, statusResponse]) => {
+    .then(async ([settingsResponse, preflightResponse, linearResponse, statusResponse]) => {
       if (disposed()) {
         return
       }
@@ -239,24 +239,27 @@ function fetchTaskProviders(
         ? (preflightResponse.result as HomePreflightStatus)
         : null
       const linear = linearResponse.ok ? (linearResponse.result as HomeLinearStatus) : null
-      // Why: a host without the Plane RPC surface must not get a home-screen
-      // chip that opens Tasks and silently lands on GitHub instead.
-      const planeSupported = isPlaneSupportedByHost(
+      // Why: the chip must not open a Tasks screen that has no Plane source, so it
+      // needs the same capability + connection gate the Tasks screen applies.
+      const plane = await readPlaneAvailability(
         statusResponse.ok
           ? (statusResponse.result as { capabilities?: string[] }).capabilities
-          : undefined
+          : undefined,
+        () => sendSingleFlightRequest(client, hostId, 'plane.status')
       )
+      if (disposed()) {
+        return
+      }
       const providers = filterAvailableTaskProviders(
         normalizeVisibleTaskProviders(settings.visibleTaskProviders),
         {
           gitlabInstalled: preflight?.glab?.installed === true,
-          linearConnected: linear?.connected === true
+          linearConnected: linear?.connected === true,
+          planeSupported: plane.supported,
+          planeConnected: plane.connected
         }
       )
-      setProviders((prev) => ({
-        ...prev,
-        [hostId]: planeSupported ? providers : providers.filter((entry) => entry !== 'plane')
-      }))
+      setProviders((prev) => ({ ...prev, [hostId]: providers }))
     })
     .catch(() => {
       if (disposed()) {

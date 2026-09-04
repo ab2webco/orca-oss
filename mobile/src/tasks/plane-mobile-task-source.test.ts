@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import {
   fetchPlaneProjects,
+  readPlaneAvailability,
   fetchPlaneStates,
   fetchPlaneStatus,
   fetchPlaneWorkItems,
@@ -36,6 +37,55 @@ describe('plane mobile task source', () => {
     expect(isPlaneSupportedByHost(['mobile.tasks.v1'])).toBe(false)
     expect(isPlaneSupportedByHost(['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY])).toBe(true)
     expect(isPlaneSupportedByHost(undefined)).toBe(false)
+  })
+
+  it('skips the status read entirely on a host without the capability', async () => {
+    const sendPlaneStatus = vi.fn()
+    expect(await readPlaneAvailability(['mobile.tasks.v1'], sendPlaneStatus)).toEqual({
+      supported: false,
+      connected: false,
+      status: null
+    })
+    expect(sendPlaneStatus).not.toHaveBeenCalled()
+  })
+
+  it('reads the connection when the host advertises the capability', async () => {
+    const calls: Call[] = []
+    const client = stubClient({ connected: true, workspaces: [{ id: 'w1' }] }, calls)
+    const availability = await readPlaneAvailability(
+      ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY],
+      () => client.sendRequest('plane.status')
+    )
+    expect(calls.map((call) => call.method)).toEqual(['plane.status'])
+    expect(availability.supported).toBe(true)
+    expect(availability.connected).toBe(true)
+    expect(availability.status?.workspaces[0]?.id).toBe('w1')
+  })
+
+  it('reports a supported host whose Plane is disconnected', async () => {
+    const calls: Call[] = []
+    const client = stubClient({ connected: false }, calls)
+    expect(
+      await readPlaneAvailability([MOBILE_TASKS_PLANE_CAPABILITY], () =>
+        client.sendRequest('plane.status')
+      )
+    ).toMatchObject({ supported: true, connected: false })
+  })
+
+  it('degrades to disconnected when the status read fails or is malformed', async () => {
+    const failing = failingClient('plane is unreachable')
+    expect(
+      await readPlaneAvailability([MOBILE_TASKS_PLANE_CAPABILITY], () =>
+        failing.sendRequest('plane.status')
+      )
+    ).toEqual({ supported: true, connected: false, status: null })
+
+    const malformed = stubClient('not an object', [])
+    expect(
+      await readPlaneAvailability([MOBILE_TASKS_PLANE_CAPABILITY], () =>
+        malformed.sendRequest('plane.status')
+      )
+    ).toEqual({ supported: true, connected: false, status: null })
   })
 
   it('lists when the query is empty and searches when it is not', async () => {
