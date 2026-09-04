@@ -13,19 +13,72 @@ type SmartSortScenario = {
   donePaneKey: string
 }
 
-async function getVisibleWorktreeIdsByTop(page: Page): Promise<string[]> {
+async function getVisibleWorktreeIdsByVirtualIndex(page: Page): Promise<string[]> {
   return page
     .locator('[data-worktree-sidebar] [role="option"][data-worktree-id]')
     .evaluateAll((elements) =>
       elements
         .map((element) => ({
           id: element.dataset.worktreeId ?? '',
-          top: element.getBoundingClientRect().top
+          index: Number.parseInt(
+            element.closest('[data-worktree-virtual-row]')?.getAttribute('data-index') ?? '',
+            10
+          )
         }))
-        .filter((row) => row.id.length > 0)
-        .sort((a, b) => a.top - b.top)
+        .filter((row) => row.id.length > 0 && Number.isFinite(row.index))
+        .sort((a, b) => a.index - b.index)
         .map((row) => row.id)
     )
+}
+
+async function waitForVisibleWorktreeOrder(page: Page, expectedIds: string[]): Promise<void> {
+  await page.evaluate((expectedOrder) => {
+    const sidebar = document.querySelector('[data-worktree-sidebar]')
+    if (!sidebar) {
+      throw new Error('Worktree sidebar is not available')
+    }
+
+    const hasExpectedOrder = (): boolean => {
+      const actualOrder = Array.from(
+        sidebar.querySelectorAll<HTMLElement>('[role="option"][data-worktree-id]')
+      )
+        .map((element) => ({
+          id: element.dataset.worktreeId ?? '',
+          index: Number.parseInt(
+            element.closest('[data-worktree-virtual-row]')?.getAttribute('data-index') ?? '',
+            10
+          )
+        }))
+        .filter((row) => row.id.length > 0 && Number.isFinite(row.index))
+        .sort((a, b) => a.index - b.index)
+        .map((row) => row.id)
+        .slice(0, expectedOrder.length)
+      return (
+        actualOrder.length === expectedOrder.length &&
+        actualOrder.every((id, index) => id === expectedOrder[index])
+      )
+    }
+
+    if (hasExpectedOrder()) {
+      return
+    }
+
+    return new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (!hasExpectedOrder()) {
+          return
+        }
+        observer.disconnect()
+        resolve()
+      })
+      observer.observe(sidebar, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['data-index', 'data-worktree-id']
+      })
+    })
+  }, expectedIds)
 }
 
 async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
@@ -39,7 +92,7 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
     state.setActiveView('terminal')
     state.setSidebarOpen(true)
     state.setGroupBy('none')
-    state.setSortBy('smart')
+    state.setSortBy('recent')
 
     const worktrees = Object.values(state.worktreesByRepo)
       .flat()
@@ -75,6 +128,12 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
             return worktree
           })
         ])
+      ),
+      // Why: lineage fixes parent/child order and would mask the Smart comparator.
+      worktreeLineageById: Object.fromEntries(
+        Object.entries(current.worktreeLineageById).filter(
+          ([worktreeId]) => worktreeId !== blocked.id && worktreeId !== done.id
+        )
       )
     }))
 
@@ -149,20 +208,6 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
       }
     })
 
-    const actions = store.getState()
-    actions.setAgentStatus(
-      `${doneTab.id}:${doneLeafId}`,
-      { state: 'done', prompt: 'Finished', agentType: 'codex' },
-      'codex',
-      { updatedAt: now, stateStartedAt: now - 1_000 }
-    )
-    actions.setAgentStatus(
-      `${blockedTab.id}:${blockedLeafId}`,
-      { state: 'blocked', prompt: 'Needs approval', agentType: 'codex' },
-      'codex',
-      { updatedAt: now, stateStartedAt: now - 60_000 }
-    )
-
     return {
       blockedId: blocked.id,
       doneId: done.id,
@@ -172,6 +217,33 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
       donePaneKey: `${doneTab.id}:${doneLeafId}`
     }
   })
+}
+
+async function activateSmartSort(page: Page): Promise<void> {
+  await page.evaluate(() => window.__store?.getState().setSortBy('smart'))
+}
+
+async function seedSmartSortAgentStatuses(page: Page, scenario: SmartSortScenario): Promise<void> {
+  await page.evaluate((seededScenario) => {
+    const actions = window.__store?.getState()
+    if (!actions) {
+      throw new Error('window.__store is not available')
+    }
+
+    const now = Date.now()
+    actions.setAgentStatus(
+      seededScenario.donePaneKey,
+      { state: 'done', prompt: 'Finished', agentType: 'codex' },
+      'codex',
+      { updatedAt: now, stateStartedAt: now - 1_000 }
+    )
+    actions.setAgentStatus(
+      seededScenario.blockedPaneKey,
+      { state: 'blocked', prompt: 'Needs approval', agentType: 'codex' },
+      'codex',
+      { updatedAt: now, stateStartedAt: now - 60_000 }
+    )
+  }, scenario)
 }
 
 async function getSmartSortScenarioReadiness(
@@ -223,6 +295,10 @@ test.describe('Worktree Smart Sort', () => {
     const scenario = await seedSmartSortScenario(orcaPage)
     const { blockedId, doneId } = scenario
 
+    await waitForVisibleWorktreeOrder(orcaPage, [doneId, blockedId])
+    await activateSmartSort(orcaPage)
+    await seedSmartSortAgentStatuses(orcaPage, scenario)
+
     await expect
       .poll(() => getSmartSortScenarioReadiness(orcaPage, scenario), {
         timeout: 8_000,
@@ -236,12 +312,11 @@ test.describe('Worktree Smart Sort', () => {
         fallbackOrder: [doneId, blockedId]
       })
 
-    await expect
-      .poll(async () => (await getVisibleWorktreeIdsByTop(orcaPage)).slice(0, 2), {
-        timeout: 12_000,
-        message: 'Smart sort did not promote the blocked worktree in the visible sidebar'
-      })
-      .toEqual([blockedId, doneId])
+    await waitForVisibleWorktreeOrder(orcaPage, [blockedId, doneId])
+    expect((await getVisibleWorktreeIdsByVirtualIndex(orcaPage)).slice(0, 2)).toEqual([
+      blockedId,
+      doneId
+    ])
 
     await expect(worktreeRow(orcaPage, blockedId)).toBeVisible()
     await expect(worktreeRow(orcaPage, doneId)).toBeVisible()
