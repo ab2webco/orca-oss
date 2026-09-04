@@ -48,6 +48,12 @@ silencio como consentimiento es exactamente cómo el board se quedó atrás. Por
 cerrado. La salida existe y es explícita: `# no-ticket: <razón>` en el comando permite
 seguir, pero deja escrito por qué se saltó la regla.
 
+Al mergear, el ticket sale del **título del PR**: el coordinador mergea parado en `main`, así
+que ninguna rama lo nombra y el comando lleva solo un número. La primera versión no leía el
+título y rechazó tres merges verificados seguidos; sus once tests no lo cazaron porque todos
+corrían desde una rama con nombre de ticket — el fixture se parecía al caller que sí permite
+(ORCA-354).
+
 ### Ciclo de vida del guard de merge
 
 `minimumVersion` fija Claude Code 2.1.229 como piso de actualizaciones, no un requisito de arranque:

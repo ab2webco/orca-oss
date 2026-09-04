@@ -20,6 +20,7 @@ PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 TICKET_RE = re.compile(r"ORCA-(\d+)", re.IGNORECASE)
 CREATE_RE = re.compile(r"\bgh\s+pr\s+create\b")
 MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b")
+MERGE_NUMBER_RE = re.compile(r"\bgh\s+pr\s+merge\s+(\d+)")
 OPT_OUT_RE = re.compile(r"no-ticket:\s*(\S.*)")
 REQUIRED_STATE = "In Progress"
 
@@ -59,6 +60,18 @@ def ticket_from(command: str, cwd: str | None) -> str | None:
         found = TICKET_RE.search(source)
         if found:
             return f"ORCA-{found.group(1)}"
+    # Why the PR title last: the coordinator merges standing on `main`, so no
+    # branch names a ticket and `gh pr merge <n>` carries only a number. Without
+    # this the guard denied every merge it was meant to let through.
+    merge = MERGE_NUMBER_RE.search(command)
+    if merge:
+        code, title = run(
+            ["gh", "pr", "view", merge.group(1), "--json", "title", "-q", ".title"], cwd
+        )
+        if code == 0 and title:
+            found = TICKET_RE.search(title)
+            if found:
+                return f"ORCA-{found.group(1)}"
     return None
 
 
