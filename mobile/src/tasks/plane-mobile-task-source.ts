@@ -1,0 +1,89 @@
+import type { RpcClient } from '../transport/rpc-client'
+import type { RpcResponse } from '../transport/types'
+import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
+import {
+  decodePlaneProjects,
+  decodePlaneStates,
+  decodePlaneStatus,
+  decodePlaneWorkItems,
+  type PlaneMobileProject,
+  type PlaneMobileState,
+  type PlaneMobileStatus,
+  type PlaneMobileWorkItem
+} from './plane-mobile-work-item-read'
+
+// Mirrors MOBILE_TASKS_PLANE_RUNTIME_CAPABILITY in src/shared/protocol-version.ts.
+// Hosts that predate it advertise mobile.tasks.v1 but refuse every plane.* call
+// at dispatch, so the Plane source must stay hidden rather than fail silently.
+export const MOBILE_TASKS_PLANE_CAPABILITY = 'mobile.tasks.plane.v1'
+
+export const PLANE_HOST_UPDATE_REQUIRED_MESSAGE =
+  'Plane tasks need a newer Orca host. Update the desktop app, then reconnect.'
+
+export const PLANE_WORK_ITEM_LIMIT = 100
+
+export function isPlaneSupportedByHost(capabilities: readonly string[] | undefined): boolean {
+  return capabilities?.includes(MOBILE_TASKS_PLANE_CAPABILITY) === true
+}
+
+function unwrap(response: RpcResponse): unknown {
+  if (!response.ok) {
+    throw new Error(response.error.message)
+  }
+  return response.result
+}
+
+export async function fetchPlaneStatus(client: RpcClient): Promise<PlaneMobileStatus> {
+  return decodePlaneStatus(unwrap(await client.sendRequest('plane.status')))
+}
+
+export async function fetchPlaneProjects(
+  client: RpcClient,
+  workspaceId: string | null
+): Promise<PlaneMobileProject[]> {
+  const projects = decodePlaneProjects(
+    unwrap(
+      await client.sendRequest('plane.listProjects', { workspaceId: workspaceId ?? undefined })
+    )
+  )
+  return projects.filter((project) => project.archived !== true)
+}
+
+export async function fetchPlaneStates(
+  client: RpcClient,
+  projectId: string,
+  workspaceId: string | null
+): Promise<PlaneMobileState[]> {
+  return decodePlaneStates(
+    unwrap(
+      await client.sendRequest('plane.listStates', {
+        projectId,
+        workspaceId: workspaceId ?? undefined
+      })
+    )
+  )
+}
+
+export async function fetchPlaneWorkItems(
+  client: RpcClient,
+  args: {
+    query: string
+    filter: PlaneWorkItemFilter
+    projectId: string | null
+    workspaceId: string | null
+  }
+): Promise<PlaneMobileWorkItem[]> {
+  const query = args.query.trim()
+  const response = query
+    ? await client.sendRequest('plane.searchWorkItems', {
+        query,
+        projectId: args.projectId ?? undefined,
+        workspaceId: args.workspaceId ?? undefined
+      })
+    : await client.sendRequest('plane.listWorkItems', {
+        filter: args.filter,
+        projectId: args.projectId ?? undefined,
+        workspaceId: args.workspaceId ?? undefined
+      })
+  return decodePlaneWorkItems(unwrap(response)).slice(0, PLANE_WORK_ITEM_LIMIT)
+}

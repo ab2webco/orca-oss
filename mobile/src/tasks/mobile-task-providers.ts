@@ -1,57 +1,55 @@
-export type TaskProvider = 'github' | 'gitlab' | 'linear'
+import {
+  filterAvailableTaskProviders as filterAvailableSharedTaskProviders,
+  isTaskProvider as isSharedTaskProvider,
+  normalizeVisibleTaskProviders as normalizeSharedVisibleTaskProviders,
+  resolveVisibleTaskProvider as resolveSharedVisibleTaskProvider,
+  type TaskProvider as SharedTaskProvider,
+  type TaskProviderAvailability
+} from '../../../src/shared/task-providers'
 
-const MOBILE_TASK_PROVIDERS: readonly TaskProvider[] = ['github', 'gitlab', 'linear']
+export type { TaskProviderAvailability }
 
-const TASK_PROVIDER_SET = new Set<TaskProvider>(MOBILE_TASK_PROVIDERS)
+// Why: the shared union also carries providers mobile has no render path for
+// (jira). Widening to it directly would surface a tab that fails every request,
+// so mobile declares what it can render and filters the shared result by it.
+export const MOBILE_RENDERABLE_TASK_PROVIDERS = [
+  'github',
+  'gitlab',
+  'linear',
+  'plane'
+] as const satisfies readonly SharedTaskProvider[]
+
+export type TaskProvider = (typeof MOBILE_RENDERABLE_TASK_PROVIDERS)[number]
+
+const RENDERABLE_SET = new Set<SharedTaskProvider>(MOBILE_RENDERABLE_TASK_PROVIDERS)
+
+export function isTaskProvider(value: unknown): value is TaskProvider {
+  return isSharedTaskProvider(value) && RENDERABLE_SET.has(value)
+}
+
+function keepRenderable(providers: readonly SharedTaskProvider[]): TaskProvider[] {
+  return providers.filter((provider): provider is TaskProvider => RENDERABLE_SET.has(provider))
+}
 
 export function normalizeVisibleTaskProviders(value: unknown): TaskProvider[] {
-  if (!Array.isArray(value)) {
-    return [...MOBILE_TASK_PROVIDERS]
-  }
-
-  const normalized: TaskProvider[] = []
-  for (const provider of value) {
-    if (!TASK_PROVIDER_SET.has(provider as TaskProvider)) {
-      continue
-    }
-    if (!normalized.includes(provider as TaskProvider)) {
-      normalized.push(provider as TaskProvider)
-    }
-  }
+  const renderable = keepRenderable(normalizeSharedVisibleTaskProviders(value))
 
   // Why: at least one provider must remain visible so the Tasks surface always
   // has a valid source to select after settings hydration or manual edits.
-  return normalized.length > 0 ? normalized : [...MOBILE_TASK_PROVIDERS]
-}
-
-export type TaskProviderAvailability = {
-  gitlabInstalled: boolean
-  linearConnected: boolean
+  return renderable.length > 0 ? renderable : [...MOBILE_RENDERABLE_TASK_PROVIDERS]
 }
 
 export function filterAvailableTaskProviders(
   visibleProviders: readonly TaskProvider[],
   availability: TaskProviderAvailability
 ): TaskProvider[] {
-  const available = visibleProviders.filter((provider) => {
-    if (provider === 'github') {
-      return true
-    }
-    if (provider === 'gitlab') {
-      return availability.gitlabInstalled
-    }
-    return availability.linearConnected
-  })
-
-  return available.length > 0 ? available : ['github']
+  return keepRenderable(filterAvailableSharedTaskProviders(visibleProviders, availability))
 }
 
 export function resolveVisibleTaskProvider(
   preferred: TaskProvider | null | undefined,
   visibleProviders: readonly TaskProvider[]
 ): TaskProvider {
-  if (preferred && visibleProviders.includes(preferred)) {
-    return preferred
-  }
-  return visibleProviders[0] ?? 'github'
+  const resolved = resolveSharedVisibleTaskProvider(preferred, visibleProviders)
+  return isTaskProvider(resolved) ? resolved : 'github'
 }
