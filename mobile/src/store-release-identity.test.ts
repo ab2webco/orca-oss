@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { IOSConfig } from 'expo/config-plugins'
 import { describe, expect, it } from 'vitest'
 
 const BUNDLE_ID = 'com.ab2web.orca.mobile'
+const DISPLAY_NAME = 'Orca Lab'
 
 function read(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../${relativePath}`, import.meta.url)), 'utf8')
 }
 
 const appConfig = JSON.parse(read('app.json')) as {
-  expo: { ios: { bundleIdentifier: string }; android: { package: string } }
+  expo: { name: string; ios: { bundleIdentifier: string }; android: { package: string } }
 }
 
 function declaredIdentifier(relativePath: string, pattern: RegExp): string {
@@ -34,6 +36,25 @@ describe('mobile store release identity', () => {
     expect(declaredIdentifier('fastlane/Appfile', /app_identifier\([^)]*?"([^"]+)"\s*\)/)).toBe(
       BUNDLE_ID
     )
+  })
+
+  // Why: expo.name is the launcher label on both platforms, and upstream's
+  // "Orca" merges back in clean.
+  it('installs under the Lab display name', () => {
+    expect(appConfig.expo.name).toBe(DISPLAY_NAME)
+  })
+
+  // Why: prebuild also names the Xcode project and scheme after expo.name, and
+  // the iOS lane pins both — a rename that skips the Fastfile fails only in CI.
+  it('builds iOS from the workspace and scheme prebuild derives from that name', () => {
+    const projectName = IOSConfig.XcodeUtils.sanitizedName(appConfig.expo.name)
+    expect(declaredIdentifier('fastlane/Fastfile', /^SCHEME\s*=\s*"([^"]+)"/m)).toBe(projectName)
+    expect(
+      declaredIdentifier(
+        'fastlane/Fastfile',
+        /WORKSPACE\s*=\s*File\.join\([^)]*"([^"]+)\.xcworkspace"\)/
+      )
+    ).toBe(projectName)
   })
 
   // Why upstream is named explicitly: an upstream sync re-adds it in files that
