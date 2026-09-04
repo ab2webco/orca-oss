@@ -7,7 +7,13 @@ import {
   resolveVisibleTaskProvider
 } from './mobile-task-providers'
 
-const ALL_UNAVAILABLE = { gitlabInstalled: false, linearConnected: false }
+const ALL_UNAVAILABLE = {
+  gitlabInstalled: false,
+  linearConnected: false,
+  planeSupported: false,
+  planeConnected: false
+}
+const PLANE_READY = { ...ALL_UNAVAILABLE, planeSupported: true, planeConnected: true }
 
 describe('mobile task providers', () => {
   it('renders plane but never jira', () => {
@@ -29,10 +35,22 @@ describe('mobile task providers', () => {
     expect(normalizeVisibleTaskProviders(['github', 'jira', 'plane'])).toEqual(['github', 'plane'])
   })
 
-  it('keeps plane available while its host connection is unconfigured', () => {
-    // Plane is connected from the Tasks surface itself, so hiding it when
-    // disconnected would remove the entry point.
-    expect(filterAvailableTaskProviders(['plane', 'linear'], ALL_UNAVAILABLE)).toEqual(['plane'])
+  it('shows plane only when the host supports it and it is connected', () => {
+    // Mobile cannot connect Plane, so a disconnected source would be a dead tab.
+    expect(filterAvailableTaskProviders(['plane', 'github'], PLANE_READY)).toEqual([
+      'plane',
+      'github'
+    ])
+    expect(
+      filterAvailableTaskProviders(['plane', 'github'], { ...PLANE_READY, planeConnected: false })
+    ).toEqual(['github'])
+    expect(
+      filterAvailableTaskProviders(['plane', 'github'], { ...PLANE_READY, planeSupported: false })
+    ).toEqual(['github'])
+  })
+
+  it('keeps a provider visible when gating plane empties the list', () => {
+    expect(filterAvailableTaskProviders(['plane'], ALL_UNAVAILABLE)).toEqual(['github'])
   })
 
   it('resolves a preferred provider mobile cannot render back to github', () => {

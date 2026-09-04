@@ -26,6 +26,33 @@ export function isPlaneSupportedByHost(capabilities: readonly string[] | undefin
   return capabilities?.includes(MOBILE_TASKS_PLANE_CAPABILITY) === true
 }
 
+export type PlaneMobileAvailability = {
+  supported: boolean
+  connected: boolean
+  status: PlaneMobileStatus | null
+}
+
+// Why: mobile hides the Plane source unless both facts hold, and the status read
+// is skipped entirely on a host that would refuse it.
+export async function readPlaneAvailability(
+  capabilities: readonly string[] | undefined,
+  sendPlaneStatus: () => Promise<RpcResponse>
+): Promise<PlaneMobileAvailability> {
+  if (!isPlaneSupportedByHost(capabilities)) {
+    return { supported: false, connected: false, status: null }
+  }
+  const response = await sendPlaneStatus()
+  if (!response.ok) {
+    return { supported: true, connected: false, status: null }
+  }
+  try {
+    const status = decodePlaneStatus(response.result)
+    return { supported: true, connected: status.connected, status }
+  } catch {
+    return { supported: true, connected: false, status: null }
+  }
+}
+
 function unwrap(response: RpcResponse): unknown {
   if (!response.ok) {
     throw new Error(response.error.message)

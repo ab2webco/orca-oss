@@ -412,7 +412,10 @@ function NewWorktreeModalContent({
         // hid GitHub; the Branch tab always guarantees at least one tab remains.
         filterAvailableTaskProviders(visibleProviders, {
           gitlabInstalled: glabInstalled,
-          linearConnected
+          linearConnected,
+          // This composer has no Plane source, so it never reads plane availability.
+          planeSupported: false,
+          planeConnected: false
         }).filter((provider) => visibleProviders.includes(provider))
       )
     })()
