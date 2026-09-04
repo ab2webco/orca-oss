@@ -181,6 +181,14 @@ import {
   sortPlaneWorkItems,
   type PlaneTaskItem
 } from '../../../src/tasks/plane-mobile-task-list'
+import { PlaneWorkItemDetail } from '../../../src/tasks/plane-work-item-detail'
+import { resolveTaskRowTap } from '../../../src/tasks/task-row-tap'
+import {
+  taskExternalOpenLabel,
+  taskKindLabel,
+  taskStatusActionLabel
+} from '../../../src/tasks/task-item-labels'
+import { repoColor } from '../../../src/worktree/repo-color'
 import type {
   PlaneMobileProject,
   PlaneMobileState
@@ -632,8 +640,8 @@ type TaskItem =
     }
   | PlaneTaskItem
 
-// Plane is read-only on mobile in this slice: rows list and open externally,
-// like GitLab todos, so they never reach the workspace-create paths.
+// Plane is read-only on mobile in this slice: rows open an in-app detail (with
+// an explicit browser action), so they never reach the workspace-create paths.
 type ActionableTaskItem = Exclude<TaskItem, { provider: 'gitlabTodo' | 'plane' }>
 type HostedReviewMergeMethod = 'merge' | 'squash' | 'rebase'
 type HostedReviewItem =
@@ -1041,16 +1049,6 @@ function createGitLabTask(repo: RepoSummary, item: Omit<GitLabWorkItem, 'repoId'
     updatedAt: item.updatedAt,
     source
   }
-}
-
-function gitLabTodoTargetLabel(todo: Pick<GitLabTodo, 'targetType'>): string {
-  if (todo.targetType === 'MergeRequest') {
-    return 'Merge request'
-  }
-  if (todo.targetType === 'Issue') {
-    return 'Issue'
-  }
-  return 'GitLab todo'
 }
 
 function gitLabTodoTargetRef(todo: Pick<GitLabTodo, 'targetType' | 'targetIid'>): string {
@@ -1480,42 +1478,6 @@ function optimisticProjectFieldValue(
   return { kind: 'text', fieldId: field.id, text: value.kind === 'text' ? value.text : '' }
 }
 
-function taskKindLabel(item: TaskItem): string {
-  if (item.provider === 'github') {
-    return item.source.type === 'pr' ? 'Pull request' : 'Issue'
-  }
-  if (item.provider === 'gitlab') {
-    return item.source.type === 'mr' ? 'Merge request' : 'Issue'
-  }
-  if (item.provider === 'gitlabTodo') {
-    return `${gitLabTodoTargetLabel(item.source)} todo`
-  }
-  if (item.provider === 'plane') {
-    return 'Plane work item'
-  }
-  return 'Linear ticket'
-}
-
-function taskExternalOpenLabel(item: ActionableTaskItem): string {
-  if (item.provider === 'github') {
-    return 'Open in GitHub'
-  }
-  if (item.provider === 'gitlab') {
-    return 'Open in GitLab'
-  }
-  return 'Open in Linear'
-}
-
-function taskStatusActionLabel(item: ActionableTaskItem): string {
-  const verb =
-    item.provider === 'github' || item.provider === 'gitlab'
-      ? item.source.state === 'closed'
-        ? 'Reopen'
-        : 'Close'
-      : ''
-  return verb ? `${verb} ${taskKindLabel(item).toLowerCase()}` : ''
-}
-
 function isGitHubPrMergeBlocked(item: Extract<TaskItem, { provider: 'github' }>): boolean {
   return item.source.type === 'pr' && item.source.mergeable === 'CONFLICTING'
 }
@@ -1756,15 +1718,6 @@ function GitHubPrFileDiff({
 
 function isFailedGitHubCheck(check: { conclusion?: string | null }): boolean {
   return ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
-}
-
-function repoColor(name: string): string {
-  const palette = ['#f97316', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#6366f1']
-  let hash = 0
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0
-  }
-  return palette[Math.abs(hash) % palette.length]!
 }
 
 function getRepoBadgeColor(repo: RepoSummary | undefined, fallbackName: string): string {
@@ -2084,6 +2037,7 @@ export default function MobileTasksScreen() {
   const [pendingGitHubProjectViewSelection, setPendingGitHubProjectViewSelection] =
     useState<GitHubProjectRef | null>(null)
   const [projectRowItem, setProjectRowItem] = useState<GitHubProjectRow | null>(null)
+  const [planeDetailItem, setPlaneDetailItem] = useState<PlaneTaskItem | null>(null)
   const [projectRowDetail, setProjectRowDetail] = useState<DetailPayload | null>(null)
   const [projectRowDetailLoading, setProjectRowDetailLoading] = useState(false)
   const [projectRowDetailError, setProjectRowDetailError] = useState('')
@@ -9661,17 +9615,14 @@ export default function MobileTasksScreen() {
                 style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
                 onPress={() => {
                   triggerMediumImpact()
-                  if (item.provider === 'gitlabTodo') {
-                    void Linking.openURL(item.source.targetUrl)
-                    return
+                  const tap = resolveTaskRowTap(item)
+                  if (tap.kind === 'open-external') {
+                    void Linking.openURL(tap.url)
+                  } else if (tap.kind === 'plane-detail') {
+                    setPlaneDetailItem(tap.item)
+                  } else {
+                    setActionItem(tap.item)
                   }
-                  if (item.provider === 'plane') {
-                    if (item.source.url) {
-                      void Linking.openURL(item.source.url)
-                    }
-                    return
-                  }
-                  setActionItem(item)
                 }}
               >
                 <View style={styles.taskIcon}>
@@ -11652,6 +11603,20 @@ export default function MobileTasksScreen() {
               </Pressable>
             </View>
           </View>
+        ) : null}
+      </BottomDrawer>
+
+      <BottomDrawer
+        visible={taskUiReady && planeDetailItem != null}
+        onClose={() => setPlaneDetailItem(null)}
+      >
+        {planeDetailItem ? (
+          <PlaneWorkItemDetail
+            item={planeDetailItem}
+            copied={copiedLinkKey === `task:${planeDetailItem.key}`}
+            onOpenInBrowser={(url) => void Linking.openURL(url)}
+            onCopyLink={(url) => void copyTaskLink(`task:${planeDetailItem.key}`, url)}
+          />
         ) : null}
       </BottomDrawer>
 
