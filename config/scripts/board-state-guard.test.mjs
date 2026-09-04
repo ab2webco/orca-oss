@@ -24,28 +24,42 @@ function makeRepo(branch) {
   return root
 }
 
+function writeStub(bin, name, body) {
+  const path = join(bin, name)
+  writeFileSync(path, body)
+  chmodSync(path, 0o755)
+}
+
 /**
- * A stub `orca` earlier on PATH than the real one. `state` null makes the
- * lookup fail, which is a separate case from a ticket in the wrong column.
+ * Stub `orca` and `gh` earlier on PATH than the real ones. `state` null makes
+ * the board lookup fail, which is a separate case from a ticket in the wrong
+ * column; `prTitle` null makes `gh pr view` fail, as it would offline.
  */
-function makeStubBin(state) {
+function makeStubBin(state, prTitle) {
   const bin = mkdtempSync(join(tmpdir(), 'orca-board-state-guard-bin-'))
   tempDirs.push(bin)
-  const body =
+  writeStub(
+    bin,
+    'orca',
     state === null
       ? '#!/bin/sh\nexit 1\n'
       : `#!/bin/sh\ncat <<'JSON'\n${JSON.stringify({
           ok: true,
           result: { workItem: { identifier: 'ORCA-155', state: { name: state } } }
         })}\nJSON\n`
-  const path = join(bin, 'orca')
-  writeFileSync(path, body)
-  chmodSync(path, 0o755)
+  )
+  writeStub(
+    bin,
+    'gh',
+    prTitle === null
+      ? '#!/bin/sh\nexit 1\n'
+      : `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(prTitle)}\n`
+  )
   return bin
 }
 
-function runHook({ command, cwd, state = 'In Progress' }) {
-  const stubBin = makeStubBin(state)
+function runHook({ command, cwd, state = 'In Progress', prTitle = null }) {
+  const stubBin = makeStubBin(state, prTitle)
   const result = spawnSync('python3', [hookScript], {
     input: JSON.stringify({ tool_input: { command }, cwd }),
     encoding: 'utf8',
@@ -146,6 +160,42 @@ describe('board-state-guard', () => {
     const output = runHook({ command: 'gh pr merge 247 --squash', cwd })
     expect(decision(output)).toBeUndefined()
     expect(output.systemMessage).toContain('Done')
+  })
+
+  // The defect that made the guard deny every merge it was meant to allow: the
+  // coordinator merges standing on `main`, so no branch names a ticket and the
+  // command carries only a PR number. Every earlier case ran from a
+  // ticket-named branch, so the fixture looked exactly like the caller allowed.
+  it('resolves the ticket from the PR title when merging from main', () => {
+    const cwd = makeRepo('main')
+    const output = runHook({
+      command: 'gh pr merge 250 --squash --delete-branch',
+      cwd,
+      prTitle: 'docs(headless): register agent accounts (ORCA-155)'
+    })
+    expect(decision(output)).toBeUndefined()
+    expect(output.systemMessage).toContain('ORCA-155')
+    expect(output.systemMessage).toContain('Done')
+  })
+
+  it('still refuses a merge whose PR title names no ticket', () => {
+    const cwd = makeRepo('main')
+    const output = runHook({
+      command: 'gh pr merge 250 --squash',
+      cwd,
+      prTitle: 'chore: unrelated'
+    })
+    expect(decision(output)).toBe('deny')
+  })
+
+  it('does not consult the PR title when opening a PR', () => {
+    const cwd = makeRepo('main')
+    const output = runHook({
+      command: 'gh pr create --title "chore: bump"',
+      cwd,
+      prTitle: 'anything (ORCA-155)'
+    })
+    expect(decision(output)).toBe('deny')
   })
 
   it('says nothing more to move when the merged ticket is already Done', () => {
