@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { decodeAccountsSnapshot } from './accounts-snapshot'
+import { decodeAccountsSnapshot, invalidAccountsSnapshotDetail } from './accounts-snapshot'
 
 function makeSnapshot(): unknown {
   return {
@@ -123,6 +123,26 @@ describe('decodeAccountsSnapshot', () => {
     setPath(snapshot, path, value)
 
     expect(() => decodeAccountsSnapshot(snapshot)).toThrow('Invalid accounts snapshot from host')
+  })
+
+  it('identifies its own rejection by identity, not by message text', () => {
+    const snapshot = makeSnapshot()
+    setPath(snapshot, ['rateLimits', 'codexTarget', 'runtime'], 'kubernetes')
+
+    let thrown: unknown
+    try {
+      decodeAccountsSnapshot(snapshot)
+    } catch (error) {
+      thrown = error
+    }
+    expect(invalidAccountsSnapshotDetail(thrown)).toContain('codexTarget.runtime')
+
+    // Why: tying the check to the text is what broke — the message grew a suffix
+    // in ORCA-348 and an equality test against the old string went dead.
+    expect(invalidAccountsSnapshotDetail(new Error('Invalid accounts snapshot from host'))).toBe(
+      null
+    )
+    expect(invalidAccountsSnapshotDetail('Invalid accounts snapshot from host')).toBe(null)
   })
 
   it('rejects a host target that smuggles a WSL distro', () => {

@@ -20,7 +20,8 @@ export {
   getUsageBarState,
   getWindowResetLabel,
   hasActiveProviderUsage,
-  hasRenderableUsage
+  hasRenderableUsage,
+  invalidAccountsSnapshotDetail
 } from './account-usage-state'
 
 // Why: matches desktop StatusBar — bars show percent used (consumption), same

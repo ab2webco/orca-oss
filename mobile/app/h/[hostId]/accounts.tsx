@@ -23,6 +23,7 @@ import {
   type ProviderKey,
   decodeAccountsSnapshot,
   getActiveProviderRateLimits,
+  invalidAccountsSnapshotDetail,
   getInactiveProviderUsage,
   getUsageBarState,
   getWindowResetLabel,
@@ -35,6 +36,10 @@ import {
 } from '../../../src/components/codex-reset-credit'
 import { CodexResetCreditAction } from '../../../src/components/CodexResetCreditAction'
 import { useCodexResetCreditAction } from '../../../src/components/use-codex-reset-credit-action'
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
 export default function AccountsScreen() {
   const router = useRouter()
@@ -57,11 +62,13 @@ export default function AccountsScreen() {
     setError(null)
     setRefreshError(null)
   }, [])
-  const rejectInvalidSnapshot = useCallback(() => {
+  const rejectInvalidSnapshot = useCallback((detail: string) => {
     // Why: a stale snapshot can expose a finite reset action for the wrong
     // account; fail closed if a host sends a shape this mobile cannot prove.
     setSnapshot(null)
-    setError('Invalid accounts snapshot from host')
+    // Why the detail: the decoder names the rejected field, and replacing it
+    // with a fixed string is what left the streaming route undiagnosable.
+    setError(detail)
     setRefreshError(null)
   }, [])
   const {
@@ -125,8 +132,8 @@ export default function AccountsScreen() {
       if (evt.type === 'ready' || evt.type === 'snapshot') {
         try {
           acceptSnapshot(decodeAccountsSnapshot(evt.snapshot))
-        } catch {
-          rejectInvalidSnapshot()
+        } catch (e) {
+          rejectInvalidSnapshot(errorText(e))
         }
       }
     })
@@ -148,10 +155,13 @@ export default function AccountsScreen() {
         reportFailure(res.error.message)
       }
     } catch (e) {
-      if (e instanceof Error && e.message === 'Invalid accounts snapshot from host') {
-        rejectInvalidSnapshot()
+      const invalidDetail = invalidAccountsSnapshotDetail(e)
+      // A rejected shape is not a refresh hiccup: it fails closed rather than
+      // leaving a snapshot the banner would imply is still good.
+      if (invalidDetail === null) {
+        reportFailure(errorText(e))
       } else {
-        reportFailure(e instanceof Error ? e.message : String(e))
+        rejectInvalidSnapshot(invalidDetail)
       }
     } finally {
       setRefreshing(false)
