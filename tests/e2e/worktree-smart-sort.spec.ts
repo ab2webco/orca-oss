@@ -106,28 +106,43 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
 
     store.setState((current) => ({
       worktreesByRepo: Object.fromEntries(
-        Object.entries(current.worktreesByRepo).map(([repoId, repoWorktrees]) => [
-          repoId,
-          repoWorktrees.map((worktree) => {
-            if (worktree.id === blocked.id) {
-              return {
-                ...worktree,
-                displayName: 'Z smart-sort blocked',
-                lastActivityAt: now - 5 * 60_000,
-                sortOrder: 0
-              }
-            }
-            if (worktree.id === done.id) {
-              return {
-                ...worktree,
-                displayName: 'A smart-sort done',
-                lastActivityAt: now,
-                sortOrder: 10
-              }
-            }
-            return worktree
+        Object.entries(current.worktreesByRepo)
+          .map(
+            ([repoId, repoWorktrees]) =>
+              [
+                repoId,
+                repoWorktrees
+                  .map((worktree) => {
+                    if (worktree.id === blocked.id) {
+                      return {
+                        ...worktree,
+                        displayName: 'Z smart-sort blocked',
+                        lastActivityAt: now - 5 * 60_000,
+                        sortOrder: 0
+                      }
+                    }
+                    if (worktree.id === done.id) {
+                      return {
+                        ...worktree,
+                        displayName: 'A smart-sort done',
+                        lastActivityAt: now,
+                        sortOrder: 10
+                      }
+                    }
+                    return worktree
+                  })
+                  .sort((a, b) => {
+                    const rank = (id: string): number =>
+                      id === done.id ? 0 : id === blocked.id ? 1 : 2
+                    return rank(a.id) - rank(b.id)
+                  })
+              ] as const
+          )
+          .sort(([leftRepoId], [rightRepoId]) => {
+            const rank = (repoId: string): number =>
+              repoId === done.repoId ? 0 : repoId === blocked.repoId ? 1 : 2
+            return rank(leftRepoId) - rank(rightRepoId)
           })
-        ])
       ),
       // Why: lineage fixes parent/child order and would mask the Smart comparator.
       worktreeLineageById: Object.fromEntries(
@@ -254,6 +269,7 @@ async function getSmartSortScenarioReadiness(
   doneHasLivePty: boolean
   blockedState: string | null
   doneState: string | null
+  storeOrder: string[]
   fallbackOrder: string[]
 }> {
   return page.evaluate((scenario) => {
@@ -264,6 +280,7 @@ async function getSmartSortScenarioReadiness(
         doneHasLivePty: false,
         blockedState: null,
         doneState: null,
+        storeOrder: [],
         fallbackOrder: []
       }
     }
@@ -275,6 +292,7 @@ async function getSmartSortScenarioReadiness(
       doneHasLivePty: (state.ptyIdsByTabId[scenario.doneTabId]?.length ?? 0) > 0,
       blockedState: state.agentStatusByPaneKey[scenario.blockedPaneKey]?.state ?? null,
       doneState: state.agentStatusByPaneKey[scenario.donePaneKey]?.state ?? null,
+      storeOrder: scenarioWorktrees.map((worktree) => worktree.id),
       fallbackOrder: scenarioWorktrees
         .sort((a, b) => b.sortOrder - a.sortOrder || a.displayName.localeCompare(b.displayName))
         .map((worktree) => worktree.id)
@@ -309,6 +327,7 @@ test.describe('Worktree Smart Sort', () => {
         doneHasLivePty: true,
         blockedState: 'blocked',
         doneState: 'done',
+        storeOrder: [doneId, blockedId],
         fallbackOrder: [doneId, blockedId]
       })
 
