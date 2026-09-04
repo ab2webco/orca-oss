@@ -37,8 +37,16 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
 | `status-line.py`                | Muestra proyecto · rama · sin-commitear                                  | La status line por defecto no dice ni el directorio ni la rama, así que no había forma de saber dónde se estaba trabajando                                                              |
 | `pre-commit-branch-guard.py`    | Antes de commit/push dice rama, upstream y cuánto falta subir            | Se hicieron 5 commits creyendo que iban a `main` cuando iban a una rama de feature, y se reportó "mergeado a main" siendo falso                                                         |
 | `main-merge-guard.py`           | Rechaza desde la Bash tool cualquier push o merge que aterrice en `main` | Un worker mergeó el PR #73 a `main` por su cuenta, minutos después de que el mensaje que lo dirigía dijera que el merge lo hacía el coordinador. La única barrera era prosa en un brief |
+| `board-state-guard.py`          | Rechaza `gh pr create` si el ticket del PR no está en `In Progress`, y al mergear nombra el movimiento a `Done` que falta | El board se quedó atrás mientras se trabajaba: PRs abiertos y mergeados con su ticket en `Backlog`, seis tickets creados que nadie movió, y uno cerrado por un merge que siguió abierto. Nada de eso se ve desde la terminal, así que recordarlo no alcanzó — `orca plane` no falla cuando el estado está mal, simplemente no se llama |
 | `test-result-guard.py`          | Lee el resumen de vitest y bloquea si hay rojos, ignorando el exit code  | **Medido**: `npm test` salió con exit code 0 reportando `Tests 6 failed \| 40082 passed`. Un gate que mire `$?` deja pasar un build roto                                                |
 | `pre-release-upstream-check.sh` | Chequea upstream antes de despachar una release                          | El checklist de release exige mergear `origin/main` primero y se salteaba                                                                                                               |
+
+### Por qué el guard del board rechaza cuando no puede leer el board
+
+Un board inaccesible y un board desalineado producen el mismo silencio, y tratar ese
+silencio como consentimiento es exactamente cómo el board se quedó atrás. Por eso falla
+cerrado. La salida existe y es explícita: `# no-ticket: <razón>` en el comando permite
+seguir, pero deja escrito por qué se saltó la regla.
 
 ### Ciclo de vida del guard de merge
 
