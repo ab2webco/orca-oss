@@ -761,6 +761,76 @@ deliberately. The post-upgrade binary and version record are retained in
 artifacts and remove them according to your retention policy after the rollback
 is resolved.
 
+## Registering Agent Accounts Without A Desktop
+
+A server with no managed account starts agents on whatever login the user's
+own `~/.claude` or `~/.codex` holds, which on a fresh host is none: `worktree
+create`, `terminal create` and `orchestration worker-start` all open panes
+whose agent cannot sign in. On the desktop those accounts are added from
+Settings, which drives the provider's OAuth login through a browser Orca can
+open. A headless host has neither, so each account is registered from an SSH
+session instead:
+
+```bash
+ssh dev1@your-server          # the Linux user whose `orca serve` should own the account
+orca account add              # Claude (default); needs the `claude` CLI on PATH
+orca account add --agent codex  # Codex; needs the `codex` CLI on PATH
+```
+
+`orca account add` runs the real provider login (`claude auth login
+--claudeai`, or `codex login --device-auth`) inside that terminal, in a
+throwaway config directory, then hands the signed-in directory to the local
+runtime and deletes it. The runtime must already be running for that user
+(foreground or the systemd unit above); the command fails before starting the
+login otherwise, so you never sign in for nothing.
+
+Neither login needs a browser on the server. Claude prints the sign-in URL and
+waits for the code the page shows after you sign in. Verified from a shell
+with neither `DISPLAY` nor `BROWSER` set, this is the whole first screen:
+
+```
+Opening browser to sign in…
+If the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=...&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&...
+Paste code here if prompted >
+```
+
+Open that URL on any machine with a browser, sign in as the account you are
+adding, and paste the code back into the SSH session. Codex uses device
+authorization for the same reason; that is the `--device-auth` flag Orca
+passes. Ctrl-C at the prompt aborts and removes the temporary directory;
+nothing is registered.
+
+Then confirm the runtime registered it, as the same user:
+
+```bash
+orca account list
+```
+
+It lists provider, email, id and the global `active` selection for that user's
+runtime. An account missing here was not registered, whatever the provider
+page said. A runtime too old to accept CLI registrations refuses before the
+login starts, with `The running Orca runtime is too old to add accounts from
+the CLI`: upgrade `orca serve` first, then add the account.
+
+What does not work, deliberately:
+
+- **A paired desktop or phone cannot add an account to the server.** The
+  registration RPC reads a credential path on the host filesystem, so it is
+  only accepted over the local socket and rejects every paired client with
+  `Adding Claude accounts is only available on the Orca host runtime.` (Codex
+  has the same guard.) A remote that could name host paths could also read
+  them. The Settings page on a paired desktop manages that desktop's accounts,
+  not the server's.
+- **Accounts do not cross users.** They live under the owning user's home
+  directory, so with one `orca serve` per developer, each developer registers
+  their own accounts under their own login and never sees another's.
+
+One account per person, not one shared team account. A Claude refresh token is
+single-use: the second runtime to refresh a shared account gets a fresh token
+and the first one's session dies at its next refresh, which reads as a random
+`Login expired` in a worker that was fine a minute ago. Two `orca serve`
+processes sharing one Claude login will keep logging each other out.
+
 ## Installing Agent Skills Without A Desktop
 
 Orca's agent skills (CLI usage, orchestration, computer use, etc.) are normally
