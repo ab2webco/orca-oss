@@ -82,7 +82,11 @@ vi.mock('./components/AgentIcons', () => ({
 // The field path is what tells you which side of the skew to fix (ORCA-348).
 const INVALID_SNAPSHOT = {
   claude: { accounts: [], activeAccountId: null },
-  codex: { accounts: [], activeAccountId: null, activeAccountIdsByRuntime: { host: null, wsl: {} } },
+  codex: {
+    accounts: [],
+    activeAccountId: null,
+    activeAccountIdsByRuntime: { host: null, wsl: {} }
+  },
   rateLimits: {
     claude: null,
     codex: null,
@@ -114,15 +118,15 @@ const VALID_SNAPSHOT = {
   }
 } as const
 
+// Why no `| null` here: the root type-aware lint runs without mobile/node_modules,
+// so ReactTestRenderer is an unresolved type there and a union around it trips
+// no-redundant-type-constituents. act() propagates a mount failure anyway.
 async function renderAccountsRoute(): Promise<ReactTestRenderer> {
-  let renderer: ReactTestRenderer | null = null
+  let renderer!: ReactTestRenderer
   await act(async () => {
     renderer = create(createElement(AccountsScreen))
     await Promise.resolve()
   })
-  if (!renderer) {
-    throw new Error('Accounts route did not render')
-  }
   return renderer
 }
 
