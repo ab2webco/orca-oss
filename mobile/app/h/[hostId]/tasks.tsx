@@ -71,6 +71,11 @@ import {
   resolveMobileSyntaxLanguage
 } from '../../../src/session/mobile-file-syntax'
 import { buildGitHubCheckSummary } from '../../../src/tasks/github-check-summary'
+import {
+  buildPartialRepositoryNotice,
+  repositoryCount,
+  taskNoticeBannersVisible
+} from '../../../src/tasks/partial-repository-notice'
 import { buildGitLabCheckSummary } from '../../../src/tasks/gitlab-check-summary'
 import {
   getHostedMergeLabel,
@@ -1753,14 +1758,6 @@ function isFailedGitHubCheck(check: { conclusion?: string | null }): boolean {
   return ['failure', 'cancelled', 'timed_out'].includes(check.conclusion ?? '')
 }
 
-function repositoryCount(count: number): string {
-  return `${count} ${count === 1 ? 'repository' : 'repositories'}`
-}
-
-function buildPartialRepositoryNotice(failedCount: number, totalCount: number): string {
-  return `${failedCount} of ${repositoryCount(totalCount)} failed to load.`
-}
-
 function repoColor(name: string): string {
   const palette = ['#f97316', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#6366f1']
   let hash = 0
@@ -1951,6 +1948,9 @@ export default function MobileTasksScreen() {
     client: null
   })
   const [error, setError] = useState('')
+  // Why: a partial load must not occupy the error slot; that slot hides the per-repo Retry banners.
+  const [partialRepositoryNotice, setPartialRepositoryNotice] = useState('')
+  const noticeBannersVisible = taskNoticeBannersVisible({ error, partialRepositoryNotice })
   const [actionItem, setActionItem] = useState<ActionableTaskItem | null>(null)
   const [mergeMethodTaskItem, setMergeMethodTaskItem] = useState<
     Extract<TaskItem, { provider: 'github' }> | Extract<TaskItem, { provider: 'gitlab' }> | null
@@ -3056,6 +3056,7 @@ export default function MobileTasksScreen() {
       const isCurrent = () =>
         loadGenerationRef.current === generation && clientRef.current === requestClient
       setError('')
+      setPartialRepositoryNotice('')
       if (options.silent) {
         setRefreshing(true)
       } else {
@@ -3146,11 +3147,12 @@ export default function MobileTasksScreen() {
               // quota on totals before the user narrows the repository scope.
               setGithubTotalCount(null)
             }
-            if (page.failedCount > 0) {
-              setError(buildPartialRepositoryNotice(page.failedCount, queriedRepos.length))
-            } else {
-              setError('')
-            }
+            setPartialRepositoryNotice(
+              page.failedCount > 0
+                ? buildPartialRepositoryNotice(page.failedCount, queriedRepos.length)
+                : ''
+            )
+            setError('')
             return
           }
           if (provider === 'gitlab' && gitlabView === 'todos') {
@@ -3216,11 +3218,10 @@ export default function MobileTasksScreen() {
               .flatMap((result) => result.items)
               .sort((a, b) => taskTime(b.updatedAt) - taskTime(a.updatedAt))
           )
-          if (failedCount > 0) {
-            setError(buildPartialRepositoryNotice(failedCount, queriedRepos.length))
-          } else {
-            setError('')
-          }
+          setPartialRepositoryNotice(
+            failedCount > 0 ? buildPartialRepositoryNotice(failedCount, queriedRepos.length) : ''
+          )
+          setError('')
         } else {
           const normalizedQuery = appliedQuery.trim()
           const response = normalizedQuery
@@ -3424,7 +3425,9 @@ export default function MobileTasksScreen() {
             break
           }
           if (page.failedCount > 0) {
-            setError(buildPartialRepositoryNotice(page.failedCount, selectedHostedRepos.length))
+            setPartialRepositoryNotice(
+              buildPartialRepositoryNotice(page.failedCount, selectedHostedRepos.length)
+            )
           }
           nextPages.push(page.items)
           cursor = page.items[page.items.length - 1]!.updatedAt
@@ -9111,7 +9114,13 @@ export default function MobileTasksScreen() {
         </View>
       ) : null}
 
-      {!error && provider === 'github' && githubMode === 'items'
+      {partialRepositoryNotice ? (
+        <View style={styles.sourceNoticeBanner}>
+          <Text style={styles.sourceNoticeText}>{partialRepositoryNotice}</Text>
+        </View>
+      ) : null}
+
+      {noticeBannersVisible && provider === 'github' && githubMode === 'items'
         ? githubSourceFallbacks.map((fallback) => (
             <View
               key={`github-source-fallback:${fallback.repoId}`}
@@ -9125,7 +9134,7 @@ export default function MobileTasksScreen() {
           ))
         : null}
 
-      {!error && provider === 'github' && githubMode === 'items'
+      {noticeBannersVisible && provider === 'github' && githubMode === 'items'
         ? githubSourceErrors.map((sourceError) => {
             const isRetrying = retryingGithubSourceRepoPaths.has(sourceError.repoPath)
             return (
@@ -9161,7 +9170,7 @@ export default function MobileTasksScreen() {
           })
         : null}
 
-      {!error &&
+      {noticeBannersVisible &&
       provider === 'github' &&
       githubMode === 'project' &&
       githubProjectTable?.parentFieldDropped === true ? (

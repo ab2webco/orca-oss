@@ -112,6 +112,10 @@ export const styles = StyleSheet.create({
     fontSize: typography.metaSize,
     color: colors.statusRed
   },
+  refreshErrorBanner: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.md
+  },
   placeholder: {
     paddingVertical: spacing.xl * 2,
     alignItems: 'center',

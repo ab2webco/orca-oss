@@ -30,6 +30,7 @@ import {
 } from '../../../src/transport/client-context'
 import { useWorktreeResync } from '../../../src/transport/use-worktree-resync'
 import { startHostWorktreeRefresh } from '../../../src/worktree/host-worktree-refresh'
+import { runWorktreeDelete } from '../../../src/worktree/delete-worktree-request'
 import {
   useLastConnectedAt,
   useReconnectAttempt
@@ -613,19 +614,17 @@ export function HostScreen({
       setWorktrees(removeFromList)
       setLastKnownWorktrees(removeFromList)
 
-      try {
-        const response = await client.sendRequest('worktree.rm', {
-          worktree: `id:${item.worktreeId}`,
-          force: true
-        })
-        if (!response.ok) {
+      const outcome = await runWorktreeDelete({
+        sendRequest: (method, params) => client.sendRequest(method, params),
+        worktreeId: item.worktreeId,
+        onRollback: () => {
           setWorktrees((prev) => [...prev, item])
           setLastKnownWorktrees((prev) => [...prev, item])
-        }
+        },
+        notifyFailure: Alert.alert
+      })
+      if (outcome !== 'failed') {
         void fetchWorktrees()
-      } catch {
-        setWorktrees((prev) => [...prev, item])
-        setLastKnownWorktrees((prev) => [...prev, item])
       }
     },
     [client, fetchWorktrees]
