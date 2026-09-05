@@ -23,6 +23,14 @@ import {
 } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
 import { movePlaneWorkItem } from './plane-work-item-move'
+import { createPlaneWorkItem } from './plane-work-item-create'
+import {
+  beginPlaneBoardCreate,
+  IDLE_PLANE_BOARD_CREATE,
+  settlePlaneBoardCreate,
+  type PlaneBoardCreateState
+} from './plane-board-create-state'
+import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
 
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -39,11 +47,17 @@ export type PlaneBoard = {
   activeStateId: string | null
   emptyState: PlaneBoardEmptyState | null
   movingWorkItemId: string | null
+  /** False on a host that would refuse the create; the screen shows no "+" at all. */
+  canCreate: boolean
+  create: PlaneBoardCreateState
   selectProject: (projectId: string) => void
   selectColumn: (stateId: string) => void
   refresh: () => void
   moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<void>
   dismissMoveError: () => void
+  /** Creates a card in the active column; resolves true once Plane has it. */
+  createCard: (name: string) => Promise<boolean>
+  dismissCreateError: () => void
 }
 
 type Loaded = {
@@ -74,6 +88,7 @@ export function usePlaneBoard(
   const [activeStateId, setActiveStateId] = useState<string | null>(null)
   const [moves, setMoves] = useState<PlaneBoardMoveOverrides>(EMPTY_PLANE_BOARD_MOVES)
   const [movingWorkItemId, setMovingWorkItemId] = useState<string | null>(null)
+  const [create, setCreate] = useState<PlaneBoardCreateState>(IDLE_PLANE_BOARD_CREATE)
   const generationRef = useRef(0)
 
   const load = useCallback(
@@ -235,6 +250,29 @@ export function usePlaneBoard(
     [client, workspaceId]
   )
 
+  const createCard = useCallback(
+    async (name: string): Promise<boolean> => {
+      const stateId = activeColumn?.stateId
+      if (!client || !projectId || !stateId) {
+        return false
+      }
+      setCreate(beginPlaneBoardCreate())
+      const result = await createPlaneWorkItem(client, {
+        projectId,
+        workspaceId,
+        name,
+        stateId
+      })
+      setCreate(settlePlaneBoardCreate(result))
+      if (result.ok) {
+        // The create reply carries no card; a silent re-read puts it on the board.
+        void load({ silent: true })
+      }
+      return result.ok
+    },
+    [activeColumn?.stateId, client, load, projectId, workspaceId]
+  )
+
   return {
     status,
     error,
@@ -248,6 +286,8 @@ export function usePlaneBoard(
     activeStateId: activeColumn?.stateId ?? null,
     emptyState,
     movingWorkItemId,
+    canCreate: isPlaneBoardWritableByHost(capabilities),
+    create,
     selectProject: useCallback((next: string) => {
       setProjectId(next)
       setActiveStateId(null)
@@ -256,6 +296,8 @@ export function usePlaneBoard(
     selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
     refresh: useCallback(() => void load({ silent: true }), [load]),
     moveWorkItem,
-    dismissMoveError: useCallback(() => setMoveError(null), [])
+    dismissMoveError: useCallback(() => setMoveError(null), []),
+    createCard,
+    dismissCreateError: useCallback(() => setCreate(IDLE_PLANE_BOARD_CREATE), [])
   }
 }

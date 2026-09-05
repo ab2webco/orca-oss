@@ -100,6 +100,8 @@ export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
 // MOBILE_RPC_METHOD_ALLOWLIST, so a paired phone's Plane reads are refused at
 // dispatch. Mobile must hide the Plane source unless this is advertised.
 export const MOBILE_TASKS_PLANE_RUNTIME_CAPABILITY = 'mobile.tasks.plane.v1' as const
+// Why: hosts before this allowlist only plane.updateWorkItem for the phone, so create/comment are refused at dispatch.
+export const MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY = 'mobile.plane-board.writes.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
@@ -117,6 +119,7 @@ export const RUNTIME_CAPABILITIES = [
   'workspace-ports.v1',
   'mobile.tasks.v1',
   MOBILE_TASKS_PLANE_RUNTIME_CAPABILITY,
+  MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,

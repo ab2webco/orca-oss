@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft } from 'lucide-react-native'
+import { ChevronLeft, Plus } from 'lucide-react-native'
 import * as Linking from 'expo-linking'
 import { useHostClient } from '../../../src/transport/client-context'
 import { BottomDrawer } from '../../../src/components/BottomDrawer'
@@ -22,6 +22,7 @@ import { createPlaneTask } from '../../../src/tasks/plane-mobile-task-list'
 import { formatUpdatedAt } from '../../../src/tasks/task-updated-at-time'
 import type { PlaneMobileWorkItem } from '../../../src/tasks/plane-mobile-work-item-read'
 import { useRuntimeCapabilities } from '../../../src/plane-board/use-runtime-capabilities'
+import { PlaneBoardCreateDrawer } from '../../../src/plane-board/plane-board-create-drawer'
 
 export default function PlaneBoardScreen() {
   const router = useRouter()
@@ -33,6 +34,7 @@ export default function PlaneBoardScreen() {
   const board = usePlaneBoard(client, connected, capabilities)
   const [selected, setSelected] = useState<PlaneMobileWorkItem | null>(null)
   const [showProjectPicker, setShowProjectPicker] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
 
   const onEmptyAction = useCallback(() => {
     const action = board.emptyState?.action
@@ -43,6 +45,11 @@ export default function PlaneBoardScreen() {
     if (action === 'refresh') {
       board.refresh()
     }
+  }, [board])
+
+  const closeCreate = useCallback(() => {
+    setShowCreate(false)
+    board.dismissCreateError()
   }, [board])
 
   const moveSelected = useCallback(
@@ -84,6 +91,17 @@ export default function PlaneBoardScreen() {
         >
           <Text style={styles.headerAction}>Project</Text>
         </Pressable>
+        {board.canCreate ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add card"
+            style={styles.headerButton}
+            disabled={board.activeColumn === null}
+            onPress={() => setShowCreate(true)}
+          >
+            <Plus size={20} color={board.activeColumn ? colors.textPrimary : colors.textMuted} />
+          </Pressable>
+        ) : null}
       </View>
 
       {board.columns.length > 0 ? (
@@ -204,6 +222,15 @@ export default function PlaneBoardScreen() {
           ))}
         </View>
       </BottomDrawer>
+
+      <PlaneBoardCreateDrawer
+        visible={showCreate}
+        columnName={board.activeColumn?.name ?? null}
+        pending={board.create.pending}
+        error={board.create.error}
+        onSubmit={board.createCard}
+        onClose={closeCreate}
+      />
 
       <BottomDrawer visible={selected !== null} onClose={() => setSelected(null)}>
         {selected ? (

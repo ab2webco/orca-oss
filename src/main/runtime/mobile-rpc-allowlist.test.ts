@@ -2,6 +2,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
+import {
+  MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
+  RUNTIME_CAPABILITIES
+} from '../../shared/protocol-version'
 
 const MOBILE_DYNAMIC_RPC_METHODS = [
   // Why: computed sendRequest method names do not appear as literals in the
@@ -131,6 +135,24 @@ describe('mobile RPC allowlist', () => {
     const missing = MOBILE_STREAMING_CLEANUP_RPC_METHODS.filter((method) => !allowed.has(method))
 
     expect(missing).toEqual([])
+  })
+
+  it('opens the Plane board write surface to the phone as one advertised capability', () => {
+    // Why: the phone hides its write UI unless this is advertised, so the
+    // capability and the methods it promises must land together.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY)
+    expect(
+      ['plane.updateWorkItem', 'plane.createWorkItem', 'plane.addWorkItemComment'].filter(
+        (method) => !allowed.has(method)
+      )
+    ).toEqual([])
+    // Column edits stay off the phone.
+    expect(
+      ['plane.createState', 'plane.updateState', 'plane.deleteState'].filter((method) =>
+        allowed.has(method)
+      )
+    ).toEqual([])
   })
 
   it('does not grant mobile credentials control over host updates', () => {
