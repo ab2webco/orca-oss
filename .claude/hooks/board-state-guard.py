@@ -15,6 +15,9 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from command_text import strip_heredocs  # noqa: E402
 
 PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 TICKET_RE = re.compile(r"ORCA-(\d+)", re.IGNORECASE)
@@ -102,7 +105,7 @@ def main() -> None:
     except Exception:
         sys.exit(0)
 
-    command = (payload.get("tool_input") or {}).get("command") or ""
+    command = strip_heredocs((payload.get("tool_input") or {}).get("command") or "")
     creating = bool(CREATE_RE.search(command))
     merging = bool(MERGE_RE.search(command))
     if not creating and not merging:

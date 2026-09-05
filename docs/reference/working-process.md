@@ -54,6 +54,19 @@ título y rechazó tres merges verificados seguidos; sus once tests no lo cazaro
 corrían desde una rama con nombre de ticket — el fixture se parecía al caller que sí permite
 (ORCA-354).
 
+### El cuerpo de un heredoc no es texto del comando
+
+Las dos guardas de Bash pasan el comando por `strip_heredocs`
+(`.claude/hooks/command_text.py`) antes de analizarlo. Sin eso, el payload de un heredoc se
+lee como si fuera el comando: escribir un documento cuyo texto decía «push notifications»
+activaba `main-merge-guard` sobre un `cat > archivo`, y los apóstrofos de la prosa hacían
+fallar el parseo, que falla cerrado. El cuerpo de un PR de release, que **lista** los tickets
+que entran, hacía que `board-state-guard` atribuyera el PR al primero mencionado. Cuatro
+bloqueos falsos en una sesión, misma causa (ORCA-362).
+
+Lo que no cambió es la severidad: un comando ilegible que sí nombra un merge sigue rechazado,
+y `gh pr create` sin ticket sigue rechazado. Se corrigió el alcance del análisis.
+
 ### Ciclo de vida del guard de merge
 
 `minimumVersion` fija Claude Code 2.1.229 como piso de actualizaciones, no un requisito de arranque:

@@ -78,6 +78,29 @@ function runGuard(command, { cwd, ghBase } = {}) {
   }
 }
 
+// ORCA-362: el cuerpo de un heredoc es un dato, no el comando. Escribir un
+// documento cuyo texto dice "push notifications" activaba la guarda, y los
+// apostrofos de la prosa hacian fallar el parseo, que falla cerrado.
+describe('main-merge-guard heredoc bodies', () => {
+  it('ignores a document whose text mentions push', () => {
+    const command = [
+      "cat > /tmp/policy.md <<'DOC'",
+      "No push notifications. It cannot read your work; we don't collect it.",
+      'DOC',
+      'echo done'
+    ].join('\n')
+    expect(runGuard(command).denied).toBe(false)
+  })
+
+  it('still refuses a real push to the protected branch', () => {
+    expect(runGuard('git push origin main').denied).toBe(true)
+  })
+
+  it('still refuses when a real merge command cannot be parsed', () => {
+    expect(runGuard('git push origin "main').denied).toBe(true)
+  })
+})
+
 afterAll(() => {
   for (const dir of tempDirs) {
     rmSync(dir, { recursive: true, force: true })

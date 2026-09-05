@@ -28,6 +28,9 @@ import re
 import shlex
 import subprocess
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from command_text import strip_heredocs  # noqa: E402
 
 PROTECTED_BRANCH = "main"
 PROJECT_SLUG = "ab2webco/orca-oss"
@@ -263,7 +266,7 @@ def main() -> None:
     except Exception:
         sys.exit(0)
 
-    command = (payload.get("tool_input") or {}).get("command") or ""
+    command = strip_heredocs((payload.get("tool_input") or {}).get("command") or "")
     if not MERGE_HINT.search(command):
         sys.exit(0)
 
