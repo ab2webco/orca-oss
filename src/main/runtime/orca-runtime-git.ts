@@ -28,6 +28,11 @@ import type { SourceControlAiOperation } from '../../shared/source-control-ai-ty
 import type { GitProviderStatusOptions } from '../providers/types'
 import { getRemoteCommitUrl, getRemoteFileUrl } from '../git/repo'
 import {
+  readWorktreeProgressFingerprint,
+  worktreeProgressGitExecOptions
+} from '../git/worktree-progress-fingerprint'
+import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
+import {
   abortMerge,
   abortRebase,
   bulkDiscardChanges,
@@ -256,6 +261,29 @@ export class RuntimeGitCommands {
       return provider.checkIgnoredPaths(target.worktree.path, relativePaths)
     }
     return checkIgnoredPaths(target.worktree.path, relativePaths, localGitOptionsForTarget(target))
+  }
+
+  // Why: the agent stall timer reads progress through the runtime so a remote-server client
+  // measures the host that owns the worktree; a reading it never got is never a stall.
+  async readRuntimeWorktreeProgressFingerprint(
+    worktreeSelector: string
+  ): Promise<WorktreeProgressProbeResult> {
+    try {
+      const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+      if (target.connectionId) {
+        // The relay's git.exec allowlist admits neither `status` nor `diff HEAD`, so an SSH
+        // worktree has no reading to give until a host-side digest op exists (ORCA-340).
+        return { kind: 'unsupported', reason: 'remote-workspace' }
+      }
+      return await readWorktreeProgressFingerprint((args) =>
+        gitExecFileAsync(
+          args,
+          worktreeProgressGitExecOptions(target.worktree.path, localGitOptionsForTarget(target))
+        )
+      )
+    } catch {
+      return { kind: 'unreadable' }
+    }
   }
 
   async getRuntimeGitHistory(

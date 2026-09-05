@@ -108,6 +108,12 @@ import {
 import { listMarkdownDocuments, markdownDocumentsFromRelativePaths } from './markdown-documents'
 import { checkRgAvailable } from './rg-availability'
 import {
+  readWorktreeProgressFingerprint,
+  worktreeProgressGitExecOptions
+} from '../git/worktree-progress-fingerprint'
+import { isFolderRepo } from '../../shared/repo-kind'
+import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
+import {
   absorbPendingRipgrepSpawnError,
   isRipgrepUnavailableExit,
   killSpawnedRipgrepProcess
@@ -1260,6 +1266,27 @@ export function registerFilesystemHandlers(
         worktreePath
       )
       return checkIgnoredPaths(worktreePath, paths, gitOptions)
+    }
+  )
+
+  // Why: the agent stall timer polls this every 15-60 minutes and must never reject; a
+  // failed reading is `unreadable`, which the timer refuses to score as "no progress".
+  ipcMain.handle(
+    'git:progressFingerprint',
+    async (_event, args: { worktreePath: string }): Promise<WorktreeProgressProbeResult> => {
+      try {
+        const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+        const repo = getLocalRepoForRegisteredWorktree(store, args.worktreePath, worktreePath)
+        if (repo && isFolderRepo(repo)) {
+          return { kind: 'unsupported', reason: 'folder-workspace' }
+        }
+        const gitOptions = getLocalGitOptionsForRepo(store, repo)
+        return await readWorktreeProgressFingerprint((gitArgs) =>
+          gitExecFileAsync(gitArgs, worktreeProgressGitExecOptions(worktreePath, gitOptions))
+        )
+      } catch {
+        return { kind: 'unreadable' }
+      }
     }
   )
 

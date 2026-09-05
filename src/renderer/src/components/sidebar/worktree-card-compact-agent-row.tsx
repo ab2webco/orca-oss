@@ -10,6 +10,7 @@ import { translate } from '@/i18n/i18n'
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
+import { AgentStallTimerControl } from './AgentStallTimerControl'
 
 function formatShortTimeAgo(ts: number, now: number): string {
   const delta = now - ts
@@ -234,6 +235,8 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
           +{childAgentCount}
         </span>
       )}
+      {/* Subagent child rows have no pane of their own to watch. */}
+      {agent.rowSource !== 'subagent' && <AgentStallTimerControl paneKey={agent.paneKey} />}
       {cacheTimer && <CacheTimer startedAt={cacheTimer.startedAt} ttlMs={cacheTimer.ttlMs} />}
       {shortTime && (
         <span

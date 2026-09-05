@@ -46,6 +46,7 @@ import { WORKTREE_REFRESH_CONCURRENCY } from './store/slices/worktrees'
 import { useShallow } from 'zustand/react/shallow'
 import { isRemoteWorkspaceSnapshotApplyInProgress, useIpcEvents } from './hooks/useIpcEvents'
 import { useAutomationDispatchEvents } from './hooks/useAutomationDispatchEvents'
+import { useAgentStallTimers } from './hooks/useAgentStallTimers'
 import { useClaudeAccountRosterSubscription } from './hooks/useClaudeAccountRosterSubscription'
 import RetainedAgentsSyncGate from './components/dashboard/RetainedAgentsSyncGate'
 import { AgentHibernationGate } from './components/AgentHibernationGate'
@@ -780,6 +781,7 @@ function App(): React.JSX.Element {
   useIpcEvents()
   useRemoteRuntimeRecoveryTriggers()
   useAutomationDispatchEvents()
+  useAgentStallTimers()
   // Why: one app-scoped watcher feeds the Claude account chip on every sidebar row.
   useClaudeAccountRosterSubscription()
   // Why: retention runs at App level (in <RetainedAgentsSyncGate />, a null leaf) so "done" agents survive card collapse and its high-churn subscriptions don't re-render App.

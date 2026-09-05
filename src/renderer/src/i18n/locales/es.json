@@ -15368,6 +15368,22 @@
           "otherTopLevelItems": "Otros elementos de nivel superior ({{value0}})"
         }
       }
+    },
+    "agentStallTimer": {
+      "title": "Comprobar si está atascado",
+      "description": "No envía nada mientras el worktree siga avanzando. Cuando los commits y los cambios del árbol de trabajo se detienen, marca este espacio de trabajo una sola vez.",
+      "off": "Desactivado",
+      "everyMinutes": "Cada {{minutes}} minutos",
+      "unavailableFolderWorkspace": "No disponible aquí: este es un espacio de trabajo de carpeta, así que no hay historial de git ni árbol de trabajo del que medir el avance.",
+      "unavailableNoWorkspace": "No disponible aquí: este panel todavía no está asociado a un espacio de trabajo.",
+      "statusStalled": "Sin avance desde la última comprobación: abre para cambiar la comprobación de bloqueo",
+      "statusOff": "Comprobar si está atascado: desactivado",
+      "statusArmed": "Comprobando bloqueos cada {{minutes}} minutos",
+      "bannerSingle": "Sin avance en este workspace desde la última comprobación.",
+      "bannerStopWatching": "Dejar de vigilar",
+      "unavailableRemoteWorkspace": "Todavía no disponible aquí: el avance de un workspace remoto tiene que medirse en el host que lo posee, y Orca aún no puede hacer esa lectura allí.",
+      "bannerUnmeasurable": "La comprobación de bloqueo está armada aquí pero ya no puede leer este workspace, así que nunca va a dispararse.",
+      "bannerScope": "Medido sobre todo el workspace. Otro agente trabajando acá lo mantiene callado, y el contenido de un archivo sin agregar, o de un submódulo, todavía no se cuenta."
     }
   },
   "dashboardPopout": {

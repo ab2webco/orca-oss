@@ -10,6 +10,7 @@ import type {
   GitUpstreamStatus
 } from '../../shared/git-status-types'
 import type { GitPushTarget } from '../../shared/worktree/types'
+import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
 import type {
   CommitMessageAgentCapability,
@@ -47,6 +48,8 @@ export type GitInspectionApi = {
     paths: string[]
     connectionId?: string
   }) => Promise<string[]>
+  /** One git progress reading for the agent stall timer; never rejects. */
+  progressFingerprint: (args: { worktreePath: string }) => Promise<WorktreeProgressProbeResult>
   findHugeFoldersToIgnore: (args: { worktreePath: string }) => Promise<string[]>
   history: (
     args: { worktreePath: string; connectionId?: string } & GitHistoryOptions

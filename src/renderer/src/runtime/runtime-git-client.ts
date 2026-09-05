@@ -23,6 +23,7 @@ import type { HostedReviewProvider } from '../../../shared/hosted-review'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../shared/source-control-ai'
 import { getCommitMessageModelDiscoveryHostKeyForScope } from '../../../shared/commit-message-host-key'
 import type { GitHistoryOptions, GitHistoryResult } from '../../../shared/git-history'
+import type { WorktreeProgressProbeResult } from '../../../shared/worktree-progress-probe'
 import { getRepoIdFromWorktreeId, splitWorktreeIdForFilesystem } from '../../../shared/worktree/id'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
@@ -289,6 +290,23 @@ export async function getRuntimeGitIgnoredPaths(
     'git.checkIgnored',
     { worktree: toRuntimeWorktreeSelector(context.worktreeId), paths },
     { timeoutMs: 15_000 }
+  )
+}
+
+export async function readRuntimeWorktreeProgressFingerprint(
+  context: RuntimeGitContext
+): Promise<WorktreeProgressProbeResult> {
+  const target = getActiveRuntimeTarget(context.settings)
+  if (target.kind === 'local' || !context.worktreeId) {
+    return window.api.git.progressFingerprint({
+      worktreePath: resolveLocalWorktreePath(context)
+    })
+  }
+  return callRuntimeRpc<WorktreeProgressProbeResult>(
+    target,
+    'git.progressFingerprint',
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId) },
+    { timeoutMs: 30_000 }
   )
 }
 

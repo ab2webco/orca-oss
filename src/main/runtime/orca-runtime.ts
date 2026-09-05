@@ -9512,6 +9512,9 @@ export class OrcaRuntimeService {
     this.gitCommands.getRuntimeGitSubmoduleStatus.bind(this.gitCommands)
   checkRuntimeGitIgnoredPaths: RuntimeGitCommands['checkRuntimeGitIgnoredPaths'] =
     this.gitCommands.checkRuntimeGitIgnoredPaths.bind(this.gitCommands)
+
+  readRuntimeWorktreeProgressFingerprint: RuntimeGitCommands['readRuntimeWorktreeProgressFingerprint'] =
+    this.gitCommands.readRuntimeWorktreeProgressFingerprint.bind(this.gitCommands)
   getRuntimeGitHistory: RuntimeGitCommands['getRuntimeGitHistory'] =
     this.gitCommands.getRuntimeGitHistory.bind(this.gitCommands)
   getRuntimeGitConflictOperation: RuntimeGitCommands['getRuntimeGitConflictOperation'] =

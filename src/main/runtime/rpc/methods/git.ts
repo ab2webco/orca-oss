@@ -58,6 +58,12 @@ export const GIT_METHODS: RpcMethod[] = [
       runtime.checkRuntimeGitIgnoredPaths(params.worktree, params.paths)
   }),
   defineMethod({
+    name: 'git.progressFingerprint',
+    params: WorktreeSelector,
+    handler: async (params, { runtime }) =>
+      runtime.readRuntimeWorktreeProgressFingerprint(params.worktree)
+  }),
+  defineMethod({
     name: 'git.submoduleStatus',
     params: GitSubmoduleStatus,
     handler: async (params, { runtime }) =>
