@@ -234,6 +234,15 @@ export type ClaudeAccountSummary = z.infer<typeof ClaudeAccountSummarySchema>
 export type CodexAccountSummary = z.infer<typeof CodexAccountSummarySchema>
 export type AccountsSnapshot = z.infer<typeof AccountsSnapshotSchema>
 
+const invalidSnapshotErrors = new WeakSet<Error>()
+
+/** The rejected-field detail when this error came from decodeAccountsSnapshot,
+ *  else null. Identity, not message text: the text carries the field and grew a
+ *  suffix in ORCA-348, which silently killed an equality check against it. */
+export function invalidAccountsSnapshotDetail(error: unknown): string | null {
+  return error instanceof Error && invalidSnapshotErrors.has(error) ? error.message : null
+}
+
 export function decodeAccountsSnapshot(value: unknown): AccountsSnapshot {
   const result = AccountsSnapshotSchema.safeParse(value)
   if (!result.success) {
@@ -244,7 +253,9 @@ export function decodeAccountsSnapshot(value: unknown): AccountsSnapshot {
       .slice(0, 3)
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ')
-    throw new Error(`Invalid accounts snapshot from host — ${where}`)
+    const error = new Error(`Invalid accounts snapshot from host — ${where}`)
+    invalidSnapshotErrors.add(error)
+    throw error
   }
   return result.data
 }
