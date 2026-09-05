@@ -1,7 +1,0 @@
-{
-  "headline": "Faster reconnects and clearer update notices",
-  "highlights": [
-    "A remote pane reconnects the moment its paired host comes back instead of waiting out a backoff",
-    "This update card can now say what a release brings instead of falling back to generic text"
-  ]
-}

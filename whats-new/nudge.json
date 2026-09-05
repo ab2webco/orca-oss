@@ -1,5 +1,13 @@
 {
-  "id": "orca-lab-1.4.160-lab.50",
+  "id": "orca-lab-1.4.160-lab.54",
   "minVersion": "1.0.0",
-  "maxVersion": "1.4.160-lab.49"
+  "maxVersion": "1.4.160-lab.53",
+  "content": {
+    "version": "1.4.160-lab.54",
+    "headline": "Faster reconnects and clearer update notices",
+    "highlights": [
+      "A remote pane reconnects the moment its paired host comes back instead of waiting out a backoff",
+      "This update card can now say what a release brings instead of falling back to generic text"
+    ]
+  }
 }
