@@ -69,7 +69,7 @@ export function WorktreeStallBanner({
             <span className="opacity-80">
               {translate(
                 'components.agentStallTimer.bannerScope',
-                'Measured across the whole workspace, from commits and tracked changes: another agent working here keeps this quiet, and a new file git has not been told about, or work inside a submodule, does not count as progress yet.'
+                'Measured across the whole workspace. Another agent working here keeps it quiet, and the contents of an unadded file, or of a submodule, are not counted yet.'
               )}
             </span>
           </>

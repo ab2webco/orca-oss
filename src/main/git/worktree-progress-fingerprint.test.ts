@@ -42,13 +42,11 @@ describe('worktreeProgressGitExecOptions', () => {
 describe('readWorktreeProgressFingerprint against a real repository', () => {
   let repo: string
 
-  // Without this the pinned gaps below depend on the developer's ~/.gitconfig: `diff.submodule`
-  // alone flips one of them from pass to fail.
-  const isolatedEnv = {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_SYSTEM: '/dev/null'
-  }
+  // Without this the pinned gaps below depend on the developer's own git setup: `diff.submodule`
+  // flips one of them from pass to fail, and `~/.config/git/ignore` is read by default and can
+  // hide the untracked files two of them create. HOME and XDG point at the tmpdir rather than
+  // relying on GIT_CONFIG_GLOBAL, which needs git 2.32 against this repo's 2.25 floor.
+  let isolatedEnv: NodeJS.ProcessEnv
   const git = async (...args: string[]): Promise<void> => {
     await execFileAsync('git', args, { cwd: repo, env: isolatedEnv })
   }
@@ -75,6 +73,13 @@ describe('readWorktreeProgressFingerprint against a real repository', () => {
 
   beforeEach(async () => {
     repo = mkdtempSync(join(tmpdir(), 'orca-progress-'))
+    const home = mkdtempSync(join(tmpdir(), 'orca-progress-home-'))
+    isolatedEnv = {
+      ...process.env,
+      HOME: home,
+      XDG_CONFIG_HOME: join(home, '.config'),
+      GIT_CONFIG_NOSYSTEM: '1'
+    }
     await git('init', '-q', '.')
     await git('config', 'user.email', 'orca@example.test')
     await git('config', 'user.name', 'Orca')
@@ -175,8 +180,8 @@ describe('readWorktreeProgressFingerprint against a real repository', () => {
   })
 
   it('known gap: the content of an untracked file is not measured', async () => {
-    // Pinned on purpose for this slice. An agent that only ever edits brand-new files it has
-    // not added reads as stalled; the escalation copy says so, and slice 2 closes it.
+    // Pinned on purpose: the file's appearance moves the digest, its later edits do not. An
+    // agent that only iterates on unadded files reads as stalled; the escalation copy says so.
     await commitFirst()
     writeFileSync(join(repo, 'draft.ts'), 'one\n')
     const before = await fingerprint()

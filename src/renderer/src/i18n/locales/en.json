@@ -16331,7 +16331,7 @@
       "bannerStopWatching": "Stop watching",
       "unavailableRemoteWorkspace": "Not available here yet: progress on a remote workspace has to be measured on the host that owns it, and Orca cannot run that reading there yet.",
       "bannerUnmeasurable": "The stuck check is armed here but can no longer read this workspace, so it will never fire.",
-      "bannerScope": "Measured across the whole workspace, from commits and tracked changes: another agent working here keeps this quiet, and a new file git has not been told about, or work inside a submodule, does not count as progress yet."
+      "bannerScope": "Measured across the whole workspace. Another agent working here keeps it quiet, and the contents of an unadded file, or of a submodule, are not counted yet."
     }
   },
   "dashboardPopout": {

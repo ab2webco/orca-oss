@@ -65,9 +65,7 @@ describe('WorktreeStallBanner', () => {
     // The alert has to name what it did not measure: a false alarm the user cannot explain
     // costs more trust than the alert buys.
     expect(
-      screen.getByText(
-        /another agent working here keeps this quiet, and a new file git has not been told about, or work inside a submodule/
-      )
+      screen.getByText(/the contents of an unadded file, or of a submodule, are not counted yet/)
     ).toBeTruthy()
   })
 
@@ -116,7 +114,7 @@ describe('WorktreeStallBanner', () => {
 
     render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
 
-    expect(screen.queryByText(/another agent working here keeps this quiet/)).toBeNull()
+    expect(screen.queryByText(/the contents of an unadded file/)).toBeNull()
   })
 
   it('says nothing about a measurable pane that is simply still moving', () => {

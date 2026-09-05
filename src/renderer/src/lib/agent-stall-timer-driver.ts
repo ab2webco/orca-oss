@@ -56,7 +56,7 @@ export async function runDueAgentStallTicks(now = Date.now()): Promise<void> {
     .filter(([paneKey, entry]) => entry.nextTickAt <= now && !inFlightPaneKeys.has(paneKey))
     .map(([paneKey]) => paneKey)
 
-  // Bounded like every other git fan-out here: one reading is up to five spawns, and panes
+  // Bounded like every other git fan-out here: one reading is up to four spawns, and panes
   // armed in a single sitting stay co-scheduled on the same poll for the whole session.
   let cursor = 0
   const workers = Array.from(
