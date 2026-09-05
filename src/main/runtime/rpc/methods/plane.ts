@@ -1,3 +1,4 @@
+import type { PlaneMember, PlaneUser } from '../../../../shared/plane-types'
 import { defineMethod, type RpcMethod } from '../core'
 import {
   AddWorkItemComment,
@@ -233,10 +234,16 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'plane.listMembers',
     params: ListMembers,
-    handler: async (params, { runtime }) =>
-      runtime.planeListMembers(params?.workspaceId, params?.projectId)
+    handler: async (params, { runtime }): Promise<PlaneMember[]> => {
+      const members = await runtime.planeListMembers(params?.workspaceId, params?.projectId)
+      return members.map(toPlaneMember)
+    }
   })
 ]
+
+function toPlaneMember({ id, displayName }: PlaneUser): PlaneMember {
+  return { id, displayName }
+}
 
 export const PLANE_METHODS: RpcMethod[] = [
   ...PLANE_BASE_METHODS,

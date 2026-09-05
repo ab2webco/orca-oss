@@ -3,7 +3,7 @@ import type {
   PlaneLabel,
   PlaneProject,
   PlaneState,
-  PlaneUser,
+  PlaneMember,
   PlaneWorkItem,
   PlaneWorkItemLink,
   PlaneWorkItemRelation,
@@ -169,7 +169,7 @@ export function formatPlaneLabels(labels: PlaneLabel[]): string {
   return labels.map((label) => `${label.name.padEnd(24)} ${label.id}`).join('\n')
 }
 
-export function formatPlaneMembers(users: PlaneUser[]): string {
+export function formatPlaneMembers(users: PlaneMember[]): string {
   if (users.length === 0) {
     return 'No Plane members found.'
   }

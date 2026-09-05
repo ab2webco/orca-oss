@@ -3,8 +3,8 @@ import {
   applyPlaneBoardMoves,
   EMPTY_PLANE_BOARD_MOVES,
   reconcilePlaneBoardMoves,
-  withPlaneBoardMove,
-  withoutPlaneBoardMove
+  rollbackPlaneBoardMove,
+  withPlaneBoardMove
 } from './plane-board-move-state'
 import { decodePlaneStates, decodePlaneWorkItems } from '../tasks/plane-mobile-work-item-read'
 
@@ -34,11 +34,27 @@ describe('plane board move state', () => {
   })
 
   it('puts the card back when the move is reverted', () => {
-    const overrides = withoutPlaneBoardMove(
+    const overrides = rollbackPlaneBoardMove(
       withPlaneBoardMove(EMPTY_PLANE_BOARD_MOVES, 'wi-1', 's-done'),
-      'wi-1'
+      'wi-1',
+      's-done',
+      undefined
     )
     expect(applyPlaneBoardMoves(items, overrides, states)[0]?.state.id).toBe('s-todo')
+  })
+
+  it('leaves a card where a later move put it when an earlier move is reverted', () => {
+    const first = withPlaneBoardMove(EMPTY_PLANE_BOARD_MOVES, 'wi-1', 's-doing')
+    const second = withPlaneBoardMove(first, 'wi-1', 's-done')
+    expect(rollbackPlaneBoardMove(second, 'wi-1', 's-doing', undefined)).toBe(second)
+  })
+
+  it('puts a card back on the pending earlier move when the later one is reverted', () => {
+    const first = withPlaneBoardMove(EMPTY_PLANE_BOARD_MOVES, 'wi-1', 's-doing')
+    const second = withPlaneBoardMove(first, 'wi-1', 's-done')
+    expect(rollbackPlaneBoardMove(second, 'wi-1', 's-done', 's-doing')).toEqual({
+      'wi-1': 's-doing'
+    })
   })
 
   it('leaves a card alone when the target state is not a column this client knows', () => {
@@ -67,6 +83,8 @@ describe('plane board move state', () => {
 
   it('returns the same object when nothing changes', () => {
     expect(reconcilePlaneBoardMoves(EMPTY_PLANE_BOARD_MOVES, items)).toBe(EMPTY_PLANE_BOARD_MOVES)
-    expect(withoutPlaneBoardMove(EMPTY_PLANE_BOARD_MOVES, 'wi-1')).toBe(EMPTY_PLANE_BOARD_MOVES)
+    expect(rollbackPlaneBoardMove(EMPTY_PLANE_BOARD_MOVES, 'wi-1', 's-done', undefined)).toBe(
+      EMPTY_PLANE_BOARD_MOVES
+    )
   })
 })

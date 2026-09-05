@@ -39,7 +39,8 @@ function toggledAssignees(
 type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
 
 function SheetBody({ item, board, onMove }: BodyProps) {
-  const editing = board.editingWorkItemId === item.id
+  const editing = board.editingWorkItemIds.has(item.id)
+  const moving = board.movingWorkItemIds.has(item.id)
   const failure = board.commentFailures[item.id] ?? null
   const { canAssign, loadMembers } = board
   useEffect(() => {
@@ -148,6 +149,7 @@ function SheetBody({ item, board, onMove }: BodyProps) {
               key={column.stateId}
               accessibilityRole="button"
               accessibilityLabel={`Move to ${column.name}`}
+              disabled={moving}
               style={styles.row}
               onPress={() => onMove(column.stateId)}
             >

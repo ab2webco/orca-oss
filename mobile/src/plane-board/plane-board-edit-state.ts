@@ -20,20 +20,55 @@ export function withPlaneBoardEdit(
   return { ...overrides, [workItemId]: { ...overrides[workItemId], ...edit } }
 }
 
-/** Rolls one card back to the entry it had before the failed edit, so a field
- *  Plane already confirmed is not undone along with the one it refused. */
-export function restorePlaneBoardEdit(
+/** Undoes a refused edit field by field: a field the card still shows at the
+ *  refused value goes back to what it showed before; one a later write on the
+ *  same card changed since is that write's to keep or roll back. */
+export function rollbackPlaneBoardEdit(
   overrides: PlaneBoardEditOverrides,
   workItemId: string,
+  failed: PlaneBoardEdit,
   previous: PlaneBoardEdit | undefined
 ): PlaneBoardEditOverrides {
+  const current = overrides[workItemId]
+  if (!current) {
+    return overrides
+  }
+  const restored: PlaneBoardEdit = { ...current }
+  let touched = false
+  if (failed.priority !== undefined && current.priority === failed.priority) {
+    replaceField(restored, 'priority', previous?.priority)
+    touched = true
+  }
+  if (
+    failed.assignees !== undefined &&
+    current.assignees !== undefined &&
+    sameAssignees(current.assignees, failed.assignees)
+  ) {
+    replaceField(restored, 'assignees', previous?.assignees)
+    touched = true
+  }
+  if (!touched) {
+    return overrides
+  }
   const next = { ...overrides }
-  if (previous) {
-    next[workItemId] = previous
+  if (Object.keys(restored).length > 0) {
+    next[workItemId] = restored
   } else {
     delete next[workItemId]
   }
   return next
+}
+
+function replaceField<K extends keyof PlaneBoardEdit>(
+  edit: PlaneBoardEdit,
+  field: K,
+  value: PlaneBoardEdit[K] | undefined
+): void {
+  if (value === undefined) {
+    delete edit[field]
+  } else {
+    edit[field] = value
+  }
 }
 
 export function applyPlaneBoardEdits(
