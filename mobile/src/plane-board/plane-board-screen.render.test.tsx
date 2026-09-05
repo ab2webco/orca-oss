@@ -29,11 +29,15 @@ vi.mock('../transport/client-context', () => ({
 
 import PlaneBoardScreen from '../../app/h/[hostId]/plane-board'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
-import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
+import {
+  MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
+  MOBILE_PLANE_BOARD_WRITES_CAPABILITY
+} from './plane-board-writes-capability'
 import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 
 const PHASE_1_HOST = ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY]
 const WRITING_HOST = [...PHASE_1_HOST, MOBILE_PLANE_BOARD_WRITES_CAPABILITY]
+const ASSIGNING_HOST = [...WRITING_HOST, MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY]
 
 const safeAreaMetrics = {
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -99,6 +103,11 @@ function createClient(
           return reply({ ok: true, id: 'wi-9', identifier: 'ORCA-9', url: '' })
         case 'plane.updateWorkItem':
           return reply({ ok: true })
+        case 'plane.listMembers':
+          return reply([
+            { id: 'u-1', displayName: 'Ada' },
+            { id: 'u-2', displayName: 'Grace' }
+          ])
         default:
           return new Promise(() => {})
       }
@@ -336,5 +345,182 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     expect(byLabel('Todo, 1 cards')).not.toBeNull()
     expect(byLabel('Doing, 0 cards')).not.toBeNull()
     expect(leafWithText('Could not move the card — Connection interrupted')).not.toBeNull()
+  })
+
+  function callsTo(calls: Call[], method: string): Call[] {
+    return calls.filter((call) => call.method === method)
+  }
+
+  async function openCard(): Promise<void> {
+    act(() => byLabel('Wire the retry')!.click())
+    await settle()
+  }
+
+  async function press(label: string): Promise<void> {
+    await act(async () => {
+      byLabel(label)!.click()
+      await Promise.resolve()
+    })
+    await settle()
+  }
+
+  it('shows neither a priority nor an assignee control on a phase-1 host', async () => {
+    const calls = await mountBoard(PHASE_1_HOST, { items: [CARD] })
+    await openCard()
+
+    expect(byLabel('Move to Doing')).not.toBeNull()
+    expect(byLabel('Priority High')).toBeNull()
+    expect(byLabel('Assign Ada')).toBeNull()
+    expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
+  })
+
+  it('shows the priority control but no assignee control on a host that only writes', async () => {
+    // Why: lab.52-54 advertise writes.v1 and still refuse plane.listMembers, so an
+    // assignee picker there would render and then fail by design.
+    const calls = await mountBoard(WRITING_HOST, { items: [CARD] })
+    await openCard()
+
+    expect(byLabel('Priority High')).not.toBeNull()
+    expect(byLabel('Assign Ada')).toBeNull()
+    expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
+  })
+
+  it('shows both controls and reads the members only once the detail opens', async () => {
+    const calls = await mountBoard(ASSIGNING_HOST, { items: [CARD] })
+    expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
+    await openCard()
+
+    expect(byLabel('Priority High')).not.toBeNull()
+    expect(byLabel('Assign Ada')).not.toBeNull()
+    expect(byLabel('Assign Grace')).not.toBeNull()
+    expect(callsTo(calls, 'plane.listMembers')).toEqual([
+      { method: 'plane.listMembers', params: { projectId: 'proj-1', workspaceId: 'ws-1' } }
+    ])
+  })
+
+  it('sets the priority from the detail and shows it on the card at once', async () => {
+    const calls = await mountBoard(WRITING_HOST, { items: [CARD] })
+    await openCard()
+    await press('Priority High')
+
+    expect(callsTo(calls, 'plane.updateWorkItem')).toEqual([
+      {
+        method: 'plane.updateWorkItem',
+        params: {
+          projectId: 'proj-1',
+          workItemId: 'wi-1',
+          workspaceId: 'ws-1',
+          updates: { priority: 'high' }
+        }
+      }
+    ])
+    expect(byLabel('Priority High')?.getAttribute('aria-selected')).toBe('true')
+    expect(leafWithText('High', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(leafWithText('Updating…')).toBeNull()
+  })
+
+  it('puts the priority back and offers a retry when the transport drops the write', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [CARD]
+    })
+    await openCard()
+    await press('Priority High')
+
+    const card = byLabel('Wire the retry')!
+    expect(leafWithText('High', card)).toBeNull()
+    expect(byLabel('Priority High')?.getAttribute('aria-selected')).not.toBe('true')
+    expect(leafWithText('Updating…')).toBeNull()
+    expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(1)
+
+    await press('Try again')
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(2)
+    expect(callsTo(calls, 'plane.updateWorkItem')[1]?.params).toMatchObject({
+      updates: { priority: 'high' }
+    })
+  })
+
+  it('re-reads the board when a priority write times out: Plane may have taken it', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: markRpcDeliveryUnknown(new Error('Request timed out: plane.updateWorkItem')),
+      items: [CARD],
+      itemsAfterWrite: [{ ...CARD, priority: 'high' }]
+    })
+    const readsBefore = readsOf(calls)
+    await openCard()
+    await press('Priority High')
+
+    expect(readsOf(calls)).toBe(readsBefore + 1)
+    expect(
+      leafWithText(`Could not update the card — ${PLANE_WRITE_UNANSWERED_MESSAGE}`)
+    ).not.toBeNull()
+    // The re-read is what puts the value on the card, not the optimistic override.
+    expect(leafWithText('High', byLabel('Wire the retry')!)).not.toBeNull()
+  })
+
+  it('assigns a member and sends the whole assignee list', async () => {
+    const calls = await mountBoard(ASSIGNING_HOST, { items: [{ ...CARD, assignees: [] }] })
+    await openCard()
+    await press('Assign Ada')
+
+    expect(callsTo(calls, 'plane.updateWorkItem')[0]?.params).toEqual({
+      projectId: 'proj-1',
+      workItemId: 'wi-1',
+      workspaceId: 'ws-1',
+      updates: { assigneeIds: ['u-1'] }
+    })
+    expect(byLabel('Unassign Ada')).not.toBeNull()
+    expect(leafWithText('Ada', byLabel('Wire the retry')!)).not.toBeNull()
+
+    await press('Assign Grace')
+    expect(callsTo(calls, 'plane.updateWorkItem')[1]?.params).toMatchObject({
+      updates: { assigneeIds: ['u-1', 'u-2'] }
+    })
+  })
+
+  it('unassigns and puts the member back when the host rejects the write', async () => {
+    const calls = await mountBoard(ASSIGNING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [{ ...CARD, assignees: [{ id: 'u-1', displayName: 'Ada' }] }]
+    })
+    await openCard()
+    expect(byLabel('Unassign Ada')).not.toBeNull()
+    await press('Unassign Ada')
+
+    expect(callsTo(calls, 'plane.updateWorkItem')[0]?.params).toMatchObject({
+      updates: { assigneeIds: [] }
+    })
+    expect(byLabel('Unassign Ada')).not.toBeNull()
+    expect(leafWithText('Ada', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
+    expect(byLabel('Try again')).not.toBeNull()
+  })
+
+  it('keeps a failed edit and its retry on the card that failed, not on the next one opened', async () => {
+    const second = { ...CARD, id: 'wi-2', identifier: 'ORCA-2', title: 'Second card' }
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [CARD, second]
+    })
+    await openCard()
+    await press('Priority High')
+    expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
+
+    // Switching cards: the list stays mounted under the sheet, so a click on the
+    // other card is what closing and reopening looks like to the screen.
+    act(() => byLabel('Second card')!.click())
+    await settle()
+    expect(leafWithText('Could not update the card — Connection interrupted')).toBeNull()
+    expect(byLabel('Try again')).toBeNull()
+
+    await openCard()
+    expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
+    await press('Try again')
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(2)
+    expect(callsTo(calls, 'plane.updateWorkItem')[1]?.params).toMatchObject({
+      workItemId: 'wi-1',
+      updates: { priority: 'high' }
+    })
   })
 })

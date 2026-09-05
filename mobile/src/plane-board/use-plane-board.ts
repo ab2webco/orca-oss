@@ -7,10 +7,11 @@ import {
   readPlaneAvailability,
   type PlaneMobileAvailability
 } from '../tasks/plane-mobile-task-source'
-import type {
-  PlaneMobileProject,
-  PlaneMobileState,
-  PlaneMobileWorkItem
+import {
+  resolvePlaneWorkspaceId,
+  type PlaneMobileProject,
+  type PlaneMobileState,
+  type PlaneMobileWorkItem
 } from '../tasks/plane-mobile-work-item-read'
 import { buildPlaneBoardColumns, type PlaneBoardColumn } from './plane-board-columns'
 import {
@@ -23,43 +24,46 @@ import {
 } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
 import { movePlaneWorkItem } from './plane-work-item-move'
-import { createPlaneWorkItem } from './plane-work-item-create'
 import {
-  beginPlaneBoardCreate,
-  IDLE_PLANE_BOARD_CREATE,
-  settlePlaneBoardCreate,
-  type PlaneBoardCreateState
-} from './plane-board-create-state'
-import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
-import { unansweredPlaneCreateLanded } from './plane-write-failure'
+  arePlaneMembersListableByHost,
+  isPlaneBoardWritableByHost
+} from './plane-board-writes-capability'
+import { applyPlaneBoardEdits } from './plane-board-edit-state'
+import { usePlaneBoardCreate, type PlaneBoardCreate } from './use-plane-board-create'
+import { usePlaneBoardEdits, type PlaneBoardEdits } from './use-plane-board-edits'
+import { usePlaneMembers, type PlaneMembers } from './use-plane-members'
 
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export type PlaneBoard = {
-  status: PlaneBoardStatus
-  error: string | null
-  moveError: string | null
-  refreshing: boolean
-  projects: PlaneMobileProject[]
-  projectId: string | null
-  projectName: string | null
-  columns: PlaneBoardColumn[]
-  activeColumn: PlaneBoardColumn | null
-  activeStateId: string | null
-  emptyState: PlaneBoardEmptyState | null
-  movingWorkItemId: string | null
-  /** False on a host that would refuse the create; the screen shows no "+" at all. */
-  canCreate: boolean
-  create: PlaneBoardCreateState
-  selectProject: (projectId: string) => void
-  selectColumn: (stateId: string) => void
-  refresh: () => void
-  moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<void>
-  dismissMoveError: () => void
-  /** Creates a card in the active column; resolves true once Plane has it. */
-  createCard: (name: string) => Promise<boolean>
-  dismissCreateError: () => void
-}
+export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
+  PlaneBoardCreate & {
+    status: PlaneBoardStatus
+    error: string | null
+    moveError: string | null
+    refreshing: boolean
+    projects: PlaneMobileProject[]
+    projectId: string | null
+    projectName: string | null
+    columns: PlaneBoardColumn[]
+    activeColumn: PlaneBoardColumn | null
+    activeStateId: string | null
+    emptyState: PlaneBoardEmptyState | null
+    movingWorkItemId: string | null
+    /** False on a host that would refuse the create; the screen shows no "+" at all. */
+    canCreate: boolean
+    /** Priority edits ride plane.updateWorkItem, the same gate as create. */
+    canEdit: boolean
+    /** False on a host that refuses plane.listMembers; no assignee picker renders at all. */
+    canAssign: boolean
+    members: PlaneMembers['members']
+    membersStatus: PlaneMembers['status']
+    loadMembers: () => void
+    selectProject: (projectId: string) => void
+    selectColumn: (stateId: string) => void
+    refresh: () => void
+    moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<void>
+    dismissMoveError: () => void
+  }
 
 type Loaded = {
   availability: PlaneMobileAvailability
@@ -89,7 +93,6 @@ export function usePlaneBoard(
   const [activeStateId, setActiveStateId] = useState<string | null>(null)
   const [moves, setMoves] = useState<PlaneBoardMoveOverrides>(EMPTY_PLANE_BOARD_MOVES)
   const [movingWorkItemId, setMovingWorkItemId] = useState<string | null>(null)
-  const [create, setCreate] = useState<PlaneBoardCreateState>(IDLE_PLANE_BOARD_CREATE)
   const generationRef = useRef(0)
 
   // Resolves the items it put on screen, or null when it lost to a newer read.
@@ -119,11 +122,7 @@ export function usePlaneBoard(
           setStatus('ready')
           return []
         }
-        const workspaceId =
-          availability.status?.selectedWorkspaceId ??
-          availability.status?.activeWorkspaceId ??
-          availability.status?.workspaces[0]?.id ??
-          null
+        const workspaceId = resolvePlaneWorkspaceId(availability.status)
         const projects = await fetchPlaneProjects(client, workspaceId)
         if (!isCurrent()) {
           return null
@@ -174,21 +173,25 @@ export function usePlaneBoard(
   }, [load])
 
   const workspaceId = useMemo(
-    () =>
-      loaded.availability.status?.selectedWorkspaceId ??
-      loaded.availability.status?.activeWorkspaceId ??
-      loaded.availability.status?.workspaces[0]?.id ??
-      null,
+    () => resolvePlaneWorkspaceId(loaded.availability.status),
     [loaded.availability]
   )
+
+  const reload = useCallback(() => load({ silent: true }), [load])
+  const edits = usePlaneBoardEdits({ client, workspaceId, items: loaded.items, reload })
+  const canAssign = arePlaneMembersListableByHost(capabilities)
+  const members = usePlaneMembers(client, projectId, workspaceId)
 
   const columns = useMemo(
     () =>
       buildPlaneBoardColumns(
         loaded.states,
-        applyPlaneBoardMoves(loaded.items, moves, loaded.states)
+        applyPlaneBoardEdits(
+          applyPlaneBoardMoves(loaded.items, moves, loaded.states),
+          edits.overrides
+        )
       ),
-    [loaded.items, loaded.states, moves]
+    [edits.overrides, loaded.items, loaded.states, moves]
   )
   const activeColumn = useMemo(
     () => columns.find((column) => column.stateId === activeStateId) ?? columns[0] ?? null,
@@ -258,37 +261,14 @@ export function usePlaneBoard(
     [client, load, workspaceId]
   )
 
-  const createCard = useCallback(
-    async (name: string): Promise<boolean> => {
-      const stateId = activeColumn?.stateId
-      if (!client || !projectId || !stateId) {
-        return false
-      }
-      const knownIds = new Set(loaded.items.map((item) => item.id))
-      setCreate(beginPlaneBoardCreate())
-      const result = await createPlaneWorkItem(client, {
-        projectId,
-        workspaceId,
-        name,
-        stateId
-      })
-      if (!result.ok && result.deliveryUnknown) {
-        // Still pending while the board is re-read: "Try again" on a create Plane
-        // did take would make the card twice.
-        const items = await load({ silent: true })
-        const landed = items !== null && unansweredPlaneCreateLanded(items, knownIds, stateId, name)
-        setCreate(landed ? IDLE_PLANE_BOARD_CREATE : settlePlaneBoardCreate(result))
-        return landed
-      }
-      setCreate(settlePlaneBoardCreate(result))
-      if (result.ok) {
-        // The create reply carries no card; a silent re-read puts it on the board.
-        void load({ silent: true })
-      }
-      return result.ok
-    },
-    [activeColumn?.stateId, client, load, loaded.items, projectId, workspaceId]
-  )
+  const creation = usePlaneBoardCreate({
+    client,
+    projectId,
+    workspaceId,
+    stateId: activeColumn?.stateId ?? null,
+    items: loaded.items,
+    reload
+  })
 
   return {
     status,
@@ -304,17 +284,37 @@ export function usePlaneBoard(
     emptyState,
     movingWorkItemId,
     canCreate: isPlaneBoardWritableByHost(capabilities),
-    create,
-    selectProject: useCallback((next: string) => {
-      setProjectId(next)
-      setActiveStateId(null)
-      setMoves(EMPTY_PLANE_BOARD_MOVES)
-    }, []),
+    canEdit: isPlaneBoardWritableByHost(capabilities),
+    canAssign,
+    members: members.members,
+    membersStatus: members.status,
+    loadMembers: useCallback(() => {
+      if (canAssign) {
+        members.load()
+      }
+    }, [canAssign, members.load]),
+    editingWorkItemId: edits.editingWorkItemId,
+    editError: edits.editError,
+    editErrorWorkItemId: edits.editErrorWorkItemId,
+    setPriority: edits.setPriority,
+    setAssignees: edits.setAssignees,
+    retryEdit: edits.retryEdit,
+    dismissEditError: edits.dismissEditError,
+    create: creation.create,
+    createCard: creation.createCard,
+    dismissCreateError: creation.dismissCreateError,
+    selectProject: useCallback(
+      (next: string) => {
+        setProjectId(next)
+        setActiveStateId(null)
+        setMoves(EMPTY_PLANE_BOARD_MOVES)
+        edits.reset()
+      },
+      [edits.reset]
+    ),
     selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
-    refresh: useCallback(() => void load({ silent: true }), [load]),
+    refresh: useCallback(() => void reload(), [reload]),
     moveWorkItem,
-    dismissMoveError: useCallback(() => setMoveError(null), []),
-    createCard,
-    dismissCreateError: useCallback(() => setCreate(IDLE_PLANE_BOARD_CREATE), [])
+    dismissMoveError: useCallback(() => setMoveError(null), [])
   }
 }

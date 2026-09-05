@@ -4,20 +4,13 @@ import { TaskProviderLogo } from '../components/TaskProviderLogo'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatUpdatedAt } from './task-updated-at-time'
 import type { PlaneTaskItem } from './plane-mobile-task-list'
+import { PLANE_PRIORITY_LABELS } from './plane-priority-label'
 
 type Props = {
   item: PlaneTaskItem
   onOpenInBrowser: (url: string) => void
   onCopyLink?: (url: string) => void
   copied?: boolean
-}
-
-const PRIORITY_LABELS: Record<PlaneTaskItem['source']['priority'], string> = {
-  none: 'None',
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  urgent: 'Urgent'
 }
 
 function planeStateLabel(state: PlaneTaskItem['source']['state']): string {
@@ -36,7 +29,7 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
   const fields: [string, string][] = [
     ['Identifier', work.identifier || '—'],
     ['State', planeStateLabel(work.state)],
-    ['Priority', PRIORITY_LABELS[work.priority]],
+    ['Priority', PLANE_PRIORITY_LABELS[work.priority]],
     ['Project', planeProjectLabel(work.project)],
     ['Updated', formatUpdatedAt(work.updatedAt) || '—']
   ]
