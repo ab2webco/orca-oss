@@ -246,6 +246,17 @@ async function readPaneContent(page: Page, webTabId: string): Promise<string> {
   }, webTabId)
 }
 
+// Why: the renderer's pty-connect console never reaches the job log, so read the ring buffer directly.
+async function readPtyConnectDiagnostics(page: Page): Promise<string> {
+  return page
+    .evaluate(() =>
+      ((globalThis as typeof globalThis & { __ptyConnectDiag?: string[] }).__ptyConnectDiag ?? [])
+        .slice(-12)
+        .join(' | ')
+    )
+    .catch(() => 'unavailable')
+}
+
 async function waitForPaneConnected(page: Page, webTabId: string): Promise<void> {
   // Why: "never connected" alone cannot name the stuck path; keep every distinct state the poll saw.
   const observed: string[] = []
@@ -271,15 +282,13 @@ async function waitForPaneConnected(page: Page, webTabId: string): Promise<void>
         { timeout: 30_000, message: `Pane ${webTabId} never completed transport recovery` }
       )
       .toBe('connected')
+    // Why: a signal only printed on failure cannot be told from one every run prints; keep the passing control.
+    console.log(
+      `[pane-connected] ${webTabId} observed ${observed.join(' -> ')}; pty-connect ${(await readPtyConnectDiagnostics(page)) || 'none'}`
+    )
   } catch (error) {
     // Why: an offline pane at epoch 0 never attached, so the connect branch it took is the diagnosis.
-    const connectDiagnostics = await page
-      .evaluate(() =>
-        ((globalThis as typeof globalThis & { __ptyConnectDiag?: string[] }).__ptyConnectDiag ?? [])
-          .slice(-12)
-          .join(' | ')
-      )
-      .catch(() => 'unavailable')
+    const connectDiagnostics = await readPtyConnectDiagnostics(page)
     throw new Error(
       `Pane ${webTabId} never completed transport recovery; observed ${observed.join(' -> ') || 'nothing'}; pty-connect ${connectDiagnostics || 'none'}`,
       { cause: error }
