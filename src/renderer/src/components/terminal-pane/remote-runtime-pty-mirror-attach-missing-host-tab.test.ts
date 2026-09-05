@@ -22,7 +22,7 @@ const { runtimeCall, emitSnapshot, latestSubscribePayload, resetRemoteRuntimeTra
 
 // A host mid-rehydration rejects the activation for a tab it has not restored yet, and its worktree
 // inventory simply does not list that tab.
-function rehydratingHostResponse(method: string): unknown | null {
+function rehydratingHostResponse(method: string): unknown {
   if (method === 'session.tabs.activate') {
     return { ok: false, error: { code: 'tab_not_found', message: 'tab_not_found' } }
   }
@@ -43,7 +43,7 @@ function rehydratingHostResponse(method: string): unknown | null {
   return null
 }
 
-function rehydratedHostResponse(method: string): unknown | null {
+function rehydratedHostResponse(method: string): unknown {
   return method === 'session.tabs.list'
     ? readyHostSessionInventoryResponse('terminal-1', 'host-tab-1')
     : null
