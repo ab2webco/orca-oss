@@ -387,6 +387,35 @@ jobs:
       - name: Build macOS native helpers
         run: pnpm build:computer-macos && pnpm build:notification-status-macos
 
+      # Why we own the keychain: electron-builder creates its own and calls
+      # set-key-partition-list without unlocking it first, which the security
+      # tooling in the macos-latest image from 20260828 rejects with
+      # "SecKeychainUnlock: passphrase not correct" (ORCA-368). Preparing it here
+      # and handing it over via CSC_KEYCHAIN skips that path entirely.
+      - name: Prepare the signing keychain
+        if: inputs.dry_run != true
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/orca-signing.keychain-db"
+          cert="$RUNNER_TEMP/orca-signing.p12"
+          # openssl, not base64: the -d/-D flag for the system base64 differs by macOS version.
+          printf '%s' "$CSC_LINK" | openssl base64 -d -A > "$cert"
+          if [[ ! -s "$cert" ]]; then
+            echo "CSC_LINK did not decode to a p12; expected base64 of the .p12" >&2
+            exit 1
+          fi
+          security create-keychain -p "$CSC_KEY_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$CSC_KEY_PASSWORD" "$keychain"
+          security import "$cert" -k "$keychain" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$CSC_KEY_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$cert"
+          echo "CSC_KEYCHAIN=$keychain" >>"$GITHUB_ENV"
+          security find-identity -v -p codesigning "$keychain"
+
       - name: Package and publish macOS artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
