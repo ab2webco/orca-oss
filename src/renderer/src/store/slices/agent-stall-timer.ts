@@ -22,8 +22,6 @@ export type AgentStallTimerEntry = {
   nextTickAt: number
   detector: AgentStallTimerState
   status: AgentStallTimerStatus
-  /** Epoch ms of the reading that flipped the pane to stalled; null while it is moving. */
-  stalledSince: number | null
 }
 
 export type AgentStallTimerTick = {
@@ -79,8 +77,7 @@ export const createAgentStallTimerSlice: StateCreator<AppState, [], [], AgentSta
             intervalMinutes,
             nextTickAt: now + intervalMinutes * MINUTE_MS,
             detector: { lastFingerprint: null, escalated: false },
-            status: 'watching',
-            stalledSince: null
+            status: 'watching'
           }
         }
       }
@@ -130,8 +127,6 @@ export const createAgentStallTimerSlice: StateCreator<AppState, [], [], AgentSta
           ...entry,
           detector: state,
           status,
-          stalledSince:
-            outcome === 'escalate' ? now : outcome === 'progressing' ? null : entry.stalledSince,
           nextTickAt: now + entry.intervalMinutes * MINUTE_MS
         }
       }

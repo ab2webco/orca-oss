@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { armAgentStallTimer } from '@/lib/agent-stall-timer-driver'
-import { selectStalledPanesForWorktree } from '@/lib/agent-stall-timer-target'
+import { selectStalledPaneKeysForWorktree } from '@/lib/agent-stall-timer-target'
 
 type WorktreeStallBannerProps = {
   worktreeId: string
@@ -18,7 +18,7 @@ export function WorktreeStallBanner({
   worktreeId
 }: WorktreeStallBannerProps): React.JSX.Element | null {
   const stalledPaneKeys = useAppStore(
-    useShallow((s) => selectStalledPanesForWorktree(s, worktreeId).map((pane) => pane.paneKey))
+    useShallow((s) => selectStalledPaneKeysForWorktree(s, worktreeId))
   )
 
   const handleStopWatching = useCallback(() => {

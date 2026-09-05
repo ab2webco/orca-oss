@@ -2,7 +2,6 @@ import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import { splitWorktreeId } from '../../../shared/worktree/id'
 import type { AppState } from '../store/types'
-import type { AgentStallTimerEntry } from '../store/slices/agent-stall-timer'
 
 export type AgentStallTimerTargetState = Pick<AppState, 'tabsByWorktree' | 'repos'>
 
@@ -81,16 +80,14 @@ export function resolveWorktreeIdForPane(
   return null
 }
 
-export type StalledWorkspacePane = { paneKey: string; entry: AgentStallTimerEntry }
-
 /**
  * Stalled panes of one workspace, read from the timer map rather than the agent rows: a pane
  * whose process died stops producing a row, and that is exactly when the alert must survive.
  */
-export function selectStalledPanesForWorktree(
+export function selectStalledPaneKeysForWorktree(
   state: Pick<AppState, 'tabsByWorktree' | 'agentStallTimerByPaneKey'>,
   worktreeId: string
-): StalledWorkspacePane[] {
+): string[] {
   // Partial store states reach this during hydration and in card tests, so every map read
   // must survive an absent slice rather than throw inside a render.
   const tabIds = new Set((state.tabsByWorktree?.[worktreeId] ?? []).map((tab) => tab.id))
@@ -105,5 +102,5 @@ export function selectStalledPanesForWorktree(
       const parsed = parsePaneKey(paneKey)
       return parsed !== null && tabIds.has(parsed.tabId)
     })
-    .map(([paneKey, entry]) => ({ paneKey, entry }))
+    .map(([paneKey]) => paneKey)
 }

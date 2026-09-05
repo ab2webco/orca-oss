@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getAgentStallTimerAvailability,
   resolveAgentStallTimerTarget,
-  selectStalledPanesForWorktree,
+  selectStalledPaneKeysForWorktree,
   type AgentStallTimerTargetState
 } from './agent-stall-timer-target'
 
@@ -62,7 +62,7 @@ describe('agent stall timer target', () => {
       available: false,
       reason: 'no-workspace'
     })
-    expect(selectStalledPanesForWorktree(empty as never, 'repo1::/repo1/feature')).toEqual([])
+    expect(selectStalledPaneKeysForWorktree(empty as never, 'repo1::/repo1/feature')).toEqual([])
   })
 
   it('rejects a malformed pane key rather than guessing a workspace', () => {

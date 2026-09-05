@@ -28,12 +28,11 @@ describe('agent stall timer slice', () => {
     expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]).toMatchObject({
       intervalMinutes: 30,
       nextTickAt: 1_000 + 30 * 60_000,
-      status: 'watching',
-      stalledSince: null
+      status: 'watching'
     })
   })
 
-  it('records when the pane went stalled and clears it once progress resumes', () => {
+  it('reports the pane stalled, then watching again once progress resumes', () => {
     const state = store.getState()
     state.setAgentStallTimer(PANE_KEY, 15, 0)
     state.seedAgentStallTimerBaseline(PANE_KEY, { kind: 'fingerprint', value: 'a' })
@@ -41,12 +40,12 @@ describe('agent stall timer slice', () => {
     expect(
       state.applyAgentStallTick(PANE_KEY, { probe: { kind: 'fingerprint', value: 'a' }, now: 500 })
     ).toBe('escalate')
-    expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]?.stalledSince).toBe(500)
+    expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]?.status).toBe('stalled')
 
     expect(
       state.applyAgentStallTick(PANE_KEY, { probe: { kind: 'fingerprint', value: 'b' }, now: 900 })
     ).toBe('progressing')
-    expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]?.stalledSince).toBeNull()
+    expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]?.status).toBe('watching')
   })
 
   it('keeps the arming baseline from being overwritten by a slow reply', () => {
