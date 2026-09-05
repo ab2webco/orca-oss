@@ -20,13 +20,7 @@ vi.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
   X: 'X'
 }))
-vi.mock('../components/BottomDrawer', async () => {
-  const React = await import('react')
-  return {
-    BottomDrawer: ({ visible, children }: { visible: boolean; children?: unknown }) =>
-      visible ? React.createElement('BottomDrawer', { visible }, children) : null
-  }
-})
+vi.mock('../components/BottomDrawer', () => import('../../test-doubles/bottom-drawer-test-double'))
 
 const MODEL_DESCRIPTOR: SessionOptionDescriptor = {
   id: 'model',

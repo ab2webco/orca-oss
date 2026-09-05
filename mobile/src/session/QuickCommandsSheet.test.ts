@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalQuickCommand } from '../../../src/shared/terminal-quick-command-types'
@@ -32,9 +32,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('lucide-react-native', () => ({ ChevronLeft: 'ChevronLeft' }))
 
-vi.mock('../components/BottomDrawer', () => ({
-  BottomDrawer: ({ children }: { children: ReactNode }) => children
-}))
+vi.mock('../components/BottomDrawer', () => import('../../test-doubles/bottom-drawer-test-double'))
 
 vi.mock('./QuickCommandEditorForm', () => ({
   QuickCommandEditorForm: 'QuickCommandEditorForm'

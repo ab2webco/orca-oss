@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PickerModal } from './PickerModal'
@@ -12,13 +12,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('lucide-react-native', () => ({ Check: 'Check' }))
 
-vi.mock('./BottomDrawer', async () => {
-  const React = await import('react')
-  return {
-    BottomDrawer: ({ children }: { children?: ReactNode }) =>
-      React.createElement('BottomDrawer', null, children)
-  }
-})
+vi.mock('./BottomDrawer', () => import('../../test-doubles/bottom-drawer-test-double'))
 
 describe('PickerModal accessibility', () => {
   let renderer: ReactTestRenderer | null = null
