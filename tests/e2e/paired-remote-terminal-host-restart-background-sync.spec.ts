@@ -247,17 +247,44 @@ async function readPaneContent(page: Page, webTabId: string): Promise<string> {
 }
 
 async function waitForPaneConnected(page: Page, webTabId: string): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        page.evaluate((id) => {
-          const manager = window.__paneManagers?.get(id)
-          const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
-          return pane?.container.dataset.ptyRecoveryState ?? null
-        }, webTabId),
-      { timeout: 30_000, message: `Pane ${webTabId} never completed transport recovery` }
+  // Why: "never connected" alone cannot name the stuck path; keep every distinct state the poll saw.
+  const observed: string[] = []
+  try {
+    await expect
+      .poll(
+        async () => {
+          const state = await page.evaluate((id) => {
+            const manager = window.__paneManagers?.get(id)
+            const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
+            if (!pane) {
+              return 'no-pane'
+            }
+            const { ptyRecoveryState, ptyRecoveryAttempt, ptyRecoveryEpoch } =
+              pane.container.dataset
+            return `${ptyRecoveryState ?? 'unset'}/epoch:${ptyRecoveryEpoch ?? '?'}/attempt:${ptyRecoveryAttempt ?? '?'}`
+          }, webTabId)
+          if (observed.at(-1) !== state) {
+            observed.push(state)
+          }
+          return state.split('/')[0]
+        },
+        { timeout: 30_000, message: `Pane ${webTabId} never completed transport recovery` }
+      )
+      .toBe('connected')
+  } catch (error) {
+    // Why: an offline pane at epoch 0 never attached, so the connect branch it took is the diagnosis.
+    const connectDiagnostics = await page
+      .evaluate(() =>
+        ((globalThis as typeof globalThis & { __ptyConnectDiag?: string[] }).__ptyConnectDiag ?? [])
+          .slice(-12)
+          .join(' | ')
+      )
+      .catch(() => 'unavailable')
+    throw new Error(
+      `Pane ${webTabId} never completed transport recovery; observed ${observed.join(' -> ') || 'nothing'}; pty-connect ${connectDiagnostics || 'none'}`,
+      { cause: error }
     )
-    .toBe('connected')
+  }
 }
 
 async function expectTerminalInteractive(
