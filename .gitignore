@@ -157,3 +157,6 @@ tests/tools/benchmarks/results/terminal-pipeline-*.json
 
 # Old release trees the cross-version wire harness extracts on demand
 tests/e2e/.cross-version-checkouts/
+
+# Bytecode the harness guards under .claude/hooks leave behind on every run
+.claude/hooks/__pycache__/
