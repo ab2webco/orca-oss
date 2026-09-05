@@ -1927,6 +1927,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     )
     // Why: retired pane keys never recur, so stranded foreground entries would accumulate for the renderer's whole lifetime.
     get().clearPaneForegroundAgentByTabPrefix(tabId)
+    get().clearAgentStallTimersByTabPrefix(tabId)
     // Why: closing a tab permanently retires its panes (reopen mints a fresh leafId), so drop hibernation output epochs to keep the module map from growing forever.
     forgetAgentHibernationTabOutput(tabId)
     // Why: same rationale — retired tab ids never recur, so drop the foreground last-seen and consumed agent-startup delivery guards.
@@ -3444,6 +3445,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       retainedCompletionEvidence
     })
     get().clearPaneForegroundAgentByWorktree(worktreeId)
+    get().clearAgentStallTimersByWorktree(worktreeId)
     const settledPtyIds = exitGuardPtyIds.filter((ptyId) => !get().isPtyShutdownPending(ptyId))
     markCommittedPtyShutdowns(settledPtyIds)
     settleDeferredPtyShutdownExits(settledPtyIds, 'committed')

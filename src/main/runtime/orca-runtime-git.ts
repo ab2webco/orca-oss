@@ -28,6 +28,12 @@ import type { SourceControlAiOperation } from '../../shared/source-control-ai-ty
 import type { GitProviderStatusOptions } from '../providers/types'
 import { getRemoteCommitUrl, getRemoteFileUrl } from '../git/repo'
 import {
+  readWorktreeProgressFingerprint,
+  WORKTREE_PROGRESS_MAX_BUFFER,
+  WORKTREE_PROGRESS_TIMEOUT_MS
+} from '../git/worktree-progress-fingerprint'
+import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
+import {
   abortMerge,
   abortRebase,
   bulkDiscardChanges,
@@ -256,6 +262,35 @@ export class RuntimeGitCommands {
       return provider.checkIgnoredPaths(target.worktree.path, relativePaths)
     }
     return checkIgnoredPaths(target.worktree.path, relativePaths, localGitOptionsForTarget(target))
+  }
+
+  // Why: the agent stall timer reads progress through the runtime so a remote-server client
+  // measures the host that owns the worktree; a reading it never got is never a stall.
+  async readRuntimeWorktreeProgressFingerprint(
+    worktreeSelector: string
+  ): Promise<WorktreeProgressProbeResult> {
+    try {
+      const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+      if (target.connectionId) {
+        const provider = getSshGitProvider(target.connectionId)
+        if (!provider) {
+          return { kind: 'unreadable' }
+        }
+        return await readWorktreeProgressFingerprint((args) =>
+          provider.exec(args, target.worktree.path, { timeoutMs: WORKTREE_PROGRESS_TIMEOUT_MS })
+        )
+      }
+      return await readWorktreeProgressFingerprint((args) =>
+        gitExecFileAsync(args, {
+          ...localGitOptionsForTarget(target),
+          cwd: target.worktree.path,
+          timeout: WORKTREE_PROGRESS_TIMEOUT_MS,
+          maxBuffer: WORKTREE_PROGRESS_MAX_BUFFER
+        })
+      )
+    } catch {
+      return { kind: 'unreadable' }
+    }
   }
 
   async getRuntimeGitHistory(

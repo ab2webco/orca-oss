@@ -16316,6 +16316,20 @@
           "otherTopLevelItems": "Other top-level items ({{value0}})"
         }
       }
+    },
+    "agentStallTimer": {
+      "title": "Check if it is stuck",
+      "description": "Sends nothing while the worktree keeps moving. When commits and working-tree changes stop, it flags this workspace once.",
+      "off": "Off",
+      "everyMinutes": "Every {{minutes}} minutes",
+      "unavailableFolderWorkspace": "Not available here: this is a folder workspace, so there is no git history or working tree to measure progress from.",
+      "unavailableNoWorkspace": "Not available here: this pane is not attached to a workspace yet.",
+      "statusStalled": "No progress since the last check - open to change the stuck check",
+      "statusOff": "Check if it is stuck: off",
+      "statusArmed": "Checking for a stall every {{minutes}} minutes",
+      "bannerSingle": "No progress here since the last check.",
+      "bannerMultiple": "No progress from {{count}} agents here since the last check.",
+      "bannerStopWatching": "Stop watching"
     }
   },
   "dashboardPopout": {

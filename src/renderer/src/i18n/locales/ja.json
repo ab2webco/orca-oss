@@ -15357,6 +15357,20 @@
           "otherTopLevelItems": "その他のトップレベル項目 ({{value0}})"
         }
       }
+    },
+    "agentStallTimer": {
+      "title": "停止していないか確認",
+      "description": "ワークツリーが動いている間は何も送信しません。コミットと作業ツリーの変更が止まると、このワークスペースを一度だけ通知します。",
+      "off": "オフ",
+      "everyMinutes": "{{minutes}} 分ごと",
+      "unavailableFolderWorkspace": "ここでは利用できません: これはフォルダーワークスペースのため、進捗を測る git 履歴も作業ツリーもありません。",
+      "unavailableNoWorkspace": "ここでは利用できません: このペインはまだワークスペースに紐づいていません。",
+      "statusStalled": "前回のチェック以降、進捗がありません - 開いて停止チェックを変更します",
+      "statusOff": "停止していないか確認: オフ",
+      "statusArmed": "{{minutes}} 分ごとに停止を確認しています",
+      "bannerSingle": "前回のチェック以降、ここでは進捗がありません。",
+      "bannerMultiple": "前回のチェック以降、ここでは {{count}} 件の Agent に進捗がありません。",
+      "bannerStopWatching": "監視を停止"
     }
   },
   "dashboardPopout": {

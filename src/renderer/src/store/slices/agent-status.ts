@@ -1533,6 +1533,7 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
             retiredPaneKeySet
           ),
           cacheTimerByKey: removePaneKeys(s.cacheTimerByKey, retiredPaneKeySet),
+          agentStallTimerByPaneKey: removePaneKeys(s.agentStallTimerByPaneKey, retiredPaneKeySet),
           retentionSuppressedPaneKeys: nextRetentionSuppressedPaneKeys,
           recentlyRetiredAgentStatusPaneKeys: boundRecentlyRetiredAgentStatusPaneKeys(
             s.recentlyRetiredAgentStatusPaneKeys,
@@ -1606,6 +1607,7 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
         unreadAgentCompletionPanes: movePaneKeyedRecord(s.unreadAgentCompletionPanes, from, to),
         lastTerminalInputAtByPaneKey: movePaneKeyedRecord(s.lastTerminalInputAtByPaneKey, from, to),
         cacheTimerByKey: movePaneKeyedRecord(s.cacheTimerByKey, from, to),
+        agentStallTimerByPaneKey: movePaneKeyedRecord(s.agentStallTimerByPaneKey, from, to),
         retentionSuppressedPaneKeys: movePaneKeyedRecord(s.retentionSuppressedPaneKeys, from, to)
       }))
       if (typeof window !== 'undefined') {

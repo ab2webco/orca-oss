@@ -15379,6 +15379,20 @@
           "otherTopLevelItems": "기타 최상위 항목 ({{value0}})"
         }
       }
+    },
+    "agentStallTimer": {
+      "title": "멈췄는지 확인",
+      "description": "워크트리가 계속 변경되는 동안에는 아무것도 보내지 않습니다. 커밋과 작업 트리 변경이 멈추면 이 워크스페이스를 한 번 표시합니다.",
+      "off": "끄기",
+      "everyMinutes": "{{minutes}}분마다",
+      "unavailableFolderWorkspace": "여기서는 사용할 수 없습니다: 폴더 워크스페이스라서 진행 상황을 측정할 git 기록이나 작업 트리가 없습니다.",
+      "unavailableNoWorkspace": "여기서는 사용할 수 없습니다: 이 패널은 아직 워크스페이스에 연결되지 않았습니다.",
+      "statusStalled": "마지막 확인 이후 진행 없음 - 열어서 정지 확인 설정을 변경하세요",
+      "statusOff": "멈췄는지 확인: 끄기",
+      "statusArmed": "{{minutes}}분마다 정지 여부를 확인하는 중",
+      "bannerSingle": "마지막 확인 이후 여기서 진행이 없습니다.",
+      "bannerMultiple": "마지막 확인 이후 여기서 에이전트 {{count}}개에 진행이 없습니다.",
+      "bannerStopWatching": "감시 중지"
     }
   },
   "dashboardPopout": {

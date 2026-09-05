@@ -2165,6 +2165,18 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         paths
       })
     },
+    progressFingerprint: async ({ worktreePath }) => {
+      try {
+        const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+        return await callRuntimeResult('git.progressFingerprint', {
+          worktree: toRuntimeWorktreeSelector(worktree.id)
+        })
+      } catch {
+        // A host too old for this op, or an unresolvable worktree, is a reading we did not
+        // get — never a stall.
+        return { kind: 'unreadable' }
+      }
+    },
     // Why: the "add huge folder to .gitignore" flow is desktop-only; the web runtime makes no offer, so return no candidates.
     findHugeFoldersToIgnore: async () => [],
     appendGitignore: async () => false,

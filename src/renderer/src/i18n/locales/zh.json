@@ -15377,6 +15377,20 @@
           "otherTopLevelItems": "其他顶层项目（{{value0}}）"
         }
       }
+    },
+    "agentStallTimer": {
+      "title": "检查是否卡住",
+      "description": "只要工作树仍在变化就不发送任何内容。当提交和工作树更改停止时，会将此工作区标记一次。",
+      "off": "关闭",
+      "everyMinutes": "每 {{minutes}} 分钟",
+      "unavailableFolderWorkspace": "此处不可用：这是文件夹工作区，没有可用于衡量进展的 git 历史或工作树。",
+      "unavailableNoWorkspace": "此处不可用：此窗格尚未关联到工作区。",
+      "statusStalled": "自上次检查以来没有进展 - 打开以更改卡住检查",
+      "statusOff": "检查是否卡住：关闭",
+      "statusArmed": "每 {{minutes}} 分钟检查一次是否停滞",
+      "bannerSingle": "自上次检查以来此处没有进展。",
+      "bannerMultiple": "自上次检查以来此处有 {{count}} 个代理没有进展。",
+      "bannerStopWatching": "停止监视"
     }
   },
   "dashboardPopout": {
