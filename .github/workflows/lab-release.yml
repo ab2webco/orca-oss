@@ -419,15 +419,16 @@ jobs:
       - name: Package and publish macOS artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Why blanked here: with CSC_LINK set, electron-builder ignores CSC_KEYCHAIN and
-          # imports the p12 into a keychain of its own — which is the path that fails on the
-          # current image (ORCA-368). Cleared, it signs from the keychain prepared above,
-          # which already reported `1 valid identities found`.
-          CSC_LINK: ''
-          CSC_KEY_PASSWORD: ''
         # Why: --publish always uploads dmg/zip/blockmaps AND latest-mac.yml to
         # the tag's release; dry runs package with --publish never instead.
         run: |
+          # Why unset and not env: '': with CSC_LINK set, electron-builder ignores CSC_KEYCHAIN
+          # and imports the p12 into a keychain of its own, which the current image rejects
+          # (ORCA-368). An empty string is still set and gets read as a path — that is the
+          # `not a file` on the repo root. Only removing them from the environment works.
+          if [[ "${{ inputs.dry_run }}" != "true" ]]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+          fi
           node config/scripts/ensure-native-runtime.mjs --runtime=electron
           publish="always"
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
