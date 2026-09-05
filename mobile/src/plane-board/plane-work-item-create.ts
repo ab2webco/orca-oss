@@ -1,8 +1,11 @@
 import type { RpcClient } from '../transport/rpc-client'
+import {
+  describePlaneWriteRejection,
+  PLANE_WRITE_REQUEST_OPTIONS,
+  type PlaneWriteFailure
+} from './plane-write-failure'
 
-export type PlaneCreateResult =
-  | { ok: true; id: string; identifier: string }
-  | { ok: false; error: string }
+export type PlaneCreateResult = { ok: true; id: string; identifier: string } | PlaneWriteFailure
 
 export type PlaneCreateRequest = {
   projectId: string
@@ -29,12 +32,21 @@ export async function createPlaneWorkItem(
   if (!title) {
     return { ok: false, error: MISSING_TITLE_MESSAGE }
   }
-  const response = await client.sendRequest('plane.createWorkItem', {
-    projectId: request.projectId,
-    workspaceId: request.workspaceId ?? undefined,
-    title,
-    stateId: request.stateId
-  })
+  let response
+  try {
+    response = await client.sendRequest(
+      'plane.createWorkItem',
+      {
+        projectId: request.projectId,
+        workspaceId: request.workspaceId ?? undefined,
+        title,
+        stateId: request.stateId
+      },
+      PLANE_WRITE_REQUEST_OPTIONS
+    )
+  } catch (error) {
+    return describePlaneWriteRejection(error)
+  }
   if (!response.ok) {
     return { ok: false, error: response.error.message }
   }

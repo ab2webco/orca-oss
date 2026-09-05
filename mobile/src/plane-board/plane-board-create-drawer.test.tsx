@@ -99,6 +99,9 @@ describe('PlaneBoardCreateDrawer', () => {
     expect(props.onClose).not.toHaveBeenCalled()
     expect(titleInput(renderer).props.value).toBe('Ship the drawer')
     expect(textOf(renderer)).toContain('Title is required')
+    // The same button is the retry: enabled, and labelled as one.
+    expect(createButton(renderer).props.disabled).toBe(false)
+    expect(textOf(renderer)).toContain('Try again')
   })
 
   it('blocks a second submit while the first is in flight', () => {

@@ -31,6 +31,7 @@ import {
   type PlaneBoardCreateState
 } from './plane-board-create-state'
 import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
+import { unansweredPlaneCreateLanded } from './plane-write-failure'
 
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -91,10 +92,11 @@ export function usePlaneBoard(
   const [create, setCreate] = useState<PlaneBoardCreateState>(IDLE_PLANE_BOARD_CREATE)
   const generationRef = useRef(0)
 
+  // Resolves the items it put on screen, or null when it lost to a newer read.
   const load = useCallback(
-    async (options: { silent?: boolean } = {}): Promise<void> => {
+    async (options: { silent?: boolean } = {}): Promise<PlaneMobileWorkItem[] | null> => {
       if (!client || !connected) {
-        return
+        return null
       }
       const generation = generationRef.current + 1
       generationRef.current = generation
@@ -110,12 +112,12 @@ export function usePlaneBoard(
           client.sendRequest('plane.status')
         )
         if (!isCurrent()) {
-          return
+          return null
         }
         if (!availability.connected) {
           setLoaded({ ...EMPTY_LOADED, availability })
           setStatus('ready')
-          return
+          return []
         }
         const workspaceId =
           availability.status?.selectedWorkspaceId ??
@@ -124,13 +126,13 @@ export function usePlaneBoard(
           null
         const projects = await fetchPlaneProjects(client, workspaceId)
         if (!isCurrent()) {
-          return
+          return null
         }
         const nextProjectId = projectId ?? projects[0]?.id ?? null
         if (!nextProjectId) {
           setLoaded({ availability, projects, states: [], items: [] })
           setStatus('ready')
-          return
+          return []
         }
         const [states, items] = await Promise.all([
           fetchPlaneStates(client, nextProjectId, workspaceId),
@@ -142,7 +144,7 @@ export function usePlaneBoard(
           })
         ])
         if (!isCurrent()) {
-          return
+          return null
         }
         setProjectId(nextProjectId)
         setLoaded({ availability, projects, states, items })
@@ -150,12 +152,14 @@ export function usePlaneBoard(
         // a snapshot taken before the write cannot undo the card on screen.
         setMoves((current) => reconcilePlaneBoardMoves(current, items))
         setStatus('ready')
+        return items
       } catch (err) {
         if (!isCurrent()) {
-          return
+          return null
         }
         setError(err instanceof Error ? err.message : 'Failed to load the Plane board')
         setStatus('error')
+        return null
       } finally {
         if (isCurrent()) {
           setRefreshing(false)
@@ -246,8 +250,12 @@ export function usePlaneBoard(
       setMoves((current) => withoutPlaneBoardMove(current, item.id))
       setActiveStateId(previousStateId)
       setMoveError(result.error)
+      if (result.deliveryUnknown) {
+        // Plane may have taken the move after all; only a re-read can tell.
+        void load({ silent: true })
+      }
     },
-    [client, workspaceId]
+    [client, load, workspaceId]
   )
 
   const createCard = useCallback(
@@ -256,6 +264,7 @@ export function usePlaneBoard(
       if (!client || !projectId || !stateId) {
         return false
       }
+      const knownIds = new Set(loaded.items.map((item) => item.id))
       setCreate(beginPlaneBoardCreate())
       const result = await createPlaneWorkItem(client, {
         projectId,
@@ -263,6 +272,14 @@ export function usePlaneBoard(
         name,
         stateId
       })
+      if (!result.ok && result.deliveryUnknown) {
+        // Still pending while the board is re-read: "Try again" on a create Plane
+        // did take would make the card twice.
+        const items = await load({ silent: true })
+        const landed = items !== null && unansweredPlaneCreateLanded(items, knownIds, stateId, name)
+        setCreate(landed ? IDLE_PLANE_BOARD_CREATE : settlePlaneBoardCreate(result))
+        return landed
+      }
       setCreate(settlePlaneBoardCreate(result))
       if (result.ok) {
         // The create reply carries no card; a silent re-read puts it on the board.
@@ -270,7 +287,7 @@ export function usePlaneBoard(
       }
       return result.ok
     },
-    [activeColumn?.stateId, client, load, projectId, workspaceId]
+    [activeColumn?.stateId, client, load, loaded.items, projectId, workspaceId]
   )
 
   return {
