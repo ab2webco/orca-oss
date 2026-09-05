@@ -15,6 +15,9 @@ permissions:
 
 jobs:
   track-community-pr:
+    # Why: the bufo-bot app and the stablyai project board exist only upstream, so in a fork the
+    # token step fails on every PR and paints a red check that gates nothing.
+    if: github.repository_owner == 'stablyai'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
