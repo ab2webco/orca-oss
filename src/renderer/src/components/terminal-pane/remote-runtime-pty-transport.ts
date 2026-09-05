@@ -551,32 +551,35 @@ export function createRemoteRuntimePtyTransport(
 
   async function waitForHostSessionHandle(
     hostTabId: string,
-    isCurrent: () => boolean,
-    intent: TabActivationIntent
+    isCurrent: () => boolean
   ): Promise<string | null | undefined | false> {
     if (!worktreeId) {
       return undefined
     }
     const worktree = toRuntimeWorktreeSelector(worktreeId)
-    let activated: RuntimeMobileSessionTabsResult
+    let activated: RuntimeMobileSessionTabsResult | null = null
     try {
-      activated = await activateHostSessionSurface(hostTabId, worktree, intent)
+      // Why: this runs when the pane itself is opened/attached — the user's wake gesture. Its retries
+      // continue that gesture, so they must not downgrade to the intent the host refuses for a slept pane.
+      activated = await activateHostSessionSurface(hostTabId, worktree, 'user')
     } catch (error) {
-      if (isMissingHostSessionSurfaceError(error)) {
-        return null
+      if (!isMissingHostSessionSurfaceError(error)) {
+        throw error
       }
-      throw error
+      // Why: a relaunched host answers for a tab it has not rehydrated yet, so no single activation
+      // failure is absence proof — the bounded inventory wait below decides (ORCA-342).
     }
-    const immediate = findReadyHostSessionHandle(activated, hostTabId)
+    const immediate = activated ? findReadyHostSessionHandle(activated, hostTabId) : null
     if (immediate) {
       return immediate
     }
 
+    let absentInventoryObserved = false
     const startedAt = Date.now()
     while (isCurrent()) {
       const remainingMs = HOST_SESSION_ATTACH_TIMEOUT_MS - (Date.now() - startedAt)
       if (remainingMs <= 0) {
-        return undefined
+        return absentInventoryObserved ? null : undefined
       }
       // Why: host mirrors can publish before their PTY handle is ready, but a stuck pending surface must not poll forever.
       await new Promise((resolve) =>
@@ -595,11 +598,18 @@ export function createRemoteRuntimePtyTransport(
         return handle
       }
       if (!hasHostSessionTerminalSurface(listed, hostTabId)) {
-        const siblingStillExists =
+        if (
           getHostSessionTerminalSurfaces(listed, hostTabId, {
             matchRequestedLeaf: false
           }).length > 0
-        return siblingStillExists ? false : null
+        ) {
+          // Why: a surviving sibling leaf makes this a populated inventory that really lacks this one.
+          return false
+        }
+        // Why: an inventory holding nothing for this tab is what a host mid-rehydration publishes, so
+        // absence only counts once it outlives the bounded wait — and polling picks the tab up within
+        // one poll interval of the host republishing, instead of waiting out a backoff tier.
+        absentInventoryObserved = true
       }
     }
     return undefined
@@ -633,13 +643,12 @@ export function createRemoteRuntimePtyTransport(
 
   async function waitForHostSessionHandleWithRecovery(
     hostTabId: string,
-    isCurrent: () => boolean,
-    intent: TabActivationIntent
+    isCurrent: () => boolean
   ): Promise<string | null | undefined | false> {
     let recoveryEpoch = recovery.isActive ? recovery.currentEpoch : undefined
     while (isCurrent()) {
       try {
-        const hostHandle = await waitForHostSessionHandle(hostTabId, isCurrent, intent)
+        const hostHandle = await waitForHostSessionHandle(hostTabId, isCurrent)
         if (!isCurrent()) {
           return undefined
         }
@@ -777,9 +786,7 @@ export function createRemoteRuntimePtyTransport(
     options: { cols?: number; rows?: number },
     notifySpawn = true,
     expectedAttachGeneration?: number,
-    expectedLifecycleEpoch?: number,
-    // Why: only the pane's own open/attach is the user's wake gesture; a recovery retry must leave a slept pane slept.
-    intent: TabActivationIntent = 'user'
+    expectedLifecycleEpoch?: number
   ): Promise<PtyConnectResult | undefined> {
     if (!tabId || !isWebTerminalSurfaceTabId(tabId)) {
       return undefined
@@ -821,9 +828,12 @@ export function createRemoteRuntimePtyTransport(
             options,
             notifySpawn,
             expectedAttachGeneration,
-            expectedLifecycleEpoch,
-            'automatic'
-          )
+            expectedLifecycleEpoch
+          ).catch((error) => {
+            if (isCurrent()) {
+              handleRemoteTerminalError(error)
+            }
+          })
         })
       ) {
         connecting = false
@@ -832,7 +842,7 @@ export function createRemoteRuntimePtyTransport(
       return undefined
     }
     const hostTabId = toHostSessionTabId(tabId)
-    const hostHandle = await waitForHostSessionHandleWithRecovery(hostTabId, isCurrent, intent)
+    const hostHandle = await waitForHostSessionHandleWithRecovery(hostTabId, isCurrent)
     if (!isCurrent()) {
       return undefined
     }

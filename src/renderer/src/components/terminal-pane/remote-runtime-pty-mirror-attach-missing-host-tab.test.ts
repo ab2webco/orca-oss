@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createRemoteRuntimeTransportMocks,
+  readyHostSessionInventoryResponse,
   type MultiplexSubscriptionCallbacks
 } from './remote-runtime-pty-transport-test-harness'
 
@@ -19,8 +20,33 @@ const { runtimeCall, emitSnapshot, latestSubscribePayload, resetRemoteRuntimeTra
     }
   })
 
-function missingHostTabResponse(): unknown {
-  return { ok: false, error: { code: 'tab_not_found', message: 'tab_not_found' } }
+// A host mid-rehydration rejects the activation for a tab it has not restored yet, and its worktree
+// inventory simply does not list that tab.
+function rehydratingHostResponse(method: string): unknown | null {
+  if (method === 'session.tabs.activate') {
+    return { ok: false, error: { code: 'tab_not_found', message: 'tab_not_found' } }
+  }
+  if (method === 'session.tabs.list') {
+    return {
+      ok: true,
+      result: {
+        worktree: 'wt-1',
+        publicationEpoch: 'epoch-rehydrating',
+        snapshotVersion: 1,
+        activeGroupId: null,
+        activeTabId: null,
+        activeTabType: null,
+        tabs: []
+      }
+    }
+  }
+  return null
+}
+
+function rehydratedHostResponse(method: string): unknown | null {
+  return method === 'session.tabs.list'
+    ? readyHostSessionInventoryResponse('terminal-1', 'host-tab-1')
+    : null
 }
 
 describe('remote runtime pty mirror attach when the host does not know the tab yet', () => {
@@ -40,25 +66,28 @@ describe('remote runtime pty mirror attach when the host does not know the tab y
     return { transport, onError }
   }
 
-  it('reconnects once the relaunched host republishes the tab it first reported missing', async () => {
+  it('picks the tab up one poll interval after the host republishes it', async () => {
     vi.useFakeTimers()
     try {
-      const rehydratedRuntimeCall = runtimeCall.getMockImplementation()!
-      runtimeCall.mockImplementation(async (request: { method: string }) =>
-        request.method === 'session.tabs.activate' || request.method === 'session.tabs.list'
-          ? missingHostTabResponse()
-          : rehydratedRuntimeCall(request)
-      )
+      const healthyRuntimeCall = runtimeCall.getMockImplementation()!
+      let rehydrated = false
+      runtimeCall.mockImplementation(async (request: { method: string }) => {
+        const staged = rehydrated
+          ? rehydratedHostResponse(request.method)
+          : rehydratingHostResponse(request.method)
+        return staged ?? healthyRuntimeCall(request)
+      })
 
       const { transport, onError } = await connectMirror()
-      await vi.advanceTimersByTimeAsync(0)
+      await vi.advanceTimersByTimeAsync(3_000)
 
-      // A pane parked at 'offline' with an idle recovery has no timer and no external trigger left.
+      // Retiring the pane here left it at 'offline' with an idle recovery: no timer, no parked retry.
       expect(transport.getRecoveryState?.().phase).not.toBe('offline')
       expect(onError).not.toHaveBeenCalled()
 
-      runtimeCall.mockImplementation(rehydratedRuntimeCall)
-      await vi.advanceTimersByTimeAsync(2_000)
+      rehydrated = true
+      // Well inside the backoff tier a ladder-only retry would still be parked on.
+      await vi.advanceTimersByTimeAsync(400)
       emitSnapshot(latestSubscribePayload().streamId, 'READY')
 
       expect(transport.isConnected()).toBe(true)
@@ -70,34 +99,26 @@ describe('remote runtime pty mirror attach when the host does not know the tab y
     }
   })
 
-  it('re-activates the host surface with automatic intent so a slept pane stays slept', async () => {
+  it('keeps the wake intent on every retry so a slept pane still materializes', async () => {
     vi.useFakeTimers()
     try {
-      const rehydratedRuntimeCall = runtimeCall.getMockImplementation()!
-      let activations = 0
-      runtimeCall.mockImplementation(async (request: { method: string; params?: unknown }) => {
-        if (request.method === 'session.tabs.activate') {
-          activations += 1
-          if (activations === 1) {
-            return missingHostTabResponse()
-          }
-        }
-        if (request.method === 'session.tabs.list') {
-          return missingHostTabResponse()
-        }
-        return rehydratedRuntimeCall(request)
-      })
+      const healthyRuntimeCall = runtimeCall.getMockImplementation()!
+      runtimeCall.mockImplementation(
+        async (request: { method: string }) =>
+          rehydratingHostResponse(request.method) ?? healthyRuntimeCall(request)
+      )
 
       const { transport } = await connectMirror()
-      await vi.advanceTimersByTimeAsync(2_000)
+      await vi.advanceTimersByTimeAsync(20_000)
 
+      // The host refuses an automatic activation for a deliberately parked pane, so a retry that
+      // downgrades the intent abandons the wake gesture it exists to complete.
       const intents = runtimeCall.mock.calls
         .map(([request]) => request as { method: string; params?: { intent?: string } })
         .filter((request) => request.method === 'session.tabs.activate')
         .map((request) => request.params?.intent)
       expect(intents.length).toBeGreaterThan(1)
-      expect(intents[0]).toBe('user')
-      expect(intents.slice(1)).toEqual(intents.slice(1).map(() => 'automatic'))
+      expect(intents).toEqual(intents.map(() => 'user'))
       transport.destroy?.()
     } finally {
       vi.useRealTimers()
@@ -107,12 +128,14 @@ describe('remote runtime pty mirror attach when the host does not know the tab y
   it('lands a host that never republishes the tab on the revivable disconnected state', async () => {
     vi.useFakeTimers()
     try {
-      const rehydratedRuntimeCall = runtimeCall.getMockImplementation()!
-      runtimeCall.mockImplementation(async (request: { method: string }) =>
-        request.method === 'session.tabs.activate' || request.method === 'session.tabs.list'
-          ? missingHostTabResponse()
-          : rehydratedRuntimeCall(request)
-      )
+      const healthyRuntimeCall = runtimeCall.getMockImplementation()!
+      let rehydrated = false
+      runtimeCall.mockImplementation(async (request: { method: string }) => {
+        const staged = rehydrated
+          ? rehydratedHostResponse(request.method)
+          : rehydratingHostResponse(request.method)
+        return staged ?? healthyRuntimeCall(request)
+      })
 
       const { transport, onError } = await connectMirror()
       await vi.advanceTimersByTimeAsync(120_000)
@@ -122,7 +145,7 @@ describe('remote runtime pty mirror attach when the host does not know the tab y
       expect(transport.getRecoveryState?.().phase).toBe('disconnected')
       expect(onError).not.toHaveBeenCalled()
 
-      runtimeCall.mockImplementation(rehydratedRuntimeCall)
+      rehydrated = true
       expect(transport.retryRecovery?.()).toBe(true)
       await vi.advanceTimersByTimeAsync(1_000)
       emitSnapshot(latestSubscribePayload().streamId, 'READY')
