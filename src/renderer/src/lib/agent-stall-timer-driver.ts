@@ -75,6 +75,12 @@ export async function runDueAgentStallTicks(now = Date.now()): Promise<void> {
 }
 
 async function tickPane(paneKey: string): Promise<void> {
+  // Re-checked here, not only when the due list was built: a poll 30s later snapshots the
+  // previous run's undrained tail, and applying two readings back to back turns the second
+  // into a stall on a pane that just reported progress.
+  if (inFlightPaneKeys.has(paneKey)) {
+    return
+  }
   inFlightPaneKeys.add(paneKey)
   try {
     const target = resolveAgentStallTimerTarget(useAppStore.getState(), paneKey)

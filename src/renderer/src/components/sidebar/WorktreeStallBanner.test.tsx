@@ -62,6 +62,11 @@ describe('WorktreeStallBanner', () => {
 
     expect(screen.getByText('No progress here since the last check.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Stop watching' })).toBeTruthy()
+    // The alert has to name what it did not measure: a false alarm the user cannot explain
+    // costs more trust than the alert buys.
+    expect(
+      screen.getByText(/a new file git has not been told about, or work inside a submodule/)
+    ).toBeTruthy()
   })
 
   it('counts every stalled pane in the workspace', () => {
@@ -96,6 +101,17 @@ describe('WorktreeStallBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop watching' }))
 
     expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]).toBeUndefined()
+  })
+
+  it('does not claim a measurement scope on the unmeasurable notice, which measured nothing', () => {
+    store.setState({
+      repos: [{ id: 'repo1', path: '/repo1', displayName: 'Repo 1', connectionId: 'ssh-1' }]
+    } as never)
+    store.getState().setAgentStallTimer(PANE_KEY, 15, 0)
+
+    render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
+
+    expect(screen.queryByText(/a new file git has not been told about/)).toBeNull()
   })
 
   it('says nothing about a measurable pane that is simply still moving', () => {

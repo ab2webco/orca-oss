@@ -6,47 +6,45 @@ import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress
 export const WORKTREE_PROGRESS_MAX_BUFFER = 64 * 1024 * 1024
 export const WORKTREE_PROGRESS_TIMEOUT_MS = 20_000
 
-export type WorktreeProgressGitExec = (
-  args: string[],
-  options?: { stdin?: string }
-) => Promise<{ stdout: string }>
+export type WorktreeProgressGitExec = (args: string[]) => Promise<{ stdout: string }>
 
 /**
  * Exec options shared by every local probe call site.
  *
- * `GIT_OPTIONAL_LOCKS=0` is the load-bearing part: this polls the worktree an agent is
- * actively working in, and `status`/`diff` would otherwise refresh the index, take
- * `.git/index.lock`, and fail that agent's own `git add` or `git commit`.
+ * `GIT_OPTIONAL_LOCKS=0` keeps the probe from refreshing the index and taking
+ * `.git/index.lock` out from under the agent it is watching. `preferWslDirectGit` is what
+ * carries that variable into WSL: the login-shell route drops it, since `wsl.exe` imports
+ * only what `WSLENV` names.
  */
 export function worktreeProgressGitExecOptions(
   cwd: string,
-  hostOptions: { wslDistro?: string },
-  stdin?: string
+  hostOptions: { wslDistro?: string }
 ): {
   cwd: string
   wslDistro?: string
+  preferWslDirectGit: true
   timeout: number
   maxBuffer: number
   env: NodeJS.ProcessEnv
-  stdin?: string
 } {
   return {
     ...hostOptions,
     cwd,
+    preferWslDirectGit: true,
     timeout: WORKTREE_PROGRESS_TIMEOUT_MS,
     maxBuffer: WORKTREE_PROGRESS_MAX_BUFFER,
-    env: gitOptionalLocksDisabledEnv(),
-    ...(stdin === undefined ? {} : { stdin })
+    env: gitOptionalLocksDisabledEnv()
   }
 }
 
 /**
- * Hashes HEAD plus the full working-tree content, tracked and untracked.
+ * Hashes HEAD plus the tracked working-tree content.
  *
- * Every part covers a hole in the others: HEAD alone misses an agent that edits without
- * committing, `status --porcelain` alone repeats byte-for-byte while an agent edits a file
- * already marked `M`, `diff HEAD` excludes untracked files entirely, and the untracked blob
- * hashes are the only thing that moves while an agent iterates on a brand-new file.
+ * HEAD alone misses an agent that edits without committing, and `status --porcelain` alone
+ * repeats byte-for-byte while an agent edits a file already marked `M` — only `diff HEAD`
+ * carries that content. Two blind spots are known and deliberate for this slice: the content
+ * of an untracked file, and work inside a submodule, both of which leave all three components
+ * byte-identical.
  */
 export async function readWorktreeProgressFingerprint(
   exec: WorktreeProgressGitExec
@@ -56,17 +54,10 @@ export async function readWorktreeProgressFingerprint(
     return { kind: 'unreadable' }
   }
 
-  const untracked = await readUntrackedContentDigest(exec)
-  if (untracked === null) {
-    return { kind: 'unreadable' }
-  }
-
   const head = await tryExec(exec, ['rev-parse', '--verify', 'HEAD'])
   const diff = head === null ? null : await tryExec(exec, ['diff', 'HEAD'])
   if (head === null) {
-    // A failed HEAD only licenses a missing diff when the branch is provably unborn:
-    // `symbolic-ref` still answers there, while a spawn or transport failure kills both.
-    if ((await tryExec(exec, ['symbolic-ref', '-q', 'HEAD'])) === null) {
+    if (!(await isUnbornBranch(exec))) {
       return { kind: 'unreadable' }
     }
   } else if (diff === null) {
@@ -79,35 +70,26 @@ export async function readWorktreeProgressFingerprint(
     .update(status)
     .update(' ')
     .update(diff ?? '')
-    .update(' ')
-    .update(untracked)
     .digest('hex')
   return { kind: 'fingerprint', value: digest }
 }
 
-/** Blob hashes of untracked files: bounded output, and the only signal that moves when an
- *  agent edits a file git has not been told about yet. */
-async function readUntrackedContentDigest(exec: WorktreeProgressGitExec): Promise<string | null> {
-  const listed = await tryExec(exec, ['ls-files', '--others', '--exclude-standard', '-z'])
-  if (listed === null) {
-    return null
+/**
+ * A missing HEAD only licenses a missing diff on a provably unborn branch. `symbolic-ref`
+ * alone does not prove it — it answers for any attached HEAD, born or not; the branch is
+ * unborn only when the ref it names also fails to resolve.
+ */
+async function isUnbornBranch(exec: WorktreeProgressGitExec): Promise<boolean> {
+  const ref = (await tryExec(exec, ['symbolic-ref', '-q', 'HEAD']))?.trim()
+  if (!ref) {
+    return false
   }
-  // `--stdin-paths` is newline-delimited, so a path containing one cannot be hashed; its
-  // presence still reaches the digest through the porcelain status.
-  const paths = listed.split('\0').filter((path) => path.length > 0 && !path.includes('\n'))
-  if (paths.length === 0) {
-    return ''
-  }
-  return tryExec(exec, ['hash-object', '--stdin-paths'], { stdin: `${paths.join('\n')}\n` })
+  return (await tryExec(exec, ['rev-parse', '--verify', '--quiet', ref])) === null
 }
 
-async function tryExec(
-  exec: WorktreeProgressGitExec,
-  args: string[],
-  options?: { stdin?: string }
-): Promise<string | null> {
+async function tryExec(exec: WorktreeProgressGitExec, args: string[]): Promise<string | null> {
   try {
-    return (await exec(args, options)).stdout
+    return (await exec(args)).stdout
   } catch {
     return null
   }

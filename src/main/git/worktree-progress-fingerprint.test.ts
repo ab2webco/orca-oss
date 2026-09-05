@@ -1,223 +1,237 @@
-import { describe, expect, it, vi } from 'vitest'
+import { execFile } from 'node:child_process'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   readWorktreeProgressFingerprint,
   worktreeProgressGitExecOptions,
   type WorktreeProgressGitExec
 } from './worktree-progress-fingerprint'
 
-type GitKey = 'head' | 'status' | 'diff' | 'lsFiles' | 'hashObject' | 'symbolicRef'
-type FakeGit = Partial<Record<GitKey, string | Error>>
-
-function keyFor(args: string[]): GitKey {
-  switch (args[0]) {
-    case 'rev-parse':
-      return 'head'
-    case 'status':
-      return 'status'
-    case 'ls-files':
-      return 'lsFiles'
-    case 'hash-object':
-      return 'hashObject'
-    case 'symbolic-ref':
-      return 'symbolicRef'
-    default:
-      return 'diff'
-  }
-}
-
-function fakeExec(responses: FakeGit): WorktreeProgressGitExec {
-  return vi.fn(async (args: string[]) => {
-    const value = responses[keyFor(args)]
-    if (value instanceof Error) {
-      throw value
-    }
-    return { stdout: value ?? '' }
-  })
-}
-
-async function fingerprintOf(responses: FakeGit): Promise<string> {
-  const result = await readWorktreeProgressFingerprint(fakeExec(responses))
-  if (result.kind !== 'fingerprint') {
-    throw new Error(`expected a fingerprint, got ${result.kind}`)
-  }
-  return result.value
-}
-
-const baseline: FakeGit = {
-  head: 'aaa111\n',
-  status: ' M src/app.ts\0',
-  diff: '--- a/src/app.ts\n+++ b/src/app.ts\n+first\n'
-}
-
-const unborn: FakeGit = {
-  head: new Error('fatal: bad revision'),
-  diff: new Error('fatal: bad revision'),
-  symbolicRef: 'refs/heads/main\n'
-}
+const execFileAsync = promisify(execFile)
 
 describe('worktreeProgressGitExecOptions', () => {
   it("disables optional locks so the probe cannot break the watched agent's own commit", () => {
-    // status and diff refresh the index, which takes .git/index.lock; the probe runs in the
-    // worktree the agent is working in, so without this it fails that agent's git add.
     expect(worktreeProgressGitExecOptions('/repo/wt', {}).env?.GIT_OPTIONAL_LOCKS).toBe('0')
   })
 
-  it('keeps the host routing and bounds every reading', () => {
-    const options = worktreeProgressGitExecOptions('/repo/wt', { wslDistro: 'Ubuntu' })
-
-    expect(options.cwd).toBe('/repo/wt')
-    expect(options.wslDistro).toBe('Ubuntu')
-    expect(options.timeout).toBeGreaterThan(0)
-    expect(options.maxBuffer).toBeGreaterThan(0)
+  it('takes the WSL direct-git route, which is the only one that carries that variable in', () => {
+    // The login-shell route drops it: wsl.exe imports only what WSLENV names, and nothing
+    // registers GIT_OPTIONAL_LOCKS there. Asserting the env alone would pass with it lost.
+    expect(worktreeProgressGitExecOptions('/repo/wt', { wslDistro: 'Ubuntu' })).toMatchObject({
+      cwd: '/repo/wt',
+      wslDistro: 'Ubuntu',
+      preferWslDirectGit: true
+    })
   })
 
-  it('passes stdin only when there is some', () => {
-    expect('stdin' in worktreeProgressGitExecOptions('/repo/wt', {})).toBe(false)
-    expect(worktreeProgressGitExecOptions('/repo/wt', {}, 'a.ts\n').stdin).toBe('a.ts\n')
+  it('bounds every reading in time and in bytes', () => {
+    const options = worktreeProgressGitExecOptions('/repo/wt', {})
+
+    expect(options.timeout).toBe(20_000)
+    expect(options.maxBuffer).toBe(64 * 1024 * 1024)
   })
 })
 
-describe('readWorktreeProgressFingerprint', () => {
-  it('is stable across reads of an unchanged worktree', async () => {
-    expect(await fingerprintOf(baseline)).toBe(await fingerprintOf(baseline))
-  })
+/**
+ * Driven against a real git binary: this module is a contract with git's output, so a faked
+ * exec proves only that the hash function is pure.
+ */
+describe('readWorktreeProgressFingerprint against a real repository', () => {
+  let repo: string
 
-  it('changes when a new commit lands', async () => {
-    expect(await fingerprintOf({ ...baseline, head: 'bbb222\n' })).not.toBe(
-      await fingerprintOf(baseline)
-    )
-  })
-
-  it('changes when an already-modified file is edited again', async () => {
-    // The porcelain line stays ` M src/app.ts` byte for byte; only the diff moves. A
-    // status-only fingerprint would report 45 minutes of real editing as a stall.
-    const edited: FakeGit = {
-      ...baseline,
-      diff: '--- a/src/app.ts\n+++ b/src/app.ts\n+first\n+second\n'
+  const git = async (...args: string[]): Promise<void> => {
+    await execFileAsync('git', args, { cwd: repo })
+  }
+  const exec: WorktreeProgressGitExec = async (args) => {
+    const { stdout } = await execFileAsync('git', args, { cwd: repo, maxBuffer: 8 * 1024 * 1024 })
+    return { stdout: String(stdout) }
+  }
+  const fingerprint = async (): Promise<string> => {
+    const result = await readWorktreeProgressFingerprint(exec)
+    if (result.kind !== 'fingerprint') {
+      throw new Error(`expected a fingerprint, got ${result.kind}`)
     }
+    return result.value
+  }
+  const commitFirst = async (): Promise<void> => {
+    writeFileSync(join(repo, 'app.ts'), 'first\n')
+    await git('add', 'app.ts')
+    await git('commit', '-qm', 'first')
+  }
 
-    expect(await fingerprintOf(edited)).not.toBe(await fingerprintOf(baseline))
+  beforeEach(async () => {
+    repo = mkdtempSync(join(tmpdir(), 'orca-progress-'))
+    await git('init', '-q', '.')
+    await git('config', 'user.email', 'orca@example.test')
+    await git('config', 'user.name', 'Orca')
   })
 
-  it('changes when an untracked file appears', async () => {
-    expect(await fingerprintOf({ ...baseline, status: ' M src/app.ts\0?? notes.md\0' })).not.toBe(
-      await fingerprintOf(baseline)
-    )
+  afterEach(() => {
+    rmSync(repo, { recursive: true, force: true })
   })
 
-  it('changes when an existing untracked file is edited', async () => {
-    // `status -z` emits the path only and `diff HEAD` excludes untracked files, so the blob
-    // hashes are the only part that moves while an agent iterates on a brand-new file.
-    const untracked: FakeGit = { ...baseline, lsFiles: 'notes.md\0' }
-    const before = await fingerprintOf({ ...untracked, hashObject: 'aaaa\n' })
-    const after = await fingerprintOf({ ...untracked, hashObject: 'bbbb\n' })
+  it('is stable across two readings of an untouched worktree', async () => {
+    await commitFirst()
 
-    expect(after).not.toBe(before)
+    expect(await fingerprint()).toBe(await fingerprint())
   })
 
-  it('hashes untracked blobs by path, skipping any path it cannot pass on stdin', async () => {
-    const exec = fakeExec({ ...baseline, lsFiles: 'notes.md\0bad\nname.md\0deep/a.ts\0' })
+  it('moves when a commit lands', async () => {
+    await commitFirst()
+    const before = await fingerprint()
 
-    await readWorktreeProgressFingerprint(exec)
+    writeFileSync(join(repo, 'app.ts'), 'second\n')
+    await git('add', 'app.ts')
+    await git('commit', '-qm', 'second')
 
-    expect(exec).toHaveBeenCalledWith(['hash-object', '--stdin-paths'], {
-      stdin: 'notes.md\ndeep/a.ts\n'
-    })
+    expect(await fingerprint()).not.toBe(before)
   })
 
-  it('does not hash blobs when there are no untracked files', async () => {
-    const exec = fakeExec({ ...baseline, lsFiles: '' })
+  it('moves when an already-modified file is edited again', async () => {
+    await commitFirst()
+    writeFileSync(join(repo, 'app.ts'), 'edited once\n')
+    const before = await fingerprint()
 
-    await readWorktreeProgressFingerprint(exec)
+    writeFileSync(join(repo, 'app.ts'), 'edited twice\n')
 
-    expect(exec).not.toHaveBeenCalledWith(['hash-object', '--stdin-paths'], expect.anything())
+    expect(await fingerprint()).not.toBe(before)
   })
 
-  it('distinguishes a clean tree at one commit from a clean tree at another', async () => {
-    const cleanA: FakeGit = { head: 'aaa111\n', status: '', diff: '' }
-    const cleanB: FakeGit = { head: 'bbb222\n', status: '', diff: '' }
+  it('moves when work is staged and not committed', async () => {
+    await commitFirst()
+    writeFileSync(join(repo, 'app.ts'), 'fix\n')
+    const before = await fingerprint()
 
-    expect(await fingerprintOf(cleanA)).not.toBe(await fingerprintOf(cleanB))
+    await git('add', 'app.ts')
+
+    expect(await fingerprint()).not.toBe(before)
   })
 
+  it('moves when an untracked file appears', async () => {
+    await commitFirst()
+    const before = await fingerprint()
+
+    writeFileSync(join(repo, 'notes.md'), 'a\n')
+
+    expect(await fingerprint()).not.toBe(before)
+  })
+
+  it('reads an unborn branch rather than refusing it', async () => {
+    writeFileSync(join(repo, 'first.ts'), 'a\n')
+
+    expect((await readWorktreeProgressFingerprint(exec)).kind).toBe('fingerprint')
+  })
+
+  it('survives an untracked dangling symlink, which git cannot open', async () => {
+    // `ls-files --others` lists symlinks, so a probe that opened them would abort the whole
+    // reading on one broken link and then never fire again.
+    await commitFirst()
+    symlinkSync(join(repo, 'missing-target'), join(repo, 'dangling'))
+
+    expect((await readWorktreeProgressFingerprint(exec)).kind).toBe('fingerprint')
+  })
+
+  it('does not read outside the worktree, whatever an untracked file is named', async () => {
+    // A name like "\057etc\057hosts" is C-quoted by git and unquotes to an absolute path.
+    await commitFirst()
+    writeFileSync(join(repo, '"\\057etc\\057hosts"'), '')
+
+    expect(await fingerprint()).toBe(await fingerprint())
+  })
+
+  it('known gap: the content of an untracked file is not measured', async () => {
+    // Pinned on purpose for this slice. An agent that only ever edits brand-new files it has
+    // not added reads as stalled; the escalation copy says so, and slice 2 closes it.
+    await commitFirst()
+    writeFileSync(join(repo, 'draft.ts'), 'one\n')
+    const before = await fingerprint()
+
+    writeFileSync(join(repo, 'draft.ts'), 'one\ntwo\n')
+
+    expect(await fingerprint()).toBe(before)
+  })
+
+  it('known gap: work inside a submodule is not measured', async () => {
+    const sub = mkdtempSync(join(tmpdir(), 'orca-progress-sub-'))
+    try {
+      for (const args of [
+        ['init', '-q', '.'],
+        ['config', 'user.email', 'orca@example.test'],
+        ['config', 'user.name', 'Orca']
+      ]) {
+        await execFileAsync('git', args, { cwd: sub })
+      }
+      writeFileSync(join(sub, 'lib.ts'), 'a\n')
+      await execFileAsync('git', ['add', 'lib.ts'], { cwd: sub })
+      await execFileAsync('git', ['commit', '-qm', 'sub'], { cwd: sub })
+      await commitFirst()
+      await git('-c', 'protocol.file.allow=always', 'submodule', '-q', 'add', sub, 'vendor')
+      await git('commit', '-qm', 'add submodule')
+      writeFileSync(join(repo, 'vendor', 'lib.ts'), 'edited\n')
+      const before = await fingerprint()
+
+      writeFileSync(join(repo, 'vendor', 'lib.ts'), 'edited again\n')
+
+      expect(await fingerprint()).toBe(before)
+    } finally {
+      rmSync(sub, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('readWorktreeProgressFingerprint failure handling', () => {
   it('reads as unreadable when git status fails', async () => {
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({ ...baseline, status: new Error('timed out') })
-    )
+    const exec = vi.fn(async (args: string[]) => {
+      if (args[0] === 'status') {
+        throw new Error('timed out')
+      }
+      return { stdout: '' }
+    })
 
-    expect(result).toEqual({ kind: 'unreadable' })
+    expect(await readWorktreeProgressFingerprint(exec)).toEqual({ kind: 'unreadable' })
   })
 
   it('reads as unreadable when the diff fails but HEAD resolves', async () => {
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({ ...baseline, diff: new Error('stdout exceeded maxBuffer') })
-    )
-
-    expect(result).toEqual({ kind: 'unreadable' })
-  })
-
-  it('reads as unreadable when the untracked listing fails', async () => {
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({ ...baseline, lsFiles: new Error('timed out') })
-    )
-
-    expect(result).toEqual({ kind: 'unreadable' })
-  })
-
-  it('reads as unreadable when hashing the untracked blobs fails', async () => {
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({ ...baseline, lsFiles: 'notes.md\0', hashObject: new Error('EMFILE') })
-    )
-
-    expect(result).toEqual({ kind: 'unreadable' })
-  })
-
-  it('still fingerprints an unborn branch, where HEAD and diff both fail', async () => {
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({ ...unborn, status: '?? first.ts\0' })
-    )
-
-    expect(result.kind).toBe('fingerprint')
-  })
-
-  it('refuses to call two failed reads an unborn branch', async () => {
-    // Spawn or transport failure kills symbolic-ref too; only a genuinely unborn branch
-    // answers it. Without this the digest silently collapses to the status line, which
-    // repeats byte for byte while an agent edits.
-    const result = await readWorktreeProgressFingerprint(
-      fakeExec({
-        head: new Error('EAGAIN'),
-        diff: new Error('EAGAIN'),
-        symbolicRef: new Error('EAGAIN'),
-        status: ' M src/app.ts\0'
-      })
-    )
-
-    expect(result).toEqual({ kind: 'unreadable' })
-  })
-
-  it('sees an untracked file being edited on an unborn branch', async () => {
-    const before = await fingerprintOf({
-      ...unborn,
-      status: '?? first.ts\0',
-      lsFiles: 'first.ts\0',
-      hashObject: 'aaaa\n'
-    })
-    const after = await fingerprintOf({
-      ...unborn,
-      status: '?? first.ts\0',
-      lsFiles: 'first.ts\0',
-      hashObject: 'bbbb\n'
+    const exec = vi.fn(async (args: string[]) => {
+      if (args[0] === 'diff') {
+        throw new Error('stdout exceeded maxBuffer')
+      }
+      return { stdout: 'aaa111\n' }
     })
 
-    expect(after).not.toBe(before)
+    expect(await readWorktreeProgressFingerprint(exec)).toEqual({ kind: 'unreadable' })
   })
 
-  it('does not let field boundaries collide between HEAD, status and diff', async () => {
-    // Concatenated without separators both read "aabbcc".
-    const a = await fingerprintOf({ head: 'aa', status: 'bb', diff: 'cc' })
-    const b = await fingerprintOf({ head: 'a', status: 'abb', diff: 'cc' })
+  it('refuses to call a failed HEAD read an unborn branch when the branch has commits', async () => {
+    // symbolic-ref answers for any attached HEAD, born or not, so it cannot decide this on
+    // its own; the ref it names still resolving proves the branch is not unborn.
+    const exec = vi.fn(async (args: string[]) => {
+      if (args[0] === 'symbolic-ref') {
+        return { stdout: 'refs/heads/main\n' }
+      }
+      if (args[0] === 'rev-parse' && args.includes('--quiet')) {
+        return { stdout: 'aaa111\n' }
+      }
+      if (args[0] === 'rev-parse' || args[0] === 'diff') {
+        throw new Error('EAGAIN')
+      }
+      return { stdout: ' M app.ts\0' }
+    })
 
-    expect(a).not.toBe(b)
+    expect(await readWorktreeProgressFingerprint(exec)).toEqual({ kind: 'unreadable' })
+  })
+
+  it('reads as unreadable when nothing answers about HEAD at all', async () => {
+    const exec = vi.fn(async (args: string[]) => {
+      if (args[0] === 'status') {
+        return { stdout: ' M app.ts\0' }
+      }
+      throw new Error('EAGAIN')
+    })
+
+    expect(await readWorktreeProgressFingerprint(exec)).toEqual({ kind: 'unreadable' })
   })
 })

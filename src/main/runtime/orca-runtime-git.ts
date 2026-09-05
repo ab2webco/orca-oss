@@ -275,14 +275,10 @@ export class RuntimeGitCommands {
         // worktree has no reading to give until a host-side digest op exists (ORCA-340).
         return { kind: 'unsupported', reason: 'remote-workspace' }
       }
-      return await readWorktreeProgressFingerprint((args, execOptions) =>
+      return await readWorktreeProgressFingerprint((args) =>
         gitExecFileAsync(
           args,
-          worktreeProgressGitExecOptions(
-            target.worktree.path,
-            localGitOptionsForTarget(target),
-            execOptions?.stdin
-          )
+          worktreeProgressGitExecOptions(target.worktree.path, localGitOptionsForTarget(target))
         )
       )
     } catch {

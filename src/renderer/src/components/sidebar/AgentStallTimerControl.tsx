@@ -40,7 +40,7 @@ export function AgentStallTimerControl({
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const repos = useAppStore((s) => s.repos)
   const availability = useMemo(
-    () => getAgentStallTimerAvailability({ tabsByWorktree, repos } as never, paneKey),
+    () => getAgentStallTimerAvailability({ tabsByWorktree, repos }, paneKey),
     [paneKey, repos, tabsByWorktree]
   )
 
@@ -62,7 +62,7 @@ export function AgentStallTimerControl({
   const label = describeTriggerLabel(entry?.intervalMinutes ?? null, isStalled)
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>

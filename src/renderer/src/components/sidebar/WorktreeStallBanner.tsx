@@ -69,6 +69,17 @@ export function WorktreeStallBanner({
                 'No progress from {{count}} agents here since the last check.',
                 { count: reportedPaneKeys.length }
               )}
+        {isStalled ? (
+          <>
+            {' '}
+            <span className="opacity-80">
+              {translate(
+                'components.agentStallTimer.bannerScope',
+                'Measured from commits and tracked changes; a new file git has not been told about, or work inside a submodule, does not count as progress yet.'
+              )}
+            </span>
+          </>
+        ) : null}
       </span>
       <button
         type="button"

@@ -1281,11 +1281,8 @@ export function registerFilesystemHandlers(
           return { kind: 'unsupported', reason: 'folder-workspace' }
         }
         const gitOptions = getLocalGitOptionsForRepo(store, repo)
-        return await readWorktreeProgressFingerprint((gitArgs, execOptions) =>
-          gitExecFileAsync(
-            gitArgs,
-            worktreeProgressGitExecOptions(worktreePath, gitOptions, execOptions?.stdin)
-          )
+        return await readWorktreeProgressFingerprint((gitArgs) =>
+          gitExecFileAsync(gitArgs, worktreeProgressGitExecOptions(worktreePath, gitOptions))
         )
       } catch {
         return { kind: 'unreadable' }

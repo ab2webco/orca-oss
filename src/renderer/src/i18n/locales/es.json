@@ -15383,7 +15383,8 @@
       "bannerMultiple": "Sin avance de {{count}} agentes aquí desde la última comprobación.",
       "bannerStopWatching": "Dejar de vigilar",
       "unavailableRemoteWorkspace": "Todavía no disponible aquí: el avance de un workspace remoto tiene que medirse en el host que lo posee, y Orca aún no puede hacer esa lectura allí.",
-      "bannerUnmeasurable": "La comprobación de bloqueo está armada aquí pero ya no puede leer este workspace, así que nunca va a dispararse."
+      "bannerUnmeasurable": "La comprobación de bloqueo está armada aquí pero ya no puede leer este workspace, así que nunca va a dispararse.",
+      "bannerScope": "Medido a partir de commits y cambios en archivos ya seguidos; un archivo nuevo que git todavía no conoce, o trabajo dentro de un submódulo, aún no cuenta como avance."
     }
   },
   "dashboardPopout": {

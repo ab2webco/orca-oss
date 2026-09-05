@@ -3,10 +3,12 @@ import { isFolderRepo } from '../../../shared/repo-kind'
 import { splitWorktreeId } from '../../../shared/worktree/id'
 import type { AppState } from '../store/types'
 
-export type AgentStallTimerTargetState = Pick<
-  AppState,
-  'tabsByWorktree' | 'repos' | 'settings' | 'agentStallTimerByPaneKey'
->
+/** What resolving a target and its availability actually reads. */
+export type AgentStallTimerTargetState = Pick<AppState, 'tabsByWorktree' | 'repos'>
+
+/** Target state plus the armed timers the card-level selectors read. */
+export type AgentStallTimerSelectorState = AgentStallTimerTargetState &
+  Pick<AppState, 'agentStallTimerByPaneKey'>
 
 export type AgentStallTimerTarget = {
   worktreeId: string
@@ -32,7 +34,7 @@ export function resolveAgentStallTimerTarget(
 ): AgentStallTimerTarget | null {
   const worktreeId = resolveWorktreeIdForPane(state, paneKey)
   const parsed = worktreeId ? splitWorktreeId(worktreeId) : null
-  if (!worktreeId || !parsed || !isMeasurableRepo(state, parsed.repoId)) {
+  if (!worktreeId || !parsed || !getAgentStallTimerAvailability(state, paneKey).available) {
     return null
   }
   return { worktreeId, worktreePath: parsed.worktreePath }
@@ -63,7 +65,7 @@ export function getAgentStallTimerAvailability(
  * whose process died stops producing a row, and that is exactly when the alert must survive.
  */
 export function selectStalledPaneKeysForWorktree(
-  state: AgentStallTimerTargetState,
+  state: AgentStallTimerSelectorState,
   worktreeId: string
 ): string[] {
   const tabIds = tabIdsForWorktree(state, worktreeId)
@@ -84,21 +86,28 @@ export function selectStalledPaneKeysForWorktree(
 /** Armed panes of one workspace whose target can no longer be measured, so the card can offer
  *  the only disarm surface left once the agent row is gone. */
 export function selectUnmeasurablePaneKeysForWorktree(
-  state: AgentStallTimerTargetState,
+  state: AgentStallTimerSelectorState,
   worktreeId: string
 ): string[] {
   const tabIds = tabIdsForWorktree(state, worktreeId)
-  if (tabIds.size === 0) {
+  // Availability is a property of the workspace's repo, so it is decided once per worktree
+  // rather than re-derived for every armed pane on every store write.
+  if (tabIds.size === 0 || isMeasurableWorktree(state, worktreeId)) {
     return []
   }
   return Object.keys(state.agentStallTimerByPaneKey ?? {}).filter((paneKey) => {
     const parsed = parsePaneKey(paneKey)
-    return (
-      parsed !== null &&
-      tabIds.has(parsed.tabId) &&
-      !getAgentStallTimerAvailability(state, paneKey).available
-    )
+    return parsed !== null && tabIds.has(parsed.tabId)
   })
+}
+
+function isMeasurableWorktree(state: AgentStallTimerTargetState, worktreeId: string): boolean {
+  const parsed = splitWorktreeId(worktreeId)
+  if (!parsed) {
+    return false
+  }
+  const repo = findRepo(state, parsed.repoId)
+  return !repo || (!isFolderRepo(repo) && !repo.connectionId)
 }
 
 export function resolveWorktreeIdForPane(
@@ -115,11 +124,6 @@ export function resolveWorktreeIdForPane(
     }
   }
   return null
-}
-
-function isMeasurableRepo(state: AgentStallTimerTargetState, repoId: string): boolean {
-  const repo = findRepo(state, repoId)
-  return !repo || (!isFolderRepo(repo) && !repo.connectionId)
 }
 
 // Partial store states reach these during hydration and in card tests, so every map read must
