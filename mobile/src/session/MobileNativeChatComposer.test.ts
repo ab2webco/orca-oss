@@ -35,13 +35,7 @@ vi.mock('lucide-react-native', () => ({
   X: 'X'
 }))
 
-vi.mock('../components/BottomDrawer', async () => {
-  const React = await import('react')
-  return {
-    BottomDrawer: ({ visible, children }: { visible: boolean; children?: unknown }) =>
-      visible ? React.createElement('BottomDrawer', { visible }, children) : null
-  }
-})
+vi.mock('../components/BottomDrawer', () => import('../../test-doubles/bottom-drawer-test-double'))
 
 describe('MobileNativeChatComposer', () => {
   let renderer: ReactTestRenderer | null = null

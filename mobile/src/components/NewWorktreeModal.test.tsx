@@ -37,8 +37,8 @@ vi.mock(
       }
     )
 )
-vi.mock('./BottomDrawer', () => ({ BottomDrawer: 'BottomDrawer' }))
-vi.mock('./bottom-drawer-modal-host', () => ({ BottomDrawerModalHost: 'BottomDrawerModalHost' }))
+vi.mock('./BottomDrawer', () => import('../../test-doubles/bottom-drawer-test-double'))
+vi.mock('./bottom-drawer-modal-host', () => import('../../test-doubles/bottom-drawer-test-double'))
 vi.mock('./PickerListDrawer', () => ({ PickerListDrawer: 'PickerListDrawer' }))
 vi.mock('./MobileAgentIcon', () => ({ MobileAgentIcon: 'MobileAgentIcon' }))
 vi.mock('./TaskProviderLogo', () => ({ TaskProviderLogo: 'TaskProviderLogo' }))
