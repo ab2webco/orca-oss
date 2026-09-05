@@ -273,4 +273,101 @@ describe('RemoteRuntimePtyRecoveryState', () => {
     expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(0)
     state.dispose()
   })
+
+  it.each([
+    ['retryNow', (state: RemoteRuntimePtyRecoveryState) => state.retryNow()],
+    ['the scheduled recovery registry', () => retryAllRemoteRuntimePtyRecoveriesNow() === 1]
+  ])(
+    'keeps a pane revivable through %s when the cutoff lands mid-attempt',
+    async (_label, revive) => {
+      vi.useFakeTimers()
+      const state = new RemoteRuntimePtyRecoveryState()
+      // Why: the attempt never settles, so the cutoff lands with the retry in flight and no timer armed.
+      const retry = vi.fn()
+      const firstEpoch = state.begin()
+      state.schedule(firstEpoch, retry)
+
+      await vi.advanceTimersByTimeAsync(250)
+      expect(retry).toHaveBeenCalledWith(firstEpoch)
+      retry.mockClear()
+
+      await vi.advanceTimersByTimeAsync(REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS)
+      expect(state.currentPhase).toBe('disconnected')
+
+      expect(revive(state)).toBe(true)
+      expect(retry).toHaveBeenCalledWith(firstEpoch + 1)
+      expect(state.currentPhase).toBe('recovering')
+      state.dispose()
+    }
+  )
+
+  it('does not revive an attempt that is still in flight before the cutoff', async () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const retry = vi.fn()
+    const epoch = state.begin()
+    state.schedule(epoch, retry)
+
+    await vi.advanceTimersByTimeAsync(250)
+    retry.mockClear()
+
+    expect(state.hasParkedRetry).toBe(false)
+    expect(state.retryNow()).toBe(false)
+    expect(state.retryForConfirmedReconnect()).toBe(false)
+    expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(0)
+    expect(retry).not.toHaveBeenCalled()
+    state.dispose()
+  })
+
+  it('leaves a discarded single-shot attempt unrevivable at the cutoff', async () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    // Why: a single-shot wait settles on its own, so replaying it would strand the pane in 'recovering'.
+    const retry = vi.fn(() => {
+      state.discardPendingRetry(retry)
+    })
+    const epoch = state.begin()
+    state.schedule(epoch, retry)
+
+    await vi.advanceTimersByTimeAsync(250)
+    expect(retry).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS)
+    expect(state.currentPhase).toBe('disconnected')
+    expect(state.hasParkedRetry).toBe(false)
+    expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(0)
+    expect(retry).toHaveBeenCalledTimes(1)
+    state.dispose()
+  })
+
+  it('revives an attempt that armed no backoff timer before the cutoff', async () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const retry = vi.fn()
+    const epoch = state.begin()
+    state.setAttemptRetry(epoch, retry)
+
+    await vi.advanceTimersByTimeAsync(REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS)
+    expect(state.currentPhase).toBe('disconnected')
+    expect(retry).not.toHaveBeenCalled()
+
+    expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(1)
+    expect(retry).toHaveBeenCalledWith(epoch + 1)
+    state.dispose()
+  })
+
+  it('ignores an attempt retry from a superseded epoch', () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const retry = vi.fn()
+    const epoch = state.begin()
+    state.cancel()
+
+    state.setAttemptRetry(epoch, retry)
+    state.markDisconnected()
+
+    expect(state.hasParkedRetry).toBe(false)
+    expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(0)
+    state.dispose()
+  })
 })
