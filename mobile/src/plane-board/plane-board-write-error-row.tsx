@@ -3,25 +3,28 @@ import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 
 type Props = {
   message: string
-  onRetry: () => void
+  /** Null when resending blind could apply the write twice. */
+  onRetry: (() => void) | null
   onDismiss: () => void
 }
 
-/** A board write Plane did not take: says so, offers the same write again. */
+/** A board write Plane did not take: says so, offers the same write again when that is safe. */
 export function PlaneBoardWriteErrorRow({ message, onRetry, onDismiss }: Props) {
   return (
     <View style={styles.row}>
       <Pressable accessibilityRole="button" style={styles.message} onPress={onDismiss}>
         <Text style={styles.messageText}>{message}</Text>
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Try again"
-        style={styles.retry}
-        onPress={onRetry}
-      >
-        <Text style={styles.retryText}>Try again</Text>
-      </Pressable>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          style={styles.retry}
+          onPress={onRetry}
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 }
