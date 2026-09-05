@@ -1,10 +1,16 @@
 import { z } from 'zod'
-import type { PlaneWorkItemPriority } from '../../../src/shared/plane-types'
+import {
+  PLANE_WORK_ITEM_PRIORITIES,
+  type PlaneWorkItemPriority
+} from '../../../src/shared/plane-types'
 
 // Why: Plane states, priorities and groups are server-owned data. A host that
 // learns a new value must not blank the phone's list, so every soft field
 // degrades to a rendered default instead of dropping the row (ORCA-155).
-const PLANE_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
+const PlaneMobileMemberSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().default('')
+})
 
 const PlaneMobileStateSchema = z
   .object({
@@ -35,7 +41,8 @@ const PlaneMobileWorkItemSchema = z
     workspaceId: z.string().optional(),
     project: PlaneMobileProjectSchema.catch({ id: '', identifier: '', name: '' }),
     state: PlaneMobileStateSchema,
-    priority: z.enum(PLANE_PRIORITIES).catch('none'),
+    priority: z.enum(PLANE_WORK_ITEM_PRIORITIES).catch('none'),
+    assignees: z.array(PlaneMobileMemberSchema).catch([]),
     updatedAt: z.string().default('')
   })
   .passthrough()
@@ -43,6 +50,7 @@ const PlaneMobileWorkItemSchema = z
 export type PlaneMobileWorkItem = z.infer<typeof PlaneMobileWorkItemSchema>
 export type PlaneMobileProject = z.infer<typeof PlaneMobileProjectSchema>
 export type PlaneMobileState = z.infer<typeof PlaneMobileStateSchema>
+export type PlaneMobileMember = z.infer<typeof PlaneMobileMemberSchema>
 
 const PlaneStatusSchema = z
   .object({
@@ -65,6 +73,13 @@ const PlaneStatusSchema = z
   .passthrough()
 
 export type PlaneMobileStatus = z.infer<typeof PlaneStatusSchema>
+
+/** The workspace the board reads and writes: the selected one, else the active one, else the first. */
+export function resolvePlaneWorkspaceId(status: PlaneMobileStatus | null): string | null {
+  return (
+    status?.selectedWorkspaceId ?? status?.activeWorkspaceId ?? status?.workspaces[0]?.id ?? null
+  )
+}
 
 export function decodePlaneStatus(result: unknown): PlaneMobileStatus {
   const parsed = PlaneStatusSchema.safeParse(result)
@@ -99,6 +114,10 @@ export function decodePlaneProjects(result: unknown): PlaneMobileProject[] {
 
 export function decodePlaneStates(result: unknown): PlaneMobileState[] {
   return decodeRows(result, PlaneMobileStateSchema, 'states')
+}
+
+export function decodePlaneMembers(result: unknown): PlaneMobileMember[] {
+  return decodeRows(result, PlaneMobileMemberSchema, 'members')
 }
 
 const PRIORITY_RANK: Record<PlaneWorkItemPriority, number> = {

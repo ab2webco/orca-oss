@@ -338,6 +338,8 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'plane.updateWorkItem',
   'plane.createWorkItem',
   'plane.addWorkItemComment',
+  // Assignee picker, gated on the phone by MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY.
+  'plane.listMembers',
   'linear.getCustomView',
   'linear.getIssue',
   'linear.getProject',
