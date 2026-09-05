@@ -53,6 +53,10 @@ export class RemoteRuntimePtyRecoveryState {
     return this.attempt
   }
 
+  get hasParkedRetry(): boolean {
+    return this.pendingRetry !== null
+  }
+
   begin(): number {
     if (this.phase === 'disposed') {
       return this.epoch
@@ -126,18 +130,30 @@ export class RemoteRuntimePtyRecoveryState {
 
   // Why: resume/online should fire an already-scheduled backoff immediately, not start a new epoch.
   retryNow(): boolean {
-    if (this.pendingRetry === null || this.pendingEpoch === null) {
+    if (this.phase !== 'backoff' && this.phase !== 'disconnected') {
       return false
     }
-    if (this.phase !== 'backoff' && this.phase !== 'disconnected') {
+    return this.firePendingRetry(false)
+  }
+
+  // Why: confirmed host liveness proves the transport is back, so the next failure must restart the ladder instead of escalating to a longer tier.
+  retryForConfirmedReconnect(): boolean {
+    return this.firePendingRetry(true)
+  }
+
+  private firePendingRetry(freshWindow: boolean): boolean {
+    if (this.pendingRetry === null || this.pendingEpoch === null) {
       return false
     }
     const retry = this.pendingRetry
     const latched = this.phase === 'disconnected'
     this.clearRetryTimer()
-    if (latched) {
+    if (latched || freshWindow) {
       // Why: the deadline only stops auto-retry; an explicit trigger opens a fresh recovery window.
-      this.epoch += 1
+      if (latched) {
+        // Why: only a latched epoch is spent. Fencing a live one would strand the awaited work that parked this retry.
+        this.epoch += 1
+      }
       this.attempt = 0
       this.armDeadline(this.epoch)
     }
