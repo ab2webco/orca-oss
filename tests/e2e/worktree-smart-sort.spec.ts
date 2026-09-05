@@ -13,19 +13,102 @@ type SmartSortScenario = {
   donePaneKey: string
 }
 
-async function getVisibleWorktreeIdsByTop(page: Page): Promise<string[]> {
+async function getVisibleWorktreeIdsByVirtualIndex(page: Page): Promise<string[]> {
   return page
     .locator('[data-worktree-sidebar] [role="option"][data-worktree-id]')
     .evaluateAll((elements) =>
       elements
         .map((element) => ({
           id: element.dataset.worktreeId ?? '',
-          top: element.getBoundingClientRect().top
+          index: Number.parseInt(
+            element.closest('[data-worktree-virtual-row]')?.getAttribute('data-index') ?? '',
+            10
+          )
         }))
-        .filter((row) => row.id.length > 0)
-        .sort((a, b) => a.top - b.top)
+        .filter((row) => row.id.length > 0 && Number.isFinite(row.index))
+        .sort((a, b) => a.index - b.index)
         .map((row) => row.id)
     )
+}
+
+// Why a deadline from the test budget and not a constant: a fixed ceiling is what flaked under
+// contention (ORCA-343). The observer is the pass signal; the deadline only turns a silent hang
+// into a failure that names the order the sidebar actually showed.
+const ORDER_REPORT_MARGIN_MS = 5_000
+// Why a cap: testStartedAt is taken inside beforeEach, after the orcaPage fixture has already
+// spent part of Playwright's budget, so the budget-derived deadline can land past the test
+// timeout and never fire. The cap keeps it firing while staying far above a real reorder.
+const MAX_ORDER_REPORT_MS = 45_000
+
+async function waitForVisibleWorktreeOrder(
+  page: Page,
+  expectedIds: string[],
+  testStartedAt: number
+): Promise<void> {
+  const remainingMs = test.info().timeout - (Date.now() - testStartedAt)
+  const reportAfterMs = Math.max(
+    1_000,
+    Math.min(remainingMs - ORDER_REPORT_MARGIN_MS, MAX_ORDER_REPORT_MS)
+  )
+  await page.evaluate(
+    ({ expectedOrder, reportAfterMs }) => {
+      const sidebar = document.querySelector('[data-worktree-sidebar]')
+      if (!sidebar) {
+        throw new Error('Worktree sidebar is not available')
+      }
+
+      const currentOrder = (): string[] =>
+        Array.from(sidebar.querySelectorAll<HTMLElement>('[role="option"][data-worktree-id]'))
+          .map((element) => ({
+            id: element.dataset.worktreeId ?? '',
+            index: Number.parseInt(
+              element.closest('[data-worktree-virtual-row]')?.getAttribute('data-index') ?? '',
+              10
+            )
+          }))
+          .filter((row) => row.id.length > 0 && Number.isFinite(row.index))
+          .sort((a, b) => a.index - b.index)
+          .map((row) => row.id)
+          .slice(0, expectedOrder.length)
+      const hasExpectedOrder = (): boolean => {
+        const actualOrder = currentOrder()
+        return (
+          actualOrder.length === expectedOrder.length &&
+          actualOrder.every((id, index) => id === expectedOrder[index])
+        )
+      }
+
+      if (hasExpectedOrder()) {
+        return
+      }
+
+      return new Promise<void>((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+          if (!hasExpectedOrder()) {
+            return
+          }
+          clearTimeout(reportTimer)
+          observer.disconnect()
+          resolve()
+        })
+        const reportTimer = setTimeout(() => {
+          observer.disconnect()
+          reject(
+            new Error(
+              `Sidebar order did not become ${JSON.stringify(expectedOrder)}; it shows ${JSON.stringify(currentOrder())}`
+            )
+          )
+        }, reportAfterMs)
+        observer.observe(sidebar, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: ['data-index', 'data-worktree-id']
+        })
+      })
+    },
+    { expectedOrder: expectedIds, reportAfterMs }
+  )
 }
 
 async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
@@ -39,7 +122,7 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
     state.setActiveView('terminal')
     state.setSidebarOpen(true)
     state.setGroupBy('none')
-    state.setSortBy('smart')
+    state.setSortBy('recent')
 
     const worktrees = Object.values(state.worktreesByRepo)
       .flat()
@@ -53,28 +136,52 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
 
     store.setState((current) => ({
       worktreesByRepo: Object.fromEntries(
-        Object.entries(current.worktreesByRepo).map(([repoId, repoWorktrees]) => [
-          repoId,
-          repoWorktrees.map((worktree) => {
-            if (worktree.id === blocked.id) {
-              return {
-                ...worktree,
-                displayName: 'Z smart-sort blocked',
-                lastActivityAt: now - 5 * 60_000,
-                sortOrder: 0
-              }
-            }
-            if (worktree.id === done.id) {
-              return {
-                ...worktree,
-                displayName: 'A smart-sort done',
-                lastActivityAt: now,
-                sortOrder: 10
-              }
-            }
-            return worktree
+        Object.entries(current.worktreesByRepo)
+          .map(
+            ([repoId, repoWorktrees]) =>
+              [
+                repoId,
+                repoWorktrees
+                  .map((worktree) => {
+                    if (worktree.id === blocked.id) {
+                      return {
+                        ...worktree,
+                        displayName: 'Z smart-sort blocked',
+                        lastActivityAt: now - 5 * 60_000,
+                        sortOrder: 0
+                      }
+                    }
+                    if (worktree.id === done.id) {
+                      // Why an hour ahead: ambient PTY events bump the blocked worktree's
+                      // lastActivityAt to Date.now() during the test, which let Recent alone
+                      // produce the order Smart is supposed to produce (ORCA-343 control 3).
+                      return {
+                        ...worktree,
+                        displayName: 'A smart-sort done',
+                        lastActivityAt: now + 60 * 60_000,
+                        sortOrder: 10
+                      }
+                    }
+                    return worktree
+                  })
+                  .sort((a, b) => {
+                    const rank = (id: string): number =>
+                      id === done.id ? 0 : id === blocked.id ? 1 : 2
+                    return rank(a.id) - rank(b.id)
+                  })
+              ] as const
+          )
+          .sort(([leftRepoId], [rightRepoId]) => {
+            const rank = (repoId: string): number =>
+              repoId === done.repoId ? 0 : repoId === blocked.repoId ? 1 : 2
+            return rank(leftRepoId) - rank(rightRepoId)
           })
-        ])
+      ),
+      // Why: lineage fixes parent/child order and would mask the Smart comparator.
+      worktreeLineageById: Object.fromEntries(
+        Object.entries(current.worktreeLineageById).filter(
+          ([worktreeId]) => worktreeId !== blocked.id && worktreeId !== done.id
+        )
       )
     }))
 
@@ -149,20 +256,6 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
       }
     })
 
-    const actions = store.getState()
-    actions.setAgentStatus(
-      `${doneTab.id}:${doneLeafId}`,
-      { state: 'done', prompt: 'Finished', agentType: 'codex' },
-      'codex',
-      { updatedAt: now, stateStartedAt: now - 1_000 }
-    )
-    actions.setAgentStatus(
-      `${blockedTab.id}:${blockedLeafId}`,
-      { state: 'blocked', prompt: 'Needs approval', agentType: 'codex' },
-      'codex',
-      { updatedAt: now, stateStartedAt: now - 60_000 }
-    )
-
     return {
       blockedId: blocked.id,
       doneId: done.id,
@@ -174,6 +267,33 @@ async function seedSmartSortScenario(page: Page): Promise<SmartSortScenario> {
   })
 }
 
+async function activateSmartSort(page: Page): Promise<void> {
+  await page.evaluate(() => window.__store?.getState().setSortBy('smart'))
+}
+
+async function seedSmartSortAgentStatuses(page: Page, scenario: SmartSortScenario): Promise<void> {
+  await page.evaluate((seededScenario) => {
+    const actions = window.__store?.getState()
+    if (!actions) {
+      throw new Error('window.__store is not available')
+    }
+
+    const now = Date.now()
+    actions.setAgentStatus(
+      seededScenario.donePaneKey,
+      { state: 'done', prompt: 'Finished', agentType: 'codex' },
+      'codex',
+      { updatedAt: now, stateStartedAt: now - 1_000 }
+    )
+    actions.setAgentStatus(
+      seededScenario.blockedPaneKey,
+      { state: 'blocked', prompt: 'Needs approval', agentType: 'codex' },
+      'codex',
+      { updatedAt: now, stateStartedAt: now - 60_000 }
+    )
+  }, scenario)
+}
+
 async function getSmartSortScenarioReadiness(
   page: Page,
   scenario: SmartSortScenario
@@ -182,6 +302,7 @@ async function getSmartSortScenarioReadiness(
   doneHasLivePty: boolean
   blockedState: string | null
   doneState: string | null
+  storeOrder: string[]
   fallbackOrder: string[]
 }> {
   return page.evaluate((scenario) => {
@@ -192,6 +313,7 @@ async function getSmartSortScenarioReadiness(
         doneHasLivePty: false,
         blockedState: null,
         doneState: null,
+        storeOrder: [],
         fallbackOrder: []
       }
     }
@@ -203,6 +325,7 @@ async function getSmartSortScenarioReadiness(
       doneHasLivePty: (state.ptyIdsByTabId[scenario.doneTabId]?.length ?? 0) > 0,
       blockedState: state.agentStatusByPaneKey[scenario.blockedPaneKey]?.state ?? null,
       doneState: state.agentStatusByPaneKey[scenario.donePaneKey]?.state ?? null,
+      storeOrder: scenarioWorktrees.map((worktree) => worktree.id),
       fallbackOrder: scenarioWorktrees
         .sort((a, b) => b.sortOrder - a.sortOrder || a.displayName.localeCompare(b.displayName))
         .map((worktree) => worktree.id)
@@ -211,7 +334,12 @@ async function getSmartSortScenarioReadiness(
 }
 
 test.describe('Worktree Smart Sort', () => {
+  // Why anchored here: the per-test budget already spans these hooks, so the order-report
+  // deadline must count them. It still undercounts the orcaPage fixture, hence the cap above.
+  let testStartedAt = 0
+
   test.beforeEach(async ({ orcaPage }) => {
+    testStartedAt = Date.now()
     await waitForSessionReady(orcaPage)
     await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
@@ -223,6 +351,12 @@ test.describe('Worktree Smart Sort', () => {
     const scenario = await seedSmartSortScenario(orcaPage)
     const { blockedId, doneId } = scenario
 
+    // Why statuses before Smart: with the same statuses in place, Recent must still rank the
+    // finished worktree first; only the Smart class ranking can move the blocked one above it.
+    await seedSmartSortAgentStatuses(orcaPage, scenario)
+    await waitForVisibleWorktreeOrder(orcaPage, [doneId, blockedId], testStartedAt)
+    await activateSmartSort(orcaPage)
+
     await expect
       .poll(() => getSmartSortScenarioReadiness(orcaPage, scenario), {
         timeout: 8_000,
@@ -233,15 +367,15 @@ test.describe('Worktree Smart Sort', () => {
         doneHasLivePty: true,
         blockedState: 'blocked',
         doneState: 'done',
+        storeOrder: [doneId, blockedId],
         fallbackOrder: [doneId, blockedId]
       })
 
-    await expect
-      .poll(async () => (await getVisibleWorktreeIdsByTop(orcaPage)).slice(0, 2), {
-        timeout: 12_000,
-        message: 'Smart sort did not promote the blocked worktree in the visible sidebar'
-      })
-      .toEqual([blockedId, doneId])
+    await waitForVisibleWorktreeOrder(orcaPage, [blockedId, doneId], testStartedAt)
+    expect((await getVisibleWorktreeIdsByVirtualIndex(orcaPage)).slice(0, 2)).toEqual([
+      blockedId,
+      doneId
+    ])
 
     await expect(worktreeRow(orcaPage, blockedId)).toBeVisible()
     await expect(worktreeRow(orcaPage, doneId)).toBeVisible()
