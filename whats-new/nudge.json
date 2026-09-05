@@ -1,13 +1,13 @@
 {
-  "id": "orca-lab-1.4.160-lab.54",
+  "id": "orca-lab-1.4.160-lab.55",
   "minVersion": "1.0.0",
-  "maxVersion": "1.4.160-lab.53",
+  "maxVersion": "1.4.160-lab.54",
   "content": {
-    "version": "1.4.160-lab.54",
-    "headline": "Faster reconnects and clearer update notices",
+    "version": "1.4.160-lab.55",
+    "headline": "A timer that tells you when an agent stopped working",
     "highlights": [
-      "A remote pane reconnects the moment its paired host comes back instead of waiting out a backoff",
-      "This update card can now say what a release brings instead of falling back to generic text"
+      "Watch an agent and get told once when its worktree stops moving, instead of finding out hours later",
+      "The phone can assign work items, and two board writes on one card no longer undo each other"
     ]
   }
 }
