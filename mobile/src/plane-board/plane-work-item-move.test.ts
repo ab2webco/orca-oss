@@ -1,13 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
+import { markRpcDeliveryUnknown } from '../transport/rpc-delivery-ambiguity'
 import { movePlaneWorkItem } from './plane-work-item-move'
+import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 
-type Call = { method: string; params?: unknown }
+type Call = { method: string; params?: unknown; options?: unknown }
+
+function rejectingClient(error: Error): RpcClient {
+  return {
+    sendRequest: vi.fn(async () => {
+      throw error
+    })
+  } as unknown as RpcClient
+}
 
 function stubClient(result: unknown, calls: Call[]): RpcClient {
   return {
-    sendRequest: vi.fn(async (method: string, params?: unknown) => {
-      calls.push({ method, params })
+    sendRequest: vi.fn(async (method: string, params?: unknown, options?: unknown) => {
+      calls.push({ method, params, options })
       return { id: '1', ok: true as const, result, _meta: { runtimeId: 'r' } }
     })
   } as unknown as RpcClient
@@ -47,9 +57,26 @@ describe('plane work item move', () => {
           workItemId: 'wi-1',
           workspaceId: 'w1',
           updates: { stateId: 's2' }
-        }
+        },
+        // A write with no ceiling leaves the card on "Moving…" for good.
+        options: { timeoutMs: 15_000, budgetSpansConnect: true }
       }
     ])
+  })
+
+  it('reports a rejected transport instead of throwing past the rollback', async () => {
+    await expect(
+      movePlaneWorkItem(rejectingClient(new Error('Connection interrupted')), REQUEST)
+    ).resolves.toEqual({ ok: false, error: 'Connection interrupted' })
+  })
+
+  it('flags a timed-out move: Plane may have taken it', async () => {
+    const timedOut = markRpcDeliveryUnknown(new Error('Request timed out: plane.updateWorkItem'))
+    await expect(movePlaneWorkItem(rejectingClient(timedOut), REQUEST)).resolves.toEqual({
+      ok: false,
+      error: PLANE_WRITE_UNANSWERED_MESSAGE,
+      deliveryUnknown: true
+    })
   })
 
   it('omits a workspace the card does not carry', async () => {

@@ -65,7 +65,7 @@ export function PlaneBoardCreateDrawer({
           onPress={() => void submit()}
         >
           <Text style={[styles.buttonText, !canSubmit && styles.buttonTextDisabled]}>
-            {pending ? 'Creating…' : 'Create'}
+            {pending ? 'Creating…' : error ? 'Try again' : 'Create'}
           </Text>
         </Pressable>
       </View>

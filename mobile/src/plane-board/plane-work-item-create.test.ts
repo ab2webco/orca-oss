@@ -1,13 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
+import { markRpcDeliveryUnknown } from '../transport/rpc-delivery-ambiguity'
 import { createPlaneWorkItem } from './plane-work-item-create'
+import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 
-type Call = { method: string; params?: unknown }
+type Call = { method: string; params?: unknown; options?: unknown }
+
+function rejectingClient(error: Error): RpcClient {
+  return {
+    sendRequest: vi.fn(async () => {
+      throw error
+    })
+  } as unknown as RpcClient
+}
 
 function stubClient(result: unknown, calls: Call[]): RpcClient {
   return {
-    sendRequest: vi.fn(async (method: string, params?: unknown) => {
-      calls.push({ method, params })
+    sendRequest: vi.fn(async (method: string, params?: unknown, options?: unknown) => {
+      calls.push({ method, params, options })
       return { id: '1', ok: true as const, result, _meta: { runtimeId: 'r' } }
     })
   } as unknown as RpcClient
@@ -53,9 +63,26 @@ describe('plane work item create', () => {
           workspaceId: 'w1',
           title: 'Ship the create drawer',
           stateId: 's2'
-        }
+        },
+        // A write with no ceiling pins the sheet on "Creating…" for good.
+        options: { timeoutMs: 15_000, budgetSpansConnect: true }
       }
     ])
+  })
+
+  it('reports a rejected transport instead of throwing past the sheet', async () => {
+    await expect(
+      createPlaneWorkItem(rejectingClient(new Error('Connection interrupted')), REQUEST)
+    ).resolves.toEqual({ ok: false, error: 'Connection interrupted' })
+  })
+
+  it('flags a timed-out create: Plane may hold the card', async () => {
+    const timedOut = markRpcDeliveryUnknown(new Error('Request timed out: plane.createWorkItem'))
+    await expect(createPlaneWorkItem(rejectingClient(timedOut), REQUEST)).resolves.toEqual({
+      ok: false,
+      error: PLANE_WRITE_UNANSWERED_MESSAGE,
+      deliveryUnknown: true
+    })
   })
 
   it('omits a workspace the board does not carry', async () => {
