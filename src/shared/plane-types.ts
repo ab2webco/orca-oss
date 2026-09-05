@@ -65,7 +65,8 @@ export type PlaneUser = {
 }
 
 // Static priority set (not fetched from the API), unlike Jira priorities.
-export type PlaneWorkItemPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
+export const PLANE_WORK_ITEM_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
+export type PlaneWorkItemPriority = (typeof PLANE_WORK_ITEM_PRIORITIES)[number]
 
 export type PlaneWorkItem = {
   id: string

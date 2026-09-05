@@ -2,6 +2,7 @@ import type { RpcClient } from '../transport/rpc-client'
 import {
   describePlaneWriteRejection,
   PLANE_WRITE_REQUEST_OPTIONS,
+  readPlaneWriteAck,
   type PlaneWriteFailure
 } from './plane-write-failure'
 
@@ -44,18 +45,8 @@ export async function movePlaneWorkItem(
   if (!response.ok) {
     return { ok: false, error: response.error.message }
   }
-  const result = response.result
-  // Why not trusting a bare resolve: the host answers { ok: false, error } for a
-  // refused move, which would otherwise read as success and leave the card moved.
-  if (result && typeof result === 'object' && 'ok' in result) {
-    const outcome = result as { ok: unknown; error?: unknown }
-    if (outcome.ok === true) {
-      return { ok: true }
-    }
-    return {
-      ok: false,
-      error: typeof outcome.error === 'string' ? outcome.error : 'Plane refused the move'
-    }
-  }
-  return { ok: false, error: 'Unexpected Plane move response' }
+  return readPlaneWriteAck(response.result, {
+    refused: 'Plane refused the move',
+    unexpected: 'Unexpected Plane move response'
+  })
 }

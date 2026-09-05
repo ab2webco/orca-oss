@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
+  arePlaneMembersListableByHost,
   isPlaneBoardWritableByHost,
+  MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
 } from './plane-board-writes-capability'
 
@@ -25,6 +27,31 @@ describe('plane board writes capability', () => {
         'mobile.tasks.v1',
         MOBILE_TASKS_PLANE_CAPABILITY,
         MOBILE_PLANE_BOARD_WRITES_CAPABILITY
+      ])
+    ).toBe(true)
+  })
+
+  it('mirrors the host members constant byte for byte', () => {
+    expect(MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY).toBe('mobile.plane-board.members.v1')
+  })
+
+  it('keeps the assignee picker off a host that only advertises writes', () => {
+    // Why: lab.52-54 announce writes.v1 and still refuse plane.listMembers at dispatch.
+    expect(arePlaneMembersListableByHost(undefined)).toBe(false)
+    expect(
+      arePlaneMembersListableByHost([
+        'mobile.tasks.v1',
+        MOBILE_TASKS_PLANE_CAPABILITY,
+        MOBILE_PLANE_BOARD_WRITES_CAPABILITY
+      ])
+    ).toBe(false)
+  })
+
+  it('turns the assignee picker on when the host advertises the member list', () => {
+    expect(
+      arePlaneMembersListableByHost([
+        MOBILE_PLANE_BOARD_WRITES_CAPABILITY,
+        MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY
       ])
     ).toBe(true)
   })

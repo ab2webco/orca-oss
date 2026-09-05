@@ -33,6 +33,25 @@ export function describePlaneWriteRejection(error: unknown): PlaneWriteFailure {
   }
 }
 
+/** A host answers { ok: false, error } for a refused write, so a bare resolve
+ *  must not read as success and leave the optimistic value on the card. */
+export function readPlaneWriteAck(
+  result: unknown,
+  messages: { refused: string; unexpected: string }
+): { ok: true } | PlaneWriteFailure {
+  if (result && typeof result === 'object' && 'ok' in result) {
+    const outcome = result as { ok: unknown; error?: unknown }
+    if (outcome.ok === true) {
+      return { ok: true }
+    }
+    return {
+      ok: false,
+      error: typeof outcome.error === 'string' ? outcome.error : messages.refused
+    }
+  }
+  return { ok: false, error: messages.unexpected }
+}
+
 /** After an unanswered create, a re-read that shows a new card with the asked title
  *  in the asked column is the success whose reply got lost; retrying blind would
  *  create it twice. */

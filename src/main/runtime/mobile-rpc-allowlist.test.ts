@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
+  MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../../shared/protocol-version'
@@ -153,6 +154,14 @@ describe('mobile RPC allowlist', () => {
         allowed.has(method)
       )
     ).toEqual([])
+  })
+
+  it('opens the Plane member list to the phone as its own advertised capability', () => {
+    // Why: hosts that announce writes.v1 still refuse plane.listMembers, so the
+    // assignee picker must key on this capability, not on writes.v1.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY)
+    expect(allowed.has('plane.listMembers')).toBe(true)
   })
 
   it('does not grant mobile credentials control over host updates', () => {

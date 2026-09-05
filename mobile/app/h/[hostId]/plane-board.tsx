@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -12,17 +12,23 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, Plus } from 'lucide-react-native'
-import * as Linking from 'expo-linking'
 import { useHostClient } from '../../../src/transport/client-context'
 import { BottomDrawer } from '../../../src/components/BottomDrawer'
 import { colors, radii, spacing, typography } from '../../../src/theme/mobile-theme'
 import { usePlaneBoard } from '../../../src/plane-board/use-plane-board'
-import { PlaneWorkItemDetail } from '../../../src/tasks/plane-work-item-detail'
-import { createPlaneTask } from '../../../src/tasks/plane-mobile-task-list'
 import { formatUpdatedAt } from '../../../src/tasks/task-updated-at-time'
 import type { PlaneMobileWorkItem } from '../../../src/tasks/plane-mobile-work-item-read'
+import { PLANE_PRIORITY_LABELS } from '../../../src/tasks/plane-priority-label'
 import { useRuntimeCapabilities } from '../../../src/plane-board/use-runtime-capabilities'
 import { PlaneBoardCreateDrawer } from '../../../src/plane-board/plane-board-create-drawer'
+import { PlaneBoardWriteErrorRow } from '../../../src/plane-board/plane-board-write-error-row'
+import { PlaneWorkItemDetailSheet } from '../../../src/plane-board/plane-work-item-detail-sheet'
+
+/** What the card shows besides its title: priority when set, then who holds it. */
+function cardFacts(item: PlaneMobileWorkItem): string[] {
+  const facts = item.priority === 'none' ? [] : [PLANE_PRIORITY_LABELS[item.priority]]
+  return facts.concat(item.assignees.map((assignee) => assignee.displayName).filter(Boolean))
+}
 
 export default function PlaneBoardScreen() {
   const router = useRouter()
@@ -32,7 +38,14 @@ export default function PlaneBoardScreen() {
   const connected = connState === 'connected'
   const capabilities = useRuntimeCapabilities(client, connected)
   const board = usePlaneBoard(client, connected, capabilities)
-  const [selected, setSelected] = useState<PlaneMobileWorkItem | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Resolved live so an optimistic edit shows in the sheet as well as on the card.
+  const selected = useMemo(
+    () =>
+      board.columns.flatMap((column) => column.items).find((item) => item.id === selectedId) ??
+      null,
+    [board.columns, selectedId]
+  )
   const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
 
@@ -53,11 +66,11 @@ export default function PlaneBoardScreen() {
   }, [board])
 
   const moveSelected = useCallback(
-    async (stateId: string) => {
+    (stateId: string) => {
       const item = selected
-      setSelected(null)
+      setSelectedId(null)
       if (item) {
-        await board.moveWorkItem(item, stateId)
+        void board.moveWorkItem(item, stateId)
       }
     },
     [board, selected]
@@ -138,6 +151,13 @@ export default function PlaneBoardScreen() {
           <Text style={styles.moveErrorText}>Could not move the card — {board.moveError}</Text>
         </Pressable>
       ) : null}
+      {board.editError && selected === null ? (
+        <PlaneBoardWriteErrorRow
+          message={`Could not update the card — ${board.editError}`}
+          onRetry={() => void board.retryEdit()}
+          onDismiss={board.dismissEditError}
+        />
+      ) : null}
 
       {board.status === 'loading' ? (
         <View style={styles.placeholder}>
@@ -183,7 +203,7 @@ export default function PlaneBoardScreen() {
               accessibilityRole="button"
               accessibilityLabel={item.title || item.identifier}
               style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-              onPress={() => setSelected(item)}
+              onPress={() => setSelectedId(item.id)}
             >
               <Text style={styles.cardTitle} numberOfLines={2}>
                 {item.title || 'Untitled work item'}
@@ -194,8 +214,19 @@ export default function PlaneBoardScreen() {
                 </Text>
                 <Text style={styles.cardMetaText}>{formatUpdatedAt(item.updatedAt)}</Text>
               </View>
+              {cardFacts(item).length > 0 ? (
+                <View style={styles.cardFacts}>
+                  {cardFacts(item).map((fact) => (
+                    <Text key={fact} style={styles.cardMetaText} numberOfLines={1}>
+                      {fact}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
               {board.movingWorkItemId === item.id ? (
                 <Text style={styles.cardMoving}>Moving…</Text>
+              ) : board.editingWorkItemId === item.id ? (
+                <Text style={styles.cardMoving}>Updating…</Text>
               ) : null}
             </Pressable>
           )}
@@ -232,38 +263,12 @@ export default function PlaneBoardScreen() {
         onClose={closeCreate}
       />
 
-      <BottomDrawer visible={selected !== null} onClose={() => setSelected(null)}>
-        {selected ? (
-          <View>
-            <PlaneWorkItemDetail
-              item={createPlaneTask(selected)}
-              onOpenInBrowser={(url) => void Linking.openURL(url)}
-            />
-            <View style={styles.moveSection}>
-              <Text style={styles.moveLabel}>Move to</Text>
-              {board.columns
-                .filter((column) => column.stateId !== selected.state.id)
-                .map((column) => (
-                  <Pressable
-                    key={column.stateId}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Move to ${column.name}`}
-                    style={styles.moveRow}
-                    onPress={() => void moveSelected(column.stateId)}
-                  >
-                    <Text style={styles.moveRowText}>{column.name}</Text>
-                    <Text style={styles.moveRowCount}>{column.items.length}</Text>
-                  </Pressable>
-                ))}
-              {board.columns.length < 2 ? (
-                <Text style={styles.moveEmpty}>
-                  This project has only one column, so there is nowhere to move this card.
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-      </BottomDrawer>
+      <PlaneWorkItemDetailSheet
+        item={selected}
+        board={board}
+        onMove={moveSelected}
+        onClose={() => setSelectedId(null)}
+      />
     </SafeAreaView>
   )
 }
@@ -343,9 +348,9 @@ const styles = StyleSheet.create({
   cardPressed: { backgroundColor: colors.bgRaised },
   cardTitle: { fontSize: typography.bodySize, color: colors.textPrimary, fontWeight: '600' },
   cardMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  cardFacts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   cardMetaText: { fontSize: typography.metaSize, color: colors.textMuted },
   cardMoving: { fontSize: typography.metaSize, color: colors.textSecondary },
-  moveSection: { marginTop: spacing.md },
   moveLabel: {
     fontSize: 11,
     color: colors.textMuted,
@@ -360,11 +365,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md
   },
   moveRowText: { fontSize: typography.bodySize, color: colors.textPrimary },
-  moveRowCount: { fontSize: typography.metaSize, color: colors.textMuted },
-  moveEmpty: {
-    fontSize: typography.metaSize,
-    color: colors.textMuted,
-    paddingHorizontal: spacing.md + 2,
-    paddingBottom: spacing.md
-  }
+  moveRowCount: { fontSize: typography.metaSize, color: colors.textMuted }
 })
