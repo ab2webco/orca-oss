@@ -15,6 +15,7 @@ import {
   type PairedElectronClient
 } from './helpers/paired-electron-client'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
+import { settlePairedCleanupCall } from './helpers/paired-cleanup-call-budget'
 import { waitForTabParked } from './helpers/terminal-hidden-parking'
 
 const PARK_DELAY_MS = 2_000
@@ -420,9 +421,12 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
   } finally {
     if (client) {
       for (const terminal of terminals) {
-        await callRuntime(client.page, client.environmentId, 'terminal.closeTab', {
-          terminal: terminal.handle
-        }).catch(() => undefined)
+        // Why: a dead paired transport never settles this RPC, and a cleanup that outlives the failure hides it behind a suite timeout.
+        await settlePairedCleanupCall(
+          callRuntime(client.page, client.environmentId, 'terminal.closeTab', {
+            terminal: terminal.handle
+          })
+        )
       }
       await client.dispose()
     }
