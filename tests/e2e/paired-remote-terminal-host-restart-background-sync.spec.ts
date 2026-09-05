@@ -270,9 +270,9 @@ async function waitForPaneConnected(page: Page, webTabId: string): Promise<void>
             if (!pane) {
               return 'no-pane'
             }
-            const { ptyRecoveryState, ptyRecoveryAttempt, ptyRecoveryEpoch } =
+            const { ptyRecoveryState, ptyRecoveryAttempt, ptyRecoveryEpoch, ptyRecoveryFlags } =
               pane.container.dataset
-            return `${ptyRecoveryState ?? 'unset'}/epoch:${ptyRecoveryEpoch ?? '?'}/attempt:${ptyRecoveryAttempt ?? '?'}`
+            return `${ptyRecoveryState ?? 'unset'}/epoch:${ptyRecoveryEpoch ?? '?'}/attempt:${ptyRecoveryAttempt ?? '?'}/${ptyRecoveryFlags ?? 'no-flags'}`
           }, webTabId)
           if (observed.at(-1) !== state) {
             observed.push(state)

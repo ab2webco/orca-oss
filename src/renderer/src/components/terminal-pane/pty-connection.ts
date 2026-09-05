@@ -5934,6 +5934,10 @@ export function connectPanePty(
               // Why: the phase alone cannot tell a pane waiting out a long backoff tier from one that never retried.
               pane.container.dataset.ptyRecoveryAttempt = String(state.attempt)
               pane.container.dataset.ptyRecoveryEpoch = String(state.epoch)
+              if (state.flags) {
+                const { connected, attachmentReady, connecting, terminalEnded } = state.flags
+                pane.container.dataset.ptyRecoveryFlags = `conn:${connected}/ready:${attachmentReady}/connecting:${connecting}/ended:${terminalEnded}`
+              }
               deps.onPtyRecoveryStateRef?.current?.(pane.id, state)
             }
           },

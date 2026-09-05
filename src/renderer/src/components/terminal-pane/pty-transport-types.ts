@@ -130,6 +130,13 @@ export type PtyTransportRecoveryState = {
     | 'disposed'
   epoch: number
   attempt: number
+  // Why: 'offline' is a fallthrough of four independent flags, so the phase alone cannot say which one held it there.
+  flags?: {
+    connected: boolean
+    attachmentReady: boolean
+    connecting: boolean
+    terminalEnded: boolean
+  }
 }
 
 export type PtyTransport = {

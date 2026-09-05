@@ -432,7 +432,8 @@ export function createRemoteRuntimePtyTransport(
     return {
       phase,
       epoch: recovery.currentEpoch,
-      attempt: recovery.attemptCount
+      attempt: recovery.attemptCount,
+      flags: { connected, attachmentReady, connecting, terminalEnded }
     }
   }
 
