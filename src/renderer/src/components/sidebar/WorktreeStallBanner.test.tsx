@@ -60,22 +60,27 @@ describe('WorktreeStallBanner', () => {
 
     render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
 
-    expect(screen.getByText('No progress here since the last check.')).toBeTruthy()
+    expect(screen.getByText(/No progress in this workspace since the last check\./)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Stop watching' })).toBeTruthy()
     // The alert has to name what it did not measure: a false alarm the user cannot explain
     // costs more trust than the alert buys.
     expect(
-      screen.getByText(/a new file git has not been told about, or work inside a submodule/)
+      screen.getByText(
+        /another agent working here keeps this quiet, and a new file git has not been told about, or work inside a submodule/
+      )
     ).toBeTruthy()
   })
 
-  it('counts every stalled pane in the workspace', () => {
+  it('speaks for the workspace, not per agent, because that is what it measures', () => {
+    // One fingerprint covers the whole worktree, so a per-agent count would be a claim the
+    // measurement cannot support.
     armAndStall(PANE_KEY)
     armAndStall(OTHER_PANE_KEY)
 
     render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
 
-    expect(screen.getByText('No progress from 2 agents here since the last check.')).toBeTruthy()
+    expect(screen.getAllByText(/No progress in this workspace/)).toHaveLength(1)
+    expect(screen.queryByText(/2 agents/)).toBeNull()
   })
 
   it('stops watching every stalled pane it reports, so the alert can be cleared', () => {
@@ -111,7 +116,7 @@ describe('WorktreeStallBanner', () => {
 
     render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
 
-    expect(screen.queryByText(/a new file git has not been told about/)).toBeNull()
+    expect(screen.queryByText(/another agent working here keeps this quiet/)).toBeNull()
   })
 
   it('says nothing about a measurable pane that is simply still moving', () => {

@@ -59,23 +59,17 @@ export function WorktreeStallBanner({
               'components.agentStallTimer.bannerUnmeasurable',
               'The stuck check is armed here but can no longer read this workspace, so it will never fire.'
             )
-          : reportedPaneKeys.length === 1
-            ? translate(
-                'components.agentStallTimer.bannerSingle',
-                'No progress here since the last check.'
-              )
-            : translate(
-                'components.agentStallTimer.bannerMultiple',
-                'No progress from {{count}} agents here since the last check.',
-                { count: reportedPaneKeys.length }
-              )}
+          : translate(
+              'components.agentStallTimer.bannerSingle',
+              'No progress in this workspace since the last check.'
+            )}
         {isStalled ? (
           <>
             {' '}
             <span className="opacity-80">
               {translate(
                 'components.agentStallTimer.bannerScope',
-                'Measured from commits and tracked changes; a new file git has not been told about, or work inside a submodule, does not count as progress yet.'
+                'Measured across the whole workspace, from commits and tracked changes: another agent working here keeps this quiet, and a new file git has not been told about, or work inside a submodule, does not count as progress yet.'
               )}
             </span>
           </>

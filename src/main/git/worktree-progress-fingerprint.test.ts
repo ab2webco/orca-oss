@@ -17,9 +17,9 @@ describe('worktreeProgressGitExecOptions', () => {
     expect(worktreeProgressGitExecOptions('/repo/wt', {}).env?.GIT_OPTIONAL_LOCKS).toBe('0')
   })
 
-  it('takes the WSL direct-git route, which is the only one that carries that variable in', () => {
-    // The login-shell route drops it: wsl.exe imports only what WSLENV names, and nothing
-    // registers GIT_OPTIONAL_LOCKS there. Asserting the env alone would pass with it lost.
+  it('asks for the WSL direct-git route, without which the variable cannot reach WSL at all', () => {
+    // The login-shell route drops it: wsl.exe imports only what WSLENV names. This pins the
+    // request, not the delivery — a cold environment cache still falls through for one read.
     expect(worktreeProgressGitExecOptions('/repo/wt', { wslDistro: 'Ubuntu' })).toMatchObject({
       cwd: '/repo/wt',
       wslDistro: 'Ubuntu',
@@ -42,11 +42,22 @@ describe('worktreeProgressGitExecOptions', () => {
 describe('readWorktreeProgressFingerprint against a real repository', () => {
   let repo: string
 
+  // Without this the pinned gaps below depend on the developer's ~/.gitconfig: `diff.submodule`
+  // alone flips one of them from pass to fail.
+  const isolatedEnv = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null'
+  }
   const git = async (...args: string[]): Promise<void> => {
-    await execFileAsync('git', args, { cwd: repo })
+    await execFileAsync('git', args, { cwd: repo, env: isolatedEnv })
   }
   const exec: WorktreeProgressGitExec = async (args) => {
-    const { stdout } = await execFileAsync('git', args, { cwd: repo, maxBuffer: 8 * 1024 * 1024 })
+    const { stdout } = await execFileAsync('git', args, {
+      cwd: repo,
+      env: isolatedEnv,
+      maxBuffer: 8 * 1024 * 1024
+    })
     return { stdout: String(stdout) }
   }
   const fingerprint = async (): Promise<string> => {
@@ -125,21 +136,42 @@ describe('readWorktreeProgressFingerprint against a real repository', () => {
     expect((await readWorktreeProgressFingerprint(exec)).kind).toBe('fingerprint')
   })
 
-  it('survives an untracked dangling symlink, which git cannot open', async () => {
-    // `ls-files --others` lists symlinks, so a probe that opened them would abort the whole
-    // reading on one broken link and then never fire again.
+  it('reads an untracked dangling symlink as a new path, not as a file to open', async () => {
+    // Slice 2 will reintroduce reading untracked content; a probe that opens these paths
+    // aborts on one broken link and then never fires again.
     await commitFirst()
+    const before = await fingerprint()
+
     symlinkSync(join(repo, 'missing-target'), join(repo, 'dangling'))
 
-    expect((await readWorktreeProgressFingerprint(exec)).kind).toBe('fingerprint')
+    expect(await fingerprint()).not.toBe(before)
   })
 
-  it('does not read outside the worktree, whatever an untracked file is named', async () => {
-    // A name like "\057etc\057hosts" is C-quoted by git and unquotes to an absolute path.
+  it('is stable whatever the user has configured an external diff driver to print', async () => {
+    // `git diff` runs external diff and textconv drivers by default. A wrapper that prints its
+    // per-invocation temp path makes an untouched worktree hash differently on every tick, so
+    // the timer reports progress forever on a pane that never moves.
     await commitFirst()
-    writeFileSync(join(repo, '"\\057etc\\057hosts"'), '')
+    writeFileSync(join(repo, 'app.ts'), 'edited\n')
+    const driver = join(repo, 'driver.sh')
+    writeFileSync(driver, '#!/bin/sh\necho "--- $2"\necho "+++ $5"\n', { mode: 0o755 })
+    const execWithDriver: WorktreeProgressGitExec = async (args) => {
+      const { stdout } = await execFileAsync('git', args, {
+        cwd: repo,
+        env: { ...isolatedEnv, GIT_EXTERNAL_DIFF: driver },
+        maxBuffer: 8 * 1024 * 1024
+      })
+      return { stdout: String(stdout) }
+    }
+    const read = async (): Promise<string> => {
+      const result = await readWorktreeProgressFingerprint(execWithDriver)
+      if (result.kind !== 'fingerprint') {
+        throw new Error(`expected a fingerprint, got ${result.kind}`)
+      }
+      return result.value
+    }
 
-    expect(await fingerprint()).toBe(await fingerprint())
+    expect(await read()).toBe(await read())
   })
 
   it('known gap: the content of an untracked file is not measured', async () => {
@@ -162,11 +194,11 @@ describe('readWorktreeProgressFingerprint against a real repository', () => {
         ['config', 'user.email', 'orca@example.test'],
         ['config', 'user.name', 'Orca']
       ]) {
-        await execFileAsync('git', args, { cwd: sub })
+        await execFileAsync('git', args, { cwd: sub, env: isolatedEnv })
       }
       writeFileSync(join(sub, 'lib.ts'), 'a\n')
-      await execFileAsync('git', ['add', 'lib.ts'], { cwd: sub })
-      await execFileAsync('git', ['commit', '-qm', 'sub'], { cwd: sub })
+      await execFileAsync('git', ['add', 'lib.ts'], { cwd: sub, env: isolatedEnv })
+      await execFileAsync('git', ['commit', '-qm', 'sub'], { cwd: sub, env: isolatedEnv })
       await commitFirst()
       await git('-c', 'protocol.file.allow=always', 'submodule', '-q', 'add', sub, 'vendor')
       await git('commit', '-qm', 'add submodule')

@@ -15388,12 +15388,11 @@
       "statusStalled": "自上次检查以来没有进展 - 打开以更改卡住检查",
       "statusOff": "检查是否卡住：关闭",
       "statusArmed": "每 {{minutes}} 分钟检查一次是否停滞",
-      "bannerSingle": "自上次检查以来此处没有进展。",
-      "bannerMultiple": "自上次检查以来此处有 {{count}} 个代理没有进展。",
+      "bannerSingle": "自上次检查以来此工作区没有进展。",
       "bannerStopWatching": "停止监视",
       "unavailableRemoteWorkspace": "此处暂不可用：远程工作区的进展必须在拥有它的主机上测量，而 Orca 尚无法在那里执行该读取。",
       "bannerUnmeasurable": "卡住检查在此处已启用，但已无法读取该工作区，因此永远不会触发。",
-      "bannerScope": "依据提交和已跟踪的更改来衡量；git 尚不知道的新文件，或子模块内的工作，目前不计为进展。"
+      "bannerScope": "按整个工作区衡量，依据提交和已跟踪的更改：此处有其他代理在工作会让此提示保持沉默，且 git 尚不知道的新文件或子模块内的工作目前不计为进展。"
     }
   },
   "dashboardPopout": {

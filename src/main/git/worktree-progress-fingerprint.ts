@@ -13,8 +13,9 @@ export type WorktreeProgressGitExec = (args: string[]) => Promise<{ stdout: stri
  *
  * `GIT_OPTIONAL_LOCKS=0` keeps the probe from refreshing the index and taking
  * `.git/index.lock` out from under the agent it is watching. `preferWslDirectGit` is what
- * carries that variable into WSL: the login-shell route drops it, since `wsl.exe` imports
- * only what `WSLENV` names.
+ * lets that variable reach WSL at all — the login-shell route drops it, since `wsl.exe`
+ * imports only what `WSLENV` names — though a cold environment cache still falls through to
+ * that route for one reading.
  */
 export function worktreeProgressGitExecOptions(
   cwd: string,
@@ -55,7 +56,12 @@ export async function readWorktreeProgressFingerprint(
   }
 
   const head = await tryExec(exec, ['rev-parse', '--verify', 'HEAD'])
-  const diff = head === null ? null : await tryExec(exec, ['diff', 'HEAD'])
+  // Why the two flags: `git diff` enables external diff and textconv drivers by default, so
+  // without them the digest is a function of the user's diff config, not of repo state — a
+  // wrapper that prints its temp-file path makes an untouched worktree hash differently every
+  // tick, and the timer then reports progress forever.
+  const diff =
+    head === null ? null : await tryExec(exec, ['diff', '--no-ext-diff', '--no-textconv', 'HEAD'])
   if (head === null) {
     if (!(await isUnbornBranch(exec))) {
       return { kind: 'unreadable' }

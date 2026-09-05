@@ -15379,12 +15379,11 @@
       "statusStalled": "Sin avance desde la última comprobación: abre para cambiar la comprobación de bloqueo",
       "statusOff": "Comprobar si está atascado: desactivado",
       "statusArmed": "Comprobando bloqueos cada {{minutes}} minutos",
-      "bannerSingle": "Sin avance aquí desde la última comprobación.",
-      "bannerMultiple": "Sin avance de {{count}} agentes aquí desde la última comprobación.",
+      "bannerSingle": "Sin avance en este workspace desde la última comprobación.",
       "bannerStopWatching": "Dejar de vigilar",
       "unavailableRemoteWorkspace": "Todavía no disponible aquí: el avance de un workspace remoto tiene que medirse en el host que lo posee, y Orca aún no puede hacer esa lectura allí.",
       "bannerUnmeasurable": "La comprobación de bloqueo está armada aquí pero ya no puede leer este workspace, así que nunca va a dispararse.",
-      "bannerScope": "Medido a partir de commits y cambios en archivos ya seguidos; un archivo nuevo que git todavía no conoce, o trabajo dentro de un submódulo, aún no cuenta como avance."
+      "bannerScope": "Medido sobre todo el workspace, a partir de commits y cambios en archivos ya seguidos: otro agente trabajando acá mantiene esto callado, y un archivo nuevo que git todavía no conoce, o trabajo dentro de un submódulo, aún no cuenta como avance."
     }
   },
   "dashboardPopout": {
