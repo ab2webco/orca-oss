@@ -29,8 +29,7 @@ import type { GitProviderStatusOptions } from '../providers/types'
 import { getRemoteCommitUrl, getRemoteFileUrl } from '../git/repo'
 import {
   readWorktreeProgressFingerprint,
-  WORKTREE_PROGRESS_MAX_BUFFER,
-  WORKTREE_PROGRESS_TIMEOUT_MS
+  worktreeProgressGitExecOptions
 } from '../git/worktree-progress-fingerprint'
 import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
 import {
@@ -272,21 +271,19 @@ export class RuntimeGitCommands {
     try {
       const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
       if (target.connectionId) {
-        const provider = getSshGitProvider(target.connectionId)
-        if (!provider) {
-          return { kind: 'unreadable' }
-        }
-        return await readWorktreeProgressFingerprint((args) =>
-          provider.exec(args, target.worktree.path, { timeoutMs: WORKTREE_PROGRESS_TIMEOUT_MS })
-        )
+        // The relay's git.exec allowlist admits neither `status` nor `diff HEAD`, so an SSH
+        // worktree has no reading to give until a host-side digest op exists (ORCA-340).
+        return { kind: 'unsupported', reason: 'remote-workspace' }
       }
-      return await readWorktreeProgressFingerprint((args) =>
-        gitExecFileAsync(args, {
-          ...localGitOptionsForTarget(target),
-          cwd: target.worktree.path,
-          timeout: WORKTREE_PROGRESS_TIMEOUT_MS,
-          maxBuffer: WORKTREE_PROGRESS_MAX_BUFFER
-        })
+      return await readWorktreeProgressFingerprint((args, execOptions) =>
+        gitExecFileAsync(
+          args,
+          worktreeProgressGitExecOptions(
+            target.worktree.path,
+            localGitOptionsForTarget(target),
+            execOptions?.stdin
+          )
+        )
       )
     } catch {
       return { kind: 'unreadable' }

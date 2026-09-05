@@ -393,9 +393,16 @@ describe('WorktreeCardAgents activation', () => {
     document.body.append(host)
     const root: Root = createRoot(host)
     const { default: WorktreeCardAgents } = await import('./WorktreeCardAgents')
+    const { TooltipProvider } = await import('@/components/ui/tooltip')
 
     await act(async () => {
-      root.render(<WorktreeCardAgents worktreeId="wt-1" />)
+      // Why: production mounts the card under App's TooltipProvider, and agent-row controls
+      // use Tooltip — Radix throws without an ancestor provider.
+      root.render(
+        <TooltipProvider>
+          <WorktreeCardAgents worktreeId="wt-1" />
+        </TooltipProvider>
+      )
     })
     const row = host.querySelector('.compact-agent-row')
     expect(row).toBeInstanceOf(HTMLElement)

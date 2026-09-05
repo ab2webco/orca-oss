@@ -49,10 +49,7 @@ export type GitInspectionApi = {
     connectionId?: string
   }) => Promise<string[]>
   /** One git progress reading for the agent stall timer; never rejects. */
-  progressFingerprint: (args: {
-    worktreePath: string
-    connectionId?: string
-  }) => Promise<WorktreeProgressProbeResult>
+  progressFingerprint: (args: { worktreePath: string }) => Promise<WorktreeProgressProbeResult>
   findHugeFoldersToIgnore: (args: { worktreePath: string }) => Promise<string[]>
   history: (
     args: { worktreePath: string; connectionId?: string } & GitHistoryOptions

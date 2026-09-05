@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { AlarmClock, TriangleAlert } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +14,10 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import { armAgentStallTimer } from '@/lib/agent-stall-timer-driver'
-import { getAgentStallTimerAvailability } from '@/lib/agent-stall-timer-target'
+import {
+  getAgentStallTimerAvailability,
+  type AgentStallTimerUnavailableReason
+} from '@/lib/agent-stall-timer-target'
 import {
   AGENT_STALL_TIMER_INTERVAL_MINUTES,
   isAgentStallTimerIntervalMinutes
@@ -25,10 +29,7 @@ type AgentStallTimerControlProps = {
   paneKey: string
 }
 
-/**
- * "Check if it is stuck": watches the worktree's git progress and escalates once when it
- * stops moving. Lives on the agent row so arming one is two clicks from the agent itself.
- */
+/** Arms the "check if it is stuck" timer for one pane, on the row where its agent already is. */
 export function AgentStallTimerControl({
   paneKey
 }: AgentStallTimerControlProps): React.JSX.Element {
@@ -39,14 +40,17 @@ export function AgentStallTimerControl({
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const repos = useAppStore((s) => s.repos)
   const availability = useMemo(
-    () => getAgentStallTimerAvailability({ tabsByWorktree, repos }, paneKey),
+    () => getAgentStallTimerAvailability({ tabsByWorktree, repos } as never, paneKey),
     [paneKey, repos, tabsByWorktree]
   )
 
   const handleValueChange = useCallback(
     (value: string) => {
       const minutes = Number.parseInt(value, 10)
-      armAgentStallTimer(paneKey, isAgentStallTimerIntervalMinutes(minutes) ? minutes : null)
+      armAgentStallTimer(
+        paneKey,
+        value !== OFF_VALUE && isAgentStallTimerIntervalMinutes(minutes) ? minutes : null
+      )
     },
     [paneKey]
   )
@@ -59,34 +63,40 @@ export function AgentStallTimerControl({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          onMouseDown={stopMouseDown}
-          onClick={(event) => event.stopPropagation()}
-          className={cn(
-            'inline-flex size-4 shrink-0 items-center justify-center rounded-sm',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring',
-            isStalled
-              ? 'text-destructive'
-              : entry
-                ? 'text-muted-foreground hover:text-foreground'
-                : cn(
-                    'text-muted-foreground/70 hover:text-foreground',
-                    'can-hover:opacity-0 transition-opacity duration-150',
-                    'group-hover/compact-agent-row:opacity-100 focus-visible:opacity-100'
-                  )
-          )}
-          aria-label={label}
-          title={label}
-        >
-          {isStalled ? (
-            <TriangleAlert className="size-3.5" aria-hidden />
-          ) : (
-            <AlarmClock className="size-3.5" aria-hidden />
-          )}
-        </button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              onMouseDown={stopMouseDown}
+              onClick={(event) => event.stopPropagation()}
+              className={cn(
+                'inline-flex size-4 shrink-0 items-center justify-center rounded-sm',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring',
+                isStalled
+                  ? 'text-destructive'
+                  : entry
+                    ? 'text-muted-foreground hover:text-foreground'
+                    : cn(
+                        'text-muted-foreground/70 hover:text-foreground',
+                        'can-hover:opacity-0 transition-opacity duration-150',
+                        'group-hover/compact-agent-row:opacity-100 focus-visible:opacity-100'
+                      )
+              )}
+              aria-label={label}
+            >
+              {isStalled ? (
+                <TriangleAlert className="size-3.5" aria-hidden />
+              ) : (
+                <AlarmClock className="size-3.5" aria-hidden />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          <span>{label}</span>
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>
           {translate('components.agentStallTimer.title', 'Check if it is stuck')}
@@ -116,19 +126,30 @@ export function AgentStallTimerControl({
           </DropdownMenuRadioGroup>
         ) : (
           <p className="px-2 py-1.5 text-xs text-muted-foreground">
-            {availability.reason === 'folder-workspace'
-              ? translate(
-                  'components.agentStallTimer.unavailableFolderWorkspace',
-                  'Not available here: this is a folder workspace, so there is no git history or working tree to measure progress from.'
-                )
-              : translate(
-                  'components.agentStallTimer.unavailableNoWorkspace',
-                  'Not available here: this pane is not attached to a workspace yet.'
-                )}
+            {describeUnavailable(availability.reason)}
           </p>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function describeUnavailable(reason: AgentStallTimerUnavailableReason): string {
+  if (reason === 'folder-workspace') {
+    return translate(
+      'components.agentStallTimer.unavailableFolderWorkspace',
+      'Not available here: this is a folder workspace, so there is no git history or working tree to measure progress from.'
+    )
+  }
+  if (reason === 'remote-workspace') {
+    return translate(
+      'components.agentStallTimer.unavailableRemoteWorkspace',
+      'Not available here yet: progress on a remote workspace has to be measured on the host that owns it, and Orca cannot run that reading there yet.'
+    )
+  }
+  return translate(
+    'components.agentStallTimer.unavailableNoWorkspace',
+    'Not available here: this pane is not attached to a workspace yet.'
   )
 }
 

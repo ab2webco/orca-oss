@@ -51,6 +51,7 @@ type OrphanTerminalCleanupState = Pick<
   | 'nativeChatLaunchDraftByTabId'
   | 'tabBarOrderByWorktree'
   | 'cacheTimerByKey'
+  | 'agentStallTimerByPaneKey'
   | 'activeTabIdByWorktree'
   | 'activeTabId'
 >
@@ -103,6 +104,7 @@ export function buildOrphanTerminalCleanupPatch(
   | 'nativeChatLaunchDraftByTabId'
   | 'tabBarOrderByWorktree'
   | 'cacheTimerByKey'
+  | 'agentStallTimerByPaneKey'
   | 'activeTabIdByWorktree'
   | 'activeTabId'
 > {
@@ -123,6 +125,7 @@ export function buildOrphanTerminalCleanupPatch(
       nativeChatLaunchDraftByTabId: state.nativeChatLaunchDraftByTabId,
       tabBarOrderByWorktree: state.tabBarOrderByWorktree,
       cacheTimerByKey: state.cacheTimerByKey,
+      agentStallTimerByPaneKey: state.agentStallTimerByPaneKey,
       activeTabIdByWorktree: state.activeTabIdByWorktree,
       activeTabId: state.activeTabId
     }
@@ -152,6 +155,7 @@ export function buildOrphanTerminalCleanupPatch(
     )
   }
   const nextCacheTimerByKey = { ...state.cacheTimerByKey }
+  const nextAgentStallTimerByPaneKey = { ...state.agentStallTimerByPaneKey }
 
   // Why: orphan runtime terminals no longer have a backing unified tab or live
   // PTY, so every per-tab cache keyed off that runtime ID must disappear with
@@ -173,6 +177,11 @@ export function buildOrphanTerminalCleanupPatch(
     for (const key of Object.keys(nextCacheTimerByKey)) {
       if (key.startsWith(`${orphanTabId}:`)) {
         delete nextCacheTimerByKey[key]
+      }
+    }
+    for (const key of Object.keys(nextAgentStallTimerByPaneKey)) {
+      if (key.startsWith(`${orphanTabId}:`)) {
+        delete nextAgentStallTimerByPaneKey[key]
       }
     }
   }
@@ -203,6 +212,7 @@ export function buildOrphanTerminalCleanupPatch(
     nativeChatLaunchDraftByTabId: nextNativeChatLaunchDraftByTabId,
     tabBarOrderByWorktree: nextTabBarOrderByWorktree,
     cacheTimerByKey: nextCacheTimerByKey,
+    agentStallTimerByPaneKey: nextAgentStallTimerByPaneKey,
     activeTabIdByWorktree: nextActiveTabIdByWorktree,
     activeTabId:
       state.activeTabId && orphanTerminalIds.has(state.activeTabId) ? null : state.activeTabId

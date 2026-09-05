@@ -84,6 +84,30 @@ describe('WorktreeStallBanner', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('offers a disarm for an armed pane whose workspace can no longer be measured', () => {
+    // An SSH workspace has no reading to give, and once the agent row is gone the banner is
+    // the only surface left that can turn the timer off.
+    store.setState({
+      repos: [{ id: 'repo1', path: '/repo1', displayName: 'Repo 1', connectionId: 'ssh-1' }]
+    } as never)
+    store.getState().setAgentStallTimer(PANE_KEY, 15, 0)
+
+    render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Stop watching' }))
+
+    expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]).toBeUndefined()
+  })
+
+  it('says nothing about a measurable pane that is simply still moving', () => {
+    store.setState({
+      repos: [{ id: 'repo1', path: '/repo1', displayName: 'Repo 1' }]
+    } as never)
+    store.getState().setAgentStallTimer(PANE_KEY, 15, 0)
+
+    const { container } = render(<WorktreeStallBanner worktreeId={WORKTREE_ID} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
   it('does not report a stalled pane belonging to another workspace', () => {
     armAndStall(NEIGHBOUR_PANE_KEY)
 

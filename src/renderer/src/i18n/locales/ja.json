@@ -15370,7 +15370,9 @@
       "statusArmed": "{{minutes}} 分ごとに停止を確認しています",
       "bannerSingle": "前回のチェック以降、ここでは進捗がありません。",
       "bannerMultiple": "前回のチェック以降、ここでは {{count}} 件の Agent に進捗がありません。",
-      "bannerStopWatching": "監視を停止"
+      "bannerStopWatching": "監視を停止",
+      "unavailableRemoteWorkspace": "ここではまだ利用できません: リモートワークスペースの進捗はそれを所有するホスト上で測る必要があり、Orca はまだそこでその読み取りを実行できません。",
+      "bannerUnmeasurable": "停止チェックはここで有効ですが、このワークスペースをもう読み取れないため、発動することはありません。"
     }
   },
   "dashboardPopout": {

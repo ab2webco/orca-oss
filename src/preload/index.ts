@@ -3642,10 +3642,8 @@ const api = {
       paths: string[]
       connectionId?: string
     }): Promise<string[]> => ipcRenderer.invoke('git:checkIgnored', args),
-    progressFingerprint: (args: {
-      worktreePath: string
-      connectionId?: string
-    }): Promise<WorktreeProgressProbeResult> => ipcRenderer.invoke('git:progressFingerprint', args),
+    progressFingerprint: (args: { worktreePath: string }): Promise<WorktreeProgressProbeResult> =>
+      ipcRenderer.invoke('git:progressFingerprint', args),
     findHugeFoldersToIgnore: (args: { worktreePath: string }): Promise<string[]> =>
       ipcRenderer.invoke('git:findHugeFoldersToIgnore', args),
     appendGitignore: (args: { worktreePath: string; folderName: string }): Promise<boolean> =>

@@ -15381,7 +15381,9 @@
       "statusArmed": "Comprobando bloqueos cada {{minutes}} minutos",
       "bannerSingle": "Sin avance aquí desde la última comprobación.",
       "bannerMultiple": "Sin avance de {{count}} agentes aquí desde la última comprobación.",
-      "bannerStopWatching": "Dejar de vigilar"
+      "bannerStopWatching": "Dejar de vigilar",
+      "unavailableRemoteWorkspace": "Todavía no disponible aquí: el avance de un workspace remoto tiene que medirse en el host que lo posee, y Orca aún no puede hacer esa lectura allí.",
+      "bannerUnmeasurable": "La comprobación de bloqueo está armada aquí pero ya no puede leer este workspace, así que nunca va a dispararse."
     }
   },
   "dashboardPopout": {

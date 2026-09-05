@@ -21,17 +21,21 @@ describe('agent stall timer target', () => {
     const state = makeState({}, 'repo1::/repo1/feature')
 
     expect(resolveAgentStallTimerTarget(state, PANE_KEY)).toEqual({
+      worktreeId: 'repo1::/repo1/feature',
       worktreePath: '/repo1/feature'
     })
     expect(getAgentStallTimerAvailability(state, PANE_KEY)).toEqual({ available: true })
   })
 
-  it('carries the SSH connection so the reading runs on the host that owns the worktree', () => {
+  it('says why an SSH workspace cannot be measured instead of arming a timer that never fires', () => {
+    // The relay's git.exec allowlist admits neither `status` nor `diff HEAD`, so every
+    // reading there would come back unreadable forever.
     const state = makeState({ connectionId: 'ssh-1' }, 'repo1::/remote/feature')
 
-    expect(resolveAgentStallTimerTarget(state, PANE_KEY)).toEqual({
-      worktreePath: '/remote/feature',
-      connectionId: 'ssh-1'
+    expect(resolveAgentStallTimerTarget(state, PANE_KEY)).toBeNull()
+    expect(getAgentStallTimerAvailability(state, PANE_KEY)).toEqual({
+      available: false,
+      reason: 'remote-workspace'
     })
   })
 

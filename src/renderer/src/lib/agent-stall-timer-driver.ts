@@ -1,9 +1,11 @@
 import { useAppStore } from '../store'
+import { readRuntimeWorktreeProgressFingerprint } from '../runtime/runtime-git-client'
 import {
   resolveAgentStallTimerTarget,
   resolveWorktreeIdForPane,
   type AgentStallTimerTarget
 } from './agent-stall-timer-target'
+import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees'
 import type { AgentStallTimerIntervalMinutes } from '../../../shared/agent-stall-timer'
 import type { WorktreeProgressProbeResult } from '../../../shared/worktree-progress-probe'
 
@@ -14,9 +16,10 @@ const inFlightPaneKeys = new Set<string>()
 
 async function readProgress(target: AgentStallTimerTarget): Promise<WorktreeProgressProbeResult> {
   try {
-    const result = await window.api.git.progressFingerprint({
-      worktreePath: target.worktreePath,
-      ...(target.connectionId ? { connectionId: target.connectionId } : {})
+    const result = await readRuntimeWorktreeProgressFingerprint({
+      settings: useAppStore.getState().settings,
+      worktreeId: target.worktreeId,
+      worktreePath: target.worktreePath
     })
     // A host too old to answer this can resolve with nothing at all; that is a reading we
     // did not get, never a stall.
@@ -53,25 +56,38 @@ export async function runDueAgentStallTicks(now = Date.now()): Promise<void> {
     .filter(([paneKey, entry]) => entry.nextTickAt <= now && !inFlightPaneKeys.has(paneKey))
     .map(([paneKey]) => paneKey)
 
-  await Promise.all(
-    duePaneKeys.map(async (paneKey) => {
-      inFlightPaneKeys.add(paneKey)
-      try {
-        const target = resolveAgentStallTimerTarget(useAppStore.getState(), paneKey)
-        const probe: WorktreeProgressProbeResult = target
-          ? await readProgress(target)
-          : { kind: 'unreadable' }
-        const outcome = useAppStore
-          .getState()
-          .applyAgentStallTick(paneKey, { probe, now: Date.now() })
-        if (outcome === 'escalate') {
-          escalateStalledPane(paneKey)
+  // Bounded like every other git fan-out here: one reading is up to five spawns, and panes
+  // armed in a single sitting stay co-scheduled on the same poll for the whole session.
+  let cursor = 0
+  const workers = Array.from(
+    { length: Math.min(WORKTREE_REFRESH_CONCURRENCY, duePaneKeys.length) },
+    async () => {
+      while (cursor < duePaneKeys.length) {
+        const paneKey = duePaneKeys[cursor]
+        cursor += 1
+        if (paneKey !== undefined) {
+          await tickPane(paneKey)
         }
-      } finally {
-        inFlightPaneKeys.delete(paneKey)
       }
-    })
+    }
   )
+  await Promise.all(workers)
+}
+
+async function tickPane(paneKey: string): Promise<void> {
+  inFlightPaneKeys.add(paneKey)
+  try {
+    const target = resolveAgentStallTimerTarget(useAppStore.getState(), paneKey)
+    const probe: WorktreeProgressProbeResult = target
+      ? await readProgress(target)
+      : { kind: 'unreadable' }
+    const outcome = useAppStore.getState().applyAgentStallTick(paneKey, { probe, now: Date.now() })
+    if (outcome === 'escalate') {
+      escalateStalledPane(paneKey)
+    }
+  } finally {
+    inFlightPaneKeys.delete(paneKey)
+  }
 }
 
 /**

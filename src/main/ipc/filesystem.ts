@@ -109,8 +109,7 @@ import { listMarkdownDocuments, markdownDocumentsFromRelativePaths } from './mar
 import { checkRgAvailable } from './rg-availability'
 import {
   readWorktreeProgressFingerprint,
-  WORKTREE_PROGRESS_MAX_BUFFER,
-  WORKTREE_PROGRESS_TIMEOUT_MS
+  worktreeProgressGitExecOptions
 } from '../git/worktree-progress-fingerprint'
 import { isFolderRepo } from '../../shared/repo-kind'
 import type { WorktreeProgressProbeResult } from '../../shared/worktree-progress-probe'
@@ -1274,35 +1273,19 @@ export function registerFilesystemHandlers(
   // failed reading is `unreadable`, which the timer refuses to score as "no progress".
   ipcMain.handle(
     'git:progressFingerprint',
-    async (
-      _event,
-      args: { worktreePath: string; connectionId?: string }
-    ): Promise<WorktreeProgressProbeResult> => {
+    async (_event, args: { worktreePath: string }): Promise<WorktreeProgressProbeResult> => {
       try {
-        if (args.connectionId) {
-          const provider = getSshGitProvider(args.connectionId)
-          if (!provider) {
-            return { kind: 'unreadable' }
-          }
-          return await readWorktreeProgressFingerprint((gitArgs) =>
-            provider.exec(gitArgs, args.worktreePath, {
-              timeoutMs: WORKTREE_PROGRESS_TIMEOUT_MS
-            })
-          )
-        }
         const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
         const repo = getLocalRepoForRegisteredWorktree(store, args.worktreePath, worktreePath)
         if (repo && isFolderRepo(repo)) {
           return { kind: 'unsupported', reason: 'folder-workspace' }
         }
         const gitOptions = getLocalGitOptionsForRepo(store, repo)
-        return await readWorktreeProgressFingerprint((gitArgs) =>
-          gitExecFileAsync(gitArgs, {
-            ...gitOptions,
-            cwd: worktreePath,
-            timeout: WORKTREE_PROGRESS_TIMEOUT_MS,
-            maxBuffer: WORKTREE_PROGRESS_MAX_BUFFER
-          })
+        return await readWorktreeProgressFingerprint((gitArgs, execOptions) =>
+          gitExecFileAsync(
+            gitArgs,
+            worktreeProgressGitExecOptions(worktreePath, gitOptions, execOptions?.stdin)
+          )
         )
       } catch {
         return { kind: 'unreadable' }

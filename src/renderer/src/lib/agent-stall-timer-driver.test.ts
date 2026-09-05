@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { createTestStore } from '../store/slices/store-test-helpers'
 import {
   armAgentStallTimer,
@@ -16,12 +16,16 @@ const PANE_KEY = `${TAB_ID}:11111111-1111-4111-8111-111111111111`
 const MINUTE_MS = 60_000
 
 let store: Store
-let progressFingerprint: ReturnType<typeof vi.fn>
+let progressFingerprint: Mock<(context: unknown) => Promise<unknown>>
 
 vi.mock('../store', () => ({
   get useAppStore() {
     return store
   }
+}))
+
+vi.mock('../runtime/runtime-git-client', () => ({
+  readRuntimeWorktreeProgressFingerprint: (context: unknown) => progressFingerprint(context)
 }))
 
 function seedWorkspace(kind: 'git' | 'folder' = 'git'): void {
@@ -62,13 +66,11 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-09-05T10:00:00Z'))
   store = createTestStore()
   resetAgentStallTimerDriverForTest()
-  progressFingerprint = vi.fn()
-  vi.stubGlobal('window', { api: { git: { progressFingerprint } } })
+  progressFingerprint = vi.fn<(context: unknown) => Promise<unknown>>()
   seedWorkspace()
 })
 
 afterEach(() => {
-  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 
@@ -214,6 +216,34 @@ describe('agent stall timer driver', () => {
 
     expect(markWorktreeUnread).not.toHaveBeenCalled()
     expect(store.getState().agentStallTimerByPaneKey[PANE_KEY]?.status).toBe('unreadable')
+  })
+
+  it('bounds how many worktrees it reads at once', async () => {
+    const tabs = Array.from({ length: 20 }, (_, index) => ({
+      id: `tab-${index}`,
+      title: 'Terminal',
+      kind: 'terminal'
+    }))
+    store.setState({ tabsByWorktree: { [WORKTREE_ID]: tabs } } as never)
+    let inFlight = 0
+    let peak = 0
+    progressFingerprint.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await Promise.resolve()
+      inFlight -= 1
+      return fingerprint('a')
+    })
+    for (const tab of tabs) {
+      armAgentStallTimer(`${tab.id}:11111111-1111-4111-8111-111111111111`, 15)
+    }
+    await vi.waitFor(() => expect(progressFingerprint).toHaveBeenCalledTimes(20))
+    peak = 0
+
+    await advanceOneInterval(15)
+
+    expect(progressFingerprint).toHaveBeenCalledTimes(40)
+    expect(peak).toBeLessThanOrEqual(8)
   })
 
   it('disarms the pane when the timer is turned off', async () => {

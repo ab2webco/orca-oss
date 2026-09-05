@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   advanceAgentStallTimer,
-  createAgentStallTimerState,
   isAgentStallTimerIntervalMinutes,
   type AgentStallProbe,
   type AgentStallTickOutcome,
@@ -10,6 +9,14 @@ import {
 
 const fingerprint = (value: string): AgentStallProbe => ({ kind: 'fingerprint', value })
 const unreadable: AgentStallProbe = { kind: 'unreadable' }
+
+/** Mirrors what the store writes on arm: a baseline it could read, or none yet. */
+function armedState(baseline: AgentStallProbe): AgentStallTimerState {
+  return {
+    lastFingerprint: baseline.kind === 'fingerprint' ? baseline.value : null,
+    escalated: false
+  }
+}
 
 function runTicks(
   state: AgentStallTimerState,
@@ -27,7 +34,7 @@ function runTicks(
 
 describe('agent stall timer', () => {
   it('does not escalate while the fingerprint keeps changing', () => {
-    const armed = createAgentStallTimerState(fingerprint('a'))
+    const armed = armedState(fingerprint('a'))
 
     const { outcomes } = runTicks(armed, [fingerprint('b'), fingerprint('c'), fingerprint('d')])
 
@@ -35,7 +42,7 @@ describe('agent stall timer', () => {
   })
 
   it('escalates once when the fingerprint stops changing, not on every tick', () => {
-    const armed = createAgentStallTimerState(fingerprint('a'))
+    const armed = armedState(fingerprint('a'))
 
     const { outcomes } = runTicks(armed, [fingerprint('a'), fingerprint('a'), fingerprint('a')])
 
@@ -43,7 +50,7 @@ describe('agent stall timer', () => {
   })
 
   it('re-arms after progress resumes so a second stall escalates again', () => {
-    const armed = createAgentStallTimerState(fingerprint('a'))
+    const armed = armedState(fingerprint('a'))
 
     const { outcomes } = runTicks(armed, [
       fingerprint('a'),
@@ -58,7 +65,7 @@ describe('agent stall timer', () => {
   it('escalates on a worktree whose only work is staged and then abandoned', () => {
     // The 11-hour case: no new commits, a dirty tree that stopped changing. A level-based
     // signal reads this as healthy; the delta does not.
-    const armed = createAgentStallTimerState(fingerprint('head=1 dirty=staged-fix'))
+    const armed = armedState(fingerprint('head=1 dirty=staged-fix'))
 
     const { outcomes } = runTicks(armed, [
       fingerprint('head=1 dirty=staged-fix'),
@@ -69,7 +76,7 @@ describe('agent stall timer', () => {
   })
 
   it('does not escalate on an unreadable probe and keeps the previous fingerprint', () => {
-    const armed = createAgentStallTimerState(fingerprint('a'))
+    const armed = armedState(fingerprint('a'))
 
     const first = advanceAgentStallTimer(armed, unreadable)
     expect(first.outcome).toBe('unreadable')
@@ -80,7 +87,7 @@ describe('agent stall timer', () => {
   })
 
   it('an unreadable probe never advances the latch on its own', () => {
-    const armed = createAgentStallTimerState(fingerprint('a'))
+    const armed = armedState(fingerprint('a'))
 
     const { outcomes } = runTicks(armed, [unreadable, unreadable, unreadable])
 
@@ -88,7 +95,7 @@ describe('agent stall timer', () => {
   })
 
   it('treats the first readable tick as the baseline when arming could not read one', () => {
-    const armed = createAgentStallTimerState(unreadable)
+    const armed = armedState(unreadable)
     expect(armed.lastFingerprint).toBeNull()
 
     const { outcomes } = runTicks(armed, [fingerprint('a'), fingerprint('a')])

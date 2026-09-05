@@ -40,17 +40,6 @@ export function isAgentStallTimerIntervalMinutes(
   return (AGENT_STALL_TIMER_INTERVAL_MINUTES as readonly number[]).includes(value)
 }
 
-/**
- * A timer armed without a readable baseline is not stalled yet: the first readable tick
- * becomes the baseline instead of escalating on it.
- */
-export function createAgentStallTimerState(baseline: AgentStallProbe): AgentStallTimerState {
-  return {
-    lastFingerprint: baseline.kind === 'fingerprint' ? baseline.value : null,
-    escalated: false
-  }
-}
-
 export function advanceAgentStallTimer(
   state: AgentStallTimerState,
   probe: AgentStallProbe

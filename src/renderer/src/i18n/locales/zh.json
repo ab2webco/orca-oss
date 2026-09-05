@@ -15390,7 +15390,9 @@
       "statusArmed": "每 {{minutes}} 分钟检查一次是否停滞",
       "bannerSingle": "自上次检查以来此处没有进展。",
       "bannerMultiple": "自上次检查以来此处有 {{count}} 个代理没有进展。",
-      "bannerStopWatching": "停止监视"
+      "bannerStopWatching": "停止监视",
+      "unavailableRemoteWorkspace": "此处暂不可用：远程工作区的进展必须在拥有它的主机上测量，而 Orca 尚无法在那里执行该读取。",
+      "bannerUnmeasurable": "卡住检查在此处已启用，但已无法读取该工作区，因此永远不会触发。"
     }
   },
   "dashboardPopout": {

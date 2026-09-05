@@ -3,5 +3,5 @@ export type WorktreeProgressProbeResult =
   | { kind: 'fingerprint'; value: string }
   /** Git could not be read this tick. Never means "unchanged". */
   | { kind: 'unreadable' }
-  /** Folder workspaces have no git, so there is no progress to measure. */
-  | { kind: 'unsupported'; reason: 'folder-workspace' }
+  /** No progress can be measured here at all, so an armed timer would never fire. */
+  | { kind: 'unsupported'; reason: 'folder-workspace' | 'remote-workspace' }

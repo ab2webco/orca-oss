@@ -2,9 +2,13 @@ import React, { useCallback } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import { armAgentStallTimer } from '@/lib/agent-stall-timer-driver'
-import { selectStalledPaneKeysForWorktree } from '@/lib/agent-stall-timer-target'
+import {
+  selectStalledPaneKeysForWorktree,
+  selectUnmeasurablePaneKeysForWorktree
+} from '@/lib/agent-stall-timer-target'
 
 type WorktreeStallBannerProps = {
   worktreeId: string
@@ -20,39 +24,51 @@ export function WorktreeStallBanner({
   const stalledPaneKeys = useAppStore(
     useShallow((s) => selectStalledPaneKeysForWorktree(s, worktreeId))
   )
+  // An armed pane whose workspace can no longer be measured has no other disarm surface:
+  // the row's interval picker hides itself once availability turns false.
+  const unmeasurablePaneKeys = useAppStore(
+    useShallow((s) => selectUnmeasurablePaneKeysForWorktree(s, worktreeId))
+  )
+  const reportedPaneKeys = stalledPaneKeys.length > 0 ? stalledPaneKeys : unmeasurablePaneKeys
 
   const handleStopWatching = useCallback(() => {
-    for (const paneKey of stalledPaneKeys) {
+    for (const paneKey of reportedPaneKeys) {
       armAgentStallTimer(paneKey, null)
     }
-  }, [stalledPaneKeys])
+  }, [reportedPaneKeys])
 
-  if (stalledPaneKeys.length === 0) {
+  if (reportedPaneKeys.length === 0) {
     return null
   }
+  const isStalled = stalledPaneKeys.length > 0
 
   return (
     <div
-      className="mt-0.5 flex items-start gap-1.5 rounded border px-1.5 py-1 text-[10.5px] leading-snug"
-      style={{
-        borderColor: 'color-mix(in srgb, var(--destructive) 25%, transparent)',
-        background: 'color-mix(in srgb, var(--destructive) 6%, transparent)',
-        color: 'var(--destructive)'
-      }}
+      className={cn(
+        'mt-0.5 flex items-start gap-1.5 rounded border px-1.5 py-1 text-[10.5px] leading-snug',
+        isStalled
+          ? 'border-destructive/25 bg-destructive/5 text-destructive'
+          : 'border-border bg-muted/40 text-muted-foreground'
+      )}
       role="status"
     >
       <TriangleAlert className="mt-[1px] size-3 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        {stalledPaneKeys.length === 1
+        {!isStalled
           ? translate(
-              'components.agentStallTimer.bannerSingle',
-              'No progress here since the last check.'
+              'components.agentStallTimer.bannerUnmeasurable',
+              'The stuck check is armed here but can no longer read this workspace, so it will never fire.'
             )
-          : translate(
-              'components.agentStallTimer.bannerMultiple',
-              'No progress from {{count}} agents here since the last check.',
-              { count: stalledPaneKeys.length }
-            )}
+          : reportedPaneKeys.length === 1
+            ? translate(
+                'components.agentStallTimer.bannerSingle',
+                'No progress here since the last check.'
+              )
+            : translate(
+                'components.agentStallTimer.bannerMultiple',
+                'No progress from {{count}} agents here since the last check.',
+                { count: reportedPaneKeys.length }
+              )}
       </span>
       <button
         type="button"
