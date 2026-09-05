@@ -551,7 +551,8 @@ export function createRemoteRuntimePtyTransport(
 
   async function waitForHostSessionHandle(
     hostTabId: string,
-    isCurrent: () => boolean
+    isCurrent: () => boolean,
+    intent: TabActivationIntent
   ): Promise<string | null | undefined | false> {
     if (!worktreeId) {
       return undefined
@@ -559,8 +560,7 @@ export function createRemoteRuntimePtyTransport(
     const worktree = toRuntimeWorktreeSelector(worktreeId)
     let activated: RuntimeMobileSessionTabsResult
     try {
-      // Why: this runs when the pane itself is opened/attached — the user's wake gesture.
-      activated = await activateHostSessionSurface(hostTabId, worktree, 'user')
+      activated = await activateHostSessionSurface(hostTabId, worktree, intent)
     } catch (error) {
       if (isMissingHostSessionSurfaceError(error)) {
         return null
@@ -633,12 +633,13 @@ export function createRemoteRuntimePtyTransport(
 
   async function waitForHostSessionHandleWithRecovery(
     hostTabId: string,
-    isCurrent: () => boolean
+    isCurrent: () => boolean,
+    intent: TabActivationIntent
   ): Promise<string | null | undefined | false> {
     let recoveryEpoch = recovery.isActive ? recovery.currentEpoch : undefined
     while (isCurrent()) {
       try {
-        const hostHandle = await waitForHostSessionHandle(hostTabId, isCurrent)
+        const hostHandle = await waitForHostSessionHandle(hostTabId, isCurrent, intent)
         if (!isCurrent()) {
           return undefined
         }
@@ -776,7 +777,9 @@ export function createRemoteRuntimePtyTransport(
     options: { cols?: number; rows?: number },
     notifySpawn = true,
     expectedAttachGeneration?: number,
-    expectedLifecycleEpoch?: number
+    expectedLifecycleEpoch?: number,
+    // Why: only the pane's own open/attach is the user's wake gesture; a recovery retry must leave a slept pane slept.
+    intent: TabActivationIntent = 'user'
   ): Promise<PtyConnectResult | undefined> {
     if (!tabId || !isWebTerminalSurfaceTabId(tabId)) {
       return undefined
@@ -818,7 +821,8 @@ export function createRemoteRuntimePtyTransport(
             options,
             notifySpawn,
             expectedAttachGeneration,
-            expectedLifecycleEpoch
+            expectedLifecycleEpoch,
+            'automatic'
           )
         })
       ) {
@@ -828,7 +832,7 @@ export function createRemoteRuntimePtyTransport(
       return undefined
     }
     const hostTabId = toHostSessionTabId(tabId)
-    const hostHandle = await waitForHostSessionHandleWithRecovery(hostTabId, isCurrent)
+    const hostHandle = await waitForHostSessionHandleWithRecovery(hostTabId, isCurrent, intent)
     if (!isCurrent()) {
       return undefined
     }
@@ -836,8 +840,10 @@ export function createRemoteRuntimePtyTransport(
       return retryMirrorAttachLater()
     }
     if (hostHandle === null) {
-      surfaceErrorMessage('Remote terminal was closed.')
-      return abandonAttach()
+      // Why: a relaunched host answers for tabs it has not rehydrated yet, so an empty inventory is unknown
+      // liveness — retiring here left the pane at 'offline' with nothing to revive it. Only a surviving
+      // sibling surface (`false` below) proves removal.
+      return retryMirrorAttachLater()
     }
     if (!hostHandle || !isCurrent()) {
       if (isCurrent()) {

@@ -4512,7 +4512,7 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
   })
 
-  it('retires a host mirror that is authoritatively absent', async () => {
+  it('keeps a host mirror recoverable instead of spawning a replacement when the tab is missing', async () => {
     runtimeCall.mockImplementation(async (args: { method: string }) => {
       if (args.method === 'session.tabs.activate') {
         return { ok: false, error: { code: 'runtime_error', message: 'tab_not_found' } }
@@ -4542,13 +4542,17 @@ describe('createRemoteRuntimePtyTransport', () => {
 
     const onError = vi.fn()
     await expect(transport.connect({ url: '', callbacks: { onError } })).resolves.toBeUndefined()
-    expect(onError).toHaveBeenCalledWith('Remote terminal was closed.')
+    // Why: a host mid-relaunch answers tab_not_found for a tab it has not rehydrated, so the pane
+    // stays inside its recovery budget instead of latching a dead error (ORCA-342).
+    expect(transport.getRecoveryState?.().phase).toBe('backoff')
+    expect(onError).not.toHaveBeenCalled()
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'terminal.recoverPane' })
     )
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'terminal.create' })
     )
+    transport.destroy?.()
   })
 
   it('activates the requested split leaf for pending host session mirrors', async () => {
