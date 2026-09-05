@@ -63,12 +63,7 @@ describe('plane board columns', () => {
 
   it('gives a card whose state the project never listed its own trailing column', () => {
     const columns = buildPlaneBoardColumns(states, [card('a', 's-todo'), card('x', 's-ghost')])
-    expect(columns.map((column) => column.name)).toEqual([
-      'Todo',
-      'In Progress',
-      'Done',
-      's-ghost'
-    ])
+    expect(columns.map((column) => column.name)).toEqual(['Todo', 'In Progress', 'Done', 's-ghost'])
     expect(columns.at(-1)).toMatchObject({ derived: true })
     expect(columns.at(-1)?.items.map((item) => item.id)).toEqual(['x'])
   })

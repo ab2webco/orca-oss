@@ -51,6 +51,8 @@ import { MobileSearchField } from '../../../src/components/MobileSearchField'
 import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegments'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { PickerListDrawer } from '../../../src/components/PickerListDrawer'
+import { PlaneSourceSegmentRow } from '../../../src/plane-board/plane-source-segment-row'
+import { useOpenMobilePlaneBoard } from '../../../src/plane-board/use-open-mobile-plane-board'
 import {
   formatGitHubPRDelta,
   getGitHubReviewerRows,
@@ -1782,6 +1784,7 @@ function compareTasksByRepository(
 export default function MobileTasksScreen() {
   const { hostId, taskSource } = useLocalSearchParams<{ hostId: string; taskSource?: string }>()
   const router = useRouter()
+  const openMobilePlaneBoard = useOpenMobilePlaneBoard()
   const insets = useSafeAreaInsets()
   const { client, state: connState } = useHostClient(hostId)
   const reconnectAttempts = useReconnectAttempt(hostId)
@@ -8931,33 +8934,21 @@ export default function MobileTasksScreen() {
             </>
           )}
 
-          {provider === 'plane' && planeSupported && planeConnected && (
-            <>
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => taskUiReady && setShowPlaneProjectPicker(true)}
-              >
-                <Text style={styles.segmentSecondaryText}>{planeProjectLabel}</Text>
-              </Pressable>
-              {planeProjectId ? (
-                <Pressable
-                  style={styles.segmentButton}
-                  disabled={!taskUiReady}
-                  onPress={() => taskUiReady && setShowPlaneStatePicker(true)}
-                >
-                  <Text style={styles.segmentSecondaryText}>{planeStateLabel}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={styles.segmentButton}
-                disabled={!taskUiReady}
-                onPress={() => taskUiReady && setShowPlaneFilterPicker(true)}
-              >
-                <Text style={styles.segmentSecondaryText}>{planeFilterLabel}</Text>
-              </Pressable>
-            </>
-          )}
+          {provider === 'plane' && planeSupported && planeConnected ? (
+            <PlaneSourceSegmentRow
+              enabled={taskUiReady}
+              hasProject={Boolean(planeProjectId)}
+              projectLabel={planeProjectLabel}
+              stateLabel={planeStateLabel}
+              filterLabel={planeFilterLabel}
+              onPickProject={() => setShowPlaneProjectPicker(true)}
+              onPickState={() => setShowPlaneStatePicker(true)}
+              onPickFilter={() => setShowPlaneFilterPicker(true)}
+              onOpenBoard={() => openMobilePlaneBoard(hostId)}
+              buttonStyle={styles.segmentButton}
+              textStyle={styles.segmentSecondaryText}
+            />
+          ) : null}
 
           {provider !== 'linear' &&
           provider !== 'plane' &&

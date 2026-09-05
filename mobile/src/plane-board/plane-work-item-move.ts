@@ -9,7 +9,8 @@ export type PlaneMoveRequest = {
   workspaceId: string | null
 }
 
-const MISSING_SCOPE_MESSAGE = 'This work item is missing the project or state Plane needs to move it'
+const MISSING_SCOPE_MESSAGE =
+  'This work item is missing the project or state Plane needs to move it'
 
 /** The board's only write. Sends the literal method name so the mobile RPC
  *  allowlist test can see it (a computed name would not be enforced). */

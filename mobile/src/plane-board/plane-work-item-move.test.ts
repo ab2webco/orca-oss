@@ -60,7 +60,9 @@ describe('plane work item move', () => {
 
   it('reports a refused move instead of reading as success', async () => {
     const calls: Call[] = []
-    expect(await movePlaneWorkItem(stubClient({ ok: false, error: 'state is archived' }, calls), REQUEST)).toEqual({
+    expect(
+      await movePlaneWorkItem(stubClient({ ok: false, error: 'state is archived' }, calls), REQUEST)
+    ).toEqual({
       ok: false,
       error: 'state is archived'
     })
