@@ -35,6 +35,10 @@ async function getVisibleWorktreeIdsByVirtualIndex(page: Page): Promise<string[]
 // contention (ORCA-343). The observer is the pass signal; the deadline only turns a silent hang
 // into a failure that names the order the sidebar actually showed.
 const ORDER_REPORT_MARGIN_MS = 5_000
+// Why a cap: testStartedAt is taken inside beforeEach, after the orcaPage fixture has already
+// spent part of Playwright's budget, so the budget-derived deadline can land past the test
+// timeout and never fire. The cap keeps it firing while staying far above a real reorder.
+const MAX_ORDER_REPORT_MS = 45_000
 
 async function waitForVisibleWorktreeOrder(
   page: Page,
@@ -42,7 +46,10 @@ async function waitForVisibleWorktreeOrder(
   testStartedAt: number
 ): Promise<void> {
   const remainingMs = test.info().timeout - (Date.now() - testStartedAt)
-  const reportAfterMs = Math.max(1_000, remainingMs - ORDER_REPORT_MARGIN_MS)
+  const reportAfterMs = Math.max(
+    1_000,
+    Math.min(remainingMs - ORDER_REPORT_MARGIN_MS, MAX_ORDER_REPORT_MS)
+  )
   await page.evaluate(
     ({ expectedOrder, reportAfterMs }) => {
       const sidebar = document.querySelector('[data-worktree-sidebar]')
@@ -328,7 +335,7 @@ async function getSmartSortScenarioReadiness(
 
 test.describe('Worktree Smart Sort', () => {
   // Why anchored here: the per-test budget already spans these hooks, so the order-report
-  // deadline must count them or it can land after Playwright's own timeout.
+  // deadline must count them. It still undercounts the orcaPage fixture, hence the cap above.
   let testStartedAt = 0
 
   test.beforeEach(async ({ orcaPage }) => {
