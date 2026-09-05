@@ -557,26 +557,29 @@ export function createRemoteRuntimePtyTransport(
       return undefined
     }
     const worktree = toRuntimeWorktreeSelector(worktreeId)
-    let activated: RuntimeMobileSessionTabsResult
+    let activated: RuntimeMobileSessionTabsResult | null = null
     try {
-      // Why: this runs when the pane itself is opened/attached — the user's wake gesture.
+      // Why: this runs when the pane itself is opened/attached — the user's wake gesture. Its retries
+      // continue that gesture, so they must not downgrade to the intent the host refuses for a slept pane.
       activated = await activateHostSessionSurface(hostTabId, worktree, 'user')
     } catch (error) {
-      if (isMissingHostSessionSurfaceError(error)) {
-        return null
+      if (!isMissingHostSessionSurfaceError(error)) {
+        throw error
       }
-      throw error
+      // Why: a relaunched host answers for a tab it has not rehydrated yet, so no single activation
+      // failure is absence proof — the bounded inventory wait below decides (ORCA-342).
     }
-    const immediate = findReadyHostSessionHandle(activated, hostTabId)
+    const immediate = activated ? findReadyHostSessionHandle(activated, hostTabId) : null
     if (immediate) {
       return immediate
     }
 
+    let absentInventoryObserved = false
     const startedAt = Date.now()
     while (isCurrent()) {
       const remainingMs = HOST_SESSION_ATTACH_TIMEOUT_MS - (Date.now() - startedAt)
       if (remainingMs <= 0) {
-        return undefined
+        return absentInventoryObserved ? null : undefined
       }
       // Why: host mirrors can publish before their PTY handle is ready, but a stuck pending surface must not poll forever.
       await new Promise((resolve) =>
@@ -595,11 +598,18 @@ export function createRemoteRuntimePtyTransport(
         return handle
       }
       if (!hasHostSessionTerminalSurface(listed, hostTabId)) {
-        const siblingStillExists =
+        if (
           getHostSessionTerminalSurfaces(listed, hostTabId, {
             matchRequestedLeaf: false
           }).length > 0
-        return siblingStillExists ? false : null
+        ) {
+          // Why: a surviving sibling leaf makes this a populated inventory that really lacks this one.
+          return false
+        }
+        // Why: an inventory holding nothing for this tab is what a host mid-rehydration publishes, so
+        // absence only counts once it outlives the bounded wait — and polling picks the tab up within
+        // one poll interval of the host republishing, instead of waiting out a backoff tier.
+        absentInventoryObserved = true
       }
     }
     return undefined
@@ -819,7 +829,11 @@ export function createRemoteRuntimePtyTransport(
             notifySpawn,
             expectedAttachGeneration,
             expectedLifecycleEpoch
-          )
+          ).catch((error) => {
+            if (isCurrent()) {
+              handleRemoteTerminalError(error)
+            }
+          })
         })
       ) {
         connecting = false
@@ -836,8 +850,10 @@ export function createRemoteRuntimePtyTransport(
       return retryMirrorAttachLater()
     }
     if (hostHandle === null) {
-      surfaceErrorMessage('Remote terminal was closed.')
-      return abandonAttach()
+      // Why: a relaunched host answers for tabs it has not rehydrated yet, so an empty inventory is unknown
+      // liveness — retiring here left the pane at 'offline' with nothing to revive it. Only a surviving
+      // sibling surface (`false` below) proves removal.
+      return retryMirrorAttachLater()
     }
     if (!hostHandle || !isCurrent()) {
       if (isCurrent()) {

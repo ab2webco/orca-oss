@@ -117,10 +117,25 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
   })
 
-  it('retires a host mirror that is authoritatively absent', async () => {
+  it('keeps a host mirror recoverable instead of spawning a replacement when the tab is missing', async () => {
     runtimeCall.mockImplementation(async (args: { method: string }) => {
       if (args.method === 'session.tabs.activate') {
         return { ok: false, error: { code: 'runtime_error', message: 'tab_not_found' } }
+      }
+      if (args.method === 'session.tabs.list') {
+        // A host mid-rehydration answers with a worktree inventory that does not list the tab yet.
+        return {
+          ok: true,
+          result: {
+            worktree: 'wt-1',
+            publicationEpoch: 'epoch-rehydrating',
+            snapshotVersion: 1,
+            activeGroupId: null,
+            activeTabId: null,
+            activeTabType: null,
+            tabs: []
+          }
+        }
       }
       if (args.method === 'terminal.recoverPane') {
         return {
@@ -146,14 +161,24 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
 
     const onError = vi.fn()
-    await expect(transport.connect({ url: '', callbacks: { onError } })).resolves.toBeUndefined()
-    expect(onError).toHaveBeenCalledWith('Remote terminal was closed.')
+    const connectPromise = transport.connect({ url: '', callbacks: { onError } })
+    await vi.waitFor(() =>
+      expect(runtimeCall).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'session.tabs.list' })
+      )
+    )
+    // Why: a host mid-relaunch answers tab_not_found for a tab it has not rehydrated, so the pane
+    // waits its bounded inventory wait out instead of latching a dead error (ORCA-342).
+    expect(transport.getRecoveryState?.().phase).toBe('connecting')
+    expect(onError).not.toHaveBeenCalled()
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'terminal.recoverPane' })
     )
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'terminal.create' })
     )
+    transport.destroy?.()
+    await connectPromise
   })
 
   it('activates the requested split leaf for pending host session mirrors', async () => {
