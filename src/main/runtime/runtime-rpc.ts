@@ -334,9 +334,10 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'plane.listWorkItems',
   'plane.searchWorkItems',
   'plane.listStates',
-  // The only board write: moving a card sets updates.stateId (ORCA-357 phase 1).
-  // Creating, deleting and column edits are later phases and stay off the phone.
+  // Board writes, gated on the phone by MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY; column edits (create/update/deleteState) stay off.
   'plane.updateWorkItem',
+  'plane.createWorkItem',
+  'plane.addWorkItemComment',
   'linear.getCustomView',
   'linear.getIssue',
   'linear.getProject',
