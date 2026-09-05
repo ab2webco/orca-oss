@@ -10,6 +10,7 @@ import type {
   PlaneStateGroup,
   PlaneCreateWorkItemResult,
   PlaneStateMutationResult,
+  PlaneMember,
   PlaneUser,
   PlaneViewer,
   PlaneWorkItem,
@@ -307,6 +308,6 @@ export async function planeListMembers(
       ? { ...(workspaceId ? { workspaceId } : {}), ...(projectId ? { projectId } : {}) }
       : undefined
   return target.kind === 'environment'
-    ? callRuntimeRpc<PlaneUser[]>(target, 'plane.listMembers', args, { timeoutMs: 30_000 })
+    ? callRuntimeRpc<PlaneMember[]>(target, 'plane.listMembers', args, { timeoutMs: 30_000 })
     : window.api.plane.listMembers(args)
 }

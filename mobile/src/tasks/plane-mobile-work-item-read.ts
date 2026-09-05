@@ -7,6 +7,7 @@ import {
 // Why: Plane states, priorities and groups are server-owned data. A host that
 // learns a new value must not blank the phone's list, so every soft field
 // degrades to a rendered default instead of dropping the row (ORCA-155).
+// Not strict: a host before ORCA-371 still sends the whole PlaneUser here.
 const PlaneMobileMemberSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().default('')

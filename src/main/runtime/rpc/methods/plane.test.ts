@@ -231,6 +231,27 @@ describe('plane RPC methods', () => {
     expect(runtime.planeListMembers).toHaveBeenCalledWith('ws-1', undefined)
   })
 
+  // ORCA-371: the phone renders id and displayName; an email the client never
+  // reads has no business on the wire, however private the channel is.
+  it('publishes only id and displayName for plane.listMembers', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      planeListMembers: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'user-1', displayName: 'Ada', email: 'ada@example.com', avatarUrl: 'https://a/ada' }
+        ])
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('plane.listMembers', { workspaceId: 'ws-1' })
+    )
+
+    expect(response.ok).toBe(true)
+    expect(response.ok && response.result).toEqual([{ id: 'user-1', displayName: 'Ada' }])
+  })
+
   // ORCA-140: the CLI decides whether archived projects are in scope, so the
   // choice has to survive the RPC boundary instead of being dropped there.
   it('threads includeArchived through plane.listProjects', async () => {

@@ -4,7 +4,7 @@ import {
   applyPlaneBoardEdits,
   EMPTY_PLANE_BOARD_EDITS,
   reconcilePlaneBoardEdits,
-  restorePlaneBoardEdit,
+  rollbackPlaneBoardEdit,
   toPlaneWorkItemPatch,
   withPlaneBoardEdit
 } from './plane-board-edit-state'
@@ -50,18 +50,41 @@ describe('plane board edit state', () => {
       priority: 'high',
       assignees: []
     })
-    const rolledBack = restorePlaneBoardEdit(during, 'wi-1', afterPriority['wi-1'])
+    const rolledBack = rollbackPlaneBoardEdit(
+      during,
+      'wi-1',
+      { assignees: [] },
+      afterPriority['wi-1']
+    )
     expect(applyPlaneBoardEdits(items, rolledBack)[0]).toMatchObject({
       priority: 'high',
       assignees: [ADA]
     })
   })
 
-  it('puts the card back entirely when the first edit is rolled back', () => {
+  it('puts the card back entirely when the only edit is rolled back', () => {
     const edits = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { priority: 'urgent' })
-    const rolledBack = restorePlaneBoardEdit(edits, 'wi-1', undefined)
-    expect(rolledBack).toEqual(EMPTY_PLANE_BOARD_EDITS)
+    const rolledBack = rollbackPlaneBoardEdit(edits, 'wi-1', { priority: 'urgent' }, undefined)
+    expect(rolledBack).toEqual({})
     expect(applyPlaneBoardEdits(items, rolledBack)[0]?.priority).toBe('medium')
+  })
+
+  it('leaves a field a later write changed alone when an earlier one is rolled back', () => {
+    const first = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { priority: 'high' })
+    const second = withPlaneBoardEdit(first, 'wi-1', { priority: 'urgent' })
+    expect(rollbackPlaneBoardEdit(second, 'wi-1', { priority: 'high' }, undefined)).toBe(second)
+  })
+
+  it('rolls a refused assignee list back to the one shown before it, by member ids', () => {
+    const first = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { assignees: [GRACE] })
+    const second = withPlaneBoardEdit(first, 'wi-1', { assignees: [ADA, GRACE] })
+    const rolledBack = rollbackPlaneBoardEdit(
+      second,
+      'wi-1',
+      { assignees: [GRACE, ADA] },
+      first['wi-1']
+    )
+    expect(rolledBack['wi-1']).toEqual({ assignees: [GRACE] })
   })
 
   it('leaves the list untouched when nothing is overridden', () => {

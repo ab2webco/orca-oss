@@ -13,15 +13,23 @@ export function withPlaneBoardMove(
   return { ...overrides, [workItemId]: stateId }
 }
 
-export function withoutPlaneBoardMove(
+/** Undoes a refused move: the card goes back to where it was before that move,
+ *  unless a later move already carried it somewhere else. */
+export function rollbackPlaneBoardMove(
   overrides: PlaneBoardMoveOverrides,
-  workItemId: string
+  workItemId: string,
+  failedStateId: string,
+  previousStateId: string | undefined
 ): PlaneBoardMoveOverrides {
-  if (!(workItemId in overrides)) {
+  if (overrides[workItemId] !== failedStateId) {
     return overrides
   }
   const next = { ...overrides }
-  delete next[workItemId]
+  if (previousStateId === undefined) {
+    delete next[workItemId]
+  } else {
+    next[workItemId] = previousStateId
+  }
   return next
 }
 

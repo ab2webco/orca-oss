@@ -64,6 +64,9 @@ export type PlaneUser = {
   avatarUrl?: string
 }
 
+/** What plane.listMembers publishes: the fields a picker renders, nothing a client would have to strip. */
+export type PlaneMember = Pick<PlaneUser, 'id' | 'displayName'>
+
 // Static priority set (not fetched from the API), unlike Jira priorities.
 export const PLANE_WORK_ITEM_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'] as const
 export type PlaneWorkItemPriority = (typeof PLANE_WORK_ITEM_PRIORITIES)[number]

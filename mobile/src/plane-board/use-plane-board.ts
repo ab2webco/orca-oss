@@ -14,16 +14,8 @@ import {
   type PlaneMobileWorkItem
 } from '../tasks/plane-mobile-work-item-read'
 import { buildPlaneBoardColumns, type PlaneBoardColumn } from './plane-board-columns'
-import {
-  applyPlaneBoardMoves,
-  EMPTY_PLANE_BOARD_MOVES,
-  reconcilePlaneBoardMoves,
-  withoutPlaneBoardMove,
-  withPlaneBoardMove,
-  type PlaneBoardMoveOverrides
-} from './plane-board-move-state'
+import { applyPlaneBoardMoves } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
-import { movePlaneWorkItem } from './plane-work-item-move'
 import {
   arePlaneMembersListableByHost,
   isPlaneBoardWritableByHost
@@ -32,16 +24,17 @@ import { applyPlaneBoardEdits } from './plane-board-edit-state'
 import { usePlaneBoardComments, type PlaneBoardComments } from './use-plane-board-comments'
 import { usePlaneBoardCreate, type PlaneBoardCreate } from './use-plane-board-create'
 import { usePlaneBoardEdits, type PlaneBoardEdits } from './use-plane-board-edits'
+import { usePlaneBoardMoves, type PlaneBoardMoves } from './use-plane-board-moves'
 import { usePlaneMembers, type PlaneMembers } from './use-plane-members'
 
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
+  Omit<PlaneBoardMoves, 'overrides' | 'reset' | 'moveWorkItem'> &
   Omit<PlaneBoardComments, 'reset'> &
   PlaneBoardCreate & {
     status: PlaneBoardStatus
     error: string | null
-    moveError: string | null
     refreshing: boolean
     projects: PlaneMobileProject[]
     projectId: string | null
@@ -50,7 +43,6 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     activeColumn: PlaneBoardColumn | null
     activeStateId: string | null
     emptyState: PlaneBoardEmptyState | null
-    movingWorkItemId: string | null
     /** False on a host that would refuse the create; the screen shows no "+" at all. */
     canCreate: boolean
     /** Priority edits ride plane.updateWorkItem, the same gate as create. */
@@ -66,7 +58,6 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     selectColumn: (stateId: string) => void
     refresh: () => void
     moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<void>
-    dismissMoveError: () => void
   }
 
 type Loaded = {
@@ -91,12 +82,9 @@ export function usePlaneBoard(
   const [loaded, setLoaded] = useState<Loaded>(EMPTY_LOADED)
   const [status, setStatus] = useState<PlaneBoardStatus>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [moveError, setMoveError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [activeStateId, setActiveStateId] = useState<string | null>(null)
-  const [moves, setMoves] = useState<PlaneBoardMoveOverrides>(EMPTY_PLANE_BOARD_MOVES)
-  const [movingWorkItemId, setMovingWorkItemId] = useState<string | null>(null)
   const generationRef = useRef(0)
 
   // Resolves the items it put on screen, or null when it lost to a newer read.
@@ -151,9 +139,6 @@ export function usePlaneBoard(
         }
         setProjectId(nextProjectId)
         setLoaded({ availability, projects, states, items })
-        // Drop the optimistic moves this read already reflects; the rest stay so
-        // a snapshot taken before the write cannot undo the card on screen.
-        setMoves((current) => reconcilePlaneBoardMoves(current, items))
         setStatus('ready')
         return items
       } catch (err) {
@@ -188,6 +173,12 @@ export function usePlaneBoard(
     reset: resetEdits,
     ...editControls
   } = usePlaneBoardEdits({ client, workspaceId, items: loaded.items, reload })
+  const {
+    overrides: moves,
+    reset: resetMoves,
+    moveWorkItem: submitMove,
+    ...moveControls
+  } = usePlaneBoardMoves({ client, workspaceId, items: loaded.items, reload })
   const { reset: resetComments, ...commentControls } = usePlaneBoardComments({
     client,
     workspaceId
@@ -238,37 +229,20 @@ export function usePlaneBoard(
     ]
   )
 
+  // Follows the card to its new column, and back only if the user is still looking there.
   const moveWorkItem = useCallback(
     async (item: PlaneMobileWorkItem, stateId: string): Promise<void> => {
-      if (!client || stateId === item.state.id) {
+      if (stateId === item.state.id) {
         return
       }
       const previousStateId = item.state.id
-      setMoveError(null)
-      setMovingWorkItemId(item.id)
-      setMoves((current) => withPlaneBoardMove(current, item.id, stateId))
       setActiveStateId(stateId)
-      const result = await movePlaneWorkItem(client, {
-        projectId: item.project.id,
-        workItemId: item.id,
-        stateId,
-        workspaceId
-      })
-      setMovingWorkItemId(null)
-      if (result.ok) {
-        return
-      }
-      // Put the card back where it was: a failed write must not leave the board
-      // claiming a move Plane never took.
-      setMoves((current) => withoutPlaneBoardMove(current, item.id))
-      setActiveStateId(previousStateId)
-      setMoveError(result.error)
-      if (result.deliveryUnknown) {
-        // Plane may have taken the move after all; only a re-read can tell.
-        void load({ silent: true })
+      const kept = await submitMove(item, stateId)
+      if (!kept) {
+        setActiveStateId((current) => (current === stateId ? previousStateId : current))
       }
     },
-    [client, load, workspaceId]
+    [submitMove]
   )
 
   const creation = usePlaneBoardCreate({
@@ -283,7 +257,6 @@ export function usePlaneBoard(
   return {
     status,
     error,
-    moveError,
     refreshing,
     projects: loaded.projects,
     projectId,
@@ -292,7 +265,6 @@ export function usePlaneBoard(
     activeColumn,
     activeStateId: activeColumn?.stateId ?? null,
     emptyState,
-    movingWorkItemId,
     canCreate: isPlaneBoardWritableByHost(capabilities),
     canEdit: isPlaneBoardWritableByHost(capabilities),
     canAssign,
@@ -305,21 +277,21 @@ export function usePlaneBoard(
       }
     }, [canAssign, members.load]),
     ...editControls,
+    ...moveControls,
     ...commentControls,
     ...creation,
     selectProject: useCallback(
       (next: string) => {
         setProjectId(next)
         setActiveStateId(null)
-        setMoves(EMPTY_PLANE_BOARD_MOVES)
+        resetMoves()
         resetEdits()
         resetComments()
       },
-      [resetComments, resetEdits]
+      [resetComments, resetEdits, resetMoves]
     ),
     selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
     refresh: useCallback(() => void reload(), [reload]),
-    moveWorkItem,
-    dismissMoveError: useCallback(() => setMoveError(null), [])
+    moveWorkItem
   }
 }

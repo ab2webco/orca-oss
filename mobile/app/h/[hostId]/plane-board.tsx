@@ -223,9 +223,9 @@ export default function PlaneBoardScreen() {
                   ))}
                 </View>
               ) : null}
-              {board.movingWorkItemId === item.id ? (
+              {board.movingWorkItemIds.has(item.id) ? (
                 <Text style={styles.cardMoving}>Moving…</Text>
-              ) : board.editingWorkItemId === item.id ? (
+              ) : board.editingWorkItemIds.has(item.id) ? (
                 <Text style={styles.cardMoving}>Updating…</Text>
               ) : null}
             </Pressable>

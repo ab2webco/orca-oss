@@ -5,7 +5,7 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneStateMutationResult,
-  PlaneUser,
+  PlaneMember,
   PlaneWorkItem,
   PlaneWorkItemUpdate
 } from '../../shared/plane-types'
@@ -269,7 +269,7 @@ export const PLANE_HANDLERS: Record<string, CommandHandler> = {
     printResult(response, json, formatPlaneLabels)
   },
   'plane members list': async ({ flags, client, json }) => {
-    const response = await client.call<PlaneUser[]>('plane.listMembers', {
+    const response = await client.call<PlaneMember[]>('plane.listMembers', {
       workspaceId: getOptionalStringFlag(flags, 'workspace'),
       projectId: getOptionalStringFlag(flags, 'project')
     })
