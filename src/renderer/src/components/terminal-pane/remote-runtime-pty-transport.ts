@@ -432,7 +432,8 @@ export function createRemoteRuntimePtyTransport(
     return {
       phase,
       epoch: recovery.currentEpoch,
-      attempt: recovery.attemptCount
+      attempt: recovery.attemptCount,
+      flags: { connected, attachmentReady, connecting, terminalEnded }
     }
   }
 
@@ -1496,6 +1497,20 @@ export function createRemoteRuntimePtyTransport(
           return
         }
         if (update.terminalHandle === previousHandle) {
+          if (
+            !autoRecoveryWindowSpent &&
+            !getCurrentMultiplexedStream(previousHandle) &&
+            // Why: a handle the host declared stale stays fenced; only a partition may reuse it on the host's word alone.
+            getRecoveryReplacementPolicy(previousHandle) !== 'require-replacement' &&
+            recovery.hasParkedRetry
+          ) {
+            // Why: the reopened window earns a fresh inventory budget too, or the reconnect retry parks again on the spent one.
+            resubscribeInventoryEpoch = null
+            // Why: a republished surface proves the host serves again, so the parked retry fires now instead of waiting out its backoff tier.
+            if (recovery.retryForConfirmedReconnect()) {
+              return
+            }
+          }
           // Why: once the auto-recovery window is spent, a host still publishing this surface is evidence the fenced handle outlived the stale error.
           if (!autoRecoveryWindowSpent || getCurrentMultiplexedStream(previousHandle)) {
             return

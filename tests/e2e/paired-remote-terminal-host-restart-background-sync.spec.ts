@@ -15,6 +15,7 @@ import {
   type PairedElectronClient
 } from './helpers/paired-electron-client'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
+import { settlePairedCleanupCall } from './helpers/paired-cleanup-call-budget'
 import { waitForTabParked } from './helpers/terminal-hidden-parking'
 
 const PARK_DELAY_MS = 2_000
@@ -245,18 +246,54 @@ async function readPaneContent(page: Page, webTabId: string): Promise<string> {
   }, webTabId)
 }
 
-async function waitForPaneConnected(page: Page, webTabId: string): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        page.evaluate((id) => {
-          const manager = window.__paneManagers?.get(id)
-          const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
-          return pane?.container.dataset.ptyRecoveryState ?? null
-        }, webTabId),
-      { timeout: 30_000, message: `Pane ${webTabId} never completed transport recovery` }
+// Why: the renderer's pty-connect console never reaches the job log, so read the ring buffer directly.
+async function readPtyConnectDiagnostics(page: Page): Promise<string> {
+  return page
+    .evaluate(() =>
+      ((globalThis as typeof globalThis & { __ptyConnectDiag?: string[] }).__ptyConnectDiag ?? [])
+        .slice(-12)
+        .join(' | ')
     )
-    .toBe('connected')
+    .catch(() => 'unavailable')
+}
+
+async function waitForPaneConnected(page: Page, webTabId: string): Promise<void> {
+  // Why: "never connected" alone cannot name the stuck path; keep every distinct state the poll saw.
+  const observed: string[] = []
+  try {
+    await expect
+      .poll(
+        async () => {
+          const state = await page.evaluate((id) => {
+            const manager = window.__paneManagers?.get(id)
+            const pane = manager?.getActivePane?.() ?? manager?.getPanes?.()[0] ?? null
+            if (!pane) {
+              return 'no-pane'
+            }
+            const { ptyRecoveryState, ptyRecoveryAttempt, ptyRecoveryEpoch, ptyRecoveryFlags } =
+              pane.container.dataset
+            return `${ptyRecoveryState ?? 'unset'}/epoch:${ptyRecoveryEpoch ?? '?'}/attempt:${ptyRecoveryAttempt ?? '?'}/${ptyRecoveryFlags ?? 'no-flags'}`
+          }, webTabId)
+          if (observed.at(-1) !== state) {
+            observed.push(state)
+          }
+          return state.split('/')[0]
+        },
+        { timeout: 30_000, message: `Pane ${webTabId} never completed transport recovery` }
+      )
+      .toBe('connected')
+    // Why: a signal only printed on failure cannot be told from one every run prints; keep the passing control.
+    console.log(
+      `[pane-connected] ${webTabId} observed ${observed.join(' -> ')}; pty-connect ${(await readPtyConnectDiagnostics(page)) || 'none'}`
+    )
+  } catch (error) {
+    // Why: an offline pane at epoch 0 never attached, so the connect branch it took is the diagnosis.
+    const connectDiagnostics = await readPtyConnectDiagnostics(page)
+    throw new Error(
+      `Pane ${webTabId} never completed transport recovery; observed ${observed.join(' -> ') || 'nothing'}; pty-connect ${connectDiagnostics || 'none'}`,
+      { cause: error }
+    )
+  }
 }
 
 async function expectTerminalInteractive(
@@ -420,9 +457,12 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
   } finally {
     if (client) {
       for (const terminal of terminals) {
-        await callRuntime(client.page, client.environmentId, 'terminal.closeTab', {
-          terminal: terminal.handle
-        }).catch(() => undefined)
+        // Why: a dead paired transport never settles this RPC, and a cleanup that outlives the failure hides it behind a suite timeout.
+        await settlePairedCleanupCall(
+          callRuntime(client.page, client.environmentId, 'terminal.closeTab', {
+            terminal: terminal.handle
+          })
+        )
       }
       await client.dispose()
     }

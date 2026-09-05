@@ -194,6 +194,72 @@ describe('RemoteRuntimePtyRecoveryState', () => {
     state.dispose()
   })
 
+  it('restarts the backoff ladder and the recovery window on a confirmed reconnect', async () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const retry = vi.fn((epoch: number) => {
+      state.schedule(epoch, retry)
+    })
+    const epoch = state.begin()
+    state.schedule(epoch, retry)
+    // Why: the ladder must be parked on a high tier, so a plain retryNow would resume at 8s.
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(state.attemptCount).toBe(5)
+
+    expect(state.retryForConfirmedReconnect()).toBe(true)
+    expect(retry).toHaveBeenLastCalledWith(epoch)
+    expect(state.attemptCount).toBe(1)
+
+    retry.mockClear()
+    await vi.advanceTimersByTimeAsync(250)
+    expect(retry).toHaveBeenCalledTimes(1)
+
+    // Why: the reopened window re-arms the deadline, so the pane must not latch on the original cutoff.
+    await vi.advanceTimersByTimeAsync(REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS - 4_000)
+    expect(state.currentPhase).not.toBe('disconnected')
+    state.dispose()
+  })
+
+  it.each([
+    [
+      'scheduled',
+      (state: RemoteRuntimePtyRecoveryState, epoch: number, retry: () => void) => {
+        state.schedule(epoch, retry)
+      }
+    ],
+    [
+      'parked',
+      (state: RemoteRuntimePtyRecoveryState, epoch: number, retry: () => void) => {
+        state.parkRetryForExternalTrigger(epoch, retry)
+      }
+    ]
+  ])('reports a %s retry as revivable until the pane finishes', (_label, arm) => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const epoch = state.begin()
+    expect(state.hasParkedRetry).toBe(false)
+
+    arm(state, epoch, vi.fn())
+    expect(state.hasParkedRetry).toBe(true)
+
+    state.markHealthy()
+    expect(state.hasParkedRetry).toBe(false)
+    state.dispose()
+  })
+
+  it('revives a parked retry on a confirmed reconnect that retryNow cannot fire', () => {
+    vi.useFakeTimers()
+    const state = new RemoteRuntimePtyRecoveryState()
+    const retry = vi.fn()
+    const epoch = state.begin()
+    state.parkRetryForExternalTrigger(epoch, retry)
+
+    expect(state.retryNow()).toBe(false)
+    expect(state.retryForConfirmedReconnect()).toBe(true)
+    expect(retry).toHaveBeenCalledWith(epoch)
+    state.dispose()
+  })
+
   it('refuses to park over an armed backoff or a stale epoch', () => {
     vi.useFakeTimers()
     const state = new RemoteRuntimePtyRecoveryState()

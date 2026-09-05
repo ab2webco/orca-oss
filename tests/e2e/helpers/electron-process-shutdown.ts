@@ -44,7 +44,12 @@ function waitForExit(proc: ChildProcess, timeoutMs: number): Promise<boolean> {
   })
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+/** Reject with `message` if `promise` outlives `timeoutMs`; the timer never holds the run open. */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
   let timeout: NodeJS.Timeout | null = null
   try {
     return await Promise.race([
