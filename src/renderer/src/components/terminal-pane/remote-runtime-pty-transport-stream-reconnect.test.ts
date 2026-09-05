@@ -14,6 +14,7 @@ let subscriptionCallbacks: MultiplexSubscriptionCallbacks = null
 let resolvedPaneHandle = 'terminal-1'
 
 const {
+  runtimeCall,
   runtimeSubscribe,
   subscriptionSendBinary,
   emitMultiplexReady,
@@ -645,5 +646,56 @@ describe('createRemoteRuntimePtyTransport', () => {
 
     await vi.waitFor(() => expect(transportCallbacks).toHaveLength(3))
     transport.destroy?.()
+  })
+
+  it('keeps the pane revivable when the recovery cutoff lands on a resubscribe still in flight', async () => {
+    vi.useFakeTimers()
+    try {
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const { retryAllRemoteRuntimePtyRecoveriesNow } =
+        await import('./remote-runtime-pty-recovery-state')
+      const healthyRuntimeCall = runtimeCall.getMockImplementation()
+      const onError = vi.fn()
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'tab-1',
+        leafId: 'pane:1'
+      })
+
+      transport.attach({
+        existingPtyId: 'remote:env-1@@terminal-1',
+        callbacks: { onError }
+      })
+      await vi.waitFor(() => expect(subscriptionSendBinary).toHaveBeenCalled())
+      emitSnapshot(latestSubscribePayload().streamId, 'before partition')
+      expect(transport.isConnected()).toBe(true)
+
+      // Why: an attempt that never settles arms no backoff, which is the shape that stranded the pane.
+      runtimeCall.mockImplementation(async (request: { method: string; params?: unknown }) => {
+        if (request.method === 'terminal.resolvePane') {
+          return new Promise(() => {})
+        }
+        return healthyRuntimeCall?.(request)
+      })
+      subscriptionCallbacks?.onClose?.()
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      const subscribeCallsAtCutoff = runtimeSubscribe.mock.calls.length
+      expect(transport.getRecoveryState?.().phase).toBe('disconnected')
+      expect(onError).not.toHaveBeenCalled()
+
+      runtimeCall.mockImplementation(healthyRuntimeCall ?? (async () => ({ ok: true })))
+      expect(retryAllRemoteRuntimePtyRecoveriesNow()).toBe(1)
+      await vi.waitFor(() =>
+        expect(runtimeSubscribe).toHaveBeenCalledTimes(subscribeCallsAtCutoff + 1)
+      )
+      emitSnapshot(latestSubscribePayload().streamId, 'after online or resume')
+
+      expect(transport.isConnected()).toBe(true)
+      expect(transport.getPtyId()).toBe('remote:env-1@@terminal-1')
+      transport.destroy?.()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

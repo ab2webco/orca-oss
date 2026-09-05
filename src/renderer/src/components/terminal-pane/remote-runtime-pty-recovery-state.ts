@@ -34,6 +34,7 @@ export class RemoteRuntimePtyRecoveryState {
   private deadlineTimer: ReturnType<typeof setTimeout> | null = null
   private pendingRetry: ((epoch: number) => void) | null = null
   private pendingEpoch: number | null = null
+  private inFlightRetry: ((epoch: number) => void) | null = null
 
   constructor(private readonly onChange?: () => void) {}
 
@@ -98,6 +99,8 @@ export class RemoteRuntimePtyRecoveryState {
       this.pendingRetry = null
       this.pendingEpoch = null
       scheduledRecoveries.delete(this)
+      // Why: the attempt this fires may never settle, and the cutoff needs something to park.
+      this.inFlightRetry = retry
       this.phase = 'recovering'
       this.onChange?.()
       retry(epoch)
@@ -120,8 +123,19 @@ export class RemoteRuntimePtyRecoveryState {
     return true
   }
 
+  // Why: an attempt that arms no timer is invisible to the cutoff, which would then latch with nothing to revive.
+  setAttemptRetry(epoch: number, retry: (epoch: number) => void): void {
+    if (!this.isCurrent(epoch)) {
+      return
+    }
+    this.inFlightRetry = retry
+  }
+
   // Why: a one-shot retry whose owner already resolved elsewhere would otherwise survive the cutoff as fake revivable work.
   discardPendingRetry(retry: (epoch: number) => void): void {
+    if (this.inFlightRetry === retry) {
+      this.inFlightRetry = null
+    }
     if (this.pendingRetry !== retry) {
       return
     }
@@ -148,6 +162,7 @@ export class RemoteRuntimePtyRecoveryState {
     const retry = this.pendingRetry
     const latched = this.phase === 'disconnected'
     this.clearRetryTimer()
+    this.inFlightRetry = retry
     if (latched || freshWindow) {
       // Why: the deadline only stops auto-retry; an explicit trigger opens a fresh recovery window.
       if (latched) {
@@ -210,11 +225,22 @@ export class RemoteRuntimePtyRecoveryState {
       this.deadlineTimer = null
       // Why: the cutoff stops self-initiated retries but must keep the pane revivable by online/resume/reconnect.
       this.stopRetryTimer()
+      this.parkInFlightRetry()
       this.phase = 'disconnected'
       this.onChange?.()
     }, REMOTE_RUNTIME_AUTO_RECOVERY_TIMEOUT_MS)
     timer.unref?.()
     this.deadlineTimer = timer
+  }
+
+  // Why: an attempt still in flight at the cutoff armed no timer, so without this the pane latches with nothing to revive.
+  private parkInFlightRetry(): void {
+    if (this.pendingRetry !== null || this.inFlightRetry === null) {
+      return
+    }
+    this.pendingRetry = this.inFlightRetry
+    this.pendingEpoch = this.epoch
+    scheduledRecoveries.add(this)
   }
 
   private clearTimers(): void {
@@ -233,6 +259,7 @@ export class RemoteRuntimePtyRecoveryState {
     this.stopRetryTimer()
     this.pendingRetry = null
     this.pendingEpoch = null
+    this.inFlightRetry = null
     scheduledRecoveries.delete(this)
   }
 

@@ -1733,6 +1733,13 @@ export function createRemoteRuntimePtyTransport(
       viewportBatcher.clear()
       clearPendingViewportClaim()
     }
+    // Why: this attempt arms no backoff timer, so the cutoff needs it to keep the pane revivable.
+    recovery.setAttemptRetry(recoveryEpoch, (nextEpoch) => {
+      scheduleResubscribeAfterTransportClose(
+        handle ? getRecoveryReplacementPolicy(handle) : 'reuse',
+        nextEpoch
+      )
+    })
     strengthenRecoveryReplacementPolicy(handle, replacementPolicy)
     if (
       replacementPolicy === 'require-replacement' &&
