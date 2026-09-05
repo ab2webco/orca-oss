@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   appMock,
   autoUpdaterMock,
+  fetchChangelogMock,
   fetchNudgeMock,
   shouldApplyNudgeMock,
   fetchNewerReleaseTagsMock,
@@ -82,6 +83,220 @@ describe('updater', () => {
       'updater:status',
       expect.objectContaining({ version: '1.0.62', activeNudgeId: 'campaign-1' })
     )
+  })
+
+  it('offers the nudge content as the changelog over the release-notes summary', async () => {
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+
+    fetchNudgeMock.mockResolvedValue({
+      id: 'campaign-1',
+      minVersion: '1.0.0',
+      content: {
+        version: '1.0.61',
+        headline: 'Faster terminal start',
+        highlights: ['Tabs restore in half the time'],
+        link: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
+      }
+    })
+    shouldApplyNudgeMock.mockReturnValue(true)
+    fetchChangelogMock.mockResolvedValue({
+      release: {
+        title: 'Orca 1.0.61',
+        description: 'chore: bump deps · fix: a commit subject',
+        releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
+      },
+      releasesBehind: null
+    })
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(sendMock).toHaveBeenCalledWith('updater:status', {
+      state: 'available',
+      version: '1.0.61',
+      activeNudgeId: 'campaign-1',
+      changelog: {
+        release: {
+          title: 'Faster terminal start',
+          description: '',
+          highlights: ['Tabs restore in half the time'],
+          releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
+        },
+        releasesBehind: null
+      }
+    })
+  })
+
+  it('keeps the release-notes summary when the nudge carries no content', async () => {
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+    const summary = {
+      release: {
+        title: 'Orca 1.0.61',
+        description: 'fix: a commit subject',
+        releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
+      },
+      releasesBehind: null
+    }
+
+    fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
+    shouldApplyNudgeMock.mockReturnValue(true)
+    fetchChangelogMock.mockResolvedValue(summary)
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(sendMock).toHaveBeenCalledWith('updater:status', {
+      state: 'available',
+      version: '1.0.61',
+      activeNudgeId: 'campaign-1',
+      changelog: summary
+    })
+  })
+
+  it('recovers the nudge content for a campaign restored from the store after a relaunch', async () => {
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+
+    fetchNudgeMock.mockResolvedValue({
+      id: 'campaign-1',
+      minVersion: '1.0.0',
+      content: {
+        version: '1.0.61',
+        headline: 'Faster terminal start',
+        highlights: ['Tabs restore faster']
+      }
+    })
+    // Why false: the persisted pending id equals the fetched id, which is exactly how shouldApplyNudge answers after a relaunch.
+    shouldApplyNudgeMock.mockReturnValue(false)
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => null,
+      getPendingUpdateNudgeId: () => 'campaign-1',
+      getDismissedUpdateNudgeId: () => null
+    })
+    await vi.waitFor(() => {
+      expect(fetchNudgeMock).toHaveBeenCalled()
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(sendMock).toHaveBeenCalledWith(
+      'updater:status',
+      expect.objectContaining({
+        state: 'available',
+        version: '1.0.61',
+        activeNudgeId: 'campaign-1',
+        changelog: expect.objectContaining({
+          release: expect.objectContaining({ title: 'Faster terminal start' })
+        })
+      })
+    )
+  })
+
+  it('keeps the release-notes summary when the offered version is not the one the content describes', async () => {
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+
+    fetchNudgeMock.mockResolvedValue({
+      id: 'campaign-1',
+      minVersion: '1.0.0',
+      content: { version: '1.0.61', headline: 'Faster terminal start', highlights: [] }
+    })
+    shouldApplyNudgeMock.mockReturnValue(true)
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // Why a newer version: a later release can publish while the campaign is still pending.
+    autoUpdaterMock.emit('update-available', { version: '1.0.62' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(sendMock).toHaveBeenCalledWith('updater:status', {
+      state: 'available',
+      version: '1.0.62',
+      activeNudgeId: 'campaign-1',
+      changelog: null
+    })
+  })
+
+  it('does not attach nudge content to a later manual check', async () => {
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+
+    fetchNudgeMock.mockResolvedValue({
+      id: 'campaign-1',
+      minVersion: '1.0.0',
+      content: { version: '1.0.61', headline: 'Faster terminal start', highlights: [] }
+    })
+    shouldApplyNudgeMock.mockReturnValue(true)
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      return Promise.resolve(undefined)
+    })
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    sendMock.mockClear()
+    checkForUpdatesFromMenu()
+    await vi.waitFor(() => {
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(2)
+    })
+    autoUpdaterMock.emit('update-available', { version: '1.0.62' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(sendMock).toHaveBeenCalledWith('updater:status', {
+      state: 'available',
+      version: '1.0.62',
+      changelog: null
+    })
   })
 
   it('preserves the pending nudge marker across a later background check', async () => {

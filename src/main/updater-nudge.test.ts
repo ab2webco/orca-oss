@@ -124,6 +124,106 @@ describe('updater-nudge', () => {
 
       await expect(fetchNudge()).resolves.toBeNull()
     })
+
+    it('carries a well-formed content block through', async () => {
+      netFetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 'campaign-1',
+          maxVersion: '1.1.19',
+          content: {
+            version: '1.1.20',
+            headline: 'Faster terminal start',
+            highlights: ['Tabs restore in half the time', 'SSH panes keep their scrollback'],
+            link: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.1.20'
+          }
+        })
+      })
+
+      await expect(fetchNudge()).resolves.toEqual({
+        id: 'campaign-1',
+        maxVersion: '1.1.19',
+        content: {
+          version: '1.1.20',
+          headline: 'Faster terminal start',
+          highlights: ['Tabs restore in half the time', 'SSH panes keep their scrollback'],
+          link: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.1.20'
+        }
+      })
+    })
+
+    it('still fires a nudge that carries no content block', async () => {
+      netFetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'campaign-1', maxVersion: '1.1.19' })
+      })
+
+      const result = await fetchNudge()
+      expect(result).not.toBeNull()
+      expect(result?.content).toBeUndefined()
+    })
+
+    it.each([
+      ['a string', 'Faster terminal start'],
+      ['an array', ['Faster terminal start']],
+      ['null', null],
+      ['a missing version', { headline: 'Faster', highlights: ['One'] }],
+      ['an invalid version', { version: 'latest', headline: 'Faster', highlights: ['One'] }],
+      ['a missing headline', { version: '1.1.20', highlights: ['One'] }],
+      ['a blank headline', { version: '1.1.20', headline: '   ', highlights: ['One'] }],
+      ['non-array highlights', { version: '1.1.20', headline: 'Faster', highlights: 'One' }],
+      ['a non-string highlight', { version: '1.1.20', headline: 'Faster', highlights: ['One', 2] }],
+      ['a blank highlight', { version: '1.1.20', headline: 'Faster', highlights: ['One', ' '] }]
+    ])('still fires the nudge when content is %s, dropping the content', async (_, content) => {
+      netFetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'campaign-1', maxVersion: '1.1.19', content })
+      })
+
+      await expect(fetchNudge()).resolves.toEqual({ id: 'campaign-1', maxVersion: '1.1.19' })
+    })
+
+    it.each(['javascript:alert(1)', 'http://example.com/notes', 'release notes'])(
+      'keeps the headline and drops a link that is not https (%s)',
+      async (link) => {
+        netFetchMock.mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            id: 'campaign-1',
+            maxVersion: '1.1.19',
+            content: { version: '1.1.20', headline: 'Faster', highlights: [], link }
+          })
+        })
+
+        await expect(fetchNudge()).resolves.toEqual({
+          id: 'campaign-1',
+          maxVersion: '1.1.19',
+          content: { version: '1.1.20', headline: 'Faster', highlights: [] }
+        })
+      }
+    )
+
+    it('keeps only the first three distinct highlights and trims each line', async () => {
+      netFetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 'campaign-1',
+          maxVersion: '1.1.19',
+          content: {
+            version: ' 1.1.20 ',
+            headline: '  Faster  ',
+            highlights: [' One ', 'Two', 'One', 'Three', 'Four']
+          }
+        })
+      })
+
+      const result = await fetchNudge()
+      expect(result?.content).toEqual({
+        version: '1.1.20',
+        headline: 'Faster',
+        highlights: ['One', 'Two', 'Three']
+      })
+    })
   })
 
   describe('versionMatchesRange', () => {

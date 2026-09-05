@@ -1,11 +1,13 @@
 import { net } from 'electron'
 import { compareVersions, isValidVersion } from './updater-fallback'
 import { UPDATE_NUDGE_URL } from './update-feed-target'
+import { parseNudgeContent, type NudgeContent } from './updater-nudge-content'
 
 export type NudgeConfig = {
   id: string
   minVersion?: string
   maxVersion?: string
+  content?: NudgeContent
 }
 
 export async function fetchNudge(): Promise<NudgeConfig | null> {
@@ -22,7 +24,7 @@ export async function fetchNudge(): Promise<NudgeConfig | null> {
       return null
     }
 
-    const { id, minVersion, maxVersion } = json as Record<string, unknown>
+    const { id, minVersion, maxVersion, content } = json as Record<string, unknown>
     if (typeof id !== 'string' || !id.trim()) {
       return null
     }
@@ -51,11 +53,12 @@ export async function fetchNudge(): Promise<NudgeConfig | null> {
       return null
     }
 
-    return {
-      id: id.trim(),
-      minVersion,
-      maxVersion
+    const config: NudgeConfig = { id: id.trim(), minVersion, maxVersion }
+    const parsedContent = parseNudgeContent(content)
+    if (parsedContent) {
+      config.content = parsedContent
     }
+    return config
   } catch {
     return null
   }

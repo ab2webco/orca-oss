@@ -74,6 +74,11 @@ jobs:
         id: head
         run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
 
+      # Why here: a malformed announcement must fail the dispatch before any build
+      # runs, not the last step after every asset is already published.
+      - name: Validate the release announcement
+        run: node config/scripts/write-update-nudge.mjs --check whats-new/next-release.json
+
   # Why the gate re-runs the suite instead of reading an existing check: PR Checks
   # is `pull_request`-only, so no commit on `main` — least of all the version-bump
   # commit this workflow authors — ever carries one. The only signal that can be
@@ -643,26 +648,46 @@ jobs:
           prev="${{ needs.version.outputs.prev }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          node -e "
-            const fs = require('fs')
-            // Why: a fresh id each release re-nudges older installs to check;
-            // maxVersion=prev keeps the newest build from nudging itself.
-            fs.mkdirSync('whats-new', { recursive: true })
-            fs.writeFileSync('whats-new/nudge.json', JSON.stringify({
-              id: 'orca-lab-$version',
-              minVersion: '1.0.0',
-              maxVersion: '$prev'
-            }, null, 2) + '\n')
-          "
-          git add whats-new/nudge.json
-          git commit -m "chore(release): announce $tag via update nudge"
-          # Why: the version job already pushed the bump commit to main; retry
-          # once with a rebase in case main moved between checkout and push.
-          push_nudge() {
-            git push origin HEAD:main
+          # Why: a fresh id each release re-nudges older installs to check;
+          # maxVersion=prev keeps the newest build from nudging itself. The
+          # content block comes from whats-new/next-release.json, which the
+          # release author writes by hand (see whats-new/README.md).
+          # Why read it from the pinned commit: main can already carry the
+          # next release's announcement by the time the builds finish.
+          resolve_sha="${{ needs.resolve.outputs.sha }}"
+          announcement=/tmp/next-release.json
+          if git cat-file -e "$resolve_sha:whats-new/next-release.json" 2>/dev/null; then
+            git show "$resolve_sha:whats-new/next-release.json" > "$announcement"
+          else
+            : > "$announcement"
+          fi
+          # Why build the commit on main's tip: the version job already pushed
+          # the bump commit, so the dispatch checkout is always behind; a rebase
+          # would replay the announcement deletion below into a modify/delete
+          # conflict whenever an author rewrote the file during the build.
+          publish_nudge_commit() {
+            git fetch -q origin main
+            git checkout -q --detach origin/main
+            mkdir -p whats-new
+            node config/scripts/write-update-nudge.mjs \
+              --version "$version" \
+              --prev "$prev" \
+              --announcement "$announcement" \
+              --out whats-new/nudge.json
+            # Why remove it: an announcement left behind would describe this
+            # release again on the next one. Only the one this release consumed:
+            # a file rewritten on main since dispatch belongs to the next release.
+            if [[ -f whats-new/next-release.json ]] \
+              && git diff --quiet "$resolve_sha" HEAD -- whats-new/next-release.json; then
+              git rm -q whats-new/next-release.json
+            fi
+            git add whats-new/nudge.json
+            git commit -q -m "chore(release): announce $tag via update nudge"
           }
-          if ! push_nudge; then
-            git fetch origin main
-            git rebase origin/main
-            push_nudge
+          publish_nudge_commit
+          # Why rebuild instead of rebase: main can move between fetch and push;
+          # recomputing on the new tip re-checks the announcement guard too.
+          if ! git push origin HEAD:main; then
+            publish_nudge_commit
+            git push origin HEAD:main
           fi

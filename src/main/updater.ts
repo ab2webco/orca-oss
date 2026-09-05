@@ -66,6 +66,7 @@ import {
 } from './updater-prerelease-feed'
 import { UPDATE_FEED_LATEST_DOWNLOAD_URL } from './update-feed-target'
 import { fetchNudge, shouldApplyNudge } from './updater-nudge'
+import { nudgeContentToChangelog, type NudgeContent } from './updater-nudge-content'
 import {
   failServeUpdateHandoff,
   getServeUpdateHandoffFailure,
@@ -155,6 +156,8 @@ let activeUpdateCheckEventAttemptId: number | null = null
 let updateAvailableEventPendingAttemptId: number | null = null
 let pendingUserInitiatedCheckAfterInFlight: UpdateCheckVariant | null = null
 let activeUpdateNudgeId: string | null = null
+// Why keyed by id and version: the copy belongs to one campaign and one release; a check that resolves another version must not wear it.
+let activeUpdateNudgeContent: { id: string; content: NudgeContent } | null = null
 let awaitingNudgeCheckOutcome = false
 let nudgeCheckInFlight = false
 let lastNudgeCheckAt = 0
@@ -245,6 +248,7 @@ function clearPrereleaseFallbackContext(): void {
 
 function clearPendingUpdateNudge(): void {
   activeUpdateNudgeId = null
+  activeUpdateNudgeContent = null
   awaitingNudgeCheckOutcome = false
   _setPendingUpdateNudgeId?.(null)
 }
@@ -273,6 +277,17 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
   }
   if (status.state === 'idle' || status.state === 'checking' || status.state === 'not-available') {
     return status
+  }
+  if (
+    status.state === 'available' &&
+    activeUpdateNudgeContent?.id === activeUpdateNudgeId &&
+    activeUpdateNudgeContent.content.version === status.version
+  ) {
+    return {
+      ...status,
+      activeNudgeId: activeUpdateNudgeId,
+      changelog: nudgeContentToChangelog(activeUpdateNudgeContent.content)
+    }
   }
   return { ...status, activeNudgeId: activeUpdateNudgeId }
 }
@@ -2079,12 +2094,17 @@ async function checkForUpdateNudge(): Promise<void> {
       return
     }
 
+    const pendingUpdateNudgeId = _getPendingUpdateNudgeId?.() ?? null
+    // Why: a relaunch restores the pending campaign id from the store but not its copy; the poll is the only place to get it back.
+    if (nudge.content && nudge.id === pendingUpdateNudgeId) {
+      activeUpdateNudgeContent = { id: nudge.id, content: nudge.content }
+    }
+
     if (currentStatus.state === 'checking' || currentStatus.state === 'downloading') {
       return
     }
 
     const appVersion = app.getVersion()
-    const pendingUpdateNudgeId = _getPendingUpdateNudgeId?.() ?? null
     const dismissedUpdateNudgeId = _getDismissedUpdateNudgeId?.() ?? null
 
     if (
@@ -2096,6 +2116,7 @@ async function checkForUpdateNudge(): Promise<void> {
       })
     ) {
       awaitingNudgeCheckOutcome = true
+      activeUpdateNudgeContent = nudge.content ? { id: nudge.id, content: nudge.content } : null
       _setPendingUpdateNudgeId?.(nudge.id)
       mainWindowRef?.webContents.send('updater:clearDismissal')
       runBackgroundUpdateCheck(nudge.id)

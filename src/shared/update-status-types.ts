@@ -7,6 +7,8 @@ import type { DedicatedRepoChannel, ReleaseBuild, ReleaseChannel } from './relea
 export type ChangelogRelease = {
   title: string
   description: string
+  /** Author-written lines from the update nudge; rendered as a list instead of `description`. */
+  highlights?: string[]
   mediaUrl?: string
   releaseNotesUrl: string
 }

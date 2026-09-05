@@ -650,6 +650,21 @@ export function UpdateCard() {
   )
 }
 
+// ── Release highlights ───────────────────────────────────────────────
+
+function ReleaseHighlights({ highlights }: { highlights?: string[] }) {
+  if (!highlights || highlights.length === 0) {
+    return null
+  }
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground marker:text-muted-foreground">
+      {highlights.map((highlight) => (
+        <li key={highlight}>{highlight}</li>
+      ))}
+    </ul>
+  )
+}
+
 // ── Rich card content ────────────────────────────────────────────────
 
 function RichCardContent({
@@ -673,6 +688,7 @@ function RichCardContent({
   onUpdate: () => void
   onClose: () => void
 }) {
+  const showReleasesBehind = releasesBehind !== null && releasesBehind > 1
   const showMedia =
     release.mediaUrl &&
     !mediaFailed &&
@@ -716,21 +732,25 @@ function RichCardContent({
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground">
-        {release.description}
-        {releasesBehind !== null && releasesBehind > 1 && (
-          <>
-            {' '}
-            <button
-              className="text-xs text-muted-foreground/70 underline hover:text-foreground inline"
-              onClick={() => void window.api.shell.openUrl(release.releaseNotesUrl)}
-            >
-              +{releasesBehind - 1}{' '}
-              {translate('auto.components.UpdateCard.ccd8b0a793', 'more since your last update')}
-            </button>
-          </>
-        )}
-      </p>
+      <ReleaseHighlights highlights={release.highlights} />
+
+      {(release.description || showReleasesBehind) && (
+        <p className="text-sm text-muted-foreground">
+          {release.description}
+          {showReleasesBehind && (
+            <>
+              {' '}
+              <button
+                className="text-xs text-muted-foreground/70 underline hover:text-foreground inline"
+                onClick={() => void window.api.shell.openUrl(release.releaseNotesUrl)}
+              >
+                +{releasesBehind - 1}{' '}
+                {translate('auto.components.UpdateCard.ccd8b0a793', 'more since your last update')}
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       <button
         className="text-xs text-muted-foreground underline hover:text-foreground self-start"
@@ -878,13 +898,21 @@ function DownloadingContent({
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground">
-        {release
-          ? release.description
-          : translate('auto.components.UpdateCard.93794ea932', 'Orca v{{value0}} is downloading.', {
-              value0: version
-            })}
-      </p>
+      {release && <ReleaseHighlights highlights={release.highlights} />}
+
+      {(!release || release.description) && (
+        <p className="text-sm text-muted-foreground">
+          {release
+            ? release.description
+            : translate(
+                'auto.components.UpdateCard.93794ea932',
+                'Orca v{{value0}} is downloading.',
+                {
+                  value0: version
+                }
+              )}
+        </p>
+      )}
 
       {showReleaseNotes && (
         <button
