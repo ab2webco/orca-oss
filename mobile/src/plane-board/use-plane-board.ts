@@ -29,6 +29,7 @@ import {
   isPlaneBoardWritableByHost
 } from './plane-board-writes-capability'
 import { applyPlaneBoardEdits } from './plane-board-edit-state'
+import { usePlaneBoardComments, type PlaneBoardComments } from './use-plane-board-comments'
 import { usePlaneBoardCreate, type PlaneBoardCreate } from './use-plane-board-create'
 import { usePlaneBoardEdits, type PlaneBoardEdits } from './use-plane-board-edits'
 import { usePlaneMembers, type PlaneMembers } from './use-plane-members'
@@ -36,6 +37,7 @@ import { usePlaneMembers, type PlaneMembers } from './use-plane-members'
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
+  Omit<PlaneBoardComments, 'reset'> &
   PlaneBoardCreate & {
     status: PlaneBoardStatus
     error: string | null
@@ -55,6 +57,8 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     canEdit: boolean
     /** False on a host that refuses plane.listMembers; no assignee picker renders at all. */
     canAssign: boolean
+    /** Comments ride the same host gate as create; write-only, no thread is read. */
+    canComment: boolean
     members: PlaneMembers['members']
     membersStatus: PlaneMembers['status']
     loadMembers: () => void
@@ -178,7 +182,16 @@ export function usePlaneBoard(
   )
 
   const reload = useCallback(() => load({ silent: true }), [load])
-  const edits = usePlaneBoardEdits({ client, workspaceId, items: loaded.items, reload })
+  // Destructured so the spread below cannot leak overrides/reset onto the board.
+  const {
+    overrides,
+    reset: resetEdits,
+    ...editControls
+  } = usePlaneBoardEdits({ client, workspaceId, items: loaded.items, reload })
+  const { reset: resetComments, ...commentControls } = usePlaneBoardComments({
+    client,
+    workspaceId
+  })
   const canAssign = arePlaneMembersListableByHost(capabilities)
   const members = usePlaneMembers(client, projectId, workspaceId)
 
@@ -186,12 +199,9 @@ export function usePlaneBoard(
     () =>
       buildPlaneBoardColumns(
         loaded.states,
-        applyPlaneBoardEdits(
-          applyPlaneBoardMoves(loaded.items, moves, loaded.states),
-          edits.overrides
-        )
+        applyPlaneBoardEdits(applyPlaneBoardMoves(loaded.items, moves, loaded.states), overrides)
       ),
-    [edits.overrides, loaded.items, loaded.states, moves]
+    [overrides, loaded.items, loaded.states, moves]
   )
   const activeColumn = useMemo(
     () => columns.find((column) => column.stateId === activeStateId) ?? columns[0] ?? null,
@@ -286,6 +296,7 @@ export function usePlaneBoard(
     canCreate: isPlaneBoardWritableByHost(capabilities),
     canEdit: isPlaneBoardWritableByHost(capabilities),
     canAssign,
+    canComment: isPlaneBoardWritableByHost(capabilities),
     members: members.members,
     membersStatus: members.status,
     loadMembers: useCallback(() => {
@@ -293,24 +304,18 @@ export function usePlaneBoard(
         members.load()
       }
     }, [canAssign, members.load]),
-    editingWorkItemId: edits.editingWorkItemId,
-    editError: edits.editError,
-    editErrorWorkItemId: edits.editErrorWorkItemId,
-    setPriority: edits.setPriority,
-    setAssignees: edits.setAssignees,
-    retryEdit: edits.retryEdit,
-    dismissEditError: edits.dismissEditError,
-    create: creation.create,
-    createCard: creation.createCard,
-    dismissCreateError: creation.dismissCreateError,
+    ...editControls,
+    ...commentControls,
+    ...creation,
     selectProject: useCallback(
       (next: string) => {
         setProjectId(next)
         setActiveStateId(null)
         setMoves(EMPTY_PLANE_BOARD_MOVES)
-        edits.reset()
+        resetEdits()
+        resetComments()
       },
-      [edits.reset]
+      [resetComments, resetEdits]
     ),
     selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
     refresh: useCallback(() => void reload(), [reload]),

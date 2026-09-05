@@ -7,6 +7,7 @@ import { createPlaneTask } from '../tasks/plane-mobile-task-list'
 import type { PlaneMobileMember, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import { PlaneWorkItemDetail } from '../tasks/plane-work-item-detail'
 import { PLANE_PRIORITY_LABELS, PLANE_PRIORITY_PICKER_ORDER } from '../tasks/plane-priority-label'
+import { PlaneBoardCommentComposer } from './plane-board-comment-composer'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 import type { PlaneBoard } from './use-plane-board'
 
@@ -39,6 +40,7 @@ type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
 
 function SheetBody({ item, board, onMove }: BodyProps) {
   const editing = board.editingWorkItemId === item.id
+  const failure = board.commentFailures[item.id] ?? null
   const { canAssign, loadMembers } = board
   useEffect(() => {
     if (canAssign) {
@@ -124,6 +126,17 @@ function SheetBody({ item, board, onMove }: BodyProps) {
           message={`Could not update the card — ${board.editError}`}
           onRetry={() => void board.retryEdit()}
           onDismiss={board.dismissEditError}
+        />
+      ) : null}
+      {board.canComment ? (
+        <PlaneBoardCommentComposer
+          key={item.id}
+          posting={board.postingCommentIds.has(item.id)}
+          initialDraft={failure?.body ?? ''}
+          error={failure?.message ?? null}
+          onPost={(body) => board.addComment(item, body)}
+          onRetry={failure?.retryable ? () => board.retryComment(item) : null}
+          onDismissError={() => board.dismissCommentError(item.id)}
         />
       ) : null}
       <View style={styles.section}>

@@ -33,6 +33,7 @@ import {
   MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
 } from './plane-board-writes-capability'
+import { PLANE_COMMENT_UNANSWERED_MESSAGE } from './use-plane-board-comments'
 import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 
 const PHASE_1_HOST = ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY]
@@ -49,6 +50,10 @@ type Call = { method: string; params?: unknown }
 type HostBehaviour = {
   /** Every board write rejects with this error, the way a dropped socket or a timeout does. */
   rejectWrites?: Error
+  /** Only writes on this card reject; the rest succeed. */
+  rejectWritesFor?: string
+  /** Writes on this card never answer, a request still inside its budget. */
+  hangWritesFor?: string
   items?: readonly unknown[]
   /** What a re-read returns once a write was attempted: what Plane really holds. */
   itemsAfterWrite?: readonly unknown[]
@@ -75,9 +80,20 @@ function createClient(
     sendRequest: vi.fn(async (method: string, params?: unknown) => {
       calls.push({ method, params })
       const reply = (result: unknown) => ({ id: '1', ok: true as const, result })
-      if (method === 'plane.createWorkItem' || method === 'plane.updateWorkItem') {
+      if (
+        method === 'plane.createWorkItem' ||
+        method === 'plane.updateWorkItem' ||
+        method === 'plane.addWorkItemComment'
+      ) {
         writeAttempted = true
-        if (behaviour.rejectWrites) {
+        const workItemId = (params as { workItemId?: string } | undefined)?.workItemId
+        if (behaviour.hangWritesFor && workItemId === behaviour.hangWritesFor) {
+          return new Promise(() => {})
+        }
+        if (
+          behaviour.rejectWrites &&
+          (!behaviour.rejectWritesFor || workItemId === behaviour.rejectWritesFor)
+        ) {
           throw behaviour.rejectWrites
         }
       }
@@ -103,6 +119,8 @@ function createClient(
           return reply({ ok: true, id: 'wi-9', identifier: 'ORCA-9', url: '' })
         case 'plane.updateWorkItem':
           return reply({ ok: true })
+        case 'plane.addWorkItemComment':
+          return reply({ ok: true, id: 'c-1' })
         case 'plane.listMembers':
           return reply([
             { id: 'u-1', displayName: 'Ada' },
@@ -128,10 +146,14 @@ function leafWithText(text: string, scope: ParentNode = document.body): HTMLElem
   return null
 }
 
-function typeInto(input: HTMLInputElement, value: string): void {
+function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   // Why: React ignores a plain `.value =` on a controlled input; the prototype
   // setter plus an input event is what a keystroke looks like to it.
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  const prototype =
+    input instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
   if (!setter) {
     throw new Error('HTMLInputElement has no value setter')
   }
@@ -522,5 +544,165 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
       workItemId: 'wi-1',
       updates: { priority: 'high' }
     })
+  })
+
+  // A multiline TextInput is a textarea on the web.
+  function commentInput(): HTMLTextAreaElement {
+    const input = byLabel('Comment')
+    if (!(input instanceof HTMLTextAreaElement)) {
+      throw new Error('comment input is not mounted')
+    }
+    return input
+  }
+
+  async function postComment(body: string): Promise<HTMLTextAreaElement> {
+    expect(byLabel('Post comment')).not.toBeNull()
+    const input = commentInput()
+    typeInto(input, body)
+    await press('Post comment')
+    return input
+  }
+
+  const COMMENT_DROPPED = 'Could not post the comment — Connection interrupted'
+
+  it('shows no comment composer at all on a phase-1 host', async () => {
+    await mountBoard(PHASE_1_HOST, { items: [CARD] })
+    await openCard()
+
+    expect(byLabel('Move to Doing')).not.toBeNull()
+    expect(byLabel('Comment')).toBeNull()
+    expect(byLabel('Post comment')).toBeNull()
+  })
+
+  it('posts a comment on the open card and clears the draft', async () => {
+    const calls = await mountBoard(WRITING_HOST, { items: [CARD] })
+    await openCard()
+    const input = await postComment('Looks good')
+
+    expect(callsTo(calls, 'plane.addWorkItemComment')).toEqual([
+      {
+        method: 'plane.addWorkItemComment',
+        params: { projectId: 'proj-1', workItemId: 'wi-1', body: 'Looks good', workspaceId: 'ws-1' }
+      }
+    ])
+    expect(input.value).toBe('')
+    expect(leafWithText('Posting…')).toBeNull()
+    expect(leafWithText('Comment posted')).not.toBeNull()
+  })
+
+  it('keeps the draft and offers a retry when the transport drops the comment', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [CARD]
+    })
+    await openCard()
+    const input = await postComment('Looks good')
+
+    expect(leafWithText('Posting…')).toBeNull()
+    expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
+    expect(byLabel('Try again')).not.toBeNull()
+    expect(input.value).toBe('Looks good')
+    // Recoverable, not hung: the PM can edit and post again.
+    expect(byLabel('Post comment')?.getAttribute('aria-disabled')).not.toBe('true')
+    expect(callsTo(calls, 'plane.addWorkItemComment')).toHaveLength(1)
+
+    // Editing the draft retires the retry: it would resend the old body over the new one.
+    typeInto(input, 'Looks good, ship it')
+    expect(byLabel('Try again')).toBeNull()
+  })
+
+  it('offers no blind retry when a comment times out: Plane may hold it, and nothing on the board would show it', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: markRpcDeliveryUnknown(
+        new Error('Request timed out: plane.addWorkItemComment')
+      ),
+      items: [CARD]
+    })
+    await openCard()
+    const readsBefore = readsOf(calls)
+    const input = await postComment('Looks good')
+
+    expect(readsOf(calls)).toBe(readsBefore)
+    expect(
+      leafWithText(`Could not post the comment — ${PLANE_COMMENT_UNANSWERED_MESSAGE}`)
+    ).not.toBeNull()
+    // A one-tap retry would post it twice if the host did take it; the draft stays
+    // so the PM can check the card in Plane and post again on purpose.
+    expect(byLabel('Try again')).toBeNull()
+    expect(input.value).toBe('Looks good')
+    expect(byLabel('Post comment')?.getAttribute('aria-disabled')).not.toBe('true')
+  })
+
+  it('keeps a failed comment and its retry on the card that failed, not on the next one opened', async () => {
+    const second = { ...CARD, id: 'wi-2', identifier: 'ORCA-2', title: 'Second card' }
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [CARD, second]
+    })
+    await openCard()
+    await postComment('Looks good')
+    expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
+
+    act(() => byLabel('Second card')!.click())
+    await settle()
+    expect(leafWithText(COMMENT_DROPPED)).toBeNull()
+    expect(byLabel('Try again')).toBeNull()
+
+    await openCard()
+    expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
+    await press('Try again')
+    expect(callsTo(calls, 'plane.addWorkItemComment')).toHaveLength(2)
+    expect(callsTo(calls, 'plane.addWorkItemComment')[1]?.params).toMatchObject({
+      workItemId: 'wi-1',
+      body: 'Looks good'
+    })
+  })
+
+  it('keeps a failed comment, its text and its retry through a successful post on another card', async () => {
+    const second = { ...CARD, id: 'wi-2', identifier: 'ORCA-2', title: 'Second card' }
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      rejectWritesFor: 'wi-1',
+      items: [CARD, second]
+    })
+    await openCard()
+    await postComment('Looks good')
+    expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
+
+    act(() => byLabel('Second card')!.click())
+    await settle()
+    await postComment('Fine by me')
+    expect(leafWithText('Comment posted')).not.toBeNull()
+
+    // The other card's success is not this card's: the failed text is the only
+    // copy the PM has, so it comes back with its error and its retry.
+    await openCard()
+    expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
+    expect(commentInput().value).toBe('Looks good')
+    await press('Try again')
+    expect(callsTo(calls, 'plane.addWorkItemComment').map((call) => call.params)).toMatchObject([
+      { workItemId: 'wi-1', body: 'Looks good' },
+      { workItemId: 'wi-2', body: 'Fine by me' },
+      { workItemId: 'wi-1', body: 'Looks good' }
+    ])
+  })
+
+  it('keeps a card posting while its request is in flight, even after another card settles', async () => {
+    const second = { ...CARD, id: 'wi-2', identifier: 'ORCA-2', title: 'Second card' }
+    await mountBoard(WRITING_HOST, { hangWritesFor: 'wi-1', items: [CARD, second] })
+    await openCard()
+    await postComment('Looks good')
+    expect(leafWithText('Posting…')).not.toBeNull()
+
+    act(() => byLabel('Second card')!.click())
+    await settle()
+    await postComment('Fine by me')
+    expect(leafWithText('Comment posted')).not.toBeNull()
+
+    // A settled post elsewhere must not re-enable this card's button: a second
+    // tap would post the same comment twice.
+    await openCard()
+    expect(leafWithText('Posting…')).not.toBeNull()
+    expect(byLabel('Post comment')?.getAttribute('aria-disabled')).toBe('true')
   })
 })
