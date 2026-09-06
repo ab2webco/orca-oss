@@ -325,6 +325,12 @@ function jsonResponse(body: object, status: number): Response {
   })
 }
 
+// Relative so a real-clock run never prunes the stored share record as expired:
+// a fixed future date silently expired and turned these into time-bomb failures.
+function unexpiredArtifactExpiry(): string {
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+}
+
 function createResponseBody(slug: string): object {
   return {
     artifact: {
@@ -336,7 +342,7 @@ function createResponseBody(slug: string): object {
       renderedContentType: 'text/html',
       createdAt: '2026-08-06T00:00:00.000Z',
       updatedAt: '2026-08-06T00:00:00.000Z',
-      expiresAt: '2026-09-06T00:00:00.000Z',
+      expiresAt: unexpiredArtifactExpiry(),
       byteSize: 17,
       deletedAt: null
     },
