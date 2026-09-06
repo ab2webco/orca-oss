@@ -187,7 +187,7 @@ function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
           // empty during that round trip — don't claim "one column" until it settles.
           <Text style={styles.note}>Loading the board…</Text>
         ) : board.status === 'error' ? (
-          // PlaneBoardView is not mounted in list mode, so the read error surfaces here.
+          // PlaneTaskBoard is not mounted in list mode, so the read error surfaces here.
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Retry loading the board"

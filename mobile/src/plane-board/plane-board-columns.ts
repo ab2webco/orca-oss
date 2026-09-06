@@ -5,6 +5,8 @@ export type PlaneBoardColumn = {
   stateId: string
   name: string
   group: string
+  /** The colour Plane shows the state in; null when the host did not send one. */
+  color: string | null
   items: PlaneMobileWorkItem[]
   /** True when the column came from the cards rather than from plane.listStates. */
   derived: boolean
@@ -25,11 +27,11 @@ function derivePlaneStatesFromItems(
 ): PlaneMobileState[] {
   const derived = new Map<string, PlaneMobileState>()
   for (const item of items) {
-    const { id, name, group } = item.state
+    const { id, name, group, color } = item.state
     if (!id || known.has(id) || derived.has(id)) {
       continue
     }
-    derived.set(id, { id, name: name || group || id, group })
+    derived.set(id, { id, name: name || group || id, group, color })
   }
   return [...derived.values()]
 }
@@ -64,6 +66,7 @@ export function buildPlaneBoardColumns(
       stateId: state.id,
       name: state.name || state.group || state.id,
       group: state.group,
+      color: state.color || null,
       items: byStateId.get(state.id) ?? [],
       derived
     })
