@@ -52,6 +52,7 @@ import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegmen
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { PickerListDrawer } from '../../../src/components/PickerListDrawer'
 import { PlaneSourceSegmentRow } from '../../../src/plane-board/plane-source-segment-row'
+import { resolvePlaneTasksChrome } from '../../../src/plane-board/plane-tasks-chrome-visibility'
 import { PlaneTasksSurface } from '../../../src/plane-board/plane-tasks-surface'
 import {
   PROVIDER_TASK_GROUP_OPTIONS as LINEAR_GROUP_OPTIONS,
@@ -8359,8 +8360,13 @@ export default function MobileTasksScreen() {
     GITLAB_FILTER_OPTIONS.find((filter) => filter.value === gitlabFilter)?.label ?? 'Open'
   const linearFilterLabel =
     LINEAR_FILTER_OPTIONS.find((filter) => filter.value === linearFilter)?.label ?? 'All'
-  const planeBoardShown =
-    taskUiReady && provider === 'plane' && planeSupported && planeViewMode === 'board'
+  const planeChrome = resolvePlaneTasksChrome({
+    provider,
+    planeSupported,
+    taskUiReady,
+    viewMode: planeViewMode
+  })
+  const planeBoardShown = planeChrome.boardShown
   const planeFilterLabel =
     PLANE_FILTER_OPTIONS.find((filter) => filter.value === planeFilter)?.label ?? 'All'
   const planeProjectItems = useMemo(
@@ -8956,7 +8962,7 @@ export default function MobileTasksScreen() {
             </>
           )}
 
-          {provider === 'plane' && planeSupported && planeConnected ? (
+          {planeChrome.segmentRowShown ? (
             <PlaneSourceSegmentRow
               enabled={taskUiReady}
               hasProject={Boolean(planeProjectId)}
@@ -9700,7 +9706,7 @@ export default function MobileTasksScreen() {
       <PlaneTasksSurface
         client={client}
         capabilities={hostCapabilities}
-        enabled={taskUiReady && provider === 'plane' && planeSupported}
+        enabled={planeChrome.surfaceEnabled}
         planeConnected={planeConnected}
         viewMode={planeViewMode}
         workspaceId={planeWorkspaceId}

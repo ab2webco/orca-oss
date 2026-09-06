@@ -18,6 +18,7 @@ import { createPlaneTask } from '../src/tasks/plane-mobile-task-list'
 import { fetchPlaneWorkItems } from '../src/tasks/plane-mobile-task-source'
 import type { PlaneMobileWorkItem } from '../src/tasks/plane-mobile-work-item-read'
 import { PlaneSourceSegmentRow } from '../src/plane-board/plane-source-segment-row'
+import { resolvePlaneTasksChrome } from '../src/plane-board/plane-tasks-chrome-visibility'
 import { PlaneTasksSurface } from '../src/plane-board/plane-tasks-surface'
 import { usePlaneViewMode } from '../src/plane-board/plane-work-item-view'
 import { useRuntimeCapabilities } from '../src/plane-board/use-runtime-capabilities'
@@ -171,6 +172,14 @@ export function PlaneTasksHarness({
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const loadedRef = useRef<PlaneMobileWorkItem[]>([])
+  // The screen's own answer to which Plane UI is on screen. surfaceEnabled is not read
+  // here: this stand-in still drives the surface's enabled off connected.
+  const chrome = resolvePlaneTasksChrome({
+    provider: 'plane',
+    planeSupported: true,
+    taskUiReady: true,
+    viewMode
+  })
   const load = useCallback(
     async (silent: boolean): Promise<PlaneMobileWorkItem[] | null> => {
       if (!connected) {
@@ -213,22 +222,24 @@ export function PlaneTasksHarness({
     createElement(
       View,
       null,
-      createElement(PlaneSourceSegmentRow, {
-        enabled: true,
-        hasProject: projectId !== null,
-        projectLabel: projectId === OTHER_PROJECT.id ? OTHER_PROJECT.name : 'Orca Lab',
-        stateLabel: 'All states',
-        filterLabel: 'All',
-        viewMode,
-        onSelectViewMode: setViewMode,
-        onPickProject: () => setPickerOpen(true),
-        onPickState: () => {},
-        onPickFilter: () => {},
-        buttonStyle: null,
-        textStyle: null,
-        selectedTextStyle: null
-      }),
-      viewMode === 'list'
+      chrome.segmentRowShown
+        ? createElement(PlaneSourceSegmentRow, {
+            enabled: true,
+            hasProject: projectId !== null,
+            projectLabel: projectId === OTHER_PROJECT.id ? OTHER_PROJECT.name : 'Orca Lab',
+            stateLabel: 'All states',
+            filterLabel: 'All',
+            viewMode,
+            onSelectViewMode: setViewMode,
+            onPickProject: () => setPickerOpen(true),
+            onPickState: () => {},
+            onPickFilter: () => {},
+            buttonStyle: null,
+            textStyle: null,
+            selectedTextStyle: null
+          })
+        : null,
+      !chrome.boardShown
         ? listItems.map((item) =>
             createElement(
               Pressable,

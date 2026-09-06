@@ -434,6 +434,19 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       await press('Toggle connection')
       expect(byLabel('Move to Doing')).not.toBeNull()
     })
+
+    it('keeps the way back to the list when the connection drops on the board', async () => {
+      // ORCA-419: the toggle used to be gated on the connection while the list stayed
+      // suppressed by the board, so a blip left no control to get back.
+      await mountBoard(root, WRITING_HOST, { items: [CARD] }, {})
+      expect(boardColumn('Todo')).not.toBeNull()
+
+      await press('Toggle connection')
+      expect(byLabel('Show as list')).not.toBeNull()
+
+      await press('Show as list')
+      expect(byLabel(`Row ${CARD.title}`)).not.toBeNull()
+    })
   })
 
   describe('grouping and ordering', () => {
