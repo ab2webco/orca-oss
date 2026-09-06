@@ -31,6 +31,8 @@ export const CJK_LATIN_SPACED_TERMS = [
   'Gemini',
   'Kimi',
   'OpenCode',
+  // Longer first: alternation is leftmost-wins, so a bare 'Orca' would shadow 'Orca Lab'.
+  'Orca Lab',
   'Orca',
   'Cursor',
   'Bitbucket',

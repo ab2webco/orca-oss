@@ -6,10 +6,10 @@ export const CROSS_LOCALE_KEY_OVERRIDES = {
     zh: '无法保存权限决定。请重试。'
   },
   'auto.components.settings.PluginConsentDialog.workerSandboxWarning': {
-    es: 'Este worker puede leer los archivos del plugin y los archivos que Orca concede a su entorno de ejecución. El proceso padre de Orca aún puede actuar sobre llamadas de API aprobadas.',
-    ja: 'このワーカーは、プラグインのファイルと Orca がランタイムに許可したファイルを読み取れます。Orca の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。',
-    ko: '이 워커는 플러그인 파일과 Orca가 런타임에 허용한 파일을 읽을 수 있습니다. Orca의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.',
-    zh: '此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。'
+    es: 'Este worker puede leer los archivos del plugin y los archivos que Orca Lab concede a su entorno de ejecución. El proceso padre de Orca Lab aún puede actuar sobre llamadas de API aprobadas.',
+    ja: 'このワーカーは、プラグインのファイルと Orca Lab がランタイムに許可したファイルを読み取れます。Orca Lab の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。',
+    ko: '이 워커는 플러그인 파일과 Orca Lab이 런타임에 허용한 파일을 읽을 수 있습니다. Orca Lab의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.',
+    zh: '此工作进程可以读取其插件文件以及 Orca Lab 授予其运行时读取权限的文件。Orca Lab 的父进程仍可执行已获批准的 API 调用。'
   },
   'auto.components.settings.PluginConsentDialog.networkRestrictedNote': {
     es: 'Las solicitudes de red están restringidas a los hosts declarados arriba.',
@@ -30,10 +30,10 @@ export const CROSS_LOCALE_KEY_OVERRIDES = {
     zh: '安装插件'
   },
   'auto.components.settings.PluginMarketplacePreviewDialog.workerSandboxWarning': {
-    es: 'Este worker puede leer los archivos del plugin y los archivos que Orca concede a su entorno de ejecución. El proceso padre de Orca aún puede actuar sobre llamadas de API aprobadas.',
-    ja: 'このワーカーは、プラグインのファイルと Orca がランタイムに許可したファイルを読み取れます。Orca の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。',
-    ko: '이 워커는 플러그인 파일과 Orca가 런타임에 허용한 파일을 읽을 수 있습니다. Orca의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.',
-    zh: '此工作进程可以读取其插件文件以及 Orca 授予其运行时读取权限的文件。Orca 的父进程仍可执行已获批准的 API 调用。'
+    es: 'Este worker puede leer los archivos del plugin y los archivos que Orca Lab concede a su entorno de ejecución. El proceso padre de Orca Lab aún puede actuar sobre llamadas de API aprobadas.',
+    ja: 'このワーカーは、プラグインのファイルと Orca Lab がランタイムに許可したファイルを読み取れます。Orca Lab の親プロセスは、承認済みの API 呼び出しに応じて引き続き動作できます。',
+    ko: '이 워커는 플러그인 파일과 Orca Lab이 런타임에 허용한 파일을 읽을 수 있습니다. Orca Lab의 상위 프로세스는 승인된 API 호출에 따라 계속 작업을 수행할 수 있습니다.',
+    zh: '此工作进程可以读取其插件文件以及 Orca Lab 授予其运行时读取权限的文件。Orca Lab 的父进程仍可执行已获批准的 API 调用。'
   },
   'auto.components.settings.PluginMarketplacePreviewDialog.networkRestrictedNote': {
     es: 'Las solicitudes de red están restringidas a los hosts declarados arriba.',
