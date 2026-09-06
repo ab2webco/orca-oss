@@ -33,6 +33,7 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
     ['Project', planeProjectLabel(work.project)],
     ['Updated', formatUpdatedAt(work.updatedAt) || '—']
   ]
+  const description = work.description?.trim()
   return (
     <View>
       <View style={styles.header}>
@@ -52,6 +53,13 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
           </View>
         ))}
       </View>
+      {description ? (
+        <View style={styles.body}>
+          <Text style={styles.bodyLabel}>Description</Text>
+          {/* Raw markdown, not rendered: triage needs the words, not a WebView. */}
+          <Text style={styles.bodyText}>{description}</Text>
+        </View>
+      ) : null}
       {url ? (
         <View style={styles.actions}>
           <View style={styles.actionSeparator} />
@@ -124,6 +132,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textPrimary,
     fontWeight: '600'
+  },
+  body: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xs
+  },
+  bodyLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginBottom: spacing.xs
+  },
+  bodyText: {
+    fontSize: typography.bodySize,
+    color: colors.textSecondary,
+    lineHeight: 20
   },
   actions: {
     marginTop: spacing.md
