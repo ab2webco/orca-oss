@@ -8,6 +8,16 @@ export const BRAND_MISTRANSLATIONS = {
     Claude: ['클로드'],
     Grok: ['그록'],
     Orca: ['오르카', '범고래'],
+    // Longer brand keys win the sort, so "Orca Lab" is restored before the bare "Orca" rule runs.
+    'Orca Lab': [
+      '오르카 랩',
+      '오르카랩',
+      '범고래 랩',
+      'Orca 랩',
+      'Orca랩',
+      '오르카 연구소',
+      '범고래 연구소'
+    ],
     Cursor: ['커서'],
     OpenCode: ['오픈코드'],
     OpenClaw: ['오픈클로'],
@@ -46,6 +56,7 @@ export const BRAND_MISTRANSLATIONS = {
     Claude: ['克洛德', '克劳德'],
     Grok: ['格罗克'],
     Orca: ['虎鲸', '逆戟鲸'],
+    'Orca Lab': ['虎鲸实验室', '逆戟鲸实验室', '虎鲸 实验室', 'Orca 实验室', 'Orca实验室'],
     Cursor: ['光标'],
     OpenCode: ['开放代码'],
     OpenClaw: ['开爪'],
@@ -94,6 +105,15 @@ export const BRAND_MISTRANSLATIONS = {
     Claude: ['クロード'],
     Grok: ['グロック'],
     Orca: ['シャチ', '逆戟鲸', 'オルカ'],
+    'Orca Lab': [
+      'シャチラボ',
+      'シャチ ラボ',
+      'オルカラボ',
+      'オルカ ラボ',
+      'Orca ラボ',
+      'Orcaラボ',
+      'シャチ研究所'
+    ],
     Cursor: ['カーソル'],
     OpenCode: ['オープンコード', 'オープン・コード'],
     OpenClaw: ['オープンクロー'],
@@ -138,6 +158,7 @@ export const BRAND_MISTRANSLATIONS = {
     Gemini: ['Géminis'],
     Claude: ['claudia', 'Claudia'],
     Orca: ['orca', 'Orcas', 'orcas'],
+    'Orca Lab': ['Laboratorio Orca', 'laboratorio Orca', 'Laboratorio de Orca', 'Orca Laboratorio'],
     OpenCode: ['código abierto', 'Código abierto'],
     OpenClaude: ['Openclaude'],
     Antigravity: ['antigravedad', 'Antigravedad'],

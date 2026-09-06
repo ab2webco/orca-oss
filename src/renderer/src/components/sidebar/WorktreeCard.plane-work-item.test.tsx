@@ -318,7 +318,7 @@ describe('WorktreeCard Plane work item', () => {
     expect(planeIdentifierChipText()).toContain('ORCA-149')
   })
 
-  it('routes Open in Orca to the exact cached work item', async () => {
+  it('routes Open in Orca Lab to the exact cached work item', async () => {
     const cachedItem = makePlaneWorkItem()
     planeWorkItemCache = {
       'item-workspace::item::ORCA-149': { data: cachedItem, fetchedAt: Date.now() }
@@ -327,7 +327,7 @@ describe('WorktreeCard Plane work item', () => {
     await renderCard()
 
     const openInOrca = [...(container?.querySelectorAll<HTMLElement>('[aria-label]') ?? [])].find(
-      (element) => element.getAttribute('aria-label') === 'Open in Orca'
+      (element) => element.getAttribute('aria-label') === 'Open in Orca Lab'
     )
     expect(openInOrca).not.toBeUndefined()
 

@@ -137,7 +137,7 @@ describe('WorktreeCardDetailsHover', () => {
     )
 
     const moreActionsIndex = markup.indexOf('aria-label="More PR actions"')
-    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca"')
+    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca Lab"')
     const viewOnGitHubIndex = markup.indexOf('aria-label="View on GitHub"')
 
     expect(moreActionsIndex).toBeGreaterThan(-1)
@@ -174,7 +174,7 @@ describe('WorktreeCardDetailsHover', () => {
     const moreActionsIndex = markup.indexOf('aria-label="More issue actions"')
     const copyLinkIndex = markup.indexOf('Copy link')
     const editIssueIndex = markup.indexOf('aria-label="Edit issue"')
-    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca"')
+    const openInOrcaIndex = markup.indexOf('aria-label="Open in Orca Lab"')
     const viewOnGitHubIndex = markup.indexOf('aria-label="View on GitHub"')
 
     expect(moreActionsIndex).toBeGreaterThan(-1)
@@ -313,10 +313,10 @@ describe('WorktreeCardDetailsHover', () => {
     expect(hoverMarkup).toContain('plane')
     expect(hoverMarkup).toContain('View on Plane')
     expect(hoverMarkup).toContain('https://plane.example.com/ab2web/browse/ORCA-149/')
-    expect(hoverMarkup).toContain('Open in Orca')
+    expect(hoverMarkup).toContain('Open in Orca Lab')
   })
 
-  it('omits Open in Orca for a Plane work item that has no cached detail yet', () => {
+  it('omits Open in Orca Lab for a Plane work item that has no cached detail yet', () => {
     const markup = renderToStaticMarkup(
       <WorktreeCardDetailsHover
         issue={null}
@@ -335,7 +335,7 @@ describe('WorktreeCardDetailsHover', () => {
 
     expect(markup).toContain('Plane ORCA-149')
     expect(markup).toContain('View on Plane')
-    expect(markup).not.toContain('Open in Orca')
+    expect(markup).not.toContain('Open in Orca Lab')
   })
 
   it('shows identifier when Linear issue URL is unavailable', () => {

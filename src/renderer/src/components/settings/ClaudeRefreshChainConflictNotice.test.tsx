@@ -71,7 +71,7 @@ describe('ClaudeRefreshChainConflictNotice', () => {
     const markup = render({ report: { status: 'unavailable', conflictSets: [] } })
 
     expect(markup).toContain(
-      "Orca couldn't verify whether saved Claude accounts share a refresh chain"
+      "Orca Lab couldn't verify whether saved Claude accounts share a refresh chain"
     )
     // "Could not look" must not read as an absence-of-conflict claim.
     expect(markup.toLowerCase()).not.toContain('no conflict')
@@ -82,7 +82,7 @@ describe('ClaudeRefreshChainConflictNotice', () => {
     const markup = render()
 
     expect(markup).toContain('These accounts share a recorded refresh chain')
-    expect(markup).toContain('match on the refresh chain Orca has recorded')
+    expect(markup).toContain('match on the refresh chain Orca Lab has recorded')
     expect(markup.toLowerCase()).not.toContain('are in conflict')
   })
 
@@ -123,9 +123,9 @@ describe('ClaudeRefreshChainConflictNotice', () => {
       }
     })
 
-    expect(markup).toContain('Claude account in another Orca profile')
+    expect(markup).toContain('Claude account in another Orca Lab profile')
     expect(markup).toContain('Another profile')
-    expect(markup).toContain('belongs to a different Orca profile on this machine')
+    expect(markup).toContain('belongs to a different Orca Lab profile on this machine')
     // Only the current-profile account gets an action it can actually perform.
     expect(screen.getAllByRole('button', { name: /Re-authenticate/ })).toHaveLength(1)
     // Internal identifiers are not user-meaningful and must stay out of the UI.
