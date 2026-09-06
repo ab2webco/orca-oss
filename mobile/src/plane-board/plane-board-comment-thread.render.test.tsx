@@ -1,6 +1,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Linking } from 'react-native'
 import type { RpcClient } from '../transport/rpc-client'
 
 // Why: lucide's circular ESM re-exports do not load under Vite's runner; icons are not under test.
@@ -16,6 +17,8 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }))
+// Why: react-native-webview ships untranspiled native source; comment bodies render no diagram.
+vi.mock('react-native-webview', () => ({ WebView: () => null }))
 vi.mock(
   '@react-native-async-storage/async-storage',
   () => import('../../test-doubles/async-storage-memory')
@@ -110,6 +113,13 @@ function createClient(
   } as unknown as RpcClient
 }
 
+const MARKDOWN_COMMENT = {
+  id: 'c-md',
+  body: 'Fixed in **lab.49**, see [the PR](https://github.test/orca/pull/1).',
+  createdAt: new Date().toISOString(),
+  user: { id: 'u-2', displayName: 'Grace' }
+}
+
 function byLabel(label: string): HTMLElement | null {
   return document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
 }
@@ -201,6 +211,23 @@ describe('Plane comment thread in the Tasks detail (react-native-web)', () => {
     expect(leafWithText('Reproduced on 0.0.47.')).not.toBeNull()
     expect(leafWithText('Ada')).not.toBeNull()
     expect(leafWithText('No comments yet.')).toBeNull()
+  })
+
+  it('renders a markdown comment formatted, with its link tappable', async () => {
+    const openURL = vi.spyOn(Linking, 'openURL').mockResolvedValue(undefined)
+    await openCard(READING_HOST, [{ kind: 'thread', comments: [MARKDOWN_COMMENT] }])
+
+    const thread = leafWithText('Grace')!.parentElement!.parentElement!
+    expect(thread.textContent).toContain('Fixed in lab.49, see the PR.')
+    expect(thread.textContent).not.toContain('**')
+    expect(thread.textContent).not.toContain('](')
+    const link = [...thread.querySelectorAll<HTMLElement>('span')].find(
+      (node) => node.textContent === 'the PR'
+    )
+    expect(link).toBeDefined()
+    act(() => link!.click())
+    expect(openURL).toHaveBeenCalledWith('https://github.test/orca/pull/1')
+    openURL.mockRestore()
   })
 
   it('says the thread is empty only after the host answered that it is', async () => {
