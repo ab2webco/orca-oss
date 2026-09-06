@@ -35,6 +35,10 @@ type Props<Item> = {
   statusDisabled?: boolean
   createDrawerSlot?: ReactNode
   writeErrorSlot?: ReactNode
+  /** Provider chrome under the column's title row, above its cards. */
+  renderColumnHeaderSlot?: (section: ProviderTaskBoardSection<Item>) => ReactNode
+  /** Provider chrome pinned below the column's cards: the cards scroll, this does not. */
+  renderColumnFooterSlot?: (section: ProviderTaskBoardSection<Item>) => ReactNode
 }
 
 export function ProviderTaskBoard<Item>({
@@ -48,7 +52,9 @@ export function ProviderTaskBoard<Item>({
   onPressStatus,
   statusDisabled = false,
   createDrawerSlot,
-  writeErrorSlot
+  writeErrorSlot,
+  renderColumnHeaderSlot,
+  renderColumnFooterSlot
 }: Props<Item>) {
   const pressStatus = (event: GestureResponderEvent, item: Item): void => {
     event.stopPropagation()
@@ -64,7 +70,7 @@ export function ProviderTaskBoard<Item>({
         contentContainerStyle={[styles.container, { paddingBottom: spacing.lg + bottomInset }]}
       >
         {sections.map((section) => (
-          <View key={section.key} style={styles.column}>
+          <View key={section.key} style={styles.column} testID={`column-${section.key}`}>
             <View style={styles.header}>
               <View style={[styles.sectionDot, { backgroundColor: section.color }]} />
               <Text style={styles.columnTitle} numberOfLines={1}>
@@ -72,7 +78,8 @@ export function ProviderTaskBoard<Item>({
               </Text>
               <Text style={styles.count}>{section.items.length}</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            {renderColumnHeaderSlot?.(section)}
+            <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
               {section.items.map((item) => {
                 const title = getTitle(item)
                 const status = getStatus?.(item)
@@ -109,6 +116,7 @@ export function ProviderTaskBoard<Item>({
                 )
               })}
             </ScrollView>
+            {renderColumnFooterSlot?.(section)}
           </View>
         ))}
       </ScrollView>
@@ -137,6 +145,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderSubtle
   },
+  // Lets the column's maxHeight squeeze the cards instead of pushing the footer slot out.
+  columnScroll: { flexShrink: 1 },
   sectionDot: { width: 6, height: 6, borderRadius: 3 },
   columnTitle: { flex: 1, color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
   count: { color: colors.textMuted, fontSize: 11 },
