@@ -31,13 +31,17 @@ SCHEME = "OrcaLab"
 BUNDLE_ID = "com.ab2web.orca.mobile"
 ANDROID_BUNDLE_PATH = File.join(MOBILE_ROOT, "android", "app", "build", "outputs", "bundle", "release", "app-release.aab")
 PLAY_TRACK = "internal".freeze
-# Why an env var: "peeps" is upstream's tester group, and a fork publishing to its own
-# App Store Connect has no such group — the upload succeeds and only distribution fails.
-TESTFLIGHT_GROUPS = (ENV["TESTFLIGHT_GROUPS"].to_s.strip.empty? ? "peeps" : ENV["TESTFLIGHT_GROUPS"])
+# Why an env var and no default: "peeps" is upstream's tester group, and a fork publishing
+# to its own App Store Connect has no such group. Empty means internal testers only.
+TESTFLIGHT_GROUPS = ENV["TESTFLIGHT_GROUPS"].to_s
   .split(",")
   .map(&:strip)
   .reject(&:empty?)
   .freeze
+# Why opt-in: external distribution needs Beta App Review, and Apple refuses a second
+# submission while another build of the same train is in review. Internal testing must not
+# depend on that. ORCA-414.
+TESTFLIGHT_EXTERNAL = %w[1 true yes].include?(ENV["TESTFLIGHT_EXTERNAL"].to_s.strip.downcase)
 DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Mobile updates and fixes.".freeze
 TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS = 20 * 60
 
@@ -249,13 +253,16 @@ platform :ios do
     app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
     UI.user_error!("Could not find App Store Connect app #{BUNDLE_ID}") unless app
 
-    available_groups = app.get_beta_groups.map(&:name)
-    missing_groups = TESTFLIGHT_GROUPS - available_groups
-    unless missing_groups.empty?
-      UI.user_error!(
-        "Missing TestFlight group(s): #{missing_groups.join(', ')}. " \
-        "Create them in App Store Connect or update TESTFLIGHT_GROUPS.",
-      )
+    unless TESTFLIGHT_GROUPS.empty?
+      available_groups = app.get_beta_groups.map(&:name)
+      missing_groups = TESTFLIGHT_GROUPS - available_groups
+      unless missing_groups.empty?
+        UI.user_error!(
+          "Missing TestFlight group(s): #{missing_groups.join(', ')}. Available: " \
+          "#{available_groups.join(', ')}. Create them in App Store Connect or " \
+          "update TESTFLIGHT_GROUPS.",
+        )
+      end
     end
 
     upload_to_testflight(
@@ -269,9 +276,9 @@ platform :ios do
       distribute_only: true,
       skip_waiting_for_build_processing: false,
       wait_processing_timeout_duration: TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS,
-      distribute_external: true,
-      groups: TESTFLIGHT_GROUPS,
-      notify_external_testers: true,
+      distribute_external: TESTFLIGHT_EXTERNAL,
+      groups: TESTFLIGHT_GROUPS.empty? ? nil : TESTFLIGHT_GROUPS,
+      notify_external_testers: TESTFLIGHT_EXTERNAL,
       changelog: testflight_changelog,
     )
   end
