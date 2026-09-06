@@ -1,8 +1,12 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
+import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
+import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { resolveLivePlaneWorkItem, resolvePlaneBoardScope } from './plane-board-scope'
+import { PlaneBoardViewMenu } from './plane-board-view-menu'
 import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
 import type { PlaneViewMode } from './plane-work-item-view'
@@ -30,6 +34,9 @@ type Props = {
   onPickProject: () => void
   onClearFilter: () => void
   bottomInset: number
+  /** The Tasks screen's segment-row chip look, so the board's menu matches the row above it. */
+  menuButtonStyle: StyleProp<ViewStyle>
+  menuTextStyle: StyleProp<TextStyle>
 }
 
 /** Everything Plane-specific the Tasks screen mounts besides its own list rows:
@@ -53,9 +60,13 @@ export function PlaneTasksSurface({
   copied,
   onPickProject,
   onClearFilter,
-  bottomInset
+  bottomInset,
+  menuButtonStyle,
+  menuTextStyle
 }: Props) {
   const openItem = enabled ? detailItem : null
+  const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
+  const [orderBy, setOrderBy] = useState<ProviderTaskOrderBy>('priority')
   const board = usePlaneBoard(
     client,
     capabilities,
@@ -105,14 +116,26 @@ export function PlaneTasksSurface({
   return (
     <>
       {enabled && viewMode === 'board' ? (
-        <PlaneTaskBoard
-          board={board}
-          sheetOpen={live !== null}
-          onOpenCard={onOpenCard}
-          onPickProject={onPickProject}
-          onClearFilter={onClearFilter}
-          bottomInset={bottomInset}
-        />
+        <View style={styles.board}>
+          <PlaneBoardViewMenu
+            groupBy={groupBy}
+            orderBy={orderBy}
+            onChangeGroupBy={setGroupBy}
+            onChangeOrderBy={setOrderBy}
+            buttonStyle={menuButtonStyle}
+            textStyle={menuTextStyle}
+          />
+          <PlaneTaskBoard
+            board={board}
+            groupBy={groupBy}
+            orderBy={orderBy}
+            sheetOpen={live !== null}
+            onOpenCard={onOpenCard}
+            onPickProject={onPickProject}
+            onClearFilter={onClearFilter}
+            bottomInset={bottomInset}
+          />
+        </View>
       ) : null}
       <PlaneWorkItemDetailSheet
         item={live}
@@ -125,3 +148,7 @@ export function PlaneTasksSurface({
     </>
   )
 }
+
+const styles = StyleSheet.create({
+  board: { flex: 1 }
+})

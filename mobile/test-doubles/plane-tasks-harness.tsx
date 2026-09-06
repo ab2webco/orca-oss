@@ -220,7 +220,9 @@ export function PlaneTasksHarness({
           setFilter('all')
           setQuery('')
         },
-        bottomInset: 0
+        bottomInset: 0,
+        menuButtonStyle: null,
+        menuTextStyle: null
       }),
       pickerOpen ? createElement(Text, null, 'Project picker') : null,
       createElement(Pressable, {

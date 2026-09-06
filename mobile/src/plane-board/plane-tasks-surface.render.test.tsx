@@ -386,4 +386,69 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(byLabel('Move to Doing')).not.toBeNull()
     })
   })
+
+  describe('grouping and ordering', () => {
+    // Identifier order is the reverse of priority order, so each picker changes what is seen.
+    const HIGH_CARD = {
+      ...CARD,
+      id: 'wi-h',
+      identifier: 'ORCA-2',
+      title: 'High card',
+      priority: 'high'
+    }
+    const LOW_CARD = {
+      ...CARD,
+      id: 'wi-l',
+      identifier: 'ORCA-1',
+      title: 'Low card',
+      priority: 'low'
+    }
+
+    /** Card titles in on-screen order, across every column. */
+    function cardTitles(): string[] {
+      return [...document.body.querySelectorAll<HTMLElement>('[aria-label^="Open "]')].map(
+        (card) => card.getAttribute('aria-label') ?? ''
+      )
+    }
+
+    /** The cards under one column header, by that column's name. */
+    function columnCards(name: string): string[] {
+      for (const leaf of document.body.querySelectorAll<HTMLElement>('div')) {
+        if (leaf.childElementCount !== 0 || leaf.textContent !== name) {
+          continue
+        }
+        if (!/^\d+$/.test(leaf.nextElementSibling?.textContent ?? '')) {
+          continue
+        }
+        const column = leaf.parentElement?.parentElement
+        return [...(column?.querySelectorAll<HTMLElement>('[aria-label^="Open "]') ?? [])].map(
+          (card) => card.getAttribute('aria-label') ?? ''
+        )
+      }
+      throw new Error(`no column named ${name}`)
+    }
+
+    it('orders a column by the Order picker and regroups the board by the Group picker', async () => {
+      await mountBoard(root, WRITING_HOST, { items: [LOW_CARD, HIGH_CARD] })
+      // Guard: the default is priority first, the order the columns already had.
+      expect(boardColumn('Todo')).toEqual({ count: 2 })
+      expect(cardTitles()).toEqual(['Open High card', 'Open Low card'])
+
+      expect(leafWithText('Order: Priority')).not.toBeNull()
+      await pressTextButton('Order: Priority')
+      await pressTextButton('Identifier')
+      expect(leafWithText('Order: Identifier')).not.toBeNull()
+      expect(cardTitles()).toEqual(['Open Low card', 'Open High card'])
+      // Status grouping keeps the project's columns, the empty one included.
+      expect(boardColumn('Doing')).toEqual({ count: 0 })
+
+      await pressTextButton('Group: No grouping')
+      expect(leafWithText('Team')).toBeNull()
+      await pressTextButton('Priority')
+      expect(leafWithText('Group: Priority')).not.toBeNull()
+      expect(boardColumn('Todo')).toBeNull()
+      expect(columnCards('High')).toEqual(['Open High card'])
+      expect(columnCards('Low')).toEqual(['Open Low card'])
+    })
+  })
 })

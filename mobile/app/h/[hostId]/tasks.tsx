@@ -53,6 +53,10 @@ import { PickerModal, type PickerOption } from '../../../src/components/PickerMo
 import { PickerListDrawer } from '../../../src/components/PickerListDrawer'
 import { PlaneSourceSegmentRow } from '../../../src/plane-board/plane-source-segment-row'
 import { PlaneTasksSurface } from '../../../src/plane-board/plane-tasks-surface'
+import {
+  PROVIDER_TASK_GROUP_OPTIONS as LINEAR_GROUP_OPTIONS,
+  PROVIDER_TASK_ORDER_OPTIONS as LINEAR_ORDER_OPTIONS
+} from '../../../src/tasks/provider-task-view-options'
 import { usePlaneViewMode } from '../../../src/plane-board/plane-work-item-view'
 import {
   formatGitHubPRDelta,
@@ -776,20 +780,6 @@ const COMMENT_REACTION_EMOJI: Record<
   rocket: 'rocket',
   eyes: 'eyes'
 }
-
-const LINEAR_GROUP_OPTIONS: PickerOption<LinearGroupBy>[] = [
-  { value: 'none', label: 'No grouping' },
-  { value: 'status', label: 'Status' },
-  { value: 'assignee', label: 'Assignee' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'team', label: 'Team' }
-]
-
-const LINEAR_ORDER_OPTIONS: PickerOption<LinearOrderBy>[] = [
-  { value: 'priority', label: 'Priority' },
-  { value: 'updated', label: 'Updated' },
-  { value: 'identifier', label: 'Identifier' }
-]
 
 const LINEAR_DISPLAY_OPTIONS: PickerOption<LinearDisplayProperty>[] = [
   { value: 'state', label: 'Status' },
@@ -9714,6 +9704,8 @@ export default function MobileTasksScreen() {
           setAppliedQuery('')
         }}
         bottomInset={insets.bottom}
+        menuButtonStyle={styles.segmentButton}
+        menuTextStyle={styles.segmentSecondaryText}
       />
 
       <PickerModal

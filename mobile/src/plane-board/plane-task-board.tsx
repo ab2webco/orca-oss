@@ -2,40 +2,16 @@ import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Plus } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import { PLANE_PRIORITY_LABELS } from '../tasks/plane-priority-label'
-import { ProviderTaskBoard, type ProviderTaskBoardSection } from '../tasks/provider-task-board'
+import { ProviderTaskBoard } from '../tasks/provider-task-board'
+import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { formatUpdatedAt } from '../tasks/task-updated-at-time'
-import type { PlaneBoardColumn } from './plane-board-columns'
 import { PlaneBoardCreateDrawer } from './plane-board-create-drawer'
+import { planeBoardSections, planeStateGroupColor } from './plane-board-sections'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 import type { PlaneBoard } from './use-plane-board'
-
-/** A state's colour when Plane sent none: its group is what the dot can still say. */
-function planeStateGroupColor(group: string): string {
-  if (group === 'started') {
-    return colors.statusAmber
-  }
-  if (group === 'completed') {
-    return colors.statusGreen
-  }
-  if (group === 'cancelled') {
-    return colors.statusRed
-  }
-  return colors.textMuted
-}
-
-/** Columns are already in the project's state order with sorted cards; the shell just draws them. */
-function planeBoardSections(
-  columns: readonly PlaneBoardColumn[]
-): ProviderTaskBoardSection<PlaneMobileWorkItem>[] {
-  return columns.map((column) => ({
-    key: column.stateId,
-    label: column.name,
-    color: column.color ?? planeStateGroupColor(column.group),
-    items: column.items
-  }))
-}
 
 // The in-flight word goes first: the shell clamps the subtitle to two lines, and the
 // facts after it are what may be cut, never the signal that a write is still pending.
@@ -56,6 +32,8 @@ function planeCardSubtitle(item: PlaneMobileWorkItem, board: PlaneBoard): string
 
 type Props = {
   board: PlaneBoard
+  groupBy: PlaneTaskGroupBy
+  orderBy: ProviderTaskOrderBy
   /** While a card's sheet is open it shows that card's write error; the board stays quiet. */
   sheetOpen: boolean
   onOpenCard: (item: PlaneMobileWorkItem) => void
@@ -67,6 +45,8 @@ type Props = {
 /** The board view of the Tasks screen: Plane's columns through the provider-neutral shell. */
 export function PlaneTaskBoard({
   board,
+  groupBy,
+  orderBy,
   sheetOpen,
   onOpenCard,
   onPickProject,
@@ -143,7 +123,7 @@ export function PlaneTaskBoard({
     <View style={styles.view}>
       {notice}
       <ProviderTaskBoard
-        sections={planeBoardSections(board.columns)}
+        sections={planeBoardSections(board.columns, groupBy, orderBy)}
         bottomInset={bottomInset}
         getItemKey={(item) => item.id}
         getTitle={(item) => item.title || 'Untitled work item'}
