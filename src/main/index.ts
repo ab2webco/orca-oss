@@ -137,6 +137,7 @@ import {
   shouldInstallManagedHooks
 } from './startup/configure-process'
 import { configurePackagedLinuxUserDataPath } from './startup/packaged-linux-user-data-path'
+import { configurePackagedMacosUserDataPath } from './startup/packaged-macos-user-data-path'
 import { attachPlaneChangeBroadcast } from './plane/plane-change-broadcast'
 import {
   installUncaughtPipeErrorGuard,
@@ -704,6 +705,9 @@ configureDevUserDataPath(is.dev)
 // Electron derives the Linux path from the app name, so app.setName('Orca') at
 // whenReady would otherwise move it and orphan the user's transcripts.
 configurePackagedLinuxUserDataPath()
+// Why: same contract on macOS for a different reason — Electron resolves that
+// path from CFBundleName, which electron-builder writes from productName.
+configurePackagedMacosUserDataPath()
 configureOrcaUserDataPathEnv()
 installServeSupervisorDisconnectQuit(isServeMode)
 
