@@ -1,4 +1,4 @@
-# Orca Mobile iOS release lane.
+# Orca Lab Mobile iOS release lane.
 #
 # Builds the prebuilt iOS workspace, signs it with the distribution identity
 # imported into the CI keychain plus an explicit App Store provisioning profile
@@ -42,7 +42,7 @@ TESTFLIGHT_GROUPS = ENV["TESTFLIGHT_GROUPS"].to_s
 # submission while another build of the same train is in review. Internal testing must not
 # depend on that. ORCA-414.
 TESTFLIGHT_EXTERNAL = %w[1 true yes].include?(ENV["TESTFLIGHT_EXTERNAL"].to_s.strip.downcase)
-DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Mobile updates and fixes.".freeze
+DEFAULT_TESTFLIGHT_CHANGELOG = "Latest Orca Lab Mobile updates and fixes.".freeze
 TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS = 20 * 60
 
 # App Store version states in which the version "train" is terminally closed to
@@ -189,10 +189,10 @@ platform :ios do
     config.fetch("expo").fetch("ios")["buildNumber"] = build_number.to_s
     write_mobile_app_config(config)
 
-    UI.message("Prepared Orca Mobile iOS #{version} (#{build_number})")
+    UI.message("Prepared Orca Lab Mobile iOS #{version} (#{build_number})")
   end
 
-  desc "Build, sign, and upload Orca Mobile to App Store Connect / TestFlight"
+  desc "Build, sign, and upload Orca Lab Mobile to App Store Connect / TestFlight"
   lane :build_and_upload do
     api_key = app_store_connect_api_key_from_env
 
@@ -283,7 +283,7 @@ platform :ios do
     )
   end
 
-  desc "Build, upload, and distribute Orca Mobile to external TestFlight testers"
+  desc "Build, upload, and distribute Orca Lab Mobile to external TestFlight testers"
   lane :release do
     build_and_upload
 

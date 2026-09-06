@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Start Orca Mobile server and load it in the iOS emulator.
+ * Start Orca Lab Mobile server and load it in the iOS emulator.
  * Looks for emulators in the given worktree.
  *
  * Usage:
@@ -566,7 +566,7 @@ async function findReachableMetroUrl(initialUrl) {
 
 // Main function
 async function main() {
-  log(colors.bright + 'Starting Orca Mobile in Emulator\n' + colors.reset)
+  log(`${colors.bright}Starting Orca Lab Mobile in Emulator\n${colors.reset}`)
   let pairingRuntime = null
 
   try {
