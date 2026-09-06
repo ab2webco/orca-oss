@@ -23,10 +23,12 @@ vi.mock(
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
 import {
+  boardColumn,
   byLabel,
   callsTo,
   CARD,
   deviceStorage,
+  DOING_CARD,
   leafWithText,
   mountBoard,
   openCard,
@@ -77,16 +79,16 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       const calls = await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       // The list is what is on screen: rows, no columns, and nothing read for a board.
       expect(byLabel('Row Wire the retry')).not.toBeNull()
-      expect(byLabel('Todo, 1 cards')).toBeNull()
+      expect(boardColumn('Todo')).toBeNull()
       expect(byLabel('Show as list')?.getAttribute('aria-selected')).toBe('true')
       expect(callsTo(calls, 'plane.listStates')).toHaveLength(0)
 
       await press('Show as board')
 
       expect(byLabel('Show as board')?.getAttribute('aria-selected')).toBe('true')
-      expect(byLabel('Todo, 1 cards')).not.toBeNull()
-      expect(byLabel('Doing, 0 cards')).not.toBeNull()
-      expect(byLabel('Wire the retry')).not.toBeNull()
+      expect(boardColumn('Todo')).toEqual({ count: 1 })
+      expect(boardColumn('Doing')).toEqual({ count: 0 })
+      expect(byLabel('Open Wire the retry')).not.toBeNull()
       expect(callsTo(calls, 'plane.listWorkItems')[0]?.params).toMatchObject({
         projectId: 'proj-1',
         workspaceId: 'ws-1',
@@ -106,18 +108,18 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
 
       expect(byLabel('Show as board')?.getAttribute('aria-selected')).toBe('true')
-      expect(byLabel('Todo, 1 cards')).not.toBeNull()
+      expect(boardColumn('Todo')).toEqual({ count: 1 })
       expect(byLabel('Row Wire the retry')).toBeNull()
     })
 
     it('goes back to the list, and the list is the default a fresh device starts on', async () => {
       await mountBoard(root, WRITING_HOST, { items: [CARD] })
-      expect(byLabel('Todo, 1 cards')).not.toBeNull()
+      expect(boardColumn('Todo')).toEqual({ count: 1 })
 
       await press('Show as list')
 
       expect(byLabel('Row Wire the retry')).not.toBeNull()
-      expect(byLabel('Todo, 1 cards')).toBeNull()
+      expect(boardColumn('Todo')).toBeNull()
       // The default is not pinned: a reset clears the key instead of storing "list".
       expect(deviceStorage.entries.has(PLANE_VIEW_STORAGE_KEY)).toBe(false)
     })
@@ -136,6 +138,17 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
 
       await press('Show as board')
       expect(leafWithText('All states')).toBeNull()
+    })
+  })
+
+  describe('the board is the provider-neutral shell', () => {
+    it('renders every column with its cards side by side, the way the Linear board does', async () => {
+      await mountBoard(root, WRITING_HOST, { items: [CARD, DOING_CARD] })
+
+      // The shell labels a card "Open <title>"; the old Plane board labelled it by bare title
+      // and showed one column at a time, so a card of the second column was never mounted.
+      expect(byLabel('Open Wire the retry')).not.toBeNull()
+      expect(byLabel('Open Ship the shell')).not.toBeNull()
     })
   })
 
@@ -208,10 +221,10 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       // Orca Lab stayed on Ab2Web's board, and the retry resent that card's patch.
       expect(leafWithText(banner)).toBeNull()
       expect(byLabel('Try again')).toBeNull()
-      expect(byLabel('Wire the retry')).toBeNull()
+      expect(byLabel('Open Wire the retry')).toBeNull()
 
       await press('Switch project')
-      expect(byLabel('Wire the retry')).not.toBeNull()
+      expect(byLabel('Open Wire the retry')).not.toBeNull()
       expect(leafWithText(banner)).not.toBeNull()
       await press('Try again')
       expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(2)
@@ -272,7 +285,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
 
     it('keeps the list-row detail open and shows the error when a move is dropped', async () => {
       // Blocker 1: closing before the move raced the list re-read ahead of the write, so a
-      // failure had nowhere to show (PlaneBoardView is not mounted in list mode).
+      // failure had nowhere to show (PlaneTaskBoard is not mounted in list mode).
       const calls = await renderPlaneTasks(
         root,
         WRITING_HOST,

@@ -29,9 +29,11 @@ import {
 import { PLANE_COMMENT_UNANSWERED_MESSAGE } from './use-plane-board-comments'
 import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 import {
+  boardColumn,
   byLabel,
   callsTo,
   CARD,
+  cardText,
   deviceStorage,
   leafWithText,
   mountBoard as mountBoardWith,
@@ -85,7 +87,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
   it('shows no add button at all on a host that would refuse the create', async () => {
     await mountBoard(PHASE_1_HOST)
 
-    expect(byLabel('Todo, 0 cards')).not.toBeNull()
+    expect(boardColumn('Todo')).toEqual({ count: 0 })
     expect(byLabel('Add card')).toBeNull()
   })
 
@@ -96,7 +98,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     expect(addButton).not.toBeNull()
 
     act(() => addButton!.click())
-    // The column chip also says "Todo"; only the sheet says it under "New card".
+    // The column header also says "Todo"; only the sheet says it under "New card".
     const sheet = leafWithText('New card')?.parentElement
     expect(sheet).not.toBeNull()
     expect(leafWithText('Todo', sheet!)).not.toBeNull()
@@ -165,7 +167,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
 
     expect(byLabel('Card title')).toBeNull()
     expect(leafWithText('Try again')).toBeNull()
-    expect(byLabel('Todo, 1 cards')).not.toBeNull()
+    expect(boardColumn('Todo')).toEqual({ count: 1 })
     expect(callsTo(calls, 'plane.createWorkItem')).toHaveLength(1)
   })
 
@@ -180,7 +182,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
 
     expect(readsOf(calls)).toBe(readsBeforeMove + 1)
     expect(leafWithText('Moving…')).toBeNull()
-    expect(byLabel('Todo, 1 cards')).not.toBeNull()
+    expect(boardColumn('Todo')).toEqual({ count: 1 })
     expect(
       leafWithText(`Could not move the card — ${PLANE_WRITE_UNANSWERED_MESSAGE}`)
     ).not.toBeNull()
@@ -191,15 +193,24 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       rejectWrites: new Error('Connection interrupted'),
       items: [CARD]
     })
-    expect(byLabel('Todo, 1 cards')).not.toBeNull()
+    expect(boardColumn('Todo')).toEqual({ count: 1 })
 
     await openCard()
     await press('Move to Doing')
 
     expect(leafWithText('Moving…')).toBeNull()
-    expect(byLabel('Todo, 1 cards')).not.toBeNull()
-    expect(byLabel('Doing, 0 cards')).not.toBeNull()
+    expect(boardColumn('Todo')).toEqual({ count: 1 })
+    expect(boardColumn('Doing')).toEqual({ count: 0 })
     expect(leafWithText('Could not move the card — Connection interrupted')).not.toBeNull()
+  })
+
+  it('says a card is moving on the card itself while its write is in flight', async () => {
+    await mountBoard(WRITING_HOST, { hangWritesFor: 'wi-1', items: [CARD] })
+    await openCard()
+    await press('Move to Doing')
+
+    expect(boardColumn('Doing')).toEqual({ count: 1 })
+    expect(cardText('Wire the retry')).toContain('Moving…')
   })
 
   it('shows neither a priority nor an assignee control on a phase-1 host', async () => {
@@ -253,7 +264,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       }
     ])
     expect(byLabel('Priority High')?.getAttribute('aria-selected')).toBe('true')
-    expect(leafWithText('High', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(cardText('Wire the retry')).toContain('High')
     expect(leafWithText('Updating…')).toBeNull()
   })
 
@@ -265,8 +276,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await openCard()
     await press('Priority High')
 
-    const card = byLabel('Wire the retry')!
-    expect(leafWithText('High', card)).toBeNull()
+    expect(cardText('Wire the retry')).not.toContain('High')
     expect(byLabel('Priority High')?.getAttribute('aria-selected')).not.toBe('true')
     expect(leafWithText('Updating…')).toBeNull()
     expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
@@ -294,7 +304,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       leafWithText(`Could not update the card — ${PLANE_WRITE_UNANSWERED_MESSAGE}`)
     ).not.toBeNull()
     // The re-read is what puts the value on the card, not the optimistic override.
-    expect(leafWithText('High', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(cardText('Wire the retry')).toContain('High')
   })
 
   it('assigns a member and sends the whole assignee list', async () => {
@@ -309,7 +319,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       updates: { assigneeIds: ['u-1'] }
     })
     expect(byLabel('Unassign Ada')).not.toBeNull()
-    expect(leafWithText('Ada', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(cardText('Wire the retry')).toContain('Ada')
 
     await press('Assign Grace')
     expect(callsTo(calls, 'plane.updateWorkItem')[1]?.params).toMatchObject({
@@ -330,7 +340,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       updates: { assigneeIds: [] }
     })
     expect(byLabel('Unassign Ada')).not.toBeNull()
-    expect(leafWithText('Ada', byLabel('Wire the retry')!)).not.toBeNull()
+    expect(cardText('Wire the retry')).toContain('Ada')
     expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
     expect(byLabel('Try again')).not.toBeNull()
   })
@@ -347,7 +357,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
 
     // Switching cards: the list stays mounted under the sheet, so a click on the
     // other card is what closing and reopening looks like to the screen.
-    await press('Second card')
+    await press('Open Second card')
     expect(leafWithText('Could not update the card — Connection interrupted')).toBeNull()
     expect(byLabel('Try again')).toBeNull()
 
@@ -455,7 +465,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
 
-    await press('Second card')
+    await press('Open Second card')
     expect(leafWithText(COMMENT_DROPPED)).toBeNull()
     expect(byLabel('Try again')).toBeNull()
 
@@ -480,7 +490,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
 
-    await press('Second card')
+    await press('Open Second card')
     await postComment('Fine by me')
     expect(leafWithText('Comment posted')).not.toBeNull()
 
@@ -502,7 +512,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText('Posting…')).not.toBeNull()
 
-    await press('Second card')
+    await press('Open Second card')
     await postComment('Fine by me')
     expect(leafWithText('Comment posted')).not.toBeNull()
 

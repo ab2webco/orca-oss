@@ -2,8 +2,8 @@ import { useCallback } from 'react'
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
 import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
-import { PlaneBoardView } from './plane-board-view'
 import { resolveLivePlaneWorkItem, resolvePlaneBoardScope } from './plane-board-scope'
+import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
 import type { PlaneViewMode } from './plane-work-item-view'
 import { usePlaneBoard } from './use-plane-board'
@@ -86,7 +86,7 @@ export function PlaneTasksSurface({
       }
       void board.moveWorkItem(item, stateId).then((kept) => {
         // Close on success either way. On failure, board mode keeps the sheet closed because
-        // PlaneBoardView shows the move error; list mode keeps it open because the sheet is
+        // PlaneTaskBoard shows the move error; list mode keeps it open because the sheet is
         // the only place that error can appear there (blocker 1).
         if (kept || viewMode === 'board') {
           onCloseDetail()
@@ -105,7 +105,7 @@ export function PlaneTasksSurface({
   return (
     <>
       {enabled && viewMode === 'board' ? (
-        <PlaneBoardView
+        <PlaneTaskBoard
           board={board}
           sheetOpen={live !== null}
           onOpenCard={onOpenCard}

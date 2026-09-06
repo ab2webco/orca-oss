@@ -32,6 +32,15 @@ export const CARD = {
   updatedAt: ''
 }
 
+/** A card in the second column: the board shows both columns' cards at once. */
+export const DOING_CARD = {
+  ...CARD,
+  id: 'wi-2',
+  identifier: 'ORCA-2',
+  title: 'Ship the shell',
+  state: { id: 'state-2', name: 'Doing', group: 'started' }
+}
+
 export type Call = { method: string; params?: unknown }
 
 export type HostBehaviour = {
@@ -327,7 +336,30 @@ export async function press(label: string): Promise<void> {
 }
 
 export async function openCard(): Promise<void> {
-  await press('Wire the retry')
+  await press('Open Wire the retry')
+}
+
+/** Everything a board card says: title, its facts line and its state pill. */
+export function cardText(title: string): string {
+  const card = byLabel(`Open ${title}`)
+  if (!card) {
+    throw new Error(`no card titled ${title}`)
+  }
+  return card.textContent ?? ''
+}
+
+/** The shell's column header: the state name beside its card count. */
+export function boardColumn(name: string): { count: number } | null {
+  for (const leaf of document.body.querySelectorAll<HTMLElement>('div')) {
+    if (leaf.childElementCount !== 0 || leaf.textContent !== name) {
+      continue
+    }
+    const count = leaf.nextElementSibling?.textContent ?? ''
+    if (/^\d+$/.test(count)) {
+      return { count: Number(count) }
+    }
+  }
+  return null
 }
 
 export function callsTo(calls: Call[], method: string): Call[] {
