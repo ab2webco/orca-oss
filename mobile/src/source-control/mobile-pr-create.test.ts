@@ -141,7 +141,7 @@ describe('mobile create form gating parity', () => {
         blockedReason: null
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      'Orca Lab could not confirm whether this branch already has a pull request. Try again in a moment.'
     )
     expect(
       getMobilePrCreateBlockMessage({
@@ -153,7 +153,7 @@ describe('mobile create form gating parity', () => {
         blockedReason: 'needs_push'
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      'Orca Lab could not confirm whether this branch already has a pull request. Try again in a moment.'
     )
   })
 
@@ -197,7 +197,7 @@ describe('mobile create form gating parity', () => {
         reviewLookupOutcome: 'unavailable'
       })
     ).toBe(
-      'Orca could not confirm whether this branch already has a pull request. Try again in a moment.'
+      'Orca Lab could not confirm whether this branch already has a pull request. Try again in a moment.'
     )
   })
 

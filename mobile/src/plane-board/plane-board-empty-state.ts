@@ -47,7 +47,7 @@ export function resolvePlaneBoardEmptyState(
     return {
       kind: 'disconnected',
       title: 'Plane is not connected on this host',
-      body: 'Connect Plane in the Orca desktop app on this host, then pull to refresh.',
+      body: 'Connect Plane in the Orca Lab desktop app on this host, then pull to refresh.',
       action: 'refresh',
       actionLabel: 'Check again'
     }
