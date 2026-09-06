@@ -38,6 +38,9 @@ const PlaneMobileWorkItemSchema = z
     id: z.string().min(1),
     identifier: z.string().default(''),
     title: z.string().default(''),
+    // Markdown, converted from Plane's HTML on the host. Absent on a host that
+    // does not publish it; the detail then renders no body rather than empty.
+    description: z.string().optional(),
     url: z.string().default(''),
     workspaceId: z.string().optional(),
     project: PlaneMobileProjectSchema.catch({ id: '', identifier: '', name: '' }),
