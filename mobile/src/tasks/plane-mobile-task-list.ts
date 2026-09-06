@@ -29,14 +29,16 @@ export function createPlaneTask(item: PlaneMobileWorkItem): PlaneTaskItem {
   }
 }
 
-export function filterPlaneWorkItemsByState(
-  items: readonly PlaneMobileWorkItem[],
+/** The state chip narrows the list's rows and nothing else: it is not rendered in board
+ *  mode, so the board keeps every state — its columns are its own state view (ORCA-417). */
+export function filterPlaneRowsByState(
+  rows: readonly PlaneTaskItem[],
   selectedStateIds: ReadonlySet<string>
-): PlaneMobileWorkItem[] {
+): PlaneTaskItem[] {
   if (selectedStateIds.size === 0) {
-    return [...items]
+    return [...rows]
   }
-  return items.filter((item) => selectedStateIds.has(item.state.id))
+  return rows.filter((row) => selectedStateIds.has(row.source.state.id))
 }
 
 export function sortPlaneWorkItems(

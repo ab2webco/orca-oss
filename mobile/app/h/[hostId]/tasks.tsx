@@ -184,7 +184,7 @@ import {
 } from '../../../src/tasks/plane-mobile-task-source'
 import {
   createPlaneTask,
-  filterPlaneWorkItemsByState,
+  filterPlaneRowsByState,
   reconcilePlaneStateSelection,
   sortPlaneWorkItems,
   type PlaneTaskItem
@@ -3041,13 +3041,11 @@ export default function MobileTasksScreen() {
           if (!isCurrent()) {
             return
           }
-          const scoped = sortPlaneWorkItems(
-            filterPlaneWorkItemsByState(workItems, planeStateIds),
-            planeStates
-          )
+          // Every row the read returned: the state chip narrows the list below, not this.
+          const ordered = sortPlaneWorkItems(workItems, planeStates)
           // Set before the commit so an awaited refresh can read back what it just loaded.
-          planeWorkItemsRef.current = scoped
-          setItems(scoped.map(createPlaneTask))
+          planeWorkItemsRef.current = ordered
+          setItems(ordered.map(createPlaneTask))
           return
         }
         // Why: Linear issues do not need the repo list, only the composer does, so
@@ -8259,7 +8257,10 @@ export default function MobileTasksScreen() {
     // Plane rows arrive in the project's own state order, so the generic
     // repository/updated sort would throw that away.
     if (provider === 'plane') {
-      return items
+      return filterPlaneRowsByState(
+        items.filter((item): item is PlaneTaskItem => item.provider === 'plane'),
+        planeStateIds
+      )
     }
     const next = [...items]
     if (taskSort === 'repository') {
@@ -8268,7 +8269,7 @@ export default function MobileTasksScreen() {
       next.sort(compareTasksByUpdated)
     }
     return next
-  }, [items, provider, reposById, taskSort])
+  }, [items, planeStateIds, provider, reposById, taskSort])
   const displayedEntries = useMemo<TaskListEntry[]>(() => {
     // Plane keeps its board order, so the repository grouping below — which
     // assumes sorted input — would emit a header per run of rows.
