@@ -69,7 +69,7 @@ export const PLANE_EXTENDED_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Three-step upload: Plane issues a signed URL, the file goes straight to storage, then the asset is confirmed.',
-      'The file is read by the Orca app host; not supported over a remote pairing. For URL links use attach add.'
+      'The file is read by the Orca Lab app host; not supported over a remote pairing. For URL links use attach add.'
     ]
   },
   {

@@ -334,10 +334,10 @@ describe('orca root help', () => {
     await main([], '/tmp/repo')
 
     expect(logSpy.mock.calls.flat().join('\n')).toContain(
-      'account add               Add a managed Claude or Codex account on this Orca host'
+      'account add               Add a managed Claude or Codex account on this Orca Lab host'
     )
     expect(logSpy.mock.calls.flat().join('\n')).toContain(
-      'account list              List managed Claude and Codex accounts on this Orca host'
+      'account list              List managed Claude and Codex accounts on this Orca Lab host'
     )
     logSpy.mockRestore()
   })
@@ -379,7 +379,7 @@ describe('orca root help', () => {
       '`--command` launches raw argv and skips those defaults'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
-      'orchestration worker-start Start a supervised worker locally or on a connected Orca server'
+      'orchestration worker-start Start a supervised worker locally or on a connected Orca Lab server'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
       'orchestration ask         Ask the coordinator a blocking question'
@@ -526,13 +526,13 @@ describe('orca root help', () => {
     expect(createHelp).not.toContain('checkout/workspace')
     expect(createHelp).not.toContain('caller workspace')
     expect(createHelp).not.toContain('current workspace')
-    expect(createHelp).not.toContain('active Orca workspace')
+    expect(createHelp).not.toContain('active Orca Lab workspace')
     expect(createHelp).not.toContain('folderWorkspaceId')
     expect(createHelp).toContain('folder:<id>')
     expect(createHelp).toContain('folder:<folderId>')
     expect(createHelp).toContain('worktree:<worktreeId>')
     expect(createHelp).toContain(
-      '--no-parent only affects Orca lineage; omit --base-branch to use the repo default base'
+      '--no-parent only affects Orca Lab lineage; omit --base-branch to use the repo default base'
     )
 
     logSpy.mockClear()
@@ -737,7 +737,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    'prepares and starts Claude Agent Teams in the current Orca terminal',
+    'prepares and starts Claude Agent Teams in the current Orca Lab terminal',
     async () => {
       process.env.ORCA_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
       queueFixtures(

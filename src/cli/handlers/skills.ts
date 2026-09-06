@@ -223,7 +223,7 @@ function resolveInstallAgentKeys(flags: Map<string, string | boolean>): string[]
     'invalid_environment',
     'No coding agent detected on this host, so there is no install target. Pass ' +
       '--agent <name>[,<name>...] to choose targets explicitly — --agent universal ' +
-      'writes only the shared .agents/skills directory that Orca reads.'
+      'writes only the shared .agents/skills directory that Orca Lab reads.'
   )
 }
 
@@ -286,7 +286,7 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
       throw new RuntimeClientError(
         'invalid_environment',
         `orca skills ${verb} writes to the machine that runs it, but this shell forwards ` +
-          `orca to the Orca host. Run the same orca skills ${verb} command on the machine ` +
+          `orca to the Orca Lab host. Run the same orca skills ${verb} command on the machine ` +
           "you want it on, where it can detect that host's agents."
       )
     }

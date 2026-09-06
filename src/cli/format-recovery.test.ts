@@ -7,13 +7,13 @@ describe('CLI error recovery', () => {
   it('distinguishes denied runtime access from an app that is not running', () => {
     const error = new RuntimeClientError(
       'runtime_access_denied',
-      'The operating system denied access to the Orca runtime transport.'
+      'The operating system denied access to the Orca Lab runtime transport.'
     )
 
     const output = formatCliError(error)
 
     expect(output).toContain('denied access')
-    expect(output).not.toContain('Orca is not running')
+    expect(output).not.toContain('Orca Lab is not running')
   })
 
   it('prints did-you-mean next steps for an unknown-command error carrying data', () => {

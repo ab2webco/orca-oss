@@ -93,7 +93,7 @@ export const PLANE_ATTACH_HANDLERS: Record<string, CommandHandler> = {
     if (ctx.client.isRemote) {
       throw new RuntimeClientError(
         'invalid_argument',
-        'plane attach upload is not supported over a remote pairing: --file is read on the machine running the Orca app, not where the CLI runs.'
+        'plane attach upload is not supported over a remote pairing: --file is read on the machine running the Orca Lab app, not where the CLI runs.'
       )
     }
     const target = await resolvePlaneWriteTarget(ctx)

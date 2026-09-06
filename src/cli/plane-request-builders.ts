@@ -60,7 +60,7 @@ export async function resolvePlaneCurrentWorkItem(
   if (!response.result) {
     throw new RuntimeClientError(
       'plane_work_item_required',
-      'Run --current inside a Plane-linked Orca worktree, or pass a work item id.'
+      'Run --current inside a Plane-linked Orca Lab worktree, or pass a work item id.'
     )
   }
   return { ...response, result: response.result }

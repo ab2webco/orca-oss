@@ -73,7 +73,7 @@ async function readStdinWithinLimit(maxBytes: number): Promise<string> {
     if (bytes > maxBytes) {
       throw new RuntimeClientError(
         'invalid_argument',
-        'Artifact is too large for the Orca CLI transport. Use the browser upload page instead.'
+        'Artifact is too large for the Orca Lab CLI transport. Use the browser upload page instead.'
       )
     }
     chunks.push(buffer)
@@ -126,7 +126,7 @@ async function readArtifactRequest(ctx: HandlerContext): Promise<ArtifactWriteRe
   if (localRead?.status === 'too-large') {
     throw new RuntimeClientError(
       'invalid_argument',
-      'Artifact is too large for the Orca CLI transport. Use the browser upload page instead.'
+      'Artifact is too large for the Orca Lab CLI transport. Use the browser upload page instead.'
     )
   }
   const content = remoteInput
@@ -147,7 +147,7 @@ async function readArtifactRequest(ctx: HandlerContext): Promise<ArtifactWriteRe
   if (Buffer.byteLength(JSON.stringify(request), 'utf8') > ARTIFACT_CLI_MAX_RPC_BYTES) {
     throw new RuntimeClientError(
       'invalid_argument',
-      'Artifact is too large for the Orca CLI transport. Use the browser upload page instead.'
+      'Artifact is too large for the Orca Lab CLI transport. Use the browser upload page instead.'
     )
   }
   return request
@@ -158,7 +158,7 @@ function requireOperation<T>(operation: ArtifactCloudOperation<T>): T {
     return operation.value
   }
   if (operation.status === 'reconnect-required') {
-    throw new RuntimeClientError('authentication_required', 'Sign in to Orca and try again.')
+    throw new RuntimeClientError('authentication_required', 'Sign in to Orca Lab and try again.')
   }
   throw new RuntimeClientError('authentication_unconfigured', operation.message)
 }

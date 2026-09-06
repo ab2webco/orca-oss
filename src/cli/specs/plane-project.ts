@@ -22,8 +22,8 @@ export const PLANE_PROJECT_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       NO_NESTING_NOTE,
       '--identifier is the short work-item prefix (BILL-1, BILL-2); Plane rejects one already used in the workspace.',
-      '--workspace accepts a workspace slug or a saved workspace id; omit it to use the workspace Orca has selected.',
-      'Uses the Plane credentials Orca already manages — no API key goes on the command line.'
+      '--workspace accepts a workspace slug or a saved workspace id; omit it to use the workspace Orca Lab has selected.',
+      'Uses the Plane credentials Orca Lab already manages — no API key goes on the command line.'
     ]
   },
   {

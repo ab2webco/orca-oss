@@ -48,22 +48,18 @@ describe('runtime transport timeout validation', () => {
 })
 
 describe('runtime transport connection errors', () => {
-  it('classifies a denied socket connection without claiming Orca is stopped', () => {
+  it('classifies a denied socket connection without claiming Orca Lab is stopped', () => {
     expect(
-      classifyRuntimeConnectionError(
-        Object.assign(new Error('connect EPERM'), { code: 'EPERM' })
-      )
+      classifyRuntimeConnectionError(Object.assign(new Error('connect EPERM'), { code: 'EPERM' }))
     ).toMatchObject({
       code: 'runtime_access_denied',
-      message: expect.stringContaining('does not mean Orca is not running')
+      message: expect.stringContaining('does not mean Orca Lab is not running')
     })
   })
 
   it('classifies a missing socket as an unavailable runtime', () => {
     expect(
-      classifyRuntimeConnectionError(
-        Object.assign(new Error('connect ENOENT'), { code: 'ENOENT' })
-      )
+      classifyRuntimeConnectionError(Object.assign(new Error('connect ENOENT'), { code: 'ENOENT' }))
     ).toMatchObject({
       code: 'runtime_unavailable'
     })
@@ -172,7 +168,7 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     await expect(sendRequest(metadata, 'status.get', undefined, 60000)).rejects.toMatchObject({
       code: 'runtime_unavailable',
       message:
-        'The Orca runtime closed the connection before responding. Restart Orca and try again.'
+        'The Orca Lab runtime closed the connection before responding. Restart Orca Lab and try again.'
     })
     expect(Date.now() - start).toBeLessThan(5000)
   })
