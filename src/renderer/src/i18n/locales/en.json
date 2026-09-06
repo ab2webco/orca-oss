@@ -6368,7 +6368,7 @@
           "statusCheckManually": "Check manually",
           "actionRequestAccess": "Request Access",
           "localNetworkPromptCheck": "Check for a macOS prompt",
-          "localNetworkPromptGuidance": "If prompted, choose Allow. If no prompt appears, open System Settings and enable Orca Lab under Privacy & Security → Local Network.",
+          "localNetworkPromptGuidance": "If prompted, choose Allow. If no prompt appears, open System Settings and enable Orca under Privacy & Security → Local Network.",
           "localNetworkOpenSettings": "Open System Settings",
           "openSettingsFailed": "Could not open System Settings",
           "localNetworkOpenSystemSettings": "Open System Settings",
@@ -6971,7 +6971,7 @@
           "0cb93240b8": "System did not show the notification",
           "145227ca2b": "Open Settings",
           "d3d54e0915": "Test notification sent",
-          "115437bc35": "If no macOS banner appeared, enable Allow notifications for Orca Lab.",
+          "115437bc35": "If no macOS banner appeared, enable Allow notifications for Orca.",
           "7f45542625": "Test notification requested",
           "98d70fb261": "Custom notification sound could not be played",
           "c83b05a055": "Notifications are not supported on this system",
@@ -12828,7 +12828,7 @@
           "0fe570690c": "Pick the alert Orca Lab plays after a desktop notification is delivered.",
           "0af746e41f": "Choose a sound",
           "8124d085a6": "Open Mac Settings",
-          "aa36281b00": "Open System Settings and make sure Orca Lab is allowed to send notifications.",
+          "aa36281b00": "Open System Settings and make sure Orca is allowed to send notifications.",
           "d2dba86837": "Allow Orca Lab in macOS",
           "e52aacf380": "Loading notification settings…",
           "3cd5374e22": "Notification settings are still loading",
@@ -12838,11 +12838,11 @@
           "56b836215c": "Checking notification permission…",
           "fd84d3e9b8": "Notifications are enabled",
           "4f7bce5644": "macOS will alert you when agents finish or terminals need attention.",
-          "95d99b52fa": "Allow notifications for Orca Lab",
+          "95d99b52fa": "Allow notifications for Orca",
           "94562ba367": "macOS is asking for permission. Click Allow in the dialog and this step updates automatically.",
           "4f6a1da718": "Open System Settings",
           "90b5d2e363": "macOS is not delivering Orca Lab notifications",
-          "2c47f5465f": "Turn on Allow notifications for Orca Lab in System Settings. This step updates automatically once enabled."
+          "2c47f5465f": "Turn on Allow notifications for Orca in System Settings. This step updates automatically once enabled."
         },
         "OnboardingFlow": {
           "1b5e182e9f": "Welcome to Orca Lab",
@@ -12939,7 +12939,7 @@
               "card": {
                 "f696515944": "Click Allow in the macOS dialog.",
                 "3d18cf71f9": "Updates automatically.",
-                "721d2bedb6": "Turn on Allow notifications for Orca Lab in System Settings."
+                "721d2bedb6": "Turn on Allow notifications for Orca in System Settings."
               }
             }
           }
@@ -14542,7 +14542,7 @@
           "7afff43472": "Dictation finished, but no text field was focused.",
           "55127a3706": "Dictation failed: {{value0}}",
           "bb7f599ee7": "Open Settings",
-          "2d5b9fabf9": "Microphone access denied. Grant access in system settings, then restart Orca Lab.",
+          "2d5b9fabf9": "Microphone access denied. Grant access in system settings, then restart Orca.",
           "5d2c3e7ae3": "No speech detected.",
           "micFallback": "Selected microphone unavailable. Using system default.",
           "micDisconnected": "Microphone disconnected. Dictation stopped."

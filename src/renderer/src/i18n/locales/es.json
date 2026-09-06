@@ -6012,7 +6012,7 @@
           "localNetworkOpenSystemSettings": "Abrir Ajustes del Sistema",
           "openSettingsFailed": "No se pudieron abrir los Ajustes del Sistema",
           "localNetworkPromptCheck": "Buscar un aviso de macOS",
-          "localNetworkPromptGuidance": "Si aparece un aviso, elige Permitir. Si no aparece ninguno, abre Ajustes del Sistema y activa Orca Lab en Privacidad y seguridad → Red local.",
+          "localNetworkPromptGuidance": "Si aparece un aviso, elige Permitir. Si no aparece ninguno, abre Ajustes del Sistema y activa Orca en Privacidad y seguridad → Red local.",
           "connectionTestTitle": "Probar la conexión",
           "connectionTestAction": "Probar conexión",
           "connectionTestDescription": "Indica un servicio de otro dispositivo de tu red local. Orca Lab prueba la misma ruta de red que usan las herramientas de terminal.",

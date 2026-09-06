@@ -85,7 +85,7 @@ describe('ClaudeAccountReassignDialog', () => {
 
     expect(markup).toContain('Live terminal')
     expect(markup).toContain('Pinned')
-    expect(markup).toContain('Orca will close the Claude terminal in feature-login')
+    expect(markup).toContain('Orca Lab will close the Claude terminal in feature-login')
   })
 
   it('names the other account and worktree that keeps the change blocked', () => {

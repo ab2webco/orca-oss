@@ -5998,7 +5998,7 @@
           "localNetworkOpenSystemSettings": "打开系统设置",
           "openSettingsFailed": "无法打开系统设置",
           "localNetworkPromptCheck": "查看 macOS 提示",
-          "localNetworkPromptGuidance": "如果出现提示，请选择“允许”。如果没有出现提示，请打开系统设置，在“隐私与安全性”→“本地网络”中启用 Orca Lab。",
+          "localNetworkPromptGuidance": "如果出现提示，请选择“允许”。如果没有出现提示，请打开系统设置，在“隐私与安全性”→“本地网络”中启用 Orca。",
           "connectionTestTitle": "测试连接",
           "connectionTestAction": "测试连接",
           "connectionTestDescription": "请输入本地网络中其他设备上的服务。Orca Lab 会测试终端工具使用的同一网络路径。",
@@ -12104,7 +12104,7 @@
           "0fe570690c": "选择发送桌面通知后 Orca Lab 播放的警报。",
           "0af746e41f": "选择声音",
           "8124d085a6": "打开 Mac 设置",
-          "aa36281b00": "打开系统设置并确保允许 Orca Lab 发送通知。",
+          "aa36281b00": "打开系统设置并确保允许 Orca 发送通知。",
           "d2dba86837": "在 macOS 中允许 Orca Lab",
           "e52aacf380": "正在加载通知设置...",
           "3cd5374e22": "通知设置仍在加载中",
@@ -12118,7 +12118,7 @@
           "94562ba367": "macOS 正在请求权限。在对话框中点按允许，此步骤会自动更新。",
           "4f6a1da718": "打开系统设置",
           "90b5d2e363": "macOS 未送达 Orca Lab 的通知",
-          "2c47f5465f": "在系统设置中启用 Orca Lab 的允许通知。启用后此步骤会自动更新。"
+          "2c47f5465f": "在系统设置中启用 Orca 的允许通知。启用后此步骤会自动更新。"
         },
         "OnboardingFlow": {
           "1b5e182e9f": "欢迎使用 Orca Lab",
@@ -12215,7 +12215,7 @@
               "card": {
                 "f696515944": "在 macOS 对话框中点按允许。",
                 "3d18cf71f9": "将自动更新。",
-                "721d2bedb6": "在系统设置中为 Orca Lab 开启允许通知。"
+                "721d2bedb6": "在系统设置中为 Orca 开启允许通知。"
               }
             }
           }
@@ -13791,7 +13791,7 @@
           "7afff43472": "听写完成，但没有聚焦文本字段。",
           "55127a3706": "听写失败：{{value0}}",
           "bb7f599ee7": "打开设置",
-          "2d5b9fabf9": "麦克风访问被拒绝。在系统设置中授予访问权限，然后重新启动 Orca Lab。",
+          "2d5b9fabf9": "麦克风访问被拒绝。在系统设置中授予访问权限，然后重新启动 Orca。",
           "5d2c3e7ae3": "未检测到语音。"
         },
         "DictationIndicator": {

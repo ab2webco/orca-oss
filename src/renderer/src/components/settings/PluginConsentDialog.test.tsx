@@ -155,7 +155,7 @@ describe('PluginConsentDialog', () => {
     )
 
     expect(document.body.textContent).toContain(
-      "These permissions limit how the plugin uses Orca's API. This plugin has no background worker."
+      "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
     )
     expect(document.body.textContent).not.toContain('full access to your files')
     expect(document.body.textContent).not.toContain('connect to any host on the internet')
@@ -176,7 +176,7 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).toContain('Review plugin')
     expect(document.body.textContent).toContain('Declarative')
     expect(document.body.textContent).toContain(
-      "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API."
+      "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
     )
     expect(document.body.textContent).not.toContain('These permissions limit')
   })

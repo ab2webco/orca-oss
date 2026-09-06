@@ -671,7 +671,7 @@ describe('web runtime environment identity', () => {
     ).resolves.toMatchObject({
       ok: false,
       kind: 'environment-save-failed',
-      message: 'Orca verified the host but could not save it. Check browser storage and try again.'
+      message: 'Orca Lab verified the host but could not save it. Check browser storage and try again.'
     })
     await expect(globals.window.api.runtimeEnvironments.list()).resolves.toMatchObject([
       { id: 'web-server-a' }
