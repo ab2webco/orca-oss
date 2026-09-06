@@ -21,9 +21,19 @@ from command_text import strip_heredocs  # noqa: E402
 
 PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 TICKET_RE = re.compile(r"ORCA-(\d+)", re.IGNORECASE)
-CREATE_RE = re.compile(r"\bgh\s+pr\s+create\b")
-MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b")
-MERGE_NUMBER_RE = re.compile(r"\bgh\s+pr\s+merge\s+(\d+)")
+
+
+def at_command_position(pattern: str) -> re.Pattern[str]:
+    # Why not `\b`: it also matches inside a quoted argument (ORCA-432).
+    return re.compile(
+        r"(?:^|[;&|(){`!]|\b(?:if|then|else|elif|do|while|until)\s)\s*" + pattern,
+        re.MULTILINE,
+    )
+
+
+CREATE_RE = at_command_position(r"gh\s+pr\s+create\b")
+MERGE_RE = at_command_position(r"gh\s+pr\s+merge\b")
+MERGE_NUMBER_RE = at_command_position(r"gh\s+pr\s+merge\s+(\d+)")
 OPT_OUT_RE = re.compile(r"no-ticket:\s*(\S.*)")
 REQUIRED_STATE = "In Progress"
 

@@ -217,6 +217,37 @@ describe('board-state-guard', () => {
     expect(output.systemMessage).toContain('ORCA-361')
   })
 
+  // ORCA-432: the create command quoted inside an `echo` argument. Same bug as
+  // ORCA-362 on another surface: data read as the command.
+  it('ignores a PR command quoted inside an argument of another command', () => {
+    const cwd = makeRepo('fabolivark/orca-155-mobile-plane')
+    const output = runHook({
+      command: 'echo "then run gh pr create --base main and gh pr merge 5" >> notes.md',
+      cwd,
+      state: 'Backlog'
+    })
+    expect(output).toEqual({})
+  })
+
+  it('still sees a PR command after a separator', () => {
+    const cwd = makeRepo('fabolivark/orca-155-mobile-plane')
+    for (const command of [
+      'git push && gh pr create --base main',
+      'git push; gh pr create --base main',
+      'git push\n  gh pr create --base main',
+      'echo $(gh pr create --base main)',
+      'echo `gh pr create --base main`',
+      'if gh pr create --base main; then echo ok; fi',
+      'for i in 1; do gh pr create --base main; done',
+      'true && { gh pr create --base main; }',
+      'case $x in y) gh pr create --base main ;; esac',
+      'true && ! gh pr create --base main'
+    ]) {
+      const output = runHook({ command, cwd, state: 'Backlog' })
+      expect(decision(output), command).toBe('deny')
+    }
+  })
+
   it('says nothing more to move when the merged ticket is already Done', () => {
     const cwd = makeRepo('fabolivark/orca-155-mobile-plane')
     const output = runHook({ command: 'gh pr merge 247 --squash', cwd, state: 'Done' })
