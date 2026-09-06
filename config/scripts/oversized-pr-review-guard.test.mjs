@@ -21,8 +21,11 @@ function makeFakeGhBin({ number = '1', files = null } = {}) {
   const truncatedJson = files === null ? null : JSON.stringify(files.slice(0, 100))
   // `gh api --jq` aplica el filtro y emite lineas, no JSON: el fake tiene que
   // servir lo mismo o el hook parsea algo que gh nunca le daria.
-  const allTsv =
-    files === null ? null : files.map(({ path, additions }) => `${path}\t${additions}`).join('\n')
+  // Why dos paginas y no una lista entera: sin esto, el fake sirve todo con o sin
+  // --paginate, y sacar la bandera deja el suite en verde. Es lo que paso en #296.
+  const page = (entries) => entries.map(({ path, additions }) => `${path}\t${additions}`).join('\n')
+  const firstPageTsv = files === null ? null : page(files.slice(0, 100))
+  const allPagesTsv = files === null ? null : page(files)
   const body =
     files === null
       ? `#!/bin/sh\ncase "$*" in *number*) echo "${number}";; *) exit 1;; esac\n`
@@ -30,9 +33,14 @@ function makeFakeGhBin({ number = '1', files = null } = {}) {
           '#!/bin/sh',
           'case "$*" in',
           `  *number*) echo "${number}";;`,
-          `  *api*files*) cat <<'JSON'`,
-          allTsv,
-          'JSON',
+          // `gh api` sin --paginate devuelve solo la primera pagina, como el real.
+          `  *--paginate*) cat <<'PAGES'`,
+          allPagesTsv,
+          'PAGES',
+          '  ;;',
+          `  *api*files*) cat <<'PAGE1'`,
+          firstPageTsv,
+          'PAGE1',
           '  ;;',
           `  *files*) cat <<'JSON'`,
           truncatedJson,
