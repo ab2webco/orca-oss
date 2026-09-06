@@ -1,29 +1,8 @@
 #!/usr/bin/env python3
-"""Rechaza cualquier merge a `main` hecho desde la Bash tool de un agente.
-
-Why: MEDIDO — un worker mergeó el PR #73 a `main` por su cuenta, minutos después
-de que el mensaje que lo dirigía dijera en palabras llanas que el merge lo hacía
-el coordinador. Salió bien por suerte, no por control: PR Checks no corre E2E
-(ORCA-196), así que un verde de PR no dice nada del runtime. La única barrera era
-prosa en un brief, y la prosa se pondera contra el criterio propio del agente.
-
-Distingue worker de coordinador por cwd: el coordinador trabaja en el worktree
-primario parado en `main`; los workers viven en worktrees de feature, que es donde
-estaba el del PR #73. Eso corta la falla medida, no la clase entera: un worker puede
-hacer `cd` al primario, y comparten el mismo token de `gh` y el mismo usuario, asi que
-ninguna marca de host es infalsificable. La proteccion obligatoria vive en la politica
-de rama del remoto (aprobacion de alguien que no sea el autor), que es lo unico que el
-token compartido no alcanza.
-
-Alcance: sólo escrituras sobre `main` del remoto propio. Un PR encadenado contra una
-rama de feature pasa sin ruido — una guarda que obligue a saltearla todos los días
-no es una guarda.
-
-Esta guarda es defensa en profundidad: si el host deja de invocar `PreToolUse`, falla
-abierto. La protección obligatoria vive en la política de rama del remoto.
-"""
+"""Rechaza merges a `main` fuera de la sesión del workspace primario."""
 
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -90,22 +69,32 @@ def deny(detail: str) -> None:
     sys.exit(0)
 
 
-def is_coordinator_cwd(cwd: str | None) -> bool:
-    """El coordinador es el worktree primario del repo del proyecto, parado en `main`."""
-    # Why sin `--path-format`: es de git 2.31 y el piso del repo es 2.25. Las dos salidas
-    # crudas son consistentes entre si en una misma invocacion, que es lo unico que importa.
-    code, common = run(["git", "rev-parse", "--git-common-dir"], cwd)
+def resolved_git_path(value: str, cwd: str) -> Path:
+    path = Path(value)
+    return (path if path.is_absolute() else Path(cwd) / path).resolve()
+
+
+def is_coordinator_workspace(workspace_id: str | None) -> bool:
+    """El coordinador pertenece al worktree primario del proyecto, parado en `main`."""
+    repo_id, separator, workspace = (workspace_id or "").partition("::")
+    if not repo_id or not separator or not workspace:
+        return False
+    workspace = re.sub(r"::workspace:[0-9a-f-]{36}$", "", workspace, flags=re.IGNORECASE)
+    wsl = re.match(
+        r"^//(?:wsl\.localhost|wsl\$)/[^/]+(?P<path>/.*)?$", workspace.replace("\\", "/"), re.IGNORECASE
+    ) if os.name != "nt" else None
+    workspace = (wsl.group("path") or "/") if wsl else workspace
+    code, common = run(["git", "rev-parse", "--git-common-dir"], workspace)
     if code != 0:
         return False
-    code, own = run(["git", "rev-parse", "--git-dir"], cwd)
-    if code != 0 or own != common:
+    code, own = run(["git", "rev-parse", "--git-dir"], workspace)
+    if code != 0 or resolved_git_path(own, workspace) != resolved_git_path(common, workspace):
         return False
-    code, branch = run(["git", "branch", "--show-current"], cwd)
+    code, branch = run(["git", "branch", "--show-current"], workspace)
     if code != 0 or branch != PROTECTED_BRANCH:
         return False
-    # Why: sin anclar la identidad del repo, cualquier checkout primario en `main` abre la
-    # puerta — incluido el temporal que usan los tests de esta guarda para probar que niega.
-    code, origin_url = run(["git", "remote", "get-url", "origin"], cwd)
+    # Why: la URL evita que otro repo primario en `main` obtenga autoridad.
+    code, origin_url = run(["git", "remote", "get-url", "origin"], workspace)
     return code == 0 and PROJECT_SLUG in origin_url
 
 
@@ -272,7 +261,7 @@ def main() -> None:
 
     cwd = payload.get("cwd")
 
-    if is_coordinator_cwd(cwd):
+    if is_coordinator_workspace(os.environ.get("ORCA_WORKTREE_ID")):
         sys.exit(0)
 
     try:

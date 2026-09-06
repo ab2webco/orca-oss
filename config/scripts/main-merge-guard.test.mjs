@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -21,7 +21,7 @@ function hasConfiguredMainMergeGuard(settings) {
   )
 }
 
-function makeRepo() {
+function makeRepo(origin = 'git@example.com:owner/repo.git') {
   const root = mkdtempSync(join(tmpdir(), 'orca-main-merge-guard-'))
   tempDirs.push(root)
   // Why: `git init --initial-branch` es de git 2.28 y el piso del repo es 2.25.
@@ -29,7 +29,7 @@ function makeRepo() {
   git(root, ['config', 'user.email', 'main-merge-guard-test@example.com'])
   git(root, ['config', 'user.name', 'Main Merge Guard Test'])
   git(root, ['checkout', '--quiet', '-b', 'main'])
-  git(root, ['remote', 'add', 'origin', 'git@example.com:owner/repo.git'])
+  git(root, ['remote', 'add', 'origin', origin])
   git(root, ['remote', 'add', 'upstream', 'git@example.com:someone-else/repo.git'])
   writeFileSync(join(root, 'base.txt'), 'base\n')
   git(root, ['add', '-A'])
@@ -53,9 +53,13 @@ function makeFakeGhBin(baseRefName) {
   return bin
 }
 
-function runGuard(command, { cwd, ghBase } = {}) {
+function runGuard(command, { cwd, ghBase, workspacePath } = {}) {
   const repo = cwd ?? makeRepo()
   const env = { ...process.env }
+  delete env.ORCA_WORKTREE_ID
+  if (workspacePath !== undefined) {
+    env.ORCA_WORKTREE_ID = `repo-id::${workspacePath}`
+  }
   if (ghBase !== undefined) {
     env.PATH = `${makeFakeGhBin(ghBase)}:${env.PATH}`
   }
@@ -123,6 +127,39 @@ describe('main merge guard static contract', () => {
     expect(hasConfiguredMainMergeGuard(settings)).toBe(true)
     delete settings.hooks.PreToolUse
     expect(hasConfiguredMainMergeGuard(settings)).toBe(false)
+  })
+})
+
+describe('main merge guard session workspace', () => {
+  it.each([
+    ['native', (path) => path, false],
+    [
+      'folder workspace',
+      (path) => `${path}::workspace:123e4567-e89b-12d3-a456-426614174000`,
+      false
+    ],
+    ['WSL UNC', (path) => `\\\\wsl.localhost\\Ubuntu${path.replaceAll('/', '\\')}`, false],
+    ['WSL legacy UNC', (path) => `\\\\wsl$\\Ubuntu${path.replaceAll('/', '\\')}`, false],
+    ['malformed folder workspace', (path) => `${path}::workspace:x`, true]
+  ])('handles a coordinator subdirectory with a %s identity', (_kind, identityPath, denied) => {
+    const repo = makeRepo('git@github.com:ab2webco/orca-oss.git')
+    const nested = join(repo, 'nested')
+    mkdirSync(nested)
+
+    const result = runGuard('git push origin main', {
+      cwd: nested,
+      workspacePath: identityPath(repo)
+    })
+    expect(result.denied).toBe(denied)
+  })
+
+  it('refuses a worker that enters the primary worktree', () => {
+    const repo = makeRepo('git@github.com:ab2webco/orca-oss.git')
+    const worker = `${repo}-worker`
+    tempDirs.push(worker)
+    git(repo, ['worktree', 'add', '--quiet', worker, 'feature'])
+
+    expect(runGuard('git push origin main', { cwd: repo, workspacePath: worker }).denied).toBe(true)
   })
 })
 
