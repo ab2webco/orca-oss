@@ -1,13 +1,13 @@
 {
-  "id": "orca-lab-1.4.160-lab.55",
+  "id": "orca-lab-1.4.160-lab.56",
   "minVersion": "1.0.0",
-  "maxVersion": "1.4.160-lab.54",
+  "maxVersion": "1.4.160-lab.55",
   "content": {
-    "version": "1.4.160-lab.55",
-    "headline": "A timer that tells you when an agent stopped working",
+    "version": "1.4.160-lab.56",
+    "headline": "The work item you tapped now shows what it says",
     "highlights": [
-      "Watch an agent and get told once when its worktree stops moving, instead of finding out hours later",
-      "The phone can assign work items, and two board writes on one card no longer undo each other"
+      "A Plane work item on the phone shows its description and its comment thread, not just its metadata",
+      "The board and the list are one screen with one detail, and the board stops reloading over itself"
     ]
   }
 }
