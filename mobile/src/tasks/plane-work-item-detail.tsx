@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Copy, ExternalLink } from 'lucide-react-native'
+import { MobileMarkdown } from '../components/MobileMarkdown'
 import { TaskProviderLogo } from '../components/TaskProviderLogo'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatUpdatedAt } from './task-updated-at-time'
@@ -56,8 +57,7 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
       {description ? (
         <View style={styles.body}>
           <Text style={styles.bodyLabel}>Description</Text>
-          {/* Raw markdown, not rendered: triage needs the words, not a WebView. */}
-          <Text style={styles.bodyText}>{description}</Text>
+          <MobileMarkdown content={description} />
         </View>
       ) : null}
       {url ? (
@@ -141,11 +141,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginBottom: spacing.xs
-  },
-  bodyText: {
-    fontSize: typography.bodySize,
-    color: colors.textSecondary,
-    lineHeight: 20
   },
   actions: {
     marginTop: spacing.md

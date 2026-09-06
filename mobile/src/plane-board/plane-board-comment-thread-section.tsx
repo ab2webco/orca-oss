@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { MobileMarkdown } from '../components/MobileMarkdown'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatUpdatedAt } from '../tasks/task-updated-at-time'
 import type { PlaneCommentThreadState } from './use-plane-comment-thread'
@@ -38,7 +39,9 @@ export function PlaneBoardCommentThreadSection({ thread, onRetry }: Props) {
               </Text>
               <Text style={styles.rowMeta}>{formatUpdatedAt(comment.createdAt)}</Text>
             </View>
-            <Text style={styles.commentBody}>{comment.body}</Text>
+            <View style={styles.commentBody}>
+              <MobileMarkdown content={comment.body} />
+            </View>
           </View>
         ))
       )}
@@ -84,10 +87,5 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '700'
   },
-  commentBody: {
-    fontSize: typography.bodySize,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginTop: 2
-  }
+  commentBody: { marginTop: 2 }
 })

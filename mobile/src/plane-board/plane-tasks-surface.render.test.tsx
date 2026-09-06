@@ -15,6 +15,8 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }))
+// Why: react-native-webview ships untranspiled native source; the sheet's markdown renders no diagram here.
+vi.mock('react-native-webview', () => ({ WebView: () => null }))
 vi.mock(
   '@react-native-async-storage/async-storage',
   () => import('../../test-doubles/async-storage-memory')
