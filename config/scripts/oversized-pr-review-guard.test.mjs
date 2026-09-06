@@ -116,6 +116,33 @@ describe('oversized-pr-review-guard', () => {
   })
 
   // Why: el umbral cuenta líneas propias. 1800 líneas de test no piden el set 4R.
+  // Why estos dos juntos: la condición de aceptación de ORCA-397 es control de
+  // mutación en las dos direcciones. Sacá el reconocimiento de datos y el primero
+  // vuelve a bloquear; bajá el umbral o contá datos y el segundo deja de bloquear.
+  it('does not count data files toward the threshold', () => {
+    const bigData = [
+      { path: 'src/main/feature.ts', additions: 10 },
+      { path: 'src/renderer/src/i18n/locales/en.json', additions: 3093 },
+      { path: 'src/renderer/src/i18n/locales/ko.json', additions: 592 },
+      // El caso original del ticket: andamiaje de test que no lleva `.test.`.
+      { path: 'mobile/test-doubles/plane-tasks-harness.tsx', additions: 313 }
+    ]
+
+    expect(runGuard('gh pr merge 7 --squash', { number: '7', files: bigData }).denied).toBe(false)
+  })
+
+  it('still denies 401 lines of real code next to a large data diff', () => {
+    const dataPlusProd = [
+      { path: 'src/main/feature.ts', additions: 401 },
+      { path: 'src/renderer/src/i18n/locales/en.json', additions: 3093 },
+      { path: 'mobile/test-doubles/plane-tasks-harness.tsx', additions: 313 }
+    ]
+
+    expect(runGuard('gh pr merge 8 --squash', { number: '8', files: dataPlusProd }).denied).toBe(
+      true
+    )
+  })
+
   it('does not count test files toward the threshold', () => {
     const result = runGuard('gh pr merge 12 --squash', { number: '12', files: bigTests })
     expect(result.denied).toBe(false)
