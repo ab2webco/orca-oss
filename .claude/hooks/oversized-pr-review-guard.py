@@ -37,11 +37,22 @@ THRESHOLD = 400
 # hook es Python. Los dos casos compartidos están cubiertos por el test de al lado.
 TEST_DIR_SEGMENT = re.compile(r"(?:^|/)(?:__tests__|e2e|tests)(?:/|$)", re.IGNORECASE)
 TEST_FILENAME = re.compile(r"\.(?:test|spec|e2e)\.[^/]+$", re.IGNORECASE)
+# Why aparte de los tests: son tablas de strings, no producto. Un rename mueve miles
+# de líneas de catálogo que se revisan por muestreo y por el gate de localización,
+# no leyéndolas — contarlas como código hace que la guarda mida otra cosa que la
+# que dice medir. Ver ORCA-397.
+DATA_PATH = re.compile(
+    r"(?:^|/)(?:test-doubles/|src/renderer/src/i18n/locales/)", re.IGNORECASE
+)
 
 
 def is_test_path(path: str) -> bool:
     normalized = path.replace("\\", "/")
     return bool(TEST_DIR_SEGMENT.search(normalized) or TEST_FILENAME.search(normalized))
+
+
+def is_data_path(path: str) -> bool:
+    return bool(DATA_PATH.search(path.replace("\\", "/")))
 
 
 def deny(detail: str) -> None:
@@ -95,7 +106,7 @@ def authored_additions(number: str, cwd: str | None) -> int | None:
     total = 0
     for entry in files:
         path = entry.get("path") or ""
-        if not path or is_test_path(path):
+        if not path or is_test_path(path) or is_data_path(path):
             continue
         total += int(entry.get("additions") or 0)
     return total
