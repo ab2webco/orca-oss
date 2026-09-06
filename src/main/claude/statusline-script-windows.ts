@@ -249,7 +249,7 @@ export function getWindowsManagedStatusLineScript(
     'if not defined ORCA_STATUSLINE_INTRO_KEY goto :orca_statusline_compose',
     'set "ORCA_STATUSLINE_INTRO_STAMP=%TEMP%\\orca-claude-statusline-intro-!ORCA_STATUSLINE_INTRO_KEY!.tmp"',
     'if exist "!ORCA_STATUSLINE_INTRO_STAMP!" goto :orca_statusline_compose',
-    'set "ORCA_STATUSLINE_INTRO=Orca by Ab2Web"',
+    'set "ORCA_STATUSLINE_INTRO=Orca Lab"',
     // Why break: an internal no-op, so the marker costs a 0-byte file and never a spawn.
     'break>"!ORCA_STATUSLINE_INTRO_STAMP!" 2>nul',
     ':orca_statusline_compose',

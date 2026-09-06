@@ -1010,7 +1010,6 @@ html.native-shell .app-layout {
   -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   height: 24px;
   max-width: min(280px, 32vw);
   margin-left: 2px;
@@ -1030,18 +1029,6 @@ html.native-shell .app-layout {
    inherit that panel's contrast instead of the generic titlebar text color. */
 .titlebar-left:not(.titlebar-left-floating) .titlebar-app-name {
   color: var(--worktree-sidebar-foreground);
-}
-
-.titlebar-app-name-main {
-  flex: 0 0 auto;
-}
-
-.titlebar-app-name-sub {
-  flex: 0 0 auto;
-  font-size: 10px;
-  font-style: italic;
-  color: var(--muted-foreground);
-  transform: translateY(0.5px);
 }
 
 .titlebar-icon-button {

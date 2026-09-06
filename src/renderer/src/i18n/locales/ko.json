@@ -138,8 +138,7 @@
       "064bd07810": "돌아가기",
       "ce37cf5279": "사이드바 표시/숨기기({{value0}})",
       "e4b9e7dff7": "사이드바 표시/숨기기",
-      "pluginCommandFailed": "플러그인 명령을 실행할 수 없습니다.",
-      "byAb2WebBadge": "by Ab2Web"
+      "pluginCommandFailed": "플러그인 명령을 실행할 수 없습니다."
     },
     "web": {
       "WebConnect": {

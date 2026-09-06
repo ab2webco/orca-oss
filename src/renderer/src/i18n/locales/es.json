@@ -138,8 +138,7 @@
       "064bd07810": "Volver",
       "ce37cf5279": "Alternar barra lateral ({{value0}})",
       "e4b9e7dff7": "Alternar barra lateral",
-      "pluginCommandFailed": "No se pudo ejecutar el comando del plugin.",
-      "byAb2WebBadge": "by Ab2Web"
+      "pluginCommandFailed": "No se pudo ejecutar el comando del plugin."
     },
     "web": {
       "WebConnect": {

@@ -2121,13 +2121,7 @@ function App(): React.JSX.Element {
                     className="titlebar-app-name"
                     aria-label={translate('auto.App.5096cbbc86', 'Orca')}
                   >
-                    <span className="titlebar-app-name-main">
-                      {translate('auto.App.5096cbbc86', 'Orca')}
-                    </span>
-                    {/* Why: brand marker so modified (Ab2Web lab) builds are visually distinguishable from official Orca. */}
-                    <span className="titlebar-app-name-sub">
-                      {translate('auto.App.byAb2WebBadge', 'by Ab2Web')}
-                    </span>
+                    {translate('auto.App.5096cbbc86', 'Orca')}
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
