@@ -168,6 +168,7 @@ import {
   type LinearIssueSection,
   type LinearOrderBy
 } from '../../../src/tasks/linear-mobile-issue-grouping'
+import { ProviderTaskBoard } from '../../../src/tasks/provider-task-board'
 import {
   fetchPlaneProjects,
   fetchPlaneStates,
@@ -8473,6 +8474,10 @@ export default function MobileTasksScreen() {
       ),
     [linearGroupBy, linearIssuesForView, linearOrderBy]
   )
+  const linearBoardColumns = useMemo(
+    () => linearBoardSections.map(({ issues, ...section }) => ({ ...section, items: issues })),
+    [linearBoardSections]
+  )
   const githubModeLabel =
     githubMode === 'project' ? 'Projects' : githubKind === 'prs' ? 'PRs' : 'Issues'
   const activeProjectLabel = githubProjectTable
@@ -9325,78 +9330,35 @@ export default function MobileTasksScreen() {
             <Text style={styles.emptyText}>{emptyLabel}</Text>
           </View>
         ) : linearViewMode === 'board' ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.boardContainer,
-              { paddingBottom: spacing.lg + insets.bottom }
-            ]}
-          >
-            {linearBoardSections.map((section) => (
-              <View key={section.key} style={styles.boardColumn}>
-                <View style={styles.boardHeader}>
-                  <View style={[styles.repoSectionDot, { backgroundColor: section.color }]} />
-                  <Text style={styles.boardTitle} numberOfLines={1}>
-                    {section.label}
-                  </Text>
-                  <Text style={styles.boardCount}>{section.issues.length}</Text>
-                </View>
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {section.issues.map((issue) => (
-                    <Pressable
-                      key={issue.id}
-                      style={({ pressed }) => [styles.boardCard, pressed && styles.taskRowPressed]}
-                      onPress={() => {
-                        triggerMediumImpact()
-                        setActionItem(
-                          createLinearTask(issue) as Extract<TaskItem, { provider: 'linear' }>
-                        )
-                      }}
-                    >
-                      <Text style={styles.taskTitle} numberOfLines={3}>
-                        {issue.title}
-                      </Text>
-                      <Text style={styles.subtitle} numberOfLines={2}>
-                        {linearIssueSecondaryParts(issue, effectiveLinearDisplayProperties).join(
-                          ' · '
-                        )}
-                      </Text>
-                      {effectiveLinearDisplayProperties.has('state') ? (
-                        <Pressable
-                          style={[styles.statusPillSelf, styles.linearStatePill]}
-                          disabled={mutatingStatus}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Change status from ${issue.state.name}`}
-                          onPress={(event) => {
-                            event.stopPropagation()
-                            triggerMediumImpact()
-                            setLinearStatusPickerItem(
-                              createLinearTask(issue) as Extract<TaskItem, { provider: 'linear' }>
-                            )
-                          }}
-                        >
-                          <View
-                            style={[
-                              styles.linearStateDot,
-                              { backgroundColor: issue.state.color || colors.textMuted }
-                            ]}
-                          />
-                          <Text
-                            style={[styles.statusText, styles.statusTextFlex]}
-                            numberOfLines={1}
-                          >
-                            {issue.state.name}
-                          </Text>
-                          <ChevronDown size={12} color={colors.textSecondary} />
-                        </Pressable>
-                      ) : null}
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            ))}
-          </ScrollView>
+          <ProviderTaskBoard
+            sections={linearBoardColumns}
+            bottomInset={insets.bottom}
+            getItemKey={(issue) => issue.id}
+            getTitle={(issue) => issue.title}
+            getSubtitle={(issue) =>
+              linearIssueSecondaryParts(issue, effectiveLinearDisplayProperties).join(' · ')
+            }
+            getStatus={(issue) =>
+              effectiveLinearDisplayProperties.has('state')
+                ? {
+                    label: issue.state.name,
+                    color: issue.state.color || colors.textMuted,
+                    accessibilityLabel: `Change status from ${issue.state.name}`
+                  }
+                : null
+            }
+            statusDisabled={mutatingStatus}
+            onPressItem={(issue) => {
+              triggerMediumImpact()
+              setActionItem(createLinearTask(issue) as Extract<TaskItem, { provider: 'linear' }>)
+            }}
+            onPressStatus={(issue) => {
+              triggerMediumImpact()
+              setLinearStatusPickerItem(
+                createLinearTask(issue) as Extract<TaskItem, { provider: 'linear' }>
+              )
+            }}
+          />
         ) : (
           <FlatList
             data={linearListEntries}
@@ -14113,46 +14075,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.sm
   },
-  boardContainer: {
-    gap: spacing.md,
-    padding: spacing.md
-  },
-  boardColumn: {
-    width: 280,
-    maxHeight: '100%',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
-    overflow: 'hidden'
-  },
-  boardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle
-  },
-  boardTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600'
-  },
   boardCount: {
     color: colors.textMuted,
     fontSize: 11
-  },
-  boardCard: {
-    margin: spacing.sm,
-    marginBottom: 0,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.bgBase,
-    padding: spacing.md
   },
   repoPickerGroup: {
     backgroundColor: colors.bgPanel,
