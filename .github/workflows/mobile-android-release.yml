@@ -44,9 +44,9 @@ jobs:
           node-version: 24
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/action-setup@v6
         with:
-          install: false
+          run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -58,6 +58,13 @@ jobs:
           MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_github_release }}
         run: node scripts/prepare-android-release.mjs
 
+      - name: Setup Ruby and fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: mobile
+
       - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
@@ -67,14 +74,92 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build Android release APK
-        run: cd android && ./gradlew assembleRelease
+      # Why $RUNNER_TEMP and not the workspace: the keystore must not sit anywhere the
+      # artifact and release globs below could pick it up.
+      - name: Decode the upload keystore
+        id: signing
+        env:
+          ANDROID_UPLOAD_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
 
-      - name: Upload APK artifact
+          # Why not a hard failure: without the keystore this job still produces the
+          # debug-signed artifacts testers sideload today. Only Play upload is lost.
+          if [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then
+            echo "ANDROID_UPLOAD_KEYSTORE is unset: building with the debug keystore. The artifacts are sideload-only and Play will reject them."
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          for secret in ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::$secret is required whenever ANDROID_UPLOAD_KEYSTORE is set"
+              exit 1
+            fi
+          done
+
+          keystore="$RUNNER_TEMP/orca-lab-upload.keystore"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE" | base64 --decode > "$keystore"
+
+          echo 'configured=true' >> "$GITHUB_OUTPUT"
+          echo "keystore=$keystore" >> "$GITHUB_OUTPUT"
+
+      # Why both: Play accepts only an App Bundle for new apps, while the APK stays the
+      # sideload path for testers who are not on Play yet.
+      #
+      # Why ORG_GRADLE_PROJECT_ env vars and not -P flags: -P puts the keystore
+      # passwords in the runner's process list. The plugin's release signing config
+      # treats an empty value as "not configured" and falls back to the debug keystore.
+      - name: Build Android release bundle and APK
+        env:
+          ORG_GRADLE_PROJECT_ORCA_UPLOAD_STORE_FILE: ${{ steps.signing.outputs.keystore }}
+          ORG_GRADLE_PROJECT_ORCA_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_ORCA_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_ORCA_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: cd android && ./gradlew bundleRelease assembleRelease
+
+      # Why this and not "an artifact exists": a build that silently falls back to the
+      # debug keystore still produces an installable file, and Play rejects it on upload.
+      # The signer is the thing worth asserting.
+      - name: Verify the bundle signer
+        env:
+          UPLOAD_SIGNING_CONFIGURED: ${{ steps.signing.outputs.configured }}
+        run: |
+          set -euo pipefail
+          bundle=$(ls android/app/build/outputs/bundle/release/*.aab)
+          echo "bundle: $bundle"
+
+          # Captured, not piped into grep: a non-matching grep exits 1 and set -e
+          # would end the step before it can decide anything.
+          certs=$(keytool -printcert -jarfile "$bundle")
+          printf '%s\n' "$certs" | sed -n '1,12p'
+
+          case "$certs" in
+            *'CN=Android Debug'*) debug_signed=true ;;
+            *) debug_signed=false ;;
+          esac
+
+          if [ "$debug_signed" = 'false' ]; then
+            exit 0
+          fi
+
+          if [ "$UPLOAD_SIGNING_CONFIGURED" = 'true' ]; then
+            echo "::error::The upload keystore was decoded but the bundle is debug-signed, so Play would reject it. Check that ANDROID_UPLOAD_KEY_ALIAS names a key in ANDROID_UPLOAD_KEYSTORE."
+            exit 1
+          fi
+
+          echo '::warning::Debug-signed bundle: installable for sideloading, rejected by Play.'
+
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: orca-mobile-apk
-          path: mobile/android/app/build/outputs/apk/release/*.apk
+          name: orca-mobile-android
+          path: |
+            mobile/android/app/build/outputs/bundle/release/*.aab
+            mobile/android/app/build/outputs/apk/release/*.apk
 
       - name: Ensure GitHub release tag
         if: steps.release.outputs.publish_release == 'true' && !startsWith(github.ref, 'refs/tags/mobile-android-v')
@@ -102,6 +187,7 @@ jobs:
             gh release upload "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber \
+              android/app/build/outputs/bundle/release/*.aab \
               android/app/build/outputs/apk/release/*.apk
           else
             gh release create "$tag" \
@@ -110,5 +196,30 @@ jobs:
               --prerelease \
               --latest=false \
               --generate-notes \
+              android/app/build/outputs/bundle/release/*.aab \
               android/app/build/outputs/apk/release/*.apk
           fi
+
+      # Last on purpose: the GitHub Release is the path that works today, and a Play
+      # rejection must not take it down. Play needs the app's first .aab uploaded by
+      # hand before the API accepts one, so this stays skipped until then.
+      - name: Publish to the Play internal track
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          UPLOAD_SIGNING_CONFIGURED: ${{ steps.signing.outputs.configured }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo 'PLAY_SERVICE_ACCOUNT_JSON is unset: skipping the Play upload.'
+            exit 0
+          fi
+
+          if [ "$UPLOAD_SIGNING_CONFIGURED" != 'true' ]; then
+            echo '::error::PLAY_SERVICE_ACCOUNT_JSON is set but no upload keystore is, so the bundle is debug-signed and Play would reject it.'
+            exit 1
+          fi
+
+          bundle exec fastlane android publish_internal

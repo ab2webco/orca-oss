@@ -1,0 +1,729 @@
+name: Lab Release
+
+# Why: one-click Orca Lab release from the fork. Computes the next
+# `<upstream-base>.lab.N` version (a bare -lab.N would sort BELOW -rc.N in
+# semver and the updater would never offer it), builds signed+notarized macOS
+# on real runs (x64 + arm64; unsigned only on dry runs) and Linux x64 artifacts,
+# and lets electron-builder publish them with
+# the auto-update manifests (latest-mac.yml / latest-linux.yml) attached —
+# the two things the hand-rolled lab.1 release got wrong.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Explicit version override (e.g. 1.4.151-rc.2.lab.1). Empty = auto-increment .lab.N.
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: Build both platforms without tagging or publishing
+        required: false
+        type: boolean
+        default: false
+      release_candidate:
+        description: >-
+          Publish as a lab RC (X.Y.Z-lab.N.rc). Downloadable, but excluded from
+          ordinary update checks and announced to nobody. Promote by re-running
+          without this flag.
+        required: false
+        type: boolean
+        default: false
+      skip_gate:
+        description: >-
+          Publish without the release signal gate. For a hotfix when CI itself is
+          down — never for a red suite. Requires skip_gate_reason, and both land
+          in the release notes.
+        required: false
+        type: boolean
+        default: false
+      skip_gate_reason:
+        description: Why the gate is being skipped. Recorded in the release notes.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lab-release
+  cancel-in-progress: false
+
+jobs:
+  # Why its own job: every gate job and the build must agree on one commit.
+  # Resolving `main` per job would let a push land between them, verifying one
+  # tree and releasing another.
+  resolve:
+    name: resolve release commit
+    # Why: gate to the fork so this workflow no-ops if the file ever reaches
+    # upstream or another fork (mirrors release-cut.yml's canonical-repo guard).
+    if: github.repository == 'ab2webco/orca-oss'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Pin the commit under release
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
+      # Why here: a malformed announcement must fail the dispatch before any build
+      # runs, not the last step after every asset is already published.
+      - name: Validate the release announcement
+        run: node config/scripts/write-update-nudge.mjs --check whats-new/next-release.json
+
+  # Why the gate re-runs the suite instead of reading an existing check: PR Checks
+  # is `pull_request`-only, so no commit on `main` — least of all the version-bump
+  # commit this workflow authors — ever carries one. The only signal that can be
+  # about the released tree is one produced against it.
+  gate_static:
+    name: release gate static analysis
+    needs: resolve
+    if: inputs.dry_run != true && inputs.skip_gate != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the commit under release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - run: pnpm typecheck
+
+      - run: pnpm run lint
+
+  gate_tests:
+    name: release gate tests ${{ matrix.shard }}/${{ matrix.shard_total }}
+    needs: resolve
+    if: inputs.dry_run != true && inputs.skip_gate != true
+    runs-on: ubuntu-latest
+    # Why 15: mirrors pr.yml's shard cap so a wedged shard reports as a failure
+    # instead of holding the release for the 6h default.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        shard_total: [16]
+
+    steps:
+      - name: Checkout the commit under release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
+
+      # Kept byte-identical to pr.yml's shard step; the parity is pinned by
+      # config/scripts/release-signal-gate-workflow.test.mjs.
+      - name: Test shard
+        run: |
+          node config/scripts/run-vitest-with-hang-watchdog.mjs --config config/vitest.config.ts \
+            --exclude=src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts \
+            --exclude=src/main/daemon/session-startup-command-gate-real-shell.test.ts \
+            --exclude=src/main/daemon/shell-ready.test.ts \
+            --exclude=src/main/daemon/node-pty-fd-leak.test.ts \
+            --exclude=src/main/providers/local-pty-shell-ready.test.ts \
+            --exclude=src/main/providers/__tests__/shell-ready-framework-example.test.ts \
+            --exclude=src/main/pty/omp-shell-wrapper.node-pty.test.ts \
+            --exclude=src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts \
+            --exclude=src/shared/posix-command-path-lookup.test.ts \
+            --exclude=tests/e2e/cross-version-wire/** \
+            --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+
+  gate:
+    name: release gate verdict
+    needs: [resolve, gate_static, gate_tests]
+    # Why always(): a skipped or failed gate job must reach the verdict, not
+    # cascade past it. The verdict itself is what refuses to publish.
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Why actions:read: the workflow default is contents:write only, and the jobs
+    # API this reads 403s without it.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reason: ${{ steps.decide.outputs.reason }}
+      headline: ${{ steps.decide.outputs.headline }}
+    steps:
+      # Why the workflow ref and not the release commit: the API reports a job by
+      # its rendered name, and only this run's own workflow file maps that name
+      # back to the job that declared it.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      - name: Capture this run's jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_PATH: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Why `|| true`: an unreadable API must reach the decision as "unknown",
+        # which refuses to publish, rather than as a step failure with no verdict.
+        run: |
+          gh api "$RUN_PATH" > "$RUNNER_TEMP/gate-run.json" || true
+          gh api --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]' \
+            | jq -s '{jobs: .}' > "$RUNNER_TEMP/gate-jobs.json" || true
+
+      # Why only failed jobs: a watchdog kill and a red test are the same shape in
+      # the jobs API, and only the log separates them.
+      - name: Capture logs for failed gate jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/gate-job-logs"
+          jq -r '.jobs[]? | select(.conclusion == "failure") | .id' "$RUNNER_TEMP/gate-jobs.json" \
+            | while read -r job_id; do
+                gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
+                  > "$RUNNER_TEMP/gate-job-logs/$job_id.txt" || true
+                # An empty log reads as "no hang" — the same misclassification on
+                # the error path, so a failed fetch must leave no file at all.
+                [ -s "$RUNNER_TEMP/gate-job-logs/$job_id.txt" ] \
+                  || rm -f "$RUNNER_TEMP/gate-job-logs/$job_id.txt"
+              done
+
+      # Why the operator's text goes through env and never into the command line:
+      # it is arbitrary input and would otherwise be shell.
+      - name: Decide whether this release may publish
+        id: decide
+        env:
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+          SKIP_REASON: >-
+            ${{ inputs.dry_run && 'dry run — nothing is published' || inputs.skip_gate_reason }}
+        run: |
+          node config/scripts/decide-release-signal-gate.mjs \
+            --run "$RUNNER_TEMP/gate-run.json" \
+            --jobs "$RUNNER_TEMP/gate-jobs.json" \
+            --job-log-dir "$RUNNER_TEMP/gate-job-logs" \
+            --release-sha "$RELEASE_SHA" \
+            --verified-sha "$RELEASE_SHA" \
+            --signal-job gate_static \
+            --signal-job gate_tests \
+            --expected-jobs 17 \
+            ${{ inputs.release_candidate && '--release-candidate' || '' }} \
+            ${{ (inputs.dry_run || inputs.skip_gate) && '--skip-gate' || '' }} \
+            --skip-reason "$SKIP_REASON"
+
+  version:
+    needs: [resolve, gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      title: ${{ steps.next.outputs.title }}
+      build_ref: ${{ steps.push.outputs.build_ref }}
+      prev: ${{ steps.push.outputs.prev }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # Why: `concurrency` serializes releases but does not stop a human push, and
+      # a bump built on top of an unverified commit would ship one.
+      - name: Refuse to release past the verified commit
+        env:
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          head="$(git rev-parse HEAD)"
+          if [[ "$head" != "$VERIFIED_SHA" ]]; then
+            echo "main moved to $head after the gate verified $VERIFIED_SHA" >&2
+            exit 1
+          fi
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next lab version
+        id: next
+        # Why env and not ${{ }} in the body: the override is free operator text,
+        # and this job holds push access.
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version }}
+        run: |
+          current="$(node -p "require('./package.json').version")"
+          override="$VERSION_OVERRIDE"
+          # Why: clean `X.Y.Z-lab.N` scheme (no upstream `-rc.X` noise). A bare
+          # `X.Y.Z-lab.N` sorts BELOW `X.Y.Z-rc.…` in semver, so migrating off the
+          # old `-rc.X.lab.N` tags bumps the patch to stay above installed labs and
+          # keep auto-update flowing. Once on the clean scheme, just increment N.
+          rc="${{ inputs.release_candidate }}"
+          # Why: an RC carries `.rc` on the number it is a candidate FOR, and promoting takes the
+          # NEXT number — `lab.36.rc` outranks `lab.36` in semver, so reusing 36 would leave every
+          # RC tester unable to update to the very build they validated.
+          if [[ -n "$override" ]]; then
+            next="$override"
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)\.rc$ ]]; then
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
+          elif [[ "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-lab\.([0-9]+)$ ]]; then
+            base_n="$(( BASH_REMATCH[2] + 1 ))"
+            if [[ "$rc" == "true" ]]; then
+              next="${BASH_REMATCH[1]}-lab.${base_n}.rc"
+            else
+              next="${BASH_REMATCH[1]}-lab.${base_n}"
+            fi
+          else
+            numeric="${current%%-*}"
+            IFS=. read -r MAJ MIN PAT <<<"$numeric"
+            next="${MAJ}.${MIN}.$(( PAT + 1 ))-lab.1"
+          fi
+          # Why: a reused or regressing version silently breaks auto-update for
+          # installed labs, so refuse same-version and already-tagged cuts.
+          if [[ "$next" == "$current" ]]; then
+            echo "Version $next equals current $current" >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "Tag v$next already exists" >&2
+            exit 1
+          fi
+          # Human title: 1.4.152-lab.1 -> Orca Lab v1.4.152-lab.1
+          base="${next%%-*}"
+          lab_n="${next##*-lab.}"
+          echo "version=$next" >>"$GITHUB_OUTPUT"
+          echo "tag=v$next" >>"$GITHUB_OUTPUT"
+          if [[ "$rc" == "true" ]]; then
+            echo "title=Orca Lab v${base}-lab.${lab_n} (release candidate)" >>"$GITHUB_OUTPUT"
+          else
+            echo "title=Orca Lab v${base}-lab.${lab_n}" >>"$GITHUB_OUTPUT"
+          fi
+          echo "Next lab version: $next"
+
+      - name: Bump, commit, tag and push
+        id: push
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "Dry run — skipping bump/tag; building the resolved commit."
+            echo "build_ref=${{ needs.resolve.outputs.sha }}" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          next="${{ steps.next.outputs.version }}"
+          tag="${{ steps.next.outputs.tag }}"
+          # Capture the version being superseded so finalize's nudge only re-checks
+          # installs at-or-below it (the just-released $next stays out of range).
+          prev="$(node -p "require('./package.json').version")"
+          node -e "
+            const fs = require('fs')
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+            pkg.version = '$next'
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+          "
+          git add package.json
+          git commit -m "chore(release): bump version to $next"
+          git tag "$tag"
+          git push origin HEAD:main "$tag"
+          echo "build_ref=$tag" >>"$GITHUB_OUTPUT"
+          echo "prev=$prev" >>"$GITHUB_OUTPUT"
+
+  mac:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 90
+    # Why: real releases sign + notarize with the ANTAKARANA Developer ID (repo
+    # secrets); dry runs resolve these to empty so they stay unsigned and fast.
+    # ORCA_MAC_RELEASE=1 flips hardenedRuntime + notarize on in the builder config.
+    env:
+      ORCA_MAC_RELEASE: ${{ !inputs.dry_run && '1' || '' }}
+      ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+      CSC_LINK: ${{ !inputs.dry_run && secrets.CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ !inputs.dry_run && secrets.CSC_KEY_PASSWORD || '' }}
+      APPLE_ID: ${{ !inputs.dry_run && secrets.APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ !inputs.dry_run && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ !inputs.dry_run && secrets.APPLE_TEAM_ID || '' }}
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Build macOS native helpers
+        run: pnpm build:computer-macos && pnpm build:notification-status-macos
+
+      # Why we own the keychain: electron-builder creates its own and calls
+      # set-key-partition-list without unlocking it first, which the security
+      # tooling in the macos-latest image from 20260828 rejects with
+      # "SecKeychainUnlock: passphrase not correct" (ORCA-368). Preparing it here
+      # and handing it over via CSC_KEYCHAIN skips that path entirely.
+      - name: Prepare the signing keychain
+        if: inputs.dry_run != true
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/orca-signing.keychain-db"
+          cert="$RUNNER_TEMP/orca-signing.p12"
+          # openssl, not base64: the -d/-D flag for the system base64 differs by macOS version.
+          printf '%s' "$CSC_LINK" | openssl base64 -d -A > "$cert"
+          if [[ ! -s "$cert" ]]; then
+            echo "CSC_LINK did not decode to a p12; expected base64 of the .p12" >&2
+            exit 1
+          fi
+          security create-keychain -p "$CSC_KEY_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$CSC_KEY_PASSWORD" "$keychain"
+          security import "$cert" -k "$keychain" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$CSC_KEY_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$cert"
+          echo "CSC_KEYCHAIN=$keychain" >>"$GITHUB_ENV"
+          security find-identity -v -p codesigning "$keychain"
+
+      - name: Package and publish macOS artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Why: --publish always uploads dmg/zip/blockmaps AND latest-mac.yml to
+        # the tag's release; dry runs package with --publish never instead.
+        run: |
+          # Why unset and not env: '': with CSC_LINK set, electron-builder ignores CSC_KEYCHAIN
+          # and imports the p12 into a keychain of its own, which the current image rejects
+          # (ORCA-368). An empty string is still set and gets read as a path — that is the
+          # `not a file` on the repo root. Only removing them from the environment works.
+          if [[ "${{ inputs.dry_run }}" != "true" ]]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+          fi
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$publish"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Package and publish Linux artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb --publish "$publish"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout build ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.build_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install dependencies (with retry)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: pnpm install --frozen-lockfile
+
+      # Why: packaging embeds native/windows-cli-launcher/.build/orca.exe,
+      # which build:native compiles with the inbox .NET Framework csc.exe.
+      - name: Build Windows native helpers
+        run: pnpm build:native
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      - name: Package and publish Windows artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+        # Why: unsigned lab build — installable past SmartScreen, but Windows
+        # auto-update will NOT apply it (electron-updater's Authenticode check
+        # rejects unsigned installers and must never be disabled). Windows lab
+        # users update manually until the fork gets SignPath/Authenticode signing.
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          publish="always"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            publish="never"
+          fi
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish "$publish"
+
+  finalize:
+    needs: [resolve, gate, version, mac, linux, windows]
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Why it re-reads the release instead of trusting the platform jobs: a job
+      # can go green having uploaded only part of its output, and what breaks
+      # installs is not a red job — it is a Latest release whose manifest names
+      # an asset nobody uploaded.
+      # Why only on the promotion path: an RC never holds Latest, and widening
+      # this to RCs would change what a release candidate is allowed to publish.
+      - name: Verify every platform manifest landed
+        if: inputs.release_candidate != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          mkdir -p /tmp/release-manifests
+          for manifest in latest-mac.yml latest-linux.yml latest.yml; do
+            # Why || true: a missing manifest is what this check reports, not a
+            # download error that hides which one is missing.
+            gh release download "$tag" --pattern "$manifest" --dir /tmp/release-manifests || true
+          done
+          gh release view "$tag" --json assets --jq '.assets[].name' > /tmp/release-assets.txt
+          node config/scripts/verify-release-update-manifests.mjs \
+            --manifest-dir /tmp/release-manifests --assets-file /tmp/release-assets.txt
+
+      - name: Set title, notes and Latest marker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERIFIED_SHA: ${{ needs.resolve.outputs.sha }}
+          GATE_REASON: ${{ needs.gate.outputs.reason }}
+          GATE_HEADLINE: ${{ needs.gate.outputs.headline }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          title="${{ needs.version.outputs.title }}"
+          prev_tag="$(git tag --list 'v*lab*' --sort=-creatordate | grep -v "^${tag}$" | head -n 1)"
+          {
+            echo "# ${title}"
+            echo
+            echo "Build del laboratorio de Ab2Web basado en Orca (upstream stablyai/orca) más las funcionalidades propias del lab."
+            echo
+            echo "> La versión interna es \`${{ needs.version.outputs.version }}\` para que las actualizaciones automáticas ordenen correctamente por semver."
+            echo
+            # Why every release until it stops mattering: macOS pins the signing team in the
+            # installed copy's designated requirement, so a build from the previous team can
+            # never be replaced by the updater — and those users cannot receive an in-app
+            # notice either. The release page is the only place they will read this.
+            echo "## macOS: si tu copia es anterior, esta actualización se instala a mano"
+            echo
+            echo "macOS solo deja que una app se reemplace a sí misma con un build que satisfaga el requisito de firma de la copia instalada, y ese requisito fija el equipo de desarrollo. Orca Lab ahora se firma con el equipo propio \`44FZN9TC23\`; las copias firmadas con el equipo anterior no pueden actualizarse solas y el actualizador las rechaza."
+            echo
+            echo "Para saber cuál tienes: \`codesign -dv /Applications/Orca.app\` y mira el campo \`TeamIdentifier\`. Si no dice \`44FZN9TC23\`, descarga el disco de abajo y arrastra Orca sobre la copia en Aplicaciones. **Es una sola vez**: desde ese build las actualizaciones automáticas vuelven a funcionar."
+            echo
+            echo "- Apple Silicon — \`orca-macos-arm64.dmg\`"
+            echo "- Intel — \`orca-macos-x64.dmg\`"
+            echo
+            if [[ -n "$prev_tag" ]]; then
+              # Why split by type: the raw log is up to 50 subjects of chores,
+              # tests and syncs, which buries the handful a user would notice.
+              # Why upstream first: a cherry-pick from upstream also reads as a
+              # fix, and listing it twice overstates what the lab wrote.
+              subjects="$(git log --no-merges --pretty='%s' "${prev_tag}..${tag}")"
+              upstream="$(printf '%s\n' "$subjects" \
+                | grep -E '^chore\(sync\)|cherry-pick.*upstream|upstream.*cherry-pick' || true)"
+              rest="$(printf '%s\n' "$subjects" \
+                | grep -vE '^chore\(sync\)|cherry-pick.*upstream|upstream.*cherry-pick' || true)"
+              feats="$(printf '%s\n' "$rest" | grep -E '^feat' \
+                | sed -E 's/^feat(\([^)]*\))?!?: //' || true)"
+              fixes="$(printf '%s\n' "$rest" | grep -E '^fix' \
+                | sed -E 's/^fix(\([^)]*\))?!?: //' || true)"
+              total="$(printf '%s\n' "$subjects" | grep -c . || true)"
+              if [[ -n "$feats" ]]; then
+                echo "## Novedades"
+                echo
+                printf '%s\n' "$feats" | sed 's/^/- /'
+                echo
+              fi
+              if [[ -n "$fixes" ]]; then
+                echo "## Arreglos"
+                echo
+                printf '%s\n' "$fixes" | sed 's/^/- /'
+                echo
+              fi
+              if [[ -n "$upstream" ]]; then
+                echo "## Desde Orca oficial"
+                echo
+                echo "Lo que llega de upstream (stablyai/orca), ya integrado y verificado en el lab."
+                echo
+                printf '%s\n' "$upstream" \
+                  | sed -E 's/^(chore|fix|feat|refactor|perf)(\([^)]*\))?!?: //' | sed 's/^/- /'
+                echo
+              fi
+              echo "<details>"
+              echo "<summary>Detalle tecnico — ${total} commits desde ${prev_tag}</summary>"
+              echo
+              git log --no-merges --pretty='- %s' "${prev_tag}..${tag}" | head -50
+              echo
+              echo "</details>"
+              echo
+            fi
+            echo "## Instalación en macOS"
+            echo "El build de macOS va firmado y notarizado con Developer ID, así que Gatekeeper lo abre sin pasos extra. Descarga el \`.dmg\` o deja que Orca se auto-actualice."
+            echo
+            echo "Los archivos \`latest-*.yml\`, \`*.zip\` y \`*.blockmap\` los usa el auto-updater — no descargarlos a mano."
+            echo
+            echo "## Validación"
+            # The released tree is this commit plus the version string this workflow wrote.
+            echo "- Commit validado: \`${VERIFIED_SHA}\`"
+            echo "- Compuerta de señal: \`${GATE_REASON}\` — ${GATE_HEADLINE}"
+            if [[ "$GATE_REASON" == "gate-skipped" ]]; then
+              echo "- **Esta build salió sin la compuerta de tests.**"
+            fi
+            if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+              echo
+              echo "## Release candidate"
+              echo "No se anuncia ni llega por auto-update: los chequeos normales excluyen los tags \`-lab.N.rc\`. Descargá el instalador a mano para validarlo. Una vez validado, se promueve con un release normal, que sale con el número siguiente."
+            fi
+          } > /tmp/notes.md
+          if [[ "${{ inputs.release_candidate }}" == "true" ]]; then
+            # Why: --prerelease keeps it off the repo's Latest pointer, but the real gate is the
+            # tag shape — src/main/updater-prerelease-feed.ts excludes X.Y.Z-lab.N.rc from ordinary
+            # checks. Installs older than that exclusion still resolve it, so never cut an RC until
+            # a normal lab release carrying the exclusion has shipped.
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease --draft=false
+            echo "Release $tag published as a release candidate (not Latest, no nudge)."
+          else
+            # Why --prerelease=false and not just --latest: the release is born a
+            # prerelease so no platform's absence can hold Latest, and this is the
+            # only place that clears it — after the manifest check above.
+            gh release edit "$tag" --title "$title" --notes-file /tmp/notes.md --prerelease=false --latest --draft=false
+            echo "Release $tag promoted to Latest."
+          fi
+
+      - name: Publish update nudge
+        # Why: an RC announces to nobody — the nudge is what makes installs check early.
+        if: inputs.release_candidate != true
+        # Why: written here (after mac/linux/windows assets are confirmed published)
+        # instead of in the version job, so installs polling the nudge never see a
+        # release announced before its latest-*.yml/zip/dmg assets exist — that race
+        # made the auto-updater resolve 'not-available' and permanently dismiss the
+        # campaign. See src/main/update-feed-target.ts UPDATE_NUDGE_URL.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          tag="${{ needs.version.outputs.tag }}"
+          prev="${{ needs.version.outputs.prev }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Why: a fresh id each release re-nudges older installs to check;
+          # maxVersion=prev keeps the newest build from nudging itself. The
+          # content block comes from whats-new/next-release.json, which the
+          # release author writes by hand (see whats-new/README.md).
+          # Why read it from the pinned commit: main can already carry the
+          # next release's announcement by the time the builds finish.
+          resolve_sha="${{ needs.resolve.outputs.sha }}"
+          announcement=/tmp/next-release.json
+          if git cat-file -e "$resolve_sha:whats-new/next-release.json" 2>/dev/null; then
+            git show "$resolve_sha:whats-new/next-release.json" > "$announcement"
+          else
+            : > "$announcement"
+          fi
+          # Why build the commit on main's tip: the version job already pushed
+          # the bump commit, so the dispatch checkout is always behind; a rebase
+          # would replay the announcement deletion below into a modify/delete
+          # conflict whenever an author rewrote the file during the build.
+          publish_nudge_commit() {
+            git fetch -q origin main
+            git checkout -q --detach origin/main
+            mkdir -p whats-new
+            node config/scripts/write-update-nudge.mjs \
+              --version "$version" \
+              --prev "$prev" \
+              --announcement "$announcement" \
+              --out whats-new/nudge.json
+            # Why remove it: an announcement left behind would describe this
+            # release again on the next one. Only the one this release consumed:
+            # a file rewritten on main since dispatch belongs to the next release.
+            if [[ -f whats-new/next-release.json ]] \
+              && git diff --quiet "$resolve_sha" HEAD -- whats-new/next-release.json; then
+              git rm -q whats-new/next-release.json
+            fi
+            git add whats-new/nudge.json
+            git commit -q -m "chore(release): announce $tag via update nudge"
+          }
+          publish_nudge_commit
+          # Why rebuild instead of rebase: main can move between fetch and push;
+          # recomputing on the new tip re-checks the announcement guard too.
+          if ! git push origin HEAD:main; then
+            publish_nudge_commit
+            git push origin HEAD:main
+          fi

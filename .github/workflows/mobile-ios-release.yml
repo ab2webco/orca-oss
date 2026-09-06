@@ -32,14 +32,6 @@ jobs:
     runs-on: macos-26
     # Archive + upload is ~30–40m when healthy; 90m leaves margin for setup.
     timeout-minutes: 90
-
-    env:
-      # Why: this job and ios-distribute resolve gems ~25 minutes apart, so both
-      # must install the committed Gemfile.lock exactly. Frozen turns a lockfile
-      # drift into a setup failure instead of two different fastlane versions in
-      # one release.
-      BUNDLE_FROZEN: 'true'
-
     outputs:
       release_version: ${{ steps.release_metadata.outputs.version }}
       build_number: ${{ steps.release_metadata.outputs.build_number }}
@@ -64,9 +56,9 @@ jobs:
           node-version: 24
 
       - name: Setup pnpm
-        uses: pnpm/setup@v2
+        uses: pnpm/action-setup@v6
         with:
-          install: false
+          run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -126,6 +118,15 @@ jobs:
           # Allow codesign/xcodebuild to use the key without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          # Why assert the type: a Developer ID certificate imports cleanly and only
+          # fails later as fastlane's generic "no matching identity for type AppStore".
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+            grep -qE "Apple Distribution|iPhone Distribution"; then
+            echo "::error::IOS_DIST_CERT_P12 carries no App Store distribution identity."
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              sed 's/[0-9A-F]\{40\}/<hash>/'
+            exit 1
+          fi
           # Put our keychain in the search list so xcodebuild can find the identity.
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           rm -f "$CERT_PATH"
@@ -157,10 +158,6 @@ jobs:
     # margin without allowing App Store Connect polling to hang for hours.
     timeout-minutes: 30
 
-    env:
-      # Same fastlane as ios-build, or fail before touching App Store Connect.
-      BUNDLE_FROZEN: 'true'
-
     defaults:
       run:
         working-directory: mobile
@@ -182,6 +179,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           TESTFLIGHT_CHANGELOG: ${{ github.event.inputs.testflight_changelog }}
+          TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS }}
           MOBILE_IOS_RELEASE_VERSION: ${{ needs.ios-build.outputs.release_version }}
           MOBILE_IOS_BUILD_NUMBER: ${{ needs.ios-build.outputs.build_number }}
           FASTLANE_SKIP_UPDATE_CHECK: '1'
