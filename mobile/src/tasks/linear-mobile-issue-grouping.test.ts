@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { colors } from '../theme/mobile-theme'
 import type { LinearMobileIssue } from './linear-mobile-issue-read'
 import {
+  compareProviderTasks,
+  createProviderPriorityScale,
   compareLinearIssues,
   getLinearPriorityLabel,
   getLinearPriorityRank,
@@ -43,6 +45,36 @@ describe('getLinearPriorityRank', () => {
     expect(getLinearPriorityRank(0)).toBe(5)
     expect(getLinearPriorityRank(1)).toBe(1)
     expect(getLinearPriorityRank(4)).toBe(4)
+  })
+})
+
+describe('provider-neutral grouping', () => {
+  it('accepts a provider-owned priority type and scale', () => {
+    type Card = { id: string; priority: 'urgent' | 'none'; updatedAt: string }
+    const scale = createProviderPriorityScale(
+      { urgent: 'Urgent', none: 'None' },
+      { urgent: 1, none: 5 },
+      String,
+      () => Number.POSITIVE_INFINITY
+    )
+    const provider = {
+      identifier: (card: Card) => card.id,
+      updatedAt: (card: Card) => card.updatedAt,
+      priority: (card: Card) => card.priority,
+      priorityLabel: scale.label,
+      priorityRank: scale.rank,
+      priorityColor: (priority: Card['priority']) =>
+        priority === 'urgent' ? colors.statusRed : colors.accentBlue,
+      status: (card: Card) => ({ key: card.id, label: card.id, color: colors.accentBlue }),
+      assignee: () => null,
+      team: (card: Card) => ({ key: card.id, label: card.id, color: colors.accentBlue }),
+      defaultColor: colors.accentBlue
+    }
+    const none: Card = { id: 'ORCA-2', priority: 'none', updatedAt: '' }
+    const urgent: Card = { id: 'ORCA-10', priority: 'urgent', updatedAt: '' }
+
+    expect(compareProviderTasks(urgent, none, 'priority', provider)).toBeLessThan(0)
+    expect(compareProviderTasks(none, urgent, 'identifier', provider)).toBeLessThan(0)
   })
 })
 
