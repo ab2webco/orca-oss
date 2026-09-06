@@ -30,7 +30,7 @@ export type ProviderTaskGrouping<Item, Priority> = {
   priorityColor: (priority: Priority) => string
   status: (item: Item) => { key: string; label: string; color: string }
   assignee: (item: Item) => { key: string; label: string } | null
-  team: (item: Item) => { key: string; label: string; color: string }
+  team?: (item: Item) => { key: string; label: string; color: string }
   defaultColor: string
 }
 
@@ -94,7 +94,7 @@ function getProviderTaskGroup<Item, Priority>(
       color: provider.priorityColor(priority)
     }
   }
-  if (groupBy === 'team') {
+  if (groupBy === 'team' && provider.team) {
     return provider.team(item)
   }
   return { key: 'all', label: 'Issues', color: provider.defaultColor }
