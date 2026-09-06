@@ -15,11 +15,33 @@ function makeFakeGhBin({ number = '1', files = null } = {}) {
   const bin = mkdtempSync(join(tmpdir(), 'orca-oversized-pr-guard-bin-'))
   tempDirs.push(bin)
   const script = join(bin, 'gh')
-  const filesJson = files === null ? null : JSON.stringify(files)
+  // Why dos formas y no una: `gh pr view --json files` corta en 100 entradas y usa
+  // `path`; `gh api .../pulls/N/files` pagina y usa `filename`. Un fake que sirve
+  // las dos igual no puede distinguir una guarda que pagina de una que no.
+  const truncatedJson = files === null ? null : JSON.stringify(files.slice(0, 100))
+  // `gh api --jq` aplica el filtro y emite lineas, no JSON: el fake tiene que
+  // servir lo mismo o el hook parsea algo que gh nunca le daria.
+  const allTsv =
+    files === null ? null : files.map(({ path, additions }) => `${path}\t${additions}`).join('\n')
   const body =
-    filesJson === null
+    files === null
       ? `#!/bin/sh\ncase "$*" in *number*) echo "${number}";; *) exit 1;; esac\n`
-      : `#!/bin/sh\ncase "$*" in\n  *number*) echo "${number}";;\n  *files*) cat <<'JSON'\n${filesJson}\nJSON\n  ;;\n  *) exit 1;;\nesac\n`
+      : [
+          '#!/bin/sh',
+          'case "$*" in',
+          `  *number*) echo "${number}";;`,
+          `  *api*files*) cat <<'JSON'`,
+          allTsv,
+          'JSON',
+          '  ;;',
+          `  *files*) cat <<'JSON'`,
+          truncatedJson,
+          'JSON',
+          '  ;;',
+          '  *) exit 1;;',
+          'esac',
+          ''
+        ].join('\n')
   writeFileSync(script, body)
   chmodSync(script, 0o755)
   return bin
@@ -119,6 +141,22 @@ describe('oversized-pr-review-guard', () => {
   // Why estos dos juntos: la condición de aceptación de ORCA-397 es control de
   // mutación en las dos direcciones. Sacá el reconocimiento de datos y el primero
   // vuelve a bloquear; bajá el umbral o contá datos y el segundo deja de bloquear.
+  // Why este caso: la fuente vieja corta en 100 entradas, asi que el archivo 101
+  // con el peso queda invisible. Es el defecto que hacia que #293 (1021 archivos)
+  // se reportara en 432 lineas en vez de 1847. ORCA-411.
+  it('counts past the first page of pull files', () => {
+    const files = [
+      ...Array.from({ length: 100 }, (_, i) => ({
+        path: `src/main/page-one-${i}.ts`,
+        additions: 1
+      })),
+      { path: 'src/main/page-two.ts', additions: 400 }
+    ]
+
+    // 100 + 400 = 500 sobre el techo; leyendo solo la primera pagina son 100 y pasa.
+    expect(runGuard('gh pr merge 9 --squash', { number: '9', files }).denied).toBe(true)
+  })
+
   it('does not count data files toward the threshold', () => {
     const bigData = [
       { path: 'src/main/feature.ts', additions: 10 },

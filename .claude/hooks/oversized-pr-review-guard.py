@@ -92,23 +92,39 @@ def pr_number(command: str, cwd: str | None) -> str | None:
 
 
 def authored_additions(number: str, cwd: str | None) -> int | None:
+    # Why `gh api --paginate` y no `gh pr view --json files`: ese corta en 100
+    # entradas sin decirlo, así que un PR ancho se reporta por su primera página.
+    # Medido en #293: 100 de 1021 archivos, 432 líneas en vez de 1847 — la guarda
+    # subcontaba justo la clase de PR que existe para frenar. ORCA-411.
+    #
+    # Why 90s y no los 20 de run(): son ~11 páginas para 1021 archivos. El costo de
+    # rate limit se paga una vez por intento de merge, que es raro; a cambio, el
+    # número es del PR y no de su primer pedazo.
     code, out = run(
-        ["gh", "pr", "view", number, "--json", "files", "-q", ".files"], cwd, timeout=30
+        [
+            "gh",
+            "api",
+            "--paginate",
+            f"repos/{{owner}}/{{repo}}/pulls/{number}/files",
+            "--jq",
+            ".[] | [.filename, (.additions|tostring)] | @tsv",
+        ],
+        cwd,
+        timeout=90,
     )
+    # Fail-closed: sin lista no hay medición, y el caller deniega. No caer a la
+    # fuente truncada — un número menor que el real es peor que ninguno.
     if code != 0 or not out:
         return None
-    try:
-        files = json.loads(out)
-    except ValueError:
-        return None
-    if not isinstance(files, list):
-        return None
     total = 0
-    for entry in files:
-        path = entry.get("path") or ""
+    for line in out.splitlines():
+        path, _, additions = line.partition("\t")
         if not path or is_test_path(path) or is_data_path(path):
             continue
-        total += int(entry.get("additions") or 0)
+        try:
+            total += int(additions or 0)
+        except ValueError:
+            return None
     return total
 
 
