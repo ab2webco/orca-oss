@@ -2128,16 +2128,22 @@ describe('orchestration RPC methods', () => {
 
     it('commits authenticated process authority on a manual dispatch', async () => {
       setup()
-      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue({
-        runtimeId: runtime.getRuntimeId(),
-        terminalHandle: 'term_a',
-        ptyId: 'pty_a',
-        worktreeId: 'repo::worktree',
-        paneKey: 'tab_w:leaf_w',
-        processIncarnation: 'runtime_test:term_a:1',
-        launchTokenHash: 'launch-token-hash',
-        hostScope: { kind: 'local', hostId: 'local' }
-      })
+      // Why: only the dispatch target holds launch authority here. A blanket mock would also hand
+      // it to the caller handle, which now decides whether the caller must attest.
+      vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockImplementation((handle) =>
+        handle === 'term_a'
+          ? {
+              runtimeId: runtime.getRuntimeId(),
+              terminalHandle: 'term_a',
+              ptyId: 'pty_a',
+              worktreeId: 'repo::worktree',
+              paneKey: 'tab_w:leaf_w',
+              processIncarnation: 'runtime_test:term_a:1',
+              launchTokenHash: 'launch-token-hash',
+              hostScope: { kind: 'local', hostId: 'local' }
+            }
+          : null
+      )
       const task = db.createTask({ spec: 'work' })
 
       const result = (await call('orchestration.dispatch', {

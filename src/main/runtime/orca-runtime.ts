@@ -13114,6 +13114,13 @@ export class OrcaRuntimeService {
     }
   }
 
+  // Why: a pane holding a live launch secret may only be named by a caller that attests to it.
+  // A restored surface alone does not count — its receipt carries no secret, so requiring
+  // attestation there would deny the pane itself along with every impostor.
+  orchestrationCallerRequiresAttestation(terminalHandle: string): boolean {
+    return Boolean(this.getOrchestrationDispatchAuthority(terminalHandle)?.launchTokenHash)
+  }
+
   private retirePtyAgentLaunchAuthority(
     ptyId: string,
     reason: AgentHookPaneRetirementReason = 'pane-closed'
