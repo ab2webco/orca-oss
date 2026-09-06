@@ -96,7 +96,7 @@ export function useArtifactPagination(
         setError(
           translate(
             'auto.components.artifacts.ArtifactsPage.signInAgain',
-            'Sign in to Orca again to load artifacts.'
+            'Sign in to Orca Lab again to load artifacts.'
           )
         )
       }
@@ -148,7 +148,7 @@ export function useArtifactPagination(
         setError(
           translate(
             'auto.components.artifacts.ArtifactsPage.signInAgain',
-            'Sign in to Orca again to load artifacts.'
+            'Sign in to Orca Lab again to load artifacts.'
           )
         )
         return

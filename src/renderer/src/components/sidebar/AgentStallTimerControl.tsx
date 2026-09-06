@@ -144,7 +144,7 @@ function describeUnavailable(reason: AgentStallTimerUnavailableReason): string {
   if (reason === 'remote-workspace') {
     return translate(
       'components.agentStallTimer.unavailableRemoteWorkspace',
-      'Not available here yet: progress on a remote workspace has to be measured on the host that owns it, and Orca cannot run that reading there yet.'
+      'Not available here yet: progress on a remote workspace has to be measured on the host that owns it, and Orca Lab cannot run that reading there yet.'
     )
   }
   return translate(

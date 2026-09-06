@@ -155,7 +155,7 @@ type RuntimeFileWatchEvent =
 const REMOTE_UPLOAD_BASE64_CHUNK_CHARS = 512 * 1024
 const REMOTE_DOWNLOAD_CHUNK_BYTES = 384 * 1024
 const REMOTE_DOWNLOAD_UPDATE_REQUIRED_MESSAGE =
-  'Remote file download requires a newer Orca server. Update the headless server and try again.'
+  'Remote file download requires a newer Orca Lab server. Update the headless server and try again.'
 
 type RemoteFileDownloadArgs = NonNullable<ReturnType<typeof getRemoteFileArgs>>
 type RuntimeFileMutationTarget = { kind: 'environment'; environmentId: string }

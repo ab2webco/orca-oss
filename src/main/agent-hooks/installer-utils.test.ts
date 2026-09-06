@@ -424,7 +424,7 @@ describe('getSharedManagedScriptPath', () => {
     )
   })
 
-  it('does not depend on Electron app.getPath, so two Orca instances resolve to the same path', () => {
+  it('does not depend on Electron app.getPath, so two Orca Lab instances resolve to the same path', () => {
     // Why: using userData here would reintroduce dev/prod settings thrash.
     const a = getSharedManagedScriptPath('claude-hook.sh')
     const b = getSharedManagedScriptPath('claude-hook.sh')

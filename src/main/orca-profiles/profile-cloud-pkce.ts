@@ -78,7 +78,7 @@ export function beginOrcaCloudPkceFlow(
 
     function writeInvalidCallback(response: ServerResponse): void {
       response.writeHead(400)
-      response.end('Invalid Orca sign-in response.')
+      response.end('Invalid Orca Lab sign-in response.')
     }
 
     const server = createServer((request, response) => {
@@ -98,7 +98,7 @@ export function beginOrcaCloudPkceFlow(
         }
         if (url.searchParams.has('error')) {
           response.writeHead(400)
-          response.end('Orca sign-in was cancelled.')
+          response.end('Orca Lab sign-in was cancelled.')
           rejectFlow(new Error('orca_cloud_auth_denied'))
           return
         }

@@ -183,7 +183,7 @@ export function isSettledClaudeTerminalAccountSwitchResult(
 }
 
 const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string> = {
-  'runtime-unavailable': 'This Orca runtime cannot switch Claude accounts for a terminal.',
+  'runtime-unavailable': 'This Orca Lab runtime cannot switch Claude accounts for a terminal.',
   'terminal-not-found': 'That terminal is not live on this runtime.',
   'unsupported-runtime':
     'Account switching runs on the runtime that owns the terminal; WSL and SSH-owned terminals are not supported yet.',
@@ -191,30 +191,30 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
   'target-ambiguous': 'That selector matches more than one managed Claude account.',
   'target-unsupported-auth':
     'That account runs on a custom endpoint; use the failover path instead of a managed account switch.',
-  'target-auth-invalid': 'The selected account is not authenticated in its own Orca vault.',
+  'target-auth-invalid': 'The selected account is not authenticated in its own Orca Lab vault.',
   'target-already-active': 'This terminal is already running on that account.',
-  'source-unknown': 'Orca does not know which managed Claude account owns this terminal.',
+  'source-unknown': 'Orca Lab does not know which managed Claude account owns this terminal.',
   'source-mismatch': 'This terminal changed accounts while the switch was being prepared.',
   'missing-launch-config':
-    'Orca has no recorded launch command for this Claude process, so it will not relaunch it with guessed flags.',
+    'Orca Lab has no recorded launch command for this Claude process, so it will not relaunch it with guessed flags.',
   'missing-session':
     'No Claude session was observed in this terminal, so there is nothing to resume.',
   'workspace-unresolved':
-    'Orca could not resolve a working directory for this terminal, so the switch stopped before touching the session.',
+    'Orca Lab could not resolve a working directory for this terminal, so the switch stopped before touching the session.',
   'transcript-unavailable':
     'The session transcript could not be made readable from the selected account.',
   'resume-verification-unavailable':
-    'Orca cannot observe a resumed Claude session in this terminal — the managed SessionStart hook is missing from the account’s Claude vault, so neither the switch nor its rollback could be verified. Relaunch the agent from Orca to reinstall it; if this keeps happening, that vault’s settings.json is not writable.',
+    'Orca Lab cannot observe a resumed Claude session in this terminal — the managed SessionStart hook is missing from the account’s Claude vault, so neither the switch nor its rollback could be verified. Relaunch the agent from Orca Lab to reinstall it; if this keeps happening, that vault’s settings.json is not writable.',
   concurrent: 'Another account switch is already running for this terminal.',
   'prepare-failed': 'Could not prepare the selected account for this terminal.',
   'source-busy':
-    'The tool call that asked for the switch is still holding this terminal, so Orca did not interrupt the agent.',
-  'source-stop-failed': 'The running agent did not exit, so Orca left the terminal untouched.',
+    'The tool call that asked for the switch is still holding this terminal, so Orca Lab did not interrupt the agent.',
+  'source-stop-failed': 'The running agent did not exit, so Orca Lab left the terminal untouched.',
   'launch-command-unbuildable': 'Could not build a resume command for the switched session.',
   'launch-write-failed': 'The terminal did not accept the resume command after switching accounts.',
   'foreground-timeout': 'The resumed agent did not take over the terminal in time.',
   'session-mismatch':
-    'The resumed agent reported a different session, so Orca rolled the switch back.',
+    'The resumed agent reported a different session, so Orca Lab rolled the switch back.',
   'commit-failed': 'The resumed terminal could not be assigned to the selected account.'
 }
 

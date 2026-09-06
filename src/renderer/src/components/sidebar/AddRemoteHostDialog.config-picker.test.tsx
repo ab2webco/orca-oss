@@ -168,11 +168,11 @@ describe('SSH config picker tombstoned hosts', () => {
 
     const removed = await screen.findByRole('button', { name: /removed/ })
     expect(removed.hasAttribute('disabled')).toBe(false)
-    expect(removed.textContent).toContain('Removed from Orca')
+    expect(removed.textContent).toContain('Removed from Orca Lab')
 
     const kept = screen.getByRole('button', { name: /kept/ })
     expect(kept.hasAttribute('disabled')).toBe(true)
-    expect(kept.textContent).toContain('In Orca')
+    expect(kept.textContent).toContain('In Orca Lab')
   })
 
   it('never claims the config is empty when every host is only tombstoned', async () => {
@@ -192,9 +192,9 @@ describe('SSH config picker tombstoned hosts', () => {
     await openPickerWith({ hosts: [], totalHostCount: 0, newHostCount: 0, matchCount: 0 })
 
     expect(await screen.findByText('No hosts in ~/.ssh/config')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Add all to Orca' }).hasAttribute('disabled')).toBe(
-      true
-    )
+    expect(
+      screen.getByRole('button', { name: 'Add all to Orca Lab' }).hasAttribute('disabled')
+    ).toBe(true)
   })
 })
 
@@ -202,7 +202,7 @@ describe('SSH config picker bulk add', () => {
   it('adds only new hosts and never re-adopts deleted aliases', async () => {
     const user = await openPicker()
 
-    await user.click(screen.getByRole('button', { name: /Add all 2 to Orca/ }))
+    await user.click(screen.getByRole('button', { name: /Add all 2 to Orca Lab/ }))
 
     await waitFor(() => expect(importConfig).toHaveBeenCalled())
     expect(importConfig).toHaveBeenCalledWith()

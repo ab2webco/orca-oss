@@ -1,5 +1,9 @@
 import type { ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../shared/types'
-import type { ClaudeManagedAccountAuthMethod, ClaudeTerminalAccountReport, ClaudeTerminalAccountUnknownReason } from '../shared/managed-account-types'
+import type {
+  ClaudeManagedAccountAuthMethod,
+  ClaudeTerminalAccountReport,
+  ClaudeTerminalAccountUnknownReason
+} from '../shared/managed-account-types'
 import type { ClaudeTerminalAccountSwitchFailureReason } from '../shared/claude-terminal-account-switch'
 import { formatVaultSettingsInheritance } from './account-settings-inheritance-format'
 import type { ClaudeAccountAuthVerdict } from '../shared/claude-account-auth-verdict'
@@ -172,21 +176,21 @@ function formatQuota(quota: AccountQuota | null): string {
 
 const UNKNOWN_TERMINAL_ACCOUNT_REASONS: Record<ClaudeTerminalAccountUnknownReason, string> = {
   'pane-unresolved': 'no live pane resolved for that handle (closed, asleep, or reminted)',
-  'no-claude-binding': 'Orca holds no Claude account binding for this pane',
+  'no-claude-binding': 'Orca Lab holds no Claude account binding for this pane',
   'ownership-unresolved': 'this pane outlived a restart and its owner is not resolved yet',
   'remote-host': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
   'no-caller-terminal':
-    'this command is not running inside an Orca-managed terminal; pass --terminal <handle>',
+    'this command is not running inside an Orca Lab-managed terminal; pass --terminal <handle>',
   'lookup-failed': 'the runtime could not answer (it may be older than this CLI)'
 }
 
 const UNSWITCHABLE_TERMINAL_REASONS: Partial<
   Record<ClaudeTerminalAccountSwitchFailureReason, string>
 > = {
-  'missing-launch-config': 'Orca no longer holds the command this pane was launched with',
+  'missing-launch-config': 'Orca Lab no longer holds the command this pane was launched with',
   'missing-session': 'no Claude session has been observed in this pane yet',
   'source-unknown': 'no managed Claude account is bound to this pane',
-  'workspace-unresolved': 'Orca could not resolve a working directory for this pane',
+  'workspace-unresolved': 'Orca Lab could not resolve a working directory for this pane',
   'transcript-unavailable': 'the session transcript could not be copied into the target account',
   'unsupported-runtime': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
   'terminal-not-found': 'no live pane resolved for that handle',
@@ -215,11 +219,11 @@ function formatTerminalAccount(report: ClaudeTerminalAccountReport): string {
   const { ownership } = report
   if (ownership.state === 'account') {
     const label = ownership.email ?? `id ${ownership.accountId}`
-    const binding = ownership.pinned ? 'pinned to this pane' : "Orca's shared runtime auth"
+    const binding = ownership.pinned ? 'pinned to this pane' : "Orca Lab's shared runtime auth"
     return `this terminal: ${label}  id ${ownership.accountId}  (${binding})${pane}${switchable}${settings}\n${caution}`
   }
   if (ownership.state === 'none') {
-    return `this terminal: no managed Claude account — it runs on the login in Orca's shared runtime${pane}${switchable}${settings}\n${caution}`
+    return `this terminal: no managed Claude account — it runs on the login in Orca Lab's shared runtime${pane}${switchable}${settings}\n${caution}`
   }
   return `this terminal: unknown — ${UNKNOWN_TERMINAL_ACCOUNT_REASONS[ownership.reason]} (${ownership.reason})${pane}${switchable}${settings}\n${caution}`
 }

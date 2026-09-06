@@ -27,7 +27,7 @@ export const TERMINAL_CREATE_COMMAND_SPECS: CommandSpec[] = [
       '--command launches raw argv and never applies the configured agent defaults, so an agent started that way keeps its own built-in permission prompts. --agent and --command are mutually exclusive; pass --command only when custom argv is required.',
       'Pass --claude-account or --codex-account (email or id from `orca account list --json`) to launch this terminal against a specific managed account. The launch flag beats the worktree account pin; the pin beats the global selection. It composes with --agent.',
       'An account-directed terminal always spawns on the background path, so it skips renderer-backed niceties for interactive agent TUIs.',
-      'Pass --task <task_id> (requires --agent) to attach the new terminal to an existing orchestration Task: once the agent is idle, Orca dispatches the task and injects the lifecycle preamble, so the worker can report worker_done instead of finishing silently. The caller must be a Run-bound coordinator terminal; pass --from <handle> when ORCA_TERMINAL_HANDLE is not set.',
+      'Pass --task <task_id> (requires --agent) to attach the new terminal to an existing orchestration Task: once the agent is idle, Orca Lab dispatches the task and injects the lifecycle preamble, so the worker can report worker_done instead of finishing silently. The caller must be a Run-bound coordinator terminal; pass --from <handle> when ORCA_TERMINAL_HANDLE is not set.',
       '--timeout-ms bounds the agent readiness wait before the --task dispatch (default 60000). If the attach fails after creation, the error names the exact recovery dispatch command.'
     ],
     examples: [

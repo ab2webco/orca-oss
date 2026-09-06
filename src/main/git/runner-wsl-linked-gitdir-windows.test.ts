@@ -48,7 +48,7 @@ describe.runIf(process.platform === 'win32' && Boolean(distro))(
       const linkedPath = join(fixtureRoot, 'linked')
 
       hostGit(['init', mainPath], fixtureRoot)
-      hostGit(['config', 'user.name', 'Orca Test'], mainPath)
+      hostGit(['config', 'user.name', 'Orca Lab Test'], mainPath)
       hostGit(['config', 'user.email', 'test@invalid'], mainPath)
       await writeFile(join(mainPath, 'tracked.txt'), 'tracked\n')
       hostGit(['add', 'tracked.txt'], mainPath)
@@ -143,7 +143,7 @@ describe.runIf(process.platform === 'win32' && Boolean(distro))(
       const windowsRoot = toWindowsWslPath(linuxRoot, distro!)
 
       wslExec(['git', 'init', linuxRoot])
-      wslExec(['git', '-C', linuxRoot, 'config', 'user.name', 'Orca Test'])
+      wslExec(['git', '-C', linuxRoot, 'config', 'user.name', 'Orca Lab Test'])
       wslExec(['git', '-C', linuxRoot, 'config', 'user.email', 'test@invalid'])
       await writeFile(join(windowsRoot, 'tracked.txt'), 'tracked\n')
       wslExec(['git', '-C', linuxRoot, 'add', 'tracked.txt'])

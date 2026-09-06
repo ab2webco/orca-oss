@@ -122,7 +122,7 @@ describe('account RPC methods', () => {
 
     for (const clientKind of ['mobile', 'runtime'] as const) {
       await expect(addMethod.handler(params, { runtime, clientKind })).rejects.toThrow(
-        /only available on the Orca host runtime/
+        /only available on the Orca Lab host runtime/
       )
     }
     expect(runtime.addClaudeAccountFromConfigDir).not.toHaveBeenCalled()

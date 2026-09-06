@@ -53,7 +53,7 @@ function worktree(id: string, repoId: string, extra: Partial<Worktree> = {}): Wo
 }
 
 // Two repos behind one project: one local checkout, one on the SSH host.
-const repos = [repo('r1', 'Orca'), repo('r2', 'Orca (builder)', 'ssh-1'), repo('r3', 'Solo')]
+const repos = [repo('r1', 'Orca'), repo('r2', 'Orca Lab (builder)', 'ssh-1'), repo('r3', 'Solo')]
 const projects = [project('p1', 'Orca')]
 const projectHostSetups = [setup('s1', 'p1', 'local', 'r1'), setup('s2', 'p1', 'ssh-1', 'r2')]
 const hostOptions = buildSidebarHostOptions({

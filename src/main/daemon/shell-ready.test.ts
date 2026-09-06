@@ -174,7 +174,7 @@ function expectZdotdirSourceContext(content: string, fileName: '.zprofile' | '.z
 }
 
 function expectFinalZdotdirRestoreContext(content: string) {
-  expect(content).toContain("after Orca's last wrapper file has loaded")
+  expect(content).toContain("after Orca Lab's last wrapper file has loaded")
   expect(content).toContain('export ZDOTDIR="$_orca_home"')
 }
 
@@ -411,7 +411,7 @@ describePosix('daemon shell-ready launch config', () => {
     }
   })
 
-  it('uses inherited ORCA_ORIG_ZDOTDIR when ZDOTDIR is an Orca wrapper dir', async () => {
+  it('uses inherited ORCA_ORIG_ZDOTDIR when ZDOTDIR is an Orca Lab wrapper dir', async () => {
     const previousZdotdir = process.env.ZDOTDIR
     const previousOrigZdotdir = process.env.ORCA_ORIG_ZDOTDIR
     const previousHome = process.env.HOME
@@ -744,7 +744,7 @@ describePosix('daemon shell-ready launch config', () => {
   )
 
   itWithBash(
-    'dispatches a non-empty preexec_functions against the real command, not Orca hooks',
+    'dispatches a non-empty preexec_functions against the real command, not Orca Lab hooks',
     async () => {
       const { getDaemonBashShellReadyRcfileContent } = await importFreshDaemonBashRcfile()
       // Why: the epilogue chains bash-preexec's re-armed DEBUG trap, so a real preexec callback must fire against the user's command.

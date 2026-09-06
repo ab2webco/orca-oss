@@ -70,7 +70,7 @@ Optional second file if the Settings Import case grows:
 |--|--|
 | **Setup** | Do not create `~/.ssh/config` (or write empty file). |
 | **Steps** | Open Add SSH host → Fill from ~/.ssh/config… |
-| **Expect** | Dialog title **Choose from ~/.ssh/config**; body **No hosts in ~/.ssh/config**; **Add all to Orca** disabled; **Back** returns to form. |
+| **Expect** | Dialog title **Choose from ~/.ssh/config**; body **No hosts in ~/.ssh/config**; **Add all to Orca Lab** disabled; **Back** returns to form. |
 
 ### P2 — Seeded hosts listed with summary lines
 
@@ -78,7 +78,7 @@ Optional second file if the Settings Import case grows:
 |--|--|
 | **Setup** | Write config with ≥2 concrete Hosts, e.g. `e2e-alpha` / `e2e-bravo` with HostName, User, Port. |
 | **Steps** | Open picker. |
-| **Expect** | Host list `SSH config hosts` shows both aliases; subtitle `user@hostname:port`; button **Add all 2 to Orca** enabled. |
+| **Expect** | Host list `SSH config hosts` shows both aliases; subtitle `user@hostname:port`; button **Add all 2 to Orca Lab** enabled. |
 
 ### P3 — Select host prefills form (and Save persists)
 
@@ -109,7 +109,7 @@ Optional second file if the Settings Import case grows:
 | | |
 |--|--|
 | **Setup** | Config with 2 new hosts; no Orca targets for them. |
-| **Steps** | **Add all 2 to Orca** → wait for success toast / return to form or list refresh. |
+| **Steps** | **Add all 2 to Orca Lab** → wait for success toast / return to form or list refresh. |
 | **Expect** | Both targets exist (DOM in Settings SSH and/or listTargets); re-open picker shows **All hosts already in Orca** / both **In Orca**. |
 
 ### P7 — Add all does **not** re-adopt deleted hosts

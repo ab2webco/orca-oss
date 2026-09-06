@@ -267,7 +267,7 @@ function expiredSessionMessage(home: KimiHomeResolution): string {
   const where =
     home.runtime === 'wsl'
       ? `inside WSL (${home.wslDistro ?? 'default distro'})`
-      : 'on the computer running Orca'
+      : 'on the computer running Orca Lab'
   return `Kimi session expired — run kimi ${where}, then retry usage.`
 }
 

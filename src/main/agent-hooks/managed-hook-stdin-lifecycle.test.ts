@@ -234,7 +234,7 @@ function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
 }
 
 describe('Windows managed hook stdin structure', () => {
-  it('exits immediately when Orca env is missing and keeps drain for other failures', () => {
+  it('exits immediately when Orca Lab env is missing and keeps drain for other failures', () => {
     const home = mkdtempSync(join(tmpdir(), 'orca-hook-stdin-windows-'))
     homedirMock.mockReturnValue(home)
     const previousGrokHome = process.env.GROK_HOME
@@ -322,7 +322,7 @@ describe('Windows managed hook stdin structure', () => {
   })
 
   it.skipIf(process.platform !== 'win32')(
-    'exits 0 for every local script and missing-script launcher, dropping stdin only without Orca env',
+    'exits 0 for every local script and missing-script launcher, dropping stdin only without Orca Lab env',
     async () => {
       const home = mkdtempSync(join(tmpdir(), 'orca-hook-stdin-windows-live-'))
       homedirMock.mockReturnValue(home)
@@ -417,7 +417,7 @@ describe.skipIf(process.platform === 'win32')('managed hook stdin lifecycle', ()
     }
   })
 
-  it('accepts a large payload without Orca environment or a broken writer', async () => {
+  it('accepts a large payload without Orca Lab environment or a broken writer', async () => {
     const scripts = await generatePosixScripts()
     for (const [agent, script] of scripts) {
       const extraEnv = agent.startsWith('command-code')

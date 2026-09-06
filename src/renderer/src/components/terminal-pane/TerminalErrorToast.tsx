@@ -82,7 +82,7 @@ export function isExplainedTerminalError(error: string): boolean {
 function humanizeUnreattachableSession(error: string): string {
   const explanation = translate(
     'auto.components.terminal.pane.TerminalErrorToast.sessionUnavailable',
-    "Orca couldn't reattach to this pane's terminal session on the host. Open a new terminal to continue."
+    "Orca Lab couldn't reattach to this pane's terminal session on the host. Open a new terminal to continue."
   )
   // Why a replacer: a translation containing `$&` or `$1` would otherwise be read as a substitution.
   return UNREATTACHABLE_SESSION_REPLACE_PATTERNS.reduce(
@@ -99,7 +99,7 @@ export function humanizeTerminalError(error: string): string {
       PANE_OWNER_UNVERIFIED_MARKER,
       translate(
         'auto.components.terminal.pane.TerminalErrorToast.7ee11bc0db',
-        "Orca couldn't confirm whether this terminal's previous session is still running, so it left the session untouched. Reopen this pane to retry."
+        "Orca Lab couldn't confirm whether this terminal's previous session is still running, so it left the session untouched. Reopen this pane to retry."
       )
     )
   }

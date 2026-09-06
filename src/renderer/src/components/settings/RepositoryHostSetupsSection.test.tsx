@@ -735,7 +735,7 @@ describe('RepositoryHostSetupsSection', () => {
     renderSection(localRepo)
     clickButton('Add to another host')
 
-    expect(container.textContent).toContain('Update Orca on this host to set up projects')
+    expect(container.textContent).toContain('Update Orca Lab on this host to set up projects')
     const browseButton = findButton('Browse folder')
     const plannedButton = findButton('Add host placeholder')
     expect(browseButton?.disabled).toBe(true)

@@ -43,7 +43,7 @@ describe('PluginOverlayManager', () => {
     expect(readFileSync(expected, 'utf8')).toBe('export const X = 1')
   })
 
-  it('mirrors a preexisting remote OpenCode config dir before adding Orca plugin', () => {
+  it('mirrors a preexisting remote OpenCode config dir before adding Orca Lab plugin', () => {
     const userConfigDir = join(homeDir, 'company-opencode')
     mkdirSync(join(userConfigDir, 'plugins'), { recursive: true })
     writeFileSync(join(userConfigDir, 'opencode.json'), '{"provider":"custom"}')
@@ -121,7 +121,7 @@ describe('PluginOverlayManager', () => {
     expect(readFileSync(result!.statusExtensionPath!, 'utf8')).not.toContain('// pi extension')
   })
 
-  it('installs Orca status extension into the remote default Pi agent dir', () => {
+  it('installs Orca Lab status extension into the remote default Pi agent dir', () => {
     const piAgentDir = join(homeDir, '.pi', 'agent')
     mkdirSync(join(piAgentDir, 'skills', 'my-skill'), { recursive: true })
     mkdirSync(join(piAgentDir, 'extensions', 'user-ext'), { recursive: true })
@@ -402,7 +402,7 @@ describe('resolvePiSourceAgentDir', () => {
     }
   })
 
-  it('keeps explicit PI_CODING_AGENT_DIR values when they are not Orca overlays', () => {
+  it('keeps explicit PI_CODING_AGENT_DIR values when they are not Orca Lab overlays', () => {
     const env = {
       HOME: mkdtempSync(join(tmpdir(), 'plugin-overlay-env-')),
       PI_CODING_AGENT_DIR: '/user/custom-omp-agent',

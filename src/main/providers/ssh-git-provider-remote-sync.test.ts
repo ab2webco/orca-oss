@@ -189,7 +189,7 @@ describe('SshGitProvider', () => {
     await expect(
       provider.fetchGitLabMergeRequestHead('/home/user/repo', 'origin', 42)
     ).rejects.toThrow(
-      'This SSH host is running an older Orca relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.'
+      'This SSH host is running an older Orca Lab relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.'
     )
   })
 
@@ -233,7 +233,7 @@ describe('SshGitProvider', () => {
     await expect(
       provider.fetchGitHubPullRequestHead('/home/user/repo', 'origin', 42)
     ).rejects.toThrow(
-      'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.'
+      'This SSH host is running an older Orca Lab relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.'
     )
   })
 

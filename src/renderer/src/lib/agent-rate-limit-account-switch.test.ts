@@ -211,7 +211,7 @@ describe('runManagedAccountSwitchRelaunch', () => {
         failure: {
           reason: 'session-mismatch',
           message:
-            'The resumed agent reported a different session, so Orca rolled the switch back.',
+            'The resumed agent reported a different session, so Orca Lab rolled the switch back.',
           observedSessionId: 'other-session'
         }
       })

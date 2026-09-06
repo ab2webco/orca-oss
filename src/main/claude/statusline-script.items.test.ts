@@ -103,15 +103,13 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       }),
       'tab-1:project-long'
     )
-    expect(stdout.trimEnd()).toBe(
-      'Orca by Ab2Web · orca-102-statusline-con… · Fable · ctx ██░░░ 42%'
-    )
+    expect(stdout.trimEnd()).toBe('Orca Lab · orca-102-statusline-con… · Fable · ctx ██░░░ 42%')
   })
 
   it('leaves the project out when the item is turned off', async () => {
     const { scriptPath, dir } = makeHarness({ project: false })
     const stdout = await runScript(scriptPath, dir, displayPayload(), 'tab-1:project-off')
-    expect(stdout.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ██░░░ 42%')
+    expect(stdout.trimEnd()).toBe('Orca Lab · Fable · ctx ██░░░ 42%')
   })
 
   it('keeps the project on a narrow line while quota falls', async () => {
@@ -139,14 +137,14 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       displayPayload({ cost: { total_cost_usd: 0.27877651, total_duration_ms: 1_000 } }),
       'tab-1:cost-on'
     )
-    expect(stdout.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · $0.27')
+    expect(stdout.trimEnd()).toBe('Orca Lab · x · Fable · ctx ██░░░ 42% · $0.27')
     const integer = await runScript(
       scriptPath,
       dir,
       displayPayload({ cost: { total_cost_usd: 12, total_duration_ms: 1_000 } }),
       'tab-1:cost-int'
     )
-    expect(integer.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · $12')
+    expect(integer.trimEnd()).toBe('Orca Lab · x · Fable · ctx ██░░░ 42% · $12')
     const hiddenHarness = makeHarness()
     const hidden = await runScript(
       hiddenHarness.scriptPath,
@@ -178,7 +176,7 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } }),
       'tab-1:bars-8'
     )
-    expect(stdout.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ███░░░░░ 42% · 5h ▌░░░░░░░ 12%')
+    expect(stdout.trimEnd()).toBe('Orca Lab · Fable · ctx ███░░░░░ 42% · 5h ▌░░░░░░░ 12%')
     // Dropping the weekly quota too frees 27 columns over two bars: the 10-cell cap.
     const wide = makeHarness({ project: false, resetCountdown: false, sevenDayQuota: false })
     const widest = await runScript(
@@ -187,7 +185,7 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } }),
       'tab-1:bars-10'
     )
-    expect(widest.trimEnd()).toBe('Orca by Ab2Web · Fable · ctx ████░░░░░░ 42% · 5h █░░░░░░░░░ 12%')
+    expect(widest.trimEnd()).toBe('Orca Lab · Fable · ctx ████░░░░░░ 42% · 5h █░░░░░░░░░ 12%')
   })
 
   it('honors turning the model and account off', async () => {
@@ -199,7 +197,7 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       JSON.stringify({ emailAddress: 'sam.rivera@example.com' })
     )
     const stdout = await runScript(scriptPath, dir, displayPayload(), PANE_KEY, configDir)
-    expect(stdout.trimEnd()).toBe('Orca by Ab2Web · x · ctx ██░░░ 42%')
+    expect(stdout.trimEnd()).toBe('Orca Lab · x · ctx ██░░░ 42%')
     expect(stdout).not.toContain('@')
     expect(stdout).not.toContain('Fable')
   })
@@ -225,11 +223,11 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
     })
     const { scriptPath, dir } = makeHarness()
     const narrow = await runScript(scriptPath, dir, payload, 'tab-1:cols-40', undefined, '40')
-    expect(narrow.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42%')
+    expect(narrow.trimEnd()).toBe('Orca Lab · x · Fable · ctx ██░░░ 42%')
     // The same script on the same PTY, next tick refit wide again: the full ladder returns.
     const wide = await runScript(scriptPath, dir, payload, 'tab-1:cols-96', undefined, '96')
     expect(wide.trimEnd()).toBe(
-      'Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
+      'Orca Lab · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
     )
   })
 
@@ -238,9 +236,9 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
     })
     const { scriptPath, dir } = makeHarness()
-    // 62 columns: banner(14) + x(1) + Fable(5) + ctx(13) + separators fit 5h (+15) but not 7d.
+    // 62 columns: banner(8) + x(1) + Fable(5) + ctx(13) + separators fit 5h (+15) but not 7d.
     const mid = await runScript(scriptPath, dir, payload, 'tab-1:cols-62', undefined, '62')
-    expect(mid.trimEnd()).toBe('Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%')
+    expect(mid.trimEnd()).toBe('Orca Lab · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12%')
     expect(columns(mid)).toBeLessThanOrEqual(62)
   })
 
@@ -260,7 +258,7 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
         malformed
       )
       expect(stdout.trimEnd()).toBe(
-        'Orca by Ab2Web · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
+        'Orca Lab · x · Fable · ctx ██░░░ 42% · 5h ▌░░░░ 12% · 7d ██░░░ 45%'
       )
     }
   })
@@ -286,7 +284,7 @@ describe.skipIf(process.platform === 'win32')('statusline items (posix behaviora
       'tab-1:item-order'
     )
     expect(stdout.trimEnd()).toBe(
-      'Orca by Ab2Web · Fable · x · ctx ██░░░ 42% · $1.50 · 7d █▌░░░ 31% · 5h ███░░ 63%'
+      'Orca Lab · Fable · x · ctx ██░░░ 42% · $1.50 · 7d █▌░░░ 31% · 5h ███░░ 63%'
     )
   })
 })

@@ -169,7 +169,7 @@ export function parseEphemeralVmRecipeResult(stdout: string): EphemeralVmRecipeR
   }
   const connection = getEphemeralVmRecipeResultConnection(result.data)
   if (connection.type === 'orca-server' && !parsePairingCode(connection.pairingCode)) {
-    return { ok: false, error: 'Recipe result pairingCode is not a valid Orca pairing code.' }
+    return { ok: false, error: 'Recipe result pairingCode is not a valid Orca Lab pairing code.' }
   }
   if (!isAbsoluteRuntimePath(connection.projectRoot)) {
     return { ok: false, error: 'Recipe result projectRoot must be an absolute runtime path.' }

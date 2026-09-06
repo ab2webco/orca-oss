@@ -98,7 +98,7 @@ describe('skills CLI agent keys', () => {
     expect(SKILLS_CLI_VALID_AGENT_KEYS).toContain(SKILLS_CLI_UNIVERSAL_AGENT_KEY)
   })
 
-  it('covers every agent Orca can detect', () => {
+  it('covers every agent Orca Lab can detect', () => {
     // Why: a new TuiAgent must be considered here, even if the answer is null —
     // otherwise it silently falls back to universal-only with no decision made.
     expect(Object.keys(SKILLS_CLI_AGENT_KEY_BY_TUI_AGENT).sort()).toEqual(
@@ -106,7 +106,7 @@ describe('skills CLI agent keys', () => {
     )
   })
 
-  it("follows Orca's own evidence for the two non-obvious mappings", () => {
+  it("follows Orca Lab's own evidence for the two non-obvious mappings", () => {
     // Why: src/shared/native-chat-agent-profiles.ts states OpenClaude reads
     // Claude-owned roots, so it is not unmappable.
     expect(SKILLS_CLI_AGENT_KEY_BY_TUI_AGENT.openclaude).toBe('claude-code')

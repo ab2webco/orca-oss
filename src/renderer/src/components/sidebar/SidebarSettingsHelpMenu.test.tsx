@@ -227,9 +227,9 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('Onboarding')
   })
 
-  it('renders Restart Orca by default', () => {
+  it('renders Restart Orca Lab by default', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).toContain('Restart Orca')
+    expect(html).toContain('Restart Orca Lab')
   })
 
   it('renders Docs link', () => {

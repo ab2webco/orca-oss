@@ -40,7 +40,7 @@ describe('terminal startup command classifier', () => {
     expect(isCodexTerminalStartupCommand('/usr/local/bin/not-codex --continue')).toBe(false)
   })
 
-  it('recognizes non-Codex Orca agent startup commands', () => {
+  it('recognizes non-Codex Orca Lab agent startup commands', () => {
     expect(isKnownTuiAgentTerminalStartupCommand('grok --permission-mode bypassPermissions')).toBe(
       true
     )

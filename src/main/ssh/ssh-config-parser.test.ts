@@ -467,7 +467,7 @@ describe('sshConfigHostsToTargets', () => {
 })
 
 describe('sshConfigHostsToSummaries', () => {
-  it('maps hosts for the picker and flags aliases already in Orca', () => {
+  it('maps hosts for the picker and flags aliases already in Orca Lab', () => {
     const hosts = [
       {
         host: 'staging',

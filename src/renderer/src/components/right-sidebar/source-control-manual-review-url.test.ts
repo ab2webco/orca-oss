@@ -224,7 +224,7 @@ describe('buildSourceControlManualReviewUrl', () => {
     ).toBe('https://github.com/stablyai/orca/compare/main...feature/pushed-name?expand=1')
   })
 
-  it('still qualifies the fork head when Orca resolved the fork push URL', () => {
+  it('still qualifies the fork head when Orca Lab resolved the fork push URL', () => {
     expect(
       buildSourceControlManualReviewUrl({
         baseRef: 'refs/remotes/origin/main',

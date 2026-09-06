@@ -177,6 +177,8 @@ export function NotificationStep({
 
   return (
     <div ref={setSelectPortalHost} className="space-y-5">
+      {/* Why it still says "Orca": this card names the macOS System Settings entry,
+          which is keyed to the bundle name and renames with productName (ORCA-401). */}
       <MacNotificationPermissionCard state={macPermissionState} />
 
       <section className="space-y-3">
@@ -187,7 +189,7 @@ export function NotificationStep({
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             {translate(
               'auto.components.onboarding.NotificationStep.0fe570690c',
-              'Pick the alert Orca plays after a desktop notification is delivered.'
+              'Pick the alert Orca Lab plays after a desktop notification is delivered.'
             )}
           </p>
         </div>

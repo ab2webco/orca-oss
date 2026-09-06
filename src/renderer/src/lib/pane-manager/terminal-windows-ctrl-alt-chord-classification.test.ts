@@ -137,7 +137,7 @@ describe('installWindowsCtrlAltChordRepair', () => {
 // Why: the repair intentionally adds no encoder — rescued chords must produce
 // whatever bytes xterm's own keyboard service computes for the protocol the
 // foreground app negotiated. These pin that contract for both protocol tiers.
-describe('rescued chords are encoded by xterm, not Orca', () => {
+describe('rescued chords are encoded by xterm, not Orca Lab', () => {
   function keyDownChord(overrides: Record<string, unknown>): Record<string, unknown> {
     return { ...chord(), repeat: false, ...overrides }
   }

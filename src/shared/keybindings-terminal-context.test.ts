@@ -7,7 +7,7 @@ import {
 } from './keybindings'
 
 describe('keybindings', () => {
-  it('keeps Orca-first terminal context backward compatible', () => {
+  it('keeps Orca Lab-first terminal context backward compatible', () => {
     const ctrlP = {
       key: 'p',
       code: 'KeyP',

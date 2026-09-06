@@ -153,8 +153,8 @@ describe('runtime RPC startup failure reporting', () => {
       parentWindow,
       expect.objectContaining({
         type: 'error',
-        title: 'Orca CLI unavailable',
-        message: "Orca couldn't start its local command transport.",
+        title: 'Orca Lab CLI unavailable',
+        message: "Orca Lab couldn't start its local command transport.",
         detail: expect.stringMatching(
           /orca status.*orca terminal.*orchestration.*Cause: metadata write failed/s
         )
@@ -165,13 +165,13 @@ describe('runtime RPC startup failure reporting', () => {
   // Why: a bare "restart" is only true for address_in_use — the other classes need the user to
   // change something, so each must reach the dialog with its own remediation.
   it.each([
-    ['EACCES', "Check permissions on Orca's data folder"],
-    ['EPERM', "Check permissions on Orca's data folder"],
+    ['EACCES', "Check permissions on Orca Lab's data folder"],
+    ['EPERM', "Check permissions on Orca Lab's data folder"],
     ['ENOSPC', 'Your disk may be full or read-only'],
     ['EROFS', 'Your disk may be full or read-only'],
     ['EINVAL', 'at a path that is too long'],
     ['ENAMETOOLONG', 'at a path that is too long'],
-    ['ENOENT', "Orca's data folder may be missing"],
+    ['ENOENT', "Orca Lab's data folder may be missing"],
     ['EADDRINUSE', 'Another process may be holding the port']
   ] as const)('guides the user on how to fix %s', async (code, guidance) => {
     const error = Object.assign(new Error('metadata write failed'), { code })
@@ -187,8 +187,8 @@ describe('runtime RPC startup failure reporting', () => {
     await showRuntimeRpcStartupFailureDialog(createParentWindow(), new Error('mystery'))
 
     const detail = showMessageBoxMock.mock.calls[0]?.[1]?.detail as string
-    expect(detail).toContain('Restart Orca to try again.')
-    expect(detail).not.toContain("Check permissions on Orca's data folder")
+    expect(detail).toContain('Restart Orca Lab to try again.')
+    expect(detail).not.toContain("Check permissions on Orca Lab's data folder")
   })
 
   it('truncates a runaway cause instead of pasting it whole into the dialog', async () => {

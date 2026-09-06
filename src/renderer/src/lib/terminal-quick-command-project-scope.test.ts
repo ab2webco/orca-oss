@@ -14,7 +14,7 @@ const WINDOWS_REPO_ID = 'a0a2b4a4-1bff-494c-b005-d77918abc6a7'
 function command(repoId: string): TerminalQuickCommand {
   return {
     id: 'test-orca',
-    label: 'Test Orca',
+    label: 'Test Orca Lab',
     action: 'terminal-command',
     command: 'pnpm test',
     appendEnter: true,

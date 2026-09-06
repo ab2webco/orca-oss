@@ -125,7 +125,7 @@ describe('StarNagToastHost', () => {
 
     expect(toastContainer.textContent).toContain('Onboarding completed!')
     expect(toastContainer.textContent).toContain(
-      'If you’re enjoying Orca so far, a GitHub star helps other developers discover it.'
+      'If you’re enjoying Orca Lab so far, a GitHub star helps other developers discover it.'
     )
     expect(toastContainer.textContent).toContain('Star on GitHub')
     expect((customToastMock.mock.calls[0][1] as CustomToastOptions).dismissible).toBe(false)

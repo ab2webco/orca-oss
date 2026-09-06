@@ -174,7 +174,7 @@ describe('AccountsPane', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 
     expect(markup).not.toContain('recorded refresh chain')
-    expect(markup).not.toContain('Orca couldn&#x27;t verify')
+    expect(markup).not.toContain('Orca Lab couldn&#x27;t verify')
   })
 
   it('offers the Claude custom endpoint action locally', () => {

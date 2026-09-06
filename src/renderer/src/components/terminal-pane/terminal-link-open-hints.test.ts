@@ -30,24 +30,24 @@ describe('getTerminalUrlOpenHint', () => {
 
   // Why: with links already opening in Orca, inverting still lands on the system
   // browser, so the hint must not promise Orca.
-  it('keeps the system-browser wording when inverting but links open in Orca', () => {
+  it('keeps the system-browser wording when inverting but links open in Orca Lab', () => {
     stubPlatform(true)
     expect(getTerminalUrlOpenHint({ openLinksInApp: true, modifierInverts: true })).toContain(
       'for system browser'
     )
   })
 
-  it('names Orca when inverting and links open externally', () => {
+  it('names Orca Lab when inverting and links open externally', () => {
     stubPlatform(true)
     expect(getTerminalUrlOpenHint({ openLinksInApp: false, modifierInverts: true })).toBe(
-      'Click for actions, ⌘+click to open, or ⇧⌘+click to open in Orca'
+      'Click for actions, ⌘+click to open, or ⇧⌘+click to open in Orca Lab'
     )
   })
 
   it('uses the Ctrl chord off macOS', () => {
     stubPlatform(false)
     expect(getTerminalUrlOpenHint({ openLinksInApp: false, modifierInverts: true })).toBe(
-      'Click for actions, Ctrl+click to open, or Shift+Ctrl+click to open in Orca'
+      'Click for actions, Ctrl+click to open, or Shift+Ctrl+click to open in Orca Lab'
     )
   })
 
@@ -59,7 +59,7 @@ describe('getTerminalUrlOpenHint', () => {
         modifierInverts: true,
         showActions: false
       })
-    ).toBe('Ctrl+click to open, or Shift+Ctrl+click to open in Orca')
+    ).toBe('Ctrl+click to open, or Shift+Ctrl+click to open in Orca Lab')
   })
 })
 
@@ -140,10 +140,10 @@ describe('terminalUrlOpenHintOptionsFor', () => {
     )
 
     expect(options.modifierInverts).toBe(true)
-    expect(getTerminalUrlOpenHint(options)).toContain('to open in Orca')
+    expect(getTerminalUrlOpenHint(options)).toContain('to open in Orca Lab')
   })
 
-  it('keeps inversion for a runtime pane when its host can open an Orca browser', () => {
+  it('keeps inversion for a runtime pane when its host can open an Orca Lab browser', () => {
     const options = terminalUrlOpenHintOptionsFor(
       {
         openLinksInApp: false,

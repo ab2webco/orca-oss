@@ -198,7 +198,7 @@ describe('fetchChangelog', () => {
     expect(result!.release.releaseNotesUrl).toBe(
       'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.160-lab.30'
     )
-    expect(result!.release.title).toBe('Orca 1.4.160-lab.30')
+    expect(result!.release.title).toBe('Orca Lab 1.4.160-lab.30')
   })
 
   it('returns null for a draft release', async () => {
@@ -210,7 +210,7 @@ describe('fetchChangelog', () => {
   })
 
   it('returns null when the release has nothing worth showing', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ name: 'Orca Lab', body: '# Orca Lab\n' }))
+    fetchMock.mockResolvedValue(jsonResponse({ name: 'Orca Lab', body: '# Orca\n' }))
 
     expect(await fetchChangelog('1.4.160-lab.30')).toBeNull()
   })

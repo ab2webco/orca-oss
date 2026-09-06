@@ -260,7 +260,7 @@ describe('resolveGroupAddress', () => {
 
     // Why: these are the titles cursor-agent natively emits and the ones Orca synthesizes
     // from Cursor hooks, so each must resolve.
-    it('matches native and Orca-synthesized Cursor titles', () => {
+    it('matches native and Orca Lab-synthesized Cursor titles', () => {
       const terminals = [
         makeSummary('coordinator', { title: 'Coordinator' }),
         makeSummary('term_native', { title: 'Cursor Agent' }),
@@ -301,7 +301,7 @@ describe('resolveGroupAddress', () => {
         makeSummary('term_claude_star', { title: '* cursor rendering done' }),
         makeSummary('term_codex', { title: '⠋ Codex: fix cursor offsets' }),
         makeSummary('term_grok', { title: '⠋ - restoring cursor state - grok' }),
-        makeSummary('term_shell', { title: 'Terminal Cursor and Orca slows down' })
+        makeSummary('term_shell', { title: 'Terminal Cursor and Orca Lab slows down' })
       ]
 
       const result = resolveGroupAddress('@cursor', 'coordinator', terminals, noStatus)

@@ -2537,7 +2537,9 @@ describe('connectPanePty', () => {
 
     expect(deps.onPtyErrorRef.current).toHaveBeenCalledWith(
       1,
-      expect.stringContaining('Orca attempts background recovery for managed local and WSL homes')
+      expect.stringContaining(
+        'Orca Lab attempts background recovery for managed local and WSL homes'
+      )
     )
   })
 
@@ -7313,7 +7315,7 @@ describe('connectPanePty', () => {
     expect(mockStoreState.removeAgentStatus).not.toHaveBeenCalled()
   })
 
-  it('clears pre-hook launch config when an Orca-started command exits', async () => {
+  it('clears pre-hook launch config when an Orca Lab-started command exits', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] })
     const { connectPanePty } = await import('./pty-connection')
     vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('zsh')
@@ -7442,7 +7444,7 @@ describe('connectPanePty', () => {
     expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('csi-u')
   })
 
-  it('confirms an Orca-launched Droid fresh spawn in a no-OSC shell (Git Bash)', async () => {
+  it('confirms an Orca Lab-launched Droid fresh spawn in a no-OSC shell (Git Bash)', async () => {
     // Why: no-OSC shells (Git Bash/cmd) emit no command boundary, so without a fresh-spawn sample the pane never earns routing trust and Shift+Enter regresses to Esc+CR (#7620).
     vi.useFakeTimers()
     const { connectPanePty } = await import('./pty-connection')
@@ -15719,7 +15721,7 @@ describe('connectPanePty', () => {
 
     expect(transport.serializeBuffer).toHaveBeenCalledTimes(1)
     expect(pane.terminal.write).not.toHaveBeenCalledWith(
-      expect.stringContaining('Orca skipped hidden terminal output'),
+      expect.stringContaining('Orca Lab skipped hidden terminal output'),
       expect.any(Function)
     )
     expect(pane.terminal.write).not.toHaveBeenCalledWith(
@@ -16549,7 +16551,7 @@ describe('connectPanePty', () => {
       expect(getMainBufferSnapshot).toHaveBeenCalledTimes(4)
       expect(pane.terminal.write).toHaveBeenCalledWith(
         expect.stringContaining(
-          'Orca skipped hidden terminal output because main recovery was unavailable.'
+          'Orca Lab skipped hidden terminal output because main recovery was unavailable.'
         ),
         expect.any(Function)
       )

@@ -351,9 +351,9 @@ describe('filterAiVaultSessions', () => {
 
   it('matches repo: queries against resolved project labels before folder fallback', () => {
     const sessionProjectById = new Map([
-      [baseSession.id, { kind: 'repo' as const, key: 'project:orca', label: 'Canonical Orca' }]
+      [baseSession.id, { kind: 'repo' as const, key: 'project:orca', label: 'Canonical Orca Lab' }]
     ])
-    const projectLabelByKey = new Map([['project:orca', 'Canonical Orca']])
+    const projectLabelByKey = new Map([['project:orca', 'Canonical Orca Lab']])
 
     expect(
       filterAiVaultSessions([baseSession], {
@@ -683,14 +683,14 @@ describe('groupAiVaultSessions', () => {
         { kind: 'repo' as const, key: 'project:orca', label: 'Orca' }
       ])
     )
-    const projectLabelByKey = new Map([['project:orca', 'Canonical Orca']])
+    const projectLabelByKey = new Map([['project:orca', 'Canonical Orca Lab']])
 
     expect(
       groupAiVaultSessions(sessions, 'project', {
         sessionProjectById,
         projectLabelByKey
       })
-    ).toEqual([{ key: 'project:orca', label: 'Canonical Orca', sessions }])
+    ).toEqual([{ key: 'project:orca', label: 'Canonical Orca Lab', sessions }])
   })
 
   it('falls back to folder grouping when project metadata is unavailable', () => {

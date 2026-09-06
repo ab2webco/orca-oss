@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, app } from 'electron'
+import { BrowserWindow, Menu } from 'electron'
 import {
   formatKeybindingList,
   getEffectiveKeybindingsForAction,
@@ -8,6 +8,7 @@ import {
 import type { UpdateCheckOptions } from '../../shared/update-status-types'
 import { translateMain } from '../i18n/main-i18n'
 import { createAppMenuSelectionItem } from './app-menu-selection-item'
+import { createMacAppMenu } from './mac-app-menu'
 import type { AppearanceMenuKey, AppearanceMenuState } from './appearance-menu-state'
 
 export {
@@ -31,8 +32,8 @@ type RegisterAppMenuOptions = {
   onToggleAppearance: (key: AppearanceMenuKey) => void
   getAppearanceState: () => AppearanceMenuState
   getKeybindings?: () => KeybindingOverrides | undefined
-  // Why: the macOS app-menu title. Passed the per-branch dev label since
-  // app.name is now pinned to a stable value for Keychain-key stability.
+  // Why: the macOS app-menu title. Carries the per-branch dev label, since
+  // app.name is pinned to a stable value for Keychain-key stability.
   appMenuLabel?: string
 }
 
@@ -122,12 +123,12 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
   }
 
   const featureTourItem: Electron.MenuItemConstructorOptions = {
-    label: translateMain('menu.exploreOrca', 'Explore Orca'),
+    label: translateMain('menu.exploreOrca', 'Explore Orca Lab'),
     click: (_menuItem, window) => onOpenFeatureTour(window)
   }
 
   const setupGuideItem: Electron.MenuItemConstructorOptions = {
-    label: translateMain('menu.gettingStarted', 'Getting Started with Orca'),
+    label: translateMain('menu.gettingStarted', 'Getting Started with Orca Lab'),
     click: (_menuItem, window) => onOpenSetupGuide(window)
   }
 
@@ -136,27 +137,11 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
     click: (_menuItem, window) => onOpenCrashReport(window)
   }
 
-  // Why: the macOS app-menu (named after the app) is mandatory on darwin and
-  // owns hide/hideOthers/unhide/services/quit roles that only make sense in
-  // the system menu bar. On Windows/Linux that menu would render as a
-  // redundant "Orca" entry with roles that don't apply, so we omit it there
-  // and distribute its items across File / Help instead.
-  const macAppMenu: Electron.MenuItemConstructorOptions = {
-    label: options.appMenuLabel ?? app.name,
-    submenu: [
-      { role: 'about' },
-      checkForUpdatesItem,
-      settingsItem,
-      { type: 'separator' },
-      { role: 'services' },
-      { type: 'separator' },
-      { role: 'hide' },
-      { role: 'hideOthers' },
-      { role: 'unhide' },
-      { type: 'separator' },
-      { role: 'quit' }
-    ]
-  }
+  const macAppMenu = createMacAppMenu({
+    title: options.appMenuLabel,
+    checkForUpdatesItem,
+    settingsItem
+  })
 
   const fileMenu: Electron.MenuItemConstructorOptions = {
     label: translateMain('menu.file', 'File'),
@@ -258,7 +243,7 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
         click: () => onToggleAppearance('showAutomationsButton')
       },
       {
-        label: translateMain('menu.showMobileButton', 'Show Orca Mobile Button'),
+        label: translateMain('menu.showMobileButton', 'Show Orca Lab Mobile Button'),
         type: 'checkbox',
         checked: appearance.showMobileButton,
         click: () => onToggleAppearance('showMobileButton')

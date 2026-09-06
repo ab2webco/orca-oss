@@ -497,7 +497,7 @@ describe('createEditorSlice activateMarkdownLink', () => {
     })
   })
 
-  it('opens in-worktree file links in Orca', async () => {
+  it('opens in-worktree file links in Orca Lab', async () => {
     const store = createEditorStore()
     await store.getState().activateMarkdownLink('./image.png', {
       sourceFilePath: '/repo/docs/note.md',
@@ -540,7 +540,7 @@ describe('createEditorSlice activateMarkdownLink', () => {
     })
   })
 
-  it('opens explicit file URLs inside the worktree in Orca', async () => {
+  it('opens explicit file URLs inside the worktree in Orca Lab', async () => {
     const store = createEditorStore()
     await store.getState().activateMarkdownLink('file:///repo/docs/image.png', {
       sourceFilePath: '/repo/docs/note.md',
@@ -558,7 +558,7 @@ describe('createEditorSlice activateMarkdownLink', () => {
     expect(openFileUriMock).not.toHaveBeenCalled()
   })
 
-  it('opens explicit file URLs outside the worktree in Orca after authorizing them', async () => {
+  it('opens explicit file URLs outside the worktree in Orca Lab after authorizing them', async () => {
     const store = createEditorStore()
     await store.getState().activateMarkdownLink('file:///tmp/image.png', {
       sourceFilePath: '/repo/docs/note.md',

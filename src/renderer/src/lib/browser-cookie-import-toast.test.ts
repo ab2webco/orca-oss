@@ -61,7 +61,7 @@ describe('emitBrowserCookieImportToast', () => {
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
     expect(warningToastMock).toHaveBeenCalledWith(
-      'Google cookies were not imported. Open a browser in Orca on Remote Mac with this profile, then sign into Google.',
+      'Google cookies were not imported. Open a browser in Orca Lab on Remote Mac with this profile, then sign into Google.',
       { duration: 12000 }
     )
     expect(successToastMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -103,7 +103,7 @@ describe('emitBrowserCookieImportToast', () => {
         'Imported 1 of 2 cookies. The rest could not be loaded, and the restart fallback was unavailable. Try the import again.'
       ],
       [
-        'Google cookies were not imported. Open a browser in Orca on Remote Mac with this profile, then sign into Google.',
+        'Google cookies were not imported. Open a browser in Orca Lab on Remote Mac with this profile, then sign into Google.',
         { duration: 12000 }
       ]
     ])

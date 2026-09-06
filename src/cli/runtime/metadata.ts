@@ -16,7 +16,7 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     if (!metadata || !findTransport(metadata, 'unix', 'named-pipe') || !metadata.authToken) {
       throw new RuntimeClientError(
         'runtime_unavailable',
-        `Orca runtime metadata is incomplete at ${metadataPath}`,
+        `Orca Lab runtime metadata is incomplete at ${metadataPath}`,
         localAttachRecoveryData()
       )
     }
@@ -27,7 +27,7 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     }
     throw new RuntimeClientError(
       'runtime_unavailable',
-      `Could not read Orca runtime metadata at ${metadataPath}.`,
+      `Could not read Orca Lab runtime metadata at ${metadataPath}.`,
       localAttachRecoveryData()
     )
   }
@@ -61,7 +61,7 @@ export function getDefaultUserDataPath(
     if (!appData) {
       throw new RuntimeClientError(
         'runtime_unavailable',
-        'APPDATA is not set, so the Orca runtime metadata path cannot be resolved.'
+        'APPDATA is not set, so the Orca Lab runtime metadata path cannot be resolved.'
       )
     }
     return join(appData, 'orca')

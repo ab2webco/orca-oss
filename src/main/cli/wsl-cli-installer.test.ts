@@ -165,7 +165,7 @@ describe('WslCliInstaller', () => {
     vi.useRealTimers()
   })
 
-  it('installs a WSL launcher that forwards to the Windows Orca launcher', async () => {
+  it('installs a WSL launcher that forwards to the Windows Orca Lab launcher', async () => {
     const wsl = createWslRunner()
     const installer = new WslCliInstaller({
       platform: 'win32',
@@ -211,7 +211,7 @@ describe('WslCliInstaller', () => {
     const hostStatus = {
       ...makeHostStatus(),
       pathConfigured: null,
-      detail: 'Orca could not read the Windows user PATH registry value.'
+      detail: 'Orca Lab could not read the Windows user PATH registry value.'
     } satisfies CliInstallStatus
     const installer = new WslCliInstaller({
       platform: 'win32',
@@ -321,7 +321,7 @@ describe('WslCliInstaller', () => {
     expect(launcher).toContain('command -v powershell.exe')
     expect(launcher).toContain('/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe')
     expect(launcher).toContain(
-      'Orca WSL CLI requires Windows interop and could not find powershell.exe.'
+      'Orca Lab WSL CLI requires Windows interop and could not find powershell.exe.'
     )
     expect(launcher).toContain('"$ORCA_POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File')
     expect(launcher).toContain('ORCA_WSL_CWD=$(pwd -P 2>/dev/null) || {')

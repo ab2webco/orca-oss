@@ -23,7 +23,10 @@ const SCOPE_OPTIONS: { value: ClaudeUsageScope; label: string }[] = [
   {
     value: 'orca',
     get label() {
-      return translate('auto.components.stats.ClaudeUsagePane.4f8368c272', 'Orca worktrees only')
+      return translate(
+        'auto.components.stats.ClaudeUsagePane.4f8368c272',
+        'Orca Lab worktrees only'
+      )
     }
   },
   {

@@ -244,7 +244,7 @@ describe('CopilotHookService', () => {
     expect(status.detail).toBe('Managed Copilot hook file is disabled')
   })
 
-  it('remove deletes only Orca-managed Copilot hooks', () => {
+  it('remove deletes only Orca Lab-managed Copilot hooks', () => {
     const service = new CopilotHookService()
     service.install()
     const configPath = join(copilotHome, 'hooks', 'orca.json')

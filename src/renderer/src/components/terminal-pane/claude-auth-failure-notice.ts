@@ -31,7 +31,7 @@ export function describeClaudeAuthFailure(account: ClaudeAuthFailurePaneAccount)
   }
   return translate(
     'auto.components.terminal-pane.claudeAuthFailure.unknown',
-    'Claude sign-in expired in this pane. Orca could not tell which account it runs on.'
+    'Claude sign-in expired in this pane. Orca Lab could not tell which account it runs on.'
   )
 }
 

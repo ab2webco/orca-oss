@@ -73,6 +73,6 @@ function linkFailureError(
 function worktreeRequiredError(command: string): RuntimeClientError {
   return new RuntimeClientError(
     'plane_worktree_required',
-    `Run ${command} from inside an Orca-managed worktree.`
+    `Run ${command} from inside an Orca Lab-managed worktree.`
   )
 }

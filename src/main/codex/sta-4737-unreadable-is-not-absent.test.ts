@@ -260,7 +260,7 @@ describe('STA-4737 promotion must not rebuild a system config it could not read'
 
 describe('STA-4737 the resource sync must not delete a mirror whose source it could not read', () => {
   const AGENTS_ENTRY = 'AGENTS.md'
-  const MIRRORED = '# instructions Orca copied for the distro\n'
+  const MIRRORED = '# instructions Orca Lab copied for the distro\n'
 
   function seedOwnedMirrorCopy(): { sourcePath: string; targetPath: string } {
     const sourcePath = join(systemHome(), AGENTS_ENTRY)

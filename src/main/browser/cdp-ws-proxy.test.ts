@@ -505,7 +505,7 @@ describe('CdpWsProxy', () => {
       id: 16,
       error: {
         code: -32000,
-        message: 'Page.reload parameter "loaderId" is not supported for Orca tab reloads'
+        message: 'Page.reload parameter "loaderId" is not supported for Orca Lab tab reloads'
       }
     })
     expect(mock.webContents.reload).not.toHaveBeenCalled()

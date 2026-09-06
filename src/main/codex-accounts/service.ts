@@ -830,7 +830,7 @@ export class CodexAccountService {
   ): Promise<CodexRateLimitAccountsState> {
     const identity = this.readIdentityFromHome(managedHome.managedHomePath, accountId)
     if (!identity.email) {
-      throw new Error('Codex login completed, but Orca could not resolve the account email.')
+      throw new Error('Codex login completed, but Orca Lab could not resolve the account email.')
     }
 
     const now = Date.now()
@@ -917,7 +917,7 @@ export class CodexAccountService {
     await this.runCodexLogin(managedHomePath)
     const identity = this.readIdentityFromHome(managedHomePath, account.id)
     if (!identity.email) {
-      throw new Error('Codex login completed, but Orca could not resolve the account email.')
+      throw new Error('Codex login completed, but Orca Lab could not resolve the account email.')
     }
 
     const settings = this.store.getSettings()
@@ -1402,7 +1402,7 @@ export class CodexAccountService {
     // Why: mirroring a custom-provider pin into an OAuth managed home makes
     // the new OAuth credentials inert; fail before login and leave user config intact.
     throw new Error(
-      `Orca cannot add a Codex OAuth account while ~/.codex/config.toml pins the custom provider ${JSON.stringify(modelProvider)}. Keep using the system-default account for this provider, or remove model_provider (or set it to "openai") before adding an OAuth account. Orca left your config unchanged.`
+      `Orca Lab cannot add a Codex OAuth account while ~/.codex/config.toml pins the custom provider ${JSON.stringify(modelProvider)}. Keep using the system-default account for this provider, or remove model_provider (or set it to "openai") before adding an OAuth account. Orca Lab left your config unchanged.`
     )
   }
 
@@ -1517,7 +1517,7 @@ export class CodexAccountService {
         !wslInfo.linuxPath.includes('/.local/share/orca/codex-accounts/') ||
         !wslInfo.linuxPath.endsWith('/home')
       ) {
-        throw new Error('Managed WSL Codex home is outside Orca account storage.')
+        throw new Error('Managed WSL Codex home is outside Orca Lab account storage.')
       }
       if (
         expectedAccountId !== undefined &&
@@ -1564,20 +1564,20 @@ export class CodexAccountService {
           }
           return toWindowsWslPath(canonicalLinuxPath, wslInfo.distro)
         } catch (error) {
-          throw new Error('Managed WSL Codex home is outside Orca account storage.', {
+          throw new Error('Managed WSL Codex home is outside Orca Lab account storage.', {
             cause: error
           })
         }
       }
 
       if (wslInfo.linuxPath.split('/').includes('..')) {
-        throw new Error('Managed WSL Codex home is outside Orca account storage.')
+        throw new Error('Managed WSL Codex home is outside Orca Lab account storage.')
       }
       if (!existsSync(candidatePath)) {
         throw new Error('Managed Codex home directory does not exist on disk.')
       }
       if (!existsSync(join(candidatePath, '.orca-managed-home'))) {
-        throw new Error('Managed Codex home is missing Orca ownership marker.')
+        throw new Error('Managed Codex home is missing Orca Lab ownership marker.')
       }
       if (
         expectedAccountId !== undefined &&

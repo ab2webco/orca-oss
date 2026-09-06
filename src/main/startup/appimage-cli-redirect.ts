@@ -47,7 +47,7 @@ export function maybeRedirectAppImageCliLaunch(options: RedirectOptions = {}): R
 
   const cliEntryPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
   if (!existsSync(cliEntryPath)) {
-    process.stderr.write(`Unable to locate the Orca CLI entrypoint at ${cliEntryPath}\n`)
+    process.stderr.write(`Unable to locate the Orca Lab CLI entrypoint at ${cliEntryPath}\n`)
     return { redirected: true, status: 1 }
   }
 

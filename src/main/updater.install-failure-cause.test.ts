@@ -107,7 +107,7 @@ const DEB_ELEVATION_ERROR =
 
 // electron-updater's ERR_UPDATER_INVALID_SIGNATURE text, which drives its own card in UpdateCard.
 const WINDOWS_SIGNATURE_MISMATCH_ERROR =
-  'New version 1.4.163 is not signed by the application owner: publisherNames: Orca, Inc.'
+  'New version 1.4.163 is not signed by the application owner: publisherNames: Orca Lab, Inc.'
 
 type CapturedSpan = {
   readonly name: string

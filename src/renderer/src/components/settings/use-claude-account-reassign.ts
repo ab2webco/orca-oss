@@ -61,7 +61,7 @@ function reportClaudeReauthReopenFailures(outcome: ClaudeReauthReopenOutcome): v
   toast.warning(
     translate(
       'auto.components.settings.useClaudeAccountReassign.reopenFailed',
-      'Signed in, but Orca could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar.',
+      'Signed in, but Orca Lab could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar.',
       { worktrees: outcome.failedWorktreeIds.join(', ') }
     )
   )

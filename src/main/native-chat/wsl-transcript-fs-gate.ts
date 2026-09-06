@@ -7,9 +7,9 @@ export const WSL_TRANSCRIPT_FS_SCAN_TIMEOUT_MS = 60_000
 export const WSL_TRANSCRIPT_FS_MAX_PENDING_TASKS = 64
 export const WSL_TRANSCRIPT_FS_MAX_WAITERS_PER_TASK = 64
 export const WSL_TRANSCRIPT_FS_SLOW_MESSAGE =
-  'WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart Orca if the issue continues.'
+  'WSL transcript files are temporarily unavailable because filesystem access is taking too long. Try again shortly or restart Orca Lab if the issue continues.'
 export const WSL_TRANSCRIPT_FS_CAPACITY_MESSAGE =
-  'WSL transcript discovery is temporarily unavailable because too many filesystem requests are already waiting. Try again shortly or restart Orca if the issue continues.'
+  'WSL transcript discovery is temporarily unavailable because too many filesystem requests are already waiting. Try again shortly or restart Orca Lab if the issue continues.'
 
 export type WslTranscriptFsFailureCode = 'timeout' | 'capacity' | 'unavailable'
 

@@ -50,11 +50,11 @@ export function GeneralWorkspaceSettingsSection({
           )}
           description={translate(
             'auto.components.settings.GeneralWorkspaceSettingsSection.externalWorktreesDescription',
-            'Choose which worktrees created outside Orca appear by default on this host.'
+            'Choose which worktrees created outside Orca Lab appear by default on this host.'
           )}
           keywords={[
             'external',
-            'non-Orca',
+            'non-Orca Lab',
             'worktree',
             'visibility',
             'sidebar',

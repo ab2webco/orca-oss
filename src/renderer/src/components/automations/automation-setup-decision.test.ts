@@ -64,7 +64,7 @@ describe('automation setup decision defaults', () => {
     ).toBe(expectedDecision)
   })
 
-  it('hides setup choice outside Orca new-run automations with setup', () => {
+  it('hides setup choice outside Orca Lab new-run automations with setup', () => {
     const baseArgs = {
       repoId: 'repo-1',
       repos: [repo],

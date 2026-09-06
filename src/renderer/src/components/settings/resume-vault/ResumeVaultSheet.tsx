@@ -34,7 +34,7 @@ export function ResumeVaultSheet({
       title: translate('resumeVault.confirmRelease.title', 'Release this resume record?'),
       description: translate(
         'resumeVault.confirmRelease.description',
-        'Orca will no longer offer to resume this {{value0}} session. The transcript on disk is not affected.',
+        'Orca Lab will no longer offer to resume this {{value0}} session. The transcript on disk is not affected.',
         { value0: getAgentLabel(entry.record.agent) }
       ),
       confirmLabel: translate('resumeVault.release', 'Release'),
@@ -60,7 +60,7 @@ export function ResumeVaultSheet({
       ),
       description: translate(
         'resumeVault.confirmReleaseAll.description',
-        'Orca will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected.',
+        'Orca Lab will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected.',
         { value0: group.identity.worktreeDisplayName }
       ),
       confirmLabel: translate('resumeVault.releaseAll', 'Release all'),
@@ -83,7 +83,7 @@ export function ResumeVaultSheet({
           <SheetDescription>
             {translate(
               'resumeVault.description',
-              "Orca keeps a resume pointer for a session it can't yet confirm has finished. Release the ones you don't need — this never deletes the transcript."
+              "Orca Lab keeps a resume pointer for a session it can't yet confirm has finished. Release the ones you don't need — this never deletes the transcript."
             )}
           </SheetDescription>
         </SheetHeader>

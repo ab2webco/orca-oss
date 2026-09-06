@@ -6,43 +6,43 @@ function issueDescription(issue: SkillFreshnessScanIssue): string {
     case 'depth-limit':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanDepthLimit',
-        'Orca reached its plugin scan depth limit before checking this folder.'
+        'Orca Lab reached its plugin scan depth limit before checking this folder.'
       )
     case 'entry-limit':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanEntryLimit',
-        'Orca reached its plugin scan entry limit before checking the rest of this cache.'
+        'Orca Lab reached its plugin scan entry limit before checking the rest of this cache.'
       )
     case 'candidate-limit':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanCandidateLimit',
-        'Orca found more same-named skill folders than it can safely inspect.'
+        'Orca Lab found more same-named skill folders than it can safely inspect.'
       )
     case 'manifest-limit':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanManifestLimit',
-        'Orca skipped this plugin manifest because it exceeded a safe limit.'
+        'Orca Lab skipped this plugin manifest because it exceeded a safe limit.'
       )
     case 'outside-root':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanOutsideRoot',
-        'Orca skipped this plugin path because it points outside the plugin cache.'
+        'Orca Lab skipped this plugin path because it points outside the plugin cache.'
       )
     case 'io-error':
       return issue.errorCode
         ? translate(
             'auto.components.skills.SkillFreshnessUpdateDialog.scanIoErrorWithCode',
-            'Orca could not read this plugin path ({{value0}}).',
+            'Orca Lab could not read this plugin path ({{value0}}).',
             { value0: issue.errorCode }
           )
         : translate(
             'auto.components.skills.SkillFreshnessUpdateDialog.scanIoError',
-            'Orca could not read this plugin path.'
+            'Orca Lab could not read this plugin path.'
           )
     case 'issue-limit':
       return translate(
         'auto.components.skills.SkillFreshnessUpdateDialog.scanIssueLimit',
-        'Orca found too many skipped plugin folders to list individually.'
+        'Orca Lab found too many skipped plugin folders to list individually.'
       )
   }
 }

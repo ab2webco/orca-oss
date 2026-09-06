@@ -155,7 +155,7 @@ describe('buildRows with pinned worktrees', () => {
     ])
   })
 
-  it('shows distinct Orca server names when status grouping mixes runtime hosts', () => {
+  it('shows distinct Orca Lab server names when status grouping mixes runtime hosts', () => {
     const firstRepo: Repo = {
       ...repo,
       id: 'repo-runtime-a',

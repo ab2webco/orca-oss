@@ -187,7 +187,7 @@ export default function FeatureTipsModal(): JSX.Element | null {
           toast.warning(
             translate(
               'auto.components.feature.tips.FeatureTipsModal.1da82af45b',
-              'Orca CLI needs attention'
+              'Orca Lab CLI needs attention'
             ),
             {
               description:
@@ -201,7 +201,7 @@ export default function FeatureTipsModal(): JSX.Element | null {
           closeModal()
           openCliSettings()
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Failed to install Orca CLI.'
+          const message = error instanceof Error ? error.message : 'Failed to install Orca Lab CLI.'
           if (
             import.meta.env.DEV &&
             message.includes('Development mode uses a generated launcher for validation only')

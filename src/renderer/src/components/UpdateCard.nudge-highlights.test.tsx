@@ -96,7 +96,7 @@ describe('UpdateCard nudge highlights', () => {
   it('keeps the one-paragraph summary when no highlights are present', () => {
     renderAvailable({
       release: {
-        title: 'Orca 1.4.200',
+        title: 'Orca Lab 1.4.200',
         description: 'fix: keep scrollback · feat: faster tabs',
         releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.4.200'
       },

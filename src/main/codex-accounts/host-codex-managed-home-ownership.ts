@@ -156,7 +156,10 @@ function evaluate({
     // Why: the marker is required, so its definitive absence is structural — but
     // an unreadable marker is not evidence of anything.
     if (isDefinitiveAbsence(error)) {
-      return { kind: 'untrusted', reason: 'Managed Codex home is missing Orca ownership marker.' }
+      return {
+        kind: 'untrusted',
+        reason: 'Managed Codex home is missing Orca Lab ownership marker.'
+      }
     }
     return { kind: 'indeterminate', error }
   }

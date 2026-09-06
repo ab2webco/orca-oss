@@ -138,7 +138,7 @@ describe('registerWorktreeHandlers', () => {
     expect(store.setWorktreeMeta).not.toHaveBeenCalled()
   })
 
-  it('strips Orca provenance fields from renderer metadata updates', () => {
+  it('strips Orca Lab provenance fields from renderer metadata updates', () => {
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
 
     const result = handlers['worktrees:updateMeta'](null, {
@@ -369,7 +369,7 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
-  it('keeps the Orca-created marker when a new worktree reuses an Orca-created fork remote', async () => {
+  it('keeps the Orca Lab-created marker when a new worktree reuses an Orca Lab-created fork remote', async () => {
     listWorktreesMock.mockResolvedValue([
       {
         path: '/workspace/improve-dashboard',

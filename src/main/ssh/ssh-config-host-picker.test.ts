@@ -72,7 +72,7 @@ describe('SSH config host picker search', () => {
     expect(result.hosts[0]).toMatchObject({ alias: 'prod', alreadyInOrca: true })
   })
 
-  it('marks a case-only alias variant as already in Orca', () => {
+  it('marks a case-only alias variant as already in Orca Lab', () => {
     const result = searchSshConfigHosts([{ host: 'prod' }], [{ configHost: 'Prod', label: 'Prod' }])
 
     expect(result).toMatchObject({ totalHostCount: 1, newHostCount: 0 })
@@ -92,7 +92,7 @@ describe('SSH config host picker search', () => {
     expect(result.hosts.find((host) => host.alias === 'active')?.previouslyRemoved).toBeUndefined()
   })
 
-  it('does not mark a host as previously removed when it is already in Orca', () => {
+  it('does not mark a host as previously removed when it is already in Orca Lab', () => {
     const result = searchSshConfigHosts(
       [{ host: 'prod' }],
       [{ configHost: 'prod', label: 'Production' }],

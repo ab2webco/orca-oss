@@ -562,7 +562,7 @@ export class BrowserManager {
                 ${JSON.stringify(prev?.targetBrowserPageId)} &&
               typeof state.setActiveBrowserPage === 'function'
             ) {
-              // Why: Orca remembers the last browser workspace/page even when
+              // Why: Orca Lab remembers the last browser workspace/page even when
               // the user is currently in terminal/editor view. Screenshot prep
               // temporarily switches that hidden browser selection state, so
               // restore it independently of the visible tab type.
@@ -1291,7 +1291,7 @@ export class BrowserManager {
     // Cancel all active grab ops before tearing down registrations
     this.grabSessionController.cancelAll('evicted')
     for (const downloadId of this.downloadsById.keys()) {
-      this.cancelDownloadInternal(downloadId, 'Orca is shutting down.')
+      this.cancelDownloadInternal(downloadId, 'Orca Lab is shutting down.')
     }
     browserDownloadDestinationReservations.clear()
     for (const browserTabId of this.webContentsIdByTabId.keys()) {

@@ -136,7 +136,7 @@ describe('agent feature skill commands', () => {
     )
   })
 
-  it('installs orca-plane from the lab fork, not the official Orca repo', () => {
+  it('installs orca-plane from the lab fork, not the official Orca Lab repo', () => {
     // orca-plane ships only in the fork, so its install URL must be the fork.
     expect(ORCA_PLANE_SKILL_INSTALL_COMMAND).toBe(
       'npx skills add https://github.com/ab2webco/orca-oss --skill orca-plane --global'

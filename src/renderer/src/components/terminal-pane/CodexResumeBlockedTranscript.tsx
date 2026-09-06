@@ -40,7 +40,7 @@ export function CodexResumeBlockedTranscript({
           <p className="text-xs text-muted-foreground">
             {translate(
               'components.terminal-pane.codex-resume-blocked.subtitle',
-              'Orca paused automatic resume because it could not confirm this Codex session belongs to the selected account. The transcript below is read-only — nothing was sent or lost. To keep working, start a new Codex session or switch to the account that owns this one.'
+              'Orca Lab paused automatic resume because it could not confirm this Codex session belongs to the selected account. The transcript below is read-only — nothing was sent or lost. To keep working, start a new Codex session or switch to the account that owns this one.'
             )}
           </p>
         </div>
@@ -53,7 +53,7 @@ export function CodexResumeBlockedTranscript({
             kind="error"
             message={translate(
               'components.terminal-pane.codex-resume-blocked.read-error',
-              'Orca could not read the saved session file either. It may have been moved or deleted; automatic resume stayed paused and nothing was sent.'
+              'Orca Lab could not read the saved session file either. It may have been moved or deleted; automatic resume stayed paused and nothing was sent.'
             )}
           />
         ) : viewState.kind === 'empty' ? (

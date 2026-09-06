@@ -51,7 +51,7 @@ export default function AboutScreen() {
 
       <View style={styles.brand}>
         <OrcaLogo size={28} />
-        <Text style={styles.brandName}>Orca</Text>
+        <Text style={styles.brandName}>Orca Lab</Text>
         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
       </View>
 

@@ -1,6 +1,9 @@
 import type { AutoSwitchRateLimitAgent } from '../../../shared/agent-rate-limit-detection'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
-import type { ClaudeLivePtyAccountInfo, ManagedPtyAccountOwner } from '../../../shared/managed-account-types'
+import type {
+  ClaudeLivePtyAccountInfo,
+  ManagedPtyAccountOwner
+} from '../../../shared/managed-account-types'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
@@ -90,7 +93,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
       'source-quota-unknown',
       translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.sourceOwnerUnknown',
-        'Could not verify which managed account owns this terminal, so Orca left it unchanged.'
+        'Could not verify which managed account owns this terminal, so Orca Lab left it unchanged.'
       )
     )
   }
@@ -99,7 +102,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
       'source-quota-unknown',
       translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.sourceOwnerUnknown',
-        'Could not verify which managed account owns this terminal, so Orca left it unchanged.'
+        'Could not verify which managed account owns this terminal, so Orca Lab left it unchanged.'
       )
     )
   }
@@ -130,11 +133,11 @@ export async function runAgentRateLimitAutoSwitch(args: {
         sourceQuota === 'available'
           ? translate(
               'auto.lib.agentRateLimitAutoSwitchRunner.sourceHasQuota',
-              'The account that owns this terminal still has quota, so Orca ignored the terminal text.'
+              'The account that owns this terminal still has quota, so Orca Lab ignored the terminal text.'
             )
           : translate(
               'auto.lib.agentRateLimitAutoSwitchRunner.sourceQuotaUnknown',
-              'The owning account quota is unavailable or stale, so Orca left the terminal unchanged.'
+              'The owning account quota is unavailable or stale, so Orca Lab left the terminal unchanged.'
             )
       )
     }
@@ -248,7 +251,7 @@ export async function runAgentRateLimitAutoSwitch(args: {
       'stop-failed',
       translate(
         'auto.lib.agentRateLimitAutoSwitchRunner.13668a6034',
-        'The limited agent did not exit after Ctrl+C, so Orca left the terminal untouched.'
+        'The limited agent did not exit after Ctrl+C, so Orca Lab left the terminal untouched.'
       )
     )
   }

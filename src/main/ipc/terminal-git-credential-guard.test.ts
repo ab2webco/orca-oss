@@ -72,7 +72,7 @@ describe('applyTerminalGitCredentialPromptGuard', () => {
     }
   })
 
-  it('does not treat a generic Orca CLI command as an agent', () => {
+  it('does not treat a generic Orca Lab CLI command as an agent', () => {
     const env: Record<string, string> = { PATH: '/usr/bin' }
 
     expect(

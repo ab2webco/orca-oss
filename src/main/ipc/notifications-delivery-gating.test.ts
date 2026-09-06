@@ -133,7 +133,7 @@ describe('registerNotificationHandlers', () => {
     expect(notificationCtorMock).not.toHaveBeenCalled()
   })
 
-  it('suppresses active-worktree notifications while Orca is focused', async () => {
+  it('suppresses active-worktree notifications while Orca Lab is focused', async () => {
     getAllWindowsMock.mockReturnValue([
       {
         isDestroyed: () => false,

@@ -324,7 +324,7 @@ describe('legacy terminal shim neutralization', () => {
 
       const git = readFileSync(join(posixDir, 'git'), 'utf8')
       expect(git.split('\n')[0]).toBe('#!/bin/bash')
-      expect(git).toContain('Orca compatibility wrapper could not locate')
+      expect(git).toContain('Orca Lab compatibility wrapper could not locate')
       expect(existsSync(join(posixDir, 'gh'))).toBe(false)
     } finally {
       vi.doUnmock('./legacy-terminal-posix-tombstone')

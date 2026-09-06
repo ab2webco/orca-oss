@@ -28,7 +28,7 @@ export function PreservedAgentSessionsSection(): React.JSX.Element {
         title={translate('resumeVault.section.title', 'Preserved Agent Sessions')}
         description={translate(
           'resumeVault.section.description',
-          "Orca keeps a resume record when it can't confirm a closed session's agent actually finished its turn. Review and release the ones you don't need."
+          "Orca Lab keeps a resume record when it can't confirm a closed session's agent actually finished its turn. Review and release the ones you don't need."
         )}
         action={
           <Button type="button" variant="outline" size="sm" onClick={() => handleOpenChange(true)}>

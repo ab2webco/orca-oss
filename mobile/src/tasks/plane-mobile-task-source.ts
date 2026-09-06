@@ -18,7 +18,7 @@ import {
 export const MOBILE_TASKS_PLANE_CAPABILITY = 'mobile.tasks.plane.v1'
 
 export const PLANE_HOST_UPDATE_REQUIRED_MESSAGE =
-  'Plane tasks need a newer Orca host. Update the desktop app, then reconnect.'
+  'Plane tasks need a newer Orca Lab host. Update the desktop app, then reconnect.'
 
 export const PLANE_WORK_ITEM_LIMIT = 100
 

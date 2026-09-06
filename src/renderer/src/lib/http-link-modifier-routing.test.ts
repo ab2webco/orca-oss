@@ -31,14 +31,14 @@ describe('resolveModifierRouting', () => {
     })
   })
 
-  it('still reaches the system browser when inverting and links open in Orca', () => {
+  it('still reaches the system browser when inverting and links open in Orca Lab', () => {
     expect(resolveModifierRouting(true, true, true)).toEqual({
       wantsOrca: false,
       wantsSystemBrowser: true
     })
   })
 
-  it('reaches Orca when inverting and links open in the system browser', () => {
+  it('reaches Orca Lab when inverting and links open in the system browser', () => {
     expect(resolveModifierRouting(true, false, true)).toEqual({
       wantsOrca: true,
       wantsSystemBrowser: false
@@ -82,7 +82,7 @@ describe('modifier routing across link source owners', () => {
     vi.unstubAllGlobals()
   })
 
-  it('still lets the inverting modifier pull a local link into Orca', () => {
+  it('still lets the inverting modifier pull a local link into Orca Lab', () => {
     storeState.settings = { openLinksInApp: false, openLinksInAppModifierInverts: true }
 
     openHttpLink('https://example.com/', {
@@ -96,7 +96,7 @@ describe('modifier routing across link source owners', () => {
     })
   })
 
-  it('lets an inverting modifier reach Orca on the owning runtime', () => {
+  it('lets an inverting modifier reach Orca Lab on the owning runtime', () => {
     storeState.settings = {
       openLinksInApp: false,
       openLinksInAppModifierInverts: true,

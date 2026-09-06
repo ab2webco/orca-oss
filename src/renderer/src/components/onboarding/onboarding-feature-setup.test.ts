@@ -411,7 +411,7 @@ describe('onboarding feature setup runner', () => {
       ...INSTALLED_CLI_STATUS,
       platform: 'win32',
       pathConfigured: null,
-      detail: 'Orca could not read the Windows user PATH registry value.'
+      detail: 'Orca Lab could not read the Windows user PATH registry value.'
     }
     const deps = createDeps({ getCliStatus: vi.fn(async () => unknownStatus) })
 

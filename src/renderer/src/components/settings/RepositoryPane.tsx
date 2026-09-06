@@ -263,7 +263,7 @@ export function RepositoryPane({
             )}
             description={translate(
               'auto.components.settings.RepositoryPane.removeProjectAllHosts',
-              'Remove this project from Orca on all configured hosts.'
+              'Remove this project from Orca Lab on all configured hosts.'
             )}
             keywords={[repo.displayName, 'delete', 'project', 'repository']}
             className="absolute top-0 right-0 z-10 w-auto max-w-none"

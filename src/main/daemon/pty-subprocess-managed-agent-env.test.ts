@@ -401,7 +401,7 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_CODEX_HOME).toBeUndefined()
   })
 
-  it('strips an inherited per-account self-contained CODEX_HOME overlay in a nested Orca (#5370)', () => {
+  it('strips an inherited per-account self-contained CODEX_HOME overlay in a nested Orca Lab (#5370)', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const previousCodexHome = process.env.CODEX_HOME

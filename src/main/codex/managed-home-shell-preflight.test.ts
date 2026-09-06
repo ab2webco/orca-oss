@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('managed Codex shell preflight', () => {
-  it('accepts the Orca shared runtime home', () => {
+  it('accepts the Orca Lab shared runtime home', () => {
     const userDataPath = makeRoot()
     const home = join(userDataPath, 'codex-runtime-home', 'home')
     mkdirSync(home, { recursive: true })

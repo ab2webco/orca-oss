@@ -207,7 +207,7 @@ describe('browserManager', () => {
     expect(shellOpenExternalMock).not.toHaveBeenCalled()
   })
 
-  it('keeps plain links current and routes explicit new-tab gestures to Orca tabs', async () => {
+  it('keeps plain links current and routes explicit new-tab gestures to Orca Lab tabs', async () => {
     const rendererSendMock = vi.fn()
     const executeJavaScriptInIsolatedWorldMock = vi.fn().mockResolvedValue(undefined)
     const guest = {
@@ -537,7 +537,7 @@ describe('browserManager', () => {
     expect(shellOpenExternalMock).toHaveBeenCalledWith('https://example.com/login')
   })
 
-  it('offers opening a link in another Orca browser tab from the guest context menu', () => {
+  it('offers opening a link in another Orca Lab browser tab from the guest context menu', () => {
     const rendererSendMock = vi.fn()
     const guest = {
       id: 104,

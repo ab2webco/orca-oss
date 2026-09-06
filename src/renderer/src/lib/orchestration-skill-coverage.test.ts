@@ -140,7 +140,7 @@ describe('orchestration skill agent coverage', () => {
         'claude',
         [
           skill({
-            name: 'Orca Orchestration',
+            name: 'Orca Lab Orchestration',
             providers: ['claude'],
             sourceKind: 'home',
             rootPath: '/Users/test/.claude/skills',
@@ -415,9 +415,11 @@ describe('orchestration skill agent coverage', () => {
     ).toBe(false)
 
     expect(
-      agentHasOrchestrationSkill('claude-zai', [skill({})], [
-        source('/Users/test/.agents/skills', null)
-      ])
+      agentHasOrchestrationSkill(
+        'claude-zai',
+        [skill({})],
+        [source('/Users/test/.agents/skills', null)]
+      )
     ).toBe(true)
   })
 

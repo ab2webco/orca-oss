@@ -174,7 +174,7 @@ describe('prepareEphemeralVmWorkspaceTarget', () => {
     expect(window.api.ephemeralVm.cleanup).not.toHaveBeenCalled()
   })
 
-  it('rejects and cleans up an Orca-server provisioned root before project import', async () => {
+  it('rejects and cleans up an Orca Lab-server provisioned root before project import', async () => {
     vi.mocked(window.api.ephemeralVm.provision).mockResolvedValue({
       ok: true,
       connectionType: 'orca-server',
@@ -227,7 +227,7 @@ describe('prepareEphemeralVmWorkspaceTarget', () => {
 
   it('cleans up the runtime when required project setup capability is missing', async () => {
     vi.mocked(assertRuntimeEnvironmentCapability).mockRejectedValue(
-      new Error('The recipe-created Orca server does not support project setup.')
+      new Error('The recipe-created Orca Lab server does not support project setup.')
     )
     vi.mocked(window.api.ephemeralVm.provision).mockResolvedValue({
       ok: true,
@@ -274,13 +274,13 @@ describe('prepareEphemeralVmWorkspaceTarget', () => {
     expect(assertRuntimeEnvironmentCapability).toHaveBeenCalledWith(
       'env-1',
       'project-host-setup.v1',
-      'The recipe-created Orca server does not support project setup.'
+      'The recipe-created Orca Lab server does not support project setup.'
     )
     expect(setupExistingFolder).not.toHaveBeenCalled()
     expect(window.api.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1' })
     expect(result).toEqual({
       ok: false,
-      error: 'The recipe-created Orca server does not support project setup.',
+      error: 'The recipe-created Orca Lab server does not support project setup.',
       stderr: 'creating sandbox'
     })
   })

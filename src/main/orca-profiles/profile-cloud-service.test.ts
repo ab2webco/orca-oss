@@ -102,7 +102,7 @@ function mockSuccessfulConnect(expiresAt = futureExpiresAt()): void {
   } satisfies OrcaCloudSessionExchangeResponse)
 }
 
-describe('Orca cloud profile service', () => {
+describe('Orca Lab cloud profile service', () => {
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-cloud-service-'))
     beginOrcaCloudPkceFlowMock.mockReset()

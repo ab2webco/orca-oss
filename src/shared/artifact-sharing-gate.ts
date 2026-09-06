@@ -10,7 +10,7 @@ export const ARTIFACT_SHARING_DISABLED_MESSAGE =
   'Publishing artifacts is off for this device. Nothing running here — agents or the orca CLI — can mint public artifact links until you allow it.'
 
 export const ARTIFACT_SHARING_DISABLED_NEXT_STEPS: readonly string[] = [
-  'Open Settings → Artifacts in the Orca desktop app on this device.',
+  'Open Settings → Artifacts in the Orca Lab desktop app on this device.',
   'Turn on "Allow publishing public artifact links".',
   'Run the share command again.'
 ]

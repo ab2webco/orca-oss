@@ -600,7 +600,7 @@ describe('claimsCodexRolloutLayout', () => {
     ).toBe(true)
   })
 
-  it('is true for a rollout under a home Orca no longer trusts, so resume cannot silently fall through to the selected account', () => {
+  it('is true for a rollout under a home Orca Lab no longer trusts, so resume cannot silently fall through to the selected account', () => {
     expect(
       claimsCodexRolloutLayout('/removed/account/home/sessions/2026/07/20/rollout-a.jsonl')
     ).toBe(true)
@@ -649,7 +649,7 @@ describe('resolveCodexSessionResumeProvenance', () => {
     return { homePath, rolloutPath }
   }
 
-  it('starts fresh for a rollout file that really exists under a home Orca no longer trusts', async () => {
+  it('starts fresh for a rollout file that really exists under a home Orca Lab no longer trusts', async () => {
     // Why: the discriminating case — the file is present, so only the trust check can
     // reject it. Resuming here would run the session under the selected account.
     const sessionId = '019f81b9-19a9-7651-a8d1-352d9420bd11'

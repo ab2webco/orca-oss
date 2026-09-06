@@ -43,7 +43,7 @@ export function resolveUnavailableCreateReviewLookupNoticeMessage(
   provider: HostedReviewProvider
 ): string {
   const copy = localizedHostedReviewCopy(resolveSupportedHostedReviewCopyProvider(provider))
-  return `Create ${copy.shortLabel} failed: Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
+  return `Create ${copy.shortLabel} failed: Orca Lab could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
 }
 
 export function resolveBlockedCreateReviewNoticeMessage(

@@ -48,7 +48,7 @@ describe('HermesHookService', () => {
     expect(config.plugins.enabled).toContain(_internals.HERMES_PLUGIN_NAME)
   })
 
-  it('preserves other enabled plugins and removes Orca from disabled list', () => {
+  it('preserves other enabled plugins and removes Orca Lab from disabled list', () => {
     writeFileSync(
       join(homeDir, 'config.yaml'),
       [
@@ -123,7 +123,7 @@ describe('HermesHookService', () => {
     expect(output.toLowerCase()).toContain('enabled')
   }, 20_000)
 
-  it('registered plugin hooks post normalized JSON to Orca', async () => {
+  it('registered plugin hooks post normalized JSON to Orca Lab', async () => {
     const pythonAvailable = spawnSync('python3', ['--version'], { encoding: 'utf-8' }).status === 0
     if (!pythonAvailable) {
       return

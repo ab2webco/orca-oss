@@ -64,7 +64,7 @@ describe('browser clicked-link routing', () => {
     vi.restoreAllMocks()
   })
 
-  it('routes plain target=_blank links back into the current Orca tab', () => {
+  it('routes plain target=_blank links back into the current Orca Lab tab', () => {
     const link = document.createElement('a')
     link.href = 'https://docs.example.com/guide'
     link.target = '_blank'

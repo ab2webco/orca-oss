@@ -165,16 +165,16 @@ export function ClaudeAccountReassignDialog({
             {isReauth
               ? translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.reauthDescription',
-                  'A live Claude CLI owns this account’s single-use refresh chain, so Orca closes those terminals first. Every worktree stays on this account, and Orca reopens the terminals it closed for it once you are signed in.'
+                  'A live Claude CLI owns this account’s single-use refresh chain, so Orca Lab closes those terminals first. Every worktree stays on this account, and Orca Lab reopens the terminals it closed for it once you are signed in.'
                 )
               : mode === 'remove' && !showReassignment
                 ? translate(
                     'auto.components.settings.ClaudeAccountReassignDialog.plainRemoveDescription',
-                    'Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.'
+                    'Orca Lab will delete the managed Claude auth for this saved account. If it is currently active, Orca Lab falls back to the system default Claude login.'
                   )
                 : translate(
                     'auto.components.settings.ClaudeAccountReassignDialog.description',
-                    'A pinned Claude CLI owns this account’s single-use refresh chain, so Orca cannot change it underneath a running session. Pick where these worktrees go and Orca closes the live terminals first.'
+                    'A pinned Claude CLI owns this account’s single-use refresh chain, so Orca Lab cannot change it underneath a running session. Pick where these worktrees go and Orca Lab closes the live terminals first.'
                   )}
           </DialogDescription>
         </DialogHeader>
@@ -193,7 +193,7 @@ export function ClaudeAccountReassignDialog({
               <WorktreeList
                 label={translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.reauthWorktreesLabel',
-                  'Terminals Orca will close and reopen'
+                  'Terminals Orca Lab will close and reopen'
                 )}
                 worktrees={worktrees}
               />
@@ -242,7 +242,7 @@ export function ClaudeAccountReassignDialog({
               <p className="text-sm text-destructive">
                 {translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.closeWarning',
-                  'Orca will close the Claude terminal in {{worktrees}}. Those sessions end.',
+                  'Orca Lab will close the Claude terminal in {{worktrees}}. Those sessions end.',
                   {
                     worktrees: plan.liveWorktrees.map((worktree) => worktree.displayName).join(', ')
                   }
@@ -254,7 +254,7 @@ export function ClaudeAccountReassignDialog({
               <p className="text-sm text-destructive">
                 {translate(
                   'auto.components.settings.ClaudeAccountReassignDialog.blockedByOther',
-                  'The active account {{accounts}} also has a live Claude terminal in {{worktrees}}. Orca closes it too, or the change stays blocked.',
+                  'The active account {{accounts}} also has a live Claude terminal in {{worktrees}}. Orca Lab closes it too, or the change stays blocked.',
                   {
                     accounts: blockingLabels.join(', '),
                     worktrees:

@@ -161,6 +161,7 @@ import {
   parseRuntimeNativeChatTurnLifecycle
 } from '@/components/native-chat/native-chat-runtime-contract'
 import { createWebFileMutationMethods } from './web-file-mutation-methods'
+import { APP_DISPLAY_NAME } from '@/../../shared/app-identity'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
 const UI_STORAGE_KEY = 'orca.web.ui.v1'
@@ -555,7 +556,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     app: {
       getIdentity: () =>
         Promise.resolve({
-          name: 'Orca',
+          name: APP_DISPLAY_NAME,
           isDev: false,
           devLabel: null,
           devBranch: null,
@@ -1440,7 +1441,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     addFromPairingCode: async ({ name, pairingCode }) => {
       const offer = parseWebPairingInput(pairingCode)
       if (!offer) {
-        throw new Error('Invalid Orca pairing code.')
+        throw new Error('Invalid Orca Lab pairing code.')
       }
       const previousEnvironment = activeEnvironment
       closeActiveRuntimeClients()
@@ -1513,7 +1514,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
           kind: 'host-unreachable',
           message: translate(
             'auto.web.webPreloadApi.remotePairingUnreachable',
-            'Cannot reach Orca at {{endpoint}}.',
+            'Cannot reach Orca Lab at {{endpoint}}.',
             { endpoint: parsed.value.displayEndpoint }
           )
         }
@@ -1539,7 +1540,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
           kind: 'environment-save-failed',
           message: translate(
             'auto.web.webPreloadApi.remotePairingSaveFailed',
-            'Orca verified the host but could not save it. Check browser storage and try again.'
+            'Orca Lab verified the host but could not save it. Check browser storage and try again.'
           )
         }
       }
@@ -1941,7 +1942,7 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         throw new Error(response.error.message)
       }
       if (runtimeUpdates.some(hasProviderAccountPinUpdate)) {
-        throw new Error('Assigning provider accounts requires a newer Orca host.')
+        throw new Error('Assigning provider accounts requires a newer Orca Lab host.')
       }
       // Why: paired clients can outpace their host during rolling upgrades;
       // older hosts still support the pre-batch per-worktree method.
@@ -3035,7 +3036,7 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     state: 'unsupported',
     currentTarget: null,
     unsupportedReason: 'launch_mode_unavailable',
-    detail: 'CLI registration is managed on the Orca server, not in the web browser.'
+    detail: 'CLI registration is managed on the Orca Lab server, not in the web browser.'
   } as const
   return {
     getInstallStatus: () => Promise.resolve(status),
@@ -3069,7 +3070,7 @@ function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
       state: 'not_installed',
       configPath: '',
       managedHooksPresent: false,
-      detail: 'Agent hook status is only available on the Orca server.'
+      detail: 'Agent hook status is only available on the Orca Lab server.'
     } as const)
   return {
     claudeStatus: () => status('claude'),
@@ -3145,7 +3146,7 @@ function createComputerUsePermissionsApi(): NonNullable<
         helperAppPath: null,
         openedSettings: false,
         launchedHelper: false,
-        nextStep: 'Computer-use permissions are managed on the Orca server.'
+        nextStep: 'Computer-use permissions are managed on the Orca Lab server.'
       })),
     reset: () =>
       Promise.resolve({
@@ -3287,11 +3288,11 @@ function createClaudeAccountsApi(): never {
       (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude,
     // Why: custom endpoints are managed on the account-owning desktop/server, not from the web client.
     addCustomEndpoint: () =>
-      Promise.reject(new Error('Add custom endpoint accounts from the Orca desktop app.')),
+      Promise.reject(new Error('Add custom endpoint accounts from the Orca Lab desktop app.')),
     // Why: the live-pty gate and account universes live on the desktop host, so web clients see no binding.
     getLivePtyAccount: () => Promise.resolve(null),
     copySessionForFailover: () =>
-      Promise.reject(new Error('Rate-limit failover runs on the Orca desktop app.'))
+      Promise.reject(new Error('Rate-limit failover runs on the Orca Lab desktop app.'))
   } as never
 }
 
@@ -3800,13 +3801,13 @@ function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
   if (environment.compatibleEnvironmentIds?.includes(selector)) {
     return environment
   }
-  throw new Error(`Unknown Orca runtime environment: ${selector}`)
+  throw new Error(`Unknown Orca Lab runtime environment: ${selector}`)
 }
 
 function requireActiveEnvironment(): StoredWebRuntimeEnvironment {
   activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   if (!activeEnvironment) {
-    throw new Error('Pair this web client with an Orca server first.')
+    throw new Error('Pair this web client with an Orca Lab server first.')
   }
   return activeEnvironment
 }
@@ -3818,7 +3819,7 @@ function requireActiveEnvironmentOrNull(): StoredWebRuntimeEnvironment | null {
 
 function assertActiveEnvironment(environmentId: string): void {
   if (requireActiveEnvironment().id !== environmentId) {
-    throw new Error('The paired Orca server changed while the request was in progress.')
+    throw new Error('The paired Orca Lab server changed while the request was in progress.')
   }
 }
 

@@ -245,7 +245,7 @@ describe('the refusal names the terminals that block it', () => {
 
     try {
       expect(() => reserveInjectedClaudeAccountLaunch('account-a')).toThrow(
-        /whose account Orca could not read blocks every assigned account until it exits \(terminal t3 "zsh" in "feature-a"\)/
+        /whose account Orca Lab could not read blocks every assigned account until it exits \(terminal t3 "zsh" in "feature-a"\)/
       )
     } finally {
       markClaudePtyExited('repo-1::/work/feature-a@@pane-1')

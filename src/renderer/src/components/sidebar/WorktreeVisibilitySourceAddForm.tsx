@@ -92,7 +92,7 @@ export function WorktreeVisibilitySourceAddForm({
         {inputError ??
           translate(
             'auto.components.sidebar.WorktreeVisibilitySourceList.rootHelp',
-            'Orca will recognize worktrees beneath this folder.'
+            'Orca Lab will recognize worktrees beneath this folder.'
           )}
       </p>
     </form>

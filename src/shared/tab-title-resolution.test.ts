@@ -120,7 +120,7 @@ describe('tab title resolution', () => {
     ).toBe('Run tests')
   })
 
-  it('keeps OpenCode native and Orca-generated title behavior intact', () => {
+  it('keeps OpenCode native and Orca Lab-generated title behavior intact', () => {
     const aiVaultTitle = {
       agent: 'codex' as const,
       sessionId: 'codex-session',
@@ -131,7 +131,7 @@ describe('tab title resolution', () => {
         {
           customTitle: null,
           aiVaultTitle,
-          generatedTitle: 'Orca generated',
+          generatedTitle: 'Orca Lab generated',
           title: 'OC | OpenCode native'
         },
         true
@@ -139,10 +139,10 @@ describe('tab title resolution', () => {
     ).toBe('OC | OpenCode native')
     expect(
       resolveTerminalTabTitle(
-        { customTitle: null, generatedTitle: 'Orca generated', title: '⠋ albacore' },
+        { customTitle: null, generatedTitle: 'Orca Lab generated', title: '⠋ albacore' },
         true
       )
-    ).toBe('Orca generated')
+    ).toBe('Orca Lab generated')
   })
 
   it('uses the same priority for unified tab labels', () => {

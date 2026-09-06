@@ -125,9 +125,9 @@ function pairingUnavailable(
 }
 
 const DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE =
-  'The pairing registry is unavailable. Verify that the Orca data directory is writable.'
+  'The pairing registry is unavailable. Verify that the Orca Lab data directory is writable.'
 const E2EE_KEY_UNAVAILABLE_GUIDANCE =
-  'The E2EE identity is unavailable. Verify that the Orca data directory is writable.'
+  'The E2EE identity is unavailable. Verify that the Orca Lab data directory is writable.'
 
 type MobileRelayPairingProvider = {
   createPairingRelay(

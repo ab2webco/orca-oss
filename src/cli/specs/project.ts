@@ -4,7 +4,7 @@ import { GLOBAL_FLAGS } from '../args'
 export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['project', 'list'],
-    summary: 'List durable projects known to Orca',
+    summary: 'List durable projects known to Orca Lab',
     usage: 'orca project list [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
     examples: ['orca project list', 'orca project list --json']
@@ -71,7 +71,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Creates setup metadata without registering a repo compatibility record.',
-      'Use setup-existing-folder when Orca should import and manage an actual checkout path now.'
+      'Use setup-existing-folder when Orca Lab should import and manage an actual checkout path now.'
     ],
     examples: [
       'orca project setup-create --project github:stablyai/orca --host runtime:gpu --state setting-up --method provisioned --json'

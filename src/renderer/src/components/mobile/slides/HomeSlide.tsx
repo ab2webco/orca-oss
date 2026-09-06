@@ -9,7 +9,7 @@ export function HomeSlide({ tapping }: { tapping: boolean }): React.JSX.Element 
         <div className="mp-app-brand">
           <OrcaLogo />
           <span className="mp-app-brand-name">
-            {translate('auto.components.mobile.slides.HomeSlide.5d94e8ddcc', 'Orca')}
+            {translate('auto.components.mobile.slides.HomeSlide.5d94e8ddcc', 'Orca Lab')}
           </span>
         </div>
         <button

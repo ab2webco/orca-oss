@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { pluginManifestSchema } from './plugin-manifest'
 
-describe('hello Orca plugin fixture', () => {
+describe('hello Orca Lab plugin fixture', () => {
   it('uses an ESM entry that remains loadable outside a type-module package', async () => {
     const root = join(process.cwd(), 'examples', 'plugins', 'hello-orca')
     const manifest = pluginManifestSchema.parse(

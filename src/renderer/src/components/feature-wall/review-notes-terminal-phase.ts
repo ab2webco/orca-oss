@@ -69,7 +69,7 @@ export async function runTerminalPhase(ctx: TerminalPhaseContext): Promise<void>
   }
   const loadedEl = term.querySelector<HTMLDivElement>('[data-term-line-loaded]')
   if (loadedEl) {
-    loadedEl.innerHTML = `<span class="ravs-term-check">✓</span><span class="ravs-term-muted">Loaded ${NOTE_TARGETS.length} review notes from Orca</span>`
+    loadedEl.innerHTML = `<span class="ravs-term-check">✓</span><span class="ravs-term-muted">Loaded ${NOTE_TARGETS.length} review notes from Orca Lab</span>`
   }
   await wait(520)
   if (isCancelled()) {

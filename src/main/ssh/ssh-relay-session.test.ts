@@ -367,7 +367,7 @@ describe('SshRelaySession', () => {
     expect(registerSshPtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
   })
 
-  it('compiles a native Windows Orca CLI bridge without a cmd.exe shim', async () => {
+  it('compiles a native Windows Orca Lab CLI bridge without a cmd.exe shim', async () => {
     const { mockStore, mockPortForward, getMainWindow } = createMockDeps()
     const mockConn = {
       writeFile: vi.fn().mockResolvedValue(undefined)

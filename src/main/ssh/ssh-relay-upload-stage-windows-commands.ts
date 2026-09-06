@@ -38,7 +38,7 @@ export function reserveWindowsRelayUploadStageCommand(poolDir: string, owner: st
       'exit 0',
       '} catch { continue }',
       '}',
-      `throw ${powerShellLiteral(`Orca relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/${RELAY_UPLOAD_STAGE_POOL_NAME}`)}`
+      `throw ${powerShellLiteral(`Orca Lab relay upload staging quota is full; reconnect after 40 minutes or inspect .orca-remote/${RELAY_UPLOAD_STAGE_POOL_NAME}`)}`
     ].join('\n')
   )
 }

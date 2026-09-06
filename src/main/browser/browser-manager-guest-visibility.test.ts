@@ -465,7 +465,7 @@ describe('browserManager', () => {
     expect(restoreScript).toContain('state.setActiveTabType("terminal");')
   })
 
-  it('does not focus the Orca window while preparing a screenshot', async () => {
+  it('does not focus the Orca Lab window while preparing a screenshot', async () => {
     const rendererExecuteJavaScriptMock = vi.fn().mockResolvedValueOnce({
       prevTabType: 'terminal',
       prevActiveWorktreeId: 'wt-1',

@@ -166,7 +166,7 @@ describe('CliInstaller', () => {
       commandPathOverride: installPath,
       userPathReader: async () => ({
         state: 'unknown',
-        detail: 'Orca could not read the Windows user PATH registry value.'
+        detail: 'Orca Lab could not read the Windows user PATH registry value.'
       })
     })
 
@@ -190,7 +190,7 @@ describe('CliInstaller', () => {
       commandPathOverride: join(fixture.root, 'Programs', 'Orca', 'bin', 'orca.cmd'),
       userPathReader: async () => ({
         state: 'unknown',
-        detail: 'Orca could not read the Windows user PATH registry value.'
+        detail: 'Orca Lab could not read the Windows user PATH registry value.'
       }),
       userPathWriter
     })
@@ -286,7 +286,7 @@ describe('CliInstaller', () => {
   it('resolves custom-install packaged Windows command path from resourcesPath', async () => {
     const fixture = await makeFixture()
     const localAppDataPath = join(fixture.root, 'AppData', 'Local')
-    const resourcesPath = join(fixture.root, 'D Custom Orca', 'resources')
+    const resourcesPath = join(fixture.root, 'D Custom Orca Lab', 'resources')
     await mkdir(join(resourcesPath, 'bin'), { recursive: true })
     await writeFile(join(resourcesPath, 'bin', 'orca.exe'), 'native launcher', 'utf8')
 
@@ -296,7 +296,7 @@ describe('CliInstaller', () => {
       resourcesPath,
       localAppDataPath,
       userDataPath: fixture.userDataPath,
-      execPath: join(fixture.root, 'D Custom Orca', 'Orca.exe'),
+      execPath: join(fixture.root, 'D Custom Orca Lab', 'Orca.exe'),
       appPath: fixture.appPath,
       userPathReader: async () => userPathRead(null),
       userPathWriter: async () => {}
@@ -322,7 +322,7 @@ describe('CliInstaller', () => {
       appPath: fixture.appPath,
       userPathReader: async () => ({
         state: 'unknown',
-        detail: 'Orca could not read the Windows user PATH registry value.'
+        detail: 'Orca Lab could not read the Windows user PATH registry value.'
       })
     })
 
@@ -336,7 +336,7 @@ describe('CliInstaller', () => {
   it('does not overwrite the packaged Windows launcher while registering PATH', async () => {
     const fixture = await makeFixture()
     const localAppDataPath = join(fixture.root, 'AppData', 'Local')
-    const resourcesPath = join(fixture.root, 'D Custom Orca', 'resources')
+    const resourcesPath = join(fixture.root, 'D Custom Orca Lab', 'resources')
     const bundledLauncher = join(resourcesPath, 'bin', 'orca.exe')
     const bundledContent = 'native launcher'
     await mkdir(dirname(bundledLauncher), { recursive: true })
@@ -349,7 +349,7 @@ describe('CliInstaller', () => {
       resourcesPath,
       localAppDataPath,
       userDataPath: fixture.userDataPath,
-      execPath: join(fixture.root, 'D Custom Orca', 'Orca.exe'),
+      execPath: join(fixture.root, 'D Custom Orca Lab', 'Orca.exe'),
       appPath: fixture.appPath,
       userPathReader: async () => userPathRead(userPath),
       userPathWriter: async (value) => {
