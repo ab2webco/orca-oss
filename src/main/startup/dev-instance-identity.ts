@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import type { AppIdentity } from '../../shared/app-identity'
+import { APP_DISPLAY_NAME, type AppIdentity } from '../../shared/app-identity'
 
-const BASE_APP_NAME = 'Orca'
+// NOT a display name. Drives app.setName and therefore the macOS safeStorage
+// Keychain item ('<appName> Safe Storage'); renaming it orphans every credential
+// the user already stored. Renames with the appId, not with the product.
+const KEYCHAIN_APP_NAME = 'Orca'
 const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
 const MAX_LABEL_LENGTH = 80
 
@@ -54,8 +57,8 @@ export function getDevInstanceIdentity(
 ): DevInstanceIdentity {
   if (!isDev) {
     return {
-      name: BASE_APP_NAME,
-      appName: BASE_APP_NAME,
+      name: APP_DISPLAY_NAME,
+      appName: KEYCHAIN_APP_NAME,
       isDev: false,
       devLabel: null,
       devBranch: null,
@@ -73,14 +76,14 @@ export function getDevInstanceIdentity(
     cleanEnvValue(path.basename(repoRoot ?? process.cwd()))
   const devLabel = cleanEnvValue(env.ORCA_DEV_INSTANCE_LABEL) ?? formatLabel(branch, worktreeName)
   const dockTitle =
-    cleanEnvValue(env.ORCA_DEV_DOCK_TITLE) ?? `${BASE_APP_NAME}: ${branch ?? devLabel ?? 'dev'}`
+    cleanEnvValue(env.ORCA_DEV_DOCK_TITLE) ?? `${APP_DISPLAY_NAME}: ${branch ?? devLabel ?? 'dev'}`
 
   return {
     name: dockTitle,
     // Why: one stable Keychain key ('Orca Dev Safe Storage') for all dev
     // branches; the per-branch identity still shows via `name` (window title,
     // app menu, renderer label).
-    appName: `${BASE_APP_NAME} Dev`,
+    appName: `${KEYCHAIN_APP_NAME} Dev`,
     isDev: true,
     devLabel,
     devBranch: branch,

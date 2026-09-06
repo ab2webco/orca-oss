@@ -73,7 +73,7 @@ describe('generated agent tab titles', () => {
 
     store.getState().setAgentStatus(paneKey, {
       state: 'working',
-      prompt: `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+      prompt: `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your task ID is: task-1
 
 === CLI COMMANDS ===
@@ -110,7 +110,7 @@ Implement the detailed worker instructions that should not be the short label`,
     const store = createTestStore()
     const tabId = seedWorktree(store, true)
     const paneKey = makePaneKey(tabId, LEAF_ID)
-    const dispatchPrompt = `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+    const dispatchPrompt = `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your task ID is: task-1
 
 === CLI COMMANDS ===
@@ -158,7 +158,7 @@ Implement the detailed worker instructions that should not be the short label`
     // Seed sticky orchestration without a prior generated title (e.g. feature was off).
     store.getState().setAgentStatus(paneKey, {
       state: 'done',
-      prompt: `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+      prompt: `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your task ID is: task-1
 
 === TASK ===
@@ -213,7 +213,7 @@ Old dispatch task that already finished`,
 
     store.getState().setAgentStatus(paneKey, {
       state: 'working',
-      prompt: `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+      prompt: `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your task ID is: task-a
 
 === TASK ===
@@ -232,7 +232,7 @@ Implement task A worker instructions that should not stick`,
 
     store.getState().setAgentStatus(paneKey, {
       state: 'working',
-      prompt: `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+      prompt: `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your task ID is: task-b
 
 === TASK ===

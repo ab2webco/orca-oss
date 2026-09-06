@@ -73,7 +73,7 @@ describe('adoptProvisionedRootSshCheckout', () => {
     })
   })
 
-  it('rejects a recipe checkout on a branch Orca did not request', async () => {
+  it('rejects a recipe checkout on a branch Orca Lab did not request', async () => {
     seedRuntime(userDataPath, projectRoot)
     registerSshGitProvider(connectionId, {
       listWorktrees: vi

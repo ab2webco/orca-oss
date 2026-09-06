@@ -12,12 +12,12 @@ export function classifyRuntimeConnectionError(error: unknown): RuntimeClientErr
   if (code === 'EACCES' || code === 'EPERM') {
     return new RuntimeClientError(
       'runtime_access_denied',
-      'The operating system denied access to the Orca runtime transport. Check the caller sandbox or permissions and retry; this does not mean Orca is not running.'
+      'The operating system denied access to the Orca Lab runtime transport. Check the caller sandbox or permissions and retry; this does not mean Orca Lab is not running.'
     )
   }
   return new RuntimeClientError(
     'runtime_unavailable',
-    'Could not connect to the Orca runtime transport from this shell.',
+    'Could not connect to the Orca Lab runtime transport from this shell.',
     localAttachRecoveryData()
   )
 }
@@ -48,7 +48,7 @@ export async function sendRequest<TResult>(
       reject(
         new RuntimeClientError(
           'runtime_unavailable',
-          'No compatible transport found in Orca runtime metadata.',
+          'No compatible transport found in Orca Lab runtime metadata.',
           localAttachRecoveryData()
         )
       )
@@ -68,7 +68,7 @@ export async function sendRequest<TResult>(
       reject(
         new RuntimeClientError(
           'runtime_timeout',
-          'Timed out waiting for the Orca runtime to respond.'
+          'Timed out waiting for the Orca Lab runtime to respond.'
         )
       )
     }, timeoutMs)
@@ -105,7 +105,7 @@ export async function sendRequest<TResult>(
         ok: false,
         error: new RuntimeClientError(
           'runtime_unavailable',
-          'The Orca runtime closed the connection before responding. Restart Orca and try again.'
+          'The Orca Lab runtime closed the connection before responding. Restart Orca Lab and try again.'
         )
       })
     })
@@ -133,7 +133,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned an invalid response frame.'
+              'The Orca Lab runtime returned an invalid response frame.'
             )
           })
           return
@@ -160,7 +160,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned an invalid response frame.'
+              'The Orca Lab runtime returned an invalid response frame.'
             )
           })
           return
@@ -181,7 +181,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'invalid_runtime_response',
-              'The Orca runtime returned a mismatched response id.'
+              'The Orca Lab runtime returned a mismatched response id.'
             )
           })
           return
@@ -191,7 +191,7 @@ export async function sendRequest<TResult>(
             ok: false,
             error: new RuntimeClientError(
               'runtime_unavailable',
-              'The Orca runtime changed while the request was in flight. Retry the command.'
+              'The Orca Lab runtime changed while the request was in flight. Retry the command.'
             )
           })
           return

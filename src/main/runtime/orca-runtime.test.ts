@@ -40573,7 +40573,7 @@ describe('OrcaRuntimeService', () => {
     ).rejects.toThrow('selector_not_found')
   })
 
-  it('rejects SSH lineage updates when Orca worktree identity is missing', async () => {
+  it('rejects SSH lineage updates when Orca Lab worktree identity is missing', async () => {
     const remoteRepo = {
       id: 'remote-repo',
       path: '/home/user/repo',
@@ -40640,7 +40640,7 @@ describe('OrcaRuntimeService', () => {
     expect(setWorktreeLineage).not.toHaveBeenCalled()
   })
 
-  it('rejects local lineage updates when Orca worktree identity is missing', async () => {
+  it('rejects local lineage updates when Orca Lab worktree identity is missing', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'orca-runtime-lineage-'))
     const repoPath = join(tempRoot, 'repo')
     const childPath = join(tempRoot, 'child')
@@ -40955,7 +40955,7 @@ describe('OrcaRuntimeService', () => {
     expect(removeWorkspaceLineage).toHaveBeenCalledWith(`worktree:${childId}`)
   })
 
-  it('strips Orca provenance fields from runtime metadata updates', async () => {
+  it('strips Orca Lab provenance fields from runtime metadata updates', async () => {
     const metaById: Record<string, WorktreeMeta> = {
       [TEST_WORKTREE_ID]: makeWorktreeMeta({ instanceId: 'child-instance' })
     }
@@ -43262,7 +43262,7 @@ describe('OrcaRuntimeService', () => {
       expect.objectContaining({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
         message:
-          'Worktree created, but Orca could not validate the current directory as a parent context.'
+          'Worktree created, but Orca Lab could not validate the current directory as a parent context.'
       })
     ])
   })
@@ -46955,7 +46955,7 @@ describe('OrcaRuntimeService', () => {
     ["fatal: couldn't find remote ref refs/merge-requests/42/head", 'deleted MR / cleaned fork'],
     ['Authentication failed. Check your remote credentials.', 'auth failure'],
     [
-      'This SSH host is running an older Orca relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.',
+      'This SSH host is running an older Orca Lab relay that cannot fetch merge request heads. Reconnect to deploy the latest relay, then try again.',
       'stale relay'
     ]
   ])('fails hard instead of soft-keeping the durable MR head on: %s', async (message) => {
@@ -48773,7 +48773,7 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  it('force-removes a legacy Orca-created runtime orphaned worktree directory after Git tracking is gone', async () => {
+  it('force-removes a legacy Orca Lab-created runtime orphaned worktree directory after Git tracking is gone', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-runtime-orphan-'))
     const repoPath = join(parentDir, 'repo')
     const orphanPath = join(parentDir, 'orphan')
@@ -48833,7 +48833,7 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  it('prompts then force-removes an Orca-created runtime unregistered leftover directory with no git marker', async () => {
+  it('prompts then force-removes an Orca Lab-created runtime unregistered leftover directory with no git marker', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-runtime-leftover-'))
     const repoPath = join(parentDir, 'repo')
     const leftoverPath = join(parentDir, 'leftover')
@@ -48903,7 +48903,7 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  it('rejects an Orca-created runtime unregistered local directory with a git directory', async () => {
+  it('rejects an Orca Lab-created runtime unregistered local directory with a git directory', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-runtime-standalone-'))
     const repoPath = join(parentDir, 'repo')
     const standalonePath = join(parentDir, 'standalone')

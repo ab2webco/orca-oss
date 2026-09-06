@@ -173,7 +173,7 @@ export function SetupScriptPromptBody({
       <>
         {translate(
           'auto.components.sidebar.SetupScriptPromptCardViews.aef6c0a213',
-          'Save the detected command to run it whenever Orca creates a worktree.'
+          'Save the detected command to run it whenever Orca Lab creates a worktree.'
         )}
       </>
     )
@@ -197,7 +197,7 @@ export function SetupScriptPromptBody({
     <>
       {translate(
         'auto.components.sidebar.SetupScriptPromptCardViews.0a98169776',
-        'Add a setup command to run when Orca creates new worktrees.'
+        'Add a setup command to run when Orca Lab creates new worktrees.'
       )}
     </>
   )

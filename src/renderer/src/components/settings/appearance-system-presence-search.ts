@@ -13,7 +13,7 @@ const getSystemTrayEntryCatalog = createLocalizedCatalog((): SettingsSearchEntry
     ),
     description: translate(
       'auto.components.settings.appearance.search.4d5b9427b5',
-      'When enabled, closing the window keeps Orca running in the system tray instead of quitting.'
+      'When enabled, closing the window keeps Orca Lab running in the system tray instead of quitting.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.appearance.search.tray.tray', 'tray', {
@@ -52,7 +52,7 @@ const getMenuBarIconEntryCatalog = createLocalizedCatalog((): SettingsSearchEntr
     title: translate('settings.appearance.menuBarIcon.title', 'Show Menu Bar Icon'),
     description: translate(
       'settings.appearance.menuBarIcon.description',
-      'Keep an Orca shortcut and activity indicator in the macOS menu bar.'
+      'Keep an Orca Lab shortcut and activity indicator in the macOS menu bar.'
     ),
     keywords: [
       ...translateSearchKeyword('settings.appearance.menuBarIcon.keyword.menuBar', 'menu bar', {

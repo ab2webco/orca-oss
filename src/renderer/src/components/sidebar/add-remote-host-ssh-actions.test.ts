@@ -206,6 +206,6 @@ describe('SSH config picker response admission', () => {
         },
         {} as never
       )
-    ).rejects.toThrow('Restart Orca')
+    ).rejects.toThrow('Restart Orca Lab')
   })
 })

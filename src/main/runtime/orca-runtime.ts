@@ -2077,7 +2077,7 @@ function createTerminalRevealWarning(handle: string, error?: unknown): string {
       ? ` Reason: ${error.message.trim()}.`
       : ''
   return [
-    `Terminal ${handle} is running, but Orca could not make it discoverable.${reason}`,
+    `Terminal ${handle} is running, but Orca Lab could not make it discoverable.${reason}`,
     `Run \`orca terminal focus --terminal ${handle}\` to reveal and focus it.`
   ].join(' ')
 }
@@ -2435,7 +2435,7 @@ function assertProjectHostSetupHostIsSupported(hostId: ExecutionHostId | null | 
     return
   }
   throw new Error(
-    'SSH hosts are not supported by this operation. Set the project up from the Orca desktop app, which owns the SSH connection.'
+    'SSH hosts are not supported by this operation. Set the project up from the Orca Lab desktop app, which owns the SSH connection.'
   )
 }
 
@@ -3776,7 +3776,9 @@ export class OrcaRuntimeService {
       | { experimentalAgentDashboardPopout?: boolean }
       | undefined
     if (settings?.experimentalAgentDashboardPopout !== true) {
-      const error = new Error('The Agent Dashboard popout feature is disabled in this Orca host.')
+      const error = new Error(
+        'The Agent Dashboard popout feature is disabled in this Orca Lab host.'
+      )
       Object.assign(error, { code: 'dashboard_popout_disabled' })
       throw error
     }
@@ -23036,7 +23038,7 @@ export class OrcaRuntimeService {
       warnings.push({
         code: 'LINEAGE_PARENT_CONTEXT_MISSING',
         message:
-          'Worktree created, but Orca could not record lineage because instance identity was unavailable.',
+          'Worktree created, but Orca Lab could not record lineage because instance identity was unavailable.',
         details: {
           childHasInstanceId: Boolean(childInstanceId),
           parentHasInstanceId: Boolean(parentInstanceId),
@@ -31054,7 +31056,8 @@ export class OrcaRuntimeService {
       } catch {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
-          message: 'Worktree created, but Orca could not validate the environment parent context.',
+          message:
+            'Worktree created, but Orca Lab could not validate the environment parent context.',
           details: { envParentWorkspace: input.envParentWorkspace }
         })
       }
@@ -31121,7 +31124,7 @@ export class OrcaRuntimeService {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
           message:
-            'Worktree created, but Orca could not validate the caller terminal as a parent context.',
+            'Worktree created, but Orca Lab could not validate the caller terminal as a parent context.',
           details: { callerTerminalHandle: input.callerTerminalHandle }
         })
       }
@@ -31137,7 +31140,7 @@ export class OrcaRuntimeService {
         warnings.push({
           code: 'LINEAGE_PARENT_CONTEXT_MISSING',
           message:
-            'Worktree created, but Orca could not validate the current directory as a parent context.',
+            'Worktree created, but Orca Lab could not validate the current directory as a parent context.',
           details: { cwdParentWorktree: input.cwdParentWorktree }
         })
       }
@@ -31161,7 +31164,8 @@ export class OrcaRuntimeService {
         warnings: [
           {
             code: 'LINEAGE_PARENT_CONTEXT_CONFLICT',
-            message: 'Worktree created, but Orca could not prove which parent context caused it.',
+            message:
+              'Worktree created, but Orca Lab could not prove which parent context caused it.',
             details: {
               terminalParentWorkspaceKey: candidates.find((c) => c.source === 'terminal-context')
                 ?.parent.workspaceKey,
@@ -35602,7 +35606,7 @@ export class OrcaRuntimeService {
       if (!worktree) {
         throw new LinearAgentAccessError(
           'linear_issue_required',
-          'Run --current from inside an Orca-managed worktree or pass an issue id.'
+          'Run --current from inside an Orca Lab-managed worktree or pass an issue id.'
         )
       }
     }
@@ -35610,7 +35614,7 @@ export class OrcaRuntimeService {
     if (!worktree) {
       throw new LinearAgentAccessError(
         'linear_issue_required',
-        'Run --current from inside an Orca-managed worktree or pass an issue id.'
+        'Run --current from inside an Orca Lab-managed worktree or pass an issue id.'
       )
     }
 
@@ -35754,7 +35758,7 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the state change, but Orca could not confirm it.',
+            'Linear may have applied the state change, but Orca Lab could not confirm it.',
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the current state before retrying.`
@@ -35802,7 +35806,7 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the relation change, but Orca could not confirm it.',
+            'Linear may have applied the relation change, but Orca Lab could not confirm it.',
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --relations --workspace ${target.workspaceId} --json\` before retrying.`
@@ -35881,7 +35885,7 @@ export class OrcaRuntimeService {
           (cause) =>
             linearError(
               'linear_write_unconfirmed',
-              'Linear may have applied the issue save, but Orca could not confirm it.',
+              'Linear may have applied the issue save, but Orca Lab could not confirm it.',
               {
                 nextSteps: [
                   `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` before retrying.`
@@ -35930,7 +35934,7 @@ export class OrcaRuntimeService {
         (cause) =>
           linearError(
             'linear_write_unconfirmed',
-            'Linear may have applied the task update, but Orca could not confirm it.',
+            'Linear may have applied the task update, but Orca Lab could not confirm it.',
             {
               nextSteps: [
                 `Run \`orca linear issue ${target.issue.identifier} --workspace ${target.workspaceId} --json\` and check the updated field before retrying.`
@@ -36944,7 +36948,7 @@ export class OrcaRuntimeService {
     }
     if (isLinearAuthError(error)) {
       return linearError('linear_auth_expired', 'Linear authentication expired.', {
-        nextSteps: ['Reconnect Linear from Orca settings.']
+        nextSteps: ['Reconnect Linear from Orca Lab settings.']
       })
     }
     return linearError(classifyLinearError(error), linearMessage(error))
@@ -37266,7 +37270,7 @@ export class OrcaRuntimeService {
     }
     if (teams.length === 0 && (getLinearStatus().workspaces?.length ?? 0) === 0) {
       throw linearError('linear_not_connected', 'Linear is not connected.', {
-        nextSteps: ['Connect Linear from Orca settings, then retry the issue create.']
+        nextSteps: ['Connect Linear from Orca Lab settings, then retry the issue create.']
       })
     }
     const matches = teams.filter(
@@ -37471,7 +37475,7 @@ export class OrcaRuntimeService {
           : ''
     return linearError(
       'linear_write_unconfirmed',
-      'Linear may have applied the write, but Orca could not confirm it.',
+      'Linear may have applied the write, but Orca Lab could not confirm it.',
       {
         writeId,
         workspaceId,

@@ -41,7 +41,7 @@ function mockFetchJson(value: unknown): void {
   })
 }
 
-describe('Orca cloud client', () => {
+describe('Orca Lab cloud client', () => {
   beforeEach(() => {
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)

@@ -119,7 +119,7 @@ describe('packaged CLI entry redirect', () => {
 
       expect(result).toEqual({ redirected: true, status: 1 })
       expect(stderrWrite).toHaveBeenCalledWith(
-        `Unable to locate the Orca CLI entrypoint at ${cliEntryPath}\n`
+        `Unable to locate the Orca Lab CLI entrypoint at ${cliEntryPath}\n`
       )
       expect(spawn).not.toHaveBeenCalled()
     } finally {
@@ -147,7 +147,7 @@ describe('packaged CLI entry redirect', () => {
 
       expect(result).toEqual({ redirected: true, status: 1 })
       expect(stderrWrite).toHaveBeenCalledWith(
-        'Unable to start the Orca CLI through Electron node mode.\n'
+        'Unable to start the Orca Lab CLI through Electron node mode.\n'
       )
       expect(spawn).not.toHaveBeenCalled()
     } finally {

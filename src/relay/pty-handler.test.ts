@@ -291,7 +291,7 @@ describe('PtyHandler', () => {
     expect(handler.activePtyCount).toBe(1)
   })
 
-  it("does not forward Orca's own NODE_ENV into the spawned shell", async () => {
+  it("does not forward Orca Lab's own NODE_ENV into the spawned shell", async () => {
     // Why: NODE_ENV in the relay host process is a build-mode flag, not the
     // user's; leaking it breaks `next build` and Vitest in the terminal.
     const previous = process.env.NODE_ENV
@@ -334,7 +334,7 @@ describe('PtyHandler', () => {
     expect(spawnOptions.env.NODE_ENV).toBe('production')
   })
 
-  it("does not forward Orca's own Claude Code child-session marker into the spawned shell", async () => {
+  it("does not forward Orca Lab's own Claude Code child-session marker into the spawned shell", async () => {
     // Why: a relay host launched from inside a Claude Code session inherits
     // its marker; leaking it makes `claude` in the spawned shell falsely
     // detect a child session and disable transcript saving.

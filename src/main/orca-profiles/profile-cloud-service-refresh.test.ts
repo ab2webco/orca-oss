@@ -111,7 +111,7 @@ function mockSuccessfulConnect(expiresAt = futureExpiresAt()): void {
   } satisfies OrcaCloudSessionExchangeResponse)
 }
 
-describe('Orca cloud profile service session refresh', () => {
+describe('Orca Lab cloud profile service session refresh', () => {
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-cloud-service-refresh-'))
     beginOrcaCloudPkceFlowMock.mockReset()

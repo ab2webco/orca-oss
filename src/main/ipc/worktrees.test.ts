@@ -854,7 +854,7 @@ describe('registerWorktreeHandlers', () => {
     ])
   }
 
-  it('strips Orca provenance fields from renderer metadata updates', () => {
+  it('strips Orca Lab provenance fields from renderer metadata updates', () => {
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
 
     const result = handlers['worktrees:updateMeta'](null, {
@@ -2100,7 +2100,7 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
-  it('keeps the Orca-created marker when a new worktree reuses an Orca-created fork remote', async () => {
+  it('keeps the Orca Lab-created marker when a new worktree reuses an Orca Lab-created fork remote', async () => {
     listWorktreesMock.mockResolvedValue([
       {
         path: '/workspace/improve-dashboard',
@@ -9668,7 +9668,7 @@ describe('registerWorktreeHandlers', () => {
     expect(forceDeleteLocalBranchMock).not.toHaveBeenCalled()
   })
 
-  it('removes an unused Orca-created fork remote after deleting its worktree', async () => {
+  it('removes an unused Orca Lab-created fork remote after deleting its worktree', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
@@ -9700,7 +9700,7 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
-  it('keeps an Orca-created fork remote while another worktree still uses it', async () => {
+  it('keeps an Orca Lab-created fork remote while another worktree still uses it', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
@@ -9863,7 +9863,7 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
-  it('force-removes a legacy Orca-created orphaned worktree directory after Git tracking is gone', async () => {
+  it('force-removes a legacy Orca Lab-created orphaned worktree directory after Git tracking is gone', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-orphan-'))
     const repoPath = join(parentDir, 'repo')
     const orphanPath = join(parentDir, 'orphan')
@@ -9910,7 +9910,7 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('prompts for force before removing an Orca-created orphaned worktree directory', async () => {
+  it('prompts for force before removing an Orca Lab-created orphaned worktree directory', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-orphan-'))
     const repoPath = join(parentDir, 'repo')
     const orphanPath = join(parentDir, 'orphan')
@@ -9949,7 +9949,7 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('prompts then force-removes an Orca-created unregistered leftover directory with no git marker', async () => {
+  it('prompts then force-removes an Orca Lab-created unregistered leftover directory with no git marker', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-leftover-'))
     const repoPath = join(parentDir, 'repo')
     const leftoverPath = join(parentDir, 'leftover')
@@ -10005,7 +10005,7 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('rejects an Orca-created unregistered local directory with a git directory', async () => {
+  it('rejects an Orca Lab-created unregistered local directory with a git directory', async () => {
     const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-standalone-'))
     const repoPath = join(parentDir, 'repo')
     const standalonePath = join(parentDir, 'standalone')

@@ -200,7 +200,7 @@ describe('rich Markdown HTML superscript links', () => {
     expect(parseHtmlSuperscriptLinkSource('<sup><a href="a" href="b">[1]</a></sup>')).toBeNull()
   })
 
-  it('renders inert live DOM while exposing link semantics through Orca context', () => {
+  it('renders inert live DOM while exposing link semantics through Orca Lab context', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const source = '<sup><a href="https://example.com">[12]</a></sup>'

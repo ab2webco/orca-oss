@@ -32,7 +32,7 @@ export const getPrivacyPaneSearchEntries = createLocalizedCatalog(() => [
     ),
     description: translate(
       'auto.components.settings.privacy.search.b707cc3981',
-      'Help improve Orca by sending anonymous feature-usage events.'
+      'Help improve Orca Lab by sending anonymous feature-usage events.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.privacy.search.77d3180def', 'telemetry'),

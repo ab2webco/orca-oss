@@ -100,7 +100,7 @@ function makeSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings {
 }
 
 describe('worktree ownership classification', () => {
-  it('treats explicit Orca metadata as managed even outside the workspace root', () => {
+  it('treats explicit Orca Lab metadata as managed even outside the workspace root', () => {
     const repo = makeRepo()
     const settings = makeSettings()
     expect(
@@ -114,7 +114,7 @@ describe('worktree ownership classification', () => {
     ).toBe('orca-managed')
   })
 
-  it('treats nested Orca workspace paths without metadata as external', () => {
+  it('treats nested Orca Lab workspace paths without metadata as external', () => {
     const repo = makeRepo()
     const settings = makeSettings()
     const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
@@ -136,7 +136,7 @@ describe('worktree ownership classification', () => {
     ).toBe('external')
   })
 
-  it('treats explicit Orca creation layout metadata as managed', () => {
+  it('treats explicit Orca Lab creation layout metadata as managed', () => {
     const repo = makeRepo()
     const settings = makeSettings()
     expect(
@@ -152,7 +152,7 @@ describe('worktree ownership classification', () => {
     ).toBe('orca-managed')
   })
 
-  it('does not treat metadata-free nested workspace paths as Orca-managed for new repos', () => {
+  it('does not treat metadata-free nested workspace paths as Orca Lab-managed for new repos', () => {
     const repo = makeRepo({ externalWorktreeVisibility: 'hide' })
     const settings = makeSettings()
     const detected = toDetectedWorktree({
@@ -169,7 +169,7 @@ describe('worktree ownership classification', () => {
     expect(detected.visible).toBe(false)
   })
 
-  it('does not treat generic discovery metadata on nested workspace paths as Orca-managed', () => {
+  it('does not treat generic discovery metadata on nested workspace paths as Orca Lab-managed', () => {
     const repo = makeRepo({ externalWorktreeVisibility: 'hide' })
     const settings = makeSettings()
     const detected = toDetectedWorktree({
@@ -516,7 +516,7 @@ describe('agent scratch worktrees', () => {
     ).toBe('agent-scratch')
   })
 
-  it('keeps strong Orca metadata authoritative over the scratch path match', () => {
+  it('keeps strong Orca Lab metadata authoritative over the scratch path match', () => {
     const repo = makeRepo()
     const settings = makeSettings()
     expect(

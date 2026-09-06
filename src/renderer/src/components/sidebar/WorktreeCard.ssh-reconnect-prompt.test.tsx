@@ -232,7 +232,7 @@ describe('WorktreeCard SSH reconnect prompt', () => {
     expect(markup).toContain('Remote Mac disconnected')
   })
 
-  it('distinguishes connected worktrees on different Orca servers', () => {
+  it('distinguishes connected worktrees on different Orca Lab servers', () => {
     runtimeEnvironments = [
       { id: 'env-1', name: 'Remote Mac' },
       { id: 'env-2', name: 'Build Linux' }

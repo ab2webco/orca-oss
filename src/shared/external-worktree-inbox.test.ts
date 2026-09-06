@@ -207,7 +207,7 @@ describe('external worktree inbox', () => {
     expect(getHiddenImportableExternalWorktrees(undefined)).toEqual([])
   })
 
-  it('offers metadata-free nested Orca workspace worktrees through the inbox', () => {
+  it('offers metadata-free nested Orca Lab workspace worktrees through the inbox', () => {
     const settings = makeSettings()
     const manual = toDetectedWorktree({
       repo,

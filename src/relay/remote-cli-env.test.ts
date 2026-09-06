@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { pickRemoteCliEnv } from './remote-cli-env'
 
 describe('pickRemoteCliEnv', () => {
-  it('forwards SSH Orca terminal and worktree context for remote CLI calls', () => {
+  it('forwards SSH Orca Lab terminal and worktree context for remote CLI calls', () => {
     expect(
       pickRemoteCliEnv({
         ORCA_TERMINAL_HANDLE: 'term_ssh',

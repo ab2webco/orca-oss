@@ -145,7 +145,7 @@ describe('spurious shell readings on Codex-launched panes', () => {
     expect(useAppStore.getState().codexRestartNoticeByPtyId).toEqual({})
   })
 
-  it('never spends the fresh scan on a pane Orca did not launch Codex in', async () => {
+  it('never spends the fresh scan on a pane Orca Lab did not launch Codex in', async () => {
     seedPane()
 
     await markLiveCodexSessionsForRestart({

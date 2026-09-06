@@ -26,7 +26,7 @@ describe('plugin skill candidate scan', () => {
     await Promise.all(
       ['one', 'two'].map(async (vendor) => {
         await mkdir(join(root, vendor, 'orca-cli'), { recursive: true })
-        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca CLI\n')
+        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca Lab CLI\n')
       })
     )
 
@@ -44,7 +44,7 @@ describe('plugin skill candidate scan', () => {
     await Promise.all(
       ['one', 'two'].map(async (vendor) => {
         await mkdir(join(root, vendor, 'orca-cli'), { recursive: true })
-        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca CLI\n')
+        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca Lab CLI\n')
       })
     )
 
@@ -108,7 +108,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.codex-plugin', 'plugin.json'),
       '{"skills":["./a-skills","./missing-one","./missing-two"]}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
     return { root, candidate }
   }
 
@@ -159,7 +159,7 @@ describe('plugin skill candidate scan', () => {
       { recursive: true }
     )
     await writeFile(join(packageRoot, '.codex-plugin', 'plugin.json'), '{"skills":"./skills/"}\n')
-    await writeFile(join(skill, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(skill, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -175,7 +175,7 @@ describe('plugin skill candidate scan', () => {
     await mkdir(join(packageRoot, '.codex-plugin'), { recursive: true })
     await mkdir(skill, { recursive: true })
     await writeFile(join(packageRoot, '.codex-plugin', 'plugin.json'), '{"skills":"./skills/"}\n')
-    await writeFile(join(skill, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(skill, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -202,7 +202,7 @@ describe('plugin skill candidate scan', () => {
     await mkdir(buried, { recursive: true })
     await writeFile(join(packageRoot, '.codex-plugin', 'plugin.json'), '{"skills":"./skills"}\n')
     await writeFile(join(skill, 'SKILL.md'), '# Sites building\n')
-    await writeFile(join(buried, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(buried, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -242,7 +242,7 @@ describe('plugin skill candidate scan', () => {
       }
       const candidate = join(parent, 'orca-cli')
       await mkdir(candidate, { recursive: true })
-      await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+      await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
       const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -303,7 +303,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.codex-plugin', 'plugin.json'),
       '{"skills":["./custom-skills","./skills"]}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -321,7 +321,7 @@ describe('plugin skill candidate scan', () => {
     await mkdir(join(packageRoot, '.claude-plugin'), { recursive: true })
     await mkdir(candidate, { recursive: true })
     await writeFile(join(packageRoot, '.claude-plugin', 'plugin.json'), '{"name":"plugin"}\n')
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -342,7 +342,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.codex-plugin', 'plugin.json'),
       '{"skills":"custom-skills"}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -393,7 +393,7 @@ describe('plugin skill candidate scan', () => {
     await mkdir(join(skillRoot, 'templates', 'orca-cli'), { recursive: true })
     await writeFile(join(packageRoot, '.claude-plugin', 'plugin.json'), '{"skills":"./skills"}\n')
     await writeFile(join(skillRoot, 'SKILL.md'), '# Sites building\n')
-    await writeFile(join(skillRoot, 'templates', 'orca-cli', 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(skillRoot, 'templates', 'orca-cli', 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -414,7 +414,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.codex-plugin', 'plugin.json'),
       '{"skills":"./..\\\\outside"}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -440,7 +440,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.claude-plugin', 'plugin.json'),
       '{"skills":"./custom-skills"}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -458,7 +458,7 @@ describe('plugin skill candidate scan', () => {
     const candidate = join(packageRoot, 'r0000', 'orca-cli')
     await mkdir(join(packageRoot, '.codex-plugin'), { recursive: true })
     await mkdir(candidate, { recursive: true })
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
     await writeFile(
       manifestPath,
       JSON.stringify({
@@ -491,7 +491,7 @@ describe('plugin skill candidate scan', () => {
       '{"skills":["./custom-skills",7]}\n'
     )
     await writeFile(join(defaultCandidate, 'SKILL.md'), '# Wrong root\n')
-    await writeFile(join(declaredCandidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(declaredCandidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -512,7 +512,7 @@ describe('plugin skill candidate scan', () => {
     }
     const hiddenCandidate = join(pluginRoot, 'orca-cli')
     await mkdir(hiddenCandidate, { recursive: true })
-    await writeFile(join(hiddenCandidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(hiddenCandidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -539,7 +539,7 @@ describe('plugin skill candidate scan', () => {
       join(packageRoot, '.claude-plugin', 'plugin.json'),
       '{"skills":"./custom-skills"}\n'
     )
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -703,7 +703,7 @@ describe('plugin skill candidate scan', () => {
     await Promise.all(
       ['zz-one', 'zz-two'].map(async (vendor) => {
         await mkdir(join(root, vendor, 'orca-cli'), { recursive: true })
-        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca CLI\n')
+        await writeFile(join(root, vendor, 'orca-cli', 'SKILL.md'), '# Orca Lab CLI\n')
       })
     )
 
@@ -740,7 +740,7 @@ describe('plugin skill candidate scan', () => {
       )
     )
     await mkdir(candidate, { recursive: true })
-    await writeFile(join(candidate, 'SKILL.md'), '# Orca CLI\n')
+    await writeFile(join(candidate, 'SKILL.md'), '# Orca Lab CLI\n')
 
     const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
 
@@ -822,7 +822,7 @@ describe('plugin skill candidate scan', () => {
       const linkPath = join(root, 'vendor')
       await mkdir(join(outside, 'orca-cli'), { recursive: true })
       await mkdir(root, { recursive: true })
-      await writeFile(join(outside, 'orca-cli', 'SKILL.md'), '# Orca CLI\n')
+      await writeFile(join(outside, 'orca-cli', 'SKILL.md'), '# Orca Lab CLI\n')
       await symlink(outside, linkPath, 'dir')
 
       const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))
@@ -844,7 +844,7 @@ describe('plugin skill candidate scan', () => {
       const outsideSkillFile = join(parent, 'outside', 'SKILL.md')
       await mkdir(skill, { recursive: true })
       await mkdir(join(parent, 'outside'), { recursive: true })
-      await writeFile(outsideSkillFile, '# Orca CLI\n')
+      await writeFile(outsideSkillFile, '# Orca Lab CLI\n')
       await symlink(outsideSkillFile, join(skill, 'SKILL.md'), 'file')
 
       const result = await scanKnownPluginSkillCandidates(root, new Set(['orca-cli']))

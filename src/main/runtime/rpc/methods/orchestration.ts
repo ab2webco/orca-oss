@@ -574,7 +574,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           ) {
             throw new OrchestrationError(
               'capability_unsupported',
-              `Federated Dispatch ${dispatchId} does not support coordinator control mail; start a fresh worker after updating its Orca server.`
+              `Federated Dispatch ${dispatchId} does not support coordinator control mail; start a fresh worker after updating its Orca Lab server.`
             )
           }
           if (db.getWorkerDispatch(dispatchId)?.state !== 'ready') {

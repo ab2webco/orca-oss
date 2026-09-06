@@ -235,7 +235,7 @@ describe('registerPtyHandlers', () => {
       const env = await spawnAndGetEnv(undefined, { ORCA_APP_VERSION: undefined })
       expect(env.TERM_PROGRAM_VERSION).toBe('0.0.0-dev')
     })
-    it('injects the selected Codex home into Orca terminal PTYs', async () => {
+    it('injects the selected Codex home into Orca Lab terminal PTYs', async () => {
       const env = await withBundledCli(() =>
         spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
       )

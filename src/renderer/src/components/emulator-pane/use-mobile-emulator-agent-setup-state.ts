@@ -159,7 +159,7 @@ export function useMobileEmulatorAgentSetupState(enabled = true): {
         toast.message(
           translate(
             'auto.components.emulator.pane.use.mobile.emulator.agent.setup.state.9dff3a6338',
-            'Skill is installed. Enable the Orca CLI to finish setup.'
+            'Skill is installed. Enable the Orca Lab CLI to finish setup.'
           )
         )
         return
@@ -168,7 +168,7 @@ export function useMobileEmulatorAgentSetupState(enabled = true): {
         toast.message(
           translate(
             'auto.components.emulator.pane.use.mobile.emulator.agent.setup.state.15986a1080',
-            'Orca CLI is ready. Install the skill to finish setup.'
+            'Orca Lab CLI is ready. Install the skill to finish setup.'
           )
         )
         return
@@ -207,7 +207,7 @@ export function useMobileEmulatorAgentSetupState(enabled = true): {
         toast.success(
           translate(
             'auto.components.emulator.pane.use.mobile.emulator.agent.setup.state.2b519eed94',
-            'Registered the Orca CLI in PATH.'
+            'Registered the Orca Lab CLI in PATH.'
           )
         )
       }

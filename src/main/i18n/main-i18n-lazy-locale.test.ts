@@ -79,15 +79,28 @@ describe('main-i18n lazy locale loading', () => {
         resourceLanguage: pluginLanguageResourceId(id),
         pluginKey: 'orca-samples.portuguese',
         locale: 'pt-BR',
-        catalog: { menu: { file: 'Arquivo Orca' } }
+        catalog: { menu: { file: 'Arquivo Orca Lab' } }
       }
     ])
 
     await setMainUiLanguage(id)
-    expect(translateMain('menu.file', 'File')).toBe('Arquivo Orca')
+    expect(translateMain('menu.file', 'File')).toBe('Arquivo Orca Lab')
 
     setMainPluginLanguagePacks([])
     expect(await setMainUiLanguage(id)).toBe('en')
     expect(translateMain('menu.file', 'File')).toBe('File')
+  })
+})
+
+describe('main-i18n before init', () => {
+  it('interpolates the caller fallback, so no {{placeholder}} reaches the UI', async () => {
+    // The macOS app menu registers before the async init resolves, so an
+    // uninterpolated fallback would ship 'About {{name}}' as a menu label.
+    vi.resetModules()
+    const { translateMain: uninitialized } = await import('./main-i18n')
+
+    expect(uninitialized('menu.about', 'About {{name}}', { name: 'Orca Lab' })).toBe(
+      'About Orca Lab'
+    )
   })
 })

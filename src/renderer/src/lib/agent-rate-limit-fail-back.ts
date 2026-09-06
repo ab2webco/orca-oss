@@ -208,7 +208,7 @@ export async function runRateLimitFailBack(args: {
       reason: 'stop-failed',
       message: translate(
         'auto.lib.agentRateLimitFailBack.stopFailed',
-        'The endpoint agent did not exit after Ctrl+C, so Orca left the terminal untouched.'
+        'The endpoint agent did not exit after Ctrl+C, so Orca Lab left the terminal untouched.'
       )
     }
   }

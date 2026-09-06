@@ -72,7 +72,7 @@ export function AddRemoteHostSshConfigPicker({
         <DialogDescription>
           {translate(
             'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerDescription',
-            'Pick a host to fill the form, or add every new host to Orca’s host list.'
+            'Pick a host to fill the form, or add every new host to Orca Lab’s host list.'
           )}
         </DialogDescription>
       </DialogHeader>
@@ -199,7 +199,7 @@ export function AddRemoteHostSshConfigPicker({
                     >
                       {translate(
                         'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerInOrca',
-                        'In Orca'
+                        'In Orca Lab'
                       )}
                     </Badge>
                   ) : host.previouslyRemoved ? (
@@ -209,7 +209,7 @@ export function AddRemoteHostSshConfigPicker({
                     >
                       {translate(
                         'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerPreviouslyRemoved',
-                        'Removed from Orca'
+                        'Removed from Orca Lab'
                       )}
                     </Badge>
                   ) : null}
@@ -246,7 +246,7 @@ export function AddRemoteHostSshConfigPicker({
             : newHostCount > 0
               ? translate(
                   'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerAddAll',
-                  'Add all {{value0}} to Orca',
+                  'Add all {{value0}} to Orca Lab',
                   { value0: newHostCount }
                 )
               : // Why: the remainder can be already-in-Orca or merely tombstoned, so the
@@ -258,7 +258,7 @@ export function AddRemoteHostSshConfigPicker({
                   )
                 : translate(
                     'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerAddAllEmpty',
-                    'Add all to Orca'
+                    'Add all to Orca Lab'
                   )}
         </Button>
         <Button

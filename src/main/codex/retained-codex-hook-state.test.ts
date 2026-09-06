@@ -13,7 +13,7 @@ function status(state: 'installed' | 'not_installed' | 'error'): AgentHookInstal
 }
 
 describe('retained Codex hook state', () => {
-  it('repairs Orca hooks before a retained shell can launch Codex', () => {
+  it('repairs Orca Lab hooks before a retained shell can launch Codex', () => {
     const install = vi.fn(() => status('installed'))
     const refreshRuntimeUserHooks = vi.fn(() => status('not_installed'))
 
@@ -29,7 +29,7 @@ describe('retained Codex hook state', () => {
     expect(refreshRuntimeUserHooks).not.toHaveBeenCalled()
   })
 
-  it('removes only Orca hooks from retained homes when hooks are disabled', () => {
+  it('removes only Orca Lab hooks from retained homes when hooks are disabled', () => {
     const install = vi.fn(() => status('installed'))
     const refreshRuntimeUserHooks = vi.fn(() => status('not_installed'))
 

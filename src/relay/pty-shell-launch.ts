@@ -84,7 +84,7 @@ function ensureOverlayRestoreWrappers(root: string): void {
   const zshDir = join(root, 'zsh')
   const bashDir = join(root, 'bash')
 
-  const zshEnv = `# Orca relay zsh overlay wrapper
+  const zshEnv = `# Orca Lab relay zsh overlay wrapper
 ${SHELL_STARTUP_IDENTITY_MARKER_BLOCK}
 export ORCA_ORIG_ZDOTDIR="\${ORCA_ORIG_ZDOTDIR:-$HOME}"
 case "\${ORCA_ORIG_ZDOTDIR%/}" in
@@ -97,13 +97,13 @@ case "\${ORCA_USER_ZDOTDIR%/}" in
 esac
 export ZDOTDIR=${quotePosixSingle(zshDir)}
 `
-  const zshProfile = `# Orca relay zsh overlay wrapper
+  const zshProfile = `# Orca Lab relay zsh overlay wrapper
 ${getZshStartupFileSourceBlock({
   fileName: '.zprofile',
   homeExpression: '"${ORCA_USER_ZDOTDIR:-${ORCA_ORIG_ZDOTDIR:-$HOME}}"'
 })}
 `
-  const zshRc = `# Orca relay zsh overlay wrapper
+  const zshRc = `# Orca Lab relay zsh overlay wrapper
 ${getZshStartupFileSourceBlock({
   fileName: '.zshrc',
   homeExpression: '"${ORCA_USER_ZDOTDIR:-${ORCA_ORIG_ZDOTDIR:-$HOME}}"',
@@ -120,7 +120,7 @@ if [[ ! -o login ]]; then
 ${getZshFinalZdotdirRestoreBlock('"${ORCA_USER_ZDOTDIR:-${ORCA_ORIG_ZDOTDIR:-$HOME}}"')}
 fi
 `
-  const zshLogin = `# Orca relay zsh overlay wrapper
+  const zshLogin = `# Orca Lab relay zsh overlay wrapper
 ${getZshStartupFileSourceBlock({
   fileName: '.zlogin',
   homeExpression: '"${ORCA_USER_ZDOTDIR:-${ORCA_ORIG_ZDOTDIR:-$HOME}}"',
@@ -134,7 +134,7 @@ ${getPosixOmpShellWrapper()}
 ${getZshFinalZdotdirRestoreBlock('"${ORCA_USER_ZDOTDIR:-${ORCA_ORIG_ZDOTDIR:-$HOME}}"')}
 ${getZshShellReadyMarkerRegistrationBlock(SHELL_READY_MARKER_ESCAPED)}
 `
-  const bashRc = `# Orca relay bash overlay wrapper
+  const bashRc = `# Orca Lab relay bash overlay wrapper
 ${SHELL_STARTUP_IDENTITY_MARKER_BLOCK}
 [[ -f /etc/profile ]] && source /etc/profile
 if [[ -f "$HOME/.bash_profile" ]]; then
@@ -144,7 +144,7 @@ elif [[ -f "$HOME/.bash_login" ]]; then
 elif [[ -f "$HOME/.profile" ]]; then
   source "$HOME/.profile"
 fi
-# Why: enable bracketed paste so Orca can deliver a multiline startup prompt as
+# Why: enable bracketed paste so Orca Lab can deliver a multiline startup prompt as
 # a single literal paste (ESC[200~…ESC[201~); without it, older readline builds
 # treat each embedded newline as Enter and mangle the prompt into PS2
 # continuation. Modern readline defaults this on; force it for the rest.
@@ -196,7 +196,7 @@ __orca_normalize_prompt_command() {
     PROMPT_COMMAND="$__orca_joined"
   fi
   # Why: RHEL-family /etc/bashrc can leave an inherited PROMPT_COMMAND ending in
-  # a ";"/whitespace separator; trim it so Orca's prepend/append never form ";;".
+  # a ";"/whitespace separator; trim it so Orca Lab's prepend/append never form ";;".
   while [[ "\${PROMPT_COMMAND:-}" == *[[:space:]\\;] ]]; do
     PROMPT_COMMAND="\${PROMPT_COMMAND%?}"
   done

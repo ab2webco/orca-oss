@@ -704,7 +704,7 @@ describe('linked transcript stores', () => {
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID, copiedFileCount: 2 })
   })
 
-  it('refuses a source projects link that points outside Orca’s store', () => {
+  it('refuses a source projects link that points outside Orca Lab’s store', () => {
     const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
     const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
     const sourceAuthPath = createManagedUniverse(source.id)
@@ -724,7 +724,7 @@ describe('linked transcript stores', () => {
     expect(result).toEqual({ ok: false, reason: 'source-not-found' })
   })
 
-  it('refuses a target projects link that points outside Orca’s store', () => {
+  it('refuses a target projects link that points outside Orca Lab’s store', () => {
     const source = makeAccount({ id: 'source-oauth', authMethod: 'subscription-oauth' })
     const target = makeAccount({ id: 'target-oauth', authMethod: 'subscription-oauth' })
     const sourceAuthPath = createManagedUniverse(source.id)

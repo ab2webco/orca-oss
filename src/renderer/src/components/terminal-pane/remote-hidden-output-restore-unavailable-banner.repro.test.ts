@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetAgentStartupDelayedDeliveryForTests } from '@/lib/agent-startup-delayed-delivery'
 
 // Deterministic reproduction for issue2-hidden-output-skip:
-//   "[Orca skipped hidden terminal output because main recovery was unavailable.]"
+//   "[Orca Lab skipped hidden terminal output because main recovery was unavailable.]"
 //   printed into a live remote-runtime agent pane.
 //
 // Topology modeled (renderer contract level, per reproduce-orca-remote-server-issues):

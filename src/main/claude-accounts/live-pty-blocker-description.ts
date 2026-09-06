@@ -163,8 +163,8 @@ export function buildGlobalTerminalLaunchBlockMessage(
   if (unknownOwnerBlockers.length > 0) {
     const subject =
       unknownOwnerBlockers.length === 1
-        ? 'A global Claude terminal whose account Orca could not read'
-        : 'Global Claude terminals whose account Orca could not read'
+        ? 'A global Claude terminal whose account Orca Lab could not read'
+        : 'Global Claude terminals whose account Orca Lab could not read'
     sentences.push(
       `${subject} blocks every assigned account until it exits (${joinTerminalDescriptions(unknownOwnerBlockers)}).`
     )

@@ -175,7 +175,7 @@ describe('FileExplorerRow collapse folder action', () => {
     await copyFileToOsClipboard(fileNode, 'ssh-1')
 
     expect(toastErrorMock).toHaveBeenCalledWith(
-      "Could not copy the file because Orca's temporary storage is unavailable"
+      "Could not copy the file because Orca Lab's temporary storage is unavailable"
     )
   })
 

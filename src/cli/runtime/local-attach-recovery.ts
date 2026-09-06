@@ -8,11 +8,11 @@
 // Deliberately platform-neutral: on Linux the command is `orca-ide`, and one
 // string is easier to keep correct than a per-platform pair.
 export const LOCAL_ATTACH_NEXT_STEPS: readonly string[] = [
-  "Check whether Orca is already running with 'orca status --json'.",
-  'To use the CLI from a shell Orca does not manage, generate a pairing code in the Orca app, then run ' +
+  "Check whether Orca Lab is already running with 'orca status --json'.",
+  'To use the CLI from a shell Orca Lab does not manage, generate a pairing code in the Orca Lab app, then run ' +
     "'orca environment add --name <name> --pairing-code <code>' once.",
   "Then pass '--environment <name>' on each command, or export ORCA_ENVIRONMENT=<name>.",
-  "If Orca is not running at all, start it with 'orca open'."
+  "If Orca Lab is not running at all, start it with 'orca open'."
 ]
 
 /**

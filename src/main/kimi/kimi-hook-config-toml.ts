@@ -21,7 +21,7 @@ export const KIMI_HOOK_EVENTS = [
   'StopFailure'
 ] as const
 
-const BLOCK_START = '# >>> orca-managed-kimi-hooks (managed by Orca; do not edit) >>>'
+const BLOCK_START = '# >>> orca-managed-kimi-hooks (managed by Orca Lab; do not edit) >>>'
 const BLOCK_END = '# <<< orca-managed-kimi-hooks <<<'
 
 function escapeRegExp(value: string): string {

@@ -254,7 +254,7 @@ describe('`account list` per-terminal Claude account', () => {
     expect(callMock).toHaveBeenCalledWith('accounts.terminalClaudeAccount', {
       terminal: 'orca-terminal-99'
     })
-    expect(printed()).toContain("Orca's shared runtime auth")
+    expect(printed()).toContain("Orca Lab's shared runtime auth")
     expect(printed()).toContain('[orca-terminal-99]')
   })
 

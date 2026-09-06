@@ -28,7 +28,7 @@ export type AgentProviderSessionKey = 'session_id' | 'conversation_id'
  *  home. The renderer matches on this exact text (Electron invoke only carries
  *  `message`) to degrade to a read-only transcript instead of a blank pane. */
 export const CODEX_RESUME_BLOCKED_MESSAGE =
-  'Orca could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.'
+  'Orca Lab could not verify the originating Codex session file, so automatic resume was stopped to avoid using a different account.'
 
 export function isCodexResumeBlockedError(message: string): boolean {
   return message.includes(CODEX_RESUME_BLOCKED_MESSAGE)

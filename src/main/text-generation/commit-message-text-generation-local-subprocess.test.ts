@@ -261,7 +261,7 @@ describe('generateCommitMessageFromContext', () => {
       expect(result).toEqual({
         success: false,
         error:
-          'C:/tools/agent.cmd cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca sends the prompt on stdin.'
+          'C:/tools/agent.cmd cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca Lab sends the prompt on stdin.'
       })
       expect(spawnMock).not.toHaveBeenCalled()
     })

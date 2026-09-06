@@ -164,9 +164,9 @@ const { getLinuxRootPackageTypeMock, recordUpdaterLifecycleMock } = vi.hoisted((
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
 const DARWIN_PRE_COMMIT_INSTALL_FAILURE =
-  'Could not restart to install the update. Quit and reopen Orca, then try again.'
+  'Could not restart to install the update. Quit and reopen Orca Lab, then try again.'
 const NON_DARWIN_PRE_COMMIT_INSTALL_FAILURE =
-  'Could not start the update installer. Orca remains open.'
+  'Could not start the update installer. Orca Lab remains open.'
 // Why a function, not a constant: cases that pin process.platform do it inside the
 // test body, long after a module-level constant has already read the host's real
 // platform — which made the linux-pinned case below assert macOS copy on a Mac.
@@ -4119,7 +4119,8 @@ describe('updater', () => {
       expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
-        message: 'Could not restart to install the update. Quit and reopen Orca, then try again.'
+        message:
+          'Could not restart to install the update. Quit and reopen Orca Lab, then try again.'
       })
       expect(updater.isQuittingForUpdate()).toBe(false)
     })
@@ -4219,7 +4220,7 @@ describe('updater', () => {
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
         message:
-          'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+          'The downloaded package no longer matches the verified release, so Orca Lab will not hand it to a package manager. Download the update again, or get it from the official release page.'
       })
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
         'linux_package_revalidation_failed',
@@ -4245,7 +4246,7 @@ describe('updater', () => {
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
         message:
-          'The downloaded package no longer matches the verified release, so Orca will not hand it to a package manager. Download the update again, or get it from the official release page.'
+          'The downloaded package no longer matches the verified release, so Orca Lab will not hand it to a package manager. Download the update again, or get it from the official release page.'
       })
       expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
       expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
@@ -4328,7 +4329,7 @@ describe('updater', () => {
       expect(lastStatus(send)).toEqual({
         state: 'error',
         message:
-          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.',
+          'Orca Lab could not read the downloaded package. Download the update again, or get it from the official release page.',
         recovery: {
           kind: 'linux-package-install',
           packageType: 'deb',
@@ -4355,7 +4356,7 @@ describe('updater', () => {
       expect(lastStatus(send)).toMatchObject({
         state: 'error',
         message:
-          'Orca could not read the downloaded package. Download the update again, or get it from the official release page.'
+          'Orca Lab could not read the downloaded package. Download the update again, or get it from the official release page.'
       })
 
       updater.quitAndInstall()

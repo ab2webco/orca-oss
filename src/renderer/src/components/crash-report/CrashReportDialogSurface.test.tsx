@@ -112,7 +112,7 @@ describe('CrashReportDialogSurface', () => {
   it('hands the crash to the fork issue form instead of uploading it', async () => {
     const { onReportChange } = renderSurface()
     fireEvent.change(
-      screen.getByPlaceholderText('Optional: what were you doing before Orca closed?'),
+      screen.getByPlaceholderText('Optional: what were you doing before Orca Lab closed?'),
       {
         target: { value: 'died on resume' }
       }

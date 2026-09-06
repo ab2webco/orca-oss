@@ -84,7 +84,7 @@ describe('agent-context over the live registry', () => {
     expect(agentContext?.flags).not.toContain('page')
   })
 
-  it('marks raw passthrough commands without synthesizing Orca flags', () => {
+  it('marks raw passthrough commands without synthesizing Orca Lab flags', () => {
     const schema = buildAgentContext(COMMAND_SPECS)
     const claudeTeams = schema.commands.find((command) => command.command === 'claude-teams')
     expect(claudeTeams?.argumentMode).toBe('passthrough')

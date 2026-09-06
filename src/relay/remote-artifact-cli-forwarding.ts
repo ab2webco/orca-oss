@@ -33,7 +33,7 @@ export function assertRemoteArtifactCliForwardingFits(
 ): void {
   if (remoteArtifactCliForwardingFrameBytes(params) > DISPATCHER_CONTROL_QUEUE_MAX_BYTES) {
     throw new Error(
-      'Artifact is too large for the Orca SSH transport. Use the browser upload page instead.'
+      'Artifact is too large for the Orca Lab SSH transport. Use the browser upload page instead.'
     )
   }
 }

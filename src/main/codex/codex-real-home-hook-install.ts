@@ -78,7 +78,7 @@ function assertHooksJsonGeneration(
   if (currentRaw !== expectedRaw || resolveHooksJsonWritePath(hooksJsonPath) !== hooksWritePath) {
     // Why: the pre-mutation RPC can overlap a user's editor save. Abort rather
     // than atomically replacing a newer file with the stale parsed snapshot.
-    throw new Error('Codex hooks.json changed while Orca prepared its trust repair')
+    throw new Error('Codex hooks.json changed while Orca Lab prepared its trust repair')
   }
 }
 
@@ -334,7 +334,7 @@ function sweepRealHomeCodexHook(): RealHomeCodexHookLane {
         timeoutSec: MANAGED_HOOK_TIMEOUT_SECONDS
       })
     } catch (error) {
-      console.warn('[codex-real-home-hooks] failed to drop Orca trust entries:', error)
+      console.warn('[codex-real-home-hooks] failed to drop Orca Lab trust entries:', error)
     }
   }
   return 'removed'

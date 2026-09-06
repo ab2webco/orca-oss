@@ -40,7 +40,7 @@ describe('dashboard popout RPC methods', () => {
     )
 
     expect(() => runtime.setDashboardPopoutOpen(true)).toThrow(
-      'The Agent Dashboard popout feature is disabled in this Orca host.'
+      'The Agent Dashboard popout feature is disabled in this Orca Lab host.'
     )
   })
 

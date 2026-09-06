@@ -58,12 +58,12 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
       'orca plane issue ORCA-25 --children --project <projectId> --json'
     ],
     notes: [
-      'Pass --current instead of an id to target the Plane work item linked to the current Orca worktree.'
+      'Pass --current instead of an id to target the Plane work item linked to the current Orca Lab worktree.'
     ]
   },
   {
     path: ['plane', 'link'],
-    summary: 'Link the current Orca worktree to a Plane work item',
+    summary: 'Link the current Orca Lab worktree to a Plane work item',
     usage: 'orca plane link <id> --project <id> [--workspace <id>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'project', 'workspace', 'id'],
     positionalArgs: ['id'],

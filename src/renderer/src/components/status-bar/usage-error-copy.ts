@@ -129,13 +129,13 @@ export function getProviderUsageErrorMessage(p: ProviderRateLimits): string {
   if (delegatedCliProvider === 'grok') {
     return translate(
       'auto.components.status.bar.tooltip.d1b7f509ac',
-      'Run grok in a terminal on the computer running Orca and wait for it to start. If prompted, complete sign-in, then retry usage. You do not need to send a chat message.'
+      'Run grok in a terminal on the computer running Orca Lab and wait for it to start. If prompted, complete sign-in, then retry usage. You do not need to send a chat message.'
     )
   }
   if (delegatedCliProvider === 'kimi') {
     return translate(
       'auto.components.status.bar.tooltip.a37e8c15d4',
-      'Run kimi in a terminal on the computer running Orca and wait for it to start, then retry usage.'
+      'Run kimi in a terminal on the computer running Orca Lab and wait for it to start, then retry usage.'
     )
   }
   if (p.provider === 'claude') {

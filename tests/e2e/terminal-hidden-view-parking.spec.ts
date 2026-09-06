@@ -333,7 +333,7 @@ test.describe('Terminal hidden view parking', () => {
       expect(content).toContain('╭')
       expect(content).toContain('├')
       expect(content).toContain('█')
-      expect(content).not.toContain('Orca skipped hidden terminal output')
+      expect(content).not.toContain('Orca Lab skipped hidden terminal output')
 
       // Why: the typed marker only appears joined in command *output*, so this
       // proves the revealed terminal accepts input end-to-end, not just echo.
@@ -536,7 +536,7 @@ test.describe('Terminal hidden view parking', () => {
           .toContain(marker)
         const rows = terminalContentRows(await getTerminalContent(orcaPage, 12_000))
         // Garble sentinel: the hidden-skip banner must never appear.
-        expect(rows.join('\n')).not.toContain('Orca skipped hidden terminal output')
+        expect(rows.join('\n')).not.toContain('Orca Lab skipped hidden terminal output')
         return rows
       }
 

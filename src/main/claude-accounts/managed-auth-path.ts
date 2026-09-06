@@ -84,7 +84,7 @@ export function writeClaudeManagedAuthFile(
 ): void {
   const filePath = resolve(managedAuthPath, filename)
   if (existsSync(filePath) && !isOwnedChildFile(managedAuthPath, filePath)) {
-    throw new Error('Managed Claude auth child file is not owned by Orca.')
+    throw new Error('Managed Claude auth child file is not owned by Orca Lab.')
   }
   writeFileAtomically(filePath, contents, { mode: 0o600 })
 }

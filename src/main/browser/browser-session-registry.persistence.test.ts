@@ -35,7 +35,7 @@ function installModuleMocks(
   const sessionFromPartitionMock = vi.fn((partition: string) => ({
     partition,
     setUserAgent: vi.fn(),
-    getUserAgent: vi.fn(() => 'Mozilla/5.0 Electron/31 Orca'),
+    getUserAgent: vi.fn(() => 'Mozilla/5.0 Electron/31 Orca Lab'),
     setPermissionRequestHandler: vi.fn(),
     setPermissionCheckHandler: vi.fn(),
     setDevicePermissionHandler: vi.fn(),
@@ -184,7 +184,7 @@ describe('BrowserSessionRegistry persistence', () => {
     expect(fsState.present.has(legacyPath)).toBe(false)
   })
 
-  it('persists new browser session profiles under the active Orca profile directory', async () => {
+  it('persists new browser session profiles under the active Orca Lab profile directory', async () => {
     const fsState = createFsState()
     const profileMetaPath = '/user-data/profiles/local-work/browser-session-meta.json'
 
@@ -218,8 +218,11 @@ describe('BrowserSessionRegistry persistence', () => {
     browserSessionRegistry.createProfile('isolated', 'Default identity')
 
     const profileSession = sessionFromPartitionMock.mock.results.at(-1)?.value
-    expect(profileSession.setUserAgent).toHaveBeenCalledWith('Mozilla/5.0 Orca')
-    expect(setupClientHintsOverrideMock).toHaveBeenCalledWith(profileSession, 'Mozilla/5.0 Orca')
+    expect(profileSession.setUserAgent).toHaveBeenCalledWith('Mozilla/5.0 Orca Lab')
+    expect(setupClientHintsOverrideMock).toHaveBeenCalledWith(
+      profileSession,
+      'Mozilla/5.0 Orca Lab'
+    )
   })
 
   it('leaves UA and client hints untouched for native-mode profiles', async () => {
@@ -390,7 +393,7 @@ describe('BrowserSessionRegistry persistence', () => {
     expect(appliedUas).not.toContain(validUa)
     // Why: every non-native profile falls to Orca's own cleaned engine UA.
     expect(appliedUas.length).toBeGreaterThan(0)
-    expect(appliedUas.every((ua) => ua === 'Mozilla/5.0 Orca')).toBe(true)
+    expect(appliedUas.every((ua) => ua === 'Mozilla/5.0 Orca Lab')).toBe(true)
     expect(
       setupClientHintsOverrideMock.mock.calls.every(
         (c: unknown[]) => c[1] !== brokenUa && c[1] !== validUa

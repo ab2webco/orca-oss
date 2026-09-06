@@ -58,7 +58,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
       }
       return result
     } catch (err) {
-      console.error('Failed to create Orca cloud profile:', err)
+      console.error('Failed to create Orca Lab cloud profile:', err)
       toast.error(
         translate('auto.store.slices.orca.profiles.f0c9e11a6d', 'Failed to create cloud profile'),
         {
@@ -106,7 +106,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
       }
       return result
     } catch (err) {
-      console.error('Failed to connect Orca profile:', err)
+      console.error('Failed to connect Orca Lab profile:', err)
       set({ orcaProfileConnecting: false })
       toast.error(
         translate('auto.store.slices.orca.profiles.33290e88ed', 'Failed to connect profile'),
@@ -142,7 +142,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
       }
       return result
     } catch (err) {
-      console.error('Failed to refresh Orca profile auth:', err)
+      console.error('Failed to refresh Orca Lab profile auth:', err)
       toast.error(
         translate('auto.store.slices.orca.profiles.2f6c78a039', 'Failed to refresh profile auth'),
         {
@@ -166,7 +166,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
       )
       return result
     } catch (err) {
-      console.error('Failed to sign out of Orca profile:', err)
+      console.error('Failed to sign out of Orca Lab profile:', err)
       toast.error(translate('auto.store.slices.orca.profiles.83600521e7', 'Failed to sign out'), {
         description: err instanceof Error ? err.message : String(err)
       })
@@ -198,7 +198,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
       }
       return result
     } catch (err) {
-      console.error('Failed to switch Orca profile org:', err)
+      console.error('Failed to switch Orca Lab profile org:', err)
       toast.error(
         translate('auto.store.slices.orca.profiles.76deec8f58', 'Failed to switch organization'),
         {

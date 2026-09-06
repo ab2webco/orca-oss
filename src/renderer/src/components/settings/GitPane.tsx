@@ -27,7 +27,7 @@ import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 export { getGitPaneSearchEntries }
 
 const KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION =
-  'When you create a workspace, Orca refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. Orca skips the update if that branch has uncommitted changes or local-only commits.'
+  'When you create a workspace, Orca Lab refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. Orca Lab skips the update if that branch has uncommitted changes or local-only commits.'
 const KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS = [
   'main',
   'master',
@@ -259,7 +259,7 @@ export function GitPane({
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.GitPane.976afc6b3e',
-              'When you create a workspace, Orca refreshes the remote base and safely fast-forwards your matching local branch, such as'
+              'When you create a workspace, Orca Lab refreshes the remote base and safely fast-forwards your matching local branch, such as'
             )}{' '}
             <code>{translate('auto.components.settings.GitPane.ffba483bae', 'main')}</code>{' '}
             {translate('auto.components.settings.GitPane.5bf885be48', 'or')}{' '}
@@ -273,7 +273,7 @@ export function GitPane({
             </code>{' '}
             {translate(
               'auto.components.settings.GitPane.36e3de3619',
-              'from comparing against stale history. Orca skips the update if that branch has uncommitted changes or local-only commits.'
+              'from comparing against stale history. Orca Lab skips the update if that branch has uncommitted changes or local-only commits.'
             )}
           </p>
         </div>
@@ -325,10 +325,10 @@ export function GitPane({
       />
     ) : null,
     matchesSettingsSearch(searchQuery, {
-      title: translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Attribution'),
+      title: translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Lab Attribution'),
       description: translate(
         'auto.components.settings.GitPane.d2eede4c54',
-        'Add Orca attribution to commits, PRs, and issues.'
+        'Add Orca Lab attribution to commits, PRs, and issues.'
       ),
       keywords: [
         translate('auto.components.settings.GitPane.32dca11189', 'github'),
@@ -343,27 +343,30 @@ export function GitPane({
     }) ? (
       <SearchableSetting
         key="github-attribution"
-        title={translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Attribution')}
+        title={translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Lab Attribution')}
         description={translate(
           'auto.components.settings.GitPane.d2eede4c54',
-          'Add Orca attribution to commits, PRs, and issues.'
+          'Add Orca Lab attribution to commits, PRs, and issues.'
         )}
         keywords={['github', 'gh', 'pr', 'issue', 'co-author', 'coauthored', 'attribution', 'orca']}
         className="flex items-center justify-between gap-4 py-2"
       >
         <div className="space-y-0.5">
           <Label>
-            {translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Attribution')}
+            {translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Lab Attribution')}
           </Label>
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.GitPane.d2eede4c54',
-              'Add Orca attribution to commits, PRs, and issues.'
+              'Add Orca Lab attribution to commits, PRs, and issues.'
             )}
           </p>
         </div>
         <Switch
-          aria-label={translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Attribution')}
+          aria-label={translate(
+            'auto.components.settings.GitPane.e02ea23a32',
+            'Orca Lab Attribution'
+          )}
           checked={settings.enableGitHubAttribution}
           onCheckedChange={(checked) =>
             updateSettings({

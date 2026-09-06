@@ -88,7 +88,7 @@ export function handleTerminalHttpLink(
     destination === 'orca'
       ? translate(
           'auto.components.terminal.pane.TerminalLinkActionPopover.orcaBrowser',
-          'Orca Browser'
+          'Orca Lab Browser'
         )
       : translate(
           'auto.components.terminal.pane.TerminalLinkActionPopover.systemBrowser',

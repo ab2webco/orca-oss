@@ -8,7 +8,7 @@ export const INTROSPECTION_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca agent-context [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
     notes: [
-      'Pure local read of the command registry — works without a running Orca app, so it is safe over SSH and in headless contexts.'
+      'Pure local read of the command registry — works without a running Orca Lab app, so it is safe over SSH and in headless contexts.'
     ],
     examples: ['orca agent-context --json']
   }

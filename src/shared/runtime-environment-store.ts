@@ -249,7 +249,7 @@ function readEnvironmentStore(userDataPath: string): RuntimeEnvironmentStore {
   } catch {
     throw new RuntimeEnvironmentStoreError(
       'runtime_error',
-      `Could not read Orca environments at ${path}; the file is invalid.`
+      `Could not read Orca Lab environments at ${path}; the file is invalid.`
     )
   }
 }
@@ -266,7 +266,7 @@ function writeEnvironmentStore(userDataPath: string, store: RuntimeEnvironmentSt
     if (error instanceof JsonStringifyByteLimitError) {
       throw new RuntimeEnvironmentStoreError(
         'runtime_error',
-        `Could not write Orca environments at ${path}; the store exceeds its durable capacity.`
+        `Could not write Orca Lab environments at ${path}; the store exceeds its durable capacity.`
       )
     }
     throw error

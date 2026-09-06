@@ -188,7 +188,7 @@ describe('isExplainedTerminalError', () => {
     ).toBe(true)
   })
 
-  it('keeps the issue link for errors Orca cannot explain', () => {
+  it('keeps the issue link for errors Orca Lab cannot explain', () => {
     expect(isExplainedTerminalError('Paste failed.')).toBe(false)
     expect(isExplainedTerminalError('node-pty: open_slave failed: EMFILE')).toBe(false)
     expect(isExplainedTerminalError('terminal_gone')).toBe(false)
@@ -241,7 +241,7 @@ describe('shouldOfferDaemonRestart', () => {
   it('matches stale daemon node-pty install failures', () => {
     expect(
       shouldOfferDaemonRestart(
-        "Daemon's node-pty install is gone (worktree deleted?). Restart Orca. node-pty: posix_spawn failed: ENOENT (errno 2, No such file or directory) - helper='/Applications/Orca.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/build/Release/spawn-helper'"
+        "Daemon's node-pty install is gone (worktree deleted?). Restart Orca Lab. node-pty: posix_spawn failed: ENOENT (errno 2, No such file or directory) - helper='/Applications/Orca.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/build/Release/spawn-helper'"
       )
     ).toBe(true)
   })
@@ -249,7 +249,7 @@ describe('shouldOfferDaemonRestart', () => {
   it('matches stale daemon cwd failures', () => {
     expect(
       shouldOfferDaemonRestart(
-        "Daemon's working directory is gone (worktree deleted?). Restart Orca. node-pty: daemon_cwd failed: ENOENT (errno 2, No such file or directory) - cwd='<unavailable>'"
+        "Daemon's working directory is gone (worktree deleted?). Restart Orca Lab. node-pty: daemon_cwd failed: ENOENT (errno 2, No such file or directory) - cwd='<unavailable>'"
       )
     ).toBe(true)
   })

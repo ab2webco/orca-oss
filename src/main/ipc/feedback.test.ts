@@ -32,7 +32,7 @@ describe('buildFeedbackIssueDraft', () => {
     expect(titleOf(draft.url)).toBe('Terminals hang on resume')
     expect(bodyOf(draft.url)).toBe(draft.body)
     expect(draft.body).toContain('Terminals hang on resume')
-    expect(draft.body).toContain('Orca 1.4.160-lab.30 ·')
+    expect(draft.body).toContain('Orca Lab 1.4.160-lab.30 ·')
     expect(draft.body).toContain('25.6.0')
   })
 
@@ -59,6 +59,6 @@ describe('buildFeedbackIssueDraft', () => {
   })
 
   it('falls back to a generic title when the report is blank', () => {
-    expect(titleOf(buildFeedbackIssueDraft('   ').url)).toBe('Orca feedback')
+    expect(titleOf(buildFeedbackIssueDraft('   ').url)).toBe('Orca Lab feedback')
   })
 })

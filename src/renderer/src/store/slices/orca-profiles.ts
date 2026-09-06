@@ -59,7 +59,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
         orcaProfilesLoading: false
       })
     } catch (err) {
-      console.error('Failed to fetch Orca profiles:', err)
+      console.error('Failed to fetch Orca Lab profiles:', err)
       set({ orcaProfilesLoading: false })
     }
   },
@@ -70,7 +70,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
       set({ orcaProfileAuthStatus: authStatus })
       return authStatus
     } catch (err) {
-      console.error('Failed to fetch Orca profile auth status:', err)
+      console.error('Failed to fetch Orca Lab profile auth status:', err)
       return null
     }
   },
@@ -85,7 +85,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
       void get().fetchOrcaProfileAuthStatus()
       return state.profile
     } catch (err) {
-      console.error('Failed to create Orca profile:', err)
+      console.error('Failed to create Orca Lab profile:', err)
       toast.error(
         translate('auto.store.slices.orca.profiles.612f7f6861', 'Failed to create profile'),
         {
@@ -112,7 +112,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
       }
       return result
     } catch (err) {
-      console.error('Failed to switch Orca profile:', err)
+      console.error('Failed to switch Orca Lab profile:', err)
       set({ orcaProfileSwitching: false })
       toast.error(
         translate('auto.store.slices.orca.profiles.7d4bc516ee', 'Failed to switch profile'),
@@ -140,7 +140,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
       }
       return result
     } catch (err) {
-      console.error('Failed to transfer Orca profile project:', err)
+      console.error('Failed to transfer Orca Lab profile project:', err)
       toast.error(
         translate('auto.store.slices.orca.profiles.f03ae7f27b', 'Failed to transfer project'),
         {

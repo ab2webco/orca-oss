@@ -219,7 +219,7 @@ export function readOrcaCloudSession(
     return {
       status: 'decrypt-failed',
       persistence: 'none',
-      error: 'Could not decrypt saved Orca account session.'
+      error: 'Could not decrypt saved Orca Lab account session.'
     }
   }
 }

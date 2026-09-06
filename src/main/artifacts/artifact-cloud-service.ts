@@ -86,7 +86,7 @@ function authContext(
         !isArtifactShareLifecycleCurrent(active.profile.id, userDataPath, lifecycleGeneration)
       ) {
         throw new Error(
-          'The signed-in Orca account changed while the artifact request was running.'
+          'The signed-in Orca Lab account changed while the artifact request was running.'
         )
       }
     }
@@ -99,7 +99,7 @@ function storedSessionAuthContext(
   userDataPath: string
 ): ArtifactAuthContext {
   if (!active.profile.cloud) {
-    throw new Error('The active Orca profile is not linked to a cloud account.')
+    throw new Error('The active Orca Lab profile is not linked to a cloud account.')
   }
   return authContext(
     active,
@@ -205,7 +205,7 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error('This file has not been shared from the active Orca Lab profile.')
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()
@@ -247,7 +247,7 @@ export class ArtifactCloudService {
           auth.scope
         )
         if (!record) {
-          throw new Error('This file has not been shared from the active Orca profile.')
+          throw new Error('This file has not been shared from the active Orca Lab profile.')
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()

@@ -221,7 +221,7 @@ export function FileExplorerRowContextMenu({
           <Globe />
           {translate(
             'auto.components.right.sidebar.FileExplorerRow.dd112c81d2',
-            'Open in Orca Browser'
+            'Open in Orca Lab Browser'
           )}
         </ContextMenuItem>
       )}

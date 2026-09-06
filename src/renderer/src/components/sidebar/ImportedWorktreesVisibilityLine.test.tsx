@@ -64,7 +64,7 @@ describe('ImportedWorktreesVisibilityLine', () => {
     )
     expect(markup).toContain('aria-expanded="false"')
     expect(markup).not.toContain('Imported 4 existing worktrees')
-    expect(markup).not.toContain('Orca found 4 worktrees')
+    expect(markup).not.toContain('Orca Lab found 4 worktrees')
     expect(markup).not.toContain('repo options')
     expect(markup).not.toContain('Reveal')
     expect(markup).not.toContain('Always show')

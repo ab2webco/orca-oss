@@ -112,7 +112,7 @@ function CardHeader(props: { providerLabel: string; range: string }): React.JSX.
         </div>
         <div style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fafafa', lineHeight: 1.2 }}>
-            {translate('auto.components.stats.ShareUsageCard.0eb31e79ee', 'Orca IDE')}
+            {translate('auto.components.stats.ShareUsageCard.0eb31e79ee', 'Orca Lab IDE')}
           </div>
           <div style={{ fontSize: 10, color: '#555', letterSpacing: 0.3 }}>
             {props.providerLabel}{' '}

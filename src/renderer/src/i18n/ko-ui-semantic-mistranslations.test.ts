@@ -5,7 +5,7 @@ import ko from './locales/ko.json'
 
 const correctedValues = {
   'auto.components.settings.AutoRenameBranchFromWorkSetting.d9b65054ef':
-    ') 작업을 요약하는 짧은 이름으로 변경됩니다. Orca가 직접 이름 붙인 브랜치만 이름을 바꾸며, 푸시된 후에는 이름을 바꾸지 않습니다.',
+    ') 작업을 요약하는 짧은 이름으로 변경됩니다. Orca Lab이 직접 이름 붙인 브랜치만 이름을 바꾸며, 푸시된 후에는 이름을 바꾸지 않습니다.',
   'auto.components.settings.source.control.action.recipe.options.commitMessage':
     '스테이징된 변경 사항에서 commit 메시지를 생성합니다.',
   'auto.components.settings.DevToolsPane.orcaCloudDescription':

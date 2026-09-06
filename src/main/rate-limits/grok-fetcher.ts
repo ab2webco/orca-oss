@@ -256,7 +256,7 @@ export async function fetchGrokRateLimits(
     // on its next run, so don't tell users to re-run `grok login` (#8497).
     return result(
       'error',
-      'Grok sign-in expired — run grok on the computer running Orca; sign in if prompted. No chat message is needed.',
+      'Grok sign-in expired — run grok on the computer running Orca Lab; sign in if prompted. No chat message is needed.',
       { failureKind: 'delegated-refresh-required', source: 'oauth' }
     )
   }

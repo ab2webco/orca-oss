@@ -100,7 +100,7 @@ describe('remote artifact CLI forwarding admission', () => {
     )
     expect(() => assertRemoteArtifactCliForwardingFits(fitting)).not.toThrow()
     expect(() => assertRemoteArtifactCliForwardingFits(oversized)).toThrow(
-      /too large for the Orca SSH transport/
+      /too large for the Orca Lab SSH transport/
     )
   })
 
@@ -121,7 +121,7 @@ describe('remote artifact CLI forwarding admission', () => {
 
     expect(Buffer.byteLength(params.stdin ?? '', 'utf8')).toBeLessThan(ARTIFACT_CLI_MAX_RPC_BYTES)
     expect(() => assertRemoteArtifactCliForwardingFits(params)).toThrow(
-      /too large for the Orca SSH transport/
+      /too large for the Orca Lab SSH transport/
     )
   })
 })

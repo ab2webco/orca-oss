@@ -54,7 +54,7 @@ function legacyManagedHookCommand(): string {
 }
 
 describe('CodexHookService', () => {
-  it('removes legacy Orca-managed hooks from system ~/.codex during install', () => {
+  it('removes legacy Orca Lab-managed hooks from system ~/.codex during install', () => {
     const systemCodexHome = join(homes.tmpHome, '.codex')
     const systemHooksPath = join(systemCodexHome, 'hooks.json')
     const legacyCommand = legacyManagedHookCommand()
@@ -117,7 +117,7 @@ describe('CodexHookService', () => {
     expect(systemToml).not.toContain(':session_start:0:0')
   })
 
-  it('removes very large legacy Orca-managed hook lists from system ~/.codex', () => {
+  it('removes very large legacy Orca Lab-managed hook lists from system ~/.codex', () => {
     const systemCodexHome = join(homes.tmpHome, '.codex')
     const systemHooksPath = join(systemCodexHome, 'hooks.json')
     const legacyCommand = legacyManagedHookCommand()
@@ -151,7 +151,7 @@ describe('CodexHookService', () => {
     expect(systemHooks.hooks.Stop).toBeUndefined()
   }, 30_000)
 
-  it('removes the legacy Orca Codex profile file when it only contains managed hooks', () => {
+  it('removes the legacy Orca Lab Codex profile file when it only contains managed hooks', () => {
     const systemCodexHome = join(homes.tmpHome, '.codex')
     const profilePath = join(systemCodexHome, 'orca-agent-status.config.toml')
     mkdirSync(systemCodexHome, { recursive: true })
@@ -162,7 +162,7 @@ describe('CodexHookService', () => {
     expect(existsSync(profilePath)).toBe(false)
   })
 
-  it('removes only the legacy Orca block from a user-edited Codex profile file', () => {
+  it('removes only the legacy Orca Lab block from a user-edited Codex profile file', () => {
     const systemCodexHome = join(homes.tmpHome, '.codex')
     const profilePath = join(systemCodexHome, 'orca-agent-status.config.toml')
     mkdirSync(systemCodexHome, { recursive: true })

@@ -3,7 +3,7 @@ const APPIMAGE_CLI_SCRIPT = [
   'try{',
   'const path=require("path");',
   'const appDir=process.env.APPDIR;',
-  'if(!appDir){console.error("Orca AppImage runtime did not set APPDIR.");process.exit(1);}',
+  'if(!appDir){console.error("Orca Lab AppImage runtime did not set APPDIR.");process.exit(1);}',
   'const cli=path.join(appDir,"resources","app.asar.unpacked","out","cli","index.js");',
   'await Promise.resolve(require(cli).main(process.argv.slice(1)));',
   '}catch(error){',
@@ -19,8 +19,8 @@ export function buildAppImageCliWrapper(appImagePath: string): string {
 set -euo pipefail
 APPIMAGE=${quoteShell(appImagePath)}
 if [ ! -f "$APPIMAGE" ]; then
-  echo "Orca AppImage not found at $APPIMAGE" >&2
-  echo "If you moved the AppImage, re-run CLI registration from Orca Settings." >&2
+  echo "Orca Lab AppImage not found at $APPIMAGE" >&2
+  echo "If you moved the AppImage, re-run CLI registration from Orca Lab Settings." >&2
   exit 1
 fi
 export ORCA_NODE_OPTIONS="\${NODE_OPTIONS-}"

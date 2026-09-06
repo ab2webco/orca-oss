@@ -613,7 +613,7 @@ describe('upsertHookTrustEntries', () => {
     expect(written).not.toContain('sha256:OLD')
   })
 
-  it('finds and replaces a legacy forward-slash block when Orca upserts with native backslash key', () => {
+  it('finds and replaces a legacy forward-slash block when Orca Lab upserts with native backslash key', () => {
     // Why: Codex 0.140 exposes Windows keys with either separator depending on cwd, so replace both.
     const backslashPath = 'C:\\Users\\Rod\\AppData\\Roaming\\orca\\hooks.json'
     const legacyKey = `${backslashPath.replace(/\\/g, '/')}:session_start:0:0`
@@ -681,7 +681,7 @@ describe('upsertHookTrustEntries', () => {
     expect(written).not.toContain(`[hooks.state.'C:\\Users\\O'Connor`)
   })
 
-  it('finds a Codex-written block with lowercased username when Orca key has mixed-case username', () => {
+  it('finds a Codex-written block with lowercased username when Orca Lab key has mixed-case username', () => {
     // Why: realpathSync.native casing can differ from what Codex wrote, so case-fold to replace not duplicate.
     const lowercasePath = 'C:\\Users\\rod\\AppData\\Roaming\\orca\\hooks.json'
     const mixedCasePath = 'C:\\Users\\Rod\\AppData\\Roaming\\orca\\hooks.json'

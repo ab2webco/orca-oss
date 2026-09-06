@@ -63,7 +63,7 @@ export function SkillRepairReview({
         <p className="text-xs leading-5 text-muted-foreground">
           {translate(
             'auto.components.skills.SkillRepairReview.description',
-            'Orca will keep a recoverable backup, then reinstall through the official installer.'
+            'Orca Lab will keep a recoverable backup, then reinstall through the official installer.'
           )}
         </p>
       </div>

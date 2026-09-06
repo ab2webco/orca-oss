@@ -245,7 +245,7 @@ export default function ArtifactsPage(): React.JSX.Element {
                 {needsReconnect
                   ? translate(
                       'auto.components.artifacts.ArtifactsPage.reconnectHeading',
-                      'Sign in to Orca again'
+                      'Sign in to Orca Lab again'
                     )
                   : translate(
                       'auto.components.artifacts.ArtifactsPage.signInHeading',
@@ -260,7 +260,7 @@ export default function ArtifactsPage(): React.JSX.Element {
                     )
                   : translate(
                       'auto.components.artifacts.ArtifactsPage.signInCopy',
-                      'Use your Orca account to upload artifacts and manage their public links.'
+                      'Use your Orca Lab account to upload artifacts and manage their public links.'
                     )}
               </p>
             </div>
@@ -275,7 +275,7 @@ export default function ArtifactsPage(): React.JSX.Element {
                       )
                     : translate(
                         'auto.components.artifacts.ArtifactsPage.signIn',
-                        'Sign in to Orca'
+                        'Sign in to Orca Lab'
                       )}
               </Button>
             ) : (
@@ -283,7 +283,7 @@ export default function ArtifactsPage(): React.JSX.Element {
                 <p className="max-w-sm text-xs leading-5 text-muted-foreground">
                   {translate(
                     'auto.components.artifacts.ArtifactsPage.unconfiguredCopy',
-                    'Orca account sign-in is not configured on this machine yet.'
+                    'Orca Lab account sign-in is not configured on this machine yet.'
                   )}
                 </p>
                 <Button variant="outline" size="sm" onClick={openAccountSettings}>

@@ -1,5 +1,5 @@
 export const AMP_PLUGIN_FILE = 'orca-agent-status.ts'
-export const AMP_PLUGIN_MARKER = 'Managed by Orca. Do not edit; changes may be overwritten.'
+export const AMP_PLUGIN_MARKER = 'Managed by Orca Lab. Do not edit; changes may be overwritten.'
 
 export function getAmpPluginSource(): string {
   return [
@@ -48,7 +48,7 @@ export function getAmpPluginSource(): string {
     '}',
     '',
     'function resolveHookCoords(): HookCoords {',
-    '  // Why: Amp sessions can outlive an Orca restart; the endpoint file is',
+    '  // Why: Amp sessions can outlive an Orca Lab restart; the endpoint file is',
     '  // rewritten on each start, so read it per event before falling back to env.',
     '  const fileEnv = readEndpointFile() ?? {}',
     '  return {',
@@ -115,7 +115,7 @@ export function getAmpPluginSource(): string {
     '      })',
     '    })',
     '  } catch {',
-    '    // Why: Orca status reporting must never affect the Amp run.',
+    '    // Why: Orca Lab status reporting must never affect the Amp run.',
     '  } finally {',
     '    clearTimeout(timeout)',
     '  }',
@@ -144,7 +144,7 @@ export function getAmpPluginSource(): string {
     '}',
     'function enqueuePost(hookEventName: string, payload: Record<string, unknown>): void {',
     '  // Why: keep hook callbacks non-blocking without retaining unbounded',
-    '  // payload closures when Orca is down and each POST waits for timeout.',
+    '  // payload closures when Orca Lab is down and each POST waits for timeout.',
     '  if (postQueue.length >= MAX_PENDING_POSTS) {',
     '    postQueue.shift()',
     '  }',

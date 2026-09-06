@@ -433,7 +433,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnMock.mock.calls.at(-1)?.[0]).toBe(PWSH7_ABS)
     })
 
-    it('marks Orca terminal handle for WSL import when buildSpawnEnv opts in', async () => {
+    it('marks Orca Lab terminal handle for WSL import when buildSpawnEnv opts in', async () => {
       Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
       const savedCodexHome = process.env.CODEX_HOME
       const savedOrcaCodexHome = process.env.ORCA_CODEX_HOME

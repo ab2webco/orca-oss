@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`buildDispatchPreamble > renders a stable snapshot of the full preamble 1`] = `
-"You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+"You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
 Your coordinator's terminal handle is: term_COORD
 Your task ID is: task_SNAP
 

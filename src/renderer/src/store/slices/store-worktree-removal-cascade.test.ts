@@ -595,7 +595,7 @@ describe('removeWorktree cascade', () => {
     }
   )
 
-  it('offers force delete for orphaned Orca worktree directories', async () => {
+  it('offers force delete for orphaned Orca Lab worktree directories', async () => {
     const store = createTestStore()
     const worktreeId = 'repo1::/path/wt1'
 

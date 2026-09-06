@@ -60,7 +60,7 @@ function throwNoCallerTerminal(flagName: string): never {
   throw new RuntimeClientError(
     'no_caller_terminal',
     `Could not determine which terminal to act on. Pass --${flagName} <terminal-handle>, or run this ` +
-      'command inside a live Orca terminal (ORCA_TERMINAL_HANDLE / ORCA_PANE_KEY are exported there).'
+      'command inside a live Orca Lab terminal (ORCA_TERMINAL_HANDLE / ORCA_PANE_KEY are exported there).'
   )
 }
 

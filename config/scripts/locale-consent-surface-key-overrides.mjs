@@ -117,10 +117,10 @@ export const CONSENT_SURFACE_KEY_OVERRIDES = {
     zh: '查看 macOS 提示'
   },
   'auto.components.settings.DeveloperPermissionsPane.localNetworkPromptGuidance': {
-    es: 'Si aparece un aviso, elige Permitir. Si no aparece ninguno, abre Ajustes del Sistema y activa Orca en Privacidad y seguridad → Red local.',
-    ja: '確認が表示されたら「許可」を選んでください。表示されない場合は、システム設定を開き、「プライバシーとセキュリティ」→「ローカルネットワーク」で Orca を有効にしてください。',
-    ko: '권한 요청이 표시되면 “허용”을 선택하세요. 표시되지 않으면 시스템 설정을 열고 “개인 정보 보호 및 보안” → “로컬 네트워크”에서 Orca를 켜세요.',
-    zh: '如果出现提示，请选择“允许”。如果没有出现提示，请打开系统设置，在“隐私与安全性”→“本地网络”中启用 Orca。'
+    es: 'Si aparece un aviso, elige Permitir. Si no aparece ninguno, abre Ajustes del Sistema y activa Orca Lab en Privacidad y seguridad → Red local.',
+    ja: '確認が表示されたら「許可」を選んでください。表示されない場合は、システム設定を開き、「プライバシーとセキュリティ」→「ローカルネットワーク」で Orca Lab を有効にしてください。',
+    ko: '권한 요청이 표시되면 “허용”을 선택하세요. 표시되지 않으면 시스템 설정을 열고 “개인 정보 보호 및 보안” → “로컬 네트워크”에서 Orca Lab을 켜세요.',
+    zh: '如果出现提示，请选择“允许”。如果没有出现提示，请打开系统设置，在“隐私与安全性”→“本地网络”中启用 Orca Lab。'
   },
 
   // ── Local Network connection test ────────────────────────────────────────
@@ -137,10 +137,10 @@ export const CONSENT_SURFACE_KEY_OVERRIDES = {
     zh: '测试连接'
   },
   'auto.components.settings.DeveloperPermissionsPane.connectionTestDescription': {
-    es: 'Indica un servicio de otro dispositivo de tu red local. Orca prueba la misma ruta de red que usan las herramientas de terminal.',
-    ja: 'ローカルネットワーク上のほかのデバイスのサービスを入力してください。Orca はターミナルツールと同じネットワーク経路をテストします。',
-    ko: '로컬 네트워크의 다른 기기에 있는 서비스를 입력하세요. Orca는 터미널 도구가 사용하는 것과 같은 네트워크 경로를 테스트합니다.',
-    zh: '请输入本地网络中其他设备上的服务。Orca 会测试终端工具使用的同一网络路径。'
+    es: 'Indica un servicio de otro dispositivo de tu red local. Orca Lab prueba la misma ruta de red que usan las herramientas de terminal.',
+    ja: 'ローカルネットワーク上のほかのデバイスのサービスを入力してください。Orca Lab はターミナルツールと同じネットワーク経路をテストします。',
+    ko: '로컬 네트워크의 다른 기기에 있는 서비스를 입력하세요. Orca Lab은 터미널 도구가 사용하는 것과 같은 네트워크 경로를 테스트합니다.',
+    zh: '请输入本地网络中其他设备上的服务。Orca Lab 会测试终端工具使用的同一网络路径。'
   },
   'auto.components.settings.DeveloperPermissionsPane.connectionTestHost': {
     es: 'Host',

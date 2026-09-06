@@ -21,7 +21,7 @@ export function pluginInstallErrorMessage(cause: unknown): string {
   if (detail.includes('requires orca')) {
     return translate(
       'auto.components.settings.pluginError.incompatible',
-      'This plugin requires a different Orca version.'
+      'This plugin requires a different Orca Lab version.'
     )
   }
   if (/(symlink|outside|absolute|path traversal|drive prefix)/.test(detail)) {
@@ -33,13 +33,13 @@ export function pluginInstallErrorMessage(cause: unknown): string {
   if (/(exceeds|too many)/.test(detail)) {
     return translate(
       'auto.components.settings.pluginError.installLimit',
-      "The plugin exceeds Orca's install size or file-count limits."
+      "The plugin exceeds Orca Lab's install size or file-count limits."
     )
   }
   if (/(git|repository|fetch|clone|checkout|remote)/.test(detail)) {
     return translate(
       'auto.components.settings.pluginError.installGit',
-      'Orca could not fetch the pinned Git revision. Check the URL, #ref, access, and system Git setup.'
+      'Orca Lab could not fetch the pinned Git revision. Check the URL, #ref, access, and system Git setup.'
     )
   }
   return translate(
@@ -71,7 +71,7 @@ export function invalidPluginErrorMessage(detailValue: string): string {
   if (detail.includes('requires orca')) {
     return translate(
       'auto.components.settings.pluginError.incompatible',
-      'This plugin requires a different Orca version.'
+      'This plugin requires a different Orca Lab version.'
     )
   }
   return translate(

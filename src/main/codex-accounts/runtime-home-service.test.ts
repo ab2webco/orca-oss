@@ -996,7 +996,7 @@ describe('CodexRuntimeHomeService', () => {
     expect(existsSync(runtimeAuthPath)).toBe(false)
   })
 
-  it('returns the Orca-managed runtime home for Codex launch and rate-limit preparation', async () => {
+  it('returns the Orca Lab-managed runtime home for Codex launch and rate-limit preparation', async () => {
     const markerPath = join(
       testState.userDataDir,
       'codex-session-backfill',
@@ -1220,7 +1220,7 @@ describe('CodexRuntimeHomeService', () => {
     }
   })
 
-  it('resolves only Orca-owned homes used by live retained host shells', async () => {
+  it('resolves only Orca Lab-owned homes used by live retained host shells', async () => {
     const accountHome = createManagedAuth(
       testState.userDataDir,
       'account-1',

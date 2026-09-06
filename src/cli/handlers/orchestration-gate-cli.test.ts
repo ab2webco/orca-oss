@@ -203,7 +203,7 @@ describe('orchestration gate commands carry caller identity', () => {
       .mockRejectedValueOnce(
         new RuntimeClientError(
           'runtime_unavailable',
-          'The Orca runtime closed the connection before responding. Restart Orca and try again. Orchestration mutation request ID: mutation_1.',
+          'The Orca Lab runtime closed the connection before responding. Restart Orca Lab and try again. Orchestration mutation request ID: mutation_1.',
           {
             orchestrationRequestId: 'mutation_1',
             failedStage: 'dispatch_input',
@@ -228,7 +228,7 @@ describe('orchestration gate commands carry caller identity', () => {
     expect(output.error.message).toContain('may already have taken effect')
     expect(output.error.message).toContain('Failed stage: dispatch_input')
     expect(output.error.message).toMatch(/Residual resources:.*repo::child.*term_worker/)
-    expect(output.error.message).not.toMatch(/restart Orca/i)
+    expect(output.error.message).not.toMatch(/restart Orca Lab/i)
     expect(output.error.data).toMatchObject({
       orchestrationRequestId: 'mutation_1',
       failedStage: 'dispatch_input',

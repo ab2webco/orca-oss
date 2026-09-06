@@ -150,7 +150,7 @@ export class CliInstaller {
         this.isLinuxAppImage() && this.appImagePath
           ? `The AppImage file at ${this.appImagePath} is missing. Move it back or re-run CLI registration from the current AppImage location.`
           : this.isPackaged
-            ? 'The bundled CLI launcher is missing from this Orca build.'
+            ? 'The bundled CLI launcher is missing from this Orca Lab build.'
             : 'Development mode uses a generated launcher for validation only.'
       return {
         platform: this.platform,
@@ -186,7 +186,7 @@ export class CliInstaller {
       throw new Error(status.detail ?? 'CLI registration is unavailable on this build.')
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      throw new Error(`Refusing to replace non-Orca Lab command at ${status.commandPath}.`)
     }
 
     // eslint-disable-next-line unicorn/prefer-ternary -- Why: the install path performs async side effects and is easier to audit as an explicit branch than as an awaited ternary.
@@ -226,10 +226,12 @@ export class CliInstaller {
       return status
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      throw new Error(`Refusing to remove non-Orca Lab command at ${status.commandPath}.`)
     }
     if (status.state === 'stale') {
-      throw new Error(`Refusing to remove a command not owned by Orca at ${status.commandPath}.`)
+      throw new Error(
+        `Refusing to remove a command not owned by Orca Lab at ${status.commandPath}.`
+      )
     }
 
     if (status.installMethod === 'symlink') {
@@ -340,7 +342,13 @@ export class CliInstaller {
         return join(this.homePath, '.local', 'bin', DEV_COMMAND_NAME)
       }
       if (this.platform === 'win32') {
-        return join(this.localAppDataPath, 'Programs', 'Orca Dev', 'bin', `${DEV_COMMAND_NAME}.cmd`)
+        return join(
+          this.localAppDataPath,
+          'Programs',
+          'Orca Lab Dev',
+          'bin',
+          `${DEV_COMMAND_NAME}.cmd`
+        )
       }
     }
 
@@ -497,7 +505,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not an Orca Lab launcher script.`
         })
       }
 
@@ -524,7 +532,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use Orca Lab from the terminal.`
         })
       }
       throw error
@@ -549,7 +557,7 @@ export class CliInstaller {
               supported: true,
               state: 'stale',
               currentTarget: managedTarget,
-              detail: `${commandPath} contains an older Orca launcher.`
+              detail: `${commandPath} contains an older Orca Lab launcher.`
             })
           }
         }
@@ -561,7 +569,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca symlink.`
+          detail: `${commandPath} exists but is not an Orca Lab symlink.`
         })
       }
 
@@ -581,8 +589,8 @@ export class CliInstaller {
         detail: isInstalled
           ? `Registered at ${commandPath}.`
           : isManagedStaleTarget
-            ? `${commandPath} points to an older Orca launcher.`
-            : `${commandPath} points to a non-Orca launcher.`
+            ? `${commandPath} points to an older Orca Lab launcher.`
+            : `${commandPath} points to a non-Orca Lab launcher.`
       })
     } catch (error) {
       if (isMissingError(error)) {
@@ -593,7 +601,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from the terminal.`
+          detail: `Register ${commandPath} to use Orca Lab from the terminal.`
         })
       }
       throw error
@@ -679,7 +687,7 @@ export class CliInstaller {
           supported: true,
           state: 'conflict',
           currentTarget: null,
-          detail: `${commandPath} exists but is not an Orca launcher script.`
+          detail: `${commandPath} exists but is not an Orca Lab launcher script.`
         })
       }
 
@@ -718,7 +726,7 @@ export class CliInstaller {
           supported: true,
           state: 'not_installed',
           currentTarget: null,
-          detail: `Register ${commandPath} to use Orca from Command Prompt or PowerShell.`
+          detail: `Register ${commandPath} to use Orca Lab from Command Prompt or PowerShell.`
         })
       }
       throw error
@@ -791,7 +799,7 @@ export class CliInstaller {
         pathConfigured,
         state: 'not_installed',
         currentTarget: null,
-        detail: `Register ${status.commandPath} to use Orca from Command Prompt or PowerShell.`
+        detail: `Register ${status.commandPath} to use Orca Lab from Command Prompt or PowerShell.`
       }
     }
 
@@ -802,7 +810,7 @@ export class CliInstaller {
         pathConfigured,
         detail:
           pathProbe.detail ??
-          'The Orca launcher exists, but Orca could not check your Windows user PATH.'
+          'The Orca Lab launcher exists, but Orca Lab could not check your Windows user PATH.'
       }
     }
 
@@ -890,8 +898,8 @@ export class CliInstaller {
       }
       const guidance =
         action === 'add'
-          ? `Add this folder to your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
-          : `Remove this folder from your PATH manually: ${pathDirectory}. Or run Orca as an administrator and try again.`
+          ? `Add this folder to your PATH manually: ${pathDirectory}. Or run Orca Lab as an administrator and try again.`
+          : `Remove this folder from your PATH manually: ${pathDirectory}. Or run Orca Lab as an administrator and try again.`
       throw new Error(
         `Windows blocked updating your user PATH (access denied). This usually means your PATH environment variable is managed by Group Policy or your organization's device management. ${guidance}`,
         { cause: error }

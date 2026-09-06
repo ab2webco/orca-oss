@@ -51,7 +51,7 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.MobileEmulatorAgentControlRow.ff4b7e65d6',
-              'Let coding agents control the active mobile emulator with Orca CLI commands.'
+              'Let coding agents control the active mobile emulator with Orca Lab CLI commands.'
             )}
           </p>
         </div>
@@ -76,13 +76,13 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
             <p className="text-sm font-medium">
               {translate(
                 'auto.components.settings.MobileEmulatorAgentControlRow.4f2205f3b6',
-                'Enable Orca CLI'
+                'Enable Orca Lab CLI'
               )}
             </p>
             <p className="text-xs text-muted-foreground">
               {translate(
                 'auto.components.settings.MobileEmulatorAgentControlRow.2fef055608',
-                'Registers the Orca CLI command so agents can control the active emulator from their shell.'
+                'Registers the Orca Lab CLI command so agents can control the active emulator from their shell.'
               )}
             </p>
             {setup.cliInstallStatus?.commandPath && setup.cliEnabled ? (
@@ -103,7 +103,7 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
               <p className="text-[11px] leading-snug text-muted-foreground">
                 {translate(
                   'auto.components.settings.MobileEmulatorAgentControlRow.3d34423e88',
-                  'Registering the Orca CLI'
+                  'Registering the Orca Lab CLI'
                 )}{' '}
                 {setup.cliInstallStatus?.commandPath ? (
                   <code className="rounded bg-muted px-1 py-0.5">
@@ -151,16 +151,16 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
             variant="inline"
             title={translate(
               'auto.components.settings.MobileEmulatorAgentControlRow.67e19ee03c',
-              'Orca CLI skill'
+              'Orca Lab CLI skill'
             )}
             description={translate(
               'auto.components.settings.MobileEmulatorAgentControlRow.d94ca6a623',
-              'Enables agents to use Orca CLI commands, including mobile emulator control.'
+              'Enables agents to use Orca Lab CLI commands, including mobile emulator control.'
             )}
             command={cliSkillInstallCommand}
             installedCommand={cliSkillUpdateCommand}
-            terminalTitle="Orca CLI skill setup"
-            terminalAriaLabel="Orca CLI skill install terminal"
+            terminalTitle="Orca Lab CLI skill setup"
+            terminalAriaLabel="Orca Lab CLI skill install terminal"
             terminalWorktreeId="settings-mobile-emulator-orca-cli-skill-terminal"
             terminalShellOverride={activeSkillRuntime.terminalShellOverride}
             installed={setup.cliSkillInstalled}
@@ -171,7 +171,7 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
             preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
             openingHint={translate(
               'auto.components.settings.MobileEmulatorAgentControlRow.3941719a56',
-              'Checking Orca CLI before opening skill setup.'
+              'Checking Orca Lab CLI before opening skill setup.'
             )}
             onBeforeOpenTerminal={async () => {
               await ensureOrcaCliAvailableForAgentSkillTerminal()

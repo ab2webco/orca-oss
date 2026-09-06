@@ -34,7 +34,7 @@ function emitGoogleCookieImportWarning(
   toast.warning(
     translate(
       'auto.lib.browser.cookie.import.toast.googleCookiesSkipped',
-      'Google cookies were not imported. Open a browser in Orca on {{value0}} with this profile, then sign into Google.',
+      'Google cookies were not imported. Open a browser in Orca Lab on {{value0}} with this profile, then sign into Google.',
       { value0: executionHostLabel }
     ),
     { duration: 12000 }

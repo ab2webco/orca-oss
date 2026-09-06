@@ -5,7 +5,7 @@ import { MemoryRemoteProvider, jsonLines } from './remote-session-scanner-test-f
 import { primeAgentFixture } from './session-scanner-prime-agent-fixtures'
 
 describe('scanRemoteAiVaultSessions', () => {
-  it('parses remote default and Orca-managed Codex homes with SSH host ids', async () => {
+  it('parses remote default and Orca Lab-managed Codex homes with SSH host ids', async () => {
     const provider = new MemoryRemoteProvider()
     provider.addFile(
       '/home/ada/.codex/session_index.jsonl',
