@@ -203,12 +203,7 @@ export default function OnboardingFlow({
         >
           <div className="relative flex h-full min-h-0 flex-col px-6 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-9">
             <div className="flex items-center gap-3 text-base font-semibold tracking-tight">
-              <img
-                src={logo}
-                alt=""
-                aria-hidden="true"
-                className="h-7 w-auto shrink-0 invert dark:invert-0"
-              />
+              <img src={logo} alt="" aria-hidden="true" className="h-7 w-auto shrink-0" />
               <span>
                 {translate('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca')}
               </span>

@@ -853,19 +853,13 @@ html.native-shell .app-layout {
 
 /* Why: small identity anchor on desktop custom titlebars where native window
    chrome is hidden. Sized to sit comfortably in the 36px titlebar with a
-   little horizontal breathing room. The SVG fill is white; light mode inverts
-   it to black so it reads on the light titlebar background. */
+   little horizontal breathing room. The symbol carries its own brand orange,
+   which reads on both the light and dark titlebar backgrounds. */
 .titlebar-logo {
   height: 16px;
   flex-shrink: 0;
   margin: 0 4px 0 10px;
   opacity: 0.75;
-}
-
-/* Why: .dark is toggled on <html> (the :root), so :not(.dark) on a descendant
-   always matches. Scope to :root:not(.dark) to correctly target light mode only. */
-:root:not(.dark) .titlebar-logo {
-  filter: invert(1);
 }
 
 /* Why: desktop custom title bar buttons replace hidden native OS chrome.
