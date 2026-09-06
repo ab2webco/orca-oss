@@ -24,13 +24,28 @@ export function planeStateGroupColor(group: string): string {
   return colors.textMuted
 }
 
+/** The board's columns are the project's states only under these groupings. Grouped by
+ *  assignee or priority a column is a person or a priority, with no state to create into. */
+export function planeBoardColumnsAreStates(groupBy: PlaneTaskGroupBy): boolean {
+  return groupBy === 'none' || groupBy === 'status'
+}
+
+/** The state a card dropped on this column would land in, or null when the column is not
+ *  a state. Reads the same key planeBoardSections wrote, so the two cannot drift apart. */
+export function planeBoardColumnStateId(
+  section: ProviderTaskBoardSection<PlaneMobileWorkItem>,
+  groupBy: PlaneTaskGroupBy
+): string | null {
+  return planeBoardColumnsAreStates(groupBy) ? section.key : null
+}
+
 // Status keeps the hook's columns (empty ones, state order); groupProviderTasks would drop and reorder them.
 export function planeBoardSections(
   columns: readonly PlaneBoardColumn[],
   groupBy: PlaneTaskGroupBy,
   orderBy: ProviderTaskOrderBy
 ): ProviderTaskBoardSection<PlaneMobileWorkItem>[] {
-  if (groupBy === 'none' || groupBy === 'status') {
+  if (planeBoardColumnsAreStates(groupBy)) {
     return columns.map((column) => ({
       key: column.stateId,
       label: column.name,
