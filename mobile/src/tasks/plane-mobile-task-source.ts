@@ -11,6 +11,7 @@ import {
   type PlaneMobileStatus,
   type PlaneMobileWorkItem
 } from './plane-mobile-work-item-read'
+import { filterPlaneWorkItemsByQuery } from './plane-work-item-search'
 
 // Mirrors MOBILE_TASKS_PLANE_RUNTIME_CAPABILITY in src/shared/protocol-version.ts.
 // Hosts that predate it advertise mobile.tasks.v1 but refuse every plane.* call
@@ -91,6 +92,10 @@ export async function fetchPlaneStates(
   )
 }
 
+// Why one call: plane.searchWorkItems is a PQL parser that rejects free text, and this
+// query is whatever a human typed into "Search Plane tasks…". The rows come back
+// unsearched and the text match runs on them — before the cap, so a match past the
+// hundredth row is still findable (ORCA-416).
 export async function fetchPlaneWorkItems(
   client: RpcClient,
   args: {
@@ -100,17 +105,11 @@ export async function fetchPlaneWorkItems(
     workspaceId: string | null
   }
 ): Promise<PlaneMobileWorkItem[]> {
-  const query = args.query.trim()
-  const response = query
-    ? await client.sendRequest('plane.searchWorkItems', {
-        query,
-        projectId: args.projectId ?? undefined,
-        workspaceId: args.workspaceId ?? undefined
-      })
-    : await client.sendRequest('plane.listWorkItems', {
-        filter: args.filter,
-        projectId: args.projectId ?? undefined,
-        workspaceId: args.workspaceId ?? undefined
-      })
-  return decodePlaneWorkItems(unwrap(response)).slice(0, PLANE_WORK_ITEM_LIMIT)
+  const response = await client.sendRequest('plane.listWorkItems', {
+    filter: args.filter,
+    projectId: args.projectId ?? undefined,
+    workspaceId: args.workspaceId ?? undefined
+  })
+  const items = decodePlaneWorkItems(unwrap(response))
+  return filterPlaneWorkItemsByQuery(items, args.query).slice(0, PLANE_WORK_ITEM_LIMIT)
 }

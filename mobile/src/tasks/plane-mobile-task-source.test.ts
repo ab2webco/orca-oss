@@ -7,7 +7,8 @@ import {
   fetchPlaneStatus,
   fetchPlaneWorkItems,
   isPlaneSupportedByHost,
-  MOBILE_TASKS_PLANE_CAPABILITY
+  MOBILE_TASKS_PLANE_CAPABILITY,
+  PLANE_WORK_ITEM_LIMIT
 } from './plane-mobile-task-source'
 
 type Call = { method: string; params?: unknown }
@@ -88,7 +89,7 @@ describe('plane mobile task source', () => {
     ).toEqual({ supported: true, connected: false, status: null })
   })
 
-  it('lists when the query is empty and searches when it is not', async () => {
+  it('lists whatever the query is, because the search endpoint only parses PQL', async () => {
     const calls: Call[] = []
     const client = stubClient([], calls)
     await fetchPlaneWorkItems(client, {
@@ -98,25 +99,66 @@ describe('plane mobile task source', () => {
       workspaceId: 'w1'
     })
     await fetchPlaneWorkItems(client, {
-      query: ' mobile ',
+      query: ' 169 ',
       filter: 'assigned',
       projectId: null,
       workspaceId: null
     })
-    expect(calls.map((call) => call.method)).toEqual([
-      'plane.listWorkItems',
-      'plane.searchWorkItems'
-    ])
+    // ORCA-416: free text reached plane.searchWorkItems and came back as a parse error.
+    expect(calls.map((call) => call.method)).toEqual(['plane.listWorkItems', 'plane.listWorkItems'])
     expect(calls[0]?.params).toEqual({
       filter: 'assigned',
       projectId: 'p1',
       workspaceId: 'w1'
     })
     expect(calls[1]?.params).toEqual({
-      query: 'mobile',
+      filter: 'assigned',
       projectId: undefined,
       workspaceId: undefined
     })
+  })
+
+  it('narrows the listed rows to the card a human searched for, by number or title', async () => {
+    const calls: Call[] = []
+    const rows = [
+      { id: 'wi-1', identifier: 'ORCA-169', title: 'The mobile search', url: '' },
+      { id: 'wi-2', identifier: 'ORCA-417', title: 'Board spinner', url: '' }
+    ]
+    const found = await fetchPlaneWorkItems(stubClient(rows, calls), {
+      query: '169',
+      filter: 'all',
+      projectId: 'p1',
+      workspaceId: 'w1'
+    })
+    expect(found.map((item) => item.id)).toEqual(['wi-1'])
+
+    const byTitle = await fetchPlaneWorkItems(stubClient(rows, calls), {
+      query: 'spinner',
+      filter: 'all',
+      projectId: 'p1',
+      workspaceId: 'w1'
+    })
+    expect(byTitle.map((item) => item.id)).toEqual(['wi-2'])
+  })
+
+  it('matches before the row cap, so a hit past the hundredth row is still findable', async () => {
+    const calls: Call[] = []
+    const rows = [
+      ...Array.from({ length: PLANE_WORK_ITEM_LIMIT }, (_unused, index) => ({
+        id: `filler-${index}`,
+        identifier: `ORCA-${index}`,
+        title: 'Filler',
+        url: ''
+      })),
+      { id: 'wi-late', identifier: 'ORCA-4210', title: 'Last of the list', url: '' }
+    ]
+    const found = await fetchPlaneWorkItems(stubClient(rows, calls), {
+      query: '4210',
+      filter: 'all',
+      projectId: 'p1',
+      workspaceId: 'w1'
+    })
+    expect(found.map((item) => item.id)).toEqual(['wi-late'])
   })
 
   it('surfaces the host error rather than an empty list', async () => {

@@ -79,7 +79,10 @@ export function PlaneTaskBoard({
       </View>
     )
   }
-  if (board.error) {
+  // Only when there is nothing to draw: the error is the state metadata read, and cards
+  // already on screen sit in columns they derive themselves. The sheet still shows the
+  // failure where it blocks something — "Move to" needs the real column list.
+  if (board.error && board.columns.length === 0) {
     return (
       <View style={styles.placeholder}>
         <Text style={styles.errorText}>{board.error}</Text>

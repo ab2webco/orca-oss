@@ -182,7 +182,7 @@ function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
       ) : null}
       <View style={styles.section}>
         <Text style={styles.label}>Move to</Text>
-        {board.status === 'loading' ? (
+        {board.status === 'loading' || board.columnsPending ? (
           // In list mode the board only reads this card's project on open, so columns are
           // empty during that round trip — don't claim "one column" until it settles.
           <Text style={styles.note}>Loading the board…</Text>

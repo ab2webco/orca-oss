@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
@@ -10,7 +10,7 @@ import { PlaneBoardViewMenu } from './plane-board-view-menu'
 import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
 import type { PlaneViewMode } from './plane-work-item-view'
-import { usePlaneBoard } from './use-plane-board'
+import { usePlaneBoard, type PlaneBoardRows } from './use-plane-board'
 
 type Props = {
   client: RpcClient | null
@@ -24,6 +24,13 @@ type Props = {
   projects: readonly PlaneMobileProject[]
   filter: PlaneWorkItemFilter
   query: string
+  /** The Plane rows the Tasks screen already read; the board's columns are these,
+   *  reprojected. Passing them is what makes the switch to board instant (ORCA-417). */
+  workItems: readonly PlaneMobileWorkItem[]
+  itemsLoading: boolean
+  itemsRefreshing: boolean
+  /** Re-reads those rows and resolves with them, so a board write can reconcile. */
+  onRefreshItems: () => Promise<PlaneMobileWorkItem[] | null>
   /** The card whose detail is open, tapped in either view. */
   detailItem: PlaneMobileWorkItem | null
   onOpenCard: (item: PlaneMobileWorkItem) => void
@@ -53,6 +60,10 @@ export function PlaneTasksSurface({
   projects,
   filter,
   query,
+  workItems,
+  itemsLoading,
+  itemsRefreshing,
+  onRefreshItems,
   detailItem,
   onOpenCard,
   onCloseDetail,
@@ -67,6 +78,15 @@ export function PlaneTasksSurface({
   const openItem = enabled ? detailItem : null
   const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
   const [orderBy, setOrderBy] = useState<ProviderTaskOrderBy>('priority')
+  const rows = useMemo<PlaneBoardRows>(
+    () => ({
+      items: workItems,
+      loading: itemsLoading,
+      refreshing: itemsRefreshing,
+      refresh: onRefreshItems
+    }),
+    [itemsLoading, itemsRefreshing, onRefreshItems, workItems]
+  )
   const board = usePlaneBoard(
     client,
     capabilities,
@@ -80,7 +100,8 @@ export function PlaneTasksSurface({
       filter,
       query,
       detailItem: openItem
-    })
+    }),
+    rows
   )
   // Resolved live so an optimistic edit shows in the sheet as well as on the card.
   const live = resolveLivePlaneWorkItem(board.columns, openItem)

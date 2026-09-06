@@ -198,7 +198,8 @@ import {
 import { repoColor } from '../../../src/worktree/repo-color'
 import type {
   PlaneMobileProject,
-  PlaneMobileState
+  PlaneMobileState,
+  PlaneMobileWorkItem
 } from '../../../src/tasks/plane-mobile-work-item-read'
 import type { PlaneWorkItemFilter } from '../../../../src/shared/plane-types'
 import { hasSettledHostRepoList } from '../../../src/tasks/host-repo-list'
@@ -1808,6 +1809,7 @@ export default function MobileTasksScreen() {
   const [planeProjects, setPlaneProjects] = useState<PlaneMobileProject[]>([])
   const [planeProjectId, setPlaneProjectId] = useState<string | null>(null)
   const [planeStates, setPlaneStates] = useState<PlaneMobileState[]>([])
+  const planeWorkItemsRef = useRef<PlaneMobileWorkItem[]>([])
   const [planeStateIds, setPlaneStateIds] = useState<Set<string>>(() => new Set())
   const [planeFilter, setPlaneFilter] = useState<PlaneWorkItemFilter>('all')
   const [showPlaneFilterPicker, setShowPlaneFilterPicker] = useState(false)
@@ -3039,8 +3041,13 @@ export default function MobileTasksScreen() {
           if (!isCurrent()) {
             return
           }
-          const scoped = filterPlaneWorkItemsByState(workItems, planeStateIds)
-          setItems(sortPlaneWorkItems(scoped, planeStates).map(createPlaneTask))
+          const scoped = sortPlaneWorkItems(
+            filterPlaneWorkItemsByState(workItems, planeStateIds),
+            planeStates
+          )
+          // Set before the commit so an awaited refresh can read back what it just loaded.
+          planeWorkItemsRef.current = scoped
+          setItems(scoped.map(createPlaneTask))
           return
         }
         // Why: Linear issues do not need the repo list, only the composer does, so
@@ -3680,6 +3687,13 @@ export default function MobileTasksScreen() {
     void repoListReload().catch(() => {})
     void loadTasks({ silent: true })
   }, [loadTasks, repoListReload])
+
+  // The board reconciles its optimistic writes against these rows, so the refresh must
+  // resolve with what the re-read put on screen rather than the pre-write copy (ORCA-417).
+  const refreshPlaneWorkItems = useCallback(async (): Promise<PlaneMobileWorkItem[] | null> => {
+    await loadTasks({ silent: true })
+    return planeWorkItemsRef.current
+  }, [loadTasks])
 
   const refreshGitHubProject = useCallback(() => {
     setGithubRepoSlugCache(dropFailedGitHubRepoSlugEntries)
@@ -8440,6 +8454,15 @@ export default function MobileTasksScreen() {
         .sort((a, b) => compareLinearIssues(a, b, linearOrderBy)),
     [items, linearOrderBy]
   )
+  // Plane's board columns are a reprojection of the rows the list already read, the way
+  // Linear's are: switching view costs nothing and the two views cannot disagree (ORCA-417).
+  const planeWorkItemsForView = useMemo(
+    () =>
+      items
+        .filter((item): item is PlaneTaskItem => item.provider === 'plane')
+        .map((item) => item.source),
+    [items]
+  )
   const linearIssueSections = useMemo(
     () => groupLinearIssues(linearIssuesForView, linearGroupBy, linearOrderBy),
     [linearGroupBy, linearIssuesForView, linearOrderBy]
@@ -9684,6 +9707,10 @@ export default function MobileTasksScreen() {
         projects={planeProjects}
         filter={planeFilter}
         query={appliedQuery}
+        workItems={planeWorkItemsForView}
+        itemsLoading={loading}
+        itemsRefreshing={refreshing}
+        onRefreshItems={refreshPlaneWorkItems}
         detailItem={planeDetailItem?.source ?? null}
         onOpenCard={(item) => setPlaneDetailItem(createPlaneTask(item))}
         onCloseDetail={() => {
