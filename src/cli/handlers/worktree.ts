@@ -158,7 +158,7 @@ async function getCreateRepoSelector(
   }
   throw new RuntimeClientError(
     'invalid_argument',
-    'Missing repo selector. Pass --repo or run from inside an Orca-managed worktree.'
+    'Missing repo selector. Pass --repo or run from inside an Orca Lab-managed worktree.'
   )
 }
 

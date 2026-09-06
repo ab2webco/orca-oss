@@ -69,7 +69,7 @@ export const CORE_HANDLERS: Record<string, CommandHandler> = {
     if (!paneKey) {
       throw new RuntimeClientError(
         'invalid_environment',
-        'orca claude-teams must be run inside an Orca terminal.'
+        'orca claude-teams must be run inside an Orca Lab terminal.'
       )
     }
     const response = await client.call<{ launch: { env: Record<string, string> } }>(

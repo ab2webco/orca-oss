@@ -25,7 +25,7 @@ async function callDashboardPopout<TResult>(
     if (error instanceof RuntimeRpcFailureError && error.code === 'method_not_found') {
       throw new RuntimeClientError(
         'method_not_supported',
-        'This Orca host is too old to answer dashboard popout commands.'
+        'This Orca Lab host is too old to answer dashboard popout commands.'
       )
     }
     throw error

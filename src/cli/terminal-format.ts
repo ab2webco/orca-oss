@@ -235,7 +235,7 @@ export function formatTerminalWait(result: { wait: RuntimeTerminalWait }): strin
 }
 
 const AGENT_SESSION_UNREAD_TEXT: Record<AgentSessionLogUnreadReason, string> = {
-  'agent-unsupported': 'this agent writes no session log Orca can read',
+  'agent-unsupported': 'this agent writes no session log Orca Lab can read',
   'agent-session-unknown': 'no agent session is identified for this pane yet',
   'session-log-missing': 'no session log found for this pane',
   'session-log-unreadable': 'the session log could not be read',

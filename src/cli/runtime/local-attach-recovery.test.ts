@@ -12,7 +12,7 @@ import { RuntimeClientError } from './types'
 function attachError(): RuntimeClientError {
   return new RuntimeClientError(
     'runtime_unavailable',
-    'Could not connect to the Orca runtime transport from this shell.',
+    'Could not connect to the Orca Lab runtime transport from this shell.',
     localAttachRecoveryData()
   )
 }
@@ -25,7 +25,7 @@ describe('local attach recovery guidance', () => {
     expect(output).toContain('--environment')
     expect(output).toContain('orca environment add')
     // Why: the old dead-end string asserted something that was false in the report.
-    expect(output).not.toContain('Orca is not running. Run')
+    expect(output).not.toContain('Orca Lab is not running. Run')
   })
 
   it('instructs the pairing path in --json output', () => {
@@ -70,11 +70,11 @@ describe('local attach recovery guidance', () => {
     const output = formatCliError(
       new RuntimeClientError(
         'runtime_unavailable',
-        'The Orca runtime changed while the request was in flight. Retry the command.'
+        'The Orca Lab runtime changed while the request was in flight. Retry the command.'
       )
     )
 
     expect(output).not.toContain('--pairing-code')
-    expect(output).toContain("Orca is not running. Run 'orca open' first.")
+    expect(output).toContain("Orca Lab is not running. Run 'orca open' first.")
   })
 })

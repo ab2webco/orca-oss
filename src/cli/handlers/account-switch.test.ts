@@ -229,7 +229,7 @@ describe('orca account switch', () => {
         failure: {
           reason: 'session-mismatch',
           message:
-            'The resumed agent reported a different session, so Orca rolled the switch back.',
+            'The resumed agent reported a different session, so Orca Lab rolled the switch back.',
           observedSessionId: 'other-session'
         }
       }
@@ -413,7 +413,7 @@ describe('orca account switch', () => {
         state: 'preflighting',
         failure: {
           reason: 'transcript-unavailable',
-          message: 'Orca could not make the session transcript readable.'
+          message: 'Orca Lab could not make the session transcript readable.'
         }
       })
       // Before the fix: 300 polls, the last one at 300_000 ms — same reason, same

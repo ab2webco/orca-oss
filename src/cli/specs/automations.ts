@@ -25,14 +25,14 @@ const AUTOMATION_STATE_FLAGS = [
 export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['automations', 'list'],
-    summary: 'List scheduled Orca automations',
+    summary: 'List scheduled Orca Lab automations',
     usage: 'orca automations list [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
     examples: ['orca automations list', 'orca automations list --json']
   },
   {
     path: ['automations', 'show'],
-    summary: 'Show one Orca automation',
+    summary: 'Show one Orca Lab automation',
     usage: 'orca automations show <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
@@ -40,7 +40,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['automations', 'create'],
-    summary: 'Create a scheduled Orca automation',
+    summary: 'Create a scheduled Orca Lab automation',
     usage:
       'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
@@ -55,13 +55,13 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Trigger accepts hourly, daily, weekdays, weekly, a 5-field cron expression, or an RRULE string.',
-      'When --repo is omitted, the CLI uses the enclosing Orca worktree when one can be resolved from cwd.',
+      'When --repo is omitted, the CLI uses the enclosing Orca Lab worktree when one can be resolved from cwd.',
       'Use --project with --host, or --project-host-setup, to run on a specific project host setup.',
       'Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.',
       'Use --workspace to run in an existing worktree; otherwise the automation creates a new worktree per run.',
       'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run.',
       'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.',
-      'Use --target-pane <paneKey> with --reuse-session to send runs to a specific open agent pane (pane keys appear as terminalPaneKey in `orca automations runs --json`). If that pane is gone at run time, Orca falls back to the previous automation session or a fresh one. Pass an empty value to clear it.'
+      'Use --target-pane <paneKey> with --reuse-session to send runs to a specific open agent pane (pane keys appear as terminalPaneKey in `orca automations runs --json`). If that pane is gone at run time, Orca Lab falls back to the previous automation session or a fresh one. Pass an empty value to clear it.'
     ],
     examples: [
       'orca automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
@@ -71,7 +71,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['automations', 'edit'],
-    summary: 'Edit an Orca automation',
+    summary: 'Edit an Orca Lab automation',
     usage: 'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
@@ -93,7 +93,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['automations', 'remove'],
     destructive: true,
-    summary: 'Remove an Orca automation and its run history',
+    summary: 'Remove an Orca Lab automation and its run history',
     usage: 'orca automations remove <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
@@ -101,7 +101,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['automations', 'run'],
-    summary: 'Run an Orca automation now',
+    summary: 'Run an Orca Lab automation now',
     usage: 'orca automations run <id> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
