@@ -893,10 +893,13 @@ import {
   createPlaneState as createPlaneBoardState,
   deletePlaneState as deletePlaneBoardState,
   deleteWorkItemComment as deletePlaneWorkItemComment,
-  listWorkItemComments as listPlaneWorkItemComments,
   updatePlaneState as updatePlaneBoardState,
   updateWorkItem as updatePlaneWorkItem
 } from '../plane/plane-work-item-writes'
+import {
+  listWorkItemComments as listPlaneWorkItemComments,
+  readWorkItemCommentThread as readPlaneWorkItemCommentThread
+} from '../plane/plane-work-item-comment-thread'
 import { deleteWorkItem as deletePlaneWorkItem } from '../plane/plane-work-item-delete'
 import {
   addWorkItemRelation as addPlaneWorkItemRelation,
@@ -37961,6 +37964,14 @@ export class OrcaRuntimeService {
     workspaceId?: PlaneWorkspaceSelection
   }): ReturnType<typeof listPlaneWorkItemComments> {
     return listPlaneWorkItemComments(args)
+  }
+
+  planeReadWorkItemCommentThread(args: {
+    projectId: string
+    workItemId: string
+    workspaceId?: PlaneWorkspaceSelection
+  }): ReturnType<typeof readPlaneWorkItemCommentThread> {
+    return readPlaneWorkItemCommentThread(args)
   }
 
   planeDeleteWorkItemComment(args: {

@@ -142,6 +142,13 @@ export type PlaneComment = {
   user?: PlaneUser
 }
 
+// Why a result and not PlaneComment[]: an empty array cannot say whether the
+// thread is empty or the read failed, and a client that shows "no comments" for
+// a failed read tells the user the opposite of the truth.
+export type PlaneCommentThreadRead =
+  | { ok: true; comments: PlaneComment[] }
+  | { ok: false; error: string }
+
 export type PlaneWorkItemUpdate = {
   title?: string
   description?: string

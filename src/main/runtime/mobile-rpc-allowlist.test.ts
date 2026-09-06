@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
+  MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
@@ -162,6 +163,16 @@ describe('mobile RPC allowlist', () => {
     const allowed = mobileRpcAllowlist()
     expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY)
     expect(allowed.has('plane.listMembers')).toBe(true)
+  })
+
+  it('opens the Plane comment thread to the phone as its own advertised capability', () => {
+    // Why: no published host through lab.55 allowlists a comment read, so a
+    // writes.v1 host still refuses the thread; the reader keys on this alone.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY)
+    expect(allowed.has('plane.readWorkItemCommentThread')).toBe(true)
+    // The PlaneComment[] reader stays off: its empty array hides a failed read.
+    expect(allowed.has('plane.listWorkItemComments')).toBe(false)
   })
 
   it('does not grant mobile credentials control over host updates', () => {
