@@ -5,7 +5,8 @@ import type { RpcClient } from '../transport/rpc-client'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
 import type { PlaneBoardScope } from './plane-board-scope'
-import { usePlaneBoard, type PlaneBoard } from './use-plane-board'
+import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
+import { usePlaneBoard, type PlaneBoard, type PlaneBoardRows } from './use-plane-board'
 
 const CAPABILITIES = [
   'mobile.tasks.v1',
@@ -32,6 +33,14 @@ const SCOPE: PlaneBoardScope = {
   projectName: CARD.project.name,
   filter: 'all',
   query: ''
+}
+
+// The Tasks screen owns the rows; the board projects them (ORCA-417).
+const ROWS: PlaneBoardRows = {
+  items: [CARD as unknown as PlaneMobileWorkItem],
+  loading: false,
+  refreshing: false,
+  refresh: async () => [CARD as unknown as PlaneMobileWorkItem]
 }
 
 type Deferred = { resolve: (result: unknown) => void; reject: (error: Error) => void }
@@ -71,7 +80,7 @@ function mountBoard() {
   } as unknown as RpcClient
 
   function Probe() {
-    latest = usePlaneBoard(client, CAPABILITIES, SCOPE)
+    latest = usePlaneBoard(client, CAPABILITIES, SCOPE, ROWS)
     return null
   }
   act(() => {

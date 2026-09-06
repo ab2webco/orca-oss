@@ -1,12 +1,21 @@
 // Render-test harness for the Plane surface of the Tasks screen: the screen's Plane
 // wiring without the 15k-line screen around it. Shared by the *.render.test.tsx files.
-import { act, createElement, useState, type ReactElement } from 'react'
+import {
+  act,
+  createElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement
+} from 'react'
 import type { Root } from 'react-dom/client'
 import { Pressable, Text, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import type { PlaneWorkItemFilter } from '../../src/shared/plane-types'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { createPlaneTask } from '../src/tasks/plane-mobile-task-list'
+import { fetchPlaneWorkItems } from '../src/tasks/plane-mobile-task-source'
 import type { PlaneMobileWorkItem } from '../src/tasks/plane-mobile-work-item-read'
 import { PlaneSourceSegmentRow } from '../src/plane-board/plane-source-segment-row'
 import { PlaneTasksSurface } from '../src/plane-board/plane-tasks-surface'
@@ -53,9 +62,10 @@ export type HostBehaviour = {
   items?: readonly unknown[]
   /** What a re-read returns once a write was attempted: what Plane really holds. */
   itemsAfterWrite?: readonly unknown[]
-  /** The board read (states + work items) never answers, so the board stays loading. */
+  /** The board's own read — the state metadata — never answers, so its columns stay
+   *  whatever the cards derive. The list's rows are unaffected. */
   hangReads?: boolean
-  /** The board read rejects, so the board settles in error. */
+  /** That same read rejects, so the board settles in error. */
   failReads?: Error
 }
 
@@ -86,12 +96,7 @@ export function createClient(
           throw behaviour.rejectWrites
         }
       }
-      if (
-        (method === 'plane.listStates' ||
-          method === 'plane.listWorkItems' ||
-          method === 'plane.searchWorkItems') &&
-        (behaviour.hangReads || behaviour.failReads)
-      ) {
+      if (method === 'plane.listStates' && (behaviour.hangReads || behaviour.failReads)) {
         if (behaviour.hangReads) {
           return new Promise(() => {})
         }
@@ -141,8 +146,6 @@ type HarnessProps = {
   client: RpcClient
   initialProjectId: string | null
   initialQuery: string
-  /** What the Tasks list would show as rows in list mode. */
-  listItems: readonly PlaneMobileWorkItem[]
 }
 
 /** The segment row picks the view; list rows and board cards open the same detail.
@@ -151,8 +154,7 @@ type HarnessProps = {
 export function PlaneTasksHarness({
   client,
   initialProjectId,
-  initialQuery,
-  listItems
+  initialQuery
 }: HarnessProps): ReactElement {
   const capabilities = useRuntimeCapabilities(client, true)
   const [viewMode, setViewMode] = usePlaneViewMode()
@@ -164,6 +166,47 @@ export function PlaneTasksHarness({
   // A relay blip flips these false the way taskUiReady does; the surface's enabled follows.
   const [connected, setConnected] = useState(true)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  // The Tasks screen owns the one read both views project from; so does this stand-in.
+  const [listItems, setListItems] = useState<readonly PlaneMobileWorkItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const loadedRef = useRef<PlaneMobileWorkItem[]>([])
+  const load = useCallback(
+    async (silent: boolean): Promise<PlaneMobileWorkItem[] | null> => {
+      if (!connected) {
+        setLoading(false)
+        return null
+      }
+      if (silent) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
+      try {
+        const rows = await fetchPlaneWorkItems(client, {
+          query,
+          filter,
+          projectId,
+          workspaceId: 'ws-1'
+        })
+        loadedRef.current = rows
+        setListItems(rows)
+        return rows
+      } catch {
+        loadedRef.current = []
+        setListItems([])
+        return null
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [client, connected, filter, projectId, query]
+  )
+  useEffect(() => {
+    void load(false)
+  }, [load])
+  const refreshItems = useCallback(() => load(true), [load])
   return createElement(
     SafeAreaProvider,
     { initialMetrics: safeAreaMetrics },
@@ -210,6 +253,10 @@ export function PlaneTasksHarness({
         projects: [PROJECT, OTHER_PROJECT],
         filter,
         query,
+        workItems: listItems,
+        itemsLoading: loading,
+        itemsRefreshing: refreshing,
+        onRefreshItems: refreshItems,
         detailItem: detail,
         onOpenCard: setDetail,
         onCloseDetail: () => setDetail(null),
@@ -229,6 +276,15 @@ export function PlaneTasksHarness({
         accessibilityRole: 'button',
         accessibilityLabel: 'Switch project',
         onPress: () => setProjectId(projectId === PROJECT.id ? OTHER_PROJECT.id : PROJECT.id)
+      }),
+      // The screen re-reads without clearing its rows whenever the filter, the project or
+      // the query changes; this is that non-silent reload, on demand.
+      createElement(Pressable, {
+        accessibilityRole: 'button',
+        accessibilityLabel: 'Reload rows',
+        onPress: () => {
+          void load(false)
+        }
       }),
       createElement(Pressable, {
         accessibilityRole: 'button',
@@ -301,8 +357,7 @@ export async function renderPlaneTasks(
       createElement(PlaneTasksHarness, {
         client,
         initialProjectId: options.projectId === undefined ? 'proj-1' : options.projectId,
-        initialQuery: options.query ?? '',
-        listItems: (behaviour.items ?? []) as PlaneMobileWorkItem[]
+        initialQuery: options.query ?? ''
       })
     )
   })

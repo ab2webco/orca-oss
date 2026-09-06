@@ -96,6 +96,46 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       })
     })
 
+    it('paints the cards in the first frame after the switch, with no spinner', async () => {
+      // ORCA-417: the board used to drop the list's rows and start its own read, so the
+      // switch showed "Loading board…". Nothing is settled here on purpose — this is the
+      // frame the press produces.
+      const calls = await renderPlaneTasks(root, WRITING_HOST, { items: [CARD, DOING_CARD] }, {})
+      const readsBefore = callsTo(calls, 'plane.listWorkItems').length
+      const toggle = byLabel('Show as board')
+      if (!toggle) {
+        throw new Error('no view toggle')
+      }
+
+      act(() => {
+        toggle.click()
+      })
+
+      expect(leafWithText('Loading board…')).toBeNull()
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
+      expect(byLabel(`Open ${DOING_CARD.title}`)).not.toBeNull()
+      expect(callsTo(calls, 'plane.listWorkItems')).toHaveLength(readsBefore)
+    })
+
+    it('revalidates under the cards, never behind a spinner that hides them', async () => {
+      // ORCA-417: a re-read with rows already on screen must not swap the board for
+      // "Loading board…". Nothing is settled after the press — that is the frame at risk.
+      await mountBoard(root, WRITING_HOST, { items: [CARD, DOING_CARD] })
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
+
+      const reload = byLabel('Reload rows')
+      if (!reload) {
+        throw new Error('no reload control')
+      }
+      act(() => {
+        reload.click()
+      })
+
+      expect(leafWithText('Loading board…')).toBeNull()
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
+      expect(byLabel(`Open ${DOING_CARD.title}`)).not.toBeNull()
+    })
+
     it('remembers the chosen view on this device across a remount', async () => {
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       await press('Show as board')
@@ -262,20 +302,29 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(leafWithText('Project picker')).not.toBeNull()
     })
 
-    it('reads the board with the list’s search, and blames the filter when it hides every card', async () => {
-      const calls = await mountBoard(root, WRITING_HOST, { items: [] }, { query: 'nothing' })
-      // A search reads through plane.searchWorkItems, the same call the list makes.
-      expect(callsTo(calls, 'plane.searchWorkItems')[0]?.params).toMatchObject({
-        query: 'nothing',
-        projectId: 'proj-1'
-      })
-      expect(callsTo(calls, 'plane.listWorkItems')).toHaveLength(0)
+    it('finds a card on the board by the number a human typed, never through PQL', async () => {
+      // ORCA-416: the search field reached plane.searchWorkItems, a PQL parser, and "ORCA-2"
+      // came back as a parse error. The board narrows the rows the list already read.
+      const calls = await mountBoard(
+        root,
+        WRITING_HOST,
+        { items: [CARD, DOING_CARD] },
+        { query: '2' }
+      )
+
+      expect(callsTo(calls, 'plane.searchWorkItems')).toHaveLength(0)
+      expect(byLabel(`Open ${DOING_CARD.title}`)).not.toBeNull()
+      expect(byLabel(`Open ${CARD.title}`)).toBeNull()
+    })
+
+    it('blames the filter when the search hides every card', async () => {
+      const calls = await mountBoard(root, WRITING_HOST, { items: [CARD] }, { query: 'nothing' })
+      expect(callsTo(calls, 'plane.searchWorkItems')).toHaveLength(0)
       expect(leafWithText('No cards match the filter')).not.toBeNull()
       expect(leafWithText('Orca Lab has no work items')).toBeNull()
 
       await press('Clear filter')
-      expect(callsTo(calls, 'plane.listWorkItems')).toHaveLength(1)
-      expect(leafWithText('Orca Lab has no work items')).not.toBeNull()
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
     })
   })
 

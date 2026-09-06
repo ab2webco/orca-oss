@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createPlaneTask,
-  filterPlaneWorkItemsByState,
+  filterPlaneRowsByState,
   reconcilePlaneStateSelection,
   sortPlaneWorkItems
 } from './plane-mobile-task-list'
@@ -50,15 +50,27 @@ describe('plane mobile task list', () => {
     expect(createPlaneTask(workItem({ title: '' })).title).toBe('Untitled work item')
   })
 
-  it('filters by state only when states are selected', () => {
-    const items = [
+  it('filters the list rows by state only when states are selected', () => {
+    const rows = [
       workItem(),
       workItem({ id: 'wi-2', state: { id: 's0', name: 'Backlog', group: 'backlog' } })
-    ]
-    expect(filterPlaneWorkItemsByState(items, new Set())).toHaveLength(2)
-    expect(filterPlaneWorkItemsByState(items, new Set(['s0'])).map((item) => item.id)).toEqual([
+    ].map(createPlaneTask)
+    expect(filterPlaneRowsByState(rows, new Set())).toHaveLength(2)
+    expect(filterPlaneRowsByState(rows, new Set(['s0'])).map((row) => row.source.id)).toEqual([
       'wi-2'
     ])
+  })
+
+  it('narrows nothing but the rows: the board reads the array this never touched', () => {
+    // ORCA-417: the board projects from the screen's rows, and the state chip is not
+    // rendered in board mode — so a filter set in the list must not follow it there.
+    const rows = [
+      workItem(),
+      workItem({ id: 'wi-2', state: { id: 's0', name: 'Backlog', group: 'backlog' } })
+    ].map(createPlaneTask)
+    const filtered = filterPlaneRowsByState(rows, new Set(['s0']))
+    expect(filtered).toHaveLength(1)
+    expect(rows.map((row) => row.source.id)).toEqual(['wi-1', 'wi-2'])
   })
 
   it('orders by the project board sequence before recency', () => {
