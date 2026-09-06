@@ -165,6 +165,18 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
         workspaceId: params.workspaceId
       })
   }),
+  // Separate from listWorkItemComments, whose published PlaneComment[] cannot
+  // report a failed read; a mobile thread needs that distinction (ORCA-377).
+  defineMethod({
+    name: 'plane.readWorkItemCommentThread',
+    params: WorkItemComments,
+    handler: async (params, { runtime }) =>
+      runtime.planeReadWorkItemCommentThread({
+        projectId: params.projectId.trim(),
+        workItemId: params.workItemId.trim(),
+        workspaceId: params.workspaceId
+      })
+  }),
   defineMethod({
     name: 'plane.deleteWorkItemComment',
     params: DeleteWorkItemComment,

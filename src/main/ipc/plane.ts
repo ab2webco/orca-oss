@@ -8,11 +8,8 @@ import {
   testConnection
 } from '../plane/plane-connection-lifecycle'
 import { getWorkItem, listWorkItems, searchWorkItems } from '../plane/work-items'
-import {
-  addWorkItemComment,
-  listWorkItemComments,
-  updateWorkItem
-} from '../plane/plane-work-item-writes'
+import { addWorkItemComment, updateWorkItem } from '../plane/plane-work-item-writes'
+import { listWorkItemComments } from '../plane/plane-work-item-comment-thread'
 import { listLabels, listMembers, listProjects, listStates } from '../plane/plane-work-item-reads'
 import { registerPlaneBoardStateHandlers } from './plane-board-state-ipc'
 import { _resetPreflightCache } from './preflight'

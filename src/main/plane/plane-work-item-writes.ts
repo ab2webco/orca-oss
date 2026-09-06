@@ -1,5 +1,6 @@
-// Plane work-item write-back: update (partial PATCH), add comment, list
-// comments, and board-state (Plane state) create/update/delete. Work-item
+// Plane work-item write-back: update (partial PATCH), add and delete comment,
+// and board-state (Plane state) create/update/delete. Reading a thread lives in
+// plane-work-item-comment-thread.ts, which reuses the path builders here. Work-item
 // create lives in plane-work-item-create.ts (which reuses the client resolver
 // and error mapper exported here) so both stay under the oxlint max-lines cap
 // without a suppression; all reuse work-items.ts's project-scoped path builder
@@ -14,15 +15,9 @@ import {
 } from './client'
 import { boundedIntegrationErrorLog } from '../integration-error-message'
 import { markdownToPlaneHtml } from './plane-html-markdown'
-import {
-  INTEGRATION_PAGINATION_MAX_PAGES,
-  IntegrationPaginationBudget
-} from '../integration-pagination-budget'
-import { fetchAllPlanePages, type PlanePage } from './plane-cursor-pagination'
-import { mapPlaneComment, mapPlaneState } from './plane-work-item-mappers'
+import { mapPlaneState } from './plane-work-item-mappers'
 import { workItemsBase } from './work-items'
 import type {
-  PlaneComment,
   PlaneCreateStateArgs,
   PlaneDeleteStateArgs,
   PlaneStateGroup,
@@ -41,7 +36,7 @@ export function resolveClient(
   return getClients(workspaceId)[0]
 }
 
-function commentsPath(
+export function commentsPath(
   client: PlaneClientForWorkspace,
   projectId: string,
   workItemId: string
@@ -55,7 +50,7 @@ function statesBase(client: PlaneClientForWorkspace, projectId: string): string 
   return `/api/v1/workspaces/${encodeURIComponent(client.workspaceSlug)}/projects/${encodeURIComponent(projectId)}/states/`
 }
 
-function commentsQuery(cursor: string | undefined): string {
+export function commentsQuery(cursor: string | undefined): string {
   const params = new URLSearchParams({ per_page: '100' })
   if (cursor) {
     params.set('cursor', cursor)
@@ -287,37 +282,6 @@ export async function deletePlaneState(args: PlaneDeleteStateArgs): Promise<Plan
   } catch (error) {
     clearWorkspaceTokenOnAuthError(client, error)
     return toMutationError(error, 'Failed to delete column.')
-  } finally {
-    release()
-  }
-}
-
-export async function listWorkItemComments(args: {
-  projectId: string
-  workItemId: string
-  workspaceId?: PlaneWorkspaceSelection | null
-}): Promise<PlaneComment[]> {
-  const client = resolveClient(args.workspaceId)
-  if (!client) {
-    return []
-  }
-  await acquire()
-  try {
-    const budget = new IntegrationPaginationBudget()
-    const raws = await fetchAllPlanePages<PlaneRecord>(
-      (cursor) =>
-        planeRequest<PlanePage<PlaneRecord>>(
-          client,
-          `${commentsPath(client, args.projectId, args.workItemId)}?${commentsQuery(cursor)}`
-        ),
-      budget,
-      INTEGRATION_PAGINATION_MAX_PAGES
-    )
-    return raws.map(mapPlaneComment)
-  } catch (error) {
-    clearWorkspaceTokenOnAuthError(client, error)
-    console.warn('[plane] listWorkItemComments failed:', boundedIntegrationErrorLog(error))
-    return []
   } finally {
     release()
   }

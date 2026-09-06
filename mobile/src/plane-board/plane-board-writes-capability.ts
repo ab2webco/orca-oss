@@ -7,6 +7,11 @@ export const MOBILE_PLANE_BOARD_WRITES_CAPABILITY = 'mobile.plane-board.writes.v
 // writes.v1 and still refuse plane.listMembers, so the assignee picker keys on this alone.
 export const MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY = 'mobile.plane-board.members.v1'
 
+// Mirrors MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY. No published host
+// through lab.55 allowlists any comment-read method, so a writes.v1 host still
+// refuses the thread: the reader keys on this alone.
+export const MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY = 'mobile.plane-board.comment-reads.v1'
+
 export function isPlaneBoardWritableByHost(capabilities: readonly string[] | undefined): boolean {
   return capabilities?.includes(MOBILE_PLANE_BOARD_WRITES_CAPABILITY) === true
 }
@@ -15,4 +20,10 @@ export function arePlaneMembersListableByHost(
   capabilities: readonly string[] | undefined
 ): boolean {
   return capabilities?.includes(MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY) === true
+}
+
+export function arePlaneCommentsReadableByHost(
+  capabilities: readonly string[] | undefined
+): boolean {
+  return capabilities?.includes(MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY) === true
 }
