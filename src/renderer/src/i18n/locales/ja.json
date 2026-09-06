@@ -138,8 +138,7 @@
       "064bd07810": "戻る",
       "ce37cf5279": "サイドバーの切り替え ({{value0}})",
       "e4b9e7dff7": "サイドバーの切り替え",
-      "pluginCommandFailed": "プラグインのコマンドを実行できませんでした。",
-      "byAb2WebBadge": "by Ab2Web"
+      "pluginCommandFailed": "プラグインのコマンドを実行できませんでした。"
     },
     "web": {
       "WebConnect": {

@@ -198,7 +198,7 @@ export function getManagedStatusLineScript(
     'if [ -n "$orca_statusline_intro_key" ]; then',
     '  orca_statusline_intro_stamp="${TMPDIR:-/tmp}/orca-claude-statusline-intro-${orca_statusline_intro_key}"',
     '  if [ ! -f "$orca_statusline_intro_stamp" ]; then',
-    "    orca_statusline_intro='Orca by Ab2Web'",
+    "    orca_statusline_intro='Orca Lab'",
     '    : >"$orca_statusline_intro_stamp" 2>/dev/null || :',
     '  fi',
     'fi',

@@ -129,7 +129,7 @@ describe('getWindowsManagedStatusLineScript (structure)', () => {
   })
 
   it('announces the identity once per pane from a marker separate from the post stamp', () => {
-    expect(script).toContain('set "ORCA_STATUSLINE_INTRO=Orca by Ab2Web"')
+    expect(script).toContain('set "ORCA_STATUSLINE_INTRO=Orca Lab"')
     expect(script).toContain(
       'set "ORCA_STATUSLINE_INTRO_STAMP=%TEMP%\\orca-claude-statusline-intro-!ORCA_STATUSLINE_INTRO_KEY!.tmp"'
     )
@@ -443,7 +443,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
   it('prints identity, model and context for a payload without rate_limits', async () => {
     const { scriptPath, temp } = makeHarness()
     const stdout = await runScript(scriptPath, temp, displayPayload())
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx ##... 42%\r\n')
+    expect(stdout).toBe('Orca Lab | Fable | ctx ##... 42%\r\n')
   })
 
   it('prints both quota windows alongside the account', async () => {
@@ -460,7 +460,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     // Why exactly one @: the leading sigil already marks the account; the elision's trailing @
     // stacked onto it read as a bug (@user@) on every user's line.
     expect(stdout).toBe(
-      'Orca by Ab2Web | Fable | ctx ##... 42% | @sam.rivera | 5h #.... 29% | 7d ####. 81%\r\n'
+      'Orca Lab | Fable | ctx ##... 42% | @sam.rivera | 5h #.... 29% | 7d ####. 81%\r\n'
     )
     expect(stdout).not.toContain('rivera@')
   })
@@ -470,7 +470,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     const payload = displayPayload({ rate_limits: { five_hour: { used_percentage: 12 } } })
     const first = await runScript(scriptPath, temp, payload)
     const second = await runScript(scriptPath, temp, payload)
-    expect(first).toBe('Orca by Ab2Web | Fable | ctx ##... 42% | 5h =.... 12%\r\n')
+    expect(first).toBe('Orca Lab | Fable | ctx ##... 42% | 5h =.... 12%\r\n')
     // Why the arrow only appears on the second tick: the first one had no baseline to compare to.
     expect(second).toBe('Fable | ctx ##... 42% ~ | 5h =.... 12%\r\n')
   })
@@ -498,7 +498,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         rate_limits: { five_hour: { resets_at: 'later' }, seven_day: { used_percentage: 81 } }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | ctx ##... 42% | 7d ####. 81%\r\n')
+    expect(stdout).toBe('Orca Lab | Fable | ctx ##... 42% | 7d ####. 81%\r\n')
     expect(stdout).not.toContain('5h')
   })
 
@@ -512,7 +512,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         rate_limits: { five_hour: { used_percentage: 12 } }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | Fable | 5h =.... 12%\r\n')
+    expect(stdout).toBe('Orca Lab | Fable | 5h =.... 12%\r\n')
   })
 
   it('falls back to model.id when display_name is absent', async () => {
@@ -525,7 +525,7 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
         context_window: { used_percentage: 42.7 }
       })
     )
-    expect(stdout).toBe('Orca by Ab2Web | claude-fable-5 | ctx ##... 42%\r\n')
+    expect(stdout).toBe('Orca Lab | claude-fable-5 | ctx ##... 42%\r\n')
   })
 
   it('bounds a long address instead of letting it push quota off the line', async () => {
@@ -550,9 +550,9 @@ describe.skipIf(process.platform !== 'win32')('getWindowsManagedStatusLineScript
     const payload = displayPayload({
       rate_limits: { five_hour: { used_percentage: 12 }, seven_day: { used_percentage: 45 } }
     })
-    // banner(14) + " | Fable"(8) + " | ctx ##... 42%"(16) = 38 fits 40; every quota bar falls.
+    // banner(8) + " | Fable"(8) + " | ctx ##... 42%"(16) = 32 fits 40; every quota bar falls.
     const narrow = await runScript(scriptPath, temp, payload, undefined, '40')
-    expect(narrow).toBe('Orca by Ab2Web | Fable | ctx ##... 42%\r\n')
+    expect(narrow).toBe('Orca Lab | Fable | ctx ##... 42%\r\n')
     expect(narrow.trimEnd().length).toBeLessThanOrEqual(40)
   })
 
