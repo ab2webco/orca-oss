@@ -81,7 +81,7 @@ function mountBoard(options: MountOptions = {}) {
     return null
   }
 
-  let renderer: ReactTestRenderer | null = null
+  let renderer!: ReactTestRenderer
   const props: ProbeProps = {
     connected: options.connected ?? true,
     capabilities: 'capabilities' in options ? options.capabilities : CAPABILITIES
@@ -111,13 +111,13 @@ function mountBoard(options: MountOptions = {}) {
     setConnected(connected: boolean): void {
       props.connected = connected
       act(() => {
-        renderer?.update(createElement(Probe, { ...props }))
+        renderer.update(createElement(Probe, { ...props }))
       })
     },
     setCapabilities(capabilities: readonly string[]): void {
       props.capabilities = capabilities
       act(() => {
-        renderer?.update(createElement(Probe, { ...props }))
+        renderer.update(createElement(Probe, { ...props }))
       })
     },
     async settle(): Promise<void> {
