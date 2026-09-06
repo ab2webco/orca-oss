@@ -13114,17 +13114,11 @@ export class OrcaRuntimeService {
     }
   }
 
-  // Why: a pane holding a live launch secret may only be named by a caller that attests to it;
-  // panes without one (SSH without remote hooks, hand-opened shells) may still name themselves.
+  // Why: a pane holding a live launch secret may only be named by a caller that attests to it.
+  // A restored surface alone does not count — its receipt carries no secret, so requiring
+  // attestation there would deny the pane itself along with every impostor.
   orchestrationCallerRequiresAttestation(terminalHandle: string): boolean {
-    const terminal = this.getOrchestrationDispatchAuthority(terminalHandle)
-    if (!terminal) {
-      return false
-    }
-    return (
-      Boolean(terminal.launchTokenHash) ||
-      this.restoredOrchestrationAuthorityByPtyId.has(terminal.ptyId)
-    )
+    return Boolean(this.getOrchestrationDispatchAuthority(terminalHandle)?.launchTokenHash)
   }
 
   private retirePtyAgentLaunchAuthority(

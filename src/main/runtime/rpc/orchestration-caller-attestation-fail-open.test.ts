@@ -151,10 +151,12 @@ describe('ORCA-370 — which panes the runtime says must attest', () => {
     expect(runtime.orchestrationCallerRequiresAttestation(handle)).toBe(true)
   })
 
-  it('requires attestation for a pane whose launch authority survived a runtime restart', () => {
+  it('leaves a restored surface with no launch secret free to name itself', () => {
+    // Why: Orca records a restore receipt for every exact restored surface, plain shells included,
+    // and that receipt holds no token. Fencing on it would deny the pane itself, not just impostors.
     const { runtime, handle } = livePane({ restored: true })
 
-    expect(runtime.orchestrationCallerRequiresAttestation(handle)).toBe(true)
+    expect(runtime.orchestrationCallerRequiresAttestation(handle)).toBe(false)
   })
 
   it('leaves a pane with no launch authority free to name itself', () => {
