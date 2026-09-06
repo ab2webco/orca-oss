@@ -80,17 +80,44 @@ export function usePlaneBoard(
   capabilities: readonly string[] | undefined
 ): PlaneBoard {
   const [loaded, setLoaded] = useState<Loaded>(EMPTY_LOADED)
-  const [status, setStatus] = useState<PlaneBoardStatus>('idle')
+  // A mount that is going to read starts on the spinner, so no empty board flashes before it.
+  const initialStatus: PlaneBoardStatus = client && connected ? 'loading' : 'idle'
+  const [status, setStatusState] = useState<PlaneBoardStatus>(initialStatus)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [activeStateId, setActiveStateId] = useState<string | null>(null)
   const generationRef = useRef(0)
+  const projectIdRef = useRef<string | null>(null)
+  const statusRef = useRef<PlaneBoardStatus>(initialStatus)
+
+  // Mirrored so load can read the status without depending on it, which would re-fire the mount effect.
+  const setStatus = useCallback((next: PlaneBoardStatus) => {
+    statusRef.current = next
+    setStatusState(next)
+  }, [])
+
+  const applyProjectId = useCallback((next: string | null) => {
+    projectIdRef.current = next
+    setProjectId(next)
+  }, [])
 
   // Resolves the items it put on screen, or null when it lost to a newer read.
   const load = useCallback(
     async (options: { silent?: boolean } = {}): Promise<PlaneMobileWorkItem[] | null> => {
       if (!client || !connected) {
+        generationRef.current += 1
+        setRefreshing(false)
+        // Only a spinner already on screen needs an exit; a board mounted disconnected stays idle.
+        if (statusRef.current === 'loading') {
+          setError('Lost the connection to the host')
+          setStatus('error')
+        }
+        return null
+      }
+      if (capabilities === undefined) {
+        // The list decides whether Plane is readable at all; reading now would paint a false empty board.
+        setStatus('loading')
         return null
       }
       const generation = generationRef.current + 1
@@ -119,7 +146,7 @@ export function usePlaneBoard(
         if (!isCurrent()) {
           return null
         }
-        const nextProjectId = projectId ?? projects[0]?.id ?? null
+        const nextProjectId = projectIdRef.current ?? projects[0]?.id ?? null
         if (!nextProjectId) {
           setLoaded({ availability, projects, states: [], items: [] })
           setStatus('ready')
@@ -137,7 +164,7 @@ export function usePlaneBoard(
         if (!isCurrent()) {
           return null
         }
-        setProjectId(nextProjectId)
+        applyProjectId(nextProjectId)
         setLoaded({ availability, projects, states, items })
         setStatus('ready')
         return items
@@ -154,7 +181,7 @@ export function usePlaneBoard(
         }
       }
     },
-    [capabilities, client, connected, projectId]
+    [applyProjectId, capabilities, client, connected, setStatus]
   )
 
   useEffect(() => {
@@ -282,13 +309,17 @@ export function usePlaneBoard(
     ...creation,
     selectProject: useCallback(
       (next: string) => {
-        setProjectId(next)
+        if (next === projectIdRef.current) {
+          return
+        }
+        applyProjectId(next)
         setActiveStateId(null)
         resetMoves()
         resetEdits()
         resetComments()
+        void load()
       },
-      [resetComments, resetEdits, resetMoves]
+      [applyProjectId, load, resetComments, resetEdits, resetMoves]
     ),
     selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
     refresh: useCallback(() => void reload(), [reload]),
