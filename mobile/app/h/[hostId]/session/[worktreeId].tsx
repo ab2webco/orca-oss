@@ -81,6 +81,7 @@ import {
 } from '../../../../src/session/mobile-bulk-close-sheet-actions'
 import { useMobilePrBranchContext } from '../../../../src/session/use-mobile-pr-branch-context'
 import { isFloatingWorkspaceWorktreeId } from '../../../../src/session/floating-workspace'
+import { createDisposableEffectTimers } from '../../../../src/session/disposable-effect-timers'
 import { SessionDockColumn } from '../../../../src/session/SessionDockColumn'
 import { MobileSessionHeaderIconButton } from '../../../../src/session/MobileSessionHeaderIconButton'
 import { MobileSessionHeaderMoreActionsSheet } from '../../../../src/session/MobileSessionHeaderMoreActionsSheet'
@@ -2617,13 +2618,7 @@ export default function SessionScreen() {
     // Why: clear the initialized flag so the reconnect scrollback replaces stale content instead of being dropped.
     initializedHandlesRef.current.clear()
     let disposed = false
-    const timers: ReturnType<typeof setTimeout>[] = []
-    function addTimer(fn: () => void, ms: number) {
-      if (disposed) {
-        return
-      }
-      timers.push(setTimeout(fn, ms))
-    }
+    const timers = createDisposableEffectTimers()
     void (async () => {
       const reportActivationOutcome = (response: RpcSuccess | null): void => {
         if (!disposed && response && headlessActivationNeedsHostRenderer(response.result)) {
@@ -2652,10 +2647,10 @@ export default function SessionScreen() {
       if (disposed) {
         return
       }
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
-      addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
+      timers.add(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
+      timers.add(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
       if (client && created === '1' && !isFloatingWorkspaceRoute) {
-        addTimer(() => {
+        timers.add(() => {
           if (activeHandleRef.current) {
             return
           }
@@ -2672,16 +2667,14 @@ export default function SessionScreen() {
               return
             }
             await fetchTerminals({ allowEmptyLoaded: true })
-            addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
+            timers.add(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
           })()
         }, 1800)
       }
     })()
     return () => {
       disposed = true
-      for (const t of timers) {
-        clearTimeout(t)
-      }
+      timers.dispose()
     }
   }, [
     client,
