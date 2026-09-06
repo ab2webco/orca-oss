@@ -52,7 +52,8 @@ import { MobileSyntaxSegments } from '../../../src/components/MobileSyntaxSegmen
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { PickerListDrawer } from '../../../src/components/PickerListDrawer'
 import { PlaneSourceSegmentRow } from '../../../src/plane-board/plane-source-segment-row'
-import { useOpenMobilePlaneBoard } from '../../../src/plane-board/use-open-mobile-plane-board'
+import { PlaneTasksSurface } from '../../../src/plane-board/plane-tasks-surface'
+import { usePlaneViewMode } from '../../../src/plane-board/plane-work-item-view'
 import {
   formatGitHubPRDelta,
   getGitHubReviewerRows,
@@ -184,7 +185,6 @@ import {
   sortPlaneWorkItems,
   type PlaneTaskItem
 } from '../../../src/tasks/plane-mobile-task-list'
-import { PlaneWorkItemDetail } from '../../../src/tasks/plane-work-item-detail'
 import { resolveTaskRowTap } from '../../../src/tasks/task-row-tap'
 import {
   taskExternalOpenLabel,
@@ -643,8 +643,7 @@ type TaskItem =
     }
   | PlaneTaskItem
 
-// Plane is read-only on mobile in this slice: rows open an in-app detail (with
-// an explicit browser action), so they never reach the workspace-create paths.
+// Plane rows open the work item detail sheet, so they never reach the workspace-create paths.
 type ActionableTaskItem = Exclude<TaskItem, { provider: 'gitlabTodo' | 'plane' }>
 type HostedReviewMergeMethod = 'merge' | 'squash' | 'rebase'
 type HostedReviewItem =
@@ -1785,7 +1784,7 @@ function compareTasksByRepository(
 export default function MobileTasksScreen() {
   const { hostId, taskSource } = useLocalSearchParams<{ hostId: string; taskSource?: string }>()
   const router = useRouter()
-  const openMobilePlaneBoard = useOpenMobilePlaneBoard()
+  const [planeViewMode, setPlaneViewMode] = usePlaneViewMode()
   const insets = useSafeAreaInsets()
   const { client, state: connState } = useHostClient(hostId)
   const reconnectAttempts = useReconnectAttempt(hostId)
@@ -1812,6 +1811,7 @@ export default function MobileTasksScreen() {
     normalizeVisibleTaskProviders(undefined)
   )
   const [linearConnected, setLinearConnected] = useState(false)
+  const [hostCapabilities, setHostCapabilities] = useState<string[] | undefined>()
   const [planeSupported, setPlaneSupported] = useState(false)
   const [planeConnected, setPlaneConnected] = useState(false)
   const [planeWorkspaceId, setPlaneWorkspaceId] = useState<string | null>(null)
@@ -2630,6 +2630,7 @@ export default function MobileTasksScreen() {
         throw new Error(statusResponse.error.message)
       }
       const status = statusResponse.result as TaskRuntimeStatus
+      setHostCapabilities(status.capabilities)
       if (!status.capabilities?.includes(MOBILE_TASKS_CAPABILITY)) {
         // Why: Tasks is additive RPC surface, so old desktop builds can still
         // pair but must not receive the newer task-specific method calls.
@@ -8353,6 +8354,8 @@ export default function MobileTasksScreen() {
     GITLAB_FILTER_OPTIONS.find((filter) => filter.value === gitlabFilter)?.label ?? 'Open'
   const linearFilterLabel =
     LINEAR_FILTER_OPTIONS.find((filter) => filter.value === linearFilter)?.label ?? 'All'
+  const planeBoardShown =
+    taskUiReady && provider === 'plane' && planeSupported && planeViewMode === 'board'
   const planeFilterLabel =
     PLANE_FILTER_OPTIONS.find((filter) => filter.value === planeFilter)?.label ?? 'All'
   const planeProjectItems = useMemo(
@@ -8949,9 +8952,17 @@ export default function MobileTasksScreen() {
               onPickProject={() => setShowPlaneProjectPicker(true)}
               onPickState={() => setShowPlaneStatePicker(true)}
               onPickFilter={() => setShowPlaneFilterPicker(true)}
-              onOpenBoard={() => openMobilePlaneBoard(hostId)}
+              viewMode={planeViewMode}
+              onSelectViewMode={(mode) => {
+                setPlaneViewMode(mode)
+                // Board writes do not touch the list's rows; re-read them on the way back.
+                if (mode === 'list') {
+                  refreshTasks()
+                }
+              }}
               buttonStyle={styles.segmentButton}
               textStyle={styles.segmentSecondaryText}
+              selectedTextStyle={styles.segmentButtonText}
             />
           ) : null}
 
@@ -9452,7 +9463,7 @@ export default function MobileTasksScreen() {
             }}
           />
         )
-      ) : loading ? (
+      ) : planeBoardShown ? null : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="small" color={colors.textSecondary} />
         </View>
@@ -9671,6 +9682,39 @@ export default function MobileTasksScreen() {
           }}
         />
       )}
+
+      <PlaneTasksSurface
+        client={client}
+        capabilities={hostCapabilities}
+        enabled={taskUiReady && provider === 'plane' && planeSupported}
+        planeConnected={planeConnected}
+        viewMode={planeViewMode}
+        workspaceId={planeWorkspaceId}
+        projectId={planeProjectId}
+        projects={planeProjects}
+        filter={planeFilter}
+        query={appliedQuery}
+        detailItem={planeDetailItem?.source ?? null}
+        onOpenCard={(item) => setPlaneDetailItem(createPlaneTask(item))}
+        onCloseDetail={() => {
+          setPlaneDetailItem(null)
+          if (planeViewMode === 'list') {
+            refreshTasks()
+          }
+        }}
+        onCopyLink={(item) => {
+          const task = createPlaneTask(item)
+          void copyTaskLink(`task:${task.key}`, task.source.url)
+        }}
+        copied={planeDetailItem != null && copiedLinkKey === `task:${planeDetailItem.key}`}
+        onPickProject={() => setShowPlaneProjectPicker(true)}
+        onClearFilter={() => {
+          setPlaneFilter('all')
+          setQuery('')
+          setAppliedQuery('')
+        }}
+        bottomInset={insets.bottom}
+      />
 
       <PickerModal
         visible={taskUiReady && showProviderPicker}
@@ -11556,20 +11600,6 @@ export default function MobileTasksScreen() {
               </Pressable>
             </View>
           </View>
-        ) : null}
-      </BottomDrawer>
-
-      <BottomDrawer
-        visible={taskUiReady && planeDetailItem != null}
-        onClose={() => setPlaneDetailItem(null)}
-      >
-        {planeDetailItem ? (
-          <PlaneWorkItemDetail
-            item={planeDetailItem}
-            copied={copiedLinkKey === `task:${planeDetailItem.key}`}
-            onOpenInBrowser={(url) => void Linking.openURL(url)}
-            onCopyLink={(url) => void copyTaskLink(`task:${planeDetailItem.key}`, url)}
-          />
         ) : null}
       </BottomDrawer>
 

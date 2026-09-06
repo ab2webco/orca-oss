@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
+import type { PlaneBoardScope } from './plane-board-scope'
 import { usePlaneBoard, type PlaneBoard } from './use-plane-board'
 
 const CAPABILITIES = [
@@ -21,6 +22,16 @@ const CARD = {
   state: { id: 's-todo', name: 'Todo', group: 'unstarted' },
   priority: 'none',
   updatedAt: '2026-09-04T00:00:00.000Z'
+}
+
+const SCOPE: PlaneBoardScope = {
+  enabled: true,
+  planeConnected: true,
+  workspaceId: 'ws-1',
+  projectId: CARD.project.id,
+  projectName: CARD.project.name,
+  filter: 'all',
+  query: ''
 }
 
 type Deferred = { resolve: (result: unknown) => void; reject: (error: Error) => void }
@@ -60,7 +71,7 @@ function mountBoard() {
   } as unknown as RpcClient
 
   function Probe() {
-    latest = usePlaneBoard(client, true, CAPABILITIES)
+    latest = usePlaneBoard(client, CAPABILITIES, SCOPE)
     return null
   }
   act(() => {

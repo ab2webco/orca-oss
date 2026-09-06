@@ -16,6 +16,8 @@ export type PlaneBoardMoves = {
   /** Cards with a move in flight. */
   movingWorkItemIds: ReadonlySet<string>
   moveError: string | null
+  /** The card the error belongs to; another project's board must not show it. */
+  moveErrorWorkItemId: string | null
   /** Resolves true while the card still shows in `stateId` once the host answered. */
   moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<boolean>
   dismissMoveError: () => void
@@ -36,7 +38,7 @@ export function usePlaneBoardMoves({ client, workspaceId, items, reload }: Input
   // the column the card showed when its own write began, not a render-old one.
   const overridesRef = useRef(overrides)
   const { ids: movingWorkItemIds, begin, end } = usePlaneBoardInFlightCards()
-  const [moveError, setMoveError] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<{ workItemId: string; message: string } | null>(null)
 
   const updateOverrides = useCallback(
     (update: (current: PlaneBoardMoveOverrides) => PlaneBoardMoveOverrides): void => {
@@ -76,7 +78,7 @@ export function usePlaneBoardMoves({ client, workspaceId, items, reload }: Input
       updateOverrides((current) =>
         rollbackPlaneBoardMove(current, item.id, stateId, previousStateId)
       )
-      setMoveError(result.error)
+      setMoveError({ workItemId: item.id, message: result.error })
       if (result.deliveryUnknown) {
         // Plane may have taken the move after all; only a re-read can tell.
         reload()
@@ -89,7 +91,8 @@ export function usePlaneBoardMoves({ client, workspaceId, items, reload }: Input
   return {
     overrides,
     movingWorkItemIds,
-    moveError,
+    moveError: moveError?.message ?? null,
+    moveErrorWorkItemId: moveError?.workItemId ?? null,
     moveWorkItem,
     dismissMoveError: useCallback(() => setMoveError(null), []),
     reset: useCallback(() => {

@@ -1,7 +1,6 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
 import type { RpcClient } from '../transport/rpc-client'
 
 // Why: lucide's circular ESM re-exports do not load under Vite's runner; icons are not under test.
@@ -16,17 +15,14 @@ vi.mock('lucide-react-native', async () => {
     }
   )
 })
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: () => {} }),
-  useLocalSearchParams: () => ({ hostId: 'host-1' })
-}))
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }))
-const hostClient = vi.hoisted(() => ({ client: null as RpcClient | null }))
-vi.mock('../transport/client-context', () => ({
-  useHostClient: () => ({ client: hostClient.client, state: 'connected' })
-}))
+vi.mock(
+  '@react-native-async-storage/async-storage',
+  () => import('../../test-doubles/async-storage-memory')
+)
 
-import PlaneBoardScreen from '../../app/h/[hostId]/plane-board'
+import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
+import { PlaneTasksHarness } from '../../test-doubles/plane-tasks-harness'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
   MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY,
@@ -39,11 +35,6 @@ const WRITING_HOST = [
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
 ]
 const READING_HOST = [...WRITING_HOST, MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY]
-
-const safeAreaMetrics = {
-  insets: { top: 0, bottom: 0, left: 0, right: 0 },
-  frame: { x: 0, y: 0, width: 390, height: 844 }
-}
 
 type Call = { method: string; params?: unknown }
 
@@ -132,7 +123,7 @@ function leafWithText(text: string): HTMLElement | null {
   return null
 }
 
-describe('PlaneBoardScreen comment thread (react-native-web)', () => {
+describe('Plane comment thread in the Tasks detail (react-native-web)', () => {
   let container: HTMLDivElement
   let root: Root
 
@@ -145,7 +136,6 @@ describe('PlaneBoardScreen comment thread (react-native-web)', () => {
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
-    hostClient.client = null
   })
 
   async function settle(): Promise<void> {
@@ -161,18 +151,19 @@ describe('PlaneBoardScreen comment thread (react-native-web)', () => {
     replies: ThreadReply[] = [{ kind: 'thread', comments: [] }]
   ): Promise<Call[]> {
     const calls: Call[] = []
-    hostClient.client = createClient(capabilities, calls, replies)
+    const client = createClient(capabilities, calls, replies)
     await act(async () => {
       root.render(
-        createElement(
-          SafeAreaProvider,
-          { initialMetrics: safeAreaMetrics },
-          createElement(PlaneBoardScreen)
-        )
+        createElement(PlaneTasksHarness, {
+          client,
+          initialProjectId: 'proj-1',
+          initialQuery: '',
+          listItems: [CARD as unknown as PlaneMobileWorkItem]
+        })
       )
     })
     await settle()
-    act(() => byLabel('Wire the retry')!.click())
+    act(() => byLabel('Row Wire the retry')!.click())
     await settle()
     return calls
   }
