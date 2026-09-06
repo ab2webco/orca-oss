@@ -277,6 +277,15 @@ export function PlaneTasksHarness({
         accessibilityLabel: 'Switch project',
         onPress: () => setProjectId(projectId === PROJECT.id ? OTHER_PROJECT.id : PROJECT.id)
       }),
+      // The screen re-reads without clearing its rows whenever the filter, the project or
+      // the query changes; this is that non-silent reload, on demand.
+      createElement(Pressable, {
+        accessibilityRole: 'button',
+        accessibilityLabel: 'Reload rows',
+        onPress: () => {
+          void load(false)
+        }
+      }),
       createElement(Pressable, {
         accessibilityRole: 'button',
         accessibilityLabel: 'Toggle connection',

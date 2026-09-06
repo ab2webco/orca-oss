@@ -117,6 +117,25 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(callsTo(calls, 'plane.listWorkItems')).toHaveLength(readsBefore)
     })
 
+    it('revalidates under the cards, never behind a spinner that hides them', async () => {
+      // ORCA-417: a re-read with rows already on screen must not swap the board for
+      // "Loading board…". Nothing is settled after the press — that is the frame at risk.
+      await mountBoard(root, WRITING_HOST, { items: [CARD, DOING_CARD] })
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
+
+      const reload = byLabel('Reload rows')
+      if (!reload) {
+        throw new Error('no reload control')
+      }
+      act(() => {
+        reload.click()
+      })
+
+      expect(leafWithText('Loading board…')).toBeNull()
+      expect(byLabel(`Open ${CARD.title}`)).not.toBeNull()
+      expect(byLabel(`Open ${DOING_CARD.title}`)).not.toBeNull()
+    })
+
     it('remembers the chosen view on this device across a remount', async () => {
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       await press('Show as board')

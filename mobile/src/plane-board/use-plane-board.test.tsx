@@ -206,6 +206,30 @@ describe('usePlaneBoard: the board is a reprojection of the list', () => {
     expect(mounted.loadingTransitions()).toBe(0)
   })
 
+  it('keeps the cards up while the list re-reads, instead of spinning over them', async () => {
+    // ORCA-417: the spinner is for a board with nothing to draw. A re-read behind cards
+    // already on screen — a filter change, a project change — must revalidate under them.
+    const mounted = mountBoard({ items: [card(0)], loading: true })
+
+    expect(mounted.statuses[0]).toBe('ready')
+    expect(mounted.cardsAt(0)).toEqual(['wi-p1'])
+
+    await mounted.settle()
+    expect(mounted.loadingTransitions()).toBe(0)
+  })
+
+  it('does not repaint a settled board as a spinner when a new read starts', async () => {
+    const mounted = mountBoard()
+    await mounted.settle()
+    expect(mounted.board.status).toBe('ready')
+
+    mounted.setRows({ loading: true })
+
+    expect(mounted.board.status).toBe('ready')
+    expect(mounted.cards()).toEqual(['wi-p1'])
+    expect(mounted.loadingTransitions()).toBe(0)
+  })
+
   it('starts the very first render on the spinner when nothing is loaded yet', async () => {
     // ORCA-387, still true for a board with nothing to draw: it must open on 'loading',
     // not settle 'idle' for a frame and paint an empty board first.
