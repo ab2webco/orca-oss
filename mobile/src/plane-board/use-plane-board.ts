@@ -16,22 +16,23 @@ import {
 import { buildPlaneBoardColumns, type PlaneBoardColumn } from './plane-board-columns'
 import { applyPlaneBoardMoves } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
-import {
-  arePlaneMembersListableByHost,
-  isPlaneBoardWritableByHost
-} from './plane-board-writes-capability'
+import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
 import { applyPlaneBoardEdits } from './plane-board-edit-state'
-import { usePlaneBoardComments, type PlaneBoardComments } from './use-plane-board-comments'
+import { usePlaneBoardAssignees, type PlaneBoardAssignees } from './use-plane-board-assignees'
+import {
+  usePlaneBoardCommentArea,
+  type PlaneBoardCommentArea
+} from './use-plane-board-comment-area'
 import { usePlaneBoardCreate, type PlaneBoardCreate } from './use-plane-board-create'
 import { usePlaneBoardEdits, type PlaneBoardEdits } from './use-plane-board-edits'
 import { usePlaneBoardMoves, type PlaneBoardMoves } from './use-plane-board-moves'
-import { usePlaneMembers, type PlaneMembers } from './use-plane-members'
 
 export type PlaneBoardStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
   Omit<PlaneBoardMoves, 'overrides' | 'reset' | 'moveWorkItem'> &
-  Omit<PlaneBoardComments, 'reset'> &
+  Omit<PlaneBoardCommentArea, 'reset'> &
+  PlaneBoardAssignees &
   PlaneBoardCreate & {
     status: PlaneBoardStatus
     error: string | null
@@ -47,13 +48,6 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     canCreate: boolean
     /** Priority edits ride plane.updateWorkItem, the same gate as create. */
     canEdit: boolean
-    /** False on a host that refuses plane.listMembers; no assignee picker renders at all. */
-    canAssign: boolean
-    /** Comments ride the same host gate as create; write-only, no thread is read. */
-    canComment: boolean
-    members: PlaneMembers['members']
-    membersStatus: PlaneMembers['status']
-    loadMembers: () => void
     selectProject: (projectId: string) => void
     selectColumn: (stateId: string) => void
     refresh: () => void
@@ -206,12 +200,12 @@ export function usePlaneBoard(
     moveWorkItem: submitMove,
     ...moveControls
   } = usePlaneBoardMoves({ client, workspaceId, items: loaded.items, reload })
-  const { reset: resetComments, ...commentControls } = usePlaneBoardComments({
+  const { reset: resetComments, ...commentArea } = usePlaneBoardCommentArea({
     client,
-    workspaceId
+    workspaceId,
+    capabilities
   })
-  const canAssign = arePlaneMembersListableByHost(capabilities)
-  const members = usePlaneMembers(client, projectId, workspaceId)
+  const assignees = usePlaneBoardAssignees({ client, projectId, workspaceId, capabilities })
 
   const columns = useMemo(
     () =>
@@ -294,18 +288,10 @@ export function usePlaneBoard(
     emptyState,
     canCreate: isPlaneBoardWritableByHost(capabilities),
     canEdit: isPlaneBoardWritableByHost(capabilities),
-    canAssign,
-    canComment: isPlaneBoardWritableByHost(capabilities),
-    members: members.members,
-    membersStatus: members.status,
-    loadMembers: useCallback(() => {
-      if (canAssign) {
-        members.load()
-      }
-    }, [canAssign, members.load]),
+    ...assignees,
     ...editControls,
     ...moveControls,
-    ...commentControls,
+    ...commentArea,
     ...creation,
     selectProject: useCallback(
       (next: string) => {
