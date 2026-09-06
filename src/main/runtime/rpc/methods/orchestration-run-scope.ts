@@ -1,9 +1,8 @@
 import type { OrchestrationCompatibilityEvidence } from '../../../../shared/orchestration-compatibility-evidence'
-import type { OrchestrationCompatibilityCallerAuthority } from '../../orca-runtime'
 import { orchestrationSkillRecoveryData } from '../../../../shared/orchestration-rpc-contract'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RunRow } from '../../orchestration/types'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { OrchestrationCompatibilityCallerAuthority, OrcaRuntimeService } from '../../orca-runtime'
 
 export type RunScopeParams = {
   runId?: string
