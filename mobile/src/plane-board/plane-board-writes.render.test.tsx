@@ -1,8 +1,6 @@
-import { act, createElement } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
-import type { RpcClient } from '../transport/rpc-client'
 import { markRpcDeliveryUnknown } from '../transport/rpc-delivery-ambiguity'
 
 // Why: lucide's circular ESM re-exports do not load under Vite's runner; icons are not under test.
@@ -17,17 +15,12 @@ vi.mock('lucide-react-native', async () => {
     }
   )
 })
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: () => {} }),
-  useLocalSearchParams: () => ({ hostId: 'host-1' })
-}))
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }))
-const hostClient = vi.hoisted(() => ({ client: null as RpcClient | null }))
-vi.mock('../transport/client-context', () => ({
-  useHostClient: () => ({ client: hostClient.client, state: 'connected' })
-}))
+vi.mock(
+  '@react-native-async-storage/async-storage',
+  () => import('../../test-doubles/async-storage-memory')
+)
 
-import PlaneBoardScreen from '../../app/h/[hostId]/plane-board'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
   MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
@@ -35,139 +28,32 @@ import {
 } from './plane-board-writes-capability'
 import { PLANE_COMMENT_UNANSWERED_MESSAGE } from './use-plane-board-comments'
 import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
+import {
+  byLabel,
+  callsTo,
+  CARD,
+  deviceStorage,
+  leafWithText,
+  mountBoard as mountBoardWith,
+  openCard,
+  press,
+  readsOf,
+  settle,
+  typeInto,
+  type HostBehaviour
+} from '../../test-doubles/plane-tasks-harness'
 
 const PHASE_1_HOST = ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY]
 const WRITING_HOST = [...PHASE_1_HOST, MOBILE_PLANE_BOARD_WRITES_CAPABILITY]
 const ASSIGNING_HOST = [...WRITING_HOST, MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY]
 
-const safeAreaMetrics = {
-  insets: { top: 0, bottom: 0, left: 0, right: 0 },
-  frame: { x: 0, y: 0, width: 390, height: 844 }
-}
-
-type Call = { method: string; params?: unknown }
-
-type HostBehaviour = {
-  /** Every board write rejects with this error, the way a dropped socket or a timeout does. */
-  rejectWrites?: Error
-  /** Only writes on this card reject; the rest succeed. */
-  rejectWritesFor?: string
-  /** Writes on this card never answer, a request still inside its budget. */
-  hangWritesFor?: string
-  items?: readonly unknown[]
-  /** What a re-read returns once a write was attempted: what Plane really holds. */
-  itemsAfterWrite?: readonly unknown[]
-}
-
-const CARD = {
-  id: 'wi-1',
-  identifier: 'ORCA-1',
-  title: 'Wire the retry',
-  url: '',
-  project: { id: 'proj-1', identifier: 'ORCA', name: 'Orca Lab' },
-  state: { id: 'state-1', name: 'Todo', group: 'unstarted' },
-  priority: 'none',
-  updatedAt: ''
-}
-
-function createClient(
-  capabilities: readonly string[],
-  calls: Call[],
-  behaviour: HostBehaviour = {}
-): RpcClient {
-  let writeAttempted = false
-  return {
-    sendRequest: vi.fn(async (method: string, params?: unknown) => {
-      calls.push({ method, params })
-      const reply = (result: unknown) => ({ id: '1', ok: true as const, result })
-      if (
-        method === 'plane.createWorkItem' ||
-        method === 'plane.updateWorkItem' ||
-        method === 'plane.addWorkItemComment'
-      ) {
-        writeAttempted = true
-        const workItemId = (params as { workItemId?: string } | undefined)?.workItemId
-        if (behaviour.hangWritesFor && workItemId === behaviour.hangWritesFor) {
-          return new Promise(() => {})
-        }
-        if (
-          behaviour.rejectWrites &&
-          (!behaviour.rejectWritesFor || workItemId === behaviour.rejectWritesFor)
-        ) {
-          throw behaviour.rejectWrites
-        }
-      }
-      switch (method) {
-        case 'status.get':
-          return reply({ hostPlatform: 'darwin', capabilities })
-        case 'plane.status':
-          return reply({
-            connected: true,
-            selectedWorkspaceId: 'ws-1',
-            workspaces: [{ id: 'ws-1', workspaceSlug: 'orca' }]
-          })
-        case 'plane.listProjects':
-          return reply([{ id: 'proj-1', identifier: 'ORCA', name: 'Orca Lab' }])
-        case 'plane.listStates':
-          return reply([
-            { id: 'state-1', name: 'Todo', group: 'unstarted', sequence: 1 },
-            { id: 'state-2', name: 'Doing', group: 'started', sequence: 2 }
-          ])
-        case 'plane.listWorkItems':
-          return reply((writeAttempted && behaviour.itemsAfterWrite) || behaviour.items || [])
-        case 'plane.createWorkItem':
-          return reply({ ok: true, id: 'wi-9', identifier: 'ORCA-9', url: '' })
-        case 'plane.updateWorkItem':
-          return reply({ ok: true })
-        case 'plane.addWorkItemComment':
-          return reply({ ok: true, id: 'c-1' })
-        case 'plane.listMembers':
-          return reply([
-            { id: 'u-1', displayName: 'Ada' },
-            { id: 'u-2', displayName: 'Grace' }
-          ])
-        default:
-          return new Promise(() => {})
-      }
-    })
-  } as unknown as RpcClient
-}
-
-function byLabel(label: string): HTMLElement | null {
-  return document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
-}
-
-function leafWithText(text: string, scope: ParentNode = document.body): HTMLElement | null {
-  for (const element of scope.querySelectorAll<HTMLElement>('div')) {
-    if (element.childElementCount === 0 && element.textContent === text) {
-      return element
-    }
-  }
-  return null
-}
-
-function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  // Why: React ignores a plain `.value =` on a controlled input; the prototype
-  // setter plus an input event is what a keystroke looks like to it.
-  const prototype =
-    input instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
-  if (!setter) {
-    throw new Error('HTMLInputElement has no value setter')
-  }
-  act(() => {
-    setter.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-}
-
-describe('PlaneBoardScreen create card (react-native-web)', () => {
+/** The writes the ORCA-367 slices bought, exercised through the board view of the Tasks screen. */
+describe('Plane board writes on the Tasks screen (react-native-web)', () => {
   let container: HTMLDivElement
   let root: Root
 
   beforeEach(() => {
+    deviceStorage.entries.clear()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -176,40 +62,10 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
-    hostClient.client = null
   })
 
-  async function settle(): Promise<void> {
-    for (let hop = 0; hop < 12; hop += 1) {
-      await act(async () => {
-        await Promise.resolve()
-      })
-    }
-  }
-
-  async function mountBoard(
-    capabilities: readonly string[],
-    behaviour: HostBehaviour = {}
-  ): Promise<Call[]> {
-    const calls: Call[] = []
-    hostClient.client = createClient(capabilities, calls, behaviour)
-    await act(async () => {
-      root.render(
-        createElement(
-          SafeAreaProvider,
-          { initialMetrics: safeAreaMetrics },
-          createElement(PlaneBoardScreen)
-        )
-      )
-    })
-    // The board reads status.get, plane.status, projects, then states + items;
-    // each hop is a microtask boundary.
-    await settle()
-    if (!calls.some((call) => call.method === 'plane.listStates')) {
-      throw new Error('board did not finish loading')
-    }
-    return calls
-  }
+  const mountBoard = (capabilities: readonly string[], behaviour: HostBehaviour = {}) =>
+    mountBoardWith(root, capabilities, behaviour)
 
   async function submitNewCard(title: string): Promise<HTMLInputElement> {
     act(() => byLabel('Add card')!.click())
@@ -226,22 +82,16 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     return input
   }
 
-  function readsOf(calls: Call[]): number {
-    return calls.filter((call) => call.method === 'plane.listWorkItems').length
-  }
-
   it('shows no add button at all on a host that would refuse the create', async () => {
     await mountBoard(PHASE_1_HOST)
 
-    // The screen is up (project picker rendered) and the columns loaded.
-    expect(byLabel('Choose project')).not.toBeNull()
     expect(byLabel('Todo, 0 cards')).not.toBeNull()
     expect(byLabel('Add card')).toBeNull()
   })
 
   it('creates a card in the column being looked at on a host that advertises writes', async () => {
     const calls = await mountBoard(WRITING_HOST)
-    const readsBeforeCreate = calls.filter((call) => call.method === 'plane.listWorkItems').length
+    const readsBeforeCreate = readsOf(calls)
     const addButton = byLabel('Add card')
     expect(addButton).not.toBeNull()
 
@@ -259,13 +109,9 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
       byLabel('Create card')!.click()
       await Promise.resolve()
     })
-    for (let hop = 0; hop < 6; hop += 1) {
-      await act(async () => {
-        await Promise.resolve()
-      })
-    }
+    await settle()
 
-    expect(calls.filter((call) => call.method === 'plane.createWorkItem')).toEqual([
+    expect(callsTo(calls, 'plane.createWorkItem')).toEqual([
       {
         method: 'plane.createWorkItem',
         params: {
@@ -277,9 +123,7 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
       }
     ])
     // The board re-reads so the new card shows up without a manual refresh.
-    expect(calls.filter((call) => call.method === 'plane.listWorkItems').length).toBe(
-      readsBeforeCreate + 1
-    )
+    expect(readsOf(calls)).toBe(readsBeforeCreate + 1)
   })
 
   it('lets the PM retry a create the transport dropped, draft intact', async () => {
@@ -288,14 +132,13 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     })
     const input = await submitNewCard('Ship the create drawer')
 
-    // The control for main: the sheet stayed on "Creating…" with no way out.
     expect(leafWithText('Creating…')).toBeNull()
     expect(leafWithText('Connection interrupted')).not.toBeNull()
     expect(input.value).toBe('Ship the create drawer')
     const retry = byLabel('Create card')
     expect(retry?.getAttribute('aria-disabled')).not.toBe('true')
     expect(leafWithText('Try again', retry!)).not.toBeNull()
-    expect(calls.filter((call) => call.method === 'plane.createWorkItem')).toHaveLength(1)
+    expect(callsTo(calls, 'plane.createWorkItem')).toHaveLength(1)
   })
 
   it('re-reads the board when a create times out and offers a retry only if the card is not there', async () => {
@@ -320,11 +163,10 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     })
     await submitNewCard('Ship the create drawer')
 
-    // The sheet closed as a success would; the board shows the card Plane holds.
     expect(byLabel('Card title')).toBeNull()
     expect(leafWithText('Try again')).toBeNull()
     expect(byLabel('Todo, 1 cards')).not.toBeNull()
-    expect(calls.filter((call) => call.method === 'plane.createWorkItem')).toHaveLength(1)
+    expect(callsTo(calls, 'plane.createWorkItem')).toHaveLength(1)
   })
 
   it('re-reads the board when a move times out: Plane may have taken it', async () => {
@@ -333,12 +175,8 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
       items: [CARD]
     })
     const readsBeforeMove = readsOf(calls)
-    act(() => byLabel('Wire the retry')!.click())
-    await act(async () => {
-      byLabel('Move to Doing')!.click()
-      await Promise.resolve()
-    })
-    await settle()
+    await openCard()
+    await press('Move to Doing')
 
     expect(readsOf(calls)).toBe(readsBeforeMove + 1)
     expect(leafWithText('Moving…')).toBeNull()
@@ -355,36 +193,14 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     })
     expect(byLabel('Todo, 1 cards')).not.toBeNull()
 
-    act(() => byLabel('Wire the retry')!.click())
-    await act(async () => {
-      byLabel('Move to Doing')!.click()
-      await Promise.resolve()
-    })
-    await settle()
+    await openCard()
+    await press('Move to Doing')
 
-    // The control for main: the card sat in Doing under "Moving…" forever.
     expect(leafWithText('Moving…')).toBeNull()
     expect(byLabel('Todo, 1 cards')).not.toBeNull()
     expect(byLabel('Doing, 0 cards')).not.toBeNull()
     expect(leafWithText('Could not move the card — Connection interrupted')).not.toBeNull()
   })
-
-  function callsTo(calls: Call[], method: string): Call[] {
-    return calls.filter((call) => call.method === method)
-  }
-
-  async function openCard(): Promise<void> {
-    act(() => byLabel('Wire the retry')!.click())
-    await settle()
-  }
-
-  async function press(label: string): Promise<void> {
-    await act(async () => {
-      byLabel(label)!.click()
-      await Promise.resolve()
-    })
-    await settle()
-  }
 
   it('shows neither a priority nor an assignee control on a phase-1 host', async () => {
     const calls = await mountBoard(PHASE_1_HOST, { items: [CARD] })
@@ -531,8 +347,7 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
 
     // Switching cards: the list stays mounted under the sheet, so a click on the
     // other card is what closing and reopening looks like to the screen.
-    act(() => byLabel('Second card')!.click())
-    await settle()
+    await press('Second card')
     expect(leafWithText('Could not update the card — Connection interrupted')).toBeNull()
     expect(byLabel('Try again')).toBeNull()
 
@@ -602,7 +417,6 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
     expect(byLabel('Try again')).not.toBeNull()
     expect(input.value).toBe('Looks good')
-    // Recoverable, not hung: the PM can edit and post again.
     expect(byLabel('Post comment')?.getAttribute('aria-disabled')).not.toBe('true')
     expect(callsTo(calls, 'plane.addWorkItemComment')).toHaveLength(1)
 
@@ -626,8 +440,6 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     expect(
       leafWithText(`Could not post the comment — ${PLANE_COMMENT_UNANSWERED_MESSAGE}`)
     ).not.toBeNull()
-    // A one-tap retry would post it twice if the host did take it; the draft stays
-    // so the PM can check the card in Plane and post again on purpose.
     expect(byLabel('Try again')).toBeNull()
     expect(input.value).toBe('Looks good')
     expect(byLabel('Post comment')?.getAttribute('aria-disabled')).not.toBe('true')
@@ -643,8 +455,7 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
 
-    act(() => byLabel('Second card')!.click())
-    await settle()
+    await press('Second card')
     expect(leafWithText(COMMENT_DROPPED)).toBeNull()
     expect(byLabel('Try again')).toBeNull()
 
@@ -669,13 +480,10 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
 
-    act(() => byLabel('Second card')!.click())
-    await settle()
+    await press('Second card')
     await postComment('Fine by me')
     expect(leafWithText('Comment posted')).not.toBeNull()
 
-    // The other card's success is not this card's: the failed text is the only
-    // copy the PM has, so it comes back with its error and its retry.
     await openCard()
     expect(leafWithText(COMMENT_DROPPED)).not.toBeNull()
     expect(commentInput().value).toBe('Looks good')
@@ -694,13 +502,10 @@ describe('PlaneBoardScreen create card (react-native-web)', () => {
     await postComment('Looks good')
     expect(leafWithText('Posting…')).not.toBeNull()
 
-    act(() => byLabel('Second card')!.click())
-    await settle()
+    await press('Second card')
     await postComment('Fine by me')
     expect(leafWithText('Comment posted')).not.toBeNull()
 
-    // A settled post elsewhere must not re-enable this card's button: a second
-    // tap would post the same comment twice.
     await openCard()
     expect(leafWithText('Posting…')).not.toBeNull()
     expect(byLabel('Post comment')?.getAttribute('aria-disabled')).toBe('true')

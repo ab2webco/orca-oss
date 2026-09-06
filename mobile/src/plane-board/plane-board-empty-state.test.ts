@@ -15,6 +15,12 @@ function column(name: string, itemCount: number): PlaneBoardColumn {
   }
 }
 
+/** Every column empty: the shape both "no work items" and "filter hid them all" share. */
+function emptyBoard(): Pick<PlaneBoardEmptyStateInput, 'columns' | 'activeColumn'> {
+  const columns = [column('Todo', 0), column('Done', 0)]
+  return { columns, activeColumn: columns[0]! }
+}
+
 function input(overrides: Partial<PlaneBoardEmptyStateInput> = {}): PlaneBoardEmptyStateInput {
   const columns = [column('Todo', 1), column('Done', 0)]
   return {
@@ -24,7 +30,7 @@ function input(overrides: Partial<PlaneBoardEmptyStateInput> = {}): PlaneBoardEm
     columns,
     activeColumn: columns[0]!,
     filtered: false,
-    unfilteredCount: 1,
+    hiddenCount: null,
     ...overrides
   }
 }
@@ -39,7 +45,7 @@ describe('plane board empty state', () => {
       ['disconnected', input({ planeConnected: false })],
       ['no-project', input({ projectId: null })],
       ['board-empty', input({ columns: [], activeColumn: null })],
-      ['filter-empty', input({ filtered: true, unfilteredCount: 4, activeColumn: column('T', 0) })],
+      ['filter-empty', input({ filtered: true, hiddenCount: 4, ...emptyBoard() })],
       ['column-empty', input({ activeColumn: column('Done', 0) })]
     ]
     const resolved = cases.map(([, value]) => resolvePlaneBoardEmptyState(value))
@@ -52,16 +58,14 @@ describe('plane board empty state', () => {
   })
 
   it('names the project that has no work items yet', () => {
-    const state = resolvePlaneBoardEmptyState(
-      input({ unfilteredCount: 0, activeColumn: column('Todo', 0) })
-    )
+    const state = resolvePlaneBoardEmptyState(input(emptyBoard()))
     expect(state).toMatchObject({ kind: 'board-empty', action: 'refresh' })
     expect(state?.title).toContain('Orca Lab')
   })
 
   it('counts what the filter is hiding rather than saying no items', () => {
     const state = resolvePlaneBoardEmptyState(
-      input({ filtered: true, unfilteredCount: 4, activeColumn: column('Todo', 0) })
+      input({ filtered: true, hiddenCount: 4, ...emptyBoard() })
     )
     expect(state).toMatchObject({ kind: 'filter-empty', action: 'clear-filter' })
     expect(state?.body).toContain('4 cards')
@@ -69,9 +73,24 @@ describe('plane board empty state', () => {
 
   it('singularises the hidden-card count', () => {
     const state = resolvePlaneBoardEmptyState(
-      input({ filtered: true, unfilteredCount: 1, activeColumn: column('Todo', 0) })
+      input({ filtered: true, hiddenCount: 1, ...emptyBoard() })
     )
     expect(state?.body).toContain('1 card in this project is hidden')
+  })
+
+  it('still names the filter when the host filtered and nothing can be counted', () => {
+    const state = resolvePlaneBoardEmptyState(
+      input({ filtered: true, hiddenCount: null, ...emptyBoard() })
+    )
+    expect(state).toMatchObject({ kind: 'filter-empty', action: 'clear-filter' })
+    expect(state?.body).toContain('hidden by the current search or filter')
+  })
+
+  it('does not blame the filter while a card is still visible in another column', () => {
+    // The filter narrowed the board, but the active column is what is empty.
+    expect(
+      resolvePlaneBoardEmptyState(input({ filtered: true, activeColumn: column('Done', 0) }))
+    ).toMatchObject({ kind: 'column-empty' })
   })
 
   it('offers no action for an empty column, because there is nothing to press', () => {

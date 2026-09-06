@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
+import type { PlaneBoardScope } from './plane-board-scope'
 import { usePlaneBoard, type PlaneBoard, type PlaneBoardStatus } from './use-plane-board'
 
 const CAPABILITIES = [
@@ -36,9 +37,30 @@ function card(projectIndex: number) {
   }
 }
 
+// The board reads a scope the Tasks screen owns; it no longer fetches status or the
+// project list itself, so a change of project or connection is a scope prop change.
+function scopeFor(
+  projectId: string | null,
+  overrides: Partial<PlaneBoardScope> = {}
+): PlaneBoardScope {
+  const project = PROJECTS.find((entry) => entry.id === projectId) ?? null
+  return {
+    enabled: true,
+    planeConnected: true,
+    workspaceId: 'ws-1',
+    projectId,
+    projectName: project ? project.name : null,
+    filter: 'all',
+    query: '',
+    ...overrides
+  }
+}
+
 type MountOptions = {
-  connected?: boolean
+  scope?: PlaneBoardScope
   hangWorkItems?: boolean
+  /** Resolve the first N listWorkItems reads, then hang — models a refresh that never returns. */
+  hangWorkItemsAfter?: number
   capabilities?: readonly string[] | undefined
 }
 
@@ -46,21 +68,17 @@ function mountBoard(options: MountOptions = {}) {
   const statuses: PlaneBoardStatus[] = []
   const calls: { method: string; params: unknown }[] = []
   let latest: PlaneBoard | null = null
+  let workItemReads = 0
   const reply = (result: unknown) => ({ id: '1', ok: true, result })
   const client = {
     sendRequest: (method: string, params?: unknown) => {
       calls.push({ method, params })
       switch (method) {
-        case 'plane.status':
-          return Promise.resolve(
-            reply({ connected: true, selectedWorkspaceId: 'ws-1', workspaces: [] })
-          )
-        case 'plane.listProjects':
-          return Promise.resolve(reply(PROJECTS))
         case 'plane.listStates':
           return Promise.resolve(reply(STATES))
         case 'plane.listWorkItems': {
-          if (options.hangWorkItems) {
+          workItemReads += 1
+          if (options.hangWorkItems || (options.hangWorkItemsAfter ?? Infinity) < workItemReads) {
             return new Promise(() => {})
           }
           const projectId = (params as { projectId?: string } | undefined)?.projectId
@@ -72,10 +90,10 @@ function mountBoard(options: MountOptions = {}) {
     }
   } as unknown as RpcClient
 
-  type ProbeProps = { connected: boolean; capabilities: readonly string[] | undefined }
+  type ProbeProps = { scope: PlaneBoardScope; capabilities: readonly string[] | undefined }
 
-  function Probe({ connected, capabilities }: ProbeProps) {
-    const board = usePlaneBoard(client, connected, capabilities)
+  function Probe({ scope, capabilities }: ProbeProps) {
+    const board = usePlaneBoard(client, capabilities, scope)
     latest = board
     statuses.push(board.status)
     return null
@@ -83,7 +101,7 @@ function mountBoard(options: MountOptions = {}) {
 
   let renderer!: ReactTestRenderer
   const props: ProbeProps = {
-    connected: options.connected ?? true,
+    scope: options.scope ?? scopeFor('p1'),
     capabilities: 'capabilities' in options ? options.capabilities : CAPABILITIES
   }
   act(() => {
@@ -104,18 +122,8 @@ function mountBoard(options: MountOptions = {}) {
       return statuses.filter((entry, index) => entry === 'loading' && statuses[index - 1] !== entry)
         .length
     },
-    /** Every status the board rendered before its first settled read. */
-    beforeFirstRead(): PlaneBoardStatus[] {
-      return [...new Set(statuses.slice(0, statuses.indexOf('ready')))]
-    },
-    setConnected(connected: boolean): void {
-      props.connected = connected
-      act(() => {
-        renderer.update(createElement(Probe, { ...props }))
-      })
-    },
-    setCapabilities(capabilities: readonly string[]): void {
-      props.capabilities = capabilities
+    setScope(scope: PlaneBoardScope): void {
+      props.scope = scope
       act(() => {
         renderer.update(createElement(Probe, { ...props }))
       })
@@ -140,20 +148,51 @@ describe('usePlaneBoard load lifecycle', () => {
     expect(mounted.calls.filter((call) => call.method === 'plane.listWorkItems')).toHaveLength(1)
   })
 
-  it('stays idle when it mounts disconnected', async () => {
-    const mounted = mountBoard({ connected: false })
+  it('starts the very first render on the spinner, so no empty board flashes before the read', async () => {
+    // ORCA-387: a mount that is going to read must open on 'loading', not settle 'idle'
+    // for a frame and paint an empty board first. Read before settle: this is the mount render.
+    const mounted = mountBoard()
+    expect(mounted.statuses[0]).toBe('loading')
+
+    await mounted.settle()
+    expect(mounted.board.status).toBe('ready')
+  })
+
+  it('stays idle from the first render when it mounts with no project to read', async () => {
+    const mounted = mountBoard({ scope: scopeFor(null) })
+    // The negative branch of the same guard: nothing to read, so no spinner at all.
+    expect(mounted.statuses[0]).toBe('idle')
+
     await mounted.settle()
 
     expect(mounted.board.status).toBe('idle')
     expect(mounted.board.error).toBeNull()
+    expect(mounted.board.emptyState?.kind).toBe('no-project')
     expect(mounted.loadingTransitions()).toBe(0)
+    expect(mounted.calls).toHaveLength(0)
+  })
+
+  it('settles disconnected on an empty state without reading, from the first render', async () => {
+    // The hook no longer probes the host itself; the caller passes planeConnected, so a host
+    // that reports no Plane arrives here as planeConnected=false. It must settle showing the
+    // cause, not spin and not read (the behavior main covered inside the hook's capability read).
+    const mounted = mountBoard({ scope: scopeFor('p1', { planeConnected: false }) })
+    expect(mounted.statuses[0]).toBe('idle')
+
+    await mounted.settle()
+
+    expect(mounted.board.status).toBe('idle')
+    expect(mounted.board.error).toBeNull()
+    expect(mounted.board.emptyState?.kind).toBe('disconnected')
+    expect(mounted.loadingTransitions()).toBe(0)
+    expect(mounted.calls).toHaveLength(0)
   })
 
   it('paints one spinner when a board mounted disconnected reconnects', async () => {
-    const mounted = mountBoard({ connected: false })
+    const mounted = mountBoard({ scope: scopeFor('p1', { planeConnected: false }) })
     await mounted.settle()
 
-    mounted.setConnected(true)
+    mounted.setScope(scopeFor('p1'))
     await mounted.settle()
 
     expect(mounted.board.status).toBe('ready')
@@ -161,12 +200,27 @@ describe('usePlaneBoard load lifecycle', () => {
     expect(mounted.calls.filter((call) => call.method === 'plane.listWorkItems')).toHaveLength(1)
   })
 
+  it('masks a settled board behind the disconnected empty state when it loses connection', async () => {
+    const mounted = mountBoard()
+    await mounted.settle()
+    expect(mounted.board.status).toBe('ready')
+    expect(mounted.board.columns.length).toBeGreaterThan(0)
+
+    mounted.setScope(scopeFor('p1', { planeConnected: false }))
+    await mounted.settle()
+
+    // ready → idle: the disconnected cause takes over so the stale columns never show through.
+    expect(mounted.board.status).toBe('idle')
+    expect(mounted.board.error).toBeNull()
+    expect(mounted.board.emptyState?.kind).toBe('disconnected')
+  })
+
   it('reloads behind a spinner when the project changes', async () => {
     const mounted = mountBoard()
     await mounted.settle()
     const before = mounted.loadingTransitions()
 
-    act(() => mounted.board.selectProject('p2'))
+    mounted.setScope(scopeFor('p2'))
     await mounted.settle()
 
     expect(mounted.loadingTransitions()).toBe(before + 1)
@@ -180,19 +234,35 @@ describe('usePlaneBoard load lifecycle', () => {
     ).toContain('p2')
   })
 
-  it('does not reload when the picker taps the project already open', async () => {
+  it('does not reload when it re-renders with the same scope', async () => {
     const mounted = mountBoard()
     await mounted.settle()
     const before = mounted.loadingTransitions()
     const reads = mounted.calls.filter((call) => call.method === 'plane.listWorkItems').length
 
-    act(() => mounted.board.selectProject('p1'))
+    mounted.setScope(scopeFor('p1'))
     await mounted.settle()
 
     expect(mounted.loadingTransitions()).toBe(before)
     expect(mounted.calls.filter((call) => call.method === 'plane.listWorkItems')).toHaveLength(
       reads
     )
+  })
+
+  it('clears the pull-to-refresh spinner if the connection drops while a refresh is in flight', async () => {
+    // First read resolves (ready); the refresh below hangs, so refreshing stays true until
+    // the disconnect. The superseded read never runs its finally, so the guard must clear it.
+    const mounted = mountBoard({ hangWorkItemsAfter: 1 })
+    await mounted.settle()
+    expect(mounted.board.status).toBe('ready')
+
+    act(() => mounted.board.refresh())
+    await mounted.settle()
+    expect(mounted.board.refreshing).toBe(true)
+
+    mounted.setScope(scopeFor('p1', { planeConnected: false }))
+    await mounted.settle()
+    expect(mounted.board.refreshing).toBe(false)
   })
 
   it('refreshes without repainting the spinner', async () => {
@@ -208,59 +278,46 @@ describe('usePlaneBoard load lifecycle', () => {
     expect(mounted.board.refreshing).toBe(false)
   })
 
-  it('leaves the spinner when the connection drops mid-load', async () => {
+  it('leaves the spinner for an error when the connection drops mid-load', async () => {
     const mounted = mountBoard({ hangWorkItems: true })
     await mounted.settle()
     expect(mounted.board.status).toBe('loading')
 
-    mounted.setConnected(false)
+    mounted.setScope(scopeFor('p1', { planeConnected: false }))
     await mounted.settle()
 
     const stuck = mounted.board.status === 'loading' && mounted.board.error === null
     expect(stuck).toBe(false)
-    expect(mounted.board.error).not.toBeNull()
-  })
-})
-
-describe('usePlaneBoard while the host capability list is still pending', () => {
-  it('waits behind one spinner instead of painting an empty board first', async () => {
-    const mounted = mountBoard({ capabilities: undefined })
-    await mounted.settle()
-    expect(mounted.board.status).toBe('loading')
-    expect(mounted.calls).toHaveLength(0)
-
-    mounted.setCapabilities(CAPABILITIES)
-    await mounted.settle()
-
-    expect(mounted.beforeFirstRead()).toEqual(['loading'])
-    expect(mounted.loadingTransitions()).toBe(1)
-    expect(mounted.board.status).toBe('ready')
-    expect(mounted.board.columns[0]?.items[0]?.id).toBe('wi-p1')
-    expect(mounted.calls.filter((call) => call.method === 'plane.listWorkItems')).toHaveLength(1)
-  })
-
-  it('settles on a host that answers the capability read with nothing', async () => {
-    const mounted = mountBoard({ capabilities: undefined })
-    await mounted.settle()
-
-    mounted.setCapabilities([])
-    await mounted.settle()
-
-    expect(mounted.board.status).toBe('ready')
-    expect(mounted.loadingTransitions()).toBe(1)
-    expect(mounted.board.emptyState).not.toBeNull()
-    expect(mounted.calls).toHaveLength(0)
-  })
-
-  it('leaves the spinner when the connection drops before the list arrives', async () => {
-    const mounted = mountBoard({ capabilities: undefined })
-    await mounted.settle()
-    expect(mounted.board.status).toBe('loading')
-
-    mounted.setConnected(false)
-    await mounted.settle()
-
     expect(mounted.board.status).toBe('error')
     expect(mounted.board.error).not.toBeNull()
+  })
+
+  it('never renders one project’s rows under another while the new read is in flight', async () => {
+    // Guard: current = loaded.projectId === projectId ? loaded : EMPTY_LOADED. p1 resolves,
+    // p2 hangs; the cached p1 rows must not show under p2.
+    const mounted = mountBoard({ hangWorkItemsAfter: 1 })
+    await mounted.settle()
+    expect(mounted.board.columns.flatMap((column) => column.items).map((item) => item.id)).toEqual([
+      'wi-p1'
+    ])
+
+    mounted.setScope(scopeFor('p2'))
+    await mounted.settle()
+
+    expect(mounted.board.status).toBe('loading')
+    expect(mounted.board.columns.flatMap((column) => column.items)).toHaveLength(0)
+  })
+
+  it('drops the column selection when the project changes', async () => {
+    const mounted = mountBoard()
+    await mounted.settle()
+    act(() => mounted.board.selectColumn('s-done'))
+    expect(mounted.board.activeStateId).toBe('s-done')
+
+    mounted.setScope(scopeFor('p2'))
+    await mounted.settle()
+
+    // The p1 selection must not carry into p2; the board falls back to p2's first column.
+    expect(mounted.board.activeStateId).toBe('s-todo')
   })
 })

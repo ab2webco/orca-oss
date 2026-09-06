@@ -25,10 +25,19 @@ export type PlaneBoardEmptyStateInput = {
   projectName: string | null
   columns: readonly PlaneBoardColumn[]
   activeColumn: PlaneBoardColumn | null
-  /** True when a search or state filter is narrowing the board. */
+  /** True when a search or filter is narrowing the board. */
   filtered: boolean
-  /** Cards the host returned before this client filtered them. */
-  unfilteredCount: number
+  /** Cards the filter hid, or null when the host filtered and the client cannot count them. */
+  hiddenCount: number | null
+}
+
+function hiddenCardsBody(hiddenCount: number | null): string {
+  if (hiddenCount === null) {
+    return 'Cards in this project are hidden by the current search or filter.'
+  }
+  return hiddenCount === 1
+    ? '1 card in this project is hidden by the current search or filter.'
+    : `${hiddenCount} cards in this project are hidden by the current search or filter.`
 }
 
 export function resolvePlaneBoardEmptyState(
@@ -61,19 +70,17 @@ export function resolvePlaneBoardEmptyState(
       actionLabel: 'Refresh'
     }
   }
-  if (input.filtered && input.unfilteredCount > 0) {
+  const visibleCount = input.columns.reduce((count, column) => count + column.items.length, 0)
+  if (visibleCount === 0 && input.filtered) {
     return {
       kind: 'filter-empty',
       title: 'No cards match the filter',
-      body:
-        input.unfilteredCount === 1
-          ? '1 card in this project is hidden by the current search or state filter.'
-          : `${input.unfilteredCount} cards in this project are hidden by the current search or state filter.`,
+      body: hiddenCardsBody(input.hiddenCount),
       action: 'clear-filter',
       actionLabel: 'Clear filter'
     }
   }
-  if (input.unfilteredCount === 0) {
+  if (visibleCount === 0) {
     return {
       kind: 'board-empty',
       title: `${input.projectName ?? 'This project'} has no work items`,

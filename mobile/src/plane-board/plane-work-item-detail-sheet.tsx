@@ -18,12 +18,30 @@ type Props = {
   board: PlaneBoard
   onMove: (stateId: string) => void
   onClose: () => void
+  /** Copy the card's share link; omitted hides the action, as GitHub/Linear also do. */
+  onCopyLink?: (url: string) => void
+  copied?: boolean
 }
 
-export function PlaneWorkItemDetailSheet({ item, board, onMove, onClose }: Props) {
+export function PlaneWorkItemDetailSheet({
+  item,
+  board,
+  onMove,
+  onClose,
+  onCopyLink,
+  copied
+}: Props) {
   return (
     <BottomDrawer visible={item !== null} onClose={onClose}>
-      {item ? <SheetBody item={item} board={board} onMove={onMove} /> : null}
+      {item ? (
+        <SheetBody
+          item={item}
+          board={board}
+          onMove={onMove}
+          onCopyLink={onCopyLink}
+          copied={copied}
+        />
+      ) : null}
     </BottomDrawer>
   )
 }
@@ -39,7 +57,7 @@ function toggledAssignees(
 
 type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
 
-function SheetBody({ item, board, onMove }: BodyProps) {
+function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
   const editing = board.editingWorkItemIds.has(item.id)
   const moving = board.movingWorkItemIds.has(item.id)
   const failure = board.commentFailures[item.id] ?? null
@@ -61,6 +79,8 @@ function SheetBody({ item, board, onMove }: BodyProps) {
       <PlaneWorkItemDetail
         item={createPlaneTask(item)}
         onOpenInBrowser={(url) => void Linking.openURL(url)}
+        onCopyLink={onCopyLink}
+        copied={copied}
       />
       {board.canEdit ? (
         <View style={styles.section}>
@@ -153,28 +173,54 @@ function SheetBody({ item, board, onMove }: BodyProps) {
           onDismissError={() => board.dismissCommentError(item.id)}
         />
       ) : null}
+      {board.moveError && board.moveErrorWorkItemId === item.id ? (
+        <PlaneBoardWriteErrorRow
+          message={`Could not move the card — ${board.moveError}`}
+          onRetry={null}
+          onDismiss={board.dismissMoveError}
+        />
+      ) : null}
       <View style={styles.section}>
         <Text style={styles.label}>Move to</Text>
-        {board.columns
-          .filter((column) => column.stateId !== item.state.id)
-          .map((column) => (
-            <Pressable
-              key={column.stateId}
-              accessibilityRole="button"
-              accessibilityLabel={`Move to ${column.name}`}
-              disabled={moving}
-              style={styles.row}
-              onPress={() => onMove(column.stateId)}
-            >
-              <Text style={styles.rowText}>{column.name}</Text>
-              <Text style={styles.rowMeta}>{column.items.length}</Text>
-            </Pressable>
-          ))}
-        {board.columns.length < 2 ? (
-          <Text style={styles.note}>
-            This project has only one column, so there is nowhere to move this card.
-          </Text>
-        ) : null}
+        {board.status === 'loading' ? (
+          // In list mode the board only reads this card's project on open, so columns are
+          // empty during that round trip — don't claim "one column" until it settles.
+          <Text style={styles.note}>Loading the board…</Text>
+        ) : board.status === 'error' ? (
+          // PlaneBoardView is not mounted in list mode, so the read error surfaces here.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading the board"
+            style={styles.row}
+            onPress={board.refresh}
+          >
+            <Text style={styles.errorText}>{board.error ?? 'Could not load the board'}</Text>
+            <Text style={styles.rowMeta}>Retry</Text>
+          </Pressable>
+        ) : (
+          <>
+            {board.columns
+              .filter((column) => column.stateId !== item.state.id)
+              .map((column) => (
+                <Pressable
+                  key={column.stateId}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move to ${column.name}`}
+                  disabled={moving}
+                  style={styles.row}
+                  onPress={() => onMove(column.stateId)}
+                >
+                  <Text style={styles.rowText}>{column.name}</Text>
+                  <Text style={styles.rowMeta}>{column.items.length}</Text>
+                </Pressable>
+              ))}
+            {board.columns.length < 2 ? (
+              <Text style={styles.note}>
+                This project has only one column, so there is nowhere to move this card.
+              </Text>
+            ) : null}
+          </>
+        )}
       </View>
     </View>
   )

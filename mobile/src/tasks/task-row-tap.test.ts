@@ -56,8 +56,16 @@ describe('tasks route row tap wiring', () => {
     expect(rowPress).not.toContain('Linking.openURL(item.source.url)')
   })
 
-  it('renders the Plane detail drawer', () => {
-    expect(source).toContain('<PlaneWorkItemDetail')
-    expect(source).toContain('planeDetailItem != null')
+  it('opens the one Plane detail from a row: the full sheet, not a read-only drawer', () => {
+    const surface = block('<PlaneTasksSurface', '/>')
+    expect(surface).toContain('detailItem={planeDetailItem?.source ?? null}')
+    expect(surface).toContain('viewMode={planeViewMode}')
+    // Copy link rode the removed read-only drawer; it must be wired through the surface now,
+    // or Plane silently loses the action GitHub and Linear keep (ORCA-385 blocker).
+    expect(surface).toContain('onCopyLink=')
+    expect(surface).toContain('copyTaskLink(')
+    expect(source).not.toContain('<PlaneWorkItemDetail')
+    // ORCA-385: the board is a view of this screen, not a route behind a door.
+    expect(source).not.toContain('use-open-mobile-plane-board')
   })
 })

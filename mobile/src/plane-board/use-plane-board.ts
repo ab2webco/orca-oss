@@ -1,21 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RpcClient } from '../transport/rpc-client'
-import {
-  fetchPlaneProjects,
-  fetchPlaneStates,
-  fetchPlaneWorkItems,
-  readPlaneAvailability,
-  type PlaneMobileAvailability
-} from '../tasks/plane-mobile-task-source'
-import {
-  resolvePlaneWorkspaceId,
-  type PlaneMobileProject,
-  type PlaneMobileState,
-  type PlaneMobileWorkItem
-} from '../tasks/plane-mobile-work-item-read'
+import { fetchPlaneStates, fetchPlaneWorkItems } from '../tasks/plane-mobile-task-source'
+import type { PlaneMobileState, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import { buildPlaneBoardColumns, type PlaneBoardColumn } from './plane-board-columns'
 import { applyPlaneBoardMoves } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
+import { isPlaneBoardFiltered, type PlaneBoardScope } from './plane-board-scope'
 import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
 import { applyPlaneBoardEdits } from './plane-board-edit-state'
 import { usePlaneBoardAssignees, type PlaneBoardAssignees } from './use-plane-board-assignees'
@@ -37,7 +27,6 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     status: PlaneBoardStatus
     error: string | null
     refreshing: boolean
-    projects: PlaneMobileProject[]
     projectId: string | null
     projectName: string | null
     columns: PlaneBoardColumn[]
@@ -48,74 +37,67 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     canCreate: boolean
     /** Priority edits ride plane.updateWorkItem, the same gate as create. */
     canEdit: boolean
-    selectProject: (projectId: string) => void
     selectColumn: (stateId: string) => void
     refresh: () => void
-    moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<void>
+    /** Resolves true when the move stuck (or was a no-op), false when it was rolled back. */
+    moveWorkItem: (item: PlaneMobileWorkItem, stateId: string) => Promise<boolean>
   }
 
 type Loaded = {
-  availability: PlaneMobileAvailability
-  projects: PlaneMobileProject[]
+  /** The project these rows belong to; rows of another project are never shown. */
+  projectId: string | null
   states: PlaneMobileState[]
   items: PlaneMobileWorkItem[]
 }
 
-const EMPTY_LOADED: Loaded = {
-  availability: { supported: false, connected: false, status: null },
-  projects: [],
-  states: [],
-  items: []
-}
+const EMPTY_LOADED: Loaded = { projectId: null, states: [], items: [] }
 
 export function usePlaneBoard(
   client: RpcClient | null,
-  connected: boolean,
-  capabilities: readonly string[] | undefined
+  capabilities: readonly string[] | undefined,
+  scope: PlaneBoardScope
 ): PlaneBoard {
+  const { enabled, planeConnected, workspaceId, projectId, projectName, filter, query } = scope
   const [loaded, setLoaded] = useState<Loaded>(EMPTY_LOADED)
-  // A mount that is going to read starts on the spinner, so no empty board flashes before it.
-  const initialStatus: PlaneBoardStatus = client && connected ? 'loading' : 'idle'
+  // A mount that is going to read starts on the spinner, so no empty board flashes before it (ORCA-387).
+  const initialStatus: PlaneBoardStatus =
+    client !== null && enabled && planeConnected && projectId !== null ? 'loading' : 'idle'
   const [status, setStatusState] = useState<PlaneBoardStatus>(initialStatus)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [projectId, setProjectId] = useState<string | null>(null)
-  const [activeStateId, setActiveStateId] = useState<string | null>(null)
+  // Keyed by project so a project change lands on the first column without an effect.
+  const [activeSelection, setActiveSelection] = useState<{
+    projectId: string | null
+    stateId: string
+  } | null>(null)
+  const activeStateId = activeSelection?.projectId === projectId ? activeSelection.stateId : null
   const generationRef = useRef(0)
-  const projectIdRef = useRef<string | null>(null)
+  // Mirrored so the disconnect branch can read the live status without load depending on it (ORCA-387).
   const statusRef = useRef<PlaneBoardStatus>(initialStatus)
-
-  // Mirrored so load can read the status without depending on it, which would re-fire the mount effect.
   const setStatus = useCallback((next: PlaneBoardStatus) => {
     statusRef.current = next
     setStatusState(next)
   }, [])
 
-  const applyProjectId = useCallback((next: string | null) => {
-    projectIdRef.current = next
-    setProjectId(next)
-  }, [])
-
   // Resolves the items it put on screen, or null when it lost to a newer read.
   const load = useCallback(
     async (options: { silent?: boolean } = {}): Promise<PlaneMobileWorkItem[] | null> => {
-      if (!client || !connected) {
-        generationRef.current += 1
+      const generation = generationRef.current + 1
+      generationRef.current = generation
+      if (!client || !enabled || !planeConnected || !projectId) {
+        // A superseded in-flight silent read skips its own finally (isCurrent() is now false),
+        // so clear the pull-to-refresh spinner here or it sticks forever (ORCA-387).
         setRefreshing(false)
-        // Only a spinner already on screen needs an exit; a board mounted disconnected stays idle.
+        // A spinner already up and no longer able to read becomes a visible error, not a pinned spinner (ORCA-387).
         if (statusRef.current === 'loading') {
           setError('Lost the connection to the host')
           setStatus('error')
+        } else {
+          setError(null)
+          setStatus('idle')
         }
         return null
       }
-      if (capabilities === undefined) {
-        // The list decides whether Plane is readable at all; reading now would paint a false empty board.
-        setStatus('loading')
-        return null
-      }
-      const generation = generationRef.current + 1
-      generationRef.current = generation
       const isCurrent = (): boolean => generationRef.current === generation
       if (options.silent) {
         setRefreshing(true)
@@ -124,42 +106,14 @@ export function usePlaneBoard(
       }
       setError(null)
       try {
-        const availability = await readPlaneAvailability(capabilities, () =>
-          client.sendRequest('plane.status')
-        )
-        if (!isCurrent()) {
-          return null
-        }
-        if (!availability.connected) {
-          setLoaded({ ...EMPTY_LOADED, availability })
-          setStatus('ready')
-          return []
-        }
-        const workspaceId = resolvePlaneWorkspaceId(availability.status)
-        const projects = await fetchPlaneProjects(client, workspaceId)
-        if (!isCurrent()) {
-          return null
-        }
-        const nextProjectId = projectIdRef.current ?? projects[0]?.id ?? null
-        if (!nextProjectId) {
-          setLoaded({ availability, projects, states: [], items: [] })
-          setStatus('ready')
-          return []
-        }
         const [states, items] = await Promise.all([
-          fetchPlaneStates(client, nextProjectId, workspaceId),
-          fetchPlaneWorkItems(client, {
-            query: '',
-            filter: 'all',
-            projectId: nextProjectId,
-            workspaceId
-          })
+          fetchPlaneStates(client, projectId, workspaceId),
+          fetchPlaneWorkItems(client, { query, filter, projectId, workspaceId })
         ])
         if (!isCurrent()) {
           return null
         }
-        applyProjectId(nextProjectId)
-        setLoaded({ availability, projects, states, items })
+        setLoaded({ projectId, states, items })
         setStatus('ready')
         return items
       } catch (err) {
@@ -175,95 +129,89 @@ export function usePlaneBoard(
         }
       }
     },
-    [applyProjectId, capabilities, client, connected, setStatus]
+    [client, enabled, filter, planeConnected, projectId, query, setStatus, workspaceId]
   )
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const workspaceId = useMemo(
-    () => resolvePlaneWorkspaceId(loaded.availability.status),
-    [loaded.availability]
-  )
+  // Rows read for another project stay cached for its next open but never render.
+  const current = loaded.projectId === projectId ? loaded : EMPTY_LOADED
 
   const reload = useCallback(() => load({ silent: true }), [load])
-  // Destructured so the spread below cannot leak overrides/reset onto the board.
+  // Destructured so the spread below cannot leak overrides/reset onto the board. reset is
+  // intentionally dropped: nothing resets these on the mobile board (see note below).
   const {
     overrides,
-    reset: resetEdits,
+    reset: _resetEdits,
     ...editControls
-  } = usePlaneBoardEdits({ client, workspaceId, items: loaded.items, reload })
+  } = usePlaneBoardEdits({ client, workspaceId, items: current.items, reload })
   const {
     overrides: moves,
-    reset: resetMoves,
+    reset: _resetMoves,
     moveWorkItem: submitMove,
     ...moveControls
-  } = usePlaneBoardMoves({ client, workspaceId, items: loaded.items, reload })
-  const { reset: resetComments, ...commentArea } = usePlaneBoardCommentArea({
+  } = usePlaneBoardMoves({ client, workspaceId, items: current.items, reload })
+  const { reset: _resetComments, ...commentArea } = usePlaneBoardCommentArea({
     client,
     workspaceId,
     capabilities
   })
+  // Why not reset on !enabled: enabled drops on any relay blip (it requires a live
+  // connection), and resetComments would wipe the body of a comment the host rejected —
+  // the PM's only copy, kept on purpose since ORCA-367. Optimistic overrides are keyed by
+  // card and reconciled on every read, so they self-clean; there is nothing to reset here.
   const assignees = usePlaneBoardAssignees({ client, projectId, workspaceId, capabilities })
 
   const columns = useMemo(
     () =>
       buildPlaneBoardColumns(
-        loaded.states,
-        applyPlaneBoardEdits(applyPlaneBoardMoves(loaded.items, moves, loaded.states), overrides)
+        current.states,
+        applyPlaneBoardEdits(applyPlaneBoardMoves(current.items, moves, current.states), overrides)
       ),
-    [overrides, loaded.items, loaded.states, moves]
+    [overrides, current.items, current.states, moves]
   )
   const activeColumn = useMemo(
     () => columns.find((column) => column.stateId === activeStateId) ?? columns[0] ?? null,
     [activeStateId, columns]
   )
-  const projectName = useMemo(() => {
-    const project = loaded.projects.find((entry) => entry.id === projectId)
-    return project ? project.name || project.identifier : null
-  }, [loaded.projects, projectId])
 
+  const filtered = isPlaneBoardFiltered(scope)
   const emptyState = useMemo(
     () =>
       status === 'loading'
         ? null
         : resolvePlaneBoardEmptyState({
-            planeConnected: loaded.availability.connected,
+            planeConnected,
             projectId,
             projectName,
             columns,
             activeColumn,
-            // Phase 1 has no board-side filter yet; the input stays so the
-            // filter-empty case cannot silently collapse into board-empty.
-            filtered: false,
-            unfilteredCount: loaded.items.length
+            filtered,
+            // The host applied the filter, so what it hid cannot be counted here.
+            hiddenCount: null
           }),
-    [
-      activeColumn,
-      columns,
-      loaded.availability.connected,
-      loaded.items.length,
-      projectId,
-      projectName,
-      status
-    ]
+    [activeColumn, columns, filtered, planeConnected, projectId, projectName, status]
   )
 
   // Follows the card to its new column, and back only if the user is still looking there.
   const moveWorkItem = useCallback(
-    async (item: PlaneMobileWorkItem, stateId: string): Promise<void> => {
+    async (item: PlaneMobileWorkItem, stateId: string): Promise<boolean> => {
       if (stateId === item.state.id) {
-        return
+        return true
       }
       const previousStateId = item.state.id
-      setActiveStateId(stateId)
+      setActiveSelection({ projectId, stateId })
       const kept = await submitMove(item, stateId)
       if (!kept) {
-        setActiveStateId((current) => (current === stateId ? previousStateId : current))
+        setActiveSelection((current) =>
+          current?.stateId === stateId ? { projectId, stateId: previousStateId } : current
+        )
       }
+      return kept
     },
-    [submitMove]
+    [projectId, submitMove]
   )
 
   const creation = usePlaneBoardCreate({
@@ -271,7 +219,7 @@ export function usePlaneBoard(
     projectId,
     workspaceId,
     stateId: activeColumn?.stateId ?? null,
-    items: loaded.items,
+    items: current.items,
     reload
   })
 
@@ -279,7 +227,6 @@ export function usePlaneBoard(
     status,
     error,
     refreshing,
-    projects: loaded.projects,
     projectId,
     projectName,
     columns,
@@ -288,26 +235,15 @@ export function usePlaneBoard(
     emptyState,
     canCreate: isPlaneBoardWritableByHost(capabilities),
     canEdit: isPlaneBoardWritableByHost(capabilities),
-    ...assignees,
     ...editControls,
     ...moveControls,
+    ...assignees,
     ...commentArea,
     ...creation,
-    selectProject: useCallback(
-      (next: string) => {
-        if (next === projectIdRef.current) {
-          return
-        }
-        applyProjectId(next)
-        setActiveStateId(null)
-        resetMoves()
-        resetEdits()
-        resetComments()
-        void load()
-      },
-      [applyProjectId, load, resetComments, resetEdits, resetMoves]
+    selectColumn: useCallback(
+      (stateId: string) => setActiveSelection({ projectId, stateId }),
+      [projectId]
     ),
-    selectColumn: useCallback((stateId: string) => setActiveStateId(stateId), []),
     refresh: useCallback(() => void reload(), [reload]),
     moveWorkItem
   }
