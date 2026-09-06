@@ -378,7 +378,7 @@ function resolveScopedDaemon(userDataDir) {
     startedAtMs: primary?.startedAtMs ?? null,
     // Why: the daemon's exe path (first token of its command line) tells us
     // whether it was forked from the relocated userData/daemon-host copy or the
-    // install-dir Orca.exe — the key survival signal.
+    // install-dir app exe — the key survival signal.
     exePath: daemonExePath(scanEntry?.commandLine),
     pids: [...pids]
   }

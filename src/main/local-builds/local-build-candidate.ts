@@ -115,7 +115,9 @@ function extractCompatibility(zipFile: FileHandle): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       '/usr/bin/unzip',
-      ['-p', '/dev/fd/3', `Orca.app/Contents/Resources/${LOCAL_BUILD_COMPATIBILITY_FILENAME}`],
+      // Why a glob: the zip's root entry is `<productName>.app`, which the Orca Lab
+      // rename changed — a literal would miss either the old or the new builds.
+      ['-p', '/dev/fd/3', `*.app/Contents/Resources/${LOCAL_BUILD_COMPATIBILITY_FILENAME}`],
       { stdio: ['ignore', 'pipe', 'ignore', zipFile.fd] }
     )
     const chunks: Buffer[] = []
@@ -251,7 +253,7 @@ export async function loadLocalBuildCandidate(
     .filter((entry) => entry.compatibility.architecture === architecture)
   if (matching.length !== 1) {
     await Promise.all(validated.map((entry) => entry.file.close()))
-    throw new Error(`The manifest must contain exactly one ${architecture} Orca ZIP.`)
+    throw new Error(`The manifest must contain exactly one ${architecture} Orca Lab ZIP.`)
   }
   const target = matching[0]
   await Promise.all(

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import assert from 'node:assert/strict'
+import { resolveDefaultAppDir } from './packaged-app-dir.mjs'
 
 const execFileAsync = promisify(execFile)
 
@@ -12,13 +13,7 @@ function readAppDirArg(argv) {
   if (explicit) {
     return explicit.slice('--app-dir='.length)
   }
-  if (process.platform === 'darwin') {
-    return 'dist/mac-arm64/Orca.app'
-  }
-  if (process.platform === 'win32') {
-    return 'dist/win-unpacked'
-  }
-  return 'dist/linux-unpacked'
+  return resolveDefaultAppDir()
 }
 
 function getPackagedCliPath(appDir) {

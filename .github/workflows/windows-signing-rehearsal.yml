@@ -88,8 +88,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm exec electron-builder --config config/electron-builder.config.cjs --win --dir --publish never
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Test-Path 'dist/win-unpacked/Orca.exe')) {
-            throw 'electron-builder --dir did not produce dist/win-unpacked/Orca.exe'
+          $builtExes = @(Get-ChildItem -Path 'dist/win-unpacked' -Filter 'Orca*.exe' -File)
+          if ($builtExes.Count -ne 1) {
+            throw "electron-builder --dir did not produce exactly one root Orca*.exe in dist/win-unpacked (found $($builtExes.Count))"
           }
 
       # Why: only unsigned PE files go to SignPath. Files that already carry a
@@ -119,8 +120,10 @@ jobs:
               $list.Add($relative)
             }
 
-          if (-not ($list -contains 'Orca.exe')) {
-            throw 'Orca.exe was not staged for signing; unpacked layout changed?'
+          # The app exe is named after productName, so match the root-level Orca* exe by shape.
+          $appExes = @($list | Where-Object { $_ -like 'Orca*.exe' -and $_ -notmatch '[\\/]' })
+          if ($appExes.Count -ne 1) {
+            throw "Expected exactly one root-level Orca*.exe staged for signing, found $($appExes.Count); unpacked layout changed?"
           }
           if (-not ($list | Where-Object { $_ -like '*conpty_console_list.node' })) {
             throw 'node-pty conpty_console_list.node was not staged; this is the file from issue #7785.'

@@ -36,6 +36,15 @@ const unixLauncherFixtures = [
     launcher: ['Contents', 'Resources', 'bin', 'orca'],
     executable: ['Contents', 'MacOS', 'Orca'],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
+  },
+  {
+    // Why: productName drives both the bundle dir and Contents/MacOS binary, so a rename moves both.
+    name: 'renamed macOS bundle',
+    asset: darwinLauncherAsset,
+    appDir: ['Orca Lab.app'],
+    launcher: ['Contents', 'Resources', 'bin', 'orca'],
+    executable: ['Contents', 'MacOS', 'Orca Lab'],
+    cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   }
 ] as const
 

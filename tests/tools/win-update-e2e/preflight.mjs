@@ -12,17 +12,18 @@ import { runCommandSync } from './powershell-runner.mjs'
 import { captureBaseline } from './window-watch.mjs'
 import { locateInstalledExe } from './installer-steps.mjs'
 import { findDaemonProcesses } from './daemon-processes.mjs'
+import { APP_EXE_NAME } from './windows-install-names.mjs'
 
 /**
  * Find running Orca APP processes (main window process), excluding daemons.
- * The daemon runs as Orca.exe too but always carries the daemon-entry.js marker
+ * The daemon runs as the same exe but always carries the daemon-entry.js marker
  * on its command line, so excluding that marker isolates the actual app. The
  * ExecutablePath lets isolated mode decide whether a running app is under the
  * test dir (fatal) or is the developer's real Orca elsewhere (informational).
  */
 export function findAppProcesses() {
   const command = [
-    `$procs = @(Get-CimInstance Win32_Process -Filter "Name = 'Orca.exe'" -ErrorAction SilentlyContinue |`,
+    `$procs = @(Get-CimInstance Win32_Process -Filter "Name = '${APP_EXE_NAME}'" -ErrorAction SilentlyContinue |`,
     `  Where-Object { -not ($_.CommandLine -match 'daemon-entry\\.js') })`,
     `$out = @($procs | ForEach-Object {`,
     `  [pscustomobject]@{ pid = $_.ProcessId; path = $_.ExecutablePath; commandLine = $_.CommandLine } })`,

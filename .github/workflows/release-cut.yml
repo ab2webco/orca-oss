@@ -1244,8 +1244,10 @@ jobs:
               $list.Add($relative)
             }
 
-          if (-not ($list -contains 'Orca.exe')) {
-            throw 'Orca.exe was not staged for signing; unpacked layout changed?'
+          # The app exe is named after productName, so match the root-level Orca* exe by shape.
+          $appExes = @($list | Where-Object { $_ -like 'Orca*.exe' -and $_ -notmatch '[\\/]' })
+          if ($appExes.Count -ne 1) {
+            throw "Expected exactly one root-level Orca*.exe staged for signing, found $($appExes.Count); unpacked layout changed?"
           }
           if (-not ($list | Where-Object { $_ -like '*conpty_console_list.node' })) {
             throw 'node-pty conpty_console_list.node was not staged; this is the file from issue #7785.'

@@ -6,6 +6,11 @@
 
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
+import {
+  APP_EXE_NAME,
+  INSTALL_DIR_NAME,
+  UNINSTALLER_EXE_NAME
+} from './windows-install-names.mjs'
 
 const VALID_PROFILES = new Set(['cold-restore', 'survival'])
 
@@ -80,11 +85,11 @@ export function parseArgs(argv) {
   return { ...opts, errors }
 }
 
-/** Default per-user oneClick install location: %LOCALAPPDATA%\Programs\Orca. */
+/** Default per-user oneClick install location: %LOCALAPPDATA%\Programs\<name>. */
 function defaultInstallDir() {
   const localAppData =
     process.env.LOCALAPPDATA ?? path.join(process.env.USERPROFILE ?? '', 'AppData', 'Local')
-  return path.join(localAppData, 'Programs', 'Orca')
+  return path.join(localAppData, 'Programs', INSTALL_DIR_NAME)
 }
 
 /** True if `child` is equal to, inside, or an ancestor of `parent` (case-insensitive). */
@@ -105,7 +110,9 @@ function pathsOverlap(a, b) {
 
 /** A prior harness install directory carries both the app exe and its uninstaller. */
 function looksLikeHarnessInstall(dir) {
-  return existsSync(path.join(dir, 'Orca.exe')) && existsSync(path.join(dir, 'Uninstall Orca.exe'))
+  return (
+    existsSync(path.join(dir, APP_EXE_NAME)) && existsSync(path.join(dir, UNINSTALLER_EXE_NAME))
+  )
 }
 
 /**
@@ -150,7 +157,8 @@ export function validateInstallDir(installDir) {
     if (entries.length > 0 && !looksLikeHarnessInstall(installDir)) {
       errors.push(
         `--install-dir "${installDir}" is a non-empty directory that does not look like a ` +
-          `prior harness install (no Orca.exe + "Uninstall Orca.exe"). Refusing to overwrite ` +
+          `prior harness install (no "${APP_EXE_NAME}" + "${UNINSTALLER_EXE_NAME}"). ` +
+          `Refusing to overwrite ` +
           `unrelated files. Point at an empty or non-existent directory.`
       )
     }
