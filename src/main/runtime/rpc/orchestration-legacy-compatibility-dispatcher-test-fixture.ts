@@ -133,6 +133,17 @@ export function createHarness(): LegacyCompatibilityDispatcherHarness {
   }
 }
 
+// Why: the harness runtime owns no PTYs, so no handle looks like a live agent pane unless a test
+// says so. Callers that exercise the attestation requirement declare the panes that hold one.
+export function requireAttestationFor(
+  harness: LegacyCompatibilityDispatcherHarness,
+  handles: readonly string[]
+): void {
+  vi.spyOn(harness.runtime, 'orchestrationCallerRequiresAttestation').mockImplementation((handle) =>
+    handles.includes(handle)
+  )
+}
+
 export function evidence(
   role: 'worker' | 'coordinator',
   valid = true

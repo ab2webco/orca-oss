@@ -1,4 +1,5 @@
 import type { OrchestrationCompatibilityEvidence } from '../../../../shared/orchestration-compatibility-evidence'
+import type { OrchestrationCompatibilityCallerAuthority } from '../../orca-runtime'
 import { orchestrationSkillRecoveryData } from '../../../../shared/orchestration-rpc-contract'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RunRow } from '../../orchestration/types'
@@ -18,19 +19,45 @@ export type RunScopeParams = {
 export function assertCallerHandleMatchesEvidence(
   runtime: OrcaRuntimeService,
   callerTerminalHandle: string,
-  callerEvidence?: OrchestrationCompatibilityEvidence
+  callerEvidence?: OrchestrationCompatibilityEvidence,
+  callerAuthority?: OrchestrationCompatibilityCallerAuthority
 ): void {
-  if (!callerEvidence) {
+  const attested = callerEvidence
+    ? runtime.verifyOrchestrationCompatibilityCaller(callerEvidence)
+    : null
+  if (attested) {
+    if (attested.terminalHandle !== callerTerminalHandle) {
+      throw new OrchestrationError(
+        'consumer_fenced',
+        `This terminal is attested as ${attested.terminalHandle} and cannot act as ${callerTerminalHandle}.`,
+        { effectsApplied: false }
+      )
+    }
     return
   }
-  const attested = runtime.verifyOrchestrationCompatibilityCaller(callerEvidence)
-  if (attested && attested.terminalHandle !== callerTerminalHandle) {
-    throw new OrchestrationError(
-      'consumer_fenced',
-      `This terminal is attested as ${attested.terminalHandle} and cannot act as ${callerTerminalHandle}.`,
-      { effectsApplied: false }
-    )
+  // Why: without this, omitting the evidence skipped the check entirely — `env -u
+  // ORCA_AGENT_LAUNCH_TOKEN orca orchestration run-current --from <someone else>` returned ok.
+  if (!runtime.orchestrationCallerRequiresAttestation(callerTerminalHandle)) {
+    return
   }
+  // Why: a freshly launched pane holds the real launch secret before the agent hook has observed
+  // it, and that live-launch match already proves it may name itself. The dispatcher may have
+  // established the same authority for this request already, so reuse it rather than re-deriving.
+  const freshLaunch =
+    callerAuthority ??
+    (callerEvidence
+      ? runtime.verifyOrchestrationCompatibilityCaller(callerEvidence, {
+          currentRuntimeLaunchSufficient: true
+        })
+      : null)
+  if (freshLaunch?.terminalHandle === callerTerminalHandle) {
+    return
+  }
+  throw new OrchestrationError(
+    'consumer_fenced',
+    `Terminal ${callerTerminalHandle} is an attested agent pane, so this caller must present its launch evidence to act as it.`,
+    { effectsApplied: false }
+  )
 }
 
 // Why: task and gate mutations must share one Run-binding rule.

@@ -89,7 +89,12 @@ export const ORCHESTRATION_RUN_METHODS: RpcMethod[] = [
           { effectsApplied: false }
         )
       }
-      assertCallerHandleMatchesEvidence(runtime, params.from, orchestrationCompatibilityEvidence)
+      assertCallerHandleMatchesEvidence(
+        runtime,
+        params.from,
+        orchestrationCompatibilityEvidence,
+        callerAuthority
+      )
       const db = runtime.getOrchestrationDb()
       const priorRun = db.getCurrentRunForPane(paneKey)
       const run = db.bindRun({
