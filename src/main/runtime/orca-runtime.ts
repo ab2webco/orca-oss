@@ -496,6 +496,7 @@ import {
   AGENT_TURN_ACCEPTANCE_TIMEOUT_MS
 } from './agent-composer-readiness'
 import type { AgentComposerReadiness, AgentTurnAcceptance } from './agent-composer-readiness'
+import { TerminalUnsubmittedInputTracker } from './terminal-unsubmitted-input-tracker'
 import { detectInstalledAgentsWithShellPathHydration, detectRemoteAgents } from '../ipc/preflight'
 import {
   markCodexProjectTrusted,
@@ -3150,6 +3151,9 @@ export class OrcaRuntimeService {
   private composerReadiness = new AgentComposerReadinessTracker((ptyId, listener) =>
     this.subscribeToTerminalData(ptyId, listener)
   )
+  // Why a sibling of composerReadiness and not part of it: readiness answers
+  // "may I write yet", this answers "did what I wrote ever land" (ORCA-457).
+  private unsubmittedInput = new TerminalUnsubmittedInputTracker()
   private setupCompletionTokenByPtyId = new Map<string, string>()
   // Why: mobile clients need to know when the desktop restores a terminal
   // from mobile-fit so they can update their UI. These listeners are
@@ -9937,6 +9941,7 @@ export class OrcaRuntimeService {
     // marker worth waiting for — a pane restored or adopted after a restart
     // handshook where nothing was listening, so its wait must resolve at once.
     this.composerReadiness.beginObserving(ptyId)
+    this.unsubmittedInput.beginObserving(ptyId)
     this.spawnPublishedPtys.add(ptyId)
     // Why: record the renderer pane identity at spawn time so a stalled graph
     // sync can't hide that a live PTY already backs a pending mobile create.
@@ -10216,6 +10221,7 @@ export class OrcaRuntimeService {
 
     const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
     this.composerReadiness.observe(ptyId, data)
+    this.unsubmittedInput.observe(ptyId, data)
     const ptyTailBefore = pty
       ? {
           lines: pty.tailBuffer,
@@ -14492,6 +14498,7 @@ export class OrcaRuntimeService {
     this.lastRendererSizes.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
     this.composerReadiness.forget(ptyId)
+    this.unsubmittedInput.forget(ptyId)
     this.setupCompletionTokenByPtyId.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
@@ -18099,7 +18106,25 @@ export class OrcaRuntimeService {
       this.getPaneKeyForTerminalHandle(handle),
       this.getAgentStatusSnapshotFn?.() ?? []
     )
-    return readTerminalAgentSessionLogState(handle, identity)
+    const session = await readTerminalAgentSessionLogState(handle, identity)
+    return {
+      ...session,
+      unsubmittedInput: this.unsubmittedInput.read(this.findPtyIdForHandle(handle))
+    }
+  }
+
+  /** The handle's live ptyId, or null — never throws, because an unresolvable
+   *  handle is an answer this field reports rather than an error it raises. */
+  private findPtyIdForHandle(handle: string): string | null {
+    try {
+      return (
+        this.getLivePtyForHandle(handle)?.pty.ptyId ??
+        this.getLiveLeafForHandle(handle).leaf.ptyId ??
+        null
+      )
+    } catch {
+      return null
+    }
   }
 
   private getTerminalAgentStatusPtyId(handle: string): string {
@@ -18553,10 +18578,19 @@ export class OrcaRuntimeService {
       if (!suffixWrote) {
         throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
       }
+      // Why `action.enter` and not `hasSuffix`: an interrupt cancels a turn, it
+      // does not submit one, so it leaves any composer text exactly where it was.
+      this.unsubmittedInput.recordWrite(ptyId, {
+        hasText,
+        submitted: action.enter === true,
+        atMs: Date.now()
+      })
       await options.afterWrite?.(ptyId)
       return
     }
     if (hasText) {
+      // Text with no suffix behind it is the composer holding it (ORCA-457).
+      this.unsubmittedInput.recordWrite(ptyId, { hasText, submitted: false, atMs: Date.now() })
       return
     }
 
@@ -18629,6 +18663,12 @@ export class OrcaRuntimeService {
     } catch (error) {
       if (wrotePasteBytes && !completedPaste) {
         this.ptyController?.write(ptyId, AGENT_PROMPT_BRACKETED_PASTE_END)
+        // Closing the paste does not submit it: those bytes are in the composer.
+        this.unsubmittedInput.recordWrite(ptyId, {
+          hasText: true,
+          submitted: false,
+          atMs: Date.now()
+        })
       }
       renderGate?.dispose()
       throw error
@@ -18652,6 +18692,11 @@ export class OrcaRuntimeService {
     if (!suffixWrote) {
       throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
     }
+    this.unsubmittedInput.recordWrite(ptyId, {
+      hasText: true,
+      submitted: true,
+      atMs: Date.now()
+    })
   }
 
   private createClaudeAgentPromptRenderGate(ptyId: string): {
@@ -32249,6 +32294,7 @@ export class OrcaRuntimeService {
     this.ptysById.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
     this.composerReadiness.forget(ptyId)
+    this.unsubmittedInput.forget(ptyId)
     this.setupCompletionTokenByPtyId.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
