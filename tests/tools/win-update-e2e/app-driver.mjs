@@ -40,7 +40,7 @@ const RESTRICTED_E2E_ENV_KEYS = new Set([
 ])
 
 /**
- * Launch the installed Orca.exe. Pointing userDataDir at a harness-owned temp
+ * Launch the installed app exe. Pointing userDataDir at a harness-owned temp
  * dir isolates this run's daemon (its socket/token path becomes unique), so
  * daemon lookups never collide with other Orca installs/daemons on the box.
  * Pass `seedProfile` (a buildFreshProfile object) to write orca-data.json

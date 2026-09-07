@@ -51,8 +51,8 @@ function findAsar(rootDir) {
   // Why: electron-builder produces one `app.asar` per platform-arch combo.
   // Linux/Windows targets ship one (`dist/linux-unpacked/resources/app.asar`,
   // `dist/win-unpacked/resources/app.asar`); macOS dual-arch ships two
-  // (`dist/mac/Orca.app/Contents/Resources/app.asar` for x64,
-  // `dist/mac-arm64/Orca.app/Contents/Resources/app.asar` for arm64) because
+  // (`dist/mac/<productName>.app/Contents/Resources/app.asar` for x64,
+  // `dist/mac-arm64/<productName>.app/Contents/Resources/app.asar` for arm64) because
   // `electron-builder.config.cjs` declares `arch: ['x64', 'arm64']`. Both
   // arches share the same JS bundle through electron-vite's single `main`
   // build, so the constants are identical across them — but verifying every

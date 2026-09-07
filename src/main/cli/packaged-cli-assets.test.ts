@@ -36,6 +36,18 @@ const unixLauncherFixtures = [
     launcher: ['Contents', 'Resources', 'bin', 'orca'],
     executable: ['Contents', 'MacOS', 'Orca'],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
+  },
+  {
+    // Why este par desalineado: Squirrel reemplaza el bundle in-place bajo el nombre
+    // que ya tenga, y el "Keep Both" del Finder lo renombra — los dos dejan la
+    // carpeta con un nombre y CFBundleExecutable con otro. Un fixture que arma los
+    // dos del mismo valor no puede distinguir un shim que resuelve de uno que adivina.
+    name: 'macOS con la carpeta y el binario desalineados',
+    asset: darwinLauncherAsset,
+    appDir: ['Orca.app'],
+    launcher: ['Contents', 'Resources', 'bin', 'orca'],
+    executable: ['Contents', 'MacOS', 'Orca Lab'],
+    cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   }
 ] as const
 
