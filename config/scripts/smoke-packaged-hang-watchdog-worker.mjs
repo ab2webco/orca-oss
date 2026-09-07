@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Worker } from 'node:worker_threads'
+import { resolveDefaultAppDir } from './packaged-app-dir.mjs'
 
 const INTERNAL_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_INTERNAL'
 const ASAR_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_ASAR'
@@ -22,13 +23,7 @@ function readAppDirArg(argv) {
   if (explicit) {
     return explicit.slice('--app-dir='.length)
   }
-  if (process.platform === 'darwin') {
-    return 'dist/mac-arm64/Orca.app'
-  }
-  if (process.platform === 'win32') {
-    return 'dist/win-unpacked'
-  }
-  return 'dist/linux-unpacked'
+  return resolveDefaultAppDir()
 }
 
 function getResourcesDir(appDir) {

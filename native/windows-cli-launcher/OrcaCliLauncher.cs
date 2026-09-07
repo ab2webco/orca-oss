@@ -12,7 +12,7 @@ internal static class OrcaCliLauncher
             string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca.exe");
+            string electronPath = ResolveElectronPath(appDirectory);
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -21,9 +21,9 @@ internal static class OrcaCliLauncher
                 "index.js"
             );
 
-            if (!File.Exists(electronPath))
+            if (electronPath == null)
             {
-                Console.Error.WriteLine("Unable to locate Orca.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine("Unable to locate the Orca executable next to \"{0}\"", resourcesDirectory);
                 return 1;
             }
 
@@ -65,6 +65,19 @@ internal static class OrcaCliLauncher
             Console.Error.WriteLine("Unable to start the Orca CLI: {0}", error.Message);
             return 1;
         }
+    }
+
+    // Why globbed: the packaged exe is named after productName, so a rename must not orphan the CLI.
+    private static string ResolveElectronPath(string appDirectory)
+    {
+        string[] branded = Directory.GetFiles(appDirectory, "Orca*.exe", SearchOption.TopDirectoryOnly);
+        if (branded.Length == 1)
+        {
+            return branded[0];
+        }
+
+        string[] every = Directory.GetFiles(appDirectory, "*.exe", SearchOption.TopDirectoryOnly);
+        return every.Length == 1 ? every[0] : null;
     }
 
     private static void MoveEnvironmentVariable(string sourceName, string targetName)

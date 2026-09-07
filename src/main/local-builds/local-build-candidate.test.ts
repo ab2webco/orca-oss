@@ -127,18 +127,20 @@ describe('loadLocalBuildCandidate', () => {
     }
   })
 
-  it.runIf(process.platform === 'darwin')(
-    'reads signed compatibility metadata through the held artifact descriptor',
-    async () => {
+  // The zip's root entry is `<productName>.app`, so a build published before the
+  // Orca Lab rename and one published after must both stay readable.
+  it.runIf(process.platform === 'darwin').each(['Orca.app', 'Orca.app'])(
+    'reads signed compatibility metadata from a %s bundle through the held descriptor',
+    async (bundleName) => {
       const directory = await mkdtemp(join(tmpdir(), 'orca-local-build-zip-'))
       tempDirectories.push(directory)
       const zipRoot = join(directory, 'zip-root')
-      const resources = join(zipRoot, 'Orca.app', 'Contents', 'Resources')
+      const resources = join(zipRoot, bundleName, 'Contents', 'Resources')
       await mkdir(resources, { recursive: true })
       await writeFile(join(resources, 'orca-local-build.json'), JSON.stringify(compatibility()))
       const artifactName = 'orca-macos-arm64.zip'
       const artifactPath = join(directory, artifactName)
-      await execFileAsync('/usr/bin/zip', ['-qry', artifactPath, 'Orca.app'], { cwd: zipRoot })
+      await execFileAsync('/usr/bin/zip', ['-qry', artifactPath, bundleName], { cwd: zipRoot })
       const artifact = await readFile(artifactPath)
       const manifestPath = join(directory, 'latest-mac.yml')
       await writeFile(
@@ -167,6 +169,6 @@ describe('loadLocalBuildCandidate', () => {
       loadLocalBuildCandidate(manifestPath, 'x64', {
         readCompatibility: async () => compatibility()
       })
-    ).rejects.toThrow('exactly one x64 Orca ZIP')
+    ).rejects.toThrow('exactly one x64 Orca Lab ZIP')
   })
 })

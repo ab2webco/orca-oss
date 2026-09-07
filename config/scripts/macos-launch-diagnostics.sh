@@ -66,7 +66,8 @@ TIMESTAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/orca-launch-diagnostics.XXXXXXXX")"
 OUT_DIR="$WORK_DIR/output"
 MOUNT_DIR="$WORK_DIR/mount"
-APP_DIR="$WORK_DIR/Orca.app"
+APP_DIR=""
+APP_NAME=""
 DMG_PATH="$WORK_DIR/$ASSET"
 mkdir -p "$OUT_DIR" "$MOUNT_DIR"
 
@@ -128,7 +129,7 @@ write_environment_report() {
 
 ensure_no_existing_orca() {
   local existing
-  existing="$(pgrep -x Orca || true)"
+  existing="$(pgrep -f '/Contents/MacOS/Orca' || true)"
   if [[ -z "$existing" ]]; then
     return 0
   fi
@@ -155,6 +156,10 @@ download_and_copy_app() {
     echo "No .app bundle found in $DMG_PATH" >&2
     exit 1
   fi
+
+  # The bundle (and its Contents/MacOS binary) is named after productName, so read it from the DMG.
+  APP_NAME="$(basename "$source_app" .app)"
+  APP_DIR="$WORK_DIR/$APP_NAME.app"
 
   diag_log "copying app to isolated temp path"
   ditto "$source_app" "$APP_DIR"
@@ -187,7 +192,7 @@ write_app_report() {
 
 start_log_stream() {
   local file="$1"
-  local predicate='process == "Orca" OR eventMessage CONTAINS[c] "Orca" OR eventMessage CONTAINS[c] "com.stablyai.orca"'
+  local predicate="process == \"$APP_NAME\" OR eventMessage CONTAINS[c] \"Orca\" OR eventMessage CONTAINS[c] \"com.stablyai.orca\""
   if command -v log >/dev/null 2>&1; then
     command log stream --style compact --predicate "$predicate" >"$file" 2>&1 &
     echo "$!"
@@ -205,7 +210,7 @@ stop_log_stream() {
 }
 
 latest_orca_pid_for_app() {
-  pgrep -nf "$APP_DIR/Contents/MacOS/Orca" || true
+  pgrep -nf "$APP_DIR/Contents/MacOS/$APP_NAME" || true
 }
 
 sample_process_once() {
@@ -325,7 +330,7 @@ run_direct_exec_probe() {
     ORCA_STARTUP_DIAGNOSTICS=trace \
     ORCA_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
     ORCA_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
-    "$APP_DIR/Contents/MacOS/Orca" >"$stdout_file" 2>"$stderr_file" &
+    "$APP_DIR/Contents/MacOS/$APP_NAME" >"$stdout_file" 2>"$stderr_file" &
   local runner_pid="$!"
   wait_for_probe "$runner_pid" "$label"
   echo "ended_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >>"$OUT_DIR/$label.meta"
@@ -333,7 +338,7 @@ run_direct_exec_probe() {
 }
 
 write_system_log_snapshot() {
-  local predicate='process == "Orca" OR eventMessage CONTAINS[c] "Orca" OR eventMessage CONTAINS[c] "com.stablyai.orca"'
+  local predicate="process == \"$APP_NAME\" OR eventMessage CONTAINS[c] \"Orca\" OR eventMessage CONTAINS[c] \"com.stablyai.orca\""
   if command -v log >/dev/null 2>&1; then
     diag_log "capturing recent unified log snapshot"
     command log show --style syslog --last 10m --predicate "$predicate" >"$OUT_DIR/system-log-last-10m.log" 2>&1 || true

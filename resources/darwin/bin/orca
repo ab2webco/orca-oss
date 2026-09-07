@@ -19,7 +19,29 @@ if [ -z "$APP_PATH" ]; then
 fi
 
 CONTENTS="$APP_PATH/Contents"
-ELECTRON="$CONTENTS/MacOS/Orca"
+# Why leido del Info.plist y no derivado del nombre de la carpeta: el binario se
+# llama por CFBundleExecutable, y el directorio es lo que haya en disco. Squirrel
+# reemplaza el bundle in-place bajo el nombre que ya tenga, y un "Keep Both" del
+# Finder lo renombra — los dos dejan carpeta y binario con nombres distintos.
+ELECTRON=""
+if [ -f "$CONTENTS/Info.plist" ]; then
+	NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$CONTENTS/Info.plist" 2>/dev/null || true)"
+	[ -n "$NAME" ] && [ -x "$CONTENTS/MacOS/$NAME" ] && ELECTRON="$CONTENTS/MacOS/$NAME"
+fi
+if [ -z "$ELECTRON" ]; then
+	# Fallback: el bundle trae un solo ejecutable en MacOS/.
+	for candidate in "$CONTENTS/MacOS/"*; do
+		if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+			ELECTRON="$candidate"
+			break
+		fi
+	done
+fi
+
+if [ -z "$ELECTRON" ]; then
+	echo "Unable to locate the Orca Lab executable inside $CONTENTS/MacOS" >&2
+	exit 1
+fi
 # Why: Orca packages the CLI entrypoint outside app.asar so the public shell
 # command can execute it directly with ELECTRON_RUN_AS_NODE, mirroring VS Code's
 # launcher model instead of requiring a separate npm-distributed binary.
