@@ -4,6 +4,7 @@ import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
+import type { PlaneTaskDisplayProperty } from '../tasks/provider-task-display-properties'
 import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { resolveLivePlaneWorkItem, resolvePlaneBoardScope } from './plane-board-scope'
 import { PlaneTaskBoard } from './plane-task-board'
@@ -22,6 +23,8 @@ type Props = {
    *  choice survives the switch between the two views (ORCA-418). */
   groupBy: PlaneTaskGroupBy
   orderBy: ProviderTaskOrderBy
+  /** Owned by the Tasks screen too, so the bar's sheet and both views agree. */
+  displayProperties: ReadonlySet<PlaneTaskDisplayProperty>
   workspaceId: string | null
   projectId: string | null
   projects: readonly PlaneMobileProject[]
@@ -57,6 +60,7 @@ export function PlaneTasksSurface({
   viewMode,
   groupBy,
   orderBy,
+  displayProperties,
   workspaceId,
   projectId,
   projects,
@@ -140,6 +144,7 @@ export function PlaneTasksSurface({
             board={board}
             groupBy={groupBy}
             orderBy={orderBy}
+            displayProperties={displayProperties}
             sheetOpen={live !== null}
             onOpenCard={onOpenCard}
             onPickProject={onPickProject}

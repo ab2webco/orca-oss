@@ -16,6 +16,11 @@ import type { PlaneWorkItemFilter } from '../../src/shared/plane-types'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { createPlaneTask } from '../src/tasks/plane-mobile-task-list'
 import type { ProviderTaskOrderBy } from '../src/tasks/linear-mobile-issue-grouping'
+import {
+  DEFAULT_PLANE_TASK_DISPLAY_PROPERTIES,
+  toggleTaskDisplayProperty,
+  type PlaneTaskDisplayProperty
+} from '../src/tasks/provider-task-display-properties'
 import type { PlaneTaskGroupBy } from '../src/tasks/provider-task-view-options'
 import { planeListSections } from '../src/tasks/plane-list-sections'
 import { fetchPlaneWorkItems } from '../src/tasks/plane-mobile-task-source'
@@ -172,6 +177,9 @@ export function PlaneTasksHarness({
   // The Tasks screen owns these; so does this stand-in, which is the point of ORCA-418.
   const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
   const [orderBy, setOrderBy] = useState<ProviderTaskOrderBy>('priority')
+  const [displayProperties, setDisplayProperties] = useState<ReadonlySet<PlaneTaskDisplayProperty>>(
+    () => new Set(DEFAULT_PLANE_TASK_DISPLAY_PROPERTIES)
+  )
   // A relay blip flips this false. It gates Plane's data only: the screen's `enabled` never
   // carried the connection, so the surface keeps its chrome and the open sheet (ORCA-419).
   const [connected, setConnected] = useState(true)
@@ -243,6 +251,9 @@ export function PlaneTasksHarness({
             orderBy,
             onChangeGroupBy: setGroupBy,
             onChangeOrderBy: setOrderBy,
+            displayProperties,
+            onToggleDisplayProperty: (property: PlaneTaskDisplayProperty) =>
+              setDisplayProperties((current) => toggleTaskDisplayProperty(current, property)),
             onPickProject: () => setPickerOpen(true),
             onPickState: () => {},
             onPickFilter: () => {},
@@ -285,6 +296,7 @@ export function PlaneTasksHarness({
         viewMode,
         groupBy,
         orderBy,
+        displayProperties,
         workspaceId: 'ws-1',
         projectId,
         projects: [PROJECT, OTHER_PROJECT],

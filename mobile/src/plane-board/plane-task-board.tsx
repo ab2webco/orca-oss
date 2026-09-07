@@ -3,10 +3,10 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
-import { PLANE_PRIORITY_LABELS } from '../tasks/plane-priority-label'
+import { planeWorkItemDisplayFacts } from '../tasks/plane-work-item-display-facts'
 import { ProviderTaskBoard } from '../tasks/provider-task-board'
+import type { PlaneTaskDisplayProperty } from '../tasks/provider-task-display-properties'
 import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
-import { formatUpdatedAt } from '../tasks/task-updated-at-time'
 import { PlaneBoardColumnComposer } from './plane-board-column-composer'
 import {
   planeBoardColumnStateId,
@@ -18,25 +18,26 @@ import type { PlaneBoard } from './use-plane-board'
 
 // The in-flight word goes first: the shell clamps the subtitle to two lines, and the
 // facts after it are what may be cut, never the signal that a write is still pending.
-function planeCardSubtitle(item: PlaneMobileWorkItem, board: PlaneBoard): string {
+function planeCardSubtitle(
+  item: PlaneMobileWorkItem,
+  board: PlaneBoard,
+  displayProperties: ReadonlySet<PlaneTaskDisplayProperty>
+): string {
   const parts: string[] = []
   if (board.movingWorkItemIds.has(item.id)) {
     parts.push('Moving…')
   } else if (board.editingWorkItemIds.has(item.id)) {
     parts.push('Updating…')
   }
-  parts.push(item.identifier, formatUpdatedAt(item.updatedAt))
-  if (item.priority !== 'none') {
-    parts.push(PLANE_PRIORITY_LABELS[item.priority])
-  }
-  parts.push(...item.assignees.map((assignee) => assignee.displayName))
-  return parts.filter(Boolean).join(' · ')
+  parts.push(...planeWorkItemDisplayFacts(item, displayProperties))
+  return parts.join(' · ')
 }
 
 type Props = {
   board: PlaneBoard
   groupBy: PlaneTaskGroupBy
   orderBy: ProviderTaskOrderBy
+  displayProperties: ReadonlySet<PlaneTaskDisplayProperty>
   /** While a card's sheet is open it shows that card's write error; the board stays quiet. */
   sheetOpen: boolean
   onOpenCard: (item: PlaneMobileWorkItem) => void
@@ -50,6 +51,7 @@ export function PlaneTaskBoard({
   board,
   groupBy,
   orderBy,
+  displayProperties,
   sheetOpen,
   onOpenCard,
   onPickProject,
@@ -126,12 +128,16 @@ export function PlaneTaskBoard({
         bottomInset={bottomInset}
         getItemKey={(item) => item.id}
         getTitle={(item) => item.title || 'Untitled work item'}
-        getSubtitle={(item) => planeCardSubtitle(item, board)}
-        getStatus={(item) => ({
-          label: item.state.name || item.state.group,
-          color: item.state.color || planeStateGroupColor(item.state.group),
-          accessibilityLabel: `Move from ${item.state.name || item.state.group}`
-        })}
+        getSubtitle={(item) => planeCardSubtitle(item, board, displayProperties)}
+        getStatus={(item) =>
+          displayProperties.has('state')
+            ? {
+                label: item.state.name || item.state.group,
+                color: item.state.color || planeStateGroupColor(item.state.group),
+                accessibilityLabel: `Move from ${item.state.name || item.state.group}`
+              }
+            : null
+        }
         onPressItem={onOpenCard}
         // The detail owns "Move to"; the pill is the shortcut into it.
         onPressStatus={onOpenCard}

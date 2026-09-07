@@ -3,6 +3,11 @@ import { Pressable, Text, type StyleProp, type TextStyle, type ViewStyle } from 
 import { PickerModal } from '../components/PickerModal'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import {
+  PLANE_TASK_DISPLAY_OPTIONS,
+  type PlaneTaskDisplayProperty
+} from '../tasks/provider-task-display-properties'
+import { ProviderTaskDisplaySheet } from '../tasks/provider-task-display-sheet'
+import {
   PLANE_TASK_GROUP_OPTIONS,
   PROVIDER_TASK_ORDER_OPTIONS,
   type PlaneTaskGroupBy
@@ -29,6 +34,8 @@ type Props = {
   orderBy: ProviderTaskOrderBy
   onChangeGroupBy: (groupBy: PlaneTaskGroupBy) => void
   onChangeOrderBy: (orderBy: ProviderTaskOrderBy) => void
+  displayProperties: ReadonlySet<PlaneTaskDisplayProperty>
+  onToggleDisplayProperty: (property: PlaneTaskDisplayProperty) => void
   onPickProject: () => void
   onPickState: () => void
   onPickFilter: () => void
@@ -52,6 +59,8 @@ export function PlaneSourceSegmentRow({
   orderBy,
   onChangeGroupBy,
   onChangeOrderBy,
+  displayProperties,
+  onToggleDisplayProperty,
   onPickProject,
   onPickState,
   onPickFilter,
@@ -60,6 +69,7 @@ export function PlaneSourceSegmentRow({
 }: Props) {
   const [showGroupPicker, setShowGroupPicker] = useState(false)
   const [showOrderPicker, setShowOrderPicker] = useState(false)
+  const [showDisplaySheet, setShowDisplaySheet] = useState(false)
   const groupLabel =
     PLANE_TASK_GROUP_OPTIONS.find((option) => option.value === groupBy)?.label ?? 'No grouping'
   const orderLabel =
@@ -105,6 +115,15 @@ export function PlaneSourceSegmentRow({
       >
         <Text style={textStyle}>Order: {orderLabel}</Text>
       </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Display properties"
+        style={buttonStyle}
+        disabled={!enabled}
+        onPress={() => enabled && setShowDisplaySheet(true)}
+      >
+        <Text style={textStyle}>Display</Text>
+      </Pressable>
       <PickerModal
         visible={showGroupPicker}
         title="Group Plane Work Items"
@@ -120,6 +139,13 @@ export function PlaneSourceSegmentRow({
         selected={orderBy}
         onSelect={onChangeOrderBy}
         onClose={() => setShowOrderPicker(false)}
+      />
+      <ProviderTaskDisplaySheet
+        visible={showDisplaySheet}
+        onClose={() => setShowDisplaySheet(false)}
+        options={PLANE_TASK_DISPLAY_OPTIONS}
+        selected={displayProperties}
+        onToggle={onToggleDisplayProperty}
       />
     </>
   )
