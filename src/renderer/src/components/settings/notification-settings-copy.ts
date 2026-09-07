@@ -157,7 +157,7 @@ export async function sendNotificationSettingsTestNotification(
         {
           description: translate(
             'auto.components.settings.NotificationsPane.4676a95bc3',
-            'Check your desktop notification settings for Orca.'
+            'Check your desktop notification settings for Orca Lab.'
           )
         }
       )
