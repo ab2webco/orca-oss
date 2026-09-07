@@ -28,7 +28,7 @@ function certaintyDescription(
     case 'recorded-chain-match':
       return translate(
         'auto.components.settings.ClaudeRefreshChainConflictNotice.description',
-        'These saved logins match on the refresh chain Orca has recorded, so refreshing one can sign the other out. Orca pauses token rotation between them. Re-authenticate one of them to give it its own chain — its chats and history stay intact.'
+        'These saved logins match on the refresh chain Orca Lab has recorded, so refreshing one can sign the other out. Orca Lab pauses token rotation between them. Re-authenticate one of them to give it its own chain — its chats and history stay intact.'
       )
   }
 }
@@ -40,7 +40,7 @@ function accountDisplayLabel(
   if (account.profileScope === 'other') {
     return translate(
       'auto.components.settings.ClaudeRefreshChainConflictNotice.otherProfileAccountLabel',
-      'Claude account in another Orca profile'
+      'Claude account in another Orca Lab profile'
     )
   }
   return (
@@ -128,7 +128,7 @@ export function ClaudeRefreshChainConflictNotice({
         <span>
           {translate(
             'auto.components.settings.ClaudeRefreshChainConflictNotice.unavailable',
-            "Orca couldn't verify whether saved Claude accounts share a refresh chain. If a shared chain exists, it is not shown here."
+            "Orca Lab couldn't verify whether saved Claude accounts share a refresh chain. If a shared chain exists, it is not shown here."
           )}
         </span>
       </div>
@@ -171,7 +171,7 @@ export function ClaudeRefreshChainConflictNotice({
               <p>
                 {translate(
                   'auto.components.settings.ClaudeRefreshChainConflictNotice.otherProfileHint',
-                  'An account marked “Another profile” belongs to a different Orca profile on this machine, so it is not in the list above and cannot be re-authenticated from here. To fix it there instead, open that profile and re-authenticate the account in Settings → Accounts.'
+                  'An account marked “Another profile” belongs to a different Orca Lab profile on this machine, so it is not in the list above and cannot be re-authenticated from here. To fix it there instead, open that profile and re-authenticate the account in Settings → Accounts.'
                 )}
               </p>
             ) : null}

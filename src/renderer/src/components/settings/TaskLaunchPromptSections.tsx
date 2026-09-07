@@ -55,7 +55,7 @@ export function LinearLaunchPromptSection({
         title={translate('auto.components.settings.TasksPane.09ae2d7c51', 'Linear')}
         description={translate(
           'auto.components.settings.TasksPane.cbcd4247a4',
-          'Customize the first instruction Orca sends to the agent when you start a worktree from a Linear issue.'
+          'Customize the first instruction Orca Lab sends to the agent when you start a worktree from a Linear issue.'
         )}
       />
       <SearchableSetting
@@ -105,7 +105,7 @@ export function PlaneTaskWriteSection({
         title={translate('auto.components.settings.TasksPane.plane_section_title', 'Plane')}
         description={translate(
           'auto.components.settings.TasksPane.plane_section_description',
-          'Customize the first instruction Orca sends to the agent when you start a worktree from a Plane work item.'
+          'Customize the first instruction Orca Lab sends to the agent when you start a worktree from a Plane work item.'
         )}
       />
       <SearchableSetting

@@ -236,7 +236,7 @@ export function AppearanceInterfaceSection({
                   // both non-obvious from the label alone.
                   description={translate(
                     'auto.components.settings.AppearancePane.b707773a0d',
-                    'When enabled, closing the window keeps Orca running in the system tray instead of quitting.'
+                    'When enabled, closing the window keeps Orca Lab running in the system tray instead of quitting.'
                   )}
                   checked={settings.minimizeToTrayOnClose === true}
                   onChange={() =>
@@ -258,7 +258,7 @@ export function AppearanceInterfaceSection({
                   // activation and the close-keeps-running lifecycle stay intact.
                   description={translate(
                     'settings.appearance.menuBarIcon.description',
-                    'Keep an Orca shortcut and activity indicator in the macOS menu bar.'
+                    'Keep an Orca Lab shortcut and activity indicator in the macOS menu bar.'
                   )}
                   checked={settings.showMenuBarIcon !== false}
                   onChange={() =>

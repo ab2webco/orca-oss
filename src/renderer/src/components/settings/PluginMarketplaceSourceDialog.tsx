@@ -137,7 +137,7 @@ export function PluginMarketplaceSourceDialog({
           <DialogDescription>
             {translate(
               'auto.components.settings.PluginMarketplaceSourceDialog.description',
-              'Marketplaces are pinned Git repositories. Orca uses your existing system Git credentials for private repositories.'
+              'Marketplaces are pinned Git repositories. Orca Lab uses your existing system Git credentials for private repositories.'
             )}
           </DialogDescription>
         </DialogHeader>
