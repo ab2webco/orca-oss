@@ -62,9 +62,9 @@ async function importPairThenDeleteAlias(
 ): Promise<{ alpha: SeededSshConfigHost; bravo: SeededSshConfigHost }> {
   const hosts = await seedPairConfig(electronApp, prefix)
   const picker = await openSshConfigHostPicker(page)
-  await expect(picker.getByRole('button', { name: 'Add all 2 to Orca' })).toBeEnabled()
-  await picker.getByRole('button', { name: 'Add all 2 to Orca' }).click()
-  await expect(page.getByText('Added 2 hosts to Orca.')).toBeVisible({ timeout: 15_000 })
+  await expect(picker.getByRole('button', { name: 'Add all 2 to Orca Lab' })).toBeEnabled()
+  await picker.getByRole('button', { name: 'Add all 2 to Orca Lab' }).click()
+  await expect(page.getByText('Added 2 hosts to Orca Lab.')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('dialog', { name: 'Choose from ~/.ssh/config' })).toBeHidden({
     timeout: 10_000
   })
@@ -103,14 +103,14 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
 
     await expect(alphaRow).toBeVisible()
     await expect(alphaRow).toBeDisabled()
-    await expect(alphaRow.getByText('In Orca', { exact: true })).toBeVisible()
+    await expect(alphaRow.getByText('In Orca Lab', { exact: true })).toBeVisible()
 
     await expect(bravoRow).toBeVisible()
     await expect(bravoRow).toBeEnabled()
-    await expect(bravoRow.getByText('In Orca', { exact: true })).toHaveCount(0)
+    await expect(bravoRow.getByText('In Orca Lab', { exact: true })).toHaveCount(0)
 
-    await expect(picker.getByRole('button', { name: 'Add all 1 to Orca' })).toBeEnabled()
-    await expect(picker.getByRole('button', { name: 'Add all 2 to Orca' })).toHaveCount(0)
+    await expect(picker.getByRole('button', { name: 'Add all 1 to Orca Lab' })).toBeEnabled()
+    await expect(picker.getByRole('button', { name: 'Add all 2 to Orca Lab' })).toHaveCount(0)
   })
 
   // ── P6 ─────────────────────────────────────────────────────────────
@@ -123,10 +123,10 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
 
     await expect(configHostRow(picker, hosts.alpha)).toBeVisible()
     await expect(configHostRow(picker, hosts.bravo)).toBeVisible()
-    await expect(picker.getByRole('button', { name: 'Add all 2 to Orca' })).toBeEnabled()
+    await expect(picker.getByRole('button', { name: 'Add all 2 to Orca Lab' })).toBeEnabled()
 
-    await picker.getByRole('button', { name: 'Add all 2 to Orca' }).click()
-    await expect(orcaPage.getByText('Added 2 hosts to Orca.')).toBeVisible({ timeout: 15_000 })
+    await picker.getByRole('button', { name: 'Add all 2 to Orca Lab' }).click()
+    await expect(orcaPage.getByText('Added 2 hosts to Orca Lab.')).toBeVisible({ timeout: 15_000 })
     await expect(orcaPage.getByRole('dialog', { name: 'Choose from ~/.ssh/config' })).toBeHidden({
       timeout: 10_000
     })
@@ -142,11 +142,11 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
     const reopened = await openSshConfigHostPicker(orcaPage)
     await expect(configHostRow(reopened, hosts.alpha)).toBeDisabled()
     await expect(
-      configHostRow(reopened, hosts.alpha).getByText('In Orca', { exact: true })
+      configHostRow(reopened, hosts.alpha).getByText('In Orca Lab', { exact: true })
     ).toBeVisible()
     await expect(configHostRow(reopened, hosts.bravo)).toBeDisabled()
     await expect(
-      configHostRow(reopened, hosts.bravo).getByText('In Orca', { exact: true })
+      configHostRow(reopened, hosts.bravo).getByText('In Orca Lab', { exact: true })
     ).toBeVisible()
     // Why this label: the remainder can be already-in-Orca or merely tombstoned, so the button
     // does not claim either one (see AddRemoteHostSshConfigPicker's sshConfigPickerNoNewHosts).
@@ -173,14 +173,14 @@ test.describe('SSH config host import (bulk + settings re-adopt)', () => {
     const alphaRow = configHostRow(picker, hosts.alpha)
     await expect(alphaRow).toBeVisible()
     await expect(alphaRow).toBeEnabled()
-    await expect(alphaRow.getByText('Removed from Orca', { exact: true })).toBeVisible()
-    await expect(alphaRow.getByText('In Orca', { exact: true })).toHaveCount(0)
+    await expect(alphaRow.getByText('Removed from Orca Lab', { exact: true })).toBeVisible()
+    await expect(alphaRow.getByText('In Orca Lab', { exact: true })).toHaveCount(0)
     await expect(configHostRow(picker, hosts.bravo)).toBeVisible()
     await expect(
-      configHostRow(picker, hosts.bravo).getByText('In Orca', { exact: true })
+      configHostRow(picker, hosts.bravo).getByText('In Orca Lab', { exact: true })
     ).toBeVisible()
     await expect(picker.getByRole('button', { name: 'No new hosts to add' })).toBeDisabled()
-    await expect(picker.getByRole('button', { name: /Add all \d+ to Orca/ })).toHaveCount(0)
+    await expect(picker.getByRole('button', { name: /Add all \d+ to Orca Lab/ })).toHaveCount(0)
 
     await returnToAppShell(orcaPage)
     const sshSection = await openSshHostSettings(orcaPage)

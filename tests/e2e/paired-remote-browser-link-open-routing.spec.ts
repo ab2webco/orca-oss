@@ -167,7 +167,7 @@ async function openLinkFromRemotePaneContextMenu(page: Page): Promise<void> {
   await expect(page.getByTestId('remote-browser-context-menu')).toBeVisible({ timeout: 30_000 })
   // The item only renders once the remote hit-test resolves an anchor, so this wait is the
   // wait for the link lookup itself.
-  const openInOrca = page.getByRole('menuitem', { name: 'Open Link In Orca Browser' })
+  const openInOrca = page.getByRole('menuitem', { name: 'Open Link In Orca Lab Browser' })
   await expect(openInOrca).toBeVisible({ timeout: 30_000 })
   await openInOrca.click()
 }
