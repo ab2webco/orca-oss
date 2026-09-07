@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { decodePng } from './trim-windows-icon-source.mjs'
+
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..')
 
 // Split so this file is not itself a match for the needles it searches for.
@@ -11,16 +13,36 @@ const ORCA_PATH_START = 'm 177.81311,' + '248.33334'
 const ORCA_NEEDLES = [ORCA_VIEWBOX, ORCA_PATH_START]
 
 const AB2WEB_VIEWBOX = '0 0 318 231'
+const AB2WEB_ICON_VIEWBOX = '0 0 1000 1000'
 const AB2WEB_ORANGE = '#FF8300'
+
+const ICON_SOURCE_SVG = 'resources/icon-source/icon.icon/Assets/logo.svg'
+
+// Every icon the app ships. The .icns is not here: its slots are an Apple
+// container this guard has no decoder for, so it stays uncovered.
+const SHIPPED_ICON_PNGS = [
+  'resources/build/icon.png',
+  'resources/icon.png',
+  'resources/icon-dev.png',
+  'mobile/assets/icon.png',
+  'mobile/assets/adaptive-icon.png',
+  'mobile/assets/splash-icon.png',
+  'mobile/assets/favicon.png'
+]
+
+// Why: the Icon Composer render adds a specular gradient and anti-aliasing, so
+// #FF8300 itself is mostly absent. Match the hue band it spreads into instead.
+const ORANGE_HUE_RANGE = [20, 45]
+const ORANGE_MIN_SATURATION = 0.45
+const ORANGE_MIN_VALUE = 0.35
+const OPAQUE_ALPHA = 200
+// No shipped icon had a single pixel in this band before the symbol landed; the
+// thinnest one now sits at 19%.
+const MIN_ORANGE_SHARE = 0.1
 
 const SCANNED_ROOTS = ['src', 'mobile/src', 'resources']
 const SCANNED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.css', '.svg', '.json', '.html'])
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'out', 'build', '.expo'])
-
-// ORCA-434 slice 2: the app-icon source still holds the orca until the icon
-// pipeline is regenerated (needs Xcode actool + ImageMagick). Delete this entry
-// when the icon slice lands so the guard covers the whole tree.
-const PENDING_ICON_SOURCE = path.join('resources', 'icon-source')
 
 function* walk(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -46,11 +68,7 @@ function scannedFiles() {
       continue
     }
     for (const absolute of walk(absoluteRoot)) {
-      const relative = path.relative(REPO_ROOT, absolute)
-      if (relative.startsWith(PENDING_ICON_SOURCE)) {
-        continue
-      }
-      files.push({ relative, absolute })
+      files.push({ relative: path.relative(REPO_ROOT, absolute), absolute })
     }
   }
   return files
@@ -58,6 +76,56 @@ function scannedFiles() {
 
 function readText(absolute) {
   return fs.readFileSync(absolute, 'utf8')
+}
+
+function isBrandOrange(r, g, b) {
+  const max = Math.max(r, g, b) / 255
+  const min = Math.min(r, g, b) / 255
+  const delta = max - min
+  if (delta === 0 || max < ORANGE_MIN_VALUE || delta / max < ORANGE_MIN_SATURATION) {
+    return false
+  }
+  const hue =
+    max === r / 255
+      ? (60 * (((g - b) / 255 / delta) % 6) + 360) % 360
+      : max === g / 255
+        ? 60 * ((b - r) / 255 / delta + 2)
+        : 60 * ((r - g) / 255 / delta + 4)
+  return hue >= ORANGE_HUE_RANGE[0] && hue <= ORANGE_HUE_RANGE[1]
+}
+
+function brandOrangeShare(buffer) {
+  const { width, height, data } = decodePng(buffer)
+  let opaque = 0
+  let orange = 0
+  for (let index = 0; index < width * height * 4; index += 4) {
+    if (data[index + 3] < OPAQUE_ALPHA) {
+      continue
+    }
+    opaque++
+    if (isBrandOrange(data[index], data[index + 1], data[index + 2])) {
+      orange++
+    }
+  }
+  return opaque === 0 ? 0 : orange / opaque
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+// The ICO the build emits stores every frame as a PNG, so the largest one can be
+// read back with the same decoder.
+function largestIcoFrame(buffer) {
+  const frames = []
+  for (let entry = 0; entry < buffer.readUInt16LE(4); entry++) {
+    const offset = 6 + entry * 16
+    const bytes = buffer.readUInt32LE(offset + 8)
+    const start = buffer.readUInt32LE(offset + 12)
+    const frame = buffer.subarray(start, start + bytes)
+    if (frame.subarray(0, 8).equals(PNG_SIGNATURE)) {
+      frames.push(frame)
+    }
+  }
+  return frames.sort((a, b) => b.length - a.length)[0]
 }
 
 describe('ORCA-434 Ab2Web symbol replaces the orca', () => {
@@ -117,5 +185,23 @@ describe('ORCA-434 Ab2Web symbol replaces the orca', () => {
   it('sizes the mobile header logo on the square-ish symbol, not the wide orca', () => {
     const component = readText(path.join(REPO_ROOT, 'mobile/src/components/OrcaLogo.tsx'))
     expect(component).toContain('318 / 231')
+  })
+
+  it('feeds the app-icon pipeline the square symbol, not the wide brand lockup', () => {
+    const source = readText(path.join(REPO_ROOT, ICON_SOURCE_SVG))
+    expect(source).toContain(AB2WEB_ICON_VIEWBOX)
+    expect(source).toContain(AB2WEB_ORANGE)
+  })
+
+  it('ships every icon raster on the brand orange, so a stale regenerate is visible', () => {
+    const shares = {}
+    for (const relative of SHIPPED_ICON_PNGS) {
+      shares[relative] = brandOrangeShare(fs.readFileSync(path.join(REPO_ROOT, relative)))
+    }
+    const ico = path.join(REPO_ROOT, 'resources/build/icon.ico')
+    shares['resources/build/icon.ico'] = brandOrangeShare(largestIcoFrame(fs.readFileSync(ico)))
+    for (const [relative, share] of Object.entries(shares)) {
+      expect(share, relative).toBeGreaterThan(MIN_ORANGE_SHARE)
+    }
   })
 })
