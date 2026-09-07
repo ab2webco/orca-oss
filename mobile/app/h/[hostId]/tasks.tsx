@@ -56,8 +56,10 @@ import { resolvePlaneTasksChrome } from '../../../src/plane-board/plane-tasks-ch
 import { PlaneTasksSurface } from '../../../src/plane-board/plane-tasks-surface'
 import {
   PROVIDER_TASK_GROUP_OPTIONS as LINEAR_GROUP_OPTIONS,
-  PROVIDER_TASK_ORDER_OPTIONS as LINEAR_ORDER_OPTIONS
+  PROVIDER_TASK_ORDER_OPTIONS as LINEAR_ORDER_OPTIONS,
+  type PlaneTaskGroupBy
 } from '../../../src/tasks/provider-task-view-options'
+import { planeListSections } from '../../../src/tasks/plane-list-sections'
 import { usePlaneViewMode, type PlaneViewMode } from '../../../src/plane-board/plane-work-item-view'
 import {
   formatGitHubPRDelta,
@@ -172,7 +174,8 @@ import {
   groupLinearIssues,
   type LinearGroupBy,
   type LinearIssueSection,
-  type LinearOrderBy
+  type LinearOrderBy,
+  type ProviderTaskOrderBy
 } from '../../../src/tasks/linear-mobile-issue-grouping'
 import { ProviderTaskBoard } from '../../../src/tasks/provider-task-board'
 import {
@@ -1847,6 +1850,8 @@ export default function MobileTasksScreen() {
   const [showLinearTeamPicker, setShowLinearTeamPicker] = useState(false)
   const [showLinearViewPicker, setShowLinearViewPicker] = useState(false)
   const [showPlaneViewPicker, setShowPlaneViewPicker] = useState(false)
+  const [planeGroupBy, setPlaneGroupBy] = useState<PlaneTaskGroupBy>('none')
+  const [planeOrderBy, setPlaneOrderBy] = useState<ProviderTaskOrderBy>('priority')
   const [showLinearGroupPicker, setShowLinearGroupPicker] = useState(false)
   const [showLinearOrderPicker, setShowLinearOrderPicker] = useState(false)
   const [showLinearDisplayPicker, setShowLinearDisplayPicker] = useState(false)
@@ -8264,10 +8269,15 @@ export default function MobileTasksScreen() {
     // Plane rows arrive in the project's own state order, so the generic
     // repository/updated sort would throw that away.
     if (provider === 'plane') {
-      return filterPlaneRowsByState(
-        items.filter((item): item is PlaneTaskItem => item.provider === 'plane'),
-        planeStateIds
-      )
+      // The state chip narrows first; Group and Order then apply to what is left.
+      return planeListSections(
+        filterPlaneRowsByState(
+          items.filter((item): item is PlaneTaskItem => item.provider === 'plane'),
+          planeStateIds
+        ),
+        planeGroupBy,
+        planeOrderBy
+      ).flatMap((section) => section.items)
     }
     const next = [...items]
     if (taskSort === 'repository') {
@@ -8276,11 +8286,33 @@ export default function MobileTasksScreen() {
       next.sort(compareTasksByUpdated)
     }
     return next
-  }, [items, planeStateIds, provider, reposById, taskSort])
+  }, [items, planeGroupBy, planeOrderBy, planeStateIds, provider, reposById, taskSort])
   const displayedEntries = useMemo<TaskListEntry[]>(() => {
     // Plane keeps its board order, so the repository grouping below — which
     // assumes sorted input — would emit a header per run of rows.
-    if (taskSort !== 'repository' || provider === 'plane') {
+    if (provider === 'plane') {
+      // Ungrouped is one unlabelled run, so the list draws its rows and no headers.
+      const planeEntries: TaskListEntry[] = []
+      for (const section of planeListSections(
+        sortedItems.filter((item): item is PlaneTaskItem => item.provider === 'plane'),
+        planeGroupBy,
+        planeOrderBy
+      )) {
+        if (section.label) {
+          planeEntries.push({
+            type: 'section',
+            key: `section:${section.key}`,
+            label: section.label,
+            color: section.color
+          })
+        }
+        for (const item of section.items) {
+          planeEntries.push({ type: 'item', key: item.key, item })
+        }
+      }
+      return planeEntries
+    }
+    if (taskSort !== 'repository') {
       return sortedItems.map((item) => ({ type: 'item', key: item.key, item }))
     }
     const entries: TaskListEntry[] = []
@@ -8299,7 +8331,7 @@ export default function MobileTasksScreen() {
       entries.push({ type: 'item', key: item.key, item })
     }
     return entries
-  }, [provider, reposById, sortedItems, taskSort])
+  }, [planeGroupBy, planeOrderBy, provider, reposById, sortedItems, taskSort])
   const sortLabel = SORT_OPTIONS.find((option) => option.value === taskSort)?.label ?? 'Updated'
   const githubProjectFields = githubProjectTable?.selectedView.fields ?? []
   const githubProjectViewSort = githubProjectTable?.selectedView.sortByFields?.[0] ?? null
@@ -8980,6 +9012,10 @@ export default function MobileTasksScreen() {
               onPickFilter={() => setShowPlaneFilterPicker(true)}
               viewMode={planeViewMode}
               onPickViewMode={() => setShowPlaneViewPicker(true)}
+              groupBy={planeGroupBy}
+              orderBy={planeOrderBy}
+              onChangeGroupBy={setPlaneGroupBy}
+              onChangeOrderBy={setPlaneOrderBy}
               buttonStyle={styles.segmentButton}
               textStyle={styles.segmentSecondaryText}
             />
@@ -9708,6 +9744,8 @@ export default function MobileTasksScreen() {
         enabled={planeChrome.surfaceEnabled}
         planeConnected={planeConnected}
         viewMode={planeViewMode}
+        groupBy={planeGroupBy}
+        orderBy={planeOrderBy}
         workspaceId={planeWorkspaceId}
         projectId={planeProjectId}
         projects={planeProjects}
@@ -9737,8 +9775,6 @@ export default function MobileTasksScreen() {
           setAppliedQuery('')
         }}
         bottomInset={insets.bottom}
-        menuButtonStyle={styles.segmentButton}
-        menuTextStyle={styles.segmentSecondaryText}
       />
 
       <PickerModal

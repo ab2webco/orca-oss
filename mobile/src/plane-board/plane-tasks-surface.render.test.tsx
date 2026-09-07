@@ -548,6 +548,42 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(columnCards('Low')).toEqual(['Open Low card'])
     })
 
+    it('groups and orders the list too, and the choice survives the view switch', async () => {
+      // ORCA-418: Group and Order used to live in the board's body with local state, so
+      // they vanished in list mode and reset on unmount. They are the bar's now.
+      await renderPlaneTasks(root, WRITING_HOST, { items: [LOW_CARD, HIGH_CARD] }, {})
+      expect(byLabel('Group High')).toBeNull()
+
+      // Chosen from list mode, which is where they used to be unreachable.
+      await pressTextButton('Group: No grouping')
+      await pressTextButton('Priority')
+      expect(leafWithText('Group: Priority')).not.toBeNull()
+      expect(byLabel('Group High')).not.toBeNull()
+      expect(byLabel('Group Low')).not.toBeNull()
+
+      await selectPlaneView('board')
+      expect(leafWithText('Group: Priority')).not.toBeNull()
+
+      await selectPlaneView('list')
+      // Survived the round trip, and the list is still grouped by it.
+      expect(leafWithText('Group: Priority')).not.toBeNull()
+      expect(byLabel('Group High')).not.toBeNull()
+    })
+
+    it('orders the list by the Order picker', async () => {
+      await renderPlaneTasks(root, WRITING_HOST, { items: [LOW_CARD, HIGH_CARD] }, {})
+      const rowTitles = (): string[] =>
+        [...document.body.querySelectorAll<HTMLElement>('[aria-label^="Row "]')].map(
+          (row) => row.getAttribute('aria-label') ?? ''
+        )
+      expect(rowTitles()).toEqual(['Row High card', 'Row Low card'])
+
+      await pressTextButton('Order: Priority')
+      await pressTextButton('Identifier')
+
+      expect(rowTitles()).toEqual(['Row Low card', 'Row High card'])
+    })
+
     it('offers no composer once the columns stop being states', async () => {
       // ORCA-422: grouped by priority a column is a priority, and Plane has no state to
       // create into. A composer here would send a destination Plane rejects.
