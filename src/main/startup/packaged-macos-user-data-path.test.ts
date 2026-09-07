@@ -90,6 +90,25 @@ describe('configurePackagedMacosUserDataPath', () => {
     }
   })
 
+  it('never overwrites a populated profile with the renamed copy', async () => {
+    // The rescue runs on machines that already hold accounts and transcripts. If it
+    // ever copies over them, a user loses working credentials for a stale set.
+    const kept = '{"type":"user","message":"the profile in use"}\n'
+    const stale = '{"type":"user","message":"the renamed leftover"}\n'
+    seedProfile('Orca', kept)
+    seedProfile('Orca Lab', stale)
+    const { configurePackagedMacosUserDataPath } = await import('./packaged-macos-user-data-path')
+
+    configurePackagedMacosUserDataPath()
+
+    expect(
+      readFileSync(
+        join(appDataDir, 'Orca', 'claude-accounts', 'account-1', 'session-1.jsonl'),
+        'utf-8'
+      )
+    ).toBe(kept)
+  })
+
   it('does not repin an unpackaged dev run', async () => {
     appMock.isPackaged = false
     const { configurePackagedMacosUserDataPath } = await import('./packaged-macos-user-data-path')
