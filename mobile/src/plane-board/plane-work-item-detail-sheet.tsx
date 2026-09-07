@@ -16,6 +16,8 @@ type Props = {
   /** The live card, so an optimistic edit shows here as well as on the board. */
   item: PlaneMobileWorkItem | null
   board: PlaneBoard
+  /** False while the relay is down: the card stays on screen, but it is the last read. */
+  planeConnected: boolean
   onMove: (stateId: string) => void
   onClose: () => void
   /** Copy the card's share link; omitted hides the action, as GitHub/Linear also do. */
@@ -26,6 +28,7 @@ type Props = {
 export function PlaneWorkItemDetailSheet({
   item,
   board,
+  planeConnected,
   onMove,
   onClose,
   onCopyLink,
@@ -37,6 +40,7 @@ export function PlaneWorkItemDetailSheet({
         <SheetBody
           item={item}
           board={board}
+          planeConnected={planeConnected}
           onMove={onMove}
           onCopyLink={onCopyLink}
           copied={copied}
@@ -57,7 +61,7 @@ function toggledAssignees(
 
 type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
 
-function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
+function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: BodyProps) {
   const editing = board.editingWorkItemIds.has(item.id)
   const moving = board.movingWorkItemIds.has(item.id)
   const failure = board.commentFailures[item.id] ?? null
@@ -76,6 +80,13 @@ function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
 
   return (
     <View>
+      {planeConnected ? null : (
+        <View style={styles.offline}>
+          <Text style={styles.offlineText}>
+            Offline — this is the last read of the card. Comments and edits resume on reconnect.
+          </Text>
+        </View>
+      )}
       <PlaneWorkItemDetail
         item={createPlaneTask(item)}
         onOpenInBrowser={(url) => void Linking.openURL(url)}
@@ -227,6 +238,13 @@ function SheetBody({ item, board, onMove, onCopyLink, copied }: BodyProps) {
 }
 
 const styles = StyleSheet.create({
+  offline: {
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.row,
+    backgroundColor: colors.bgPanel
+  },
+  offlineText: { fontSize: typography.metaSize, color: colors.textSecondary },
   section: { marginTop: spacing.md },
   label: {
     fontSize: 11,

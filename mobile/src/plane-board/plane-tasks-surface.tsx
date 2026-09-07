@@ -161,6 +161,7 @@ export function PlaneTasksSurface({
       <PlaneWorkItemDetailSheet
         item={live}
         board={board}
+        planeConnected={planeConnected}
         onMove={moveOpenCard}
         onClose={onCloseDetail}
         onCopyLink={live ? () => copyOpenCard() : undefined}

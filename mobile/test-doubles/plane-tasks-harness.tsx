@@ -164,7 +164,8 @@ export function PlaneTasksHarness({
   const [query, setQuery] = useState(initialQuery)
   const [detail, setDetail] = useState<PlaneMobileWorkItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  // A relay blip flips these false the way taskUiReady does; the surface's enabled follows.
+  // A relay blip flips this false. It gates Plane's data only: the screen's `enabled` never
+  // carried the connection, so the surface keeps its chrome and the open sheet (ORCA-419).
   const [connected, setConnected] = useState(true)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   // The Tasks screen owns the one read both views project from; so does this stand-in.
@@ -172,8 +173,7 @@ export function PlaneTasksHarness({
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const loadedRef = useRef<PlaneMobileWorkItem[]>([])
-  // The screen's own answer to which Plane UI is on screen. surfaceEnabled is not read
-  // here: this stand-in still drives the surface's enabled off connected.
+  // The screen's own answer to which Plane UI is on screen.
   const chrome = resolvePlaneTasksChrome({
     provider: 'plane',
     planeSupported: true,
@@ -256,7 +256,7 @@ export function PlaneTasksHarness({
       createElement(PlaneTasksSurface, {
         client,
         capabilities,
-        enabled: connected,
+        enabled: chrome.surfaceEnabled,
         planeConnected: connected,
         viewMode,
         workspaceId: 'ws-1',

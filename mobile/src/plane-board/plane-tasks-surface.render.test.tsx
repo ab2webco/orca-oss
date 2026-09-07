@@ -54,6 +54,9 @@ async function pressTextButton(text: string): Promise<void> {
   })
 }
 
+const OFFLINE_NOTICE =
+  'Offline — this is the last read of the card. Comments and edits resume on reconnect.'
+
 const WRITING_HOST = [
   'mobile.tasks.v1',
   MOBILE_TASKS_PLANE_CAPABILITY,
@@ -424,17 +427,43 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(reopened.value).toBe('Looks good')
     })
 
-    it('closes the detail while disconnected and reopens it on reconnect', async () => {
-      // Guard: openItem = enabled ? detailItem : null — no sheet over a board that cannot read.
+    it('keeps the open card on screen while disconnected, saying so inside', async () => {
+      // The connection gates Plane's data, never its chrome (ORCA-419). Closing the sheet on
+      // a relay blip loses the reader's place and whatever they were typing.
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       await press('Row Wire the retry')
+      expect(byLabel('Comment')).not.toBeNull()
       expect(byLabel('Move to Doing')).not.toBeNull()
+      expect(leafWithText(OFFLINE_NOTICE)).toBeNull()
 
       await press('Toggle connection')
+      // Still open, still showing the card that was read, and saying why it is stale. The
+      // move targets are the project's states, which is exactly what cannot be read now.
+      expect(byLabel('Comment')).not.toBeNull()
+      expect(leafWithText(OFFLINE_NOTICE)).not.toBeNull()
       expect(byLabel('Move to Doing')).toBeNull()
 
       await press('Toggle connection')
+      expect(leafWithText(OFFLINE_NOTICE)).toBeNull()
       expect(byLabel('Move to Doing')).not.toBeNull()
+    })
+
+    it('keeps a half-typed comment through a relay blip', async () => {
+      await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
+      await press('Row Wire the retry')
+      const input = byLabel('Comment')
+      if (!(input instanceof HTMLTextAreaElement)) {
+        throw new Error('comment input is not mounted')
+      }
+      typeInto(input, 'Half a thought')
+
+      await press('Toggle connection')
+
+      const kept = byLabel('Comment')
+      if (!(kept instanceof HTMLTextAreaElement)) {
+        throw new Error('the composer went away with the connection')
+      }
+      expect(kept.value).toBe('Half a thought')
     })
 
     it('keeps the way back to the list when the connection drops on the board', async () => {

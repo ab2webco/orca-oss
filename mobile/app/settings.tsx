@@ -212,7 +212,11 @@ export default function SettingsScreen() {
         <View style={[styles.section, styles.sectionSpacer]}>
           <Pressable
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => void Linking.openURL('https://core.ab2web.com/knowledgebase/9/Privacy-Policy--Orca-Lab.html')}
+            onPress={() =>
+              void Linking.openURL(
+                'https://core.ab2web.com/knowledgebase/9/Privacy-Policy--Orca-Lab.html'
+              )
+            }
           >
             <Shield size={16} color={colors.textSecondary} />
             <Text style={styles.rowLabel}>Privacy Policy</Text>
