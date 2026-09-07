@@ -212,7 +212,7 @@ function getComputerUseInstallStatus(
         permissions.unavailableReason === 'web_client'
           ? translate(
               'auto.components.feature.wall.agent.capability.setup.status.4c8e1f92a7',
-              'open Orca Desktop on this Mac'
+              'open Orca Lab Desktop on this Mac'
             )
           : translate(
               'auto.components.feature.wall.agent.capability.setup.status.6d2b0a84e1',

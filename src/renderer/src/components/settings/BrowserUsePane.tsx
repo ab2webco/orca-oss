@@ -162,7 +162,7 @@ export function BrowserUseSetup({
         toast.success(
           translate(
             'auto.components.settings.BrowserUsePane.721aee31b4',
-            'Registered the Orca CLI in PATH.'
+            'Registered the Orca Lab CLI in PATH.'
           )
         )
       }
@@ -266,7 +266,7 @@ export function BrowserUseSetup({
           )}
           description={translate(
             'auto.components.settings.BrowserUsePane.68ea76eb71',
-            "Install the Browser Use skill so agents can operate Orca's browser."
+            "Install the Browser Use skill so agents can operate Orca Lab's browser."
           )}
           keywords={getBrowserUsePaneSearchEntries()[1].keywords}
           className={cn(

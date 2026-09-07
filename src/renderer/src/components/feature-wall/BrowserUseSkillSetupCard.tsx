@@ -51,7 +51,7 @@ export function BrowserUseSkillSetupCard(props: {
       )}
       description={translate(
         'auto.components.feature.wall.BrowserUseSkillSetupCard.cbc45022d4',
-        "Enables agents to navigate and verify pages in Orca's browser."
+        "Enables agents to navigate and verify pages in Orca Lab's browser."
       )}
       command={installCommand}
       installedCommand={updateCommand}
