@@ -911,6 +911,12 @@ const TerminalSend = TerminalHandle.extend({
     })
     .optional(),
   requireAgentStatus: z.enum(['sendable']).optional(),
+  // Why: a raw `text\r` write races the agent's composer — the CR can land
+  // before the TUI has taken the text, which leaves the prompt sitting unsent
+  // (ORCA-437). This routes the write through the bracketed-paste + delayed
+  // submit path instead. `z.literal(true)` on purpose: a client that sends
+  // anything else must fail loudly, not degrade to the racy path in silence.
+  agentPrompt: z.literal(true).optional(),
   // Why: terminal-generated replies are valid input but must not transfer the shared terminal floor.
   inputKind: z.enum(['query-reply']).optional(),
   // Why: identifies the caller for the driver state machine; when absent (older clients) the server falls back to the most recent mobile actor (docs/mobile-presence-lock.md).
@@ -1400,23 +1406,45 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
               mobileFloorClaim.current = claim
             }
           : undefined
+      // Why: only a submitted prompt qualifies. Without text there is nothing to
+      // paste, and `interrupt` is a control byte the paste framing would corrupt.
+      const agentPromptText =
+        params.agentPrompt === true &&
+        params.enter === true &&
+        params.interrupt !== true &&
+        typeof params.text === 'string' &&
+        params.text.length > 0
+          ? params.text
+          : null
+      if (params.agentPrompt === true && mobileFloorClientId) {
+        // The agent-prompt write does not carry the mobile floor handshake, so
+        // taking it here would drop the claim rather than degrade politely.
+        throw new InvalidArgumentError('agentPrompt is not supported for mobile input')
+      }
       let result
       try {
-        result = await runtime.sendTerminal(
-          params.terminal,
-          {
-            text: params.text,
-            enter: params.enter === true,
-            interrupt: params.interrupt === true
-          },
-          {
-            beforeWrite,
-            ...(reserveWrite ? { reserveWrite } : {}),
-            ...(params.inputKind !== 'query-reply' && mobileFloorClientId
-              ? { afterWrite: () => commitMobileInputFloorClaim(mobileFloorClaim) }
-              : {})
-          }
-        )
+        result =
+          agentPromptText !== null
+            ? await runtime.sendTerminalAgentPrompt(
+                params.terminal,
+                agentPromptText,
+                beforeWrite ? { beforeWrite } : {}
+              )
+            : await runtime.sendTerminal(
+                params.terminal,
+                {
+                  text: params.text,
+                  enter: params.enter === true,
+                  interrupt: params.interrupt === true
+                },
+                {
+                  beforeWrite,
+                  ...(reserveWrite ? { reserveWrite } : {}),
+                  ...(params.inputKind !== 'query-reply' && mobileFloorClientId
+                    ? { afterWrite: () => commitMobileInputFloorClaim(mobileFloorClaim) }
+                    : {})
+                }
+              )
       } catch (error) {
         mobileFloorClaim.current?.rollback()
         const refusedReason = getTerminalSendGuardRefusedReason(error)
