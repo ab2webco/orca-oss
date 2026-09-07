@@ -17,7 +17,7 @@ describe('switch-account skill guidance', () => {
     expect(guide).toContain('orca account switch --to <email|id>')
     expect(guide).toContain('carries no switching logic')
     // Cached roster: resolving a name must never force a provider usage refresh.
-    expect(guide).toContain("reads Orca's cached roster and quota")
+    expect(guide).toContain("reads Orca Lab's cached roster and quota")
   })
 
   it('keeps the switch on the caller’s own terminal', () => {
