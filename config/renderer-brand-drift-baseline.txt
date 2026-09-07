@@ -18,6 +18,6 @@
 # stale-fallbacks  fallback that differs from its catalog value for any reason (superset)
 # resolved-calls   parsed translate() calls whose key resolves in the catalog
 
-rename-drift 452
-stale-fallbacks 514
+rename-drift 250
+stale-fallbacks 312
 resolved-calls 12474

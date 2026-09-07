@@ -203,7 +203,7 @@ export function PluginConsentDialog({
                 {plugin.hasWorker
                   ? `${translate(
                       'auto.components.settings.PluginConsentDialog.workerSandboxWarning',
-                      "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls."
+                      "This worker can read its plugin files and files Orca Lab grants to its runtime. Orca Lab's parent process can still act on approved API calls."
                     )} ${
                       plugin.capabilities.some((capability) => capability.kind === 'net:fetch')
                         ? translate(
@@ -223,11 +223,11 @@ export function PluginConsentDialog({
                     : plugin.capabilities.length > 0 || plugin.panels.length > 0
                       ? translate(
                           'auto.components.settings.PluginConsentDialog.panelWarning',
-                          "These permissions limit how the plugin uses Orca's API. This plugin has no background worker."
+                          "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
                         )
                       : translate(
                           'auto.components.settings.PluginConsentDialog.declarativeWarning',
-                          "This plugin contributes validated content only. It does not run a background worker or receive access to Orca's API."
+                          "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
                         )}
               </span>
             </div>

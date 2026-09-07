@@ -87,7 +87,7 @@ export function PluginInstallDialog({
           <DialogDescription>
             {translate(
               'auto.components.settings.PluginInstallDialog.description',
-              'Installing copies the plugin into Orca and shows its permissions for review. No plugin code runs until you enable it.'
+              'Installing copies the plugin into Orca Lab and shows its permissions for review. No plugin code runs until you enable it.'
             )}
           </DialogDescription>
         </DialogHeader>

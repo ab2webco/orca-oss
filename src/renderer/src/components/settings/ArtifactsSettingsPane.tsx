@@ -47,7 +47,7 @@ export function ArtifactsSettingsPane({
             description: isWebClient
               ? translate(
                   'auto.components.settings.artifacts.enableStepWebDescription',
-                  'Open Settings → Artifacts in the Orca desktop app on the host device and enable publishing.'
+                  'Open Settings → Artifacts in the Orca Lab desktop app on the host device and enable publishing.'
                 )
               : translate(
                   'auto.components.settings.artifacts.enableStepDescription',
@@ -76,7 +76,10 @@ export function ArtifactsSettingsPane({
     },
     {
       key: 'manage',
-      title: translate('auto.components.settings.artifacts.manageStepTitle', 'Manage it in Orca'),
+      title: translate(
+        'auto.components.settings.artifacts.manageStepTitle',
+        'Manage it in Orca Lab'
+      ),
       description: translate(
         'auto.components.settings.artifacts.manageStepDescription',
         'Open Artifacts from the sidebar to preview or remove links.'
@@ -99,7 +102,7 @@ export function ArtifactsSettingsPane({
               )
             : translate(
                 'auto.components.settings.artifacts.allowPublishingDescription',
-                'Publish HTML and Markdown files as links anyone with the URL can open. File contents are uploaded to {{host}}, which upstream Orca operates — this build does not host it. Existing links remain until you delete them from Artifacts.',
+                'Publish HTML and Markdown files as links anyone with the URL can open. File contents are uploaded to {{host}}, which upstream Orca Lab operates — this build does not host it. Existing links remain until you delete them from Artifacts.',
                 { host: ARTIFACT_SHARE_HOST }
               )
         }
@@ -128,7 +131,7 @@ export function ArtifactsSettingsPane({
             <p className="text-xs leading-relaxed text-muted-foreground">
               {translate(
                 'auto.components.settings.artifacts.signInDescription',
-                'Use your Orca account to upload artifacts and manage their public links.'
+                'Use your Orca Lab account to upload artifacts and manage their public links.'
               )}
             </p>
           </div>
@@ -142,7 +145,7 @@ export function ArtifactsSettingsPane({
               ? translate('auto.components.settings.artifacts.signingIn', 'Signing in…')
               : authStatus?.state === 'reconnect-required'
                 ? translate('auto.components.settings.artifacts.signInAgain', 'Sign in again')
-                : translate('auto.components.settings.artifacts.signIn', 'Sign in to Orca')}
+                : translate('auto.components.settings.artifacts.signIn', 'Sign in to Orca Lab')}
           </Button>
         </section>
       ) : null}

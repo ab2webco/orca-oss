@@ -54,7 +54,7 @@ export function MobileEmulatorExamples({
       <p className="mt-1 text-xs text-muted-foreground">
         {translate(
           'auto.components.settings.MobileEmulatorExamples.4daa95f25a',
-          'Paste any of these into Claude Code, Codex, or another agent in a project where the Orca CLI skill is installed.'
+          'Paste any of these into Claude Code, Codex, or another agent in a project where the Orca Lab CLI skill is installed.'
         )}
       </p>
       <ul className="mt-3 space-y-2">

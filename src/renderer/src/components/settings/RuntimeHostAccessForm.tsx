@@ -77,7 +77,7 @@ export function RuntimeHostAccessForm({
           <li>
             {translate(
               'auto.components.settings.RuntimeHostAccessForm.stepOpenShare',
-              'Open Settings → Remote Orca Servers → Share this host.'
+              'Open Settings → Remote Orca Lab Servers → Share this host.'
             )}
           </li>
           <li>
@@ -89,7 +89,7 @@ export function RuntimeHostAccessForm({
           <li>
             {translate(
               'auto.components.settings.RuntimeHostAccessForm.stepCopyLink',
-              'Generate the link, then copy the “Pair another Orca client” link.'
+              'Generate the link, then copy the “Pair another Orca Lab client” link.'
             )}
           </li>
         </ol>
@@ -98,7 +98,7 @@ export function RuntimeHostAccessForm({
       <div className="grid gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
         <div className="space-y-2">
           <Label htmlFor="runtime-server-name">
-            {translate('auto.components.settings.RuntimeHostAccessForm.name', 'Name in Orca')}
+            {translate('auto.components.settings.RuntimeHostAccessForm.name', 'Name in Orca Lab')}
           </Label>
           <Input
             id="runtime-server-name"
@@ -114,7 +114,7 @@ export function RuntimeHostAccessForm({
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.RuntimeHostAccessForm.nameHelp',
-              'This only changes how the computer appears in Orca.'
+              'This only changes how the computer appears in Orca Lab.'
             )}
           </p>
         </div>
@@ -141,7 +141,7 @@ export function RuntimeHostAccessForm({
           <p id="runtime-server-access-link-help" className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.RuntimeHostAccessForm.accessLinkHelp',
-              'Orca shows the destination before connecting. Credentials stay hidden.'
+              'Orca Lab shows the destination before connecting. Credentials stay hidden.'
             )}
           </p>
           {inputError ? (
@@ -247,7 +247,7 @@ export function RuntimeHostAccessForm({
             {failure.kind === 'host-identity-mismatch'
               ? translate(
                   'auto.components.settings.RuntimeHostAccessForm.identityMismatch',
-                  'The reached Orca host does not match this access link'
+                  'The reached Orca Lab host does not match this access link'
                 )
               : failure.kind === 'access-link-invalid'
                 ? translate(
@@ -257,7 +257,7 @@ export function RuntimeHostAccessForm({
                 : failure.kind === 'protocol-incompatible'
                   ? translate(
                       'auto.components.settings.RuntimeHostAccessForm.incompatible',
-                      'Orca versions are not compatible'
+                      'Orca Lab versions are not compatible'
                     )
                   : failure.kind === 'connection-interrupted'
                     ? translate(

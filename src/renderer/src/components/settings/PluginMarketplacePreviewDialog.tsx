@@ -239,7 +239,7 @@ export function PluginMarketplacePreviewDialog({
                 <span>
                   {translate(
                     'auto.components.settings.PluginMarketplacePreviewDialog.workerSandboxWarning',
-                    "This worker can read its plugin files and files Orca grants to its runtime. Orca's parent process can still act on approved API calls."
+                    "This worker can read its plugin files and files Orca Lab grants to its runtime. Orca Lab's parent process can still act on approved API calls."
                   )}{' '}
                   {preview.manifest.capabilities.some(
                     (capability) => capability.kind === 'net:fetch'
@@ -259,7 +259,7 @@ export function PluginMarketplacePreviewDialog({
               <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-sm text-destructive">
                 {translate(
                   'auto.components.settings.PluginMarketplacePreviewDialog.blocked',
-                  "Orca's safety list blocks this plugin: {{value0}}",
+                  "Orca Lab's safety list blocks this plugin: {{value0}}",
                   { value0: blocked.reason }
                 )}
               </p>

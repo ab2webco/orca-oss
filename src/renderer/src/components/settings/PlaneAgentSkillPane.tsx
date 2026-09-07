@@ -102,7 +102,7 @@ export function PlaneAgentSkillPane(): React.JSX.Element {
         title={translate('auto.components.settings.PlaneAgentSkillPane.skillTitle', 'Plane skill')}
         description={translate(
           'auto.components.settings.PlaneAgentSkillPane.skillDescription',
-          'Enables agents to read work items and post updates to Plane through Orca.'
+          'Enables agents to read work items and post updates to Plane through Orca Lab.'
         )}
         command={installCommand}
         installedCommand={updateCommand}

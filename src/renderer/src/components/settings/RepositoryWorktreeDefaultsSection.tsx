@@ -62,7 +62,7 @@ export function RepositoryWorktreeDefaultsSection({
         )}
         description={translate(
           'auto.components.settings.RepositoryPane.externalWorktreesDescription',
-          'Override whether worktrees created outside Orca appear for this project.'
+          'Override whether worktrees created outside Orca Lab appear for this project.'
         )}
         keywords={[repo.displayName, 'external', 'non-Orca', 'visibility', 'sidebar']}
         className="space-y-2"
