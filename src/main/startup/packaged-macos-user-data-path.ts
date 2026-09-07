@@ -4,8 +4,16 @@ import { app } from 'electron'
 import { getMainE2EConfig } from '../e2e-config'
 
 /** The Application Support directory every shipped macOS build has written to.
- *  A literal, not a derived value: that is the whole point — see below. */
-const PINNED_USER_DATA_DIR_NAME = 'Orca'
+ *  A literal, not a derived value: that is the whole point — see below.
+ *
+ *  Lowercase, and measured rather than assumed: `app.getName()` on a packaged
+ *  build resolves from the asar's package.json, which carries `name: 'orca'` and
+ *  no `productName`, so the directory has always been `orca`. It was written
+ *  'Orca' first; on this machine's case-insensitive APFS both spellings resolve
+ *  to the same 6.9 GB directory, so nothing failed — on a case-sensitive volume
+ *  the pin would have created an empty `Orca` and caused the loss it exists to
+ *  prevent. */
+const PINNED_USER_DATA_DIR_NAME = 'orca'
 
 /** Subdirectories holding data a user cannot lose. Mirrors the Linux pin. */
 const RESCUED_USER_DATA_ENTRIES = [
