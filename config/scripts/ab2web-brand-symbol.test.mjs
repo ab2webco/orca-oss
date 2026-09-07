@@ -24,10 +24,21 @@ const SHIPPED_ICON_PNGS = [
   'resources/build/icon.png',
   'resources/icon.png',
   'resources/icon-dev.png',
+  // The two icons the user can pick in Settings, each also the macOS dock icon.
+  'resources/app-icons/orca-blue.png',
+  'resources/app-icons/orca-watercolor.png',
   'mobile/assets/icon.png',
   'mobile/assets/adaptive-icon.png',
   'mobile/assets/splash-icon.png',
   'mobile/assets/favicon.png'
+]
+
+// The macOS menu bar item. Excluded from the orange check on purpose: a Template
+// image is black plus alpha, and macOS recolours it — colour here would ship a
+// wrongly painted tray icon (ORCA-438).
+const TEMPLATE_ICON_PNGS = [
+  'resources/tray/orca-menu-barTemplate.png',
+  'resources/tray/orca-menu-barTemplate@2x.png'
 ]
 
 // Why: the Icon Composer render adds a specular gradient and anti-aliasing, so
@@ -191,6 +202,27 @@ describe('ORCA-434 Ab2Web symbol replaces the orca', () => {
     const source = readText(path.join(REPO_ROOT, ICON_SOURCE_SVG))
     expect(source).toContain(AB2WEB_ICON_VIEWBOX)
     expect(source).toContain(AB2WEB_ORANGE)
+  })
+
+  it('keeps the menu bar icon a monochrome template with real coverage', () => {
+    for (const relative of TEMPLATE_ICON_PNGS) {
+      const { width, height, data } = decodePng(fs.readFileSync(path.join(REPO_ROOT, relative)))
+      let opaque = 0
+      let coloured = 0
+      for (let index = 0; index < width * height * 4; index += 4) {
+        if (data[index + 3] < OPAQUE_ALPHA) {
+          continue
+        }
+        opaque++
+        const [r, g, b] = [data[index], data[index + 1], data[index + 2]]
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 12 || Math.max(r, g, b) > 96) {
+          coloured++
+        }
+      }
+      // A shape, not an empty canvas: the symbol covers a fifth of the box.
+      expect(opaque / (width * height), relative).toBeGreaterThan(0.15)
+      expect(coloured, relative).toBe(0)
+    }
   })
 
   it('ships every icon raster on the brand orange, so a stale regenerate is visible', () => {
