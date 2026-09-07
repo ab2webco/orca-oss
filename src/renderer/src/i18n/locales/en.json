@@ -96,7 +96,10 @@
     "help": "Help",
     "paste": "Paste",
     "copy": "Copy",
-    "selectAll": "Select All"
+    "selectAll": "Select All",
+    "about": "About {{name}}",
+    "hide": "Hide {{name}}",
+    "quit": "Quit {{name}}"
   },
   "tray": {
     "openOrca": "Open Orca Lab",

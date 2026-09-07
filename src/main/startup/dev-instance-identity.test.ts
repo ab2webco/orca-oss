@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getDevInstanceIdentity } from './dev-instance-identity'
 
 describe('dev-instance-identity', () => {
-  it('keeps packaged identity stable', () => {
+  it('shows the Orca Lab name while keeping the Keychain-driving appName on Orca', () => {
+    // appName drives app.setName -> the '<appName> Safe Storage' Keychain item.
+    // Renaming it would orphan every credential the user already stored.
     expect(getDevInstanceIdentity(false, {})).toMatchObject({
-      name: 'Orca',
+      name: 'Orca Lab',
       appName: 'Orca',
       isDev: false,
       devLabel: null,
@@ -39,7 +41,7 @@ describe('dev-instance-identity', () => {
       devWorktreeName: 'dev-indicator',
       devRepoRoot: '/repo/worktrees/dev-indicator'
     })
-    expect(identity.name).toBe('Orca: nwparker/dev-indicator')
+    expect(identity.name).toBe('Orca Lab: nwparker/dev-indicator')
     expect(identity.dockBadgeLabel).toBeNull()
     expect(identity.appUserModelId).toMatch(/^com\.stablyai\.orca\.dev\.[a-f0-9]{10}$/)
   })
@@ -52,7 +54,7 @@ describe('dev-instance-identity', () => {
     })
 
     expect(identity.devLabel).toBe('payment-ui @ feature/billing-shell')
-    expect(identity.name).toBe('Orca: feature/billing-shell')
+    expect(identity.name).toBe('Orca Lab: feature/billing-shell')
     expect(identity.dockBadgeLabel).toBeNull()
   })
 
@@ -64,7 +66,7 @@ describe('dev-instance-identity', () => {
     })
 
     expect(identity.devLabel).toBe('manual label')
-    expect(identity.name).toBe('Orca: feature/other')
+    expect(identity.name).toBe('Orca Lab: feature/other')
     expect(identity.dockBadgeLabel).toBeNull()
   })
 })

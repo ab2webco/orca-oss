@@ -69,7 +69,10 @@
     "help": "ヘルプ",
     "paste": "貼り付け",
     "copy": "コピー",
-    "selectAll": "すべて選択"
+    "selectAll": "すべて選択",
+    "about": "{{name}}について",
+    "hide": "{{name}}を隠す",
+    "quit": "{{name}}を終了"
   },
   "tray": {
     "openOrca": "Orca Lab を開く",

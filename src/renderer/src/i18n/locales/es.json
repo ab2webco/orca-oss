@@ -69,7 +69,10 @@
     "help": "Ayuda",
     "paste": "Pegar",
     "copy": "Copiar",
-    "selectAll": "Seleccionar todo"
+    "selectAll": "Seleccionar todo",
+    "about": "Acerca de {{name}}",
+    "hide": "Ocultar {{name}}",
+    "quit": "Salir de {{name}}"
   },
   "tray": {
     "openOrca": "Abrir Orca Lab",

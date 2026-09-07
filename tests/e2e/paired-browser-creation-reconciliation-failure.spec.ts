@@ -188,7 +188,7 @@ async function runReconciliationFailureJourney(args: {
       )
     ).toBe(true)
 
-    await expect(page.getByText('Unable to open this file in Orca Browser.')).toBeVisible({
+    await expect(page.getByText('Unable to open this file in Orca Lab Browser.')).toBeVisible({
       timeout: 30_000
     })
     await expect
@@ -293,7 +293,7 @@ async function runCapabilityFailureJourney(args: {
     })
     await openPreviewToSide.click()
 
-    await expect(page.getByText('Unable to open this file in Orca Browser.')).toBeVisible({
+    await expect(page.getByText('Unable to open this file in Orca Lab Browser.')).toBeVisible({
       timeout: 30_000
     })
     await expect
