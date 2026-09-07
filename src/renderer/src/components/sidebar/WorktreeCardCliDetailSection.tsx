@@ -22,7 +22,7 @@ export function WorktreeCardCliDetailSection({
     <WorktreeCardDetailSection>
       <DetailHeader
         icon={<SquareTerminal className="size-3 text-muted-foreground" />}
-        label={translate('auto.components.sidebar.WorktreeCardMeta.cliHeader', 'Orca CLI')}
+        label={translate('auto.components.sidebar.WorktreeCardMeta.cliHeader', 'Orca Lab CLI')}
       />
       <WorktreeCardDetailSectionContent className="space-y-1.5">
         <div className="text-[13px] font-semibold leading-snug text-foreground break-words">
