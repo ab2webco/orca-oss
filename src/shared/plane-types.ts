@@ -156,8 +156,9 @@ export type PlaneWorkItemUpdate = {
   assigneeIds?: string[]
   priority?: PlaneWorkItemPriority
   stateId?: string
-  startDate?: string
-  targetDate?: string
+  /** `null` clears the date. */
+  startDate?: string | null
+  targetDate?: string | null
   parentId?: string | null
 }
 

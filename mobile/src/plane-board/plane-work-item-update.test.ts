@@ -65,6 +65,46 @@ describe('plane work item update', () => {
     ])
   })
 
+  it('sends a title-only patch as updates.title, with no priority or assignee beside it', async () => {
+    // The mutation control for ORCA-424: the old guard refused any patch without
+    // a priority or an assignee list, so this reached the wire as an error.
+    const calls: Call[] = []
+    expect(
+      await updatePlaneWorkItem(stubClient({ ok: true }, calls), {
+        ...REQUEST,
+        patch: { title: 'Renamed' }
+      })
+    ).toEqual({ ok: true })
+    expect(calls[0]?.params).toEqual({
+      projectId: 'p1',
+      workItemId: 'wi-1',
+      workspaceId: 'w1',
+      updates: { title: 'Renamed' }
+    })
+  })
+
+  it('forwards a cleared date as null, and the text fields as they are', async () => {
+    const calls: Call[] = []
+    await updatePlaneWorkItem(stubClient({ ok: true }, calls), {
+      ...REQUEST,
+      patch: { description: 'Body', labelIds: ['l-1'], startDate: '2026-09-07', targetDate: null }
+    })
+    expect(calls[0]?.params).toMatchObject({
+      updates: { description: 'Body', labelIds: ['l-1'], startDate: '2026-09-07', targetDate: null }
+    })
+  })
+
+  it('refuses a patch whose every field is undefined as nothing to update', async () => {
+    const calls: Call[] = []
+    expect(
+      await updatePlaneWorkItem(stubClient({ ok: true }, calls), {
+        ...REQUEST,
+        patch: { title: undefined, priority: undefined }
+      })
+    ).toEqual({ ok: false, error: 'Nothing to update' })
+    expect(calls).toEqual([])
+  })
+
   it('sends the whole assignee list as updates.assigneeIds', async () => {
     const calls: Call[] = []
     await updatePlaneWorkItem(stubClient({ ok: true }, calls), {

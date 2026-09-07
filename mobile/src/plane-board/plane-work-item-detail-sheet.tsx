@@ -10,6 +10,7 @@ import { PLANE_PRIORITY_LABELS, PLANE_PRIORITY_PICKER_ORDER } from '../tasks/pla
 import { PlaneBoardCommentComposer } from './plane-board-comment-composer'
 import { PlaneBoardCommentThreadSection } from './plane-board-comment-thread-section'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
+import { PlaneWorkItemFieldEditor } from './plane-work-item-field-editor'
 import type { PlaneBoard } from './use-plane-board'
 
 type Props = {
@@ -93,6 +94,14 @@ function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: 
         onCopyLink={onCopyLink}
         copied={copied}
       />
+      {board.canEdit ? (
+        <PlaneWorkItemFieldEditor
+          item={item}
+          editing={editing}
+          clearable={board.canClearDates}
+          onSave={(edit) => void board.setFields(item, edit)}
+        />
+      ) : null}
       {board.canEdit ? (
         <View style={styles.section}>
           <Text style={styles.label}>Priority</Text>

@@ -8,9 +8,15 @@ import {
 } from './plane-write-failure'
 
 export type PlaneWorkItemPatch = {
+  title?: string
+  description?: string
   priority?: PlaneWorkItemPriority
-  /** The whole list: Plane replaces, it does not merge. */
+  /** Whole lists: Plane replaces, it does not merge. */
+  labelIds?: string[]
   assigneeIds?: string[]
+  /** `null` clears the date. */
+  startDate?: string | null
+  targetDate?: string | null
 }
 
 export type PlaneUpdateResult = { ok: true } | PlaneWriteFailure
@@ -33,7 +39,7 @@ export async function updatePlaneWorkItem(
   if (!request.projectId || !request.workItemId) {
     return { ok: false, error: MISSING_SCOPE_MESSAGE }
   }
-  if (request.patch.priority === undefined && request.patch.assigneeIds === undefined) {
+  if (!Object.values(request.patch).some((value) => value !== undefined)) {
     return { ok: false, error: EMPTY_PATCH_MESSAGE }
   }
   let response

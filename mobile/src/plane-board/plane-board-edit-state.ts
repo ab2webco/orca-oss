@@ -2,10 +2,30 @@ import type { PlaneWorkItemPriority } from '../../../src/shared/plane-types'
 import type { PlaneMobileMember, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import type { PlaneWorkItemPatch } from './plane-work-item-update'
 
+/** Keyed like the work item so an override spreads straight onto the card. */
 export type PlaneBoardEdit = {
+  title?: string
+  description?: string
   priority?: PlaneWorkItemPriority
+  /** `null` clears the date. */
+  startDate?: string | null
+  targetDate?: string | null
+  labelIds?: string[]
   assignees?: PlaneMobileMember[]
 }
+
+type EditField = keyof PlaneBoardEdit
+type EditValue = PlaneBoardEdit[EditField]
+
+const EDIT_FIELDS: readonly EditField[] = [
+  'title',
+  'description',
+  'priority',
+  'startDate',
+  'targetDate',
+  'labelIds',
+  'assignees'
+]
 
 /** work item id → the fields the phone changed but the server has not confirmed. */
 export type PlaneBoardEditOverrides = Readonly<Record<string, PlaneBoardEdit>>
@@ -35,17 +55,15 @@ export function rollbackPlaneBoardEdit(
   }
   const restored: PlaneBoardEdit = { ...current }
   let touched = false
-  if (failed.priority !== undefined && current.priority === failed.priority) {
-    replaceField(restored, 'priority', previous?.priority)
-    touched = true
-  }
-  if (
-    failed.assignees !== undefined &&
-    current.assignees !== undefined &&
-    sameAssignees(current.assignees, failed.assignees)
-  ) {
-    replaceField(restored, 'assignees', previous?.assignees)
-    touched = true
+  for (const field of EDIT_FIELDS) {
+    if (
+      failed[field] !== undefined &&
+      current[field] !== undefined &&
+      sameFieldValue(current[field], failed[field])
+    ) {
+      replaceField(restored, field, previous?.[field])
+      touched = true
+    }
   }
   if (!touched) {
     return overrides
@@ -59,7 +77,7 @@ export function rollbackPlaneBoardEdit(
   return next
 }
 
-function replaceField<K extends keyof PlaneBoardEdit>(
+function replaceField<K extends EditField>(
   edit: PlaneBoardEdit,
   field: K,
   value: PlaneBoardEdit[K] | undefined
@@ -84,15 +102,19 @@ export function applyPlaneBoardEdits(
   })
 }
 
-function sameAssignees(
-  left: readonly PlaneMobileMember[],
-  right: readonly PlaneMobileMember[]
-): boolean {
-  if (left.length !== right.length) {
-    return false
+function entryKey(entry: string | PlaneMobileMember): string {
+  return typeof entry === 'string' ? entry : entry.id
+}
+
+/** Lists compare as sets (Plane returns them in its own order); a cleared date
+ *  matches a read that omits the field. */
+function sameFieldValue(left: EditValue, right: EditValue): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    const entries: readonly (string | PlaneMobileMember)[] = left
+    const keys = new Set(right.map(entryKey))
+    return entries.length === keys.size && entries.every((entry) => keys.has(entryKey(entry)))
   }
-  const ids = new Set(right.map((member) => member.id))
-  return left.every((member) => ids.has(member.id))
+  return (left ?? null) === (right ?? null)
 }
 
 /** Drops the fields a fresh read already reflects. Without this a value the
@@ -117,11 +139,11 @@ export function reconcilePlaneBoardEdits(
       continue
     }
     const remaining: PlaneBoardEdit = {}
-    if (edit.priority !== undefined && edit.priority !== item.priority) {
-      remaining.priority = edit.priority
-    }
-    if (edit.assignees !== undefined && !sameAssignees(edit.assignees, item.assignees)) {
-      remaining.assignees = edit.assignees
+    for (const field of EDIT_FIELDS) {
+      const value = edit[field]
+      if (value !== undefined && !sameFieldValue(value, item[field])) {
+        replaceField(remaining, field, value)
+      }
     }
     if (Object.keys(remaining).length === Object.keys(edit).length) {
       kept[workItemId] = edit
@@ -135,13 +157,24 @@ export function reconcilePlaneBoardEdits(
   return changed ? kept : overrides
 }
 
-export function toPlaneWorkItemPatch(edit: PlaneBoardEdit): PlaneWorkItemPatch {
-  const patch: PlaneWorkItemPatch = {}
-  if (edit.priority !== undefined) {
-    patch.priority = edit.priority
+/** Forgets the description override of every confirmed id the read returned. */
+export function dropConfirmedDescriptions(
+  overrides: PlaneBoardEditOverrides,
+  items: readonly PlaneMobileWorkItem[],
+  confirmed: Set<string>
+): PlaneBoardEditOverrides {
+  let next = overrides
+  for (const { id } of items) {
+    const description = next[id]?.description
+    if (confirmed.delete(id) && description !== undefined) {
+      next = rollbackPlaneBoardEdit(next, id, { description }, undefined)
+    }
   }
-  if (edit.assignees !== undefined) {
-    patch.assigneeIds = edit.assignees.map((member) => member.id)
-  }
-  return patch
+  return next
+}
+
+export function toPlaneWorkItemPatch({ assignees, ...fields }: PlaneBoardEdit): PlaneWorkItemPatch {
+  return assignees === undefined
+    ? fields
+    : { ...fields, assigneeIds: assignees.map((member) => member.id) }
 }

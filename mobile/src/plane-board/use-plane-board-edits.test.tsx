@@ -39,6 +39,8 @@ type Deferred = { resolve: (result: unknown) => void; reject: (error: Error) => 
 function mountEdits() {
   const pending: Deferred[] = []
   let latest: PlaneBoardEdits | null = null
+  let shown = items
+  let reloads = 0
   const client = {
     sendRequest: () =>
       new Promise((resolve, reject) => {
@@ -50,14 +52,27 @@ function mountEdits() {
   } as unknown as RpcClient
 
   function Probe() {
-    latest = usePlaneBoardEdits({ client, workspaceId: 'ws-1', items, reload: () => {} })
+    latest = usePlaneBoardEdits({
+      client,
+      workspaceId: 'ws-1',
+      items: shown,
+      reload: () => reloads++
+    })
     return null
   }
+  let renderer!: ReturnType<typeof create>
   act(() => {
-    create(createElement(Probe))
+    renderer = create(createElement(Probe))
   })
   return {
     pending,
+    get reloads() {
+      return reloads
+    },
+    read(next: typeof items) {
+      shown = next
+      act(() => renderer.update(createElement(Probe)))
+    },
     get edits(): PlaneBoardEdits {
       if (!latest) {
         throw new Error('probe never rendered')
@@ -115,6 +130,34 @@ describe('usePlaneBoardEdits with two writes in flight on one card', () => {
     await mounted.settle()
 
     expect(mounted.edits.overrides['wi-1']).toEqual({ priority: 'urgent' })
+  })
+
+  it('sends the text fields through setFields and rolls a refused one back', async () => {
+    const mounted = mountEdits()
+
+    act(() => void mounted.edits.setFields(CARD, { title: 'Renamed', targetDate: null }))
+    expect(mounted.pending).toHaveLength(1)
+    expect(mounted.edits.overrides['wi-1']).toEqual({ title: 'Renamed', targetDate: null })
+
+    mounted.pending[0]?.reject(new Error('Title is locked'))
+    await mounted.settle()
+
+    expect(mounted.edits.overrides['wi-1']).toBeUndefined()
+    expect(mounted.edits.editError).toBe('Title is locked')
+  })
+
+  it('re-reads an acked description and lets that read replace the draft', async () => {
+    const mounted = mountEdits()
+
+    act(() => void mounted.edits.setFields(CARD, { description: '* one ' }))
+    mounted.pending[0]?.resolve({ ok: true })
+    await mounted.settle()
+    expect(mounted.reloads).toBe(1)
+    expect(mounted.edits.overrides['wi-1']).toEqual({ description: '* one ' })
+
+    // The host stores HTML and re-reads Markdown, so the read never equals the draft.
+    mounted.read([{ ...CARD, description: '- one' }, OTHER_CARD])
+    expect(mounted.edits.overrides['wi-1']).toBeUndefined()
   })
 
   it('tracks in-flight edits per card, so a reply for one card does not free another', async () => {

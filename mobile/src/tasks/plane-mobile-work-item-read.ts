@@ -47,6 +47,10 @@ const PlaneMobileWorkItemSchema = z
     state: PlaneMobileStateSchema,
     priority: z.enum(PLANE_WORK_ITEM_PRIORITIES).catch('none'),
     assignees: z.array(PlaneMobileMemberSchema).catch([]),
+    labelIds: z.array(z.string()).optional(),
+    // Absent when unset on the host; `null` is what a cleared edit shows until the re-read.
+    startDate: z.string().nullish(),
+    targetDate: z.string().nullish(),
     updatedAt: z.string().default('')
   })
   .passthrough()

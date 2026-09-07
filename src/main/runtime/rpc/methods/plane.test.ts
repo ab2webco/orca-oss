@@ -43,6 +43,30 @@ describe('plane RPC methods', () => {
     expect(runtime.planeDisconnect).toHaveBeenCalledWith(undefined)
   })
 
+  it('lets a work item update clear a date with null while an empty string stays unset', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      planeUpdateWorkItem: vi.fn().mockResolvedValue({ ok: true })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('plane.updateWorkItem', {
+        projectId: 'proj-1',
+        workItemId: 'wi-3',
+        updates: { targetDate: null, startDate: '' }
+      })
+    )
+
+    expect(response.ok).toBe(true)
+    expect(runtime.planeUpdateWorkItem).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      workItemId: 'wi-3',
+      workspaceId: undefined,
+      updates: { targetDate: null, startDate: undefined }
+    })
+  })
+
   it('rejects Plane connect when required fields are missing', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

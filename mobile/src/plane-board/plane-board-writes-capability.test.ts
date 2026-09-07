@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
+  arePlaneDateClearsSupportedByHost,
   arePlaneMembersListableByHost,
   isPlaneBoardWritableByHost,
+  MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
 } from './plane-board-writes-capability'
@@ -54,5 +56,14 @@ describe('plane board writes capability', () => {
         MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY
       ])
     ).toBe(true)
+  })
+
+  it('keeps date clears off a host that only advertises writes', () => {
+    expect(MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY).toBe('mobile.plane-board.date-clears.v1')
+    expect(arePlaneDateClearsSupportedByHost(undefined)).toBe(false)
+    expect(arePlaneDateClearsSupportedByHost([MOBILE_PLANE_BOARD_WRITES_CAPABILITY])).toBe(false)
+    expect(arePlaneDateClearsSupportedByHost([MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY])).toBe(
+      true
+    )
   })
 })

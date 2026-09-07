@@ -12,6 +12,9 @@ export const MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY = 'mobile.plane-board.members
 // refuses the thread: the reader keys on this alone.
 export const MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY = 'mobile.plane-board.comment-reads.v1'
 
+// Mirrors MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY; writes.v1 hosts drop a null date.
+export const MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY = 'mobile.plane-board.date-clears.v1'
+
 export function isPlaneBoardWritableByHost(capabilities: readonly string[] | undefined): boolean {
   return capabilities?.includes(MOBILE_PLANE_BOARD_WRITES_CAPABILITY) === true
 }
@@ -20,6 +23,12 @@ export function arePlaneMembersListableByHost(
   capabilities: readonly string[] | undefined
 ): boolean {
   return capabilities?.includes(MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY) === true
+}
+
+export function arePlaneDateClearsSupportedByHost(
+  capabilities: readonly string[] | undefined
+): boolean {
+  return capabilities?.includes(MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY) === true
 }
 
 export function arePlaneCommentsReadableByHost(

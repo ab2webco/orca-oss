@@ -27,6 +27,22 @@ export function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: s
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
 }
+/** Enter on a single-line input: what react-native-web turns into onSubmitEditing. */
+export async function submitInput(input: HTMLInputElement | HTMLTextAreaElement): Promise<void> {
+  await act(async () => {
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await Promise.resolve()
+  })
+  await settle()
+}
+/** Leaving a field: React reads onBlur off focusout. */
+export async function blurInput(input: HTMLInputElement | HTMLTextAreaElement): Promise<void> {
+  await act(async () => {
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    await Promise.resolve()
+  })
+  await settle()
+}
 /** The surface reads status.get, then states + items; each hop is a microtask boundary. */
 export async function settle(): Promise<void> {
   for (let hop = 0; hop < 12; hop += 1) {
