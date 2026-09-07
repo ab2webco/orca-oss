@@ -272,7 +272,8 @@ describe('Plane comment thread in the Tasks detail (react-native-web)', () => {
       { kind: 'thread', comments: [] },
       { kind: 'thread', comments: [COMMENT] }
     ])
-    const input = document.body.querySelector('textarea')!
+    // By label: the sheet's Description field is a textarea above this one.
+    const input = byLabel('Comment') as HTMLTextAreaElement
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
     act(() => {
       setter!.call(input, 'Looks good')

@@ -22,6 +22,8 @@ const items = decodePlaneWorkItems([
     state: { id: 's-todo', name: 'Todo', group: 'unstarted' },
     priority: 'medium',
     assignees: [ADA],
+    labelIds: ['l-bug', 'l-ui'],
+    targetDate: '2026-09-10',
     updatedAt: '2026-09-04T00:00:00.000Z'
   }
 ])
@@ -114,10 +116,70 @@ describe('plane board edit state', () => {
     expect(reconcilePlaneBoardEdits(edits, items)).toBe(edits)
   })
 
+  it('shows an edited title, labels and dates on the card before the server confirms', () => {
+    const edits = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', {
+      title: 'Renamed',
+      description: 'Body',
+      labelIds: ['l-ui'],
+      startDate: '2026-09-08',
+      targetDate: null
+    })
+    expect(applyPlaneBoardEdits(items, edits)[0]).toMatchObject({
+      title: 'Renamed',
+      description: 'Body',
+      labelIds: ['l-ui'],
+      startDate: '2026-09-08',
+      targetDate: null,
+      priority: 'medium'
+    })
+  })
+
+  it('rolls a refused title back and leaves the priority beside it alone', () => {
+    const first = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { priority: 'high' })
+    const second = withPlaneBoardEdit(first, 'wi-1', { title: 'Renamed' })
+    expect(rollbackPlaneBoardEdit(second, 'wi-1', { title: 'Renamed' }, first['wi-1'])).toEqual({
+      'wi-1': { priority: 'high' }
+    })
+    expect(rollbackPlaneBoardEdit(second, 'wi-1', { title: 'Other' }, first['wi-1'])).toBe(second)
+  })
+
+  it('rolls a refused label list back by ids regardless of order', () => {
+    const first = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { labelIds: ['l-ui'] })
+    const second = withPlaneBoardEdit(first, 'wi-1', { labelIds: ['l-ui', 'l-bug'] })
+    expect(
+      rollbackPlaneBoardEdit(second, 'wi-1', { labelIds: ['l-bug', 'l-ui'] }, first['wi-1'])
+    ).toEqual({ 'wi-1': { labelIds: ['l-ui'] } })
+  })
+
+  it('rolls a refused cleared date back to the one shown before it', () => {
+    const edits = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', { targetDate: null })
+    expect(rollbackPlaneBoardEdit(edits, 'wi-1', { targetDate: null }, undefined)).toEqual({})
+  })
+
+  it('drops a title, a label set and a cleared date once a fresh read reflects them', () => {
+    const edits = withPlaneBoardEdit(EMPTY_PLANE_BOARD_EDITS, 'wi-1', {
+      title: 'Renamed',
+      labelIds: ['l-ui', 'l-new'],
+      targetDate: null
+    })
+    const serverHasTitle = decodePlaneWorkItems([{ ...items[0], title: 'Renamed' }])
+    expect(reconcilePlaneBoardEdits(edits, serverHasTitle)).toEqual({
+      'wi-1': { labelIds: ['l-ui', 'l-new'], targetDate: null }
+    })
+    // Plane returns the labels in its own order and an unset date as no field at all.
+    const serverHasAll = decodePlaneWorkItems([
+      { ...items[0], title: 'Renamed', labelIds: ['l-new', 'l-ui'], targetDate: undefined }
+    ])
+    expect(reconcilePlaneBoardEdits(edits, serverHasAll)).toEqual(EMPTY_PLANE_BOARD_EDITS)
+  })
+
   it('turns an edit into the ids Plane expects', () => {
     expect(toPlaneWorkItemPatch({ assignees: [ADA, GRACE] })).toEqual({
       assigneeIds: ['u-1', 'u-2']
     })
     expect(toPlaneWorkItemPatch({ priority: 'low' })).toEqual({ priority: 'low' })
+    expect(toPlaneWorkItemPatch({ title: 'Renamed', labelIds: ['l-ui'], startDate: null })).toEqual(
+      { title: 'Renamed', labelIds: ['l-ui'], startDate: null }
+    )
   })
 })

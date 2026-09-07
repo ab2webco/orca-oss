@@ -6,7 +6,10 @@ import { buildPlaneBoardColumns, type PlaneBoardColumn } from './plane-board-col
 import { applyPlaneBoardMoves } from './plane-board-move-state'
 import { resolvePlaneBoardEmptyState, type PlaneBoardEmptyState } from './plane-board-empty-state'
 import { isPlaneBoardFiltered, type PlaneBoardScope } from './plane-board-scope'
-import { isPlaneBoardWritableByHost } from './plane-board-writes-capability'
+import {
+  arePlaneDateClearsSupportedByHost,
+  isPlaneBoardWritableByHost
+} from './plane-board-writes-capability'
 import { applyPlaneBoardEdits } from './plane-board-edit-state'
 import { usePlaneBoardAssignees, type PlaneBoardAssignees } from './use-plane-board-assignees'
 import {
@@ -51,6 +54,7 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
     canCreate: boolean
     /** Priority edits ride plane.updateWorkItem, the same gate as create. */
     canEdit: boolean
+    canClearDates: boolean
     selectColumn: (stateId: string) => void
     refresh: () => void
     /** Resolves true when the move stuck (or was a no-op), false when it was rolled back. */
@@ -236,6 +240,7 @@ export function usePlaneBoard(
     columnsPending,
     canCreate: isPlaneBoardWritableByHost(capabilities),
     canEdit: isPlaneBoardWritableByHost(capabilities),
+    canClearDates: arePlaneDateClearsSupportedByHost(capabilities),
     ...editControls,
     ...moveControls,
     ...assignees,

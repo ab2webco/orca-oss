@@ -55,6 +55,15 @@ export const GetWorkItem = z.object({
   workspaceId: OptionalString
 })
 
+// Like OptionalString, but `null` survives: it is how a client clears a date.
+const OptionalClearableString = z
+  .unknown()
+  .transform((value) =>
+    value === null ? null : typeof value === 'string' && value.length > 0 ? value : undefined
+  )
+  .pipe(z.union([z.string(), z.null(), z.undefined()]))
+  .optional()
+
 const WorkItemUpdate = z.object({
   title: OptionalString,
   description: OptionalPlainString,
@@ -62,8 +71,8 @@ const WorkItemUpdate = z.object({
   assigneeIds: z.array(z.string()).optional(),
   priority: z.enum(VALID_PRIORITIES).optional(),
   stateId: OptionalString,
-  startDate: OptionalString,
-  targetDate: OptionalString,
+  startDate: OptionalClearableString,
+  targetDate: OptionalClearableString,
   parentId: z.union([z.string(), z.null()]).optional()
 })
 

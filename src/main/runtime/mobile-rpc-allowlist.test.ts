@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
+  MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
@@ -173,6 +174,11 @@ describe('mobile RPC allowlist', () => {
     expect(allowed.has('plane.readWorkItemCommentThread')).toBe(true)
     // The PlaneComment[] reader stays off: its empty array hides a failed read.
     expect(allowed.has('plane.listWorkItemComments')).toBe(false)
+  })
+
+  it('advertises date clears as their own capability', () => {
+    // Why: a writes.v1 host decodes a null date as undefined and answers ok without clearing it.
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY)
   })
 
   it('does not grant mobile credentials control over host updates', () => {

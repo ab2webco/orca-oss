@@ -3,6 +3,7 @@ import type { PlaneWorkItemPriority } from '../../../src/shared/plane-types'
 import type { PlaneMobileMember, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import type { RpcClient } from '../transport/rpc-client'
 import {
+  dropConfirmedDescriptions,
   EMPTY_PLANE_BOARD_EDITS,
   reconcilePlaneBoardEdits,
   rollbackPlaneBoardEdit,
@@ -16,6 +17,12 @@ import { updatePlaneWorkItem } from './plane-work-item-update'
 
 export type PlaneBoardEditTarget = Pick<PlaneMobileWorkItem, 'id' | 'project'>
 
+/** The text and date fields the detail sheet edits in place. */
+export type PlaneWorkItemFieldEdit = Pick<
+  PlaneBoardEdit,
+  'title' | 'description' | 'labelIds' | 'startDate' | 'targetDate'
+>
+
 export type PlaneBoardEdits = {
   overrides: PlaneBoardEditOverrides
   /** Cards with an edit in flight. */
@@ -26,6 +33,7 @@ export type PlaneBoardEdits = {
   setPriority: (item: PlaneBoardEditTarget, priority: PlaneWorkItemPriority) => Promise<void>
   /** The whole list: Plane replaces, it does not merge. */
   setAssignees: (item: PlaneBoardEditTarget, assignees: PlaneMobileMember[]) => Promise<void>
+  setFields: (item: PlaneBoardEditTarget, edit: PlaneWorkItemFieldEdit) => Promise<void>
   retryEdit: () => Promise<void>
   dismissEditError: () => void
   reset: () => void
@@ -44,6 +52,8 @@ export function usePlaneBoardEdits({ client, workspaceId, items, reload }: Input
   // Why a ref: two writes can start before a render lands, and each rollback needs
   // the value the card showed when its own write began, not a render-old one.
   const overridesRef = useRef(overrides)
+  // Why: the server's re-read of a description is the truth once acked; its Markdown may not equal the draft.
+  const confirmedDescriptionIds = useRef(new Set<string>())
   const { ids: editingWorkItemIds, begin, end } = usePlaneBoardInFlightCards()
   const [editError, setEditError] = useState<string | null>(null)
   const [failed, setFailed] = useState<{ item: PlaneBoardEditTarget; edit: PlaneBoardEdit } | null>(
@@ -61,7 +71,10 @@ export function usePlaneBoardEdits({ client, workspaceId, items, reload }: Input
   // Drop the optimistic edits this read already reflects; the rest stay so a
   // snapshot taken before the write cannot undo the value on screen.
   useEffect(() => {
-    updateOverrides((current) => reconcilePlaneBoardEdits(current, items))
+    updateOverrides((current) => {
+      const reconciled = reconcilePlaneBoardEdits(current, items)
+      return dropConfirmedDescriptions(reconciled, items, confirmedDescriptionIds.current)
+    })
   }, [items, updateOverrides])
 
   const submit = useCallback(
@@ -82,6 +95,10 @@ export function usePlaneBoardEdits({ client, workspaceId, items, reload }: Input
       end(item.id)
       if (result.ok) {
         setFailed(null)
+        if (edit.description !== undefined) {
+          confirmedDescriptionIds.current.add(item.id)
+          reload()
+        }
         return
       }
       // Put the value back: a failed write must not leave the card claiming
@@ -103,6 +120,7 @@ export function usePlaneBoardEdits({ client, workspaceId, items, reload }: Input
     editErrorWorkItemId: editError && failed ? failed.item.id : null,
     setPriority: useCallback((item, priority) => submit(item, { priority }), [submit]),
     setAssignees: useCallback((item, assignees) => submit(item, { assignees }), [submit]),
+    setFields: submit,
     retryEdit: useCallback(async () => {
       if (failed) {
         await submit(failed.item, failed.edit)

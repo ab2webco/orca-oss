@@ -25,6 +25,7 @@ vi.mock(
 
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
+  MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
 } from './plane-board-writes-capability'
@@ -39,6 +40,7 @@ import {
   type HostBehaviour
 } from '../../test-doubles/plane-tasks-harness'
 import {
+  blurInput,
   boardColumn,
   byLabel,
   cardText,
@@ -46,12 +48,14 @@ import {
   openCard,
   press,
   settle,
+  submitInput,
   typeInto
 } from '../../test-doubles/plane-tasks-screen-driver'
 
 const PHASE_1_HOST = ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY]
 const WRITING_HOST = [...PHASE_1_HOST, MOBILE_PLANE_BOARD_WRITES_CAPABILITY]
 const ASSIGNING_HOST = [...WRITING_HOST, MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY]
+const CLEARING_HOST = [...WRITING_HOST, MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY]
 
 /** The writes the ORCA-367 slices bought, exercised through the board view of the Tasks screen. */
 describe('Plane board writes on the Tasks screen (react-native-web)', () => {
@@ -243,6 +247,126 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     expect(byLabel('Priority High')).toBeNull()
     expect(byLabel('Assign Ada')).toBeNull()
     expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
+  })
+
+  it('shows no Title, Description, Labels, Start date or Target date field on a phase-1 host', async () => {
+    await mountBoard(PHASE_1_HOST, { items: [CARD] })
+    await openCard()
+
+    expect(byLabel('Move to Doing')).not.toBeNull()
+    for (const field of ['Title', 'Description', 'Labels', 'Start date', 'Target date']) {
+      expect(byLabel(field), field).toBeNull()
+    }
+  })
+
+  function fieldInput(label: string): HTMLInputElement | HTMLTextAreaElement {
+    const input = byLabel(label)
+    if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
+      throw new Error(`${label} input is not mounted`)
+    }
+    return input
+  }
+
+  it('renames the card from the Title field and shows the new title on the card at once', async () => {
+    const calls = await mountBoard(WRITING_HOST, { items: [CARD] })
+    await openCard()
+    const input = fieldInput('Title')
+    expect(input.value).toBe('Wire the retry')
+
+    typeInto(input, 'Wire the retry, again')
+    await submitInput(input)
+
+    expect(callsTo(calls, 'plane.updateWorkItem')).toEqual([
+      {
+        method: 'plane.updateWorkItem',
+        params: {
+          projectId: 'proj-1',
+          workItemId: 'wi-1',
+          workspaceId: 'ws-1',
+          updates: { title: 'Wire the retry, again' }
+        }
+      }
+    ])
+    expect(byLabel('Open Wire the retry, again')).not.toBeNull()
+    expect(fieldInput('Title').value).toBe('Wire the retry, again')
+    expect(leafWithText('Updating…')).toBeNull()
+  })
+
+  it('puts the title back and offers a retry when the host refuses the rename', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      rejectWrites: new Error('Connection interrupted'),
+      items: [CARD]
+    })
+    await openCard()
+    const input = fieldInput('Title')
+    typeInto(input, 'Wire the retry, again')
+    await submitInput(input)
+
+    expect(byLabel('Open Wire the retry')).not.toBeNull()
+    expect(byLabel('Open Wire the retry, again')).toBeNull()
+    expect(fieldInput('Title').value).toBe('Wire the retry')
+    expect(leafWithText('Could not update the card — Connection interrupted')).not.toBeNull()
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(1)
+
+    await press('Try again')
+    expect(callsTo(calls, 'plane.updateWorkItem')[1]?.params).toMatchObject({
+      updates: { title: 'Wire the retry, again' }
+    })
+  })
+
+  it('saves the description and the labels on blur, as the whole values', async () => {
+    const calls = await mountBoard(WRITING_HOST, {
+      items: [{ ...CARD, description: 'Old body', labelIds: ['l-ui'] }]
+    })
+    await openCard()
+
+    const description = fieldInput('Description')
+    expect(description.value).toBe('Old body')
+    typeInto(description, 'New body')
+    await blurInput(description)
+
+    const labels = fieldInput('Labels')
+    expect(labels.value).toBe('l-ui')
+    typeInto(labels, 'l-ui, l-bug')
+    await blurInput(labels)
+
+    expect(callsTo(calls, 'plane.updateWorkItem').map((call) => call.params)).toMatchObject([
+      { workItemId: 'wi-1', updates: { description: 'New body' } },
+      { workItemId: 'wi-1', updates: { labelIds: ['l-ui', 'l-bug'] } }
+    ])
+  })
+
+  it('clears a target date with null and refuses a date that is not YYYY-MM-DD', async () => {
+    const calls = await mountBoard(CLEARING_HOST, {
+      items: [{ ...CARD, startDate: '2026-09-01', targetDate: '2026-09-10' }]
+    })
+    await openCard()
+
+    const target = fieldInput('Target date')
+    expect(target.value).toBe('2026-09-10')
+    typeInto(target, '')
+    await blurInput(target)
+    expect(callsTo(calls, 'plane.updateWorkItem').map((call) => call.params)).toMatchObject([
+      { workItemId: 'wi-1', updates: { targetDate: null } }
+    ])
+
+    const start = fieldInput('Start date')
+    typeInto(start, '2026-13-01')
+    await submitInput(start)
+    expect(leafWithText('Use the YYYY-MM-DD format')).not.toBeNull()
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(1)
+  })
+
+  it('refuses to clear a date on a host that would keep it and still answer ok', async () => {
+    // Why: a writes.v1 host decodes a null date as undefined, so the PATCH omits it.
+    const calls = await mountBoard(WRITING_HOST, { items: [{ ...CARD, targetDate: '2026-09-10' }] })
+    await openCard()
+
+    const target = fieldInput('Target date')
+    typeInto(target, '')
+    await blurInput(target)
+    expect(leafWithText('This host cannot clear a date yet')).not.toBeNull()
+    expect(callsTo(calls, 'plane.updateWorkItem')).toHaveLength(0)
   })
 
   it('shows the priority control but no assignee control on a host that only writes', async () => {
