@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizePlaneFilter, PLANE_FILTER_OPTIONS } from './task-source-picker-options'
+import { normalizePlaneFilter, PLANE_FILTER_OPTIONS } from './plane-filter-picker-options'
 import {
   DEFAULT_PLANE_WORK_ITEM_FILTER,
   PLANE_WORK_ITEM_FILTER_LABELS,

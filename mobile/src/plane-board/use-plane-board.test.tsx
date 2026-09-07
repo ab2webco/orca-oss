@@ -6,6 +6,7 @@ import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
 import type { PlaneBoardScope } from './plane-board-scope'
+import { DEFAULT_PLANE_WORK_ITEM_FILTER } from '../../../src/shared/plane-work-item-filter-labels'
 import {
   usePlaneBoard,
   type PlaneBoard,
@@ -57,7 +58,7 @@ function scopeFor(
     workspaceId: 'ws-1',
     projectId,
     projectName: project ? project.name : null,
-    filter: 'all',
+    filter: DEFAULT_PLANE_WORK_ITEM_FILTER,
     query: '',
     ...overrides
   }

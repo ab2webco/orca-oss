@@ -162,15 +162,15 @@ import {
   resolveVisibleTaskProvider,
   type TaskProvider
 } from '../../../src/tasks/mobile-task-providers'
+import { TASK_PROVIDER_OPTIONS } from '../../../src/tasks/task-source-picker-options'
 import {
   normalizePlaneFilter,
-  PLANE_FILTER_OPTIONS,
-  TASK_PROVIDER_OPTIONS
-} from '../../../src/tasks/task-source-picker-options'
+  PLANE_FILTER_OPTIONS
+} from '../../../src/tasks/plane-filter-picker-options'
 import {
   DEFAULT_PLANE_WORK_ITEM_FILTER,
   PLANE_WORK_ITEM_FILTER_LABELS
-} from '../../../src/shared/plane-work-item-filter-labels'
+} from '../../../../src/shared/plane-work-item-filter-labels'
 import { formatUpdatedAt, taskTime } from '../../../src/tasks/task-updated-at-time'
 import {
   compareLinearIssues,
