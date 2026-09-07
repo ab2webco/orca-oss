@@ -77,7 +77,7 @@ const winSpeechNativeResource = {
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca Lab',
+  productName: 'Orca',
   ...(devChannelBuildVersion
     ? { extraMetadata: { version: devChannelBuildVersion } }
     : localBuildVersion
@@ -309,8 +309,11 @@ module.exports = {
   },
   nsis: {
     artifactName: 'orca-windows-setup.${ext}',
-    shortcutName: '${productName}',
-    uninstallDisplayName: '${productName}',
+    // Why literales y no ${productName}: productName volvio a ser la identidad
+    // ('Orca'), no el nombre visible. Windows lee estos dos para el acceso directo
+    // y la lista de programas, asi que el nombre nuevo va explicito. ORCA-448.
+    shortcutName: 'Orca Lab',
+    uninstallDisplayName: 'Orca Lab',
     createDesktopShortcut: 'always',
     // Why: on a real uninstall, stop and remove the relocated terminal daemon
     // (which lives outside the install dir under LOCALAPPDATA by design). Guarded
@@ -322,16 +325,16 @@ module.exports = {
     entitlements: 'resources/build/entitlements.mac.plist',
     entitlementsInherit: 'resources/build/entitlements.mac.plist',
     extendInfo: {
-      // Why estas dos y no productName solo: electron-builder escribe productName
-      // en CFBundleName Y en CFBundleDisplayName, y app.getName() en empaquetado
-      // lee CFBundleName. De ahi salen la carpeta de userData y el item de llavero
-      // '<nombre> Safe Storage'. Renombrar productName movia las dos, y app.setName()
-      // no lo evita: corre en whenReady, despues de que Electron los resolvio.
-      // Medido: el llavero tiene 'Orca Safe Storage' y NO 'Orca Dev Safe Storage',
-      // aunque setName('Orca Dev') corre en cada arranque de dev desde #9400.
-      // CFBundleName es la identidad y no se mueve; CFBundleDisplayName es lo que
-      // el usuario lee. ORCA-441.
-      CFBundleName: 'Orca',
+      // Why solo CFBundleDisplayName: los tres nombres del bundle tienen que coincidir.
+      // Electron resuelve el helper como '<CFBundleName> Helper.app', y electron-builder
+      // nombra los helpers desde productName. Fijar CFBundleName distinto de productName
+      // hace que Electron busque 'Orca Helper.app' dentro de un bundle que trae
+      // 'Orca Lab Helper.app', y el proceso muere antes de la ventana con
+      // 'FATAL electron_main_delegate_mac.mm:66 Unable to find helper app'. Asi salio
+      // lab.58 y no arrancaba. productName queda en Orca -- nombra el bundle, el
+      // ejecutable, los helpers, la carpeta de userData y el item de llavero
+      // '<nombre> Safe Storage' -- y el nombre que el usuario lee sale de
+      // CFBundleDisplayName y de APP_DISPLAY_NAME. ORCA-448.
       CFBundleDisplayName: 'Orca Lab',
       NSAppleEventsUsageDescription:
         'Orca allows terminal-launched developer tools to automate local apps when you request it.',
