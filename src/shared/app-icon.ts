@@ -1,7 +1,9 @@
+// The ids outlive their labels on purpose: one is already stored in every user's
+// settings, and renaming them would silently reset the choice to the default.
 export const APP_ICON_OPTIONS = [
-  { id: 'classic', label: 'Classic Orca' },
-  { id: 'watercolor', label: 'Watercolor Orca' },
-  { id: 'blue', label: 'Blue Orca' }
+  { id: 'classic', label: 'Ab2Web Orange' },
+  { id: 'watercolor', label: 'Monochrome' },
+  { id: 'blue', label: 'Violet' }
 ] as const
 
 export type AppIconId = (typeof APP_ICON_OPTIONS)[number]['id']
