@@ -15,6 +15,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import type { PlaneWorkItemFilter } from '../../src/shared/plane-types'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { createPlaneTask } from '../src/tasks/plane-mobile-task-list'
+import type { ProviderTaskOrderBy } from '../src/tasks/linear-mobile-issue-grouping'
+import type { PlaneTaskGroupBy } from '../src/tasks/provider-task-view-options'
+import { planeListSections } from '../src/tasks/plane-list-sections'
 import { fetchPlaneWorkItems } from '../src/tasks/plane-mobile-task-source'
 import type { PlaneMobileWorkItem } from '../src/tasks/plane-mobile-work-item-read'
 import { PlaneSourceSegmentRow } from '../src/plane-board/plane-source-segment-row'
@@ -166,6 +169,9 @@ export function PlaneTasksHarness({
   const [detail, setDetail] = useState<PlaneMobileWorkItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [viewPickerOpen, setViewPickerOpen] = useState(false)
+  // The Tasks screen owns these; so does this stand-in, which is the point of ORCA-418.
+  const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
+  const [orderBy, setOrderBy] = useState<ProviderTaskOrderBy>('priority')
   // A relay blip flips this false. It gates Plane's data only: the screen's `enabled` never
   // carried the connection, so the surface keeps its chrome and the open sheet (ORCA-419).
   const [connected, setConnected] = useState(true)
@@ -233,6 +239,10 @@ export function PlaneTasksHarness({
             filterLabel: 'All',
             viewMode,
             onPickViewMode: () => setViewPickerOpen(true),
+            groupBy,
+            orderBy,
+            onChangeGroupBy: setGroupBy,
+            onChangeOrderBy: setOrderBy,
             onPickProject: () => setPickerOpen(true),
             onPickState: () => {},
             onPickFilter: () => {},
@@ -240,19 +250,32 @@ export function PlaneTasksHarness({
             textStyle: null
           })
         : null,
+      // The screen runs its list rows through planeListSections; so does this stand-in,
+      // which is what makes Group and Order real in list mode (ORCA-418).
       !chrome.boardShown
-        ? listItems.map((item) =>
-            createElement(
-              Pressable,
-              {
-                key: item.id,
-                accessibilityRole: 'button',
-                accessibilityLabel: `Row ${item.title}`,
-                onPress: () => setDetail(item)
-              },
-              createElement(Text, null, item.title)
+        ? planeListSections(listItems.map(createPlaneTask), groupBy, orderBy).flatMap((section) => [
+            ...(section.label
+              ? [
+                  createElement(
+                    Text,
+                    { key: `section:${section.key}`, accessibilityLabel: `Group ${section.label}` },
+                    section.label
+                  )
+                ]
+              : []),
+            ...section.items.map((row) =>
+              createElement(
+                Pressable,
+                {
+                  key: row.source.id,
+                  accessibilityRole: 'button',
+                  accessibilityLabel: `Row ${row.source.title}`,
+                  onPress: () => setDetail(row.source)
+                },
+                createElement(Text, null, row.source.title)
+              )
             )
-          )
+          ])
         : null,
       createElement(PlaneTasksSurface, {
         client,
@@ -260,6 +283,8 @@ export function PlaneTasksHarness({
         enabled: chrome.surfaceEnabled,
         planeConnected: connected,
         viewMode,
+        groupBy,
+        orderBy,
         workspaceId: 'ws-1',
         projectId,
         projects: [PROJECT, OTHER_PROJECT],
@@ -279,9 +304,7 @@ export function PlaneTasksHarness({
           setFilter('all')
           setQuery('')
         },
-        bottomInset: 0,
-        menuButtonStyle: null,
-        menuTextStyle: null
+        bottomInset: 0
       }),
       pickerOpen ? createElement(Text, null, 'Project picker') : null,
       // The screen opens a PickerModal here; the stand-in offers the same two choices.

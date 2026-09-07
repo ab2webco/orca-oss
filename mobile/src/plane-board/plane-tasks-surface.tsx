@@ -1,12 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
-import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { useCallback, useMemo } from 'react'
+import { StyleSheet, View } from 'react-native'
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { resolveLivePlaneWorkItem, resolvePlaneBoardScope } from './plane-board-scope'
-import { PlaneBoardViewMenu } from './plane-board-view-menu'
 import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
 import type { PlaneViewMode } from './plane-work-item-view'
@@ -19,6 +18,10 @@ type Props = {
   enabled: boolean
   planeConnected: boolean
   viewMode: PlaneViewMode
+  /** Owned by the Tasks screen so the bar's chips and the board agree, and so the
+   *  choice survives the switch between the two views (ORCA-418). */
+  groupBy: PlaneTaskGroupBy
+  orderBy: ProviderTaskOrderBy
   workspaceId: string | null
   projectId: string | null
   projects: readonly PlaneMobileProject[]
@@ -41,9 +44,6 @@ type Props = {
   onPickProject: () => void
   onClearFilter: () => void
   bottomInset: number
-  /** The Tasks screen's segment-row chip look, so the board's menu matches the row above it. */
-  menuButtonStyle: StyleProp<ViewStyle>
-  menuTextStyle: StyleProp<TextStyle>
 }
 
 /** Everything Plane-specific the Tasks screen mounts besides its own list rows:
@@ -55,6 +55,8 @@ export function PlaneTasksSurface({
   enabled,
   planeConnected,
   viewMode,
+  groupBy,
+  orderBy,
   workspaceId,
   projectId,
   projects,
@@ -71,13 +73,9 @@ export function PlaneTasksSurface({
   copied,
   onPickProject,
   onClearFilter,
-  bottomInset,
-  menuButtonStyle,
-  menuTextStyle
+  bottomInset
 }: Props) {
   const openItem = enabled ? detailItem : null
-  const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
-  const [orderBy, setOrderBy] = useState<ProviderTaskOrderBy>('priority')
   const rows = useMemo<PlaneBoardRows>(
     () => ({
       items: workItems,
@@ -138,14 +136,6 @@ export function PlaneTasksSurface({
     <>
       {enabled && viewMode === 'board' ? (
         <View style={styles.board}>
-          <PlaneBoardViewMenu
-            groupBy={groupBy}
-            orderBy={orderBy}
-            onChangeGroupBy={setGroupBy}
-            onChangeOrderBy={setOrderBy}
-            buttonStyle={menuButtonStyle}
-            textStyle={menuTextStyle}
-          />
           <PlaneTaskBoard
             board={board}
             groupBy={groupBy}
