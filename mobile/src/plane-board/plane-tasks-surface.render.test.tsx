@@ -514,5 +514,25 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(columnCards('High')).toEqual(['Open High card'])
       expect(columnCards('Low')).toEqual(['Open Low card'])
     })
+
+    it('offers no composer once the columns stop being states', async () => {
+      // ORCA-422: grouped by priority a column is a priority, and Plane has no state to
+      // create into. A composer here would send a destination Plane rejects.
+      await mountBoard(root, WRITING_HOST, { items: [LOW_CARD, HIGH_CARD] })
+      expect(byLabel('Add card to Todo')).not.toBeNull()
+
+      await pressTextButton('Group: No grouping')
+      await pressTextButton('Priority')
+      expect(leafWithText('Group: Priority')).not.toBeNull()
+
+      expect(byLabel('Add card to High')).toBeNull()
+      expect(byLabel('Add card to Low')).toBeNull()
+      expect(byLabel('Add card to Todo')).toBeNull()
+
+      // Back on Status the columns are states again, so the composer comes back.
+      await pressTextButton('Group: Priority')
+      await pressTextButton('Status')
+      expect(byLabel('Add card to Todo')).not.toBeNull()
+    })
   })
 })

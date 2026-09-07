@@ -12,8 +12,9 @@ import { unansweredPlaneCreateLanded } from './plane-write-failure'
 
 export type PlaneBoardCreate = {
   create: PlaneBoardCreateState
-  /** Creates a card in the active column; resolves true once Plane has it. */
-  createCard: (name: string) => Promise<boolean>
+  /** Creates a card in `stateId`, or in the active column when it is left out.
+   *  Resolves true once Plane has it. */
+  createCard: (name: string, stateId?: string) => Promise<boolean>
   dismissCreateError: () => void
 }
 
@@ -32,14 +33,15 @@ export function usePlaneBoardCreate({
   client,
   projectId,
   workspaceId,
-  stateId,
+  stateId: activeStateId,
   items,
   reload
 }: Input): PlaneBoardCreate {
   const [create, setCreate] = useState<PlaneBoardCreateState>(IDLE_PLANE_BOARD_CREATE)
 
   const createCard = useCallback(
-    async (name: string): Promise<boolean> => {
+    async (name: string, destination?: string): Promise<boolean> => {
+      const stateId = destination ?? activeStateId
       if (!client || !projectId || !stateId) {
         return false
       }
@@ -61,7 +63,7 @@ export function usePlaneBoardCreate({
       }
       return result.ok
     },
-    [client, items, projectId, reload, stateId, workspaceId]
+    [activeStateId, client, items, projectId, reload, workspaceId]
   )
 
   return {

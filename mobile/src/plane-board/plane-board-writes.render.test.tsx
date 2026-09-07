@@ -71,9 +71,9 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
   const mountBoard = (capabilities: readonly string[], behaviour: HostBehaviour = {}) =>
     mountBoardWith(root, capabilities, behaviour)
 
-  async function submitNewCard(title: string): Promise<HTMLInputElement> {
-    act(() => byLabel('Add card')!.click())
-    const input = byLabel('Card title')
+  async function submitNewCard(title: string, column = 'Todo'): Promise<HTMLInputElement> {
+    act(() => byLabel(`Add card to ${column}`)!.click())
+    const input = byLabel(`New card in ${column}`)
     if (!(input instanceof HTMLInputElement)) {
       throw new Error('card title input is not mounted')
     }
@@ -90,30 +90,27 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await mountBoard(PHASE_1_HOST)
 
     expect(boardColumn('Todo')).toEqual({ count: 0 })
-    expect(byLabel('Add card')).toBeNull()
+    expect(byLabel('Add card to Todo')).toBeNull()
   })
 
-  it('creates a card in the column being looked at on a host that advertises writes', async () => {
+  it('gives every state column its own composer, each naming its column', async () => {
+    await mountBoard(WRITING_HOST)
+
+    expect(byLabel('Add card to Todo')).not.toBeNull()
+    expect(byLabel('Add card to Doing')).not.toBeNull()
+    act(() => byLabel('Add card to Doing')!.click())
+    // Only the column that was asked opens; the other keeps its collapsed button.
+    expect(byLabel('New card in Doing')).not.toBeNull()
+    expect(byLabel('New card in Todo')).toBeNull()
+    expect(byLabel('Add card to Todo')).not.toBeNull()
+  })
+
+  it('creates into the column the composer belongs to, not the one being looked at', async () => {
     const calls = await mountBoard(WRITING_HOST)
     const readsBeforeCreate = readsOf(calls)
-    const addButton = byLabel('Add card')
-    expect(addButton).not.toBeNull()
 
-    act(() => addButton!.click())
-    // The column header also says "Todo"; only the sheet says it under "New card".
-    const sheet = leafWithText('New card')?.parentElement
-    expect(sheet).not.toBeNull()
-    expect(leafWithText('Todo', sheet!)).not.toBeNull()
-    const input = byLabel('Card title')
-    if (!(input instanceof HTMLInputElement)) {
-      throw new Error('card title input is not mounted')
-    }
-    typeInto(input, 'Ship the create drawer')
-    await act(async () => {
-      byLabel('Create card')!.click()
-      await Promise.resolve()
-    })
-    await settle()
+    // Todo is the active column on mount; the create must still land in Doing.
+    await submitNewCard('Ship the column composer', 'Doing')
 
     expect(callsTo(calls, 'plane.createWorkItem')).toEqual([
       {
@@ -121,8 +118,8 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
         params: {
           projectId: 'proj-1',
           workspaceId: 'ws-1',
-          title: 'Ship the create drawer',
-          stateId: 'state-1'
+          title: 'Ship the column composer',
+          stateId: 'state-2'
         }
       }
     ])
@@ -130,18 +127,38 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     expect(readsOf(calls)).toBe(readsBeforeCreate + 1)
   })
 
+  it('creates a card in its own column on a host that advertises writes', async () => {
+    const calls = await mountBoard(WRITING_HOST)
+    const readsBeforeCreate = readsOf(calls)
+
+    await submitNewCard('Ship the create composer')
+
+    expect(callsTo(calls, 'plane.createWorkItem')).toEqual([
+      {
+        method: 'plane.createWorkItem',
+        params: {
+          projectId: 'proj-1',
+          workspaceId: 'ws-1',
+          title: 'Ship the create composer',
+          stateId: 'state-1'
+        }
+      }
+    ])
+    expect(readsOf(calls)).toBe(readsBeforeCreate + 1)
+  })
+
   it('lets the PM retry a create the transport dropped, draft intact', async () => {
     const calls = await mountBoard(WRITING_HOST, {
       rejectWrites: new Error('Connection interrupted')
     })
-    const input = await submitNewCard('Ship the create drawer')
+    const input = await submitNewCard('Ship the create composer')
 
     expect(leafWithText('Creating…')).toBeNull()
-    expect(leafWithText('Connection interrupted')).not.toBeNull()
-    expect(input.value).toBe('Ship the create drawer')
-    const retry = byLabel('Create card')
-    expect(retry?.getAttribute('aria-disabled')).not.toBe('true')
-    expect(leafWithText('Try again', retry!)).not.toBeNull()
+    expect(leafWithText('Could not add the card — Connection interrupted')).not.toBeNull()
+    // The draft survives: the composer is the retry, so the error row offers none.
+    expect(input.value).toBe('Ship the create composer')
+    expect(byLabel('Create card')?.getAttribute('aria-disabled')).not.toBe('true')
+    expect(byLabel('Try again')).toBeNull()
     expect(callsTo(calls, 'plane.createWorkItem')).toHaveLength(1)
   })
 
@@ -150,25 +167,26 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       rejectWrites: markRpcDeliveryUnknown(new Error('Request timed out: plane.createWorkItem'))
     })
     const readsBeforeCreate = readsOf(calls)
-    await submitNewCard('Ship the create drawer')
+    await submitNewCard('Ship the create composer')
 
     expect(readsOf(calls)).toBe(readsBeforeCreate + 1)
     expect(leafWithText('Creating…')).toBeNull()
-    expect(leafWithText(PLANE_WRITE_UNANSWERED_MESSAGE)).not.toBeNull()
-    expect(leafWithText('Try again')).not.toBeNull()
+    expect(
+      leafWithText(`Could not add the card — ${PLANE_WRITE_UNANSWERED_MESSAGE}`)
+    ).not.toBeNull()
   })
 
   it('treats an unanswered create as done when the re-read shows the card: no second card', async () => {
     const calls = await mountBoard(WRITING_HOST, {
       rejectWrites: markRpcDeliveryUnknown(new Error('Request timed out: plane.createWorkItem')),
       itemsAfterWrite: [
-        { ...CARD, id: 'wi-9', identifier: 'ORCA-9', title: 'Ship the create drawer' }
+        { ...CARD, id: 'wi-9', identifier: 'ORCA-9', title: 'Ship the create composer' }
       ]
     })
-    await submitNewCard('Ship the create drawer')
+    await submitNewCard('Ship the create composer')
 
-    expect(byLabel('Card title')).toBeNull()
-    expect(leafWithText('Try again')).toBeNull()
+    // Landed: the draft is cleared and no failure is reported.
+    expect(leafWithText('Could not add the card — ' + PLANE_WRITE_UNANSWERED_MESSAGE)).toBeNull()
     expect(boardColumn('Todo')).toEqual({ count: 1 })
     expect(callsTo(calls, 'plane.createWorkItem')).toHaveLength(1)
   })
