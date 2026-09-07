@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 
 import {
   findIncreases,
+  main,
   parseBaseline,
   readBaselineAt,
   resolveBaseRef
@@ -114,6 +115,36 @@ describe('reading the baseline from the base ref', () => {
     execFileSync('git', ['commit', '-qm', 'drop baseline'], { cwd: root })
     execFileSync('git', ['tag', 'before-baseline'], { cwd: root })
     expect(readBaselineAt('before-baseline', root)).toBeNull()
+  })
+})
+
+/** A throwaway repo with a baseline but no ref to compare it against. */
+function repoWithoutBase() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-drift-ratchet-nobase-'))
+  repos.push(root)
+  execFileSync('git', ['init', '-b', 'work'], { cwd: root, stdio: 'ignore' })
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
+  // measure() walks src/renderer/src; empty keeps every counter at zero, so the
+  // baseline matches the tree and main() reaches the base-ref branch under test.
+  const locales = path.join(root, 'src', 'renderer', 'src', 'i18n', 'locales')
+  fs.mkdirSync(locales, { recursive: true })
+  fs.writeFileSync(path.join(locales, 'en.json'), '{}')
+  fs.writeFileSync(
+    path.join(root, BASELINE_PATH),
+    baselineText({ rename: 0, stale: 0, resolved: 0 })
+  )
+  return root
+}
+
+describe('a run with no base ref', () => {
+  it('fails closed on a pull request, where the base is always fetched', () => {
+    expect(main(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'pull_request' })).toBe(1)
+  })
+
+  it('skips on a release run, which checks out a bare SHA and has no base', () => {
+    // Why not env.CI: that was the old condition and it blocked lab.61. A release
+    // builds already-merged main, which the PR gate judged on the way in.
+    expect(main(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch' })).toBe(0)
   })
 })
 
