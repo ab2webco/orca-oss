@@ -1,0 +1,23 @@
+# Renderer translate() fallback drift, measured against src/renderer/src/i18n/locales/en.json.
+#
+# This is a RATCHET. `rename-drift` and `stale-fallbacks` may only go DOWN: the
+# numbers below are compared against their values on the PR base, and any
+# increase fails `pnpm check:renderer-brand-drift-ratchet`. Each rebranding
+# slice of ORCA-443 lowers them by exactly what it fixed. A file rename cannot
+# quietly drop a surface out of coverage the way a path allow-list could.
+#
+# `resolved-calls` is pinned for equality only, with no direction gate: deleting
+# a renderer component legitimately lowers it, and a gate with no in-repo
+# override would go red on unrelated work. Any change still forces an explicit
+# edit here that a reviewer sees.
+#
+# Test files are excluded from all three — their translate() calls are fixtures,
+# not product copy, so no slice can ever retire one.
+#
+# rename-drift     fallback whose catalog value is exactly it with the product renamed
+# stale-fallbacks  fallback that differs from its catalog value for any reason (superset)
+# resolved-calls   parsed translate() calls whose key resolves in the catalog
+
+rename-drift 529
+stale-fallbacks 591
+resolved-calls 12474
