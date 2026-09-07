@@ -2012,7 +2012,7 @@ export function FloatingTerminalPanel({
               <p className="text-xs leading-5 text-muted-foreground">
                 {translate(
                   'auto.components.floating.terminal.FloatingTerminalPanel.8cf80db43b',
-                  'Set up the Orca CLI and agent skill so agents can coordinate through Orca.'
+                  'Set up the Orca Lab CLI and agent skill so agents can coordinate through Orca Lab.'
                 )}
               </p>
             </div>

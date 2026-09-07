@@ -137,7 +137,7 @@ describe('openFileInBrowserTab', () => {
     })
 
     await vi.waitFor(() =>
-      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Browser.')
+      expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Lab Browser.')
     )
     expect(mocks.closeEmptyGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
@@ -212,7 +212,7 @@ describe('openFileInBrowserTab', () => {
       sourceGroupId: 'group-1'
     })
 
-    expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Browser.')
+    expect(mocks.toastError).toHaveBeenCalledWith('Unable to open this file in Orca Lab Browser.')
     expect(mocks.createEmptySplitGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
     expect(mocks.createWebRuntimeSessionBrowserTab).not.toHaveBeenCalled()

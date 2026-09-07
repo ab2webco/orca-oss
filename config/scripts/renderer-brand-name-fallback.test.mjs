@@ -28,14 +28,26 @@ const HAS_OLD_NAME = new RegExp(`\\b${OLD_NAME}\\b(?! Lab)`)
 const REALIGNED_PATHS = [
   /^components\/feature-wall\//,
   /^components\/settings\/BrowserUse/,
-  /^components\/settings\/browser-use/
+  /^components\/settings\/browser-use/,
+  // File-level entries: each directory below still has other drifted files.
+  /^components\/sidebar\/AddRemoteHostSshConfigPicker\.tsx$/,
+  /^components\/sidebar\/add-remote-host-ssh-actions\.ts$/,
+  /^components\/settings\/OrchestrationPane\.tsx$/,
+  /^components\/settings\/OrchestrationSetupCard\.tsx$/,
+  /^components\/floating-terminal\/FloatingTerminalOrchestrationDialog\.tsx$/,
+  /^components\/floating-terminal\/FloatingTerminalPanel\.tsx$/,
+  /^components\/browser-pane\/BrowserPane\.tsx$/,
+  /^components\/browser-pane\/browser-load-failure-overlay\.tsx$/,
+  /^components\/right-sidebar\/file-explorer-row-context-menu\.tsx$/,
+  /^components\/terminal-pane\/terminal-url-link-hit-testing\.ts$/,
+  /^lib\/file-preview\.ts$/
 ]
 
 // Remaining un-realigned fallbacks, pinned exactly: a new drift anywhere pushes
 // this over, and realigning one without moving its path above pushes it under.
 // This pin, not the parsed-call floor below, is what catches a parser that stops
 // reading a literal shape repository-wide.
-const KNOWN_DRIFT_SITES = 608
+const KNOWN_DRIFT_SITES = 591
 
 // Floor on the calls the parser reads inside the realigned surface. Without it
 // the surface has no coverage canary of its own: a parser regression scoped to
@@ -44,7 +56,7 @@ const KNOWN_DRIFT_SITES = 608
 // below would then pass while covering nothing. A floor rather than an equality
 // pin so that adding a translate() call here is not a failing build; the
 // key-resolves check next to it is what keeps the floor honest.
-const REALIGNED_PARSED_CALLS = 303
+const REALIGNED_PARSED_CALLS = 506
 
 // Repository-wide floor. Deliberately loose — it only catches a parser that
 // stops matching almost everything.

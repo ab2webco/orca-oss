@@ -133,7 +133,7 @@ describe('TerminalLinkActionPopover', () => {
       anchorY: 200,
       destination: 'https://example.com',
       kind: 'url',
-      primary: { external: false, label: 'Orca Browser', run: vi.fn() },
+      primary: { external: false, label: 'Orca Lab Browser', run: vi.fn() },
       alternate: { external: true, label: 'System Browser', run: vi.fn() },
       focusTerminal: vi.fn()
     }
@@ -141,7 +141,7 @@ describe('TerminalLinkActionPopover', () => {
     render(<TerminalLinkActionPopover request={request} onClose={vi.fn()} />)
 
     expect(
-      screen.getByText('Orca Browser').closest('button')?.querySelector('.lucide-globe')
+      screen.getByText('Orca Lab Browser').closest('button')?.querySelector('.lucide-globe')
     ).toBeTruthy()
     expect(
       screen.getByText('System Browser').closest('button')?.querySelector('.lucide-external-link')
