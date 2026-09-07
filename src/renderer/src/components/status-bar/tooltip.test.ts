@@ -148,7 +148,7 @@ describe('provider usage error copy', () => {
 
     expect(getProviderUsageStatusLabel(grok)).toBe('Run Grok to refresh')
     expect(getProviderUsageErrorMessage(grok)).toBe(
-      'Run grok in a terminal on the computer running Orca and wait for it to start. If prompted, complete sign-in, then retry usage. You do not need to send a chat message.'
+      'Run grok in a terminal on the computer running Orca Lab and wait for it to start. If prompted, complete sign-in, then retry usage. You do not need to send a chat message.'
     )
   })
 
@@ -164,7 +164,7 @@ describe('provider usage error copy', () => {
 
     expect(getProviderUsageStatusLabel(kimi)).toBe('Run Kimi to refresh')
     expect(getProviderUsageErrorMessage(kimi)).toBe(
-      'Run kimi in a terminal on the computer running Orca and wait for it to start, then retry usage.'
+      'Run kimi in a terminal on the computer running Orca Lab and wait for it to start, then retry usage.'
     )
   })
 

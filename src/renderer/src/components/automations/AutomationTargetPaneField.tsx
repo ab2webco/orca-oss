@@ -70,7 +70,7 @@ export function AutomationTargetPaneField({
             <TooltipContent side="top" sideOffset={6} className="max-w-72">
               {translate(
                 'auto.components.automations.AutomationTargetPaneField.1286051832',
-                'Send reuse runs to this open agent pane. If it is gone at run time, Orca falls back to the previous automation session or a fresh one.'
+                'Send reuse runs to this open agent pane. If it is gone at run time, Orca Lab falls back to the previous automation session or a fresh one.'
               )}
             </TooltipContent>
           </Tooltip>

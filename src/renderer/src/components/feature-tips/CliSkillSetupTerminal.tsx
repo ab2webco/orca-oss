@@ -85,11 +85,11 @@ export function CliSkillSetupTerminal(): React.JSX.Element {
         )}
         ariaLabel={translate(
           'auto.components.feature.tips.CliSkillSetupTerminal.43b60ec5c3',
-          'Orca CLI and orchestration skill install terminal'
+          'Orca Lab CLI and orchestration skill install terminal'
         )}
         description={translate(
           'auto.components.feature.tips.CliSkillSetupTerminal.1953e90447',
-          'Press Enter to install the Orca CLI orchestration skill for your agents.'
+          'Press Enter to install the Orca Lab CLI orchestration skill for your agents.'
         )}
         terminalHeightPx={280}
         terminalTopMarginPx={8}

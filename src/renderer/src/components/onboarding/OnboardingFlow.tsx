@@ -27,7 +27,7 @@ const stepCopy = {
     get subtitle() {
       return translate(
         'auto.components.onboarding.OnboardingFlow.322fc50a18',
-        "Orca works with every CLI agent. Choose the one you'll reach for most. Switch any time."
+        "Orca Lab works with every CLI agent. Choose the one you'll reach for most. Switch any time."
       )
     }
   },
@@ -55,7 +55,7 @@ const stepCopy = {
     get subtitle() {
       return translate(
         'auto.components.onboarding.OnboardingFlow.ff92d15436',
-        'Orca will notify you when agents are done or need help.'
+        'Orca Lab will notify you when agents are done or need help.'
       )
     }
   },
@@ -192,7 +192,7 @@ export default function OnboardingFlow({
           role="dialog"
           aria-label={translate(
             'auto.components.onboarding.OnboardingFlow.277ba45540',
-            'Orca onboarding'
+            'Orca Lab onboarding'
           )}
           aria-modal="true"
           data-onboarding-modal
@@ -205,7 +205,7 @@ export default function OnboardingFlow({
             <div className="flex items-center gap-3 text-base font-semibold tracking-tight">
               <img src={logo} alt="" aria-hidden="true" className="h-7 w-auto shrink-0" />
               <span>
-                {translate('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca')}
+                {translate('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca Lab')}
               </span>
             </div>
 
@@ -255,7 +255,7 @@ export default function OnboardingFlow({
                 <div className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   {translate(
                     'auto.components.onboarding.OnboardingFlow.1b5e182e9f',
-                    'Welcome to Orca'
+                    'Welcome to Orca Lab'
                   )}
                 </div>
               )}

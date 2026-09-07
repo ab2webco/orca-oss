@@ -61,11 +61,11 @@ function describeRestoreOutcome(restored: boolean): string {
   return restored
     ? translate(
         'auto.lib.agentRateLimitAccountSwitch.restoredOnOrigin',
-        'Orca resumed the session on the original account.'
+        'Orca Lab resumed the session on the original account.'
       )
     : translate(
         'auto.lib.agentRateLimitAccountSwitch.restoreFailed',
-        'Orca could not bring the session back; resume it from this terminal.'
+        'Orca Lab could not bring the session back; resume it from this terminal.'
       )
 }
 

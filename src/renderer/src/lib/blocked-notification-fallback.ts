@@ -18,7 +18,7 @@ export function showBlockedNotificationFallbackToast(): void {
   toast.warning(
     translate(
       'auto.lib.blocked.notification.fallback.de50bef680',
-      'macOS is blocking Orca notifications'
+      'macOS is blocking Orca Lab notifications'
     ),
     {
       description: translate(

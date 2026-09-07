@@ -84,7 +84,7 @@ export async function runInPlaceManagedClaudeAccountSwitch(args: {
       reason: 'failed',
       message: translate(
         'auto.lib.agentRateLimitAccountSwitch.switchRequestFailed',
-        'Orca could not reach the runtime that owns this terminal to switch accounts.'
+        'Orca Lab could not reach the runtime that owns this terminal to switch accounts.'
       )
     }
   }

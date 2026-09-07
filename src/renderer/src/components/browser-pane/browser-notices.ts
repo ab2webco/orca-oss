@@ -98,13 +98,13 @@ export function formatLoadFailureDescription(
     if (loadError.code === -202) {
       return translate(
         'browser.loadFailure.certificateAuthorityInvalid',
-        "Orca doesn't trust the authority that issued the certificate for {{value0}}.",
+        "Orca Lab doesn't trust the authority that issued the certificate for {{value0}}.",
         { value0: host }
       )
     }
     return translate(
       'browser.loadFailure.certificateVerificationFailed',
-      "Orca couldn't verify the certificate for {{value0}}.",
+      "Orca Lab couldn't verify the certificate for {{value0}}.",
       { value0: host }
     )
   }

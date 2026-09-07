@@ -8732,7 +8732,7 @@ export default function TaskPage(): React.JSX.Element {
           setLinearError(
             translate(
               'auto.components.TaskPage.linearHasWorktreeLoadFailed',
-              'Unable to load Linear issues linked to an Orca workspace.'
+              'Unable to load Linear issues linked to an Orca Lab workspace.'
             )
           )
           setLinearIssues([])
@@ -8743,7 +8743,7 @@ export default function TaskPage(): React.JSX.Element {
           setLinearError(
             translate(
               'auto.components.TaskPage.linearHasWorktreePartialLoadFailed',
-              'Some Linear issues linked to an Orca workspace could not be loaded. Refresh to try again.'
+              'Some Linear issues linked to an Orca Lab workspace could not be loaded. Refresh to try again.'
             )
           )
         }
@@ -10196,7 +10196,7 @@ export default function TaskPage(): React.JSX.Element {
                                 <TooltipContent side="bottom" sideOffset={6}>
                                   {translate(
                                     'auto.components.TaskPage.linearModeHasWorktreeTooltip',
-                                    'Linear tickets linked to an Orca workspace'
+                                    'Linear tickets linked to an Orca Lab workspace'
                                   )}
                                 </TooltipContent>
                               </Tooltip>
@@ -10375,7 +10375,7 @@ export default function TaskPage(): React.JSX.Element {
                               linearMode === 'in-orca'
                                 ? translate(
                                     'auto.components.TaskPage.linearHasWorktreeSearchPlaceholder',
-                                    'Filter issues linked to an Orca workspace...'
+                                    'Filter issues linked to an Orca Lab workspace...'
                                   )
                                 : translate(
                                     'auto.components.TaskPage.eec0c5c079',
@@ -12589,7 +12589,7 @@ export default function TaskPage(): React.JSX.Element {
                           }
                           return translate(
                             'auto.components.TaskPage.linearEmptyHasWorktree',
-                            'No Linear tickets are linked to an Orca workspace yet. Start work from a Linear issue to see it here.'
+                            'No Linear tickets are linked to an Orca Lab workspace yet. Start work from a Linear issue to see it here.'
                           )
                         }
                         const emptyKind = resolveLinearIssueEmptyKind({

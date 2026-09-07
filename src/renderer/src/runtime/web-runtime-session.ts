@@ -307,7 +307,7 @@ async function createWebRuntimeSessionTerminalResult(
         status: 'failed',
         message: translate(
           'auto.runtime.webRuntimeSession.remoteHostDisconnected',
-          'The workspace is not connected to a remote Orca host.'
+          'The workspace is not connected to a remote Orca Lab host.'
         )
       }
     }

@@ -197,7 +197,7 @@ export function MacNotificationPermissionCard({
               <TriangleAlert className="size-4" />
               {translate(
                 'auto.components.onboarding.NotificationStep.90b5d2e363',
-                'macOS is not delivering Orca notifications'
+                'macOS is not delivering Orca Lab notifications'
               )}
             </div>
             <p className="max-w-[58ch] text-[13px] leading-relaxed text-amber-700/80 dark:text-amber-200/80">

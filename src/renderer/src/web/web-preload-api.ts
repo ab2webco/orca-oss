@@ -1513,7 +1513,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
           kind: 'host-unreachable',
           message: translate(
             'auto.web.webPreloadApi.remotePairingUnreachable',
-            'Cannot reach Orca at {{endpoint}}.',
+            'Cannot reach Orca Lab at {{endpoint}}.',
             { endpoint: parsed.value.displayEndpoint }
           )
         }
@@ -1539,7 +1539,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
           kind: 'environment-save-failed',
           message: translate(
             'auto.web.webPreloadApi.remotePairingSaveFailed',
-            'Orca verified the host but could not save it. Check browser storage and try again.'
+            'Orca Lab verified the host but could not save it. Check browser storage and try again.'
           )
         }
       }
