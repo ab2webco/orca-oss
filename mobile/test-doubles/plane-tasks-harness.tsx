@@ -20,9 +20,10 @@ import type { PlaneMobileWorkItem } from '../src/tasks/plane-mobile-work-item-re
 import { PlaneSourceSegmentRow } from '../src/plane-board/plane-source-segment-row'
 import { resolvePlaneTasksChrome } from '../src/plane-board/plane-tasks-chrome-visibility'
 import { PlaneTasksSurface } from '../src/plane-board/plane-tasks-surface'
-import { usePlaneViewMode } from '../src/plane-board/plane-work-item-view'
+import { PLANE_VIEW_MODES, usePlaneViewMode } from '../src/plane-board/plane-work-item-view'
 import { useRuntimeCapabilities } from '../src/plane-board/use-runtime-capabilities'
 import { deviceStorage } from './async-storage-memory'
+import { settle } from './plane-tasks-screen-driver'
 
 export { deviceStorage }
 
@@ -164,6 +165,7 @@ export function PlaneTasksHarness({
   const [query, setQuery] = useState(initialQuery)
   const [detail, setDetail] = useState<PlaneMobileWorkItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [viewPickerOpen, setViewPickerOpen] = useState(false)
   // A relay blip flips this false. It gates Plane's data only: the screen's `enabled` never
   // carried the connection, so the surface keeps its chrome and the open sheet (ORCA-419).
   const [connected, setConnected] = useState(true)
@@ -230,13 +232,12 @@ export function PlaneTasksHarness({
             stateLabel: 'All states',
             filterLabel: 'All',
             viewMode,
-            onSelectViewMode: setViewMode,
+            onPickViewMode: () => setViewPickerOpen(true),
             onPickProject: () => setPickerOpen(true),
             onPickState: () => {},
             onPickFilter: () => {},
             buttonStyle: null,
-            textStyle: null,
-            selectedTextStyle: null
+            textStyle: null
           })
         : null,
       !chrome.boardShown
@@ -283,6 +284,20 @@ export function PlaneTasksHarness({
         menuTextStyle: null
       }),
       pickerOpen ? createElement(Text, null, 'Project picker') : null,
+      // The screen opens a PickerModal here; the stand-in offers the same two choices.
+      viewPickerOpen
+        ? PLANE_VIEW_MODES.map((mode) =>
+            createElement(Pressable, {
+              key: mode,
+              accessibilityRole: 'button',
+              accessibilityLabel: `Show as ${mode}`,
+              onPress: () => {
+                setViewMode(mode)
+                setViewPickerOpen(false)
+              }
+            })
+          )
+        : null,
       createElement(Pressable, {
         accessibilityRole: 'button',
         accessibilityLabel: 'Switch project',
@@ -309,45 +324,6 @@ export function PlaneTasksHarness({
       })
     )
   )
-}
-
-export function byLabel(label: string): HTMLElement | null {
-  return document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
-}
-
-export function leafWithText(text: string, scope: ParentNode = document.body): HTMLElement | null {
-  for (const element of scope.querySelectorAll<HTMLElement>('div')) {
-    if (element.childElementCount === 0 && element.textContent === text) {
-      return element
-    }
-  }
-  return null
-}
-
-export function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  // Why: React ignores a plain `.value =` on a controlled input; the prototype
-  // setter plus an input event is what a keystroke looks like to it.
-  const prototype =
-    input instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
-  if (!setter) {
-    throw new Error('HTMLInputElement has no value setter')
-  }
-  act(() => {
-    setter.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-}
-
-/** The surface reads status.get, then states + items; each hop is a microtask boundary. */
-export async function settle(): Promise<void> {
-  for (let hop = 0; hop < 12; hop += 1) {
-    await act(async () => {
-      await Promise.resolve()
-    })
-  }
 }
 
 export type MountOptions = {
@@ -389,45 +365,6 @@ export async function mountBoard(
     throw new Error('board did not finish loading')
   }
   return calls
-}
-
-export async function press(label: string): Promise<void> {
-  const target = byLabel(label)
-  if (!target) {
-    throw new Error(`no control labelled ${label}`)
-  }
-  await act(async () => {
-    target.click()
-    await Promise.resolve()
-  })
-  await settle()
-}
-
-export async function openCard(): Promise<void> {
-  await press('Open Wire the retry')
-}
-
-/** Everything a board card says: title, its facts line and its state pill. */
-export function cardText(title: string): string {
-  const card = byLabel(`Open ${title}`)
-  if (!card) {
-    throw new Error(`no card titled ${title}`)
-  }
-  return card.textContent ?? ''
-}
-
-/** The shell's column header: the state name beside its card count. */
-export function boardColumn(name: string): { count: number } | null {
-  for (const leaf of document.body.querySelectorAll<HTMLElement>('div')) {
-    if (leaf.childElementCount !== 0 || leaf.textContent !== name) {
-      continue
-    }
-    const count = leaf.nextElementSibling?.textContent ?? ''
-    if (/^\d+$/.test(count)) {
-      return { count: Number(count) }
-    }
-  }
-  return null
 }
 
 export function callsTo(calls: Call[], method: string): Call[] {

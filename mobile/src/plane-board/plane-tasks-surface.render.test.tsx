@@ -25,20 +25,23 @@ vi.mock(
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import { MOBILE_PLANE_BOARD_WRITES_CAPABILITY } from './plane-board-writes-capability'
 import {
+  CARD,
+  DOING_CARD,
+  PLANE_VIEW_STORAGE_KEY,
+  callsTo,
+  deviceStorage,
+  mountBoard,
+  renderPlaneTasks
+} from '../../test-doubles/plane-tasks-harness'
+import {
   boardColumn,
   byLabel,
-  callsTo,
-  CARD,
-  deviceStorage,
-  DOING_CARD,
   leafWithText,
-  mountBoard,
   openCard,
-  PLANE_VIEW_STORAGE_KEY,
   press,
-  renderPlaneTasks,
+  selectPlaneView,
   typeInto
-} from '../../test-doubles/plane-tasks-harness'
+} from '../../test-doubles/plane-tasks-screen-driver'
 
 /** Click the react-native-web button that wraps a leaf text label (used for controls
  *  the underlying component renders without an accessibility label). */
@@ -80,17 +83,17 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
   })
 
   describe('view mode', () => {
-    it('shows the board in place when "Show as board" is pressed: same screen, no route', async () => {
+    it('shows the board in place when Board is chosen: same screen, no route', async () => {
       const calls = await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       // The list is what is on screen: rows, no columns, and nothing read for a board.
       expect(byLabel('Row Wire the retry')).not.toBeNull()
       expect(boardColumn('Todo')).toBeNull()
-      expect(byLabel('Show as list')?.getAttribute('aria-selected')).toBe('true')
+      expect(leafWithText('List')).not.toBeNull()
       expect(callsTo(calls, 'plane.listStates')).toHaveLength(0)
 
-      await press('Show as board')
+      await selectPlaneView('board')
 
-      expect(byLabel('Show as board')?.getAttribute('aria-selected')).toBe('true')
+      expect(leafWithText('Board')).not.toBeNull()
       expect(boardColumn('Todo')).toEqual({ count: 1 })
       expect(boardColumn('Doing')).toEqual({ count: 0 })
       expect(byLabel('Open Wire the retry')).not.toBeNull()
@@ -107,9 +110,10 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       // frame the press produces.
       const calls = await renderPlaneTasks(root, WRITING_HOST, { items: [CARD, DOING_CARD] }, {})
       const readsBefore = callsTo(calls, 'plane.listWorkItems').length
+      await press('Plane view')
       const toggle = byLabel('Show as board')
       if (!toggle) {
-        throw new Error('no view toggle')
+        throw new Error('no view choice')
       }
 
       act(() => {
@@ -143,7 +147,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
 
     it('remembers the chosen view on this device across a remount', async () => {
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
-      await press('Show as board')
+      await selectPlaneView('board')
       expect(deviceStorage.entries.get(PLANE_VIEW_STORAGE_KEY)).toBe(
         JSON.stringify({ viewMode: 'board' })
       )
@@ -152,7 +156,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       root = createRoot(container)
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
 
-      expect(byLabel('Show as board')?.getAttribute('aria-selected')).toBe('true')
+      expect(leafWithText('Board')).not.toBeNull()
       expect(boardColumn('Todo')).toEqual({ count: 1 })
       expect(byLabel('Row Wire the retry')).toBeNull()
     })
@@ -161,7 +165,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       await mountBoard(root, WRITING_HOST, { items: [CARD] })
       expect(boardColumn('Todo')).toEqual({ count: 1 })
 
-      await press('Show as list')
+      await selectPlaneView('list')
 
       expect(byLabel('Row Wire the retry')).not.toBeNull()
       expect(boardColumn('Todo')).toBeNull()
@@ -173,7 +177,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       deviceStorage.entries.set(PLANE_VIEW_STORAGE_KEY, '{"viewMode":"kanban"}')
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
 
-      expect(byLabel('Show as list')?.getAttribute('aria-selected')).toBe('true')
+      expect(leafWithText('List')).not.toBeNull()
       expect(byLabel('Row Wire the retry')).not.toBeNull()
     })
 
@@ -181,7 +185,7 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       await renderPlaneTasks(root, WRITING_HOST, { items: [CARD] }, {})
       expect(leafWithText('All states')).not.toBeNull()
 
-      await press('Show as board')
+      await selectPlaneView('board')
       expect(leafWithText('All states')).toBeNull()
     })
   })
@@ -473,9 +477,9 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(boardColumn('Todo')).not.toBeNull()
 
       await press('Toggle connection')
-      expect(byLabel('Show as list')).not.toBeNull()
+      expect(byLabel('Plane view')).not.toBeNull()
 
-      await press('Show as list')
+      await selectPlaneView('list')
       expect(byLabel(`Row ${CARD.title}`)).not.toBeNull()
     })
   })
