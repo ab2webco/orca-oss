@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { TerminalUnsubmittedInputTracker } from './terminal-unsubmitted-input-tracker'
-import { formatTerminalAgentSessionState } from '../../cli/terminal-format'
-import type { RuntimeTerminalAgentSessionState } from '../../shared/runtime-types'
 
 /**
  * The control ORCA-457 states outright: a pane holding input the agent never
@@ -27,27 +25,9 @@ function trackerWithBothPanes(): TerminalUnsubmittedInputTracker {
   return tracker
 }
 
-function sessionState(
-  handle: string,
-  unsubmittedInput: RuntimeTerminalAgentSessionState['unsubmittedInput']
-): { agentSession: RuntimeTerminalAgentSessionState } {
-  return {
-    agentSession: {
-      handle,
-      agent: 'claude',
-      sessionId: 'session-1',
-      session: {
-        read: true,
-        state: 'awaiting-input',
-        lastTurnAtMs: 1_000,
-        queuedInput: { supported: true, pending: 0 },
-        unparsedRecords: 0
-      },
-      ...(unsubmittedInput ? { unsubmittedInput } : {})
-    }
-  }
-}
-
+// The printed half of this control lives in
+// src/cli/terminal-format.unsubmitted-input.test.ts: the CLI and main tsconfigs
+// are separate projects, so one test file cannot hold both halves.
 describe('a stuck pane and a working pane do not report the same thing', () => {
   it('separates them at the tracker', () => {
     const tracker = trackerWithBothPanes()
@@ -61,18 +41,6 @@ describe('a stuck pane and a working pane do not report the same thing', () => {
     })
     expect(working).toEqual({ observed: true, pending: null })
     expect(stuck).not.toEqual(working)
-  })
-
-  it('separates them in what `terminal state` prints, where both said awaiting-input', () => {
-    const tracker = trackerWithBothPanes()
-
-    const stuck = formatTerminalAgentSessionState(sessionState(STUCK, tracker.read(STUCK)))
-    const working = formatTerminalAgentSessionState(sessionState(WORKING, tracker.read(WORKING)))
-
-    expect(stuck).toContain('state: awaiting-input')
-    expect(working).toContain('state: awaiting-input')
-    expect(stuck).toContain('unsubmitted input: submitted, but the agent never started a turn')
-    expect(working).toContain('unsubmitted input: none')
   })
 })
 
@@ -147,14 +115,5 @@ describe('what the tracker reports and why', () => {
       observed: true,
       pending: { evidence: 'text-without-submit', sinceMs: 7 }
     })
-  })
-})
-
-describe('an older host that does not report the field', () => {
-  it('reads as unobservable, never as nothing pending', () => {
-    const printed = formatTerminalAgentSessionState(sessionState('term-1', undefined))
-
-    expect(printed).toContain('unsubmitted input: unobservable — this host does not report it')
-    expect(printed).not.toContain('unsubmitted input: none')
   })
 })
