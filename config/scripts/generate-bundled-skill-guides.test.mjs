@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -73,25 +73,45 @@ describe('bundled skill guide generator', () => {
   })
 
   it('keeps pre-guide fallback useful and read-only for every converted domain', async () => {
+    // Why la lista sale del directorio: la versión anterior iteraba un objeto de 7 topics
+    // con 10 stubs en disco, así que `orca-cli`, `orca-plane` y `switch-account` podían
+    // perder su sección de fallback en verde. El nombre del caso decía *every* y no lo era.
+    // Un stub nuevo sin fila acá ahora pone esto en rojo. ORCA-451.
     const expectedFallbackCommands = {
       'computer-use': ['ORCA computer capabilities --json', 'ORCA computer list-apps --json'],
       'linear-tickets': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
+      'orca-cli': ['ORCA status --json', 'ORCA terminal list --json'],
       'orca-emulator': ['ORCA emulator list --json'],
       'orca-emulator-android': ['ORCA emulator devices --json'],
       'orca-linear': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
       'orca-per-workspace-env': ['ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json'],
-      orchestration: ['ORCA orchestration task-list --json', 'ORCA terminal list --json']
+      'orca-plane': ['ORCA plane --help'],
+      orchestration: ['ORCA orchestration task-list --json', 'ORCA terminal list --json'],
+      'switch-account': ['ORCA account list --json']
     }
+    // Why por topic y no global: el fallback de `orca-cli` lista worktrees a propósito — es el
+    // topic de orientación del CLI. Para los demás, arrastrar ese comando es justo el ruido
+    // que este caso prohíbe.
+    const allowsWorktreeListing = new Set(['orca-cli'])
 
-    for (const [name, commands] of Object.entries(expectedFallbackCommands)) {
+    const stubTopics = (await readdir(path.join(projectDir, 'skill-stubs')))
+      .filter((entry) => entry.endsWith('.md'))
+      .map((entry) => entry.slice(0, -'.md'.length))
+      .sort()
+    expect(stubTopics).toEqual(Object.keys(expectedFallbackCommands).sort())
+
+    for (const name of stubTopics) {
       const stub = await readFile(path.join(projectDir, 'skill-stubs', `${name}.md`), 'utf8')
       const fallback = stub.split('## If an older Orca Lab does not recognize `skills get`')[1]
 
       expect(fallback, name).toBeDefined()
-      for (const command of commands) {
+      for (const command of expectedFallbackCommands[name]) {
         expect(fallback, name).toContain(command)
       }
-      expect(fallback, name).not.toContain('ORCA worktree ps --json')
+      expect(fallback, name).toContain(`ORCA skills get ${name}`)
+      if (!allowsWorktreeListing.has(name)) {
+        expect(fallback, name).not.toContain('ORCA worktree ps --json')
+      }
     }
   })
 
