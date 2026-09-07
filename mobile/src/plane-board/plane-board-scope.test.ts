@@ -7,6 +7,7 @@ import {
   resolvePlaneBoardScope,
   type PlaneBoardScopeInput
 } from './plane-board-scope'
+import { DEFAULT_PLANE_WORK_ITEM_FILTER } from '../../../src/shared/plane-work-item-filter-labels'
 
 const PROJECTS = [
   { id: 'proj-1', identifier: 'ORCA', name: 'Orca Lab' },
@@ -82,9 +83,19 @@ describe('resolvePlaneBoardScope', () => {
 
 describe('isPlaneBoardFiltered', () => {
   it('treats the list default as unfiltered and anything else as narrowing', () => {
-    expect(isPlaneBoardFiltered({ filter: 'all', query: '  ' })).toBe(false)
+    expect(isPlaneBoardFiltered({ filter: DEFAULT_PLANE_WORK_ITEM_FILTER, query: '  ' })).toBe(
+      false
+    )
     expect(isPlaneBoardFiltered({ filter: 'assigned', query: '' })).toBe(true)
-    expect(isPlaneBoardFiltered({ filter: 'all', query: 'retry' })).toBe(true)
+    expect(isPlaneBoardFiltered({ filter: DEFAULT_PLANE_WORK_ITEM_FILTER, query: 'retry' })).toBe(
+      true
+    )
+  })
+
+  it('reads `all` as narrowing, because it hides done items', () => {
+    // It was the default until ORCA-460 and is not one any more: 'all' is the
+    // open-only view, so a board on it is showing less than everything.
+    expect(isPlaneBoardFiltered({ filter: 'all', query: '' })).toBe(true)
   })
 })
 
