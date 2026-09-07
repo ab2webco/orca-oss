@@ -58,7 +58,7 @@ import {
   PROVIDER_TASK_GROUP_OPTIONS as LINEAR_GROUP_OPTIONS,
   PROVIDER_TASK_ORDER_OPTIONS as LINEAR_ORDER_OPTIONS
 } from '../../../src/tasks/provider-task-view-options'
-import { usePlaneViewMode } from '../../../src/plane-board/plane-work-item-view'
+import { usePlaneViewMode, type PlaneViewMode } from '../../../src/plane-board/plane-work-item-view'
 import {
   formatGitHubPRDelta,
   getGitHubReviewerRows,
@@ -755,6 +755,11 @@ const LINEAR_FILTER_OPTIONS: PickerOption<LinearFilter>[] = [
 
 const LINEAR_VIEW_OPTIONS: PickerOption<LinearViewMode>[] = [
   { value: 'list', label: 'List', subtitle: 'Compact issue rows' },
+  { value: 'board', label: 'Board', subtitle: 'Grouped columns' }
+]
+
+const PLANE_VIEW_OPTIONS: PickerOption<PlaneViewMode>[] = [
+  { value: 'list', label: 'List', subtitle: 'Compact work item rows' },
   { value: 'board', label: 'Board', subtitle: 'Grouped columns' }
 ]
 
@@ -1841,6 +1846,7 @@ export default function MobileTasksScreen() {
   const [showLinearWorkspacePicker, setShowLinearWorkspacePicker] = useState(false)
   const [showLinearTeamPicker, setShowLinearTeamPicker] = useState(false)
   const [showLinearViewPicker, setShowLinearViewPicker] = useState(false)
+  const [showPlaneViewPicker, setShowPlaneViewPicker] = useState(false)
   const [showLinearGroupPicker, setShowLinearGroupPicker] = useState(false)
   const [showLinearOrderPicker, setShowLinearOrderPicker] = useState(false)
   const [showLinearDisplayPicker, setShowLinearDisplayPicker] = useState(false)
@@ -8973,16 +8979,9 @@ export default function MobileTasksScreen() {
               onPickState={() => setShowPlaneStatePicker(true)}
               onPickFilter={() => setShowPlaneFilterPicker(true)}
               viewMode={planeViewMode}
-              onSelectViewMode={(mode) => {
-                setPlaneViewMode(mode)
-                // Board writes do not touch the list's rows; re-read them on the way back.
-                if (mode === 'list') {
-                  refreshTasks()
-                }
-              }}
+              onPickViewMode={() => setShowPlaneViewPicker(true)}
               buttonStyle={styles.segmentButton}
               textStyle={styles.segmentSecondaryText}
-              selectedTextStyle={styles.segmentButtonText}
             />
           ) : null}
 
@@ -10558,6 +10557,21 @@ export default function MobileTasksScreen() {
           )}
         </View>
       </BottomDrawer>
+
+      <PickerModal
+        visible={taskUiReady && showPlaneViewPicker}
+        title="Plane View"
+        options={PLANE_VIEW_OPTIONS}
+        selected={planeViewMode}
+        onSelect={(mode) => {
+          setPlaneViewMode(mode)
+          // Board writes do not touch the list's rows; re-read them on the way back.
+          if (mode === 'list') {
+            refreshTasks()
+          }
+        }}
+        onClose={() => setShowPlaneViewPicker(false)}
+      />
 
       <PickerModal
         visible={taskUiReady && showLinearViewPicker}

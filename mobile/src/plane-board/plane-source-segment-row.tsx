@@ -1,7 +1,10 @@
 import { Pressable, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
-import { PLANE_VIEW_MODES, type PlaneViewMode } from './plane-work-item-view'
+import type { PlaneViewMode } from './plane-work-item-view'
 
-const VIEW_MODE_LABELS: Record<PlaneViewMode, string> = { list: 'List', board: 'Board' }
+export const PLANE_VIEW_MODE_LABELS: Record<PlaneViewMode, string> = {
+  list: 'List',
+  board: 'Board'
+}
 
 type Props = {
   enabled: boolean
@@ -10,14 +13,14 @@ type Props = {
   stateLabel: string
   filterLabel: string
   viewMode: PlaneViewMode
-  onSelectViewMode: (mode: PlaneViewMode) => void
+  /** Opens the view picker; which view is chosen is the Tasks screen's state. */
+  onPickViewMode: () => void
   onPickProject: () => void
   onPickState: () => void
   onPickFilter: () => void
   /** Owned by the Tasks screen so the row keeps one source of truth for its look. */
   buttonStyle: StyleProp<ViewStyle>
   textStyle: StyleProp<TextStyle>
-  selectedTextStyle: StyleProp<TextStyle>
 }
 
 /** The Plane controls in the Tasks segment row: which view shows the work items,
@@ -30,33 +33,25 @@ export function PlaneSourceSegmentRow({
   stateLabel,
   filterLabel,
   viewMode,
-  onSelectViewMode,
+  onPickViewMode,
   onPickProject,
   onPickState,
   onPickFilter,
   buttonStyle,
-  textStyle,
-  selectedTextStyle
+  textStyle
 }: Props) {
   return (
     <>
-      {PLANE_VIEW_MODES.map((mode) => {
-        const selected = mode === viewMode
-        return (
-          <Pressable
-            key={mode}
-            accessibilityRole="button"
-            accessibilityLabel={`Show as ${VIEW_MODE_LABELS[mode].toLowerCase()}`}
-            accessibilityState={{ selected }}
-            aria-selected={selected}
-            style={buttonStyle}
-            disabled={!enabled}
-            onPress={() => enabled && !selected && onSelectViewMode(mode)}
-          >
-            <Text style={selected ? selectedTextStyle : textStyle}>{VIEW_MODE_LABELS[mode]}</Text>
-          </Pressable>
-        )
-      })}
+      {/* One chip carrying the current view, opening a picker — the Linear pattern. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Plane view"
+        style={buttonStyle}
+        disabled={!enabled}
+        onPress={() => enabled && onPickViewMode()}
+      >
+        <Text style={textStyle}>{PLANE_VIEW_MODE_LABELS[viewMode]}</Text>
+      </Pressable>
       <Pressable style={buttonStyle} disabled={!enabled} onPress={() => enabled && onPickProject()}>
         <Text style={textStyle}>{projectLabel}</Text>
       </Pressable>

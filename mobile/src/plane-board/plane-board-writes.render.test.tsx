@@ -31,21 +31,23 @@ import {
 import { PLANE_COMMENT_UNANSWERED_MESSAGE } from './use-plane-board-comments'
 import { PLANE_WRITE_UNANSWERED_MESSAGE } from './plane-write-failure'
 import {
-  boardColumn,
-  byLabel,
-  callsTo,
   CARD,
-  cardText,
+  callsTo,
   deviceStorage,
-  leafWithText,
   mountBoard as mountBoardWith,
-  openCard,
-  press,
   readsOf,
-  settle,
-  typeInto,
   type HostBehaviour
 } from '../../test-doubles/plane-tasks-harness'
+import {
+  boardColumn,
+  byLabel,
+  cardText,
+  leafWithText,
+  openCard,
+  press,
+  settle,
+  typeInto
+} from '../../test-doubles/plane-tasks-screen-driver'
 
 const PHASE_1_HOST = ['mobile.tasks.v1', MOBILE_TASKS_PLANE_CAPABILITY]
 const WRITING_HOST = [...PHASE_1_HOST, MOBILE_PLANE_BOARD_WRITES_CAPABILITY]
