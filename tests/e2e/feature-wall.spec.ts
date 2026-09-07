@@ -34,7 +34,7 @@ test.describe('Feature tour modal', () => {
   }) => {
     await openFeatureTourFromMenu(electronApp)
 
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible({
+    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca Lab' })).toBeVisible({
       timeout: 10_000
     })
     await expect(orcaPage.getByText('Reopen any time from Help > Explore Orca.')).toBeVisible()
@@ -68,7 +68,7 @@ test.describe('Feature tour modal', () => {
     ).toBeVisible()
     await expect(orcaPage.getByRole('heading', { name: 'Browser Use skill' })).toBeVisible()
     await expect(
-      orcaPage.getByText("Enables agents to navigate and verify pages in Orca's browser.")
+      orcaPage.getByText("Enables agents to navigate and verify pages in Orca Lab's browser.")
     ).toBeVisible()
     await expect(orcaPage.getByRole('heading', { name: 'CLI skill' })).toHaveCount(0)
     await expect(orcaPage.getByText('With the Orca CLI skill', { exact: false })).toHaveCount(0)
@@ -109,7 +109,7 @@ test.describe('Feature tour modal', () => {
       store.getState().openModal('feature-wall', { source: 'help_menu' })
     })
 
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible({
+    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca Lab' })).toBeVisible({
       timeout: 10_000
     })
     await orcaPage
@@ -118,7 +118,7 @@ test.describe('Feature tour modal', () => {
       .click()
     await expect(orcaPage.getByText('Start work directly from GitHub or Linear.')).toBeVisible()
     await expect(orcaPage.getByText('Connect GitHub or Linear once')).toHaveCount(0)
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible()
+    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca Lab' })).toBeVisible()
     await expect
       .poll(async () => getStoreState<string>(orcaPage, 'activeView'))
       .not.toBe('settings')
