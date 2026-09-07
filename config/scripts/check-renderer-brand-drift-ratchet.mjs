@@ -101,10 +101,14 @@ export function main(root = process.cwd(), env = process.env) {
 
   const baseRef = resolveBaseRef(root, env)
   if (!baseRef) {
-    // Failing closed here would block anyone whose clone has no main to compare
-    // against; in CI the base is always fetched, so there it is a real error.
+    // Why the event and not env.CI: only a PR run is guaranteed a base. The
+    // release job checks out a bare SHA with no origin/main, and failing closed
+    // there blocked lab.61 on a comparison that run has nothing to make -- it
+    // builds already-merged main, which the PR gate judged on the way in.
     const message = `no base ref to compare ${BASELINE_PATH} against (tried origin/<base>, origin/main, main)`
-    if (env.CI) {
+    const expectsBase =
+      env.GITHUB_EVENT_NAME === 'pull_request' || env.GITHUB_EVENT_NAME === 'pull_request_target'
+    if (expectsBase) {
       console.error(`::error::${message}`)
       return 1
     }
