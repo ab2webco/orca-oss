@@ -21,8 +21,8 @@ describe('orca CLI skill guidance', () => {
   it('keeps independent worktree lineage separate from Git base selection', () => {
     const skill = readSkill()
 
-    expect(skill).toContain('`--no-parent` only controls Orca lineage')
-    expect(skill).toContain('omit `--base-branch` so Orca uses the repo default base')
+    expect(skill).toContain('`--no-parent` only controls Orca Lab lineage')
+    expect(skill).toContain('omit `--base-branch` so Orca Lab uses the repo default base')
     expect(skill).toContain('Never base it on the current feature branch')
   })
 
