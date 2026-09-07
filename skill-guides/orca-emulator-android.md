@@ -1,7 +1,7 @@
 ---
 name: orca-emulator-android
 description: >
-  Control an Android emulator / device from inside Orca using the `orca` CLI.
+  Control an Android emulator / device from inside Orca Lab using the `orca` CLI.
   Use for listing/booting AVDs, taps, swipes, typing, hardware buttons (incl. Back
   and Recents), rotation, app install/launch, runtime permissions, the accessibility
   tree, and logcat — driving a real adb-connected device or emulator. Cross-platform
@@ -11,7 +11,7 @@ license: Apache-2.0
 
 # Orca Emulator — Android (adb / emulator powered)
 
-Drive an Android emulator or adb-connected device **from within Orca** using
+Drive an Android emulator or adb-connected device **from within Orca Lab** using
 `ORCA emulator ...` commands. The Android backend shells out to the Android SDK
 (`adb`, `emulator`, `avdmanager`) that Android Studio installs, so it works on
 Windows, Linux, and macOS — unlike the iOS backend (`orca-emulator`), which is
@@ -25,9 +25,9 @@ streaming server.
 
 ## CLI executable
 
-Choose the Orca executable once: use the `ORCA_CLI_COMMAND` environment value when set;
+Choose the Orca Lab executable once: use the `ORCA_CLI_COMMAND` environment value when set;
 otherwise use `orca-dev` in a dev session exposing `ORCA_DEV_REPO_ROOT`, `orca-ide` on
-Linux outside an Orca-managed terminal, and `orca` everywhere else. Never try bare
+Linux outside an Orca Lab-managed terminal, and `orca` everywhere else. Never try bare
 `orca` first on unmanaged Linux because it normally resolves to the GNOME screen reader.
 
 In every command example — fenced blocks, tables, and prose — `ORCA` is a documentation
@@ -52,17 +52,17 @@ shell-neutral for POSIX shells, PowerShell, and cmd.exe.
   scope for now).
 - Remote/SSH device control → out of scope; the SDK + device are local to the host.
 
-## Prerequisites (surfaced by Orca)
+## Prerequisites (surfaced by Orca Lab)
 
 - **Android Studio / Android SDK** installed, with `ANDROID_HOME` (or
-  `ANDROID_SDK_ROOT`) set. Orca also checks the per-OS default location
+  `ANDROID_SDK_ROOT`) set. Orca Lab also checks the per-OS default location
   (`%LOCALAPPDATA%\Android\Sdk`, `~/Library/Android/sdk`, `~/Android/Sdk`).
 - `adb` + `emulator` on the SDK path; at least one **AVD** (create in Android
   Studio ▸ Device Manager) or a connected device with USB debugging.
 - A device that is **booted and `adb`-visible** for input/capability commands
   (an AVD that is still shutdown can be listed but must be booted first).
 
-Orca returns a clear message when the SDK is missing
+Orca Lab returns a clear message when the SDK is missing
 (`Android SDK not found. Install Android Studio and set ANDROID_HOME.`).
 
 ## Mental model
@@ -80,14 +80,14 @@ Orca returns a clear message when the SDK is missing
                                                    Android emulator / device
 ```
 
-Orca owns backend routing and the per-worktree active-device registry. The
-Android backend converts Orca's normalized 0–1 coordinates to device pixels and
+Orca Lab owns backend routing and the per-worktree active-device registry. The
+Android backend converts Orca Lab's normalized 0–1 coordinates to device pixels and
 issues `adb shell input` events; AVD names resolve to running adb serials.
 
 ## Common operations
 
 Use `--json` for agent-friendly output. Coordinates are **normalized 0..1**
-(top-left origin) — never pixels; Orca converts using the live screen size.
+(top-left origin) — never pixels; Orca Lab converts using the live screen size.
 
 | Goal                       | Command                                                        | Notes |
 |----------------------------|----------------------------------------------------------------|-------|
@@ -106,7 +106,7 @@ Use `--json` for agent-friendly output. Coordinates are **normalized 0..1**
 
 ## Critical gotchas (teach agents)
 
-- **All coordinates are normalized 0..1** (top-left origin), never pixels — Orca
+- **All coordinates are normalized 0..1** (top-left origin), never pixels — Orca Lab
   scales to the device's live resolution.
 - **Target a running device by its adb serial** (e.g. `emulator-5554`) shown in
   `ORCA emulator devices`. An AVD name resolves only once that AVD is booted.

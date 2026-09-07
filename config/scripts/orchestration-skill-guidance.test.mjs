@@ -38,9 +38,9 @@ describe('orchestration skill guidance', () => {
       '`coordinator-start`, `coordinator-stop`, `run`, and `run-stop` are retired scheduler commands'
     )
     expect(toolBoundary).toContain(
-      'Do not substitute non-Orca subagent tools, generic agent-spawn APIs, or chat-only parallel worker features'
+      'Do not substitute non-Orca Lab subagent tools, generic agent-spawn APIs, or chat-only parallel worker features'
     )
-    expect(toolBoundary).toContain('do not create Orca task/dispatch provenance')
+    expect(toolBoundary).toContain('do not create Orca Lab task/dispatch provenance')
     expect(toolBoundary).toContain('injected lifecycle preambles')
     expect(toolBoundary).toContain('`worker_done` authority')
     expect(toolBoundary).toContain('decision gates')
@@ -113,7 +113,7 @@ describe('orchestration skill guidance', () => {
       'read the worker terminal after prompt delivery except to avoid losing the initial prompt'
     )
     expect(skill).toContain(
-      '`--no-parent` only controls Orca lineage; it does not choose the Git base.'
+      '`--no-parent` only controls Orca Lab lineage; it does not choose the Git base.'
     )
     expect(skill).toContain(
       'never base it on the current feature branch unless the user explicitly asks'
@@ -122,7 +122,7 @@ describe('orchestration skill guidance', () => {
       'orca worktree create --name <task-name> --no-parent --agent codex --prompt'
     )
     expect(fullHandoffs).toContain(
-      'Before creating a new worktree from an active feature branch, decide and state whether the desired Orca lineage is child or top-level'
+      'Before creating a new worktree from an active feature branch, decide and state whether the desired Orca Lab lineage is child or top-level'
     )
     expect(fullHandoffs).toContain(
       'Use child worktree lineage only when the new work is conceptually stacked under or dependent on the active worktree'
@@ -256,7 +256,7 @@ describe('orchestration skill guidance', () => {
       'read the `worker.agent_terminal_handle` field of `worker-show --dispatch <dispatch_id> --json`'
     )
     expect(workerLoop).toContain(
-      'orca orchestration worker-start --task <next_task_id> --terminal <handle> --json` so Orca ' +
+      'orca orchestration worker-start --task <next_task_id> --terminal <handle> --json` so Orca Lab ' +
         'transfers cleanup ownership to the new Dispatch'
     )
     expect(workerLoop).toContain(
