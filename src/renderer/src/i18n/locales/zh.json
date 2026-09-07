@@ -69,7 +69,10 @@
     "help": "帮助",
     "paste": "粘贴",
     "copy": "复制",
-    "selectAll": "全选"
+    "selectAll": "全选",
+    "about": "关于 {{name}}",
+    "hide": "隐藏 {{name}}",
+    "quit": "退出 {{name}}"
   },
   "tray": {
     "openOrca": "打开 Orca Lab",

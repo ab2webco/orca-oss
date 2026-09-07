@@ -201,7 +201,7 @@ async function openLinkFromRemotePane(page: Page, testInfo: TestInfo): Promise<v
   const frame = page.locator('[data-testid="remote-browser-frame"]:visible').first()
   await expect(frame).toBeVisible({ timeout: 60_000 })
   await frame.click({ button: 'right', position: { x: 60, y: 60 }, force: true })
-  const open = page.getByRole('menuitem', { name: 'Open Link In Orca Browser' })
+  const open = page.getByRole('menuitem', { name: 'Open Link In Orca Lab Browser' })
   await expect(open).toBeVisible({ timeout: 30_000 })
   await page.screenshot({
     path: testInfo.outputPath('sta-4231-owner-pinned-link-route.png'),

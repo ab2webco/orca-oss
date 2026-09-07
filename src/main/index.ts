@@ -138,6 +138,7 @@ import {
 } from './startup/configure-process'
 import { configurePackagedLinuxUserDataPath } from './startup/packaged-linux-user-data-path'
 import { configurePackagedMacosUserDataPath } from './startup/packaged-macos-user-data-path'
+import { APP_DISPLAY_NAME } from '../shared/app-identity'
 import { attachPlaneChangeBroadcast } from './plane/plane-change-broadcast'
 import {
   installUncaughtPipeErrorGuard,
@@ -517,7 +518,7 @@ const isServeMode = process.argv.includes('--serve')
 function updateGpuAccelerationAboutPanel(): void {
   app.setAboutPanelOptions(
     createGpuAccelerationAboutPanelOptions({
-      appName: app.name,
+      appName: APP_DISPLAY_NAME,
       appVersion: app.getVersion(),
       platform: process.platform,
       gpuFallbackActive: gpuFallbackActiveThisLaunch,
@@ -1742,9 +1743,9 @@ async function presentRendererRecoveryPrompt(recentRecoveryCount: number): Promi
     buttons: ['Reload', 'Quit'],
     defaultId: 0,
     cancelId: 1,
-    title: 'Orca keeps failing to load',
+    title: 'Orca Lab keeps failing to load',
     message: 'The app window crashed repeatedly and stopped reloading automatically.',
-    detail: `Orca tried to recover ${recentRecoveryCount} times in a row without success. This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch Orca.`
+    detail: `Orca Lab tried to recover ${recentRecoveryCount} times in a row without success. This is often a graphics-driver or installation problem. Reload to try again, or quit and relaunch Orca Lab.`
   }
   const { response } = window
     ? await dialog.showMessageBox(window, options)

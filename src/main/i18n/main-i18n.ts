@@ -122,10 +122,24 @@ export function setMainPluginLanguagePacks(
   return true
 }
 
+/** Fill {{placeholders}} the uninitialized path cannot hand to i18next. */
+function interpolateFallback(fallback: string, options?: TOptions): string {
+  if (!options) {
+    return fallback
+  }
+  return fallback.replace(/{{\s*(\w+)\s*}}/g, (match, name: string) => {
+    const value = (options as Record<string, unknown>)[name]
+    return value === undefined || value === null ? match : String(value)
+  })
+}
+
 export function translateMain(key: string, fallback: string, options?: TOptions): string {
-  // Why: menu registration can run before async init finishes in tests; fall back
-  // to the English default instead of returning undefined from an uninitialized i18n.
-  const raw = initialized ? mainI18n.t(key, { defaultValue: fallback, ...options }) : fallback
-  const value = typeof raw === 'string' && raw.length > 0 ? raw : fallback
+  // Why: menu registration can run before async init finishes; fall back to the
+  // English default instead of returning undefined from an uninitialized i18n.
+  const raw = initialized
+    ? mainI18n.t(key, { defaultValue: fallback, ...options })
+    : interpolateFallback(fallback, options)
+  const value =
+    typeof raw === 'string' && raw.length > 0 ? raw : interpolateFallback(fallback, options)
   return isPseudoLocalizationLocale(mainI18n.language) ? pseudoLocalizeString(value) : value
 }

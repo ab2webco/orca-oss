@@ -70,7 +70,7 @@ test.describe('SSH config host picker', () => {
     await expect(
       picker.getByText('Add a Host entry there, or go back and type the details manually.')
     ).toBeVisible()
-    await expect(picker.getByRole('button', { name: 'Add all to Orca' })).toBeDisabled()
+    await expect(picker.getByRole('button', { name: 'Add all to Orca Lab' })).toBeDisabled()
 
     await picker.getByRole('button', { name: 'Back' }).click()
     const form = orcaPage.getByRole('dialog', { name: 'Add SSH host' })

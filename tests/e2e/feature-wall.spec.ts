@@ -6,10 +6,10 @@ async function openFeatureTourFromMenu(electronApp: ElectronApplication): Promis
   await electronApp.evaluate(({ BrowserWindow, Menu }) => {
     const featureTourItem = Menu.getApplicationMenu()
       ?.items.find((item) => item.label === 'Help')
-      ?.submenu?.items.find((item) => item.label === 'Explore Orca')
+      ?.submenu?.items.find((item) => item.label === 'Explore Orca Lab')
 
     if (!featureTourItem) {
-      throw new Error('Explore Orca menu item was not registered')
+      throw new Error('Explore Orca Lab menu item was not registered')
     }
 
     const window = BrowserWindow.getAllWindows()[0]
@@ -37,7 +37,7 @@ test.describe('Feature tour modal', () => {
     await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca Lab' })).toBeVisible({
       timeout: 10_000
     })
-    await expect(orcaPage.getByText('Reopen any time from Help > Explore Orca.')).toBeVisible()
+    await expect(orcaPage.getByText('Reopen any time from Help > Explore Orca Lab.')).toBeVisible()
 
     // Five workflow rows in the rail.
     const rail = orcaPage.getByRole('navigation', { name: 'Workflows' })

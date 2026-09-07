@@ -69,7 +69,10 @@
     "help": "도움말",
     "paste": "붙여넣기",
     "copy": "복사",
-    "selectAll": "모두 선택"
+    "selectAll": "모두 선택",
+    "about": "{{name}} 정보",
+    "hide": "{{name}} 가리기",
+    "quit": "{{name}} 종료"
   },
   "tray": {
     "openOrca": "Orca Lab 열기",

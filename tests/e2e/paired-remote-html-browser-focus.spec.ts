@@ -191,7 +191,7 @@ test('keeps remote HTML preview placement and focuses it only after a click', as
                 hostTabsError: response.ok ? null : response.error.message,
                 sourceEditorStillActive: activeGroup?.activeTabId === sourceTabId,
                 previewOpenFailedToast: document.body.innerText.includes(
-                  'Unable to open this file in Orca Browser.'
+                  'Unable to open this file in Orca Lab Browser.'
                 )
               }
             },
