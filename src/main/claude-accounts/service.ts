@@ -535,7 +535,7 @@ export class ClaudeAccountService {
     captured: CapturedClaudeAuth
   ): Promise<ClaudeRateLimitAccountsState> {
     if (!captured.identity.email) {
-      throw new Error('Claude login completed, but Orca could not resolve the account email.')
+      throw new Error('Claude login completed, but Orca Lab could not resolve the account email.')
     }
     // Why: duplicate rows confuse selection and rate-limit tracking; re-authentication
     // is the supported way to refresh an account that is already managed.
@@ -761,7 +761,7 @@ export class ClaudeAccountService {
 
     const owned = resolveOwnedClaudeManagedAuthPath(input.accountId, account.managedAuthPath)
     if (!owned) {
-      throw new Error('Managed Claude auth storage is not owned by Orca.')
+      throw new Error('Managed Claude auth storage is not owned by Orca Lab.')
     }
 
     // Preserve any settings.json keys we did not author (e.g. seeded hooks) and
@@ -877,7 +877,7 @@ export class ClaudeAccountService {
       wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
     })
     if (!captured.identity.email) {
-      throw new Error('Claude login completed, but Orca could not resolve the account email.')
+      throw new Error('Claude login completed, but Orca Lab could not resolve the account email.')
     }
     // Why: the browser's active claude.ai SSO session decides whose tokens the login
     // captures; silently adopting a different identity would repoint every worktree
@@ -1658,7 +1658,7 @@ export class ClaudeAccountService {
         !wslInfo.linuxPath.includes('/.local/share/orca/claude-accounts/') ||
         !wslInfo.linuxPath.endsWith('/auth')
       ) {
-        throw new Error('Managed WSL Claude auth storage is outside Orca account storage.')
+        throw new Error('Managed WSL Claude auth storage is outside Orca Lab account storage.')
       }
       if (process.platform === 'win32') {
         try {
@@ -1692,7 +1692,7 @@ export class ClaudeAccountService {
           }
           return toWindowsWslPath(canonicalLinuxPath, wslInfo.distro)
         } catch (error) {
-          throw new Error('Managed WSL Claude auth storage is outside Orca account storage.', {
+          throw new Error('Managed WSL Claude auth storage is outside Orca Lab account storage.', {
             cause: error
           })
         }
@@ -1701,7 +1701,7 @@ export class ClaudeAccountService {
         !existsSync(candidatePath) ||
         !existsSync(join(candidatePath, '.orca-managed-claude-auth'))
       ) {
-        throw new Error('Managed Claude auth storage is not owned by Orca.')
+        throw new Error('Managed Claude auth storage is not owned by Orca Lab.')
       }
       return candidatePath
     }
@@ -1715,7 +1715,7 @@ export class ClaudeAccountService {
       adoptLegacyMarker: true
     })
     if (!trustedPath) {
-      throw new Error('Managed Claude auth storage is not owned by Orca.')
+      throw new Error('Managed Claude auth storage is not owned by Orca Lab.')
     }
     return trustedPath
   }

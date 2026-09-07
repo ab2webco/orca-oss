@@ -78,7 +78,7 @@ describe('readShellStartupEnvVar', () => {
   // pick up that export so the overlay mirrors the user's real config.
   // Scope: this intentionally covers direct static exports; sourced files,
   // conditionals, and full shell evaluation remain out of scope.
-  it('mirrors the user scenario: GUI-launched Orca discovers .zshrc-only export', () => {
+  it('mirrors the user scenario: GUI-launched Orca Lab discovers .zshrc-only export', () => {
     mockStartupFiles({
       '.zshrc': 'export OPENCODE_CONFIG_DIR="$HOME/.config/opencode"\n'
     })

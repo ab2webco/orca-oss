@@ -177,7 +177,7 @@ async function warnAliasConflict(accountIds: readonly string[]): Promise<void> {
       title: 'Claude account refresh paused',
       message: 'Some managed Claude accounts share one OAuth grant.',
       detail:
-        'Orca paused automatic refresh to protect active sessions. Re-authenticate one duplicate account in Settings to create an independent grant.'
+        'Orca Lab paused automatic refresh to protect active sessions. Re-authenticate one duplicate account in Settings to create an independent grant.'
     })
   } catch {
     // Headless runtimes retain the durable marker and diagnostic warning.

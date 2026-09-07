@@ -3657,7 +3657,7 @@ describe('registerPtyHandlers', () => {
       expect(env.TERM_PROGRAM_VERSION).toBe('0.0.0-dev')
     })
 
-    it('injects the selected Codex home into Orca terminal PTYs', async () => {
+    it('injects the selected Codex home into Orca Lab terminal PTYs', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
       expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
@@ -3919,7 +3919,7 @@ describe('registerPtyHandlers', () => {
       }
 
       posixOnlyIt(
-        'launches plain codex when a REAL rollout sits under a home Orca no longer trusts',
+        'launches plain codex when a REAL rollout sits under a home Orca Lab no longer trusts',
         async () => {
           // Why: the discriminating case — the rollout exists, so only the trust check can
           // reject it. Falling through would resume it under the selected account.
@@ -4204,7 +4204,7 @@ describe('registerPtyHandlers', () => {
       )
     })
 
-    it('injects the OpenCode hook env into Orca terminal PTYs', async () => {
+    it('injects the OpenCode hook env into Orca Lab terminal PTYs', async () => {
       // Why: clear any ambient OPENCODE_CONFIG_DIR so the mock's value is used
       const env = await spawnAndGetEnv(undefined, { OPENCODE_CONFIG_DIR: undefined })
       expect(openCodeBuildPtyEnvMock).toHaveBeenCalledTimes(1)
@@ -4216,7 +4216,7 @@ describe('registerPtyHandlers', () => {
       expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe(env.OPENCODE_CONFIG_DIR)
     })
 
-    it('mirrors the original OpenCode source dir when launched from an Orca overlay shell', async () => {
+    it('mirrors the original OpenCode source dir when launched from an Orca Lab overlay shell', async () => {
       const env = await spawnAndGetEnv({
         OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
         ORCA_OPENCODE_SOURCE_CONFIG_DIR: '/tmp/user-opencode-config'
@@ -4230,7 +4230,7 @@ describe('registerPtyHandlers', () => {
       expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBe('/tmp/user-opencode-config')
     })
 
-    it('does not treat inherited Orca OpenCode config as user config without a source dir', async () => {
+    it('does not treat inherited Orca Lab OpenCode config as user config without a source dir', async () => {
       const env = await spawnAndGetEnv({
         OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
         ORCA_OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay'
@@ -4242,7 +4242,7 @@ describe('registerPtyHandlers', () => {
       expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
     })
 
-    it('restores user OpenCode config when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user OpenCode config when agent status hooks are disabled in a nested Orca Lab shell', async () => {
       const env = await spawnAndGetEnv(
         {
           OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
@@ -4317,7 +4317,7 @@ describe('registerPtyHandlers', () => {
       expect(mimoCodeBuildPtyEnvMock).not.toHaveBeenCalled()
     })
 
-    it('restores user MiMo home when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user MiMo home when agent status hooks are disabled in a nested Orca Lab shell', async () => {
       const env = await spawnAndGetEnv(
         {
           MIMOCODE_HOME: '/tmp/parent-orca-mimocode-overlay',
@@ -4337,7 +4337,7 @@ describe('registerPtyHandlers', () => {
     })
 
     posixOnlyIt(
-      'reproduces issue #1534: GUI-launched Orca mirrors zshrc-only OpenCode config',
+      'reproduces issue #1534: GUI-launched Orca Lab mirrors zshrc-only OpenCode config',
       async () => {
         // Why: the reporter's app didn't inherit OPENCODE_CONFIG_DIR; their interactive zsh later exported a company config repo.
         readFileSyncMock.mockImplementation((path: string) => {
@@ -4369,7 +4369,7 @@ describe('registerPtyHandlers', () => {
       }
     )
 
-    it('installs Pi managed extensions without redirecting Orca terminal PTY homes', async () => {
+    it('installs Pi managed extensions without redirecting Orca Lab terminal PTY homes', async () => {
       const env = await spawnAndGetEnv(undefined, { PI_CODING_AGENT_DIR: '/tmp/user-pi-agent' })
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(
         expect.any(String),
@@ -4501,7 +4501,7 @@ describe('registerPtyHandlers', () => {
       expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
     })
 
-    it('mirrors the original Pi source dir when launched from an Orca overlay shell', async () => {
+    it('mirrors the original Pi source dir when launched from an Orca Lab overlay shell', async () => {
       const env = await spawnAndGetEnv({
         PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
         ORCA_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
@@ -4564,7 +4564,7 @@ describe('registerPtyHandlers', () => {
       expect(env.ORCA_OMP_STATUS_EXTENSION).toBeUndefined()
     })
 
-    it('restores user Pi config when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user Pi config when agent status hooks are disabled in a nested Orca Lab shell', async () => {
       const env = await spawnAndGetEnv(
         {
           PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
@@ -4622,7 +4622,7 @@ describe('registerPtyHandlers', () => {
       }
     )
 
-    it('injects the agent hook receiver env into Orca terminal PTYs', async () => {
+    it('injects the agent hook receiver env into Orca Lab terminal PTYs', async () => {
       const env = await spawnAndGetEnv()
       // Why: buildAgentHookEnv must run exactly once per local spawn (inside shared buildPtyHostEnv); the old ad-hoc double-call is gone.
       expect(buildAgentHookEnvMock).toHaveBeenCalledTimes(1)
@@ -4727,7 +4727,7 @@ describe('registerPtyHandlers', () => {
       expect(env.PATH).toContain(expectedAttributionShimDir())
     })
 
-    it('overrides ambient CODEX_HOME with the Orca-managed home for system default', async () => {
+    it('overrides ambient CODEX_HOME with the Orca Lab-managed home for system default', async () => {
       const env = await spawnAndGetEnv(
         undefined,
         { CODEX_HOME: '/tmp/system-codex-home' },
@@ -4879,7 +4879,7 @@ describe('registerPtyHandlers', () => {
       expect(env.CODEX_HOME).toBe('/tmp/system-codex-home')
     })
 
-    it('strips a nested-Orca override for system default when the real-home flag is ON', async () => {
+    it('strips a nested-Orca Lab override for system default when the real-home flag is ON', async () => {
       const env = await spawnAndGetEnv(
         { CODEX_HOME: '/managed/home', ORCA_CODEX_HOME: '/managed/home' },
         undefined,
@@ -5876,7 +5876,7 @@ describe('registerPtyHandlers', () => {
         }
       })
 
-      it('strips the daemon-inherited Orca-owned CODEX_HOME for real-home routing', async () => {
+      it('strips the daemon-inherited Orca Lab-owned CODEX_HOME for real-home routing', async () => {
         const spawnOptions = await daemonSpawnAndGetOptions(
           {},
           () => null,
@@ -13280,7 +13280,7 @@ describe('registerPtyHandlers', () => {
     expect(runtime.preAllocateHandleForPty).toHaveBeenCalledWith(expect.any(String))
   })
 
-  it('forwards the trusted Orca terminal handle into managed WSL terminals', async () => {
+  it('forwards the trusted Orca Lab terminal handle into managed WSL terminals', async () => {
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', {
       configurable: true,
@@ -21288,7 +21288,7 @@ describe('isClaudeLaunchCommand', () => {
     expect(isClaudeLaunchCommand('/usr/local/bin/claude --resume abc')).toBe(true)
   })
 
-  it('detects the Orca Agent Teams wrapper so per-worktree account pins apply', () => {
+  it('detects the Orca Lab Agent Teams wrapper so per-worktree account pins apply', () => {
     expect(isClaudeLaunchCommand('orca claude-teams')).toBe(true)
     expect(isClaudeLaunchCommand('orca-dev claude-teams --foo')).toBe(true)
     expect(isClaudeLaunchCommand('orca-ide claude-teams')).toBe(true)

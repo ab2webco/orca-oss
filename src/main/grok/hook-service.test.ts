@@ -335,7 +335,7 @@ describe('GrokHookService', () => {
     }
   })
 
-  it('preserves user-authored hook entries in the Orca Grok config file', () => {
+  it('preserves user-authored hook entries in the Orca Lab Grok config file', () => {
     const configPath = join(homeDir, '.grok', 'hooks', 'orca-status.json')
     mkdirSync(dirname(configPath), { recursive: true })
     writeFileSync(

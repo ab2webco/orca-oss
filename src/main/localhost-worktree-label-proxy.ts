@@ -125,7 +125,7 @@ export class LocalhostWorktreeLabelProxy {
     const route = this.routeForRequest(request)
     if (!route) {
       response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
-      response.end('Unknown Orca localhost label.')
+      response.end('Unknown Orca Lab localhost label.')
       return
     }
 

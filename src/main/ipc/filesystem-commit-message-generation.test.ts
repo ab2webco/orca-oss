@@ -174,7 +174,7 @@ describe('registerFilesystemHandlers', () => {
     )
   })
 
-  it('prepares the Orca-managed Codex home for the default system selection', async () => {
+  it('prepares the Orca Lab-managed Codex home for the default system selection', async () => {
     const context = {
       branch: 'feature/ai',
       stagedSummary: 'M\tREADME.md',

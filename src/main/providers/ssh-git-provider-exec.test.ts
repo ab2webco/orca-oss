@@ -65,7 +65,7 @@ describe('SshGitProvider', () => {
     await expect(
       provider.clone(['clone', '--progress', '--', 'url', 'repo'], '/home/user')
     ).rejects.toThrow(
-      'SSH clone support is unavailable on this relay. Reconnect the SSH target to update Orca on the host, then try again.'
+      'SSH clone support is unavailable on this relay. Reconnect the SSH target to update Orca Lab on the host, then try again.'
     )
   })
 

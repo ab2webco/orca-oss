@@ -181,7 +181,7 @@ if [[ -n "$real_command" && "$real_command" -ef "${SHELL_DOLLAR}{BASH_SOURCE[0]}
   real_command=""
 fi
 if [[ -z "$real_command" ]]; then
-  printf 'Orca compatibility wrapper could not locate %s on PATH.\n' "$command_name" >&2
+  printf 'Orca Lab compatibility wrapper could not locate %s on PATH.\n' "$command_name" >&2
   exit 127
 fi
 PATH="$cleaned_path" exec "$real_command" "$@"

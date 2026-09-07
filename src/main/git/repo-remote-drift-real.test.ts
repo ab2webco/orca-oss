@@ -21,7 +21,7 @@ describe('remote drift real Git contract', () => {
       execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' })
 
     git('init', '--quiet')
-    git('config', 'user.name', 'Orca Test')
+    git('config', 'user.name', 'Orca Lab Test')
     git('config', 'user.email', 'orca@example.test')
     git('config', 'commit.gpgSign', 'false')
     git('config', 'core.hooksPath', '.git/no-hooks')

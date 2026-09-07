@@ -248,7 +248,7 @@ const POSIX_GIT_WRAPPER = `${POSIX_COMMON}
 real_path="$(clean_path)"
 real_git="$(PATH="$real_path" command -v git || true)"
 if [[ -z "$real_git" ]]; then
-  echo "Orca attribution wrapper could not locate git on PATH." >&2
+  echo "Orca Lab attribution wrapper could not locate git on PATH." >&2
   exit 127
 fi
 
@@ -475,7 +475,7 @@ const POSIX_GH_WRAPPER = `${POSIX_COMMON}
 real_path="$(clean_path)"
 real_gh="$(PATH="$real_path" command -v gh || true)"
 if [[ -z "$real_gh" ]]; then
-  echo "Orca attribution wrapper could not locate gh on PATH." >&2
+  echo "Orca Lab attribution wrapper could not locate gh on PATH." >&2
   exit 127
 fi
 
@@ -655,7 +655,7 @@ exit /b %ERRORLEVEL%
 if defined ORCA_REAL_GIT (
   "%ORCA_REAL_GIT%" %*
 ) else (
-  echo Orca attribution wrapper could not locate git on PATH. 1>&2
+  echo Orca Lab attribution wrapper could not locate git on PATH. 1>&2
   exit /b 127
 )
 exit /b %ERRORLEVEL%
@@ -710,7 +710,7 @@ exit /b %ERRORLEVEL%
 if defined ORCA_REAL_GH (
   "%ORCA_REAL_GH%" %*
 ) else (
-  echo Orca attribution wrapper could not locate gh on PATH. 1>&2
+  echo Orca Lab attribution wrapper could not locate gh on PATH. 1>&2
   exit /b 127
 )
 exit /b %ERRORLEVEL%

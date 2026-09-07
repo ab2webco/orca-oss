@@ -216,7 +216,7 @@ describe('registerWorktreeHandlers', () => {
     expect(forceDeleteLocalBranchMock).not.toHaveBeenCalled()
   })
 
-  it('removes an unused Orca-created fork remote after deleting its worktree', async () => {
+  it('removes an unused Orca Lab-created fork remote after deleting its worktree', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
@@ -248,7 +248,7 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
-  it('keeps an Orca-created fork remote while another worktree still uses it', async () => {
+  it('keeps an Orca Lab-created fork remote while another worktree still uses it', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {

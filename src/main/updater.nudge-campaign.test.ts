@@ -102,7 +102,7 @@ describe('updater', () => {
     shouldApplyNudgeMock.mockReturnValue(true)
     fetchChangelogMock.mockResolvedValue({
       release: {
-        title: 'Orca 1.0.61',
+        title: 'Orca Lab 1.0.61',
         description: 'chore: bump deps · fix: a commit subject',
         releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
       },
@@ -144,7 +144,7 @@ describe('updater', () => {
     const mainWindow = { webContents: { send: sendMock } }
     const summary = {
       release: {
-        title: 'Orca 1.0.61',
+        title: 'Orca Lab 1.0.61',
         description: 'fix: a commit subject',
         releaseNotesUrl: 'https://github.com/ab2webco/orca-oss/releases/tag/v1.0.61'
       },

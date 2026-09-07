@@ -157,7 +157,7 @@ describe('windows mobile firewall', () => {
     }
   })
 
-  it('repairs only Orca mobile pairing on private networks after elevation', async () => {
+  it('repairs only Orca Lab mobile pairing on private networks after elevation', async () => {
     const runPowerShell = vi.fn().mockResolvedValue('{"launched":true,"exitCode":0}')
     await expect(repairWindowsMobileFirewall(6769, environment(runPowerShell))).resolves.toEqual({
       ok: true

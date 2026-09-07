@@ -2,7 +2,7 @@ import { getPowerShellOmpShellWrapper } from './pty/omp-shell-wrapper'
 import { getPowerShellCodexShellLaunchPreflight } from './pty/codex-shell-launch-preflight'
 export { encodePowerShellCommand } from '../shared/powershell-command-encoding'
 
-const POWERSHELL_OSC133_BOOTSTRAP = `# Orca OSC 133 shell integration for PowerShell.
+const POWERSHELL_OSC133_BOOTSTRAP = `# Orca Lab OSC 133 shell integration for PowerShell.
 # Profiles have already loaded normally by the time -EncodedCommand runs.
 # Restore managed ownership before the shell-integration compatibility guard.
 if ($env:ORCA_OPENCODE_CONFIG_DIR) { $env:OPENCODE_CONFIG_DIR = $env:ORCA_OPENCODE_CONFIG_DIR }

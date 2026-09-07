@@ -15,13 +15,13 @@ function buildBody(feedback: string): string {
     feedback.trim(),
     '',
     '---',
-    `Orca ${app.getVersion()} · ${process.platform} ${os.release()} · ${process.arch}`
+    `Orca Lab ${app.getVersion()} · ${process.platform} ${os.release()} · ${process.arch}`
   ].join('\n')
 }
 
 export function buildFeedbackIssueDraft(feedback: string): FeedbackIssueDraft {
   const body = buildBody(feedback)
-  const title = truncateIssueTitle(feedback.trim().split('\n')[0] ?? '', 'Orca feedback')
+  const title = truncateIssueTitle(feedback.trim().split('\n')[0] ?? '', 'Orca Lab feedback')
   return { ...buildForkIssueUrl(title, body), body }
 }
 

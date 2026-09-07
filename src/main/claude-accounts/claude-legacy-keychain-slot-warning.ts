@@ -47,7 +47,7 @@ export function noteLegacyClaudeKeychainSlotBlob(
   }
   warnedUnusableSlot = true
   console.warn(
-    '[claude-legacy-keychain] The machine-wide Claude Code-credentials item cannot refresh (no usable refresh token). Managed accounts are unaffected; one /login from a plain `claude` outside Orca restores it.'
+    '[claude-legacy-keychain] The machine-wide Claude Code-credentials item cannot refresh (no usable refresh token). Managed accounts are unaffected; one /login from a plain `claude` outside Orca Lab restores it.'
   )
   void showUnusableSlotDialog()
 }
@@ -64,7 +64,7 @@ async function showUnusableSlotDialog(): Promise<void> {
       ),
       detail: translateMain(
         'claudeAuth.legacySlotUnusable.detail',
-        'Your Orca-managed Claude accounts are unaffected. To restore the system-wide login, run claude outside Orca and complete /login once.'
+        'Your Orca Lab-managed Claude accounts are unaffected. To restore the system-wide login, run claude outside Orca Lab and complete /login once.'
       )
     })
   } catch {

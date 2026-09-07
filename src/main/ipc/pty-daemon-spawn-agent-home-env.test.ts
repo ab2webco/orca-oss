@@ -330,7 +330,7 @@ describe('registerPtyHandlers', () => {
           spy.mockRestore()
         }
       })
-      it('strips the daemon-inherited Orca-owned CODEX_HOME for real-home routing', async () => {
+      it('strips the daemon-inherited Orca Lab-owned CODEX_HOME for real-home routing', async () => {
         const spawnOptions = await daemonSpawnAndGetOptions(
           {},
           () => null,

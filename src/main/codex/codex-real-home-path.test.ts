@@ -26,7 +26,7 @@ afterEach(() => {
 })
 
 describe('hasCustomCodexHomeOverride', () => {
-  it('recognizes normalized aliases of Orca-owned CODEX_HOME', () => {
+  it('recognizes normalized aliases of Orca Lab-owned CODEX_HOME', () => {
     const managedHome = `${process.cwd()}${sep}codex-runtime-home${sep}home`
 
     expect(

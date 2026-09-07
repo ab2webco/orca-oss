@@ -147,7 +147,7 @@ describe('system SSH forward process', () => {
     )
   })
 
-  it('suppresses Orca mux flags for port forwards without disabling ssh_config muxing', () => {
+  it('suppresses Orca Lab mux flags for port forwards without disabling ssh_config muxing', () => {
     spawnMock.mockReturnValue(createFakeProcess())
 
     spawnSystemSshPortForward(createTarget(), 5173, '127.0.0.1', 3000, {

@@ -65,7 +65,7 @@ describe('mergeHooksIntoVaultSettings', () => {
     ])
   })
 
-  it('appends to an event array without clobbering existing (e.g. Orca) hooks', () => {
+  it('appends to an event array without clobbering existing (e.g. Orca Lab) hooks', () => {
     const existing = JSON.stringify({
       hooks: { Stop: [{ hooks: [{ type: 'command', command: '/orca/claude-hook.sh' }] }] }
     })

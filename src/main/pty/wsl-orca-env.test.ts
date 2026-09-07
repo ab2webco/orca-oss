@@ -10,7 +10,7 @@ import {
 } from './wsl-orca-env'
 
 describe('addOrcaWslInteropEnv', () => {
-  it('marks the Orca terminal handle for Windows to WSL env import', () => {
+  it('marks the Orca Lab terminal handle for Windows to WSL env import', () => {
     const env: Record<string, string> = { ORCA_TERMINAL_HANDLE: 'term_wsl' }
 
     addOrcaWslInteropEnv(env)

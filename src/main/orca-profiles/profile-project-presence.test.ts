@@ -84,10 +84,14 @@ describe('profile project presence', () => {
 
   it('finds matching projects in other profiles while excluding the active profile', async () => {
     writeProfileState('personal', [
-      makeRepo({ id: 'personal-repo', path: 'C:\\Code\\Orca', displayName: 'Personal Orca' })
+      makeRepo({
+        id: 'personal-repo',
+        path: 'C:\\Code\\Orca',
+        displayName: 'Personal Orca Lab'
+      })
     ])
     writeProfileState('work', [
-      makeRepo({ id: 'work-repo', path: 'C:\\Code\\Orca', displayName: 'Work Orca' })
+      makeRepo({ id: 'work-repo', path: 'C:\\Code\\Orca', displayName: 'Work Orca Lab' })
     ])
 
     const { findOrcaProfileProjectsByPath } = await loadPresenceModule()
@@ -106,20 +110,20 @@ describe('profile project presence', () => {
         profileName: 'Work',
         profileKind: 'local',
         repoId: 'work-repo',
-        repoName: 'Work Orca'
+        repoName: 'Work Orca Lab'
       }
     ])
   })
 
   it('keeps SSH projects separate from local projects with the same path', async () => {
     writeProfileState('personal', [
-      makeRepo({ id: 'local-repo', path: '/srv/orca', displayName: 'Local Orca' })
+      makeRepo({ id: 'local-repo', path: '/srv/orca', displayName: 'Local Orca Lab' })
     ])
     writeProfileState('work', [
       makeRepo({
         id: 'ssh-repo',
         path: '/srv/orca',
-        displayName: 'SSH Orca',
+        displayName: 'SSH Orca Lab',
         connectionId: 'builder',
         executionHostId: 'ssh:builder'
       })
@@ -139,7 +143,7 @@ describe('profile project presence', () => {
       expect.objectContaining({
         profileId: 'work',
         repoId: 'ssh-repo',
-        repoName: 'SSH Orca'
+        repoName: 'SSH Orca Lab'
       })
     ])
   })

@@ -22,7 +22,7 @@ function decodePowerShellCommand(command: string): string {
   return Buffer.from(encoded, 'base64').toString('utf16le')
 }
 
-describe('SSH remote Orca CLI launcher', () => {
+describe('SSH remote Orca Lab CLI launcher', () => {
   function windowsInstallPlan(): ReturnType<typeof createRemoteCliInstallPlan> {
     return createRemoteCliInstallPlan({
       binDir: 'C:/Users/me user/.orca-relay/bin',
@@ -68,7 +68,7 @@ describe('SSH remote Orca CLI launcher', () => {
     // Why: a host missing csc.exe or failing the compile must keep its existing
     // CLI, so every fail-closed guard precedes the legacy %* shim removal.
     const guards = [
-      "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the Orca SSH CLI launcher.'; exit 1 }",
+      "if (-not $compiler) { Write-Error 'Unable to find the .NET Framework C# compiler required for the Orca Lab SSH CLI launcher.'; exit 1 }",
       'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
       "if (-not (Test-Path -LiteralPath 'C:/Users/me user/.orca-relay/bin/orca.exe' -PathType Leaf))"
     ]

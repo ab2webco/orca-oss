@@ -2,7 +2,7 @@ export function computerProviderUnavailableMessage(platform: NodeJS.Platform): s
   if (platform === 'darwin') {
     return [
       'computer-use has no native provider for darwin because Orca Computer Use.app was not found or this macOS version is unsupported.',
-      'For local development, run pnpm build:computer-macos and restart Orca from this worktree.'
+      'For local development, run pnpm build:computer-macos and restart Orca Lab from this worktree.'
     ].join(' ')
   }
   if (platform === 'linux' || platform === 'win32') {
