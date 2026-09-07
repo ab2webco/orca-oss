@@ -6,6 +6,7 @@ import type {
   AgentType
 } from './agent-status-types'
 import type { AgentSessionLogReading } from './agent-session-log-state'
+import type { TerminalUnsubmittedInput } from './terminal-unsubmitted-input'
 import type { ComposerReadyState } from './composer-ready-observation'
 import type {
   BrowserCertificateFailure,
@@ -666,6 +667,12 @@ export type RuntimeTerminalAgentSessionState = {
   agent: AgentType | null
   sessionId: string | null
   session: AgentSessionLogReading
+  /** Input this runtime wrote that the agent never took — the difference
+   *  between a pane holding an unsent prompt and one whose agent is working
+   *  (ORCA-457). Optional: hosts that predate it omit it, and every reader must
+   *  treat absence as "cannot tell" (docs/reference/remote-wire-compatibility.md
+   *  rule 1). */
+  unsubmittedInput?: TerminalUnsubmittedInput
 }
 
 export type RuntimeTerminalAgentStatus = {

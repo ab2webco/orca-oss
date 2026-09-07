@@ -1,5 +1,10 @@
 import type { AgentSessionLogUnreadReason } from '../shared/agent-session-log-state'
 import type {
+  TerminalUnsubmittedInput,
+  TerminalUnsubmittedInputEvidence,
+  TerminalUnsubmittedInputUnobservedReason
+} from '../shared/terminal-unsubmitted-input'
+import type {
   RuntimeTerminalAgentSessionState,
   RuntimeTerminalClose,
   RuntimeTerminalCreate,
@@ -245,14 +250,21 @@ const AGENT_SESSION_UNREAD_TEXT: Record<AgentSessionLogUnreadReason, string> = {
 export function formatTerminalAgentSessionState(result: {
   agentSession: RuntimeTerminalAgentSessionState
 }): string {
-  const { handle, agent, sessionId, session } = result.agentSession
+  const { handle, agent, sessionId, session, unsubmittedInput } = result.agentSession
   const identity = [
     `handle: ${handle}`,
     `agent: ${agent ?? 'unknown'}`,
     `session: ${sessionId ?? 'unknown'}`
   ]
+  // Why on both branches: an unreadable session log is exactly when a stuck
+  // composer is hardest to see, so this line must not be the one that drops out.
+  const unsubmitted = formatUnsubmittedInput(unsubmittedInput)
   if (!session.read) {
-    return [...identity, `state: unknown — ${AGENT_SESSION_UNREAD_TEXT[session.reason]}`].join('\n')
+    return [
+      ...identity,
+      `state: unknown — ${AGENT_SESSION_UNREAD_TEXT[session.reason]}`,
+      unsubmitted
+    ].join('\n')
   }
   const lastTurn =
     session.lastTurnAtMs === null
@@ -266,8 +278,37 @@ export function formatTerminalAgentSessionState(result: {
     `state: ${session.state}`,
     lastTurn,
     queued,
+    unsubmitted,
     ...(session.unparsedRecords > 0
       ? [`warning: ${session.unparsedRecords} session-log records could not be parsed`]
       : [])
   ].join('\n')
+}
+
+const UNSUBMITTED_INPUT_TEXT: Record<TerminalUnsubmittedInputEvidence, string> = {
+  'text-without-submit': 'text was written and never submitted',
+  'submit-without-turn': 'submitted, but the agent never started a turn'
+}
+
+const UNSUBMITTED_INPUT_UNOBSERVED_TEXT: Record<TerminalUnsubmittedInputUnobservedReason, string> =
+  {
+    'pty-not-watched': 'this runtime never watched this terminal from spawn',
+    'pty-gone': 'the handle resolves to no live terminal'
+  }
+
+/** Why it prints even when nothing is pending: "nothing unsent" is the answer a
+ *  coordinator acts on, and a line that appears only on trouble teaches readers
+ *  that its absence means healthy — which is what an older host also looks like. */
+function formatUnsubmittedInput(input: TerminalUnsubmittedInput | undefined): string {
+  if (input === undefined) {
+    return 'unsubmitted input: unobservable — this host does not report it'
+  }
+  if (!input.observed) {
+    return `unsubmitted input: unobservable — ${UNSUBMITTED_INPUT_UNOBSERVED_TEXT[input.reason]}`
+  }
+  if (input.pending === null) {
+    return 'unsubmitted input: none'
+  }
+  const since = new Date(input.pending.sinceMs).toISOString()
+  return `unsubmitted input: ${UNSUBMITTED_INPUT_TEXT[input.pending.evidence]} (since ${since})`
 }
