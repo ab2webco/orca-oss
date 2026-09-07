@@ -24,9 +24,6 @@ const SHIPPED_ICON_PNGS = [
   'resources/build/icon.png',
   'resources/icon.png',
   'resources/icon-dev.png',
-  // The two icons the user can pick in Settings, each also the macOS dock icon.
-  'resources/app-icons/orca-blue.png',
-  'resources/app-icons/orca-watercolor.png',
   'mobile/assets/icon.png',
   'mobile/assets/adaptive-icon.png',
   'mobile/assets/splash-icon.png',
@@ -36,6 +33,17 @@ const SHIPPED_ICON_PNGS = [
 // The macOS menu bar item. Excluded from the orange check on purpose: a Template
 // image is black plus alpha, and macOS recolours it — colour here would ship a
 // wrongly painted tray icon (ORCA-438).
+// The alternate colourways the user can pick in Settings, each also the macOS dock
+// icon. Deliberately outside the orange check: monochrome and violet carry no brand
+// orange by design. What must hold is the ground — an orca shipped on its old blue,
+// or a stale regenerate, fails this (ORCA-438).
+const COLOURWAY_GROUNDS = [
+  // Neutral: the ground has no hue at all, so a coloured orca on blue fails here.
+  { relative: 'resources/app-icons/orca-watercolor.png', character: 'neutral' },
+  // Violet: blue leads, red follows, green trails, with real chroma.
+  { relative: 'resources/app-icons/orca-blue.png', character: 'violet' }
+]
+
 const TEMPLATE_ICON_PNGS = [
   'resources/tray/orca-menu-barTemplate.png',
   'resources/tray/orca-menu-barTemplate@2x.png'
@@ -202,6 +210,26 @@ describe('ORCA-434 Ab2Web symbol replaces the orca', () => {
     const source = readText(path.join(REPO_ROOT, ICON_SOURCE_SVG))
     expect(source).toContain(AB2WEB_ICON_VIEWBOX)
     expect(source).toContain(AB2WEB_ORANGE)
+  })
+
+  it('keeps each alternate colourway on its declared ground', () => {
+    for (const { relative, character } of COLOURWAY_GROUNDS) {
+      const { width, height, data } = decodePng(fs.readFileSync(path.join(REPO_ROOT, relative)))
+      // Well inside the squircle and clear of the symbol, and it must be opaque:
+      // a transparent sample reads as black and would pass any dark ground.
+      const index = (Math.round(height * 0.25) * width + Math.round(width * 0.25)) * 4
+      const [r, g, b, alpha] = [data[index], data[index + 1], data[index + 2], data[index + 3]]
+      const where = `${relative} ${r},${g},${b} a${alpha}`
+      expect(alpha, where).toBeGreaterThan(200)
+      expect(width, relative).toBe(1024)
+      if (character === 'neutral') {
+        expect(Math.max(r, g, b) - Math.min(r, g, b), where).toBeLessThan(12)
+      } else {
+        expect(b - r, where).toBeGreaterThan(4)
+        expect(r - g, where).toBeGreaterThan(2)
+        expect(Math.max(r, g, b) - Math.min(r, g, b), where).toBeGreaterThan(8)
+      }
+    }
   })
 
   it('keeps the menu bar icon a monochrome template with real coverage', () => {
