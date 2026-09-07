@@ -104,14 +104,22 @@ describe('what the tracker reports and why', () => {
     })
   })
 
-  it('starts a fresh scan per submit so an older turn cannot clear a newer one', () => {
+  it('starts a fresh scan per submit, so bytes from before it cannot clear it', () => {
     const tracker = new TerminalUnsubmittedInputTracker()
     tracker.beginObserving(STUCK)
-    tracker.recordWrite(STUCK, { hasText: true, submitted: true, atMs: 1 })
-    tracker.observe(STUCK, INTERRUPT_AFFORDANCE)
-    expect(tracker.read(STUCK)).toEqual({ observed: true, pending: null })
 
+    // A partial affordance arrives under the first submit — not acceptance yet.
+    tracker.recordWrite(STUCK, { hasText: true, submitted: true, atMs: 1 })
+    tracker.observe(STUCK, INTERRUPT_AFFORDANCE.slice(0, 8))
+    expect(tracker.read(STUCK)).toEqual({
+      observed: true,
+      pending: { evidence: 'submit-without-turn', sinceMs: 1 }
+    })
+
+    // The second submit must not inherit that half-match: joined across the two,
+    // the tail alone would complete the phrase and clear a turn that never began.
     tracker.recordWrite(STUCK, { hasText: true, submitted: true, atMs: 2 })
+    tracker.observe(STUCK, INTERRUPT_AFFORDANCE.slice(8))
 
     expect(tracker.read(STUCK)).toEqual({
       observed: true,
