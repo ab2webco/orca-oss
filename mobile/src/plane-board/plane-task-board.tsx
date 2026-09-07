@@ -1,6 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
-import { Plus } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
@@ -8,8 +7,12 @@ import { PLANE_PRIORITY_LABELS } from '../tasks/plane-priority-label'
 import { ProviderTaskBoard } from '../tasks/provider-task-board'
 import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { formatUpdatedAt } from '../tasks/task-updated-at-time'
-import { PlaneBoardCreateDrawer } from './plane-board-create-drawer'
-import { planeBoardSections, planeStateGroupColor } from './plane-board-sections'
+import { PlaneBoardColumnComposer } from './plane-board-column-composer'
+import {
+  planeBoardColumnStateId,
+  planeBoardSections,
+  planeStateGroupColor
+} from './plane-board-sections'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 import type { PlaneBoard } from './use-plane-board'
 
@@ -53,8 +56,6 @@ export function PlaneTaskBoard({
   onClearFilter,
   bottomInset
 }: Props) {
-  const [showCreate, setShowCreate] = useState(false)
-
   const onEmptyAction = useCallback(() => {
     const action = board.emptyState?.action
     if (action === 'pick-project') {
@@ -65,11 +66,6 @@ export function PlaneTaskBoard({
       board.refresh()
     }
   }, [board, onClearFilter, onPickProject])
-
-  const closeCreate = useCallback(() => {
-    setShowCreate(false)
-    board.dismissCreateError()
-  }, [board])
 
   if (board.status === 'loading') {
     return (
@@ -155,35 +151,30 @@ export function PlaneTaskBoard({
                 onDismiss={board.dismissEditError}
               />
             ) : null}
+            {board.create.error ? (
+              <PlaneBoardWriteErrorRow
+                message={`Could not add the card — ${board.create.error}`}
+                // The composer keeps the title for a retry; resending blind could make the card twice.
+                onRetry={null}
+                onDismiss={board.dismissCreateError}
+              />
+            ) : null}
           </>
         }
-        createDrawerSlot={
-          board.canCreate ? (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Add card"
-                style={styles.addButton}
-                disabled={board.activeColumn === null}
-                onPress={() => setShowCreate(true)}
-              >
-                <Plus
-                  size={14}
-                  color={board.activeColumn ? colors.textPrimary : colors.textMuted}
-                />
-                <Text style={styles.addText}>Add card</Text>
-              </Pressable>
-              <PlaneBoardCreateDrawer
-                visible={showCreate}
-                columnName={board.activeColumn?.name ?? null}
-                pending={board.create.pending}
-                error={board.create.error}
-                onSubmit={board.createCard}
-                onClose={closeCreate}
-              />
-            </>
-          ) : undefined
-        }
+        renderColumnFooterSlot={(section) => {
+          // No stateId means the column is a priority or an assignee, not a state: there is
+          // nothing for Plane to create into (ORCA-422).
+          const stateId = planeBoardColumnStateId(section, groupBy)
+          if (!board.canCreate || stateId === null) {
+            return null
+          }
+          return (
+            <PlaneBoardColumnComposer
+              columnName={section.label}
+              onCreate={(title) => board.createCard(title, stateId)}
+            />
+          )
+        }}
       />
     </View>
   )
@@ -222,17 +213,5 @@ const styles = StyleSheet.create({
     borderRadius: radii.button,
     backgroundColor: colors.bgRaised
   },
-  emptyButtonText: { fontSize: typography.bodySize, color: colors.textPrimary },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing.sm,
-    marginHorizontal: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.button,
-    backgroundColor: colors.bgPanel
-  },
-  addText: { fontSize: typography.metaSize, color: colors.textSecondary }
+  emptyButtonText: { fontSize: typography.bodySize, color: colors.textPrimary }
 })
