@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Orca Lab</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#FAF9F7;color:#040404;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+main{max-width:44rem;margin:0 auto;padding:3rem 1.4rem 5rem;background:#fff;border-left:1px solid #E7E4E0;border-right:1px solid #E7E4E0;min-height:100vh}
+h1{font-size:1.9rem;line-height:1.2;margin:0 0 1.6rem;letter-spacing:-.01em}
+h2{font-size:1.15rem;margin:2.6rem 0 .7rem;padding-top:1.3rem;border-top:1px solid #E7E4E0}
+h3{font-size:1rem;margin:1.8rem 0 .5rem;color:#3D3B39}
+p{margin:0 0 1rem}
+ul{margin:0 0 1rem;padding-left:1.2rem}
+li{margin:.4rem 0}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.86em;background:#FAF9F7;border:1px solid #E7E4E0;border-radius:2px;padding:.06em .34em}
+strong{font-weight:700}
+.nota{background:#FFF3E6;border-left:2px solid #FF8300;padding:.8rem 1rem;font-size:.92rem;margin:0 0 1.4rem}
+.scroll{overflow-x:auto;margin:0 0 1.3rem}
+table{border-collapse:collapse;width:100%;font-size:.92rem;min-width:30rem}
+th,td{text-align:left;padding:.6rem .9rem .6rem 0;border-bottom:1px solid #E7E4E0;vertical-align:top}
+thead th{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:#6B6B6B;border-bottom:1px solid #040404}
+@media(max-width:640px){main{padding:2rem 1rem 4rem;border:0}h1{font-size:1.55rem}}
+</style>
+</head>
+<body>
+<main>
+<h1>Privacy Policy — Orca Lab (mobile)</h1>
+<p><strong>Last updated:</strong> 6 September 2026 <strong>Applies to:</strong> the Orca Lab mobile app for iOS and Android (<code>com.ab2web.orca.mobile</code>), published by Ab2Web.</p>
+<h2>1. What this app is</h2>
+<p>Orca Lab is a companion app. It does not work on its own: it connects to <strong>Orca running on your own computer</strong>, and every action you take on the phone is executed by that computer. Your repositories, your files, your terminals and your agent credentials stay on the machine you control. Ab2Web operates no server that stores them, because no copy of them is ever sent to us.</p>
+<p>That is the most important fact in this policy: <strong>there is no Ab2Web database of your work.</strong></p>
+<h2>2. Permissions the app asks for, and why</h2>
+<div class="scroll"><table><thead><tr><th>Permission</th><th>Why</th><th>When</th></tr></thead><tbody>
+<tr><td>Camera</td><td>Read the pairing QR code shown by Orca on your computer</td><td>Only on the pairing screen</td></tr>
+<tr><td>Photo library</td><td>Attach an image to a message you send to an agent</td><td>Only when you pick an image</td></tr>
+<tr><td>Microphone</td><td>Dictate text instead of typing</td><td>Only while you hold the dictation control</td></tr>
+<tr><td>Local network (iOS)</td><td>Reach your computer directly on the same network</td><td>Only while connecting</td></tr>
+</tbody></table></div>
+<p>Declining any of them leaves the rest of the app working. You can paste a pairing code instead of scanning it.</p>
+<h2>3. What the app stores on your phone</h2>
+<ul>
+<li><strong>Pairing credentials</strong> for each computer you pair — a device token and that computer&#x27;s public</li>
+<p>  key, held in the operating system keychain.</p>
+<li><strong>Your view preferences</strong> — filters, grouping, the last workspace you opened.</li>
+<li><strong>A short local cache</strong> of what the connected computer sent, so screens are not blank while</li>
+<p>  reconnecting.</p>
+</ul>
+<p>All of it stays on the device. Removing a paired computer in the app deletes its credential. Uninstalling the app removes everything.</p>
+<h2>4. What leaves your phone, and who can read it</h2>
+<p>Stated per destination, because the answers differ.</p>
+<h3>4.1 To your own computer — everything you do</h3>
+<p>Every command, keystroke and file you read travels between the phone and your computer. When the connection goes through Orca Relay (below), the payloads are <strong>sealed end to end</strong>: encrypted with a key the phone and your computer agree on directly, using the public key printed in the pairing QR code. Nobody in between holds that key — not Ab2Web, and not the relay operator.</p>
+<h3>4.2 To Orca Relay — optional, and it cannot read your work</h3>
+<p>If your phone cannot reach your computer directly, Orca can route the connection through a relay. The relay forwards <strong>encrypted bytes it cannot open</strong>. It does see the metadata it needs in order to route: which computer you are reaching, which relay location, when, and how much traffic.</p>
+<p>You can avoid the relay entirely by pairing over your own network — a LAN, or a private network such as Tailscale. That path needs no account and no server operated by anyone else.</p>
+<p><strong>The relay is operated by Stably, the upstream author of Orca, not by Ab2Web.</strong> Orca Lab is a fork of their open-source app and reuses their relay service.</p>
+<h3>4.3 To Orca Cloud sign-in — optional</h3>
+<p>Signing in to an Orca account is required only to use the relay or to publish an artifact. The sign-in happens in your own browser, against a service that sees your identity — your email and name. <strong>That identity provider is also operated by Stably, not by Ab2Web.</strong></p>
+<h3>4.4 To artifact sharing — off by default, and it sends file contents</h3>
+<p>If you enable artifact sharing and publish a file, <strong>the contents of that file are uploaded in readable form</strong> to a hosting service, and the resulting link is viewable by anyone who holds it.</p>
+<p>This is off by default and nothing is uploaded until you explicitly publish. <strong>That hosting service is operated by Stably, not by Ab2Web.</strong> Do not publish anything you would not put on a public web page.</p>
+<h2>5. What the app never does</h2>
+<ul>
+<li><strong>No analytics.</strong> No usage tracking, no event collection, no session recording. There is no</li>
+<p>  analytics SDK in the app.</p>
+<li><strong>No crash reporting service.</strong> No third-party crash or performance SDK.</li>
+<li><strong>No push notifications.</strong> Notifications are generated locally on your device from data your own</li>
+<p>  computer sent. There is no push token and no notification server.</p>
+<li><strong>No advertising identifiers</strong>, no ad networks, no profiling.</li>
+<li><strong>No selling or sharing of personal data</strong>, under any definition, to anyone.</li>
+</ul>
+<h2>6. Third parties, named</h2>
+<div class="scroll"><table><thead><tr><th>Service</th><th>Operated by</th><th>What it can see</th><th>Avoidable</th></tr></thead><tbody>
+<tr><td>Orca Relay</td><td>Stably (upstream)</td><td>Encrypted traffic plus routing metadata</td><td>Yes — pair over your own network</td></tr>
+<tr><td>Orca Cloud sign-in</td><td>Stably (upstream)</td><td>Your account identity</td><td>Yes — not needed for local pairing</td></tr>
+<tr><td>Artifact hosting</td><td>Stably (upstream)</td><td>The contents of files you choose to publish</td><td>Yes — off by default</td></tr>
+<tr><td>App Store / Google Play</td><td>Apple, Google</td><td>The install and crash data they collect as platforms</td><td>No — inherent to app distribution</td></tr>
+</tbody></table></div>
+<p>Ab2Web operates none of the first three today. If that changes, this policy will be updated before the change ships.</p>
+<h2>7. Retention</h2>
+<p>Ab2Web holds no personal data about you, so there is nothing for us to retain or delete. Data on your phone is under your control and is removed when you unpair a computer or uninstall the app. For the third-party services above, their own retention terms apply.</p>
+<h2>8. Children</h2>
+<p>Orca Lab is a developer tool and is not directed at children under 13. We do not knowingly collect data from children.</p>
+<h2>9. Your rights</h2>
+<p>Because Ab2Web stores no personal data about you, a request to access, correct, export or delete such data has nothing to act on — and we will say so plainly rather than pretend otherwise. For data held by the third parties named in section 6, direct the request to their operator.</p>
+<p>If you believe this policy is inaccurate about what the app does, write to us. The app is open source and can be read.</p>
+<h2>10. Changes</h2>
+<p>We will update this page when the app&#x27;s data handling changes, and change the date at the top. The version that applies is the one published on this page at the time you use the app.</p>
+<h2>11. Contact</h2>
+<p><a href="mailto:fabian@ab2web.com">fabian@ab2web.com</a></p>
+<p>Ab2Web — Barranquilla, Colombia</p>
+</main>
+</body>
+</html>
