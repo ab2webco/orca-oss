@@ -157,7 +157,7 @@ export function getClaudeStatusLineOwnershipHomeBody(): string {
 export function getClaudeStatusLineOwnershipVaultBody(count: number): string {
   return translate(
     'auto.components.settings.claude-statusline-items-copy.ownershipVaultBody',
-    '{{value0}} account vault(s) still carry a copy of your custom statusLine, which blocks Orca’s status line in terminals pinned to those accounts.',
+    '{{value0}} account vault(s) still carry a copy of your custom statusLine, which blocks Orca Lab’s status line in terminals pinned to those accounts.',
     { value0: String(count) }
   )
 }
@@ -165,7 +165,7 @@ export function getClaudeStatusLineOwnershipVaultBody(count: number): string {
 export function getClaudeStatusLineOwnershipAction(): string {
   return translate(
     'auto.components.settings.claude-statusline-items-copy.ownershipAction',
-    'Use Orca’s status line'
+    'Use Orca Lab’s status line'
   )
 }
 
@@ -179,7 +179,7 @@ export function getClaudeStatusLineOwnershipDialogTitle(): string {
 export function getClaudeStatusLineOwnershipDialogBody(): string {
   return translate(
     'auto.components.settings.claude-statusline-items-copy.ownershipDialogBody',
-    'Orca removes your statusLine command and installs its managed status line in every location listed below. Everything else in those files is preserved.'
+    'Orca Lab removes your statusLine command and installs its managed status line in every location listed below. Everything else in those files is preserved.'
   )
 }
 

@@ -70,7 +70,7 @@ export const getWebRuntimeEnvironmentsSearchEntry = createLocalizedCatalog(
     ),
     description: translate(
       'auto.components.settings.runtime.environments.search.baec27aa8f',
-      'Connect this browser to a saved Orca server.'
+      'Connect this browser to a saved Orca Lab server.'
     ),
     keywords: [
       ...translateSearchKeyword(
