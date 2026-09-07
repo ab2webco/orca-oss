@@ -26,14 +26,19 @@ const PRESET_KEYS = {
 }
 
 describe('the Plane filter labels desktop ships', () => {
-  const byKey = new Map(collectFallbacks(ROOT).map((call) => [call.key, call.fallback]))
+  // Every call, not the last one: `all` and `done` share their keys with the Jira
+  // presets, so a rename there moves Plane's label too and must land here.
+  const fallbacks = collectFallbacks(ROOT)
   const catalogValue = readCatalog(ROOT)
 
   for (const [id, key] of Object.entries(PRESET_KEYS)) {
     it(`names '${id}' the way both clients name it, in source and in the catalog`, () => {
       const expected = PLANE_WORK_ITEM_FILTER_LABELS[id]
 
-      expect(byKey.get(key), `${key} is no longer a literal translate() fallback`).toBe(expected)
+      const literals = fallbacks.filter((call) => call.key === key).map((call) => call.fallback)
+
+      expect(literals, `${key} is no longer a literal translate() fallback`).not.toHaveLength(0)
+      expect(new Set(literals)).toEqual(new Set([expected]))
       expect(catalogValue(key)).toBe(expected)
     })
   }

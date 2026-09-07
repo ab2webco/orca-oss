@@ -9775,7 +9775,7 @@ export default function MobileTasksScreen() {
         copied={planeDetailItem != null && copiedLinkKey === `task:${planeDetailItem.key}`}
         onPickProject={() => setShowPlaneProjectPicker(true)}
         onClearFilter={() => {
-          setPlaneFilter('all')
+          setPlaneFilter(DEFAULT_PLANE_WORK_ITEM_FILTER)
           setQuery('')
           setAppliedQuery('')
         }}
