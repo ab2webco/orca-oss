@@ -129,7 +129,7 @@ describe('loadLocalBuildCandidate', () => {
 
   // The zip's root entry is `<productName>.app`, so a build published before the
   // Orca Lab rename and one published after must both stay readable.
-  it.runIf(process.platform === 'darwin').each(['Orca.app', 'Orca.app'])(
+  it.runIf(process.platform === 'darwin').each(['Orca.app', 'Orca Lab.app'])(
     'reads signed compatibility metadata from a %s bundle through the held descriptor',
     async (bundleName) => {
       const directory = await mkdtemp(join(tmpdir(), 'orca-local-build-zip-'))

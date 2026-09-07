@@ -322,6 +322,17 @@ module.exports = {
     entitlements: 'resources/build/entitlements.mac.plist',
     entitlementsInherit: 'resources/build/entitlements.mac.plist',
     extendInfo: {
+      // Why estas dos y no productName solo: electron-builder escribe productName
+      // en CFBundleName Y en CFBundleDisplayName, y app.getName() en empaquetado
+      // lee CFBundleName. De ahi salen la carpeta de userData y el item de llavero
+      // '<nombre> Safe Storage'. Renombrar productName movia las dos, y app.setName()
+      // no lo evita: corre en whenReady, despues de que Electron los resolvio.
+      // Medido: el llavero tiene 'Orca Safe Storage' y NO 'Orca Dev Safe Storage',
+      // aunque setName('Orca Dev') corre en cada arranque de dev desde #9400.
+      // CFBundleName es la identidad y no se mueve; CFBundleDisplayName es lo que
+      // el usuario lee. ORCA-441.
+      CFBundleName: 'Orca',
+      CFBundleDisplayName: 'Orca Lab',
       NSAppleEventsUsageDescription:
         'Orca allows terminal-launched developer tools to automate local apps when you request it.',
       NSBluetoothAlwaysUsageDescription:
