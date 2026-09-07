@@ -55,6 +55,16 @@ import { PlaneSourceSegmentRow } from '../../../src/plane-board/plane-source-seg
 import { resolvePlaneTasksChrome } from '../../../src/plane-board/plane-tasks-chrome-visibility'
 import { PlaneTasksSurface } from '../../../src/plane-board/plane-tasks-surface'
 import {
+  DEFAULT_LINEAR_TASK_DISPLAY_PROPERTIES,
+  DEFAULT_PLANE_TASK_DISPLAY_PROPERTIES,
+  LINEAR_TASK_DISPLAY_OPTIONS,
+  toggleTaskDisplayProperty,
+  type LinearTaskDisplayProperty,
+  type PlaneTaskDisplayProperty
+} from '../../../src/tasks/provider-task-display-properties'
+import { ProviderTaskDisplaySheet } from '../../../src/tasks/provider-task-display-sheet'
+import { planeWorkItemDisplayFacts } from '../../../src/tasks/plane-work-item-display-facts'
+import {
   PROVIDER_TASK_GROUP_OPTIONS as LINEAR_GROUP_OPTIONS,
   PROVIDER_TASK_ORDER_OPTIONS as LINEAR_ORDER_OPTIONS,
   type PlaneTaskGroupBy
@@ -471,7 +481,6 @@ type GitLabView = 'project' | 'todos'
 type GitLabFilter = 'opened' | 'merged' | 'closed' | 'all'
 type LinearFilter = 'assigned' | 'created' | 'all' | 'completed'
 type LinearViewMode = 'list' | 'board'
-type LinearDisplayProperty = 'state' | 'priority' | 'assignee' | 'team' | 'labels' | 'updated'
 type TaskSort = 'updated' | 'repository'
 type DetailCommentGroup =
   | { kind: 'standalone'; comment: DetailComment }
@@ -790,24 +799,6 @@ const COMMENT_REACTION_EMOJI: Record<
   rocket: 'rocket',
   eyes: 'eyes'
 }
-
-const LINEAR_DISPLAY_OPTIONS: PickerOption<LinearDisplayProperty>[] = [
-  { value: 'state', label: 'Status' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'assignee', label: 'Assignee' },
-  { value: 'team', label: 'Team' },
-  { value: 'labels', label: 'Labels' },
-  { value: 'updated', label: 'Updated' }
-]
-
-const DEFAULT_LINEAR_DISPLAY_PROPERTIES: LinearDisplayProperty[] = [
-  'state',
-  'priority',
-  'assignee',
-  'team',
-  'labels',
-  'updated'
-]
 
 const GITHUB_KIND_OPTIONS: PickerOption<GitHubMode>[] = [
   { value: 'issues', label: 'Issues', subtitle: 'GitHub issues' },
@@ -1254,7 +1245,7 @@ function issueSourceSlug(source: GitHubOwnerRepo | null | undefined): string {
 
 function linearIssueSecondaryParts(
   issue: LinearIssue,
-  displayProperties: ReadonlySet<LinearDisplayProperty>
+  displayProperties: ReadonlySet<LinearTaskDisplayProperty>
 ): string[] {
   const parts = [issue.identifier]
   if (displayProperties.has('priority')) {
@@ -1835,8 +1826,8 @@ export default function MobileTasksScreen() {
   const [linearGroupBy, setLinearGroupBy] = useState<LinearGroupBy>('none')
   const [linearOrderBy, setLinearOrderBy] = useState<LinearOrderBy>('priority')
   const [linearDisplayProperties, setLinearDisplayProperties] = useState<
-    ReadonlySet<LinearDisplayProperty>
-  >(() => new Set(DEFAULT_LINEAR_DISPLAY_PROPERTIES))
+    ReadonlySet<LinearTaskDisplayProperty>
+  >(() => new Set(DEFAULT_LINEAR_TASK_DISPLAY_PROPERTIES))
   const [linearTeamPropertyTouched, setLinearTeamPropertyTouched] = useState(false)
   const [linearWorkspaces, setLinearWorkspaces] = useState<LinearWorkspace[]>([])
   const [selectedLinearWorkspaceId, setSelectedLinearWorkspaceId] = useState<string | 'all' | null>(
@@ -1852,6 +1843,9 @@ export default function MobileTasksScreen() {
   const [showPlaneViewPicker, setShowPlaneViewPicker] = useState(false)
   const [planeGroupBy, setPlaneGroupBy] = useState<PlaneTaskGroupBy>('none')
   const [planeOrderBy, setPlaneOrderBy] = useState<ProviderTaskOrderBy>('priority')
+  const [planeDisplayProperties, setPlaneDisplayProperties] = useState<
+    ReadonlySet<PlaneTaskDisplayProperty>
+  >(() => new Set(DEFAULT_PLANE_TASK_DISPLAY_PROPERTIES))
   const [showLinearGroupPicker, setShowLinearGroupPicker] = useState(false)
   const [showLinearOrderPicker, setShowLinearOrderPicker] = useState(false)
   const [showLinearDisplayPicker, setShowLinearDisplayPicker] = useState(false)
@@ -9016,6 +9010,10 @@ export default function MobileTasksScreen() {
               orderBy={planeOrderBy}
               onChangeGroupBy={setPlaneGroupBy}
               onChangeOrderBy={setPlaneOrderBy}
+              displayProperties={planeDisplayProperties}
+              onToggleDisplayProperty={(property) =>
+                setPlaneDisplayProperties((current) => toggleTaskDisplayProperty(current, property))
+              }
               buttonStyle={styles.segmentButton}
               textStyle={styles.segmentSecondaryText}
             />
@@ -9629,6 +9627,10 @@ export default function MobileTasksScreen() {
             const isGitLabMr = item.provider === 'gitlab' && item.source.type === 'mr'
             const githubPrDelta = isGitHubPr ? formatGitHubPRDelta(item.source) : null
             const branchSummary = hostedBranchSummary(item)
+            const subtitle =
+              item.provider === 'plane'
+                ? planeWorkItemDisplayFacts(item.source, planeDisplayProperties).join(' · ')
+                : item.subtitle
             return (
               <Pressable
                 style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
@@ -9656,12 +9658,14 @@ export default function MobileTasksScreen() {
                     <Text style={styles.taskTitle} numberOfLines={2}>
                       {item.title}
                     </Text>
-                    <Text style={styles.updatedAt}>{formatUpdatedAt(item.updatedAt)}</Text>
+                    {item.provider !== 'plane' || planeDisplayProperties.has('updated') ? (
+                      <Text style={styles.updatedAt}>{formatUpdatedAt(item.updatedAt)}</Text>
+                    ) : null}
                   </View>
                   <View style={styles.metaRow}>
                     <View style={[styles.repoDot, { backgroundColor: repo.color }]} />
                     <Text style={styles.subtitle} numberOfLines={1}>
-                      {taskKindLabel(item)} · {item.subtitle}
+                      {taskKindLabel(item)} · {subtitle}
                     </Text>
                   </View>
                   {branchSummary ? (
@@ -9726,11 +9730,13 @@ export default function MobileTasksScreen() {
                   ) : null}
                 </View>
                 <View style={styles.taskRowTrailing}>
-                  <View style={styles.statusPill}>
-                    <Text style={styles.statusText} numberOfLines={1}>
-                      {item.status}
-                    </Text>
-                  </View>
+                  {item.provider !== 'plane' || planeDisplayProperties.has('state') ? (
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusText} numberOfLines={1}>
+                        {item.status}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </Pressable>
             )
@@ -9746,6 +9752,7 @@ export default function MobileTasksScreen() {
         viewMode={planeViewMode}
         groupBy={planeGroupBy}
         orderBy={planeOrderBy}
+        displayProperties={planeDisplayProperties}
         workspaceId={planeWorkspaceId}
         projectId={planeProjectId}
         projects={planeProjects}
@@ -10636,46 +10643,18 @@ export default function MobileTasksScreen() {
         onClose={() => setShowLinearOrderPicker(false)}
       />
 
-      <BottomDrawer
+      <ProviderTaskDisplaySheet
         visible={taskUiReady && showLinearDisplayPicker}
         onClose={() => setShowLinearDisplayPicker(false)}
-      >
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>Display Properties</Text>
-        </View>
-        <View style={styles.repoPickerGroup}>
-          {LINEAR_DISPLAY_OPTIONS.map((property, index) => {
-            const selected = effectiveLinearDisplayProperties.has(property.value)
-            return (
-              <View key={property.value}>
-                {index > 0 ? <View style={styles.actionSeparator} /> : null}
-                <Pressable
-                  style={styles.repoPickerRow}
-                  onPress={() => {
-                    if (property.value === 'team') {
-                      setLinearTeamPropertyTouched(true)
-                    }
-                    setLinearDisplayProperties((current) => {
-                      const next = new Set(current)
-                      if (next.has(property.value)) {
-                        next.delete(property.value)
-                      } else {
-                        next.add(property.value)
-                      }
-                      return next
-                    })
-                  }}
-                >
-                  <View style={styles.repoPickerTextWrap}>
-                    <Text style={styles.repoPickerTitle}>{property.label}</Text>
-                  </View>
-                  {selected ? <Check size={15} color={colors.textPrimary} /> : null}
-                </Pressable>
-              </View>
-            )
-          })}
-        </View>
-      </BottomDrawer>
+        options={LINEAR_TASK_DISPLAY_OPTIONS}
+        selected={effectiveLinearDisplayProperties}
+        onToggle={(property) => {
+          if (property === 'team') {
+            setLinearTeamPropertyTouched(true)
+          }
+          setLinearDisplayProperties((current) => toggleTaskDisplayProperty(current, property))
+        }}
+      />
 
       <PickerModal
         visible={taskUiReady && showSortPicker}
