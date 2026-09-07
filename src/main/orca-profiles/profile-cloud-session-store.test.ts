@@ -59,7 +59,7 @@ function writePlaintextSessionFile(profileId: string, session: OrcaCloudSession)
   )
 }
 
-describe('Orca cloud session store', () => {
+describe('Orca Lab cloud session store', () => {
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-cloud-session-'))
     vi.unstubAllEnvs()

@@ -143,7 +143,7 @@ export async function fetchChangelog(incomingVersion: string): Promise<Changelog
 
   return {
     release: {
-      title: name || `Orca ${normalizeTagToVersion(incomingVersion)}`,
+      title: name || `Orca Lab ${normalizeTagToVersion(incomingVersion)}`,
       description,
       releaseNotesUrl
     },

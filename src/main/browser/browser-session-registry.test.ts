@@ -328,7 +328,7 @@ describe('BrowserSessionRegistry', () => {
     expect(webAuthnCallback).toHaveBeenCalledWith('credential-1')
   })
 
-  it('uses profile-owned partitions for non-default Orca profiles', () => {
+  it('uses profile-owned partitions for non-default Orca Lab profiles', () => {
     const orcaProfileId = 'local-work'
     browserSessionRegistry.configureForOrcaProfile({
       orcaProfileId,

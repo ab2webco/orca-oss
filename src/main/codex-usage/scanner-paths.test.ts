@@ -127,7 +127,7 @@ afterEach(() => {
 })
 
 describe('getCodexSessionsDirectory', () => {
-  it('defaults to Orca-managed Codex runtime sessions', () => {
+  it('defaults to Orca Lab-managed Codex runtime sessions', () => {
     expect(getCodexSessionsDirectory()).toBe(
       join(userDataDir, 'codex-runtime-home', 'home', 'sessions')
     )
@@ -143,7 +143,7 @@ describe('getCodexSessionsDirectory', () => {
 })
 
 describe('listCodexSessionFiles', () => {
-  it('scans both Orca-managed and system Codex session homes', async () => {
+  it('scans both Orca Lab-managed and system Codex session homes', async () => {
     const runtimeSessionsDir = join(userDataDir, 'codex-runtime-home', 'home', 'sessions')
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })

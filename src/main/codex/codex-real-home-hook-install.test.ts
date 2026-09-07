@@ -100,7 +100,7 @@ afterEach(() => {
 })
 
 describe('ensureRealHomeCodexHookState (install)', () => {
-  it('creates hooks.json with the Orca entry in every managed event for a fresh home', () => {
+  it('creates hooks.json with the Orca Lab entry in every managed event for a fresh home', () => {
     grantSucceeds()
 
     const lane = ensureRealHomeCodexHookState({ hooksEnabled: true, userDataPath: userDataDir })
@@ -352,7 +352,7 @@ describe('ensureRealHomeCodexHookState (install)', () => {
     expect(plan.managedEntries.find((entry) => entry.eventLabel === 'stop')?.groupIndex).toBe(1)
   })
 
-  it("keeps later user handler trust positions stable inside Orca's hook group", () => {
+  it("keeps later user handler trust positions stable inside Orca Lab's hook group", () => {
     grantSucceeds()
     ensureRealHomeCodexHookState({ hooksEnabled: true, userDataPath: userDataDir })
     const installed = readRealHooksJson()
@@ -372,7 +372,7 @@ describe('ensureRealHomeCodexHookState (install)', () => {
 })
 
 describe('ensureRealHomeCodexHookState (opt-out sweep)', () => {
-  it('rebases trust when a user appended hooks after Orca installed', () => {
+  it('rebases trust when a user appended hooks after Orca Lab installed', () => {
     grantSucceeds()
     const before = { type: 'command', command: 'before.sh' }
     writeFileSync(
@@ -450,7 +450,7 @@ describe('ensureRealHomeCodexHookState (opt-out sweep)', () => {
     expect(readFileSync(getRealConfigTomlPath(), 'utf-8')).toBe(userTrustToml)
   })
 
-  it('removes only Orca entries and reports the removed lane', () => {
+  it('removes only Orca Lab entries and reports the removed lane', () => {
     grantSucceeds()
     const userStop = {
       matcher: 'deploy-*',
@@ -485,7 +485,7 @@ describe('ensureRealHomeCodexHookState (opt-out sweep)', () => {
     expect(existsSync(getRealHooksJsonPath())).toBe(false)
   })
 
-  it('removes only hash-proven Orca trust from a mixed hook group', () => {
+  it('removes only hash-proven Orca Lab trust from a mixed hook group', () => {
     const material = getCodexManagedHookInstallMaterial()
     const userCommand = 'my-user-hook.sh'
     writeFileSync(

@@ -125,7 +125,7 @@ function mockSuccessfulSessionRefresh(): void {
   } satisfies OrcaCloudSessionExchangeResponse)
 }
 
-describe('Orca cloud profile auth-failure retry', () => {
+describe('Orca Lab cloud profile auth-failure retry', () => {
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-cloud-service-auth-retry-'))
     beginOrcaCloudPkceFlowMock.mockReset()

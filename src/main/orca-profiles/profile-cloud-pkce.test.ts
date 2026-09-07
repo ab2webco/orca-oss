@@ -79,7 +79,7 @@ async function startedFlow(): Promise<{
   return { authUrl, flow, nonce, redirectUri, state }
 }
 
-describe('Orca cloud PKCE flow', () => {
+describe('Orca Lab cloud PKCE flow', () => {
   beforeEach(() => {
     openExternalMock.mockReset()
     openExternalMock.mockResolvedValue(undefined)
@@ -97,7 +97,7 @@ describe('Orca cloud PKCE flow', () => {
     expect(validResponse.statusCode).toBe(200)
     expect(validResponse.headers['cache-control']).toBe('no-store')
     expect(validResponse.headers['content-security-policy']).toContain("default-src 'none'")
-    expect(validResponse.body).toContain('<h1>Signed in to Orca</h1>')
+    expect(validResponse.body).toContain('<h1>Signed in to Orca Lab</h1>')
     expect(validResponse.body).toContain('You can close this tab and return to the app.')
     expect(validResponse.body).not.toContain('class="brand"')
     await expect(flow).resolves.toMatchObject({

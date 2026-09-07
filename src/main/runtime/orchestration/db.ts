@@ -3637,7 +3637,7 @@ export class OrchestrationDb {
     }
 
     const originalBody = message.body ? `\n\nOriginal body:\n${message.body}` : ''
-    const body = `Orca rejected this ${message.type}: ${reason}${originalBody}`
+    const body = `Orca Lab rejected this ${message.type}: ${reason}${originalBody}`
     const payload = addLifecycleRejectionMarker(message.payload, code, reason)
     // Why: rejected lifecycle signals stay auditable but must not reach read paths as actionable completion/liveness events.
     this.db

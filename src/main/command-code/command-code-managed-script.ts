@@ -92,7 +92,7 @@ export function buildCommandCodeManagedScript(
     '  done',
     '}',
     '# Why: Command Code sanitizes hook subprocess env. The parent TUI process',
-    '# still has Orca pane/hook metadata, so recover it before posting.',
+    '# still has Orca Lab pane/hook metadata, so recover it before posting.',
     'for __orca_name in ORCA_AGENT_HOOK_ENDPOINT ORCA_AGENT_HOOK_PORT ORCA_AGENT_HOOK_TOKEN ORCA_AGENT_HOOK_ENV ORCA_AGENT_HOOK_VERSION ORCA_PANE_KEY ORCA_TAB_ID ORCA_WORKTREE_ID ORCA_AGENT_LAUNCH_TOKEN; do',
     '  __orca_fill_from_ancestor "$__orca_name"',
     'done',

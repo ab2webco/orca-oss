@@ -85,7 +85,7 @@ Options:
   --json                 Emit machine-readable JSON
   --pairing-code
   --environment
-  --current              Use the current Orca worktree linked Linear issue
+  --current              Use the current Orca Lab worktree linked Linear issue
   --comments             Include threaded Linear comments
   --children             Include recursive child issues
   --depth <n>            Child issue depth for --children/--full

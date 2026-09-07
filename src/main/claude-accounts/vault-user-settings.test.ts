@@ -22,7 +22,7 @@ const HOME_SETTINGS = {
 }
 
 describe('selectInheritableSettings', () => {
-  it('takes the user-owned keys and leaves identity- and Orca-owned keys behind', () => {
+  it('takes the user-owned keys and leaves identity- and Orca Lab-owned keys behind', () => {
     const selected = selectInheritableSettings(HOME_SETTINGS)
     expect(Object.keys(selected).sort()).toEqual([...INHERITABLE_VAULT_SETTING_KEYS].sort())
     for (const excluded of ['env', 'statusLine', 'hooks', 'mcpServers', 'theme']) {

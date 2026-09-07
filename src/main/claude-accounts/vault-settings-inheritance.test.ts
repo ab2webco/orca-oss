@@ -89,7 +89,7 @@ describe('output style resolution', () => {
 })
 
 describe('buildInheritedVaultSettings', () => {
-  it('leaves Orca instrumentation and the custom-endpoint token untouched', () => {
+  it('leaves Orca Lab instrumentation and the custom-endpoint token untouched', () => {
     writeHomeSettings({
       includeCoAuthoredBy: false,
       statusLine: { type: 'command', command: 'home-status' },

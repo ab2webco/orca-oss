@@ -92,7 +92,7 @@ function shellReadyWrappersExist(): boolean {
 }
 
 export function getDaemonBashShellReadyRcfileContent(): string {
-  return `# Orca daemon bash shell-ready wrapper
+  return `# Orca Lab daemon bash shell-ready wrapper
 ${SHELL_STARTUP_IDENTITY_MARKER_BLOCK}
 [[ -f /etc/profile ]] && source /etc/profile
 if [[ -f "$HOME/.bash_profile" ]]; then
@@ -102,7 +102,7 @@ elif [[ -f "$HOME/.bash_login" ]]; then
 elif [[ -f "$HOME/.profile" ]]; then
   source "$HOME/.profile"
 fi
-# Why: enable bracketed paste so Orca can deliver a multiline startup prompt as
+# Why: enable bracketed paste so Orca Lab can deliver a multiline startup prompt as
 # a single literal paste (ESC[200~…ESC[201~); without it, older readline builds
 # treat each embedded newline as Enter and mangle the prompt into PS2
 # continuation. Modern readline defaults this on; force it for the rest.
@@ -123,12 +123,12 @@ __orca_restore_agent_teams_path() {
   export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
 __orca_restore_agent_teams_path
-# Why: user startup files may set the default OpenCode config after Orca's
-# spawn env; restore the Orca-managed config dir before the first prompt.
+# Why: user startup files may set the default OpenCode config after Orca Lab's
+# spawn env; restore the Orca Lab-managed config dir before the first prompt.
 [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
 [[ -n "\${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${ORCA_MIMOCODE_HOME}"
 ${getPosixOmpShellWrapper()}
-# Why: Codex must keep using Orca's runtime CODEX_HOME after profile scripts.
+# Why: Codex must keep using Orca Lab's runtime CODEX_HOME after profile scripts.
 [[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
 ${getPosixCodexShellLaunchPreflight()}
 # Why: emit OSC 133 C/D so terminal-command-lifecycle can drop stale agent
@@ -145,7 +145,7 @@ __orca_osc133_precmd() {
   printf "\\033]133;A\\007"
   # Why: emit the shell-ready marker here (not a trailing PROMPT_COMMAND entry)
   # so a framework that must be last in PROMPT_COMMAND — bash-preexec — is not
-  # displaced by one of Orca's own hooks.
+  # displaced by one of Orca Lab's own hooks.
   [[ "\${ORCA_SHELL_READY_MARKER:-0}" == "1" ]] && printf "${SHELL_READY_MARKER}"
 }
 __orca_run_user_debug_trap() {
@@ -176,7 +176,7 @@ __orca_osc133_preexec() {
 # Why: runs LAST every prompt — closes the prompt window (so command starts emit
 # C) and re-arms our single DEBUG trap. A framework that replaced DEBUG at the
 # first prompt is captured and chained rather than discarded, so it keeps working
-# while its re-arm can no longer silence Orca's command-start signal.
+# while its re-arm can no longer silence Orca Lab's command-start signal.
 __orca_osc133_epilogue() {
   unset __orca_in_prompt_command
   local __orca_spec="$(trap -p DEBUG)"
@@ -223,7 +223,7 @@ trap '__orca_osc133_preexec' DEBUG
 }
 
 export function getDaemonZshShellReadyRcfileContent(): string {
-  return `# Orca daemon zsh shell-ready wrapper
+  return `# Orca Lab daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({
   fileName: '.zshrc',
   interactiveOnly: true,
@@ -265,7 +265,7 @@ __orca_osc133_preexec() {
   printf "\\033]133;C\\007"
   __orca_in_command=1
 }
-# Why: prepend so Orca captures $? before user prompt hooks can overwrite it.
+# Why: prepend so Orca Lab captures $? before user prompt hooks can overwrite it.
 precmd_functions=(__orca_osc133_precmd \${precmd_functions[@]})
 preexec_functions=(__orca_osc133_preexec \${preexec_functions[@]})
 if [[ ! -o login ]]; then
@@ -288,11 +288,11 @@ function ensureShellReadyWrappers(): void {
   const bashDir = join(root, 'bash')
 
   const zshEnv = getZshEnvTemplate(zshDir, 'daemon')
-  const zshProfile = `# Orca daemon zsh shell-ready wrapper
+  const zshProfile = `# Orca Lab daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({ fileName: '.zprofile' })}
 `
   const zshRc = getDaemonZshShellReadyRcfileContent()
-  const zshLogin = `# Orca daemon zsh shell-ready wrapper
+  const zshLogin = `# Orca Lab daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({ fileName: '.zlogin', interactiveOnly: true })}
 __orca_restore_attribution_path() {
   [[ -n "\${ORCA_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0

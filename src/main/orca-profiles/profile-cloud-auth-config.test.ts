@@ -11,7 +11,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-describe('Orca cloud auth config', () => {
+describe('Orca Lab cloud auth config', () => {
   it('reports unconfigured without both API URL and client ID', () => {
     expect(getOrcaCloudAuthConfig({})).toEqual({
       configured: false,

@@ -188,7 +188,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.CUSTOM_VAR).toBe('custom-value')
     })
 
-    it('does not inherit NODE_ENV from the Orca process env', async () => {
+    it('does not inherit NODE_ENV from the Orca Lab process env', async () => {
       // Why: NODE_ENV in Orca's process is Orca's build mode (electron-vite sets
       // `development` in dev runs); leaking it breaks `next build` and Vitest.
       const previous = process.env.NODE_ENV
@@ -429,7 +429,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnEnv.Path.split(':')[0]).toBe('/tmp/orca-agent-teams-bin')
     })
 
-    it('does not inherit parent Orca pane identity when caller omits pane env', async () => {
+    it('does not inherit parent Orca Lab pane identity when caller omits pane env', async () => {
       const saved = {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,
@@ -457,7 +457,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_WORKTREE_ID).toBeUndefined()
     })
 
-    it('preserves explicit child Orca pane identity over parent env', async () => {
+    it('preserves explicit child Orca Lab pane identity over parent env', async () => {
       const saved = {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,

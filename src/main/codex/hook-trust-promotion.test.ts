@@ -149,7 +149,7 @@ describe('codex hook trust write-back promotion', () => {
     )
   })
 
-  it('keeps an in-Orca approval of a user hook across launches and promotes it to ~/.codex', () => {
+  it('keeps an in-Orca Lab approval of a user hook across launches and promotes it to ~/.codex', () => {
     writeSystemUserHook()
     const service = new CodexHookService()
     service.install()
@@ -182,7 +182,7 @@ describe('codex hook trust write-back promotion', () => {
     expect(readFileSync(runtimeTomlPath, 'utf-8')).toBe(runtimeTomlAfterPromotion)
   })
 
-  it('never promotes trust for the Orca-managed status hook into ~/.codex', () => {
+  it('never promotes trust for the Orca Lab-managed status hook into ~/.codex', () => {
     writeSystemUserHook()
     const service = new CodexHookService()
     service.install()
@@ -233,7 +233,7 @@ describe('codex hook trust write-back promotion', () => {
     expect(readSystemToml()).not.toContain('[hooks.state.')
   })
 
-  it('promotes an in-Orca disable of a mirrored user hook back to the system config', () => {
+  it('promotes an in-Orca Lab disable of a mirrored user hook back to the system config', () => {
     writeSystemUserHook()
     const systemTomlPath = join(systemCodexDir(), 'config.toml')
     writeFileSync(systemTomlPath, upsertHookTrustEntriesInContent('', [systemUserStopEntry()]))

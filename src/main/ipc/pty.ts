@@ -2080,7 +2080,7 @@ export function isCodexLaunchCommand(command: string | undefined): boolean {
     return false
   }
   // Why: mirrors isClaudeLaunchCommand's shape (path prefixes, Windows
-  // extensions, shell separators); Codex has no Orca wrapper command today.
+  // extensions, shell separators); Codex has no Orca Lab wrapper command today.
   return /(^|[\s;&|('"`])(?:[^\s;&|('"`]*[\\/])?codex(?:\.cmd|\.exe)?($|[\s;&|)'"`])/i.test(command)
 }
 

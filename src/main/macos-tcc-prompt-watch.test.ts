@@ -49,7 +49,7 @@ describe('parseTccPromptEvent', () => {
 })
 
 describe('isOrcaAttributedPrompt', () => {
-  it('accepts the app and detached terminal helper across Orca build identities', () => {
+  it('accepts the app and detached terminal helper across Orca Lab build identities', () => {
     for (const id of [
       'com.stablyai.orca',
       'com.stablyai.orca.helper',
@@ -78,7 +78,7 @@ describe('isOrcaAttributedPrompt', () => {
     ).toBe(false)
   })
 
-  it('rejects unrelated services even when Orca is responsible', () => {
+  it('rejects unrelated services even when Orca Lab is responsible', () => {
     expect(
       isOrcaAttributedPrompt({
         service: 'kTCCServiceMicrophone',
@@ -135,7 +135,7 @@ describe('MacosTccPromptWatch', () => {
     expect(spawnLogStream).not.toHaveBeenCalled()
   })
 
-  it('reports only Orca-attributed dialogs from a live stream', async () => {
+  it('reports only Orca Lab-attributed dialogs from a live stream', async () => {
     const { child, stdout } = createFakeLogStream()
     const onPrompt = vi.fn()
     const watch = new MacosTccPromptWatch({ onPrompt, spawnLogStream: () => child })

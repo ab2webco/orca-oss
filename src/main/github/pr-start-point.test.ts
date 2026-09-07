@@ -173,7 +173,7 @@ describe('resolveGitHubPrStartPoint', () => {
     })
     fetchPullRequestHeadRefMock.mockRejectedValue(
       new Error(
-        'This SSH host is running an older Orca relay that cannot fetch pull request heads.'
+        'This SSH host is running an older Orca Lab relay that cannot fetch pull request heads.'
       )
     )
     const gitExec = vi.fn(async () => ({ stdout: '', stderr: '' }))
@@ -190,7 +190,7 @@ describe('resolveGitHubPrStartPoint', () => {
 
     expect(result).toEqual({
       error:
-        'Failed to fetch refs/pull/77/head: This SSH host is running an older Orca relay that cannot fetch pull request heads.'
+        'Failed to fetch refs/pull/77/head: This SSH host is running an older Orca Lab relay that cannot fetch pull request heads.'
     })
   })
 
@@ -286,7 +286,7 @@ describe('resolveGitHubPrStartPoint', () => {
     ["fatal: couldn't find remote ref refs/pull/1849/head", 'deleted PR / cleaned fork'],
     ['Authentication failed. Check your remote credentials.', 'auth failure'],
     [
-      'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.',
+      'This SSH host is running an older Orca Lab relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.',
       'stale relay'
     ]
   ])('fails hard instead of soft-keeping the durable PR head on: %s', async (message) => {
