@@ -22,28 +22,28 @@ export function concurrentLookupDetail(input: ChecksPanelReviewStateInput): stri
   if (input.reviewLookup === 'positive_unresolved') {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.positive',
-      'Orca also has saved {{reviewLabel}} information that it could not verify.',
+      'Orca Lab also has saved {{reviewLabel}} information that it could not verify.',
       { reviewLabel }
     )
   }
   if (isRateLimitRefresh(refresh)) {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.rate_limited',
-      'Orca also could not check {{reviewLabel}} status because {{provider}} is temporarily limiting requests.',
+      'Orca Lab also could not check {{reviewLabel}} status because {{provider}} is temporarily limiting requests.',
       { reviewLabel, provider: providerName }
     )
   }
   if (refresh?.errorType === 'network') {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.network',
-      'Orca also could not check {{reviewLabel}} status because this environment could not reach {{provider}}.',
+      'Orca Lab also could not check {{reviewLabel}} status because this environment could not reach {{provider}}.',
       { reviewLabel, provider: providerName }
     )
   }
   if (refresh?.status === 'error' || isHardRefreshError(refresh)) {
     return translate(
       'auto.components.right.sidebar.checks.panel.review.detail.untyped',
-      'Orca also could not confirm whether this branch already has a {{reviewLabel}}.',
+      'Orca Lab also could not confirm whether this branch already has a {{reviewLabel}}.',
       { reviewLabel }
     )
   }
@@ -112,7 +112,7 @@ export function transientRefreshState(
       ),
       description: translate(
         'auto.components.right.sidebar.checks.panel.review.unknown_error.body',
-        'The lookup failed, so Orca could not confirm whether this branch already has a {{reviewLabel}}.',
+        'The lookup failed, so Orca Lab could not confirm whether this branch already has a {{reviewLabel}}.',
         { reviewLabel }
       )
     }
@@ -126,7 +126,7 @@ export function transientRefreshState(
     ),
     description: translate(
       'auto.components.right.sidebar.checks.panel.review.untyped.body',
-      'Orca could not confirm whether this branch already has a {{reviewLabel}}. Retry to check again.',
+      'Orca Lab could not confirm whether this branch already has a {{reviewLabel}}. Retry to check again.',
       { reviewLabel }
     )
   }

@@ -184,7 +184,7 @@ export function LinearApiKeyDialog({
             <p>
               {translate(
                 'auto.components.linear.api.key.dialog.d56d3629f4',
-                'Prefer full access when Orca should show every team the account can access in that workspace. Restricted keys only expose permitted teams, and private teams require the key owner to have access.'
+                'Prefer full access when Orca Lab should show every team the account can access in that workspace. Restricted keys only expose permitted teams, and private teams require the key owner to have access.'
               )}
             </p>
             <p>

@@ -122,7 +122,7 @@ export function SshHostFields({
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.sidebar.AddRemoteHostDialog.identityFileFromConfigHint',
-              'Left empty on purpose: Orca uses every key ~/.ssh/config resolves for {{value0}}. Type a path to use just that key.',
+              'Left empty on purpose: Orca Lab uses every key ~/.ssh/config resolves for {{value0}}. Type a path to use just that key.',
               { value0: configIdentityAlias }
             )}
           </p>

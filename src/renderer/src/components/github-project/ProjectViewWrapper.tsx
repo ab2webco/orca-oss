@@ -968,14 +968,14 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
             <DialogTitle>
               {translate(
                 'auto.components.github.project.ProjectViewWrapper.7037c8f5f1',
-                'Repository not in Orca'
+                'Repository not in Orca Lab'
               )}
             </DialogTitle>
             <DialogDescription>
               {resolvedMissingRepoDialogs.repoNotInOrca
                 ? translate(
                     'auto.components.github.project.ProjectViewWrapper.1850fceac8',
-                    "{{value0}}/{{value1}} isn't added to Orca. Add it to start work, or open in GitHub.",
+                    "{{value0}}/{{value1}} isn't added to Orca Lab. Add it to start work, or open in GitHub.",
                     {
                       value0: resolvedMissingRepoDialogs.repoNotInOrca.owner,
                       value1: resolvedMissingRepoDialogs.repoNotInOrca.repo
@@ -1185,7 +1185,7 @@ function ViewTabStrip({
                 ? v.name
                 : translate(
                     'auto.components.github.project.ProjectViewWrapper.2edf5e7e77',
-                    "{{value0}} — Orca doesn't support {{value1}} project views yet. File a feature request at {{value2}}.",
+                    "{{value0}} — Orca Lab doesn't support {{value1}} project views yet. File a feature request at {{value2}}.",
                     { value0: v.name, value1: layoutLabel, value2: ORCA_FEATURE_REQUEST_URL }
                   )
             }
@@ -1227,7 +1227,7 @@ function ViewTabStrip({
                   {unsupportedMessage}{' '}
                   {translate(
                     'auto.components.github.project.ProjectViewWrapper.1bf8c01c8b',
-                    'Switch to a Table view to work with this project in Orca.'
+                    'Switch to a Table view to work with this project in Orca Lab.'
                   )}
                 </p>
                 <Button

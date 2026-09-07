@@ -86,7 +86,7 @@ export class RichMarkdownErrorBoundary extends React.Component<Props, State> {
           <div>
             {translate(
               'auto.components.editor.RichMarkdownErrorBoundary.dfdf1cacd4',
-              'The rich markdown editor hit an unexpected error and was reset to keep the rest of Orca responsive.'
+              'The rich markdown editor hit an unexpected error and was reset to keep the rest of Orca Lab responsive.'
             )}
           </div>
           <div className="text-xs opacity-70">

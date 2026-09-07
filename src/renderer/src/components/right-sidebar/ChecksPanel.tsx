@@ -3200,7 +3200,7 @@ export default function ChecksPanel(): React.JSX.Element {
           githubTarget && activeReview.provider === 'github'
             ? translate(
                 'auto.components.right.sidebar.ChecksPanel.5eb2163b6b',
-                'Review the prompt before starting an agent. After the prompt is delivered, Orca resolves the selected host threads and replies to comments it cannot resolve.'
+                'Review the prompt before starting an agent. After the prompt is delivered, Orca Lab resolves the selected host threads and replies to comments it cannot resolve.'
               )
             : translate(
                 'auto.components.right.sidebar.ChecksPanel.abf59262fb',
@@ -4311,7 +4311,7 @@ export default function ChecksPanel(): React.JSX.Element {
       reviewState.autoRetryAt !== undefined && reviewState.autoRetryAt > Date.now()
         ? translate(
             'auto.components.right.sidebar.ChecksPanel.review.auto_retry',
-            'Orca will retry at {{time}}.',
+            'Orca Lab will retry at {{time}}.',
             { time: new Date(reviewState.autoRetryAt).toLocaleTimeString() }
           )
         : null
