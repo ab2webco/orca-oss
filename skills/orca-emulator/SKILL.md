@@ -56,7 +56,7 @@ change between Orca Lab releases, and this file deliberately no longer lists the
 app is up with `ORCA status --json` (start it with `ORCA open --json` if needed), and
 prefer `--json` for agent-driven calls.
 
-## If an older Orca does not recognize `skills get`
+## If an older Orca Lab does not recognize `skills get`
 
 Use this fallback only when the selected binary explicitly reports that `skills get` is an
 unknown command. Another failure is not proof of an older binary; report it rather than

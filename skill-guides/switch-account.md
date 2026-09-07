@@ -4,7 +4,7 @@ description: >-
   Switch the Claude account of the terminal you are running in, or list the
   managed Claude accounts with their cached quota so the user can pick one. Runs
   `orca account list` with no selector and `orca account switch --to
-  <email|id>` with one, letting Orca's runtime swap the account in place and
+  <email|id>` with one, letting Orca Lab's runtime swap the account in place and
   resume this same conversation. Use when the user says "switch to account X",
   asks which accounts are available, or when this session is out of quota and
   another account has some left.
@@ -18,7 +18,7 @@ asks which accounts are available.
 `switch-account` is a skill name, not a CLI namespace. It carries no switching logic of its
 own: everything below is one of two `orca account ...` commands. The whole swap — stopping
 the agent, changing the account, relaunching, resuming this exact session — belongs to the
-Orca runtime that owns the terminal.
+Orca Lab runtime that owns the terminal.
 
 ## Resolve the CLI
 
@@ -26,11 +26,11 @@ Pick the executable once and substitute it for `orca` in every command below:
 
 - If the `ORCA_CLI_COMMAND` environment variable is set, use its value.
 - Otherwise, in a dev checkout (the session exposes `ORCA_DEV_REPO_ROOT`, or `orca` is not on PATH but `orca-dev` is), use `orca-dev` — so the commands become `orca-dev account ...`.
-- Otherwise, on Linux outside an Orca-managed terminal, use `orca-ide` (never bare `orca` there — it usually resolves to the GNOME Orca screen reader).
+- Otherwise, on Linux outside an Orca Lab-managed terminal, use `orca-ide` (never bare `orca` there — it usually resolves to the GNOME Orca screen reader).
 - Otherwise, use `orca`.
 
 If the resolved executable cannot run, report its exact error and stop; do not fall through
-to another executable, which could target a different Orca build.
+to another executable, which could target a different Orca Lab build.
 
 ## No selector: list the accounts
 
@@ -38,26 +38,26 @@ to another executable, which could target a different Orca build.
 orca account list
 ```
 
-This reads Orca's cached roster and quota — it never forces a provider refresh, so it
+This reads Orca Lab's cached roster and quota — it never forces a provider refresh, so it
 cannot stall behind another account's broken auth. Show the user the accounts with their
 remaining quota and ask which one to switch to. Add `--json` when you need to parse it.
 
 ## Which account is this terminal on
 
-Never answer this from `active`. `active` is the account Orca selects for *new* launches on the
+Never answer this from `active`. `active` is the account Orca Lab selects for *new* launches on the
 whole machine; a pane can run on a different one, and both readings are internally consistent —
 which is exactly how an agent came to tell a user their terminal was still on the old account
 while it had already been switched.
 
 The answer is the `terminal` block of the same `orca account list` output. Run it with no
-`--terminal` so it resolves the pane you are in, proven from the environment Orca exports there:
+`--terminal` so it resolves the pane you are in, proven from the environment Orca Lab exports there:
 
 ```bash
 orca account list --json
 ```
 
 - `terminal.ownership.state: "account"` — this terminal runs on that `accountId` / `email`. That is the answer.
-- `"none"` — this terminal owns no managed account; it runs on the login in Orca's shared runtime.
+- `"none"` — this terminal owns no managed account; it runs on the login in Orca Lab's shared runtime.
 - `"unknown"` — the runtime cannot prove this pane's account. Report exactly that, with the `reason`.
 
 An `unknown` is never a licence to fall back to `active`. Do not substitute
@@ -67,7 +67,7 @@ managed vault — a fresh pane on one vault reported a different account's email
 
 Pass `--terminal <handle>` only to ask about a pane the user named.
 
-If this Orca is too old to print a `terminal` block, the pane's account cannot be determined
+If this Orca Lab is too old to print a `terminal` block, the pane's account cannot be determined
 from the CLI. Say that, and do not name an account instead.
 
 ## With a selector: switch this terminal
@@ -77,7 +77,7 @@ orca account switch --to <email|id>
 ```
 
 Run it with no `--terminal`: the CLI proves which pane it is running in from the environment
-Orca exports there, so it switches the terminal you are in. Never pass a handle you guessed,
+Orca Lab exports there, so it switches the terminal you are in. Never pass a handle you guessed,
 and never pass another pane's handle unless the user explicitly named that terminal —
 `--terminal <handle>` stops somebody else's agent.
 
@@ -108,9 +108,9 @@ binding and your turn are all intact. Report the message as-is and stop. Common 
 
 - **No managed Claude account matches that selector** — run `orca account list` and ask the user which one.
 - **That selector matches more than one managed Claude account** — use the account id instead of the email.
-- **The selected account is not authenticated in its own Orca vault** — the user has to sign that account in from Orca's Accounts settings.
+- **The selected account is not authenticated in its own Orca Lab vault** — the user has to sign that account in from Orca Lab's Accounts settings.
 - **This terminal is already running on that account** — nothing to do; say so.
-- **Orca has no recorded launch command for this Claude process** — this Claude was started outside Orca's terminal management, so the runtime will not relaunch it with guessed flags. Tell the user to start the agent from Orca to make it switchable.
+- **Orca Lab has no recorded launch command for this Claude process** — this Claude was started outside Orca Lab's terminal management, so the runtime will not relaunch it with guessed flags. Tell the user to start the agent from Orca Lab to make it switchable.
 - **WSL and SSH-owned terminals are not supported yet** — auth and transcript state do not cross that boundary; do not attempt a manual swap.
 
 If a switch reports `rollback-failed`, do not retry. It carries the account, session id and

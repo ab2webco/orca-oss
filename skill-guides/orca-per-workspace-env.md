@@ -1,7 +1,7 @@
 ---
 name: orca-per-workspace-env
 description: >-
-  Set up, review, debug, or validate Orca per-workspace environment recipes —
+  Set up, review, debug, or validate Orca Lab per-workspace environment recipes —
   on-demand, disposable runtimes (cloud sandboxes, VMs, or local) created fresh
   for each workspace. Covers first-time setup (provider prerequisites, the
   reusable base snapshot, the coding-agent auth snapshot, credentials, and
@@ -16,7 +16,7 @@ Help a user stand up and maintain a repo-owned per-workspace environment recipe 
 workspace gets its own on-demand, disposable runtime (a cloud sandbox, a VM, or a local one),
 created fresh and torn down after.
 
-Orca is a **thin wrapper**: you guide, detect, and scaffold; you never own the user's cloud account,
+Orca Lab is a **thin wrapper**: you guide, detect, and scaffold; you never own the user's cloud account,
 billing, images, or credentials.
 
 - **You DO:** sequence the setup, detect what's detectable (provider CLI present/logged-in? recipe
@@ -37,11 +37,11 @@ Then the **per-workspace contract** (create/suspend/resume/destroy) runs fast (�
 
 **The one branch that shapes everything — connection mode:** **Orca-server** (`create` runs `orca serve`
 in the env and emits a `pairingCode`; §7c/§7f) vs **SSH** (`create` runs no server and emits a
-`connection.type:"ssh"` block Orca dials into; §7g/§7h). Settle this first — it changes the `create`
+`connection.type:"ssh"` block Orca Lab dials into; §7g/§7h). Settle this first — it changes the `create`
 output shape and half the templates.
 
-Keep Orca's checkout behavior unchanged by default: omit `checkoutMode`, emit schema version 1, and
-let Orca create a linked worktree. Only use `checkoutMode: provisioned-root` when the user explicitly
+Keep Orca Lab's checkout behavior unchanged by default: omit `checkoutMode`, emit schema version 1, and
+let Orca Lab create a linked worktree. Only use `checkoutMode: provisioned-root` when the user explicitly
 wants one ephemeral machine to clone the finished workspace itself. This niche mode currently requires
 direct SSH, an ordinary non-bare/non-sparse primary checkout at `projectRoot`, and schema version 2.
 
@@ -56,14 +56,14 @@ self-test loop (§9) until it passes.
 ## 1. Setup workflow
 
 Drive these with the user. **[CHECKPOINT]** steps need explicit confirmation — they spend money, take
-a long time, or need the user at the keyboard. Never create an Orca workspace or commit unless asked.
+a long time, or need the user at the keyboard. Never create an Orca Lab workspace or commit unless asked.
 
 1. **Inspect the repo** for an existing `environmentRecipes` entry, `scripts/orca-vm/`, a state file, or setup
    notes. If a working recipe exists, jump to Doctor (§9) instead of rebuilding.
 2. **Interview the user up front** — gather these choices and confirm them back before scaffolding
    anything. Don't pick for them (§11); don't guess.
-   - **Connection mode:** how Orca attaches to the environment — an **Orca server** (the VM runs
-     `orca serve` and Orca pairs over its pairing URL; worked example §7f) or **SSH** (Orca connects to
+   - **Connection mode:** how Orca Lab attaches to the environment — an **Orca Lab server** (the VM runs
+     `orca serve` and Orca Lab pairs over its pairing URL; worked example §7f) or **SSH** (Orca Lab connects to
      the host over SSH; §7g). This decides the recipe's connection shape, so settle it first.
    - **Checkout ownership:** do not ask by default. Only when the user requires the environment to
      create the exact final checkout, confirm `provisioned-root` and direct SSH; otherwise omit it.
@@ -71,7 +71,7 @@ a long time, or need the user at the keyboard. Never create an Orca workspace or
      ask scope/project/region and plan limits (§2). Then **read that provider's CLI/SDK docs** (or
      `<cli> --help`) before scaffolding — you need its exact create/exec/snapshot/remove verbs.
      If a provider advertises `ssh`, verify whether it exposes a real dialable SSH target
-     (host/port/user/key or proxy command) or only a provider-mediated interactive shell; Orca SSH mode
+     (host/port/user/key or proxy command) or only a provider-mediated interactive shell; Orca Lab SSH mode
      needs the former.
    - **Coding-agent CLI + account:** which agent runs in the VM (`codex`, `claude`, …) and that the user
      has an account for it — it gets logged in during the Phase-3 auth snapshot (§4).
@@ -111,7 +111,7 @@ a long time, or need the user at the keyboard. Never create an Orca workspace or
 The user's responsibility; verify what's verifiable, ask for the rest, invent nothing. State which
 items you verified vs. which the user asserted.
 
-- **Connection mode** (Orca server vs SSH) confirmed with the user — see §1 step 2; it shapes the recipe.
+- **Connection mode** (Orca Lab server vs SSH) confirmed with the user — see §1 step 2; it shapes the recipe.
 - **Cloud account + plan** that allows sandboxes/VMs. Ask.
 - **Provider CLI installed + authenticated** — detect (`command -v <cli>`), check auth (e.g.
   `vercel whoami`). If missing, point at the provider's docs; don't log them in.
@@ -317,7 +317,7 @@ and poll until that file parses as JSON (and bail if the process dies — dump i
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-payload="$(cat)"                       # Orca passes lifecycle JSON on stdin
+payload="$(cat)"                       # Orca Lab passes lifecycle JSON on stdin
 resource_id="$(node -e 'const d=JSON.parse(process.argv[1]); process.stdout.write(d.recipeResult?.userData?.resourceId ?? "")' "$payload")"
 [ -n "$resource_id" ] || { echo "No resource id in lifecycle payload" >&2; exit 1; }
 # suspend: provider suspend "$resource_id"
@@ -440,11 +440,11 @@ pairing URL). If the user chose **SSH** in the §1 interview, use §7g instead.
 
 SSH mode is **fundamentally different from §7c/§7f**, not a relabeling of them:
 
-- **`create` does NOT run `orca serve` and does NOT emit a `pairingCode`.** Orca itself connects to the
+- **`create` does NOT run `orca serve` and does NOT emit a `pairingCode`.** Orca Lab itself connects to the
   host over its SSH relay, brings up the git + filesystem providers, and imports the repo. The script's
-  only job is to make the host ready and **print SSH connection details** Orca will dial.
+  only job is to make the host ready and **print SSH connection details** Orca Lab will dial.
 - The result uses a `connection` block with `type: "ssh"` and a `target`, **not** the flat
-  `pairingCode`/`projectRoot` shape. Exact shape (Orca rejects anything else):
+  `pairingCode`/`projectRoot` shape. Exact shape (Orca Lab rejects anything else):
 
 ```json
 {
@@ -506,7 +506,7 @@ Fail if the requested schema is not `2`; do not silently fall back to the ordina
 - Through a bastion → `jumpHost` (a `user@host` ProxyJump) **or** a full `proxyCommand` (e.g. an access
   proxy). Use one, not both.
 - A service port the workspace needs → add entries to `portForwards`.
-- `relayGracePeriodSeconds` (optional): how long Orca keeps the SSH relay alive after the workspace
+- `relayGracePeriodSeconds` (optional): how long Orca Lab keeps the SSH relay alive after the workspace
   detaches before tearing it down; `0` = tear down immediately. Leave it off unless the user wants a
   reconnect grace window.
 
@@ -536,7 +536,7 @@ ssh "${ssh_opts[@]}" "$ssh_target" \
      cd \"$project_root\" && git fetch origin \"$repo_ref\" && git checkout -B \"$repo_ref\" FETCH_HEAD
    '" >&2
 
-# 2. print the SSH connection block (NO pairingCode, NO orca serve). host/port/username tell Orca's
+# 2. print the SSH connection block (NO pairingCode, NO orca serve). host/port/username tell Orca Lab's
 #    relay how to dial in; identityFile/jumpHost/proxyCommand/portForwards are emitted when set.
 node -e 'const [host,port,user,idf,jh,pc,root]=process.argv.slice(1);
   const target={ label:"per-workspace-host", host, port:Number(port), username:user };
@@ -547,7 +547,7 @@ node -e 'const [host,port,user,idf,jh,pc,root]=process.argv.slice(1);
 ```
 
 `suspend`/`resume`/`destroy`: on a persistent host there's usually nothing to tear down — set
-`destroy: none` and omit suspend/resume. (Orca still disconnects/reconnects its own SSH relay on
+`destroy: none` and omit suspend/resume. (Orca Lab still disconnects/reconnects its own SSH relay on
 sleep/wake/delete — that's separate from these scripts.)
 
 If the SSH host is instead an **ephemeral/snapshot-capable VM** (your hypervisor, or a cloud VM with
@@ -667,7 +667,7 @@ Lifecycle hooks (all run locally):
 - `resume`: optional. Wake; reads payload on stdin and **prints fresh recipe JSON** (pairing may change).
 - `destroy`: optional unless `destroy: none`. Delete/cleanup; reads payload on stdin.
 
-Start Orca remotely with `orca serve --port "$PORT" --project-root "$ABS_ROOT" --pairing-address
+Start Orca Lab remotely with `orca serve --port "$PORT" --project-root "$ABS_ROOT" --pairing-address
 "$EXTERNAL_WSS_URL" --recipe-json` (exact flags + output in §7c). Set `--pairing-address` to the
 externally reachable address so the emitted `pairingCode` is reachable; tunneling/port mapping is the
 script's job.
@@ -773,5 +773,5 @@ startup-only `docker run` before the full clone/install path.
 - Don't invent or store credentials; no secrets in `userData`, state, comments, docs, or commits.
 - Don't run paid/long phases (base snapshot, auth, live test) without an explicit OK.
 - Don't hide provider errors behind generic messages — preserve actionable stderr.
-- Don't make Orca own provider lifecycle beyond invoking the configured scripts.
-- Don't commit or create an Orca workspace unless asked.
+- Don't make Orca Lab own provider lifecycle beyond invoking the configured scripts.
+- Don't commit or create an Orca Lab workspace unless asked.

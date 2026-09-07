@@ -1,11 +1,11 @@
 ---
 name: computer-use
 description: >-
-  Use Orca's computer-use CLI to inspect and operate local desktop app windows
+  Use Orca Lab's computer-use CLI to inspect and operate local desktop app windows
   through accessibility trees, screenshots, and safe UI actions. Use for
   desktop app interaction: list apps/windows, get app state, read visible UI,
   click controls, type, press keys, scroll, drag, set values, or perform
-  accessibility actions. Also use for browser windows, webviews, Orca app UI,
+  accessibility actions. Also use for browser windows, webviews, Orca Lab app UI,
   or other desktop UI. Triggers include "computer use", "orca computer", "read
   Spotify", "read Slack", "control/click/read in a desktop app", and "get app
   state".
@@ -17,9 +17,9 @@ Use this skill for desktop UI through `orca computer`. When the requested target
 
 ## Preconditions
 
-- Choose the Orca executable once: use the `ORCA_CLI_COMMAND` environment value when set;
+- Choose the Orca Lab executable once: use the `ORCA_CLI_COMMAND` environment value when set;
   otherwise use `orca-dev` in a dev session exposing `ORCA_DEV_REPO_ROOT`, `orca-ide` on
-  Linux outside an Orca-managed terminal, and `orca` everywhere else. Never try bare
+  Linux outside an Orca Lab-managed terminal, and `orca` everywhere else. Never try bare
   `orca` first on unmanaged Linux because it normally resolves to the GNOME screen reader.
 - In every command example, `ORCA` is a documentation placeholder — including examples that
   name a specific shell. Replace it with that chosen executable before running the command;
@@ -154,4 +154,4 @@ Slack: the accessibility tree may be shallow while the screenshot contains usefu
 
 ## Next Action
 
-Confirm Orca status unless already checked, then run `ORCA computer capabilities --json`. For website or web-app targets such as Gmail, identify the desktop browser app/window that contains the page, then get that target app state with `ORCA computer get-app-state --app <app> --json`.
+Confirm Orca Lab status unless already checked, then run `ORCA computer capabilities --json`. For website or web-app targets such as Gmail, identify the desktop browser app/window that contains the page, then get that target app state with `ORCA computer get-app-state --app <app> --json`.
