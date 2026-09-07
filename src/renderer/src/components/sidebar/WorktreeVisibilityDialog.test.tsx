@@ -342,7 +342,7 @@ describe('WorktreeVisibilityDialog', () => {
     await renderDialog()
 
     expect(document.body.textContent).toContain('Hidden worktrees (0)')
-    expect(document.body.textContent).toContain('No non-Orca worktrees found')
+    expect(document.body.textContent).toContain('No non-Orca Lab worktrees found')
   })
 
   it('says it is checking instead of claiming nothing is hidden on a fallback snapshot', async () => {
@@ -589,7 +589,7 @@ describe('WorktreeVisibilityDialog', () => {
     await click(sourceSwitch())
 
     expect(document.querySelector('[role="alert"]')?.textContent).toContain(
-      "This host doesn't support source-specific worktree visibility. Update Orca on the host to change this setting."
+      "This host doesn't support source-specific worktree visibility. Update Orca Lab on the host to change this setting."
     )
     expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('Try again')
     expect(mocks.state.fetchWorktrees).not.toHaveBeenCalled()

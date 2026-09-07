@@ -150,7 +150,7 @@ export function WorktreeCardHeader({
                     )
                   : translate(
                       'auto.components.sidebar.WorktreeCard.runtimeHostProject',
-                      'Project on Orca server'
+                      'Project on Orca Lab server'
                     )}
             </TooltipContent>
           </Tooltip>

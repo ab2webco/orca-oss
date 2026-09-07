@@ -29,9 +29,11 @@ const REALIGNED_PATHS = [
   /^components\/feature-wall\//,
   /^components\/settings\/BrowserUse/,
   /^components\/settings\/browser-use/,
+  // AddRemoteHostFields.tsx is excluded: two of its fallbacks diverge from the
+  // catalog as copy, not rename, so the stale check would fail on copy this
+  // slice does not own.
+  /^components\/sidebar\/(?!AddRemoteHostFields\.tsx)/,
   // File-level entries: each directory below still has other drifted files.
-  /^components\/sidebar\/AddRemoteHostSshConfigPicker\.tsx$/,
-  /^components\/sidebar\/add-remote-host-ssh-actions\.ts$/,
   /^components\/settings\/OrchestrationPane\.tsx$/,
   /^components\/settings\/OrchestrationSetupCard\.tsx$/,
   /^components\/floating-terminal\/FloatingTerminalOrchestrationDialog\.tsx$/,
@@ -47,7 +49,7 @@ const REALIGNED_PATHS = [
 // this over, and realigning one without moving its path above pushes it under.
 // This pin, not the parsed-call floor below, is what catches a parser that stops
 // reading a literal shape repository-wide.
-const KNOWN_DRIFT_SITES = 591
+const KNOWN_DRIFT_SITES = 529
 
 // Floor on the calls the parser reads inside the realigned surface. Without it
 // the surface has no coverage canary of its own: a parser regression scoped to
@@ -56,7 +58,7 @@ const KNOWN_DRIFT_SITES = 591
 // below would then pass while covering nothing. A floor rather than an equality
 // pin so that adding a translate() call here is not a failing build; the
 // key-resolves check next to it is what keeps the floor honest.
-const REALIGNED_PARSED_CALLS = 506
+const REALIGNED_PARSED_CALLS = 1525
 
 // Repository-wide floor. Deliberately loose — it only catches a parser that
 // stops matching almost everything.
