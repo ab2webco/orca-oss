@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
+  MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY,
@@ -161,6 +162,7 @@ describe('mobile RPC allowlist', () => {
       'plane.readWorkItemCommentThread',
       'plane.searchWorkItems',
       'plane.status',
+      'plane.updateState',
       'plane.updateWorkItem'
     ])
   })
@@ -185,12 +187,18 @@ describe('mobile RPC allowlist', () => {
         (method) => !allowed.has(method)
       )
     ).toEqual([])
-    // Column edits stay off the phone.
+  })
+
+  it('opens Plane column edits to the phone as their own advertised capability', () => {
+    // Why: writes.v1 hosts refuse the three state methods at dispatch, so the
+    // phone's column menu keys on this capability alone.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY)
     expect(
       ['plane.createState', 'plane.updateState', 'plane.deleteState'].filter((method) =>
         allowed.has(method)
       )
-    ).toEqual([])
+    ).toEqual(['plane.updateState'])
   })
 
   it('opens the Plane member list to the phone as its own advertised capability', () => {

@@ -334,10 +334,12 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'plane.listWorkItems',
   'plane.searchWorkItems',
   'plane.listStates',
-  // Board writes, gated on the phone by MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY; column edits (create/update/deleteState) stay off.
+  // Board writes, gated on the phone by MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY.
   'plane.updateWorkItem',
   'plane.createWorkItem',
   'plane.addWorkItemComment',
+  // Column rename (later reorder), gated on the phone by MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY; create/delete arrive under their own capability with their UI.
+  'plane.updateState',
   // Assignee picker, gated on the phone by MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY.
   'plane.listMembers',
   // Comment thread read, gated by MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY;

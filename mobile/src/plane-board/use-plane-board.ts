@@ -16,6 +16,7 @@ import {
   usePlaneBoardCommentArea,
   type PlaneBoardCommentArea
 } from './use-plane-board-comment-area'
+import { usePlaneBoardColumns, type PlaneBoardColumns } from './use-plane-board-columns'
 import { usePlaneBoardCreate, type PlaneBoardCreate } from './use-plane-board-create'
 import { usePlaneBoardEdits, type PlaneBoardEdits } from './use-plane-board-edits'
 import { usePlaneBoardMoves, type PlaneBoardMoves } from './use-plane-board-moves'
@@ -37,7 +38,8 @@ export type PlaneBoard = Omit<PlaneBoardEdits, 'overrides' | 'reset'> &
   Omit<PlaneBoardMoves, 'overrides' | 'reset' | 'moveWorkItem'> &
   Omit<PlaneBoardCommentArea, 'reset'> &
   PlaneBoardAssignees &
-  PlaneBoardCreate & {
+  PlaneBoardCreate &
+  PlaneBoardColumns & {
     status: PlaneBoardStatus
     error: string | null
     refreshing: boolean
@@ -91,27 +93,29 @@ export function usePlaneBoard(
 
   // Silent on purpose: the cards are already here, so the column metadata must never
   // replace a drawn board with a spinner. Until it lands, derived columns carry the cards.
-  const loadStates = useCallback(async (): Promise<void> => {
+  const loadStates = useCallback(async (): Promise<PlaneMobileState[] | 'stale' | 'failed'> => {
     const generation = generationRef.current + 1
     generationRef.current = generation
     if (!client || !enabled || !planeConnected || !projectId) {
       setLoadedStates(EMPTY_STATES)
       setStatesError(null)
-      return
+      return 'stale'
     }
     try {
       const states = await fetchPlaneStates(client, projectId, workspaceId)
       if (generationRef.current !== generation) {
-        return
+        return 'stale'
       }
       setLoadedStates({ projectId, states })
       setStatesError(null)
+      return states
     } catch (err) {
       if (generationRef.current !== generation) {
-        return
+        return 'stale'
       }
       setLoadedStates({ projectId, states: [] })
       setStatesError(err instanceof Error ? err.message : 'Failed to load the Plane board')
+      return 'failed'
     }
   }, [client, enabled, planeConnected, projectId, workspaceId])
 
@@ -226,6 +230,13 @@ export function usePlaneBoard(
     items: visibleItems,
     reload
   })
+  const columnEdits = usePlaneBoardColumns({
+    client,
+    projectId,
+    workspaceId,
+    capabilities,
+    reloadStates: loadStates
+  })
 
   return {
     status,
@@ -246,6 +257,7 @@ export function usePlaneBoard(
     ...assignees,
     ...commentArea,
     ...creation,
+    ...columnEdits,
     selectColumn: useCallback(
       (stateId: string) => setActiveSelection({ projectId, stateId }),
       [projectId]

@@ -126,6 +126,9 @@ export const MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY =
 // would leave the detail blank, so they are advertised as one thing (ORCA-464).
 export const MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY =
   'mobile.plane-board.work-item-description.v1' as const
+// Why: writes.v1 hosts refuse plane.updateState at dispatch, so the phone keys its column UI (rename, later reorder) on this alone; create/delete get their own capability with their UI, so an old columns.v1 host never refuses a newer phone.
+export const MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY =
+  'mobile.plane-board.columns.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
@@ -148,6 +151,7 @@ export const RUNTIME_CAPABILITIES = [
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY,
+  MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY,
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,

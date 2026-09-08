@@ -36,3 +36,12 @@ export function arePlaneCommentsReadableByHost(
 ): boolean {
   return capabilities?.includes(MOBILE_PLANE_BOARD_COMMENT_READS_CAPABILITY) === true
 }
+
+// Mirrors MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY: plane.updateState only; create/delete get their own.
+export const MOBILE_PLANE_BOARD_COLUMNS_CAPABILITY = 'mobile.plane-board.columns.v1'
+
+export function arePlaneColumnsEditableByHost(
+  capabilities: readonly string[] | undefined
+): boolean {
+  return capabilities?.includes(MOBILE_PLANE_BOARD_COLUMNS_CAPABILITY) === true
+}
