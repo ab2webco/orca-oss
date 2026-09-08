@@ -4,6 +4,7 @@ import type {
   CodexRateLimitAccountsState
 } from '../../../shared/managed-account-types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 export type HostLoginAgent = 'claude' | 'codex'
 
@@ -24,15 +25,21 @@ const COMPLETE_TIMEOUT_MS = 180_000
 
 type Settings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
 
-function requireRemoteTarget(settings: Settings): ReturnType<typeof getActiveRuntimeTarget> {
+function requireAccountOwningTarget(settings: Settings): ReturnType<typeof getActiveRuntimeTarget> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind !== 'environment') {
-    // Why refuse instead of falling back to the desktop flow: this lane exists
-    // for the server that owns the accounts. On the local host the interactive
-    // add already works and running both would create the account twice.
-    throw new Error('Host sign-in is only used when an Orca server owns the accounts.')
+  if (target.kind === 'environment') {
+    return target
   }
-  return target
+  // Why the web client counts as an owner while the desktop does not: the page
+  // is served BY the runtime that owns the accounts, so its "local" target is
+  // that server. Its accounts shim resolves an empty roster for `add`, which is
+  // why clicking the button there looked like nothing happened at all.
+  if (isWebClientLocation()) {
+    return target
+  }
+  // On a desktop talking to itself the interactive add already works, and
+  // running both lanes would create the account twice.
+  throw new Error('Host sign-in is only used when a runtime other than this desktop owns the accounts.')
 }
 
 /** Ask the account-owning server to start a sign-in and report what to open. */
@@ -41,7 +48,7 @@ export async function beginHostAccountLogin(
   agent: HostLoginAgent
 ): Promise<HostLoginStarted> {
   return callRuntimeRpc<HostLoginStarted>(
-    requireRemoteTarget(settings),
+    requireAccountOwningTarget(settings),
     'accounts.beginHostLogin',
     { agent },
     { timeoutMs: BEGIN_TIMEOUT_MS }
@@ -55,7 +62,7 @@ export async function completeHostAccountLogin(
   code: string | null
 ): Promise<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState> {
   return callRuntimeRpc<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState>(
-    requireRemoteTarget(settings),
+    requireAccountOwningTarget(settings),
     'accounts.completeHostLogin',
     { sessionId, code },
     { timeoutMs: COMPLETE_TIMEOUT_MS }
@@ -68,7 +75,7 @@ export async function cancelHostAccountLogin(
   sessionId: string
 ): Promise<void> {
   await callRuntimeRpc(
-    requireRemoteTarget(settings),
+    requireAccountOwningTarget(settings),
     'accounts.cancelHostLogin',
     { sessionId },
     { timeoutMs: BEGIN_TIMEOUT_MS }
