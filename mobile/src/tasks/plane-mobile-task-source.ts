@@ -5,6 +5,7 @@ import {
   decodePlaneProjects,
   decodePlaneStates,
   decodePlaneStatus,
+  decodePlaneWorkItem,
   decodePlaneWorkItems,
   type PlaneMobileProject,
   type PlaneMobileState,
@@ -25,6 +26,20 @@ export const PLANE_WORK_ITEM_LIMIT = 100
 
 export function isPlaneSupportedByHost(capabilities: readonly string[] | undefined): boolean {
   return capabilities?.includes(MOBILE_TASKS_PLANE_CAPABILITY) === true
+}
+
+// Mirrors MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY. It stands for two
+// facts at once — the host honours `omitDescription` on the list AND allowlists
+// plane.getWorkItem — because asking for the lean list on a host that refuses the
+// second leaves every card's body blank (ORCA-464).
+export const MOBILE_PLANE_WORK_ITEM_DESCRIPTION_CAPABILITY =
+  'mobile.plane-board.work-item-description.v1'
+
+/** True where the detail can read a description the list no longer carries. */
+export function isPlaneWorkItemDescriptionReadableByHost(
+  capabilities: readonly string[] | undefined
+): boolean {
+  return capabilities?.includes(MOBILE_PLANE_WORK_ITEM_DESCRIPTION_CAPABILITY) === true
 }
 
 export type PlaneMobileAvailability = {
@@ -92,6 +107,31 @@ export async function fetchPlaneStates(
   )
 }
 
+/**
+ * The open card's description, read on its own because the list stopped carrying
+ * it. Returns '' for a work item that genuinely has none — the caller cannot tell
+ * that from "omitted" by looking at the list row, which is why this always runs
+ * rather than branching on the field being absent (ORCA-464).
+ */
+export async function fetchPlaneWorkItemDescription(
+  client: RpcClient,
+  args: { workItemId: string; projectId: string; workspaceId: string | null }
+): Promise<string> {
+  const item = decodePlaneWorkItem(
+    unwrap(
+      await client.sendRequest('plane.getWorkItem', {
+        workItemId: args.workItemId,
+        projectId: args.projectId,
+        workspaceId: args.workspaceId ?? undefined
+      })
+    )
+  )
+  if (!item) {
+    throw new Error('Plane returned a work item this app could not read.')
+  }
+  return item.description ?? ''
+}
+
 // Why one call: plane.searchWorkItems is a PQL parser that rejects free text, and this
 // query is whatever a human typed into "Search Plane tasks…". The rows come back
 // unsearched and the text match runs on them — before the cap, so a match past the
@@ -103,12 +143,19 @@ export async function fetchPlaneWorkItems(
     filter: PlaneWorkItemFilter
     projectId: string | null
     workspaceId: string | null
+    /** Host capabilities; without them the list is requested whole. */
+    capabilities?: readonly string[] | undefined
   }
 ): Promise<PlaneMobileWorkItem[]> {
+  // `description` was 58% of this payload and no row renders it, but asking for
+  // it to be dropped is only safe where the detail can read it back — otherwise
+  // an older host answers with the field gone and nothing can fill it in.
+  const omitDescription = isPlaneWorkItemDescriptionReadableByHost(args.capabilities)
   const response = await client.sendRequest('plane.listWorkItems', {
     filter: args.filter,
     projectId: args.projectId ?? undefined,
-    workspaceId: args.workspaceId ?? undefined
+    workspaceId: args.workspaceId ?? undefined,
+    ...(omitDescription ? { omitDescription: true } : {})
   })
   const items = decodePlaneWorkItems(unwrap(response))
   return filterPlaneWorkItemsByQuery(items, args.query).slice(0, PLANE_WORK_ITEM_LIMIT)

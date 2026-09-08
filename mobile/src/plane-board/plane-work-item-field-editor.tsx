@@ -9,9 +9,14 @@ import {
   shouldSavePlaneDescription
 } from './plane-work-item-field-drafts'
 import type { PlaneWorkItemFieldEdit } from './use-plane-board-edits'
+import type { PlaneWorkItemDescription } from './use-plane-work-item-description'
 
 type Props = {
   item: PlaneMobileWorkItem
+  /** The card's body. Until it is `ready` this field cannot be edited: seeding
+   *  the draft from a description that was never read would save the blank over
+   *  the real one the moment the field is left (ORCA-464). */
+  description: PlaneWorkItemDescription
   /** A write on this card is in flight: the fields wait for it. */
   editing: boolean
   clearable: boolean
@@ -23,7 +28,7 @@ type FieldSave = { edit: PlaneWorkItemFieldEdit } | { error: string } | null
 /** The in-place text and date fields of the detail sheet. Each one saves when
  *  it is left or submitted, and shows what the card shows — so an optimistic
  *  edit, its rollback and a re-read all land here through `item`. */
-export function PlaneWorkItemFieldEditor({ item, editing, clearable, onSave }: Props) {
+export function PlaneWorkItemFieldEditor({ item, description, editing, clearable, onSave }: Props) {
   const dateField = (field: 'startDate' | 'targetDate') => (draft: string) => {
     const save = resolvePlaneDateSave({ draft, stored: item[field], clearable })
     return save && 'value' in save ? { edit: { [field]: save.value } } : save
@@ -40,19 +45,28 @@ export function PlaneWorkItemFieldEditor({ item, editing, clearable, onSave }: P
           return save && { edit: save }
         }}
       />
-      <DraftField
-        label="Description"
-        stored={item.description ?? ''}
-        placeholder="Add a description"
-        multiline
-        editing={editing}
-        onSave={onSave}
-        resolve={(draft) =>
-          shouldSavePlaneDescription({ draft, stored: item.description })
-            ? { edit: { description: draft } }
-            : null
-        }
-      />
+      {description.state === 'ready' ? (
+        <DraftField
+          label="Description"
+          stored={description.text}
+          placeholder="Add a description"
+          multiline
+          editing={editing}
+          onSave={onSave}
+          resolve={(draft) =>
+            shouldSavePlaneDescription({ draft, stored: description.text })
+              ? { edit: { description: draft } }
+              : null
+          }
+        />
+      ) : (
+        <View style={styles.field}>
+          <Text style={styles.label}>Description</Text>
+          <Text style={styles.unread}>
+            {description.state === 'loading' ? 'Reading…' : description.error}
+          </Text>
+        </View>
+      )}
       <DraftField
         label="Labels"
         stored={(item.labelIds ?? []).join(', ')}
@@ -172,6 +186,7 @@ const styles = StyleSheet.create({
   section: { marginTop: spacing.md, paddingHorizontal: spacing.md + 2, gap: spacing.sm },
   field: { gap: spacing.xs },
   label: { fontSize: 11, color: colors.textMuted },
+  unread: { fontSize: typography.bodySize, color: colors.textMuted },
   input: {
     borderWidth: 1,
     borderColor: colors.borderSubtle,

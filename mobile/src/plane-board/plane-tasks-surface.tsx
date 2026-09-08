@@ -16,6 +16,7 @@ import { PlaneCreateSheet } from './plane-create-sheet'
 import { createPlaneWorkItemFromHeader, stubPlaneWorkItem } from './plane-header-create'
 import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
+import { usePlaneWorkItemDescription } from './use-plane-work-item-description'
 import type { PlaneViewMode } from './plane-work-item-view'
 import { usePlaneBoard, type PlaneBoardRows } from './use-plane-board'
 
@@ -124,6 +125,7 @@ export function PlaneTasksSurface({
   )
   // Resolved live so an optimistic edit shows in the sheet as well as on the card.
   const live = resolveLivePlaneWorkItem(board.columns, openItem)
+  const description = usePlaneWorkItemDescription(client, capabilities, workspaceId, live)
 
   // Await the move before closing: closing re-reads the Tasks list, and in list mode the
   // row comes from that list, not board.columns. Closing first raced the re-read ahead of
@@ -258,6 +260,7 @@ export function PlaneTasksSurface({
         onClose={onCloseDetail}
         onCopyLink={live ? () => copyOpenCard() : undefined}
         copied={copied}
+        description={description}
       />
       <PlaneCreateSheet
         visible={enabled && createOpen}

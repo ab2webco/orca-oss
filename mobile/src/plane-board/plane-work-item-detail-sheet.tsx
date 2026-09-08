@@ -18,6 +18,7 @@ import { PlaneBoardCommentThreadSection } from './plane-board-comment-thread-sec
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 import { PlaneWorkItemFieldEditor } from './plane-work-item-field-editor'
 import type { PlaneBoard } from './use-plane-board'
+import type { PlaneWorkItemDescription } from './use-plane-work-item-description'
 
 type Props = {
   /** The live card, so an optimistic edit shows here as well as on the board. */
@@ -30,6 +31,8 @@ type Props = {
   /** Copy the card's share link; omitted hides the action, as GitHub/Linear also do. */
   onCopyLink?: (url: string) => void
   copied?: boolean
+  /** The open card's body, which the lean list no longer carries (ORCA-464). */
+  description: PlaneWorkItemDescription
 }
 
 export function PlaneWorkItemDetailSheet({
@@ -39,7 +42,8 @@ export function PlaneWorkItemDetailSheet({
   onMove,
   onClose,
   onCopyLink,
-  copied
+  copied,
+  description
 }: Props) {
   return (
     <BottomDrawer visible={item !== null} onClose={onClose}>
@@ -51,6 +55,7 @@ export function PlaneWorkItemDetailSheet({
           onMove={onMove}
           onCopyLink={onCopyLink}
           copied={copied}
+          description={description}
         />
       ) : null}
     </BottomDrawer>
@@ -59,7 +64,15 @@ export function PlaneWorkItemDetailSheet({
 
 type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
 
-function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: BodyProps) {
+function SheetBody({
+  item,
+  board,
+  planeConnected,
+  onMove,
+  onCopyLink,
+  copied,
+  description
+}: BodyProps) {
   const editing = board.editingWorkItemIds.has(item.id)
   const moving = board.movingWorkItemIds.has(item.id)
   const failure = board.commentFailures[item.id] ?? null
@@ -87,6 +100,7 @@ function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: 
       )}
       <PlaneWorkItemDetail
         item={createPlaneTask(item)}
+        description={description}
         onOpenInBrowser={(url) => void Linking.openURL(url)}
         onCopyLink={onCopyLink}
         copied={copied}
@@ -94,6 +108,7 @@ function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: 
       {board.canEdit ? (
         <PlaneWorkItemFieldEditor
           item={item}
+          description={description}
           editing={editing}
           clearable={board.canClearDates}
           onSave={(edit) => void board.setFields(item, edit)}
