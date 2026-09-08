@@ -6,9 +6,12 @@ import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatUpdatedAt } from './task-updated-at-time'
 import type { PlaneTaskItem } from './plane-mobile-task-list'
 import { PLANE_PRIORITY_LABELS } from './plane-priority-label'
+import type { PlaneWorkItemDescription } from '../plane-board/use-plane-work-item-description'
 
 type Props = {
   item: PlaneTaskItem
+  /** Read on open where the list omits it, so it has a state of its own. */
+  description: PlaneWorkItemDescription
   onOpenInBrowser: (url: string) => void
   onCopyLink?: (url: string) => void
   copied?: boolean
@@ -24,7 +27,13 @@ function planeProjectLabel(project: PlaneTaskItem['source']['project']): string 
 }
 
 /** Read-only Plane work item detail. Mutations are ORCA-357; this only reads and opens. */
-export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied }: Props) {
+export function PlaneWorkItemDetail({
+  item,
+  description,
+  onOpenInBrowser,
+  onCopyLink,
+  copied
+}: Props) {
   const work = item.source
   const url = work.url
   const fields: [string, string][] = [
@@ -34,7 +43,7 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
     ['Project', planeProjectLabel(work.project)],
     ['Updated', formatUpdatedAt(work.updatedAt) || '—']
   ]
-  const description = work.description?.trim()
+  const body = description.state === 'ready' ? description.text.trim() : ''
   return (
     <View>
       <View style={styles.header}>
@@ -54,12 +63,23 @@ export function PlaneWorkItemDetail({ item, onOpenInBrowser, onCopyLink, copied 
           </View>
         ))}
       </View>
-      {description ? (
+      {description.state === 'ready' ? (
+        body ? (
+          <View style={styles.body}>
+            <Text style={styles.bodyLabel}>Description</Text>
+            <MobileMarkdown content={body} />
+          </View>
+        ) : null
+      ) : (
         <View style={styles.body}>
           <Text style={styles.bodyLabel}>Description</Text>
-          <MobileMarkdown content={description} />
+          {/* Never blank on its own: an empty body is what "still reading" and
+              "the read failed" both used to look like. */}
+          <Text style={styles.bodyNotice}>
+            {description.state === 'loading' ? 'Reading…' : description.error}
+          </Text>
         </View>
-      ) : null}
+      )}
       {url ? (
         <View style={styles.actions}>
           <View style={styles.actionSeparator} />
@@ -141,6 +161,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginBottom: spacing.xs
+  },
+  bodyNotice: {
+    fontSize: typography.bodySize,
+    color: colors.textMuted
   },
   actions: {
     marginTop: spacing.md

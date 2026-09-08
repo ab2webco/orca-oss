@@ -3050,7 +3050,8 @@ export default function MobileTasksScreen() {
             query: appliedQuery,
             filter: planeFilter,
             projectId: planeProjectId,
-            workspaceId: planeWorkspaceId
+            workspaceId: planeWorkspaceId,
+            capabilities: hostCapabilities
           })
           if (!isCurrent()) {
             return

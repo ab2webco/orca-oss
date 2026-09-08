@@ -227,7 +227,10 @@ export function PlaneTasksHarness({
           query,
           filter,
           projectId,
-          workspaceId: 'ws-1'
+          workspaceId: 'ws-1',
+          // The stand-in has to ask the same question the screen asks, or the
+          // render tests exercise a full list production never requests.
+          capabilities
         })
         loadedRef.current = rows
         setListItems(rows)

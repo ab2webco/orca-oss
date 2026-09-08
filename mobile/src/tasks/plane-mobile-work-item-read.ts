@@ -116,6 +116,12 @@ export function decodePlaneWorkItems(result: unknown): PlaneMobileWorkItem[] {
   return decodeRows(result, PlaneMobileWorkItemSchema, 'work items')
 }
 
+/** One work item, read on its own — the list no longer carries `description`. */
+export function decodePlaneWorkItem(result: unknown): PlaneMobileWorkItem | null {
+  const parsed = PlaneMobileWorkItemSchema.safeParse(result)
+  return parsed.success ? parsed.data : null
+}
+
 export function decodePlaneProjects(result: unknown): PlaneMobileProject[] {
   return decodeRows(result, PlaneMobileProjectSchema, 'projects')
 }

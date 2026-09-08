@@ -113,6 +113,12 @@ export const MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY =
 // Why: writes.v1 hosts decode a null date as undefined and answer ok without clearing it.
 export const MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY =
   'mobile.plane-board.date-clears.v1' as const
+// Why: two facts at once, and the phone needs both before it can stop reading
+// `description` off the list — this host allowlists plane.getWorkItem, and its
+// plane.listWorkItems honours `omitDescription`. A host with only one of the two
+// would leave the detail blank, so they are advertised as one thing (ORCA-464).
+export const MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY =
+  'mobile.plane-board.work-item-description.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
@@ -134,6 +140,7 @@ export const RUNTIME_CAPABILITIES = [
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
+  MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY,
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,

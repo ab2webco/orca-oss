@@ -5,6 +5,7 @@ import { ALL_RPC_METHODS } from './rpc/methods'
 import {
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
+  MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
@@ -138,6 +139,40 @@ describe('mobile RPC allowlist', () => {
     const missing = MOBILE_STREAMING_CLEANUP_RPC_METHODS.filter((method) => !allowed.has(method))
 
     expect(missing).toEqual([])
+  })
+
+  it('allows exactly these Plane methods on the phone, and no others', () => {
+    // Why an exact list and not a pair of membership checks: "these three are
+    // allowed, those three are not" says nothing about a fourth. The next change
+    // that opens plane.deleteWorkItem to a paired phone has to land here, in a
+    // diff someone reads, rather than pass because nobody named it.
+    const planeMethods = [...mobileRpcAllowlist()]
+      .filter((method) => method.startsWith('plane.'))
+      .sort()
+
+    expect(planeMethods).toEqual([
+      'plane.addWorkItemComment',
+      'plane.createWorkItem',
+      'plane.getWorkItem',
+      'plane.listMembers',
+      'plane.listProjects',
+      'plane.listStates',
+      'plane.listWorkItems',
+      'plane.readWorkItemCommentThread',
+      'plane.searchWorkItems',
+      'plane.status',
+      'plane.updateWorkItem'
+    ])
+  })
+
+  it('opens one Plane work item to the phone as its own advertised capability', () => {
+    // Why its own capability: the phone asks plane.listWorkItems to omit
+    // `description`, so the detail has to read it somewhere. A host that
+    // allowlists neither, or only one of the two, would show a blank body —
+    // so one flag stands for both and the phone keeps the list copy without it.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY)
+    expect(allowed.has('plane.getWorkItem')).toBe(true)
   })
 
   it('opens the Plane board write surface to the phone as one advertised capability', () => {

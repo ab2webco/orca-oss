@@ -20,6 +20,7 @@ vi.mock('../components/TaskProviderLogo', () => ({ TaskProviderLogo: 'TaskProvid
 vi.mock('../components/pr-sidebar/MermaidDiagram', () => ({ MermaidDiagram: 'MermaidDiagram' }))
 
 import { PlaneWorkItemDetail } from './plane-work-item-detail'
+import type { PlaneWorkItemDescription } from '../plane-board/use-plane-work-item-description'
 
 const MARKDOWN_DESCRIPTION = [
   '## Steps',
@@ -52,10 +53,22 @@ function planeItem(url: string, description?: string): PlaneTaskItem {
   }
 }
 
-function mount(item: PlaneTaskItem, onOpenInBrowser = vi.fn(), onCopyLink = vi.fn()) {
+// The description reaches the detail as its own read since ORCA-464; these cases
+// are about what it renders, so they hand it the resolved text directly.
+function mount(
+  item: PlaneTaskItem,
+  onOpenInBrowser = vi.fn(),
+  onCopyLink = vi.fn(),
+  description: PlaneWorkItemDescription = {
+    state: 'ready',
+    text: item.source.description ?? ''
+  }
+) {
   let renderer!: ReactTestRenderer
   act(() => {
-    renderer = create(createElement(PlaneWorkItemDetail, { item, onOpenInBrowser, onCopyLink }))
+    renderer = create(
+      createElement(PlaneWorkItemDetail, { item, description, onOpenInBrowser, onCopyLink })
+    )
   })
   return { renderer, onOpenInBrowser, onCopyLink }
 }

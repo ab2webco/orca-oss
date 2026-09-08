@@ -343,6 +343,9 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // Comment thread read, gated by MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY;
   // plane.listWorkItemComments stays off because its [] hides a failed read.
   'plane.readWorkItemCommentThread',
+  // One work item, gated by MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY: the
+  // list no longer carries `description`, so the detail reads it here on open (ORCA-464).
+  'plane.getWorkItem',
   'linear.getCustomView',
   'linear.getIssue',
   'linear.getProject',
