@@ -28,7 +28,10 @@ import {
 import type { PlaneTaskGroupBy } from '../src/tasks/provider-task-view-options'
 import { planeListSections } from '../src/tasks/plane-list-sections'
 import { fetchPlaneWorkItems } from '../src/tasks/plane-mobile-task-source'
-import type { PlaneMobileWorkItem } from '../src/tasks/plane-mobile-work-item-read'
+import type {
+  PlaneMobileState,
+  PlaneMobileWorkItem
+} from '../src/tasks/plane-mobile-work-item-read'
 import { PlaneSourceSegmentRow } from '../src/plane-board/plane-source-segment-row'
 import { resolvePlaneTasksChrome } from '../src/plane-board/plane-tasks-chrome-visibility'
 import { PlaneTasksSurface } from '../src/plane-board/plane-tasks-surface'
@@ -160,6 +163,8 @@ type HarnessProps = {
   client: RpcClient
   initialProjectId: string | null
   initialQuery: string
+  /** The screen's planeStates[0]; null while a project change has emptied it (ORCA-463). */
+  defaultState: PlaneMobileState | null
 }
 
 /** The segment row picks the view; list rows and board cards open the same detail.
@@ -168,7 +173,8 @@ type HarnessProps = {
 export function PlaneTasksHarness({
   client,
   initialProjectId,
-  initialQuery
+  initialQuery,
+  defaultState
 }: HarnessProps): ReactElement {
   const capabilities = useRuntimeCapabilities(client, true)
   const [viewMode, setViewMode] = usePlaneViewMode()
@@ -177,6 +183,7 @@ export function PlaneTasksHarness({
   const [query, setQuery] = useState(initialQuery)
   const [detail, setDetail] = useState<PlaneMobileWorkItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
   const [viewPickerOpen, setViewPickerOpen] = useState(false)
   // The Tasks screen owns these; so does this stand-in, which is the point of ORCA-418.
   const [groupBy, setGroupBy] = useState<PlaneTaskGroupBy>('none')
@@ -320,7 +327,11 @@ export function PlaneTasksHarness({
           setFilter(DEFAULT_PLANE_WORK_ITEM_FILTER)
           setQuery('')
         },
-        bottomInset: 0
+        bottomInset: 0,
+        createOpen,
+        onCloseCreate: () => setCreateOpen(false),
+        projectLabel: projectId === OTHER_PROJECT.id ? OTHER_PROJECT.name : 'Orca Lab',
+        defaultState
       }),
       pickerOpen ? createElement(Text, null, 'Project picker') : null,
       // The screen opens a PickerModal here; the stand-in offers the same two choices.
@@ -337,6 +348,12 @@ export function PlaneTasksHarness({
             })
           )
         : null,
+      // The screen's header `+`: the sheet cannot create without a project, so it opens the picker then.
+      createElement(Pressable, {
+        accessibilityRole: 'button',
+        accessibilityLabel: 'New work item',
+        onPress: () => (projectId === null ? setPickerOpen(true) : setCreateOpen(true))
+      }),
       createElement(Pressable, {
         accessibilityRole: 'button',
         accessibilityLabel: 'Switch project',
@@ -368,6 +385,7 @@ export function PlaneTasksHarness({
 export type MountOptions = {
   projectId?: string | null
   query?: string
+  defaultState?: PlaneMobileState | null
 }
 
 export async function renderPlaneTasks(
@@ -383,7 +401,8 @@ export async function renderPlaneTasks(
       createElement(PlaneTasksHarness, {
         client,
         initialProjectId: options.projectId === undefined ? 'proj-1' : options.projectId,
-        initialQuery: options.query ?? ''
+        initialQuery: options.query ?? '',
+        defaultState: options.defaultState === undefined ? CARD.state : options.defaultState
       })
     )
   })

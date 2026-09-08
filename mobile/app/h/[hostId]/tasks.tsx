@@ -82,6 +82,7 @@ import {
   type GitHubPRReviewSummary
 } from '../../../src/tasks/github-mobile-pr-review'
 import { TaskProviderLogo } from '../../../src/components/TaskProviderLogo'
+import { resolveHeaderCreateTask } from '../../../src/tasks/header-create-task-visibility'
 import {
   buildGitHubPrFileDiffPreview,
   type GitHubPrFileDiffLine
@@ -1895,6 +1896,7 @@ export default function MobileTasksScreen() {
   const [showGitHubIssueSourcePicker, setShowGitHubIssueSourcePicker] = useState(false)
   const [showGitHubPagePicker, setShowGitHubPagePicker] = useState(false)
   const [showCreateTask, setShowCreateTask] = useState(false)
+  const [showPlaneCreate, setShowPlaneCreate] = useState(false)
   const [showCreateTargetPicker, setShowCreateTargetPicker] = useState(false)
   const [createTitle, setCreateTitle] = useState('')
   const [createBody, setCreateBody] = useState('')
@@ -8204,8 +8206,7 @@ export default function MobileTasksScreen() {
       : ((selectedCreateTarget as LinearTeam | null)?.name ?? 'Select target')
   const providerLabel =
     TASK_PROVIDER_OPTIONS.find((option) => option.value === provider)?.label ?? 'GitHub'
-  const showHeaderCreateTask =
-    provider === 'linear' || (provider === 'github' && githubMode === 'items')
+  const showHeaderCreateTask = resolveHeaderCreateTask({ provider, githubMode })
   const providerOptions = useMemo(
     () => TASK_PROVIDER_OPTIONS.filter((option) => visibleProviders.includes(option.value)),
     [visibleProviders]
@@ -8680,6 +8681,14 @@ export default function MobileTasksScreen() {
                   setLinearConnectState('idle')
                   setLinearConnectError('')
                   setShowLinearConnect(true)
+                  return
+                }
+                if (provider === 'plane') {
+                  if (planeProjectId) {
+                    setShowPlaneCreate(true)
+                  } else {
+                    setShowPlaneProjectPicker(true)
+                  }
                   return
                 }
                 setCreateTitle('')
@@ -9787,6 +9796,10 @@ export default function MobileTasksScreen() {
           setAppliedQuery('')
         }}
         bottomInset={insets.bottom}
+        createOpen={showPlaneCreate}
+        onCloseCreate={() => setShowPlaneCreate(false)}
+        projectLabel={planeProjectLabel}
+        defaultState={planeStates[0] ?? null}
       />
 
       <PickerModal

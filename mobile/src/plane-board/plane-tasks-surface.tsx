@@ -3,10 +3,17 @@ import { StyleSheet, View } from 'react-native'
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
-import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
+import type {
+  PlaneMobileProject,
+  PlaneMobileState,
+  PlaneMobileWorkItem
+} from '../tasks/plane-mobile-work-item-read'
+import { fetchPlaneStates } from '../tasks/plane-mobile-task-source'
 import type { PlaneTaskDisplayProperty } from '../tasks/provider-task-display-properties'
 import type { PlaneTaskGroupBy } from '../tasks/provider-task-view-options'
 import { resolveLivePlaneWorkItem, resolvePlaneBoardScope } from './plane-board-scope'
+import { PlaneCreateSheet } from './plane-create-sheet'
+import { createPlaneWorkItemFromHeader, stubPlaneWorkItem } from './plane-header-create'
 import { PlaneTaskBoard } from './plane-task-board'
 import { PlaneWorkItemDetailSheet } from './plane-work-item-detail-sheet'
 import type { PlaneViewMode } from './plane-work-item-view'
@@ -47,6 +54,12 @@ type Props = {
   onPickProject: () => void
   onClearFilter: () => void
   bottomInset: number
+  /** The header `+` sheet (ORCA-463); opened by the Tasks screen, closed here or by it. */
+  createOpen: boolean
+  onCloseCreate: () => void
+  projectLabel: string
+  /** The project's first state: where a header-created card lands when no board column is shown. */
+  defaultState: PlaneMobileState | null
 }
 
 /** Everything Plane-specific the Tasks screen mounts besides its own list rows:
@@ -77,7 +90,11 @@ export function PlaneTasksSurface({
   copied,
   onPickProject,
   onClearFilter,
-  bottomInset
+  bottomInset,
+  createOpen,
+  onCloseCreate,
+  projectLabel,
+  defaultState
 }: Props) {
   const openItem = enabled ? detailItem : null
   const rows = useMemo<PlaneBoardRows>(
@@ -136,6 +153,86 @@ export function PlaneTasksSurface({
     }
   }, [live, onCopyLink])
 
+  // The board's first column wins over the project's first state: it is the column on screen.
+  const firstColumn = board.columns[0]
+  const landingState = useMemo(
+    () =>
+      firstColumn
+        ? { id: firstColumn.stateId, name: firstColumn.name, group: firstColumn.group }
+        : defaultState,
+    [defaultState, firstColumn]
+  )
+  const createFromHeader = useCallback(
+    async (title: string) => {
+      if (!client) {
+        return { ok: false as const, error: 'Not connected to the host' }
+      }
+      const knownIds = new Set(workItems.map((item) => item.id))
+      // Why: the screen empties planeStates on a project change and refills it only after its
+      // own read, so a + right after picking a project would otherwise send an empty stateId.
+      const landing =
+        landingState ??
+        (projectId ? await fetchFirstPlaneState(client, projectId, workspaceId) : null)
+      const result = await createPlaneWorkItemFromHeader(client, {
+        projectId,
+        workspaceId,
+        defaultStateId: landing?.id ?? null,
+        title
+      })
+      if (!result.ok) {
+        if (!result.deliveryUnknown) {
+          return result
+        }
+        // Same rule as the composer: a retry after a timeout would make the card twice.
+        const landed = (await onRefreshItems())?.find(
+          (item) => !knownIds.has(item.id) && item.state.id === landing?.id && item.title === title
+        )
+        if (!landed) {
+          return result
+        }
+        onCloseCreate()
+        onOpenCard(landed)
+        return { ok: true as const }
+      }
+      onCloseCreate()
+      // The create reply carries no card and the header has no column to show it in, so
+      // open the detail: the fresh row when the re-read has it, else a stub until it does.
+      const fresh = await onRefreshItems()
+      const created = fresh?.find((item) => item.id === result.id)
+      onOpenCard(
+        created ??
+          stubPlaneWorkItem({
+            id: result.id,
+            identifier: result.identifier,
+            title,
+            project: projects.find((project) => project.id === projectId) ?? {
+              id: projectId ?? '',
+              identifier: '',
+              name: ''
+            },
+            state: landing ?? { id: '', name: '', group: '' },
+            workspaceId
+          })
+      )
+      return { ok: true as const }
+    },
+    [
+      client,
+      landingState,
+      onCloseCreate,
+      onOpenCard,
+      onRefreshItems,
+      projectId,
+      projects,
+      workItems,
+      workspaceId
+    ]
+  )
+  const pickProjectFromCreate = useCallback(() => {
+    onCloseCreate()
+    onPickProject()
+  }, [onCloseCreate, onPickProject])
+
   return (
     <>
       {enabled && viewMode === 'board' ? (
@@ -162,8 +259,29 @@ export function PlaneTasksSurface({
         onCopyLink={live ? () => copyOpenCard() : undefined}
         copied={copied}
       />
+      <PlaneCreateSheet
+        visible={enabled && createOpen}
+        projectLabel={projectLabel}
+        onPickProject={pickProjectFromCreate}
+        onClose={onCloseCreate}
+        onCreate={createFromHeader}
+      />
     </>
   )
+}
+
+/** Null when the read fails or the project has no states: the create then answers with
+ *  its own missing-column text. */
+async function fetchFirstPlaneState(
+  client: RpcClient,
+  projectId: string,
+  workspaceId: string | null
+): Promise<PlaneMobileState | null> {
+  try {
+    return (await fetchPlaneStates(client, projectId, workspaceId))[0] ?? null
+  } catch {
+    return null
+  }
 }
 
 const styles = StyleSheet.create({
