@@ -94,7 +94,16 @@ export async function runInPlaceManagedClaudeAccountSwitch(args: {
     return { ok: true, switched: result.continuationDelivered ? 'resumed' : 'launched' }
   }
   if (result.failure && NOT_SWITCHABLE_IN_PLACE.has(result.failure.reason)) {
-    return { ok: false, reason: 'unhealthy', message: '' }
+    // Why carry the message now: this used to be `''` because every caller
+    // answered `unhealthy` by falling back to a fresh tab, so nobody read it. A
+    // pane hosted on a server has no such fallback — the transcript and the
+    // account are on the far side — so the refusal reaches the user, and an
+    // empty string reached them as "Account switch failed." with no reason.
+    return {
+      ok: false,
+      reason: 'unhealthy',
+      message: describeClaudeTerminalAccountSwitchFailure(result.failure)
+    }
   }
   if (result.failure?.reason === 'source-stop-failed') {
     // Why its own reason: the agent is still running and owns the terminal, so

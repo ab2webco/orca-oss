@@ -164,6 +164,25 @@ describe('runManagedAccountSwitchRelaunch', () => {
     expect(copySessionForAccountSwitch).not.toHaveBeenCalled()
   })
 
+  // Why assert the text and not just the failure: the refusal used to travel as
+  // an empty string, so the user got "Account switch failed." with nothing under
+  // it and no way to know the pane simply had no account bound to it.
+  it('names why a server-hosted pane was refused instead of failing blankly', async () => {
+    getRemoteRuntimePtyEnvironmentId.mockReturnValue('env-1')
+    store.settings = { agentCmdOverrides: {}, claudeManagedAccounts: [] }
+    callRuntimeRpc.mockResolvedValue(
+      switchResponse({
+        state: 'refused',
+        failure: { reason: 'source-unknown', message: '' }
+      })
+    )
+
+    const result = await run({ settings: store.settings as never })
+
+    expect(result).toMatchObject({ ok: false, reason: 'resume-failed' })
+    expect((result as { message: string }).message).toMatch(/managed Claude account/i)
+  })
+
   it('reports the runtime reason for a server-hosted pane it cannot switch in place', async () => {
     getRemoteRuntimePtyEnvironmentId.mockReturnValue('env-1')
     store.settings = { agentCmdOverrides: {}, claudeManagedAccounts: [] }
