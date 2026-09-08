@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
@@ -15,6 +15,7 @@ import {
 } from './plane-board-sections'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 import { PlaneColumnMenu } from './plane-column-menu'
+import { PlaneColumnPickerSheet } from './plane-column-picker-sheet'
 import type { PlaneBoard } from './use-plane-board'
 
 // The in-flight word goes first: the shell clamps the subtitle to two lines, and the
@@ -59,6 +60,9 @@ export function PlaneTaskBoard({
   onClearFilter,
   bottomInset
 }: Props) {
+  // The card whose status pill was tapped, held here so the board's own columns
+  // are what the picker lists.
+  const [pickerItem, setPickerItem] = useState<PlaneMobileWorkItem | null>(null)
   const onEmptyAction = useCallback(() => {
     const action = board.emptyState?.action
     if (action === 'pick-project') {
@@ -140,8 +144,9 @@ export function PlaneTaskBoard({
             : null
         }
         onPressItem={onOpenCard}
-        // The detail owns "Move to"; the pill is the shortcut into it.
-        onPressStatus={onOpenCard}
+        // Withheld on a read-only host, which drops the chevron with it: a menu
+        // affordance that cannot write is the same broken promise (ORCA-472).
+        onPressStatus={board.canEdit ? setPickerItem : undefined}
         writeErrorSlot={
           <>
             {board.moveError && onBoard(board.moveErrorWorkItemId) ? (
@@ -203,6 +208,21 @@ export function PlaneTaskBoard({
               onCreate={(title) => board.createCard(title, stateId)}
             />
           )
+        }}
+      />
+      <PlaneColumnPickerSheet
+        item={pickerItem}
+        columns={board.columns}
+        moving={pickerItem !== null && board.movingWorkItemIds.has(pickerItem.id)}
+        onClose={() => setPickerItem(null)}
+        onMove={(stateId) => {
+          // Close on the tap: the optimistic override already shows the card in
+          // its new column, and a refused move reports itself in the error row.
+          const moved = pickerItem
+          setPickerItem(null)
+          if (moved) {
+            void board.moveWorkItem(moved, stateId)
+          }
         }}
       />
     </View>
