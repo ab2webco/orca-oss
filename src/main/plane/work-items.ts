@@ -168,10 +168,27 @@ async function resolveViewerId(client: PlaneClientForWorkspace): Promise<string 
 // regardless of a tenant's no-pql default behavior (see listWorkItems).
 const FETCH_ALL_STATES_PQL = 'stateGroup IN openStates() OR stateGroup IN closedStates()'
 
+// Dropping the key, not blanking it: an absent optional field costs zero bytes,
+// while `''` would read as "this work item has no description".
+function withoutDescription(item: PlaneWorkItem): PlaneWorkItem {
+  const lean = { ...item }
+  delete lean.description
+  return lean
+}
+
 export async function listWorkItems(args: {
   projectId?: string
   filter: PlaneWorkItemFilter
   workspaceId?: PlaneWorkspaceSelection | null
+  /**
+   * Opt-in: no row surface renders `description`, and it was 58% of the bytes
+   * on a real board — 1892 B of 3.3 KB per item, 5 s for 108 items (ORCA-464).
+   *
+   * Opt-IN rather than opt-out because dropping a field reaches old clients
+   * with no schema change: a phone that predates this reads `description` from
+   * the list and would render the detail empty. Absent means the full item.
+   */
+  omitDescription?: boolean
 }): Promise<PlaneWorkItem[]> {
   const entries = getClients(args.workspaceId)
   if (entries.length === 0) {
@@ -194,7 +211,8 @@ export async function listWorkItems(args: {
     },
     true
   )
-  return items.slice(0, INTEGRATION_PAGINATION_MAX_ITEMS)
+  const page = items.slice(0, INTEGRATION_PAGINATION_MAX_ITEMS)
+  return args.omitDescription === true ? page.map(withoutDescription) : page
 }
 
 // Why: the self-hosted REST v1 ignores ?pql=, so a server-side search returns

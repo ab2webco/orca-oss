@@ -70,7 +70,8 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
       runtime.planeListWorkItems({
         projectId: params?.projectId,
         filter: params?.filter ?? 'all',
-        workspaceId: params?.workspaceId
+        workspaceId: params?.workspaceId,
+        omitDescription: params?.omitDescription
       })
   }),
   defineMethod({
