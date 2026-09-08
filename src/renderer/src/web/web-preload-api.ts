@@ -940,7 +940,11 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       transferPaneAuthority: () => {}
     },
     mobile: {
-      listNetworkInterfaces: () => Promise.resolve({ interfaces: [] }),
+      // Why the web client can answer this at all: the runtime it is talking to
+      // IS the machine being paired, so its own addresses are the right ones to
+      // advertise. Returning an empty list left the wizard on "No interfaces
+      // found" with a refresh button, which reads as a transient failure.
+      listNetworkInterfaces: () => callRuntimeResult('pairing.listNetworkInterfaces'),
       getPairingQR: () => Promise.resolve({ available: false }),
       getWindowsFirewallStatus: () => Promise.resolve({ supported: false }),
       repairWindowsFirewall: () => Promise.resolve({ ok: false, reason: 'unsupported' }),
