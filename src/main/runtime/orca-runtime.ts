@@ -37820,6 +37820,7 @@ export class OrcaRuntimeService {
     projectId?: string
     filter: PlaneWorkItemFilter
     workspaceId?: PlaneWorkspaceSelection
+    omitDescription?: boolean
   }): ReturnType<typeof listPlaneWorkItems> {
     return listPlaneWorkItems(args)
   }

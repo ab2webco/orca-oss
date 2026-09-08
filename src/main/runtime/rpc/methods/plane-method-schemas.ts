@@ -35,11 +35,15 @@ export const SelectWorkspace = z.object({
   workspaceId: requiredString('Workspace is required')
 })
 
+// `omitDescription` is opt-in so a client that predates it keeps receiving the
+// full item: dropping a field reaches old readers with no schema change at all,
+// and the host cannot tell the two apart unless the new one asks (ORCA-464).
 export const ListWorkItems = z
   .object({
     projectId: OptionalString,
     filter: z.enum(VALID_FILTERS).optional(),
-    workspaceId: OptionalString
+    workspaceId: OptionalString,
+    omitDescription: z.boolean().optional()
   })
   .optional()
 
