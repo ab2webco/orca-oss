@@ -58,6 +58,12 @@
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/test-result-guard.py",
             "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-merge-board-close.py",
+            "if": "Bash(gh pr merge*)",
+            "timeout": 30
           }
         ]
       }

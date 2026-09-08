@@ -50,7 +50,23 @@ sweep_line() {
   board=$(orca plane list --project "$PROJECT" --json 2>/dev/null |
     jq -r 'if .ok then ([..|objects|select(.identifier?)]|length|tostring) else empty end' 2>/dev/null)
 
-  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | board-open:${board:-?}"
+  # Deriva del board: tickets In Progress cuyo PR ya mergeó. El harness sólo mira el
+  # board al abrir el PR, así que nadie los mueve — 8 de 11 el día que se midió (ORCA-471).
+  # Una sola llamada a `gh` y una a `orca`: N consultas por tick chocan el rate limit.
+  local drift merged inprog
+  merged=$(gh pr list -R "$REPO" --state merged --limit 60 --json title 2>/dev/null |
+    grep -oiE 'ORCA-[0-9]+' | tr 'a-z' 'A-Z' | sort -u)
+  inprog=$(orca plane list --project "$PROJECT" --state "In Progress" --json 2>/dev/null |
+    jq -r 'if .ok then ([..|objects|select(.identifier?)|.identifier]|join("\n")) else empty end' 2>/dev/null)
+  # Sin `.ok` la lista vacía de una caída se lee como "cero deriva", que es la misma
+  # mentira que este contador existe para romper.
+  if [ -z "$inprog" ]; then
+    drift="?"
+  else
+    drift=$(comm -12 <(sort -u <<<"$inprog") <(echo "$merged") | tr '\n' ' ' | sed 's/ $//')
+  fi
+
+  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | board-drift:${drift:-none} | board-open:${board:-?}"
 }
 
 if [ "${1:-}" = "--once" ]; then
