@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import * as Linking from 'expo-linking'
 import { BottomDrawer } from '../components/BottomDrawer'
@@ -7,6 +7,12 @@ import { createPlaneTask } from '../tasks/plane-mobile-task-list'
 import type { PlaneMobileMember, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import { PlaneWorkItemDetail } from '../tasks/plane-work-item-detail'
 import { PLANE_PRIORITY_LABELS, PLANE_PRIORITY_PICKER_ORDER } from '../tasks/plane-priority-label'
+import {
+  memberDisplayName,
+  memberInitials,
+  toggledAssignees
+} from './plane-assignee-picker-options'
+import { PlaneAssigneePickerSheet } from './plane-assignee-picker-sheet'
 import { PlaneBoardCommentComposer } from './plane-board-comment-composer'
 import { PlaneBoardCommentThreadSection } from './plane-board-comment-thread-section'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
@@ -49,15 +55,6 @@ export function PlaneWorkItemDetailSheet({
       ) : null}
     </BottomDrawer>
   )
-}
-
-function toggledAssignees(
-  assignees: readonly PlaneMobileMember[],
-  member: PlaneMobileMember
-): PlaneMobileMember[] {
-  return assignees.some((assignee) => assignee.id === member.id)
-    ? assignees.filter((assignee) => assignee.id !== member.id)
-    : [...assignees, member]
 }
 
 type BodyProps = Omit<Props, 'item' | 'onClose'> & { item: PlaneMobileWorkItem }
@@ -145,26 +142,15 @@ function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: 
           ) : board.members.length === 0 ? (
             <Text style={styles.note}>This project has no members to assign.</Text>
           ) : (
-            board.members.map((member) => {
-              const assigned = item.assignees.some((assignee) => assignee.id === member.id)
-              const name = member.displayName || 'Unnamed member'
-              return (
-                <Pressable
-                  key={member.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${assigned ? 'Unassign' : 'Assign'} ${name}`}
-                  aria-checked={assigned}
-                  disabled={editing}
-                  style={styles.row}
-                  onPress={() =>
-                    void board.setAssignees(item, toggledAssignees(item.assignees, member))
-                  }
-                >
-                  <Text style={[styles.rowText, assigned && styles.rowTextActive]}>{name}</Text>
-                  {assigned ? <Text style={styles.rowMeta}>Assigned</Text> : null}
-                </Pressable>
-              )
-            })
+            <AssigneeSummary
+              key={item.id}
+              item={item}
+              members={board.members}
+              editing={editing}
+              onToggle={(member) =>
+                void board.setAssignees(item, toggledAssignees(item.assignees, member))
+              }
+            />
           )}
         </View>
       ) : null}
@@ -246,6 +232,54 @@ function SheetBody({ item, board, planeConnected, onMove, onCopyLink, copied }: 
   )
 }
 
+type AssigneeSummaryProps = {
+  item: PlaneMobileWorkItem
+  members: readonly PlaneMobileMember[]
+  editing: boolean
+  onToggle: (member: PlaneMobileMember) => void
+}
+
+/** The assigned members as chips; the list of everyone lives in the picker sheet. */
+function AssigneeSummary({ item, members, editing, onToggle }: AssigneeSummaryProps) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  return (
+    <>
+      <View style={styles.chips}>
+        {item.assignees.length === 0 ? (
+          <Text style={styles.chipNote}>Nobody assigned</Text>
+        ) : (
+          item.assignees.map((assignee) => (
+            <View key={assignee.id} style={[styles.chip, styles.assigneeChip]}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{memberInitials(assignee.displayName)}</Text>
+              </View>
+              <Text style={styles.chipText}>{memberDisplayName(assignee)}</Text>
+            </View>
+          ))
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Edit assignees"
+          style={[styles.chip, styles.chipActive]}
+          onPress={() => setPickerOpen(true)}
+        >
+          <Text style={[styles.chipText, styles.chipTextActive]}>
+            {item.assignees.length === 0 ? 'Add' : 'Edit'}
+          </Text>
+        </Pressable>
+      </View>
+      <PlaneAssigneePickerSheet
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        members={members}
+        assignees={item.assignees}
+        disabled={editing}
+        onToggle={onToggle}
+      />
+    </>
+  )
+}
+
 const styles = StyleSheet.create({
   offline: {
     marginBottom: spacing.sm,
@@ -277,6 +311,17 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.bgRaised },
   chipText: { fontSize: typography.metaSize, color: colors.textSecondary },
   chipTextActive: { color: colors.textPrimary, fontWeight: '700' },
+  chipNote: { fontSize: typography.metaSize, color: colors.textMuted, alignSelf: 'center' },
+  assigneeChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  avatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgRaised
+  },
+  avatarText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,7 +330,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md
   },
   rowText: { fontSize: typography.bodySize, color: colors.textPrimary },
-  rowTextActive: { fontWeight: '700' },
   rowMeta: { fontSize: typography.metaSize, color: colors.textMuted },
   note: {
     fontSize: typography.metaSize,

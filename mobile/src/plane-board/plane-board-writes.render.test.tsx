@@ -245,6 +245,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
 
     expect(byLabel('Move to Doing')).not.toBeNull()
     expect(byLabel('Priority High')).toBeNull()
+    expect(byLabel('Edit assignees')).toBeNull()
     expect(byLabel('Assign Ada')).toBeNull()
     expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
   })
@@ -376,6 +377,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await openCard()
 
     expect(byLabel('Priority High')).not.toBeNull()
+    expect(byLabel('Edit assignees')).toBeNull()
     expect(byLabel('Assign Ada')).toBeNull()
     expect(callsTo(calls, 'plane.listMembers')).toHaveLength(0)
   })
@@ -386,6 +388,8 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
     await openCard()
 
     expect(byLabel('Priority High')).not.toBeNull()
+    expect(byLabel('Edit assignees')).not.toBeNull()
+    await press('Edit assignees')
     expect(byLabel('Assign Ada')).not.toBeNull()
     expect(byLabel('Assign Grace')).not.toBeNull()
     expect(callsTo(calls, 'plane.listMembers')).toEqual([
@@ -456,6 +460,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
   it('assigns a member and sends the whole assignee list', async () => {
     const calls = await mountBoard(ASSIGNING_HOST, { items: [{ ...CARD, assignees: [] }] })
     await openCard()
+    await press('Edit assignees')
     await press('Assign Ada')
 
     expect(callsTo(calls, 'plane.updateWorkItem')[0]?.params).toEqual({
@@ -479,6 +484,7 @@ describe('Plane board writes on the Tasks screen (react-native-web)', () => {
       items: [{ ...CARD, assignees: [{ id: 'u-1', displayName: 'Ada' }] }]
     })
     await openCard()
+    await press('Edit assignees')
     expect(byLabel('Unassign Ada')).not.toBeNull()
     await press('Unassign Ada')
 
