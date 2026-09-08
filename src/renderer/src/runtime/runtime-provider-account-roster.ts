@@ -1,4 +1,7 @@
-import type { ClaudeRateLimitAccountsState } from '../../../shared/managed-account-types'
+import type {
+  ClaudeRateLimitAccountsState,
+  CodexRateLimitAccountsState
+} from '../../../shared/managed-account-types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 
 const ROSTER_TIMEOUT_MS = 15_000
@@ -26,4 +29,24 @@ export async function listClaudeAccountsForActiveHost(
     return response.claude
   }
   return (await window.api.claudeAccounts.list()) as ClaudeRateLimitAccountsState
+}
+
+/** The Codex sibling of the above, for the same reason: a picker must offer the
+ *  accounts of the machine that will run the agent, not of this desktop. */
+export async function listCodexAccountsForActiveHost(
+  settings: { activeRuntimeEnvironmentId?: string | null } | null | undefined
+): Promise<CodexRateLimitAccountsState> {
+  const target = getActiveRuntimeTarget({
+    activeRuntimeEnvironmentId: settings?.activeRuntimeEnvironmentId ?? null
+  })
+  if (target.kind === 'environment') {
+    const response = await callRuntimeRpc<{ codex: CodexRateLimitAccountsState }>(
+      target,
+      'accounts.list',
+      { refreshUsage: false },
+      { timeoutMs: ROSTER_TIMEOUT_MS }
+    )
+    return response.codex
+  }
+  return (await window.api.codexAccounts.list()) as CodexRateLimitAccountsState
 }

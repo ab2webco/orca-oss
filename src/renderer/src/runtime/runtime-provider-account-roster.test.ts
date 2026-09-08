@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { listClaudeAccountsForActiveHost } from './runtime-provider-account-roster'
+import {
+  listClaudeAccountsForActiveHost,
+  listCodexAccountsForActiveHost
+} from './runtime-provider-account-roster'
 
 const callRuntimeRpc = vi.hoisted(() => vi.fn())
 
@@ -42,6 +45,34 @@ describe('listClaudeAccountsForActiveHost', () => {
     const roster = await listClaudeAccountsForActiveHost({ activeRuntimeEnvironmentId: null })
 
     expect(roster).toEqual(localRoster)
+    expect(callRuntimeRpc).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('listCodexAccountsForActiveHost', () => {
+  // Why this matters as much as the Claude one: the workspace context menu pins
+  // both providers, and a pin is what makes a terminal launch bound to an
+  // account at all.
+  it('reads the Codex roster of the server that owns the accounts', async () => {
+    callRuntimeRpc.mockClear().mockResolvedValueOnce({ codex: { accounts: [{ id: 'srv-codex' }] } })
+    vi.stubGlobal('window', { api: { codexAccounts: { list: vi.fn() } } })
+
+    const roster = await listCodexAccountsForActiveHost({ activeRuntimeEnvironmentId: 'env-1' })
+
+    expect(roster.accounts).toEqual([{ id: 'srv-codex' }])
+    vi.unstubAllGlobals()
+  })
+
+  it('falls back to this desktop only when no server is active', async () => {
+    callRuntimeRpc.mockClear()
+    const local = { accounts: [{ id: 'local-codex' }] }
+    const list = vi.fn().mockResolvedValue(local)
+    vi.stubGlobal('window', { api: { codexAccounts: { list } } })
+
+    await expect(
+      listCodexAccountsForActiveHost({ activeRuntimeEnvironmentId: null })
+    ).resolves.toEqual(local)
     expect(callRuntimeRpc).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
