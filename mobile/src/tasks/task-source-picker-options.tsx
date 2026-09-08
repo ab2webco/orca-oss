@@ -1,4 +1,3 @@
-import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
 import { TaskProviderLogo } from '../components/TaskProviderLogo'
 import type { PickerOption } from '../components/PickerModal'
 import { colors } from '../theme/mobile-theme'
@@ -40,19 +39,3 @@ export const TASK_PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
     renderIcon: providerIcon('plane')
   }
 ]
-
-export const PLANE_FILTER_OPTIONS: PickerOption<PlaneWorkItemFilter>[] = [
-  { value: 'all', label: 'All', subtitle: 'Open work items in scope' },
-  { value: 'assigned', label: 'My Work Items', subtitle: 'Work items assigned to you' },
-  { value: 'created', label: 'Created', subtitle: 'Work items you created' },
-  { value: 'done', label: 'Done', subtitle: 'Recently completed work items' },
-  { value: 'everything', label: 'Everything', subtitle: 'Any state, including archived states' }
-]
-
-const PLANE_FILTERS = new Set<PlaneWorkItemFilter>(
-  PLANE_FILTER_OPTIONS.map((option) => option.value)
-)
-
-export function normalizePlaneFilter(value: unknown): PlaneWorkItemFilter {
-  return PLANE_FILTERS.has(value as PlaneWorkItemFilter) ? (value as PlaneWorkItemFilter) : 'all'
-}

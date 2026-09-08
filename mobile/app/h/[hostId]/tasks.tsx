@@ -172,11 +172,15 @@ import {
   resolveVisibleTaskProvider,
   type TaskProvider
 } from '../../../src/tasks/mobile-task-providers'
+import { TASK_PROVIDER_OPTIONS } from '../../../src/tasks/task-source-picker-options'
 import {
   normalizePlaneFilter,
-  PLANE_FILTER_OPTIONS,
-  TASK_PROVIDER_OPTIONS
-} from '../../../src/tasks/task-source-picker-options'
+  PLANE_FILTER_OPTIONS
+} from '../../../src/tasks/plane-filter-picker-options'
+import {
+  DEFAULT_PLANE_WORK_ITEM_FILTER,
+  PLANE_WORK_ITEM_FILTER_LABELS
+} from '../../../../src/shared/plane-work-item-filter-labels'
 import { formatUpdatedAt, taskTime } from '../../../src/tasks/task-updated-at-time'
 import {
   compareLinearIssues,
@@ -1811,7 +1815,9 @@ export default function MobileTasksScreen() {
   const [planeStates, setPlaneStates] = useState<PlaneMobileState[]>([])
   const planeWorkItemsRef = useRef<PlaneMobileWorkItem[]>([])
   const [planeStateIds, setPlaneStateIds] = useState<Set<string>>(() => new Set())
-  const [planeFilter, setPlaneFilter] = useState<PlaneWorkItemFilter>('all')
+  const [planeFilter, setPlaneFilter] = useState<PlaneWorkItemFilter>(
+    DEFAULT_PLANE_WORK_ITEM_FILTER
+  )
   const [showPlaneFilterPicker, setShowPlaneFilterPicker] = useState(false)
   const [showPlaneProjectPicker, setShowPlaneProjectPicker] = useState(false)
   const [showPlaneStatePicker, setShowPlaneStatePicker] = useState(false)
@@ -8399,8 +8405,7 @@ export default function MobileTasksScreen() {
     viewMode: planeViewMode
   })
   const planeBoardShown = planeChrome.boardShown
-  const planeFilterLabel =
-    PLANE_FILTER_OPTIONS.find((filter) => filter.value === planeFilter)?.label ?? 'All'
+  const planeFilterLabel = PLANE_WORK_ITEM_FILTER_LABELS[planeFilter]
   const planeProjectItems = useMemo(
     () => [
       { id: '', label: 'All projects', detail: `${planeProjects.length} projects` },
@@ -9777,7 +9782,7 @@ export default function MobileTasksScreen() {
         copied={planeDetailItem != null && copiedLinkKey === `task:${planeDetailItem.key}`}
         onPickProject={() => setShowPlaneProjectPicker(true)}
         onClearFilter={() => {
-          setPlaneFilter('all')
+          setPlaneFilter(DEFAULT_PLANE_WORK_ITEM_FILTER)
           setQuery('')
           setAppliedQuery('')
         }}

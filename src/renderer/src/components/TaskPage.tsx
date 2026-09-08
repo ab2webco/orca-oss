@@ -255,6 +255,7 @@ import {
 } from '@/lib/new-workspace'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { getTaskPresetQuery } from '../../../shared/task-preset-query'
+import { DEFAULT_PLANE_WORK_ITEM_FILTER } from '../../../shared/plane-work-item-filter-labels'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import {
   readLinearBoardIssueDragData,
@@ -4893,7 +4894,9 @@ export default function TaskPage(): React.JSX.Element {
   // Plane tab state. Why: no priority-fetch or project-status-order effect —
   // Plane has a static priority enum and a native per-item state.sequence
   // (see mem #2200), unlike Jira which fetches both per site/project.
-  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>('everything')
+  const [activePlanePreset, setActivePlanePreset] = useState<PlanePresetId>(
+    DEFAULT_PLANE_WORK_ITEM_FILTER
+  )
   // Why seeded from the store cache at mount: planeItems used to reset to [] on
   // every entry, so the pane showed a blocking skeleton even with a warm cache.
   // Reads the entry regardless of TTL — an old list beats an empty one while the

@@ -13,6 +13,10 @@ import type { Root } from 'react-dom/client'
 import { Pressable, Text, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import type { PlaneWorkItemFilter } from '../../src/shared/plane-types'
+import {
+  DEFAULT_PLANE_WORK_ITEM_FILTER,
+  PLANE_WORK_ITEM_FILTER_LABELS
+} from '../../src/shared/plane-work-item-filter-labels'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { createPlaneTask } from '../src/tasks/plane-mobile-task-list'
 import type { ProviderTaskOrderBy } from '../src/tasks/linear-mobile-issue-grouping'
@@ -169,7 +173,7 @@ export function PlaneTasksHarness({
   const capabilities = useRuntimeCapabilities(client, true)
   const [viewMode, setViewMode] = usePlaneViewMode()
   const [projectId, setProjectId] = useState(initialProjectId)
-  const [filter, setFilter] = useState<PlaneWorkItemFilter>('all')
+  const [filter, setFilter] = useState<PlaneWorkItemFilter>(DEFAULT_PLANE_WORK_ITEM_FILTER)
   const [query, setQuery] = useState(initialQuery)
   const [detail, setDetail] = useState<PlaneMobileWorkItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -244,7 +248,7 @@ export function PlaneTasksHarness({
             hasProject: projectId !== null,
             projectLabel: projectId === OTHER_PROJECT.id ? OTHER_PROJECT.name : 'Orca Lab',
             stateLabel: 'All states',
-            filterLabel: 'All',
+            filterLabel: PLANE_WORK_ITEM_FILTER_LABELS[filter],
             viewMode,
             onPickViewMode: () => setViewPickerOpen(true),
             groupBy,
@@ -313,7 +317,7 @@ export function PlaneTasksHarness({
         copied: detail !== null && copiedKey === createPlaneTask(detail).key,
         onPickProject: () => setPickerOpen(true),
         onClearFilter: () => {
-          setFilter('all')
+          setFilter(DEFAULT_PLANE_WORK_ITEM_FILTER)
           setQuery('')
         },
         bottomInset: 0

@@ -100,7 +100,8 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
       expect(callsTo(calls, 'plane.listWorkItems')[0]?.params).toMatchObject({
         projectId: 'proj-1',
         workspaceId: 'ws-1',
-        filter: 'all'
+        // The screen's default filter, which is desktop's since ORCA-460.
+        filter: 'everything'
       })
     })
 

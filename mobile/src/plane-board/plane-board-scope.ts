@@ -1,4 +1,5 @@
 import type { PlaneWorkItemFilter } from '../../../src/shared/plane-types'
+import { DEFAULT_PLANE_WORK_ITEM_FILTER } from '../../../src/shared/plane-work-item-filter-labels'
 import type { PlaneMobileProject, PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import type { PlaneBoardColumn } from './plane-board-columns'
 import type { PlaneViewMode } from './plane-work-item-view'
@@ -45,9 +46,11 @@ export function resolvePlaneBoardScope(input: PlaneBoardScopeInput): PlaneBoardS
   }
 }
 
-/** 'all' is the list's unfiltered default; anything else narrows what the host returns. */
+/** Unfiltered means the filter both clients open on; anything else narrows what
+ *  the host returns. Following the default id rather than a second copy of it is
+ *  what keeps the board from opening in a "filtered" chrome (ORCA-460). */
 export function isPlaneBoardFiltered(scope: Pick<PlaneBoardScope, 'filter' | 'query'>): boolean {
-  return scope.filter !== 'all' || scope.query.trim() !== ''
+  return scope.filter !== DEFAULT_PLANE_WORK_ITEM_FILTER || scope.query.trim() !== ''
 }
 
 /** The card as the board shows it, optimistic edits included; the tapped row's own
