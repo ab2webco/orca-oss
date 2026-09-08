@@ -117,6 +117,9 @@ import {
 } from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { addClaudeCustomEndpointProviderAccount } from '@/runtime/runtime-provider-custom-endpoint'
+import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
+import { HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import { HostAccountLoginDialog } from './HostAccountLoginDialog'
 import {
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
@@ -408,7 +411,36 @@ export function AccountsPane({
   // Why: with a Remote Orca Server active the server owns provider accounts
   // (see #7973); every list/select/remove below must scope to it, not host/WSL.
   const isRemoteAccountScope = hasRemoteProviderAccountOwner(settings)
+  const [hostLoginAgent, setHostLoginAgent] = useState<'claude' | 'codex' | null>(null)
+  // Why ask the runtime instead of assuming: a newer client against an older
+  // server must keep the button disabled rather than fail on click.
+  const [hostLoginSupported, setHostLoginSupported] = useState(false)
   const activeRuntimeEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
+
+  useEffect(() => {
+    if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
+      setHostLoginSupported(false)
+      return
+    }
+    let cancelled = false
+    void runtimeEnvironmentSupportsCapability(
+      activeRuntimeEnvironmentId,
+      HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
+    )
+      .then((supported) => {
+        if (!cancelled) {
+          setHostLoginSupported(supported)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHostLoginSupported(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isRemoteAccountScope, activeRuntimeEnvironmentId])
   // Why: keep the real name separate from the prose fallback below; the scope
   // label must not interpolate the fallback.
   const remoteServerName = isRemoteAccountScope
@@ -1365,17 +1397,21 @@ export function AccountsPane({
                 variant="outline"
                 size="xs"
                 onClick={() =>
-                  void runClaudeAccountAction('adding', () =>
-                    window.api.claudeAccounts.add({
-                      runtime: accountRuntime.runtime,
-                      wslDistro: accountRuntime.wslDistro
-                    })
-                  )
+                  isRemoteAccountScope
+                    ? setHostLoginAgent('claude')
+                    : void runClaudeAccountAction('adding', () =>
+                        window.api.claudeAccounts.add({
+                          runtime: accountRuntime.runtime,
+                          wslDistro: accountRuntime.wslDistro
+                        })
+                      )
                 }
                 disabled={
-                  // Why: interactive `claude login` needs a desktop browser and
-                  // would authenticate against this device, not the server.
-                  isRemoteAccountScope ||
+                  // Why the remote lane is gated on a capability instead of shut:
+                  // the sign-in runs on the account-owning server and hands the
+                  // user a page plus a code, so no browser of this device is in
+                  // the loop. An older server cannot do that and stays disabled.
+                  (isRemoteAccountScope && !hostLoginSupported) ||
                   claudeAction !== 'idle' ||
                   wslCapabilitiesLoading ||
                   accountRuntimeUnavailable
@@ -1884,17 +1920,20 @@ export function AccountsPane({
               variant="outline"
               size="xs"
               onClick={() =>
-                void runCodexAccountAction('adding', () =>
-                  window.api.codexAccounts.add({
-                    runtime: accountRuntime.runtime,
-                    wslDistro: accountRuntime.wslDistro
-                  })
-                )
+                isRemoteAccountScope
+                  ? setHostLoginAgent('codex')
+                  : void runCodexAccountAction('adding', () =>
+                      window.api.codexAccounts.add({
+                        runtime: accountRuntime.runtime,
+                        wslDistro: accountRuntime.wslDistro
+                      })
+                    )
               }
               disabled={
-                // Why: interactive `codex login` needs a desktop browser and
-                // would authenticate against this device, not the server.
-                isRemoteAccountScope ||
+                // Why gated and not shut: `codex login --device-auth` shows a
+                // page and a short code, so the server can run it and this
+                // client only relays them. An older server stays disabled.
+                (isRemoteAccountScope && !hostLoginSupported) ||
                 codexAction !== 'idle' ||
                 wslCapabilitiesLoading ||
                 accountRuntimeUnavailable
@@ -2932,6 +2971,18 @@ export function AccountsPane({
         open={globalConfigSyncDialog.open}
         accountId={globalConfigSyncDialog.accountId}
         onOpenChange={(open) => setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))}
+      />
+      <HostAccountLoginDialog
+        // Why keyed: a new provider is a new sign-in, and remounting gives it
+        // fresh state without resetting anything on a prop change.
+        key={hostLoginAgent ?? 'none'}
+        agent={hostLoginAgent}
+        settings={settings}
+        serverLabel={remoteServerLabel ?? ''}
+        onClose={() => setHostLoginAgent(null)}
+        // Why a refresh and not the returned roster: the pane already watches
+        // the server's accounts, and re-reading keeps one source of truth.
+        onCompleted={() => void fetchInactiveClaudeAccountUsage()}
       />
       {visibleSections.map((section, index) => (
         <div key={index} className="space-y-8">

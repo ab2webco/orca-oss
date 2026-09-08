@@ -15570,5 +15570,13 @@
       "message": "El inicio de sesión de Claude Code de todo el sistema ya no es utilizable.",
       "detail": "Tus cuentas de Claude administradas por Orca Lab no se ven afectadas. Para restaurar el inicio de sesión de todo el sistema, ejecuta claude fuera de Orca Lab y completa /login una vez."
     }
-  }
+  },
+  "auto.components.settings.HostAccountLoginDialog.title": "Iniciar sesión en {{server}}",
+  "auto.components.settings.HostAccountLoginDialog.description": "La cuenta se crea en el servidor, no en este equipo. Abre la página de abajo, inicia sesión y trae el código de vuelta aquí.",
+  "auto.components.settings.HostAccountLoginDialog.open": "Abrir página de inicio de sesión",
+  "auto.components.settings.HostAccountLoginDialog.copyUrl": "Copiar enlace",
+  "auto.components.settings.HostAccountLoginDialog.deviceCode": "Introduce este código en esa página:",
+  "auto.components.settings.HostAccountLoginDialog.codeLabel": "Código de esa página",
+  "auto.components.settings.HostAccountLoginDialog.cancel": "Cancelar",
+  "auto.components.settings.HostAccountLoginDialog.finish": "Finalizar inicio de sesión"
 }

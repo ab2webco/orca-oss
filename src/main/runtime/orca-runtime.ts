@@ -1202,6 +1202,14 @@ import type {
   ClaudeAccountService,
   ClaudeCustomEndpointAccountInput
 } from '../claude-accounts/service'
+import {
+  beginHostLogin,
+  completeHostLogin,
+  discardHostLoginHome,
+  endHostLogin,
+  type HostLoginAgent,
+  type HostLoginSessionStarted
+} from './accounts/host-login-session'
 import type {
   CodexAccountService,
   CodexResetCreditRejectedBeforeProviderReason
@@ -14074,6 +14082,33 @@ export class OrcaRuntimeService {
     input: ClaudeCustomEndpointAccountInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.requireAccountServices().claudeAccounts.addCustomEndpointAccount(input)
+  }
+
+  // Why these three and not one call: the sign-in has a human in the middle.
+  // The host starts the agent and reports the page to open; the user copies a
+  // code from that page; the host feeds it in and imports the credentials. The
+  // caller never names a path — `home` is chosen here — so the guard that keeps
+  // remote clients away from arbitrary credential directories still holds.
+  beginHostAccountLogin(agent: HostLoginAgent): Promise<HostLoginSessionStarted> {
+    return beginHostLogin(agent)
+  }
+
+  async completeHostAccountLogin(
+    sessionId: string,
+    code: string | null
+  ): Promise<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState> {
+    const { agent, home } = await completeHostLogin(sessionId, code)
+    try {
+      return agent === 'claude'
+        ? await this.addClaudeAccountFromConfigDir(home)
+        : await this.addCodexAccountFromHome(home)
+    } finally {
+      discardHostLoginHome(home)
+    }
+  }
+
+  cancelHostAccountLogin(sessionId: string): void {
+    endHostLogin(sessionId)
   }
 
   removeCodexAccount(accountId: string): Promise<CodexRateLimitAccountsState> {

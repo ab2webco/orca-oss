@@ -15581,5 +15581,13 @@
       "message": "시스템 전체 Claude Code 로그인을 더 이상 사용할 수 없습니다.",
       "detail": "Orca Lab이 관리하는 Claude 계정은 영향을 받지 않습니다. 시스템 전체 로그인을 복원하려면 Orca Lab 밖에서 claude를 실행하고 /login을 한 번 완료하세요."
     }
-  }
+  },
+  "auto.components.settings.HostAccountLoginDialog.title": "{{server}}에서 로그인",
+  "auto.components.settings.HostAccountLoginDialog.description": "계정은 이 컴퓨터가 아니라 서버에 만들어집니다. 아래 페이지를 열어 로그인한 뒤 코드를 여기로 가져오세요.",
+  "auto.components.settings.HostAccountLoginDialog.open": "로그인 페이지 열기",
+  "auto.components.settings.HostAccountLoginDialog.copyUrl": "링크 복사",
+  "auto.components.settings.HostAccountLoginDialog.deviceCode": "해당 페이지에 이 코드를 입력하세요:",
+  "auto.components.settings.HostAccountLoginDialog.codeLabel": "해당 페이지의 코드",
+  "auto.components.settings.HostAccountLoginDialog.cancel": "취소",
+  "auto.components.settings.HostAccountLoginDialog.finish": "로그인 완료"
 }

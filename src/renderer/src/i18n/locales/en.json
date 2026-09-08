@@ -11235,6 +11235,16 @@
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "Signed in, but Orca Lab could not reopen the Claude terminal in {{worktrees}}. Start it again from the tab bar."
+        },
+        "HostAccountLoginDialog": {
+          "title": "Sign in on {{server}}",
+          "description": "The account is created on the server, not on this computer. Open the page below, sign in, and bring the code back here.",
+          "open": "Open sign-in page",
+          "copyUrl": "Copy link",
+          "deviceCode": "Enter this code on that page:",
+          "codeLabel": "Code from that page",
+          "cancel": "Cancel",
+          "finish": "Finish sign-in"
         }
       },
       "right": {
