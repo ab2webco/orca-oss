@@ -187,7 +187,11 @@ describe('AccountsPane', () => {
     )
   })
 
-  it('disables the Claude custom endpoint action under a remote account scope', () => {
+  // Why this flipped: a custom endpoint is a label, a base URL and a token, so
+  // the account-owning host can create it from what the user typed. The OAuth
+  // add below stays disabled because `claude login` binds a loopback callback
+  // on that host, which this browser cannot reach.
+  it('offers the Claude custom endpoint action under a remote account scope', () => {
     const markup = renderPane({
       ...getDefaultSettings('/tmp'),
       activeRuntimeEnvironmentId: 'env-1'
@@ -195,8 +199,19 @@ describe('AccountsPane', () => {
 
     const endpointIndex = markup.indexOf('Add custom endpoint')
     expect(endpointIndex).toBeGreaterThan(0)
-    expect(markup.slice(markup.lastIndexOf('<button', endpointIndex), endpointIndex)).toContain(
+    expect(markup.slice(markup.lastIndexOf('<button', endpointIndex), endpointIndex)).not.toContain(
       'disabled=""'
     )
+  })
+
+  it('still disables the interactive Claude add action under a remote account scope', () => {
+    const markup = renderPane({
+      ...getDefaultSettings('/tmp'),
+      activeRuntimeEnvironmentId: 'env-1'
+    })
+
+    const addIndex = markup.indexOf('Add Account')
+    expect(addIndex).toBeGreaterThan(0)
+    expect(markup.slice(markup.lastIndexOf('<button', addIndex), addIndex)).toContain('disabled=""')
   })
 })

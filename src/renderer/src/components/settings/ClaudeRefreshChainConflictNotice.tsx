@@ -117,7 +117,11 @@ export function ClaudeRefreshChainConflictNotice({
   reauthenticatingAccountId,
   busy
 }: ClaudeRefreshChainConflictNoticeProps): React.JSX.Element | null {
-  if (report === null) {
+  // Why `== null` and not `=== null`: the web client's accounts shim has no
+  // refresh-chain registry to read, so it resolves `undefined` where the desktop
+  // preload resolves `null`. A strict check let `undefined` fall through to
+  // `report.status` below and took the whole Settings page down with it.
+  if (report == null) {
     return null
   }
   if (report.status !== 'available') {

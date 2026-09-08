@@ -116,6 +116,7 @@ import {
   selectClaudeAccountUsage
 } from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
+import { addClaudeCustomEndpointProviderAccount } from '@/runtime/runtime-provider-custom-endpoint'
 import {
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
@@ -1108,7 +1109,10 @@ export function AccountsPane({
               token: endpointTokenDraft.trim() || null,
               ...fields
             })
-          : await window.api.claudeAccounts.addCustomEndpoint({
+          : // Why not window.api directly: with a remote server active the
+            // preload would create the endpoint on this desktop instead of on
+            // the host that owns the accounts. The helper routes it.
+            await addClaudeCustomEndpointProviderAccount(settings, {
               token: endpointTokenDraft.trim(),
               ...fields
             })
@@ -1390,9 +1394,13 @@ export function AccountsPane({
                 size="xs"
                 onClick={openAddEndpointDialog}
                 disabled={
-                  // Why: the endpoint account is created on the account owner;
-                  // a remote server manages its own provider accounts.
-                  isRemoteAccountScope || claudeAction !== 'idle'
+                  // Why this one stays enabled under a remote scope while "Add
+                  // Account" above does not: `claude login` binds a loopback
+                  // callback on the account owner, which this browser cannot
+                  // reach. A custom endpoint is a label, a base URL and a token,
+                  // so the account owner can create it from what the user typed
+                  // — that is what `accounts.addCustomEndpoint` carries.
+                  claudeAction !== 'idle'
                 }
                 className="gap-1.5 text-muted-foreground hover:text-foreground"
               >

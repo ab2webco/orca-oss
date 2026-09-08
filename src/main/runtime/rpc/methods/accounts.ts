@@ -89,6 +89,21 @@ const AddCodexFromHomeParams = z.object({
   wslDistro: z.string().nullish()
 })
 
+// Why no host path here: a custom endpoint is described entirely by values the
+// caller types, so this is the one Claude add-lane a remote or web client may
+// drive. The model overrides stay nullish — a blank field means "leave it to
+// the endpoint's default", not an empty model name.
+const AddClaudeCustomEndpointParams = z.object({
+  label: z.string().min(1, 'Missing label'),
+  baseUrl: z.string().min(1, 'Missing baseUrl'),
+  token: z.string().min(1, 'Missing token'),
+  model: z.string().nullish(),
+  opusModel: z.string().nullish(),
+  sonnetModel: z.string().nullish(),
+  haikuModel: z.string().nullish(),
+  subagentModel: z.string().nullish()
+})
+
 // Why: `orca account list` prints only emails and the active ids, so it opts out
 // of the forced all-provider usage refresh below — that lane bypasses the poll
 // throttle and Retry-After gate and costs one serial round-trip per account.
@@ -204,6 +219,16 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
         previousLegacyCredentialsSha256: params.previousLegacyCredentialsSha256
       })
     }
+  }),
+  defineMethod({
+    // Why this one has no clientKind guard while the two above do: those capture
+    // a filesystem path on the account-owning host, so a paired client could aim
+    // them at credentials it must never read. This one carries no path, which is
+    // what lets a headless server be given a Z.ai-style endpoint from the web
+    // client or a paired desktop.
+    name: 'accounts.addCustomEndpoint',
+    params: AddClaudeCustomEndpointParams,
+    handler: async (params, { runtime }) => runtime.addClaudeCustomEndpointAccount(params)
   }),
   defineMethod({
     name: 'accounts.addCodexFromHome',
