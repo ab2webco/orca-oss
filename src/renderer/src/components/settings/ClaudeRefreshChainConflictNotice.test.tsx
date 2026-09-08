@@ -133,6 +133,15 @@ describe('ClaudeRefreshChainConflictNotice', () => {
     expect(markup).not.toContain('account-x')
   })
 
+  // Why an undefined case at all: the web client's accounts shim resolves
+  // undefined where the desktop preload resolves null. A `=== null` guard let it
+  // through to `report.status` and took the whole Settings page down.
+  it('renders nothing when the report is undefined', () => {
+    const markup = render({ report: undefined as never })
+
+    expect(markup).toBe('')
+  })
+
   it('falls back to the roster email when the report has none for a current account', () => {
     const markup = render({
       report: {
