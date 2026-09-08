@@ -72,4 +72,19 @@ describe('pairing RPC methods', () => {
     expect(pairing.provisionRelay).not.toHaveBeenCalled()
     expect(pairing.getEndpoints).not.toHaveBeenCalled()
   })
+
+  // Why this one has no `pairing` context and the others do: it reads the host's
+  // own addresses, not a pairing session. A remote client must be able to ask
+  // for them or the wizard has nothing to advertise for the machine it pairs.
+  it('answers pairing.listNetworkInterfaces without a pairing context', async () => {
+    const response = await dispatchPairing(
+      'pairing.listNetworkInterfaces',
+      undefined,
+      undefined as never
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    const result = (response as { result: { interfaces: unknown } }).result
+    expect(Array.isArray(result.interfaces)).toBe(true)
+  })
 })

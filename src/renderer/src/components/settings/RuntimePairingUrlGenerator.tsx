@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { useAppStore } from '@/store'
 import type { RuntimeAccessGrant } from '../../../../shared/runtime-access-grants'
 import { Label } from '../ui/label'
 import { RuntimeAccessGrantList } from './RuntimeAccessGrantList'
@@ -16,15 +17,13 @@ import {
   type RuntimePairingIntent,
   type RuntimePairingUrlGeneratorProps
 } from './runtime-pairing-link-state'
+import { usePairingNetworkInterfaces } from './use-pairing-network-interfaces'
 
 export function RuntimePairingUrlGenerator({
   framed = true,
   showHeader = true,
   showGeneratorForm = true
 }: RuntimePairingUrlGeneratorProps): React.JSX.Element {
-  const [networkInterfaces, setNetworkInterfaces] = useState<{ name: string; address: string }[]>(
-    []
-  )
   const [selectedAddress, setSelectedAddress] = useState(runtimePairingLinkCache.selectedAddress)
   const [intent, setIntent] = useState<RuntimePairingIntent>(runtimePairingLinkCache.intent)
   const [generatedAddress, setGeneratedAddress] = useState<string | null>(
@@ -41,14 +40,18 @@ export function RuntimePairingUrlGenerator({
   )
   const [runtimeAccessGrants, setRuntimeAccessGrants] = useState<RuntimeAccessGrant[]>([])
   const [isLoadingAccessGrants, setIsLoadingAccessGrants] = useState(false)
-  const [refreshingNetworkInterfaces, setRefreshingNetworkInterfaces] = useState(false)
   const [revokingGrantId, setRevokingGrantId] = useState<string | null>(null)
   const [copiedTarget, setCopiedTarget] = useState<'web' | 'pairing' | null>(null)
   const [isGeneratingPairing, setIsGeneratingPairing] = useState(false)
-  const networkInterfaceLoadIdRef = useRef(0)
   const accessGrantLoadIdRef = useRef(0)
   const copiedTargetResetTimerRef = useRef<number | null>(null)
   const mountedRef = useMountedRef()
+  const activeRuntimeEnvironmentId = useAppStore((s) => s.settings?.activeRuntimeEnvironmentId ?? null)
+  const {
+    networkInterfaces,
+    refreshing: refreshingNetworkInterfaces,
+    load: loadNetworkInterfaces
+  } = usePairingNetworkInterfaces(mountedRef, activeRuntimeEnvironmentId)
 
   const clearCopiedTargetResetTimer = useCallback((): void => {
     if (copiedTargetResetTimerRef.current === null) {
@@ -105,45 +108,8 @@ export function RuntimePairingUrlGenerator({
     [mountedRef]
   )
 
-  const loadNetworkInterfaces = useCallback(
-    async (options: { showToastOnError?: boolean } = {}): Promise<void> => {
-      const loadId = networkInterfaceLoadIdRef.current + 1
-      networkInterfaceLoadIdRef.current = loadId
-      if (mountedRef.current) {
-        setRefreshingNetworkInterfaces(true)
-      }
-      try {
-        const result = await window.api.mobile.listNetworkInterfaces()
-        if (mountedRef.current && loadId === networkInterfaceLoadIdRef.current) {
-          setNetworkInterfaces(result.interfaces)
-        }
-      } catch {
-        if (
-          mountedRef.current &&
-          loadId === networkInterfaceLoadIdRef.current &&
-          options.showToastOnError
-        ) {
-          toast.error(
-            translate(
-              'auto.components.settings.RuntimePairingUrlGenerator.95b8be4cea',
-              'Failed to refresh network interfaces.'
-            )
-          )
-        }
-      } finally {
-        if (mountedRef.current && loadId === networkInterfaceLoadIdRef.current) {
-          setRefreshingNetworkInterfaces(false)
-        }
-      }
-    },
-    [mountedRef]
-  )
-
   useEffect(() => {
     void loadNetworkInterfaces()
-    return () => {
-      networkInterfaceLoadIdRef.current += 1
-    }
   }, [loadNetworkInterfaces])
 
   useEffect(() => {

@@ -23,6 +23,7 @@ import {
   type MobilePairingAddressChange,
   useMobilePairingAddressPreference
 } from './use-mobile-pairing-address-preference'
+import { listPairingNetworkInterfaces } from '@/runtime/runtime-pairing-interfaces'
 
 export default function MobilePage(): React.JSX.Element {
   const [stepIdx, setStepIdx] = useState<StepIndex>(0)
@@ -38,6 +39,9 @@ export default function MobilePage(): React.JSX.Element {
   const [relayMintFailure, setRelayMintFailure] = useState<MobileRelayMintFailure | null>(null)
   const [pairLoading, setPairLoading] = useState(false)
   const signedIn = useAppStore((state) => state.orcaProfileAuthStatus?.state === 'connected')
+  const activeRuntimeEnvironmentId = useAppStore(
+    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
+  )
   const [connectionMode, setConnectionMode] = useMobilePairingConnectionMode()
   const [networkInterfaces, setNetworkInterfaces] = useState<MobileNetworkInterface[]>([])
   const pairingAddressChangeRef = useRef<(change: MobilePairingAddressChange) => void>(() => {})
@@ -183,10 +187,10 @@ export default function MobilePage(): React.JSX.Element {
       setRefreshingNetworkInterfaces(true)
     }
     try {
-      const result = await window.api.mobile.listNetworkInterfaces()
+      const interfaces = await listPairingNetworkInterfaces(activeRuntimeEnvironmentId)
       if (mountedRef.current) {
-        setNetworkInterfaces(result.interfaces)
-        selectAddressAfterRefresh(result.interfaces)
+        setNetworkInterfaces(interfaces)
+        selectAddressAfterRefresh(interfaces)
       }
     } catch {
       // Network list is non-critical; the QR will still mint with default routing.
@@ -195,7 +199,7 @@ export default function MobilePage(): React.JSX.Element {
         setRefreshingNetworkInterfaces(false)
       }
     }
-  }, [mountedRef, selectAddressAfterRefresh])
+  }, [mountedRef, selectAddressAfterRefresh, activeRuntimeEnvironmentId])
 
   useEffect(() => {
     if (stage !== 'flow') {

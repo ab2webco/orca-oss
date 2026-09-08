@@ -25,6 +25,7 @@ import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-min
 import { useMobilePairingConnectionMode } from '../mobile/use-mobile-pairing-connection-mode'
 import { useMobilePairingAddressPreference } from '../mobile/use-mobile-pairing-address-preference'
 import { shouldOpenMobilePairingAddress } from './mobile-pane-search'
+import { listPairingNetworkInterfaces } from '@/runtime/runtime-pairing-interfaces'
 export { getMobilePaneSearchEntries } from './mobile-pane-search'
 
 export function MobilePane(): React.JSX.Element {
@@ -43,6 +44,9 @@ export function MobilePane(): React.JSX.Element {
   const [deviceCountAtQr, setDeviceCountAtQr] = useState<number | null>(null)
   const signedIn = useAppStore((state) => state.orcaProfileAuthStatus?.state === 'connected')
   const settingsSearchQuery = useAppStore((state) => state.settingsSearchQuery)
+  const activeRuntimeEnvironmentId = useAppStore(
+    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
+  )
   const [connectionMode, setConnectionMode] = useMobilePairingConnectionMode()
   const [rotateNextQr, setRotateNextQr] = useState(false)
   const codeCopiedResetTimerRef = useRef<number | null>(null)
@@ -142,10 +146,10 @@ export function MobilePane(): React.JSX.Element {
     async (opts: { notifyOnError?: boolean } = {}) => {
       setRefreshingNetworkInterfaces(true)
       try {
-        const result = await window.api.mobile.listNetworkInterfaces()
+        const interfaces = await listPairingNetworkInterfaces(activeRuntimeEnvironmentId)
         if (mountedRef.current) {
-          setNetworkInterfaces(result.interfaces)
-          selectAddressAfterRefresh(result.interfaces)
+          setNetworkInterfaces(interfaces)
+          selectAddressAfterRefresh(interfaces)
         }
       } catch {
         if (opts.notifyOnError && mountedRef.current) {
@@ -162,7 +166,7 @@ export function MobilePane(): React.JSX.Element {
         }
       }
     },
-    [mountedRef, selectAddressAfterRefresh]
+    [mountedRef, selectAddressAfterRefresh, activeRuntimeEnvironmentId]
   )
 
   const generateQR = useCallback(

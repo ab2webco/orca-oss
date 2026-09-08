@@ -24,6 +24,13 @@ export const MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION = 2
 export const MIN_COMPATIBLE_RUNTIME_SERVER_VERSION = 2
 
 export const PROJECT_HOST_SETUP_RUNTIME_CAPABILITY = 'project-host-setup.v1' as const
+
+// Why a capability and not a bare call: a client that can ask the account-owning
+// host for its own pairing addresses must know the host answers before it offers
+// the wizard. Against an older runtime the picker has to keep saying so instead
+// of showing an empty list that reads like a transient failure.
+export const PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY =
+  'pairing.network-interfaces.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
@@ -156,7 +163,8 @@ export const RUNTIME_CAPABILITIES = [
   WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
-  CODEX_RESET_CREDIT_RUNTIME_CAPABILITY
+  CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
+  PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
