@@ -26,6 +26,7 @@ import {
   type AgentRateLimitFailoverMode
 } from '@/lib/agent-rate-limit-failover'
 import { runInPlaceManagedClaudeAccountSwitch } from '@/lib/agent-rate-limit-in-place-account-switch'
+import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 
 export type AgentRateLimitAccountSwitchResult =
   | { ok: true; accountLabel: string; switched: AgentRateLimitFailoverMode }
@@ -158,7 +159,16 @@ export async function runManagedAccountSwitchRelaunch(args: {
     typeof args.sourceAccountId === 'string'
       ? args.settings?.claudeManagedAccounts.find((account) => account.id === args.sourceAccountId)
       : undefined
-  const canAttemptInPlace = accountsShareRuntime(sourceAccount, args.targetAccount)
+  // Why a server-hosted PTY skips this local check: `claudeManagedAccounts` is
+  // THIS desktop's roster, so the source account of a terminal running on a
+  // server is never in it. The gate then closed on the one path that does work
+  // remotely and dropped the switch into the fallback below, which copies a
+  // transcript that is not on this machine into an account this machine does not
+  // have. The owning runtime re-resolves the source itself and refuses with
+  // `source-unknown` when it genuinely cannot.
+  const canAttemptInPlace =
+    getRemoteRuntimePtyEnvironmentId(args.ptyId) !== null ||
+    accountsShareRuntime(sourceAccount, args.targetAccount)
 
   if (canAttemptInPlace) {
     // Why nothing is stopped or copied here first: the runtime that owns the PTY
@@ -177,6 +187,14 @@ export async function runManagedAccountSwitchRelaunch(args: {
     }
     if (inPlace.reason === 'stop-failed') {
       return { ok: false, reason: 'stop-failed', message: inPlace.message }
+    }
+    // Why a remote PTY stops here instead of falling through: the fallback below
+    // copies the transcript and opens the replacement tab on THIS desktop, and
+    // neither the session nor the target account is here. Falling through turned
+    // a real refusal into "could not copy the session transcript", which named
+    // the wrong failure and hid the runtime's own reason.
+    if (inPlace.reason === 'unhealthy' && getRemoteRuntimePtyEnvironmentId(args.ptyId) !== null) {
+      return { ok: false, reason: 'resume-failed', message: inPlace.message }
     }
     if (inPlace.reason !== 'unhealthy') {
       return {
