@@ -89,6 +89,20 @@ const AddCodexFromHomeParams = z.object({
   wslDistro: z.string().nullish()
 })
 
+const BeginHostLoginParams = z.object({
+  agent: z.enum(['claude', 'codex'])
+})
+
+const CompleteHostLoginParams = z.object({
+  sessionId: z.string().min(1, 'Missing sessionId'),
+  // Codex device auth needs no code back; Claude does.
+  code: z.string().min(1).nullish()
+})
+
+const CancelHostLoginParams = z.object({
+  sessionId: z.string().min(1, 'Missing sessionId')
+})
+
 // Why no host path here: a custom endpoint is described entirely by values the
 // caller types, so this is the one Claude add-lane a remote or web client may
 // drive. The model overrides stay nullish — a blank field means "leave it to
@@ -218,6 +232,29 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
         wslDistro: params.wslDistro ?? null,
         previousLegacyCredentialsSha256: params.previousLegacyCredentialsSha256
       })
+    }
+  }),
+  defineMethod({
+    // Why a remote client may drive this while addClaudeFromConfigDir stays
+    // host-only: the sign-in has a human in the middle, and the directory it
+    // writes into is chosen by the host. The caller supplies no path — only the
+    // provider name, and later the code the user copied from the sign-in page.
+    name: 'accounts.beginHostLogin',
+    params: BeginHostLoginParams,
+    handler: async (params, { runtime }) => runtime.beginHostAccountLogin(params.agent)
+  }),
+  defineMethod({
+    name: 'accounts.completeHostLogin',
+    params: CompleteHostLoginParams,
+    handler: async (params, { runtime }) =>
+      runtime.completeHostAccountLogin(params.sessionId, params.code ?? null)
+  }),
+  defineMethod({
+    name: 'accounts.cancelHostLogin',
+    params: CancelHostLoginParams,
+    handler: async (params, { runtime }) => {
+      runtime.cancelHostAccountLogin(params.sessionId)
+      return { cancelled: true }
     }
   }),
   defineMethod({

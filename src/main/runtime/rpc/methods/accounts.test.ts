@@ -129,6 +129,38 @@ describe('account RPC methods', () => {
     expect(runtime.addCodexAccountFromHome).not.toHaveBeenCalled()
   })
 
+  // Why these are reachable from a paired client while addClaudeFromConfigDir
+  // is not: the caller names no path. It picks a provider, and later returns the
+  // code the user copied; the directory the credentials land in is the host's.
+  it('lets a paired device drive a host sign-in', async () => {
+    const begin = vi.fn().mockResolvedValue({ sessionId: 's-1', url: 'https://example.test' })
+    const complete = vi.fn().mockResolvedValue({ accounts: [] })
+    const cancel = vi.fn()
+    const runtime = {
+      beginHostAccountLogin: begin,
+      completeHostAccountLogin: complete,
+      cancelHostAccountLogin: cancel
+    } as unknown as OrcaRuntimeService
+
+    const call = async (name: string, params: unknown): Promise<unknown> => {
+      const m = method(name)
+      if (isStreamingMethod(m)) {
+        throw new Error(`${name} must be a request method`)
+      }
+      return m.handler(params, { runtime, clientKind: 'runtime' })
+    }
+
+    await expect(call('accounts.beginHostLogin', { agent: 'claude' })).resolves.toMatchObject({
+      sessionId: 's-1'
+    })
+    await call('accounts.completeHostLogin', { sessionId: 's-1', code: 'abc' })
+    await call('accounts.cancelHostLogin', { sessionId: 's-1' })
+
+    expect(begin).toHaveBeenCalledWith('claude')
+    expect(complete).toHaveBeenCalledWith('s-1', 'abc')
+    expect(cancel).toHaveBeenCalledWith('s-1')
+  })
+
   // Why this one is not in the rejection table above: it carries no host
   // filesystem path, so a paired client cannot aim it at credentials it must
   // never read. That is what lets a headless server be given a custom endpoint.

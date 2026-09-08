@@ -31,6 +31,11 @@ export const PROJECT_HOST_SETUP_RUNTIME_CAPABILITY = 'project-host-setup.v1' as 
 // of showing an empty list that reads like a transient failure.
 export const PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY =
   'pairing.network-interfaces.v1' as const
+
+// Why a capability: the client only offers "Add Account" against a server that
+// can actually run the sign-in. Against an older runtime the button must keep
+// saying the account is managed on that host instead of failing on click.
+export const HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY = 'accounts.host-login.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
@@ -171,7 +176,8 @@ export const RUNTIME_CAPABILITIES = [
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
-  PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY
+  PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY,
+  HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
