@@ -1198,7 +1198,10 @@ import {
 } from '../providers/ssh-git-dispatch'
 import { detectGitHubAvatarIcon, detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
-import type { ClaudeAccountService } from '../claude-accounts/service'
+import type {
+  ClaudeAccountService,
+  ClaudeCustomEndpointAccountInput
+} from '../claude-accounts/service'
 import type {
   CodexAccountService,
   CodexResetCreditRejectedBeforeProviderReason
@@ -14061,6 +14064,16 @@ export class OrcaRuntimeService {
     }
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.requireAccountServices().claudeAccounts.addAccountFromConfigDir(configDir, options)
+  }
+
+  // Why this one is reachable from a remote client and addClaudeAccountFromConfigDir
+  // is not: that one captures a filesystem path on the account-owning host, so a
+  // paired client could point it at credentials it must never read. A custom
+  // endpoint carries no host path — label, base URL, token and model names only.
+  addClaudeCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.requireAccountServices().claudeAccounts.addCustomEndpointAccount(input)
   }
 
   removeCodexAccount(accountId: string): Promise<CodexRateLimitAccountsState> {

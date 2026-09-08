@@ -3285,9 +3285,18 @@ function createClaudeAccountsApi(): never {
     ...(createAccountsApi() as NonNullable<Partial<PreloadApi>['claudeAccounts']>),
     list: async () =>
       (await callRuntimeResult<{ claude: ClaudeRateLimitAccountsState }>('accounts.list')).claude,
-    // Why: custom endpoints are managed on the account-owning desktop/server, not from the web client.
-    addCustomEndpoint: () =>
-      Promise.reject(new Error('Add custom endpoint accounts from the Orca desktop app.')),
+    // Why the web client may add these and not OAuth accounts: a custom endpoint
+    // is a label, a base URL and a token — no browser round trip. `claude login`
+    // binds a loopback callback on the account-owning host, which the web
+    // client's browser cannot reach; that one stays desktop-only.
+    addCustomEndpoint: (input) => callRuntimeResult('accounts.addCustomEndpoint', input),
+    // Why: the refresh-chain registry is reconciled from the account-owning
+    // host's credential files, which the web client has no view of. 'unavailable'
+    // is the honest answer — "could not look" is a different claim than "no
+    // conflicts", and the notice renders that distinction. Returning nothing
+    // instead let `undefined` reach the notice and crash the Settings page.
+    getRefreshChainAliasReport: () =>
+      Promise.resolve({ status: 'unavailable', conflictSets: [] } as const),
     // Why: the live-pty gate and account universes live on the desktop host, so web clients see no binding.
     getLivePtyAccount: () => Promise.resolve(null),
     copySessionForFailover: () =>

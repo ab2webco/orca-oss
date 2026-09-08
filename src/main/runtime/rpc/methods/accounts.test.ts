@@ -129,6 +129,28 @@ describe('account RPC methods', () => {
     expect(runtime.addCodexAccountFromHome).not.toHaveBeenCalled()
   })
 
+  // Why this one is not in the rejection table above: it carries no host
+  // filesystem path, so a paired client cannot aim it at credentials it must
+  // never read. That is what lets a headless server be given a custom endpoint.
+  it('allows paired-device calls to accounts.addCustomEndpoint', async () => {
+    const add = vi.fn().mockResolvedValue({ accounts: [] })
+    const runtime = { addClaudeCustomEndpointAccount: add } as unknown as OrcaRuntimeService
+    const addMethod = method('accounts.addCustomEndpoint')
+    if (isStreamingMethod(addMethod)) {
+      throw new Error('accounts.addCustomEndpoint must be a request method')
+    }
+    const params = { label: 'z.ai · GLM', baseUrl: 'https://api.z.ai/api/anthropic', token: 'tok' }
+
+    for (const clientKind of ['mobile', 'runtime'] as const) {
+      await expect(
+        addMethod.handler(params, { runtime, clientKind })
+      ).resolves.toEqual({ accounts: [] })
+    }
+
+    expect(add).toHaveBeenCalledTimes(2)
+    expect(add).toHaveBeenLastCalledWith(expect.objectContaining(params))
+  })
+
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {

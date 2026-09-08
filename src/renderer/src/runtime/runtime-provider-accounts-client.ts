@@ -37,7 +37,7 @@ const REMOTE_ACCOUNTS_FIRST_SNAPSHOT_TIMEOUT_MS = 15_000
 // Why: the server applies a selection before it awaits provider usage
 // refreshes, and those refreshes can crawl behind broken auth. Give the call
 // room to finish instead of reporting failure for an applied switch.
-const REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS = 30_000
+export const REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS = 30_000
 const pendingProviderAccountsSnapshots = new Map<string, Promise<ProviderAccountsSnapshot>>()
 
 function getProviderAccountsOwnerKey(
