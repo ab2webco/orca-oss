@@ -15579,5 +15579,13 @@
       "message": "系统级 Claude Code 登录已不可用。",
       "detail": "由 Orca Lab 管理的 Claude 账户不受影响。要恢复系统级登录，请在 Orca Lab 之外运行 claude 并完成一次 /login。"
     }
-  }
+  },
+  "auto.components.settings.HostAccountLoginDialog.title": "在 {{server}} 上登录",
+  "auto.components.settings.HostAccountLoginDialog.description": "账号创建在服务器上，而不是这台电脑。请打开下面的页面登录，然后把验证码带回这里。",
+  "auto.components.settings.HostAccountLoginDialog.open": "打开登录页面",
+  "auto.components.settings.HostAccountLoginDialog.copyUrl": "复制链接",
+  "auto.components.settings.HostAccountLoginDialog.deviceCode": "在该页面输入此代码：",
+  "auto.components.settings.HostAccountLoginDialog.codeLabel": "该页面上的代码",
+  "auto.components.settings.HostAccountLoginDialog.cancel": "取消",
+  "auto.components.settings.HostAccountLoginDialog.finish": "完成登录"
 }

@@ -2973,6 +2973,9 @@ export function AccountsPane({
         onOpenChange={(open) => setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))}
       />
       <HostAccountLoginDialog
+        // Why keyed: a new provider is a new sign-in, and remounting gives it
+        // fresh state without resetting anything on a prop change.
+        key={hostLoginAgent ?? 'none'}
         agent={hostLoginAgent}
         settings={settings}
         serverLabel={remoteServerLabel ?? ''}

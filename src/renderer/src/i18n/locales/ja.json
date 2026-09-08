@@ -15559,5 +15559,13 @@
       "message": "システム全体の Claude Code ログインが使用できなくなっています。",
       "detail": "Orca Lab が管理する Claude アカウントには影響ありません。システム全体のログインを復元するには、Orca Lab の外で claude を実行し、/login を一度完了してください。"
     }
-  }
+  },
+  "auto.components.settings.HostAccountLoginDialog.title": "{{server}} でサインイン",
+  "auto.components.settings.HostAccountLoginDialog.description": "アカウントはこのパソコンではなくサーバー上に作成されます。下のページを開いてサインインし、コードをここに戻してください。",
+  "auto.components.settings.HostAccountLoginDialog.open": "サインインページを開く",
+  "auto.components.settings.HostAccountLoginDialog.copyUrl": "リンクをコピー",
+  "auto.components.settings.HostAccountLoginDialog.deviceCode": "そのページでこのコードを入力してください:",
+  "auto.components.settings.HostAccountLoginDialog.codeLabel": "そのページのコード",
+  "auto.components.settings.HostAccountLoginDialog.cancel": "キャンセル",
+  "auto.components.settings.HostAccountLoginDialog.finish": "サインインを完了"
 }

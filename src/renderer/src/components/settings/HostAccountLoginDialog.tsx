@@ -48,9 +48,10 @@ export function HostAccountLoginDialog({
       return
     }
     let cancelled = false
-    setSession(null)
-    setCode('')
-    setError(null)
+    // Why no state reset here: the caller remounts this dialog per provider with
+    // a `key`, so a fresh sign-in starts from fresh state. Clearing it in an
+    // effect would be adjusting state on a prop change, which React reruns a
+    // render to undo and which hides the real lifetime of the session.
     setBusy(true)
     void beginHostAccountLogin(settings, agent)
       .then((started) => {
