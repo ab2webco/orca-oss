@@ -43,6 +43,36 @@ describe('plane RPC methods', () => {
     expect(runtime.planeDisconnect).toHaveBeenCalledWith(undefined)
   })
 
+  it('carries omitDescription to the runtime, and says nothing when the client did not ask', async () => {
+    // The ORCA-437 shape: a key the schema does not declare is stripped in
+    // silence, so the phone would ask for a lean list and pay full price with
+    // every test still green. This asserts the route, not the response.
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      planeListWorkItems: vi.fn().mockResolvedValue([])
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PLANE_METHODS })
+
+    await dispatcher.dispatch(
+      makeRequest('plane.listWorkItems', { projectId: 'proj-1', omitDescription: true })
+    )
+    await dispatcher.dispatch(makeRequest('plane.listWorkItems', { projectId: 'proj-1' }))
+
+    expect(runtime.planeListWorkItems).toHaveBeenNthCalledWith(1, {
+      projectId: 'proj-1',
+      filter: 'all',
+      workspaceId: undefined,
+      omitDescription: true
+    })
+    // Undefined, never `false`: absent has to reach listWorkItems as "not asked".
+    expect(runtime.planeListWorkItems).toHaveBeenNthCalledWith(2, {
+      projectId: 'proj-1',
+      filter: 'all',
+      workspaceId: undefined,
+      omitDescription: undefined
+    })
+  })
+
   it('lets a work item update clear a date with null while an empty string stays unset', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
