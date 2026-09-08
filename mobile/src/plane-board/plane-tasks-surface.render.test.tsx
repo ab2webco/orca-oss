@@ -289,6 +289,8 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
     })
 
     it('closes on the column it is already in rather than writing a no-op', async () => {
+      // The write itself is already refused upstream (use-plane-board.ts:205), so
+      // this pins what the user sees: the sheet treats that tap as a dismissal.
       const calls = await mountBoard(root, WRITING_HOST, { items: [CARD] })
 
       await press('Move from Todo')
