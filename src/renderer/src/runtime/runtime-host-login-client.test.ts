@@ -18,6 +18,12 @@ vi.mock('./runtime-rpc-client', () => ({
 const remote = { activeRuntimeEnvironmentId: 'env-1' } as never
 const local = { activeRuntimeEnvironmentId: null } as never
 
+vi.mock('@/lib/web-client-location', () => ({
+  isWebClientLocation: () => webClient.value
+}))
+
+const webClient = { value: false }
+
 describe('runtime host login client', () => {
   it('routes the sign-in to the environment that owns the accounts', async () => {
     callRuntimeRpc.mockResolvedValueOnce({ sessionId: 's-1', url: 'https://example.test/auth' })
@@ -59,17 +65,36 @@ describe('runtime host login client', () => {
     )
   })
 
-  // Why refuse rather than fall back to the desktop flow: on the local host the
-  // interactive add already works, and running both would create the account
-  // twice — once through IPC and once through the runtime.
+  // Why the web client passes with a local target: the page is served by the
+  // runtime that owns the accounts, so "local" there means that server. Its
+  // accounts shim resolves an empty roster for `add`, so without this lane the
+  // button looked like it did nothing.
+  it('uses the serving runtime when it is the web client', async () => {
+    webClient.value = true
+    callRuntimeRpc.mockClear().mockResolvedValueOnce({ sessionId: 's-web', url: 'https://x.test' })
+
+    await expect(beginHostAccountLogin(local, 'claude')).resolves.toMatchObject({
+      sessionId: 's-web'
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'accounts.beginHostLogin',
+      { agent: 'claude' },
+      expect.anything()
+    )
+    webClient.value = false
+  })
+
   it.each([
     ['begin', () => beginHostAccountLogin(local, 'claude')],
     ['complete', () => completeHostAccountLogin(local, 's-1', 'code')],
     ['cancel', () => cancelHostAccountLogin(local, 's-1')]
-  ])('refuses %s when no server owns the accounts', async (_name, call) => {
+  ])('refuses %s when this desktop owns the accounts', async (_name, call) => {
+    // Why refuse instead of falling back: the interactive add already works
+    // here, and running both lanes would create the account twice.
     callRuntimeRpc.mockClear()
 
-    await expect(call()).rejects.toThrow(/only used when an Orca server owns the accounts/)
+    await expect(call()).rejects.toThrow(/owns the accounts/)
     expect(callRuntimeRpc).not.toHaveBeenCalled()
   })
 })

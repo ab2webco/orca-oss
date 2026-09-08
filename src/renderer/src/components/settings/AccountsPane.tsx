@@ -117,7 +117,7 @@ import {
 } from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { addClaudeCustomEndpointProviderAccount } from '@/runtime/runtime-provider-custom-endpoint'
-import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import { HostAccountLoginDialog } from './HostAccountLoginDialog'
 import {
@@ -412,21 +412,35 @@ export function AccountsPane({
   // (see #7973); every list/select/remove below must scope to it, not host/WSL.
   const isRemoteAccountScope = hasRemoteProviderAccountOwner(settings)
   const [hostLoginAgent, setHostLoginAgent] = useState<'claude' | 'codex' | null>(null)
+  // Why the web client joins this lane: the page is served by the runtime that
+  // owns the accounts, so its interactive add has to run there too. Its accounts
+  // shim resolves an empty roster instead, which read as the button doing
+  // nothing at all.
+  const hostLoginLane = isRemoteAccountScope || isWebClientLocation()
   // Why ask the runtime instead of assuming: a newer client against an older
   // server must keep the button disabled rather than fail on click.
   const [hostLoginSupported, setHostLoginSupported] = useState(false)
   const activeRuntimeEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
 
   useEffect(() => {
-    if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
+    if (!hostLoginLane) {
       setHostLoginSupported(false)
       return
     }
     let cancelled = false
-    void runtimeEnvironmentSupportsCapability(
-      activeRuntimeEnvironmentId,
-      HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
-    )
+    // Why two paths: a desktop names the environment it is pointed at, while the
+    // web client has no environment id — the runtime serving the page is the one
+    // to ask, and that is what a local-target status.get reaches.
+    const probe = activeRuntimeEnvironmentId
+      ? runtimeEnvironmentSupportsCapability(
+          activeRuntimeEnvironmentId,
+          HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
+        )
+      : callRuntimeRpc<{ capabilities?: string[] }>({ kind: 'local' }, 'status.get').then(
+          (status) =>
+            status.capabilities?.includes(HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY) === true
+        )
+    void probe
       .then((supported) => {
         if (!cancelled) {
           setHostLoginSupported(supported)
@@ -440,7 +454,7 @@ export function AccountsPane({
     return () => {
       cancelled = true
     }
-  }, [isRemoteAccountScope, activeRuntimeEnvironmentId])
+  }, [hostLoginLane, activeRuntimeEnvironmentId])
   // Why: keep the real name separate from the prose fallback below; the scope
   // label must not interpolate the fallback.
   const remoteServerName = isRemoteAccountScope
@@ -1397,7 +1411,7 @@ export function AccountsPane({
                 variant="outline"
                 size="xs"
                 onClick={() =>
-                  isRemoteAccountScope
+                  hostLoginLane
                     ? setHostLoginAgent('claude')
                     : void runClaudeAccountAction('adding', () =>
                         window.api.claudeAccounts.add({
@@ -1411,7 +1425,7 @@ export function AccountsPane({
                   // the sign-in runs on the account-owning server and hands the
                   // user a page plus a code, so no browser of this device is in
                   // the loop. An older server cannot do that and stays disabled.
-                  (isRemoteAccountScope && !hostLoginSupported) ||
+                  (hostLoginLane && !hostLoginSupported) ||
                   claudeAction !== 'idle' ||
                   wslCapabilitiesLoading ||
                   accountRuntimeUnavailable
@@ -1920,7 +1934,7 @@ export function AccountsPane({
               variant="outline"
               size="xs"
               onClick={() =>
-                isRemoteAccountScope
+                hostLoginLane
                   ? setHostLoginAgent('codex')
                   : void runCodexAccountAction('adding', () =>
                       window.api.codexAccounts.add({
@@ -1933,7 +1947,7 @@ export function AccountsPane({
                 // Why gated and not shut: `codex login --device-auth` shows a
                 // page and a short code, so the server can run it and this
                 // client only relays them. An older server stays disabled.
-                (isRemoteAccountScope && !hostLoginSupported) ||
+                (hostLoginLane && !hostLoginSupported) ||
                 codexAction !== 'idle' ||
                 wslCapabilitiesLoading ||
                 accountRuntimeUnavailable
