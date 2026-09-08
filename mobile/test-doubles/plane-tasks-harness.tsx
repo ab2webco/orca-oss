@@ -84,6 +84,8 @@ export type HostBehaviour = {
   hangReads?: boolean
   /** That same read rejects, so the board settles in error. */
   failReads?: Error
+  /** What plane.listMembers answers; Ada and Grace when omitted. */
+  members?: readonly unknown[]
 }
 
 export function createClient(
@@ -143,10 +145,12 @@ export function createClient(
         case 'plane.addWorkItemComment':
           return reply({ ok: true, id: 'c-1' })
         case 'plane.listMembers':
-          return reply([
-            { id: 'u-1', displayName: 'Ada' },
-            { id: 'u-2', displayName: 'Grace' }
-          ])
+          return reply(
+            behaviour.members ?? [
+              { id: 'u-1', displayName: 'Ada' },
+              { id: 'u-2', displayName: 'Grace' }
+            ]
+          )
         default:
           return new Promise(() => {})
       }
