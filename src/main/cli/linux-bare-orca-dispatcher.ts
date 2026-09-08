@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { buildAppImageCliWrapper, quoteShell } from './appimage-cli-wrapper'
@@ -16,12 +16,19 @@ export type LinuxBareOrcaDispatcherOptions = {
   homePath?: string
   /** Test seam — defaults to $APPIMAGE (set only when running from an AppImage). */
   appImagePath?: string | null
+  /** Test seam — defaults to the system paths GNOME Orca installs into. */
+  systemOrcaPaths?: readonly string[]
 }
+
+// Why these two: GNOME's Orca screen reader ships `orca` from a distro package,
+// which lands in /usr/bin (deb/rpm) or /usr/local/bin (built from source).
+const SYSTEM_ORCA_PATHS = ['/usr/bin/orca', '/usr/local/bin/orca'] as const
 
 export type LinuxBareOrcaDispatcherState =
   | 'installed'
   | 'skipped-foreign'
   | 'skipped-launcher-missing'
+  | 'skipped-system-orca'
 
 export type LinuxBareOrcaDispatcherResult = {
   state: LinuxBareOrcaDispatcherState
@@ -36,7 +43,8 @@ export type LinuxBareOrcaDispatcherResult = {
 // headless serve box needs a bare-`orca` dispatcher on the managed-terminal PATH
 // (~/.local/bin, which patchPackagedProcessPath puts ahead of /usr/bin). It is a
 // plain file, not a managed symlink, so CliInstaller.removeLegacyLinuxCommandIfManaged
-// never reclaims it.
+// never reclaims it. It is written ONLY where no screen reader owns the name —
+// see the SYSTEM_ORCA_PATHS check below.
 export async function installLinuxBareOrcaDispatcher(
   options: LinuxBareOrcaDispatcherOptions
 ): Promise<LinuxBareOrcaDispatcherResult> {
@@ -46,6 +54,25 @@ export async function installLinuxBareOrcaDispatcher(
   const resolved = resolveDispatcherScript(options.resourcesPath, appImagePath)
   if (!resolved) {
     return { state: 'skipped-launcher-missing', dispatcherPath, target: null }
+  }
+
+  // Why: ~/.local/bin sits AHEAD of /usr/bin on a login-shell PATH, so writing a
+  // bare `orca` here on a box that also runs a GNOME desktop silently takes over
+  // the user's screen reader command in every shell they open — an assistive tool
+  // they cannot get back without knowing this file exists. Orca terminals do not
+  // need it: ensureLinuxTerminalOrcaCliShimDir already puts bare `orca` on the
+  // managed-PTY PATH, scoped to those PTYs. Outside them, `orca-ide` is the name.
+  const systemOrca = (options.systemOrcaPaths ?? SYSTEM_ORCA_PATHS).some((candidate) =>
+    existsSync(candidate)
+  )
+  if (systemOrca) {
+    // Why remove and not just skip: the screen reader is often installed AFTER a
+    // dispatcher we wrote, and a stale file keeps shadowing it forever. Only ever
+    // our own marked file — a user's own `orca` here is theirs to keep.
+    if (existsSync(dispatcherPath) && (await isOwnedDispatcher(dispatcherPath))) {
+      await rm(dispatcherPath, { force: true })
+    }
+    return { state: 'skipped-system-orca', dispatcherPath, target: resolved.target }
   }
 
   // Why: only (re)write a dispatcher we previously created; leave a user's own

@@ -26,13 +26,76 @@ afterEach(async () => {
 })
 
 describe('installLinuxBareOrcaDispatcher', () => {
+  // Why: ~/.local/bin is ahead of /usr/bin on a login-shell PATH, so a bare `orca`
+  // here takes over the GNOME Orca screen reader command in every shell the user
+  // opens. Orca terminals get bare `orca` from the userData-scoped PTY shim, so
+  // nothing needs this file on a machine where the name is already taken.
+  it('never writes a dispatcher when a screen reader already owns the orca command', async () => {
+    const { homePath, resourcesPath } = await makeFixture()
+    const screenReader = join(resourcesPath, 'fake-usr-bin-orca')
+    await writeFile(screenReader, '#!/usr/bin/env bash\n', 'utf8')
+
+    const result = await installLinuxBareOrcaDispatcher({
+      resourcesPath,
+      homePath,
+      appImagePath: null,
+      systemOrcaPaths: [screenReader]
+    })
+
+    expect(result.state).toBe('skipped-system-orca')
+    await expect(stat(result.dispatcherPath)).rejects.toThrow()
+  })
+
+  it('removes a dispatcher it wrote earlier once a screen reader takes the name', async () => {
+    const { homePath, resourcesPath } = await makeFixture()
+    const installed = await installLinuxBareOrcaDispatcher({
+      resourcesPath,
+      homePath,
+      appImagePath: null,
+      systemOrcaPaths: []
+    })
+    expect(installed.state).toBe('installed')
+
+    const screenReader = join(resourcesPath, 'fake-usr-bin-orca')
+    await writeFile(screenReader, '#!/usr/bin/env bash\n', 'utf8')
+    const result = await installLinuxBareOrcaDispatcher({
+      resourcesPath,
+      homePath,
+      appImagePath: null,
+      systemOrcaPaths: [screenReader]
+    })
+
+    expect(result.state).toBe('skipped-system-orca')
+    // A stale file we wrote would keep shadowing the screen reader forever.
+    await expect(stat(result.dispatcherPath)).rejects.toThrow()
+  })
+
+  it("leaves a user's own bare orca alone when a screen reader is present", async () => {
+    const { homePath, resourcesPath } = await makeFixture()
+    const dispatcherPath = join(homePath, '.local', 'bin', 'orca')
+    await mkdir(join(homePath, '.local', 'bin'), { recursive: true })
+    await writeFile(dispatcherPath, '#!/usr/bin/env bash\necho mine\n', 'utf8')
+    const screenReader = join(resourcesPath, 'fake-usr-bin-orca')
+    await writeFile(screenReader, '#!/usr/bin/env bash\n', 'utf8')
+
+    const result = await installLinuxBareOrcaDispatcher({
+      resourcesPath,
+      homePath,
+      appImagePath: null,
+      systemOrcaPaths: [screenReader]
+    })
+
+    expect(result.state).toBe('skipped-system-orca')
+    expect(await readFile(dispatcherPath, 'utf8')).toContain('echo mine')
+  })
   it('writes an executable bare-orca dispatcher that execs the bundled orca-ide launcher', async () => {
     const { homePath, resourcesPath } = await makeFixture()
 
     const result = await installLinuxBareOrcaDispatcher({
       resourcesPath,
       homePath,
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
 
     const expectedTarget = join(resourcesPath, 'bin', 'orca-ide')
@@ -55,12 +118,14 @@ describe('installLinuxBareOrcaDispatcher', () => {
     const first = await installLinuxBareOrcaDispatcher({
       resourcesPath,
       homePath,
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
     const second = await installLinuxBareOrcaDispatcher({
       resourcesPath,
       homePath,
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
 
     expect(second).toEqual(first)
@@ -77,7 +142,8 @@ describe('installLinuxBareOrcaDispatcher', () => {
     const result = await installLinuxBareOrcaDispatcher({
       resourcesPath,
       homePath: join(root, 'home'),
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
 
     const content = await readFile(result.dispatcherPath, 'utf8')
@@ -88,7 +154,12 @@ describe('installLinuxBareOrcaDispatcher', () => {
     const { homePath, resourcesPath } = await makeFixture()
     const appImagePath = join(homePath, 'Applications', 'Orca.AppImage')
 
-    const result = await installLinuxBareOrcaDispatcher({ resourcesPath, homePath, appImagePath })
+    const result = await installLinuxBareOrcaDispatcher({
+      resourcesPath,
+      homePath,
+      appImagePath,
+      systemOrcaPaths: []
+    })
 
     expect(result.state).toBe('installed')
     expect(result.target).toBe(appImagePath)
@@ -107,7 +178,8 @@ describe('installLinuxBareOrcaDispatcher', () => {
     const result = await installLinuxBareOrcaDispatcher({
       resourcesPath,
       homePath,
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
 
     expect(result.state).toBe('skipped-foreign')
@@ -121,7 +193,8 @@ describe('installLinuxBareOrcaDispatcher', () => {
     const result = await installLinuxBareOrcaDispatcher({
       resourcesPath: join(root, 'resources'),
       homePath: join(root, 'home'),
-      appImagePath: null
+      appImagePath: null,
+      systemOrcaPaths: []
     })
 
     expect(result.state).toBe('skipped-launcher-missing')
