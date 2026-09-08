@@ -143,6 +143,45 @@ beforeEach(() => {
 })
 
 describe('runManagedAccountSwitchRelaunch', () => {
+  // Why these two: a terminal running on a paired server has its source account
+  // in THAT server's roster, never in this desktop's `claudeManagedAccounts`. The
+  // old gate read the local roster, missed, and sent the switch down the local
+  // fallback — which reported "could not copy the session transcript" for a
+  // session that was never on this machine.
+  it('switches a server-hosted terminal through the runtime that owns it', async () => {
+    getRemoteRuntimePtyEnvironmentId.mockReturnValue('env-1')
+    store.settings = { agentCmdOverrides: {}, claudeManagedAccounts: [] }
+
+    const result = await run({ settings: store.settings as never })
+
+    expect(result).toEqual({ ok: true, accountLabel: 'spare@example.com', switched: 'resumed' })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'accounts.switchClaudeTerminal',
+      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: TARGET_ACCOUNT.id }),
+      expect.anything()
+    )
+    expect(copySessionForAccountSwitch).not.toHaveBeenCalled()
+  })
+
+  it('reports the runtime reason for a server-hosted pane it cannot switch in place', async () => {
+    getRemoteRuntimePtyEnvironmentId.mockReturnValue('env-1')
+    store.settings = { agentCmdOverrides: {}, claudeManagedAccounts: [] }
+    callRuntimeRpc.mockResolvedValue(
+      switchResponse({
+        state: 'refused',
+        failure: { reason: 'unsupported-runtime', message: 'This terminal is not switchable.' }
+      })
+    )
+
+    const result = await run({ settings: store.settings as never })
+
+    expect(result).toMatchObject({ ok: false, reason: 'resume-failed' })
+    // The local fallback would have copied a transcript this machine does not have.
+    expect(copySessionForAccountSwitch).not.toHaveBeenCalled()
+    expect(store.createTab).not.toHaveBeenCalled()
+  })
+
   it('delegates the whole switch to the runtime that owns the PTY, then pins the worktree', async () => {
     const result = await run()
 
