@@ -9,6 +9,8 @@ import {
 import { translate } from '@/i18n/i18n'
 import { claudeAccountSwitchLabel } from './use-manual-claude-account-switch'
 import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
+import { useAppStore } from '@/store'
+import { listClaudeAccountsForActiveHost } from '@/runtime/runtime-provider-account-roster'
 
 /** Fetches and splits switchable Claude accounts while `enabled`, keeping the
  *  managed OAuth accounts and custom-endpoint accounts in separate groups.
@@ -19,6 +21,9 @@ export function useClaudeAccountSwitchTargets(enabled: boolean): {
   activeAccountId: string | null
   activeModel: string | null
 } {
+  const activeRuntimeEnvironmentId = useAppStore(
+    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
+  )
   const [accounts, setAccounts] = useState<ClaudeManagedAccountSummary[]>([])
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
   const [activeModel, setActiveModel] = useState<string | null>(null)
@@ -27,12 +32,11 @@ export function useClaudeAccountSwitchTargets(enabled: boolean): {
     if (!enabled) {
       return
     }
-    const list = window.api?.claudeAccounts?.list
-    if (!list) {
-      return
-    }
     let cancelled = false
-    void list()
+    // Why the routed roster: the switch itself already runs on the PTY's own
+    // runtime, but this list came from the local preload — so against a server
+    // the menu offered this desktop's accounts and none of them exist there.
+    void listClaudeAccountsForActiveHost({ activeRuntimeEnvironmentId })
       .then((result) => {
         if (!cancelled) {
           setAccounts(result.accounts)
@@ -46,7 +50,7 @@ export function useClaudeAccountSwitchTargets(enabled: boolean): {
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, activeRuntimeEnvironmentId])
 
   return useMemo(
     () => ({
