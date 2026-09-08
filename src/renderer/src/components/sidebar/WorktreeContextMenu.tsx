@@ -46,6 +46,10 @@ import {
   INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE,
   isLocalCodexAccountWorktreeTarget
 } from '@/lib/codex-account-runtime-filter'
+import {
+  listClaudeAccountsForActiveHost,
+  listCodexAccountsForActiveHost
+} from '@/runtime/runtime-provider-account-roster'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import type {
   ClaudeManagedAccountSummary,
@@ -677,8 +681,12 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       return
     }
     let cancelled = false
-    void window.api.claudeAccounts
-      .list()
+    // Why routed: this submenu is how a workspace gets an account pinned, and
+    // the pin is what makes its terminals launch bound to that account. Reading
+    // THIS desktop's roster left the submenu empty for a workspace on a server,
+    // so nothing could be pinned there — and an unpinned terminal is exactly
+    // what the runtime later refuses to switch, with `source-unknown`.
+    void listClaudeAccountsForActiveHost(useAppStore.getState().settings)
       .then((result) => {
         if (!cancelled) {
           setClaudeAccounts(result.accounts)
@@ -697,8 +705,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       return
     }
     let cancelled = false
-    void window.api.codexAccounts
-      .list()
+    void listCodexAccountsForActiveHost(useAppStore.getState().settings)
       .then((result) => {
         if (!cancelled) {
           setCodexAccounts(result.accounts)
