@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CodexManagedAccountSummary } from '../../../shared/types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
 import {
   filterCodexAccountsByRuntime,
   filterCodexAccountsByWorktreeRuntimes,
@@ -86,7 +87,9 @@ describe('canPinCodexAccountToWorktree', () => {
   // Same reasoning as the Claude twin: a runtime-owned worktree has that
   // runtime's vaults, so the pin means something there. Gating on "local" hid
   // the assign submenu for a server-hosted workspace.
-  it.each([
+  // Why the tuple is typed: `it.each` widens the literals to `string`, and
+  // `Worktree.hostId` is the narrower `ExecutionHostId`.
+  it.each<[string, ExecutionHostId | undefined, boolean]>([
     ['a paired runtime', 'runtime:env-1', true],
     ['the local host', undefined, true],
     ['an SSH connection', 'ssh:my-box', false]
