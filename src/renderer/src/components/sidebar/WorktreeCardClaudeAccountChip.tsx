@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import { isLocalClaudeAccountWorktreeTarget } from '@/lib/claude-account-runtime-filter'
+import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filter'
 import type { Repo, Worktree } from '../../../../shared/types'
 import { buildWorktreeClaudeAccountChipModel } from './worktree-claude-account-chip-model'
 
@@ -26,7 +26,7 @@ export function WorktreeCardClaudeAccountChip({
 }): React.JSX.Element | null {
   const roster = useAppStore((s) => s.claudeAccountRoster)
 
-  if (isWebClientLocation() || !isLocalClaudeAccountWorktreeTarget(worktree, repo)) {
+  if (isWebClientLocation() || !canPinClaudeAccountToWorktree(worktree, repo)) {
     return null
   }
 

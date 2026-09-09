@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CodexManagedAccountSummary } from '../../../shared/types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
 import {
   filterCodexAccountsByRuntime,
   filterCodexAccountsByWorktreeRuntimes,
-  isLocalCodexAccountWorktreeTarget
+  isLocalCodexAccountWorktreeTarget,
+  canPinCodexAccountToWorktree
 } from './codex-account-runtime-filter'
 
 function account(
@@ -76,5 +78,31 @@ describe('Codex account binding target ownership', () => {
     expect(isLocalCodexAccountWorktreeTarget({ id: 'folder:folder-workspace-1' }, localRepo)).toBe(
       false
     )
+  })
+})
+
+describe('canPinCodexAccountToWorktree', () => {
+  const localRepo = { connectionId: null, executionHostId: 'local' as const }
+
+  // Same reasoning as the Claude twin: a runtime-owned worktree has that
+  // runtime's vaults, so the pin means something there. Gating on "local" hid
+  // the assign submenu for a server-hosted workspace.
+  // Why the tuple is typed: `it.each` widens the literals to `string`, and
+  // `Worktree.hostId` is the narrower `ExecutionHostId`.
+  it.each<[string, ExecutionHostId | undefined, boolean]>([
+    ['a paired runtime', 'runtime:env-1', true],
+    ['the local host', undefined, true],
+    ['an SSH connection', 'ssh:my-box', false]
+  ])('accepts %s: %s', (_name, hostId, expected) => {
+    expect(
+      canPinCodexAccountToWorktree(
+        { id: 'repo-1::/home/dev/worktree', ...(hostId ? { hostId } : {}) },
+        localRepo
+      )
+    ).toBe(expected)
+  })
+
+  it('rejects a folder workspace, whose id is a workspace key', () => {
+    expect(canPinCodexAccountToWorktree({ id: 'folder:folder-workspace-1' }, localRepo)).toBe(false)
   })
 })

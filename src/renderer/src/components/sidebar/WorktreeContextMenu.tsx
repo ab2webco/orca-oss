@@ -38,13 +38,13 @@ import { cn } from '@/lib/utils'
 import {
   filterClaudeAccountsByWorktreeRuntimes,
   INHERIT_GLOBAL_CLAUDE_ACCOUNT_VALUE,
-  isLocalClaudeAccountWorktreeTarget,
+  canPinClaudeAccountToWorktree,
   type ClaudeAccountLaunchRuntime
 } from '@/lib/claude-account-runtime-filter'
 import {
   filterCodexAccountsByWorktreeRuntimes,
   INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE,
-  isLocalCodexAccountWorktreeTarget
+  canPinCodexAccountToWorktree
 } from '@/lib/codex-account-runtime-filter'
 import {
   listClaudeAccountsForActiveHost,
@@ -130,7 +130,7 @@ export function canAssignClaudeAccountsToWorktrees(
     !isPairedWebClient &&
     worktrees.length > 0 &&
     worktrees.every((worktree) =>
-      isLocalClaudeAccountWorktreeTarget(worktree, repoMap.get(worktree.repoId))
+      canPinClaudeAccountToWorktree(worktree, repoMap.get(worktree.repoId))
     )
   )
 }
@@ -144,7 +144,7 @@ export function canAssignCodexAccountsToWorktrees(
     !isPairedWebClient &&
     worktrees.length > 0 &&
     worktrees.every((worktree) =>
-      isLocalCodexAccountWorktreeTarget(worktree, repoMap.get(worktree.repoId))
+      canPinCodexAccountToWorktree(worktree, repoMap.get(worktree.repoId))
     )
   )
 }
