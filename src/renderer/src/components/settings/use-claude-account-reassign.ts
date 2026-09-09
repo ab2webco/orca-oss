@@ -5,11 +5,11 @@ import {
   emptyClaudeAccountWorktreeUsageReport,
   type ClaudeAccountWorktreeUsageReport
 } from '../../../../shared/claude-account-worktree-usage'
+import { removeClaudeProviderAccount } from '@/runtime/runtime-provider-accounts-client'
 import {
   getClaudeAccountWorktreeUsage,
-  reassignClaudeWorktreeAccounts,
-  removeClaudeProviderAccount
-} from '@/runtime/runtime-provider-accounts-client'
+  reassignClaudeWorktreeAccounts
+} from '@/runtime/runtime-claude-account-usage-client'
 import {
   reopenClaudeTerminalsAfterReauth,
   type ClaudeReauthReopenOutcome
