@@ -39,124 +39,20 @@ import { PLANE_VIEW_MODES, usePlaneViewMode } from '../src/plane-board/plane-wor
 import { useRuntimeCapabilities } from '../src/plane-board/use-runtime-capabilities'
 import { deviceStorage } from './async-storage-memory'
 import { settle } from './plane-tasks-screen-driver'
+import {
+  CARD,
+  OTHER_PROJECT,
+  PROJECT,
+  createClient,
+  type Call,
+  type HostBehaviour
+} from './plane-tasks-rpc-double'
 
 export { deviceStorage }
 
 export const PLANE_VIEW_STORAGE_KEY = 'orca:plane.work-item-view.v1'
 
-export const PROJECT = { id: 'proj-1', identifier: 'ORCA', name: 'Orca Lab' }
-export const OTHER_PROJECT = { id: 'proj-2', identifier: 'AB2', name: 'Ab2Web' }
-
-export const CARD = {
-  id: 'wi-1',
-  identifier: 'ORCA-1',
-  title: 'Wire the retry',
-  url: '',
-  project: PROJECT,
-  state: { id: 'state-1', name: 'Todo', group: 'unstarted' },
-  priority: 'none',
-  updatedAt: ''
-}
-
-/** A card in the second column: the board shows both columns' cards at once. */
-export const DOING_CARD = {
-  ...CARD,
-  id: 'wi-2',
-  identifier: 'ORCA-2',
-  title: 'Ship the shell',
-  state: { id: 'state-2', name: 'Doing', group: 'started' }
-}
-
-export type Call = { method: string; params?: unknown }
-
-export type HostBehaviour = {
-  /** Every board write rejects with this error, the way a dropped socket or a timeout does. */
-  rejectWrites?: Error
-  /** Only writes on this card reject; the rest succeed. */
-  rejectWritesFor?: string
-  /** Writes on this card never answer, a request still inside its budget. */
-  hangWritesFor?: string
-  items?: readonly unknown[]
-  /** What a re-read returns once a write was attempted: what Plane really holds. */
-  itemsAfterWrite?: readonly unknown[]
-  /** The board's own read — the state metadata — never answers, so its columns stay
-   *  whatever the cards derive. The list's rows are unaffected. */
-  hangReads?: boolean
-  /** That same read rejects, so the board settles in error. */
-  failReads?: Error
-  /** What plane.listMembers answers; Ada and Grace when omitted. */
-  members?: readonly unknown[]
-}
-
-export function createClient(
-  capabilities: readonly string[],
-  calls: Call[],
-  behaviour: HostBehaviour = {}
-): RpcClient {
-  let writeAttempted = false
-  return {
-    sendRequest: async (method: string, params?: unknown) => {
-      calls.push({ method, params })
-      const reply = (result: unknown) => ({ id: '1', ok: true as const, result })
-      if (
-        method === 'plane.createWorkItem' ||
-        method === 'plane.updateWorkItem' ||
-        method === 'plane.addWorkItemComment'
-      ) {
-        writeAttempted = true
-        const workItemId = (params as { workItemId?: string } | undefined)?.workItemId
-        if (behaviour.hangWritesFor && workItemId === behaviour.hangWritesFor) {
-          return new Promise(() => {})
-        }
-        if (
-          behaviour.rejectWrites &&
-          (!behaviour.rejectWritesFor || workItemId === behaviour.rejectWritesFor)
-        ) {
-          throw behaviour.rejectWrites
-        }
-      }
-      if (method === 'plane.listStates' && (behaviour.hangReads || behaviour.failReads)) {
-        if (behaviour.hangReads) {
-          return new Promise(() => {})
-        }
-        throw behaviour.failReads
-      }
-      switch (method) {
-        case 'status.get':
-          return reply({ hostPlatform: 'darwin', capabilities })
-        case 'plane.listStates':
-          return reply([
-            { id: 'state-1', name: 'Todo', group: 'unstarted', sequence: 1 },
-            { id: 'state-2', name: 'Doing', group: 'started', sequence: 2 }
-          ])
-        case 'plane.listWorkItems':
-        case 'plane.searchWorkItems': {
-          // Cards belong to the first project; the other project is empty.
-          const projectId = (params as { projectId?: string } | undefined)?.projectId
-          if (projectId === OTHER_PROJECT.id) {
-            return reply([])
-          }
-          return reply((writeAttempted && behaviour.itemsAfterWrite) || behaviour.items || [])
-        }
-        case 'plane.createWorkItem':
-          return reply({ ok: true, id: 'wi-9', identifier: 'ORCA-9', url: '' })
-        case 'plane.updateWorkItem':
-          return reply({ ok: true })
-        case 'plane.addWorkItemComment':
-          return reply({ ok: true, id: 'c-1' })
-        case 'plane.listMembers':
-          return reply(
-            behaviour.members ?? [
-              { id: 'u-1', displayName: 'Ada' },
-              { id: 'u-2', displayName: 'Grace' }
-            ]
-          )
-        default:
-          return new Promise(() => {})
-      }
-    }
-  } as unknown as RpcClient
-}
+export * from './plane-tasks-rpc-double'
 
 const safeAreaMetrics = {
   insets: { top: 0, bottom: 0, left: 0, right: 0 },

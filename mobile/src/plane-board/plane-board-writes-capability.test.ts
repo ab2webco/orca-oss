@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_TASKS_PLANE_CAPABILITY } from '../tasks/plane-mobile-task-source'
 import {
+  arePlaneColumnsEditableByHost,
   arePlaneDateClearsSupportedByHost,
   arePlaneMembersListableByHost,
   isPlaneBoardWritableByHost,
+  MOBILE_PLANE_BOARD_COLUMNS_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_CAPABILITY
@@ -65,5 +67,33 @@ describe('plane board writes capability', () => {
     expect(arePlaneDateClearsSupportedByHost([MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY])).toBe(
       true
     )
+  })
+
+  it('mirrors the host columns constant byte for byte', () => {
+    expect(MOBILE_PLANE_BOARD_COLUMNS_CAPABILITY).toBe('mobile.plane-board.columns.v1')
+  })
+
+  it('keeps column edits off a host that only advertises writes', () => {
+    // Why: writes.v1 hosts refuse plane.updateState/deleteState at dispatch.
+    expect(arePlaneColumnsEditableByHost(undefined)).toBe(false)
+    expect(arePlaneColumnsEditableByHost([])).toBe(false)
+    expect(
+      arePlaneColumnsEditableByHost([
+        'mobile.tasks.v1',
+        MOBILE_TASKS_PLANE_CAPABILITY,
+        MOBILE_PLANE_BOARD_WRITES_CAPABILITY,
+        MOBILE_PLANE_BOARD_MEMBERS_CAPABILITY,
+        MOBILE_PLANE_BOARD_DATE_CLEARS_CAPABILITY
+      ])
+    ).toBe(false)
+  })
+
+  it('turns column edits on when the host advertises them', () => {
+    expect(
+      arePlaneColumnsEditableByHost([
+        MOBILE_PLANE_BOARD_WRITES_CAPABILITY,
+        MOBILE_PLANE_BOARD_COLUMNS_CAPABILITY
+      ])
+    ).toBe(true)
   })
 })

@@ -14,6 +14,7 @@ import {
   planeStateGroupColor
 } from './plane-board-sections'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
+import { PlaneColumnMenu } from './plane-column-menu'
 import type { PlaneBoard } from './use-plane-board'
 
 // The in-flight word goes first: the shell clamps the subtitle to two lines, and the
@@ -165,8 +166,30 @@ export function PlaneTaskBoard({
                 onDismiss={board.dismissCreateError}
               />
             ) : null}
+            {board.columnError ? (
+              <PlaneBoardWriteErrorRow
+                message={`Could not change the column — ${board.columnError.message}`}
+                onRetry={null}
+                onDismiss={board.dismissColumnError}
+              />
+            ) : null}
           </>
         }
+        renderColumnHeaderSlot={(section) => {
+          // A priority or assignee column is not a state: nothing for Plane to rename.
+          const stateId = planeBoardColumnStateId(section, groupBy)
+          if (!board.canEditColumns || stateId === null) {
+            return null
+          }
+          return (
+            <PlaneColumnMenu
+              name={section.label}
+              editing={board.editingStateIds.has(stateId)}
+              error={board.columnError?.stateId === stateId ? board.columnError.message : null}
+              onRename={(name) => board.renameColumn(stateId, name)}
+            />
+          )
+        }}
         renderColumnFooterSlot={(section) => {
           // No stateId means the column is a priority or an assignee, not a state: there is
           // nothing for Plane to create into (ORCA-422).
