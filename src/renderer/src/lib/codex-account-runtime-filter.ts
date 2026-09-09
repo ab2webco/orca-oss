@@ -1,5 +1,9 @@
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
+  parseExecutionHostId
+} from '../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { CodexManagedAccountSummary, Repo, Worktree } from '../../../shared/types'
 
@@ -14,6 +18,34 @@ export type CodexAccountLaunchRuntime =
 export const INHERIT_GLOBAL_CODEX_ACCOUNT_VALUE = '__inherit-global__'
 
 type CodexAccountTargetRepo = Pick<Repo, 'connectionId' | 'executionHostId'>
+
+/** Whether a worktree can carry an account pin at all.
+ *
+ *  Why not just "is it local": the pin names which managed vault the agent
+ *  launches against, and a worktree owned by a paired runtime has vaults of its
+ *  own — that runtime's. Restricting this to the local host hid the whole
+ *  affordance for a server-hosted workspace: no submenu to assign an account,
+ *  and no chip saying which one is in use. The account the pin names is resolved
+ *  against the owning host's roster, so the pin means the same thing there.
+ *
+ *  Folder workspaces stay excluded: their synthetic ids are workspace keys, not
+ *  worktree ids, and nothing resolves a credential binding for them.
+ */
+export function canPinCodexAccountToWorktree(
+  worktree: Pick<Worktree, 'id' | 'hostId'>,
+  repo: CodexAccountTargetRepo | null | undefined
+): boolean {
+  if (parseWorkspaceKey(worktree.id)?.type === 'folder') {
+    return false
+  }
+  const hostId = worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : null)
+  if (hostId === LOCAL_EXECUTION_HOST_ID) {
+    return true
+  }
+  // A paired runtime owns accounts; an SSH connection does not — its agent runs
+  // over a shell Orca does not manage a vault for.
+  return parseExecutionHostId(hostId)?.kind === 'runtime'
+}
 
 export function isLocalCodexAccountWorktreeTarget(
   worktree: Pick<Worktree, 'id' | 'hostId'>,
