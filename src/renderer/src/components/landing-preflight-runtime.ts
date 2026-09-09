@@ -30,10 +30,14 @@ export function useLandingPreflightRuntime(): { preflightIssues: PreflightIssue[
     () =>
       preflightStatus
         ? getLandingPreflightIssues(preflightStatus, {
-            hasGitHubBackedProject: hasGitHubProject
+            hasGitHubBackedProject: hasGitHubProject,
+            // Why derived from the same key the effect below watches: the offer
+            // is only real while a reachable server owns the terminals — that
+            // is the host whose gh the sign-in would authenticate.
+            canSignInOnHost: activeRuntimeState.endsWith(':reachable')
           })
         : [],
-    [preflightStatus, hasGitHubProject]
+    [preflightStatus, hasGitHubProject, activeRuntimeState]
   )
 
   useEffect(() => {

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ExternalLink, FolderPlus, GitBranchPlus, Star, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  ExternalLink,
+  FolderPlus,
+  GitBranchPlus,
+  LogIn,
+  Star,
+  X
+} from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useAppStore } from '../store'
 import { isGitRepoKind } from '../../../shared/repo-kind'
@@ -16,6 +24,8 @@ import logo from '../../../../resources/logo.svg'
 import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
+import { HostAccountLoginDialog } from './settings/HostAccountLoginDialog'
+import type { HostLoginAgent } from '@/runtime/runtime-host-login-client'
 
 type ShortcutItem = {
   id: string
@@ -155,6 +165,9 @@ function PreflightBanner({
   // GitHub project (which changes the key) re-evaluates dismissals, so a lapsed
   // dismissal re-surfaces the nudge without a manual reset.
   const githubKey = githubProjectKeys(repos).join('|')
+  const [hostSignInAgent, setHostSignInAgent] = useState<HostLoginAgent | null>(null)
+  const settings = useAppStore((s) => s.settings)
+  const invalidatePreflightStatus = useAppStore((s) => s.invalidatePreflightStatus)
   const [dismissed, setDismissed] = useState<Set<string>>(
     () =>
       new Set(
@@ -202,13 +215,27 @@ function PreflightBanner({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="text-[13px] font-medium leading-snug text-foreground">{issue.title}</p>
             <p className="text-xs leading-snug text-muted-foreground">{issue.description}</p>
-            <button
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
-              onClick={() => window.api.shell.openUrl(issue.fixUrl)}
-            >
-              {issue.fixLabel}
-              <ExternalLink className="size-3" />
-            </button>
+            {issue.hostSignIn ? (
+              // Why a sign-in and not a doc link: on a host whose browser this
+              // client cannot open, "run gh auth login in a terminal" dead-ends
+              // — gh there tries to launch a browser and fails. This runs it on
+              // that host and carries its device code back here.
+              <button
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
+                onClick={() => setHostSignInAgent(issue.hostSignIn ?? null)}
+              >
+                {translate('auto.components.Landing.preflightHostSignIn', 'Sign in from here')}
+                <LogIn className="size-3" />
+              </button>
+            ) : (
+              <button
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
+                onClick={() => window.api.shell.openUrl(issue.fixUrl)}
+              >
+                {issue.fixLabel}
+                <ExternalLink className="size-3" />
+              </button>
+            )}
           </div>
           {issue.dismissible && (
             <button
@@ -221,6 +248,21 @@ function PreflightBanner({
           )}
         </div>
       ))}
+      {hostSignInAgent ? (
+        <HostAccountLoginDialog
+          // Why keyed: a fresh sign-in must start from fresh dialog state, and
+          // remounting is how that happens without adjusting state on a prop.
+          key={hostSignInAgent}
+          agent={hostSignInAgent}
+          settings={settings}
+          serverLabel={translate('auto.components.Landing.preflightHostLabel', 'this server')}
+          onClose={() => setHostSignInAgent(null)}
+          // Why invalidate and not assume success: the issue is derived from a
+          // preflight probe, so the banner only clears once that probe reruns
+          // and actually finds gh authenticated.
+          onCompleted={() => invalidatePreflightStatus()}
+        />
+      ) : null}
     </div>
   )
 }

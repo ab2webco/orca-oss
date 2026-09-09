@@ -8,6 +8,9 @@ export type PreflightIssue = {
   description: string
   fixLabel: string
   fixUrl: string
+  /** Present when this issue can be cleared by a device-code sign-in run on the
+   *  host that owns the terminals, instead of by reading a doc. */
+  hostSignIn?: 'github'
   /** Git is a hard global dependency and stays pinned; provider-specific CLI
    *  setup is a soft nudge the user can dismiss. */
   dismissible?: boolean
@@ -20,6 +23,9 @@ export type LandingPreflightStatus = {
 
 export type LandingPreflightIssueOptions = {
   hasGitHubBackedProject: boolean
+  /** True when a paired runtime owns the terminals, so the sign-in can run
+   *  there and hand its device code back through the UI. */
+  canSignInOnHost?: boolean
 }
 
 export function hasGitHubBackedProject(repos: readonly Repo[]): boolean {
@@ -68,12 +74,23 @@ export function getLandingPreflightIssues(
     issues.push({
       id: 'gh-auth',
       title: translate('auto.components.Landing.9f96d018b7', 'GitHub CLI is not authenticated'),
-      description: translate(
-        'auto.components.Landing.00cee697c1',
-        'Run "gh auth login" in a terminal to connect your GitHub account.'
-      ),
+      // Why the copy changes with the host: telling someone to "run gh auth
+      // login in a terminal" is the wrong instruction when the host is a server
+      // — gh there has no browser to open, so the plain flow dead-ends. The
+      // device-code sign-in below runs it on that host and carries the code
+      // back, which is the only way through without shell access.
+      description: options.canSignInOnHost
+        ? translate(
+            'auto.components.Landing.ghAuthHostDescription',
+            'Sign in from here and Orca Lab will run the sign-in on the machine that owns the terminals.'
+          )
+        : translate(
+            'auto.components.Landing.00cee697c1',
+            'Run "gh auth login" in a terminal to connect your GitHub account.'
+          ),
       fixLabel: 'Learn more',
       fixUrl: 'https://cli.github.com/manual/gh_auth_login',
+      ...(options.canSignInOnHost ? { hostSignIn: 'github' as const } : {}),
       dismissible: true
     })
   }

@@ -127,7 +127,10 @@ export function HostAccountLoginDialog({
                 onClick={() => window.open(session.url, '_blank', 'noopener')}
               >
                 <ExternalLink className="size-3" />
-                {translate('auto.components.settings.HostAccountLoginDialog.open', 'Open sign-in page')}
+                {translate(
+                  'auto.components.settings.HostAccountLoginDialog.open',
+                  'Open sign-in page'
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -150,10 +153,13 @@ export function HostAccountLoginDialog({
             ) : null}
           </div>
         ) : null}
-        {session && !session.deviceCode ? (
+        {session?.awaitingCode ? (
           <div className="space-y-1.5">
             <Label htmlFor="host-login-code">
-              {translate('auto.components.settings.HostAccountLoginDialog.codeLabel', 'Code from that page')}
+              {translate(
+                'auto.components.settings.HostAccountLoginDialog.codeLabel',
+                'Code from that page'
+              )}
             </Label>
             <Input
               id="host-login-code"
@@ -173,9 +179,13 @@ export function HostAccountLoginDialog({
             size="sm"
             className="gap-1.5"
             onClick={submit}
-            // Why the device-auth case may submit with an empty field: Codex
-            // already took the code in the browser and only needs the go-ahead.
-            disabled={busy || !session || (!session.deviceCode && code.trim() === '')}
+            // Why gated on awaitingCode and not on deviceCode: a flow that
+            // SHOWS a code (Codex, gh) takes it in the browser and only needs
+            // the go-ahead, while Claude asks for one back. Keying this off
+            // `deviceCode` conflated the two, so any flow whose code we failed
+            // to parse demanded input the user was never shown — with the
+            // button disabled, that was a dead end.
+            disabled={busy || !session || (session.awaitingCode && code.trim() === '')}
           >
             {busy ? <Loader2 className="size-3 animate-spin" /> : null}
             {translate('auto.components.settings.HostAccountLoginDialog.finish', 'Finish sign-in')}

@@ -1256,7 +1256,10 @@
         "0d0ace8861": "GitHub에서 별표 주기",
         "ec43b38ba7": "GitHub에 별표 표시됨",
         "157bb5ecbb": "GitHub 열기",
-        "preflightDismiss": "닫기"
+        "preflightDismiss": "닫기",
+        "preflightHostSignIn": "여기에서 로그인",
+        "preflightHostLabel": "이 서버",
+        "ghAuthHostDescription": "여기에서 로그인하면 Orca Lab이 터미널을 소유한 머신에서 로그인을 실행합니다."
       },
       "LinearIssueMarkdownDescriptionEditor": {
         "d9c47069ef": "Markdown",

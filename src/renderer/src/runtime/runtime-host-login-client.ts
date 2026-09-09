@@ -6,7 +6,7 @@ import type {
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import { isWebClientLocation } from '@/lib/web-client-location'
 
-export type HostLoginAgent = 'claude' | 'codex'
+export type HostLoginAgent = 'claude' | 'codex' | 'github'
 
 export type HostLoginStarted = {
   sessionId: string
@@ -39,7 +39,9 @@ function requireAccountOwningTarget(settings: Settings): ReturnType<typeof getAc
   }
   // On a desktop talking to itself the interactive add already works, and
   // running both lanes would create the account twice.
-  throw new Error('Host sign-in is only used when a runtime other than this desktop owns the accounts.')
+  throw new Error(
+    'Host sign-in is only used when a runtime other than this desktop owns the accounts.'
+  )
 }
 
 /** Ask the account-owning server to start a sign-in and report what to open. */
@@ -70,10 +72,7 @@ export async function completeHostAccountLogin(
 }
 
 /** Drop a sign-in the user walked away from, so its temp credentials go too. */
-export async function cancelHostAccountLogin(
-  settings: Settings,
-  sessionId: string
-): Promise<void> {
+export async function cancelHostAccountLogin(settings: Settings, sessionId: string): Promise<void> {
   await callRuntimeRpc(
     requireAccountOwningTarget(settings),
     'accounts.cancelHostLogin',

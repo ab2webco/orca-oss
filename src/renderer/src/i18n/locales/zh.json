@@ -1256,7 +1256,10 @@
         "0d0ace8861": "在 GitHub 上加星标",
         "ec43b38ba7": "已在 GitHub 上加星标",
         "157bb5ecbb": "打开 GitHub",
-        "preflightDismiss": "关闭"
+        "preflightDismiss": "关闭",
+        "preflightHostSignIn": "在此登录",
+        "preflightHostLabel": "此服务器",
+        "ghAuthHostDescription": "在此登录，Orca Lab 将在拥有这些终端的机器上执行登录。"
       },
       "LinearIssueMarkdownDescriptionEditor": {
         "d9c47069ef": "Markdown",

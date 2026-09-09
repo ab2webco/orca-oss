@@ -1210,6 +1210,10 @@ import {
   type HostLoginAgent,
   type HostLoginSessionStarted
 } from './accounts/host-login-session'
+import {
+  importGithubCliCredentials,
+  type GithubCliImportResult
+} from './accounts/github-cli-credentials'
 import type {
   CodexAccountService,
   CodexResetCreditRejectedBeforeProviderReason
@@ -14096,9 +14100,15 @@ export class OrcaRuntimeService {
   async completeHostAccountLogin(
     sessionId: string,
     code: string | null
-  ): Promise<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState> {
+  ): Promise<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState | GithubCliImportResult> {
     const { agent, home } = await completeHostLogin(sessionId, code)
     try {
+      if (agent === 'github') {
+        // Why not an "account": gh credentials are not a managed provider vault
+        // — they live in this host's gh config and are what turns off the
+        // "GitHub CLI is not authenticated" preflight issue.
+        return importGithubCliCredentials(home)
+      }
       return agent === 'claude'
         ? await this.addClaudeAccountFromConfigDir(home)
         : await this.addCodexAccountFromHome(home)
