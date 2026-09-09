@@ -894,10 +894,6 @@ export class DaemonPtyAdapter implements IPtyProvider {
     }
 
     const reattachSnapshot = await this.overlayDurableRestoreSnapshot(sessionId, result.snapshot)
-    const reattachProviderSequence =
-      typeof reattachSnapshot.outputSequence === 'number'
-        ? { value: reattachSnapshot.outputSequence, generation: 'continued' as const }
-        : providerSequence
     const isAltScreen = reattachSnapshot.modes.alternateScreen
     const snapshotPrefix = reattachSnapshot.scrollbackAnsi + reattachSnapshot.rehydrateSequences
     const snapshotFrame = reattachSnapshot.snapshotAnsi
@@ -926,7 +922,10 @@ export class DaemonPtyAdapter implements IPtyProvider {
             snapshotFrameRestoreAnsi: reattachSnapshot.frameRestoreAnsi
           }
         : {}),
-      ...(reattachProviderSequence ? { providerSequence: reattachProviderSequence } : {}),
+      // Keep the attach baseline: output received during the history overlay is
+      // already counted live, so taking the post-overlay snapshot's sequence
+      // counted it twice and made the client report gaps that were not there.
+      ...(providerSequence ? { providerSequence } : {}),
       ...(kittyKeyboardFlags !== undefined
         ? { snapshotKittyKeyboardFlags: kittyKeyboardFlags }
         : {}),

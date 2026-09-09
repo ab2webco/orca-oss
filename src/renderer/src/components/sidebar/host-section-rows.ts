@@ -15,6 +15,7 @@ import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Row } from './worktree-list/grouping/row-types'
+import { getProjectGroupExecutionHostIdForRows } from './worktree-list/listing/host-filtering'
 
 export type HostHeaderRow = {
   type: 'host-header'
@@ -80,6 +81,9 @@ function getRowHostId(row: Row, defaultHostId: ExecutionHostId): ExecutionHostId
     case 'folder-workspace':
       return getFolderWorkspaceHostId(row.folderWorkspace, row.projectGroup, defaultHostId)
     case 'header':
+      if (row.projectGroup?.id != null) {
+        return getProjectGroupExecutionHostIdForRows(row.projectGroup, defaultHostId)
+      }
       return row.repo ? getRepoHostId(row.repo, defaultHostId) : null
   }
 }
