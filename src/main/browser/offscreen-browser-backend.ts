@@ -5,6 +5,15 @@ import { ORCA_BROWSER_GUEST_WEB_PREFERENCES } from '../../shared/browser-guest-w
 import type { BrowserBackend, BrowserBackendCreateTab } from './browser-backend'
 import type { BrowserManager } from './browser-manager'
 import { browserSessionRegistry } from './browser-session-registry'
+import {
+  OffscreenBrowserTabCapacityError,
+  resolveOffscreenBrowserTabCap
+} from './offscreen-browser-tab-capacity'
+import {
+  nodeRendererProcessControl,
+  reclaimRendererProcess,
+  type RendererProcessControl
+} from './offscreen-renderer-process-reclaim'
 
 // Why: headless orca serve has no renderer window to host a <webview>, so each
 // browser page is backed by a main-process offscreen BrowserWindow. The window
@@ -20,12 +29,32 @@ const LOAD_TIMEOUT_MS = 30_000
 export class OffscreenBrowserBackend implements BrowserBackend {
   private readonly windowsByPageId = new Map<string, BrowserWindow>()
 
-  constructor(private readonly browserManager: BrowserManager) {}
+  private readonly maxTabs: number
+  private readonly rendererProcessControl: RendererProcessControl
+
+  constructor(
+    private readonly browserManager: BrowserManager,
+    options: {
+      /** Per-host override; production resolves the cap from the environment. */
+      maxTabs?: number
+      rendererProcessControl?: RendererProcessControl
+    } = {}
+  ) {
+    this.maxTabs = options.maxTabs ?? resolveOffscreenBrowserTabCap()
+    this.rendererProcessControl = options.rendererProcessControl ?? nodeRendererProcessControl
+  }
 
   async createTab(params: BrowserBackendCreateTab): Promise<{ browserPageId: string }> {
     const browserPageId = params.browserPageId ?? randomUUID()
     if (this.windowsByPageId.has(browserPageId)) {
       throw new Error(`Browser page ${browserPageId} already exists`)
+    }
+    // Why refuse instead of evicting the oldest tab: an open offscreen page is a
+    // measurement an agent is in the middle of, and closing it out from under
+    // the agent would lose page state it cannot recover — a refusal names the
+    // tab it must close and leaves the choice with the caller.
+    if (this.windowsByPageId.size >= this.maxTabs) {
+      throw new OffscreenBrowserTabCapacityError(this.windowsByPageId.size, this.maxTabs)
     }
     // Why: profiles map to Electron partitions; using the profile's partition
     // makes cookies/storage persist in the same SQLite DB the desktop path uses.
@@ -88,8 +117,18 @@ export class OffscreenBrowserBackend implements BrowserBackend {
     const win = this.windowsByPageId.get(browserPageId)
     this.windowsByPageId.delete(browserPageId)
     this.browserManager.unregisterGuest(browserPageId)
-    if (win && !win.isDestroyed()) {
+    if (!win) {
+      return
+    }
+    // Why read the pid before teardown: WebContents stops answering once it is
+    // destroyed, and the pid is the only handle left on a renderer that outlives
+    // its window — which is exactly the one that holds a slot forever.
+    const osProcessId = win.isDestroyed() ? 0 : win.webContents.getOSProcessId()
+    if (!win.isDestroyed()) {
       win.destroy()
+    }
+    if (osProcessId > 0) {
+      await reclaimRendererProcess(osProcessId, { control: this.rendererProcessControl })
     }
   }
 
