@@ -1256,7 +1256,10 @@
         "0d0ace8861": "Dar estrella en GitHub",
         "ec43b38ba7": "Con estrella en GitHub",
         "157bb5ecbb": "Abrir GitHub",
-        "preflightDismiss": "Descartar"
+        "preflightDismiss": "Descartar",
+        "preflightHostSignIn": "Iniciar sesión desde aquí",
+        "preflightHostLabel": "este servidor",
+        "ghAuthHostDescription": "Inicia sesión desde aquí y Orca Lab ejecutará el inicio de sesión en la máquina que gestiona las terminales."
       },
       "LinearIssueMarkdownDescriptionEditor": {
         "d9c47069ef": "Markdown",

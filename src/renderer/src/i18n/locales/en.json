@@ -1384,7 +1384,10 @@
         "0d0ace8861": "Star on GitHub",
         "ec43b38ba7": "Starred on GitHub",
         "157bb5ecbb": "Open GitHub",
-        "preflightDismiss": "Dismiss"
+        "preflightDismiss": "Dismiss",
+        "preflightHostSignIn": "Sign in from here",
+        "preflightHostLabel": "this server",
+        "ghAuthHostDescription": "Sign in from here and Orca Lab will run the sign-in on the machine that owns the terminals."
       },
       "LinearIssueMarkdownDescriptionEditor": {
         "d9c47069ef": "Markdown",

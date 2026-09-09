@@ -1256,7 +1256,10 @@
         "0d0ace8861": "GitHub でスターを付ける",
         "ec43b38ba7": "GitHub でスター済み",
         "157bb5ecbb": "GitHub を開く",
-        "preflightDismiss": "閉じる"
+        "preflightDismiss": "閉じる",
+        "preflightHostSignIn": "ここからサインイン",
+        "preflightHostLabel": "このサーバー",
+        "ghAuthHostDescription": "ここからサインインすると、Orca Lab がターミナルを所有しているマシン上でサインインを実行します。"
       },
       "LinearIssueMarkdownDescriptionEditor": {
         "d9c47069ef": "Markdown",

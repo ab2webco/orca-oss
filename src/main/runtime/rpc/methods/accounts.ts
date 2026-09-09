@@ -90,7 +90,11 @@ const AddCodexFromHomeParams = z.object({
 })
 
 const BeginHostLoginParams = z.object({
-  agent: z.enum(['claude', 'codex'])
+  // Why github belongs here: `gh auth login --web` is the same shape as the two
+  // agent sign-ins — a device code the user carries to a browser — and it is
+  // what clears the "GitHub CLI is not authenticated" preflight issue on a host
+  // whose browser the caller cannot open.
+  agent: z.enum(['claude', 'codex', 'github'])
 })
 
 const CompleteHostLoginParams = z.object({
