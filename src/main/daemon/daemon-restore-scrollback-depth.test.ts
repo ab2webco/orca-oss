@@ -736,7 +736,7 @@ describe('STA-4091 previously recoverable restore depth', () => {
       expect(overlaid?.seq).toBe(current?.seq)
     })
 
-    it('uses the post-drain sequence for output produced during warm reattach', async () => {
+    it('preserves the attach baseline and counts warm reattach output exactly once', async () => {
       const { id } = await adapter.spawn({
         cols: 80,
         rows: 24,
@@ -744,7 +744,16 @@ describe('STA-4091 previously recoverable restore depth', () => {
         cwd: '/tmp'
       })
       lastSubprocess.emitData(numberedOutput(DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT))
-      await adapter.getBufferSnapshot(id)
+      const baseline = await adapter.getBufferSnapshot(id)
+      expect(baseline?.seq).toEqual(expect.any(Number))
+
+      const duringOverlay = `${FRESH_AFTER_CHECKPOINT}\r\n`
+      let streamedChars = 0
+      adapter.onData(({ id: outputId, data, sequenceChars }) => {
+        if (outputId === id) {
+          streamedChars += sequenceChars ?? data.length
+        }
+      })
 
       const internals = adapter as unknown as {
         client: { request: (method: string, params?: unknown) => Promise<unknown> }
@@ -766,7 +775,10 @@ describe('STA-4091 previously recoverable restore depth', () => {
       const reattach = await adapter.spawn({ cols: 80, rows: 24, sessionId: id, cwd: '/tmp' })
       const current = await adapter.getBufferSnapshot(id, { scrollbackRows: 24 })
       expect(reattach.snapshot).toContain(FRESH_AFTER_CHECKPOINT)
-      expect(reattach.providerSequence?.value).toBe(current?.seq)
+      expect(reattach.providerSequence?.value).toBe(baseline!.seq)
+      await vi.waitFor(() => expect(streamedChars).toBe(duringOverlay.length))
+      expect(current?.seq).toBe(baseline!.seq + duringOverlay.length)
+      expect(reattach.providerSequence!.value + streamedChars).toBe(current!.seq)
     })
   })
 })
