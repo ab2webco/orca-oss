@@ -39228,7 +39228,7 @@ function appendNormalizedToMultilineTailBuffer(
     const line = lines[index]!
     const lastChar = line.charCodeAt(line.length - 1)
     if (lastChar === 32 || lastChar === 9) {
-      lines[index] = line.replace(/[ \t]+$/g, '')
+      lines[index] = trimTerminalLineRight(line)
     }
   }
   for (const line of windowed.lines) {
@@ -39442,7 +39442,7 @@ function finalizeRetainedTerminalRows(
   newlyCompletedLines: string[]
 } {
   let truncated = initialTruncated
-  let retainedRows = rows.map((row) => ({ ...row, text: row.text.replace(/[ \t]+$/g, '') }))
+  let retainedRows = rows.map((row) => ({ ...row, text: trimTerminalLineRight(row.text) }))
 
   if (retainedRows.length > MAX_TAIL_LINES + 1) {
     const removeCount = retainedRows.length - (MAX_TAIL_LINES + 1)
@@ -39709,10 +39709,16 @@ function hasCanonicalNumericCsiParams(params: string): boolean {
 }
 
 function containsTerminalVerticalLineControl(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    if (value[index] !== '\u001b') {
-      continue
-    }
+  // Why indexOf and not a code-unit walk: only ESC can introduce a vertical
+  // control, so ordinary output — build logs, `cat`, piped text — needs no walk
+  // at all. The old form also read `value[index]`, which mints a one-character
+  // string per position on every chunk. This runs once per PTY chunk on the
+  // main thread for every terminal, visible or not.
+  for (
+    let index = value.indexOf('\u001b');
+    index !== -1;
+    index = value.indexOf('\u001b', index + 1)
+  ) {
     const parsed = parseAnsiControlSequence(value, index)
     if (!parsed) {
       return false
