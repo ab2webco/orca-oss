@@ -59,7 +59,29 @@ const QUERY_REPLY_PREFIX_RES = [
   new RegExp('^\\u001b\\][0-9]+;[^\\u0007\\u001b]*(?:\\u0007|\\u001b\\\\)'),
   new RegExp('^\\u001bP(?:[01]\\$r[^\\u001b]*|>\\|[^\\u001b]*)\\u001b\\\\')
 ]
+// Replies the runtime's OWN view-attribute responder produces for a PTY it
+// hosts: the OSC 4/10/11/12 colour reports and the CSI ?997 colour-scheme
+// report (its answer to DSR ?996n). Deliberately excludes CPR/DA1/DECRPM,
+// which the runtime's headless core answers by falling through — those keep
+// replying from the client exactly as they always have.
+const RUNTIME_VIEW_ATTRIBUTE_REPLY_RES = [
+  new RegExp('^\\u001b\\](?:4|10|11|12);[^\\u0007\\u001b]*(?:\\u0007|\\u001b\\\\)$'),
+  new RegExp('^\\u001b\\[\\?997;[0-9]+n$')
+]
 /* oxlint-enable no-control-regex */
+
+/**
+ * True when `data` is a reply that a paired runtime's view-attribute responder
+ * also produces for a PTY it hosts.
+ *
+ * Why a client needs to know: two answerers for one query means the second
+ * reply arrives a whole round trip late, after the process that asked has moved
+ * on, and lands in whatever reads next. That stray `ESC ]` is what aborts an
+ * interactive prompt on a server-hosted terminal.
+ */
+export function isRuntimeOwnedViewAttributeReply(data: string): boolean {
+  return RUNTIME_VIEW_ATTRIBUTE_REPLY_RES.some((pattern) => pattern.test(data))
+}
 
 /**
  * True when any part of `data` is a reply the emulator synthesized — one whole

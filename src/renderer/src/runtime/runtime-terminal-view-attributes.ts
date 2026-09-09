@@ -6,35 +6,109 @@ import { useAppStore } from '@/store'
 // and nothing the user did is waiting on it.
 const PUBLISH_TIMEOUT_MS = 5_000
 
+/** Last palette the renderer composed, kept so a later connect can replay it.
+ *  The renderer only recomposes on an appearance change, which is not when a
+ *  server arrives. */
+let lastAttributes: TerminalViewAttributes | null = null
+/** `${environmentId}|${serialized}` already delivered; a new server re-sends. */
+let lastDelivered: string | null = null
+let watchingRuntimeChanges = false
+
+function activeEnvironmentId(): string | null {
+  try {
+    const target = getActiveRuntimeTarget({
+      activeRuntimeEnvironmentId:
+        useAppStore.getState().settings?.activeRuntimeEnvironmentId ?? null
+    })
+    return target.kind === 'environment' ? target.environmentId : null
+  } catch {
+    return null
+  }
+}
+
+function deliver(environmentId: string, attributes: TerminalViewAttributes): void {
+  const key = `${environmentId}|${JSON.stringify(attributes)}`
+  if (key === lastDelivered) {
+    return
+  }
+  lastDelivered = key
+  void callRuntimeRpc(
+    { kind: 'environment', environmentId },
+    'terminal.publishViewAttributes',
+    attributes,
+    { timeoutMs: PUBLISH_TIMEOUT_MS }
+  ).catch(() => {
+    // Best effort. Clear the key so the next connect or appearance change
+    // retries instead of trusting a delivery that never landed.
+    lastDelivered = null
+  })
+}
+
+/** Re-send the palette whenever the active server changes.
+ *
+ *  Why a subscription and not just the publish call: the renderer composes the
+ *  palette on an appearance change and dedupes identical snapshots, so after
+ *  the app has published once, connecting to a server produces no new call —
+ *  and that server would keep an empty palette for the rest of the session.
+ */
+function watchRuntimeChanges(): void {
+  if (watchingRuntimeChanges) {
+    return
+  }
+  watchingRuntimeChanges = true
+  let previous = activeEnvironmentId()
+  useAppStore.subscribe(() => {
+    const current = activeEnvironmentId()
+    if (current === previous) {
+      return
+    }
+    previous = current
+    if (current && lastAttributes) {
+      deliver(current, lastAttributes)
+    }
+  })
+}
+
 /** Hand the runtime that owns the terminals the palette its OSC responder needs.
  *
- *  Why this exists: the daemon answers OSC 4/10/11/12 and DSR ?996n itself, but
- *  only once a renderer has pushed colours — with none it stays silent by
- *  design, so every colour query travels to the client and back. The reply
- *  returns after the process that asked it has already moved on, and the next
- *  reader finds `ESC ]` in its stdin. That is what kills `gh auth login` and
- *  every other interactive prompt in a terminal hosted on a server.
+ *  Why this exists: the daemon answers OSC 4/10/11/12 and DSR ?996n on its own
+ *  side, but only once a renderer has pushed colours — with none it stays
+ *  silent by design. A silent responder is not harmless: it consumes the query
+ *  without replying, so a TUI that asks the background colour before drawing
+ *  (`gh auth login`) waits forever for an answer nobody will send.
  */
 export function publishTerminalViewAttributesToActiveRuntime(
   attributes: TerminalViewAttributes
 ): void {
-  let target: ReturnType<typeof getActiveRuntimeTarget>
-  try {
-    target = getActiveRuntimeTarget({
-      activeRuntimeEnvironmentId:
-        useAppStore.getState().settings?.activeRuntimeEnvironmentId ?? null
-    })
-  } catch {
-    return
-  }
-  if (target.kind !== 'environment') {
+  lastAttributes = attributes
+  watchRuntimeChanges()
+  const environmentId = activeEnvironmentId()
+  if (!environmentId) {
     // A desktop talking to itself already published over its own preload IPC.
     return
   }
-  void callRuntimeRpc(target, 'terminal.publishViewAttributes', attributes, {
-    timeoutMs: PUBLISH_TIMEOUT_MS
-  }).catch(() => {
-    // Best effort: an unreachable server re-receives the palette on the next
-    // appearance apply, and until then its responder simply stays silent.
-  })
+  deliver(environmentId, attributes)
+}
+
+/** Make sure `environmentId` has the palette before a PTY there runs anything.
+ *
+ *  Why at connect and not only on change: the client now drops its own colour
+ *  replies for a remote pane, so the runtime is the ONLY answerer. If it were
+ *  still waiting for a palette, a TUI that queries the background colour before
+ *  drawing would get no reply at all and wait forever — a worse failure than
+ *  the late reply this replaced. Cheap to call per pane: `deliver` dedupes by
+ *  server and payload.
+ */
+export function ensureTerminalViewAttributesPublishedTo(environmentId: string): void {
+  if (!lastAttributes) {
+    return
+  }
+  deliver(environmentId, lastAttributes)
+}
+
+/** Test seam: drop the module state between tests. */
+export function _resetRuntimeTerminalViewAttributesForTest(): void {
+  lastAttributes = null
+  lastDelivered = null
+  watchingRuntimeChanges = false
 }
