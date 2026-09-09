@@ -213,8 +213,17 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.linux.icon).toBe('resources/build/icon.icns')
   })
 
-  it('matches the Linux desktop entry to Electron window class', () => {
-    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca')
+  // Why asserted together: the entry only groups correctly when the class it
+  // declares is the class the window actually reports, and the window reports
+  // `orca` (from productName) unless --class overrides it. GNOME's Orca screen
+  // reader owns `orca`, so leaving either half alone puts two desktop entries
+  // on one class.
+  it('pins the Linux window to a class the screen reader does not own', () => {
+    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca-ide')
+    // Why no Exec assertion: electron-builder refuses a desktop Exec override
+    // ("specify executable name as linux.executableName instead"), so the
+    // matching --class is appended in-process by pinLinuxWindowClass().
+    expect(electronBuilderConfig.linux.desktop.entry.Exec).toBeUndefined()
   })
 
   it('uses AppImage and deb as local Linux targets without changing existing artifact names', () => {

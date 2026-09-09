@@ -428,9 +428,16 @@ module.exports = {
     icon: 'resources/build/icon.icns',
     desktop: {
       entry: {
-        // Why: Electron reports WM_CLASS=orca for the visible Linux window;
-        // GNOME docks need an exact match to group it with orca-ide.desktop.
-        StartupWMClass: 'orca'
+        // Why orca-ide and not the Electron default: Electron derives WM_CLASS
+        // from productName, so the window would announce itself as `orca` —
+        // the very class GNOME's Orca screen reader owns, and two desktop
+        // entries on one class is what leaves the dock showing the wrong icon
+        // and groups Orca Lab's windows under the screen reader's launcher.
+        // The window is pinned to this same name at startup by
+        // pinLinuxWindowClass(); electron-builder rejects a desktop `Exec`
+        // override (it must come from executableName), so the switch is
+        // appended in-process instead. Both halves must stay in step.
+        StartupWMClass: 'orca-ide'
       }
     },
     extraResources: [

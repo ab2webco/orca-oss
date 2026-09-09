@@ -74,6 +74,7 @@ import {
   type GeneratedTabTitleUpdate,
   type TerminalTabTitleUpdate
 } from './terminal-tab-title-batch'
+import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
 import {
   dedupeTabOrder,
   ensureGroup,
@@ -1056,6 +1057,20 @@ function targetScopedWorkspaceHydrationPatch(
   }
 }
 
+/** Frames above `createTab`, which name whichever path opened this tab. */
+function describeTabCreateCaller(): string {
+  const stack = new Error('tab-create').stack
+  if (!stack) {
+    return 'unavailable'
+  }
+  return stack
+    .split('\n')
+    .slice(2, 7)
+    .map((line) => line.trim().replace(/^at\s+/, ''))
+    .join(' <- ')
+    .slice(0, 400)
+}
+
 export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> = (set, get) => ({
   tabsByWorktree: {},
   activeTabId: null,
@@ -1318,6 +1333,20 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     }),
 
   createTab: (worktreeId, targetGroupId, shellOverride, options) => {
+    // Why instrumented: nothing on either side recorded WHO opens a tab, so a
+    // workspace activation that ends up with more terminals than the user asked
+    // for could not be attributed from logs at all — only guessed at. The stack
+    // is trimmed to the frames above this action, which is exactly the caller
+    // chain that identifies the creator. Tab creation is a user-scale event, so
+    // the cost is irrelevant next to being able to name the culprit.
+    recordRendererCrashBreadcrumb('terminal_tab_create', {
+      worktreeId,
+      ...(targetGroupId === undefined ? {} : { targetGroupId }),
+      ...(options?.launchAgent ? { launchAgent: options.launchAgent } : {}),
+      pendingActivationSpawn: options?.pendingActivationSpawn === true,
+      existingTabCount: (get().tabsByWorktree[worktreeId] ?? []).length,
+      caller: describeTabCreateCaller()
+    })
     let tab!: TerminalTab
     set((s) => {
       const orphanTerminalIds = getOrphanTerminalIds(s, worktreeId)

@@ -128,6 +128,7 @@ import {
   configureDevUserDataPath,
   configureOrcaUserDataPathEnv,
   disableUnsupportedChromiumFeatures,
+  pinLinuxWindowClass,
   enableMainProcessGpuFeatures,
   installDevParentDisconnectQuit,
   installDevParentSignalQuit,
@@ -895,6 +896,7 @@ if (hasSingleInstanceLock) {
     ...getMainProcessLifecycleIdentity()
   })
   disableUnsupportedChromiumFeatures()
+  pinLinuxWindowClass()
   configureElectronNetworkCompatibility()
   enableRendererHeapHeadroom()
   maybeApplyGpuFallbackForThisLaunch()

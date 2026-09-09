@@ -66,6 +66,33 @@ export function configureElectronNetworkCompatibility(
   app.commandLine.appendSwitch('disable-http2')
 }
 
+/** WM_CLASS the Linux desktop entry declares; see linux.desktop in the builder config. */
+const LINUX_WINDOW_CLASS = 'orca-ide'
+
+/** Pin the Linux window class so it never collides with GNOME Orca.
+ *
+ *  Why: Chromium derives WM_CLASS from the app name, which would make the
+ *  window announce itself as `orca` — the class the GNOME Orca screen reader
+ *  owns. Two desktop entries claiming one class leaves the dock showing the
+ *  wrong icon and groups this app's windows under the screen reader's launcher.
+ *  The desktop entry declares `orca-ide`, and a dock only groups a window with
+ *  its launcher when the two match exactly, so this must stay in step with it.
+ *
+ *  Why in-process and not the entry's Exec line: electron-builder rejects a
+ *  desktop `Exec` override outright ("specify executable name as
+ *  linux.executableName instead"), so the switch cannot be baked into the
+ *  launcher.
+ */
+export function pinLinuxWindowClass(): void {
+  if (process.platform !== 'linux') {
+    return
+  }
+  // Why both: --class sets WM_CLASS's instance name and Chromium reads
+  // --wm-class-name/--wm-class-class on some builds; setting the pair keeps the
+  // whole property on one name instead of a mixed (orca-ide, Orca) tuple.
+  app.commandLine.appendSwitch('class', LINUX_WINDOW_CLASS)
+}
+
 export function disableUnsupportedChromiumFeatures(): void {
   appendDisabledChromiumFeatures(['FedCm'])
 }
