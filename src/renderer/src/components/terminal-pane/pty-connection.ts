@@ -38,8 +38,10 @@ import {
 import { serializeWithAbsoluteCursor } from '../../../../shared/terminal-serialize-absolute-cursor'
 import {
   containsTerminalQueryReply,
+  isRuntimeOwnedViewAttributeReply,
   isTerminalQueryReply
 } from '../../../../shared/terminal-query-reply'
+import { ensureTerminalViewAttributesPublishedTo } from '@/runtime/runtime-terminal-view-attributes'
 import type { PtyBufferSnapshot, PtyConnectResult, PtyReplayDataMeta } from './pty-transport'
 import type { IpcPtyTransportOptions, PtyTransportRecoveryState } from './pty-transport-types'
 import { createIpcPtyTransport } from './pty-transport'
@@ -3935,7 +3937,11 @@ export function connectPanePty(
             : 'Workspace host is still loading. Retry when the project finishes hydrating.'
         )
       : runtimeEnvironmentId
-        ? createRemoteRuntimePtyTransport(runtimeEnvironmentId, transportOptions)
+        ? // Why here: this client no longer answers the colour queries of a
+          // remote pane, so that runtime must already hold the palette by the
+          // time anything runs in the PTY. Deduped per server downstream.
+          (ensureTerminalViewAttributesPublishedTo(runtimeEnvironmentId),
+          createRemoteRuntimePtyTransport(runtimeEnvironmentId, transportOptions))
         : createIpcPtyTransport(transportOptions)
   const canSendDesktopQueryReply = (): boolean => {
     const ptyId = transport.getPtyId()
@@ -3943,8 +3949,20 @@ export function connectPanePty(
   }
   // Why: parser/capability handlers bypass the ordinary onData guard. Keep
   // desktop silent while the elected mobile xterm owns query replies.
-  const sendDesktopQueryReplyImmediate = (data: string): boolean =>
-    canSendDesktopQueryReply() && transport.sendInputImmediate(data)
+  const sendDesktopQueryReplyImmediate = (data: string): boolean => {
+    // Why a remote pane drops its colour replies here: the PTY already has an
+    // answerer attached to it on the far side — the runtime's own
+    // view-attribute responder, which replies without crossing the network. A
+    // second reply from this client arrives a full round trip later, after the
+    // process that asked has moved on, and lands in whatever reads next. That
+    // stray `ESC ]` is what aborts an interactive prompt (`gh auth login`) on a
+    // server-hosted terminal. Scoped to the colour queries the runtime owns:
+    // CPR/DA1 keep replying from here, as they always have.
+    if (runtimeEnvironmentId && isRuntimeOwnedViewAttributeReply(data)) {
+      return true
+    }
+    return canSendDesktopQueryReply() && transport.sendInputImmediate(data)
+  }
   // Why (gate mode only): gate-managed PTYs never see the subscribe bytes, so this fact is
   // their only cue to record the subscription — without the registry entry a later theme
   // flip never pushes the CSI 997 update and the TUI keeps a stale theme after reveal.

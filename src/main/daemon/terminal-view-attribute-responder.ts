@@ -84,10 +84,13 @@ export function installTerminalViewAttributeResponder(
   const handleSpecialColor = (data: string, offset: number): boolean => {
     const slots = data.split(';')
     // Why tracked: silence is the right answer for a query we cannot answer
-    // truthfully, but silence PLUS consuming the sequence is not — it strands
-    // the asker. A TUI that queries the background colour before drawing (`gh
-    // auth login` through termenv) then waits forever for a reply nobody will
-    // send. Declining the sequence lets it reach whoever can answer instead.
+    // truthfully — a fabricated default would resurrect the default-black
+    // OSC-11 bug — but consuming the sequence on top of that hides the query
+    // from the headless core as well, so nothing downstream can react to it.
+    // Declining leaves the stream honest: we answered nothing and we hid
+    // nothing. Not a fix for a stranded asker on its own (whoever else might
+    // answer lives across the network); the palette arriving before the PTY
+    // runs is what keeps this path unreachable in practice.
     let unanswerableQuery = false
     for (let i = 0; i < slots.length; ++i, ++offset) {
       if (offset >= SPECIAL_COLOR_SLOTS.length) {

@@ -90,6 +90,22 @@ export function publishTerminalViewAttributesToActiveRuntime(
   deliver(environmentId, attributes)
 }
 
+/** Make sure `environmentId` has the palette before a PTY there runs anything.
+ *
+ *  Why at connect and not only on change: the client now drops its own colour
+ *  replies for a remote pane, so the runtime is the ONLY answerer. If it were
+ *  still waiting for a palette, a TUI that queries the background colour before
+ *  drawing would get no reply at all and wait forever — a worse failure than
+ *  the late reply this replaced. Cheap to call per pane: `deliver` dedupes by
+ *  server and payload.
+ */
+export function ensureTerminalViewAttributesPublishedTo(environmentId: string): void {
+  if (!lastAttributes) {
+    return
+  }
+  deliver(environmentId, lastAttributes)
+}
+
 /** Test seam: drop the module state between tests. */
 export function _resetRuntimeTerminalViewAttributesForTest(): void {
   lastAttributes = null

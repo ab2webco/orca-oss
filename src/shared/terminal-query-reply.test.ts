@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   containsTerminalQueryReply,
   extractOnlyCookedEchoSafeQueryReplies,
+  isRuntimeOwnedViewAttributeReply,
   isTerminalQueryReply,
   needsCookedEchoSafeQueryReply
 } from './terminal-query-reply'
@@ -178,5 +179,36 @@ describe('what xterm actually emits', () => {
       disposable.dispose()
       terminal.dispose()
     }
+  })
+})
+
+describe('isRuntimeOwnedViewAttributeReply', () => {
+  // Why these are singled out: a PTY hosted on a paired runtime already has an
+  // answerer attached to it for exactly these queries, so a second reply from
+  // the client arrives a round trip late — after the asker moved on — and
+  // lands in whatever reads next.
+  it.each([
+    '\u001b]11;rgb:2828/2c2c/3434\u001b\\',
+    '\u001b]10;rgb:c8c8/c8c8/c8c8\u0007',
+    '\u001b]12;rgb:ffff/ffff/ffff\u001b\\',
+    '\u001b]4;12;rgb:0000/0000/ffff\u001b\\',
+    '\u001b[?997;1n'
+  ])('claims %j', (reply) => {
+    expect(isRuntimeOwnedViewAttributeReply(reply)).toBe(true)
+  })
+
+  // The runtime's headless core answers these by falling through, and the
+  // client has always answered them too; narrowing that is a separate change.
+  it.each([
+    '\u001b[31;56R',
+    '\u001b[0n',
+    '\u001b[?62;c',
+    '\u001b[4;600;800t',
+    '\u001b[?2004;1$y',
+    '\u001b]0;a title\u0007',
+    'q',
+    ''
+  ])('leaves %j alone', (data) => {
+    expect(isRuntimeOwnedViewAttributeReply(data)).toBe(false)
   })
 })

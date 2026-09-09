@@ -45,11 +45,9 @@ describe('terminal view attribute responder', () => {
     expect(emitReply).toHaveBeenCalledWith(expect.stringContaining(']11;rgb:'))
   })
 
-  // Why this is the interesting case: staying silent is correct when we cannot
-  // answer truthfully, but consuming the sequence as well strands the asker.
-  // `gh auth login` queries the background colour through termenv before it
-  // draws, and with the query swallowed and no reply it waits forever — the
-  // prompt renders and then accepts nothing.
+  // Why this case: with no palette we must not invent a colour, but consuming
+  // the sequence anyway also hides it from the headless core, so nothing
+  // downstream can react. Declining keeps the stream honest.
   it('declines a query it cannot answer instead of swallowing it', () => {
     const { parser, osc } = makeParser()
     const emitReply = vi.fn()
