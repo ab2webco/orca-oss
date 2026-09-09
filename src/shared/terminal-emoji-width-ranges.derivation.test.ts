@@ -8,12 +8,18 @@
  * the committed ranges to build its expectation.
  *
  * Direction matters, because the tables are frozen at one Unicode version and
- * this runs on whatever the test runner embeds:
- *  - "no missing entries" runs always. An older runtime simply has not assigned
- *    the newest code points, so it can never fail this direction spuriously,
- *    and a newer one fails it exactly when the table has gone stale.
- *  - exact equality runs only when the runtime's Unicode version matches the
- *    version the tables were generated against, where any difference is real.
+ * this runs on whatever the test runner embeds — CI and a developer machine do
+ * not always agree, so nothing load-bearing may depend on the version matching:
+ *  - "no missing entries" catches staleness, the direction the tables exist to
+ *    prevent. It runs always: an older runtime has simply not assigned the
+ *    newest code points, so it cannot fail this direction spuriously.
+ *  - "no spurious entries" catches a hand-edited or mis-generated table. It
+ *    runs always too, allowing only entries this runtime has not assigned —
+ *    which is exactly how a genuinely newer table looks to an older runtime,
+ *    and is not how a wrong entry looks, since a wrong one names something the
+ *    runtime already knows.
+ *  - exact equality is the strictest form and needs both sides on the same
+ *    Unicode version, so it runs only when they match.
  */
 import { describe, expect, it } from 'vitest'
 import { Terminal } from '@xterm/headless'
@@ -40,6 +46,8 @@ const REGIONAL_INDICATOR_LAST = 0x1f1ff
 const EMOJI = /\p{Emoji}/u
 const EMOJI_PRESENTATION = /\p{Emoji_Presentation}/u
 const EMOJI_MODIFIER_BASE = /\p{Emoji_Modifier_Base}/u
+/** Unassigned to THIS runtime — how a newer table's entries look to an older one. */
+const UNASSIGNED = /\p{Cn}/u
 
 type UnicodeServiceInternals = { activeVersion: string; wcwidth(codepoint: number): number }
 
@@ -133,17 +141,30 @@ describe('emoji width range derivation', () => {
     expect(summarize(missing)).toEqual([])
   })
 
-  it.each(TABLES)('%s: the lookup agrees with the committed ranges', (name, ranges, lookup) => {
+  it.each(TABLES)('%s: the lookup agrees with the committed ranges', (_name, ranges, lookup) => {
     // Guards the binary search and the fast-path bound, not just the data.
     const disagreeing = expandRanges(ranges).filter((codepoint) => !lookup(codepoint))
     expect(summarize(disagreeing)).toEqual([])
     expect(lookup(SURROGATE_FIRST)).toBe(false)
   })
 
+  it.each(TABLES)('%s: the committed table holds no spurious code point', (name, ranges) => {
+    // Why the unassigned allowance rather than a version guard: an entry this
+    // runtime has never heard of is what a table generated against a newer
+    // Unicode legitimately looks like here. An entry the runtime DOES know, and
+    // still does not derive, is a wrong entry on any version.
+    const derivedSet = new Set(derivedByName[name]!)
+    const spurious = expandRanges(ranges).filter(
+      (codepoint) => !derivedSet.has(codepoint) && !UNASSIGNED.test(String.fromCodePoint(codepoint))
+    )
+    expect(summarize(spurious)).toEqual([])
+  })
+
   it.each(TABLES)('%s: matches the derivation exactly on the generated version', (name, ranges) => {
     if (process.versions.unicode !== GENERATED_AGAINST_UNICODE) {
       // A different embedded Unicode version legitimately derives a different
-      // set; the "no missing entries" case above still gates staleness there.
+      // set. The two cases above still run there and between them cover both
+      // directions, so skipping this one costs strictness, not coverage.
       expect(process.versions.unicode).toBeTypeOf('string')
       return
     }
