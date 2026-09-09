@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   listClaudeAccountsForActiveHost,
+  listClaudeAccountsForEnvironment,
   listCodexAccountsForActiveHost
 } from './runtime-provider-account-roster'
 
@@ -73,6 +74,40 @@ describe('listCodexAccountsForActiveHost', () => {
     await expect(
       listCodexAccountsForActiveHost({ activeRuntimeEnvironmentId: null })
     ).resolves.toEqual(local)
+    expect(callRuntimeRpc).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('listClaudeAccountsForEnvironment', () => {
+  // Why a named host and not the active one: the sidebar shows every host at
+  // once, so a menu opened on a server-owned row has to ask THAT server. The
+  // app's active runtime is a different question, and is often null while the
+  // row's owner is not — which is how the assign menu ended up listing this
+  // desktop's accounts on a server-owned worktree.
+  it('asks the host it was named, not whichever is active', async () => {
+    callRuntimeRpc.mockClear().mockResolvedValueOnce({ claude: { accounts: [{ id: 'srv' }] } })
+    vi.stubGlobal('window', { api: { claudeAccounts: { list: vi.fn() } } })
+
+    const roster = await listClaudeAccountsForEnvironment('env-row-owner')
+
+    expect(roster.accounts).toEqual([{ id: 'srv' }])
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-row-owner' },
+      'accounts.list',
+      { refreshUsage: false },
+      expect.anything()
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('falls back to this desktop for a row this desktop owns', async () => {
+    callRuntimeRpc.mockClear()
+    const local = { accounts: [{ id: 'local-1' }] }
+    const list = vi.fn().mockResolvedValue(local)
+    vi.stubGlobal('window', { api: { claudeAccounts: { list } } })
+
+    await expect(listClaudeAccountsForEnvironment(null)).resolves.toEqual(local)
     expect(callRuntimeRpc).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })

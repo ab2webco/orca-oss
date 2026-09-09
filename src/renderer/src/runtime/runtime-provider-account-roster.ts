@@ -16,9 +16,22 @@ const ROSTER_TIMEOUT_MS = 15_000
 export async function listClaudeAccountsForActiveHost(
   settings: { activeRuntimeEnvironmentId?: string | null } | null | undefined
 ): Promise<ClaudeRateLimitAccountsState> {
-  const target = getActiveRuntimeTarget({
-    activeRuntimeEnvironmentId: settings?.activeRuntimeEnvironmentId ?? null
-  })
+  return listClaudeAccountsForEnvironment(settings?.activeRuntimeEnvironmentId ?? null)
+}
+
+/** Read the Claude roster of one named host, rather than whichever is active.
+ *
+ *  Why this exists next to the active-host reader: the sidebar shows every host
+ *  at once, so a menu opened on a row belonging to a server must offer THAT
+ *  server's accounts — the app's active runtime is a different question and is
+ *  often `null` while the row's owner is not. Keying the roster off the active
+ *  runtime is why the assign menu listed this desktop's accounts on a
+ *  server-owned worktree.
+ */
+export async function listClaudeAccountsForEnvironment(
+  environmentId: string | null
+): Promise<ClaudeRateLimitAccountsState> {
+  const target = getActiveRuntimeTarget({ activeRuntimeEnvironmentId: environmentId })
   if (target.kind === 'environment') {
     const response = await callRuntimeRpc<{ claude: ClaudeRateLimitAccountsState }>(
       target,
@@ -36,9 +49,14 @@ export async function listClaudeAccountsForActiveHost(
 export async function listCodexAccountsForActiveHost(
   settings: { activeRuntimeEnvironmentId?: string | null } | null | undefined
 ): Promise<CodexRateLimitAccountsState> {
-  const target = getActiveRuntimeTarget({
-    activeRuntimeEnvironmentId: settings?.activeRuntimeEnvironmentId ?? null
-  })
+  return listCodexAccountsForEnvironment(settings?.activeRuntimeEnvironmentId ?? null)
+}
+
+/** The Codex sibling of {@link listClaudeAccountsForEnvironment}. */
+export async function listCodexAccountsForEnvironment(
+  environmentId: string | null
+): Promise<CodexRateLimitAccountsState> {
+  const target = getActiveRuntimeTarget({ activeRuntimeEnvironmentId: environmentId })
   if (target.kind === 'environment') {
     const response = await callRuntimeRpc<{ codex: CodexRateLimitAccountsState }>(
       target,

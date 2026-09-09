@@ -47,10 +47,11 @@ import {
   canPinCodexAccountToWorktree
 } from '@/lib/codex-account-runtime-filter'
 import {
-  listClaudeAccountsForActiveHost,
-  listCodexAccountsForActiveHost
+  listClaudeAccountsForEnvironment,
+  listCodexAccountsForEnvironment
 } from '@/runtime/runtime-provider-account-roster'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type {
   ClaudeManagedAccountSummary,
   CodexManagedAccountSummary,
@@ -486,6 +487,16 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       ? status
       : ''
   }, [activeContextWorktrees, workspaceStatuses])
+  // Why resolved from the first context worktree: a multi-select spanning two
+  // hosts has no single roster to offer, and `canAssign*` already requires every
+  // selected worktree to be pinnable, so they share an owner in practice.
+  const accountRosterEnvironmentId = useMemo(
+    () =>
+      menuOpen && activeContextWorktrees[0]
+        ? getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), activeContextWorktrees[0].id)
+        : null,
+    [activeContextWorktrees, menuOpen]
+  )
   const canAssignClaudeAccount = canAssignClaudeAccountsToWorktrees(
     activeContextWorktrees,
     repoMap,
@@ -681,12 +692,16 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       return
     }
     let cancelled = false
-    // Why routed: this submenu is how a workspace gets an account pinned, and
-    // the pin is what makes its terminals launch bound to that account. Reading
-    // THIS desktop's roster left the submenu empty for a workspace on a server,
-    // so nothing could be pinned there — and an unpinned terminal is exactly
-    // what the runtime later refuses to switch, with `source-unknown`.
-    void listClaudeAccountsForActiveHost(useAppStore.getState().settings)
+    // Why the WORKTREE's owner and not the app's active runtime: the sidebar
+    // shows every host at once, so a menu opened on a server-owned row must
+    // offer THAT server's accounts. Keying this off the active runtime — often
+    // null while the row's owner is not — is why the menu listed this desktop's
+    // accounts on a server-owned worktree.
+    //
+    // Why it matters: the pin is what makes that worktree's terminals launch
+    // bound to an account, and an unpinned terminal is exactly what the runtime
+    // later refuses to switch, with `source-unknown`.
+    void listClaudeAccountsForEnvironment(accountRosterEnvironmentId)
       .then((result) => {
         if (!cancelled) {
           setClaudeAccounts(result.accounts)
@@ -698,14 +713,14 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     return () => {
       cancelled = true
     }
-  }, [canAssignClaudeAccount, menuOpen])
+  }, [accountRosterEnvironmentId, canAssignClaudeAccount, menuOpen])
 
   useEffect(() => {
     if (!menuOpen || !canAssignCodexAccount) {
       return
     }
     let cancelled = false
-    void listCodexAccountsForActiveHost(useAppStore.getState().settings)
+    void listCodexAccountsForEnvironment(accountRosterEnvironmentId)
       .then((result) => {
         if (!cancelled) {
           setCodexAccounts(result.accounts)
@@ -717,7 +732,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     return () => {
       cancelled = true
     }
-  }, [canAssignCodexAccount, menuOpen])
+  }, [accountRosterEnvironmentId, canAssignCodexAccount, menuOpen])
 
   const handleCopyPath = useCallback(() => {
     window.api.ui.writeClipboardText(worktree.path)
