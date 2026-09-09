@@ -43,6 +43,7 @@ import {
   EMPTY_LAYOUT,
   serializeTerminalLayout
 } from './layout-serialization'
+import { collectLeafIds } from './terminal-pane-layout-tree'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import {
@@ -151,7 +152,10 @@ import {
 } from '@/lib/terminal-pane-title-sanitization'
 import {
   isHostAuthoritativeLayout,
-  planTerminalLiveLayoutInsertions
+  planTerminalLiveLayoutInsertions,
+  planTerminalLiveLayoutRemovals,
+  selectRetiredPaneIds,
+  trackRetiredLeafIds
 } from './terminal-live-layout-reconciliation'
 import type { TerminalQuickCommand, TerminalQuickCommandScope } from '../../../../shared/types'
 import {
@@ -343,6 +347,10 @@ function TerminalPane(
     new Map()
   )
   const paneTransportsRef = useRef<Map<number, PtyTransport>>(new Map())
+  // Why kept across renders: a leaf is only "retired" relative to the layout the
+  // host named BEFORE this one, so the comparison needs the previous snapshot.
+  const hostLayoutLeafIdsRef = useRef<ReadonlySet<string>>(new Set())
+  const retiredLeafIdsRef = useRef<ReadonlySet<string>>(new Set())
   // Why: per-pane live cwd via OSC 7 for split-pane cwd inheritance; split actions read it at dispatch. See docs/ssh-split-pane-inherit-cwd.md.
   const paneCwdRef = useRef<Map<number, { cwd: string; confirmed: boolean }>>(new Map())
   const paneMode2031Ref = useRef<Map<number, boolean>>(new Map())
@@ -1635,12 +1643,41 @@ function TerminalPane(
     ) {
       return
     }
-    const insertions = planTerminalLiveLayoutInsertions(
+    const layoutLeafIds = new Set(collectLeafIds(restoredLayout.root))
+    const mountedLeafIds = manager.getPanes().map((pane) => pane.leafId)
+    const retiredLeafIds = trackRetiredLeafIds({
+      retiredLeafIds: retiredLeafIdsRef.current,
+      previousLayoutLeafIds: hostLayoutLeafIdsRef.current,
+      layoutLeafIds,
+      mountedLeafIds
+    })
+    hostLayoutLeafIdsRef.current = layoutLeafIds
+    retiredLeafIdsRef.current = retiredLeafIds
+
+    const insertions = planTerminalLiveLayoutInsertions(restoredLayout.root, mountedLeafIds)
+    const removals = planTerminalLiveLayoutRemovals(
       restoredLayout.root,
-      manager.getPanes().map((pane) => pane.leafId)
+      mountedLeafIds,
+      retiredLeafIds
     )
-    if (insertions.length === 0) {
+    if (insertions.length === 0 && removals.length === 0) {
       return
+    }
+
+    // Why: the host retired these leaves (its PTY for them ended), so their panes
+    // would otherwise outlive the layout as blank ghosts and take the tab's next
+    // close for themselves. selectRetiredPaneIds closes only a pane whose PTY has
+    // already cleared, so this never kills a still-live remote terminal; a leaf
+    // whose PTY is still ending stays retired and is removed on the re-run that
+    // ptyRecoveryStatesByPaneId triggers. executeClosePane runs the same cleanup
+    // a user close does.
+    const retiredPaneIds = selectRetiredPaneIds(removals, {
+      paneCount: manager.getPanes().length,
+      paneIdForLeaf: (leafId) => manager.getNumericIdForLeaf(leafId),
+      ptyIdForPane: (paneId) => paneTransportsRef.current.get(paneId)?.getPtyId()
+    })
+    for (const paneId of retiredPaneIds) {
+      executeClosePane(paneId)
     }
 
     let appliedInsertion = false
@@ -1687,7 +1724,17 @@ function TerminalPane(
     if (nextActivePaneId !== null) {
       manager.setActivePane(nextActivePaneId, { focus: isActive })
     }
-  }, [isActive, paneCount, persistLayoutSnapshot, restoredLayout])
+    // Why ptyRecoveryStatesByPaneId: a host-retired pane whose PTY has not yet
+    // finished ending is kept until this re-run, when its transport reports a
+    // new recovery state and its PTY has cleared.
+  }, [
+    executeClosePane,
+    isActive,
+    paneCount,
+    persistLayoutSnapshot,
+    ptyRecoveryStatesByPaneId,
+    restoredLayout
+  ])
 
   // Activity-only isolation: when portaled into Activity for one agent pane, hide split siblings via a separate snapshot ref (independent of expand state).
   // useLayoutEffect so style writes land before paint (no flash); paneCount in deps re-applies after splits/closes.
