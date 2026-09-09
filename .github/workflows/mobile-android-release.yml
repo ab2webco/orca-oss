@@ -22,6 +22,11 @@ on:
 jobs:
   android-build:
     runs-on: ubuntu-latest
+    # Why 60: real builds take 28-31 min (0.0.50, 0.0.51). Without this the job
+    # inherits GitHub's 360-minute default, where a hung Gradle and a slow one
+    # both just read `in_progress` -- iOS has been bounded at 90 all along
+    # (ORCA-470).
+    timeout-minutes: 60
 
     # Why: the "Create GitHub Release" step below uses the default GITHUB_TOKEN
     # to call `gh release create`, which requires contents:write. Without this,
