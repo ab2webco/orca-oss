@@ -220,7 +220,10 @@ describe('electron-builder config', () => {
   // on one class.
   it('pins the Linux window to a class the screen reader does not own', () => {
     expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca-ide')
-    expect(electronBuilderConfig.linux.desktop.entry.Exec).toContain('--class=orca-ide')
+    // Why no Exec assertion: electron-builder refuses a desktop Exec override
+    // ("specify executable name as linux.executableName instead"), so the
+    // matching --class is appended in-process by pinLinuxWindowClass().
+    expect(electronBuilderConfig.linux.desktop.entry.Exec).toBeUndefined()
   })
 
   it('uses AppImage and deb as local Linux targets without changing existing artifact names', () => {

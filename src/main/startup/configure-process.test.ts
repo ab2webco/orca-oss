@@ -719,3 +719,47 @@ describe('enableMainProcessGpuFeatures', () => {
     expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('enable-features', 'ExistingFeature')
   })
 })
+
+describe('pinLinuxWindowClass', () => {
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+
+  function setPlatform(value: NodeJS.Platform): void {
+    Object.defineProperty(process, 'platform', { value, configurable: true })
+  }
+
+  afterEach(() => {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
+  })
+
+  // Why this matters: Chromium derives WM_CLASS from the app name, which lands
+  // on `orca` — the class GNOME's Orca screen reader owns. The desktop entry
+  // declares `orca-ide`, and a dock only groups a window with its launcher when
+  // the two match exactly, so this switch and linux.desktop.StartupWMClass in
+  // the builder config have to carry the same value.
+  it('pins the window class on Linux', async () => {
+    setPlatform('linux')
+    const { app } = await import('electron')
+    const { pinLinuxWindowClass } = await import('./configure-process')
+    vi.mocked(app.commandLine.appendSwitch).mockClear()
+
+    pinLinuxWindowClass()
+
+    expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('class', 'orca-ide')
+  })
+
+  it.each(['darwin', 'win32'] as NodeJS.Platform[])(
+    'leaves %s alone, where WM_CLASS does not exist',
+    async (platform) => {
+      setPlatform(platform)
+      const { app } = await import('electron')
+      const { pinLinuxWindowClass } = await import('./configure-process')
+      vi.mocked(app.commandLine.appendSwitch).mockClear()
+
+      pinLinuxWindowClass()
+
+      expect(app.commandLine.appendSwitch).not.toHaveBeenCalled()
+    }
+  )
+})

@@ -428,14 +428,15 @@ module.exports = {
     icon: 'resources/build/icon.icns',
     desktop: {
       entry: {
-        // Why an explicit --class and not the default: Electron derives
-        // WM_CLASS from productName, so the window announces itself as `orca`
-        // — the very class GNOME's Orca screen reader owns. Two desktop entries
-        // claiming one class is what leaves the dock showing the wrong icon and
-        // grouping Orca Lab's windows under the screen reader's launcher.
-        // Passing --class pins the window to a name only this app uses, and
-        // StartupWMClass below matches it exactly so docks still group it.
-        Exec: '/opt/Orca/orca-ide --class=orca-ide %U',
+        // Why orca-ide and not the Electron default: Electron derives WM_CLASS
+        // from productName, so the window would announce itself as `orca` —
+        // the very class GNOME's Orca screen reader owns, and two desktop
+        // entries on one class is what leaves the dock showing the wrong icon
+        // and groups Orca Lab's windows under the screen reader's launcher.
+        // The window is pinned to this same name at startup by
+        // pinLinuxWindowClass(); electron-builder rejects a desktop `Exec`
+        // override (it must come from executableName), so the switch is
+        // appended in-process instead. Both halves must stay in step.
         StartupWMClass: 'orca-ide'
       }
     },
