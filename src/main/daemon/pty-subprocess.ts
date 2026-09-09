@@ -929,6 +929,10 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
 
   // Why: node-pty throws Napi::Error if write/resize/kill hit a closed fd (child-exit vs onExit race); uncaught it std::terminates the daemon.
   let dead = false
+  // Why separate from `dead`: an I/O failure is not exit evidence. Folding the
+  // two meant one failed write or resize disabled kill, forceKill, signal and
+  // the producer's flow control — the session could never be terminated again.
+  let ioFailed = false
   let disposed = false
   let nodePtyKillIssued = false
   let cachedAgentForeground: { processName: string; refreshedAt: number } | null = null
@@ -1166,31 +1170,28 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
       }
     },
     write: (data) => {
-      if (dead) {
+      if (dead || ioFailed) {
         return
       }
       try {
         proc.write(data)
       } catch {
-        dead = true
+        ioFailed = true
       }
     },
     resize: (cols, rows) => {
-      if (dead) {
-        return
-      }
-      if (!isValidPtySize(cols, rows)) {
+      if (dead || ioFailed || !isValidPtySize(cols, rows)) {
         return
       }
       try {
         proc.resize(cols, rows)
       } catch {
-        dead = true
+        ioFailed = true
       }
     },
     // Why pause/resume work on Windows too: WindowsTerminal wires _socket to the ConPTY conout pipe, so pausing backpressures the child.
     pause: () => {
-      if (dead) {
+      if (dead || ioFailed) {
         return
       }
       try {
