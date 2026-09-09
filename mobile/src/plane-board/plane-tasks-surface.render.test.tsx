@@ -253,6 +253,63 @@ describe('Plane on the Tasks screen: one screen, two views, one detail (react-na
     })
   })
 
+  describe('the status pill on a board card', () => {
+    it('opens the column list and NOT the detail', async () => {
+      // ORCA-472's control. Asserting only that the list appeared would pass with
+      // onPressStatus and onPressItem still pointing at the same handler, because
+      // the detail carries its own "Move to" — so what proves the fix is the
+      // detail staying shut.
+      await mountBoard(root, WRITING_HOST, { items: [CARD, DOING_CARD] })
+
+      await press('Move from Todo')
+
+      expect(byLabel('Move to Doing')).not.toBeNull()
+      // Only the picker marks the column the card is already in.
+      expect(byLabel('Stay in Todo')).not.toBeNull()
+      // The detail's own controls, which the pill used to reach.
+      expect(byLabel('Post comment')).toBeNull()
+      expect(byLabel('Priority High')).toBeNull()
+      expect(leafWithText('Plane work item')).toBeNull()
+    })
+
+    it('moves the card from the pill, without the detail ever opening', async () => {
+      const calls = await mountBoard(root, WRITING_HOST, { items: [CARD, DOING_CARD] })
+
+      await press('Move from Todo')
+      await press('Move to Doing')
+
+      expect(callsTo(calls, 'plane.updateWorkItem')[0]?.params).toMatchObject({
+        workItemId: 'wi-1',
+        updates: { stateId: 'state-2' }
+      })
+      // The optimistic override moved it before Plane answered.
+      expect(boardColumn('Todo')).toEqual({ count: 0 })
+      expect(boardColumn('Doing')).toEqual({ count: 2 })
+      expect(leafWithText('Plane work item')).toBeNull()
+    })
+
+    it('closes on the column it is already in rather than writing a no-op', async () => {
+      // The write itself is already refused upstream (use-plane-board.ts:205), so
+      // this pins what the user sees: the sheet treats that tap as a dismissal.
+      const calls = await mountBoard(root, WRITING_HOST, { items: [CARD] })
+
+      await press('Move from Todo')
+      await press('Stay in Todo')
+
+      expect(callsTo(calls, 'plane.updateWorkItem')).toEqual([])
+      expect(byLabel('Stay in Todo')).toBeNull()
+    })
+
+    it('drops the chevron on a host that cannot write, instead of promising a menu', async () => {
+      // A pill that opens a list it cannot act on is the same broken promise the
+      // ticket is about, one screen further in.
+      await mountBoard(root, [MOBILE_TASKS_PLANE_CAPABILITY], { items: [CARD] })
+
+      expect(byLabel('Open Wire the retry')).not.toBeNull()
+      expect(byLabel('Move from Todo')).toBeNull()
+    })
+  })
+
   describe('board scope follows the Tasks screen', () => {
     it('keeps a failed edit and its retry with its project, not on the next project opened', async () => {
       const calls = await mountBoard(root, WRITING_HOST, {
