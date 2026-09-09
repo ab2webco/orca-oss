@@ -1,6 +1,7 @@
 import type { IUnicodeHandling, IUnicodeVersionProvider } from '@xterm/xterm'
 import {
   isEmojiModifier,
+  isEmojiModifierBase,
   isEmojiPresentationWideCodepoint,
   isEmojiVariationSequenceBase
 } from './terminal-emoji-width-ranges'
@@ -87,23 +88,24 @@ class OrcaUnicodeProvider implements IUnicodeVersionProvider {
       return createProperties(codepoint, 2, true)
     }
 
-    if (isEmojiModifier(codepoint) && precedingWidth === 2) {
+    if (isEmojiModifier(codepoint) && precedingWidth === 2 && isEmojiModifierBase(precedingKind)) {
       // Why: a skin-tone modifier belongs to its base's cluster. Left to the v11
       // table it lands as a second wide cell and every later column shifts by two.
+      // Why gated on the base: a modifier after any other wide cell — a CJK
+      // ideograph, an emoji that takes no skin tone — is not a modifier sequence,
+      // and joining it there would narrow text this provider never measured.
       return createProperties(codepoint, 2, true)
     }
 
     const base = this.baseProvider.charProperties(codepoint, preceding)
     const shouldJoin = extractShouldJoin(base)
+    const baseWidth = extractWidth(base)
     // Why re-encode: the base provider reports char kind 0 and derives width
     // from its own wcwidth, so the rules above would lose both the preceding
     // code point and this provider's post-Unicode-11 widths. A joining code
     // point keeps the cluster width the base already resolved.
-    return createProperties(
-      codepoint,
-      shouldJoin ? extractWidth(base) : this.wcwidth(codepoint),
-      shouldJoin
-    )
+    const width = shouldJoin || !isEmojiPresentationWideCodepoint(codepoint) ? baseWidth : 2
+    return createProperties(codepoint, width, shouldJoin)
   }
 }
 

@@ -34,8 +34,11 @@ const SEQUENCES: [string, string, number][] = [
   ['desktop computer U+1F5A5 U+FE0F', '\u{1F5A5}️', 2],
   ['warning U+26A0 U+FE0F', '⚠️', 2],
   ['keycap U+0031 U+FE0F U+20E3', '1️⃣', 2],
+  // A variation selector inside a ZWJ cluster is the same promotion, one level in.
+  ['heart on fire U+2764 U+FE0F U+200D U+1F525', '❤️‍\u{1F525}', 2],
   // Same authority, same defect class: a modifier is part of its base's cluster.
   ['thumbs up + skin tone', '\u{1F44D}\u{1F3FD}', 2],
+  ['person + skin tone + ZWJ role', '\u{1F9D1}\u{1F3FD}‍\u{1F4BB}', 2],
   // Emoji that postdate xterm's frozen Unicode 11 width table.
   ['melting face U+1FAE0', '\u{1FAE0}', 2],
   ['bubble tea U+1F9CB', '\u{1F9CB}', 2],
@@ -45,7 +48,11 @@ const SEQUENCES: [string, string, number][] = [
   ['check mark U+2705', '✅', 2],
   ['regional-indicator flag', '\u{1F1E8}\u{1F1F3}', 2],
   ['ZWJ family', '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}', 2],
-  ['heart on fire U+2764 U+FE0F U+200D U+1F525', '❤️‍\u{1F525}', 2],
+  // A modifier only belongs to a base that takes one. After anything else it is
+  // its own cluster, exactly as it was before this provider learned the rule.
+  ['CJK + skin tone', '中\u{1F3FD}', 4],
+  ['non-modifier-base emoji + skin tone', '\u{1F355}\u{1F3FD}', 4],
+  ['ASCII + skin tone', 'a\u{1F3FD}', 3],
   // A variation selector after a non-emoji base is not a variation sequence.
   ['letter + U+FE0F', 'a️', 1],
   ['plain ASCII', 'ab', 2]
@@ -80,9 +87,9 @@ describe('terminal emoji cell width agreement (STA-6740)', () => {
   })
 
   it('reserves the second cell of a widened cluster instead of leaving it writable', async () => {
-    // Why: the reported symptom is lost characters, which needs the cell the
-    // cluster claims to actually be a wide-char placeholder — otherwise the next
-    // glyph lands inside the emoji and one of the two is overwritten.
+    // Why: advancing two cells is only half the contract. The second cell must
+    // also be a wide-char placeholder, or the next glyph lands inside the
+    // cluster and one of the two is overwritten.
     const parity = createTerminal()
     await writeToTerminal(parity.terminal, '\x1b[H\x1b[2J⚠️X')
     const line = parity.terminal.buffer.active.getLine(0)
