@@ -1,9 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
-import { publishTerminalViewAttributesToActiveRuntime } from './runtime-terminal-view-attributes'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  _resetRuntimeTerminalViewAttributesForTest,
+  publishTerminalViewAttributesToActiveRuntime
+} from './runtime-terminal-view-attributes'
 import type { TerminalViewAttributes } from '../../../shared/terminal-view-attributes'
 
 const callRuntimeRpc = vi.hoisted(() => vi.fn(() => Promise.resolve({ published: true })))
-const settings = vi.hoisted(() => ({ value: null as string | null }))
+const state = vi.hoisted(() => ({ env: null as string | null }))
+const subscribers = vi.hoisted(() => [] as (() => void)[])
 
 vi.mock('./runtime-rpc-client', () => ({
   callRuntimeRpc,
@@ -15,9 +19,20 @@ vi.mock('./runtime-rpc-client', () => ({
 
 vi.mock('@/store', () => ({
   useAppStore: {
-    getState: () => ({ settings: { activeRuntimeEnvironmentId: settings.value } })
+    getState: () => ({ settings: { activeRuntimeEnvironmentId: state.env } }),
+    subscribe: (fn: () => void) => {
+      subscribers.push(fn)
+      return () => {}
+    }
   }
 }))
+
+function setActiveEnvironment(id: string | null): void {
+  state.env = id
+  for (const fn of subscribers) {
+    fn()
+  }
+}
 
 const ATTRIBUTES = {
   foreground: [200, 200, 200],
@@ -29,14 +44,16 @@ const ATTRIBUTES = {
   cursorBlink: false
 } as unknown as TerminalViewAttributes
 
+beforeEach(() => {
+  callRuntimeRpc.mockClear()
+  subscribers.length = 0
+  state.env = null
+  _resetRuntimeTerminalViewAttributesForTest()
+})
+
 describe('publishTerminalViewAttributesToActiveRuntime', () => {
-  // Why this matters: with no palette the server's responder stays silent by
-  // design, so every colour query round-trips to the client. Its reply lands
-  // after the asking process is gone and the next reader gets `ESC ]`, which is
-  // what kills an interactive prompt on a server-hosted terminal.
   it('pushes the palette to the server that owns the terminals', () => {
-    settings.value = 'env-1'
-    callRuntimeRpc.mockClear()
+    state.env = 'env-1'
 
     publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)
 
@@ -49,19 +66,45 @@ describe('publishTerminalViewAttributesToActiveRuntime', () => {
   })
 
   it('stays quiet when this desktop owns the terminals', () => {
-    settings.value = null
-    callRuntimeRpc.mockClear()
-
     publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)
 
-    // The desktop already published over its own preload IPC.
     expect(callRuntimeRpc).not.toHaveBeenCalled()
   })
 
-  it('swallows an unreachable server instead of breaking an appearance apply', () => {
-    settings.value = 'env-1'
-    callRuntimeRpc.mockClear().mockRejectedValueOnce(new Error('offline'))
+  // Why this is the case that matters: the renderer composes the palette on an
+  // appearance change and dedupes identical snapshots, so connecting to a
+  // server produces no new call. Without this replay that server keeps an empty
+  // palette all session — and a silent OSC responder does not just stay quiet,
+  // it swallows the query, leaving a TUI that asked for the background colour
+  // waiting forever.
+  it('replays the palette to a server connected after the last appearance change', () => {
+    publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)
+    expect(callRuntimeRpc).not.toHaveBeenCalled()
 
-    expect(() => publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)).not.toThrow()
+    setActiveEnvironment('env-late')
+
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-late' },
+      'terminal.publishViewAttributes',
+      ATTRIBUTES,
+      expect.anything()
+    )
+  })
+
+  it('sends once per server, then again when a different one becomes active', () => {
+    state.env = 'env-1'
+    publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)
+    publishTerminalViewAttributesToActiveRuntime(ATTRIBUTES)
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(1)
+
+    setActiveEnvironment('env-2')
+
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(2)
+    expect(callRuntimeRpc).toHaveBeenLastCalledWith(
+      { kind: 'environment', environmentId: 'env-2' },
+      'terminal.publishViewAttributes',
+      ATTRIBUTES,
+      expect.anything()
+    )
   })
 })

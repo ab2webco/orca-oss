@@ -83,6 +83,12 @@ export function installTerminalViewAttributeResponder(
 
   const handleSpecialColor = (data: string, offset: number): boolean => {
     const slots = data.split(';')
+    // Why tracked: silence is the right answer for a query we cannot answer
+    // truthfully, but silence PLUS consuming the sequence is not — it strands
+    // the asker. A TUI that queries the background colour before drawing (`gh
+    // auth login` through termenv) then waits forever for a reply nobody will
+    // send. Declining the sequence lets it reach whoever can answer instead.
+    let unanswerableQuery = false
     for (let i = 0; i < slots.length; ++i, ++offset) {
       if (offset >= SPECIAL_COLOR_SLOTS.length) {
         break
@@ -92,6 +98,8 @@ export function installTerminalViewAttributeResponder(
         const base = deps.getBaseAttributes()
         if (base) {
           reportColor(SPECIAL_COLOR_IDENTS[slot], specialOverrides.get(slot) ?? base[slot])
+        } else {
+          unanswerableQuery = true
         }
       } else {
         const rgb = parseXColorSpec(slots[i])
@@ -102,7 +110,7 @@ export function installTerminalViewAttributeResponder(
     }
     // True consumes the sequence; the headless core's own OSC 10/11/12
     // handler only fires an onColor event nothing consumes.
-    return true
+    return !unanswerableQuery
   }
 
   deps.parser.registerOscHandler(4, (data) => {
