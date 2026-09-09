@@ -15,6 +15,7 @@ import type {
   TerminalViewAttributes,
   TerminalViewRgb
 } from '../../../../shared/terminal-view-attributes'
+import { publishTerminalViewAttributesToActiveRuntime } from '@/runtime/runtime-terminal-view-attributes'
 
 type ParsedCssColor = {
   rgb: TerminalViewRgb
@@ -214,9 +215,16 @@ export function composeTerminalViewAttributes(
 let lastPublishedSnapshot: string | null = null
 
 function sendViaPreload(attributes: TerminalViewAttributes): boolean {
-  // Guarded: unit tests and the web client run without the preload bridge
-  // (remote-runtime PTYs are never hidden-gate markable anyway).
+  // Why the remote push comes first and is not gated on the preload: the web
+  // client has no preload bridge at all, and a paired desktop's bridge reaches
+  // only its OWN daemon. Either way the server would keep an empty palette.
+  publishTerminalViewAttributesToActiveRuntime(attributes)
+  // Guarded: unit tests and the web client run without the preload bridge.
   if (typeof window === 'undefined' || !window.api?.pty?.publishTerminalViewAttributes) {
+    // Why still false: the local-bridge contract is unchanged — a later call
+    // with a working bridge must still publish. The runtime push above already
+    // happened, and re-pushing an identical palette is dropped by main's store
+    // (terminalViewAttributesEqual), so the repeat costs one cheap RPC.
     return false
   }
   window.api.pty.publishTerminalViewAttributes(attributes)
