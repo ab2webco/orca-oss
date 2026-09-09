@@ -26,6 +26,8 @@ import {
 } from '../terminal-output-frame-chunks'
 import { TERMINAL_PANE_SPLIT_SOURCES } from '../../../../shared/feature-education-telemetry'
 import type { TerminalOscLinkRange } from '../../../../shared/terminal-osc-link-ranges'
+import { setTerminalViewAttributes } from '../../terminal-view-attribute-store'
+import type { TerminalViewAttributes } from '../../../../shared/terminal-view-attributes'
 import {
   TERMINAL_INPUT_MAX_BYTES,
   TERMINAL_INPUT_TOO_LARGE_ERROR,
@@ -1169,6 +1171,24 @@ const TerminalUpdateViewport = TerminalHandle.extend({
 // Why: phone-fit auto-restore preference (docs/mobile-fit-hold.md); `null` = Indefinite, finite ms clamped to [5_000, 60min] server-side.
 const TerminalSetAutoRestoreFit = z.object({
   ms: z.number().nullable()
+})
+
+// Why a schema and not a cast: this crosses the RPC boundary from a paired
+// client, and the responder answers OSC 4/10/11/12 straight from these values.
+// A malformed palette would make every colour query reply garbage.
+const Rgb = z.tuple([
+  z.number().int().min(0).max(255),
+  z.number().int().min(0).max(255),
+  z.number().int().min(0).max(255)
+])
+const TerminalPublishViewAttributes = z.object({
+  foreground: Rgb,
+  background: Rgb,
+  cursor: Rgb,
+  ansi: z.array(Rgb).length(256),
+  colorSchemeMode: z.enum(['dark', 'light']),
+  cursorStyle: z.enum(['block', 'underline', 'bar']),
+  cursorBlink: z.boolean()
 })
 
 export const TERMINAL_METHODS: RpcAnyMethod[] = [
@@ -3828,5 +3848,25 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     handler: async (params, { runtime }) => ({
       ms: runtime.setMobileAutoRestoreFitMs(params.ms)
     })
+  }),
+  defineMethod({
+    // Why a paired client may push this while `addClaudeFromConfigDir` stays
+    // host-only: it carries colours, not a path — nothing here can be aimed at
+    // the host's filesystem.
+    //
+    // Why it exists at all: the daemon answers OSC 4/10/11/12 and DSR ?996n
+    // itself (terminal-view-attribute-responder.ts), but only once a renderer
+    // has pushed a palette; with none it stays silent by design. The desktop
+    // published only over its own preload IPC, so a server never had one and
+    // stayed silent — sending every colour query on a round trip to the client
+    // instead. Those replies come back after the process that asked has moved
+    // on, and the next reader gets `ESC ]` in its stdin: that is what kills an
+    // interactive prompt (`gh auth login`) on a remote terminal.
+    name: 'terminal.publishViewAttributes',
+    params: TerminalPublishViewAttributes,
+    handler: async (params) => {
+      setTerminalViewAttributes(params as TerminalViewAttributes)
+      return { published: true }
+    }
   })
 ]
