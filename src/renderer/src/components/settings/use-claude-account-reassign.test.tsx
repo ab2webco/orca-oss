@@ -51,10 +51,12 @@ const reopenClaudeTerminalsAfterReauth = vi.fn(
 )
 
 vi.mock('@/runtime/runtime-provider-accounts-client', () => ({
+  removeClaudeProviderAccount: () => removeClaudeProviderAccount()
+}))
+vi.mock('@/runtime/runtime-claude-account-usage-client', () => ({
   getClaudeAccountWorktreeUsage: async () => usageReport,
   reassignClaudeWorktreeAccounts: (settings: unknown, request: ClaudeWorktreeAccountReassignment) =>
-    reassignClaudeWorktreeAccounts(settings, request),
-  removeClaudeProviderAccount: () => removeClaudeProviderAccount()
+    reassignClaudeWorktreeAccounts(settings, request)
 }))
 vi.mock('sonner', () => ({ toast: { warning: (message: string) => toastWarning(message) } }))
 vi.mock('@/lib/claude-reauth-terminal-reopen', () => ({

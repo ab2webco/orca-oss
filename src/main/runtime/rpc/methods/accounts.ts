@@ -43,6 +43,30 @@ const ClaudeWorktreeUsageParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })
 
+// Why the discriminant is required and has no default: an absent intent would
+// read as `reassign` with no target and silently unpin every worktree to the
+// system default. The IPC handler refuses it for the same reason.
+// Why every field is required, mirroring ClaudeWorktreeAccountReassignment: the
+// shared type is deliberately strict so a dropped field cannot read as
+// "reassign to null" and unpin every worktree. A schema with optionals here
+// would reopen exactly that hole across the wire.
+const ClaudeWorktreeReassignBase = {
+  fromAccountId: z.string().min(1, 'Missing fromAccountId'),
+  closeLiveTerminals: z.boolean(),
+  closeLiveTerminalAccountIds: z.array(z.string().min(1)).optional()
+}
+const ClaudeWorktreeReassignParams = z.discriminatedUnion('intent', [
+  z.object({ ...ClaudeWorktreeReassignBase, intent: z.literal('keep-pins') }).strict(),
+  z
+    .object({
+      ...ClaudeWorktreeReassignBase,
+      intent: z.literal('reassign'),
+      // null means the system default Claude login.
+      toAccountId: z.string().min(1).nullable()
+    })
+    .strict()
+])
+
 const GetPtyOwnerParams = z
   .object({
     ptyId: z.string().min(1, 'Missing ptyId'),
@@ -192,6 +216,15 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     name: 'accounts.claudeWorktreeUsage',
     params: ClaudeWorktreeUsageParams,
     handler: async (params, { runtime }) => runtime.getClaudeAccountWorktreeUsage(params.accountId)
+  }),
+  defineMethod({
+    // Why this joined the usage report: both answer "what does removing this
+    // account cost", and the pins they move live wherever the agent runs. A
+    // client that refused outright for a server-hosted account made every
+    // action that must clear a pin first impossible off the local runtime.
+    name: 'accounts.reassignClaudeWorktrees',
+    params: ClaudeWorktreeReassignParams,
+    handler: async (params, { runtime }) => runtime.reassignClaudeWorktreeAccounts(params)
   }),
   defineMethod({
     name: 'accounts.selectCodex',

@@ -279,7 +279,10 @@ import type {
   ClaudeVaultSettingsInheritanceReport,
   ManagedPtyAccountOwner
 } from '../../shared/managed-account-types'
-import type { ClaudeAccountWorktreeUsageReport } from '../../shared/claude-account-worktree-usage'
+import type {
+  ClaudeAccountWorktreeUsageReport,
+  ClaudeWorktreeAccountReassignment
+} from '../../shared/claude-account-worktree-usage'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
@@ -13936,9 +13939,40 @@ export class OrcaRuntimeService {
 
   /** Which worktrees and live terminals hold a Claude account. Reads this host's
    *  own PTY registries, so a paired client gets the host's facts, not an empty
-   *  report — the renderer's remote shortcut is what returns `supported: false`. */
+   *  report. */
   getClaudeAccountWorktreeUsage(accountId: string): ClaudeAccountWorktreeUsageReport {
     return this.requireAccountServices().claudeAccounts.getAccountWorktreeUsageReport(accountId)
+  }
+
+  /** Move or clear the pins that name an account on THIS host.
+   *
+   *  Why the runtime has to answer: accounts are host-scoped — the vault, the
+   *  pins naming it and the PTYs it launched all live on the host running the
+   *  agent, so the client cannot resolve any of it locally.
+   */
+  reassignClaudeWorktreeAccounts(
+    request: ClaudeWorktreeAccountReassignment
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const base = {
+      fromAccountId: request.fromAccountId,
+      closeLiveTerminals: request.closeLiveTerminals === true,
+      closeLiveTerminalAccountIds: request.closeLiveTerminalAccountIds
+    }
+    const claudeAccounts = this.requireAccountServices().claudeAccounts
+    if (request.intent === 'keep-pins') {
+      return claudeAccounts.reassignWorktreeAccountPins({ ...base, intent: 'keep-pins' })
+    }
+    // Why refuse instead of defaulting to `reassign`: an absent discriminant
+    // would silently unpin every worktree to the system default. Same reading
+    // the IPC handler takes.
+    if (request.intent !== 'reassign') {
+      throw new Error('Unknown Claude worktree reassignment intent.')
+    }
+    return claudeAccounts.reassignWorktreeAccountPins({
+      ...base,
+      intent: 'reassign',
+      toAccountId: request.toAccountId ?? null
+    })
   }
 
   /**

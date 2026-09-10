@@ -30,7 +30,8 @@ export type ClaudeAccountWorktreeUsageReport = {
   pendingGlobalLaunchCount: number
   /** Live terminals of other accounts that block this mutation anyway. */
   blockedByOtherAccounts: ClaudeAccountBlockingTerminal[]
-  /** False on remote runtimes, where Orca owns no host PTYs or pins to move. */
+  /** False only where no host owns the pins — a folder workspace or an SSH
+   *  host. A runtime environment answers this itself and reports its own facts. */
   supported: boolean
 }
 
