@@ -248,6 +248,7 @@ import {
   getCustomCodexHomeOverrideForLaunch,
   shellStartupCodexHomeOverrideContextsEqual
 } from '../codex/codex-real-home-path'
+import { resolveCommittedPtySize } from './pty-attached-size'
 import type { CodexSessionResumePreparation } from '../codex/codex-session-resume-home'
 import { dropUnverifiedCodexResumeArgv } from '../codex/codex-unverified-resume-launch'
 import { isHostCodexHomeForWsl, isWslCodexHomeForHost } from '../pty/codex-home-wsl-env'
@@ -5790,7 +5791,17 @@ export function registerPtyHandlers(
         if (!hostSessionBinding) {
           persistSshLease()
         }
-        ptySizes.set(result.id, { cols: args.cols, rows: args.rows })
+        // Why not `args`: on a reattach the requested grid describes the pane,
+        // not the live session the daemon just handed back — a pane that
+        // mounted hidden reports xterm's unmeasured 80x24.
+        ptySizes.set(
+          result.id,
+          resolveCommittedPtySize({
+            result,
+            requested: { cols: args.cols, rows: args.rows },
+            cachedBeforeAttach: sessionSizeBeforeAttach
+          })
+        )
         if (effectiveSessionAppId !== undefined && effectiveSessionAppId !== result.id) {
           ptySizes.delete(effectiveSessionAppId)
         }
