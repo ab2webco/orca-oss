@@ -9,6 +9,7 @@ import type {
 import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
 import { buildActiveOpenFileSignature, buildActiveOpenRowKeys } from './active-open-file-keys'
 import type { FlatEntry } from './use-selection'
+import { resolveSourceControlOpenOwner } from '../source-control-open-owner'
 import {
   isSourceControlSplitOpenModifier,
   shouldOpenSourceControlRowAsPreview,
@@ -103,15 +104,23 @@ export function useSourceControlRowOpening({
       const filePath = joinPath(worktreePath, entry.path)
       // Why: unstaged markdown diffs open as an edit tab in Changes view (one tab per file); staged diffs still get a separate diff tab since that isn't what the editor edits.
       if (language === 'markdown' && entry.area === 'unstaged') {
+        const owner = resolveSourceControlOpenOwner(activeWorktreeId)
         openFile(
           {
             filePath,
             relativePath: entry.path,
             worktreeId: activeWorktreeId,
             language,
-            mode: 'edit'
+            mode: 'edit',
+            ...(owner.runtimeEnvironmentId !== undefined
+              ? { runtimeEnvironmentId: owner.runtimeEnvironmentId }
+              : {})
           },
-          { targetGroupId, preview: openAsPreview }
+          {
+            targetGroupId,
+            preview: openAsPreview,
+            suppressActiveRuntimeFallback: owner.suppressActiveRuntimeFallback
+          }
         )
         setEditorViewMode(filePath, 'changes')
         return
