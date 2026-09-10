@@ -109,6 +109,9 @@ type ProcessPtyOutputOptions = {
   /** Kitty flags the snapshot owner proved at `snapshotSeq`. */
   kittyKeyboardFlags?: number
   snapshotSeq?: number
+  /** Grid the host serialized this image at, when it proved one. */
+  snapshotCols?: number
+  snapshotRows?: number
 }
 
 type PendingPtySideEffect = {
@@ -507,7 +510,10 @@ export function createPtyOutputProcessor({
         ...(options.kittyKeyboardFlags !== undefined
           ? { kittyKeyboardFlags: options.kittyKeyboardFlags }
           : {}),
-        ...(options.snapshotSeq !== undefined ? { snapshotSeq: options.snapshotSeq } : {})
+        ...(options.snapshotSeq !== undefined ? { snapshotSeq: options.snapshotSeq } : {}),
+        ...(options.snapshotCols !== undefined && options.snapshotRows !== undefined
+          ? { snapshotCols: options.snapshotCols, snapshotRows: options.snapshotRows }
+          : {})
       }
       // Why: preserve the bare-data call shape when there's no replay metadata, so eager-buffer replay (which passes none) is unchanged.
       if (Object.keys(replayMeta).length > 0) {

@@ -5747,11 +5747,16 @@ export function connectPanePty(
       pendingEscapeTailAnsi?: string
       kittyKeyboardFlags?: number
       snapshotSeq?: number
+      snapshotCols?: number
+      snapshotRows?: number
     }
 
     let pendingReplayData: PendingReplayData | null = null
     let replayPayloadGeneration = 0
     let replayDrainQueued = false
+    // Why: a payload replayed at a foreign grid leaves xterm sized to the
+    // source, so the destination fit belongs after the whole transaction parses.
+    let replayedAtSourceGrid = false
     const drainReplayDataQueue = async (
       expectedPtyId: string | null,
       expectedStreamGeneration: number
@@ -5772,7 +5777,8 @@ export function connectPanePty(
           return false
         }
         const payload = pendingReplayData
-        const { data, clearBeforeReplay, pendingEscapeTailAnsi } = payload
+        const { data, clearBeforeReplay, pendingEscapeTailAnsi, snapshotCols, snapshotRows } =
+          payload
         pendingReplayData = null
         const isCurrentPayload = (): boolean =>
           !disposed &&
@@ -5785,11 +5791,34 @@ export function connectPanePty(
         // Relay replay buffers may overlap with content already rendered in
         // xterm. Local eager replay decides this earlier so metadata-only frames
         // can keep restored scrollback while still using the replay guard.
+        // Why ahead of the source-grid resize: the clear is grid-independent,
+        // so dropping the scrollback first spares a reflow of history the very
+        // next sequence discards.
         if (clearBeforeReplay) {
           await writeReplayDataAsync('\x1b[2J\x1b[3J\x1b[H')
           if (!isCurrentPayload()) {
             continue
           }
+        }
+        // Why before the frame: the payload's wraps and cursor moves are
+        // relative to the grid the host serialized it at. Parsed at the pane's
+        // own grid the image clips or re-wraps, and an idle TUI never repaints
+        // to correct it — the pane stays wrong until the next byte, which for a
+        // finished agent session never comes.
+        const sourceGrid = resolvePositiveTerminalDimensions(snapshotCols, snapshotRows)
+        if (
+          sourceGrid &&
+          (pane.terminal.cols !== sourceGrid.cols || pane.terminal.rows !== sourceGrid.rows)
+        ) {
+          // Why suppressed: this resize is a layout step for parsing, not the
+          // pane's real geometry — the fit below owns the PTY grid.
+          suppressStructuralReplayPtyResize = true
+          try {
+            pane.terminal.resize(sourceGrid.cols, sourceGrid.rows)
+          } finally {
+            suppressStructuralReplayPtyResize = false
+          }
+          replayedAtSourceGrid = true
         }
         if (clearBeforeReplay || data.length > 0) {
           // Why: an empty clearing frame is still an authoritative repaint and
@@ -5831,12 +5860,58 @@ export function connectPanePty(
       }
       return appliedCurrentPayload
     }
+    // Why the same choreography the reattach payload uses: a source-grid replay
+    // leaves xterm at the host's geometry, so the pane must fit back and push
+    // the resulting grid to the PTY before live bytes resume.
+    const fitAfterSourceGridReplay = async (
+      scheduledPtyId: string | null,
+      scheduledStreamGeneration: number
+    ): Promise<void> => {
+      if (!replayedAtSourceGrid) {
+        return
+      }
+      replayedAtSourceGrid = false
+      if (
+        disposed ||
+        transport.getPtyId() !== scheduledPtyId ||
+        transportStreamGeneration !== scheduledStreamGeneration ||
+        !scheduledPtyId
+      ) {
+        return
+      }
+      // Why fit without the grid push: a mobile fit override owns the PTY
+      // geometry, but the pane must still leave the host's replay grid.
+      if (getFitOverrideForPty(scheduledPtyId)) {
+        safeFit(pane)
+        return
+      }
+      const gridPush = createReattachGridPush(scheduledStreamGeneration, scheduledPtyId)
+      const fit = safeFitAndThen(pane, 'replay-source-grid-fit', gridPush.continuation, {
+        shouldContinue: gridPush.shouldContinue,
+        retryIfUnmeasurable: true,
+        // Why: a hidden or parked pane must still leave the source grid once it
+        // is revealed, or the PTY stays pinned to the host's replay geometry.
+        deferIfHidden: true
+      })
+      pendingReattachFit = fit
+      try {
+        await fit.completion
+      } finally {
+        if (pendingReattachFit === fit) {
+          pendingReattachFit = null
+        }
+      }
+    }
     const scheduleReplayDataDrain = (): void => {
       if (replayDrainQueued) {
         return
       }
       const scheduledPtyId = pendingReplayData?.ptyId ?? null
       replayDrainQueued = true
+      // Why reset here: a transaction whose restore was skipped never ran its
+      // afterRestore, and a stale flag would fit a later drain that never left
+      // the pane's own grid.
+      replayedAtSourceGrid = false
       // Why: live bytes are newer than the authoritative replay frame. Hold
       // them until clear + replay + reset have all parsed, or replay can erase them.
       const scheduledStreamGeneration =
@@ -5857,7 +5932,9 @@ export function connectPanePty(
               shouldRestore: () =>
                 !disposed &&
                 transport.getPtyId() === scheduledPtyId &&
-                transportStreamGeneration === scheduledStreamGeneration
+                transportStreamGeneration === scheduledStreamGeneration,
+              afterRestore: () =>
+                fitAfterSourceGridReplay(scheduledPtyId, scheduledStreamGeneration)
             }
           )
         )
@@ -5893,6 +5970,9 @@ export function connectPanePty(
               kittyKeyboardFlags: meta.kittyKeyboardFlags,
               snapshotSeq: meta.snapshotSeq
             }
+          : {}),
+        ...(meta.snapshotCols !== undefined && meta.snapshotRows !== undefined
+          ? { snapshotCols: meta.snapshotCols, snapshotRows: meta.snapshotRows }
           : {})
       }
       scheduleReplayDataDrain()

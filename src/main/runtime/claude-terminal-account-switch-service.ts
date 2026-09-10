@@ -25,9 +25,11 @@ let services: ClaudeTerminalAccountSwitchServices | null = null
 let operationSeq = 0
 
 /**
- * Attaches the desktop-only account services the switch needs. Headless
- * `orca serve` never calls it, so the RPC fails with `runtime-unavailable`
- * instead of half-executing a transaction it cannot finish.
+ * Attaches the account services the switch needs. Called from the shared
+ * bootstrap, so a headless `orca serve` gets them too — it owns the PTYs it
+ * would be switching. Left unattached (no store yet, no auth service) the RPC
+ * still refuses with `runtime-unavailable` rather than half-executing a
+ * transaction it cannot finish.
  */
 export function attachClaudeTerminalAccountSwitchServices(
   next: ClaudeTerminalAccountSwitchServices | null

@@ -27,7 +27,6 @@ import {
   type GetSelectedCodexHomePath,
   type PrepareCodexSessionResume
 } from '../ipc/pty'
-import { attachClaudeTerminalAccountSwitchServices } from '../runtime/claude-terminal-account-switch-service'
 import { registerDaemonManagementHandlers } from '../ipc/pty-management'
 import { registerSshHandlers } from '../ipc/ssh'
 import { registerRemoteWorkspaceHandlers } from '../ipc/remote-workspace'
@@ -160,18 +159,6 @@ export function attachMainWindowServices(
       onPtyExit: options?.onPtyExit
     },
     isInjectedClaudeAccountTarget
-  )
-  // Why: the atomic per-terminal Claude account switch runs inside the runtime
-  // that owns the PTY and needs the same auth preparation as a launch. Headless
-  // `orca serve` never reaches here, so its RPC refuses with runtime-unavailable
-  // instead of starting a transaction it cannot finish.
-  attachClaudeTerminalAccountSwitchServices(
-    prepareClaudeAuth
-      ? {
-          getSettings: () => store.getSettings(),
-          prepareClaudeAuth
-        }
-      : null
   )
   // Why: register after registerPtyHandlers so pty:management:* IPC re-installs on macOS re-activation (docs/daemon-staleness-ux.md §Phase 1).
   registerDaemonManagementHandlers()

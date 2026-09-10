@@ -194,7 +194,7 @@ const UNSWITCHABLE_TERMINAL_REASONS: Partial<
   'transcript-unavailable': 'the session transcript could not be copied into the target account',
   'unsupported-runtime': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
   'terminal-not-found': 'no live pane resolved for that handle',
-  'runtime-unavailable': 'this runtime has no account services attached'
+  'runtime-unavailable': 'this runtime came up without account services attached'
 }
 
 // Why this is reported unasked: until ORCA-187 the only signal that a pane could

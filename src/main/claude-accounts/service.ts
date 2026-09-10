@@ -31,6 +31,7 @@ import {
   mergeMcpServersIntoVaultConfig,
   removeVaultSkillsSymlink
 } from './global-config-inheritance'
+import { seedVaultOnboardingCompletion } from './vault-onboarding-seed'
 import {
   collectGlobalHooks,
   mergeHooksIntoSettingsObject,
@@ -1489,6 +1490,10 @@ export class ClaudeAccountService {
   ): Promise<void> {
     await this.writeManagedCredentials(accountId, managedAuthPath, captured.credentialsJson)
     await this.writeManagedOauthAccount(accountId, managedAuthPath, captured.oauthAccount)
+    // Why here: the vault now holds a real identity, so Claude Code's first-run
+    // wizard has nothing left to ask. Without the flag an interactive launch
+    // opens it anyway — which on a headless serve box no one can click through.
+    seedVaultOnboardingCompletion(this.assertManagedAuthPath(managedAuthPath, accountId))
   }
 
   private async writeManagedCredentials(

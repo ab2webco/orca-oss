@@ -273,6 +273,7 @@ import { getDefaultWslDistro } from './wsl'
 import { collectWorktreeTrashSweepRoots, sweepStaleWorktreeTrash } from './worktree-trash'
 import { ClaudeAccountService } from './claude-accounts/service'
 import { notifyWorktreesChanged } from './ipc/worktree-remote'
+import { attachClaudeTerminalAccountSwitchServices } from './runtime/claude-terminal-account-switch-service'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import {
   attachClaudeLivePtyPersistence,
@@ -2877,6 +2878,21 @@ void app.whenReady().then(async () => {
     )
   )
   runtimeService.setAccountServices({ claudeAccounts, codexAccounts, rateLimits })
+  // Why here and no longer in the window bootstrap: the atomic per-terminal
+  // Claude account switch runs inside the runtime that OWNS the PTY, and a
+  // headless `orca serve` owns its own. Attached only on the desktop, the RPC
+  // answered `runtime-unavailable` for every terminal on a server — the switch
+  // was not unfinishable there, it was simply never wired. This bootstrap runs
+  // in both modes, which is also where the auth service it needs already lives.
+  attachClaudeTerminalAccountSwitchServices(
+    store
+      ? {
+          getSettings: () => store!.getSettings(),
+          prepareClaudeAuth: (target, opts) =>
+            claudeRuntimeAuth!.prepareForClaudeLaunch(target, { reservePtyAccount: true, ...opts })
+        }
+      : null
+  )
   runtimeService.setCommitMessageAgentEnvironmentResolvers({
     // Why: Codex hooks/auth live in Orca's managed runtime home even for the default path, so every launch must resolve CODEX_HOME via runtime-home.
     prepareForCodexLaunch: prepareCodexRuntimeHomeForLaunch,

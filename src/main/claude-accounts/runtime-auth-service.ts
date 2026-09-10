@@ -10,6 +10,7 @@ import type { Store } from '../persistence'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import type { ClaudeEnvPatch } from './environment'
 import { claudeHookService } from '../claude/hook-service'
+import { seedVaultOnboardingCompletion } from './vault-onboarding-seed'
 import {
   readClaudeManagedAuthFile,
   resolveOwnedClaudeManagedAuthPath,
@@ -221,6 +222,11 @@ export class ClaudeRuntimeAuthService {
         // Why: reserve before async ownership/Keychain work so a concurrent
         // global switch cannot fork this account before the PTY becomes live.
         await this.seedInjectedHostAccountKeychain(injectedAccount)
+        // Why also here and not only at vault creation: vaults created before
+        // this existed hold valid credentials but no onboarding flag, so their
+        // first interactive launch still opens the wizard. Idempotent — one
+        // read that returns immediately once the flag is there.
+        seedVaultOnboardingCompletion(injectedAccount.managedAuthPath)
         this.ensureInjectedHostInstrumentation(injectedAccount)
         return this.getInjectedPreparation(injectedAccount, reservationId)
       }
