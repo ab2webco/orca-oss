@@ -40,9 +40,17 @@ export function seedVaultOnboardingCompletion(managedAuthPath: string): void {
     }
   }
   config[ONBOARDING_FLAG] = true
-  writeClaudeManagedAuthFile(
-    managedAuthPath,
-    '.claude.json',
-    `${JSON.stringify(config, null, 2)}\n`
-  )
+  try {
+    writeClaudeManagedAuthFile(
+      managedAuthPath,
+      '.claude.json',
+      `${JSON.stringify(config, null, 2)}\n`
+    )
+  } catch {
+    // Why swallowed: this runs on the launch path, and the worst case of a
+    // failed write is the wizard the user would have seen anyway. A vault dir
+    // that is not there yet — a WSL UNC path this host cannot reach, say —
+    // must never be the reason a terminal refuses to start. Same contract as
+    // seedInjectedHostAccountKeychain.
+  }
 }
