@@ -375,7 +375,11 @@ describe('SourceControl preview row opens', () => {
         language: 'markdown',
         mode: 'edit'
       },
-      { targetGroupId: undefined, preview: true }
+      // Why the flag is asserted: a Changes-view open used to pass no owner, so
+      // openFile inherited the app's active runtime and a local file could be
+      // read from a server. `true` here is "this worktree is local", not a
+      // default — see source-control-open-owner.ts.
+      { targetGroupId: undefined, preview: true, suppressActiveRuntimeFallback: true }
     )
     expect(mocks.calls.openConflictFile).toHaveBeenCalledWith(
       mocks.activeWorktree.id,

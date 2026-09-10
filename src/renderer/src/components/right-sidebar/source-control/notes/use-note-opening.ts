@@ -9,6 +9,7 @@ import type {
 } from '../../../../../../shared/git-diff-compare-types'
 import type { DiffComment } from '../../../../../../shared/diff-comment-types'
 import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import { resolveSourceControlOpenOwner } from '../source-control-open-owner'
 import {
   cancelSourceControlEditorRevealFrames,
   requestSourceControlEditorRevealFrame
@@ -71,13 +72,20 @@ export function useSourceControlNoteOpening({
         const language = detectLanguage(filePath)
         setEditorViewMode(absPath, 'edit')
         setMarkdownViewMode(absPath, 'source')
-        openFile({
-          filePath: absPath,
-          relativePath: filePath,
-          worktreeId: activeWorktreeId,
-          language,
-          mode: 'edit'
-        })
+        const markdownOwner = resolveSourceControlOpenOwner(activeWorktreeId)
+        openFile(
+          {
+            filePath: absPath,
+            relativePath: filePath,
+            worktreeId: activeWorktreeId,
+            language,
+            mode: 'edit',
+            ...(markdownOwner.runtimeEnvironmentId !== undefined
+              ? { runtimeEnvironmentId: markdownOwner.runtimeEnvironmentId }
+              : {})
+          },
+          { suppressActiveRuntimeFallback: markdownOwner.suppressActiveRuntimeFallback }
+        )
         setPendingEditorReveal(null)
         requestSourceControlEditorRevealFrame(pendingCommentEditorRevealFrameIdsRef, () => {
           requestSourceControlEditorRevealFrame(pendingCommentEditorRevealFrameIdsRef, () => {
@@ -115,13 +123,20 @@ export function useSourceControlNoteOpening({
       // Why: neither diff surface has the file (e.g. change committed+merged), so open a plain editor tab in 'changes' mode where DiffViewer picks up the scroll request.
       const absPath = joinPath(worktreePath, filePath)
       const language = detectLanguage(filePath)
-      openFile({
-        filePath: absPath,
-        relativePath: filePath,
-        worktreeId: activeWorktreeId,
-        language,
-        mode: 'edit'
-      })
+      const plainOwner = resolveSourceControlOpenOwner(activeWorktreeId)
+      openFile(
+        {
+          filePath: absPath,
+          relativePath: filePath,
+          worktreeId: activeWorktreeId,
+          language,
+          mode: 'edit',
+          ...(plainOwner.runtimeEnvironmentId !== undefined
+            ? { runtimeEnvironmentId: plainOwner.runtimeEnvironmentId }
+            : {})
+        },
+        { suppressActiveRuntimeFallback: plainOwner.suppressActiveRuntimeFallback }
+      )
       if (commentId) {
         setEditorViewMode(absPath, 'changes')
         setScrollToDiffCommentId(commentId)
