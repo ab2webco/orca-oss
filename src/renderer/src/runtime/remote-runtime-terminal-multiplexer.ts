@@ -71,6 +71,10 @@ export type RemoteRuntimeMultiplexedTerminalCallbacks = {
       pendingEscapeTailAnsi?: string
       seq?: number
       kittyKeyboardFlags?: number
+      /** Grid the host serialized this image at. Absent means the producer did
+       *  not prove one, and the consumer keeps the pane's own grid. */
+      cols?: number
+      rows?: number
     }
   ) => void
   onSubscribed?: () => void
@@ -917,7 +921,12 @@ class RemoteRuntimeTerminalMultiplexer {
           stream.callbacks.onSnapshot(data ?? '', {
             pendingEscapeTailAnsi: info?.pendingEscapeTailAnsi,
             seq: info?.seq,
-            kittyKeyboardFlags: info?.kittyKeyboardFlags
+            kittyKeyboardFlags: info?.kittyKeyboardFlags,
+            // Why: the image encodes wraps and cursor moves against the host's
+            // grid, so the restorer must replay it there — the request path has
+            // always carried these; the pushes silently dropped them.
+            cols: info?.cols,
+            rows: info?.rows
           })
         } else if (target === 'recovery') {
           // Why: a server-pushed recovery snapshot replaces terminal state
@@ -927,7 +936,9 @@ class RemoteRuntimeTerminalMultiplexer {
           stream.callbacks.onSnapshot(`\x1b[2J\x1b[3J\x1b[H${data ?? ''}`, {
             pendingEscapeTailAnsi: info?.pendingEscapeTailAnsi,
             seq: info?.seq,
-            kittyKeyboardFlags: info?.kittyKeyboardFlags
+            kittyKeyboardFlags: info?.kittyKeyboardFlags,
+            cols: info?.cols,
+            rows: info?.rows
           })
         }
       } else if (matchesPendingRequest) {
