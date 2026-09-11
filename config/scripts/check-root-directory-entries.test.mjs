@@ -105,6 +105,21 @@ describe('root directory guard', () => {
     expect(output).toContain('new-root.md')
   })
 
+  it('allows .mcp.json at the root but still blocks a sibling new root file', () => {
+    const fixture = makeFixture()
+    const head = commitFiles(fixture.root, [
+      ['.mcp.json', '{}\n'],
+      ['.other-root.json', '{}\n']
+    ])
+
+    const result = runGuard({ ...fixture, head })
+    const output = `${result.stdout}\n${result.stderr}`
+
+    expect(result.status).toBe(1)
+    expect(output).toContain('.other-root.json')
+    expect(output).not.toContain('.mcp.json')
+  })
+
   it('rejects a new top-level directory', () => {
     const fixture = makeFixture()
     const head = commitFiles(fixture.root, [['new-folder/file.txt', 'too prominent\n']])
