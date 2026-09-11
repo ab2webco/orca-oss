@@ -23,6 +23,8 @@ function checkRootDirectoryEntries(argv) {
   const baseEntries = new Set(readRootEntries(baseSha))
   // Why: site is the fork's public GitHub Pages root, separate from private docs.
   baseEntries.add('site')
+  // Why: Claude Code reads the project's MCP servers only from a root .mcp.json.
+  baseEntries.add('.mcp.json')
   const blockedEntries = readRootEntries(headSha).filter((entry) => !baseEntries.has(entry))
 
   if (blockedEntries.length === 0) {

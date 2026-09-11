@@ -162,3 +162,6 @@ tests/e2e/.cross-version-checkouts/
 
 # Bytecode the harness guards under .claude/hooks leave behind on every run
 .claude/hooks/__pycache__/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
