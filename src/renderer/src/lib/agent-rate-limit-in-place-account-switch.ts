@@ -6,7 +6,10 @@ import {
 } from '../../../shared/claude-terminal-account-switch'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
-import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
+import {
+  getRemoteRuntimePtyEnvironmentId,
+  getRemoteRuntimeTerminalHandle
+} from '@/runtime/runtime-terminal-stream'
 import type { AgentRateLimitFailoverMode } from '@/lib/agent-rate-limit-failover'
 
 export type InPlaceManagedClaudeSwitchResult =
@@ -64,13 +67,24 @@ export async function runInPlaceManagedClaudeAccountSwitch(args: {
     ? ({ kind: 'environment', environmentId } as const)
     : ({ kind: 'local' } as const)
 
+  // Why the handle and not the ptyId for a remote pane: `args.ptyId` is the
+  // CLIENT's id for the pane — `remote:<env>@@<handle>` — and the runtime knows
+  // nothing about that shape. Sent as `ptyId` it never resolved, and the switch
+  // came back "That terminal is not live on this runtime" for a terminal that
+  // was plainly alive. The handle is the selector the runtime actually indexes,
+  // and the one `orca account switch --terminal` has always passed.
+  const remoteHandle = environmentId ? getRemoteRuntimeTerminalHandle(args.ptyId) : null
+  const terminalSelector = remoteHandle
+    ? ({ terminal: remoteHandle } as const)
+    : ({ ptyId: args.ptyId } as const)
+
   let response: SwitchResponse
   try {
     response = await callRuntimeRpc<SwitchResponse>(
       target,
       'accounts.switchClaudeTerminal',
       {
-        ptyId: args.ptyId,
+        ...terminalSelector,
         targetAccountId: args.targetAccount.id,
         awaitMs: SWITCH_AWAIT_MS
       },
