@@ -7,6 +7,10 @@ import type {
   NativeChatAppendedMessages
 } from '../../../preload/api-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
+import type {
+  AgentCliSelfUpdateRepairResult,
+  AgentCliSelfUpdateStatus
+} from '../../../shared/agent-cli-self-update'
 import { parseHostAccessLink } from '../../../shared/remote-pairing-address'
 import { verifyRemotePairingRuntimeStatus } from '../../../shared/remote-pairing-verification'
 import type { AiVaultDeleteSessionArgs } from '../../../shared/ai-vault-session-deletion'
@@ -3012,6 +3016,23 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
             .then((result) => result as RefreshAgentsResult)
             .catch(() => fallbackRefreshAgents)
         : Promise.resolve(fallbackRefreshAgents),
+    checkAgentSelfUpdate: async () => {
+      if (!requireActiveEnvironmentOrNull()) {
+        return []
+      }
+      return callRuntimeResult<AgentCliSelfUpdateStatus[]>('preflight.checkAgentSelfUpdate').catch(
+        () => []
+      )
+    },
+    repairAgentSelfUpdate: async (args) => {
+      // Why no hay fallback silencioso: reparar es una accion que el usuario
+      // pidio; decirle "listo" sin haber llegado al host seria mentirle.
+      requireActiveEnvironment()
+      return callRuntimeResult<AgentCliSelfUpdateRepairResult>(
+        'preflight.repairAgentSelfUpdate',
+        args
+      )
+    },
     detectRemoteAgents: async (args) =>
       requireActiveEnvironmentOrNull()
         ? callRuntimeResult<string[]>('preflight.detectRemoteAgents', args).catch(() => [])

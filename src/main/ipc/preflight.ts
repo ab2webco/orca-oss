@@ -14,6 +14,9 @@ import { detectWslCommandsOnPath, type WslPreflightTarget } from './preflight-ws
 import { detectCommandsInInstallDirs } from './local-agent-install-dir-detection'
 import { getPreflightWslTarget, type PreflightRuntimeContext } from './preflight-runtime-target'
 import { hydrateShellPathForAgentDetection } from './agent-detection-shell-path'
+import { probeRepairableAgentCliSelfUpdates } from './agent-cli-self-update-probe'
+import { repairAgentCliSelfUpdate } from './agent-cli-self-update-repair'
+import type { TuiAgent } from '../../shared/tui-agent'
 import {
   execCommandInWsl,
   execLocalPreflightCommand,
@@ -300,6 +303,12 @@ export function registerPreflightHandlers(): void {
   ipcMain.handle('preflight:refreshAgents', async (_event, args?: PreflightRuntimeContext) => {
     return refreshShellPathAndDetectAgents(args)
   })
+
+  ipcMain.handle('preflight:checkAgentSelfUpdate', async () => probeRepairableAgentCliSelfUpdates())
+
+  ipcMain.handle('preflight:repairAgentSelfUpdate', async (_event, args: { agentId: TuiAgent }) =>
+    repairAgentCliSelfUpdate(args.agentId)
+  )
 
   // Why: remote worktrees need agent detection on the SSH host, not the local
   // machine. This handler forwards the same KNOWN_AGENT_COMMANDS list to the

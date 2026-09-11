@@ -10621,6 +10621,17 @@
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "Sesión iniciada, pero Orca Lab no pudo volver a abrir la terminal de Claude en {{worktrees}}. Iniciala de nuevo desde la barra de pestañas."
+        },
+        "AgentCliSelfUpdateNotice": {
+          "blocked": "Este CLI no puede actualizarse solo",
+          "blockedDetail": "Esta instalado en un directorio que este usuario no puede escribir, asi que su propio actualizador falla y la version se queda congelada.",
+          "fixing": "Moviendo…",
+          "fix": "Reinstalar para este usuario",
+          "manual": "Reinstalalo dentro de tu carpeta personal para que su actualizador pueda escribir.",
+          "repaired": "Reinstalado",
+          "shadowed": "Instalado, pero sigue ganando la copia vieja",
+          "shadowedDetail": "Pone {dir} primero en tu PATH y abri una terminal nueva.",
+          "failed": "No se pudo reinstalar"
         }
       },
       "right": {

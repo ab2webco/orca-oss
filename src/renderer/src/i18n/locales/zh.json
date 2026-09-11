@@ -10630,6 +10630,17 @@
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "已登录，但 Orca Lab 无法重新打开 {{worktrees}} 中的 Claude 终端。请从标签栏重新启动。"
+        },
+        "AgentCliSelfUpdateNotice": {
+          "blocked": "该 CLI 无法自行更新",
+          "blockedDetail": "它安装在当前用户无法写入的目录中，因此它自己的更新程序会失败，版本会一直停留不变。",
+          "fixing": "正在移动…",
+          "fix": "为当前用户重新安装",
+          "manual": "请重新安装到你的主目录下，让它的更新程序可以写入。",
+          "repaired": "已重新安装",
+          "shadowed": "已安装，但旧版本仍然优先",
+          "shadowedDetail": "把 {dir} 放到 PATH 最前面，然后打开一个新终端。",
+          "failed": "无法重新安装"
         }
       },
       "right": {
