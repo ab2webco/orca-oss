@@ -6,11 +6,7 @@ import { assertRuntimeStatusCompatible } from './runtime-protocol-compat'
 import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call'
 import { withLocalRuntimeRpcDeadline } from './runtime-rpc-local-deadline'
 import { callRuntimeEnvironmentWithRevision } from './runtime-rpc-environment-call'
-import {
-  markRuntimeCapabilityUnsupported,
-  RuntimeRpcCallError,
-  unwrapRuntimeRpcResult
-} from './runtime-rpc-result'
+import { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
 import type { RuntimeClientTarget } from './runtime-client-target'
 
@@ -335,7 +331,7 @@ export async function assertRuntimeEnvironmentCapability(
   timeoutMs?: number
 ): Promise<void> {
   if (!(await runtimeEnvironmentSupportsCapability(environmentId, capability, timeoutMs))) {
-    throw markRuntimeCapabilityUnsupported(new Error(message))
+    throw new Error(message)
   }
 }
 
