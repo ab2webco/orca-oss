@@ -78,6 +78,7 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     onContinueAgentSessionInNewSession: vi.fn(),
     onForkAgentSession: vi.fn(),
     canSwitchClaudeAccount: false,
+    claudeAccountOwnerEnvironmentId: null,
     onSwitchClaudeAccount: vi.fn(),
     canToggleNativeChat: false,
     isNativeChatView: false,

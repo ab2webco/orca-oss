@@ -202,7 +202,7 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
   'workspace-unresolved':
     'Orca could not resolve a working directory for this terminal, so the switch stopped before touching the session.',
   'transcript-unavailable':
-    'The session transcript could not be made readable from the selected account.',
+    'This session has no saved conversation yet, so there is nothing for the other account to pick up — send it a message first, then switch.',
   'resume-verification-unavailable':
     'Orca cannot observe a resumed Claude session in this terminal — the managed SessionStart hook is missing from the account’s Claude vault, so neither the switch nor its rollback could be verified. Relaunch the agent from Orca to reinstall it; if this keeps happening, that vault’s settings.json is not writable.',
   concurrent: 'Another account switch is already running for this terminal.',

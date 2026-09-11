@@ -15,6 +15,7 @@ import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import type { PtyTransport } from './pty-transport'
 import { handleInternalTerminalFileDrop } from './terminal-drop-handler'
 import { TerminalClaudeAccountSwitchButton } from './TerminalClaudeAccountSwitchButton'
+import { resolvePaneOwnerEnvironmentId } from './pane-owner-environment'
 import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
 
 export type PaneTitleOverlayRect = {
@@ -281,6 +282,10 @@ export default function TerminalPaneHeaderOverlay({
                   ) : null}
                   {canSwitchClaudeAccount && isActivePane ? (
                     <TerminalClaudeAccountSwitchButton
+                      ownerEnvironmentId={resolvePaneOwnerEnvironmentId(
+                        paneTransportsRef.current,
+                        pane.id
+                      )}
                       onSwitch={(account) => onSwitchClaudeAccount?.(pane, account)}
                     />
                   ) : null}

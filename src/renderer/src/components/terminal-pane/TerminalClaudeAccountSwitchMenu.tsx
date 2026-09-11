@@ -11,6 +11,8 @@ import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
 type Props = {
   /** Fetch accounts only while the owning menu is open. */
   enabled: boolean
+  /** Runtime that owns the pane this menu acts on; `null` for a local pane. */
+  ownerEnvironmentId: string | null
   onSwitch: (account: ClaudeManagedAccountSummary) => void
 }
 
@@ -20,9 +22,13 @@ type Props = {
  * context menu, native-chat context menu). The parent gates it on the pane being
  * a Claude agent session.
  */
-export function TerminalClaudeAccountSwitchMenu({ enabled, onSwitch }: Props): React.JSX.Element {
+export function TerminalClaudeAccountSwitchMenu({
+  enabled,
+  ownerEnvironmentId,
+  onSwitch
+}: Props): React.JSX.Element {
   const { oauthAccounts, endpointAccounts, activeAccountId, activeModel } =
-    useClaudeAccountSwitchTargets(enabled)
+    useClaudeAccountSwitchTargets(enabled, ownerEnvironmentId)
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>

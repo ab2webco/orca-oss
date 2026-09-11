@@ -16,7 +16,8 @@ vi.mock('../../../claude-accounts/managed-vault-authentication', () => ({
   isManagedClaudeVaultAuthenticated: vi.fn(async () => true)
 }))
 vi.mock('../../../claude-accounts/session-failover', () => ({
-  copyClaudeSessionForAccountSwitch: vi.fn(() => ({ ok: true, copiedFileCount: 0 }))
+  copyClaudeSessionForAccountSwitch: vi.fn(() => ({ ok: true, copiedFileCount: 0 })),
+  hasClaudeSessionTranscript: vi.fn(() => true)
 }))
 
 function method(name: string) {
@@ -174,9 +175,9 @@ describe('account RPC methods', () => {
     const params = { label: 'z.ai · GLM', baseUrl: 'https://api.z.ai/api/anthropic', token: 'tok' }
 
     for (const clientKind of ['mobile', 'runtime'] as const) {
-      await expect(
-        addMethod.handler(params, { runtime, clientKind })
-      ).resolves.toEqual({ accounts: [] })
+      await expect(addMethod.handler(params, { runtime, clientKind })).resolves.toEqual({
+        accounts: []
+      })
     }
 
     expect(add).toHaveBeenCalledTimes(2)

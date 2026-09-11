@@ -137,6 +137,10 @@ export async function runInPlaceManagedClaudeAccountSwitch(args: {
           'auto.lib.agentRateLimitAccountSwitch.switchUnfinished',
           'The account switch did not finish; check this terminal before continuing.'
         ),
-    restored: result.state === 'rolled-back'
+    // Why `preflighting` claims neither verdict: the switch refused before the
+    // Ctrl+C, so nothing was ever stopped — and reporting `false` appended "could
+    // not bring the session back" to a terminal that was never touched, which is
+    // what made a refusal read like a lost conversation.
+    ...(result.state === 'preflighting' ? {} : { restored: result.state === 'rolled-back' })
   }
 }

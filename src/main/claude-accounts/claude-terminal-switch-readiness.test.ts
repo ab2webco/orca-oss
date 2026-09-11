@@ -22,6 +22,7 @@ function preflight(
     cwd: '/repo',
     sourceAccountId: 'account-1',
     providerSessionId: 'session-1',
+    sessionTranscriptPresent: true,
     launchConfig: LAUNCH_CONFIG,
     ...overrides
   }
@@ -30,6 +31,25 @@ function preflight(
 describe('resolveClaudeTerminalSwitchReadiness', () => {
   it('reports a fully bound pane as ready', () => {
     expect(resolveClaudeTerminalSwitchReadiness(preflight())).toEqual({ state: 'ready' })
+  })
+
+  // Measured twice on a real remote host: a Claude session that has just
+  // started has no transcript file yet. The readiness used to call it ready, so
+  // the menu offered the switch, the transaction began, and the copy failed
+  // mid-flight with a message that read like the session had been lost.
+  it('refuses a session that has no saved conversation yet, before anything starts', () => {
+    expect(
+      resolveClaudeTerminalSwitchReadiness(preflight({ sessionTranscriptPresent: false }))
+    ).toEqual({ state: 'unavailable', reason: 'transcript-unavailable' })
+  })
+
+  // The other half, and the one that would hurt more if it broke: a session that
+  // DOES have a transcript must stay switchable. Every uncertainty upstream
+  // resolves to `true` precisely so a probe that cannot answer never refuses.
+  it('stays ready when the transcript is present', () => {
+    expect(
+      resolveClaudeTerminalSwitchReadiness(preflight({ sessionTranscriptPresent: true }))
+    ).toEqual({ state: 'ready' })
   })
 
   // ORCA-187: the state a restored pane lands in — every other prerequisite

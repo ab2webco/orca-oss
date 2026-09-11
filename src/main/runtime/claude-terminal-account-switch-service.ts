@@ -9,7 +9,9 @@ import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resum
 import type { ClaudeTerminalSwitchCapture } from '../claude-accounts/atomic-terminal-account-switch'
 import { runAtomicClaudeTerminalAccountSwitch } from '../claude-accounts/atomic-terminal-account-switch'
 import { resolveClaudeTerminalSwitchReadiness } from '../claude-accounts/claude-terminal-switch-readiness'
+import { hasClaudeSessionTranscript } from '../claude-accounts/session-failover'
 import {
+  buildClaudeSessionTranscriptDeps,
   buildClaudeTerminalAccountSwitchPorts,
   resolveClaudeTerminalSwitchShell,
   resolvePtyClaudeAccountId,
@@ -99,14 +101,27 @@ function runClaudeTerminalSwitchPreflight(
   const target = snapshot?.ok === true ? snapshot : null
   const sourceAccountId =
     attached && target ? resolvePtyClaudeAccountId(attached, target.ptyId) : null
+  const providerSessionId = target?.providerSession?.id ?? null
+  const cwd = target?.cwd ?? null
+  // Why only when all three are bound: the probe needs every one of them to mean
+  // anything, and a pane already failing an earlier prerequisite must not pay for
+  // a filesystem scan to be refused for a reason it is not being refused for.
+  const sessionTranscriptPresent =
+    attached === null || cwd === null || providerSessionId === null
+      ? true
+      : hasClaudeSessionTranscript(
+          { sessionId: providerSessionId, cwd, sourceAccountId },
+          buildClaudeSessionTranscriptDeps(attached)
+        )
   const readiness = resolveClaudeTerminalSwitchReadiness({
     servicesAttached: attached !== null,
     paneResolved: target !== null,
     isWsl: target?.isWsl === true,
     remoteConnectionId: target?.remoteConnectionId ?? null,
-    cwd: target?.cwd ?? null,
+    cwd,
     sourceAccountId,
-    providerSessionId: target?.providerSession?.id ?? null,
+    providerSessionId,
+    sessionTranscriptPresent,
     launchConfig: target?.launchConfig
   })
   if (readiness.state === 'unavailable') {

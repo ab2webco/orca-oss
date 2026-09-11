@@ -33,6 +33,7 @@ import TerminalSearch from '@/components/TerminalSearch'
 import type { PtyTransport } from './pty-transport'
 import type { PtyTransportRecoveryState } from './pty-transport-types'
 import { fitPanes, isWindowsUserAgent } from './pane-helpers'
+import { resolvePaneOwnerEnvironmentId } from './pane-owner-environment'
 import { getConnectionId } from '@/lib/connection-context'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { hydrateRuntimeEnvironmentSshState } from '@/runtime/runtime-environment-ssh-state'
@@ -3371,6 +3372,10 @@ function TerminalPane(
                   onForkAgentSession: () =>
                     void contextMenu.runForPane(chatPane.id, contextMenu.onForkAgentSession),
                   canSwitchClaudeAccount: resolveAgentForLeaf(chatPane.leafId) === 'claude',
+                  claudeAccountOwnerEnvironmentId: resolvePaneOwnerEnvironmentId(
+                    paneTransportsRef.current,
+                    chatPane.id
+                  ),
                   onSwitchClaudeAccount: (account) =>
                     switchClaudeAccount(resolvePaneClaudeContext(chatPane), account),
                   onSetTitle: () => contextMenu.runForPane(chatPane.id, contextMenu.onSetTitle),
@@ -3411,6 +3416,10 @@ function TerminalPane(
         onContinueAgentSessionInNewSession={contextMenu.onContinueAgentSessionInNewSession}
         onForkAgentSession={() => void contextMenu.onForkAgentSession()}
         canSwitchClaudeAccount={contextMenuIsClaudeSession}
+        claudeAccountOwnerEnvironmentId={resolvePaneOwnerEnvironmentId(
+          paneTransportsRef.current,
+          contextMenu.menuPaneId
+        )}
         // Why resolveMenuPane and not menuPaneId: selecting an account closes
         // the menu first, and `menuPaneId` is gated on `open` — by the time this
         // fires it is already null, so the pane resolved to nothing and the
