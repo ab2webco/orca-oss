@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-const path = require('path');
-const fs = require('fs');
-const { pathToFileURL } = require('url');
-const { execFileSync } = require('child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
+const { execFileSync } = require('node:child_process');
 const dir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const BAKED = null; // no hardcodear una ruta de la maquina del que corrio graft init
 
@@ -31,13 +31,13 @@ function versionOf(distClaude) {
 
 // Numeric-dotted compare of the release part; an unreadable version loses to any known one.
 function newer(a, b) {
-  if (!a) return false;
-  if (!b) return true;
+  if (!a) { return false; }
+  if (!b) { return true; }
   const p = (v) => String(v).split('-')[0].split('.').map((n) => Number(n) || 0);
   const pa = p(a), pb = p(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d !== 0) return d > 0;
+    if (d !== 0) { return d > 0; }
   }
   return false;
 }
@@ -46,7 +46,7 @@ function newer(a, b) {
 function best(dirs, name) {
   let bestDir = null, bestVer = null;
   for (const d of dirs) {
-    if (!d || !fs.existsSync(path.join(d, name))) continue;
+    if (!d || !fs.existsSync(path.join(d, name))) { continue; }
     const v = versionOf(d);
     if (bestDir === null || newer(v, bestVer)) { bestDir = d; bestVer = v; }
   }
@@ -57,10 +57,10 @@ function entry(name) {
   // Cheap candidates first, and only shell out to npm when every one of them misses.
   const cheap = [BAKED, fromPkg(dir), fromPkg(path.join(path.dirname(process.execPath), '..', 'lib'))];
   const hit = best(cheap, name);
-  if (hit) return path.join(hit, name);
+  if (hit) { return path.join(hit, name); }
   const gr = globalRoot();
   const global = gr && path.join(gr, '@nanonets', 'graft', 'dist', 'claude');
-  if (global && fs.existsSync(path.join(global, name))) return path.join(global, name);
+  if (global && fs.existsSync(path.join(global, name))) { return path.join(global, name); }
   return path.join(dir, 'dist', 'claude', name); // last-ditch; import will no-op if absent
 }
 
