@@ -358,6 +358,14 @@ export type GlobalSettings = {
   visibleTaskProvidersDefaultedForJira: boolean
   /** Why: one-shot guard to make Plane visible for existing profiles once, without re-adding after a later opt-out. */
   visibleTaskProvidersDefaultedForPlane: boolean
+  /**
+   * Why existe un segundo intento: el guard de arriba se estampaba en CUALQUIER
+   * guardado de `visibleTaskProviders`, incluso desde un build que no conocia
+   * Plane. Esos perfiles quedaron con el flag en true y sin Plane en la lista, y
+   * la migracion ya nunca los tocaba: el proveedor quedaba invisible para
+   * siempre. Este repara esos perfiles una sola vez.
+   */
+  visibleTaskProvidersPlaneOfferRepaired: boolean
   /** Persisted repo selection (cross-repo tasks view). null = sticky-all (includes future-added repos);
    *  string[] = frozen curated subset (ineligible ids dropped on load; empty after drop is treated as null). */
   defaultRepoSelection: string[] | null

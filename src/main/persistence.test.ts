@@ -3036,7 +3036,12 @@ describe('Store', () => {
       settings: {
         visibleTaskProviders: ['gitlab'],
         visibleTaskProvidersDefaultedForJira: true,
-        visibleTaskProvidersDefaultedForPlane: true
+        visibleTaskProvidersDefaultedForPlane: true,
+        // Why hace falta el segundo flag: un perfil con solo el primero puede
+        // ser uno al que nunca se le ofrecio Plane (el guard viejo se estampaba
+        // en cualquier guardado de la lista), asi que ya no basta para probar
+        // una decision. Con este puesto, el opt-out si es deliberado.
+        visibleTaskProvidersPlaneOfferRepaired: true
       },
       ui: {},
       githubCache: { pr: {}, issue: {} },
@@ -3085,7 +3090,12 @@ describe('Store', () => {
       settings: {
         visibleTaskProviders: ['gitlab'],
         visibleTaskProvidersDefaultedForJira: true,
-        visibleTaskProvidersDefaultedForPlane: true
+        visibleTaskProvidersDefaultedForPlane: true,
+        // Why hace falta el segundo flag: un perfil con solo el primero puede
+        // ser uno al que nunca se le ofrecio Plane (el guard viejo se estampaba
+        // en cualquier guardado de la lista), asi que ya no basta para probar
+        // una decision. Con este puesto, el opt-out si es deliberado.
+        visibleTaskProvidersPlaneOfferRepaired: true
       },
       ui: {},
       githubCache: { pr: {}, issue: {} },
@@ -3094,6 +3104,37 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab'])
+  })
+
+  it('offers plane once more to a profile whose flag was stamped without it', async () => {
+    // El caso real (medido en el Mac de Fabian): el guard viejo se estampaba en
+    // CUALQUIER guardado de `visibleTaskProviders`, tambien desde un build que
+    // no conocia Plane. Resultado: flag en true, Plane fuera de la lista, y la
+    // migracion saltandose el perfil para siempre. Conectar la API key y activar
+    // el skill no servia de nada, porque la barra lee esta lista.
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {
+        visibleTaskProviders: ['github', 'gitlab', 'linear', 'jira'],
+        visibleTaskProvidersDefaultedForJira: true,
+        visibleTaskProvidersDefaultedForPlane: true
+      },
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+
+    const store = await createStore()
+
+    expect(store.getSettings().visibleTaskProviders).toContain('plane')
+    store.flush()
+    const persisted = readDataFile() as {
+      settings?: { visibleTaskProvidersPlaneOfferRepaired?: boolean }
+    }
+    // Y se marca, para que el proximo opt-out si se respete.
+    expect(persisted.settings?.visibleTaskProvidersPlaneOfferRepaired).toBe(true)
   })
 
   it('defaults fresh installs with plane already visible and the migration flag set', async () => {

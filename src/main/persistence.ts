@@ -3512,9 +3512,21 @@ export class Store {
             : [...rawTaskProviderSettings.visibleTaskProviders, 'jira' as const]
         const visibleTaskProvidersDefaultedForPlane =
           parsed.settings?.visibleTaskProvidersDefaultedForPlane === true
-        const migratedVisibleTaskProvidersWithPlane = visibleTaskProvidersDefaultedForPlane
-          ? migratedVisibleTaskProviders
-          : migratedVisibleTaskProviders.includes('plane')
+        // Why un segundo intento: el guard de arriba se estampaba en CUALQUIER
+        // guardado de la lista, tambien desde builds que no conocian Plane. Esos
+        // perfiles quedaron con el flag en true y sin Plane, y la migracion ya
+        // nunca los tocaba — el proveedor quedaba invisible para siempre y no
+        // habia forma de repararlo salvo editar el JSON a mano. Medido en un
+        // perfil real: ['github','gitlab','linear','jira'] con el flag en true.
+        //
+        // Se ofrece una vez mas y se marca aparte, asi que a quien lo oculto a
+        // proposito solo le reaparece esta vez y su siguiente opt-out se respeta.
+        const visibleTaskProvidersPlaneOfferRepaired =
+          parsed.settings?.visibleTaskProvidersPlaneOfferRepaired === true
+        const shouldOfferPlane =
+          !visibleTaskProvidersDefaultedForPlane || !visibleTaskProvidersPlaneOfferRepaired
+        const migratedVisibleTaskProvidersWithPlane =
+          !shouldOfferPlane || migratedVisibleTaskProviders.includes('plane')
             ? migratedVisibleTaskProviders
             : [...migratedVisibleTaskProviders, 'plane' as const]
         const taskProviderSettings = normalizeTaskProviderSettings({
@@ -3540,7 +3552,7 @@ export class Store {
         if (!visibleTaskProvidersDefaultedForJira) {
           this.loadNeedsSave = true
         }
-        if (!visibleTaskProvidersDefaultedForPlane) {
+        if (!visibleTaskProvidersDefaultedForPlane || !visibleTaskProvidersPlaneOfferRepaired) {
           this.loadNeedsSave = true
         }
         const claudeAgentTeamsDefaultDisabledMigrated =
@@ -3736,6 +3748,7 @@ export class Store {
             visibleTaskProviders: taskProviderSettings.visibleTaskProviders,
             visibleTaskProvidersDefaultedForJira: true,
             visibleTaskProvidersDefaultedForPlane: true,
+            visibleTaskProvidersPlaneOfferRepaired: true,
             terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
               parsed.settings?.terminalShortcutPolicy
             ),

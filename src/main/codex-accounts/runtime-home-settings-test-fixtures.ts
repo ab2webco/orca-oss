@@ -136,6 +136,7 @@ export function createSettings(overrides: TestSettingsOverrides = {}): GlobalSet
     agentStatusHooksEnabled,
     tabAutoGenerateTitle,
     enableGitHubAttribution: overrides.enableGitHubAttribution ?? true,
-    visibleTaskProvidersDefaultedForPlane: overrides.visibleTaskProvidersDefaultedForPlane ?? true
+    visibleTaskProvidersDefaultedForPlane: overrides.visibleTaskProvidersDefaultedForPlane ?? true,
+    visibleTaskProvidersPlaneOfferRepaired: overrides.visibleTaskProvidersPlaneOfferRepaired ?? true
   }
 }
