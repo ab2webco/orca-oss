@@ -3207,13 +3207,6 @@ function TerminalPane(
     },
     [tabId]
   )
-  const findManagedPaneById = useCallback(
-    (paneId: number | null): ManagedPane | null =>
-      paneId === null
-        ? null
-        : (managerRef.current?.getPanes().find((candidate) => candidate.id === paneId) ?? null),
-    []
-  )
   const { switchToAccount: switchClaudeAccount } = useManualClaudeAccountSwitch({ worktreeId })
   // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
   const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
@@ -3418,11 +3411,13 @@ function TerminalPane(
         onContinueAgentSessionInNewSession={contextMenu.onContinueAgentSessionInNewSession}
         onForkAgentSession={() => void contextMenu.onForkAgentSession()}
         canSwitchClaudeAccount={contextMenuIsClaudeSession}
+        // Why resolveMenuPane and not menuPaneId: selecting an account closes
+        // the menu first, and `menuPaneId` is gated on `open` — by the time this
+        // fires it is already null, so the pane resolved to nothing and the
+        // switch died on "no resumable Claude session". The header button never
+        // hit this because it is handed the pane object directly.
         onSwitchClaudeAccount={(account) =>
-          switchClaudeAccount(
-            resolvePaneClaudeContext(findManagedPaneById(contextMenu.menuPaneId)),
-            account
-          )
+          switchClaudeAccount(resolvePaneClaudeContext(contextMenu.resolveMenuPane()), account)
         }
         canToggleNativeChat={contextMenuCanToggleChat}
         isNativeChatView={contextMenuIsChatView}
