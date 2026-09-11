@@ -11,6 +11,7 @@ import {
   projectGroupsMoveProject,
   projectsSetupExistingFolder,
   ptyKill,
+  remoteCatalogCallResult,
   remoteRepo,
   reposAdd,
   reposClone,
@@ -94,12 +95,9 @@ describe('repo slice runtime routing', () => {
   })
 
   it('fetches repos from the active remote runtime environment', async () => {
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { repos: [remoteRepo] },
-      _meta: { runtimeId: 'runtime-remote' }
-    })
+    runtimeEnvironmentCall.mockImplementation(({ method }: { method: string }) =>
+      remoteCatalogCallResult(method, [remoteRepo])
+    )
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,

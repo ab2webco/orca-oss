@@ -67,3 +67,27 @@ export function unwrapRuntimeRpcResult<TResult>(response: RuntimeRpcResponse<TRe
   }
   return response.result
 }
+
+/** Marca que un runtime respondio y genuinamente no habla esta capability. */
+const RUNTIME_CAPABILITY_UNSUPPORTED = 'runtimeCapabilityUnsupported'
+
+/**
+ * Un runtime viejo que no conoce la capability, separado de un fallo real.
+ *
+ * Why: quien degrada para un runtime viejo NO debe degradar ante un fallo de
+ * transporte ni un error del runtime. Mientras los dos fueron un `Error` pelado
+ * eran indistinguibles, y un servidor que respondio mal se mostraba como un
+ * fallback sano (ORCA-467).
+ */
+export function markRuntimeCapabilityUnsupported(error: Error): Error {
+  return Object.assign(error, { [RUNTIME_CAPABILITY_UNSUPPORTED]: true as const })
+}
+
+export function isRuntimeCapabilityUnsupported(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error as Error & { runtimeCapabilityUnsupported?: boolean })[
+      RUNTIME_CAPABILITY_UNSUPPORTED
+    ] === true
+  )
+}

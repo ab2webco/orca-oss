@@ -302,6 +302,12 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
       // Why: hydration is host-merged by downstream slices. Switching focus
       // should add/update the selected host without discarding other hosts.
       await get().fetchRepos()
+      // Why: sin estas dos, cambiar de Active Server nunca traia los project
+      // groups ni los folder workspaces del host nuevo — el sidebar se quedaba
+      // mostrando solo los del host anterior y parecia que el servidor no tenia
+      // nada (ORCA-467). El merge es por host, asi que esto suma, no reemplaza.
+      await get().fetchProjectGroups()
+      await get().fetchFolderWorkspaces()
       await get().fetchAllWorktrees()
       await get().fetchWorktreeLineage()
       await get().fetchBrowserSessionProfiles()
