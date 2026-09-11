@@ -76,6 +76,10 @@ import {
   hasRuntimeRpcErrorCode,
   settingsForRuntimeOwner
 } from '../../runtime/runtime-rpc-client'
+import {
+  isRuntimeCapabilityUnsupported,
+  markRuntimeCapabilityUnsupported
+} from '../../runtime/runtime-rpc-result'
 import { syncRuntimeGitForkDefaultBranch } from '../../runtime/runtime-git-client'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
 import { buildDismissedOnboardingFolderAgentStartup } from '@/lib/onboarding-folder-agent-startup'
@@ -502,7 +506,7 @@ function setupWithFetchedOwner(
 async function fetchProjectHostSetupCompatibility(
   target: ReturnType<typeof getActiveRuntimeTarget>,
   repos: readonly Repo[]
-): Promise<ProjectHostSetupProjection> {
+): Promise<ProjectHostSetupProjection | null> {
   try {
     if (target.kind === 'local') {
       const projectsApi = (
@@ -534,9 +538,31 @@ async function fetchProjectHostSetupCompatibility(
       projects: projectResponse.projects,
       setups: setupResponse.setups.map((setup) => setupWithFetchedOwner(setup, target))
     }
-  } catch {
-    // Why: newer clients must hydrate against older runtimes that only know repo.list; derive the transitional model locally.
-    return projectHostSetupProjectionFromRepos(repos)
+  } catch (error) {
+    // Why solo estos dos: la proyeccion transitoria es la respuesta para un host
+    // al que NO se le puede preguntar — un runtime viejo sin
+    // `project-host-setup.v1`, o un preload sin la API de proyectos. Es la
+    // respuesta equivocada para un host que respondio mal: un fallo de
+    // transporte, un timeout o un error del runtime volvian como una lista de
+    // proyectos sana, que es como un servidor con un proyecto mostraba los
+    // treinta y dos del escritorio (ORCA-467). Lo demas se propaga, y el
+    // cargador por host omite ese host en vez de sustituirlo.
+    if (
+      isRuntimeCapabilityUnsupported(error) ||
+      (error instanceof Error && error.message === 'projects_api_unavailable')
+    ) {
+      return projectHostSetupProjectionFromRepos(repos)
+    }
+    // Why no se relanza: `repo.list` ya respondio. Tumbar el catalogo entero por
+    // esto haria desaparecer del sidebar los repos del servidor cada vez que
+    // `project.list` de timeout — cambiar "proyectos equivocados" por "el host
+    // desaparece" no es un arreglo. `null` deja las filas de ese host como
+    // estaban y no las inventa.
+    console.error(
+      `Failed to fetch the project catalog for ${getRuntimeTargetHostId(target)}:`,
+      error
+    )
+    return null
   }
 }
 
@@ -546,12 +572,21 @@ async function assertProjectHostSetupRuntimeCapability(
   if (target.kind !== 'environment') {
     return
   }
-  await assertRuntimeEnvironmentCapability(
-    target.environmentId,
-    PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-    'The selected Orca server does not support project host setup yet. Update Orca on the server and try again.',
-    15_000
-  )
+  try {
+    await assertRuntimeEnvironmentCapability(
+      target.environmentId,
+      PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
+      'The selected Orca server does not support project host setup yet. Update Orca on the server and try again.',
+      15_000
+    )
+  } catch (error) {
+    // Why se marca todo lo que salga de aqui: no poder DETERMINAR la capability
+    // es el caso de compatibilidad que la proyeccion transitoria existe para
+    // cubrir — un runtime viejo falla la verificacion de protocolo antes de
+    // llegar a declarar capabilities. Lo que no puede disfrazarse es un
+    // `project.list` que si se pudo pedir y fallo (ORCA-467).
+    throw error instanceof Error ? markRuntimeCapabilityUnsupported(error) : error
+  }
 }
 
 async function assertProjectHostSetupMutationRuntimeCapabilities(
@@ -1225,7 +1260,11 @@ function mergeFetchedFolderWorkspacesForHost({
 
 type FetchedRepoCatalog = {
   repos: readonly Repo[]
-  projectHostSetupCompatibility: ProjectHostSetupProjection
+  // Why: `null` significa "este host no pudo responder por sus proyectos". No es
+  // lo mismo que "no tiene": una proyeccion vacia BORRA las filas del host en el
+  // merge, y un timeout de `project.list` no es prueba de que el servidor se haya
+  // quedado sin proyectos (ORCA-467).
+  projectHostSetupCompatibility: ProjectHostSetupProjection | null
   hostId: ReturnType<typeof getRuntimeTargetHostId>
 }
 
@@ -1286,7 +1325,7 @@ function mergeFetchedRepoCatalog(
   currentRepos: readonly Repo[]
 ): {
   repos: readonly Repo[]
-  projectHostSetupCompatibility: ProjectHostSetupProjection
+  projectHostSetupCompatibility: ProjectHostSetupProjection | null
   hostId: ReturnType<typeof getRuntimeTargetHostId>
 } {
   const repos = mergeFetchedReposForHost(currentRepos, catalog.repos, catalog.hostId)
@@ -1361,6 +1400,34 @@ function projectCompatibilityForReconciledRepos(
   fetched: ProjectHostSetupProjection
 ): Pick<RepoSlice, 'projects' | 'projectHostSetups'> {
   return mergeProjectHostSetupCompatibility(projectCompatibilityFromRepos(repos), fetched)
+}
+
+// Devuelve el parche de estado para `projects`/`projectHostSetups` de un catalogo
+// recien traido — o uno vacio cuando el host no pudo responder por sus proyectos,
+// porque el merge por host interpreta "sin proyectos" como "borralos" (ORCA-467).
+function projectCompatibilityPatchForCatalog(args: {
+  previous: Pick<RepoSlice, 'projects' | 'projectHostSetups'>
+  projection: ProjectHostSetupProjection | null
+  mergedRepos: readonly Repo[]
+  finalizedRepos: readonly Repo[]
+  hostId: string
+}): Partial<Pick<RepoSlice, 'projects' | 'projectHostSetups'>> {
+  if (!args.projection) {
+    return {}
+  }
+  return mergeFetchedProjectCompatibilityForHost({
+    previous: {
+      projects: args.previous.projects,
+      projectHostSetups: filterSetupsForPrunedRepoRows(
+        args.previous.projectHostSetups,
+        args.mergedRepos,
+        args.finalizedRepos
+      )
+    },
+    fetched: projectCompatibilityForReconciledRepos(args.finalizedRepos, args.projection),
+    repos: args.finalizedRepos,
+    hostId: args.hostId
+  })
 }
 
 function filterTrustedOrcaHooksToValidRepos(
@@ -2105,21 +2172,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const prunedRepos = applyManualRepoOrder(reconciliation.repos, s.manualRepoOrder)
         const validRepoIds = new Set(prunedRepos.map((repo) => repo.id))
         const validRepoHostIdentities = new Set(prunedRepos.map(getRepoHostIdentity))
-        const projectCompatibility = projectCompatibilityForReconciledRepos(
-          prunedRepos,
-          catalog.projectHostSetupCompatibility
-        )
-        const mergedProjectCompatibility = mergeFetchedProjectCompatibilityForHost({
-          previous: {
-            projects: s.projects,
-            projectHostSetups: filterSetupsForPrunedRepoRows(
-              s.projectHostSetups,
-              result.repos,
-              prunedRepos
-            )
-          },
-          fetched: projectCompatibility,
-          repos: prunedRepos,
+        const mergedProjectCompatibility = projectCompatibilityPatchForCatalog({
+          previous: s,
+          projection: result.projectHostSetupCompatibility,
+          mergedRepos: result.repos,
+          finalizedRepos: prunedRepos,
           hostId: result.hostId
         })
         finalizedHostRepos = prunedRepos.filter(
@@ -2196,21 +2253,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const finalizedRepos = applyManualRepoOrder(reconciliation.repos, s.manualRepoOrder)
         const validRepoIds = new Set(finalizedRepos.map((repo) => repo.id))
         const validRepoHostIdentities = new Set(finalizedRepos.map(getRepoHostIdentity))
-        const projectCompatibility = projectCompatibilityForReconciledRepos(
+        const mergedProjectCompatibility = projectCompatibilityPatchForCatalog({
+          previous: s,
+          projection: result.projectHostSetupCompatibility,
+          mergedRepos: result.repos,
           finalizedRepos,
-          catalog.projectHostSetupCompatibility
-        )
-        const mergedProjectCompatibility = mergeFetchedProjectCompatibilityForHost({
-          previous: {
-            projects: s.projects,
-            projectHostSetups: filterSetupsForPrunedRepoRows(
-              s.projectHostSetups,
-              result.repos,
-              finalizedRepos
-            )
-          },
-          fetched: projectCompatibility,
-          repos: finalizedRepos,
           hostId: result.hostId
         })
         finalizedHostRepos = finalizedRepos.filter(
@@ -2296,21 +2343,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const result = mergeFetchedRepoCatalog(catalog, s.repos)
         const reconciliation = reconcileSupersededSshRepos(result.repos, s)
         const finalizedRepos = applyManualRepoOrder(reconciliation.repos, s.manualRepoOrder)
-        const projectCompatibility = projectCompatibilityForReconciledRepos(
+        const mergedProjectCompatibility = projectCompatibilityPatchForCatalog({
+          previous: s,
+          projection: result.projectHostSetupCompatibility,
+          mergedRepos: result.repos,
           finalizedRepos,
-          catalog.projectHostSetupCompatibility
-        )
-        const mergedProjectCompatibility = mergeFetchedProjectCompatibilityForHost({
-          previous: {
-            projects: s.projects,
-            projectHostSetups: filterSetupsForPrunedRepoRows(
-              s.projectHostSetups,
-              result.repos,
-              finalizedRepos
-            )
-          },
-          fetched: projectCompatibility,
-          repos: finalizedRepos,
           hostId: result.hostId
         })
         hostRepos = finalizedRepos.filter((repo) => getRepoExecutionHostId(repo) === result.hostId)

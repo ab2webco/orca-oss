@@ -53,6 +53,27 @@ export const projectsUpdate: Mock = vi.fn()
 export const projectGroupsMoveProject: Mock = vi.fn()
 export const ptyKill: Mock = vi.fn()
 export const runtimeEnvironmentCall: Mock = vi.fn()
+
+// Respuestas por metodo para un runtime remoto que SI anuncia
+// `project-host-setup.v1`. Responderle el payload de `repo.list` a todo hacia
+// fallar el catalogo de proyectos, y la proyeccion derivada tapaba el fallo —
+// justo lo que ORCA-467 prohibe.
+export function remoteCatalogCallResult(
+  method: string,
+  repos: readonly Repo[]
+): { id: string; ok: true; result: unknown; _meta: { runtimeId: string } } {
+  const resultByMethod: Record<string, unknown> = {
+    'repo.list': { repos },
+    'project.list': { projects: [] },
+    'projectHostSetup.list': { setups: [] }
+  }
+  return {
+    id: `rpc-${method}`,
+    ok: true,
+    result: resultByMethod[method] ?? {},
+    _meta: { runtimeId: 'runtime-remote' }
+  }
+}
 export const runtimeEnvironmentTransportCall: Mock = vi.fn()
 export const orcaProfileFindProjectProfiles: Mock = vi.fn()
 export const uiSet: Mock = vi.fn()
