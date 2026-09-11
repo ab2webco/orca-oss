@@ -66,6 +66,13 @@ import {
   resolveWebSessionReorderedOrder
 } from './web-session-reorder-intent'
 import {
+  beginWebRuntimeInitialTerminalBootstrap,
+  clearWebRuntimeInitialTerminalBootstrapForEnvironment,
+  clearWebRuntimeInitialTerminalBootstrapForWorktree,
+  endWebRuntimeInitialTerminalBootstrap,
+  hasWebRuntimeInitialTerminalBootstrap
+} from './web-runtime-initial-terminal-bootstrap'
+import {
   beginWebRuntimeWakeTerminalRespawn,
   clearAllWebRuntimeWakeTerminalRespawn,
   clearWebRuntimeWakeTerminalRespawnForWorktree,
@@ -575,6 +582,10 @@ export function shouldBootstrapInitialWebRuntimeTerminal(args: {
   requestedInitialTerminal: boolean
   snapshotIsFresh: boolean
   localTerminalCount: number
+  // Why aparte de `requestedInitialTerminal`: ese guardia vive en el efecto y se
+  // estrena en cada reconexion, asi que no distingue "nunca se abrio" de "ya se
+  // abrio y el usuario la cerro". Este lo recuerda entre reconexiones.
+  alreadyBootstrapped?: boolean
 }): boolean {
   return (
     args.snapshotIsFresh &&
@@ -582,6 +593,7 @@ export function shouldBootstrapInitialWebRuntimeTerminal(args: {
     args.event.tabs.length === 0 &&
     args.localTerminalCount === 0 &&
     !args.requestedInitialTerminal &&
+    args.alreadyBootstrapped !== true &&
     args.activeWorktreeId === args.event.worktree
   )
 }
@@ -683,6 +695,7 @@ function clearWebSessionTabsTrackingForWorktree(environmentId: string, worktreeI
   removeWebSessionTabsEnvironment(environmentId, worktreeId)
   lastHostTerminalTabCountByWorktree.delete(key)
   clearWebRuntimeWakeTerminalRespawnForWorktree(worktreeId)
+  clearWebRuntimeInitialTerminalBootstrapForWorktree(worktreeId)
   clearWebSessionReorderIntentsForWorktree({ environmentId }, worktreeId)
   clearWebSessionCloseIntentsForWorktree({ environmentId }, worktreeId)
   clearWebAgentSessionHandoffsForWorktree(environmentId, worktreeId)
@@ -743,6 +756,7 @@ export function clearWebSessionTabsTrackingForEnvironment(environmentId: string)
   clearWebAgentSessionHandoffsForEnvironment(trimmedEnvironmentId)
   clearWebSessionBrowserPlacementsForEnvironment(trimmedEnvironmentId)
   clearAllWebRuntimeWakeTerminalRespawn()
+  clearWebRuntimeInitialTerminalBootstrapForEnvironment(trimmedEnvironmentId)
 }
 
 function hostSessionTabMappingKey(args: {
@@ -4284,7 +4298,8 @@ export function useWebSessionTabsSync(): void {
         activeWorktreeId,
         requestedInitialTerminal,
         snapshotIsFresh: fresh,
-        localTerminalCount
+        localTerminalCount,
+        alreadyBootstrapped: hasWebRuntimeInitialTerminalBootstrap(environmentId, activeWorktreeId)
       })
       const shouldRespawnAfterWake = shouldRespawnWebRuntimeTerminalAfterWake({
         event: recoveredEvent,
@@ -4301,13 +4316,28 @@ export function useWebSessionTabsSync(): void {
         )
         recordVisibilityResumeSnapshotRef.current(environmentId, recovered, receivedFrame)
       }
-      if (isCurrent() && shouldBootstrapInitialTerminal) {
+      if (
+        isCurrent() &&
+        shouldBootstrapInitialTerminal &&
+        // Why el claim va aqui y no dentro del predicado: dos instancias del
+        // efecto pueden evaluarlo a la vez con el mismo snapshot vacio. Reclamar
+        // es lo unico atomico, y el que pierde no abre nada.
+        beginWebRuntimeInitialTerminalBootstrap(environmentId, activeWorktreeId)
+      ) {
         requestedInitialTerminal = true
-        await createWebRuntimeSessionTerminal({
-          worktreeId: activeWorktreeId,
-          environmentId,
-          activate: true
-        })
+        let bootstrapSucceeded = false
+        try {
+          await createWebRuntimeSessionTerminal({
+            worktreeId: activeWorktreeId,
+            environmentId,
+            activate: true
+          })
+          bootstrapSucceeded = true
+        } finally {
+          endWebRuntimeInitialTerminalBootstrap(environmentId, activeWorktreeId, {
+            succeeded: bootstrapSucceeded
+          })
+        }
       } else if (
         isCurrent() &&
         shouldRespawnAfterWake &&

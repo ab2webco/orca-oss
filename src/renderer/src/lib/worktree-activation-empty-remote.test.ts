@@ -1,11 +1,18 @@
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../shared/constants'
 import type { Worktree } from '../../../shared/worktree/types'
-import { resetWebRuntimeWakeTerminalRespawnForTests } from '@/runtime/web-runtime-wake-terminal-respawn'
+import {
+  endWebRuntimeWakeTerminalRespawn,
+  resetWebRuntimeWakeTerminalRespawnForTests
+} from '@/runtime/web-runtime-wake-terminal-respawn'
 import { resetWebSessionTabsSnapshotFreshnessForTests } from '@/runtime/web-session-tabs-sync'
 import { useAppStore } from '@/store'
 import { ensureWebRuntimeWorktreeTerminalAfterWake } from './web-runtime-worktree-terminal-after-wake'
+import {
+  hasWebRuntimeInitialTerminalBootstrap,
+  resetWebRuntimeInitialTerminalBootstrapForTests
+} from '@/runtime/web-runtime-initial-terminal-bootstrap'
 
 const initialAppStoreState = useAppStore.getState()
 const WORKTREE_PATH = path.join('workspace', 'feature')
@@ -46,6 +53,11 @@ function makeWorktree(): Worktree {
 }
 
 describe('empty remote worktree activation', () => {
+  beforeEach(() => {
+    resetWebRuntimeInitialTerminalBootstrapForTests()
+    resetWebRuntimeWakeTerminalRespawnForTests()
+  })
+
   it('creates a host terminal when waking an empty remote workspace', async () => {
     const worktree = makeWorktree()
     const callRuntimeEnvironment = vi.fn().mockResolvedValueOnce({
@@ -115,5 +127,75 @@ describe('empty remote worktree activation', () => {
         })
       })
     )
+  })
+
+  it('does not re-open a terminal in a workspace the user emptied', async () => {
+    // El reporte de Fabian: cerro las terminales una por una y al volver a entrar
+    // estaban ahi otra vez. Abrir la primera al llegar a un workspace vacio es
+    // deseado (el caso de arriba); repetirlo despues de que el usuario las cerro
+    // no. La diferencia la lleva el registro de bootstrap, que sobrevive a la
+    // reconexion igual que la intencion del usuario.
+    const worktree = makeWorktree()
+    const callRuntimeEnvironment = vi.fn().mockResolvedValue({
+      ok: true,
+      result: {
+        tab: {
+          type: 'terminal',
+          id: 'host-tab-1::leaf-1',
+          parentTabId: 'host-tab-1',
+          leafId: 'leaf-1',
+          title: 'Terminal 1',
+          terminal: 'term_host',
+          status: 'ready',
+          isActive: true
+        },
+        publicationEpoch: 'epoch-1',
+        snapshotVersion: 1
+      }
+    })
+    ;(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = true
+    vi.stubGlobal('window', {
+      api: { runtimeEnvironments: { call: callRuntimeEnvironment, subscribe: vi.fn() } }
+    })
+
+    useAppStore.setState({
+      repos: [
+        {
+          id: 'repo-1',
+          path: REPO_PATH,
+          displayName: 'repo',
+          badgeColor: '#000000',
+          addedAt: 0
+        }
+      ],
+      worktreesByRepo: { 'repo-1': [worktree] },
+      tabsByWorktree: {},
+      ptyIdsByTabId: {},
+      settings: {
+        ...getDefaultSettings(ORCA_WORKSPACES_PATH),
+        activeRuntimeEnvironmentId: 'web-runtime-1'
+      },
+      reconcileWorktreeTabModel: vi.fn(() => ({
+        renderableTabCount: 0,
+        activeRenderableTabId: null
+      }))
+    })
+
+    // Primera activacion: le corresponde su terminal.
+    ensureWebRuntimeWorktreeTerminalAfterWake(worktree.id)
+    await vi.waitFor(() => {
+      expect(hasWebRuntimeInitialTerminalBootstrap('web-runtime-1', worktree.id)).toBe(true)
+    })
+    // Why se suelta a mano: el candado en vuelo es lo unico que separa a la
+    // segunda llamada de la primera, y sin soltarlo el test rebotaria contra el
+    // candado en vez de contra la memoria — que es lo que se esta fijando.
+    endWebRuntimeWakeTerminalRespawn(worktree.id)
+    const callsAfterFirst = callRuntimeEnvironment.mock.calls.length
+
+    // Segunda y tercera activacion del mismo workspace vacio: ya no le toca otra.
+    ensureWebRuntimeWorktreeTerminalAfterWake(worktree.id)
+    ensureWebRuntimeWorktreeTerminalAfterWake(worktree.id)
+
+    expect(callRuntimeEnvironment.mock.calls.length).toBe(callsAfterFirst)
   })
 })

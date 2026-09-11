@@ -31,6 +31,7 @@ import {
   validatePrecomputedTerminalCloseState,
   type PrecomputedTerminalCloseState
 } from './terminal-close-target'
+import { resolveTerminalTabRuntimeEnvironment } from './terminal-tab-runtime-environment'
 export type { PrecomputedTerminalCloseState } from './terminal-close-target'
 export { closeOtherTerminalTabs, closeTerminalTabsToRight } from './terminal-tab-bulk-actions'
 
@@ -85,8 +86,22 @@ export function closeTerminalTab(
     return
   }
   const { worktreeId: owningWorktreeId, terminalTabId } = target
+  // Why se resuelve desde el TAB y no solo desde el worktree: el cierre se
+  // enrutaba con la ruta del worktree, asi que un tab cuya pty vive en otro
+  // runtime recibia la orden en el host equivocado — y un worktree sin ruta
+  // cancelaba el cierre entero sin hacer nada. En los dos casos la pty seguia
+  // viva en el servidor, y al reconectar el snapshot la traia de vuelta: la
+  // terminal "no se dejaba cerrar" y reaparecia sola.
+  const terminalRuntimeEnvironment = resolveTerminalTabRuntimeEnvironment(
+    state,
+    owningWorktreeId,
+    terminalTabId
+  )
   const worktreeRoute = resolveTerminalWorktreeRoute(state, owningWorktreeId)
-  if (!worktreeRoute) {
+  if (
+    terminalRuntimeEnvironment.kind === 'conflict' ||
+    (!worktreeRoute && terminalRuntimeEnvironment.kind === 'none')
+  ) {
     options?.onCancel?.()
     return
   }
@@ -133,7 +148,10 @@ export function closeTerminalTab(
     return
   }
 
-  const runtimeEnvironmentId = worktreeRoute.runtimeEnvironmentId
+  const runtimeEnvironmentId =
+    terminalRuntimeEnvironment.kind === 'runtime'
+      ? terminalRuntimeEnvironment.environmentId
+      : (worktreeRoute?.runtimeEnvironmentId ?? null)
   if (runtimeEnvironmentId && isWebRuntimeSessionActive(runtimeEnvironmentId)) {
     if (options?.reason === 'pty-exit') {
       // Why: stream exit is not host-tab closure; the HUB snapshot decides whether reconnect restores or removes this tab.
@@ -167,6 +185,11 @@ export function closeTerminalTab(
     // host session snapshot catches up.
     closeLocalTerminalTabState(terminalTabId, {
       reason: options?.reason,
+      // Why aparte de `reason`: un pty que murio solo llega como
+      // `hostCloseReason`, y `reason` se deja SIN marcar a proposito para que los
+      // guardias locales sigan aplicando. Esta bandera lleva la distincion que la
+      // limpieza de agentes dormidos necesita sin tocar esa invariante.
+      retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
       ...(options?.captureRecentlyClosed !== undefined
         ? { captureRecentlyClosed: options.captureRecentlyClosed }
         : {}),
@@ -205,6 +228,11 @@ export function closeTerminalTab(
   if (terminalCountBeforeClose <= 1) {
     closeLocalTerminalTabState(terminalTabId, {
       reason: options?.reason,
+      // Why aparte de `reason`: un pty que murio solo llega como
+      // `hostCloseReason`, y `reason` se deja SIN marcar a proposito para que los
+      // guardias locales sigan aplicando. Esta bandera lleva la distincion que la
+      // limpieza de agentes dormidos necesita sin tocar esa invariante.
+      retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
       ...(options?.captureRecentlyClosed !== undefined
         ? { captureRecentlyClosed: options.captureRecentlyClosed }
         : {}),
@@ -250,6 +278,7 @@ export function closeTerminalTab(
 
   closeLocalTerminalTabState(terminalTabId, {
     reason: options?.reason,
+    retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
     ...(options?.captureRecentlyClosed !== undefined
       ? { captureRecentlyClosed: options.captureRecentlyClosed }
       : {}),
