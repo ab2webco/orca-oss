@@ -11,6 +11,10 @@ import {
   endWebRuntimeWakeTerminalRespawn
 } from '@/runtime/web-runtime-wake-terminal-respawn'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import {
+  beginWebRuntimeInitialTerminalBootstrap,
+  endWebRuntimeInitialTerminalBootstrap
+} from '@/runtime/web-runtime-initial-terminal-bootstrap'
 
 export function ensureWebRuntimeWorktreeTerminalAfterWake(worktreeId: string): void {
   const state = useAppStore.getState()
@@ -44,17 +48,43 @@ export function ensureWebRuntimeWorktreeTerminalAfterWake(worktreeId: string): v
     return
   }
 
+  // Why se separan los dos casos: con tabs esto es un DESPERTAR — dormir conserva
+  // las filas y `terminal.stop` limpia las PTYs del host, asi que recrear la
+  // superficie es el trabajo de esta funcion. Sin ninguna tab no hay nada que
+  // despertar: o es la primera vez que se abre el workspace (y entonces si
+  // corresponde una terminal), o el usuario las cerro todas — y ahi volver a
+  // abrirle una es exactamente lo que pidio que dejara de pasar.
+  const isEmptyWorkspace = tabs.length === 0
+
   if (!beginWebRuntimeWakeTerminalRespawn(worktreeId)) {
     return
   }
+  // Why el reclamo es el unico guardia: es atomico, ya devuelve false cuando el
+  // workspace tiene su marca, y lo comparte con el mirror de session tabs — los
+  // dos caminos pueden correr en la misma activacion, y sin un reclamo comun
+  // cada uno abriria la suya.
+  if (
+    isEmptyWorkspace &&
+    !beginWebRuntimeInitialTerminalBootstrap(runtimeEnvironmentId, worktreeId)
+  ) {
+    endWebRuntimeWakeTerminalRespawn(worktreeId)
+    return
+  }
 
-  // Why: sleep keeps tab rows but terminal.stop clears host PTYs, so a woke workspace can have tab chrome but no surface.
   void createWebRuntimeSessionTerminal({
     worktreeId,
     environmentId: runtimeEnvironmentId,
     activate: true,
     selectWorktree: false
-  }).finally(() => {
-    endWebRuntimeWakeTerminalRespawn(worktreeId)
   })
+    .then((created) => {
+      if (isEmptyWorkspace) {
+        endWebRuntimeInitialTerminalBootstrap(runtimeEnvironmentId, worktreeId, {
+          succeeded: created.status === 'created'
+        })
+      }
+    })
+    .finally(() => {
+      endWebRuntimeWakeTerminalRespawn(worktreeId)
+    })
 }

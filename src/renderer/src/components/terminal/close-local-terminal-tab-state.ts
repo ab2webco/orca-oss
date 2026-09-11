@@ -14,25 +14,33 @@ export function closeLocalTerminalTabState(
     localPtyTeardownOwnedExternally?: boolean
     runtimeInitiated?: boolean
     precomputedRetirementPlan?: TerminalTabRetirementPlan
+    /** El proceso murio solo: su hibernacion sigue siendo valida. */
+    retainSleepingAgents?: boolean
   }
 ): void {
   // Why aqui y no en cada sitio que cierra: este es el punto comun por donde
   // pasan todas las rutas de cierre local, remota incluida.
-  clearSleepingAgentSessionsForClosedTab(terminalTabId, options?.reason)
+  const { retainSleepingAgents, ...closeTabOptions } = options ?? {}
+  if (!retainSleepingAgents) {
+    clearSleepingAgentSessionsForClosedTab(terminalTabId)
+  }
+  // Why se consume aqui: la bandera decide la limpieza y nada mas. Reenviarla al
+  // store la metia en la forma de las opciones de `closeTab`, que varios tests
+  // comparan entera — y el store no tiene nada que hacer con ella.
   const state = useAppStore.getState()
   if (
     options?.precomputedRetirementPlan?.tabId === terminalTabId ||
     Object.values(state.tabsByWorktree).some((tabs) => tabs.some((tab) => tab.id === terminalTabId))
   ) {
     if (
-      options?.reason ||
-      options?.captureRecentlyClosed !== undefined ||
-      options?.remoteCloseOwnedByHost ||
-      options?.localPtyTeardownOwnedExternally ||
-      options?.runtimeInitiated ||
-      options?.precomputedRetirementPlan
+      closeTabOptions.reason ||
+      closeTabOptions.captureRecentlyClosed !== undefined ||
+      closeTabOptions.remoteCloseOwnedByHost ||
+      closeTabOptions.localPtyTeardownOwnedExternally ||
+      closeTabOptions.runtimeInitiated ||
+      closeTabOptions.precomputedRetirementPlan
     ) {
-      state.closeTab(terminalTabId, options)
+      state.closeTab(terminalTabId, closeTabOptions)
     } else {
       state.closeTab(terminalTabId)
     }
@@ -46,7 +54,7 @@ export function closeLocalTerminalTabState(
         (tab.entityId === terminalTabId || tab.id === terminalTabId)
     )
     if (unified) {
-      state.closeTab(unified.entityId, options)
+      state.closeTab(unified.entityId, closeTabOptions)
       return
     }
   }

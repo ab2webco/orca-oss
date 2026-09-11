@@ -1,6 +1,5 @@
 import { useAppStore } from '@/store'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
-import type { TerminalTabCloseReason } from '@/store/slices/terminal-tab-retirement'
 
 /**
  * Cerrar un tab tiene que borrar los registros de agente dormido de sus panes.
@@ -16,17 +15,13 @@ import type { TerminalTabCloseReason } from '@/store/slices/terminal-tab-retirem
  * navegador, volver a entrar — y Claude Code aparecia corriendo otra vez. Esto
  * no era solo cosmetico: relanzar un agente gasta cuota y ejecuta trabajo que
  * nadie pidio.
+ *
+ * Quien decide es el caller: un pty que murio solo SI conserva su hibernacion,
+ * que es justo el caso para el que existe. Esa distincion viaja en
+ * `retainSleepingAgents` y no en `reason`, porque el cierre de ciclo de vida
+ * deja `reason` sin marcar a proposito para que los guardias locales apliquen.
  */
-export function clearSleepingAgentSessionsForClosedTab(
-  terminalTabId: string,
-  reason?: TerminalTabCloseReason
-): void {
-  // Why se respeta `pty-exit`: ahi el proceso termino solo, que es justo el caso
-  // para el que la hibernacion existe. Lo que no puede sobrevivir es un cierre
-  // que pidio el usuario.
-  if (reason === 'pty-exit') {
-    return
-  }
+export function clearSleepingAgentSessionsForClosedTab(terminalTabId: string): void {
   const state = useAppStore.getState()
   // Why el `?? {}`: esto corre en el camino comun de cierre, que se ejercita
   // desde estados parciales (y desde tests con un store minimo). Reventar aqui

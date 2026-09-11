@@ -28,6 +28,10 @@ vi.mock('@/store', () => ({
   }
 }))
 
+// El store de este suite se arma por caso, asi que el spy vive aparte y cada
+// caso lo inyecta en el estado que devuelve `getStateMock`.
+const clearSleepingAgentSessionMock = vi.fn()
+
 vi.mock('@/runtime/web-runtime-session', () => ({
   activateWebRuntimeSessionTab: activateWebRuntimeSessionTabMock,
   closeWebRuntimeSessionTab: closeWebRuntimeSessionTabMock,
@@ -311,6 +315,65 @@ describe('closeTerminalTab', () => {
 
     expect(closeTab).not.toHaveBeenCalled()
     expect(closeWebRuntimeSessionTabMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the sleeping-agent hibernation when the pty exited on its own', () => {
+    // Why este test: la limpieza de agentes dormidos NO puede viajar en `reason`,
+    // porque el cierre de ciclo de vida lo deja sin marcar a proposito (ver el
+    // caso de abajo). Si se guiara por `reason`, un pty que murio solo caeria del
+    // lado de "el usuario lo cerro" y se perderia su hibernacion.
+    const closeTab = vi.fn()
+    isWebRuntimeSessionActiveMock.mockReturnValue(true)
+    resolveHostSessionTabIdForWebSessionTabMock.mockReturnValue('host-tab-1')
+    getStateMock.mockReturnValue({
+      settings: { activeRuntimeEnvironmentId: 'web-runtime' },
+      tabsByWorktree: {
+        'wt-1': [{ id: 'local-tab-1' }, { id: 'local-tab-2' }]
+      },
+      activeWorktreeId: 'wt-1',
+      activeTabId: 'local-tab-1',
+      closeTab,
+      setActiveTab: vi.fn(),
+      sleepingAgentSessionsByPaneKey: {
+        'local-tab-1:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': { paneKey: 'x' }
+      },
+      clearSleepingAgentSession: clearSleepingAgentSessionMock
+    })
+
+    closeTerminalTab('local-tab-1', {
+      hostCloseReason: 'pty-exit',
+      lifecyclePtyId: 'remote:web-runtime@@term-1'
+    })
+
+    expect(clearSleepingAgentSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('drops the sleeping-agent hibernation when the user closes the tab', () => {
+    // El reporte: `exit` en Claude Code, cerrar la pestaña, recargar, y Claude
+    // Code corriendo otra vez. Cerrado tiene que ser cerrado.
+    const closeTab = vi.fn()
+    isWebRuntimeSessionActiveMock.mockReturnValue(true)
+    resolveHostSessionTabIdForWebSessionTabMock.mockReturnValue('host-tab-1')
+    getStateMock.mockReturnValue({
+      settings: { activeRuntimeEnvironmentId: 'web-runtime' },
+      tabsByWorktree: {
+        'wt-1': [{ id: 'local-tab-1' }, { id: 'local-tab-2' }]
+      },
+      activeWorktreeId: 'wt-1',
+      activeTabId: 'local-tab-1',
+      closeTab,
+      setActiveTab: vi.fn(),
+      sleepingAgentSessionsByPaneKey: {
+        'local-tab-1:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': { paneKey: 'x' }
+      },
+      clearSleepingAgentSession: clearSleepingAgentSessionMock
+    })
+
+    closeTerminalTab('local-tab-1', { reason: 'user' })
+
+    expect(clearSleepingAgentSessionMock).toHaveBeenCalledWith(
+      'local-tab-1:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    )
   })
 
   it('sends hostCloseReason on the wire without tagging the local close reason', () => {

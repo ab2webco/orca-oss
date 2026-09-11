@@ -15,23 +15,19 @@ import { ensureWorktreeHasInitialTerminal } from '@/lib/worktree-initial-termina
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
-import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import {
   activateWebRuntimeSessionWorktree,
-  createWebRuntimeSessionTerminal,
-  isWebRuntimeSessionActive,
-  isWebTerminalSurfaceTabId
+  isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
-import { getLastKnownHostTerminalTabCount } from '@/runtime/web-session-tabs-sync'
-import {
-  beginWebRuntimeWakeTerminalRespawn,
-  endWebRuntimeWakeTerminalRespawn
-} from '@/runtime/web-runtime-wake-terminal-respawn'
 import {
   setWorktreeNavActivator,
   setWorktreeNavViewActivator
 } from '@/store/slices/worktree-nav-history'
 import { resumeSleepingAgentSessionsForWorktree } from '@/lib/resume-sleeping-agent-session'
+// Why se importa en vez de repetirse: esta funcion existia DOS veces, identica
+// palabra por palabra, y la copia de este archivo era la que corria mientras los
+// tests importaban la otra. Un arreglo en una no llegaba a la que se ejecuta.
+import { ensureWebRuntimeWorktreeTerminalAfterWake } from '@/lib/web-runtime-worktree-terminal-after-wake'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../shared/workspace-scope'
 import {
@@ -297,53 +293,6 @@ export function activateAndRevealWorktree(
   }
 
   return { primaryTabId }
-}
-
-export function ensureWebRuntimeWorktreeTerminalAfterWake(worktreeId: string): void {
-  const state = useAppStore.getState()
-  const worktree = state.getKnownWorktreeById(worktreeId)
-  if (!worktree) {
-    return
-  }
-  const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktree.id)
-  if (!runtimeEnvironmentId || !isWebRuntimeSessionActive(runtimeEnvironmentId)) {
-    return
-  }
-
-  const tabs = state.tabsByWorktree[worktreeId] ?? []
-  const hasLivePty = tabs.some((tab) => tabHasLivePty(state.ptyIdsByTabId, tab.id))
-  if (hasLivePty) {
-    return
-  }
-
-  const hasMirroredHostTabs = tabs.some((tab) => isWebTerminalSurfaceTabId(tab.id))
-  if (hasMirroredHostTabs) {
-    // Why: the host session still owns these tabs — wait for the mirror to repopulate PTY handles instead of duplicating a terminal.
-    return
-  }
-
-  if (getLastKnownHostTerminalTabCount(runtimeEnvironmentId, worktreeId) > 0) {
-    return
-  }
-
-  const { renderableTabCount } = state.reconcileWorktreeTabModel(worktreeId)
-  if (tabs.length > 0 && renderableTabCount === 0) {
-    return
-  }
-
-  if (!beginWebRuntimeWakeTerminalRespawn(worktreeId)) {
-    return
-  }
-
-  // Why: sleep keeps tab rows but terminal.stop clears host PTYs, so a woke workspace can have tab chrome but no surface.
-  void createWebRuntimeSessionTerminal({
-    worktreeId,
-    environmentId: runtimeEnvironmentId,
-    activate: true,
-    selectWorktree: false
-  }).finally(() => {
-    endWebRuntimeWakeTerminalRespawn(worktreeId)
-  })
 }
 
 /**

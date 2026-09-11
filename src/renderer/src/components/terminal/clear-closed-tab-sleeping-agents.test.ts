@@ -49,24 +49,19 @@ describe('clearSleepingAgentSessionsForClosedTab', () => {
     expect(clearSleepingAgentSession).not.toHaveBeenCalledWith(paneKey(OTHER_TAB, LEAF_A))
   })
 
-  it('keeps the records when the pty exited on its own', () => {
-    // Ahi el proceso termino solo, que es el caso para el que la hibernacion
-    // existe. Lo que no puede sobrevivir es un cierre que pidio el usuario.
-    clearSleepingAgentSessionsForClosedTab(TAB, 'pty-exit')
-
-    expect(clearSleepingAgentSession).not.toHaveBeenCalled()
-  })
-
-  it('clears on a user close even when a reason is given', () => {
-    clearSleepingAgentSessionsForClosedTab(TAB, 'user')
-
-    expect(clearSleepingAgentSession).toHaveBeenCalledTimes(2)
-  })
-
   it('ignores pane keys it cannot parse', () => {
     sleepingAgentSessionsByPaneKey = { 'not-a-pane-key': { paneKey: 'not-a-pane-key' } }
 
     expect(() => clearSleepingAgentSessionsForClosedTab(TAB)).not.toThrow()
     expect(clearSleepingAgentSession).not.toHaveBeenCalled()
+  })
+
+  it('survives a store that has no sleeping-agent map yet', () => {
+    // Corre en el camino comun de cierre, que se ejercita desde estados
+    // parciales. Reventar aqui abortaria el cierre entero — justo el sintoma
+    // que este archivo arregla.
+    sleepingAgentSessionsByPaneKey = undefined as unknown as Record<string, { paneKey: string }>
+
+    expect(() => clearSleepingAgentSessionsForClosedTab(TAB)).not.toThrow()
   })
 })

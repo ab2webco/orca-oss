@@ -185,6 +185,11 @@ export function closeTerminalTab(
     // host session snapshot catches up.
     closeLocalTerminalTabState(terminalTabId, {
       reason: options?.reason,
+      // Why aparte de `reason`: un pty que murio solo llega como
+      // `hostCloseReason`, y `reason` se deja SIN marcar a proposito para que los
+      // guardias locales sigan aplicando. Esta bandera lleva la distincion que la
+      // limpieza de agentes dormidos necesita sin tocar esa invariante.
+      retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
       ...(options?.captureRecentlyClosed !== undefined
         ? { captureRecentlyClosed: options.captureRecentlyClosed }
         : {}),
@@ -223,6 +228,11 @@ export function closeTerminalTab(
   if (terminalCountBeforeClose <= 1) {
     closeLocalTerminalTabState(terminalTabId, {
       reason: options?.reason,
+      // Why aparte de `reason`: un pty que murio solo llega como
+      // `hostCloseReason`, y `reason` se deja SIN marcar a proposito para que los
+      // guardias locales sigan aplicando. Esta bandera lleva la distincion que la
+      // limpieza de agentes dormidos necesita sin tocar esa invariante.
+      retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
       ...(options?.captureRecentlyClosed !== undefined
         ? { captureRecentlyClosed: options.captureRecentlyClosed }
         : {}),
@@ -268,6 +278,7 @@ export function closeTerminalTab(
 
   closeLocalTerminalTabState(terminalTabId, {
     reason: options?.reason,
+    retainSleepingAgents: (options?.reason ?? options?.hostCloseReason) === 'pty-exit',
     ...(options?.captureRecentlyClosed !== undefined
       ? { captureRecentlyClosed: options.captureRecentlyClosed }
       : {}),
