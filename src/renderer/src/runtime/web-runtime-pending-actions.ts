@@ -1,0 +1,117 @@
+/**
+ * Cuantas acciones remotas hay en vuelo por workspace, para que la UI pueda
+ * decir "esto esta pasando" mientras se espera al host.
+ *
+ * Por que existe: el camino local crea su tab al instante
+ * (`pendingActivationSpawn`), asi que el clic se siente atendido de inmediato.
+ * El remoto no crea nada provisional — espera el round-trip y, hasta que el
+ * snapshot del host publica la tab, no hay ninguna senal en pantalla. Sobre una
+ * conexion lenta son varios segundos en los que el boton parece roto, y el
+ * usuario vuelve a hacer clic (ORCA-481).
+ *
+ * Por que un contador y no un booleano: dos creaciones pueden solaparse, y con
+ * un booleano la primera en terminar apagaria el indicador de la otra.
+ *
+ * Por que un registro de modulo con `useSyncExternalStore` y no estado del
+ * store: esto es efimero y no se persiste. Meterlo en el store de la app lo
+ * mezclaria con el modelo de tabs, que es justo lo que NO hay que tocar — una
+ * tab provisional remota chocaria con el mirror del host y podria duplicar,
+ * que es el defecto que se acaba de cerrar en ORCA-478.
+ */
+export type RemoteRuntimeActionKind = 'terminal' | 'browser'
+
+type PendingKey = string
+
+const pendingCountByKey = new Map<PendingKey, number>()
+const listeners = new Set<() => void>()
+
+function pendingKey(
+  environmentId: string,
+  worktreeId: string,
+  kind: RemoteRuntimeActionKind
+): PendingKey {
+  return `${kind}\u0000${environmentId}\u0000${worktreeId}`
+}
+
+function emit(): void {
+  for (const listener of listeners) {
+    listener()
+  }
+}
+
+export function beginRemoteRuntimeAction(
+  environmentId: string,
+  worktreeId: string,
+  kind: RemoteRuntimeActionKind
+): void {
+  const key = pendingKey(environmentId, worktreeId, kind)
+  pendingCountByKey.set(key, (pendingCountByKey.get(key) ?? 0) + 1)
+  emit()
+}
+
+export function endRemoteRuntimeAction(
+  environmentId: string,
+  worktreeId: string,
+  kind: RemoteRuntimeActionKind
+): void {
+  const key = pendingKey(environmentId, worktreeId, kind)
+  const next = (pendingCountByKey.get(key) ?? 0) - 1
+  if (next > 0) {
+    pendingCountByKey.set(key, next)
+  } else {
+    pendingCountByKey.delete(key)
+  }
+  emit()
+}
+
+export function getRemoteRuntimeActionPendingCount(
+  environmentId: string,
+  worktreeId: string,
+  kind: RemoteRuntimeActionKind
+): number {
+  return pendingCountByKey.get(pendingKey(environmentId, worktreeId, kind)) ?? 0
+}
+
+export function isRemoteRuntimeActionPending(
+  environmentId: string | null | undefined,
+  worktreeId: string | null | undefined,
+  kind: RemoteRuntimeActionKind
+): boolean {
+  if (!environmentId || !worktreeId) {
+    return false
+  }
+  return getRemoteRuntimeActionPendingCount(environmentId, worktreeId, kind) > 0
+}
+
+/** Suscripcion para `useSyncExternalStore`. */
+export function subscribeToRemoteRuntimeActions(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+/**
+ * Envuelve una accion remota para que el indicador se levante antes de la
+ * llamada y se baje pase lo que pase. El `finally` no es decorativo: si un
+ * rechazo dejara el contador arriba, el spinner se quedaria girando para
+ * siempre y el boton inutilizable.
+ */
+export async function trackRemoteRuntimeAction<T>(
+  environmentId: string,
+  worktreeId: string,
+  kind: RemoteRuntimeActionKind,
+  run: () => Promise<T>
+): Promise<T> {
+  beginRemoteRuntimeAction(environmentId, worktreeId, kind)
+  try {
+    return await run()
+  } finally {
+    endRemoteRuntimeAction(environmentId, worktreeId, kind)
+  }
+}
+
+export function resetRemoteRuntimeActionsForTests(): void {
+  pendingCountByKey.clear()
+  listeners.clear()
+}

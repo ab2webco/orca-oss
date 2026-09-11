@@ -3122,7 +3122,8 @@
             "2148f65e04": "PowerShell",
             "ab589350e5": "无法为 {{value0}} 构建启动命令。",
             "7a9b4af2af": "向左滚动标签页",
-            "232e075b07": "向右滚动标签页"
+            "232e075b07": "向右滚动标签页",
+            "newTabPendingOnRemote": "正在远程服务器上打开…"
           },
           "TabBarCreateEntry": {
             "d62d63b807": "创建文件",

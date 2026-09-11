@@ -6,6 +6,9 @@ import type { TabBarItem } from './tab-bar-item-model'
 import { useTabBarRuntimeModel } from './use-tab-bar-runtime-model'
 import { useTabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
 import { useTabBarItemProjection } from './use-tab-bar-item-projection'
+import { useAppStore } from '@/store'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { useRemoteRuntimeActionPending } from '@/runtime/use-remote-runtime-action-pending'
 import { renderTabBarSurface } from './tab-bar-surface'
 
 function TabBarInner(props: TabBarProps): React.JSX.Element {
@@ -73,6 +76,15 @@ function TabBarInner(props: TabBarProps): React.JSX.Element {
     start: tabStripNavigation.tabStripOverflowState.canScrollStart,
     end: tabStripNavigation.tabStripOverflowState.canScrollEnd
   })
+  // Why solo remoto: en local la tab aparece al instante y el spinner solo
+  // parpadearia. Contra un host remoto el clic se queda sin respuesta visible
+  // durante todo el round-trip, y el usuario vuelve a pulsar (ORCA-481).
+  const remoteEnvironmentId = useAppStore((state) =>
+    worktreeId ? getRuntimeEnvironmentIdForWorktree(state, worktreeId) : null
+  )
+  const terminalPending = useRemoteRuntimeActionPending(remoteEnvironmentId, worktreeId, 'terminal')
+  const browserPending = useRemoteRuntimeActionPending(remoteEnvironmentId, worktreeId, 'browser')
+  const remoteCreationPending = terminalPending || browserPending
 
   return renderTabBarSurface({
     props,
@@ -81,7 +93,8 @@ function TabBarInner(props: TabBarProps): React.JSX.Element {
     itemProjection,
     tabStripNavigation,
     tabStripDragScroll,
-    togglePinned
+    togglePinned,
+    remoteCreationPending
   })
 }
 
