@@ -59,7 +59,11 @@ vi.mock('react', async () => {
     useCallback: <T>(callback: T) => callback,
     useMemo: <T>(factory: () => T) => factory(),
     useRef: <T>(current: T) => ({ current }),
-    useState: <T>(initial: T) => [initial, vi.fn()] as const
+    useState: <T>(initial: T) => [initial, vi.fn()] as const,
+    // Why: el mock headless no instala dispatcher, y `useSyncExternalStore` sin
+    // el revienta. Leer el snapshot directo es fiel: es lo que React hace en el
+    // primer render.
+    useSyncExternalStore: <T>(_subscribe: unknown, getSnapshot: () => T) => getSnapshot()
   }
 })
 

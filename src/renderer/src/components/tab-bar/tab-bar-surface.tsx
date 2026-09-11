@@ -1,6 +1,6 @@
 import React from 'react'
 import { SortableContext } from '@dnd-kit/sortable'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,7 +31,8 @@ export function renderTabBarSurface({
   itemProjection,
   tabStripNavigation,
   tabStripDragScroll,
-  togglePinned
+  togglePinned,
+  remoteCreationPending = false
 }: {
   props: TabBarProps
   runtime: TabBarRuntimeModel
@@ -40,6 +41,12 @@ export function renderTabBarSurface({
   tabStripNavigation: ReturnType<typeof useTabStripOverflowNavigation>
   tabStripDragScroll: ReturnType<typeof useTabStripDragScrollHandlers>
   togglePinned: (item: TabBarItem) => void
+  /**
+   * Hay una creacion remota en vuelo para este workspace. Llega calculado
+   * porque esto es una funcion de render y no un componente: no puede llamar
+   * hooks. Lo resuelve `TabBar` (ORCA-481).
+   */
+  remoteCreationPending?: boolean
 }): React.JSX.Element {
   const {
     worktreeId,
@@ -49,6 +56,7 @@ export function renderTabBarSurface({
     onOpenEntry,
     tabStripChrome = 'default'
   } = props
+
   const {
     resolvedGroupId,
     mobileEmulatorEnabled,
@@ -203,11 +211,22 @@ export function renderTabBarSurface({
           <button
             className="ml-2 my-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            title={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
+            title={
+              remoteCreationPending
+                ? translate(
+                    'auto.components.tab.bar.TabBar.newTabPendingOnRemote',
+                    'Opening on the remote server…'
+                  )
+                : translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')
+            }
             // Why: aria-label matches the tooltip so E2E can locate the "+" via getByRole('button', { name: 'New tab' }).
             aria-label={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
           >
-            <Plus className="w-3.5 h-3.5" />
+            {remoteCreationPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Plus className="w-3.5 h-3.5" />
+            )}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

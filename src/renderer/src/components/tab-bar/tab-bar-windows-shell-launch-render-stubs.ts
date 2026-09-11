@@ -14,7 +14,10 @@ export async function stubHeadlessReact(): Promise<Record<string, unknown>> {
     useState: <T>(initial: T | (() => T)) => {
       const value = typeof initial === 'function' ? (initial as () => T)() : initial
       return [value, vi.fn()] as const
-    }
+    },
+    // Why: sin dispatcher, `useSyncExternalStore` revienta. Leer el snapshot
+    // directo es fiel — es lo que React hace en el primer render.
+    useSyncExternalStore: <T>(_subscribe: unknown, getSnapshot: () => T) => getSnapshot()
   }
 }
 

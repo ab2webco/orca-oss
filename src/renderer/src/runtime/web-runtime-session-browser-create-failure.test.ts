@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWebRuntimeSessionBrowserTab } from './web-runtime-session'
 import { resetWebSessionCloseIntentForTests } from './web-session-close-intent'
 import {
+  isRemoteRuntimeActionPending,
+  resetRemoteRuntimeActionsForTests
+} from './web-runtime-pending-actions'
+import {
   ENVIRONMENT_ID,
   WORKTREE_ID,
   makeSnapshot,
@@ -67,6 +71,7 @@ afterEach(() => resetWebSessionCloseIntentForTests())
 describe('createWebRuntimeSessionBrowserTab', () => {
   beforeEach(() => {
     stubBrowserTabCreateEnvironment(mocks)
+    resetRemoteRuntimeActionsForTests()
   })
 
   afterEach(() => {
@@ -92,6 +97,10 @@ describe('createWebRuntimeSessionBrowserTab', () => {
 
     expect(runtimeCall).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).not.toHaveBeenCalled()
+    // Why aqui: este es el camino real, no el registro aislado. Si la envoltura
+    // del indicador no bajara el contador al rechazar, el spinner del "+" se
+    // quedaria girando y el boton inutilizable (ORCA-481).
+    expect(isRemoteRuntimeActionPending(ENVIRONMENT_ID, WORKTREE_ID, 'browser')).toBe(false)
   })
 
   it.each([

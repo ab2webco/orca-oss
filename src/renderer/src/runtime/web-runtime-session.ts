@@ -34,6 +34,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import { createBrowserUuid } from '../lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
 import { useAppStore } from '../store'
+import { trackRemoteRuntimeAction } from './web-runtime-pending-actions'
 import { hasRuntimeRpcErrorCode, unwrapRuntimeRpcResult } from './runtime-rpc-client'
 import {
   createAgentSessionCreateOperation,
@@ -297,6 +298,24 @@ export async function createWebRuntimeAgentSessionTerminalWithLaunchDraft(
 async function createWebRuntimeSessionTerminalResult(
   args: CreateWebRuntimeSessionTerminalArgs
 ): Promise<CreatedWebRuntimeSessionTerminal> {
+  // Why aqui y no en cada boton: este es el punto unico por donde pasan las tres
+  // variantes de creacion remota de terminal, asi que el indicador cubre a todas
+  // sin que ningun llamador tenga que acordarse (ORCA-481).
+  const trackedEnvironmentId =
+    args.environmentId?.trim() ??
+    useAppStore.getState().settings?.activeRuntimeEnvironmentId?.trim() ??
+    null
+  if (!trackedEnvironmentId) {
+    return runCreateWebRuntimeSessionTerminal(args)
+  }
+  return trackRemoteRuntimeAction(trackedEnvironmentId, args.worktreeId, 'terminal', () =>
+    runCreateWebRuntimeSessionTerminal(args)
+  )
+}
+
+async function runCreateWebRuntimeSessionTerminal(
+  args: CreateWebRuntimeSessionTerminalArgs
+): Promise<CreatedWebRuntimeSessionTerminal> {
   const environmentId =
     args.environmentId?.trim() ??
     useAppStore.getState().settings?.activeRuntimeEnvironmentId?.trim() ??
@@ -526,6 +545,15 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   if (!environmentId || !isWebRuntimeSessionActive(environmentId)) {
     return false
   }
+  return trackRemoteRuntimeAction(environmentId, args.worktreeId, 'browser', () =>
+    runCreateWebRuntimeSessionBrowserTab(args, environmentId)
+  )
+}
+
+async function runCreateWebRuntimeSessionBrowserTab(
+  args: Parameters<typeof createWebRuntimeSessionBrowserTab>[0],
+  environmentId: string
+): Promise<boolean> {
   const intentOwner = captureWebSessionIntentOwner(environmentId)
   const callEnvironment = captureRuntimeEnvironmentCall(environmentId, intentOwner.pairingRevision)
   const shouldFocusOnCreate = args.focusOnCreate !== false

@@ -3110,7 +3110,8 @@
             "2148f65e04": "PowerShell",
             "ab589350e5": "No se pudo generar el comando de inicio para {{value0}}.",
             "7a9b4af2af": "Desplazar pestañas a la izquierda",
-            "232e075b07": "Desplazar pestañas a la derecha"
+            "232e075b07": "Desplazar pestañas a la derecha",
+            "newTabPendingOnRemote": "Abriendo en el servidor remoto…"
           },
           "TabBarCreateEntry": {
             "d62d63b807": "Crear archivo",
