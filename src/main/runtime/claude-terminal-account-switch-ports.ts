@@ -19,7 +19,10 @@ import {
   markInjectedClaudePtySpawned,
   releaseInjectedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
-import { copyClaudeSessionForAccountSwitch } from '../claude-accounts/session-failover'
+import {
+  copyClaudeSessionForAccountSwitch,
+  type ClaudeSessionFailoverDeps
+} from '../claude-accounts/session-failover'
 import { claudeUniverseReportsResumedSession } from '../claude-accounts/claude-resume-observability'
 import { resolveOwnedClaudeManagedAuthPath } from '../claude-accounts/managed-auth-path'
 import { isManagedClaudeVaultAuthenticated } from '../claude-accounts/managed-vault-authentication'
@@ -46,6 +49,21 @@ export type ClaudeTerminalAccountSwitchServices = {
   ): Promise<ClaudeRuntimeAuthPreparation>
   /** Managed-account owner of a live PTY; defaults to the injected-binding registry. */
   getPtyClaudeAccountId?(ptyId: string): string | null
+}
+
+/**
+ * The universe lookup both the preflight's transcript probe and the transaction's
+ * transcript copy run against. Why shared: two assemblies could point at different
+ * roots, and the preflight would then clear a copy that is about to fail.
+ */
+export function buildClaudeSessionTranscriptDeps(
+  attached: ClaudeTerminalAccountSwitchServices
+): ClaudeSessionFailoverDeps {
+  return {
+    getAccounts: () => attached.getSettings().claudeManagedAccounts,
+    getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir,
+    getSharedTranscriptsRoot: getSharedClaudeTranscriptsRoot
+  }
 }
 
 export function resolvePtyClaudeAccountId(
@@ -120,11 +138,7 @@ export function buildClaudeTerminalAccountSwitchPorts(
           targetAccountId: capture.targetAccountId,
           sourceAccountId: capture.sourceAccountId
         },
-        {
-          getAccounts: () => attached.getSettings().claudeManagedAccounts,
-          getSharedConfigDir: () => new ClaudeRuntimePathResolver().getRuntimePaths().configDir,
-          getSharedTranscriptsRoot: getSharedClaudeTranscriptsRoot
-        }
+        buildClaudeSessionTranscriptDeps(attached)
       )
       return copied.ok
         ? { ok: true, copiedFileCount: copied.copiedFileCount }

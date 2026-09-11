@@ -9,39 +9,49 @@ import {
 import { translate } from '@/i18n/i18n'
 import { claudeAccountSwitchLabel } from './use-manual-claude-account-switch'
 import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
-import { useAppStore } from '@/store'
-import { listClaudeAccountsForActiveHost } from '@/runtime/runtime-provider-account-roster'
+import { listClaudeAccountsForEnvironment } from '@/runtime/runtime-provider-account-roster'
 
 /** Fetches and splits switchable Claude accounts while `enabled`, keeping the
  *  managed OAuth accounts and custom-endpoint accounts in separate groups.
  *  Also surfaces the active account + its live model so the row can show it. */
-export function useClaudeAccountSwitchTargets(enabled: boolean): {
+export function useClaudeAccountSwitchTargets(
+  enabled: boolean,
+  ownerEnvironmentId: string | null
+): {
   oauthAccounts: ClaudeManagedAccountSummary[]
   endpointAccounts: ClaudeManagedAccountSummary[]
   activeAccountId: string | null
   activeModel: string | null
 } {
-  const activeRuntimeEnvironmentId = useAppStore(
-    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
-  )
   const [accounts, setAccounts] = useState<ClaudeManagedAccountSummary[]>([])
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
   const [activeModel, setActiveModel] = useState<string | null>(null)
+  const [loadedForEnvironmentId, setLoadedForEnvironmentId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!enabled) {
       return
     }
     let cancelled = false
+    // Why drop what is on screen when the owner changed: one menu instance serves
+    // every pane, so reopening it over a differently-owned pane would keep offering
+    // the previous host's accounts until the new roster lands — the same wrong-id
+    // switch. Reopening over the same owner keeps the list, so it does not blink.
+    if (loadedForEnvironmentId !== ownerEnvironmentId) {
+      setAccounts([])
+      setActiveAccountId(null)
+      setActiveModel(null)
+    }
     // Why the routed roster: the switch itself already runs on the PTY's own
     // runtime, but this list came from the local preload — so against a server
     // the menu offered this desktop's accounts and none of them exist there.
-    void listClaudeAccountsForActiveHost({ activeRuntimeEnvironmentId })
+    void listClaudeAccountsForEnvironment(ownerEnvironmentId)
       .then((result) => {
         if (!cancelled) {
           setAccounts(result.accounts)
           setActiveAccountId(result.activeAccountId)
           setActiveModel(result.activeModel ?? null)
+          setLoadedForEnvironmentId(ownerEnvironmentId)
         }
       })
       .catch(() => {
@@ -50,7 +60,11 @@ export function useClaudeAccountSwitchTargets(enabled: boolean): {
     return () => {
       cancelled = true
     }
-  }, [enabled, activeRuntimeEnvironmentId])
+    // Why loadedForEnvironmentId is not a dependency: it is only read to decide
+    // whether the shown list belongs to this owner. Re-running on it would refetch
+    // once more each time a roster lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, ownerEnvironmentId])
 
   return useMemo(
     () => ({

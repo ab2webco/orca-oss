@@ -18,13 +18,16 @@ import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
  * fetched only while the popover is open.
  */
 export function TerminalClaudeAccountSwitchButton({
+  ownerEnvironmentId,
   onSwitch
 }: {
+  /** Runtime that owns this pane; `null` for a local pane. */
+  ownerEnvironmentId: string | null
   onSwitch: (account: ClaudeManagedAccountSummary) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const { oauthAccounts, endpointAccounts, activeAccountId, activeModel } =
-    useClaudeAccountSwitchTargets(open)
+    useClaudeAccountSwitchTargets(open, ownerEnvironmentId)
   const label = translate(
     'auto.components.terminalPane.TerminalClaudeAccountSwitchMenu.trigger',
     'Switch Account & Continue'

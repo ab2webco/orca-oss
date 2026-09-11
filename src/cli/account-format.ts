@@ -191,7 +191,8 @@ const UNSWITCHABLE_TERMINAL_REASONS: Partial<
   'missing-session': 'no Claude session has been observed in this pane yet',
   'source-unknown': 'no managed Claude account is bound to this pane',
   'workspace-unresolved': 'Orca Lab could not resolve a working directory for this pane',
-  'transcript-unavailable': 'the session transcript could not be copied into the target account',
+  'transcript-unavailable':
+    'this session has no saved conversation yet; send it a message first, then switch',
   'unsupported-runtime': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
   'terminal-not-found': 'no live pane resolved for that handle',
   'runtime-unavailable': 'this runtime came up without account services attached'

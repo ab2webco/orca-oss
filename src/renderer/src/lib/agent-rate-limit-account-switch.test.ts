@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeManagedAccountSummary } from '../../../shared/types'
 import type { ClaudeSessionFailoverCopyResult } from '../../../shared/managed-account-types'
 import type { AgentProviderSessionMetadata } from '../../../shared/agent-session-resume'
+import type * as RuntimeTerminalStream from '@/runtime/runtime-terminal-stream'
 
 const callRuntimeRpc = vi.fn<(...args: unknown[]) => Promise<unknown>>()
 const getRemoteRuntimePtyEnvironmentId = vi.fn<(ptyId: string) => string | null>(() => null)
@@ -36,7 +37,11 @@ vi.mock('@/store', () => ({ useAppStore: { getState: () => store } }))
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
 }))
-vi.mock('@/runtime/runtime-terminal-stream', () => ({
+vi.mock('@/runtime/runtime-terminal-stream', async (importOriginal) => ({
+  // Why importOriginal: the handle parser is pure string work, and stubbing it
+  // is what let an unrealistic `pty-1` fixture pass while the real
+  // `remote:<env>@@<handle>` shape failed against the runtime.
+  ...(await importOriginal<typeof RuntimeTerminalStream>()),
   getRemoteRuntimePtyEnvironmentId: (ptyId: string) => getRemoteRuntimePtyEnvironmentId(ptyId)
 }))
 vi.mock('@/lib/agent-launch-prompt-delivery', () => ({
@@ -148,17 +153,25 @@ describe('runManagedAccountSwitchRelaunch', () => {
   // old gate read the local roster, missed, and sent the switch down the local
   // fallback — which reported "could not copy the session transcript" for a
   // session that was never on this machine.
+  // Why a REAL `remote:<env>@@<handle>` id and not the bare `pty-1` this file
+  // used before: the runtime indexes terminals by handle, and with an
+  // unrealistic fixture the adapter could ship the client's own id forever and
+  // still pass here. It shipped, and the switch came back "That terminal is not
+  // live on this runtime" for a terminal that was plainly alive.
   it('switches a server-hosted terminal through the runtime that owns it', async () => {
     getRemoteRuntimePtyEnvironmentId.mockReturnValue('env-1')
     store.settings = { agentCmdOverrides: {}, claudeManagedAccounts: [] }
 
-    const result = await run({ settings: store.settings as never })
+    const result = await run({
+      ptyId: 'remote:env-1@@term_abc',
+      settings: store.settings as never
+    })
 
     expect(result).toEqual({ ok: true, accountLabel: 'spare@example.com', switched: 'resumed' })
     expect(callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
       'accounts.switchClaudeTerminal',
-      expect.objectContaining({ ptyId: 'pty-1', targetAccountId: TARGET_ACCOUNT.id }),
+      expect.objectContaining({ terminal: 'term_abc', targetAccountId: TARGET_ACCOUNT.id }),
       expect.anything()
     )
     expect(copySessionForAccountSwitch).not.toHaveBeenCalled()

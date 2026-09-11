@@ -58,6 +58,8 @@ type TerminalContextMenuProps = {
   onContinueAgentSessionInNewSession: () => void
   onForkAgentSession: () => void
   canSwitchClaudeAccount: boolean
+  /** Runtime owning the pane the menu was opened over; `null` for a local pane. */
+  claudeAccountOwnerEnvironmentId: string | null
   onSwitchClaudeAccount: (account: ClaudeManagedAccountSummary) => void
   canToggleNativeChat: boolean
   isNativeChatView: boolean
@@ -99,6 +101,7 @@ export default function TerminalContextMenu({
   onContinueAgentSessionInNewSession,
   onForkAgentSession,
   canSwitchClaudeAccount,
+  claudeAccountOwnerEnvironmentId,
   onSwitchClaudeAccount,
   canToggleNativeChat,
   isNativeChatView,
@@ -215,7 +218,11 @@ export default function TerminalContextMenu({
           )}
         </DropdownMenuItem>
         {canSwitchClaudeAccount ? (
-          <TerminalClaudeAccountSwitchMenu enabled={open} onSwitch={onSwitchClaudeAccount} />
+          <TerminalClaudeAccountSwitchMenu
+            enabled={open}
+            ownerEnvironmentId={claudeAccountOwnerEnvironmentId}
+            onSwitch={onSwitchClaudeAccount}
+          />
         ) : null}
         <DropdownMenuItem onSelect={onCopyAgentSessionContext}>
           <ClipboardCopy />

@@ -4,7 +4,6 @@ import type { ClaudeManagedAccount } from '../../shared/types'
 import type { ClaudeSessionFailoverCopyResult } from '../../shared/managed-account-types'
 import { resolveOwnedClaudeManagedAuthPath } from './managed-auth-path'
 import {
-  findSessionProjectDir,
   isInsideRoot,
   isParkedTranscriptDuplicate,
   isRealFile,
@@ -14,9 +13,19 @@ import {
 } from './session-transcript-location'
 
 export { encodeClaudeProjectDirName } from './session-transcript-location'
+import {
+  SESSION_ID_PATTERN,
+  findSourceSessionTranscript,
+  hasClaudeSessionTranscript,
+  resolveManagedSourceRoot,
+  resolveSwitchSourceRoot
+} from './claude-session-transcript-presence'
 
-// Why: the session id becomes a filename prefix; anything outside this shape could traverse or hide files.
-const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,511}$/
+// Why re-exported: the presence probe and the copy answer the same question
+// from the same resolution, and callers should not have to know which file it
+// moved to.
+export { hasClaudeSessionTranscript }
+export type { ClaudeSessionTranscriptPresenceArgs } from './claude-session-transcript-presence'
 
 export type CopyClaudeSessionForFailoverArgs = {
   sessionId: string
@@ -50,22 +59,6 @@ export type ClaudeSessionFailoverDeps = {
   getSharedConfigDir(): string
   /** Orca's own transcript store — the single link target a universe's `projects/` may legitimately point at. */
   getSharedTranscriptsRoot(): string
-}
-
-function resolveManagedSourceRoot(
-  account: ClaudeManagedAccount | undefined
-):
-  | { ok: true; root: string }
-  | { ok: false; reason: 'source-account-not-found' | 'source-dir-unresolved' } {
-  if (!account) {
-    return { ok: false, reason: 'source-account-not-found' }
-  }
-  // Why: WSL universes live on a different filesystem; host-side copy would silently produce wrong paths.
-  if (account.managedAuthRuntime === 'wsl') {
-    return { ok: false, reason: 'source-dir-unresolved' }
-  }
-  const root = resolveOwnedClaudeManagedAuthPath(account.id, account.managedAuthPath)
-  return root ? { ok: true, root } : { ok: false, reason: 'source-dir-unresolved' }
 }
 
 /**
@@ -221,25 +214,13 @@ export function copyClaudeSessionForAccountSwitch(
     return { ok: false, reason: 'target-dir-unresolved' }
   }
 
-  let sourceRoot: string
-  if (typeof args.sourceAccountId === 'string' && args.sourceAccountId.length > 0) {
-    const resolved = resolveManagedSourceRoot(
-      accounts.find((account) => account.id === args.sourceAccountId)
-    )
-    if (!resolved.ok) {
-      return { ok: false, reason: resolved.reason }
-    }
-    sourceRoot = resolved.root
-  } else {
-    const shared = resolveRealRoot(deps.getSharedConfigDir())
-    if (!shared) {
-      return { ok: false, reason: 'source-dir-unresolved' }
-    }
-    sourceRoot = shared
+  const source = resolveSwitchSourceRoot(args.sourceAccountId, accounts, deps)
+  if (!source.ok) {
+    return { ok: false, reason: source.reason }
   }
 
   return copySessionFilesBetweenRoots({
-    sourceRoot,
+    sourceRoot: source.root,
     targetRoot,
     cwd: args.cwd,
     sessionId,
@@ -254,20 +235,20 @@ function copySessionFilesBetweenRoots(args: {
   sessionId: string
   sharedTranscriptsRoot: string
 }): ClaudeSessionFailoverCopyResult {
-  const sourceProjects = resolveProjectsDir(args.sourceRoot, args.sharedTranscriptsRoot)
-  if (sourceProjects.status !== 'resolved') {
+  const sourceProject = findSourceSessionTranscript({
+    sourceRoot: args.sourceRoot,
+    cwd: args.cwd,
+    sessionId: args.sessionId,
+    sharedTranscriptsRoot: args.sharedTranscriptsRoot
+  })
+  if (sourceProject.status === 'unresolved') {
     return { ok: false, reason: 'source-not-found' }
   }
   const targetProjects = resolveProjectsDir(args.targetRoot, args.sharedTranscriptsRoot)
   if (targetProjects.status === 'rejected') {
     return { ok: false, reason: 'target-dir-unresolved' }
   }
-  const sourceProject = findSessionProjectDir(
-    sourceProjects.canonicalRoot,
-    args.cwd,
-    args.sessionId
-  )
-  if (!sourceProject) {
+  if (sourceProject.status === 'absent') {
     return { ok: false, reason: 'source-not-found' }
   }
   // Why: both universes link `projects/` to the same store, so the target already reads
@@ -275,7 +256,7 @@ function copySessionFilesBetweenRoots(args: {
   // truncating the user's conversation with copyFileSync. Nothing to do is the success.
   if (
     targetProjects.status === 'resolved' &&
-    isSamePath(targetProjects.canonicalRoot, sourceProjects.canonicalRoot)
+    isSamePath(targetProjects.canonicalRoot, sourceProject.canonicalProjectsRoot)
   ) {
     return { ok: true, sessionId: args.sessionId, copiedFileCount: 0 }
   }
@@ -291,7 +272,10 @@ function copySessionFilesBetweenRoots(args: {
       }
       const sourceFile = join(sourceProject.dirPath, entry)
       // Why: never follow symlinks — a planted link could exfiltrate arbitrary files across universes.
-      if (!isRealFile(sourceFile) || !isInsideRoot(sourceProjects.canonicalRoot, sourceFile)) {
+      if (
+        !isRealFile(sourceFile) ||
+        !isInsideRoot(sourceProject.canonicalProjectsRoot, sourceFile)
+      ) {
         continue
       }
       const targetFile = join(targetProjectDir, entry)

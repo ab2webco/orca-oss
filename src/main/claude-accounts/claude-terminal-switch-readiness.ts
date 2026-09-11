@@ -14,6 +14,8 @@ export type ClaudeTerminalSwitchPreflight = {
   /** Managed account this runtime can release — injected bindings only. */
   sourceAccountId: string | null
   providerSessionId: string | null
+  /** The source universe already holds a transcript for that session. Uncertainty reads as `true`. */
+  sessionTranscriptPresent: boolean
   launchConfig: SleepingAgentLaunchConfig | null | undefined
 }
 
@@ -37,8 +39,6 @@ export function resolveClaudeTerminalSwitchReadiness(
   if (preflight.isWsl || preflight.remoteConnectionId) {
     return { state: 'unavailable', reason: 'unsupported-runtime' }
   }
-  // Why not `transcript-unavailable`: nothing has read a transcript yet, and the
-  // transcript copy is two steps further down (ORCA-195).
   if (!preflight.cwd) {
     return { state: 'unavailable', reason: 'workspace-unresolved' }
   }
@@ -47,6 +47,12 @@ export function resolveClaudeTerminalSwitchReadiness(
   }
   if (!preflight.providerSessionId) {
     return { state: 'unavailable', reason: 'missing-session' }
+  }
+  // Why here and not at the copy: a session with no saved conversation has nothing
+  // to resume, and letting the transaction find that out midway produced a failure
+  // that read like the session had been lost. Refuse before anything is touched.
+  if (!preflight.sessionTranscriptPresent) {
+    return { state: 'unavailable', reason: 'transcript-unavailable' }
   }
   // Why argv and not the whole config: the switch relaunches the CLI, and a
   // config without a command would leave it guessing the launcher.

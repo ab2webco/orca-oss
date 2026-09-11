@@ -59,6 +59,8 @@ export type NativeChatContextMenuActions = {
   onContinueAgentSessionInNewSession: () => void
   onForkAgentSession: () => void
   canSwitchClaudeAccount: boolean
+  /** Runtime owning the chat pane; `null` for a local pane. */
+  claudeAccountOwnerEnvironmentId: string | null
   onSwitchClaudeAccount: (account: ClaudeManagedAccountSummary) => void
   onSetTitle: () => void
   onCopyTerminalId: () => void
@@ -80,6 +82,7 @@ export const emptyNativeChatContextMenuActions: Omit<NativeChatContextMenuAction
   onContinueAgentSessionInNewSession: () => {},
   onForkAgentSession: () => {},
   canSwitchClaudeAccount: false,
+  claudeAccountOwnerEnvironmentId: null,
   onSwitchClaudeAccount: () => {},
   onSetTitle: () => {},
   onCopyTerminalId: () => {},
@@ -200,6 +203,7 @@ export function useNativeChatContextMenu({
           {actions.canSwitchClaudeAccount ? (
             <TerminalClaudeAccountSwitchMenu
               enabled={state.open}
+              ownerEnvironmentId={actions.claudeAccountOwnerEnvironmentId}
               onSwitch={actions.onSwitchClaudeAccount}
             />
           ) : null}
