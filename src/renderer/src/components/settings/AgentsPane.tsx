@@ -57,6 +57,8 @@ import {
 } from '../../../../shared/tui-agent-permissions'
 import { getSettingOwnershipSummary } from './setting-ownership'
 import { translate } from '@/i18n/i18n'
+import { AgentCliSelfUpdateNotice } from './AgentCliSelfUpdateNotice'
+import { useAgentCliSelfUpdate } from './use-agent-cli-self-update'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { parseAgentDefaultEnvDraft, stringifyAgentDefaultEnvDraft } from './agent-default-env-draft'
 import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
@@ -790,6 +792,10 @@ export function AgentsPane({
     )
   }
 
+  // El CLI puede estar detectado y aun asi no poder actualizarse solo: instalado
+  // por root en un prefix global, o en un montaje de solo lectura.
+  const selfUpdate = useAgentCliSelfUpdate()
+
   // Why: null means detection is in flight, not "all agents are installed".
   // Showing the full catalog here makes the default-agent picker flash invalid
   // options while switching between Windows and WSL detection contexts.
@@ -932,31 +938,36 @@ export function AgentsPane({
 
           <div className="divide-y divide-border/40">
             {detectedAgents.map((agent) => (
-              <AgentRow
-                key={agent.id}
-                agentId={agent.id}
-                label={agent.label}
-                homepageUrl={agent.homepageUrl}
-                defaultCmd={agent.cmd}
-                defaultArgs={getTuiAgentDefaultArgs(agent.id)}
-                defaultEnv={getTuiAgentDefaultEnv(agent.id)}
-                isDetected
-                isEnabled={isTuiAgentEnabled(agent.id, disabledAgents)}
-                isDefault={defaultAgent === agent.id}
-                cmdOverride={cmdOverrides[agent.id]}
-                argsOverride={resolveTuiAgentLaunchArgs(agent.id, agentDefaultArgs)}
-                envOverride={resolveTuiAgentLaunchEnv(agent.id, agentDefaultEnv)}
-                onSetDefault={() => setDefault(agent.id)}
-                onSetEnabled={(enabled) => setAgentEnabled(agent.id, enabled)}
-                onSaveOverride={(v) => saveOverride(agent.id, v)}
-                onSaveArgs={(v) => saveAgentArgs(agent.id, v)}
-                onSaveEnv={(v) => saveAgentEnv(agent.id, v)}
-                sessionSourceHome={
-                  agent.id === 'codex'
-                    ? buildCodexSessionSourceHomeControl(settings, updateSettings)
-                    : undefined
-                }
-              />
+              <div key={agent.id}>
+                <AgentRow
+                  agentId={agent.id}
+                  label={agent.label}
+                  homepageUrl={agent.homepageUrl}
+                  defaultCmd={agent.cmd}
+                  defaultArgs={getTuiAgentDefaultArgs(agent.id)}
+                  defaultEnv={getTuiAgentDefaultEnv(agent.id)}
+                  isDetected
+                  isEnabled={isTuiAgentEnabled(agent.id, disabledAgents)}
+                  isDefault={defaultAgent === agent.id}
+                  cmdOverride={cmdOverrides[agent.id]}
+                  argsOverride={resolveTuiAgentLaunchArgs(agent.id, agentDefaultArgs)}
+                  envOverride={resolveTuiAgentLaunchEnv(agent.id, agentDefaultEnv)}
+                  onSetDefault={() => setDefault(agent.id)}
+                  onSetEnabled={(enabled) => setAgentEnabled(agent.id, enabled)}
+                  onSaveOverride={(v) => saveOverride(agent.id, v)}
+                  onSaveArgs={(v) => saveAgentArgs(agent.id, v)}
+                  onSaveEnv={(v) => saveAgentEnv(agent.id, v)}
+                  sessionSourceHome={
+                    agent.id === 'codex'
+                      ? buildCodexSessionSourceHomeControl(settings, updateSettings)
+                      : undefined
+                  }
+                />
+                <AgentCliSelfUpdateNotice
+                  status={selfUpdate.statusByAgentId.get(agent.id) ?? null}
+                  onRepair={selfUpdate.repair}
+                />
+              </div>
             ))}
           </div>
         </section>

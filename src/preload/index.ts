@@ -4,6 +4,11 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type {
+  AgentCliSelfUpdateRepairResult,
+  AgentCliSelfUpdateStatus,
+  RepairableAgentCliId
+} from '../shared/agent-cli-self-update'
 import type { WorktreeProgressProbeResult } from '../shared/worktree-progress-probe'
 import type {
   GlobalConfigSyncInventory,
@@ -2523,6 +2528,12 @@ const api = {
       ipcRenderer.invoke('preflight:detectAgents', args),
     refreshAgents: (args?: PreflightRuntimeContext): Promise<RefreshAgentsResult> =>
       ipcRenderer.invoke('preflight:refreshAgents', args),
+    checkAgentSelfUpdate: (): Promise<AgentCliSelfUpdateStatus[]> =>
+      ipcRenderer.invoke('preflight:checkAgentSelfUpdate'),
+    repairAgentSelfUpdate: (args: {
+      agentId: RepairableAgentCliId
+    }): Promise<AgentCliSelfUpdateRepairResult> =>
+      ipcRenderer.invoke('preflight:repairAgentSelfUpdate', args),
     detectRemoteAgents: (args: { connectionId: string }): Promise<string[]> =>
       ipcRenderer.invoke('preflight:detectRemoteAgents', args),
     detectRemoteWindowsTerminalCapabilities: (args: {

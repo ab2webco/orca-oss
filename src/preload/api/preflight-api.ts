@@ -1,3 +1,8 @@
+import type {
+  AgentCliSelfUpdateRepairResult,
+  AgentCliSelfUpdateStatus,
+  RepairableAgentCliId
+} from '../../shared/agent-cli-self-update'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import type {
   PathSource,
@@ -47,6 +52,13 @@ export type PreflightApi = {
   check: (args?: PreflightRuntimeContext & { force?: boolean }) => Promise<PreflightStatus>
   detectAgents: (args?: PreflightRuntimeContext) => Promise<string[]>
   refreshAgents: (args?: PreflightRuntimeContext) => Promise<RefreshAgentsResult>
+  // Si el CLI del agente esta puesto donde su dueno no lo puede actualizar, y
+  // si Orca sabe moverlo al HOME. Corre en el host del runtime, que es donde
+  // vive el problema.
+  checkAgentSelfUpdate: () => Promise<AgentCliSelfUpdateStatus[]>
+  repairAgentSelfUpdate: (args: {
+    agentId: RepairableAgentCliId
+  }) => Promise<AgentCliSelfUpdateRepairResult>
   detectRemoteAgents: (args: { connectionId: string }) => Promise<string[]>
   detectRemoteWindowsTerminalCapabilities: (args: { connectionId: string }) => Promise<{
     wslAvailable: boolean

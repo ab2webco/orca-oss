@@ -10610,6 +10610,17 @@
         },
         "useClaudeAccountReassign": {
           "reopenFailed": "サインインは完了しましたが、Orca Lab は {{worktrees}} の Claude ターミナルを開き直せませんでした。タブバーから起動し直してください。"
+        },
+        "AgentCliSelfUpdateNotice": {
+          "blocked": "この CLI は自動更新できません",
+          "blockedDetail": "このユーザーが書き込めないディレクトリにインストールされているため、CLI 自身の更新が失敗し、バージョンが固定されたままになります。",
+          "fixing": "移動中…",
+          "fix": "このユーザー用に再インストール",
+          "manual": "更新できるように、ホームディレクトリ配下に再インストールしてください。",
+          "repaired": "再インストールしました",
+          "shadowed": "インストールしましたが、まだ古い方が優先されています",
+          "shadowedDetail": "PATH の先頭に {dir} を置き、新しいターミナルを開いてください。",
+          "failed": "再インストールできませんでした"
         }
       },
       "right": {

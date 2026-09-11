@@ -11248,6 +11248,17 @@
           "codeLabel": "Code from that page",
           "cancel": "Cancel",
           "finish": "Finish sign-in"
+        },
+        "AgentCliSelfUpdateNotice": {
+          "blocked": "This CLI can't update itself",
+          "blockedDetail": "It is installed in a directory this user cannot write, so its own updater fails and the version stays frozen.",
+          "fixing": "Moving…",
+          "fix": "Reinstall for this user",
+          "manual": "Reinstall it under your home directory so its updater can write.",
+          "repaired": "Reinstalled",
+          "shadowed": "Installed, but the old copy still wins",
+          "shadowedDetail": "Put {dir} first in your PATH and open a new terminal.",
+          "failed": "Could not reinstall"
         }
       },
       "right": {
