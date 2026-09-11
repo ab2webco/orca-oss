@@ -51,6 +51,10 @@ type TerminalMenuState = {
   menuOpenedAtRef: React.RefObject<number>
   paneCount: number
   menuPaneId: number | null
+  /** The pane the menu was opened over, resolved from the ref rather than from
+   *  `menuPaneId`. Needed by actions that fire AS the menu closes: `menuPaneId`
+   *  is gated on `open` and is already null by then. */
+  resolveMenuPane: () => ManagedPane | null
   onContextMenuCapture: (event: React.MouseEvent<HTMLDivElement>) => void
   onPaneTitleContextMenu: (event: React.MouseEvent<HTMLElement>, paneId: number) => void
   onCopy: () => Promise<void>
@@ -268,6 +272,7 @@ export function useTerminalPaneContextMenu({
     menuOpenedAtRef,
     paneCount,
     menuPaneId,
+    resolveMenuPane,
     onContextMenuCapture,
     onPaneTitleContextMenu,
     onCopy,
