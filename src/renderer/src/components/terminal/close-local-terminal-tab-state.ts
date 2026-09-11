@@ -3,6 +3,7 @@ import type {
   TerminalTabCloseReason,
   TerminalTabRetirementPlan
 } from '@/store/slices/terminal-tab-retirement'
+import { clearSleepingAgentSessionsForClosedTab } from './clear-closed-tab-sleeping-agents'
 
 export function closeLocalTerminalTabState(
   terminalTabId: string,
@@ -15,6 +16,9 @@ export function closeLocalTerminalTabState(
     precomputedRetirementPlan?: TerminalTabRetirementPlan
   }
 ): void {
+  // Why aqui y no en cada sitio que cierra: este es el punto comun por donde
+  // pasan todas las rutas de cierre local, remota incluida.
+  clearSleepingAgentSessionsForClosedTab(terminalTabId, options?.reason)
   const state = useAppStore.getState()
   if (
     options?.precomputedRetirementPlan?.tabId === terminalTabId ||
