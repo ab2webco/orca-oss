@@ -16,8 +16,10 @@ import {
 } from './claude-refresh-chain-lease'
 import {
   getManagedClaudeRefreshAccounts,
-  readManagedClaudeRefreshCredentials
+  readManagedClaudeRefreshCredentials,
+  resolveManagedClaudeAccountIdentityKey
 } from './claude-managed-refresh-chain'
+import type { ClaudeRefreshChainIdentityKey } from './claude-refresh-chain-identity'
 import {
   inspectManagedClaudeRefreshChainAliases,
   type ManagedClaudeRefreshChainAliasStatus
@@ -92,6 +94,7 @@ type BackgroundRotationDependencies = {
     accountId: string,
     fingerprint: ClaudeRefreshChainFingerprint
   ) => Promise<ManagedClaudeRefreshChainAliasStatus>
+  resolveIdentityKey?: (accountId: string) => ClaudeRefreshChainIdentityKey | null
 }
 
 const warnedAliasAccounts = new Set<string>()
@@ -139,7 +142,10 @@ export async function tryRunManagedClaudeAccountBackgroundRotation<T>(
     }
   }
   const leaseStore = dependencies.leaseStore ?? claudeRefreshChainLeaseStore
-  const lease = leaseStore.tryAcquireRotation(fingerprint)
+  const lease = leaseStore.tryAcquireRotation(
+    fingerprint,
+    (dependencies.resolveIdentityKey ?? resolveManagedClaudeAccountIdentityKey)(accountId)
+  )
   if (!lease) {
     if (!inherited?.has(accountId)) {
       endManagedClaudeAccountMutation(accountId)

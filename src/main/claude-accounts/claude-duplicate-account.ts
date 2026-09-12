@@ -1,4 +1,5 @@
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
+import type { ClaudeProfileAccountIdentity } from './claude-profile-account-index'
 import { getClaudeWslSelectionKey } from './runtime-selection'
 
 export type ClaudeAccountIdentityCandidate = {
@@ -50,6 +51,26 @@ export function findDuplicateClaudeAccount(
         normalizeEmail(account.email) === email &&
         normalizeOrganizationUuid(account.organizationUuid) === organizationUuid &&
         runtimeScopeKey(account.managedAuthRuntime, account.wslDistro) === scope
+    ) ?? null
+  )
+}
+
+// Why no runtime scope here: a neighbour profile's vault records the identity, not which runtime
+// materialized it, and a host add is the only caller — WSL vaults live inside the distro.
+export function findClaudeIdentityInOtherProfiles(
+  identities: readonly ClaudeProfileAccountIdentity[],
+  candidate: Pick<ClaudeAccountIdentityCandidate, 'email' | 'organizationUuid'>
+): ClaudeProfileAccountIdentity | null {
+  const email = normalizeEmail(candidate.email)
+  if (!email) {
+    return null
+  }
+  const organizationUuid = normalizeOrganizationUuid(candidate.organizationUuid)
+  return (
+    identities.find(
+      (identity) =>
+        normalizeEmail(identity.email) === email &&
+        normalizeOrganizationUuid(identity.organizationUuid) === organizationUuid
     ) ?? null
   )
 }

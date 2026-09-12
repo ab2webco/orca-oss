@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { ClaudeRefreshChainFingerprint } from './claude-refresh-chain-fingerprint'
+import type { ClaudeRefreshChainIdentityKey } from './claude-refresh-chain-identity'
 
 export type ClaudeRefreshChainLeaseRecord = {
   version: 1
@@ -8,6 +9,9 @@ export type ClaudeRefreshChainLeaseRecord = {
   instanceStartedAt: number
   expiresAt: number
   fingerprint: ClaudeRefreshChainFingerprint | null
+  // Why optional rather than nullable: an older instance writes the record without this field at
+  // all, and reading that absence as "unresolved" would let it block every rotation here.
+  identityKey?: ClaudeRefreshChainIdentityKey | null
 }
 
 export function readClaudeRefreshChainLeaseRecord(
@@ -21,7 +25,10 @@ export function readClaudeRefreshChainLeaseRecord(
       typeof value.instanceId !== 'string' ||
       typeof value.instanceStartedAt !== 'number' ||
       typeof value.expiresAt !== 'number' ||
-      (value.fingerprint !== null && typeof value.fingerprint !== 'string')
+      (value.fingerprint !== null && typeof value.fingerprint !== 'string') ||
+      (value.identityKey !== undefined &&
+        value.identityKey !== null &&
+        typeof value.identityKey !== 'string')
     ) {
       return null
     }
