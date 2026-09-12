@@ -204,6 +204,28 @@ describe('Claude refresh-chain lease', () => {
     liveInstance.releaseClaim('live-session')
   })
 
+  it('serializes two instances over one identity with no claim registered', () => {
+    const rootPath = createRoot()
+    const first = store(rootPath, 1515)
+    const second = store(rootPath, 1616)
+    const sharedIdentity = identity()
+    // Why no claim here: hasBlockingClaim is advisory and sees nothing until a live session
+    // registers. The lock directory is the only real mutual exclusion, so if it were named by the
+    // chain digest these two would take DIFFERENT locks and both rotate one shared chain.
+    const lease = first.tryAcquireRotation(fingerprint(), sharedIdentity)
+
+    expect(lease).not.toBeNull()
+    expect(second.tryAcquireRotation(fingerprint(), sharedIdentity)).toBeNull()
+
+    // And it is a lock, not a lockout: the loser gets its turn once the holder releases.
+    lease?.release()
+    const afterRelease = second.tryAcquireRotation(fingerprint(), sharedIdentity)
+
+    expect(afterRelease).not.toBeNull()
+
+    afterRelease?.release()
+  })
+
   it('lets a drifted chain rotate when the live claim is a different identity', () => {
     const rootPath = createRoot()
     const liveInstance = store(rootPath, 1010)
