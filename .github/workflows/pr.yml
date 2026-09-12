@@ -604,6 +604,28 @@ jobs:
           ORCA_REUSE_PREPARED_NATIVE_RUNTIME: '1'
         run: pnpm exec electron-builder --config config/electron-builder.config.cjs --dir
 
+      # Why read the exe and not the config: FileDescription is the string Task
+      # Manager shows, electron-builder writes it from productName, and that write
+      # happens after the afterPack hook that sets it. A config assertion stays green
+      # with the wrong name inside the binary. ORCA-491.
+      - name: Verify Windows executable display name
+        shell: pwsh
+        run: |
+          $exe = 'dist/win-unpacked/Orca Lab.exe'
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Missing packaged executable: $exe"
+          }
+          $info = (Get-Item -LiteralPath $exe).VersionInfo
+          Write-Host "FileDescription=$($info.FileDescription) ProductName=$($info.ProductName) ProductVersion=$($info.ProductVersion)"
+          foreach ($field in 'FileDescription', 'ProductName') {
+            if ($info.$field -ne 'Orca Lab') {
+              throw "$field is '$($info.$field)', expected 'Orca Lab'"
+            }
+          }
+          if (-not $info.ProductVersion) {
+            throw 'ProductVersion is empty; the version resource was not written.'
+          }
+
       - name: Smoke packaged CLI
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/win-unpacked
 
