@@ -15,6 +15,9 @@ const { verifyLinuxGlibcFloor } = require('./scripts/verify-linux-glibc-floor.cj
 const { writeMacBuildCompatibility } = require('./scripts/mac-build-compatibility.cjs')
 const { verifyPackagedPluginResources } = require('./scripts/verify-packaged-plugin-resources.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
+const {
+  writeWindowsExecutableVersionInfo
+} = require('./scripts/windows-executable-version-info.cjs')
 
 // Why: dev-channel builds must carry the *release* identity — same bundle id,
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
@@ -207,6 +210,12 @@ module.exports = {
     if (!existsSync(resourcesDir)) {
       throw new Error(`Missing packaged resources directory: ${resourcesDir}`)
     }
+    // Why here and not electron-builder's own pass: it writes FileDescription from
+    // productName ('Orca') and exposes no override, so the Windows exe announced the
+    // wrong name in Task Manager. ORCA-491.
+    if (context.electronPlatformName === 'win32') {
+      await writeWindowsExecutableVersionInfo(context)
+    }
     if (context.electronPlatformName === 'darwin') {
       const architectureByEnum = { 1: 'x64', 3: 'arm64' }
       const architecture = architectureByEnum[context.arch]
@@ -279,6 +288,12 @@ module.exports = {
   },
   win: {
     executableName: 'Orca Lab',
+    // Why: electron-builder's resource edit and the code signing it is bundled with
+    // are one switch, and the edit runs after afterPack (platformPackager.js:245 then
+    // :255), clobbering the display name written there. afterPack owns the whole
+    // version resource instead. Nothing is lost with it off: there is no Windows
+    // certificate here, so every signing call it skipped was already a no-op.
+    signAndEditExecutable: false,
     // Why: Windows installers are signed after electron-builder packaging by
     // SignPath, so the packager cannot infer the updater publisherName.
     signtoolOptions: {
