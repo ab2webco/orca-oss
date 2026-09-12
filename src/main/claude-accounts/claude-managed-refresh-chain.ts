@@ -6,6 +6,10 @@ import {
   readManagedClaudeKeychainCredentials
 } from './keychain'
 import {
+  claudeRefreshChainIdentityKey,
+  type ClaudeRefreshChainIdentityKey
+} from './claude-refresh-chain-identity'
+import {
   getClaudeManagedAccountsRoot,
   readClaudeManagedAuthFile,
   resolveOwnedClaudeManagedAuthPath
@@ -31,6 +35,13 @@ export function configureManagedClaudeRefreshAccounts(
 
 export function getManagedClaudeRefreshAccounts(): readonly ClaudeManagedAccount[] {
   return managedAccountsSource()
+}
+
+export function resolveManagedClaudeAccountIdentityKey(
+  accountId: string
+): ClaudeRefreshChainIdentityKey | null {
+  const account = managedAccountsSource().find((candidate) => candidate.id === accountId)
+  return account ? claudeRefreshChainIdentityKey(account.email, account.organizationUuid) : null
 }
 
 export async function readManagedClaudeRefreshCredentials(

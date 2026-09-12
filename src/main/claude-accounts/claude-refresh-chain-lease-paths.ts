@@ -1,6 +1,7 @@
 import { readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ClaudeRefreshChainFingerprint } from './claude-refresh-chain-fingerprint'
+import type { ClaudeRefreshChainIdentityKey } from './claude-refresh-chain-identity'
 
 export function claudeRefreshClaimsPath(rootPath: string): string {
   return join(rootPath, 'claims')
@@ -24,9 +25,9 @@ export function claudeRefreshInstancePath(rootPath: string, processId: number): 
 
 export function claudeRefreshRotationLockPath(
   rootPath: string,
-  fingerprint: ClaudeRefreshChainFingerprint
+  chainKey: ClaudeRefreshChainFingerprint | ClaudeRefreshChainIdentityKey
 ): string {
-  return join(claudeRefreshRotationsPath(rootPath), `${fingerprint}.lock`)
+  return join(claudeRefreshRotationsPath(rootPath), `${chainKey}.lock`)
 }
 
 export function removeClaudeRefreshClaim(rootPath: string, ownerId: string): void {
