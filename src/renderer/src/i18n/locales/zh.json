@@ -5527,6 +5527,7 @@
           "clearAccountConfig": "Clear config (start fresh)",
           "editEndpointLoadFailed": "Could not load the endpoint settings.",
           "editEndpointRemoteUnsupported": "此端点位于 {{value0}}，该服务器的 Orca 版本无法编辑它。请更新服务器。",
+          "globalConfigSyncRemoteUnsupported": "这些账户位于 {{value0}}，该服务器的 Orca 版本无法同步全局配置。请更新服务器。",
           "editEndpoint": "编辑",
           "editEndpointTitle": "Edit Custom Endpoint Account",
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",

@@ -45,6 +45,11 @@ export const HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY = 'accounts.host-reauth.v1' 
 // custom endpoint is disabled in remote scope, so enabling it needs proof the host
 // can read and write the endpoint — trading a dead button for a dead click is no fix.
 export const CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY = 'accounts.custom-endpoint-edit.v1' as const
+
+// Why a capability for this one and a plain error for the per-account items: the
+// roster-wide Sync button is disabled in remote scope today, and enabling it
+// against a host without the methods trades a dead button for a dead click.
+export const GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY = 'accounts.global-config.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
@@ -192,7 +197,8 @@ export const RUNTIME_CAPABILITIES = [
   PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY,
-  CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY
+  CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
+  GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})

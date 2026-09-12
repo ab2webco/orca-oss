@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAppStore } from '@/store'
+import {
+  previewGlobalConfigForProviderAccounts,
+  resyncGlobalConfigForProviderAccounts,
+  syncGlobalConfigForProviderAccount
+} from '@/runtime/runtime-provider-global-config'
 import { Loader2, Blocks, PlugZap, Webhook } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -69,6 +75,9 @@ export function GlobalConfigSyncDialog({
   accountId,
   onSynced
 }: GlobalConfigSyncDialogProps): React.JSX.Element {
+  // Why from the store and not a prop: every call below has to reach whichever
+  // host owns the accounts, and the dialog's callers do not carry that.
+  const settings = useAppStore((state) => state.settings)
   const [inventory, setInventory] = useState<GlobalConfigSyncInventory | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -84,8 +93,9 @@ export function GlobalConfigSyncDialog({
     let cancelled = false
     setLoading(true)
     setInventory(null)
-    void window.api.claudeAccounts
-      .previewGlobalConfig()
+    // Why routed: the owner resolves this selection by name when it seeds, so an
+    // inventory read off this desktop would name servers the owner does not have.
+    void previewGlobalConfigForProviderAccounts(settings)
       .then((result) => {
         if (cancelled) {
           return
@@ -115,7 +125,7 @@ export function GlobalConfigSyncDialog({
     return () => {
       cancelled = true
     }
-  }, [open, onOpenChange])
+  }, [open, onOpenChange, settings])
 
   const totalSelected = selectedMcp.size + selectedSkills.size + selectedHooks.size
 
@@ -129,7 +139,7 @@ export function GlobalConfigSyncDialog({
     setSubmitting(true)
     try {
       if (accountId) {
-        await window.api.claudeAccounts.syncGlobalConfigForAccount({ accountId, selection })
+        await syncGlobalConfigForProviderAccount(settings, { accountId, selection })
         toast.success(
           translate(
             'auto.components.settings.GlobalConfigSyncDialog.syncedAccount',
@@ -137,7 +147,7 @@ export function GlobalConfigSyncDialog({
           )
         )
       } else {
-        const processed = await window.api.claudeAccounts.resyncGlobalConfig({ selection })
+        const processed = await resyncGlobalConfigForProviderAccounts(settings, { selection })
         toast.success(
           translate(
             'auto.components.settings.GlobalConfigSyncDialog.syncedAll',
@@ -165,6 +175,7 @@ export function GlobalConfigSyncDialog({
     selectedHooks,
     selectedMcp,
     selectedSkills,
+    settings,
     writeGlobalHooks
   ])
 

@@ -1207,6 +1207,10 @@ import type {
   ClaudeCustomEndpointAccountInput,
   ClaudeCustomEndpointAccountUpdateInput
 } from '../claude-accounts/service'
+import type {
+  GlobalConfigSyncInventory,
+  GlobalConfigSyncSelection
+} from '../../shared/global-config-sync'
 import {
   beginHostLogin,
   completeHostLogin,
@@ -14134,6 +14138,27 @@ export class OrcaRuntimeService {
     input: ClaudeCustomEndpointAccountUpdateInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.requireAccountServices().claudeAccounts.updateCustomEndpointAccount(input)
+  }
+
+  // Why these four are reachable from a remote client: the global config they
+  // seed lives on the account owner, so the inventory a caller picks from and
+  // the vault it lands in have to be the same machine's.
+  buildGlobalConfigSyncInventory(): GlobalConfigSyncInventory {
+    return this.requireAccountServices().claudeAccounts.buildGlobalConfigSyncInventory()
+  }
+
+  syncGlobalConfigForClaudeAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
+    this.requireAccountServices().claudeAccounts.syncGlobalConfigForAccount(accountId, selection)
+  }
+
+  resyncClaudeGlobalConfig(selection?: GlobalConfigSyncSelection): number {
+    return this.requireAccountServices().claudeAccounts.resyncGlobalConfigIntoManagedVaults(
+      selection
+    )
+  }
+
+  clearGlobalConfigForClaudeAccount(accountId: string): void {
+    this.requireAccountServices().claudeAccounts.clearGlobalConfigForAccount(accountId)
   }
 
   // Why these three and not one call: the sign-in has a human in the middle.

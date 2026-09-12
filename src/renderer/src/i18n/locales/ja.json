@@ -5515,6 +5515,7 @@
           "clearAccountConfig": "Clear config (start fresh)",
           "editEndpointLoadFailed": "Could not load the endpoint settings.",
           "editEndpointRemoteUnsupported": "このエンドポイントは {{value0}} 上にあり、そのサーバーの Orca のバージョンでは編集できません。サーバーを更新してください。",
+          "globalConfigSyncRemoteUnsupported": "これらのアカウントは {{value0}} 上にあり、そのサーバーの Orca のバージョンではグローバル設定を同期できません。サーバーを更新してください。",
           "editEndpoint": "Edit",
           "editEndpointTitle": "Edit Custom Endpoint Account",
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
