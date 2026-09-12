@@ -5545,7 +5545,8 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "reassignSystemDefault": "System default"
+          "reassignSystemDefault": "System default",
+          "hostReauthUnsupported": "Este servidor es demasiado antiguo para volver a autenticar una cuenta en su sitio. Actualízalo, o inicia sesión en el propio servidor."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",
@@ -10633,6 +10634,10 @@
           "shadowed": "Instalado, pero sigue ganando la copia vieja",
           "shadowedDetail": "Pone {dir} primero en tu PATH y abri una terminal nueva.",
           "failed": "No se pudo reinstalar"
+        },
+        "HostAccountLoginDialog": {
+          "reauthTitle": "Volver a autenticar en {{server}}",
+          "reauthDescription": "Esto actualiza la cuenta que ya existe en el servidor y conserva sus worktrees fijados. Inicia sesión con la misma cuenta: otra distinta se rechaza."
         }
       },
       "right": {

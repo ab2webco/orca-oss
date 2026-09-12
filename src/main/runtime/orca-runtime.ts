@@ -14127,16 +14127,36 @@ export class OrcaRuntimeService {
   // code from that page; the host feeds it in and imports the credentials. The
   // caller never names a path — `home` is chosen here — so the guard that keeps
   // remote clients away from arbitrary credential directories still holds.
-  beginHostAccountLogin(agent: HostLoginAgent): Promise<HostLoginSessionStarted> {
-    return beginHostLogin(agent)
+  beginHostAccountLogin(
+    agent: HostLoginAgent,
+    accountId: string | null = null
+  ): Promise<HostLoginSessionStarted> {
+    return beginHostLogin(agent, accountId)
   }
 
   async completeHostAccountLogin(
     sessionId: string,
     code: string | null
   ): Promise<ClaudeRateLimitAccountsState | CodexRateLimitAccountsState | GithubCliImportResult> {
-    const { agent, home } = await completeHostLogin(sessionId, code)
+    const { agent, home, accountId } = await completeHostLogin(sessionId, code)
     try {
+      if (accountId !== null) {
+        if (agent === 'github') {
+          throw new Error('GitHub CLI credentials are not a managed account to re-authenticate.')
+        }
+        // Why in place and not add: `add` mints a new id, so the repaired entry
+        // would lose its vault and every worktree pinned to it, and the broken
+        // row would survive next to a duplicate of the same email.
+        return agent === 'claude'
+          ? await this.requireAccountServices().claudeAccounts.reauthenticateAccountFromConfigDir(
+              accountId,
+              home
+            )
+          : await this.requireAccountServices().codexAccounts.reauthenticateAccountFromHome(
+              accountId,
+              home
+            )
+      }
       if (agent === 'github') {
         // Why not an "account": gh credentials are not a managed provider vault
         // — they live in this host's gh config and are what turns off the

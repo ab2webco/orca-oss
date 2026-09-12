@@ -118,7 +118,11 @@ const BeginHostLoginParams = z.object({
   // agent sign-ins — a device code the user carries to a browser — and it is
   // what clears the "GitHub CLI is not authenticated" preflight issue on a host
   // whose browser the caller cannot open.
-  agent: z.enum(['claude', 'codex', 'github'])
+  agent: z.enum(['claude', 'codex', 'github']),
+  // Why optional: absent means "add an account", present means "repair this
+  // one". Clients gate it on accounts.host-reauth.v1 because an older host
+  // strips it and adds a duplicate row instead of refusing.
+  accountId: z.string().min(1).optional()
 })
 
 const CompleteHostLoginParams = z.object({
@@ -278,7 +282,8 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     // provider name, and later the code the user copied from the sign-in page.
     name: 'accounts.beginHostLogin',
     params: BeginHostLoginParams,
-    handler: async (params, { runtime }) => runtime.beginHostAccountLogin(params.agent)
+    handler: async (params, { runtime }) =>
+      runtime.beginHostAccountLogin(params.agent, params.accountId ?? null)
   }),
   defineMethod({
     name: 'accounts.completeHostLogin',

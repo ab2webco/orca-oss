@@ -5531,7 +5531,8 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "reassignSystemDefault": "System default"
+          "reassignSystemDefault": "System default",
+          "hostReauthUnsupported": "该服务器版本过旧，无法就地重新验证账户。请更新服务器，或直接在服务器上登录。"
         },
         "AdvancedPane": {
           "40b29e0bf3": "重新启动",
@@ -10642,6 +10643,10 @@
           "shadowed": "已安装，但旧版本仍然优先",
           "shadowedDetail": "把 {dir} 放到 PATH 最前面，然后打开一个新终端。",
           "failed": "无法重新安装"
+        },
+        "HostAccountLoginDialog": {
+          "reauthTitle": "在 {{server}} 上重新验证",
+          "reauthDescription": "这会刷新服务器上已有的账户，并保留其工作树绑定。请使用同一个账户登录；换成其他账户会被拒绝。"
         }
       },
       "right": {

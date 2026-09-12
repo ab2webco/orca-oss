@@ -5530,7 +5530,8 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "reassignSystemDefault": "System default"
+          "reassignSystemDefault": "System default",
+          "hostReauthUnsupported": "이 서버는 버전이 오래되어 계정을 그 자리에서 다시 인증할 수 없습니다. 서버를 업데이트하거나 서버에서 직접 로그인하세요."
         },
         "AdvancedPane": {
           "40b29e0bf3": "다시 시작",
@@ -10633,6 +10634,10 @@
           "shadowed": "설치했지만 아직 이전 버전이 우선합니다",
           "shadowedDetail": "PATH 맨 앞에 {dir}을(를) 두고 새 터미널을 여세요.",
           "failed": "다시 설치하지 못했습니다"
+        },
+        "HostAccountLoginDialog": {
+          "reauthTitle": "{{server}}에서 재인증",
+          "reauthDescription": "서버에 있는 기존 계정을 갱신하며 워크트리 고정은 그대로 유지됩니다. 같은 계정으로 로그인하세요. 다른 계정은 거부됩니다."
         }
       },
       "right": {

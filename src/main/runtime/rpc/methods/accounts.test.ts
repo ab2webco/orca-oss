@@ -157,9 +157,28 @@ describe('account RPC methods', () => {
     await call('accounts.completeHostLogin', { sessionId: 's-1', code: 'abc' })
     await call('accounts.cancelHostLogin', { sessionId: 's-1' })
 
-    expect(begin).toHaveBeenCalledWith('claude')
+    expect(begin).toHaveBeenCalledWith('claude', null)
     expect(complete).toHaveBeenCalledWith('s-1', 'abc')
     expect(cancel).toHaveBeenCalledWith('s-1')
+  })
+
+  // Why the id rides on begin and not on complete: binding it to the session at
+  // the start is what stops a caller from starting a sign-in as one account and
+  // landing the captured tokens in another (ORCA-482).
+  it('carries the account to repair into the host sign-in it starts', async () => {
+    const begin = vi.fn().mockResolvedValue({ sessionId: 's-2', url: 'https://example.test' })
+    const runtime = { beginHostAccountLogin: begin } as unknown as OrcaRuntimeService
+    const beginMethod = method('accounts.beginHostLogin')
+    if (isStreamingMethod(beginMethod)) {
+      throw new Error('accounts.beginHostLogin must be a request method')
+    }
+
+    await beginMethod.handler(
+      { agent: 'codex', accountId: 'codex-account-7' },
+      { runtime, clientKind: 'runtime' }
+    )
+
+    expect(begin).toHaveBeenCalledWith('codex', 'codex-account-7')
   })
 
   // Why this one is not in the rejection table above: it carries no host

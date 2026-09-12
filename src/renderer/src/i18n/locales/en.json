@@ -5898,7 +5898,8 @@
           "editEndpointSubmit": "Save changes",
           "reassignSystemDefault": "System default",
           "checkSignInHint": "Asks the provider whether this credential still works. One request for this account only.",
-          "checkSignIn": "Check sign-in"
+          "checkSignIn": "Check sign-in",
+          "hostReauthUnsupported": "This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -11248,7 +11249,9 @@
           "deviceCode": "Enter this code on that page:",
           "codeLabel": "Code from that page",
           "cancel": "Cancel",
-          "finish": "Finish sign-in"
+          "finish": "Finish sign-in",
+          "reauthTitle": "Re-authenticate on {{server}}",
+          "reauthDescription": "This refreshes the existing account on the server, keeping its worktree pins. Sign in as the same account — a different one is refused."
         },
         "AgentCliSelfUpdateNotice": {
           "blocked": "This CLI can't update itself",

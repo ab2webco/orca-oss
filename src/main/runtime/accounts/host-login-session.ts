@@ -23,6 +23,8 @@ type Session = {
   child: ChildProcess
   /** Chosen here, never by the caller: a remote client must not name a path. */
   home: string
+  /** Set when this sign-in repairs an existing account instead of adding one. */
+  accountId: string | null
   exited: Promise<number | null>
   transcript: string
 }
@@ -127,7 +129,10 @@ function parseTranscript(transcript: string): Omit<HostLoginSessionStarted, 'ses
 export const _parseHostLoginTranscriptForTest = parseTranscript
 
 /** Start an agent sign-in on this host and return what the user needs to see. */
-export async function beginHostLogin(agent: HostLoginAgent): Promise<HostLoginSessionStarted> {
+export async function beginHostLogin(
+  agent: HostLoginAgent,
+  accountId: string | null = null
+): Promise<HostLoginSessionStarted> {
   const home = mkdtempSync(join(tmpdir(), `orca-host-login-${agent}-`))
   const { command, args, env } = agentInvocation(agent, home)
   const child = spawn(resolveCliCommand(command), args, {
@@ -139,6 +144,7 @@ export async function beginHostLogin(agent: HostLoginAgent): Promise<HostLoginSe
     agent,
     child,
     home,
+    accountId,
     transcript: '',
     exited: new Promise((resolve) => child.once('close', (code) => resolve(code)))
   }
@@ -185,6 +191,10 @@ export type HostLoginCompletion = {
   agent: HostLoginAgent
   /** The directory the agent wrote its credentials into, chosen by this host. */
   home: string
+  // Why bound at begin and not taken as a completion param: a caller that could
+  // name the account here could start a sign-in as one account and land the
+  // captured tokens in another.
+  accountId: string | null
 }
 
 /** Hand the agent the code the user copied, then wait for it to finish. */
@@ -213,7 +223,7 @@ export async function completeHostLogin(
   sessions.delete(sessionId)
   // Why the caller cleans up and not this module: the credentials still have to
   // be imported out of `home`, and deleting it here would race that import.
-  return { agent: session.agent, home: session.home }
+  return { agent: session.agent, home: session.home, accountId: session.accountId }
 }
 
 /** Kill a session the user abandoned and remove its temporary credentials. */
