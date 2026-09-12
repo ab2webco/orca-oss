@@ -2047,7 +2047,9 @@ export function useIpcEvents(): void {
           window.dispatchEvent(new CustomEvent(CLOSE_TERMINAL_PANE_EVENT, { detail }))
         } else {
           // Why: the CLI/RPC caller is answered immediately, so it cannot wait on a modal.
-          closeTerminalTab(tabId, { skipRunningProcessConfirm: true })
+          // Why `runtimeInitiated`: solo el runtime emite este canal, y sin la marca el
+          // preload viejo le borraba al worker retirado su autoridad de resume (ORCA-488).
+          closeTerminalTab(tabId, { skipRunningProcessConfirm: true, runtimeInitiated: true })
         }
       })
     )
