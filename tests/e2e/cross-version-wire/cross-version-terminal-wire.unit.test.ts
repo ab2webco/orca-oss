@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { resolveBaselineReleaseRef, selectLatestStableReleaseTag } from './release-checkout'
+import { execFileSync } from 'node:child_process'
+import { REPO_ROOT, resolveBaselineReleaseRef, selectBaselineReleaseTag } from './release-checkout'
 import {
   JOURNEY_INPUTS,
   JOURNEY_STEPS,
@@ -91,16 +92,35 @@ function expectWireCompatible(record: JourneyRecord): void {
   }
 }
 
+function isReachableFromHead(ref: string): boolean {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', `${ref}^{commit}`, 'HEAD'], {
+      cwd: REPO_ROOT,
+      stdio: 'ignore'
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 describe('cross-version remote terminal wire', () => {
-  it('ignores legacy, mobile, and prerelease tags when selecting the baseline', () => {
+  it('ignores legacy and mobile tags, and releases this history never merged', () => {
+    // A development clone carries the upstream remote's tags. `v1.4.197` is newer than every
+    // reachable tag and must still lose: pairing against a release this repo never merged is a
+    // pairing that never ships, and the journey hangs on it instead of failing (ORCA-497).
+    const reachable = new Set(['v1.4.175', 'v1.4.176-lab.9', 'v1.4.176-lab.82'])
     expect(
-      selectLatestStableReleaseTag([
-        'v799',
-        'mobile-v9.0.0',
-        'v1.4.177-rc.3',
-        'v1.4.175',
-        'v1.4.176'
-      ])
+      selectBaselineReleaseTag(
+        ['v799', 'mobile-v9.0.0', 'v1.4.197', 'v1.4.175', 'v1.4.176-lab.9', 'v1.4.176-lab.82'],
+        (tag) => reachable.has(tag)
+      )
+    ).toBe('v1.4.176-lab.82')
+  })
+
+  it('prefers a finished release over its own prereleases', () => {
+    expect(
+      selectBaselineReleaseTag(['v1.4.176-lab.82', 'v1.4.176', 'v1.4.176-rc.1'], () => true)
     ).toBe('v1.4.176')
   })
 
@@ -108,6 +128,11 @@ describe('cross-version remote terminal wire', () => {
     'skews current code against a real published release',
     () => {
       expect(baselineRef).toMatch(/^v?\d/)
+      // The pairing only means something if current code descends from the baseline.
+      expect({ baselineRef, reachable: isReachableFromHead(baselineRef) }).toEqual({
+        baselineRef,
+        reachable: true
+      })
       expect(baseline.revision).toMatch(/^[0-9a-f]{40}$/)
       expect(baseline.revision).not.toBe(current.revision)
     },

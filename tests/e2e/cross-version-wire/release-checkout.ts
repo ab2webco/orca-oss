@@ -21,7 +21,7 @@ const CHECKOUT_FORMAT = 1
 const ARCHIVE_PATHS = ['src/main', 'src/shared', 'src/preload', 'src/renderer', 'src/types']
 
 const BASELINE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
-const STABLE_DESKTOP_RELEASE_TAG = /^v\d+\.\d+\.\d+$/
+const DESKTOP_RELEASE_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/
 
 export type ReleaseCheckout = {
   /** The ref as requested, e.g. `v1.4.169`. */
@@ -43,26 +43,55 @@ function git(args: string[]): string {
 }
 
 function compareReleaseTags(a: string, b: string): number {
-  const parts = (tag: string): number[] =>
-    tag
-      .replace(/^v/, '')
-      .split('.')
-      .map((part) => Number.parseInt(part, 10))
-      .map((value) => (Number.isFinite(value) ? value : 0))
-  const left = parts(a)
-  const right = parts(b)
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0)
+  const left = DESKTOP_RELEASE_TAG.exec(a)
+  const right = DESKTOP_RELEASE_TAG.exec(b)
+  if (!left || !right) {
+    return 0
+  }
+  for (let index = 1; index <= 3; index++) {
+    const diff = Number(left[index]) - Number(right[index])
     if (diff !== 0) {
       return diff
     }
+  }
+  return comparePrereleases(left[4], right[4])
+}
+
+// Semver ordering: a release outranks any prerelease of the same version, and between two
+// prereleases a numeric identifier compares as a number so `lab.9` sorts below `lab.82`.
+function comparePrereleases(a: string | undefined, b: string | undefined): number {
+  if (a === b) {
+    return 0
+  }
+  if (a === undefined) {
+    return 1
+  }
+  if (b === undefined) {
+    return -1
+  }
+  const left = a.split('.')
+  const right = b.split('.')
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const one = left[index]
+    const other = right[index]
+    if (one === undefined) {
+      return -1
+    }
+    if (other === undefined) {
+      return 1
+    }
+    if (one === other) {
+      continue
+    }
+    const numeric = /^\d+$/.test(one) && /^\d+$/.test(other)
+    return numeric ? Number(one) - Number(other) : one.localeCompare(other)
   }
   return 0
 }
 
 /**
  * The version point the harness pairs current code against. An explicit
- * {@link BASELINE_REF_ENV} wins; otherwise the newest stable desktop release tag.
+ * {@link BASELINE_REF_ENV} wins; otherwise the newest release this history descends from.
  *
  * Throws rather than skipping: a cross-version lane that quietly runs nothing is
  * the exact failure this harness exists to prevent.
@@ -73,29 +102,47 @@ export function resolveBaselineReleaseRef(): string {
     return override
   }
   let tags: string[]
+  let reachable: Set<string>
   try {
     tags = git(['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean)
+    reachable = new Set(
+      git(['tag', '--list', 'v[0-9]*', '--merged', 'HEAD']).split('\n').filter(Boolean)
+    )
   } catch (error) {
     throw new Error(
       `Cross-version harness could not list git tags in ${REPO_ROOT}: ${String(error)}. ` +
         `Run it inside a git checkout, or pin a ref with ${BASELINE_REF_ENV}.`
     )
   }
-  const latest = selectLatestStableReleaseTag(tags)
+  const latest = selectBaselineReleaseTag(tags, (tag) => reachable.has(tag))
   if (!latest) {
     throw new Error(
-      `Cross-version harness found no stable desktop release tags matching vX.Y.Z (saw ${tags.length} tag(s) total). ` +
-        'CI checkouts default to a shallow clone with no tags: use `actions/checkout` with `fetch-depth: 0`, ' +
-        `or pin a ref with ${BASELINE_REF_ENV}.`
+      `Cross-version harness found no vX.Y.Z release tag reachable from HEAD (saw ${tags.length} tag(s) total, ` +
+        `${reachable.size} of them reachable). A shallow CI clone has no tags: use \`actions/checkout\` with ` +
+        `\`fetch-depth: 0\`, or pin a ref with ${BASELINE_REF_ENV}.`
     )
   }
   return latest
 }
 
-export function selectLatestStableReleaseTag(tags: string[]): string | null {
+/**
+ * The newest release-shaped tag the given history actually descends from.
+ *
+ * Why reachability and not just the newest tag: a development clone carries the `upstream`
+ * remote's tags too, so "newest in the clone" can name a release this repo never merged. Pairing
+ * current code against a build that never shipped together with it proves nothing — and it hangs
+ * the journey instead of failing it, because the two sides disagree about the protocol outright.
+ *
+ * Why prereleases count: a repo whose every cut is `vX.Y.Z-lab.N` has no other baseline, and a
+ * lane with no baseline is the one failure mode this harness must never have.
+ */
+export function selectBaselineReleaseTag(
+  tags: readonly string[],
+  isReachable: (tag: string) => boolean
+): string | null {
   return (
     tags
-      .filter((tag) => STABLE_DESKTOP_RELEASE_TAG.test(tag))
+      .filter((tag) => DESKTOP_RELEASE_TAG.test(tag) && isReachable(tag))
       .sort(compareReleaseTags)
       .at(-1) ?? null
   )
