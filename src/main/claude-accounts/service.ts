@@ -290,6 +290,22 @@ export class ClaudeAccountService {
     )
   }
 
+  /**
+   * Re-authenticates in place from a `CLAUDE_CONFIG_DIR` this host already signed
+   * into, for a caller with no browser on it. Keeps the vault (so worktree pins
+   * survive), the rollback and the identity check of the interactive flow.
+   */
+  async reauthenticateAccountFromConfigDir(
+    accountId: string,
+    configDir: string
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(() =>
+      this.withManagedAccountMutation(accountId, () =>
+        this.doReauthenticateAccount(accountId, configDir)
+      )
+    )
+  }
+
   async removeAccount(
     accountId: string,
     options: ClaudeAccountRemovalOptions = {}
@@ -860,7 +876,10 @@ export class ClaudeAccountService {
     }
   }
 
-  private async doReauthenticateAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
+  private async doReauthenticateAccount(
+    accountId: string,
+    capturedConfigDir?: string
+  ): Promise<ClaudeRateLimitAccountsState> {
     this.assertAccountAuthIsIdle(accountId)
     const account = this.requireAccount(accountId)
     if (account.authMethod === 'custom-endpoint') {
@@ -871,12 +890,14 @@ export class ClaudeAccountService {
     const managedAuthPath = this.assertManagedAuthPath(account.managedAuthPath, accountId)
     const previousSettings = this.store.getSettings()
     const previousManagedAuth = await this.readManagedAuthSnapshot(accountId, managedAuthPath)
-    const captured = await this.runClaudeLoginAndCapture({
-      managedAuthPath,
-      managedAuthRuntime: account.managedAuthRuntime ?? 'host',
-      wslDistro: account.wslDistro ?? null,
-      wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
-    })
+    const captured = capturedConfigDir
+      ? await this.captureFromExistingConfigDir(capturedConfigDir)
+      : await this.runClaudeLoginAndCapture({
+          managedAuthPath,
+          managedAuthRuntime: account.managedAuthRuntime ?? 'host',
+          wslDistro: account.wslDistro ?? null,
+          wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
+        })
     if (!captured.identity.email) {
       throw new Error('Claude login completed, but Orca Lab could not resolve the account email.')
     }

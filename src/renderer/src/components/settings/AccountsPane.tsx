@@ -118,7 +118,10 @@ import {
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { addClaudeCustomEndpointProviderAccount } from '@/runtime/runtime-provider-custom-endpoint'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
-import { HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import {
+  HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
+  HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
+} from '../../../../shared/protocol-version'
 import { HostAccountLoginDialog } from './HostAccountLoginDialog'
 import {
   emptyClaudeAccountsState,
@@ -411,7 +414,11 @@ export function AccountsPane({
   // Why: with a Remote Orca Server active the server owns provider accounts
   // (see #7973); every list/select/remove below must scope to it, not host/WSL.
   const isRemoteAccountScope = hasRemoteProviderAccountOwner(settings)
-  const [hostLoginAgent, setHostLoginAgent] = useState<'claude' | 'codex' | null>(null)
+  // An accountId turns the dialog into a re-authentication of that entry.
+  const [hostLogin, setHostLogin] = useState<{
+    agent: 'claude' | 'codex'
+    accountId: string | null
+  } | null>(null)
   // Why the web client joins this lane: the page is served by the runtime that
   // owns the accounts, so its interactive add has to run there too. Its accounts
   // shim resolves an empty roster instead, which read as the button doing
@@ -420,11 +427,15 @@ export function AccountsPane({
   // Why ask the runtime instead of assuming: a newer client against an older
   // server must keep the button disabled rather than fail on click.
   const [hostLoginSupported, setHostLoginSupported] = useState(false)
+  // Why separate from the add capability: a server that only knows host-login
+  // strips the account id and adds a duplicate row instead of repairing.
+  const [hostReauthSupported, setHostReauthSupported] = useState(false)
   const activeRuntimeEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
 
   useEffect(() => {
     if (!hostLoginLane) {
       setHostLoginSupported(false)
+      setHostReauthSupported(false)
       return
     }
     let cancelled = false
@@ -432,23 +443,33 @@ export function AccountsPane({
     // web client has no environment id — the runtime serving the page is the one
     // to ask, and that is what a local-target status.get reaches.
     const probe = activeRuntimeEnvironmentId
-      ? runtimeEnvironmentSupportsCapability(
-          activeRuntimeEnvironmentId,
-          HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
-        )
+      ? Promise.all([
+          runtimeEnvironmentSupportsCapability(
+            activeRuntimeEnvironmentId,
+            HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
+          ),
+          runtimeEnvironmentSupportsCapability(
+            activeRuntimeEnvironmentId,
+            HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
+          )
+        ]).then(([add, reauth]) => ({ add, reauth }))
       : callRuntimeRpc<{ capabilities?: string[] }>({ kind: 'local' }, 'status.get').then(
-          (status) =>
-            status.capabilities?.includes(HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY) === true
+          (status) => ({
+            add: status.capabilities?.includes(HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY) === true,
+            reauth: status.capabilities?.includes(HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY) === true
+          })
         )
     void probe
       .then((supported) => {
         if (!cancelled) {
-          setHostLoginSupported(supported)
+          setHostLoginSupported(supported.add)
+          setHostReauthSupported(supported.reauth)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setHostLoginSupported(false)
+          setHostReauthSupported(false)
         }
       })
     return () => {
@@ -1035,7 +1056,7 @@ export function AccountsPane({
     }
   }, [isRemoteAccountScope, claudeRefreshChainRosterKey])
 
-  const reauthenticateForRefreshChainConflict = (accountId: string): void => {
+  const reauthenticateClaudeAccountLocally = (accountId: string): void => {
     const account = claudeAccounts.accounts.find((candidate) => candidate.id === accountId)
     void runClaudeAccountAction(
       `reauth:${accountId}`,
@@ -1044,6 +1065,31 @@ export function AccountsPane({
       accountId
     )
   }
+
+  // Why the server and not this desktop's IPC: the credentials live on the
+  // machine that runs the agent, so the sign-in has to run there too.
+  const reauthenticateProviderAccount = (agent: 'claude' | 'codex', accountId: string): void => {
+    if (hostLoginLane) {
+      setHostLogin({ agent, accountId })
+      return
+    }
+    if (agent === 'claude') {
+      reauthenticateClaudeAccountLocally(accountId)
+      return
+    }
+    const account = codexAccounts.accounts.find((candidate) => candidate.id === accountId)
+    void runCodexAccountAction(
+      `reauth:${accountId}`,
+      () => window.api.codexAccounts.reauthenticate({ accountId }),
+      account ? getProviderAccountRuntime(account) : accountRuntime
+    )
+  }
+
+  const hostReauthUnsupported = hostLoginLane && !hostReauthSupported
+  const hostReauthUnsupportedReason = translate(
+    'auto.components.settings.AccountsPane.hostReauthUnsupported',
+    'This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself.'
+  )
 
   const [globalConfigSyncDialog, setGlobalConfigSyncDialog] = useState<{
     open: boolean
@@ -1412,7 +1458,7 @@ export function AccountsPane({
                 size="xs"
                 onClick={() =>
                   hostLoginLane
-                    ? setHostLoginAgent('claude')
+                    ? setHostLogin({ agent: 'claude', accountId: null })
                     : void runClaudeAccountAction('adding', () =>
                         window.api.claudeAccounts.add({
                           runtime: accountRuntime.runtime,
@@ -1503,7 +1549,7 @@ export function AccountsPane({
             resolveAccountEmail={(accountId) =>
               claudeAccounts.accounts.find((account) => account.id === accountId)?.email ?? null
             }
-            onReauthenticate={reauthenticateForRefreshChainConflict}
+            onReauthenticate={reauthenticateClaudeAccountLocally}
             reauthenticatingAccountId={
               claudeAction.startsWith('reauth:') ? claudeAction.slice('reauth:'.length) : null
             }
@@ -1718,17 +1764,10 @@ export function AccountsPane({
                             size="xs"
                             onClick={(event) => {
                               event.stopPropagation()
-                              void runClaudeAccountAction(
-                                `reauth:${account.id}`,
-                                () =>
-                                  window.api.claudeAccounts.reauthenticate({
-                                    accountId: account.id
-                                  }),
-                                getProviderAccountRuntime(account),
-                                account.id
-                              )
+                              reauthenticateProviderAccount('claude', account.id)
                             }}
-                            disabled={isRemoteAccountScope || isBusy}
+                            disabled={hostReauthUnsupported || isBusy}
+                            title={hostReauthUnsupported ? hostReauthUnsupportedReason : undefined}
                             className="h-6 px-2 text-muted-foreground hover:text-foreground"
                           >
                             {isReauthing ? (
@@ -1935,7 +1974,7 @@ export function AccountsPane({
               size="xs"
               onClick={() =>
                 hostLoginLane
-                  ? setHostLoginAgent('codex')
+                  ? setHostLogin({ agent: 'codex', accountId: null })
                   : void runCodexAccountAction('adding', () =>
                       window.api.codexAccounts.add({
                         runtime: accountRuntime.runtime,
@@ -2168,16 +2207,10 @@ export function AccountsPane({
                           size="xs"
                           onClick={(event) => {
                             event.stopPropagation()
-                            void runCodexAccountAction(
-                              `reauth:${account.id}`,
-                              () =>
-                                window.api.codexAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
-                              getProviderAccountRuntime(account)
-                            )
+                            reauthenticateProviderAccount('codex', account.id)
                           }}
-                          disabled={isRemoteAccountScope || isBusy}
+                          disabled={hostReauthUnsupported || isBusy}
+                          title={hostReauthUnsupported ? hostReauthUnsupportedReason : undefined}
                           className="h-6 px-2 text-muted-foreground hover:text-foreground"
                         >
                           {isReauthing ? (
@@ -2989,11 +3022,12 @@ export function AccountsPane({
       <HostAccountLoginDialog
         // Why keyed: a new provider is a new sign-in, and remounting gives it
         // fresh state without resetting anything on a prop change.
-        key={hostLoginAgent ?? 'none'}
-        agent={hostLoginAgent}
+        key={hostLogin ? `${hostLogin.agent}:${hostLogin.accountId ?? 'add'}` : 'none'}
+        agent={hostLogin?.agent ?? null}
+        accountId={hostLogin?.accountId ?? null}
         settings={settings}
         serverLabel={remoteServerLabel ?? ''}
-        onClose={() => setHostLoginAgent(null)}
+        onClose={() => setHostLogin(null)}
         // Why a refresh and not the returned roster: the pane already watches
         // the server's accounts, and re-reading keeps one source of truth.
         onCompleted={() => void fetchInactiveClaudeAccountUsage()}

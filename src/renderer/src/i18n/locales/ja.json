@@ -5519,7 +5519,8 @@
           "editEndpointDescription": "Update this endpoint. Leave the API token blank to keep the one already stored on this device.",
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
-          "reassignSystemDefault": "System default"
+          "reassignSystemDefault": "System default",
+          "hostReauthUnsupported": "このサーバーはバージョンが古く、アカウントをその場で再認証できません。サーバーを更新するか、サーバー上で直接サインインしてください。"
         },
         "AdvancedPane": {
           "40b29e0bf3": "再起動",
@@ -10622,6 +10623,10 @@
           "shadowed": "インストールしましたが、まだ古い方が優先されています",
           "shadowedDetail": "PATH の先頭に {dir} を置き、新しいターミナルを開いてください。",
           "failed": "再インストールできませんでした"
+        },
+        "HostAccountLoginDialog": {
+          "reauthTitle": "{{server}} で再認証",
+          "reauthDescription": "サーバー上の既存アカウントを更新し、ワークツリーのピン留めはそのまま保持します。同じアカウントでサインインしてください。別のアカウントは拒否されます。"
         }
       },
       "right": {

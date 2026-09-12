@@ -39,6 +39,21 @@ describe('runtime host login client', () => {
     )
   })
 
+  // Why the param is absent rather than null when adding: an older host that
+  // never heard of it must see exactly the payload it saw before.
+  it('names the account to repair only when one was given', async () => {
+    callRuntimeRpc.mockResolvedValueOnce({ sessionId: 's-9', url: 'https://example.test/auth' })
+
+    await beginHostAccountLogin(remote, 'claude', 'claude-7')
+
+    expect(callRuntimeRpc).toHaveBeenLastCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'accounts.beginHostLogin',
+      { agent: 'claude', accountId: 'claude-7' },
+      expect.anything()
+    )
+  })
+
   it('sends the code the user copied back to the same session', async () => {
     callRuntimeRpc.mockResolvedValueOnce({ accounts: [] })
 

@@ -36,6 +36,10 @@ export const PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY =
 // can actually run the sign-in. Against an older runtime the button must keep
 // saying the account is managed on that host instead of failing on click.
 export const HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY = 'accounts.host-login.v1' as const
+// Why its own capability instead of reusing host-login.v1: a host that speaks
+// only the older one strips the unknown `accountId`, ADDS a second row for the
+// same email and answers ok — the silent wrong result, not a visible refusal.
+export const HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY = 'accounts.host-reauth.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
@@ -181,7 +185,8 @@ export const RUNTIME_CAPABILITIES = [
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
   PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY,
-  HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY
+  HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
+  HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})

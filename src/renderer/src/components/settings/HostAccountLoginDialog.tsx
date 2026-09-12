@@ -17,6 +17,8 @@ type Settings = { activeRuntimeEnvironmentId?: string | null } | null | undefine
 
 export type HostAccountLoginDialogProps = {
   agent: HostLoginAgent | null
+  /** An account id turns this into a re-authentication of that entry. */
+  accountId?: string | null
   settings: Settings
   serverLabel: string
   onClose: () => void
@@ -33,6 +35,7 @@ export type HostAccountLoginDialogProps = {
  */
 export function HostAccountLoginDialog({
   agent,
+  accountId = null,
   settings,
   serverLabel,
   onClose,
@@ -53,7 +56,7 @@ export function HostAccountLoginDialog({
     // effect would be adjusting state on a prop change, which React reruns a
     // render to undo and which hides the real lifetime of the session.
     setBusy(true)
-    void beginHostAccountLogin(settings, agent)
+    void beginHostAccountLogin(settings, agent, accountId)
       .then((started) => {
         if (!cancelled) {
           setSession(started)
@@ -72,7 +75,7 @@ export function HostAccountLoginDialog({
     return () => {
       cancelled = true
     }
-  }, [agent, settings])
+  }, [accountId, agent, settings])
 
   const close = useCallback(() => {
     // Why cancel on close: the agent is still running on the server with a
@@ -105,17 +108,28 @@ export function HostAccountLoginDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {translate(
-              'auto.components.settings.HostAccountLoginDialog.title',
-              'Sign in on {{server}}'
+            {(accountId === null
+              ? translate(
+                  'auto.components.settings.HostAccountLoginDialog.title',
+                  'Sign in on {{server}}'
+                )
+              : translate(
+                  'auto.components.settings.HostAccountLoginDialog.reauthTitle',
+                  'Re-authenticate on {{server}}'
+                )
             ).replace('{{server}}', serverLabel)}
           </DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.HostAccountLoginDialog.description',
-            'The account is created on the server, not on this computer. Open the page below, sign in, and bring the code back here.'
-          )}
+          {accountId === null
+            ? translate(
+                'auto.components.settings.HostAccountLoginDialog.description',
+                'The account is created on the server, not on this computer. Open the page below, sign in, and bring the code back here.'
+              )
+            : translate(
+                'auto.components.settings.HostAccountLoginDialog.reauthDescription',
+                'This refreshes the existing account on the server, keeping its worktree pins. Sign in as the same account — a different one is refused.'
+              )}
         </p>
         {session?.url ? (
           <div className="space-y-2">

@@ -325,6 +325,20 @@ export class CodexAccountService {
     return this.serializeMutation(() => this.doReauthenticateAccount(accountId, options))
   }
 
+  /**
+   * Re-authenticates in place from a `CODEX_HOME` this host already signed into,
+   * for a caller with no browser on it. Keeps the managed home, so every
+   * worktree pinned to this account keeps working.
+   */
+  async reauthenticateAccountFromHome(
+    accountId: string,
+    sourceHome: string
+  ): Promise<CodexRateLimitAccountsState> {
+    return this.serializeMutation(() =>
+      this.doReauthenticateAccount(accountId, undefined, sourceHome)
+    )
+  }
+
   async removeAccount(accountId: string): Promise<CodexRateLimitAccountsState> {
     return this.serializeMutation(() => this.doRemoveAccount(accountId))
   }
@@ -824,6 +838,30 @@ export class CodexAccountService {
     })
   }
 
+  // Why restore instead of leaving the import in place: a rejected identity must
+  // not become this account's credentials just because the write already landed.
+  private restoreManagedAuthJson(
+    managedHomePath: string,
+    accountId: string,
+    previousAuthJson: string | null | undefined
+  ): void {
+    if (previousAuthJson === undefined) {
+      console.warn('[codex-accounts] No auth.json snapshot to restore for', accountId)
+      return
+    }
+    try {
+      const trustedHome = this.assertManagedHomePath(managedHomePath, accountId)
+      const authPath = join(trustedHome, 'auth.json')
+      if (previousAuthJson === null) {
+        rmSync(authPath, { force: true })
+        return
+      }
+      writeFileAtomically(authPath, previousAuthJson, { mode: 0o600 })
+    } catch (error) {
+      console.warn('[codex-accounts] Failed to restore auth.json:', error)
+    }
+  }
+
   private async persistCapturedCodexAccount(
     accountId: string,
     managedHome: ManagedHomeLocation
@@ -898,7 +936,8 @@ export class CodexAccountService {
 
   private async doReauthenticateAccount(
     accountId: string,
-    options?: CodexAccountReauthenticateOptions
+    options?: CodexAccountReauthenticateOptions,
+    sourceHome?: string
   ): Promise<CodexRateLimitAccountsState> {
     const account = this.requireAccount(accountId)
     const managedHomePath = this.ensureManagedHomeForReauthentication(account)
@@ -913,11 +952,33 @@ export class CodexAccountService {
     const activateAfterLogin =
       options?.activateIfSelectionWasEmpty === true && selectedAccountId === null
 
+    const previousAuthJson = sourceHome
+      ? readLoginAuthSnapshot(join(managedHomePath, 'auth.json'))
+      : null
+
     this.safeSyncCanonicalConfigIntoManagedHome(managedHomePath, undefined, account.id)
-    await this.runCodexLogin(managedHomePath)
+    if (sourceHome === undefined) {
+      await this.runCodexLogin(managedHomePath)
+    } else {
+      this.importCodexAuthFromHome(sourceHome, managedHomePath, account.id)
+    }
     const identity = this.readIdentityFromHome(managedHomePath, account.id)
     if (!identity.email) {
+      this.restoreManagedAuthJson(managedHomePath, account.id, previousAuthJson)
       throw new Error('Codex login completed, but Orca Lab could not resolve the account email.')
+    }
+    // Why only the imported lane: the browser that signed in belongs to the
+    // client, so its live session — not this host — decides whose tokens arrive,
+    // and adopting another identity would repoint every worktree pinned here.
+    if (
+      sourceHome !== undefined &&
+      account.email &&
+      identity.email.trim().toLowerCase() !== account.email.trim().toLowerCase()
+    ) {
+      this.restoreManagedAuthJson(managedHomePath, account.id, previousAuthJson)
+      throw new Error(
+        `Codex sign-in returned ${identity.email.trim()}, but this entry is ${account.email}. Sign out of that account in your browser (or use a private window), then re-authenticate as ${account.email}.`
+      )
     }
 
     const settings = this.store.getSettings()

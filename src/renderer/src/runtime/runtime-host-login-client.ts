@@ -44,15 +44,17 @@ function requireAccountOwningTarget(settings: Settings): ReturnType<typeof getAc
   )
 }
 
-/** Ask the account-owning server to start a sign-in and report what to open. */
+/** Ask the account-owning server to start a sign-in and report what to open.
+ *  With `accountId`, the server repairs that account instead of adding one. */
 export async function beginHostAccountLogin(
   settings: Settings,
-  agent: HostLoginAgent
+  agent: HostLoginAgent,
+  accountId: string | null = null
 ): Promise<HostLoginStarted> {
   return callRuntimeRpc<HostLoginStarted>(
     requireAccountOwningTarget(settings),
     'accounts.beginHostLogin',
-    { agent },
+    accountId === null ? { agent } : { agent, accountId },
     { timeoutMs: BEGIN_TIMEOUT_MS }
   )
 }
