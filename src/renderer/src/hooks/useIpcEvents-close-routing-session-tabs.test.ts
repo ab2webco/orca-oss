@@ -92,9 +92,11 @@ describe('useIpcEvents browser tab close routing', () => {
 
     closeTerminalListenerRef.current?.({ tabId: 'terminal-1' })
 
-    // The CLI/RPC caller is answered immediately, so this close must never raise a modal.
+    // The CLI/RPC caller is answered immediately, so this close must never raise a modal,
+    // and only the runtime emits this channel — de ahi `runtimeInitiated` (ORCA-488).
     expect(closeTerminalTabMock).toHaveBeenCalledWith('terminal-1', {
-      skipRunningProcessConfirm: true
+      skipRunningProcessConfirm: true,
+      runtimeInitiated: true
     })
   })
 
