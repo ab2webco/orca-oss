@@ -1203,7 +1203,9 @@ import { detectGitHubAvatarIcon, detectRepoIconAndUpstream } from '../repo-icon-
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import type {
   ClaudeAccountService,
-  ClaudeCustomEndpointAccountInput
+  ClaudeCustomEndpointAccountConfig,
+  ClaudeCustomEndpointAccountInput,
+  ClaudeCustomEndpointAccountUpdateInput
 } from '../claude-accounts/service'
 import {
   beginHostLogin,
@@ -14120,6 +14122,18 @@ export class OrcaRuntimeService {
     input: ClaudeCustomEndpointAccountInput
   ): Promise<ClaudeRateLimitAccountsState> {
     return this.requireAccountServices().claudeAccounts.addCustomEndpointAccount(input)
+  }
+
+  // Why these two share that exemption: the read hands back no token and the
+  // update names an account id, so neither lets a caller reach a host path.
+  getClaudeCustomEndpointAccountConfig(accountId: string): ClaudeCustomEndpointAccountConfig {
+    return this.requireAccountServices().claudeAccounts.getCustomEndpointAccountConfig(accountId)
+  }
+
+  updateClaudeCustomEndpointAccount(
+    input: ClaudeCustomEndpointAccountUpdateInput
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.requireAccountServices().claudeAccounts.updateCustomEndpointAccount(input)
   }
 
   // Why these three and not one call: the sign-in has a human in the middle.

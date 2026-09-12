@@ -5899,7 +5899,8 @@
           "reassignSystemDefault": "System default",
           "checkSignInHint": "Asks the provider whether this credential still works. One request for this account only.",
           "checkSignIn": "Check sign-in",
-          "hostReauthUnsupported": "This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself."
+          "hostReauthUnsupported": "This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself.",
+          "editEndpointRemoteUnsupported": "This endpoint lives on {{value0}}, which is running a version of Orca that cannot edit it. Update the server."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
