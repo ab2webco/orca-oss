@@ -21,7 +21,10 @@ export function closeLocalTerminalTabState(
   // Why aqui y no en cada sitio que cierra: este es el punto comun por donde
   // pasan todas las rutas de cierre local, remota incluida.
   const { retainSleepingAgents, ...closeTabOptions } = options ?? {}
-  if (!retainSleepingAgents) {
+  // Why `runtimeInitiated` tambien: un cierre por CLI/RPC no es el usuario dando fe de
+  // que el agente termino — el store ya decide asi (`retiresAgentSessions`, terminals.ts),
+  // y borrar antes de llegar ahi le saca al worker retirado su autoridad de resume.
+  if (!retainSleepingAgents && !closeTabOptions.runtimeInitiated) {
     clearSleepingAgentSessionsForClosedTab(terminalTabId)
   }
   // Why se consume aqui: la bandera decide la limpieza y nada mas. Reenviarla al
