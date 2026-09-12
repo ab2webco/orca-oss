@@ -1761,6 +1761,7 @@ export function AccountsPane({
                           // Why the span carries the reason: the disabled Button sets
                           // pointer-events-none, so its own title never surfaces.
                           <span
+                            className="inline-flex"
                             title={
                               endpointEditBlockedReason === null
                                 ? undefined

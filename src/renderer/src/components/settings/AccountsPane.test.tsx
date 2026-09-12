@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -175,6 +176,19 @@ describe('AccountsPane', () => {
 
     expect(markup).not.toContain('recorded refresh chain')
     expect(markup).not.toContain('Orca Lab couldn&#x27;t verify')
+  })
+
+  // Why a source guard and not a click: this pane only renders here, so nothing
+  // else would notice the edit dialog being pointed back at the desktop preload —
+  // which is the exact regression ORCA-484 fixed.
+  it('reaches the endpoint dialog through the runtime helper, not the local preload', () => {
+    const source = readFileSync(new URL('./AccountsPane.tsx', import.meta.url), 'utf8')
+
+    expect(source).not.toMatch(
+      /window\.api\.claudeAccounts\.(getCustomEndpointConfig|updateCustomEndpoint)/
+    )
+    expect(source).toContain('getClaudeCustomEndpointProviderConfig(settings')
+    expect(source).toContain('updateClaudeCustomEndpointProviderAccount(settings')
   })
 
   it('offers the Claude custom endpoint action locally', () => {
