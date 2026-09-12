@@ -53,15 +53,18 @@ sweep_line() {
   # Deriva del board: tickets In Progress cuyo PR ya mergeó. El harness sólo mira el
   # board al abrir el PR, así que nadie los mueve — 8 de 11 el día que se midió (ORCA-471).
   # Una sola llamada a `gh` y una a `orca`: N consultas por tick chocan el rate limit.
-  local drift merged inprog
+  local drift merged inprog board_read
   merged=$(gh pr list -R "$REPO" --state merged --limit 60 --json title 2>/dev/null |
     grep -oiE 'ORCA-[0-9]+' | tr 'a-z' 'A-Z' | sort -u)
-  inprog=$(orca plane list --project "$PROJECT" --state "In Progress" --json 2>/dev/null |
-    jq -r 'if .ok then ([..|objects|select(.identifier?)|.identifier]|join("\n")) else empty end' 2>/dev/null)
-  # Sin `.ok` la lista vacía de una caída se lee como "cero deriva", que es la misma
-  # mentira que este contador existe para romper.
-  if [ -z "$inprog" ]; then
+  # Why `.ok` aparte de la lista: un board sano sin nada en progreso devuelve la misma
+  # lista vacía que una caída, y `?` sobre un board sano enseña a ignorar el contador.
+  board_read=$(orca plane list --project "$PROJECT" --state "In Progress" --json 2>/dev/null)
+  inprog=$(jq -r 'if .ok then ([..|objects|select(.identifier?)|.identifier]|join("\n")) else empty end' <<<"$board_read" 2>/dev/null)
+  jq -e '.ok' <<<"$board_read" >/dev/null 2>&1 || board_read=''
+  if [ -z "$board_read" ]; then
     drift="?"
+  elif [ -z "$inprog" ]; then
+    drift=""
   else
     drift=$(comm -12 <(sort -u <<<"$inprog") <(echo "$merged") | tr '\n' ' ' | sed 's/ $//')
   fi
