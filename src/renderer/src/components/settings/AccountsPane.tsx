@@ -116,9 +116,14 @@ import {
   selectClaudeAccountUsage
 } from './claude-account-auth-row-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import { addClaudeCustomEndpointProviderAccount } from '@/runtime/runtime-provider-custom-endpoint'
+import {
+  addClaudeCustomEndpointProviderAccount,
+  getClaudeCustomEndpointProviderConfig,
+  updateClaudeCustomEndpointProviderAccount
+} from '@/runtime/runtime-provider-custom-endpoint'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import {
+  CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
@@ -476,6 +481,35 @@ export function AccountsPane({
       cancelled = true
     }
   }, [hostLoginLane, activeRuntimeEnvironmentId])
+  // Why probe instead of letting the click fail: remote scope has kept this
+  // button disabled since it shipped, and an older server has neither endpoint
+  // method — enabling it blind would trade a dead button for a dead click.
+  const [remoteEndpointEditSupported, setRemoteEndpointEditSupported] = useState(false)
+
+  useEffect(() => {
+    if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
+      setRemoteEndpointEditSupported(false)
+      return
+    }
+    let cancelled = false
+    void runtimeEnvironmentSupportsCapability(
+      activeRuntimeEnvironmentId,
+      CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY
+    )
+      .then((supported) => {
+        if (!cancelled) {
+          setRemoteEndpointEditSupported(supported)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteEndpointEditSupported(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isRemoteAccountScope, activeRuntimeEnvironmentId])
   // Why: keep the real name separate from the prose fallback below; the scope
   // label must not interpolate the fallback.
   const remoteServerName = isRemoteAccountScope
@@ -486,6 +520,14 @@ export function AccountsPane({
     ? (remoteServerName ??
       translate('auto.components.settings.AccountsPane.remoteServerFallback', 'the remote server'))
     : null
+  const endpointEditBlockedReason =
+    isRemoteAccountScope && !remoteEndpointEditSupported
+      ? translate(
+          'auto.components.settings.AccountsPane.editEndpointRemoteUnsupported',
+          'This endpoint lives on {{value0}}, which is running a version of Orca that cannot edit it. Update the server.',
+          { value0: remoteServerLabel ?? '' }
+        )
+      : null
   const accountRuntime: LocalAccountRuntime = isRemoteAccountScope
     ? { runtime: 'host', label: remoteServerLabel ?? '' }
     : localAccountRuntime
@@ -1152,7 +1194,9 @@ export function AccountsPane({
 
   const openEditEndpointDialog = async (accountId: string): Promise<void> => {
     try {
-      const config = await window.api.claudeAccounts.getCustomEndpointConfig({ accountId })
+      // Why not window.api directly: the dialog pre-fills from this, so with a
+      // remote server active it would show this desktop's endpoint as the server's.
+      const config = await getClaudeCustomEndpointProviderConfig(settings, accountId)
       setEndpointLabelDraft(config.label)
       setEndpointBaseUrlDraft(config.baseUrl)
       setEndpointTokenDraft('')
@@ -1195,7 +1239,7 @@ export function AccountsPane({
           subagentModel: endpointSubagentModelDraft.trim() || null
         }
         const next = editingId
-          ? await window.api.claudeAccounts.updateCustomEndpoint({
+          ? await updateClaudeCustomEndpointProviderAccount(settings, {
               accountId: editingId,
               // Blank token keeps the stored one.
               token: endpointTokenDraft.trim() || null,
@@ -1714,22 +1758,32 @@ export function AccountsPane({
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
                         {isCustomEndpoint ? (
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void openEditEndpointDialog(account.id)
-                            }}
-                            disabled={isRemoteAccountScope || isBusy}
-                            className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                          // Why the span carries the reason: the disabled Button sets
+                          // pointer-events-none, so its own title never surfaces.
+                          <span
+                            title={
+                              endpointEditBlockedReason === null
+                                ? undefined
+                                : endpointEditBlockedReason
+                            }
                           >
-                            <Pencil className="size-3" />
-                            {translate(
-                              'auto.components.settings.AccountsPane.editEndpoint',
-                              'Edit'
-                            )}
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void openEditEndpointDialog(account.id)
+                              }}
+                              disabled={endpointEditBlockedReason !== null || isBusy}
+                              className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.editEndpoint',
+                                'Edit'
+                              )}
+                            </Button>
+                          </span>
                         ) : (
                           <Button
                             variant="ghost"

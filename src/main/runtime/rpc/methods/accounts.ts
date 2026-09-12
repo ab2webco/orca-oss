@@ -150,6 +150,24 @@ const AddClaudeCustomEndpointParams = z.object({
   subagentModel: z.string().nullish()
 })
 
+// Edit counterpart of the add params. Why token is optional here: a blank token
+// keeps the stored secret, so a base URL or model can be fixed without re-typing it.
+const UpdateClaudeCustomEndpointParams = z.object({
+  accountId: z.string().min(1, 'Missing accountId'),
+  label: z.string().min(1, 'Missing label'),
+  baseUrl: z.string().min(1, 'Missing baseUrl'),
+  token: z.string().nullish(),
+  model: z.string().nullish(),
+  opusModel: z.string().nullish(),
+  sonnetModel: z.string().nullish(),
+  haikuModel: z.string().nullish(),
+  subagentModel: z.string().nullish()
+})
+
+const GetClaudeCustomEndpointConfigParams = z.object({
+  accountId: z.string().min(1, 'Missing accountId')
+})
+
 // Why: `orca account list` prints only emails and the active ids, so it opts out
 // of the forced all-provider usage refresh below — that lane bypasses the poll
 // throttle and Retry-After gate and costs one serial round-trip per account.
@@ -308,6 +326,19 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     name: 'accounts.addCustomEndpoint',
     params: AddClaudeCustomEndpointParams,
     handler: async (params, { runtime }) => runtime.addClaudeCustomEndpointAccount(params)
+  }),
+  defineMethod({
+    // Why these two ride the same exemption as the add above: neither carries a
+    // host path, and the read deliberately answers without the stored token.
+    name: 'accounts.getCustomEndpointConfig',
+    params: GetClaudeCustomEndpointConfigParams,
+    handler: async (params, { runtime }) =>
+      runtime.getClaudeCustomEndpointAccountConfig(params.accountId)
+  }),
+  defineMethod({
+    name: 'accounts.updateCustomEndpoint',
+    params: UpdateClaudeCustomEndpointParams,
+    handler: async (params, { runtime }) => runtime.updateClaudeCustomEndpointAccount(params)
   }),
   defineMethod({
     name: 'accounts.addCodexFromHome',

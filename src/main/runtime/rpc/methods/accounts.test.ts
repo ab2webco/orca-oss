@@ -203,6 +203,43 @@ describe('account RPC methods', () => {
     expect(add).toHaveBeenLastCalledWith(expect.objectContaining(params))
   })
 
+  // Why alongside the add: the edit lane is the same exemption, so the guard
+  // table above must keep leaving all three out.
+  it('allows paired-device reads and edits of a custom endpoint', async () => {
+    const config = { label: 'z.ai · GLM', baseUrl: 'https://api.z.ai/api/anthropic', hasToken: true }
+    const getConfig = vi.fn().mockReturnValue(config)
+    const update = vi.fn().mockResolvedValue({ accounts: [] })
+    const runtime = {
+      getClaudeCustomEndpointAccountConfig: getConfig,
+      updateClaudeCustomEndpointAccount: update
+    } as unknown as OrcaRuntimeService
+
+    const call = async (name: string, params: unknown): Promise<unknown> => {
+      const m = method(name)
+      if (isStreamingMethod(m)) {
+        throw new Error(`${name} must be a request method`)
+      }
+      return m.handler(m.params?.parse(params), { runtime, clientKind: 'mobile' })
+    }
+
+    await expect(call('accounts.getCustomEndpointConfig', { accountId: 'acct-1' })).resolves.toBe(
+      config
+    )
+    // Why a blank token is sent rather than omitted: that is how the dialog says
+    // "keep the stored one", so the params must accept it instead of rejecting.
+    await expect(
+      call('accounts.updateCustomEndpoint', {
+        accountId: 'acct-1',
+        label: 'z.ai · GLM',
+        baseUrl: 'https://api.z.ai/api/anthropic',
+        token: null
+      })
+    ).resolves.toEqual({ accounts: [] })
+
+    expect(getConfig).toHaveBeenCalledWith('acct-1')
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acct-1', token: null }))
+  })
+
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {

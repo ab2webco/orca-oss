@@ -3315,6 +3315,10 @@ function createClaudeAccountsApi(): never {
     // binds a loopback callback on the account-owning host, which the web
     // client's browser cannot reach; that one stays desktop-only.
     addCustomEndpoint: (input) => callRuntimeResult('accounts.addCustomEndpoint', input),
+    // Why these two and not the whole edit lane: same reasoning — no browser round
+    // trip, and the read never carries the stored token back to the page.
+    getCustomEndpointConfig: (args) => callRuntimeResult('accounts.getCustomEndpointConfig', args),
+    updateCustomEndpoint: (input) => callRuntimeResult('accounts.updateCustomEndpoint', input),
     // Why: the refresh-chain registry is reconciled from the account-owning
     // host's credential files, which the web client has no view of. 'unavailable'
     // is the honest answer — "could not look" is a different claim than "no

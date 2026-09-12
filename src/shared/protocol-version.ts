@@ -40,6 +40,11 @@ export const HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY = 'accounts.host-login.v1' as
 // only the older one strips the unknown `accountId`, ADDS a second row for the
 // same email and answers ok — the silent wrong result, not a visible refusal.
 export const HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY = 'accounts.host-reauth.v1' as const
+
+// Why a capability and not just letting the two methods 404: the Edit button on a
+// custom endpoint is disabled in remote scope, so enabling it needs proof the host
+// can read and write the endpoint — trading a dead button for a dead click is no fix.
+export const CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY = 'accounts.custom-endpoint-edit.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
@@ -186,7 +191,8 @@ export const RUNTIME_CAPABILITIES = [
   CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
   PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
-  HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
+  HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY,
+  CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
