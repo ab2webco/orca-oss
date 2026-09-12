@@ -8,6 +8,9 @@ import {
   runRateLimitFailBack,
   type AgentRateLimitFailBackResult
 } from '@/lib/agent-rate-limit-fail-back'
+import { fetchProviderAccountsSnapshot } from '@/runtime/runtime-provider-accounts-client'
+import { settingsForRuntimeOwner } from '@/runtime/runtime-rpc-client'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
 
 const FAIL_BACK_CHECK_INTERVAL_MS = 60_000
@@ -61,7 +64,18 @@ export function useAgentRateLimitFailBack(args: {
       }
       evaluatingWorktreeIds.add(worktreeId)
       try {
-        const accountsState = await window.api.claudeAccounts.list().catch(() => null)
+        // Why the worktree's owner and not the active scope: the fail-back picks
+        // the account the agent will actually run as, and the agent runs on the
+        // host that owns this worktree — which may not be the one in view.
+        const parsedHost = parseExecutionHostId(worktree.hostId)
+        const ownerEnvironmentId =
+          worktree.runtimeOwnerEnvironmentId ??
+          (parsedHost?.kind === 'runtime' ? parsedHost.environmentId : null)
+        const accountsState = await fetchProviderAccountsSnapshot(
+          settingsForRuntimeOwner(state.settings, ownerEnvironmentId)
+        )
+          .then((snapshot) => snapshot.claude)
+          .catch(() => null)
         if (!accountsState) {
           return
         }

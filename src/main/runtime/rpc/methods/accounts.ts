@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../core'
 import { CLAUDE_TERMINAL_SWITCH_METHODS } from './accounts-claude-terminal-switch'
+import { GLOBAL_CONFIG_METHODS } from './accounts-global-config'
 
 // Why: monotonically increasing per-process counter avoids the Date.now()
 // collision that fired when two near-simultaneous accounts.subscribe calls
@@ -167,6 +168,7 @@ const UpdateClaudeCustomEndpointParams = z.object({
 const GetClaudeCustomEndpointConfigParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })
+
 
 // Why: `orca account list` prints only emails and the active ids, so it opts out
 // of the forced all-provider usage refresh below — that lane bypasses the poll
@@ -340,6 +342,7 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
     params: UpdateClaudeCustomEndpointParams,
     handler: async (params, { runtime }) => runtime.updateClaudeCustomEndpointAccount(params)
   }),
+  ...GLOBAL_CONFIG_METHODS,
   defineMethod({
     name: 'accounts.addCodexFromHome',
     params: AddCodexFromHomeParams,

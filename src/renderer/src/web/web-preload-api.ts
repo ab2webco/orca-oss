@@ -3319,6 +3319,18 @@ function createClaudeAccountsApi(): never {
     // trip, and the read never carries the stored token back to the page.
     getCustomEndpointConfig: (args) => callRuntimeResult('accounts.getCustomEndpointConfig', args),
     updateCustomEndpoint: (input) => callRuntimeResult('accounts.updateCustomEndpoint', input),
+    // Why the web client gets these: the global config they seed lives on the
+    // runtime serving this page, which is the same host that owns the accounts.
+    previewGlobalConfig: () => callRuntimeResult('accounts.previewGlobalConfig'),
+    syncGlobalConfigForAccount: async (args) => {
+      await callRuntimeResult('accounts.syncGlobalConfigForAccount', args)
+    },
+    resyncGlobalConfig: async (args) =>
+      (await callRuntimeResult<{ processed: number }>('accounts.resyncGlobalConfig', args ?? {}))
+        .processed,
+    clearGlobalConfigForAccount: async (args) => {
+      await callRuntimeResult('accounts.clearGlobalConfigForAccount', args)
+    },
     // Why: the refresh-chain registry is reconciled from the account-owning
     // host's credential files, which the web client has no view of. 'unavailable'
     // is the honest answer — "could not look" is a different claim than "no

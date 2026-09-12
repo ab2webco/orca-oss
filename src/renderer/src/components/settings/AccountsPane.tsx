@@ -121,9 +121,11 @@ import {
   getClaudeCustomEndpointProviderConfig,
   updateClaudeCustomEndpointProviderAccount
 } from '@/runtime/runtime-provider-custom-endpoint'
+import { clearGlobalConfigForProviderAccount } from '@/runtime/runtime-provider-global-config'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import {
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
+  GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
@@ -481,29 +483,39 @@ export function AccountsPane({
       cancelled = true
     }
   }, [hostLoginLane, activeRuntimeEnvironmentId])
-  // Why probe instead of letting the click fail: remote scope has kept this
-  // button disabled since it shipped, and an older server has neither endpoint
-  // method — enabling it blind would trade a dead button for a dead click.
+  // Why probe instead of letting the click fail: remote scope has kept both of
+  // these buttons disabled since they shipped, and an older server has neither
+  // set of methods — enabling them blind trades a dead button for a dead click.
   const [remoteEndpointEditSupported, setRemoteEndpointEditSupported] = useState(false)
+  const [remoteGlobalConfigSupported, setRemoteGlobalConfigSupported] = useState(false)
 
   useEffect(() => {
     if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
       setRemoteEndpointEditSupported(false)
+      setRemoteGlobalConfigSupported(false)
       return
     }
     let cancelled = false
-    void runtimeEnvironmentSupportsCapability(
-      activeRuntimeEnvironmentId,
-      CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY
-    )
-      .then((supported) => {
+    void Promise.all([
+      runtimeEnvironmentSupportsCapability(
+        activeRuntimeEnvironmentId,
+        CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY
+      ),
+      runtimeEnvironmentSupportsCapability(
+        activeRuntimeEnvironmentId,
+        GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY
+      )
+    ])
+      .then(([endpointEdit, globalConfig]) => {
         if (!cancelled) {
-          setRemoteEndpointEditSupported(supported)
+          setRemoteEndpointEditSupported(endpointEdit)
+          setRemoteGlobalConfigSupported(globalConfig)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setRemoteEndpointEditSupported(false)
+          setRemoteGlobalConfigSupported(false)
         }
       })
     return () => {
@@ -525,6 +537,14 @@ export function AccountsPane({
       ? translate(
           'auto.components.settings.AccountsPane.editEndpointRemoteUnsupported',
           'This endpoint lives on {{value0}}, which is running a version of Orca that cannot edit it. Update the server.',
+          { value0: remoteServerLabel ?? '' }
+        )
+      : null
+  const globalConfigSyncBlockedReason =
+    isRemoteAccountScope && !remoteGlobalConfigSupported
+      ? translate(
+          'auto.components.settings.AccountsPane.globalConfigSyncRemoteUnsupported',
+          'These accounts live on {{value0}}, which is running a version of Orca that cannot sync global config. Update the server.',
           { value0: remoteServerLabel ?? '' }
         )
       : null
@@ -1147,7 +1167,9 @@ export function AccountsPane({
   const runClearGlobalConfigForAccount = async (accountId: string): Promise<void> => {
     setClaudeAction('resyncing')
     try {
-      await window.api.claudeAccounts.clearGlobalConfigForAccount({ accountId })
+      // Why not window.api directly: with a remote server active the preload
+      // would wipe this desktop's vault for an account that lives on the server.
+      await clearGlobalConfigForProviderAccount(settings, accountId)
       toast.success(
         translate(
           'auto.components.settings.AccountsPane.clearAccountConfigDone',
@@ -1554,26 +1576,30 @@ export function AccountsPane({
                   'Add custom endpoint'
                 )}
               </Button>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => openGlobalConfigSyncDialog(null)}
-                // Why: pinned accounts run in isolated vaults; this opens a popup
-                // to pick which global MCP servers, skills, and plugin hooks to
-                // copy into existing accounts so newer tools reach older accounts.
-                disabled={isRemoteAccountScope || claudeAction !== 'idle'}
-                title={translate(
-                  'auto.components.settings.AccountsPane.resyncGlobalConfigHint',
-                  'Choose global MCP servers, skills, and hooks to copy into existing accounts'
-                )}
-                className="gap-1.5 text-muted-foreground hover:text-foreground"
-              >
-                <RefreshCw className="size-3" />
-                {translate(
-                  'auto.components.settings.AccountsPane.resyncGlobalConfig',
-                  'Sync global config'
-                )}
-              </Button>
+              {/* Why the span carries the blocked reason: the disabled Button sets
+                  pointer-events-none, so its own title never surfaces. */}
+              <span className="inline-flex" title={globalConfigSyncBlockedReason ?? undefined}>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => openGlobalConfigSyncDialog(null)}
+                  // Why: pinned accounts run in isolated vaults; this opens a popup
+                  // to pick which global MCP servers, skills, and plugin hooks to
+                  // copy into existing accounts so newer tools reach older accounts.
+                  disabled={globalConfigSyncBlockedReason !== null || claudeAction !== 'idle'}
+                  title={translate(
+                    'auto.components.settings.AccountsPane.resyncGlobalConfigHint',
+                    'Choose global MCP servers, skills, and hooks to copy into existing accounts'
+                  )}
+                  className="gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className="size-3" />
+                  {translate(
+                    'auto.components.settings.AccountsPane.resyncGlobalConfig',
+                    'Sync global config'
+                  )}
+                </Button>
+              </span>
               {claudeAction === 'adding' ? (
                 <Button
                   variant="ghost"
