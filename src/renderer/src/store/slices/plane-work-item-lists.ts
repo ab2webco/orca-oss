@@ -4,7 +4,14 @@ import type { PlaneWorkItem, PlaneWorkItemFilter } from '../../../../shared/plan
 import type { CacheEntry } from './github'
 import { isIntegrationCredentialDecryptionError } from '../../../../shared/integration-credential-errors'
 import { planeListWorkItems, planeSearchWorkItems } from '@/runtime/runtime-plane-client'
-import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
+import {
+  getProviderRuntimeContextKey,
+  getProviderRuntimeScopeKey
+} from '@/lib/provider-runtime-context'
+import {
+  readPlaneListSnapshot,
+  writePlaneListSnapshot
+} from './plane-list-snapshot-storage'
 import {
   bumpPlaneCacheGeneration,
   canWritePlaneReadResult,
@@ -88,7 +95,12 @@ export const createPlaneWorkItemListSlice: StateCreator<
       args.filter ?? 'assigned',
       args.projectId
     )
-    return get().planeListCache[cacheKey] ?? null
+    // Falls through to the persisted snapshot so a launch paints the last list
+    // it saw instead of a blocking skeleton (ORCA-492).
+    return (
+      get().planeListCache[cacheKey] ??
+      readPlaneListSnapshot(getProviderRuntimeScopeKey(get().settings), cacheKey)
+    )
   },
 
   searchPlaneWorkItems: async (query, projectId, workspaceId, options) => {
@@ -193,12 +205,14 @@ export const createPlaneWorkItemListSlice: StateCreator<
             requestMutationGeneration
           )
         ) {
+          const entry = { data: items, fetchedAt: Date.now() }
           set((s) => ({
             planeListCache: evictStalePlaneCacheEntries({
               ...s.planeListCache,
-              [cacheKey]: { data: items, fetchedAt: Date.now() }
+              [cacheKey]: entry
             })
           }))
+          writePlaneListSnapshot(getProviderRuntimeScopeKey(get().settings), cacheKey, entry)
           return items
         }
         // Superseded by a mutation/context switch while this request was in
@@ -213,7 +227,14 @@ export const createPlaneWorkItemListSlice: StateCreator<
         if (isIntegrationCredentialDecryptionError(error) || looksLikePlaneAuthError(error)) {
           void get().checkPlaneConnection(true)
         }
-        return get().planeListCache[cacheKey]?.data ?? []
+        // The persisted snapshot is the only fallback on the first load after a
+        // launch: the all-projects fan-out times out at 30 s and an empty list
+        // would blank a pane that had something true to show (ORCA-492).
+        return (
+          get().planeListCache[cacheKey]?.data ??
+          readPlaneListSnapshot(getProviderRuntimeScopeKey(get().settings), cacheKey)?.data ??
+          []
+        )
       })
       .finally(() => {
         if (inflightListRequests.get(cacheKey) === entry) {

@@ -20,6 +20,7 @@ import {
   currentPlaneMutationGeneration,
   getSelectedPlaneWorkspaceId
 } from './plane-cache-guards'
+import { clearPlaneListSnapshots } from './plane-list-snapshot-storage'
 
 export const planeEmptyStatus: PlaneConnectionStatus = { connected: false, viewer: null }
 
@@ -172,6 +173,9 @@ export const createPlaneConnectionSlice: StateCreator<AppState, [], [], PlaneCon
     ) {
       return
     }
+    // Only here, not in resetAllPlaneCaches: that runs on the boot status check
+    // too, which would wipe the snapshot before the pane ever reads it.
+    clearPlaneListSnapshots()
     set({
       ...resetAllPlaneCaches(),
       planeStatus: planeEmptyStatus,
