@@ -20,6 +20,7 @@ import { parsePaneKey } from '../../../../shared/stable-pane-id'
  * que es justo el caso para el que existe. Esa distincion viaja en
  * `retainSleepingAgents` y no en `reason`, porque el cierre de ciclo de vida
  * deja `reason` sin marcar a proposito para que los guardias locales apliquen.
+ * Un cierre por CLI/RPC (`runtimeInitiated`) tampoco borra: ORCA-487.
  */
 export function clearSleepingAgentSessionsForClosedTab(terminalTabId: string): void {
   const state = useAppStore.getState()
