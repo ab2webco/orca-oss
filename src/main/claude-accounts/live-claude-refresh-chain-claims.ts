@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { fingerprintClaudeRefreshChain } from './claude-refresh-chain-fingerprint'
 import { claudeRefreshChainLeaseStore } from './claude-refresh-chain-lease'
-import { readManagedClaudeRefreshCredentials } from './claude-managed-refresh-chain'
+import {
+  readManagedClaudeRefreshCredentials,
+  resolveManagedClaudeAccountIdentityKey
+} from './claude-managed-refresh-chain'
 import { shouldTrackClaudePtyCredentials } from './claude-pty-credential-location'
 
 const claimOwnerByGateId = new Map<string, string>()
-// Why remember the account per claim: the fingerprint has to be re-read on every heartbeat, and
-// the claim record deliberately persists only the digest — never the account it came from.
+// Why remember the account per claim: the fingerprint and the identity have to be re-read on every
+// heartbeat, and the claim record persists only their digests — never the account or the email.
 const accountIdByOwnerId = new Map<string, string>()
 let renewalObserverInstalled = false
 
@@ -105,7 +108,11 @@ async function resolveClaimFingerprint(ownerId: string, accountId: string): Prom
     }
     const fingerprint = fingerprintClaudeRefreshChain(credentialsJson)
     if (fingerprint) {
-      claudeRefreshChainLeaseStore.setClaimFingerprint(ownerId, fingerprint)
+      claudeRefreshChainLeaseStore.setClaimFingerprint(
+        ownerId,
+        fingerprint,
+        resolveManagedClaudeAccountIdentityKey(accountId)
+      )
     }
   } catch {
     // Unknown claims intentionally block background rotation until the session exits.

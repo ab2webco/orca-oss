@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ClaudeRefreshChainFingerprint } from './claude-refresh-chain-fingerprint'
+import type { ClaudeRefreshChainIdentityKey } from './claude-refresh-chain-identity'
 import {
   claudeRefreshClaimPath,
   claudeRefreshClaimsPath,
@@ -12,11 +13,10 @@ import {
   claudeRefreshRotationLockPath,
   claudeRefreshRotationsPath,
   releaseClaudeRefreshRotationLock,
-  renewClaudeRefreshRotationLock,
-  touchClaudeRefreshRotationLock
+  renewClaudeRefreshRotationLock
 } from './claude-refresh-chain-lease-paths'
+import { acquireClaudeRefreshRotationLock } from './claude-refresh-chain-rotation-lock'
 import {
-  isNodeError,
   isProcessAlive,
   readClaudeRefreshChainLeaseRecord,
   type ClaudeRefreshChainLeaseRecord
@@ -75,7 +75,11 @@ export class ClaudeRefreshChainLeaseStore {
     }
   }
 
-  setClaimFingerprint(ownerId: string, fingerprint: ClaudeRefreshChainFingerprint): void {
+  setClaimFingerprint(
+    ownerId: string,
+    fingerprint: ClaudeRefreshChainFingerprint,
+    identityKey: ClaudeRefreshChainIdentityKey | null = null
+  ): void {
     const current = this.claimIds.get(ownerId)
     if (!current) {
       return
@@ -83,6 +87,7 @@ export class ClaudeRefreshChainLeaseStore {
     const updated = {
       ...current,
       fingerprint,
+      identityKey,
       expiresAt: this.now() + CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS
     }
     this.claimIds.set(ownerId, updated)
@@ -119,16 +124,29 @@ export class ClaudeRefreshChainLeaseStore {
   }
 
   tryAcquireRotation(
-    fingerprint: ClaudeRefreshChainFingerprint
+    fingerprint: ClaudeRefreshChainFingerprint,
+    identityKey: ClaudeRefreshChainIdentityKey | null = null
   ): ClaudeRefreshChainRotationLease | null {
     try {
       this.ensureDirectories()
       this.sweepDeadClaims()
-      const lockPath = claudeRefreshRotationLockPath(this.options.rootPath, fingerprint)
-      if (!this.acquireLockDirectory(lockPath)) {
+      // Why the identity wins the lock name: two profiles rotating one shared chain hold
+      // different digests, so a digest-named lock would let both rotate it at once.
+      const lockPath = claudeRefreshRotationLockPath(
+        this.options.rootPath,
+        identityKey ?? fingerprint
+      )
+      if (
+        !acquireClaudeRefreshRotationLock(
+          lockPath,
+          this.instanceId,
+          this.now(),
+          CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS
+        )
+      ) {
         return null
       }
-      if (this.hasBlockingClaim(fingerprint)) {
+      if (this.hasBlockingClaim(fingerprint, identityKey)) {
         rmSync(lockPath, { recursive: true, force: true })
         return null
       }
@@ -173,7 +191,8 @@ export class ClaudeRefreshChainLeaseStore {
       instanceId: this.instanceId,
       instanceStartedAt: this.instanceStartedAt,
       expiresAt: this.now() + CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS,
-      fingerprint
+      fingerprint,
+      identityKey: null
     }
   }
 
@@ -249,7 +268,10 @@ export class ClaudeRefreshChainLeaseStore {
     }
   }
 
-  private hasBlockingClaim(fingerprint: ClaudeRefreshChainFingerprint): boolean {
+  private hasBlockingClaim(
+    fingerprint: ClaudeRefreshChainFingerprint,
+    identityKey: ClaudeRefreshChainIdentityKey | null
+  ): boolean {
     for (const name of readdirSync(claudeRefreshClaimsPath(this.options.rootPath))) {
       const record = readClaudeRefreshChainLeaseRecord(
         join(claudeRefreshClaimsPath(this.options.rootPath), name)
@@ -258,6 +280,11 @@ export class ClaudeRefreshChainLeaseStore {
         return true
       }
       if (record.fingerprint === null || record.fingerprint === fingerprint) {
+        return true
+      }
+      // Why the digests may differ and the claim still block: each profile keeps its own copy of
+      // one shared chain, so the live session's copy has already moved past the one being rotated.
+      if (identityKey !== null && record.identityKey === identityKey) {
         return true
       }
     }
@@ -274,33 +301,6 @@ export class ClaudeRefreshChainLeaseStore {
 
   private isRecordOwnerValid(record: ClaudeRefreshChainLeaseRecord): boolean {
     return isClaudeRefreshChainClaimOwnerValid(record, this.livenessContext)
-  }
-
-  private acquireLockDirectory(lockPath: string): boolean {
-    try {
-      mkdirSync(lockPath, { mode: 0o700 })
-      touchClaudeRefreshRotationLock(lockPath, this.instanceId, this.now())
-      return true
-    } catch (error) {
-      if (!isNodeError(error) || error.code !== 'EEXIST') {
-        throw error
-      }
-    }
-    const stat = statSync(lockPath)
-    if (stat.mtimeMs + CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS > this.now()) {
-      return false
-    }
-    rmSync(lockPath, { recursive: true, force: true })
-    try {
-      mkdirSync(lockPath, { mode: 0o700 })
-      touchClaudeRefreshRotationLock(lockPath, this.instanceId, this.now())
-      return true
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'EEXIST') {
-        return false
-      }
-      throw error
-    }
   }
 
   private removeClaimFile(ownerId: string): void {

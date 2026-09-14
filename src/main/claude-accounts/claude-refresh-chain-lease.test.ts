@@ -1,16 +1,25 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fingerprintClaudeRefreshChain } from './claude-refresh-chain-fingerprint'
+import { claudeRefreshChainIdentityKey } from './claude-refresh-chain-identity'
 import {
   CLAUDE_REFRESH_CHAIN_LEASE_TTL_MS,
   ClaudeRefreshChainLeaseStore
 } from './claude-refresh-chain-lease'
 import { claudeRefreshClaimPath } from './claude-refresh-chain-lease-paths'
+import { readClaudeRefreshChainLeaseRecord } from './claude-refresh-chain-lease-record'
 
 const roots: string[] = []
+
+// Simulates a claim written by an Orca instance from before the identity field existed.
+function stripIdentityKey(claimPath: string): void {
+  const record = JSON.parse(readFileSync(claimPath, 'utf8')) as Record<string, unknown>
+  delete record.identityKey
+  writeFileSync(claimPath, JSON.stringify(record), 'utf8')
+}
 
 function createRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'orca-claude-chain-test-'))
@@ -28,6 +37,26 @@ function fingerprint() {
     throw new Error('Test credentials must have a fingerprint.')
   }
   return value
+}
+
+function identity(
+  email: string = 'fabiana@koombea.com',
+  organizationUuid: string = 'efb40f7b-4417-4a49-846a-b3075f27637b'
+) {
+  const value = claudeRefreshChainIdentityKey(email, organizationUuid)
+  if (!value) {
+    throw new Error('Test identities must have a key.')
+  }
+  return value
+}
+
+function store(rootPath: string, processId: number): ClaudeRefreshChainLeaseStore {
+  return new ClaudeRefreshChainLeaseStore({
+    rootPath,
+    processId,
+    instanceId: randomUUID(),
+    processIsAlive: () => true
+  })
 }
 
 describe('Claude refresh-chain lease', () => {
@@ -158,5 +187,92 @@ describe('Claude refresh-chain lease', () => {
 
     stale.releaseClaim('stale-session')
     replacement.releaseClaim('replacement-session')
+  })
+
+  it('blocks rotation when another instance holds the same identity under a drifted chain digest', () => {
+    const rootPath = createRoot()
+    const liveInstance = store(rootPath, 808)
+    const rotatingInstance = store(rootPath, 909)
+    const sharedIdentity = identity()
+    // Why the digests differ: each Orca profile keeps its own copy of one shared chain, so the
+    // live session's copy has already rotated past the one the other instance is about to refresh.
+    liveInstance.registerClaim('live-session')
+    liveInstance.setClaimFingerprint('live-session', fingerprint(), sharedIdentity)
+
+    expect(rotatingInstance.tryAcquireRotation(fingerprint(), sharedIdentity)).toBeNull()
+
+    liveInstance.releaseClaim('live-session')
+  })
+
+  it('serializes two instances over one identity with no claim registered', () => {
+    const rootPath = createRoot()
+    const first = store(rootPath, 1515)
+    const second = store(rootPath, 1616)
+    const sharedIdentity = identity()
+    // Why no claim here: hasBlockingClaim is advisory and sees nothing until a live session
+    // registers. The lock directory is the only real mutual exclusion, so if it were named by the
+    // chain digest these two would take DIFFERENT locks and both rotate one shared chain.
+    const lease = first.tryAcquireRotation(fingerprint(), sharedIdentity)
+
+    expect(lease).not.toBeNull()
+    expect(second.tryAcquireRotation(fingerprint(), sharedIdentity)).toBeNull()
+
+    // And it is a lock, not a lockout: the loser gets its turn once the holder releases.
+    lease?.release()
+    const afterRelease = second.tryAcquireRotation(fingerprint(), sharedIdentity)
+
+    expect(afterRelease).not.toBeNull()
+
+    afterRelease?.release()
+  })
+
+  it('lets a drifted chain rotate when the live claim is a different identity', () => {
+    const rootPath = createRoot()
+    const liveInstance = store(rootPath, 1010)
+    const rotatingInstance = store(rootPath, 1111)
+    liveInstance.registerClaim('live-session')
+    liveInstance.setClaimFingerprint('live-session', fingerprint(), identity())
+
+    const lease = rotatingInstance.tryAcquireRotation(fingerprint(), identity('someone@else.com'))
+
+    expect(lease).not.toBeNull()
+
+    lease?.release()
+    liveInstance.releaseClaim('live-session')
+  })
+
+  it('falls back to digest-only when an older instance wrote a claim without an identity', () => {
+    const rootPath = createRoot()
+    const liveInstance = store(rootPath, 1212)
+    const rotatingInstance = store(rootPath, 1313)
+    const chain = fingerprint()
+    liveInstance.registerClaim('live-session')
+    liveInstance.setClaimFingerprint('live-session', chain)
+    stripIdentityKey(claudeRefreshClaimPath(rootPath, 'live-session'))
+
+    expect(rotatingInstance.tryAcquireRotation(chain, identity())).toBeNull()
+    const lease = rotatingInstance.tryAcquireRotation(fingerprint(), identity())
+
+    expect(lease).not.toBeNull()
+
+    lease?.release()
+    liveInstance.releaseClaim('live-session')
+  })
+
+  it('keeps a chain-digest identity out of the machine-wide claim file', () => {
+    const rootPath = createRoot()
+    const liveInstance = store(rootPath, 1414)
+    liveInstance.registerClaim('live-session')
+    liveInstance.setClaimFingerprint('live-session', fingerprint(), identity())
+
+    const raw = readFileSync(claudeRefreshClaimPath(rootPath, 'live-session'), 'utf8')
+
+    expect(raw).not.toContain('fabiana@koombea.com')
+    expect(
+      readClaudeRefreshChainLeaseRecord(claudeRefreshClaimPath(rootPath, 'live-session'))
+        ?.identityKey
+    ).toBe(identity())
+
+    liveInstance.releaseClaim('live-session')
   })
 })

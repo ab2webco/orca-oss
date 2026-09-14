@@ -17,6 +17,7 @@ import { hydrateShellPath, mergePathSegments } from '../startup/hydrate-shell-pa
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
 import {
   getClaudeManagedAccountsRoot,
+  getOrcaProfilePaths,
   readClaudeManagedAuthFile,
   resolveOwnedClaudeManagedAuthPath,
   writeClaudeManagedAuthFile
@@ -78,7 +79,11 @@ import type {
   ClaudeAccountWorktreeUsageReport,
   ClaudeWorktreeAccountReassignment
 } from '../../shared/claude-account-worktree-usage'
-import { findDuplicateClaudeAccount } from './claude-duplicate-account'
+import {
+  findClaudeIdentityInOtherProfiles,
+  findDuplicateClaudeAccount
+} from './claude-duplicate-account'
+import { listClaudeIdentitiesInOtherProfiles } from './claude-profile-account-index'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
 import { buildEncodedWslBashCommand } from '../wsl-bash-command'
@@ -573,6 +578,7 @@ export class ClaudeAccountService {
     ) {
       throw new DuplicateClaudeAccountError('This Claude account is already added.')
     }
+    this.assertClaudeIdentityIsFreeAcrossProfiles(managedAuth, captured)
     await this.writeManagedAuth(accountId, managedAuth.managedAuthPath, captured)
     // Inherit the user's global MCP servers + skills into the new vault so a
     // pinned account starts with the same tooling as the global config.
@@ -607,6 +613,27 @@ export class ClaudeAccountService {
     this.runtimeAuth.clearLastWrittenCredentialsJson(accountId)
     this.rateLimits.evictInactiveClaudeCache(accountId)
     return this.getSnapshot()
+  }
+
+  // Why an add is refused and not merged: both profiles would keep their own copy of one
+  // single-use refresh chain, and whichever rotates first logs the other's live session out.
+  private assertClaudeIdentityIsFreeAcrossProfiles(
+    managedAuth: ManagedClaudeAuthLocation,
+    captured: CapturedClaudeAuth
+  ): void {
+    if (managedAuth.managedAuthRuntime !== 'host') {
+      return
+    }
+    const { profilesRoot, currentProfilePath } = getOrcaProfilePaths()
+    const match = findClaudeIdentityInOtherProfiles(
+      listClaudeIdentitiesInOtherProfiles(profilesRoot, currentProfilePath),
+      { email: captured.identity.email, organizationUuid: captured.identity.organizationUuid }
+    )
+    if (match) {
+      throw new DuplicateClaudeAccountError(
+        `This Claude account is already added in the "${match.profileName}" Orca profile. Both copies would share one sign-in and log each other out — remove it there first, or sign in with a different account.`
+      )
+    }
   }
 
   private async rollbackAddAccount(

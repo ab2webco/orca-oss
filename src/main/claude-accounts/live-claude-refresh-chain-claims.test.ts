@@ -2,13 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const readManagedClaudeRefreshCredentials = vi.fn<(accountId: string) => Promise<string | null>>()
 const setClaimFingerprint = vi.fn()
+const resolveManagedClaudeAccountIdentityKey = vi.fn<(accountId: string) => string | null>(
+  () => 'identity-key'
+)
 const registerClaim = vi.fn()
 const releaseClaim = vi.fn()
 let renewalObserver: (() => void) | null = null
 
 vi.mock('./claude-managed-refresh-chain', () => ({
   readManagedClaudeRefreshCredentials: (accountId: string) =>
-    readManagedClaudeRefreshCredentials(accountId)
+    readManagedClaudeRefreshCredentials(accountId),
+  resolveManagedClaudeAccountIdentityKey: (accountId: string) =>
+    resolveManagedClaudeAccountIdentityKey(accountId)
 }))
 
 vi.mock('./claude-refresh-chain-lease', () => ({
@@ -49,6 +54,9 @@ describe('live Claude refresh-chain claims', () => {
     await settle()
     const first = setClaimFingerprint.mock.calls.at(-1)?.[1]
     expect(first).toBeTruthy()
+    // Why the identity travels with the digest: the other instance's copy of this chain has a
+    // different digest, so identity is the only key that can block its rotation (ORCA-496).
+    expect(setClaimFingerprint.mock.calls.at(-1)?.[2]).toBe('identity-key')
 
     readManagedClaudeRefreshCredentials.mockResolvedValueOnce(credentialsFor('chain-two'))
     expect(renewalObserver).toBeTypeOf('function')
@@ -80,9 +88,8 @@ describe('live Claude refresh-chain claims', () => {
 
   it('stops re-resolving a released claim', async () => {
     readManagedClaudeRefreshCredentials.mockResolvedValueOnce(credentialsFor('chain-one'))
-    const { reserveLiveClaudeRefreshChain, releaseLiveClaudeRefreshChain } = await import(
-      './live-claude-refresh-chain-claims'
-    )
+    const { reserveLiveClaudeRefreshChain, releaseLiveClaudeRefreshChain } =
+      await import('./live-claude-refresh-chain-claims')
 
     reserveLiveClaudeRefreshChain('gate-1', 'account-1')
     await settle()
