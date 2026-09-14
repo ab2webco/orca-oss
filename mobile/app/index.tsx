@@ -77,6 +77,7 @@ import { useOpenMobileTasks } from '../src/tasks/use-open-mobile-tasks'
 import { useResponsiveLayout } from '../src/layout/responsive-layout'
 import { useOpenMobileSession } from '../src/session/use-open-mobile-session'
 import { useOpenMobileAccounts } from '../src/accounts/use-open-mobile-accounts'
+import { MobileHomeAccountSwitch } from '../src/accounts/MobileHomeAccountSwitch'
 import {
   isResumeTargetConfirmedMissing,
   selectHomeResumeCard,
@@ -641,8 +642,8 @@ export default function HomeScreen() {
   )
 
   // Why: only show Account usage for connected hosts; stale cached usage would imply live data.
-  // Why a separate list: the usage card is the only route to the accounts screen, so a
-  // host whose snapshot was rejected has to say so instead of rendering nothing.
+  // Why a separate list: a host whose snapshot was rejected has to say why instead of
+  // rendering nothing under the heading.
   const accountsFailures = useMemo(() => {
     const items: { host: HostProfile; reason: string }[] = []
     for (const host of sortedHosts) {
@@ -952,6 +953,13 @@ export default function HomeScreen() {
                 connectedHosts={connectedHosts}
                 onPairDesktop={() => router.push('/pair-scan')}
                 onCreateWorkspace={(hostId) => router.push(hostNewWorktreeRoute(hostId))}
+              />
+
+              {/* ─── Accounts ─── */}
+              <MobileHomeAccountSwitch
+                connectedHosts={connectedHosts}
+                accountsByHost={accountsByHost}
+                onOpenAccounts={openMobileAccounts}
               />
 
               {/* ─── Account usage ─── */}
