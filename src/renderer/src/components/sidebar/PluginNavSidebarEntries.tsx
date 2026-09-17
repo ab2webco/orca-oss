@@ -1,5 +1,6 @@
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { formatPluginNavBadgeCount } from '../../../../shared/plugins/plugin-nav-badge'
 import { useEnabledPluginNavPanels } from '../plugins/plugin-surface-pages'
 import { resolvePluginPanelIcon } from '../right-sidebar/plugin-panel-activity-items'
 
@@ -36,6 +37,13 @@ export function PluginNavSidebarEntries(): React.JSX.Element | null {
             />
             {/* Why: panel titles come from plugin manifests, not the app catalog. */}
             <span className="min-w-0 flex-1 truncate">{panel.title}</span>
+            {/* El contador espeja el de "Agents": numero desnudo, sin label
+                traducible, y ausente cuando no hay nada que contar. */}
+            {panel.badgeCount !== undefined && panel.badgeCount > 0 ? (
+              <span className="shrink-0 rounded-full bg-primary px-1.5 py-px text-[10px] font-semibold text-primary-foreground">
+                {formatPluginNavBadgeCount(panel.badgeCount)}
+              </span>
+            ) : null}
           </button>
         )
       })}

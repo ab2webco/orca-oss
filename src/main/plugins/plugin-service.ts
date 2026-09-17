@@ -178,6 +178,7 @@ export class PluginService {
     this.housekeeping.sync({
       enabled,
       devPaths,
+      pluginsDataDir: getPluginsDataDir(this.options.userDataPath),
       reapIdle: () => this.workerController.reapIdle(),
       refresh: () => void this.refresh()
     })

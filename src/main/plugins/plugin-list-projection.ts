@@ -16,6 +16,11 @@ import {
 } from '../../shared/plugins/plugin-marketplace'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import { projectPluginSettings, type PluginSettingProjection } from './plugin-settings-values'
+import {
+  parsePluginNavBadgeCount,
+  PLUGIN_NAV_BADGE_STORAGE_KEY
+} from '../../shared/plugins/plugin-nav-badge'
+import { PluginKvStore } from './plugin-storage-store'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -32,6 +37,10 @@ export type PluginListPanelEntry = {
   icon?: string
   tabKey: `plugin:${string}`
   surface?: 'worktree' | 'settings' | 'nav'
+  /** Positive counter from the plugin's reserved `navBadge` storage key;
+   *  absent means no badge. Es POR PLUGIN, no por panel: dos paneles `nav`
+   *  del mismo plugin espejan el mismo numero a proposito. */
+  badgeCount?: number
 }
 
 export type PluginListStatus =
@@ -85,6 +94,26 @@ export type PluginListEntry = {
     resolvedCommit: string | null
     contentHash: string
     marketplace?: { reference: string; resolvedCommit: string }
+  }
+}
+
+/** Fail-soft read of the plugin's reserved badge key. A corrupt store, an
+ *  unreadable file or a nonsense value all mean "no badge" — la barra nunca
+ *  se rompe por lo que un plugin haya escrito. */
+function readPluginNavBadgeCount(
+  pluginsDataDir: string,
+  pluginKey: string,
+  hasNavPanel: boolean
+): number | null {
+  if (!hasNavPanel) {
+    return null
+  }
+  try {
+    return parsePluginNavBadgeCount(
+      new PluginKvStore(pluginsDataDir, pluginKey, 'storage.json').get(PLUGIN_NAV_BADGE_STORAGE_KEY)
+    )
+  } catch {
+    return null
   }
 }
 
@@ -166,6 +195,11 @@ export async function buildPluginList(
         settingsState.unconfigured.length > 0 &&
         activation !== 'disabled' &&
         activation !== 'pending'
+      const navBadgeCount = readPluginNavBadgeCount(
+        getPluginsDataDir(service.options.userDataPath),
+        plugin.pluginKey,
+        plugin.manifest.contributes.panels.some((panel) => panel.surface === 'nav')
+      )
       const bundled = lockEntry?.source.kind === 'bundled'
       const official =
         bundled ||
@@ -199,7 +233,10 @@ export async function buildPluginList(
           tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id),
           // Solo el valor no-default viaja: un cliente viejo ignora la clave y
           // un host viejo que no la manda sigue significando 'worktree'.
-          ...(panel.surface === 'worktree' ? {} : { surface: panel.surface })
+          ...(panel.surface === 'worktree' ? {} : { surface: panel.surface }),
+          ...(panel.surface === 'nav' && navBadgeCount !== null
+            ? { badgeCount: navBadgeCount }
+            : {})
         })),
         commands: service.contentPacks.commands.preview(plugin.pluginKey).map((command) => ({
           id: command.id,

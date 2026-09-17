@@ -27,17 +27,25 @@ function releaseSubscription(subscription: WatcherProcessSubscription): void {
   void subscription.unsubscribe().catch(() => undefined)
 }
 
-/** Owns debounced manifest/panel refresh watchers for mutable dev plugins. */
-export class PluginDevWatcher {
+/**
+ * Owns the debounced filesystem watchers that force a full plugin projection
+ * refresh: the root of every mutable dev plugin (manifest/panel edits) and the
+ * `plugins-data` directory (an external process writing a plugin's own KV, p.ej.
+ * el contador `navBadge`).
+ *
+ * El debounce es UNO SOLO y compartido entre todas las rutas a proposito: un
+ * plugin que escribe su storage en rafaga colapsa en un unico `refresh()`.
+ */
+export class PluginRefreshWatcher {
   private readonly subscriptions: WatcherProcessSubscription[] = []
   private refreshTimer: ReturnType<typeof setTimeout> | null = null
   private generation = 0
 
   constructor(private readonly subscribePath: SubscribePluginPath = subscribePluginPath) {}
 
-  start(devPaths: readonly string[], refresh: () => void, onWatcherError?: () => void): void {
+  start(paths: readonly string[], refresh: () => void, onWatcherError?: () => void): void {
     const generation = ++this.generation
-    for (const devPath of devPaths) {
+    for (const watchedPath of paths) {
       let subscription: WatcherProcessSubscription | null = null
       let failedBeforeReady = false
       const fail = (): void => {
@@ -53,7 +61,7 @@ export class PluginDevWatcher {
         this.scheduleRefresh(refresh)
       }
       void this.subscribePath(
-        devPath,
+        watchedPath,
         (error) => {
           if (error) {
             fail()

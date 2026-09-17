@@ -18,6 +18,9 @@ export type PluginHostPanel = {
   /** Absent over the wire when the host predates panel surfaces, or when the
    *  panel uses the default one; both mean `worktree`. */
   surface?: 'worktree' | 'settings' | 'nav'
+  /** Positive counter for a `nav` entry badge, read from the plugin's reserved
+   *  `navBadge` storage key. Absent means no badge. */
+  badgeCount?: number
 }
 
 /** `pending` = awaiting (re-)consent; `idle` = enabled, worker not running
