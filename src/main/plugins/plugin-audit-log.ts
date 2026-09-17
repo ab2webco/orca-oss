@@ -19,6 +19,11 @@ export type PluginAuditEntry = {
   outcome: 'attempt' | 'ok' | 'error'
 }
 
+/** Host-owned files at the root of `plugins-data`. Watchers of that directory
+ *  must exclude them: they are written by the host on every mediated plugin
+ *  mutation, and treating that as plugin data would refresh in a loop. */
+export const PLUGIN_AUDIT_LOG_FILE_NAMES = ['audit.log', 'audit.log.1'] as const
+
 export class PluginAuditLog {
   private readonly filePath: string
   private readonly rotatedFilePath: string
@@ -27,8 +32,8 @@ export class PluginAuditLog {
   private fileBytes: number | null = null
 
   constructor(pluginsDataDir: string, options: { maxBytes?: number } = {}) {
-    this.filePath = join(pluginsDataDir, 'audit.log')
-    this.rotatedFilePath = join(pluginsDataDir, 'audit.log.1')
+    this.filePath = join(pluginsDataDir, PLUGIN_AUDIT_LOG_FILE_NAMES[0])
+    this.rotatedFilePath = join(pluginsDataDir, PLUGIN_AUDIT_LOG_FILE_NAMES[1])
     this.maxBytes = options.maxBytes ?? 10 * 1024 * 1024
   }
 

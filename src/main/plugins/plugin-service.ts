@@ -28,7 +28,7 @@ import { bindPluginHostServices, type PluginRuntimeDelegate } from './plugin-hos
 import { PluginLogBuffer, type PluginLogLine } from './plugin-log-buffer'
 import { PluginPanelController } from './plugin-panel-controller'
 import { PluginWorkerController } from './plugin-worker-controller'
-import { PluginServiceHousekeeping } from './plugin-service-housekeeping'
+import { pluginDataWatchDir, PluginServiceHousekeeping } from './plugin-service-housekeeping'
 import { collectApprovedWorkerSpecs } from './plugin-worker-reconciliation'
 import type { PluginRunState } from './plugin-supervisor'
 import { isPluginApproved, snapshotPluginConsentLists } from './plugin-activation-policy'
@@ -178,7 +178,7 @@ export class PluginService {
     this.housekeeping.sync({
       enabled,
       devPaths,
-      pluginsDataDir: getPluginsDataDir(this.options.userDataPath),
+      pluginDataDir: pluginDataWatchDir(this.options.userDataPath, next),
       reapIdle: () => this.workerController.reapIdle(),
       refresh: () => void this.refresh()
     })

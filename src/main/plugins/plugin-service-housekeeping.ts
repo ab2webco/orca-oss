@@ -1,5 +1,28 @@
 import { mkdirSync } from 'node:fs'
-import { PluginRefreshWatcher } from './plugin-refresh-watcher'
+import { PLUGIN_AUDIT_LOG_FILE_NAMES } from './plugin-audit-log'
+import {
+  getPluginsDataDir,
+  isInvalidDiscoveredPlugin,
+  type DiscoveredPlugin
+} from './plugin-discovery'
+import { PluginRefreshWatcher, type WatchedPluginPath } from './plugin-refresh-watcher'
+
+/**
+ * The plugin data dir to watch, or `null` when nothing there can change on its
+ * own: only a `surface: 'nav'` panel reads a key an external process writes
+ * (`navBadge`), so no nav panel means no recursive watch for that user.
+ */
+export function pluginDataWatchDir(
+  userDataPath: string,
+  plugins: readonly DiscoveredPlugin[]
+): string | null {
+  const hasNavPanel = plugins.some(
+    (plugin) =>
+      !isInvalidDiscoveredPlugin(plugin) &&
+      plugin.manifest.contributes.panels.some((panel) => panel.surface === 'nav')
+  )
+  return hasNavPanel ? getPluginsDataDir(userDataPath) : null
+}
 
 /** Starts and stops lifecycle maintenance as the feature flag and watched paths change. */
 export class PluginServiceHousekeeping {
@@ -10,10 +33,10 @@ export class PluginServiceHousekeeping {
   sync(options: {
     enabled: boolean
     devPaths: readonly string[]
-    /** `<userData>/plugins-data`: a plugin worker or an external process can
-     *  rewrite a plugin's own KV (p.ej. el contador `navBadge`) sin pasar por
-     *  el host, y esa escritura tiene que llegar al sidebar sola. */
-    pluginsDataDir: string
+    /** `<userData>/plugins-data` when something there must reach the sidebar on
+     *  its own — un proceso externo reescribiendo el KV de un plugin, p.ej. el
+     *  contador `navBadge` — y `null` cuando no hay nada que vigilar. */
+    pluginDataDir: string | null
     reapIdle: () => void
     refresh: () => void
   }): void {
@@ -25,17 +48,27 @@ export class PluginServiceHousekeeping {
       this.reapTimer = setInterval(options.reapIdle, 60_000)
       this.reapTimer.unref?.()
     }
-    // Why: the data dir is created lazily on the first KV write, and watching a
-    // missing path fails forever; creating it up front makes the watch stick.
-    try {
-      mkdirSync(options.pluginsDataDir, { recursive: true })
-    } catch {
-      // A data dir we cannot create simply stays unwatched; the projection
-      // still refreshes on every other plugin change.
+    const watchedPaths: WatchedPluginPath[] = options.devPaths.map((path) => ({ path }))
+    if (options.pluginDataDir) {
+      watchedPaths.push({
+        path: options.pluginDataDir,
+        // El audit log vive en la raiz de este dir y lo escribe el host en cada
+        // mutacion mediada: vigilarlo seria refrescar por nuestro propio ruido.
+        ignore: PLUGIN_AUDIT_LOG_FILE_NAMES
+      })
     }
-    const watchedPaths = [...options.devPaths, options.pluginsDataDir]
     const pathsKey = JSON.stringify(watchedPaths)
     if (pathsKey !== this.watchedPathsKey) {
+      // Why: the data dir is created lazily on the first KV write, and watching
+      // a missing path fails forever; creating it up front makes the watch stick.
+      if (options.pluginDataDir) {
+        try {
+          mkdirSync(options.pluginDataDir, { recursive: true })
+        } catch {
+          // A data dir we cannot create simply stays unwatched; the projection
+          // still refreshes on every other plugin change.
+        }
+      }
       this.watcher.dispose()
       this.watcher.start(watchedPaths, options.refresh, () => {
         // The next refresh retries a failed watcher even when the configured

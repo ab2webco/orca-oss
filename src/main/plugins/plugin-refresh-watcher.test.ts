@@ -17,7 +17,7 @@ describe('PluginRefreshWatcher', () => {
     const devWatcher = new PluginRefreshWatcher(subscribePath)
     const refresh = vi.fn()
     const onWatcherError = vi.fn()
-    devWatcher.start(['/plugins/demo'], refresh, onWatcherError)
+    devWatcher.start([{ path: '/plugins/demo' }], refresh, onWatcherError)
     await vi.waitFor(() => expect(subscribePath).toHaveBeenCalledOnce())
 
     expect(() => onEvent(new Error('watch failed'))).not.toThrow()
@@ -40,7 +40,7 @@ describe('PluginRefreshWatcher', () => {
     )
     const devWatcher = new PluginRefreshWatcher(subscribePath)
 
-    devWatcher.start(['/plugins/demo'], vi.fn())
+    devWatcher.start([{ path: '/plugins/demo' }], vi.fn())
     devWatcher.dispose()
     resolveSubscription({ unsubscribe })
 
@@ -53,7 +53,7 @@ describe('PluginRefreshWatcher', () => {
       .mockRejectedValue(new Error('Unable to remove watcher: Invalid argument'))
     const subscribePath = vi.fn(async () => ({ unsubscribe }))
     const devWatcher = new PluginRefreshWatcher(subscribePath)
-    devWatcher.start(['/plugins/demo'], vi.fn())
+    devWatcher.start([{ path: '/plugins/demo' }], vi.fn())
     await vi.waitFor(() => expect(subscribePath).toHaveBeenCalledOnce())
 
     expect(() => devWatcher.dispose()).not.toThrow()
@@ -70,7 +70,7 @@ describe('PluginRefreshWatcher', () => {
     const onWatcherError = vi.fn()
     const devWatcher = new PluginRefreshWatcher(subscribePath)
 
-    devWatcher.start(['/plugins/missing'], refresh, onWatcherError)
+    devWatcher.start([{ path: '/plugins/missing' }], refresh, onWatcherError)
     await vi.waitFor(() => expect(onWatcherError).toHaveBeenCalledOnce())
     vi.advanceTimersByTime(10_000)
 

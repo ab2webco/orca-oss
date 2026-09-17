@@ -3,17 +3,21 @@ import {
   type WatcherProcessSubscription
 } from '../ipc/parcel-watcher-process'
 
+/** A directory to watch, plus file names inside it whose writes must not
+ *  trigger a refresh. */
+export type WatchedPluginPath = { path: string; ignore?: readonly string[] }
+
 type SubscribePluginPath = (
-  path: string,
+  target: WatchedPluginPath,
   onEvent: (error: Error | null) => void,
   onInterruption: () => void
 ) => Promise<WatcherProcessSubscription>
 
-const subscribePluginPath: SubscribePluginPath = (path, onEvent, onInterruption) =>
+const subscribePluginPath: SubscribePluginPath = (target, onEvent, onInterruption) =>
   subscribeViaWatcherProcess(
-    path,
+    target.path,
     (error) => onEvent(error),
-    {},
+    target.ignore ? { ignore: [...target.ignore] } : {},
     {
       onInterruption,
       onTerminalError: onEvent
@@ -43,7 +47,11 @@ export class PluginRefreshWatcher {
 
   constructor(private readonly subscribePath: SubscribePluginPath = subscribePluginPath) {}
 
-  start(paths: readonly string[], refresh: () => void, onWatcherError?: () => void): void {
+  start(
+    paths: readonly WatchedPluginPath[],
+    refresh: () => void,
+    onWatcherError?: () => void
+  ): void {
     const generation = ++this.generation
     for (const watchedPath of paths) {
       let subscription: WatcherProcessSubscription | null = null
