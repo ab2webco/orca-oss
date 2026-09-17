@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { PLUGIN_AUDIT_LOG_FILE_NAMES } from './plugin-audit-log'
 import {
   getPluginsDataDir,
@@ -50,11 +51,13 @@ export class PluginServiceHousekeeping {
     }
     const watchedPaths: WatchedPluginPath[] = options.devPaths.map((path) => ({ path }))
     if (options.pluginDataDir) {
+      const dataDir = options.pluginDataDir
       watchedPaths.push({
-        path: options.pluginDataDir,
+        path: dataDir,
         // El audit log vive en la raiz de este dir y lo escribe el host en cada
         // mutacion mediada: vigilarlo seria refrescar por nuestro propio ruido.
-        ignore: PLUGIN_AUDIT_LOG_FILE_NAMES
+        // Parcel compara rutas, no nombres sueltos.
+        ignore: PLUGIN_AUDIT_LOG_FILE_NAMES.map((name) => join(dataDir, name))
       })
     }
     const pathsKey = JSON.stringify(watchedPaths)

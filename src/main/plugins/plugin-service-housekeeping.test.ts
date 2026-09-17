@@ -54,7 +54,12 @@ describe('PluginServiceHousekeeping watched paths', () => {
 
     expect(watchedPaths()).toEqual([
       { path: '/plugins/demo' },
-      { path: pluginsDataDir, ignore: ['audit.log', 'audit.log.1'] }
+      {
+        path: pluginsDataDir,
+        // Absolute: parcel matches `ignore` against paths, so a bare file name
+        // would be a silent no-op and the audit log would keep waking us.
+        ignore: [join(pluginsDataDir, 'audit.log'), join(pluginsDataDir, 'audit.log.1')]
+      }
     ])
   })
 
