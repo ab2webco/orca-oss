@@ -200,9 +200,9 @@ describe('plugin host main/relay conformance', () => {
     },
     {
       name: 'panel-forbidden method',
-      request: { method: 'storage.get', params: { key: 'alpha' } },
+      request: { method: 'secrets.get', params: { key: 'token' } },
       viaPanel: true,
-      policy: () => createPolicy(['storage']),
+      policy: () => createPolicy(['secrets']),
       code: 'panel_forbidden'
     },
     {

@@ -156,7 +156,12 @@ export const PLUGIN_HOST_API_V0: readonly PluginHostMethodSpec[] = [
     scope: 'plugin-private',
     capability: 'storage',
     mutation: false,
-    panel: false,
+    // Why: a panel with no host storage has no persistence at all — the frame is
+    // sandboxed without allow-same-origin, so localStorage throws on its opaque
+    // origin. Reads and writes stay inside the plugin's own `plugin-private`
+    // namespace and behind the `storage` capability the user already consented to,
+    // so this widens what a panel can keep, not what it can reach.
+    panel: true,
     params: storageGetParams,
     result: storageGetResult
   }),
@@ -166,7 +171,12 @@ export const PLUGIN_HOST_API_V0: readonly PluginHostMethodSpec[] = [
     scope: 'plugin-private',
     capability: 'storage',
     mutation: true,
-    panel: false,
+    // Why: a panel with no host storage has no persistence at all — the frame is
+    // sandboxed without allow-same-origin, so localStorage throws on its opaque
+    // origin. Reads and writes stay inside the plugin's own `plugin-private`
+    // namespace and behind the `storage` capability the user already consented to,
+    // so this widens what a panel can keep, not what it can reach.
+    panel: true,
     params: storageSetParams,
     result: storageSetResult
   }),
