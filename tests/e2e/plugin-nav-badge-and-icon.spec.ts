@@ -186,6 +186,22 @@ test('badges a nav entry from plugin storage and paints the plugin own icon', as
     await expect(messages).toHaveText('Messages99+', { timeout: 15_000 })
     await orcaPage.screenshot({ path: testInfo.outputPath('nav-badge-1440-dark-capped.png') })
 
+    // --- Narrow widths: the pill must never be what gets squeezed ---
+    for (const width of [768, 390, 320]) {
+      await electronApp.evaluate(({ BrowserWindow }, next) => {
+        BrowserWindow.getAllWindows()[0]?.setSize(next, 900)
+      }, width)
+      await expect(messages).toHaveText('Messages99+')
+      // The title truncates; the badge keeps its full width at every size.
+      expect(
+        await messages
+          .locator('span')
+          .last()
+          .evaluate((node) => node.clientWidth)
+      ).toBeGreaterThan(24)
+      await orcaPage.screenshot({ path: testInfo.outputPath(`nav-badge-${width}-dark-capped.png`) })
+    }
+
     await writeFile(storagePath, JSON.stringify({ navBadge: { count: 0 } }, null, 2))
     // A count of zero must clear the badge, never leave a dangling "0".
     await expect(messages).toHaveText('Messages', { timeout: 15_000 })
