@@ -75,6 +75,46 @@ describe('buildPluginList consent identity', () => {
     })
   })
 
+  it('sends only the non-default panel surface so old clients stay unaffected', async () => {
+    const plugin: ValidDiscoveredPlugin = {
+      pluginKey: 'orca-samples.demo',
+      rootDir: join(tmpdir(), 'plugins', 'demo'),
+      manifest: pluginManifestSchema.parse({
+        manifestVersion: 1,
+        id: 'demo',
+        publisher: 'orca-samples',
+        name: 'Demo',
+        version: '1.0.0',
+        engines: { orca: '>=1.0.0' },
+        pluginApi: 1,
+        contributes: {
+          panels: [
+            { id: 'dashboard', title: 'Dashboard', entry: 'dashboard.html' },
+            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' }
+          ],
+          commands: [],
+          events: []
+        },
+        capabilities: []
+      }),
+      consentFingerprint: 'sha256-current',
+      contentHash: null,
+      isDev: true
+    }
+
+    const [entry] = await buildPluginList(serviceWith(plugin), emptyPluginLockfile())
+
+    expect(entry?.panels).toEqual([
+      { id: 'dashboard', title: 'Dashboard', tabKey: 'plugin:orca-samples.demo/dashboard' },
+      {
+        id: 'registry',
+        title: 'Registry',
+        tabKey: 'plugin:orca-samples.demo/registry',
+        surface: 'settings'
+      }
+    ])
+  })
+
   it('projects supervised backoff as restarting instead of running', async () => {
     const plugin: ValidDiscoveredPlugin = {
       pluginKey: 'orca-samples.demo',

@@ -8,6 +8,22 @@ export type ActivePluginPanel = PluginHostPanel & {
   pluginName: string
 }
 
+/** Statuses whose panels are mounted. `idle` and `restarting` still show panels
+ *  — the panel itself never needs a worker — but `errored` does not, so any
+ *  surface offering a panel must agree with this or it opens an empty state. */
+export function pluginPanelsAreMounted(plugin: Pick<PluginHostListEntry, 'status'>): boolean {
+  return plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
+}
+
+/** A host that predates panel surfaces sends no `surface`; that means worktree. */
+export function isWorktreeSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface !== 'settings'
+}
+
+export function isSettingsSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface === 'settings'
+}
+
 export type ActivePluginCommand = PluginHostListEntry['commands'][number] & {
   pluginKey: string
   pluginName: string
@@ -139,18 +155,13 @@ export function ensurePluginPanelsLoaded(): void {
 /** Panels of plugins the user enabled (consented + not disabled). `idle` and
  *  `restarting` still show panels — the panel itself never needs a worker. */
 export function collectActivePluginPanels(plugins: PluginHostListEntry[]): ActivePluginPanel[] {
-  return plugins
-    .filter(
-      (plugin) =>
-        plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
-    )
-    .flatMap((plugin) =>
-      plugin.panels.map((panel) => ({
-        ...panel,
-        pluginKey: plugin.pluginKey,
-        pluginName: plugin.name
-      }))
-    )
+  return plugins.filter(pluginPanelsAreMounted).flatMap((plugin) =>
+    plugin.panels.map((panel) => ({
+      ...panel,
+      pluginKey: plugin.pluginKey,
+      pluginName: plugin.name
+    }))
+  )
 }
 
 /** Tab keys of every installed plugin panel (any status) — used by the

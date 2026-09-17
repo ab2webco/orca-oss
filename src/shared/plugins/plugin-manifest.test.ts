@@ -71,6 +71,43 @@ describe('pluginManifestSchema boundaries', () => {
     expect(parsePluginManifest(manifest({ version: '1.0.0-alpha.1+build.5' })).ok).toBe(true)
   })
 
+  it('defaults a panel surface to worktree and accepts an explicit settings surface', () => {
+    const parsed = pluginManifestSchema.safeParse(
+      manifest({
+        contributes: {
+          panels: [
+            { id: 'dashboard', title: 'Dashboard', entry: 'dashboard.html' },
+            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' }
+          ],
+          commands: [],
+          events: []
+        }
+      })
+    )
+
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.contributes.panels.map((panel) => panel.surface)).toEqual([
+        'worktree',
+        'settings'
+      ])
+    }
+  })
+
+  it('rejects an unknown panel surface', () => {
+    expect(
+      parsePluginManifest(
+        manifest({
+          contributes: {
+            panels: [{ id: 'registry', title: 'Registry', entry: 'r.html', surface: 'sidebar' }],
+            commands: [],
+            events: []
+          }
+        })
+      ).ok
+    ).toBe(false)
+  })
+
   it('rejects duplicate contribution ids', () => {
     const parsed = pluginManifestSchema.safeParse(
       manifest({

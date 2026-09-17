@@ -84,7 +84,7 @@ describe('declared plugin artifacts', () => {
       manifest({
         main: 'missing-worker.js',
         contributes: {
-          panels: [{ id: 'panel', title: 'Panel', entry: 'panel.html' }],
+          panels: [{ id: 'panel', title: 'Panel', entry: 'panel.html', surface: 'worktree' }],
           commands: [],
           events: []
         }
@@ -106,7 +106,7 @@ describe('declared plugin artifacts', () => {
     )
     const pluginManifest = manifest({
       contributes: {
-        panels: [{ id: 'panel', title: 'Panel', entry: 'escape/panel.html' }],
+        panels: [{ id: 'panel', title: 'Panel', entry: 'escape/panel.html', surface: 'worktree' }],
         commands: [],
         events: []
       }
@@ -143,7 +143,7 @@ describe('declared plugin artifacts', () => {
     await truncate(panelPath, PLUGIN_PANEL_ENTRY_MAX_BYTES + 1)
     const pluginManifest = manifest({
       contributes: {
-        panels: [{ id: 'panel', title: 'Panel', entry: 'panel.html' }],
+        panels: [{ id: 'panel', title: 'Panel', entry: 'panel.html', surface: 'worktree' }],
         commands: [],
         events: []
       }

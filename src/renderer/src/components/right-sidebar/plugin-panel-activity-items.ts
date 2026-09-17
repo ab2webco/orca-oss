@@ -27,7 +27,7 @@ import {
   Wrench,
   Zap
 } from 'lucide-react'
-import type { ActivePluginPanel } from '@/store/plugin-panels'
+import { isWorktreeSurfacePanel, type ActivePluginPanel } from '@/store/plugin-panels'
 import type { ActivityBarItem } from './activity-bar-buttons'
 
 type PluginPanelIcon = ActivityBarItem['icon']
@@ -77,12 +77,14 @@ export function resolvePluginPanelIcon(iconName: string | undefined): PluginPane
     : Plug
 }
 
-/** Maps active plugin panel contributions onto right-sidebar activity items. */
+/** Maps active plugin panel contributions onto right-sidebar activity items.
+ *  Filtering happens here and not in `collectActivePluginPanels` because the
+ *  Settings surface resolves its panel through that same collection. */
 export function getPluginPanelActivityItems(
   panels: ActivePluginPanel[],
   panelErrors: Readonly<Record<string, true>> = {}
 ): ActivityBarItem[] {
-  return panels.map((panel) => ({
+  return panels.filter(isWorktreeSurfacePanel).map((panel) => ({
     id: panel.tabKey,
     icon: resolvePluginPanelIcon(panel.icon),
     // Why: panel titles come from plugin manifests, not the app catalog, so

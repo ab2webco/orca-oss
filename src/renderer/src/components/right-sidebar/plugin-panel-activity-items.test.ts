@@ -36,6 +36,24 @@ describe('resolvePluginPanelIcon', () => {
 })
 
 describe('getPluginPanelActivityItems', () => {
+  it('keeps a settings-surface panel out of the per-worktree activity bar', () => {
+    const settingsPanel: ActivePluginPanel = {
+      ...panel,
+      id: 'registry',
+      tabKey: 'plugin:orca-samples.demo/registry',
+      surface: 'settings'
+    }
+
+    expect(getPluginPanelActivityItems([panel, settingsPanel]).map((item) => item.id)).toEqual([
+      panel.tabKey
+    ])
+  })
+
+  it('treats a panel without a declared surface as a worktree panel', () => {
+    expect(panel.surface).toBeUndefined()
+    expect(getPluginPanelActivityItems([panel]).map((item) => item.id)).toEqual([panel.tabKey])
+  })
+
   it('projects watchdog failure into host-owned activity chrome', () => {
     expect(
       getPluginPanelActivityItems([panel], {

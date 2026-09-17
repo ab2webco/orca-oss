@@ -10296,7 +10296,9 @@
           "invalidPluginError": "プラグインのマニフェストまたはインストール済みファイルが無効です。修正してから更新してください。",
           "configure": "設定",
           "networkRestricted": "ネットワークアクセスは、このプラグインが宣言したホストに制限されています。",
-          "networkBlocked": "このプラグインが net:fetch を宣言していないため、ネットワークアクセスはブロックされています。"
+          "networkBlocked": "このプラグインが net:fetch を宣言していないため、ネットワークアクセスはブロックされています。",
+          "showPanel": "パネルを表示",
+          "hidePanel": "パネルを非表示"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "作成",

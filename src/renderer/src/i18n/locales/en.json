@@ -10736,7 +10736,9 @@
           "finishSetup": "Finish setup",
           "configure": "Configure",
           "networkRestricted": "Network access is restricted to the hosts declared by this plugin.",
-          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch."
+          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch.",
+          "showPanel": "Show panel",
+          "hidePanel": "Hide panel"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",

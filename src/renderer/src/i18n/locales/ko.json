@@ -10307,7 +10307,9 @@
           "invalidPluginError": "플러그인 매니페스트 또는 설치된 파일이 올바르지 않습니다. 수정한 후 새로 고치세요.",
           "configure": "설정",
           "networkRestricted": "네트워크 접근은 이 플러그인이 선언한 호스트로 제한됩니다.",
-          "networkBlocked": "이 플러그인이 net:fetch를 선언하지 않으므로 네트워크 접근이 차단됩니다."
+          "networkBlocked": "이 플러그인이 net:fetch를 선언하지 않으므로 네트워크 접근이 차단됩니다.",
+          "showPanel": "패널 보기",
+          "hidePanel": "패널 숨기기"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "생성",

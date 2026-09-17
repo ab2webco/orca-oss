@@ -53,7 +53,11 @@ const panelContributionSchema = z.object({
   /** Lucide icon name rendered in the right-sidebar activity bar. */
   icon: z.string().min(1).max(64).optional(),
   /** HTML entry rendered inside a sandboxed panel frame. */
-  entry: pluginRelativePathSchema
+  entry: pluginRelativePathSchema,
+  // El right-sidebar es por worktree: un panel cuyo contenido es global (un
+  // registro de configuracion, p.ej.) ahi aparenta pertenecer al proyecto
+  // abierto. `settings` lo mueve a la tarjeta del plugin en Settings.
+  surface: z.enum(['worktree', 'settings']).default('worktree')
 })
 
 const commandContributionSchema = z.object({

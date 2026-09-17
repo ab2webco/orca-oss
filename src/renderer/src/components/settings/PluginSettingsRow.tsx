@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import {
   AlertTriangle,
   BadgeCheck,
   FileText,
+  LayoutPanelTop,
   Loader2,
   MoreHorizontal,
   RotateCcw,
@@ -9,9 +11,12 @@ import {
   Trash2
 } from 'lucide-react'
 import type { PluginHostListEntry, PluginHostLogLine } from '../../../../preload/api-types'
+import { isSettingsSurfacePanel, pluginPanelsAreMounted } from '@/store/plugin-panels'
+import { PluginSettingsSurfacePanels } from './PluginSettingsSurfacePanels'
 import { translate } from '@/i18n/i18n'
 import { PluginCatalogAvatar } from '../plugin-catalog/PluginCatalogAvatar'
 import { invalidPluginErrorMessage } from './plugin-error-presentation'
+import { pluginStatusPresentation } from './plugin-status-presentation'
 import { cn } from '@/lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -44,55 +49,6 @@ type PluginSettingsRowProps = {
   onToggleLogs: (pluginKey: string) => void
   onRollbackRequest: (pluginKey: string) => void
   onRemoveRequest: (pluginKey: string) => void
-}
-
-function statusPresentation(plugin: PluginHostListEntry): { label: string; className: string } {
-  if (plugin.blockedByKillList) {
-    return {
-      label: translate('auto.components.settings.PluginSettingsRow.blocked', 'Blocked'),
-      className: 'border-destructive/25 bg-destructive/8 text-destructive'
-    }
-  }
-  if (plugin.needsReconsent || plugin.status === 'pending') {
-    return {
-      label: translate('auto.components.settings.PluginSettingsRow.needsReview', 'Needs review'),
-      className: 'border-foreground/20 bg-foreground/8 text-foreground'
-    }
-  }
-  if (plugin.needsSetup) {
-    return {
-      label: translate('auto.components.settings.PluginSettingsRow.needsSetup', 'Needs setup'),
-      className: 'border-foreground/20 bg-foreground/8 text-foreground'
-    }
-  }
-  if (plugin.status === 'restarting') {
-    return {
-      label: translate('auto.components.settings.PluginSettingsRow.restarting', 'Restarting'),
-      className: 'border-foreground/20 bg-foreground/8 text-foreground'
-    }
-  }
-  if (plugin.status === 'errored' || plugin.status === 'invalid') {
-    return {
-      label:
-        plugin.status === 'invalid'
-          ? translate('auto.components.settings.PluginSettingsRow.invalid', 'Invalid')
-          : translate('auto.components.settings.PluginSettingsRow.error', 'Error'),
-      className: 'border-destructive/25 bg-destructive/8 text-destructive'
-    }
-  }
-  if (plugin.status === 'disabled') {
-    return {
-      label: translate('auto.components.settings.PluginSettingsRow.disabled', 'Disabled'),
-      className: 'border-border bg-muted/40 text-muted-foreground'
-    }
-  }
-  return {
-    label:
-      plugin.status === 'running'
-        ? translate('auto.components.settings.PluginSettingsRow.running', 'Running')
-        : translate('auto.components.settings.PluginSettingsRow.enabled', 'Enabled'),
-    className: 'border-status-success-border bg-status-success-background text-status-success'
-  }
 }
 
 function PluginLogs({ pluginKey, state }: { pluginKey: string; state?: PluginLogsState }) {
@@ -154,7 +110,8 @@ export function PluginSettingsRow({
   onRollbackRequest,
   onRemoveRequest
 }: PluginSettingsRowProps): React.JSX.Element {
-  const status = statusPresentation(plugin)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const status = pluginStatusPresentation(plugin)
   const needsReview = plugin.needsReconsent || plugin.status === 'pending'
   const enabled =
     plugin.status === 'running' ||
@@ -193,9 +150,30 @@ export function PluginSettingsRow({
           : translate('auto.components.settings.PluginSettingsRow.configure', 'Configure')}
       </Button>
     ) : null
+  const settingsSurfaceTabKeys = plugin.panels
+    .filter(isSettingsSurfacePanel)
+    .map((panel) => panel.tabKey)
+  // Not `enabled`: that includes `errored`, whose panels the store never mounts,
+  // so the button would reliably open "no longer available".
+  const panelAction =
+    pluginPanelsAreMounted(plugin) && !needsReview && settingsSurfaceTabKeys.length > 0 ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        aria-expanded={panelOpen}
+        onClick={() => setPanelOpen((open) => !open)}
+      >
+        <LayoutPanelTop />
+        {panelOpen
+          ? translate('auto.components.settings.PluginSettingsRow.hidePanel', 'Hide panel')
+          : translate('auto.components.settings.PluginSettingsRow.showPanel', 'Show panel')}
+      </Button>
+    ) : null
   const footerAction =
-    reviewAction || configureAction ? (
+    reviewAction || configureAction || panelAction ? (
       <>
+        {panelAction}
         {configureAction}
         {reviewAction}
       </>
@@ -389,6 +367,9 @@ export function PluginSettingsRow({
           state={settingsFormState}
           onSave={onSaveSetting}
         />
+      ) : null}
+      {panelOpen && panelAction ? (
+        <PluginSettingsSurfacePanels tabKeys={settingsSurfaceTabKeys} />
       ) : null}
       {logsOpen ? <PluginLogs pluginKey={plugin.pluginKey} state={logsState} /> : null}
     </article>

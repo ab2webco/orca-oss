@@ -10308,7 +10308,9 @@
           "invalidPluginError": "插件清单或已安装文件无效。请修复插件后刷新。",
           "configure": "配置",
           "networkRestricted": "网络访问仅限于此插件声明的主机。",
-          "networkBlocked": "由于此插件未声明 net:fetch，网络访问已被阻止。"
+          "networkBlocked": "由于此插件未声明 net:fetch，网络访问已被阻止。",
+          "showPanel": "显示面板",
+          "hidePanel": "隐藏面板"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "创建",

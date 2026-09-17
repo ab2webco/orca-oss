@@ -10307,7 +10307,9 @@
           "invalidPluginError": "El manifiesto o los archivos instalados del plugin no son válidos. Corrige el plugin y actualiza.",
           "configure": "Configurar",
           "networkRestricted": "El acceso a la red está restringido a los hosts declarados por este plugin.",
-          "networkBlocked": "El acceso a la red está bloqueado porque este plugin no declara net:fetch."
+          "networkBlocked": "El acceso a la red está bloqueado porque este plugin no declara net:fetch.",
+          "showPanel": "Mostrar panel",
+          "hidePanel": "Ocultar panel"
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Crear",
