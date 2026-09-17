@@ -48,7 +48,7 @@ import { isMacUserAgent, isWindowsUserAgent } from '@/components/terminal-pane/p
 import type { SettingsNavSection } from '@/lib/settings-navigation-types'
 import type { ActivePluginPanel } from '@/store/plugin-panels'
 import { useEnabledPluginSettingsPanels } from '@/components/plugins/plugin-surface-pages'
-import { resolvePluginPanelIcon } from '@/components/right-sidebar/plugin-panel-activity-items'
+import { resolvePluginPanelIcon } from '@/components/right-sidebar/plugin-panel-icon'
 import { getGeneralPaneSearchEntries } from '@/components/settings/general-search'
 import { getAgentsPaneSearchEntries } from '@/components/settings/agents-search'
 import { getAccountsPaneSearchEntries } from '@/components/settings/accounts-search'
@@ -701,7 +701,7 @@ export function buildSettingsNavigationMetadata({
               'Provided by the {{value0}} plugin.',
               { value0: panel.pluginName }
             ),
-            icon: resolvePluginPanelIcon(panel.icon),
+            icon: resolvePluginPanelIcon(panel),
             searchEntries: [{ title: panel.title, keywords: [panel.pluginName] }],
             group: 'plugins'
           }))

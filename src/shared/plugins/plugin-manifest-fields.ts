@@ -36,6 +36,27 @@ export const pluginRelativeDirectorySchema = z
   .transform((value) => value.replace(/[\\/]+$/, ''))
   .refine(isSafePluginRelativePath, 'must be a portable relative path inside the plugin directory')
 
+/** Un icono de panel es un nombre del set curado de lucide, o una ruta
+ *  relativa a un `.svg` de la propia carpeta del plugin (misma contencion que
+ *  `entry`, symlinks incluidos). */
+export function isPluginPanelIconPath(value: string): boolean {
+  return value.toLowerCase().endsWith('.svg')
+}
+
+const PLUGIN_PANEL_ICON_NAME_MAX_LENGTH = 64
+
+export const pluginPanelIconSchema = z
+  .string()
+  .min(1)
+  .max(1024)
+  .refine(
+    (value) =>
+      isPluginPanelIconPath(value)
+        ? isSafePluginRelativePath(value)
+        : value.length <= PLUGIN_PANEL_ICON_NAME_MAX_LENGTH,
+    'must be a curated icon name or a relative .svg path inside the plugin directory'
+  )
+
 export const pluginCommandIdSchema = z
   .string()
   .min(1)

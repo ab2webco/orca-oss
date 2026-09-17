@@ -2,7 +2,7 @@ import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatPluginNavBadgeCount } from '../../../../shared/plugins/plugin-nav-badge'
 import { useEnabledPluginNavPanels } from '../plugins/plugin-surface-pages'
-import { resolvePluginPanelIcon } from '../right-sidebar/plugin-panel-activity-items'
+import { resolvePluginPanelIcon } from '../right-sidebar/plugin-panel-icon'
 
 /** One first-level destination per `surface: 'nav'` panel of an enabled plugin. */
 export function PluginNavSidebarEntries(): React.JSX.Element | null {
@@ -17,7 +17,7 @@ export function PluginNavSidebarEntries(): React.JSX.Element | null {
     <>
       {panels.map((panel) => {
         const active = activeView === 'plugin' && activeTabKey === panel.tabKey
-        const Icon = resolvePluginPanelIcon(panel.icon)
+        const Icon = resolvePluginPanelIcon(panel)
         return (
           <button
             key={panel.tabKey}

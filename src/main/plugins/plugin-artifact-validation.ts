@@ -2,6 +2,8 @@ import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
+import { isPluginPanelIconPath } from '../../shared/plugins/plugin-manifest-fields'
+import { PLUGIN_PANEL_ICON_SVG_MAX_BYTES } from '../../shared/plugins/plugin-panel-icon-svg'
 import { parsePluginVmRecipeArtifact } from '../../shared/plugins/plugin-vm-recipe-artifact'
 
 export type PluginArtifactValidationResult = { ok: true } | { ok: false; error: string }
@@ -45,6 +47,18 @@ function declaredArtifactPaths(manifest: PluginManifest): DeclaredArtifact[] {
       kind: 'file' as const,
       maxBytes: PLUGIN_PANEL_ENTRY_MAX_BYTES
     })),
+    ...manifest.contributes.panels.flatMap((panel) =>
+      panel.icon && isPluginPanelIconPath(panel.icon)
+        ? [
+            {
+              label: `panel "${panel.id}" icon`,
+              path: panel.icon,
+              kind: 'file' as const,
+              maxBytes: PLUGIN_PANEL_ICON_SVG_MAX_BYTES
+            }
+          ]
+        : []
+    ),
     ...manifest.contributes.languagePacks.map((languagePack) => ({
       label: `language pack "${languagePack.locale}"`,
       path: languagePack.path,

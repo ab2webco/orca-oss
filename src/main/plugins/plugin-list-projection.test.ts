@@ -14,7 +14,7 @@ import { emptyPluginLockfile } from '../../shared/plugins/plugin-install-lockfil
 import { pluginManifestSchema } from '../../shared/plugins/plugin-manifest'
 import type { InvalidDiscoveredPlugin, ValidDiscoveredPlugin } from './plugin-discovery'
 import { getPluginsDataDir } from './plugin-discovery'
-import { buildPluginList } from './plugin-list-projection'
+import { buildPluginList, type PluginListPanelEntry } from './plugin-list-projection'
 import { writePluginSetting } from './plugin-settings-write'
 import type { PluginService } from './plugin-service'
 
@@ -491,5 +491,73 @@ describe('buildPluginList nav badge', () => {
 
     expect(entry?.panels.find((panel) => panel.id === 'side')).not.toHaveProperty('badgeCount')
     await rm(userDataPath, { recursive: true, force: true })
+  })
+})
+
+describe('buildPluginList panel icons', () => {
+  async function projectIcon(
+    icon: string,
+    files: Readonly<Record<string, string>> = {}
+  ): Promise<PluginListPanelEntry | undefined> {
+    const rootDir = await mkdtemp(join(tmpdir(), 'orca-panel-icon-'))
+    try {
+      for (const [name, content] of Object.entries(files)) {
+        await mkdir(join(rootDir, name, '..'), { recursive: true })
+        await writeFile(join(rootDir, name), content, 'utf8')
+      }
+      const plugin: ValidDiscoveredPlugin = {
+        pluginKey: 'orca-samples.demo',
+        rootDir,
+        manifest: pluginManifestSchema.parse({
+          manifestVersion: 1,
+          id: 'demo',
+          publisher: 'orca-samples',
+          name: 'Demo',
+          version: '1.0.0',
+          engines: { orca: '>=1.0.0' },
+          pluginApi: 1,
+          contributes: {
+            panels: [{ id: 'inbox', title: 'Inbox', entry: 'inbox.html', icon, surface: 'nav' }]
+          },
+          capabilities: []
+        }),
+        consentFingerprint: 'sha256-current',
+        contentHash: null,
+        isDev: true
+      }
+      const [entry] = await buildPluginList(
+        serviceWith(plugin, { activation: 'approved' }),
+        emptyPluginLockfile()
+      )
+      return entry?.panels[0]
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  }
+
+  it('ships the sanitized tree of the plugin own svg icon', async () => {
+    const panel = await projectIcon('assets/brand.svg', {
+      'assets/brand.svg':
+        '<svg viewBox="0 0 24 24" width="99"><path d="M2 2h20" fill="#25D366"/></svg>'
+    })
+
+    expect(panel?.iconSvg).toEqual({
+      tag: 'svg',
+      attributes: { viewBox: '0 0 24 24', fill: 'currentColor' },
+      children: [{ tag: 'path', attributes: { d: 'M2 2h20', fill: 'currentColor' }, children: [] }]
+    })
+  })
+
+  it('keeps a curated icon name off the svg path entirely', async () => {
+    const panel = await projectIcon('message-square')
+    expect(panel?.icon).toBe('message-square')
+    expect(panel).not.toHaveProperty('iconSvg')
+  })
+
+  it('projects no icon tree when the declared file is missing or unsafe', async () => {
+    expect(await projectIcon('assets/brand.svg')).not.toHaveProperty('iconSvg')
+    expect(
+      await projectIcon('assets/brand.svg', { 'assets/brand.svg': '<svg><script/></svg>' })
+    ).not.toHaveProperty('iconSvg')
   })
 })

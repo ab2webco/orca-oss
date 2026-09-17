@@ -15,6 +15,7 @@ import {
   isSafePluginId,
   pluginCommandIdSchema,
   pluginIdSchema,
+  pluginPanelIconSchema,
   pluginRelativePathSchema
 } from './plugin-manifest-fields'
 import { validatePluginManifestContributions } from './plugin-manifest-contribution-validation'
@@ -50,8 +51,9 @@ const orcaEngineRangeSchema = z
 const panelContributionSchema = z.object({
   id: pluginIdSchema,
   title: z.string().min(1).max(256),
-  /** Lucide icon name rendered in the right-sidebar activity bar. */
-  icon: z.string().min(1).max(64).optional(),
+  /** Curated lucide icon name, or a relative `.svg` inside the plugin folder
+   *  (sanitizado antes de pintarse; si no pasa, cae al icono por defecto). */
+  icon: pluginPanelIconSchema.optional(),
   /** HTML entry rendered inside a sandboxed panel frame. */
   entry: pluginRelativePathSchema,
   // El right-sidebar es por worktree: un panel cuyo contenido es global (un
