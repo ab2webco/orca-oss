@@ -115,8 +115,12 @@ function parseElement(source: string): PluginPanelIconSvgNode | null {
   return root
 }
 
-/** Comments are skipped (real exporters emit them); DOCTYPE, processing
- *  instructions and CDATA are refused rather than half-understood. */
+const XML_DECLARATION_RE = /^<\?xml[\s?]/
+
+/** Comments and the XML declaration are skipped — every design tool emits them
+ *  and neither can carry executable content. DOCTYPE, CDATA and any other
+ *  processing instruction (`<?xml-stylesheet ?>`) are refused rather than
+ *  half-understood. */
 function skipProlog(state: ParserState): void {
   for (;;) {
     skipWhitespace(state)
@@ -127,6 +131,14 @@ function skipProlog(state: ParserState): void {
         throw new Error('unterminated comment')
       }
       state.index = end + 3
+      continue
+    }
+    if (XML_DECLARATION_RE.test(rest)) {
+      const end = state.source.indexOf('?>', state.index + 5)
+      if (end === -1) {
+        throw new Error('unterminated xml declaration')
+      }
+      state.index = end + 2
       continue
     }
     if (rest.startsWith('<!') || rest.startsWith('<?')) {

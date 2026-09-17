@@ -680,6 +680,11 @@ describe('plugin-declared automations', () => {
     // Un cron invalido haria throw al calcular la proxima corrida.
     expect(automation.nextRunAt).toBeGreaterThan(0)
     expect(store.listAutomationsByPlugin('orca-samples.wa')).toHaveLength(1)
+    // The reconciler reads through listAutomations(), which normalizes rows.
+    expect(store.listAutomations()[0]?.pluginOrigin).toEqual({
+      pluginKey: 'orca-samples.wa',
+      automationId: 'triage'
+    })
     expect(store.listAutomationsByPlugin('orca-samples.other')).toHaveLength(0)
 
     store.flush()

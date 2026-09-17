@@ -43,6 +43,14 @@ describe('sanitizePluginPanelIconSvg', () => {
     })
   })
 
+  it('accepts the xml declaration every design tool exports', () => {
+    expect(
+      sanitizePluginPanelIconSvg(
+        '<?xml version="1.0" encoding="UTF-8"?><svg viewBox="0 0 1 1"><path d="M1 1"/></svg>'
+      )
+    ).toMatchObject({ tag: 'svg' })
+  })
+
   it('preserves an explicit fill of none instead of repainting it', () => {
     expect(
       sanitizePluginPanelIconSvg(
