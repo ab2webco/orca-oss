@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import {
   AlertTriangle,
   BadgeCheck,
   FileText,
-  LayoutPanelTop,
   Loader2,
   MoreHorizontal,
   RotateCcw,
@@ -11,8 +9,6 @@ import {
   Trash2
 } from 'lucide-react'
 import type { PluginHostListEntry, PluginHostLogLine } from '../../../../preload/api-types'
-import { isSettingsSurfacePanel, pluginPanelsAreMounted } from '@/store/plugin-panels'
-import { PluginSettingsSurfacePanels } from './PluginSettingsSurfacePanels'
 import { translate } from '@/i18n/i18n'
 import { PluginCatalogAvatar } from '../plugin-catalog/PluginCatalogAvatar'
 import { invalidPluginErrorMessage } from './plugin-error-presentation'
@@ -110,7 +106,6 @@ export function PluginSettingsRow({
   onRollbackRequest,
   onRemoveRequest
 }: PluginSettingsRowProps): React.JSX.Element {
-  const [panelOpen, setPanelOpen] = useState(false)
   const status = pluginStatusPresentation(plugin)
   const needsReview = plugin.needsReconsent || plugin.status === 'pending'
   const enabled =
@@ -150,30 +145,9 @@ export function PluginSettingsRow({
           : translate('auto.components.settings.PluginSettingsRow.configure', 'Configure')}
       </Button>
     ) : null
-  const settingsSurfaceTabKeys = plugin.panels
-    .filter(isSettingsSurfacePanel)
-    .map((panel) => panel.tabKey)
-  // Not `enabled`: that includes `errored`, whose panels the store never mounts,
-  // so the button would reliably open "no longer available".
-  const panelAction =
-    pluginPanelsAreMounted(plugin) && !needsReview && settingsSurfaceTabKeys.length > 0 ? (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy}
-        aria-expanded={panelOpen}
-        onClick={() => setPanelOpen((open) => !open)}
-      >
-        <LayoutPanelTop />
-        {panelOpen
-          ? translate('auto.components.settings.PluginSettingsRow.hidePanel', 'Hide panel')
-          : translate('auto.components.settings.PluginSettingsRow.showPanel', 'Show panel')}
-      </Button>
-    ) : null
   const footerAction =
-    reviewAction || configureAction || panelAction ? (
+    reviewAction || configureAction ? (
       <>
-        {panelAction}
         {configureAction}
         {reviewAction}
       </>
@@ -367,9 +341,6 @@ export function PluginSettingsRow({
           state={settingsFormState}
           onSave={onSaveSetting}
         />
-      ) : null}
-      {panelOpen && panelAction ? (
-        <PluginSettingsSurfacePanels tabKeys={settingsSurfaceTabKeys} />
       ) : null}
       {logsOpen ? <PluginLogs pluginKey={plugin.pluginKey} state={logsState} /> : null}
     </article>

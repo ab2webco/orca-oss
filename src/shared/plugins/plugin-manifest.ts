@@ -56,8 +56,10 @@ const panelContributionSchema = z.object({
   entry: pluginRelativePathSchema,
   // El right-sidebar es por worktree: un panel cuyo contenido es global (un
   // registro de configuracion, p.ej.) ahi aparenta pertenecer al proyecto
-  // abierto. `settings` lo mueve a la tarjeta del plugin en Settings.
-  surface: z.enum(['worktree', 'settings']).default('worktree')
+  // abierto. `settings` lo mueve a la tarjeta del plugin en Settings, y `nav`
+  // lo promueve a destino de primer nivel del sidebar izquierdo (pagina
+  // completa) para contenido global con entidad propia.
+  surface: z.enum(['worktree', 'settings', 'nav']).default('worktree')
 })
 
 const commandContributionSchema = z.object({

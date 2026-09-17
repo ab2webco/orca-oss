@@ -90,7 +90,8 @@ describe('buildPluginList consent identity', () => {
         contributes: {
           panels: [
             { id: 'dashboard', title: 'Dashboard', entry: 'dashboard.html' },
-            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' }
+            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' },
+            { id: 'inbox', title: 'Inbox', entry: 'inbox.html', surface: 'nav' }
           ],
           commands: [],
           events: []
@@ -111,6 +112,12 @@ describe('buildPluginList consent identity', () => {
         title: 'Registry',
         tabKey: 'plugin:orca-samples.demo/registry',
         surface: 'settings'
+      },
+      {
+        id: 'inbox',
+        title: 'Inbox',
+        tabKey: 'plugin:orca-samples.demo/inbox',
+        surface: 'nav'
       }
     ])
   })

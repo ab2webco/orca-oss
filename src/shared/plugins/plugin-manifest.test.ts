@@ -71,13 +71,14 @@ describe('pluginManifestSchema boundaries', () => {
     expect(parsePluginManifest(manifest({ version: '1.0.0-alpha.1+build.5' })).ok).toBe(true)
   })
 
-  it('defaults a panel surface to worktree and accepts an explicit settings surface', () => {
+  it('defaults a panel surface to worktree and accepts the explicit settings and nav surfaces', () => {
     const parsed = pluginManifestSchema.safeParse(
       manifest({
         contributes: {
           panels: [
             { id: 'dashboard', title: 'Dashboard', entry: 'dashboard.html' },
-            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' }
+            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' },
+            { id: 'inbox', title: 'Inbox', entry: 'inbox.html', surface: 'nav' }
           ],
           commands: [],
           events: []
@@ -89,7 +90,8 @@ describe('pluginManifestSchema boundaries', () => {
     if (parsed.success) {
       expect(parsed.data.contributes.panels.map((panel) => panel.surface)).toEqual([
         'worktree',
-        'settings'
+        'settings',
+        'nav'
       ])
     }
   })

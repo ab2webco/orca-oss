@@ -6,12 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginHostListEntry } from '../../../../preload/api-types'
 import { PluginSettingsRow } from './PluginSettingsRow'
 
-// The panel itself is an opaque sandboxed iframe; the row's contract is which
-// tabKey it mounts and when.
-vi.mock('../right-sidebar/PluginPanel', () => ({
-  default: ({ tabKey }: { tabKey: string }) => <div data-plugin-panel={tabKey} />
-}))
-
 vi.mock('../ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -235,58 +229,4 @@ describe('PluginSettingsRow declared settings', () => {
     )
     unmount()
   })
-})
-
-const withSettingsPanel: PluginHostListEntry = {
-  ...configurable,
-  needsSetup: undefined,
-  settings: undefined,
-  panels: [
-    { id: 'dashboard', title: 'Dashboard', tabKey: 'plugin:orca-samples.webhook/dashboard' },
-    {
-      id: 'registry',
-      title: 'Registry',
-      tabKey: 'plugin:orca-samples.webhook/registry',
-      surface: 'settings'
-    }
-  ]
-}
-
-describe('PluginSettingsRow settings-surface panel', () => {
-  it('mounts only the settings-surface panel, and only after the user opens it', async () => {
-    const { container, unmount } = await renderRow(withSettingsPanel)
-    expect(container.querySelector('[data-plugin-panel]')).toBeNull()
-
-    const toggle = [...container.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Show panel'
-    )!
-    await act(async () => {
-      toggle.click()
-    })
-
-    expect(
-      [...container.querySelectorAll('[data-plugin-panel]')].map((node) =>
-        node.getAttribute('data-plugin-panel')
-      )
-    ).toEqual(['plugin:orca-samples.webhook/registry'])
-    unmount()
-  })
-
-  it('offers no panel section for a plugin whose panels are all worktree-surface', async () => {
-    const { container, unmount } = await renderRow({
-      ...withSettingsPanel,
-      panels: withSettingsPanel.panels.filter((panel) => panel.surface !== 'settings')
-    })
-    expect(container.textContent).not.toContain('Show panel')
-    unmount()
-  })
-
-  it.each(['disabled', 'errored', 'pending'] as const)(
-    'hides the panel section for a %s plugin, whose panels the store never mounts',
-    async (status) => {
-      const { container, unmount } = await renderRow({ ...withSettingsPanel, status })
-      expect(container.textContent).not.toContain('Show panel')
-      unmount()
-    }
-  )
 })

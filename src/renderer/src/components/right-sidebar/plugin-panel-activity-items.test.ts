@@ -49,6 +49,19 @@ describe('getPluginPanelActivityItems', () => {
     ])
   })
 
+  it('keeps a nav-surface panel out of the per-worktree activity bar', () => {
+    const navPanel: ActivePluginPanel = {
+      ...panel,
+      id: 'inbox',
+      tabKey: 'plugin:orca-samples.demo/inbox',
+      surface: 'nav'
+    }
+
+    expect(getPluginPanelActivityItems([panel, navPanel]).map((item) => item.id)).toEqual([
+      panel.tabKey
+    ])
+  })
+
   it('treats a panel without a declared surface as a worktree panel', () => {
     expect(panel.surface).toBeUndefined()
     expect(getPluginPanelActivityItems([panel]).map((item) => item.id)).toEqual([panel.tabKey])

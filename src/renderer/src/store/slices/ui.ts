@@ -521,7 +521,16 @@ function sanitizeHydratedActiveView(
   if (value === 'activity' && !experimentalActivityEnabled) {
     return 'terminal'
   }
+  // Why: the nav panel behind `plugin` is not persisted, so restoring it would blank the surface.
+  if (value === 'plugin') {
+    return 'terminal'
+  }
   return value
+}
+
+/** Back targets store a view, not a route, so a stale `plugin` falls to terminal. */
+function demotePluginNavView<T extends TopLevelView>(view: T): Exclude<T, 'plugin'> | 'terminal' {
+  return view === 'plugin' ? 'terminal' : (view as Exclude<T, 'plugin'>)
 }
 
 let agentSendTargetModeInstanceCounter = 0
@@ -637,6 +646,7 @@ export type UISlice = {
     | 'space'
     | 'artifacts'
     | 'mobile'
+    | 'plugin'
   previousViewBeforeSettings:
     | 'terminal'
     | 'tasks'
@@ -645,6 +655,7 @@ export type UISlice = {
     | 'space'
     | 'artifacts'
     | 'mobile'
+    | 'plugin'
   previousViewBeforeActivity:
     | 'terminal'
     | 'settings'
@@ -653,6 +664,7 @@ export type UISlice = {
     | 'space'
     | 'artifacts'
     | 'mobile'
+    | 'plugin'
   previousViewBeforeAutomations:
     | 'terminal'
     | 'settings'
@@ -661,6 +673,7 @@ export type UISlice = {
     | 'space'
     | 'artifacts'
     | 'mobile'
+    | 'plugin'
   previousViewBeforeSpace:
     | 'terminal'
     | 'settings'
@@ -669,6 +682,7 @@ export type UISlice = {
     | 'automations'
     | 'artifacts'
     | 'mobile'
+    | 'plugin'
   previousViewBeforeMobile:
     | 'terminal'
     | 'settings'
@@ -677,6 +691,7 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'artifacts'
+    | 'plugin'
   previousViewBeforeArtifacts:
     | 'terminal'
     | 'settings'
@@ -685,6 +700,22 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'mobile'
+    | 'plugin'
+  previousViewBeforePlugin:
+    | 'terminal'
+    | 'settings'
+    | 'tasks'
+    | 'activity'
+    | 'automations'
+    | 'space'
+    | 'artifacts'
+    | 'mobile'
+  /** Which `surface: 'nav'` plugin panel the `plugin` view renders. */
+  activePluginNavTabKey: string | null
+  openPluginNavPage: (tabKey: string) => void
+  closePluginNavPage: () => void
+  /** Drops a nav route whose plugin is gone, including from every back target. */
+  clearPluginNavRoute: () => void
   setActiveView: (view: UISlice['activeView']) => void
   taskPageData: {
     preselectedRepoId?: string
@@ -1263,6 +1294,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   previousViewBeforeSpace: 'terminal',
   previousViewBeforeMobile: 'terminal',
   previousViewBeforeArtifacts: 'terminal',
+  previousViewBeforePlugin: 'terminal',
+  activePluginNavTabKey: null,
   setActiveView: (view) => set({ activeView: view }),
   taskPageData: {},
   taskResumeState: undefined,
@@ -1519,6 +1552,32 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   closeArtifactsPage: () =>
     set((state) => ({
       activeView: state.previousViewBeforeArtifacts
+    })),
+  openPluginNavPage: (tabKey) =>
+    set((state) => ({
+      activeView: 'plugin',
+      activePluginNavTabKey: tabKey,
+      previousViewBeforePlugin:
+        state.activeView === 'plugin'
+          ? state.previousViewBeforePlugin
+          : demotePluginNavView(state.activeView)
+    })),
+  closePluginNavPage: () =>
+    set((state) => ({
+      activeView: state.previousViewBeforePlugin,
+      activePluginNavTabKey: null
+    })),
+  clearPluginNavRoute: () =>
+    set((state) => ({
+      activePluginNavTabKey: null,
+      activeView: demotePluginNavView(state.activeView),
+      previousViewBeforeTasks: demotePluginNavView(state.previousViewBeforeTasks),
+      previousViewBeforeSettings: demotePluginNavView(state.previousViewBeforeSettings),
+      previousViewBeforeActivity: demotePluginNavView(state.previousViewBeforeActivity),
+      previousViewBeforeAutomations: demotePluginNavView(state.previousViewBeforeAutomations),
+      previousViewBeforeSpace: demotePluginNavView(state.previousViewBeforeSpace),
+      previousViewBeforeMobile: demotePluginNavView(state.previousViewBeforeMobile),
+      previousViewBeforeArtifacts: demotePluginNavView(state.previousViewBeforeArtifacts)
     })),
   openMobilePage: () =>
     set((state) => ({

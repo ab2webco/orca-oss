@@ -199,6 +199,7 @@ import { registerAppCommandDispatcher } from '@/lib/app-command-dispatch'
 import { executePluginCommand } from '@/lib/plugin-command-execution'
 import { findPluginCommandForKeybinding } from '@/lib/plugin-command-keybindings'
 import { usePluginCommands } from '@/store/plugin-panels'
+import { usePluginNavRouteReconciliation } from '@/components/plugins/plugin-nav-route-reconciliation'
 import {
   getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,
@@ -346,6 +347,7 @@ const Settings = lazy(() => import('./components/settings/Settings'))
 const ArtifactsPage = lazy(() => import('./components/artifacts/ArtifactsPage'))
 const WorkspaceSpacePage = lazy(() => import('./components/workspace-space/WorkspaceSpacePage'))
 const MobilePage = lazy(() => import('./components/mobile/MobilePage'))
+const PluginNavPage = lazy(() => import('./components/plugins/PluginNavPage'))
 const QuickOpen = lazy(() => import('./components/QuickOpen'))
 const WorktreeJumpPalette = lazy(() => import('./components/WorktreeJumpPalette'))
 const WorkspaceCleanupDialog = lazy(
@@ -544,6 +546,7 @@ function App(): React.JSX.Element {
   )
   const keybindings = useAppStore((s) => s.keybindings)
   const pluginCommands = usePluginCommands()
+  usePluginNavRouteReconciliation()
   const updateStatus = useAppStore((s) => s.updateStatus)
   const activeContextualTourId = useAppStore((s) => s.activeContextualTourId)
   const leftSidebarShortcutLabel = useShortcutLabel('sidebar.left.toggle')
@@ -2434,6 +2437,7 @@ function App(): React.JSX.Element {
                               {activeView === 'activity' ? <ActivityPrototypePage /> : null}
                               {activeView === 'space' ? <WorkspaceSpacePage /> : null}
                               {activeView === 'mobile' ? <MobilePage /> : null}
+                              {activeView === 'plugin' ? <PluginNavPage /> : null}
                               {activeView === 'terminal' &&
                               creationLayoutActive &&
                               activePendingCreationId ? (

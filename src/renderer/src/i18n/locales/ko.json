@@ -902,6 +902,7 @@
         "linearDescription": "Orca Lab에서 Linear가 작동하는 방식, 설정 체크리스트, 에이전트 스킬, 프롬프트 예시입니다.",
         "pluginsTitle": "플러그인",
         "pluginsDescription": "실험적인 Orca Lab 플러그인을 설치하고 관리합니다.",
+        "pluginPanelDescription": "{{value0}} 플러그인에서 제공합니다.",
         "tasksDescription": "제공업체를 연결하고 Linear 스킬을 설치한 다음 작업에 표시할 항목을 선택하세요.",
         "planeTitle": "Plane",
         "planeDescription": "Give agents the skill to read and update your Plane work items."
@@ -7102,6 +7103,7 @@
           "3bf149e873": "프로젝트 설정 > {{value0}}",
           "075341c763": "아직 구체화되고 있는 새로운 기능입니다. 한번 시도해 보세요.",
           "8b017f2506": "실험적",
+          "pluginsGroup": "플러그인",
           "499c1cd7f9": "문제 해결을 위한 낮은 수준의 호환성 설정입니다.",
           "1c87f8d024": "고급",
           "c1b43dc4e2": "익명의 사용 데이터 및 텔레메트리 제어.",
@@ -10307,9 +10309,7 @@
           "invalidPluginError": "플러그인 매니페스트 또는 설치된 파일이 올바르지 않습니다. 수정한 후 새로 고치세요.",
           "configure": "설정",
           "networkRestricted": "네트워크 접근은 이 플러그인이 선언한 호스트로 제한됩니다.",
-          "networkBlocked": "이 플러그인이 net:fetch를 선언하지 않으므로 네트워크 접근이 차단됩니다.",
-          "showPanel": "패널 보기",
-          "hidePanel": "패널 숨기기"
+          "networkBlocked": "이 플러그인이 net:fetch를 선언하지 않으므로 네트워크 접근이 차단됩니다."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "생성",

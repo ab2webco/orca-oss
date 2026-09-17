@@ -122,3 +122,5 @@ export type TopLevelView =
   | 'space'
   | 'artifacts'
   | 'mobile'
+  /** A `surface: 'nav'` plugin panel; which one lives in `activePluginNavTabKey`. */
+  | 'plugin'

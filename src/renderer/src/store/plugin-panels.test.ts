@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginHostListEntry } from '../../../preload/api-types'
 import {
   collectActivePluginCommands,
+  collectActivePluginPanels,
   collectEditablePluginCommands,
+  isNavSurfacePanel,
+  isSettingsSurfacePanel,
+  isWorktreeSurfacePanel,
   usePluginPanelsStore
 } from './plugin-panels'
 
@@ -151,4 +155,41 @@ describe('plugin panel list loading', () => {
       plugins: [expect.objectContaining({ pluginKey: 'orca-samples.recovered' })]
     })
   })
+})
+
+describe('plugin panel surfaces', () => {
+  const panels = [
+    { id: 'dashboard', title: 'Dashboard', tabKey: 'plugin:demo/dashboard' as const },
+    {
+      id: 'registry',
+      title: 'Registry',
+      tabKey: 'plugin:demo/registry' as const,
+      surface: 'settings' as const
+    },
+    { id: 'inbox', title: 'Inbox', tabKey: 'plugin:demo/inbox' as const, surface: 'nav' as const }
+  ]
+
+  it('routes each panel to exactly one surface, defaulting to worktree', () => {
+    expect(panels.filter(isWorktreeSurfacePanel).map((panel) => panel.id)).toEqual(['dashboard'])
+    expect(panels.filter(isSettingsSurfacePanel).map((panel) => panel.id)).toEqual(['registry'])
+    expect(panels.filter(isNavSurfacePanel).map((panel) => panel.id)).toEqual(['inbox'])
+  })
+
+  it.each(['disabled', 'errored', 'pending', 'invalid'] as const)(
+    'offers no panel of any surface for a %s plugin',
+    (status) => {
+      expect(collectActivePluginPanels([{ ...plugin('demo'), status, panels }])).toEqual([])
+    }
+  )
+
+  it.each(['running', 'restarting', 'idle'] as const)(
+    'offers every surface of a %s plugin',
+    (status) => {
+      expect(
+        collectActivePluginPanels([{ ...plugin('demo'), status, panels }]).map(
+          (panel) => panel.tabKey
+        )
+      ).toEqual(['plugin:demo/dashboard', 'plugin:demo/registry', 'plugin:demo/inbox'])
+    }
+  )
 })

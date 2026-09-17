@@ -15,13 +15,19 @@ export function pluginPanelsAreMounted(plugin: Pick<PluginHostListEntry, 'status
   return plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
 }
 
-/** A host that predates panel surfaces sends no `surface`; that means worktree. */
+/** No `surface` (host predates them) means worktree; allow-list so an unknown
+ *  surface never leaks into the per-worktree activity bar. */
 export function isWorktreeSurfacePanel(panel: PluginHostPanel): boolean {
-  return panel.surface !== 'settings'
+  return panel.surface === undefined || panel.surface === 'worktree'
 }
 
 export function isSettingsSurfacePanel(panel: PluginHostPanel): boolean {
   return panel.surface === 'settings'
+}
+
+/** Panels promoted to a first-level destination in the left sidebar. */
+export function isNavSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface === 'nav'
 }
 
 export type ActivePluginCommand = PluginHostListEntry['commands'][number] & {
@@ -213,6 +219,19 @@ export function usePluginPanels(): ActivePluginPanel[] {
   // Why: derive in useMemo (not the selector) so the store snapshot stays
   // referentially stable and doesn't retrigger useSyncExternalStore loops.
   return useMemo(() => collectActivePluginPanels(plugins), [plugins])
+}
+
+/** Nav-surface panels of enabled plugins — one left-sidebar destination each;
+ *  disabling or uninstalling a plugin drops its destination for free. */
+export function usePluginNavPanels(): ActivePluginPanel[] {
+  const panels = usePluginPanels()
+  return useMemo(() => panels.filter(isNavSurfacePanel), [panels])
+}
+
+/** Settings-surface panels of enabled plugins, one Settings page each. */
+export function usePluginSettingsPanels(): ActivePluginPanel[] {
+  const panels = usePluginPanels()
+  return useMemo(() => panels.filter(isSettingsSurfacePanel), [panels])
 }
 
 /** Commands of enabled plugins, sharing the authoritative plugin-list refresh. */
