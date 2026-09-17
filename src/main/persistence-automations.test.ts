@@ -647,3 +647,71 @@ describe('Store', () => {
     })
   })
 })
+
+describe('plugin-declared automations', () => {
+  beforeEach(() => {
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-plugin-automations-'))
+  })
+
+  afterEach(() => {
+    rmSync(testState.dir, { recursive: true, force: true })
+  })
+
+  it('stores a project-less cron automation and keeps its plugin origin', async () => {
+    const store = await createStore()
+
+    const automation = store.createAutomation({
+      name: 'WhatsApp: triage',
+      prompt: 'Triage the pending threads.',
+      agentId: 'claude',
+      // El plugin no conoce el workspace: la fila nace sin proyecto.
+      projectId: '',
+      workspaceMode: 'new_per_run',
+      timezone: 'America/Bogota',
+      rrule: '*/5 8-18 * * 1-5',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime(),
+      enabled: false,
+      pluginOrigin: { pluginKey: 'orca-samples.wa', automationId: 'triage' }
+    })
+
+    expect(automation.enabled).toBe(false)
+    expect(automation.reuseSession).toBe(false)
+    expect(automation.executionTargetType).toBe('local')
+    // Un cron invalido haria throw al calcular la proxima corrida.
+    expect(automation.nextRunAt).toBeGreaterThan(0)
+    expect(store.listAutomationsByPlugin('orca-samples.wa')).toHaveLength(1)
+    expect(store.listAutomationsByPlugin('orca-samples.other')).toHaveLength(0)
+
+    store.flush()
+    const persisted = readDataFile() as {
+      automations: { pluginOrigin?: { pluginKey: string; automationId: string } }[]
+    }
+    expect(persisted.automations[0].pluginOrigin).toEqual({
+      pluginKey: 'orca-samples.wa',
+      automationId: 'triage'
+    })
+  })
+
+  it('keeps the plugin origin across a user edit', async () => {
+    const store = await createStore()
+    const automation = store.createAutomation({
+      name: 'WhatsApp: triage',
+      prompt: 'Triage the pending threads.',
+      agentId: 'claude',
+      projectId: '',
+      workspaceMode: 'new_per_run',
+      timezone: 'America/Bogota',
+      rrule: '*/5 8-18 * * 1-5',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime(),
+      enabled: false,
+      pluginOrigin: { pluginKey: 'orca-samples.wa', automationId: 'triage' }
+    })
+
+    const edited = store.updateAutomation(automation.id, { name: 'Mi triage', enabled: true })
+
+    expect(edited.pluginOrigin).toEqual({
+      pluginKey: 'orca-samples.wa',
+      automationId: 'triage'
+    })
+  })
+})

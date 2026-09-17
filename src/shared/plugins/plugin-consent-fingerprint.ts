@@ -3,7 +3,9 @@ import { canonicalizeCapabilitySet } from './plugin-capabilities'
 import type { PluginManifest } from './plugin-manifest'
 
 type PluginConsentSubject = Pick<PluginManifest, 'capabilities' | 'main'> & {
-  contributes?: Partial<Pick<PluginManifest['contributes'], 'keybindings' | 'vmRecipes' | 'agents'>>
+  contributes?: Partial<
+    Pick<PluginManifest['contributes'], 'keybindings' | 'vmRecipes' | 'agents' | 'automations'>
+  >
 }
 
 export function hasInstructionalPluginContributions(manifest: PluginConsentSubject): boolean {
@@ -12,7 +14,10 @@ export function hasInstructionalPluginContributions(manifest: PluginConsentSubje
     contributions &&
     ((contributions.keybindings?.length ?? 0) > 0 ||
       (contributions.vmRecipes?.length ?? 0) > 0 ||
-      (contributions.agents?.length ?? 0) > 0)
+      (contributions.agents?.length ?? 0) > 0 ||
+      // Un prompt de automatizacion lo ejecuta despues un agente de codigo con
+      // la autoridad del usuario: son bytes instruccionales como los demas.
+      (contributions.automations?.length ?? 0) > 0)
   )
 }
 

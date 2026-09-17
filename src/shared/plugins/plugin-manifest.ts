@@ -18,6 +18,10 @@ import {
   pluginPanelIconSchema,
   pluginRelativePathSchema
 } from './plugin-manifest-fields'
+import {
+  PLUGIN_AUTOMATION_LIMIT,
+  pluginAutomationContributionSchema
+} from './plugin-automation-contribution'
 import { validatePluginManifestContributions } from './plugin-manifest-contribution-validation'
 import {
   pluginSettingsContributionSchema,
@@ -129,6 +133,10 @@ export const pluginManifestSchema = z
           .array(pluginAgentProfileContributionSchema)
           .max(PLUGIN_AGENT_PROFILE_LIMIT)
           .default([]),
+        automations: z
+          .array(pluginAutomationContributionSchema)
+          .max(PLUGIN_AUTOMATION_LIMIT)
+          .default([]),
         settings: pluginSettingsContributionSchema
       })
       .strict()
@@ -140,6 +148,7 @@ export const pluginManifestSchema = z
         keybindings: [],
         vmRecipes: [],
         agents: [],
+        automations: [],
         settings: []
       })),
     capabilities: z.array(pluginCapabilitySchema).max(32).default([])

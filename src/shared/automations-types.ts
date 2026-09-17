@@ -88,6 +88,14 @@ export type AutomationPrecheckResult = {
   completedAt: number
 }
 
+/** Identity of the plugin that declared an automation, and of the declaration
+ *  inside its manifest. El host es dueno del ciclo de vida de esa fila: se crea
+ *  al habilitar el plugin y se borra al deshabilitarlo o desinstalarlo. */
+export type AutomationPluginOrigin = {
+  pluginKey: string
+  automationId: string
+}
+
 export type Automation = {
   id: string
   name: string
@@ -127,6 +135,8 @@ export type Automation = {
   missedRunGraceMinutes: number
   createdAt: number
   updatedAt: number
+  /** Present only on automations a plugin declared. */
+  pluginOrigin?: AutomationPluginOrigin
 }
 
 export type AutomationRun = {
@@ -182,6 +192,7 @@ export type AutomationCreateInput = {
   dtstart: number
   enabled?: boolean
   missedRunGraceMinutes?: number
+  pluginOrigin?: AutomationPluginOrigin
 }
 
 export type AutomationUpdateInput = Partial<

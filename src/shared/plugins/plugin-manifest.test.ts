@@ -151,3 +151,45 @@ describe('pluginManifestSchema boundaries', () => {
     ).toBe(false)
   })
 })
+
+describe('contributes.automations', () => {
+  const automation = {
+    id: 'triage',
+    title: 'WhatsApp: triage',
+    trigger: '*/5 8-18 * * 1-5',
+    timezone: 'America/Bogota',
+    precheck: 'wa-scope pending',
+    prompt: 'PROMPT-triage.md',
+    provider: 'claude'
+  }
+
+  function withAutomations(entries: readonly Record<string, unknown>[]): Record<string, unknown> {
+    return manifest({ contributes: { automations: entries } })
+  }
+
+  it('accepts a cron-triggered declaration and defaults to none', () => {
+    expect(parsePluginManifest(withAutomations([automation])).ok).toBe(true)
+    const parsed = pluginManifestSchema.parse(manifest())
+    expect(parsed.contributes.automations).toEqual([])
+  })
+
+  it.each([
+    ['an unparseable cron expression', { trigger: 'every five minutes' }],
+    ['a cron expression that can never run', { trigger: '0 0 30 2 *' }],
+    ['an RRULE where a cron expression belongs', { trigger: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0' }],
+    ['an unknown time zone', { timezone: 'Mars/Olympus' }],
+    ['an agent Orca cannot launch', { provider: 'not-an-agent' }],
+    ['a prompt that escapes the plugin directory', { prompt: '../../secrets.md' }],
+    ['an absolute prompt path', { prompt: '/etc/passwd' }],
+    ['an inline prompt instead of a file', { prompt: 'Triage the pending threads.\nThen stop.' }],
+    ['an unknown extra key', { reuseSession: true }]
+  ])('rejects %s', (_label, overrides) => {
+    expect(parsePluginManifest(withAutomations([{ ...automation, ...overrides }])).ok).toBe(false)
+  })
+
+  it('rejects two declarations sharing one id', () => {
+    expect(
+      parsePluginManifest(withAutomations([automation, { ...automation, title: 'Other' }])).ok
+    ).toBe(false)
+  })
+})

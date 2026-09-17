@@ -19,6 +19,7 @@ import {
   removeInstalledPlugin
 } from '../plugins/plugin-install'
 import { applyPluginConsent, applyPluginEnablement } from '../plugins/plugin-enablement'
+import { reconcilePluginAutomations } from '../plugins/plugin-automation-reconciliation'
 import { buildPluginList, type PluginListEntry } from '../plugins/plugin-list-projection'
 import type { PluginService } from '../plugins/plugin-service'
 import { bindPluginPanelOwnerLifecycle } from '../plugins/plugin-panel-owner-lifecycle'
@@ -248,6 +249,9 @@ export function registerPluginHandlers(
       { notifyListeners: true, originWebContentsId: event.sender.id }
     )
     await pluginService.refresh()
+    // El plugin ya no existe, asi que la reconciliacion borra sus (y solo
+    // sus) automatizaciones declaradas.
+    await reconcilePluginAutomations({ store, pluginService })
     return listPluginsForClients(pluginService)
   })
 

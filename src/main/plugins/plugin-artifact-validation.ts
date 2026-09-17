@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
+import { PLUGIN_AUTOMATION_PROMPT_MAX_BYTES } from '../../shared/plugins/plugin-automation-contribution'
 import { isPluginPanelIconPath } from '../../shared/plugins/plugin-manifest-fields'
 import { PLUGIN_PANEL_ICON_SVG_MAX_BYTES } from '../../shared/plugins/plugin-panel-icon-svg'
 import { parsePluginVmRecipeArtifact } from '../../shared/plugins/plugin-vm-recipe-artifact'
@@ -76,6 +77,12 @@ function declaredArtifactPaths(manifest: PluginManifest): DeclaredArtifact[] {
       path: agent.path,
       kind: 'file' as const,
       maxBytes: PLUGIN_AGENT_PROFILE_MAX_BYTES
+    })),
+    ...manifest.contributes.automations.map((automation) => ({
+      label: `automation "${automation.id}" prompt`,
+      path: automation.prompt,
+      kind: 'file' as const,
+      maxBytes: PLUGIN_AUTOMATION_PROMPT_MAX_BYTES
     }))
   ]
 }
