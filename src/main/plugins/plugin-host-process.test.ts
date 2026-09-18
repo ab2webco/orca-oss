@@ -41,7 +41,14 @@ beforeEach(() => {
   processMocks.fork.mockReset()
 })
 
+// Why: vi.restoreAllMocks() cannot undo a defineProperty, so a win32 override
+// would leak into every later test in this file.
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+
 afterEach(() => {
+  if (originalPlatform) {
+    Object.defineProperty(process, 'platform', originalPlatform)
+  }
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
@@ -137,6 +144,52 @@ describe('startPluginWorker', () => {
       handle.kill()
       await new Promise<void>((resolve) => setImmediate(resolve))
       expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+    }
+  )
+
+  it('forks detached only when process spawning was consented', async () => {
+    const deniedChild = new FakeChild()
+    const deniedPending = start(deniedChild)
+    deniedChild.emit('message', { type: 'ready', commands: [] })
+    await deniedPending
+
+    const allowedChild = new FakeChild()
+    const allowedPending = start(allowedChild, { grantedCapabilities: ['process:spawn'] })
+    allowedChild.emit('message', { type: 'ready', commands: [] })
+    await allowedPending
+
+    // Only a detached fork owns its pid as a pgid; kill(-pid) depends on it.
+    expect(processMocks.fork.mock.calls[0]?.[2]?.detached).toBe(false)
+    expect(processMocks.fork.mock.calls[1]?.[2]?.detached).toBe(process.platform !== 'win32')
+  })
+
+  it.runIf(process.platform !== 'win32')(
+    'sweeps the process group after the worker exits on its own',
+    async () => {
+      const child = new FakeChild()
+      const pending = start(child, { grantedCapabilities: ['process:spawn'] })
+      child.emit('message', { type: 'ready', commands: [] })
+      await pending
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+
+      child.emit('exit', 0)
+
+      expect(killProcess).toHaveBeenCalledWith(-4321, 'SIGKILL')
+    }
+  )
+
+  it.runIf(process.platform !== 'win32')(
+    'leaves the process group alone for a worker without process spawning',
+    async () => {
+      const child = new FakeChild()
+      const pending = start(child)
+      child.emit('message', { type: 'ready', commands: [] })
+      await pending
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+
+      child.emit('exit', 0)
+
+      expect(killProcess).not.toHaveBeenCalled()
     }
   )
 

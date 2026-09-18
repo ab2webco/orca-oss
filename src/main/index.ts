@@ -332,7 +332,7 @@ import { PluginMarketplaceService } from './plugins/plugin-marketplace-service'
 import { PluginMarketplaceInstaller } from './plugins/plugin-marketplace-installer'
 import { PluginBundledBootstrapCoordinator } from './plugins/plugin-bundled-bootstrap-coordinator'
 import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
-import { resolvePluginHostEntryPath } from './plugins/plugin-host-process'
+import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
 import { setPluginServiceForRpc } from './runtime/rpc/methods/plugins'
 import {

@@ -1,6 +1,4 @@
 import { fork, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import {
   PLUGIN_WORKER_INVOKE_TIMEOUT_MS,
   PLUGIN_WORKER_READY_TIMEOUT_MS,
@@ -13,7 +11,11 @@ import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel
 import { buildPluginWorkerEnv } from './plugin-worker-env'
 import { pipePluginWorkerOutput } from './plugin-worker-output-buffer'
 import { buildPluginWorkerSandboxArgs } from './plugin-worker-sandbox-args'
-import { hasSpawnCapability, terminatePluginWorkerTree } from './plugin-worker-process-tree'
+import {
+  reapPluginWorkerGroup,
+  terminatePluginWorkerTree,
+  usesDetachedProcessGroup
+} from './plugin-worker-process-tree'
 
 // Grace between the shutdown message and SIGKILL: long enough for plugin
 // cleanup, short enough that disable/quit never feels stuck.
@@ -59,20 +61,6 @@ export type StartPluginWorkerOptions = {
   signal?: AbortSignal
 }
 
-/**
- * Resolves the compiled child entry from the app path. Mirrors
- * getDaemonEntryPath(): packaged apps must fork the asar-unpacked copy
- * because fork() cannot execute scripts from inside app.asar.
- */
-export function resolvePluginHostEntryPath(appPath: string, isPackaged: boolean): string {
-  const basePath = isPackaged ? appPath.replace('app.asar', 'app.asar.unpacked') : appPath
-  const directEntryPath = join(basePath, 'plugin-host-entry.js')
-  if (existsSync(directEntryPath)) {
-    return directEntryPath
-  }
-  return join(basePath, 'out', 'main', 'plugin-host-entry.js')
-}
-
 type PendingCall = {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
@@ -100,13 +88,15 @@ export async function startPluginWorker(
     // Why: the protocol permits structured-clone values. Node's default JSON
     // fork serialization rejects BigInt, cycles, maps, and typed arrays.
     serialization: 'advanced',
-    detached: hasSpawnCapability(options.grantedCapabilities) && process.platform !== 'win32',
+    detached: usesDetachedProcessGroup(options.grantedCapabilities),
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   })
   pipePluginWorkerOutput(child.stdout, 'info', log)
   pipePluginWorkerOutput(child.stderr, 'error', log)
 
   const killWorkerTree = () => terminatePluginWorkerTree(child, options.grantedCapabilities)
+  // Why: child.pid is cleared on exit, and the post-exit sweep still needs it.
+  const workerPid = child.pid
 
   const pendingCommands = new Map<number, PendingCall>()
   const pendingEvents = new Map<number, ReturnType<typeof setTimeout>>()
@@ -139,6 +129,9 @@ export async function startPluginWorker(
   child.on('exit', (code) => {
     exited = true
     exitCode = code
+    // Why: a clean self-exit never goes through killWorkerTree, so without this
+    // the children the worker spawned would outlive it.
+    reapPluginWorkerGroup(workerPid, options.grantedCapabilities)
     rejectAllPending(`${tag} worker exited before responding`)
     for (const callback of exitCallbacks) {
       callback(code)
