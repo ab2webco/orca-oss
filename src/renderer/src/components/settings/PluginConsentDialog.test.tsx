@@ -224,6 +224,40 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).not.toContain('These permissions limit')
   })
 
+  it('shows the shell command a contributed automation would run on a schedule', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.sync',
+        name: 'Acme Sync',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [
+          {
+            id: 'mirror',
+            title: 'Mirror the vault',
+            trigger: '*/5 * * * *',
+            command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    // A scheduled shell command is not "validated content only".
+    expect(document.body.textContent).not.toContain('Declarative')
+    expect(document.body.textContent).not.toContain('contributes validated content only')
+    expect(document.body.textContent).toContain('Instructional')
+    expect(document.body.textContent).toContain('Mirror the vault')
+    expect(document.body.textContent).toContain('*/5 * * * *')
+    const commands = Array.from(document.querySelectorAll('pre'))
+    expect(commands.map((node) => node.textContent)).toEqual([
+      'rsync -a --delete "$HOME/vault/" backup:/vault/'
+    ])
+    expect(commands[0]?.getAttribute('aria-label')).toBe('Mirror the vault · command')
+  })
+
   it('shows every VM recipe lifecycle command verbatim', async () => {
     await renderConsent(
       {

@@ -106,3 +106,23 @@ function isSupportedTimezone(value: string): boolean {
     return false
   }
 }
+
+/** Wire preview of a contributed automation. `command` present = command-only:
+ *  that shell string IS the run, so consent has to show it verbatim. */
+export type PluginAutomationPreview = {
+  id: string
+  title: string
+  trigger: string
+  command?: string
+}
+
+export function previewPluginAutomations(
+  contributions: readonly PluginAutomationContribution[]
+): PluginAutomationPreview[] {
+  return contributions.map((contribution) => ({
+    id: contribution.id,
+    title: contribution.title,
+    trigger: contribution.trigger,
+    ...(isPluginCommandAutomation(contribution) ? { command: contribution.command } : {})
+  }))
+}

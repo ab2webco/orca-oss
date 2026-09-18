@@ -10085,6 +10085,14 @@
           "descriptionSystem": "Links open in Orca Lab, so {{chord}}+click sends one to your system browser instead.",
           "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca Lab's built-in browser instead."
         },
+        "PluginAutomationConsentPreview": {
+          "heading": "Automatizaciones programadas",
+          "schedule": "Programacion",
+          "command": "Comando",
+          "commandLabel": "{{value0}} · comando",
+          "runs": "Corre",
+          "agentRun": "Lanza un agente de codigo con el prompt que trae el plugin."
+        },
         "PluginConsentDialog": {
           "workerTrust": "Proceso en segundo plano — se ejecuta en su propio proceso",
           "instructionalTrust": "Contenido instructivo — se ejecuta más tarde con la autoridad del usuario o del agente",

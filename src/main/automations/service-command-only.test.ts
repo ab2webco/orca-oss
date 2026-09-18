@@ -37,7 +37,11 @@ function registerWorkDir(): string {
   return 'repo-1'
 }
 
-function createCommandAutomation(command: string): Automation {
+/** Blocks for ~3s without reading stdin, so the run is still in flight while
+ *  the assertions below look at everything else. */
+const SLOW_COMMAND = 'node -e "setTimeout(()=>{},3000)"'
+
+function createCommandAutomation(command: string, enabled = false): Automation {
   return store.createAutomation({
     name: 'Sync',
     command: { command, timeoutSeconds: 30 },
@@ -46,13 +50,34 @@ function createCommandAutomation(command: string): Automation {
     timezone: 'UTC',
     rrule: '*/5 * * * *',
     dtstart: Date.now(),
-    enabled: false
+    enabled
   })
 }
 
 function latestRun(automationId: string): AutomationRun {
   const runs = store.listAutomationRuns(automationId)
   return runs.at(-1) as AutomationRun
+}
+
+/** Real-timer poll: the fixtures fake `Date` only, so vitest helpers that drive
+ *  fake timers would stall on a child process that settles on I/O. */
+async function waitForRun(
+  automationId: string,
+  predicate: (run: AutomationRun | undefined) => boolean,
+  budgetMs = 2000
+): Promise<AutomationRun> {
+  const deadline = performance.now() + budgetMs
+  for (;;) {
+    const runs = store.listAutomationRuns(automationId)
+    const run = runs.at(-1)
+    if (predicate(run)) {
+      return run as AutomationRun
+    }
+    if (performance.now() > deadline) {
+      throw new Error(`run for ${automationId} never matched; last status ${run?.status ?? 'none'}`)
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  }
 }
 
 beforeEach(async () => {
@@ -62,6 +87,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   rmSync(testState.dir, { recursive: true, force: true })
   rmSync(workDir, { recursive: true, force: true })
 })
@@ -73,10 +99,9 @@ describe('command-only automations', () => {
     // esto terminaria en `skipped_unavailable`, que es la falla que evitamos.
     const service = new AutomationService(store)
 
-    const run = await service.runNow(automation.id)
+    await service.runNow(automation.id)
 
-    expect(run.status).toBe('completed')
-    const stored = latestRun(automation.id)
+    const stored = await waitForRun(automation.id, (entry) => entry?.status === 'completed')
     expect(stored.commandResult?.exitCode).toBe(0)
     expect(stored.outputSnapshot?.content).toContain('synced')
     expect(stored.error).toBeNull()
@@ -86,11 +111,13 @@ describe('command-only automations', () => {
     const automation = createCommandAutomation('exit 3')
     const service = new AutomationService(store)
 
-    const run = await service.runNow(automation.id)
+    await service.runNow(automation.id)
 
-    expect(run.status).toBe('command_failed')
-    expect(run.status).not.toBe('skipped_precheck')
-    const stored = latestRun(automation.id)
+    const stored = await waitForRun(automation.id, (entry) =>
+      Boolean(entry && entry.status !== 'pending' && entry.status !== 'dispatching')
+    )
+    expect(stored.status).toBe('command_failed')
+    expect(stored.status).not.toBe('skipped_precheck')
     expect(stored.commandResult?.exitCode).toBe(3)
     expect(stored.error).toContain('3')
   })
@@ -131,6 +158,32 @@ describe('command-only automations', () => {
     // diciendo que no habia donde lanzarlo.
     expect(run.status).toBe('skipped_unavailable')
     expect(run.error).toContain('window')
+  })
+
+  it('keeps evaluating other automations while one command is still running', async () => {
+    // Solo `Date` es falso: el hijo termina por I/O, no por un timer.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const slow = createCommandAutomation(SLOW_COMMAND, true)
+    const quick = createCommandAutomation('echo quick', true)
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+    const service = new AutomationService(store)
+
+    service.setRendererReady()
+
+    await waitForRun(quick.id, (entry) => entry?.status === 'completed')
+    expect(latestRun(slow.id).status).toBe('dispatching')
+  })
+
+  it('does not start a second run while the same automation is still running', async () => {
+    const automation = createCommandAutomation(SLOW_COMMAND)
+    const service = new AutomationService(store)
+
+    const first = await service.runNow(automation.id)
+    const second = await service.runNow(automation.id)
+
+    expect(first.status).toBe('dispatching')
+    expect(second.status).toBe('skipped_unavailable')
+    expect(second.error).toContain('still running')
   })
 
   it('refuses a row that would neither run a command nor launch an agent', () => {

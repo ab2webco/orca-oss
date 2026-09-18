@@ -5,6 +5,7 @@ import { translate } from '@/i18n/i18n'
 import { pluginConsentErrorMessage } from './plugin-error-presentation'
 import { Button } from '../ui/button'
 import { PluginVmRecipeConsentPreview } from './PluginVmRecipeConsentPreview'
+import { PluginAutomationConsentPreview } from './PluginAutomationConsentPreview'
 import { PluginKeybindingConsentPreview } from './PluginKeybindingConsentPreview'
 import { PluginConsentProvenance } from './PluginConsentProvenance'
 import { pluginCapabilityDescription } from './plugin-capability-presentation'
@@ -57,6 +58,9 @@ function hasInstructionalContent(plugin: PluginHostListEntry): boolean {
     // A contributed skill is read by an agent and acted on with the user's
     // authority: the same trust tier as a VM recipe, not panel content.
     (plugin.skills?.length ?? 0) > 0 ||
+    // A contributed automation runs on a schedule under the user's authority —
+    // a bare shell command in the command-only form. Never "declarative".
+    (plugin.automations?.length ?? 0) > 0 ||
     plugin.commands.some((command) => command.keybindings.length > 0)
   )
 }
@@ -235,6 +239,7 @@ export function PluginConsentDialog({
               </span>
             </div>
             <PluginKeybindingConsentPreview commands={plugin.commands} />
+            <PluginAutomationConsentPreview automations={plugin.automations ?? []} />
             <PluginVmRecipeConsentPreview recipes={plugin.vmRecipes ?? []} />
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
             <DialogFooter>

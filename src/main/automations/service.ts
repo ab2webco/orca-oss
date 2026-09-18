@@ -6,12 +6,13 @@ import {
   type AutomationDispatchRequest,
   type AutomationDispatchResult,
   type AutomationPrecheckResult,
-  type AutomationRun
+  type AutomationRun,
+  type AutomationShellCommand
 } from '../../shared/automations-types'
 import type { ClaudeUsageStore } from '../claude-usage/store'
 import type { CodexUsageStore } from '../codex-usage/store'
 import { runAutomationPrecheck } from './precheck-runner'
-import { resolveAutomationRunTarget } from './run-target-resolution'
+import { resolveAutomationRunTarget, type AutomationRunTargetResult } from './run-target-resolution'
 import { collectAutomationRunUsage } from './run-usage-collection'
 import type { HeadlessAutomationDispatcher } from './headless-dispatch'
 import { clearAutomationDispatchTokens, createAutomationDispatchToken } from './dispatch-tokens'
@@ -28,6 +29,9 @@ export class AutomationService {
   private webContents: WebContents | null = null
   private rendererReady = false
   private evaluating = false
+  /** Corridas command-only vivas, por automatizacion: el scheduler las arranca
+   *  y sigue, y esta llave impide que dos corridas de la misma fila se pisen. */
+  private readonly commandRunsInFlight = new Map<string, Promise<void>>()
   private readonly claudeUsage: ClaudeUsageStore | null
   private readonly codexUsage: CodexUsageStore | null
   private readonly allowRemoteHostScheduling: boolean
@@ -225,14 +229,7 @@ export class AutomationService {
     if (action.kind === 'command') {
       // Ni ventana, ni terminal, ni cuenta de agente, ni modelo: el sentido de
       // esta forma es que sea barata. Se resuelve entera en el main.
-      return await dispatchCommandOnlyAutomationRun({
-        store: this.store,
-        automation,
-        run,
-        target,
-        command: action.command,
-        runPrecheck: () => this.runPrecheck(automation.id, run.id)
-      })
+      return this.startCommandOnlyRun(automation, run, target, action.command)
     }
     const webContents = this.webContents
     if (!webContents || webContents.isDestroyed() || !this.rendererReady) {
@@ -267,5 +264,57 @@ export class AutomationService {
     }
     webContents.send('automations:dispatchRequested', payload)
     return updated
+  }
+
+  /**
+   * Arranca la corrida y devuelve la fila en `dispatching` sin esperar el
+   * comando: su runtime es shell del usuario (hasta 600s), y esperarlo aca
+   * congelaba la evaluacion de todas las demas filas y la respuesta de
+   * `automations:runNow`. El final lo escribe el store cuando el comando sale.
+   */
+  private startCommandOnlyRun(
+    automation: Automation,
+    run: AutomationRun,
+    target: Extract<AutomationRunTargetResult, { ok: true }>,
+    command: AutomationShellCommand
+  ): AutomationRun {
+    if (this.commandRunsInFlight.has(automation.id)) {
+      return this.store.updateAutomationRun({
+        runId: run.id,
+        status: 'skipped_unavailable',
+        workspaceId: null,
+        error: 'The previous run of this automation is still running.'
+      })
+    }
+    const dispatching = this.store.updateAutomationRun({
+      runId: run.id,
+      status: 'dispatching',
+      workspaceId: null,
+      error: null
+    })
+    const settled = dispatchCommandOnlyAutomationRun({
+      store: this.store,
+      automation,
+      run: dispatching,
+      target,
+      command,
+      runPrecheck: () => this.runPrecheck(automation.id, run.id)
+    })
+      .then(() => undefined)
+      .catch((cause: unknown) => {
+        // Nadie espera esta promesa, asi que un throw dejaria la fila clavada
+        // en `dispatching` para siempre.
+        this.store.updateAutomationRun({
+          runId: run.id,
+          status: 'dispatch_failed',
+          workspaceId: null,
+          error: cause instanceof Error ? cause.message : String(cause)
+        })
+      })
+      .finally(() => {
+        this.commandRunsInFlight.delete(automation.id)
+      })
+    this.commandRunsInFlight.set(automation.id, settled)
+    return dispatching
   }
 }

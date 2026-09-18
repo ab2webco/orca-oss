@@ -10086,6 +10086,14 @@
           "descriptionSystem": "链接在 Orca Lab 中打开，因此 {{chord}}+点击会将其发送到系统浏览器。",
           "descriptionOrca": "链接在系统浏览器中打开。启用后，{{chord}}+点击会改在 Orca Lab 内置浏览器中打开。"
         },
+        "PluginAutomationConsentPreview": {
+          "heading": "计划的自动化",
+          "schedule": "计划",
+          "command": "命令",
+          "commandLabel": "{{value0}} · 命令",
+          "runs": "运行",
+          "agentRun": "使用插件内置的提示词启动编码代理。"
+        },
         "PluginConsentDialog": {
           "workerTrust": "后台工作进程 — 在独立进程中运行",
           "instructionalTrust": "指令内容 — 稍后以用户或智能体权限运行",

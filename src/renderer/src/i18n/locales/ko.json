@@ -10085,6 +10085,14 @@
           "descriptionSystem": "Links open in Orca Lab, so {{chord}}+click sends one to your system browser instead.",
           "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca Lab's built-in browser instead."
         },
+        "PluginAutomationConsentPreview": {
+          "heading": "예약된 자동화",
+          "schedule": "일정",
+          "command": "명령",
+          "commandLabel": "{{value0}} · 명령",
+          "runs": "실행",
+          "agentRun": "플러그인에 포함된 프롬프트로 코딩 에이전트를 실행합니다."
+        },
         "PluginConsentDialog": {
           "workerTrust": "백그라운드 워커 — 별도 프로세스에서 실행",
           "instructionalTrust": "지침 콘텐츠 — 나중에 사용자 또는 에이전트 권한으로 실행",
