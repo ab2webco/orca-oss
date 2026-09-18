@@ -6,6 +6,8 @@ export type AutomationPluginManagedField =
   | 'prompt'
   | 'precheck'
   | 'agentId'
+  /** Solo para declaraciones command-only: el comando que ES la corrida. */
+  | 'command'
   | 'rrule'
   | 'timezone'
   /** Solo para declaraciones con `workspace: 'plugin-owned'`: el repo de la

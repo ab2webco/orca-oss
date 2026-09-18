@@ -14164,7 +14164,9 @@
           "51a470b966": "SSH",
           "b09b2384fd": "일시중지됨",
           "eaa02014f8": "활성화됨",
-          "29baf8f4c2": "소스"
+          "29baf8f4c2": "소스",
+          "commandAction": "명령",
+          "runsLabel": "실행 내용"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "취소",
@@ -14355,7 +14357,9 @@
           "tableStatus": "상태",
           "tableActions": "작업",
           "newAutomation": "새 자동화",
-          "rowActions": "자동화 작업"
+          "rowActions": "자동화 작업",
+          "enterCommand": "저장하기 전에 명령을 입력하세요.",
+          "runsInProjectDirectory": "프로젝트 디렉터리에서"
         },
         "CreateFromPicker": {
           "f061f49e3f": "repo 브랜치 검색...",
@@ -14480,7 +14484,20 @@
           "clear": "검색 지우기"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "자동화 작업"
+          "c92c9463c6": "자동화 작업",
+          "noProjectChosen": "아직 프로젝트 없음",
+          "commandAction": "명령"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "에이전트 실행",
+          "runCommand": "명령 실행",
+          "commandLabel": "명령",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "에이전트, 터미널, 모델 없이 대상 프로젝트 디렉터리에서 실행됩니다. 종료 코드 0은 성공이고, 그 외에는 실패한 실행으로 기록됩니다.",
+          "commandTimeout": "제한 시간(초)"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "실행되지 않음"
         }
       },
       "agent": {

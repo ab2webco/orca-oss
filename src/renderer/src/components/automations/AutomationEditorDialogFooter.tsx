@@ -97,109 +97,114 @@ export function AutomationEditorDialogFooter({
             getRepoHostLabel={getRepoHostLabel}
           />
         </Field>
-        <Field
-          label={
-            <span className="inline-flex items-center gap-1">
-              {translate(
-                'auto.components.automations.AutomationEditorDialog.b28b140eaf',
-                'Workspace'
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={translate(
-                      'auto.components.automations.AutomationEditorDialog.2c3fd9bfa1',
-                      'Workspace mode help'
+        {/* Un comando corre en el directorio del proyecto: el store fuerza
+            `workspaceId: null`, asi que ofrecer el selector seria ofrecer una
+            eleccion que se descarta al guardar. */}
+        {draft.actionKind === 'command' ? null : (
+          <Field
+            label={
+              <span className="inline-flex items-center gap-1">
+                {translate(
+                  'auto.components.automations.AutomationEditorDialog.b28b140eaf',
+                  'Workspace'
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={translate(
+                        'auto.components.automations.AutomationEditorDialog.2c3fd9bfa1',
+                        'Workspace mode help'
+                      )}
+                      className="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      <Info className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6} className="max-w-72">
+                    {translate(
+                      'auto.components.automations.AutomationEditorDialog.6f9610e667',
+                      'Worktree runs in the selected workspace. New run creates a fresh workspace from the selected branch each time.'
                     )}
-                    className="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6} className="max-w-72">
-                  {translate(
-                    'auto.components.automations.AutomationEditorDialog.6f9610e667',
-                    'Worktree runs in the selected workspace. New run creates a fresh workspace from the selected branch each time.'
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </span>
-          }
-          className={isHermesTarget ? undefined : 'sm:col-span-2 lg:col-span-3'}
-        >
-          {isHermesTarget ? (
-            <WorkspaceCombobox
-              worktrees={worktrees}
-              value={draft.workspaceId}
-              triggerClassName={pickerTriggerClassName}
-              onValueChange={(workspaceId) =>
-                onDraftChange((current) => ({ ...current, workspaceId }))
-              }
-            />
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-              <ToggleGroup
-                type="single"
-                value={draft.workspaceMode}
-                onValueChange={(workspaceMode) =>
-                  workspaceMode &&
-                  onDraftChange((current) => ({
-                    ...current,
-                    workspaceMode: workspaceMode as AutomationWorkspaceMode,
-                    reuseSession: workspaceMode === 'existing' ? current.reuseSession : false
-                  }))
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+            }
+            className={isHermesTarget ? undefined : 'sm:col-span-2 lg:col-span-3'}
+          >
+            {isHermesTarget ? (
+              <WorkspaceCombobox
+                worktrees={worktrees}
+                value={draft.workspaceId}
+                triggerClassName={pickerTriggerClassName}
+                onValueChange={(workspaceId) =>
+                  onDraftChange((current) => ({ ...current, workspaceId }))
                 }
-                variant="outline"
-                size="sm"
-                className="grid w-full grid-cols-2"
-              >
-                <ToggleGroupItem value="existing" className={modeToggleItemClassName}>
-                  {translate(
-                    'auto.components.automations.AutomationEditorDialog.a2e688226d',
-                    'Worktree'
-                  )}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="new_per_run" className={modeToggleItemClassName}>
-                  {translate(
-                    'auto.components.automations.AutomationEditorDialog.6ff66f9012',
-                    'New run'
-                  )}
-                </ToggleGroupItem>
-              </ToggleGroup>
-              {draft.workspaceMode === 'existing' ? (
-                <WorkspaceCombobox
-                  worktrees={worktrees}
-                  value={draft.workspaceId}
-                  triggerClassName={`min-w-0 ${pickerTriggerClassName}`}
-                  onValueChange={(workspaceId) =>
+              />
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                <ToggleGroup
+                  type="single"
+                  value={draft.workspaceMode}
+                  onValueChange={(workspaceMode) =>
+                    workspaceMode &&
                     onDraftChange((current) => ({
                       ...current,
-                      workspaceId,
-                      // Why: a pane key is bound to one workspace; keeping it would silently save a target that can never resolve.
-                      targetPaneKey:
-                        workspaceId === current.workspaceId ? current.targetPaneKey : ''
+                      workspaceMode: workspaceMode as AutomationWorkspaceMode,
+                      reuseSession: workspaceMode === 'existing' ? current.reuseSession : false
                     }))
                   }
-                />
-              ) : (
-                <CreateFromPicker
-                  // Why: branch search state belongs to the selected project,
-                  // so repo switches should reset it before the next paint.
-                  key={draft.projectId}
-                  repoId={draft.projectId}
-                  repoMap={repoMap}
-                  worktrees={worktrees}
-                  value={draft.baseBranch}
-                  triggerClassName={`min-w-0 ${pickerTriggerClassName}`}
-                  onValueChange={(baseBranch) =>
-                    onDraftChange((current) => ({ ...current, baseBranch }))
-                  }
-                />
-              )}
-            </div>
-          )}
-        </Field>
+                  variant="outline"
+                  size="sm"
+                  className="grid w-full grid-cols-2"
+                >
+                  <ToggleGroupItem value="existing" className={modeToggleItemClassName}>
+                    {translate(
+                      'auto.components.automations.AutomationEditorDialog.a2e688226d',
+                      'Worktree'
+                    )}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="new_per_run" className={modeToggleItemClassName}>
+                    {translate(
+                      'auto.components.automations.AutomationEditorDialog.6ff66f9012',
+                      'New run'
+                    )}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                {draft.workspaceMode === 'existing' ? (
+                  <WorkspaceCombobox
+                    worktrees={worktrees}
+                    value={draft.workspaceId}
+                    triggerClassName={`min-w-0 ${pickerTriggerClassName}`}
+                    onValueChange={(workspaceId) =>
+                      onDraftChange((current) => ({
+                        ...current,
+                        workspaceId,
+                        // Why: a pane key is bound to one workspace; keeping it would silently save a target that can never resolve.
+                        targetPaneKey:
+                          workspaceId === current.workspaceId ? current.targetPaneKey : ''
+                      }))
+                    }
+                  />
+                ) : (
+                  <CreateFromPicker
+                    // Why: branch search state belongs to the selected project,
+                    // so repo switches should reset it before the next paint.
+                    key={draft.projectId}
+                    repoId={draft.projectId}
+                    repoMap={repoMap}
+                    worktrees={worktrees}
+                    value={draft.baseBranch}
+                    triggerClassName={`min-w-0 ${pickerTriggerClassName}`}
+                    onValueChange={(baseBranch) =>
+                      onDraftChange((current) => ({ ...current, baseBranch }))
+                    }
+                  />
+                )}
+              </div>
+            )}
+          </Field>
+        )}
         {isHermesTarget ? scheduleField : null}
       </div>
 
@@ -223,29 +228,36 @@ export function AutomationEditorDialogFooter({
                 : 'translate-y-0 opacity-100 delay-200'
             )}
           >
-            <Field
-              label={translate(
-                'auto.components.automations.AutomationEditorDialog.57b722cbba',
-                'Agent'
-              )}
-            >
-              <AgentCombobox
-                agents={visibleAgents}
-                value={draft.agentId}
-                onValueChange={(agentId) =>
-                  agentId && onDraftChange((current) => ({ ...current, agentId }))
-                }
-                defaultAgent={settings?.defaultTuiAgent ?? null}
-                triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
-                allowNarrowTrigger
+            {/* Una fila command-only no lanza agente: pedir uno seria pedir
+                algo que no se va a usar. */}
+            {draft.actionKind === 'command' ? null : (
+              <Field
+                label={translate(
+                  'auto.components.automations.AutomationEditorDialog.57b722cbba',
+                  'Agent'
+                )}
+              >
+                <AgentCombobox
+                  agents={visibleAgents}
+                  value={draft.agentId}
+                  onValueChange={(agentId) =>
+                    agentId && onDraftChange((current) => ({ ...current, agentId }))
+                  }
+                  defaultAgent={settings?.defaultTuiAgent ?? null}
+                  triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
+                  allowNarrowTrigger
+                />
+              </Field>
+            )}
+            {/* Ni sesion ni panel: un comando no abre terminal. */}
+            {draft.actionKind === 'command' ? null : (
+              <AutomationSessionField
+                draft={draft}
+                toggleItemClassName={modeToggleItemClassName}
+                onDraftChange={onDraftChange}
               />
-            </Field>
-            <AutomationSessionField
-              draft={draft}
-              toggleItemClassName={modeToggleItemClassName}
-              onDraftChange={onDraftChange}
-            />
-            {isHermesTarget ? null : (
+            )}
+            {isHermesTarget || draft.actionKind === 'command' ? null : (
               <AutomationTargetPaneField
                 draft={draft}
                 pickerTriggerClassName={pickerTriggerClassName}

@@ -1,10 +1,12 @@
 import type { Automation } from '../../shared/automations-types'
 import { DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS } from '../../shared/automation-precheck'
 import {
+  isPluginCommandAutomation,
   PLUGIN_AUTOMATION_PROMPT_MAX_BYTES,
   usesPluginOwnedWorkspace,
   type PluginAutomationContribution
 } from '../../shared/plugins/plugin-automation-contribution'
+import { DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS } from '../../shared/automation-command-run'
 import type { Store } from '../persistence'
 import { readContainedPluginArtifactText } from './plugin-artifact-validation'
 import { isInvalidDiscoveredPlugin } from './plugin-discovery'
@@ -163,6 +165,11 @@ async function readDeclaredFields(
   rootDir: string,
   contribution: PluginAutomationContribution
 ): Promise<PluginManagedAutomationFields | null> {
+  // Una declaracion command-only no tiene prompt que leer: el comando ES la
+  // corrida y viaja en el manifiesto, que el hash de contenido ya cubre.
+  if (isPluginCommandAutomation(contribution)) {
+    return pluginDeclaredAutomationFields(contribution, '')
+  }
   let prompt: string
   try {
     prompt = await readContainedPluginArtifactText(
@@ -185,9 +192,8 @@ function createPluginAutomation(
   contribution: PluginAutomationContribution,
   fields: PluginManagedAutomationFields
 ): void {
-  store.createAutomation({
+  const base = {
     name: fields.name,
-    prompt: fields.prompt,
     ...(fields.precheck
       ? {
           precheck: {
@@ -196,13 +202,12 @@ function createPluginAutomation(
           }
         }
       : {}),
-    agentId: fields.agentId,
     // Sin proyecto hasta que el usuario elija: el plugin no conoce el workspace
     // y adivinarlo correria trabajo ajeno en el repo equivocado. Con
     // `workspace: 'plugin-owned'` el destino es la carpeta del propio plugin,
     // que no es un repo del usuario: nadie adivino nada.
     projectId: fields.runTarget ?? '',
-    workspaceMode: 'new_per_run',
+    workspaceMode: 'new_per_run' as const,
     timezone: fields.timezone,
     rrule: fields.rrule,
     dtstart: Date.now(),
@@ -212,7 +217,23 @@ function createPluginAutomation(
       automationId: contribution.id,
       managedFingerprints: fingerprintPluginAutomationFields(fields)
     }
-  })
+  }
+  // Una u otra forma, nunca las dos ni ninguna: el esquema del manifiesto ya lo
+  // garantiza y la union de `AutomationCreateInput` lo vuelve a exigir aca.
+  if (fields.command) {
+    store.createAutomation({
+      ...base,
+      command: {
+        command: fields.command,
+        timeoutSeconds: DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS
+      }
+    })
+    return
+  }
+  if (!fields.agentId) {
+    return
+  }
+  store.createAutomation({ ...base, agentId: fields.agentId, prompt: fields.prompt })
 }
 
 function refreshPluginAutomation(

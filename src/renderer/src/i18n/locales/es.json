@@ -14153,7 +14153,9 @@
           "51a470b966": "ssh",
           "b09b2384fd": "En pausa",
           "eaa02014f8": "Activado",
-          "29baf8f4c2": "Source"
+          "29baf8f4c2": "Source",
+          "commandAction": "Comando",
+          "runsLabel": "Ejecuta"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "Cancelar",
@@ -14344,7 +14346,9 @@
           "tableStatus": "Estado",
           "tableActions": "Acciones",
           "newAutomation": "Nueva automatización",
-          "rowActions": "Acciones de automatización"
+          "rowActions": "Acciones de automatización",
+          "enterCommand": "Escribe un comando antes de guardar.",
+          "runsInProjectDirectory": "En el directorio del proyecto"
         },
         "CreateFromPicker": {
           "f061f49e3f": "Buscar ramas del repositorio...",
@@ -14469,7 +14473,20 @@
           "clear": "Borrar búsqueda"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "Acciones de automatización"
+          "c92c9463c6": "Acciones de automatización",
+          "noProjectChosen": "Todavía sin proyecto",
+          "commandAction": "Comando"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "Lanzar un agente",
+          "runCommand": "Ejecutar un comando",
+          "commandLabel": "Comando",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "Se ejecuta en el directorio del proyecto de destino, sin agente, terminal ni modelo. El código de salida 0 es un éxito; cualquier otro se registra como una ejecución fallida.",
+          "commandTimeout": "Tiempo límite (segundos)"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "No se ejecutará"
         }
       },
       "agent": {

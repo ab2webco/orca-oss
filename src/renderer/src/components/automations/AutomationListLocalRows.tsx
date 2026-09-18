@@ -1,5 +1,5 @@
 import React from 'react'
-import { MoreHorizontal, Pause, Pencil, Play, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pause, Pencil, Play, SquareTerminal, Trash2 } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentIcon } from '@/lib/agent-catalog'
+import { getAutomationAction } from '../../../../shared/automation-action'
 import { cn } from '@/lib/utils'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
@@ -127,7 +128,14 @@ export function AutomationListLocalRows({
           ? formatAutomationDateTimeWithRelative(automation.nextRunAt, relativeNow)
           : translate('auto.components.automations.AutomationsPage.paused', 'Paused')
         const isSelected = isSelectedLocal && selectedId === automation.id
-        const agentLabel = getAgentLabel(automation.agentId)
+        const action = getAutomationAction(automation)
+        const agentLabel =
+          action.kind === 'command'
+            ? translate(
+                'auto.components.automations.AutomationListLocalRows.commandAction',
+                'Command'
+              )
+            : getAgentLabel(action.agentId)
         const hostId =
           automation.runContext?.hostId ??
           (automationRepo ? getRepoExecutionHostId(automationRepo) : null)
@@ -232,7 +240,11 @@ export function AutomationListLocalRows({
                       className="flex items-center justify-center text-muted-foreground"
                       aria-label={agentTooltipLabel}
                     >
-                      <AgentIcon agent={automation.agentId} size={16} />
+                      {action.kind === 'command' ? (
+                        <SquareTerminal className="size-4" />
+                      ) : (
+                        <AgentIcon agent={action.agentId} size={16} />
+                      )}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={4}>

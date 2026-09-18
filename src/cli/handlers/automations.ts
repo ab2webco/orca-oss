@@ -4,6 +4,7 @@ import type {
   AutomationCreateInput,
   AutomationPrecheck,
   AutomationRun,
+  AutomationShellCommand,
   AutomationSchedulePreset,
   AutomationUpdateInput
 } from '../../shared/automations-types'
@@ -19,6 +20,10 @@ import {
   DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS,
   MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS
 } from '../../shared/automation-precheck'
+import {
+  MAX_AUTOMATION_COMMAND_TIMEOUT_SECONDS,
+  normalizeAutomationCommandTimeoutSeconds
+} from '../../shared/automation-command-run'
 import { buildAutomationRrule, isValidAutomationSchedule } from '../../shared/automation-schedules'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import type { CommandHandler } from '../dispatch'
@@ -44,7 +49,10 @@ import {
   resolveProjectCreateTarget
 } from '../worktree-project-target'
 
-type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
+/** `Omit` sobre una union colapsa las dos formas; distribuir las conserva. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+type AutomationCreateParams = DistributiveOmit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   repo?: string
   timezone?: string
   workspace?: string
@@ -114,6 +122,34 @@ function getProviderFlag(flags: Map<string, string | boolean>): TuiAgent {
     throw new RuntimeClientError('invalid_argument', `Unknown provider: ${provider}`)
   }
   return provider
+}
+
+/** `--command` convierte la fila en command-only: corre el comando y termina,
+ *  sin agente ni terminal. Mismo techo de tiempo que un precheck. */
+function getCommandFlag(
+  flags: Map<string, string | boolean>
+): AutomationShellCommand | null | undefined {
+  const timeoutSeconds = getOptionalPositiveIntegerFlag(flags, 'command-timeout')
+  if (!flags.has('command')) {
+    if (timeoutSeconds !== undefined) {
+      throw new RuntimeClientError('invalid_argument', '--command-timeout requires --command')
+    }
+    return undefined
+  }
+  const value = flags.get('command')
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new RuntimeClientError('invalid_argument', '--command requires a command')
+  }
+  if (timeoutSeconds !== undefined && timeoutSeconds > MAX_AUTOMATION_COMMAND_TIMEOUT_SECONDS) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--command-timeout must be at most ${MAX_AUTOMATION_COMMAND_TIMEOUT_SECONDS} seconds`
+    )
+  }
+  return {
+    command: value.trim(),
+    timeoutSeconds: normalizeAutomationCommandTimeoutSeconds(timeoutSeconds)
+  }
 }
 
 function getOptionalProviderFlag(flags: Map<string, string | boolean>): TuiAgent | undefined {
@@ -453,11 +489,19 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const sourceContext = getSourceContextFlag(flags)
     const workspaceMode =
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
+    const command = getCommandFlag(flags)
+    if (command && (flags.has('provider') || flags.has('prompt'))) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--command runs instead of an agent: pass --command or --provider/--prompt, not both'
+      )
+    }
     const result = await client.call<{ automation: Automation }>('automation.create', {
       name: getRequiredStringFlag(flags, 'name'),
-      prompt: getRequiredStringFlag(flags, 'prompt'),
+      ...(command
+        ? { command }
+        : { prompt: getRequiredStringFlag(flags, 'prompt'), agentId: getProviderFlag(flags) }),
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -484,6 +528,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
         prompt: getOptionalStringFlag(flags, 'prompt'),
         precheck: getPrecheckFlag(flags),
         agentId: getOptionalProviderFlag(flags),
+        command: getCommandFlag(flags),
         ...(target.runContext ? { runContext: target.runContext } : {}),
         ...(sourceContext !== undefined ? { sourceContext } : {}),
         repo: target.repo,

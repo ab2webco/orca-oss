@@ -9,7 +9,11 @@ import type {
 } from '../../shared/automation-plugin-origin'
 import type { Automation, AutomationUpdateInput } from '../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../shared/automation-run-identity'
-import type { PluginAutomationContribution } from '../../shared/plugins/plugin-automation-contribution'
+import { DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS } from '../../shared/automation-command-run'
+import {
+  isPluginCommandAutomation,
+  type PluginAutomationContribution
+} from '../../shared/plugins/plugin-automation-contribution'
 import type { TuiAgent } from '../../shared/tui-agent'
 
 /**
@@ -31,6 +35,7 @@ export const PLUGIN_MANAGED_AUTOMATION_FIELDS: readonly AutomationPluginManagedF
   'prompt',
   'precheck',
   'agentId',
+  'command',
   'rrule',
   'timezone',
   'runTarget'
@@ -45,7 +50,11 @@ export type PluginManagedAutomationFields = {
   prompt: string
   /** Solo el comando: el timeout es del usuario. `null` = el plugin no declara. */
   precheck: string | null
-  agentId: TuiAgent
+  /** `null` cuando la declaracion es command-only. */
+  agentId: TuiAgent | null
+  /** Solo el comando: el timeout lo elige Orca al crear y el usuario despues,
+   *  igual que con el precheck. `null` = la declaracion lanza un agente. */
+  command: string | null
   rrule: string
   timezone: string
   /** Repo donde corre, cuando la declaracion pide la carpeta del plugin.
@@ -71,7 +80,8 @@ export function pluginDeclaredAutomationFields(
             }
           : null
       )?.command ?? null,
-    agentId: contribution.provider,
+    agentId: isPluginCommandAutomation(contribution) ? null : contribution.provider,
+    command: isPluginCommandAutomation(contribution) ? contribution.command.trim() : null,
     rrule: contribution.trigger,
     timezone: contribution.timezone,
     runTarget
@@ -86,6 +96,7 @@ export function storedPluginAutomationFields(
     prompt: automation.prompt,
     precheck: automation.precheck?.command ?? null,
     agentId: automation.agentId,
+    command: automation.command?.command ?? null,
     rrule: automation.rrule,
     timezone: automation.timezone,
     // `''` es el "sin proyecto" con el que nacen: se lee como ningun destino.
@@ -101,6 +112,7 @@ export function fingerprintPluginAutomationFields(
     prompt: fingerprint(fields.prompt),
     precheck: fingerprint(fields.precheck),
     agentId: fingerprint(fields.agentId),
+    command: fingerprint(fields.command),
     rrule: fingerprint(fields.rrule),
     timezone: fingerprint(fields.timezone),
     runTarget: fingerprint(fields.runTarget)
@@ -198,6 +210,17 @@ function refreshUpdates(
             }
     },
     agentId: { agentId: declared.agentId },
+    command: {
+      command:
+        declared.command === null
+          ? null
+          : {
+              command: declared.command,
+              // El timeout es del usuario; el plugin no lo declara.
+              timeoutSeconds:
+                automation.command?.timeoutSeconds ?? DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS
+            }
+    },
     rrule: { rrule: declared.rrule },
     timezone: { timezone: declared.timezone },
     // `projectId` es el id de repo; `updateAutomation` recalcula `runContext`

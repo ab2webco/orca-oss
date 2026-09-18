@@ -87,6 +87,7 @@ import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
   normalizeProjectRuntimePreference
 } from '../shared/project-execution-runtime'
+import { normalizeAutomationCommand } from '../shared/automation-command-run'
 import { projectHostSetupProjectionFromRepos } from '../shared/project-host-setup-projection'
 import { carryProjectStateThroughIdentityChange } from '../shared/project-identity-succession'
 import { isPluginPanelTabKey } from '../shared/plugins/plugin-manifest'
@@ -5597,6 +5598,12 @@ export class Store {
   }
 
   createAutomation(input: AutomationCreateInput): Automation {
+    const command = normalizeAutomationCommand(input.command)
+    // Una fila que no lanza agente ni corre comando no significa nada. Los
+    // tipos ya lo impiden; esto atrapa una carga RPC/persistida deformada.
+    if (!command && !input.agentId) {
+      throw new Error('An automation needs either a command to run or an agent to launch.')
+    }
     const repo = this.state.repos.find((entry) => entry.id === input.projectId)
     const now = Date.now()
     const executionTargetType = repo?.connectionId ? 'ssh' : 'local'
@@ -5605,9 +5612,13 @@ export class Store {
     const automation: Automation = {
       id: randomUUID(),
       name: input.name.trim() || 'Untitled automation',
-      prompt: input.prompt,
+      prompt: input.prompt ?? '',
       precheck: normalizeAutomationPrecheck(input.precheck),
-      agentId: input.agentId,
+      // Un comando gana sobre el agente: la union de entrada no deja declarar
+      // los dos, y si una carga vieja trae ambos, correr el comando es lo
+      // barato y reversible.
+      agentId: command ? null : (input.agentId ?? null),
+      command,
       runContext: input.runContext ?? contexts.runContext,
       sourceContext: input.sourceContext ?? contexts.sourceContext,
       projectId: input.projectId,
@@ -5615,15 +5626,19 @@ export class Store {
       executionTargetId: executionTargetType === 'ssh' ? (repo?.connectionId ?? '') : 'local',
       schedulerOwner,
       workspaceMode: input.workspaceMode,
-      workspaceId: input.workspaceMode === 'existing' ? (input.workspaceId ?? null) : null,
+      // Una fila command-only no abre workspace: el comando corre en el
+      // directorio del proyecto, asi que no puede reclamar uno ni una sesion.
+      workspaceId:
+        !command && input.workspaceMode === 'existing' ? (input.workspaceId ?? null) : null,
       baseBranch: input.workspaceMode === 'new_per_run' ? (input.baseBranch ?? null) : null,
       setupDecision: normalizeAutomationSetupDecisionForWorkspaceMode(
         input.workspaceMode,
         input.setupDecision
       ),
-      reuseSession: input.workspaceMode === 'existing' ? (input.reuseSession ?? false) : false,
+      reuseSession:
+        !command && input.workspaceMode === 'existing' ? (input.reuseSession ?? false) : false,
       targetPaneKey:
-        input.workspaceMode === 'existing' && input.reuseSession === true
+        !command && input.workspaceMode === 'existing' && input.reuseSession === true
           ? (input.targetPaneKey ?? null)
           : null,
       timezone: input.timezone,
@@ -5649,6 +5664,17 @@ export class Store {
       throw new Error('Automation not found.')
     }
     const current = this.state.automations[index]
+    const nextCommand = Object.hasOwn(updates, 'command')
+      ? normalizeAutomationCommand(updates.command)
+      : (current.command ?? null)
+    const nextAgentId = nextCommand
+      ? null
+      : Object.hasOwn(updates, 'agentId')
+        ? (updates.agentId ?? current.agentId)
+        : current.agentId
+    if (!nextCommand && !nextAgentId) {
+      throw new Error('An automation needs either a command to run or an agent to launch.')
+    }
     const repoId = updates.projectId ?? current.projectId
     const repo = this.state.repos.find((entry) => entry.id === repoId)
     const executionTargetType = repo?.connectionId ? 'ssh' : 'local'
@@ -5659,13 +5685,15 @@ export class Store {
     const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
     const workspaceMode = updates.workspaceMode ?? current.workspaceMode
     const nextWorkspaceId =
-      workspaceMode === 'existing'
+      !nextCommand && workspaceMode === 'existing'
         ? Object.hasOwn(updates, 'workspaceId')
           ? (updates.workspaceId ?? null)
           : current.workspaceId
         : null
     const nextReuseSession =
-      workspaceMode === 'existing' ? (updates.reuseSession ?? current.reuseSession ?? false) : false
+      !nextCommand && workspaceMode === 'existing'
+        ? (updates.reuseSession ?? current.reuseSession ?? false)
+        : false
     const updated: Automation = {
       ...current,
       ...updates,
@@ -5674,6 +5702,8 @@ export class Store {
       precheck: Object.hasOwn(updates, 'precheck')
         ? normalizeAutomationPrecheck(updates.precheck)
         : normalizeAutomationPrecheck(current.precheck),
+      agentId: nextAgentId,
+      command: nextCommand,
       projectId: repoId,
       runContext: Object.hasOwn(updates, 'runContext')
         ? (updates.runContext ?? null)
@@ -5823,6 +5853,9 @@ export class Store {
       precheckResult: Object.hasOwn(result, 'precheckResult')
         ? normalizeAutomationPrecheckResult(result.precheckResult)
         : normalizeAutomationPrecheckResult(current.precheckResult),
+      commandResult: Object.hasOwn(result, 'commandResult')
+        ? normalizeAutomationPrecheckResult(result.commandResult)
+        : normalizeAutomationPrecheckResult(current.commandResult ?? null),
       usage: Object.hasOwn(result, 'usage') ? (result.usage ?? null) : (current.usage ?? null),
       error: result.error ?? null,
       startedAt: current.startedAt ?? now,

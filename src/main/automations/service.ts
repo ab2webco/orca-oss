@@ -11,14 +11,13 @@ import {
 import type { ClaudeUsageStore } from '../claude-usage/store'
 import type { CodexUsageStore } from '../codex-usage/store'
 import { runAutomationPrecheck } from './precheck-runner'
-import { resolveAutomationRunTarget, type AutomationRunTargetResult } from './run-target-resolution'
+import { resolveAutomationRunTarget } from './run-target-resolution'
 import { collectAutomationRunUsage } from './run-usage-collection'
 import type { HeadlessAutomationDispatcher } from './headless-dispatch'
 import { clearAutomationDispatchTokens, createAutomationDispatchToken } from './dispatch-tokens'
-import {
-  didAutomationPrecheckPass,
-  formatAutomationPrecheckFailure
-} from '../../shared/automation-precheck'
+import { getAutomationAction } from '../../shared/automation-action'
+import { dispatchCommandOnlyAutomationRun } from './command-run-dispatch'
+import { dispatchHeadlessAutomationRun } from './headless-run-dispatch'
 
 const DEFAULT_TICK_MS = 60 * 1000
 
@@ -222,10 +221,31 @@ export class AutomationService {
         error: target.error
       })
     }
+    const action = getAutomationAction(automation)
+    if (action.kind === 'command') {
+      // Ni ventana, ni terminal, ni cuenta de agente, ni modelo: el sentido de
+      // esta forma es que sea barata. Se resuelve entera en el main.
+      return await dispatchCommandOnlyAutomationRun({
+        store: this.store,
+        automation,
+        run,
+        target,
+        command: action.command,
+        runPrecheck: () => this.runPrecheck(automation.id, run.id)
+      })
+    }
     const webContents = this.webContents
     if (!webContents || webContents.isDestroyed() || !this.rendererReady) {
       if (this.headlessDispatcher) {
-        return await this.requestHeadlessDispatch(automation, run, target)
+        return await dispatchHeadlessAutomationRun({
+          store: this.store,
+          dispatcher: this.headlessDispatcher,
+          automation,
+          run,
+          target,
+          runPrecheck: () => this.runPrecheck(automation.id, run.id),
+          markDispatchResult: (result) => this.markDispatchResult(result)
+        })
       }
       return this.store.updateAutomationRun({
         runId: run.id,
@@ -247,70 +267,5 @@ export class AutomationService {
     }
     webContents.send('automations:dispatchRequested', payload)
     return updated
-  }
-
-  private async requestHeadlessDispatch(
-    automation: Automation,
-    run: AutomationRun,
-    target: Extract<AutomationRunTargetResult, { ok: true }>
-  ): Promise<AutomationRun> {
-    const precheckResult =
-      run.trigger === 'scheduled' && automation.precheck
-        ? await this.runPrecheck(automation.id, run.id)
-        : null
-    if (precheckResult && !didAutomationPrecheckPass(precheckResult)) {
-      return this.store.updateAutomationRun({
-        runId: run.id,
-        status: 'skipped_precheck',
-        workspaceId: automation.workspaceId,
-        precheckResult,
-        error: formatAutomationPrecheckFailure(precheckResult)
-      })
-    }
-    try {
-      const launch = await this.headlessDispatcher!({ automation, run, target })
-      const launchRunTarget = {
-        workspaceId: launch.workspaceId,
-        workspaceDisplayName: launch.workspaceDisplayName ?? null,
-        terminalSessionId: launch.terminalSessionId,
-        terminalPaneKey: launch.terminalPaneKey ?? null,
-        terminalPtyId: launch.terminalPtyId ?? null
-      }
-      const updated = this.store.updateAutomationRun({
-        runId: run.id,
-        status: 'dispatched',
-        ...launchRunTarget,
-        error: null
-      })
-      if (launch.completion) {
-        void launch.completion
-          .then((completion) =>
-            this.markDispatchResult({
-              runId: run.id,
-              status: completion.status,
-              ...launchRunTarget,
-              precheckResult,
-              outputSnapshot: completion.outputSnapshot ?? null,
-              error: completion.error ?? null
-            })
-          )
-          .catch((error) =>
-            this.markDispatchResult({
-              runId: run.id,
-              status: 'dispatch_failed',
-              ...launchRunTarget,
-              error: error instanceof Error ? error.message : String(error)
-            })
-          )
-      }
-      return updated
-    } catch (error) {
-      return this.store.updateAutomationRun({
-        runId: run.id,
-        status: 'dispatch_failed',
-        workspaceId: automation.workspaceId,
-        error: error instanceof Error ? error.message : String(error)
-      })
-    }
   }
 }

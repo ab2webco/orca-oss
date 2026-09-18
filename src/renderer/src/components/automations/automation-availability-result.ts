@@ -41,18 +41,17 @@ export function unavailable(
  * Las de SSH y runtime quedan fuera a proposito: son conectividad, y decir
  * "no va a correr" de un host que esta reconectando seria mentir al reves.
  */
+const MISCONFIGURED_REASONS: ReadonlySet<AutomationTargetAvailability['reason']> = new Set([
+  'missing-project',
+  'missing-project-host-setup',
+  'project-host-setup-not-ready',
+  'missing-workspace',
+  'host-mismatch',
+  'unsupported-host'
+])
+
 export function isAutomationTargetMisconfigured(
   availability: AutomationTargetAvailability
 ): boolean {
-  switch (availability.reason) {
-    case 'missing-project':
-    case 'missing-project-host-setup':
-    case 'project-host-setup-not-ready':
-    case 'missing-workspace':
-    case 'host-mismatch':
-    case 'unsupported-host':
-      return true
-    default:
-      return false
-  }
+  return MISCONFIGURED_REASONS.has(availability.reason)
 }

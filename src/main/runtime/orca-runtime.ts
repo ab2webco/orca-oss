@@ -1399,7 +1399,11 @@ type RuntimeStore = {
   ) => unknown
 }
 
-export type RuntimeAutomationCreateInput = Omit<
+/** `Omit` sobre una union colapsa las dos formas en sus claves comunes y se
+ *  pierde la garantia de "agente o comando". Distribuir la conserva. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+export type RuntimeAutomationCreateInput = DistributiveOmit<
   AutomationCreateInput,
   'projectId' | 'workspaceId' | 'workspaceMode' | 'timezone'
 > & {
@@ -4052,11 +4056,9 @@ export class OrcaRuntimeService {
     if (input.reuseSession && target.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
     }
-    return this.store.createAutomation({
+    const base = {
       name: input.name,
-      prompt: input.prompt,
       precheck: input.precheck,
-      agentId: input.agentId,
       runContext: input.runContext,
       sourceContext: input.sourceContext,
       projectId: target.projectId,
@@ -4071,6 +4073,17 @@ export class OrcaRuntimeService {
       dtstart: input.dtstart,
       enabled: input.enabled,
       missedRunGraceMinutes: input.missedRunGraceMinutes
+    }
+    if (input.command) {
+      return this.store.createAutomation({ ...base, command: input.command })
+    }
+    if (!input.agentId) {
+      throw new Error('An automation needs either a command to run or an agent to launch.')
+    }
+    return this.store.createAutomation({
+      ...base,
+      agentId: input.agentId,
+      prompt: input.prompt ?? ''
     })
   }
 
@@ -4091,6 +4104,9 @@ export class OrcaRuntimeService {
     }
     if (hasRuntimeAutomationUpdateValue(updates, 'agentId')) {
       patch.agentId = updates.agentId
+    }
+    if (hasRuntimeAutomationUpdateValue(updates, 'command')) {
+      patch.command = updates.command
     }
     if (hasRuntimeAutomationUpdateValue(updates, 'runContext')) {
       patch.runContext = updates.runContext

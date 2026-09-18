@@ -17,7 +17,10 @@ import { i18n } from '@/i18n/i18n'
 
 const BASE_DRAFT: AutomationDraft = {
   name: '',
+  actionKind: 'agent',
   prompt: '',
+  command: '',
+  commandTimeoutSeconds: '300',
   agentId: 'codex',
   projectId: '',
   workspaceMode: 'existing',

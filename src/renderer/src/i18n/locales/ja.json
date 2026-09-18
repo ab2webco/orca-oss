@@ -14142,7 +14142,9 @@
           "51a470b966": "ssh",
           "b09b2384fd": "一時停止中",
           "eaa02014f8": "有効",
-          "29baf8f4c2": "ソース"
+          "29baf8f4c2": "ソース",
+          "commandAction": "コマンド",
+          "runsLabel": "実行内容"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "キャンセル",
@@ -14333,7 +14335,9 @@
           "tableStatus": "ステータス",
           "tableActions": "操作",
           "newAutomation": "新しい自動化",
-          "rowActions": "自動化の操作"
+          "rowActions": "自動化の操作",
+          "enterCommand": "保存する前にコマンドを入力してください。",
+          "runsInProjectDirectory": "プロジェクトのディレクトリ内"
         },
         "CreateFromPicker": {
           "f061f49e3f": "リポジトリブランチを検索…",
@@ -14458,7 +14462,20 @@
           "clear": "検索をクリア"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "自動化の操作"
+          "c92c9463c6": "自動化の操作",
+          "noProjectChosen": "プロジェクト未選択",
+          "commandAction": "コマンド"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "エージェントを起動",
+          "runCommand": "コマンドを実行",
+          "commandLabel": "コマンド",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "エージェント・ターミナル・モデルなしで、対象プロジェクトのディレクトリで実行します。終了コード 0 は成功、それ以外は失敗した実行として記録されます。",
+          "commandTimeout": "タイムアウト（秒）"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "実行されません"
         }
       },
       "agent": {

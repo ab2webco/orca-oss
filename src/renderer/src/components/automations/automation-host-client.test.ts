@@ -90,7 +90,7 @@ describe('automation host client', () => {
       name: automation.name,
       prompt: automation.prompt,
       precheck: null,
-      agentId: automation.agentId,
+      agentId: automation.agentId ?? 'claude',
       runContext: automation.runContext,
       projectId: automation.projectId,
       workspaceMode: automation.workspaceMode,

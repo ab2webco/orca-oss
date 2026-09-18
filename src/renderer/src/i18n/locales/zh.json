@@ -14162,7 +14162,9 @@
           "51a470b966": "SSH",
           "b09b2384fd": "已暂停",
           "eaa02014f8": "启用",
-          "29baf8f4c2": "来源"
+          "29baf8f4c2": "来源",
+          "commandAction": "命令",
+          "runsLabel": "运行内容"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "取消",
@@ -14353,7 +14355,9 @@
           "tableStatus": "状态",
           "tableActions": "操作",
           "newAutomation": "新建自动化",
-          "rowActions": "自动化操作"
+          "rowActions": "自动化操作",
+          "enterCommand": "保存前请输入命令。",
+          "runsInProjectDirectory": "在项目目录中"
         },
         "CreateFromPicker": {
           "f061f49e3f": "搜索仓库分支...",
@@ -14478,7 +14482,20 @@
           "clear": "清除搜索"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "自动化操作"
+          "c92c9463c6": "自动化操作",
+          "noProjectChosen": "尚未选择项目",
+          "commandAction": "命令"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "启动代理",
+          "runCommand": "运行命令",
+          "commandLabel": "命令",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "在目标项目目录中运行，不需要代理、终端或模型。退出码 0 表示成功，其他值会记录为失败的运行。",
+          "commandTimeout": "超时（秒）"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "不会运行"
         }
       },
       "agent": {

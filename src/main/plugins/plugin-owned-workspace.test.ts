@@ -107,6 +107,34 @@ describe('plugin-owned automation workspace', () => {
     })
   })
 
+  it('creates a command-only declaration with no agent and no prompt', async () => {
+    const pluginService = pluginServiceWith(
+      manifestWith([
+        {
+          id: 'sync',
+          title: 'WhatsApp: sync',
+          trigger: '*/5 * * * *',
+          timezone: 'America/Bogota',
+          command: 'wa-inbox sync --quiet',
+          workspace: 'plugin-owned'
+        }
+      ]),
+      rootDir
+    )
+
+    await reconcilePluginAutomations({ store, pluginService })
+
+    const [automation] = store.listAutomations()
+    expect(automation.agentId).toBeNull()
+    expect(automation.command?.command).toBe('wa-inbox sync --quiet')
+    expect(automation.prompt).toBe('')
+    expect(automation.enabled).toBe(false)
+    expect(resolveAutomationRunTarget(store, automation)).toMatchObject({
+      ok: true,
+      cwd: getPluginWorkspaceDir(testState.dir, pluginKey)
+    })
+  })
+
   it('leaves a declaration that does not opt in exactly as before', async () => {
     const pluginService = pluginServiceWith(manifestWith([sync]), rootDir)
 

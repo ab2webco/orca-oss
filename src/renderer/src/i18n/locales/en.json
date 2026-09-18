@@ -14953,7 +14953,9 @@
           "51a470b966": "ssh",
           "b09b2384fd": "Paused",
           "eaa02014f8": "Enabled",
-          "29baf8f4c2": "Source"
+          "29baf8f4c2": "Source",
+          "commandAction": "Command",
+          "runsLabel": "Runs"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "Cancel",
@@ -15146,7 +15148,9 @@
           "newAutomation": "New Automation",
           "rowActions": "Automation actions",
           "tableLastRun": "Last run",
-          "noListMatches": "No automations match."
+          "noListMatches": "No automations match.",
+          "enterCommand": "Enter a command before saving.",
+          "runsInProjectDirectory": "In the project directory"
         },
         "AutomationsPageSkeleton": {
           "55527b7bcf": "Loading automations"
@@ -15279,7 +15283,9 @@
           "clear": "Clear search"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "Automation actions"
+          "c92c9463c6": "Automation actions",
+          "noProjectChosen": "No project chosen yet",
+          "commandAction": "Command"
         },
         "AutomationListFilterMenu": {
           "removeFilter": "Remove {{value0}} filter",
@@ -15293,6 +15299,17 @@
         "AutomationListSortHeader": {
           "sortedAscending": "{{value0}}, sorted ascending",
           "sortedDescending": "{{value0}}, sorted descending"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "Launch an agent",
+          "runCommand": "Run a command",
+          "commandLabel": "Command",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "Runs in the target project directory with no agent, terminal or model. Exit code 0 is a success; anything else is recorded as a failed run.",
+          "commandTimeout": "Timeout (seconds)"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "Will not run"
         }
       },
       "agent": {
