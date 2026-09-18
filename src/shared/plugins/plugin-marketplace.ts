@@ -6,20 +6,24 @@ export const PLUGIN_MARKETPLACE_FILENAME = 'orca-marketplace.json'
 export const PLUGIN_MARKETPLACE_ENTRY_LIMIT = 2_048
 export const PLUGIN_MARKETPLACE_CATEGORY_LIMIT = 16
 
-// Why these stay `stablyai` in this fork (ORCA-192 tier 2, reviewed and kept):
-// they are not a link to upstream, they are a namespace guard. They stop a
-// random repo publishing `stablyai.orca-git` and having it read as official
-// inside our build, and they gate the three bundled plugins we ship — which
-// carry `stablyai.orca-*` identities and would fail their own install trust
-// check the moment this name changed. The fork publishes nothing in its own
-// namespace and still installs from `stablyai/orca-plugins`, so repointing
-// these would loosen a supply-chain check and buy nothing. If the fork ever
-// ships plugins of its own, the change is to *add* a trusted publisher here,
-// never to replace this one.
-export const OFFICIAL_PLUGIN_PUBLISHER = 'stablyai'
+// Ab2Web is the official namespace of this build: only `ab2web.orca-*` plugins
+// served from the `ab2webco` GitHub organization earn the "Oficial" badge. This
+// is a namespace guard, not a link to a vendor — it stops a random repo
+// publishing `ab2web.orca-git` and having it read as official here. The
+// `orca-` prefix stays *reserved* on its own (see `isReservedPluginIdentity`),
+// so foreign `*.orca-*` identities still cannot be installed from a local path
+// or from outside the official organization.
+export const OFFICIAL_PLUGIN_PUBLISHER = 'ab2web'
 export const OFFICIAL_PLUGIN_ID_PREFIX = 'orca-'
-export const OFFICIAL_MARKETPLACE_OWNER = 'stablyai'
-export const OFFICIAL_MARKETPLACE_REPOSITORY = 'orca-plugins'
+// Why this is its own constant: upstream's publisher string and GitHub org were
+// the same word by coincidence, so `isOfficialOrganizationGitSource` compared
+// repo owners against the *publisher*. Ours differ — publisher `ab2web`, org
+// `ab2webco` — and collapsing them again fails every official listing's
+// provenance check. It equalling OFFICIAL_MARKETPLACE_OWNER is also
+// coincidence: one is a GitHub org, the other a marketplace-index field.
+export const OFFICIAL_PLUGIN_ORG = 'ab2webco'
+export const OFFICIAL_MARKETPLACE_OWNER = 'ab2webco'
+export const OFFICIAL_MARKETPLACE_REPOSITORY = 'orcalab-plugins'
 
 // Why: theme/icon/skill contributions were deferred, so `contributes` now
 // rejects them and any plugin declaring one fails to install wholesale. The
@@ -126,7 +130,7 @@ export type PluginMarketplaceTrustMetadata = z.infer<typeof pluginMarketplaceTru
 
 export const OFFICIAL_MARKETPLACE_GIT_SOURCE: PluginMarketplaceGitSource = {
   kind: 'git',
-  url: 'https://github.com/stablyai/orca-plugins.git',
+  url: 'https://github.com/ab2webco/orcalab-plugins.git',
   ref: 'main'
 }
 
@@ -204,7 +208,8 @@ function repositoryIdentity(host: string, repositoryPath: string): GitRepository
 
 export function isOfficialOrganizationGitSource(url: string): boolean {
   const source = parseGitRepositoryIdentity(url)
-  return source?.host === 'github.com' && source.owner.toLowerCase() === OFFICIAL_PLUGIN_PUBLISHER
+  // Compares the GitHub org, never the publisher string — different words here.
+  return source?.host === 'github.com' && source.owner.toLowerCase() === OFFICIAL_PLUGIN_ORG
 }
 
 export function isOfficialMarketplaceGitSource(url: string): boolean {

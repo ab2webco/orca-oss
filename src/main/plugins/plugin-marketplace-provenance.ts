@@ -1,5 +1,6 @@
 import {
   OFFICIAL_MARKETPLACE_OWNER,
+  OFFICIAL_PLUGIN_ORG,
   isOfficialMarketplaceGitSource,
   isOfficialOrganizationGitSource,
   isReservedPluginIdentity
@@ -20,7 +21,7 @@ export function validateMarketplaceProvenance(
   for (const entry of fetched.marketplace.plugins) {
     if (isReservedPluginIdentity(entry.id) && !isOfficialOrganizationGitSource(entry.source.url)) {
       throw new Error(
-        `reserved plugin identity ${entry.id} must resolve to the stablyai organization`
+        `reserved plugin identity ${entry.id} must resolve to the ${OFFICIAL_PLUGIN_ORG} organization`
       )
     }
   }

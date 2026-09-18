@@ -5,7 +5,7 @@
  */
 
 import { execFile } from 'node:child_process'
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -71,6 +71,14 @@ async function copyLaunchPlugin(
   await cp(join(process.cwd(), 'resources', 'plugins', 'launch', launchDirectory), repository, {
     recursive: true
   })
+  // The shipped packs are published by upstream. Republish them under the
+  // official publisher so this fixture exercises the official install path.
+  const manifestPath = join(repository, 'orca-plugin.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { publisher: string }
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify({ ...manifest, publisher: 'ab2web' }, null, 2)}\n`
+  )
   await commitRepository(repository, gitEnvironment)
 }
 
@@ -85,7 +93,7 @@ async function configureFixtureGit(home: string, repositories: string): Promise<
   }
   const repositoryBaseUrl = pathToFileURL(`${repositories}${sep}`).href
   const entries = [
-    [`url.${repositoryBaseUrl}.insteadOf`, 'https://github.com/stablyai/'],
+    [`url.${repositoryBaseUrl}.insteadOf`, 'https://github.com/ab2webco/'],
     ['protocol.file.allow', 'always'],
     ['commit.gpgSign', 'false'],
     ['tag.gpgSign', 'false'],
@@ -123,23 +131,23 @@ async function createMarketplaceFixture(): Promise<MarketplaceFixture> {
     gitEnvironment
   )
 
-  const marketplaceRepository = join(repositories, 'orca-plugins.git')
+  const marketplaceRepository = join(repositories, 'orcalab-plugins.git')
   await mkdir(marketplaceRepository, { recursive: true })
   await writeFile(
     join(marketplaceRepository, 'orca-marketplace.json'),
     `${JSON.stringify(
       {
         name: 'Orca Plugins',
-        owner: 'stablyai',
+        owner: 'ab2webco',
         plugins: [
-          ['stablyai.orca-portuguese', 'orca-portuguese', 'languages'],
-          ['stablyai.orca-multipass-recipes', 'orca-multipass-recipes', 'vm-recipes'],
-          ['stablyai.orca-navigation-shortcuts', 'orca-navigation-shortcuts', 'keybindings']
+          ['ab2web.orca-portuguese', 'orca-portuguese', 'languages'],
+          ['ab2web.orca-multipass-recipes', 'orca-multipass-recipes', 'vm-recipes'],
+          ['ab2web.orca-navigation-shortcuts', 'orca-navigation-shortcuts', 'keybindings']
         ].map(([id, repository, category]) => ({
           id,
           source: {
             kind: 'git',
-            url: `https://github.com/stablyai/${repository}.git`,
+            url: `https://github.com/ab2webco/${repository}.git`,
             ref: 'v1.0.0'
           },
           categories: [category]
@@ -180,7 +188,7 @@ async function installMarketplacePluginThroughUi(
   await expect(listing).toBeVisible()
   await listing.getByRole('button', { name: 'Install' }).click()
   const preview = page.getByRole('dialog', { name: pluginName })
-  await expect(preview).toContainText('Official · stablyai')
+  await expect(preview).toContainText('Official · ab2web')
   await preview.getByRole('button', { name: 'Install plugin' }).click()
   const consent = page.getByRole('dialog', { name: consentDialogName })
   await expect(consent).toBeVisible()
@@ -188,23 +196,8 @@ async function installMarketplacePluginThroughUi(
   await expect(consent).toBeHidden()
 }
 
-async function enableInstalledPluginThroughUi(
-  page: Page,
-  pluginKey: string,
-  consentDialogName: string
-): Promise<void> {
-  await page.getByRole('tab', { name: /^Installed/ }).click()
-  const plugin = page.locator(`[data-plugin-key="${pluginKey}"]`)
-  await expect(plugin).toBeVisible()
-  await plugin.getByRole('button', { name: 'Review & enable' }).click()
-  const consent = page.getByRole('dialog', { name: consentDialogName })
-  await expect(consent).toBeVisible()
-  await consent.getByRole('button', { name: 'Enable plugin' }).click()
-  await expect(consent).toBeHidden()
-}
-
 async function applyInstalledLanguage(page: Page): Promise<void> {
-  const languageId = 'plugin:stablyai.orca-portuguese/pt-BR'
+  const languageId = 'plugin:ab2web.orca-portuguese/pt-BR'
   await page.evaluate(() => {
     const state = window.__store?.getState()
     if (!state) {
@@ -215,7 +208,7 @@ async function applyInstalledLanguage(page: Page): Promise<void> {
   await expect(page.locator('[data-settings-section="appearance"]')).toBeVisible()
   await page.evaluate(() => window.__store?.setState({ settingsSearchQuery: 'Language' }))
   await page.getByRole('combobox', { name: 'Language' }).click()
-  await page.getByRole('option', { name: 'pt-BR — stablyai.orca-portuguese', exact: true }).click()
+  await page.getByRole('option', { name: 'pt-BR — ab2web.orca-portuguese', exact: true }).click()
   await expect
     .poll(() => page.evaluate(() => window.__store?.getState().settings?.uiLanguage))
     .toBe(languageId)
@@ -239,10 +232,10 @@ async function runMarketplaceJourney(page: Page): Promise<void> {
     .toMatchObject({
       sources: [expect.objectContaining({ official: true, stale: false })],
       listings: expect.arrayContaining([
-        expect.objectContaining({ pluginKey: 'stablyai.orca-portuguese', official: true }),
-        expect.objectContaining({ pluginKey: 'stablyai.orca-multipass-recipes', official: true }),
+        expect.objectContaining({ pluginKey: 'ab2web.orca-portuguese', official: true }),
+        expect.objectContaining({ pluginKey: 'ab2web.orca-multipass-recipes', official: true }),
         expect.objectContaining({
-          pluginKey: 'stablyai.orca-navigation-shortcuts',
+          pluginKey: 'ab2web.orca-navigation-shortcuts',
           official: true
         })
       ])
@@ -250,19 +243,20 @@ async function runMarketplaceJourney(page: Page): Promise<void> {
 
   await installMarketplacePluginThroughUi(
     page,
-    'stablyai.orca-portuguese',
+    'ab2web.orca-portuguese',
     'Português do Brasil',
     'Review plugin'
   )
   await installMarketplacePluginThroughUi(
     page,
-    'stablyai.orca-multipass-recipes',
+    'ab2web.orca-multipass-recipes',
     'Multipass VM Recipes',
     'Review plugin content'
   )
-  await enableInstalledPluginThroughUi(
+  await installMarketplacePluginThroughUi(
     page,
-    'stablyai.orca-navigation-shortcuts',
+    'ab2web.orca-navigation-shortcuts',
+    'Orca Navigation Shortcuts',
     'Review plugin content'
   )
 

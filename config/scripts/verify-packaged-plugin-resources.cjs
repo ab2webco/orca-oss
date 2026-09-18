@@ -74,8 +74,10 @@ function verifyPackagedPluginResources(resourcesDir) {
   }
   const index = readJsonFile(join(launchRoot, 'bundled-plugins.json'), 'bundled plugin index')
   readJsonFile(join(launchRoot, 'orca-marketplace.json'), 'marketplace index')
-  if (index?.version !== 1 || !Array.isArray(index.plugins) || index.plugins.length === 0) {
-    throw new Error('[verify-packaged-plugin-resources] bundled plugin index is empty or invalid')
+  // An empty list is valid: it means this build auto-installs nothing while the
+  // launch packs still ship. Every entry that *is* listed is still hashed below.
+  if (index?.version !== 1 || !Array.isArray(index.plugins)) {
+    throw new Error('[verify-packaged-plugin-resources] bundled plugin index is invalid')
   }
   const resolvedRoot = resolve(launchRoot)
   for (const entry of index.plugins) {

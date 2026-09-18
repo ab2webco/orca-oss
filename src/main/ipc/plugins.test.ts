@@ -113,15 +113,15 @@ describe('plugin removal authority', () => {
 
   it('refuses bundled installs because startup would restore them', () => {
     const service = {
-      getDiscovered: () => [{ pluginKey: 'stablyai.orca-theme', isDev: false }]
+      getDiscovered: () => [{ pluginKey: 'ab2web.orca-theme', isDev: false }]
     } as unknown as PluginService
     const lock = {
       version: 1,
       plugins: {
-        'stablyai.orca-theme': {
-          pluginKey: 'stablyai.orca-theme',
+        'ab2web.orca-theme': {
+          pluginKey: 'ab2web.orca-theme',
           version: '1.0.0',
-          source: { kind: 'bundled', bundleId: 'stablyai.orca-theme' },
+          source: { kind: 'bundled', bundleId: 'ab2web.orca-theme' },
           resolvedCommit: null,
           contentHash: 'a'.repeat(64),
           consentFingerprint: 'reviewed',
@@ -130,7 +130,7 @@ describe('plugin removal authority', () => {
       }
     } satisfies PluginLockfile
 
-    expect(canRemoveInstalledPlugin(service, 'stablyai.orca-theme', lock)).toBe(false)
+    expect(canRemoveInstalledPlugin(service, 'ab2web.orca-theme', lock)).toBe(false)
   })
 })
 

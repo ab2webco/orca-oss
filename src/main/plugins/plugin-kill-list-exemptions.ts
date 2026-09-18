@@ -1,10 +1,10 @@
 import { killedPluginKeys, type PluginKillList } from '../../shared/plugins/plugin-kill-list'
 
-// Why this exists: the plugin safety list is published by upstream, for a
-// marketplace (stablyai/orca-plugins) this fork consumes but does not curate.
-// We cannot host that data — only upstream sees the advisories that fill it —
-// so the fetch stays. What the fork was missing is the other half: upstream
-// could revoke a plugin inside a Lab build and nothing here could disagree.
+// Why this exists: the plugin safety list is still published by upstream even
+// though the official marketplace is now ours (ab2webco/orcalab-plugins). We
+// cannot host that data — only upstream sees the advisories that fill it — so
+// the fetch stays. What the fork was missing is the other half: upstream could
+// revoke a plugin inside a Lab build and nothing here could disagree.
 //
 // A key listed below is ignored wherever it appears in the fetched or cached
 // list, so the plugin keeps running in this build. It is deliberately a
